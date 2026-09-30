@@ -24,7 +24,7 @@ const retiredSiteVariables = ['NEXT_PUBLIC_SITE_ID', 'SITE_ID'] as const
 /**
  * Validates that the top level of the Wrangler config is the dedicated local
  * best.serp.co Worker: local identity, local D1 binding, `d1/drizzle` history,
- * and the OpenNext build output of `apps/web`.
+ * the `apps/web` Worker entry (which wraps the OpenNext build), and its assets.
  */
 export function validateCanonicalLocalConfig(
   configPath: string = project.wranglerConfigPath
@@ -46,7 +46,7 @@ export function validateCanonicalLocalConfig(
   const expectedAppRoot = resolve(project.appDirectory, '.open-next')
   if (
     !config.main ||
-    resolve(dirname(absoluteConfigPath), config.main) !== resolve(expectedAppRoot, 'worker.js') ||
+    resolve(dirname(absoluteConfigPath), config.main) !== resolve(project.workerEntryPath) ||
     config.assets?.binding !== 'ASSETS' ||
     !config.assets.directory ||
     resolve(dirname(absoluteConfigPath), config.assets.directory) !==

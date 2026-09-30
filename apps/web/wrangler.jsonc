@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "best-serp-co-local",
-  "main": ".open-next/worker.js",
+  "main": "worker.ts",
   "compatibility_date": "2026-07-13",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -11,6 +11,9 @@
   "vars": {
     "AUTH_TRUST_HOST": "true",
     "D1_RUNTIME_ENV": "local"
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
   },
   "d1_databases": [
     {
@@ -31,6 +34,9 @@
         "AUTH_TRUST_HOST": "true",
         "D1_RUNTIME_ENV": "staging"
       },
+      "version_metadata": {
+        "binding": "CF_VERSION_METADATA"
+      },
       "d1_databases": [
         {
           "binding": "DB",
@@ -49,6 +55,9 @@
       "vars": {
         "AUTH_TRUST_HOST": "true",
         "D1_RUNTIME_ENV": "production"
+      },
+      "version_metadata": {
+        "binding": "CF_VERSION_METADATA"
       },
       "d1_databases": [
         {
