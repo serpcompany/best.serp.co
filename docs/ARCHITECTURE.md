@@ -68,8 +68,9 @@ untrusted request / environment / migration source
            -> local D1 or protected remote workflow
 ```
 
-Client code never imports the catalog repository. Local tools cannot select staging
-or production resources, and a passing local harness does not authorize a remote
+Client code never imports the catalog repository. Local tools cannot change staging or
+production resources: `scripts/cloudflare-release.ts` allows only its read-only checks
+outside the protected workflows, and a passing local harness does not authorize a remote
 operation.
 
 Conditional badge verification, rejection, and approval plans place a `changes()`

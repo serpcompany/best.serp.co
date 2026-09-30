@@ -1,0 +1,119 @@
+name: Deploy Production
+
+# Manual production release from main with a typed confirmation. database-and-worker exports a
+# D1 backup (kept 30 days) and applies migrations before the Worker deploy; worker-only refuses
+# to deploy onto a database with pending migrations. See docs/DEPLOY_RUNBOOK.md.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type deploy-best.serp.co-production to deploy production'
+        required: true
+        type: string
+      release_mode:
+        description: 'worker-only, or back up and migrate production D1 before the Worker deploy'
+        required: true
+        default: worker-only
+        type: choice
+        options:
+          - worker-only
+          - database-and-worker
+
+permissions:
+  contents: read
+
+concurrency:
+  group: best-serp-co-production
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Check ref and confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main and the typed confirmation
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Production deploys run only from main, not $GITHUB_REF."
+            exit 1
+          fi
+          if [ "$CONFIRMATION" != "deploy-best.serp.co-production" ]; then
+            echo "::error::Type deploy-best.serp.co-production to deploy production."
+            exit 1
+          fi
+
+  release:
+    name: Validate, back up, migrate & deploy production
+    needs: [authorize]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: production
+      url: https://best.serp.co
+    steps:
+      - name: Require Cloudflare credentials
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::The production environment needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/DEPLOY_RUNBOOK.md)."
+            exit 1
+          fi
+
+      - name: Checkout reviewed source
+        uses: actions/checkout@v7
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Validate with the fast harness
+        run: pnpm harness:fast
+
+      - name: Build OpenNext Worker
+        run: pnpm worker:build
+
+      - name: Back up production D1
+        if: inputs.release_mode == 'database-and-worker'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RELEASE_CONFIRM: ${{ inputs.confirmation }}
+        run: pnpm tsx scripts/cloudflare-release.ts backup production --output "$RUNNER_TEMP/d1-backup/best-serp-co-production-$GITHUB_SHA-$GITHUB_RUN_ID.sql"
+
+      - name: Retain production D1 backup
+        if: inputs.release_mode == 'database-and-worker'
+        uses: actions/upload-artifact@v7
+        with:
+          name: best-serp-co-production-d1-pre-deploy-${{ github.run_id }}
+          path: ${{ runner.temp }}/d1-backup/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Apply production D1 migrations
+        if: inputs.release_mode == 'database-and-worker'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RELEASE_CONFIRM: ${{ inputs.confirmation }}
+        run: pnpm tsx scripts/cloudflare-release.ts migrate production
+
+      - name: Deploy production Worker
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RELEASE_CONFIRM: ${{ inputs.confirmation }}
+        run: pnpm tsx scripts/cloudflare-release.ts deploy production
+
+      - name: Run production HTTP gates
+        run: |
+          server="$(curl -sSI https://best.serp.co | tr -d '\r' | awk -F': ' 'tolower($1) == "server" { print $2 }')"
+          if [ "$server" = "GitHub.com" ]; then
+            message="Production HTTP gates skipped: best.serp.co is still served by GitHub Pages. Attach the Worker Custom Domain, then rerun (docs/DEPLOY_RUNBOOK.md)."
+            echo "::notice title=HTTP gates skipped::$message"
+            echo "$message" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          pnpm tsx scripts/d1-preview-http-gates.ts production https://best.serp.co

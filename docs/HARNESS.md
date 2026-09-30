@@ -67,7 +67,9 @@ on the exact resulting `main` revision. It supplies the before/after push revisi
 to the changed-file policy and has read-only repository permission. It does not
 deploy, use a protected environment, or access a remote D1 database. This post-merge
 result proves the integrated revision independently; it does not replace the required
-pre-merge checks.
+pre-merge checks. Deployment is separate: `deploy-staging.yml` runs the fast loop and
+deploys the same push to staging, and production releases are manual protected workflows
+(see the [deploy runbook](./DEPLOY_RUNBOOK.md#workflows)).
 
 ## Documentation health
 
