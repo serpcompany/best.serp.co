@@ -4,24 +4,19 @@ Install dependencies with Node 24 (`.nvmrc`) and `pnpm install`.
 
 ## Local catalog
 
-Local D1 is seeded from the one-time import artifacts, which are generated (not
-committed) from a checkout of `serpcompany/json-directory-template` at `25e2a8d`:
-
-```bash
-git clone https://github.com/serpcompany/json-directory-template ../json-directory
-git -C ../json-directory checkout 25e2a8d
-pnpm migration:generate -- --source-root ../json-directory --site-id serp.co
-```
-
-The generator is deterministic and must reproduce the committed
-`d1/artifacts/best-serp-co-v1-parity.yaml` target checksum. Then prepare the local
-database:
+Local D1 is seeded from the committed import (`d1/artifacts/best-serp-co-v1.sql.br`,
+checked against the parity report):
 
 ```bash
 pnpm d1:local:migrate
 pnpm d1:local:import
 pnpm d1:local:verify
 ```
+
+To rebuild the artifacts from the source, check out `serpcompany/json-directory-template`
+at `25e2a8d` and run
+`pnpm migration:generate -- --source-root ../json-directory --site-id serp.co`; it must
+reproduce the committed parity report exactly.
 
 State lives under `.wrangler/drizzle-state/best-serp-co/` and uses the synthetic
 local database in `apps/web/wrangler.jsonc`. Repeating `migrate` or `import` after a

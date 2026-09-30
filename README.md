@@ -15,12 +15,10 @@ the source of truth.
 
 ## Local development
 
-Use Node 24 and pnpm. The import artifacts are generated from a local checkout of
-`serpcompany/json-directory-template` at the pinned commit:
+Use Node 24 and pnpm. Local D1 is seeded from the committed initial import:
 
 ```bash
 pnpm install
-pnpm migration:generate -- --source-root ../json-directory --site-id serp.co
 pnpm d1:local:migrate
 pnpm d1:local:import
 pnpm d1:local:verify

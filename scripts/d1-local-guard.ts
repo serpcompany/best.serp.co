@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
+import { brotliDecompressSync } from 'node:zlib'
 import { parse } from 'yaml'
 import { captureApplicationSnapshot, type SnapshotTransport } from './d1-application-snapshot'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
@@ -91,6 +92,29 @@ function readReviewedBatches(report: ParityReport): string[] {
   return batches
 }
 
+/**
+ * The combined import SQL, from the locally generated batches when present, otherwise from
+ * the committed brotli artifact. Either way it must match the reviewed artifact checksum.
+ */
+export function readReviewedImportSql(report: ParityReport): string {
+  const combined = existsSync(resolve(importBatchPath(1)))
+    ? readReviewedBatches(report).join('\n')
+    : existsSync(resolve(project.artifact.compressedSqlPath))
+      ? brotliDecompressSync(readFileSync(resolve(project.artifact.compressedSqlPath))).toString(
+          'utf8'
+        )
+      : undefined
+  if (combined === undefined) {
+    throw new Error(
+      `Missing import SQL: neither ${project.artifact.batchDirectory} nor ${project.artifact.compressedSqlPath} exists. Run pnpm migration:generate.`
+    )
+  }
+  if (report.artifact?.sqlChecksum && sha256(combined) !== report.artifact.sqlChecksum) {
+    throw new Error('Import SQL does not reproduce the reviewed artifact checksum.')
+  }
+  return combined
+}
+
 function migrate(): void {
   wrangler(['d1', 'migrations', 'apply', project.local.databaseName])
 }
@@ -110,13 +134,9 @@ function importArtifact(): void {
     throw new Error(
       'Refusing a different or partial initial catalog; restore the clean pre-import state.'
     )
-  const batches = readReviewedBatches(report)
-  const combined = batches.join('\n')
-  if (report.artifact?.sqlChecksum && sha256(combined) !== report.artifact.sqlChecksum) {
-    throw new Error('Reviewed import batches do not reproduce the reviewed artifact checksum.')
-  }
-  // The batches exist for remote D1 request limits. Local D1 applies the identical,
-  // checksum-verified SQL in one execution instead of one Wrangler start-up per batch.
+  const combined = readReviewedImportSql(report)
+  // Local D1 applies the checksum-verified SQL in one execution instead of one Wrangler
+  // start-up per batch.
   const directory = mkdtempSync(join(tmpdir(), 'best-serp-co-d1-import-'))
   try {
     const importPath = join(directory, 'import.sql')
@@ -125,7 +145,7 @@ function importArtifact(): void {
   } finally {
     rmSync(directory, { force: true, recursive: true })
   }
-  console.log(`Imported ${batches.length} reviewed D1 batches into local ${project.domain}.`)
+  console.log(`Imported the reviewed initial catalog into local ${project.domain}.`)
 }
 
 function localSqlitePath(directory: string): string {
@@ -180,7 +200,7 @@ function expectedBootstrapTransport(report: ParityReport) {
   for (const migration of freshMigrationNames()) {
     database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
   }
-  for (const batch of readReviewedBatches(report)) database.exec(batch)
+  database.exec(readReviewedImportSql(report))
   return databaseTransport(database)
 }
 

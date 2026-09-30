@@ -7,6 +7,8 @@ export const project = {
   appPackageName: 'web',
   artifact: {
     batchDirectory: 'd1/artifacts/best-serp-co-v1-import',
+    /** Brotli copy of the combined import SQL, committed so fresh clones and CI can seed D1. */
+    compressedSqlPath: 'd1/artifacts/best-serp-co-v1.sql.br',
     name: 'best-serp-co-v1',
     parityReportPath: 'd1/artifacts/best-serp-co-v1-parity.yaml'
   },

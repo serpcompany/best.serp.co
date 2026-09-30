@@ -24,8 +24,8 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `packages/design-system/`: UI primitives.
 - `d1/drizzle/`: forward-only migration history applied by Wrangler.
 - `d1/publications/`: reviewed catalog mutation manifests.
-- `d1/artifacts/`: one-time JSON import artifacts (generated, git-ignored except the
-  parity report).
+- `d1/artifacts/`: one-time JSON import; the parity report and the brotli-compressed
+  SQL are committed, the uncompressed SQL and batches are generated.
 - `scripts/project.ts`: the single deployment target (app, local D1, artifacts).
 - `scripts/migration/`: the one-time json-directory-template → D1 import and the
   live-vs-candidate page comparison.
@@ -38,7 +38,7 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 
 - `pnpm dev` / `pnpm worker:preview`: build and serve the Worker against local D1.
 - `pnpm d1:local:migrate`, `pnpm d1:local:import`, `pnpm d1:local:verify`: prepare
-  local D1 (run `pnpm migration:generate` first; see [Development](./docs/DEVELOPMENT.md)).
+  local D1 from the committed import (see [Development](./docs/DEVELOPMENT.md)).
 - `pnpm harness:fast` / `pnpm harness:check`: fast and full validation loops.
 - `pnpm test:e2e`: Playwright against a local Worker.
 - `pnpm migration:compare -- <origin>`: structural page parity against best.serp.co.

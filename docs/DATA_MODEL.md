@@ -49,6 +49,7 @@ The catalog was bootstrapped once from `serpcompany/json-directory-template@25e2
 (`sites/serp.co/products.json`, 3,422 listings, 141 categories) with
 `pnpm migration:generate`. Listing IDs are
 `lst_` + `sha256("legacy-product-map" NUL <slug>)[0:24]`, so re-running the generator
-produces identical rows. The generated SQL under `d1/artifacts/` is git-ignored; the
-committed `best-serp-co-v1-parity.yaml` records source checksums, counts, and the
-target checksum written to `publication_state`.
+produces identical rows. `best-serp-co-v1-parity.yaml` records source checksums,
+counts, the SQL checksum, and the target checksum written to `publication_state`;
+`best-serp-co-v1.sql.br` is the committed brotli copy of the SQL that seeds local D1 and
+CI. The uncompressed SQL and per-batch files are git-ignored.

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 import { stringify } from 'yaml'
 import { z } from 'zod'
 import { project } from '../project'
@@ -388,6 +389,19 @@ export function generateInitialArtifact(options: GeneratorOptions): GeneratedArt
   const allSql = `${batches.join('\n')}`
   const artifactPath = project.artifact.parityReportPath.replace(/-parity\.yaml$/u, '.sql')
   writeGenerated(resolve(options.outputRoot, artifactPath), allSql)
+  mkdirSync(dirname(resolve(options.outputRoot, project.artifact.compressedSqlPath)), {
+    recursive: true
+  })
+  writeFileSync(
+    resolve(options.outputRoot, project.artifact.compressedSqlPath),
+    brotliCompressSync(allSql, {
+      params: {
+        [zlibConstants.BROTLI_PARAM_LGWIN]: 24,
+        [zlibConstants.BROTLI_PARAM_QUALITY]: 11,
+        [zlibConstants.BROTLI_PARAM_SIZE_HINT]: Buffer.byteLength(allSql)
+      }
+    })
+  )
   batches.forEach((batch, index) => {
     writeGenerated(
       resolve(
