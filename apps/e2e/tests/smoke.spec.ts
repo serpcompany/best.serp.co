@@ -176,6 +176,24 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     expect(await page.locator('main a[href^="/products/"]').count()).toBeGreaterThan(0)
   })
 
+  test('serves anonymous pages from the edge cache and bypasses private routes', async ({
+    request
+  }) => {
+    // A unique query string gives this run its own cache entry.
+    const path = `/about/?edge-cache-check=${Date.now()}`
+    const first = await request.get(path)
+    expect(first.status()).toBe(200)
+    expect(first.headers()['x-edge-cache']).toBe('MISS')
+    await expect(async () => {
+      const repeat = await request.get(path)
+      expect(repeat.headers()['x-edge-cache']).toBe('HIT')
+      expect(repeat.headers()['cache-control']).toBe(first.headers()['cache-control'])
+    }).toPass({ timeout: 10_000 })
+
+    const search = await request.get('/search/?q=video')
+    expect(search.headers()['x-edge-cache']).toBe('BYPASS')
+  })
+
   test('renders static, commercial, and legal pages', async ({ page }) => {
     const pages: Array<{ path: string; heading: RegExp }> = [
       { path: '/about/', heading: /^about serp$/i },
