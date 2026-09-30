@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@content-collections/core": "^0.8.2",
-    "@content-collections/next": "^0.2.10",
+    "@content-collections/next": "^0.2.11",
     "@emotion/is-prop-valid": "^1.4.0",
     "@hookform/resolvers": "^5.2.2",
     "@icons-pack/react-simple-icons": "^12.9.0",
