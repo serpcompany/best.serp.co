@@ -1,0 +1,35 @@
+name: Harness Gardening
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 16 * * 3'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness-gardening
+  cancel-in-progress: true
+
+jobs:
+  deterministic-audit:
+    name: Documentation and architecture health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Audit documentation and D1 architecture
+        run: pnpm docs:garden
+
+      - name: Exercise migration and worktree harness contracts
+        run: pnpm exec vitest run scripts/migration-preflight.test.ts scripts/worktree-harness.test.ts
+
+      - name: Run fast feedback loop
+        run: pnpm harness:fast

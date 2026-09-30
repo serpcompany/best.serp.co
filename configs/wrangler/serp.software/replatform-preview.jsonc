@@ -1,0 +1,22 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "${CLOUDFLARE_WORKER_PREVIEW_NAME}",
+  "main": "../../../apps/serp.software/.open-next/worker.js",
+  "compatibility_date": "2026-07-13",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": "../../../apps/serp.software/.open-next/assets", "binding": "ASSETS" },
+  "vars": {
+    "AUTH_TRUST_HOST": "true",
+    "SITE_ID": "serp.software",
+    "NEXT_PUBLIC_SITE_ID": "serp.software",
+    "D1_RUNTIME_ENV": "preview"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "${CLOUDFLARE_D1_REPLACEMENT_PREVIEW_DATABASE_NAME}",
+      "database_id": "${CLOUDFLARE_D1_REPLACEMENT_PREVIEW_DATABASE_ID}",
+      "migrations_dir": "../../../d1/drizzle"
+    }
+  ]
+}

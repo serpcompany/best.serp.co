@@ -1,0 +1,165 @@
+name: Deploy pornvideodownloaders.com
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Protected deployment target'
+        required: true
+        type: choice
+        options:
+          - preview
+          - production
+      confirmation:
+        description: 'Type the site- and environment-specific deploy confirmation'
+        required: true
+        type: string
+      release_mode:
+        description: 'Deploy only the Worker, or also bootstrap the selected D1 database'
+        required: true
+        default: worker-only
+        type: choice
+        options:
+          - worker-only
+          - database-and-worker
+
+concurrency:
+  group: ${{ inputs.environment == 'production' && 'pornvideodownloaders.com-production-d1' || 'pornvideodownloaders.com-preview' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    name: Validate, bootstrap & deploy preview
+    if: github.ref == 'refs/heads/main' && inputs.environment == 'preview' && inputs.confirmation == 'deploy-pornvideodownloaders.com-preview'
+    runs-on: ubuntu-latest
+    environment:
+      name: pornvideodownloaders-preview
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v7
+
+      - name: Install dependencies
+        uses: ./.github/actions/install
+
+      - name: Validate repository and Worker contracts
+        run: |
+          pnpm harness:fast
+          pnpm tsx scripts/worker-release.ts validate-replatform preview --site pornvideodownloaders.com
+          pnpm test:d1
+          pnpm typecheck
+
+      - name: Build OpenNext Worker
+        run: pnpm --filter pornvideodownloaders.com build:worker
+
+      - name: Plan remote migration and verification
+        if: inputs.release_mode == 'database-and-worker'
+        env:
+          D1_REMOTE_CONFIRM: plan-pornvideodownloaders.com-preview
+          D1_RELEASE_GENERATION: replatform
+        run: |
+          pnpm tsx scripts/worker-release.ts plan-migration preview --site pornvideodownloaders.com
+          pnpm tsx scripts/worker-release.ts plan-verify preview --site pornvideodownloaders.com
+
+      - name: Back up preview D1
+        if: inputs.release_mode == 'database-and-worker'
+        env: &preview_env
+          CI: 'true'
+          D1_RELEASE_GENERATION: replatform
+          WORKER_PRODUCTION_CONFIRM: ${{ inputs.confirmation }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_D1_REPLACEMENT_PREVIEW_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_REPLACEMENT_PREVIEW_DATABASE_ID }}
+          CLOUDFLARE_D1_REPLACEMENT_PREVIEW_DATABASE_NAME: ${{ secrets.CLOUDFLARE_D1_REPLACEMENT_PREVIEW_DATABASE_NAME }}
+          CLOUDFLARE_WORKER_PREVIEW_NAME: ${{ secrets.CLOUDFLARE_WORKER_PREVIEW_NAME }}
+        run: pnpm tsx scripts/worker-release.ts backup preview --site pornvideodownloaders.com
+
+      - name: Retain preview D1 backup
+        if: inputs.release_mode == 'database-and-worker'
+        uses: actions/upload-artifact@v7
+        with:
+          name: pornvideodownloaders-preview-d1-${{ github.sha }}
+          path: .wrangler/backups/pornvideodownloaders-com/preview/${{ github.sha }}.replatform.sql
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Apply migrations, import, and verify preview D1
+        if: inputs.release_mode == 'database-and-worker'
+        env: *preview_env
+        run: |
+          pnpm tsx scripts/worker-release.ts migrate preview --site pornvideodownloaders.com
+          pnpm tsx scripts/worker-release.ts import preview --site pornvideodownloaders.com
+          pnpm tsx scripts/worker-release.ts verify preview --site pornvideodownloaders.com
+
+      - name: Verify schema compatibility and deploy preview Worker
+        env: *preview_env
+        run: |
+          set -euo pipefail
+          pnpm tsx scripts/worker-release.ts check-schema preview --site pornvideodownloaders.com
+          pnpm tsx scripts/worker-release.ts deploy preview --site pornvideodownloaders.com
+
+  production:
+    name: Validate, bootstrap & deploy production
+    if: github.ref == 'refs/heads/main' && inputs.environment == 'production' && inputs.confirmation == 'deploy-pornvideodownloaders.com-production'
+    runs-on: ubuntu-latest
+    environment:
+      name: pornvideodownloaders-production
+    steps:
+      - name: Checkout reviewed source
+        uses: actions/checkout@v7
+
+      - name: Install dependencies
+        uses: ./.github/actions/install
+
+      - name: Validate repository and Worker contracts
+        run: |
+          pnpm harness:check
+          pnpm tsx scripts/worker-release.ts validate-replatform production --site pornvideodownloaders.com
+
+      - name: Build OpenNext Worker
+        run: pnpm --filter pornvideodownloaders.com build:worker
+
+      - name: Plan remote migration and verification
+        if: inputs.release_mode == 'database-and-worker'
+        env:
+          D1_REMOTE_CONFIRM: plan-pornvideodownloaders.com-production
+          D1_RELEASE_GENERATION: replatform
+        run: |
+          pnpm tsx scripts/worker-release.ts plan-migration production --site pornvideodownloaders.com
+          pnpm tsx scripts/worker-release.ts plan-verify production --site pornvideodownloaders.com
+
+      - name: Back up production D1
+        if: inputs.release_mode == 'database-and-worker'
+        env: &production_env
+          CI: 'true'
+          D1_RELEASE_GENERATION: replatform
+          WORKER_PRODUCTION_CONFIRM: ${{ inputs.confirmation }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_ID }}
+          CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_NAME: ${{ secrets.CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_NAME }}
+          CLOUDFLARE_WORKER_PRODUCTION_NAME: ${{ secrets.CLOUDFLARE_WORKER_PRODUCTION_NAME }}
+        run: pnpm tsx scripts/worker-release.ts backup production --site pornvideodownloaders.com
+
+      - name: Retain production D1 backup
+        if: inputs.release_mode == 'database-and-worker'
+        uses: actions/upload-artifact@v7
+        with:
+          name: pornvideodownloaders-production-d1-${{ github.sha }}
+          path: .wrangler/backups/pornvideodownloaders-com/production/${{ github.sha }}.replatform.sql
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Apply production D1 migrations
+        if: inputs.release_mode == 'database-and-worker'
+        env: *production_env
+        run: pnpm tsx scripts/worker-release.ts migrate production --site pornvideodownloaders.com
+
+      - name: Verify schema compatibility and deploy production Worker
+        env: *production_env
+        run: |
+          set -euo pipefail
+          pnpm tsx scripts/worker-release.ts check-schema production --site pornvideodownloaders.com
+          pnpm tsx scripts/worker-release.ts deploy production --site pornvideodownloaders.com

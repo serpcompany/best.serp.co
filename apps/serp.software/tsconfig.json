@@ -1,0 +1,31 @@
+{
+  "extends": "@serpdirectory/config-typescript/nextjs.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"],
+      "content-collections": ["./.content-collections/generated"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".content-collections/generated/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "_archive",
+    "_archive/**/*",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**"
+  ]
+}

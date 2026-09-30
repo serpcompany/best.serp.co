@@ -1,0 +1,25 @@
+# Dependencies and generated build output
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+.open-next/
+**/.open-next/
+.content-collections/
+**/.content-collections/
+.turbo/
+**/.turbo/
+coverage/
+**/coverage/
+dist/
+build/
+out/
+test-results/
+playwright-report/
+
+# Large generated bundles
+**/*.chunk.js
+**/*.bundle.js
+**/webpack-stats.json
+**/_generated.js
+**/generated/*.js

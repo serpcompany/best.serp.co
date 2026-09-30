@@ -1,0 +1,26 @@
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "${CLOUDFLARE_WORKER_PRODUCTION_NAME}",
+  "main": "../../../apps/pornvideodownloaders.com/.open-next/worker.js",
+  "compatibility_date": "2026-07-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [{ "pattern": "pornvideodownloaders.com/*", "zone_name": "pornvideodownloaders.com" }],
+  "assets": {
+    "directory": "../../../apps/pornvideodownloaders.com/.open-next/assets",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "AUTH_TRUST_HOST": "true",
+    "SITE_ID": "pornvideodownloaders.com",
+    "NEXT_PUBLIC_SITE_ID": "pornvideodownloaders.com",
+    "D1_RUNTIME_ENV": "production"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "${CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_NAME}",
+      "database_id": "${CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_ID}",
+      "migrations_dir": "../../../d1/drizzle"
+    }
+  ]
+}

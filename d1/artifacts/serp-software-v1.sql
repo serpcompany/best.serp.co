@@ -1,0 +1,3 @@
+-- Deterministic import plan. Execute the 43 ordered files in d1/artifacts/serp-software-v1-import.
+-- Input checksum: e0f1f70aa986813cccd1f379a24bdc8dc27d546e67572d08fea1a4832c5a689e
+-- Target checksum: 02a719a3aa6ba6060a5b2ce6cd90bc2d367b82940de10051f866df3d6fcccfe7

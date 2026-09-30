@@ -1,0 +1,155 @@
+name: PR Review
+
+on:
+  pull_request:
+    branches: ['main']
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Site & Policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Validate repository documentation
+        run: pnpm docs:check
+
+      - name: Validate Worker configuration contracts
+        run: pnpm worker:config:validate
+
+      - name: Run Biome Check
+        run: |
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- \
+              '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.jsonc' '*.css'
+          )
+          if ((${#changed_files[@]} == 0)); then
+            echo "No Biome-supported files changed; skipping."
+            exit 0
+          fi
+          pnpm exec biome check --no-errors-on-unmatched "${changed_files[@]}"
+
+      - name: Run forbidden listing link guard
+        run: pnpm lint:forbidden-links
+
+      - name: Run repository policy tests
+        run: pnpm test:repo
+
+      - name: Run D1 contract tests
+        run: pnpm test:d1
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Run type check
+        run: pnpm typecheck
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Run tests
+        run: pnpm test
+
+  worker-build:
+    name: OpenNext Worker Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Build OpenNext Worker
+        run: pnpm worker:build
+
+  # links:
+  #   name: Check Links
+  #   runs-on: self-hosted
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v7
+
+  #     - name: Check Links
+  #       uses: lycheeverse/lychee-action@v2.2.0
+  #       with:
+  #         args: --config ./lychee.toml --verbose --no-progress .
+  #         fail: true
+
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      e2e_relevant: ${{ steps.filter.outputs.e2e_relevant }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check for e2e-relevant changes
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            e2e_relevant:
+              - 'apps/serp.software/**'
+              - 'apps/pornvideodownloaders.com/**'
+              - 'apps/e2e/**'
+              - 'd1/**'
+              - 'packages/data-ops/**'
+              - 'packages/web-core/**'
+              - 'packages/design-system/**'
+              - 'sites/**'
+
+  e2e:
+    name: E2E Tests
+    needs: [changes]
+    if: needs.changes.outputs.e2e_relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Install Playwright Browsers
+        run: pnpm --filter e2e test:install
+
+      - name: Run Playwright tests
+        run: pnpm test:e2e
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: apps/e2e/playwright-report/
+          retention-days: 30

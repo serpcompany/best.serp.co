@@ -1,0 +1,35 @@
+{
+  "name": "@serpdirectory/data-ops",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./cache": "./src/cache.ts",
+    "./catalog": "./src/catalog.ts",
+    "./client": "./src/client.ts",
+    "./contracts": "./src/contracts.ts",
+    "./cutover-lock": "./src/cutover-lock.ts",
+    "./public-url": "./src/public-url.ts",
+    "./replatform-preview-capability": "./src/replatform-preview-capability.ts",
+    "./schema": "./src/schema.ts",
+    "./submissions": "./src/submissions.ts",
+    "./submission-plans": "./src/submission-plans.ts"
+  },
+  "scripts": {
+    "benchmark": "vitest run src/benchmark.test.ts",
+    "test": "vitest run src/cache.test.ts src/catalog.test.ts src/client.test.ts src/cutover-lock.test.ts src/public-url.test.ts src/replatform-preview-capability.test.ts src/submissions.test.ts src/submission-plans.test.ts src/benchmark.test.ts",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
+  "dependencies": {
+    "@serpdirectory/site-contract": "workspace:*",
+    "drizzle-orm": "0.45.3",
+    "server-only": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260923.1",
+    "@serpdirectory/config-typescript": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "4.1.11"
+  }
+}

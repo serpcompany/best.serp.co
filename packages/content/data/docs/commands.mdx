@@ -1,0 +1,35 @@
+---
+title: 'Common Commands'
+description: 'Local D1, verification, and Worker build commands'
+order: 2
+published: true
+---
+
+# Common Commands
+
+Initialize and verify the isolated local D1 database:
+
+```bash
+pnpm d1:local:migrate
+pnpm d1:local:import
+pnpm d1:local:verify
+```
+
+Build and run the local OpenNext Worker:
+
+```bash
+pnpm dev
+```
+
+Verify the repository:
+
+```bash
+pnpm worker:config:validate
+pnpm test:d1
+pnpm test:repo
+pnpm typecheck
+pnpm worker:build
+```
+
+Production commands are available only inside the protected GitHub Actions release
+workflows.

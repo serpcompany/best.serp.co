@@ -1,0 +1,56 @@
+name: Prepare protected D1 replatform
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_id:
+        description: 'Explicit Site target'
+        required: true
+        type: choice
+        options:
+          - serp.software
+          - pornvideodownloaders.com
+      environment:
+        description: 'Evidence target; this workflow performs no remote operation'
+        required: true
+        type: choice
+        options:
+          - preview
+          - production
+      confirmation:
+        description: 'Type plan-<site>-<environment>; this does not authorize mutation'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: inputs.confirmation == format('plan-{0}-{1}', inputs.site_id, inputs.environment)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v7
+
+      - name: Install pinned dependencies
+        uses: ./.github/actions/install
+
+      - name: Validate repository and replacement templates
+        run: |
+          pnpm harness:fast
+          pnpm d1:replatform:config:validate
+
+      - name: Build matching Workers
+        run: pnpm worker:build
+
+      - name: Emit credential-free cutover plan
+        run: pnpm tsx scripts/d1-replatform-cutover.ts plan "${{ inputs.environment }}" --site "${{ inputs.site_id }}" > cutover-plan.json
+
+      - name: Retain exact-commit plan
+        uses: actions/upload-artifact@v7
+        with:
+          name: d1-replatform-plan-${{ inputs.site_id }}-${{ inputs.environment }}-${{ github.sha }}
+          path: cutover-plan.json
+          if-no-files-found: error
+          retention-days: 30

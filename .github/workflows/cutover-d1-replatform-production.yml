@@ -1,0 +1,194 @@
+name: Cut over Production D1 replacement
+
+on:
+  workflow_dispatch:
+    inputs:
+      site_id:
+        description: Production Site
+        required: true
+        type: choice
+        options: [serp.software, pornvideodownloaders.com]
+      confirmation:
+        description: Type cutover-<site>-production exactly
+        required: true
+        type: string
+      cutover_id:
+        description: Stable unique cutover ID; reuse exactly for an interrupted retry
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ inputs.site_id }}-production-d1
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  cutover:
+    if: github.ref == 'refs/heads/main' && inputs.confirmation == format('cutover-{0}-production', inputs.site_id)
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.site_id == 'serp.software' && 'production' || 'pornvideodownloaders-production' }}
+    env:
+      CI: 'true'
+      GITHUB_TOKEN: ${{ github.token }}
+      WORKER_PRODUCTION_CONFIRM: ${{ inputs.confirmation }}
+      D1_CUTOVER_ALLOWED_SITE_IDS: ${{ vars.D1_CUTOVER_ALLOWED_SITE_IDS }}
+      D1_CUTOVER_PROTECTED_ENVIRONMENT: ${{ inputs.site_id == 'serp.software' && 'production' || 'pornvideodownloaders-production' }}
+      TRUSTED_PREVIEW_RUN_ID: ${{ vars.TRUSTED_PREVIEW_RUN_ID }}
+      TRUSTED_PREVIEW_RECEIPT_SHA256: ${{ secrets.TRUSTED_PREVIEW_RECEIPT_SHA256 }}
+      PRODUCTION_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_EXPECTED_ACCOUNT_ID: ${{ vars.CLOUDFLARE_EXPECTED_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_D1_PRODUCTION_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_PRODUCTION_DATABASE_ID }}
+      CLOUDFLARE_D1_PRODUCTION_DATABASE_NAME: ${{ secrets.CLOUDFLARE_D1_PRODUCTION_DATABASE_NAME }}
+      CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_ID }}
+      CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_NAME: ${{ secrets.CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_NAME }}
+      CLOUDFLARE_WORKER_PRODUCTION_NAME: ${{ secrets.CLOUDFLARE_WORKER_PRODUCTION_NAME }}
+    steps:
+      - name: Checkout exact reviewed main commit
+        uses: actions/checkout@v7
+      - name: Install dependencies
+        uses: ./.github/actions/install
+      - name: Initialize runner-only evidence
+        env:
+          CUTOVER_ID: ${{ inputs.cutover_id }}
+        run: |
+          printf '%s\n' "EVIDENCE_DIR=$RUNNER_TEMP/d1-production-cutover" >> "$GITHUB_ENV"
+          EVIDENCE_DIR="$RUNNER_TEMP/d1-production-cutover"
+          mkdir -p "$EVIDENCE_DIR"
+          chmod 700 "$EVIDENCE_DIR"
+          printf '%s' "$CUTOVER_ID" > "$EVIDENCE_DIR/cutover-id.txt"
+      - name: Validate exact-main Preview trust and Production identity
+        run: pnpm tsx scripts/d1-replatform-production.ts preflight --site "${{ inputs.site_id }}" --output "$EVIDENCE_DIR/preflight.json"
+      - name: Validate contracts and build exact-main lock-aware Worker
+        run: |
+          pnpm test:d1
+          pnpm typecheck
+          pnpm tsx scripts/worker-release.ts validate-replatform production --site "${{ inputs.site_id }}"
+          pnpm --filter "${{ inputs.site_id }}" build:worker
+      - name: Deploy and observe exact-main source-bound Worker
+        env:
+          D1_RELEASE_GENERATION: legacy
+        run: |
+          set -euo pipefail
+          pnpm tsx scripts/worker-release.ts deploy production --site "${{ inputs.site_id }}" 2>&1 | tee "$EVIDENCE_DIR/source-deploy.log"
+          source_version="$(node -e 'const fs=require("node:fs"); const s=fs.readFileSync(process.argv[1],"utf8").replace(/\u001b\[[0-9;]*m/g,""); const ids=[...s.matchAll(/Current Version ID:\s*([0-9a-f-]{36})/g)].map(m=>m[1]); if(ids.length!==1) throw new Error("Deploy did not emit exactly one version ID"); process.stdout.write(ids[0])' "$EVIDENCE_DIR/source-deploy.log")"
+          pnpm tsx scripts/d1-replatform-production.ts observe --site "${{ inputs.site_id }}" --database-id "$CLOUDFLARE_D1_PRODUCTION_DATABASE_ID" --version-id "$source_version" --output "$EVIDENCE_DIR/source-deployment.json"
+      - name: Retain immutable source and empty-target backups
+        run: |
+          D1_RELEASE_GENERATION=legacy pnpm tsx scripts/worker-release.ts backup production --site "${{ inputs.site_id }}"
+          D1_RELEASE_GENERATION=replatform pnpm tsx scripts/worker-release.ts backup production --site "${{ inputs.site_id }}"
+          find .wrangler/backups -name "${GITHUB_SHA}.sql" -exec cp {} "$EVIDENCE_DIR/source-backup.sql" \;
+          find .wrangler/backups -name "${GITHUB_SHA}.replatform.sql" -exec cp {} "$EVIDENCE_DIR/target-backup.sql" \;
+          test -s "$EVIDENCE_DIR/source-backup.sql"
+          test -s "$EVIDENCE_DIR/target-backup.sql"
+      - name: Upload pre-mutation recovery backups
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.site_id }}-production-cutover-backups-${{ github.sha }}
+          path: ${{ runner.temp }}/d1-production-cutover/*-backup.sql
+          if-no-files-found: error
+          retention-days: 90
+      - name: Acquire immutable Site-wide write lock
+        run: pnpm tsx scripts/d1-replatform-production.ts acquire-lock --site "${{ inputs.site_id }}" --cutover-id "$(cat "$EVIDENCE_DIR/cutover-id.txt")" --output "$EVIDENCE_DIR/lock.json"
+      - name: Prove public writes are frozen
+        run: |
+          status="$(curl --silent --show-error --output "$EVIDENCE_DIR/frozen-write.json" --write-out '%{http_code}' --max-time 20 -X POST -H 'content-type: application/json' --data '{}' "${PRODUCTION_BASE_URL%/}/api/submissions")"
+          test "$status" = 503
+          grep -F 'cutover_frozen' "$EVIDENCE_DIR/frozen-write.json"
+      - name: Capture exact stable frozen 17-table source snapshot
+        run: pnpm tsx scripts/d1-replatform-production.ts capture --site "${{ inputs.site_id }}" --cutover-id "$(cat "$EVIDENCE_DIR/cutover-id.txt")" --output "$EVIDENCE_DIR/frozen-snapshot.json"
+      - name: Apply fresh schema and resumably import exact frozen snapshot
+        env:
+          D1_RELEASE_GENERATION: replatform
+        run: |
+          pnpm tsx scripts/worker-release.ts cutover-migrate production --site "${{ inputs.site_id }}"
+          pnpm tsx scripts/d1-replatform-production.ts materialize --site "${{ inputs.site_id }}" --snapshot "$EVIDENCE_DIR/frozen-snapshot.json" --output "$EVIDENCE_DIR/transfer.json"
+          pnpm tsx scripts/d1-replatform-production.ts verify-transfer --site "${{ inputs.site_id }}" --snapshot "$EVIDENCE_DIR/frozen-snapshot.json" --output "$EVIDENCE_DIR/transfer-verified.json"
+      - name: Seal and retain incomplete-run recovery authority before traffic switch
+        run: |
+          pnpm tsx scripts/d1-replatform-production.ts assemble-recovery --site "${{ inputs.site_id }}" --cutover-id "$(cat "$EVIDENCE_DIR/cutover-id.txt")" --preflight "$EVIDENCE_DIR/preflight.json" --source-observation "$EVIDENCE_DIR/source-deployment.json" --output "$EVIDENCE_DIR/recovery-receipt.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.site_id }}-production-cutover-recovery-${{ github.sha }}
+          path: ${{ runner.temp }}/d1-production-cutover/recovery-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Deploy same commit target-bound and attest sole active version
+        env:
+          D1_RELEASE_GENERATION: replatform
+        run: |
+          set -euo pipefail
+          pnpm tsx scripts/worker-release.ts deploy production --site "${{ inputs.site_id }}" 2>&1 | tee "$EVIDENCE_DIR/target-deploy.log"
+          target_version="$(node -e 'const fs=require("node:fs"); const s=fs.readFileSync(process.argv[1],"utf8").replace(/\u001b\[[0-9;]*m/g,""); const ids=[...s.matchAll(/Current Version ID:\s*([0-9a-f-]{36})/g)].map(m=>m[1]); if(ids.length!==1) throw new Error("Deploy did not emit exactly one version ID"); process.stdout.write(ids[0])' "$EVIDENCE_DIR/target-deploy.log")"
+          pnpm tsx scripts/d1-replatform-production.ts observe --site "${{ inputs.site_id }}" --database-id "$CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_ID" --version-id "$target_version" --output "$EVIDENCE_DIR/target-deployment.json"
+      - name: Run Production-safe catalog and frozen-write gates
+        run: |
+          pnpm tsx scripts/d1-preview-http-gates.ts production "${{ inputs.site_id }}" "$PRODUCTION_BASE_URL" "$EVIDENCE_DIR/catalog-gates.json"
+          status="$(curl --silent --show-error --output "$EVIDENCE_DIR/target-frozen-write.json" --write-out '%{http_code}' --max-time 20 -X POST -H 'content-type: application/json' --data '{}' "${PRODUCTION_BASE_URL%/}/api/submissions")"
+          test "$status" = 503
+          grep -F 'cutover_frozen' "$EVIDENCE_DIR/target-frozen-write.json"
+      - name: Derive browser fixtures from the exact frozen snapshot
+        run: |
+          pnpm tsx scripts/d1-replatform-production.ts browser-fixture --site "${{ inputs.site_id }}" --snapshot "$EVIDENCE_DIR/frozen-snapshot.json" --output "$EVIDENCE_DIR/browser-fixture.json"
+          # shellcheck disable=SC2016
+          node -e 'const fs=require("node:fs"); const v=require(process.argv[1]); fs.appendFileSync(process.env.GITHUB_ENV, `E2E_LISTING_COUNT=${v.listingCount}\nE2E_LISTING_NAME=${v.listingName}\nE2E_LISTING_SLUG=${v.listingSlug}\nE2E_CATEGORY_SLUG=${v.categorySlug}\n`)' "$EVIDENCE_DIR/browser-fixture.json"
+      - name: Run Production-safe browser gates
+        env:
+          E2E_SITE_ID: ${{ inputs.site_id }}
+          E2E_SITE_NAME: ${{ inputs.site_id == 'serp.software' && 'SERP Software' || 'Porn Video Downloaders' }}
+          PLAYWRIGHT_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+          PLAYWRIGHT_EXTERNAL_SERVER: '1'
+        run: |
+          pnpm --filter e2e exec playwright install --with-deps chromium
+          pnpm --filter e2e exec playwright test tests/multisite-smoke.spec.ts --project=chromium
+      - name: Rehearse immutable source-version rollback
+        run: |
+          source_version="$(node -e 'console.log(require(process.argv[1]).versionId)' "$EVIDENCE_DIR/source-deployment.json")"
+          pnpm exec wrangler versions deploy "${source_version}@100" --name "$CLOUDFLARE_WORKER_PRODUCTION_NAME" --message "${{ inputs.site_id }} D1 cutover source rollback rehearsal"
+          pnpm tsx scripts/d1-replatform-production.ts observe --site "${{ inputs.site_id }}" --database-id "$CLOUDFLARE_D1_PRODUCTION_DATABASE_ID" --version-id "$source_version" --output "$EVIDENCE_DIR/rollback-source.json"
+          pnpm tsx scripts/d1-preview-http-gates.ts production "${{ inputs.site_id }}" "$PRODUCTION_BASE_URL" "$EVIDENCE_DIR/rollback-source-gates.json"
+      - name: Restore exact target version and leave both databases locked
+        run: |
+          target_version="$(node -e 'console.log(require(process.argv[1]).versionId)' "$EVIDENCE_DIR/target-deployment.json")"
+          pnpm exec wrangler versions deploy "${target_version}@100" --name "$CLOUDFLARE_WORKER_PRODUCTION_NAME" --message "${{ inputs.site_id }} D1 cutover target restoration"
+          pnpm tsx scripts/d1-replatform-production.ts observe --site "${{ inputs.site_id }}" --database-id "$CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_ID" --version-id "$target_version" --output "$EVIDENCE_DIR/rollback-target.json"
+          cutover_id="$(cat "$EVIDENCE_DIR/cutover-id.txt")"
+          pnpm tsx scripts/d1-replatform-production.ts assert-locked --site "${{ inputs.site_id }}" --database-id "$CLOUDFLARE_D1_PRODUCTION_DATABASE_ID" --cutover-id "$cutover_id"
+          pnpm tsx scripts/d1-replatform-production.ts assert-locked --site "${{ inputs.site_id }}" --database-id "$CLOUDFLARE_D1_REPLACEMENT_PRODUCTION_DATABASE_ID" --cutover-id "$cutover_id"
+      - name: Seal exact measured cutover receipt
+        run: |
+          cutover_id="$(cat "$EVIDENCE_DIR/cutover-id.txt")"
+          pnpm tsx scripts/d1-replatform-production.ts assemble --site "${{ inputs.site_id }}" --cutover-id "$cutover_id" --preflight "$EVIDENCE_DIR/preflight.json" --snapshot "$EVIDENCE_DIR/frozen-snapshot.json" --transfer "$EVIDENCE_DIR/transfer.json" --verification "$EVIDENCE_DIR/transfer-verified.json" --source-observation "$EVIDENCE_DIR/source-deployment.json" --target-observation "$EVIDENCE_DIR/target-deployment.json" --rollback-source "$EVIDENCE_DIR/rollback-source.json" --rollback-target "$EVIDENCE_DIR/rollback-target.json" --source-backup "$EVIDENCE_DIR/source-backup.sql" --target-backup "$EVIDENCE_DIR/target-backup.sql" --output "$EVIDENCE_DIR/evidence.json"
+          pnpm tsx scripts/d1-replatform-production.ts seal --site "${{ inputs.site_id }}" --evidence "$EVIDENCE_DIR/evidence.json" --output "$EVIDENCE_DIR/receipt.json"
+      - name: Retain exact cutover evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.site_id }}-production-cutover-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/d1-production-cutover/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Fail closed after any unsuccessful cutover step
+        if: failure()
+        run: |
+          if [ -f "$EVIDENCE_DIR/source-deployment.json" ]
+          then
+            source_version="$(node -e 'console.log(require(process.argv[1]).versionId)' "$EVIDENCE_DIR/source-deployment.json")"
+            pnpm exec wrangler versions deploy "${source_version}@100" --name "$CLOUDFLARE_WORKER_PRODUCTION_NAME" --message "fail-closed D1 source restoration"
+            pnpm tsx scripts/d1-replatform-production.ts observe --site "${{ inputs.site_id }}" --database-id "$CLOUDFLARE_D1_PRODUCTION_DATABASE_ID" --version-id "$source_version" --output "$EVIDENCE_DIR/failure-source-restoration.json"
+          fi
+      - name: Retain final recovery status
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.site_id }}-production-cutover-final-status-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/d1-production-cutover/recovery-receipt.json
+            ${{ runner.temp }}/d1-production-cutover/failure-source-restoration.json
+          if-no-files-found: error
+          retention-days: 90

@@ -1,0 +1,142 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": [
+        "CLERK_SECRET_KEY",
+        "CLERK_WEBHOOK_SECRET",
+        "FLAGS_SECRET",
+        "GITHUB_TOKEN",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_OPENPANEL_CLIENT_ID",
+        "OPENPANEL_SECRET_ID",
+        "OPENPANEL_CLIENT_SECRET",
+        "RSS_FEED_URL",
+        "SENTRY_AUTH_TOKEN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT"
+      ]
+    },
+    "clean": {
+      "cache": false
+    },
+    "typecheck": {
+      "cache": false
+    },
+    "lint": {
+      "cache": false
+    },
+    "lint:fix": {
+      "cache": false
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "env": ["CLERK_SECRET_KEY", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"]
+    },
+    "test": {
+      "cache": false,
+      "dependsOn": ["^build"],
+      "env": ["CLERK_SECRET_KEY", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"]
+    },
+    "test:watch": {
+      "cache": false,
+      "dependsOn": ["^build"]
+    },
+    "test:e2e": {
+      "cache": false,
+      "dependsOn": ["^build"],
+      "env": [
+        "E2E_CATEGORY_ROUTE_BASE_PATH",
+        "E2E_CATEGORY_SLUG",
+        "E2E_LISTING_ROUTE_BASE_PATH",
+        "E2E_SITE_ID",
+        "E2E_VISUAL",
+        "E2E_WORKERS",
+        "PLAYWRIGHT_BASE_URL",
+        "PLAYWRIGHT_PORT",
+        "PLAYWRIGHT_WEB_SERVER_COMMAND"
+      ]
+    },
+    "test:e2e:smoke": {
+      "cache": false,
+      "env": [
+        "E2E_CATEGORY_ROUTE_BASE_PATH",
+        "E2E_CATEGORY_SLUG",
+        "E2E_LISTING_ROUTE_BASE_PATH",
+        "E2E_SITE_ID",
+        "E2E_WORKERS",
+        "PLAYWRIGHT_BASE_URL",
+        "PLAYWRIGHT_PORT",
+        "PLAYWRIGHT_WEB_SERVER_COMMAND"
+      ]
+    },
+    "test:e2e:fast": {
+      "cache": false,
+      "env": [
+        "E2E_CATEGORY_ROUTE_BASE_PATH",
+        "E2E_CATEGORY_SLUG",
+        "E2E_LISTING_ROUTE_BASE_PATH",
+        "E2E_SITE_ID",
+        "E2E_WORKERS",
+        "PLAYWRIGHT_BASE_URL",
+        "PLAYWRIGHT_PORT",
+        "PLAYWRIGHT_WEB_SERVER_COMMAND"
+      ]
+    },
+    "test:e2e:ui": {
+      "cache": false,
+      "dependsOn": ["^build"],
+      "env": [
+        "E2E_CATEGORY_ROUTE_BASE_PATH",
+        "E2E_CATEGORY_SLUG",
+        "E2E_LISTING_ROUTE_BASE_PATH",
+        "E2E_SITE_ID",
+        "E2E_VISUAL",
+        "E2E_WORKERS",
+        "PLAYWRIGHT_BASE_URL",
+        "PLAYWRIGHT_PORT",
+        "PLAYWRIGHT_WEB_SERVER_COMMAND"
+      ]
+    },
+    "test:e2e:debug": {
+      "cache": false,
+      "dependsOn": ["^build"],
+      "env": [
+        "E2E_CATEGORY_ROUTE_BASE_PATH",
+        "E2E_CATEGORY_SLUG",
+        "E2E_LISTING_ROUTE_BASE_PATH",
+        "E2E_SITE_ID",
+        "E2E_VISUAL",
+        "E2E_WORKERS",
+        "PLAYWRIGHT_BASE_URL",
+        "PLAYWRIGHT_PORT",
+        "PLAYWRIGHT_WEB_SERVER_COMMAND"
+      ]
+    },
+    "test:e2e:headed": {
+      "cache": false,
+      "dependsOn": ["^build"],
+      "env": [
+        "E2E_CATEGORY_ROUTE_BASE_PATH",
+        "E2E_CATEGORY_SLUG",
+        "E2E_LISTING_ROUTE_BASE_PATH",
+        "E2E_SITE_ID",
+        "E2E_VISUAL",
+        "E2E_WORKERS",
+        "PLAYWRIGHT_BASE_URL",
+        "PLAYWRIGHT_PORT",
+        "PLAYWRIGHT_WEB_SERVER_COMMAND"
+      ]
+    },
+    "test:install": {
+      "cache": false
+    },
+    "test:related": {
+      "cache": false
+    }
+  }
+}

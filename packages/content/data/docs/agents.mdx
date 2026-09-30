@@ -1,0 +1,27 @@
+---
+title: 'AI-Assisted Workflow'
+description: 'Repository boundaries for coding agents working on SERP Software'
+order: 3
+published: true
+---
+
+# AI-Assisted Workflow
+
+Read `AGENTS.md` before changing the repository. The public catalog is stored only in
+Cloudflare D1.
+
+Agents must use the server-only catalog repository for listing and category reads,
+prepared statements for SQL, D1 migrations for schema changes, and reviewed
+publication manifests for data changes.
+
+Do not create a catalog file, generated browser search index, filesystem fallback,
+starter/default site, static-directory build, or GitHub Pages deployment path.
+
+Before declaring work complete, run:
+
+```bash
+pnpm test:repo
+pnpm test:d1
+pnpm typecheck
+pnpm worker:build
+```

@@ -1,0 +1,1709 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "73d39ded-6f82-423c-b51b-5cb320ee9523",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "categories": {
+      "name": "categories",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "categories_public_idx": {
+          "name": "categories_public_idx",
+          "columns": ["site_id", "is_active", "sort_order", "name"],
+          "isUnique": false
+        },
+        "categories_site_slug_unique": {
+          "name": "categories_site_slug_unique",
+          "columns": ["site_id", "slug"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "categories_site_id_sites_id_fk": {
+          "name": "categories_site_id_sites_id_fk",
+          "tableFrom": "categories",
+          "tableTo": "sites",
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "categories_is_active_boolean": {
+          "name": "categories_is_active_boolean",
+          "value": "\"is_active\" IN (0, 1)"
+        }
+      }
+    },
+    "listing_categories": {
+      "name": "listing_categories",
+      "columns": {
+        "listing_id": {
+          "name": "listing_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        }
+      },
+      "indexes": {
+        "listing_categories_one_primary_idx": {
+          "name": "listing_categories_one_primary_idx",
+          "columns": ["listing_id"],
+          "isUnique": true,
+          "where": "\"listing_categories\".\"is_primary\" = 1"
+        },
+        "listing_categories_category_idx": {
+          "name": "listing_categories_category_idx",
+          "columns": ["category_id", "listing_id"],
+          "isUnique": false
+        },
+        "listing_categories_listing_order_idx": {
+          "name": "listing_categories_listing_order_idx",
+          "columns": ["listing_id", "sort_order"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "listing_categories_listing_id_listings_id_fk": {
+          "name": "listing_categories_listing_id_listings_id_fk",
+          "tableFrom": "listing_categories",
+          "tableTo": "listings",
+          "columnsFrom": ["listing_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "listing_categories_category_id_categories_id_fk": {
+          "name": "listing_categories_category_id_categories_id_fk",
+          "tableFrom": "listing_categories",
+          "tableTo": "categories",
+          "columnsFrom": ["category_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "listing_categories_listing_id_category_id_pk": {
+          "columns": ["listing_id", "category_id"],
+          "name": "listing_categories_listing_id_category_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listing_categories_is_primary_boolean": {
+          "name": "listing_categories_is_primary_boolean",
+          "value": "\"is_primary\" IN (0, 1)"
+        }
+      }
+    },
+    "listing_faqs": {
+      "name": "listing_faqs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "listing_id": {
+          "name": "listing_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "question": {
+          "name": "question",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "answer": {
+          "name": "answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "listing_faqs_listing_idx": {
+          "name": "listing_faqs_listing_idx",
+          "columns": ["listing_id", "sort_order"],
+          "isUnique": false
+        },
+        "listing_faqs_listing_order_unique": {
+          "name": "listing_faqs_listing_order_unique",
+          "columns": ["listing_id", "sort_order"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "listing_faqs_listing_id_listings_id_fk": {
+          "name": "listing_faqs_listing_id_listings_id_fk",
+          "tableFrom": "listing_faqs",
+          "tableTo": "listings",
+          "columnsFrom": ["listing_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "listing_media": {
+      "name": "listing_media",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "listing_id": {
+          "name": "listing_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "listing_media_listing_idx": {
+          "name": "listing_media_listing_idx",
+          "columns": ["listing_id", "sort_order"],
+          "isUnique": false
+        },
+        "listing_media_listing_kind_order_unique": {
+          "name": "listing_media_listing_kind_order_unique",
+          "columns": ["listing_id", "kind", "sort_order"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "listing_media_listing_id_listings_id_fk": {
+          "name": "listing_media_listing_id_listings_id_fk",
+          "tableFrom": "listing_media",
+          "tableTo": "listings",
+          "columnsFrom": ["listing_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listing_media_kind_valid": {
+          "name": "listing_media_kind_valid",
+          "value": "\"listing_media\".\"kind\" IN ('logo', 'image', 'video')"
+        }
+      }
+    },
+    "listing_resource_links": {
+      "name": "listing_resource_links",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "listing_id": {
+          "name": "listing_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "listing_resource_links_listing_idx": {
+          "name": "listing_resource_links_listing_idx",
+          "columns": ["listing_id", "sort_order"],
+          "isUnique": false
+        },
+        "listing_resource_links_listing_order_unique": {
+          "name": "listing_resource_links_listing_order_unique",
+          "columns": ["listing_id", "sort_order"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "listing_resource_links_listing_id_listings_id_fk": {
+          "name": "listing_resource_links_listing_id_listings_id_fk",
+          "tableFrom": "listing_resource_links",
+          "tableTo": "listings",
+          "columnsFrom": ["listing_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "listing_slug_redirects": {
+      "name": "listing_slug_redirects",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "listing_id": {
+          "name": "listing_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "old_slug": {
+          "name": "old_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "new_slug": {
+          "name": "new_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "manifest_id": {
+          "name": "manifest_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "listing_slug_redirects_listing_idx": {
+          "name": "listing_slug_redirects_listing_idx",
+          "columns": ["listing_id", "\"created_at\" DESC"],
+          "isUnique": false
+        },
+        "listing_slug_redirects_site_old_slug_unique": {
+          "name": "listing_slug_redirects_site_old_slug_unique",
+          "columns": ["site_id", "old_slug"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "listing_slug_redirects_site_id_sites_id_fk": {
+          "name": "listing_slug_redirects_site_id_sites_id_fk",
+          "tableFrom": "listing_slug_redirects",
+          "tableTo": "sites",
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "listing_slug_redirects_listing_id_listings_id_fk": {
+          "name": "listing_slug_redirects_listing_id_listings_id_fk",
+          "tableFrom": "listing_slug_redirects",
+          "tableTo": "listings",
+          "columnsFrom": ["listing_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listing_slug_redirects_slug_change": {
+          "name": "listing_slug_redirects_slug_change",
+          "value": "\"listing_slug_redirects\".\"old_slug\" != \"listing_slug_redirects\".\"new_slug\""
+        }
+      }
+    },
+    "listing_submission_events": {
+      "name": "listing_submission_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "submission_id": {
+          "name": "submission_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "detail": {
+          "name": "detail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "actor": {
+          "name": "actor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "listing_submission_events_submission_idx": {
+          "name": "listing_submission_events_submission_idx",
+          "columns": ["submission_id", "created_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "listing_submission_events_submission_id_listing_submissions_id_fk": {
+          "name": "listing_submission_events_submission_id_listing_submissions_id_fk",
+          "tableFrom": "listing_submission_events",
+          "tableTo": "listing_submissions",
+          "columnsFrom": ["submission_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listing_submission_events_type_valid": {
+          "name": "listing_submission_events_type_valid",
+          "value": "\"listing_submission_events\".\"event_type\" IN ('created', 'verification_failed', 'badge_verified', 'approved', 'rejected')"
+        }
+      }
+    },
+    "listing_submission_faqs": {
+      "name": "listing_submission_faqs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "submission_id": {
+          "name": "submission_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "question": {
+          "name": "question",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "answer": {
+          "name": "answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "listing_submission_faqs_submission_order_unique": {
+          "name": "listing_submission_faqs_submission_order_unique",
+          "columns": ["submission_id", "sort_order"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "listing_submission_faqs_submission_id_listing_submissions_id_fk": {
+          "name": "listing_submission_faqs_submission_id_listing_submissions_id_fk",
+          "tableFrom": "listing_submission_faqs",
+          "tableTo": "listing_submissions",
+          "columnsFrom": ["submission_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "listing_submission_notifications": {
+      "name": "listing_submission_notifications",
+      "columns": {
+        "submission_id": {
+          "name": "submission_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "external_url": {
+          "name": "external_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "recipient": {
+          "name": "recipient",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "preview_token_hash": {
+          "name": "preview_token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "listing_submission_notifications_recipient_idx": {
+          "name": "listing_submission_notifications_recipient_idx",
+          "columns": ["channel", "recipient", "created_at"],
+          "isUnique": false
+        },
+        "listing_submission_notifications_preview_token_idx": {
+          "name": "listing_submission_notifications_preview_token_idx",
+          "columns": ["preview_token_hash"],
+          "isUnique": true,
+          "where": "\"listing_submission_notifications\".\"preview_token_hash\" IS NOT NULL"
+        },
+        "listing_submission_notifications_channel_external_unique": {
+          "name": "listing_submission_notifications_channel_external_unique",
+          "columns": ["channel", "external_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "listing_submission_notifications_submission_id_listing_submissions_id_fk": {
+          "name": "listing_submission_notifications_submission_id_listing_submissions_id_fk",
+          "tableFrom": "listing_submission_notifications",
+          "tableTo": "listing_submissions",
+          "columnsFrom": ["submission_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "listing_submission_notifications_submission_id_channel_pk": {
+          "columns": ["submission_id", "channel"],
+          "name": "listing_submission_notifications_submission_id_channel_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listing_submission_notifications_channel_valid": {
+          "name": "listing_submission_notifications_channel_valid",
+          "value": "\"listing_submission_notifications\".\"channel\" IN ('github_issue')"
+        }
+      }
+    },
+    "listing_submission_rate_limits": {
+      "name": "listing_submission_rate_limits",
+      "columns": {
+        "fingerprint_hash": {
+          "name": "fingerprint_hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "window_started_at": {
+          "name": "window_started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "request_count": {
+          "name": "request_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listing_submission_rate_limits_request_count_nonnegative": {
+          "name": "listing_submission_rate_limits_request_count_nonnegative",
+          "value": "\"listing_submission_rate_limits\".\"request_count\" >= 0"
+        }
+      }
+    },
+    "listing_submission_resource_links": {
+      "name": "listing_submission_resource_links",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "submission_id": {
+          "name": "submission_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "listing_submission_resource_links_submission_order_unique": {
+          "name": "listing_submission_resource_links_submission_order_unique",
+          "columns": ["submission_id", "sort_order"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "listing_submission_resource_links_submission_id_listing_submissions_id_fk": {
+          "name": "listing_submission_resource_links_submission_id_listing_submissions_id_fk",
+          "tableFrom": "listing_submission_resource_links",
+          "tableTo": "listing_submissions",
+          "columnsFrom": ["submission_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "listing_submissions": {
+      "name": "listing_submissions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "website": {
+          "name": "website",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_slug": {
+          "name": "category_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "logo_url": {
+          "name": "logo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "video_url": {
+          "name": "video_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending_badge'"
+        },
+        "access_token_hash": {
+          "name": "access_token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "verification_attempts": {
+          "name": "verification_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "last_verification_at": {
+          "name": "last_verification_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_verification_error": {
+          "name": "last_verification_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "badge_verified_at": {
+          "name": "badge_verified_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reviewed_by": {
+          "name": "reviewed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "listing_id": {
+          "name": "listing_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "listing_submissions_active_slug_idx": {
+          "name": "listing_submissions_active_slug_idx",
+          "columns": ["site_id", "slug"],
+          "isUnique": true,
+          "where": "\"listing_submissions\".\"status\" IN ('pending_badge', 'verified')"
+        },
+        "listing_submissions_review_queue_idx": {
+          "name": "listing_submissions_review_queue_idx",
+          "columns": ["site_id", "status", "badge_verified_at", "created_at"],
+          "isUnique": false
+        },
+        "listing_submissions_site_token_unique": {
+          "name": "listing_submissions_site_token_unique",
+          "columns": ["site_id", "access_token_hash"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "listing_submissions_site_id_sites_id_fk": {
+          "name": "listing_submissions_site_id_sites_id_fk",
+          "tableFrom": "listing_submissions",
+          "tableTo": "sites",
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "listing_submissions_listing_id_listings_id_fk": {
+          "name": "listing_submissions_listing_id_listings_id_fk",
+          "tableFrom": "listing_submissions",
+          "tableTo": "listings",
+          "columnsFrom": ["listing_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listing_submissions_status_valid": {
+          "name": "listing_submissions_status_valid",
+          "value": "\"listing_submissions\".\"status\" IN ('pending_badge', 'verified', 'approved', 'rejected')"
+        },
+        "listing_submissions_verification_attempts_nonnegative": {
+          "name": "listing_submissions_verification_attempts_nonnegative",
+          "value": "\"listing_submissions\".\"verification_attempts\" >= 0"
+        }
+      }
+    },
+    "listings": {
+      "name": "listings",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "website": {
+          "name": "website",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "priority": {
+          "name": "priority",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_unofficial": {
+          "name": "is_unofficial",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "is_featured": {
+          "name": "is_featured",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'draft'"
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_kind": {
+          "name": "source_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_identity": {
+          "name": "source_identity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_updated_at": {
+          "name": "source_updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "checksum": {
+          "name": "checksum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "listings_slug_lookup_idx": {
+          "name": "listings_slug_lookup_idx",
+          "columns": ["site_id", "slug"],
+          "isUnique": false
+        },
+        "listings_publication_idx": {
+          "name": "listings_publication_idx",
+          "columns": [
+            "site_id",
+            "status",
+            "is_active",
+            "\"published_at\" DESC",
+            "display_order",
+            "slug"
+          ],
+          "isUnique": false
+        },
+        "listings_featured_idx": {
+          "name": "listings_featured_idx",
+          "columns": [
+            "site_id",
+            "status",
+            "is_active",
+            "is_featured",
+            "\"published_at\" DESC",
+            "display_order"
+          ],
+          "isUnique": false
+        },
+        "listings_name_idx": {
+          "name": "listings_name_idx",
+          "columns": ["site_id", "\"name\" COLLATE NOCASE"],
+          "isUnique": false
+        },
+        "listings_related_name_idx": {
+          "name": "listings_related_name_idx",
+          "columns": ["site_id", "name", "slug"],
+          "isUnique": false,
+          "where": "\"listings\".\"status\" = 'approved' AND \"listings\".\"is_active\" = 1 AND \"listings\".\"published_at\" IS NOT NULL"
+        },
+        "listings_site_slug_unique": {
+          "name": "listings_site_slug_unique",
+          "columns": ["site_id", "slug"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "listings_site_id_sites_id_fk": {
+          "name": "listings_site_id_sites_id_fk",
+          "tableFrom": "listings",
+          "tableTo": "sites",
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listings_priority_valid": {
+          "name": "listings_priority_valid",
+          "value": "\"listings\".\"priority\" IS NULL OR \"listings\".\"priority\" IN ('high', 'medium', 'low')"
+        },
+        "listings_is_unofficial_boolean": {
+          "name": "listings_is_unofficial_boolean",
+          "value": "\"is_unofficial\" IN (0, 1)"
+        },
+        "listings_is_featured_boolean": {
+          "name": "listings_is_featured_boolean",
+          "value": "\"is_featured\" IN (0, 1)"
+        },
+        "listings_is_active_boolean": {
+          "name": "listings_is_active_boolean",
+          "value": "\"is_active\" IN (0, 1)"
+        },
+        "listings_status_valid": {
+          "name": "listings_status_valid",
+          "value": "\"listings\".\"status\" IN ('draft', 'review', 'approved', 'rejected')"
+        },
+        "listings_display_order_nonnegative": {
+          "name": "listings_display_order_nonnegative",
+          "value": "\"listings\".\"display_order\" >= 0"
+        }
+      }
+    },
+    "migration_runs": {
+      "name": "migration_runs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "manifest_identity": {
+          "name": "manifest_identity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "input_checksum": {
+          "name": "input_checksum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_checksum": {
+          "name": "target_checksum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "affected_records": {
+          "name": "affected_records",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "migration_runs_site_time_idx": {
+          "name": "migration_runs_site_time_idx",
+          "columns": ["site_id", "\"started_at\" DESC"],
+          "isUnique": false
+        },
+        "migration_runs_site_manifest_unique": {
+          "name": "migration_runs_site_manifest_unique",
+          "columns": ["site_id", "manifest_identity"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "migration_runs_site_id_sites_id_fk": {
+          "name": "migration_runs_site_id_sites_id_fk",
+          "tableFrom": "migration_runs",
+          "tableTo": "sites",
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "migration_runs_outcome_valid": {
+          "name": "migration_runs_outcome_valid",
+          "value": "\"migration_runs\".\"outcome\" IN ('started', 'succeeded', 'failed')"
+        }
+      }
+    },
+    "publication_runs": {
+      "name": "publication_runs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "manifest_id": {
+          "name": "manifest_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "base_version": {
+          "name": "base_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_version": {
+          "name": "published_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "input_checksum": {
+          "name": "input_checksum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "affected_records": {
+          "name": "affected_records",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "affected_routes": {
+          "name": "affected_routes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "actor": {
+          "name": "actor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "workflow": {
+          "name": "workflow",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "before_checksum": {
+          "name": "before_checksum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "after_checksum": {
+          "name": "after_checksum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "publication_runs_site_time_idx": {
+          "name": "publication_runs_site_time_idx",
+          "columns": ["site_id", "\"started_at\" DESC"],
+          "isUnique": false
+        },
+        "publication_runs_site_manifest_unique": {
+          "name": "publication_runs_site_manifest_unique",
+          "columns": ["site_id", "manifest_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "publication_runs_site_id_sites_id_fk": {
+          "name": "publication_runs_site_id_sites_id_fk",
+          "tableFrom": "publication_runs",
+          "tableTo": "sites",
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "publication_runs_outcome_valid": {
+          "name": "publication_runs_outcome_valid",
+          "value": "\"publication_runs\".\"outcome\" IN ('started', 'succeeded', 'failed')"
+        }
+      }
+    },
+    "publication_state": {
+      "name": "publication_state",
+      "columns": {
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "manifest_id": {
+          "name": "manifest_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "checksum": {
+          "name": "checksum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "publication_state_site_id_sites_id_fk": {
+          "name": "publication_state_site_id_sites_id_fk",
+          "tableFrom": "publication_state",
+          "tableTo": "sites",
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "publication_state_version_nonnegative": {
+          "name": "publication_state_version_nonnegative",
+          "value": "\"publication_state\".\"version\" >= 0"
+        }
+      }
+    },
+    "sites": {
+      "name": "sites",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {
+      "listing_slug_redirects_listing_idx": {
+        "columns": {
+          "\"created_at\" DESC": {
+            "isExpression": true
+          }
+        }
+      },
+      "listings_publication_idx": {
+        "columns": {
+          "\"published_at\" DESC": {
+            "isExpression": true
+          }
+        }
+      },
+      "listings_featured_idx": {
+        "columns": {
+          "\"published_at\" DESC": {
+            "isExpression": true
+          }
+        }
+      },
+      "listings_name_idx": {
+        "columns": {
+          "\"name\" COLLATE NOCASE": {
+            "isExpression": true
+          }
+        }
+      },
+      "migration_runs_site_time_idx": {
+        "columns": {
+          "\"started_at\" DESC": {
+            "isExpression": true
+          }
+        }
+      },
+      "publication_runs_site_time_idx": {
+        "columns": {
+          "\"started_at\" DESC": {
+            "isExpression": true
+          }
+        }
+      }
+    }
+  }
+}

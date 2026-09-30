@@ -1,0 +1,27 @@
+---
+title: 'Getting Started'
+description: 'Run the Cloudflare D1-backed SERP Software Worker locally'
+order: 1
+published: true
+---
+
+# Getting Started
+
+Use Node 24 and pnpm 10.
+
+```bash
+nvm use
+pnpm install
+pnpm d1:local:migrate
+pnpm d1:local:import
+pnpm d1:local:verify
+pnpm dev
+```
+
+The local preview is the same OpenNext Worker architecture used in production, with
+an isolated local D1 identity. Listings, categories, search, RSS, and sitemaps all
+query D1.
+
+Site presentation configuration lives in `sites/serp.software/site-config.ts`.
+Schema changes live in `d1/migrations/`, while approved catalog changes use
+versioned manifests under `d1/publications/`.
