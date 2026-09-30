@@ -5,7 +5,10 @@ export type CatalogOperation =
   | 'canonical-redirect'
   | 'category-summaries'
   | 'featured-summaries'
+  | 'latest-summaries'
   | 'listing-detail'
+  | 'listing-name-order'
+  | 'listing-name-page'
   | 'listing-page'
   | 'published-summaries'
   | 'publication-version'
@@ -16,20 +19,19 @@ export type CatalogQueryShape =
   | 'canonical-redirect'
   | 'category-summaries'
   | 'featured-summaries'
+  | 'latest-summaries'
   | 'listing-detail'
+  | 'listing-name-order'
+  | 'listing-name-page-items'
   | 'listing-page-count'
   | 'listing-page-items'
-  | 'navigation-next-display'
-  | 'navigation-next-publication'
-  | 'navigation-next-slug'
-  | 'navigation-previous-display'
-  | 'navigation-previous-publication'
-  | 'navigation-previous-slug'
+  | 'navigation-next'
+  | 'navigation-previous'
   | 'publication-version'
   | 'published-summaries'
-  | 'related-logos'
-  | 'related-ranked-seek'
-  | 'related-single-category'
+  | 'related-shared-categories'
+  | 'related-single-category-members'
+  | 'related-single-category-seek'
   | 'search-summaries'
   | 'shell-stats'
 
@@ -47,7 +49,14 @@ export interface CatalogQueryEvent {
 
 export interface CatalogCacheEvent {
   event: 'catalog_cache'
-  operation: 'listing-detail' | 'published-summaries' | 'shell-stats'
+  operation:
+    | 'featured-summaries'
+    | 'latest-summaries'
+    | 'listing-detail'
+    | 'listing-name-order'
+    | 'listing-name-page'
+    | 'published-summaries'
+    | 'shell-stats'
   state: 'corrupt' | 'error' | 'hit' | 'miss' | 'write-error' | 'written'
 }
 
@@ -120,6 +129,28 @@ export interface ListingPage {
   total: number
 }
 
+/**
+ * One page of listings in directory (name) order, optionally within one category.
+ * `firstPublishedAt` / `lastPublishedAt` span the whole collection, not just the page.
+ */
+export interface ListingNamePage {
+  category: string | null
+  firstPublishedAt: string | null
+  items: ListingSummary[]
+  lastPublishedAt: string | null
+  page: number
+  pageCount: number
+  pageSize: number
+  total: number
+}
+
+export interface ListingNamePageQuery {
+  /** Restrict to one active category slug; omit for the whole directory. */
+  category?: string
+  page?: number
+  pageSize?: number
+}
+
 export interface PublishedCategory {
   count: number
   description: string
@@ -131,6 +162,8 @@ export interface PublishedCategory {
 export interface CatalogShellStats {
   categories: PublishedCategory[]
   featuredCount: number
+  /** Number of publicly visible listings. */
+  listingCount: number
   publicationVersion: number
 }
 
@@ -143,6 +176,7 @@ export interface CatalogOperations {
   getFeaturedListings(limit?: number): Promise<ListingSummary[]>
   getLatestListings(limit?: number): Promise<ListingSummary[]>
   getListingBySlug(slug: string): Promise<ListingDetail | null>
+  getListingNamePage(query?: ListingNamePageQuery): Promise<ListingNamePage>
   getListingsByCategory(slug: string): Promise<ListingSummary[]>
   getPublicationVersion(): Promise<number>
   getPublishedListingPage(page?: number, pageSize?: number): Promise<ListingPage>

@@ -1,6 +1,12 @@
 import 'server-only'
 
 import { and, eq, type SQL, sql } from 'drizzle-orm'
+import {
+  type CatalogEpoch,
+  catalogEpochStatement,
+  catalogEpochToken,
+  parseCatalogEpoch
+} from './catalog-epoch'
 import { type CompiledQuery, runQuery } from './client'
 import type {
   CatalogCacheEvent,
@@ -11,6 +17,8 @@ import type {
   CatalogQueryShape,
   CatalogShellStats,
   ListingDetail,
+  ListingNamePage,
+  ListingNamePageQuery,
   ListingNavigation,
   ListingPage,
   ListingResourceLink,
@@ -18,12 +26,29 @@ import type {
   PublishedCategory,
   RelatedListing
 } from './contracts'
-import { listingSlugRedirects, listings, publicationState } from './schema'
+import { listingSlugRedirects, listings } from './schema'
 
-const CACHE_SCHEMA = 'v2'
-const CACHE_TTL_SECONDS = 60 * 60
+const CACHE_SCHEMA = 'v3'
+/**
+ * Keys include the catalog epoch (publication version plus the latest public
+ * `published_at`), so an entry can never outlive the content it was built from; the TTL
+ * only bounds storage.
+ */
+const CACHE_TTL_SECONDS = 24 * 60 * 60
 const PUBLICATION_ORDER = 'l.published_at DESC, l.display_order ASC, l.slug ASC'
+/** Directory pages show this many listings unless a caller asks for another size. */
+export const LISTING_PAGE_SIZE = 48
+const MAX_LISTING_PAGE_SIZE = 100
+/**
+ * A single-category listing's related candidates are read from its category's members
+ * when the category is at most this large; larger (dense) categories walk the name index
+ * instead, which finds four members after a handful of rows. Both plans return the same
+ * rows; this only picks the cheaper one (see DATA_MODEL.md).
+ */
+const RELATED_MEMBER_SCAN_LIMIT = 128
 const runtimePriorities = new Set(['high', 'medium', 'low'])
+/** Directory name order is the locale order the pages have always used (`localeCompare`). */
+const nameCollator = new Intl.Collator()
 
 interface QueryMeta {
   duration?: number
@@ -62,14 +87,26 @@ interface NavigationRow {
   website: string
 }
 
-interface RelatedLogoRow {
-  listing_id: string
-  url: string
+interface RelatedRow {
+  description: string
+  id: string
+  is_unofficial: number
+  logo: string | null
+  name: string
+  slug: string
+  website: string
+}
+
+interface NameOrderRow {
+  id: string
+  name: string
+  published_at: string
 }
 
 interface ShellRow {
   categories: string
   featured_count: number
+  listing_count: number
 }
 
 /**
@@ -235,6 +272,8 @@ function isShellStats(value: unknown, publicationVersion: number): value is Cata
     candidate.publicationVersion === publicationVersion &&
     Number.isSafeInteger(candidate.featuredCount) &&
     (candidate.featuredCount as number) >= 0 &&
+    Number.isSafeInteger(candidate.listingCount) &&
+    (candidate.listingCount as number) >= 0 &&
     Array.isArray(candidate.categories) &&
     candidate.categories.every(
       category =>
@@ -387,12 +426,60 @@ function isDetailCacheEntry(value: unknown, publicationVersion: number): value i
   )
 }
 
+interface NameOrderEntry {
+  firstPublishedAt: string | null
+  ids: string[]
+  lastPublishedAt: string | null
+  publicationVersion: number
+}
+
+interface NamePageEntry {
+  page: ListingNamePage
+  publicationVersion: number
+}
+
+function isNullableString(value: unknown): boolean {
+  return value === null || (typeof value === 'string' && value.length > 0)
+}
+
+function isNameOrderEntry(value: unknown, publicationVersion: number): value is NameOrderEntry {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<NameOrderEntry>
+  return (
+    candidate.publicationVersion === publicationVersion &&
+    Array.isArray(candidate.ids) &&
+    candidate.ids.every(id => typeof id === 'string' && id.length > 0) &&
+    isNullableString(candidate.firstPublishedAt) &&
+    isNullableString(candidate.lastPublishedAt)
+  )
+}
+
+function isNamePageEntry(value: unknown, publicationVersion: number): value is NamePageEntry {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<NamePageEntry>
+  const page = candidate.page as Partial<ListingNamePage> | undefined
+  return (
+    candidate.publicationVersion === publicationVersion &&
+    !!page &&
+    typeof page === 'object' &&
+    (page.category === null || (typeof page.category === 'string' && page.category.length > 0)) &&
+    isNullableString(page.firstPublishedAt) &&
+    isNullableString(page.lastPublishedAt) &&
+    Array.isArray(page.items) &&
+    page.items.every(isListingSummary) &&
+    [page.page, page.pageCount, page.pageSize, page.total].every(
+      value => Number.isSafeInteger(value) && (value as number) >= 0
+    )
+  )
+}
+
 export function createCatalogOperations(config: CatalogOperationsConfig): CatalogOperations {
   const { cache, client, clock, observe } = config
-  let publicationVersionPromise: Promise<number> | undefined
+  let epochPromise: Promise<CatalogEpoch> | undefined
   let publishedListingsPromise: Promise<ListingSummary[]> | undefined
   let shellStatsPromise: Promise<CatalogShellStats> | undefined
   const detailPromises = new Map<string, Promise<ListingDetail | null>>()
+  const nameOrderPromises = new Map<string, Promise<NameOrderEntry>>()
 
   async function queryAll<T>(
     operation: CatalogOperation,
@@ -506,38 +593,62 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     return rows.map(mapSummary)
   }
 
-  async function queryPublicationVersion(): Promise<number> {
-    const rows = await queryAll<{ version: number }>(
+  async function queryCatalogEpoch(): Promise<CatalogEpoch> {
+    const rows = await queryAll(
       'publication-version',
       'publication-version',
-      client.database
-        .select({ version: publicationState.version })
-        .from(publicationState)
-        .where(eq(publicationState.id, 1))
-        .limit(1)
+      catalogEpochStatement(operationTime())
     )
-    return requireNonNegativeInteger(rows[0]?.version, 'publication state')
+    return parseCatalogEpoch(rows[0])
   }
 
-  function getPublicationVersion(): Promise<number> {
-    publicationVersionPromise ||= queryPublicationVersion()
-    return publicationVersionPromise
+  function getCatalogEpoch(): Promise<CatalogEpoch> {
+    epochPromise ||= queryCatalogEpoch()
+    return epochPromise
+  }
+
+  async function getPublicationVersion(): Promise<number> {
+    return (await getCatalogEpoch()).version
+  }
+
+  /** Cache key prefix for the current epoch: `<kind>:<schema>:<epoch token>`. */
+  async function epochKey(kind: string): Promise<{ key: string; publicationVersion: number }> {
+    const epoch = await getCatalogEpoch()
+    return {
+      key: `${kind}:${CACHE_SCHEMA}:${catalogEpochToken(epoch)}`,
+      publicationVersion: epoch.version
+    }
   }
 
   async function loadShellStats(): Promise<CatalogShellStats> {
-    const publicationVersion = await getPublicationVersion()
-    const cacheKey = `catalog-shell:${CACHE_SCHEMA}:${publicationVersion}`
+    const { key: cacheKey, publicationVersion } = await epochKey('catalog-shell')
     const cached = await readCache('shell-stats', cacheKey, (value): value is CatalogShellStats =>
       isShellStats(value, publicationVersion)
     )
     if (cached) return cached
 
     const asOf = operationTime()
+    // One pass over public memberships instead of a correlated count per category, which
+    // read categories x listings rows (~487k on the live catalog). Every public listing has
+    // exactly one primary category (enforced by the baseline triggers), so the listing and
+    // featured totals are sums of primary memberships from the same pass.
     const rows = await queryAll<ShellRow>(
       'shell-stats',
       'shell-stats',
       parameterizedQuery<ShellRow>(
-        `SELECT
+        `WITH membership_counts AS (
+          SELECT
+            lc.category_id,
+            COUNT(*) AS listing_count,
+            SUM(lc.is_primary) AS primary_count,
+            SUM(CASE WHEN lc.is_primary = 1 AND l.is_featured = 1 THEN 1 ELSE 0 END)
+              AS featured_primary_count
+          FROM listings l
+          JOIN listing_categories lc ON lc.listing_id = l.id
+          WHERE ${publicEligibilitySql()}
+          GROUP BY lc.category_id
+        )
+        SELECT
         COALESCE((
           SELECT json_group_array(json_object(
             'slug', counts.slug,
@@ -552,23 +663,17 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
               c.name,
               c.description,
               c.sort_order,
-              (
-                SELECT COUNT(*)
-                FROM listing_categories lc
-                JOIN listings l ON l.id = lc.listing_id
-                WHERE lc.category_id = c.id AND ${publicEligibilitySql()}
-              ) AS listing_count
+              COALESCE(membership_counts.listing_count, 0) AS listing_count
             FROM categories c
+            LEFT JOIN membership_counts ON membership_counts.category_id = c.id
             WHERE c.is_active = 1
             ORDER BY c.sort_order ASC, c.name ASC
           ) counts
         ), '[]') AS categories,
-        (
-          SELECT COUNT(*)
-          FROM listings l
-          WHERE ${publicEligibilitySql()} AND l.is_featured = 1
-        ) AS featured_count`,
-        [asOf, asOf]
+        COALESCE((SELECT SUM(featured_primary_count) FROM membership_counts), 0)
+          AS featured_count,
+        COALESCE((SELECT SUM(primary_count) FROM membership_counts), 0) AS listing_count`,
+        [asOf]
       )
     )
     const row = rows[0]
@@ -590,6 +695,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     const stats: CatalogShellStats = {
       categories,
       featuredCount: requireNonNegativeInteger(row.featured_count, 'featured count'),
+      listingCount: requireNonNegativeInteger(row.listing_count, 'listing count'),
       publicationVersion
     }
     await writeCache('shell-stats', cacheKey, stats)
@@ -601,6 +707,13 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     return shellStatsPromise
   }
 
+  /**
+   * Adjacent listing in publication order. The three keyset branches (same publication
+   * time and display order, same publication time, earlier/later publication) are each an
+   * index seek. They run as one statement whose COALESCE only evaluates a branch when the
+   * previous ones found nothing, so a detail page needs one round trip per direction
+   * instead of up to three sequential ones, without reading more rows.
+   */
   async function navigation(
     current: Pick<SummaryRow, 'display_order' | 'published_at' | 'slug'>,
     asOf: string,
@@ -612,49 +725,42 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
           {
             bindings: [current.published_at, current.display_order, current.slug],
             order: 'l.slug DESC',
-            predicate: 'l.published_at = ? AND l.display_order = ? AND l.slug < ?',
-            shape: 'navigation-previous-slug' as const
+            predicate: 'l.published_at = ? AND l.display_order = ? AND l.slug < ?'
           },
           {
             bindings: [current.published_at, current.display_order],
             order: 'l.display_order DESC, l.slug DESC',
-            predicate: 'l.published_at = ? AND l.display_order < ?',
-            shape: 'navigation-previous-display' as const
+            predicate: 'l.published_at = ? AND l.display_order < ?'
           },
           {
             bindings: [current.published_at],
             order: 'l.published_at ASC, l.display_order DESC, l.slug DESC',
-            predicate: 'l.published_at > ?',
-            shape: 'navigation-previous-publication' as const
+            predicate: 'l.published_at > ?'
           }
         ]
       : [
           {
             bindings: [current.published_at, current.display_order, current.slug],
             order: 'l.slug ASC',
-            predicate: 'l.published_at = ? AND l.display_order = ? AND l.slug > ?',
-            shape: 'navigation-next-slug' as const
+            predicate: 'l.published_at = ? AND l.display_order = ? AND l.slug > ?'
           },
           {
             bindings: [current.published_at, current.display_order],
             order: 'l.display_order ASC, l.slug ASC',
-            predicate: 'l.published_at = ? AND l.display_order > ?',
-            shape: 'navigation-next-display' as const
+            predicate: 'l.published_at = ? AND l.display_order > ?'
           },
           {
             bindings: [current.published_at],
             order: PUBLICATION_ORDER,
-            predicate: 'l.published_at < ?',
-            shape: 'navigation-next-publication' as const
+            predicate: 'l.published_at < ?'
           }
         ]
 
-    for (const branch of branches) {
-      const rows = await queryAll<NavigationRow>(
-        'listing-detail',
-        branch.shape,
-        parameterizedQuery<NavigationRow>(
-          `SELECT
+    const rows = await queryAll<NavigationRow>(
+      'listing-detail',
+      isPrevious ? 'navigation-previous' : 'navigation-next',
+      parameterizedQuery<NavigationRow>(
+        `SELECT
         l.slug,
         l.name,
         l.website,
@@ -664,15 +770,24 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
           ORDER BY m.sort_order ASC LIMIT 1
         ) AS logo
       FROM listings l
-      WHERE ${publicEligibilitySql()} AND ${branch.predicate}
-      ORDER BY ${branch.order}
-      LIMIT 1`,
-          [asOf, ...branch.bindings]
-        )
+      WHERE l.id = COALESCE(
+        ${branches
+          .map(
+            branch => `(
+          SELECT l.id
+          FROM listings l
+          WHERE ${publicEligibilitySql()} AND ${branch.predicate}
+          ORDER BY ${branch.order}
+          LIMIT 1
+        )`
+          )
+          .join(',\n        ')}
       )
-      if (rows[0]) return mapNavigation(rows[0])
-    }
-    return null
+      LIMIT 1`,
+        branches.flatMap(branch => [asOf, ...branch.bindings])
+      )
+    )
+    return mapNavigation(rows[0])
   }
 
   async function queryListingBySlug(slug: string): Promise<ListingDetail | null> {
@@ -716,123 +831,8 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     const row = rows[0]
     if (!row) return null
 
-    const relatedRows: SummaryRow[] = []
-    const sharedCategoryCount = (row.categories || '')
-      .split(String.fromCharCode(31))
-      .filter(Boolean).length
-    if (sharedCategoryCount === 1) {
-      relatedRows.push(
-        ...(await queryAll<SummaryRow>(
-          'listing-detail',
-          'related-single-category',
-          parameterizedQuery<SummaryRow>(
-            `SELECT
-             l.id,
-             l.slug,
-             l.name,
-             l.description,
-             l.website,
-             l.display_order,
-             l.is_unofficial,
-             l.is_featured,
-             l.published_at,
-             '' AS category,
-             NULL AS categories,
-             NULL AS logo
-           FROM listings l INDEXED BY listings_related_name_idx
-           WHERE ${publicEligibilitySql()}
-             AND l.id != ?
-             AND EXISTS (
-               SELECT 1
-               FROM listing_categories shared
-               WHERE shared.listing_id = l.id
-                 AND shared.category_id = (
-                   SELECT current.category_id
-                   FROM listing_categories current
-                   WHERE current.listing_id = ?
-                   LIMIT 1
-                 )
-             )
-           ORDER BY l.name ASC, l.slug ASC
-           LIMIT 4`,
-            [asOf, row.id, row.id]
-          )
-        ))
-      )
-    }
-    for (
-      let score = sharedCategoryCount;
-      sharedCategoryCount > 1 && score >= 1 && relatedRows.length < 4;
-      score -= 1
-    ) {
-      const scoreRows = await queryAll<SummaryRow>(
-        'listing-detail',
-        'related-ranked-seek',
-        parameterizedQuery<SummaryRow>(
-          `SELECT
-           l.id,
-           l.slug,
-           l.name,
-           l.description,
-           l.website,
-           l.display_order,
-           l.is_unofficial,
-           l.is_featured,
-           l.published_at,
-           '' AS category,
-           NULL AS categories,
-           NULL AS logo
-         FROM listings l INDEXED BY listings_related_name_idx
-         WHERE ${publicEligibilitySql()}
-           AND l.id != ?
-           AND (
-             SELECT COUNT(*)
-             FROM listing_categories current
-             WHERE current.listing_id = ?
-               AND EXISTS (
-                 SELECT 1
-                 FROM listing_categories shared
-                 WHERE shared.listing_id = l.id
-                   AND shared.category_id = current.category_id
-               )
-           ) = ?
-         ORDER BY l.name ASC, l.slug ASC
-         LIMIT ?`,
-          [asOf, row.id, row.id, score, 4 - relatedRows.length]
-        )
-      )
-      relatedRows.push(...scoreRows)
-    }
-    const relatedIds = relatedRows.map(related => related.id)
-    const logoRows = relatedIds.length
-      ? await queryAll<RelatedLogoRow>(
-          'listing-detail',
-          'related-logos',
-          parameterizedQuery<RelatedLogoRow>(
-            `SELECT listing_id, url
-           FROM listing_media
-           WHERE listing_id IN (${relatedIds.map(() => '?').join(', ')})
-             AND kind = 'logo'
-           ORDER BY listing_id ASC, sort_order ASC`,
-            relatedIds
-          )
-        )
-      : []
-    const logos = new Map<string, string>()
-    for (const logo of logoRows) {
-      if (!logos.has(logo.listing_id)) logos.set(logo.listing_id, logo.url)
-    }
-    const relatedWebsites: RelatedListing[] = relatedRows.map(related => ({
-      description: requireString(related.description, 'related description'),
-      isUnofficial: related.is_unofficial === 1 || undefined,
-      media: logos.has(related.id)
-        ? { logo: requireString(logos.get(related.id), 'related logo') }
-        : undefined,
-      name: requireString(related.name, 'related name'),
-      slug: requireString(related.slug, 'related slug'),
-      website: requireString(related.website, 'related website')
-    }))
-    const [previousWebsite, nextWebsite] = await Promise.all([
+    const [relatedWebsites, previousWebsite, nextWebsite] = await Promise.all([
+      relatedListings(row, asOf),
       navigation(row, asOf, 'previous'),
       navigation(row, asOf, 'next')
     ])
@@ -844,9 +844,113 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     }
   }
 
+  /**
+   * Up to four related listings ranked by shared categories (most first), then name and
+   * slug. One statement, with each related logo resolved only for the returned rows.
+   *
+   * - Several categories: count shared memberships from the listing's own categories
+   *   (bounded by the size of those categories).
+   * - One category: read that category's members when it is small, otherwise walk the
+   *   public name index, where a dense category yields four members almost immediately.
+   */
+  async function relatedListings(row: DetailRow, asOf: string): Promise<RelatedListing[]> {
+    const sharedCategoryCount = (row.categories || '')
+      .split(String.fromCharCode(31))
+      .filter(Boolean).length
+    let queryShape: CatalogQueryShape
+    let candidates: string
+    let bindings: unknown[]
+    if (sharedCategoryCount > 1) {
+      queryShape = 'related-shared-categories'
+      candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
+             COUNT(*) AS score
+           FROM listing_categories current
+           CROSS JOIN listing_categories shared INDEXED BY listing_categories_category_idx
+             ON shared.category_id = current.category_id
+           CROSS JOIN listings l ON l.id = shared.listing_id
+           WHERE current.listing_id = ?
+             AND shared.listing_id != current.listing_id
+             AND ${publicEligibilitySql()}
+           GROUP BY l.id
+           ORDER BY score DESC, l.name ASC, l.slug ASC
+           LIMIT 4`
+      bindings = [row.id, asOf]
+    } else {
+      const categorySize = (await getShellStats()).categories.find(
+        category => category.slug === row.category
+      )?.count
+      const currentCategory = `(
+               SELECT current.category_id
+               FROM listing_categories current
+               WHERE current.listing_id = ?
+               LIMIT 1
+             )`
+      if (categorySize !== undefined && categorySize <= RELATED_MEMBER_SCAN_LIMIT) {
+        queryShape = 'related-single-category-members'
+        candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
+             1 AS score
+           FROM listing_categories shared INDEXED BY listing_categories_category_idx
+           CROSS JOIN listings l ON l.id = shared.listing_id
+           WHERE shared.category_id = ${currentCategory}
+             AND ${publicEligibilitySql()}
+             AND l.id != ?
+           ORDER BY l.name ASC, l.slug ASC
+           LIMIT 4`
+        bindings = [row.id, asOf, row.id]
+      } else {
+        queryShape = 'related-single-category-seek'
+        candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
+             1 AS score
+           FROM listings l INDEXED BY listings_related_name_idx
+           WHERE ${publicEligibilitySql()}
+             AND l.id != ?
+             AND EXISTS (
+               SELECT 1
+               FROM listing_categories shared
+               WHERE shared.listing_id = l.id
+                 AND shared.category_id = ${currentCategory}
+             )
+           ORDER BY l.name ASC, l.slug ASC
+           LIMIT 4`
+        bindings = [asOf, row.id, row.id]
+      }
+    }
+    const relatedRows = await queryAll<RelatedRow>(
+      'listing-detail',
+      queryShape,
+      parameterizedQuery<RelatedRow>(
+        `SELECT
+        related.id,
+        related.slug,
+        related.name,
+        related.description,
+        related.website,
+        related.is_unofficial,
+        (
+          SELECT m.url FROM listing_media m
+          WHERE m.listing_id = related.id AND m.kind = 'logo'
+          ORDER BY m.sort_order ASC LIMIT 1
+        ) AS logo
+      FROM (
+        ${candidates}
+      ) related
+      ORDER BY related.score DESC, related.name ASC, related.slug ASC`,
+        bindings
+      )
+    )
+    return relatedRows.map(related => ({
+      description: requireString(related.description, 'related description'),
+      isUnofficial: related.is_unofficial === 1 || undefined,
+      media: related.logo ? { logo: requireString(related.logo, 'related logo') } : undefined,
+      name: requireString(related.name, 'related name'),
+      slug: requireString(related.slug, 'related slug'),
+      website: requireString(related.website, 'related website')
+    }))
+  }
+
   async function loadListingBySlug(slug: string): Promise<ListingDetail | null> {
-    const publicationVersion = await getPublicationVersion()
-    const cacheKey = `catalog-detail:${CACHE_SCHEMA}:${publicationVersion}:${slug}`
+    const { key, publicationVersion } = await epochKey('catalog-detail')
+    const cacheKey = `${key}:${slug}`
     const cached = await readCache('listing-detail', cacheKey, (value): value is DetailCacheEntry =>
       isDetailCacheEntry(value, publicationVersion)
     )
@@ -866,8 +970,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   }
 
   async function loadPublishedListings(): Promise<ListingSummary[]> {
-    const publicationVersion = await getPublicationVersion()
-    const cacheKey = `catalog-published:${CACHE_SCHEMA}:${publicationVersion}`
+    const { key: cacheKey, publicationVersion } = await epochKey('catalog-published')
     const cached = await readCache(
       'published-summaries',
       cacheKey,
@@ -891,9 +994,12 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     return publishedListingsPromise
   }
 
-  async function getPublishedListingPage(page = 1, pageSize = 48): Promise<ListingPage> {
+  async function getPublishedListingPage(
+    page = 1,
+    pageSize = LISTING_PAGE_SIZE
+  ): Promise<ListingPage> {
     const safePage = Math.max(1, Math.trunc(page))
-    const safePageSize = Math.min(100, Math.max(1, Math.trunc(pageSize)))
+    const safePageSize = Math.min(MAX_LISTING_PAGE_SIZE, Math.max(1, Math.trunc(pageSize)))
     const asOf = operationTime()
     const [rows, countRows] = await Promise.all([
       queryAll<SummaryRow>(
@@ -919,6 +1025,145 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       pageSize: safePageSize,
       total: requireNonNegativeInteger(countRows[0]?.total, 'listing count')
     }
+  }
+
+  /**
+   * Public listing ids in directory name order, optionally within one category. The
+   * order is the one the directory pages have always rendered: publication order, then a
+   * stable locale sort by name. Only ids, names, and dates are read, and the result is
+   * cached per epoch, so a page needs one small lookup instead of the whole catalog.
+   */
+  function getNameOrder(category: string | null): Promise<NameOrderEntry> {
+    const key = category ?? '*'
+    let order = nameOrderPromises.get(key)
+    if (!order) {
+      order = loadNameOrder(category)
+      nameOrderPromises.set(key, order)
+    }
+    return order
+  }
+
+  async function loadNameOrder(category: string | null): Promise<NameOrderEntry> {
+    const { key, publicationVersion } = await epochKey('catalog-name-order')
+    const cacheKey = `${key}:${category ?? '*'}`
+    const cached = await readCache(
+      'listing-name-order',
+      cacheKey,
+      (value): value is NameOrderEntry => isNameOrderEntry(value, publicationVersion)
+    )
+    if (cached) return cached
+
+    const asOf = operationTime()
+    const rows = await queryAll<NameOrderRow>(
+      'listing-name-order',
+      'listing-name-order',
+      category === null
+        ? parameterizedQuery<NameOrderRow>(
+            `SELECT l.id, l.name, l.published_at
+            FROM listings l
+            WHERE ${publicEligibilitySql()}
+            ORDER BY ${PUBLICATION_ORDER}`,
+            [asOf]
+          )
+        : parameterizedQuery<NameOrderRow>(
+            `SELECT l.id, l.name, l.published_at
+            FROM categories c
+            CROSS JOIN listing_categories lc INDEXED BY listing_categories_category_idx
+              ON lc.category_id = c.id
+            CROSS JOIN listings l ON l.id = lc.listing_id
+            WHERE c.slug = ? AND c.is_active = 1 AND ${publicEligibilitySql()}
+            ORDER BY ${PUBLICATION_ORDER}`,
+            [category, asOf]
+          )
+    )
+    const ordered = rows
+      .map(orderRow => ({
+        id: requireString(orderRow.id, 'listing id'),
+        name: requireString(orderRow.name, 'listing name'),
+        publishedAt: requireString(orderRow.published_at, 'publication date').slice(0, 10)
+      }))
+      .sort((left, right) => nameCollator.compare(left.name, right.name))
+    const dates = ordered.map(entry => entry.publishedAt).sort()
+    const entry: NameOrderEntry = {
+      firstPublishedAt: dates[0] ?? null,
+      ids: ordered.map(orderEntry => orderEntry.id),
+      lastPublishedAt: dates.at(-1) ?? null,
+      publicationVersion
+    }
+    await writeCache('listing-name-order', cacheKey, entry)
+    return entry
+  }
+
+  async function getListingNamePage(query: ListingNamePageQuery = {}): Promise<ListingNamePage> {
+    const category = query.category ?? null
+    const page = Math.max(1, Math.trunc(query.page ?? 1))
+    const pageSize = Math.min(
+      MAX_LISTING_PAGE_SIZE,
+      Math.max(1, Math.trunc(query.pageSize ?? LISTING_PAGE_SIZE))
+    )
+    const { key, publicationVersion } = await epochKey('catalog-name-page')
+    const cacheKey = `${key}:${category ?? '*'}:${pageSize}:${page}`
+    const cached = await readCache('listing-name-page', cacheKey, (value): value is NamePageEntry =>
+      isNamePageEntry(value, publicationVersion)
+    )
+    if (cached) return cached.page
+
+    const order = await getNameOrder(category)
+    const ids = order.ids.slice((page - 1) * pageSize, page * pageSize)
+    const rows = ids.length
+      ? await queryAll<SummaryRow>(
+          'listing-name-page',
+          'listing-name-page-items',
+          parameterizedQuery<SummaryRow>(
+            `SELECT ${summaryColumns}
+            FROM json_each(?) page_ids
+            CROSS JOIN listings l ON l.id = page_ids.value
+            WHERE ${publicEligibilitySql()}`,
+            [JSON.stringify(ids), operationTime()]
+          )
+        )
+      : []
+    const byId = new Map(rows.map(summaryRow => [summaryRow.id, mapSummary(summaryRow)]))
+    const result: ListingNamePage = {
+      category,
+      firstPublishedAt: order.firstPublishedAt,
+      items: ids.flatMap(id => {
+        const item = byId.get(id)
+        return item ? [item] : []
+      }),
+      lastPublishedAt: order.lastPublishedAt,
+      page,
+      pageCount: Math.max(1, Math.ceil(order.ids.length / pageSize)),
+      pageSize,
+      total: order.ids.length
+    }
+    await writeCache('listing-name-page', cacheKey, { page: result, publicationVersion })
+    return result
+  }
+
+  /** First `limit` public listings in publication order, optionally featured only. */
+  async function publicationHead(
+    operation: 'featured-summaries' | 'latest-summaries',
+    limit: number
+  ): Promise<ListingSummary[]> {
+    const safeLimit = Math.min(MAX_LISTING_PAGE_SIZE, Math.max(1, Math.trunc(limit)))
+    const { key, publicationVersion } = await epochKey(`catalog-${operation}`)
+    const cacheKey = `${key}:${safeLimit}`
+    const cached = await readCache(operation, cacheKey, (value): value is PublishedCacheEntry =>
+      isPublishedCacheEntry(value, publicationVersion)
+    )
+    if (cached) return cached.items
+
+    const items = await summaries(
+      operation,
+      operation,
+      operation === 'featured-summaries' ? ' AND l.is_featured = 1' : '',
+      [],
+      PUBLICATION_ORDER,
+      safeLimit
+    )
+    await writeCache(operation, cacheKey, { items, publicationVersion })
+    return items
   }
 
   async function searchListings(query: string, limit = 50): Promise<ListingSummary[]> {
@@ -984,14 +1229,13 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       return (await getShellStats()).featuredCount
     },
     async getFeaturedListings(limit = 6) {
-      const safeLimit = Math.min(100, Math.max(1, Math.trunc(limit)))
-      return (await getPublishedListings()).filter(listing => listing.featured).slice(0, safeLimit)
+      return publicationHead('featured-summaries', limit)
     },
     async getLatestListings(limit = 12) {
-      const safeLimit = Math.min(100, Math.max(1, Math.trunc(limit)))
-      return (await getPublishedListings()).slice(0, safeLimit)
+      return publicationHead('latest-summaries', limit)
     },
     getListingBySlug,
+    getListingNamePage,
     async getListingsByCategory(slug) {
       return (await getPublishedListings()).filter(listing => listing.categories?.includes(slug))
     },
