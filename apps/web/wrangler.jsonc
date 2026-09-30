@@ -19,5 +19,45 @@
       "database_id": "00000000-0000-0000-0000-000000000001",
       "migrations_dir": "../../d1/drizzle"
     }
-  ]
+  ],
+  "env": {
+    "staging": {
+      "name": "best-serp-co-staging",
+      "workers_dev": true,
+      "observability": {
+        "enabled": true
+      },
+      "vars": {
+        "AUTH_TRUST_HOST": "true",
+        "D1_RUNTIME_ENV": "staging"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "best-serp-co-staging",
+          "database_id": "8e6b67e5-9c58-4fa9-aca1-25b0020c0833",
+          "migrations_dir": "../../d1/drizzle"
+        }
+      ]
+    },
+    "production": {
+      "name": "best-serp-co-production",
+      "workers_dev": false,
+      "observability": {
+        "enabled": true
+      },
+      "vars": {
+        "AUTH_TRUST_HOST": "true",
+        "D1_RUNTIME_ENV": "production"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "best-serp-co-production",
+          "database_id": "404ec437-53a2-4fbc-8b5f-b5e69065708e",
+          "migrations_dir": "../../d1/drizzle"
+        }
+      ]
+    }
+  }
 }

@@ -70,6 +70,27 @@ describe('changed-file Biome policy', () => {
     )
   })
 
+  it('diffs a force-pushed unrelated history from its own root, not the replaced revision', () => {
+    const root = initializeGitRepository('biome-force-push-')
+
+    writeFileSync(join(root, 'replaced.ts'), 'export const replaced = true\n')
+    git(root, ['add', '.'])
+    git(root, ['commit', '-m', 'replaced history'])
+    const before = gitOutput(root, ['rev-parse', 'HEAD'])
+
+    git(root, ['checkout', '--orphan', 'rewritten'])
+    git(root, ['rm', '-rf', '.'])
+    writeFileSync(join(root, 'imported.ts'), 'export const imported = true\n')
+    git(root, ['add', '.'])
+    git(root, ['commit', '-m', 'imported baseline'])
+    writeFileSync(join(root, 'changed.ts'), 'export const changed = true\n')
+    git(root, ['add', '.'])
+    git(root, ['commit', '-m', 'change on the new history'])
+    const head = gitOutput(root, ['rev-parse', 'HEAD'])
+
+    expect(collectChangedBiomeFiles(root, { base: before, head })).toEqual(['changed.ts'])
+  })
+
   it('includes supported files committed after origin main', () => {
     const root = initializeGitRepository('biome-branch-range-')
 

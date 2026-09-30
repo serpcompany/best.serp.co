@@ -1,13 +1,30 @@
 # Deploy runbook
 
-Status: staging and production are not provisioned yet (serpcompany/best.serp.co#34,
-Phase 4). Until cutover, best.serp.co is still served by GitHub Pages from the
-`legacy-static` bundle.
+Status (serpcompany/best.serp.co#34):
+
+- **Staging** is live at https://best-serp-co-staging.serpcompany.workers.dev (D1
+  `best-serp-co-staging`, catalog imported and verified against the parity report). Every
+  `*.workers.dev` response carries `X-Robots-Tag: noindex, nofollow`.
+- **Production** D1 `best-serp-co-production` exists with no data; the production Worker
+  is not deployed.
+- **best.serp.co** is still served by GitHub Pages from the `legacy-static` branch, whose
+  deploy workflow runs on pushes to that branch.
+
+Manual commands used so far (from `apps/web`, authenticated with `wrangler login`):
+
+```bash
+pnpm exec wrangler d1 migrations apply best-serp-co-staging --remote --env staging
+pnpm exec wrangler d1 execute best-serp-co-staging --remote --env staging \
+  --file ../../d1/artifacts/best-serp-co-v1.sql --yes
+pnpm build:worker && pnpm exec opennextjs-cloudflare deploy --env staging
+```
+
+The single-file import applies all 3,422 listings in about 30 seconds.
 
 ## Target shape
 
-- Workers `best-serp-co-staging` and `best-serp-co-production`, declared as
-  `env.staging` / `env.production` in `apps/web/wrangler.jsonc`.
+- Workers `best-serp-co-staging` (workers.dev) and `best-serp-co-production` (no
+  workers.dev), declared as `env.staging` / `env.production` in `apps/web/wrangler.jsonc`.
 - D1 databases `best-serp-co-staging` and `best-serp-co-production` (IDs committed in
   `wrangler.jsonc`; they are not secrets), `D1_RUNTIME_ENV` `staging` / `production`.
 - Production served through a Worker Custom Domain on the `serp.co` zone for

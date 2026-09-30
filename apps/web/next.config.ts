@@ -94,6 +94,12 @@ let nextConfig: NextConfig = {
 
   headers: async () => [
     {
+      // Staging runs on a public *.workers.dev hostname; keep it out of search indexes.
+      source: '/:path*',
+      has: [{ type: 'host', value: '.*\\.workers\\.dev' }],
+      headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }]
+    },
+    {
       source: '/admin/submissions/:path*',
       headers: [
         { key: 'Cache-Control', value: 'private, no-store, max-age=0' },

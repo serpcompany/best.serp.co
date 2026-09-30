@@ -59,6 +59,29 @@ function assertGitRevision(root: string, revision: string, role: 'base' | 'head'
   }
 }
 
+function gitSucceeds(root: string, args: string[]): boolean {
+  return spawnSync('git', args, { cwd: root, stdio: 'ignore' }).status === 0
+}
+
+function gitLine(root: string, args: string[]): string | undefined {
+  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
+  return result.status === 0 ? result.stdout.trim().split('\n').at(-1) || undefined : undefined
+}
+
+/**
+ * A force-push or history rewrite hands us a `before` revision that is not an ancestor of
+ * the pushed head, so `base..head` would list every file in the repository. Compare against
+ * the common ancestor instead, or, for unrelated histories, the pushed history's root commit.
+ */
+export function effectiveDiffBase(root: string, range: CommittedDiffRange): string {
+  if (gitSucceeds(root, ['merge-base', '--is-ancestor', range.base, range.head])) return range.base
+  return (
+    gitLine(root, ['merge-base', range.base, range.head]) ??
+    gitLine(root, ['rev-list', '--max-parents=0', range.head]) ??
+    range.base
+  )
+}
+
 export function collectChangedBiomeFiles(
   root: string,
   committedRange?: CommittedDiffRange
@@ -72,7 +95,7 @@ export function collectChangedBiomeFiles(
       'diff',
       '--name-only',
       '--diff-filter=ACMR',
-      `${committedRange.base}..${committedRange.head}`
+      `${effectiveDiffBase(root, committedRange)}..${committedRange.head}`
     ])) {
       paths.add(path)
     }
