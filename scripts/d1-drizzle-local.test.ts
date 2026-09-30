@@ -109,7 +109,7 @@ function validLocalConfig(): LocalConfigFixture {
         migrations_dir: resolve('d1/drizzle')
       }
     ],
-    main: resolve(project.appDirectory, '.open-next/worker.js'),
+    main: resolve(project.workerEntryPath),
     name: project.local.workerName,
     vars: {
       D1_RUNTIME_ENV: 'local'
@@ -220,7 +220,7 @@ describe('fresh Drizzle D1 history', () => {
       vars: Record<string, string>
     }
     expect(config.name).toBe('best-serp-co-local')
-    expect(config.main).toBe('.open-next/worker.js')
+    expect(config.main).toBe('worker.ts')
     expect(config.d1_databases).toHaveLength(1)
     expect(config.d1_databases[0]?.database_id).toBe('00000000-0000-0000-0000-000000000001')
     expect(config.d1_databases[0]?.migrations_dir).toBe('../../d1/drizzle')
@@ -277,7 +277,7 @@ describe('fresh Drizzle D1 history', () => {
     assertRejected(
       'worker-main',
       config => {
-        config.main = resolve('apps/other/.open-next/worker.js')
+        config.main = resolve('apps/web/.open-next/worker.js')
       },
       /OpenNext Worker/u
     )

@@ -51,6 +51,8 @@ export const project = {
     }
   },
   repository: 'serpcompany/best.serp.co',
+  /** Worker entry: the edge HTML cache in front of the generated `.open-next/worker.js`. */
+  workerEntryPath: 'apps/web/worker.ts',
   wranglerConfigPath: 'apps/web/wrangler.jsonc'
 } as const
 

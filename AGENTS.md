@@ -14,6 +14,7 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 ## Repository map
 
 - `apps/web/`: the best.serp.co Next.js routes and OpenNext Worker (`wrangler.jsonc`).
+  `worker.ts` is the Worker entry: an epoch-keyed edge HTML cache in front of OpenNext.
 - `apps/web/lib/catalog/`: server-only adapter that acquires and validates the `DB`
   binding and delegates to `packages/data-ops/`.
 - `apps/e2e/`: Playwright suites that run against the local or deployed Worker.
