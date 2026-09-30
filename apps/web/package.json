@@ -67,7 +67,7 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
     "server-only": "catalog:",
-    "sonner": "^2.0.7",
+    "sonner": "^2.0.8",
     "unified": "^11.0.5",
     "validator": "^13.15.26",
     "zod": "catalog:",
