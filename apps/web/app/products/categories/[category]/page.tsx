@@ -6,6 +6,11 @@ import {
 } from '@serpdirectory/web-core/category-routes/category-page'
 import { CategoryWebsitesListRoute as CategoryWebsitesList } from '@serpdirectory/web-core/category-websites-list-route'
 import { JsonLd } from '@serpdirectory/web-core/json-ld'
+import {
+  ListingPagination,
+  paginatedMetadata,
+  parseListingPageParam
+} from '@serpdirectory/web-core/listing-pagination'
 import { getRoute } from '@serpdirectory/web-core/routes'
 import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@serpdirectory/web-core/sections/external-resources-section-route'
 import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@serpdirectory/web-core/sections/featured-guides-section-route'
@@ -15,22 +20,32 @@ import { notFound } from 'next/navigation'
 import {
   getActiveCategories,
   getCategoryBySlug,
-  getListingsByCategory
+  getListingNamePage,
+  type PublishedCategory
 } from '@/lib/catalog/repository'
 import { getGuides } from '@/lib/content-loader'
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>
+  searchParams: Promise<{ page?: string | string[] }>
+}
+
+function presentCategory(storedCategory: PublishedCategory) {
+  return {
+    ...storedCategory,
+    icon: getCategoryIcon(storedCategory.slug),
+    priority: 'low' as const
+  }
 }
 
 /**
- * Generates static params for all category pages
- */
-/**
  * Generates metadata for category pages with SEO-optimized descriptions
  */
-export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
-  const resolvedParams = await params
+export async function generateMetadata({
+  params,
+  searchParams
+}: CategoryPageProps): Promise<Metadata> {
+  const [resolvedParams, resolvedSearchParams] = await Promise.all([params, searchParams])
   const storedCategory = await getCategoryBySlug(resolvedParams.category)
 
   if (!storedCategory) {
@@ -40,40 +55,58 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     }
   }
 
-  const allProjects = await getListingsByCategory(storedCategory.slug)
-  const category = {
-    ...storedCategory,
-    icon: getCategoryIcon(storedCategory.slug),
-    priority: 'low' as const
-  }
-  return generateCategoryRouteMetadata({ allProjects, category })
+  const metadata = await generateCategoryRouteMetadata({
+    category: presentCategory(storedCategory),
+    count: storedCategory.count
+  })
+  return paginatedMetadata(metadata, {
+    basePath: getRoute('category.page', { category: storedCategory.slug }),
+    page: parseListingPageParam(resolvedSearchParams.page)
+  })
 }
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
-  const resolvedParams = await params
+export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
+  const [resolvedParams, resolvedSearchParams] = await Promise.all([params, searchParams])
   const storedCategory = await getCategoryBySlug(resolvedParams.category)
 
-  if (!storedCategory) {
+  if (!storedCategory || storedCategory.count === 0) {
     notFound()
   }
 
-  const [allProjects, featuredGuides, activeCategories] = await Promise.all([
-    getListingsByCategory(storedCategory.slug),
+  const page = parseListingPageParam(resolvedSearchParams.page)
+  const [listingPage, firstPage, featuredGuides, activeCategories] = await Promise.all([
+    getListingNamePage({ category: storedCategory.slug, page }),
+    // Structured data describes the whole category, so every page repeats page 1's list.
+    getListingNamePage({ category: storedCategory.slug, page: 1 }),
     getGuides(),
     getActiveCategories()
   ])
-  const category = {
-    ...storedCategory,
-    icon: getCategoryIcon(storedCategory.slug),
-    priority: 'low' as const
+  if (page > listingPage.pageCount) {
+    notFound()
   }
+
+  const category = presentCategory(storedCategory)
   const categoryPath = getRoute('category.page', { category: category.slug })
   const activeCategorySlugs = activeCategories.map(activeCategory => activeCategory.slug)
   const route = CategoryRoutePage({
     activeCategorySlugs,
-    allProjects,
     category,
+    collection: {
+      count: listingPage.total,
+      firstPublishedAt: listingPage.firstPublishedAt,
+      lastPublishedAt: listingPage.lastPublishedAt,
+      leadingProjects: firstPage.items
+    },
     featuredGuides,
+    pageProjects: listingPage.items,
+    pagination: (
+      <ListingPagination
+        basePath={categoryPath}
+        label={`${category.name} pages`}
+        page={listingPage.page}
+        pageCount={listingPage.pageCount}
+      />
+    ),
     slots: {
       CategoryWebsitesList,
       ExternalResourcesSection,
@@ -87,10 +120,6 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       )
     }
   })
-
-  if (route.categoryProjects.length === 0) {
-    notFound()
-  }
 
   return route.element
 }

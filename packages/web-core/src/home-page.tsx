@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
-import type { ComponentType, ReactElement } from 'react'
-import { getActiveCategories } from './category-navigation'
+import type { ComponentType, ReactElement, ReactNode } from 'react'
 import {
   type GuideMetadata,
   toWebsiteBrowseCardMetadata,
@@ -8,14 +7,24 @@ import {
   type WebsiteMetadata
 } from './content-query'
 import { AppSidebar } from './layout/app-sidebar'
+import { type ListingPageInfo, ListingPagination } from './listing-pagination'
+import { getRoute } from './routes'
 import { HeroSection } from './sections/hero-section'
 import { NewsletterSection } from './sections/newsletter-section'
 import { generateBaseMetadata, generateWebsiteSchema, KEYWORDS } from './seo-config'
 import { siteConfig } from './site-config'
 import { siteCopy } from './site-copy'
 
+/** One page of the directory, already in directory (name) order. */
+export interface DirectoryPage extends ListingPageInfo {
+  items: WebsiteMetadata[]
+  pageSize: number
+}
+
 export interface HomePageData {
-  allProjects: WebsiteMetadata[]
+  /** Categories with public listings, in navigation order. */
+  activeCategorySlugs: string[]
+  browse: DirectoryPage
   featuredGuides: GuideMetadata[]
   featuredProjects: WebsiteMetadata[]
   recentlyUpdatedProjects: WebsiteMetadata[]
@@ -23,38 +32,34 @@ export interface HomePageData {
 }
 
 interface BuildHomePageDataInput {
+  activeCategorySlugs: string[]
+  browse: DirectoryPage
+  /** Featured listings in publication order (the `is_featured` placement flag). */
+  featured: WebsiteMetadata[]
   guides: GuideMetadata[]
-  websites: WebsiteMetadata[]
+  /** Latest listings in publication order. */
+  latest: WebsiteMetadata[]
+  totalCount: number
 }
 
-export function getFeaturedProjects(projects: WebsiteMetadata[]): WebsiteMetadata[] {
-  const featuredProjects = projects.filter(project => project.featured === true)
+const HOMEPAGE_CARD_SECTION_SIZE = 8
 
-  if (featuredProjects.length) {
-    return featuredProjects.slice(0, 8)
-  }
-
-  return [...projects]
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-    .slice(0, 8)
-}
-
-export function getRecentlyUpdatedProjects(
-  projects: WebsiteMetadata[],
-  limit = 5
-): WebsiteMetadata[] {
-  return [...projects]
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
-    .slice(0, limit)
-}
-
-export function buildHomePageData({ guides, websites }: BuildHomePageDataInput): HomePageData {
+export function buildHomePageData({
+  activeCategorySlugs,
+  browse,
+  featured,
+  guides,
+  latest,
+  totalCount
+}: BuildHomePageDataInput): HomePageData {
   return {
-    allProjects: websites,
+    activeCategorySlugs,
+    browse,
     featuredGuides: guides,
-    featuredProjects: getFeaturedProjects(websites),
-    recentlyUpdatedProjects: getRecentlyUpdatedProjects(websites, 8),
-    totalCount: websites.length
+    // Without featured listings the section falls back to the newest ones, as before.
+    featuredProjects: (featured.length ? featured : latest).slice(0, HOMEPAGE_CARD_SECTION_SIZE),
+    recentlyUpdatedProjects: latest.slice(0, HOMEPAGE_CARD_SECTION_SIZE),
+    totalCount
   }
 }
 
@@ -76,6 +81,7 @@ interface RecentlyAddedSectionProps {
 
 interface StaticWebsitesListProps {
   displayLimit: number
+  pagination?: ReactNode
   totalCount: number
   websites: WebsiteBrowseCardMetadata[]
 }
@@ -112,8 +118,14 @@ interface HomePageRouteProps {
 
 export function HomePageRoute({ data, slots }: HomePageRouteProps): ReactElement {
   const HOMEPAGE_SECTION_LIMIT = 200
-  const { allProjects, featuredGuides, featuredProjects, recentlyUpdatedProjects, totalCount } =
-    data
+  const {
+    activeCategorySlugs,
+    browse,
+    featuredGuides,
+    featuredProjects,
+    recentlyUpdatedProjects,
+    totalCount
+  } = data
   const {
     CreatorProjectsSection,
     ExternalResourcesSection,
@@ -124,15 +136,10 @@ export function HomePageRoute({ data, slots }: HomePageRouteProps): ReactElement
     StaticWebsitesList
   } = slots
 
-  const sortedProjects = [...allProjects].sort((a, b) => a.name.localeCompare(b.name))
-  const homepageProjects = sortedProjects
-    .slice(0, HOMEPAGE_SECTION_LIMIT)
-    .map(toWebsiteBrowseCardMetadata)
+  const homepageProjects = browse.items.map(toWebsiteBrowseCardMetadata)
   const featuredProjectCards = featuredProjects.map(toWebsiteBrowseCardMetadata)
   const recentlyUpdatedProjectCards = recentlyUpdatedProjects.map(toWebsiteBrowseCardMetadata)
   const homepageFeaturedGuides = featuredGuides.slice(0, HOMEPAGE_SECTION_LIMIT)
-  const activeCategories = getActiveCategories(allProjects)
-  const activeCategorySlugs = activeCategories.map(category => category.slug)
 
   return (
     <>
@@ -157,7 +164,15 @@ export function HomePageRoute({ data, slots }: HomePageRouteProps): ReactElement
               <StaticWebsitesList
                 websites={homepageProjects}
                 totalCount={totalCount}
-                displayLimit={HOMEPAGE_SECTION_LIMIT}
+                displayLimit={browse.pageSize}
+                pagination={
+                  <ListingPagination
+                    basePath={getRoute('listing.list')}
+                    fragment={siteCopy.allAnchorId}
+                    page={browse.page}
+                    pageCount={browse.pageCount}
+                  />
+                }
               />
             </section>
 

@@ -23,6 +23,8 @@ interface StaticWebsitesListProps {
   websites: WebsiteBrowseCardMetadata[]
   totalCount?: number
   displayLimit?: number
+  /** Crawlable page links rendered under the list. */
+  pagination?: ReactNode
   slots: {
     Section: ComponentType<SectionProps>
     WebsitesListWithSearch: ComponentType<WebsitesListWithSearchProps>
@@ -33,6 +35,7 @@ export function StaticWebsitesList({
   websites,
   totalCount,
   displayLimit,
+  pagination,
   slots: { Section, WebsitesListWithSearch }
 }: StaticWebsitesListProps) {
   return (
@@ -48,6 +51,7 @@ export function StaticWebsitesList({
         emptyTitle="No entries found"
         emptyDescription={`There are no directory entries available. Try checking back later or ${siteCopy.submitLabel.toLowerCase()}.`}
       />
+      {pagination}
     </Section>
   )
 }

@@ -1,16 +1,37 @@
-import { buildHomePageData } from '@serpdirectory/web-core/home-page'
-import { getGuides, getWebsites } from '@/lib/content-loader'
+import { buildHomePageData, type HomePageData } from '@serpdirectory/web-core/home-page'
+import {
+  getFeaturedListings,
+  getLatestListings,
+  getListedCategorySlugs,
+  getListingNamePage,
+  getPublishedListingCount
+} from '@/lib/catalog/repository'
+import { getGuides } from '@/lib/content-loader'
+
+const HOMEPAGE_CARD_SECTION_SIZE = 8
 
 /**
- * Fetches homepage data including featured projects, recently updated projects, and initial website list
- * Optimized to load only first 48 websites initially to improve performance
+ * Homepage and `/products/` data: the featured and recently added sections plus one page
+ * of the directory. Every read is bounded (a page, eight cards, cached shell counts); the
+ * full catalog is never loaded for display.
  *
- * @returns Promise containing homepage data with pagination info
+ * @returns null when `page` is past the last directory page
  */
-export async function getHomePageData() {
-  const websites = await getWebsites()
+export async function getHomePageData(page = 1): Promise<HomePageData | null> {
+  const [browse, featured, latest, activeCategorySlugs, totalCount] = await Promise.all([
+    getListingNamePage({ page }),
+    getFeaturedListings(HOMEPAGE_CARD_SECTION_SIZE),
+    getLatestListings(HOMEPAGE_CARD_SECTION_SIZE),
+    getListedCategorySlugs(),
+    getPublishedListingCount()
+  ])
+  if (page > browse.pageCount) return null
   return buildHomePageData({
+    activeCategorySlugs,
+    browse,
+    featured,
     guides: getGuides(),
-    websites
+    latest,
+    totalCount
   })
 }

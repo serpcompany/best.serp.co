@@ -1,37 +1,32 @@
-import { ExternalLink, Home as HomeIcon } from 'lucide-react';
-import type { Metadata } from 'next';
-import Link from 'next/link';
-import type { ComponentType } from 'react';
-import { Suspense } from 'react';
-import {
-  getActiveCategories,
-  type CategoryLike,
-} from '../category-navigation';
-import { getCategoryDisplayName } from '../category-display';
-import { externalResources } from '../external-resources';
-import { getRoute } from '../routes';
-import { generateBaseMetadata } from '../seo-config';
-import { siteCopy } from '../site-copy';
-import { siteConfig } from '../site-config';
-import type { WebsiteMetadata } from '../content-query';
+import { ExternalLink, Home as HomeIcon } from 'lucide-react'
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import type { ComponentType } from 'react'
+import { Suspense } from 'react'
+import { resolveCategories } from '../categories'
+import { getCategoryDisplayName } from '../category-display'
+import { externalResources } from '../external-resources'
+import { getRoute } from '../routes'
+import { generateBaseMetadata } from '../seo-config'
+import { siteConfig } from '../site-config'
+import { siteCopy } from '../site-copy'
 
-type SearchResultsSlot = ComponentType;
+type SearchResultsSlot = ComponentType
 
 type SearchIndexPageProps = {
-  allProjects: Array<WebsiteMetadata & CategoryLike>;
+  /** Categories with public listings, in navigation order. */
+  activeCategorySlugs: string[]
   slots: {
-    SearchResults: SearchResultsSlot;
-  };
-};
+    SearchResults: SearchResultsSlot
+  }
+}
 
 function showExternalSearchResources(): boolean {
-  return (
-    siteConfig.features.showExternalResources && externalResources.length > 0
-  );
+  return siteConfig.features.showExternalResources && externalResources.length > 0
 }
 
 export function generateSearchPageMetadata(): Metadata {
-  const showExternalResources = showExternalSearchResources();
+  const showExternalResources = showExternalSearchResources()
 
   return generateBaseMetadata({
     title: 'Search',
@@ -40,25 +35,16 @@ export function generateSearchPageMetadata(): Metadata {
       : `Search for listings and resources in ${siteConfig.name}.`,
     path: '/search',
     keywords: showExternalResources
-      ? [
-          'search',
-          'find',
-          'directory listings',
-          'external resources',
-          'resources',
-        ]
+      ? ['search', 'find', 'directory listings', 'external resources', 'resources']
       : ['search', 'find', 'directory listings', 'resources'],
-    noindex: true,
-  });
+    noindex: true
+  })
 }
 
-export function SearchIndexPage({
-  allProjects,
-  slots,
-}: SearchIndexPageProps) {
-  const showExternalResources = showExternalSearchResources();
-  const activeCategories = getActiveCategories(allProjects);
-  const { SearchResults } = slots;
+export function SearchIndexPage({ activeCategorySlugs, slots }: SearchIndexPageProps) {
+  const showExternalResources = showExternalSearchResources()
+  const activeCategories = resolveCategories(activeCategorySlugs)
+  const { SearchResults } = slots
 
   return (
     <div className="border-t">
@@ -68,9 +54,7 @@ export function SearchIndexPage({
             <h2 className="sr-only">Search Filters</h2>
 
             <div>
-              <h3 className="mb-4 text-sm font-semibold text-muted-foreground">
-                Categories
-              </h3>
+              <h3 className="mb-4 text-sm font-semibold text-muted-foreground">Categories</h3>
               <nav className="space-y-1">
                 <Link
                   href={getRoute('home')}
@@ -79,11 +63,11 @@ export function SearchIndexPage({
                   <HomeIcon className="h-4 w-4" />
                   {siteCopy.allLabel}
                 </Link>
-                {activeCategories.map((category) => (
+                {activeCategories.map(category => (
                   <Link
                     key={category.slug}
                     href={getRoute('category.page', {
-                      category: category.slug,
+                      category: category.slug
                     })}
                     className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
                   >
@@ -96,11 +80,9 @@ export function SearchIndexPage({
 
             {showExternalResources ? (
               <div>
-                <h3 className="mb-4 text-sm font-semibold text-muted-foreground">
-                  Resources
-                </h3>
+                <h3 className="mb-4 text-sm font-semibold text-muted-foreground">Resources</h3>
                 <nav className="space-y-1">
-                  {externalResources.map((resource) => (
+                  {externalResources.map(resource => (
                     <Link
                       key={resource.slug}
                       href={resource.url}
@@ -145,5 +127,5 @@ export function SearchIndexPage({
         </div>
       </div>
     </div>
-  );
+  )
 }

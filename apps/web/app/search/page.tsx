@@ -4,7 +4,7 @@ import {
 } from '@serpdirectory/web-core/search/index-page'
 import { SearchResultsRoute as SearchResults } from '@serpdirectory/web-core/search/search-results-route'
 import type { Metadata } from 'next'
-import { getWebsites } from '@/lib/content-loader'
+import { getListedCategorySlugs } from '@/lib/catalog/repository'
 
 /**
  * Generate metadata for the static search shell.
@@ -15,5 +15,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function SearchPage() {
-  return <SearchIndexPage allProjects={await getWebsites()} slots={{ SearchResults }} />
+  return (
+    <SearchIndexPage
+      activeCategorySlugs={await getListedCategorySlugs()}
+      slots={{ SearchResults }}
+    />
+  )
 }

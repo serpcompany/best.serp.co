@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import type { ComponentType, ReactNode } from 'react'
 import type { Category } from '../categories'
-import { type CategoryLike, listingMatchesCategory } from '../category-navigation'
 import { getCategorySEO } from '../category-seo'
 import {
   type GuideMetadata,
@@ -49,27 +48,33 @@ export function generateCategoryRouteStaticParams(categories: Category[]) {
   }))
 }
 
+/**
+ * The whole category, independent of the page being shown: its size, publication span,
+ * and first listings in directory order (structured data describes the collection, so
+ * every page of a category emits the same JSON-LD as page 1).
+ */
+export interface CategoryCollection {
+  count: number
+  firstPublishedAt: string | null
+  lastPublishedAt: string | null
+  /** At least the first 20 listings of the category in directory (name) order. */
+  leadingProjects: WebsiteMetadata[]
+}
+
 export async function generateCategoryRouteMetadata({
-  allProjects,
-  category
+  category,
+  count
 }: {
-  allProjects: Array<WebsiteMetadata & CategoryLike>
   category: Category
+  count: number
 }): Promise<Metadata> {
   const seoContent = getCategorySEO(category.slug, category)
-  const categoryProjectsCount =
-    category.slug === 'featured'
-      ? allProjects.filter(project => project.featured === true).length
-      : allProjects.filter(project => listingMatchesCategory(project, category.slug)).length
 
-  const title =
-    categoryProjectsCount > 0
-      ? `${categoryProjectsCount}+ ${seoContent.metaTitle}`
-      : seoContent.metaTitle
+  const title = count > 0 ? `${count}+ ${seoContent.metaTitle}` : seoContent.metaTitle
 
   const description =
-    categoryProjectsCount > 0
-      ? `${categoryProjectsCount}+ ${siteCopy.listingName.plural}. ${seoContent.metaDescription}`
+    count > 0
+      ? `${count}+ ${siteCopy.listingName.plural}. ${seoContent.metaDescription}`
       : seoContent.metaDescription
 
   return generateDynamicMetadata({
@@ -83,15 +88,20 @@ export async function generateCategoryRouteMetadata({
 
 export function CategoryRoutePage({
   activeCategorySlugs,
-  allProjects,
   category,
+  collection,
   featuredGuides,
+  pageProjects,
+  pagination,
   slots
 }: {
   activeCategorySlugs: string[]
-  allProjects: Array<WebsiteMetadata & CategoryLike>
   category: Category
+  collection: CategoryCollection
   featuredGuides: GuideMetadata[]
+  /** The listings on the requested page, in directory (name) order. */
+  pageProjects: WebsiteMetadata[]
+  pagination?: ReactNode
   slots: CategoryRouteSlots
 }) {
   const {
@@ -107,23 +117,16 @@ export function CategoryRoutePage({
   const categoryPath = getRoute('category.page', { category: category.slug })
   const categoryUrl = `${SITE_PUBLIC_URL}${categoryPath}`
 
-  const categoryProjects =
-    category.slug === 'featured'
-      ? allProjects
-          .filter(project => project.featured === true)
-          .sort((a, b) => a.name.localeCompare(b.name))
-      : allProjects
-          .filter(project => listingMatchesCategory(project, category.slug))
-          .sort((a, b) => a.name.localeCompare(b.name))
-  const listedCategoryProjects =
-    category.slug === 'other' && categoryProjects.length > 200
-      ? categoryProjects.slice(0, 200)
-      : categoryProjects
-  const listedCategoryProjectCards = listedCategoryProjects.map(toWebsiteBrowseCardMetadata)
-  const schemaDates = resolveCollectionPageSchemaDates(categoryProjects)
+  const categoryCount = collection.count
+  const leadingProjects = collection.leadingProjects
+  const listedCategoryProjectCards = pageProjects.map(toWebsiteBrowseCardMetadata)
+  const schemaDates = resolveCollectionPageSchemaDates(
+    [collection.firstPublishedAt, collection.lastPublishedAt]
+      .filter((publishedAt): publishedAt is string => Boolean(publishedAt))
+      .map(publishedAt => ({ publishedAt }))
+  )
 
   return {
-    categoryProjects,
     element: (
       <>
         <JsonLd
@@ -132,10 +135,8 @@ export function CategoryRoutePage({
             '@type': 'CollectionPage',
             '@id': categoryUrl,
             name: `${categoryDisplayName} - ${SITE_NAME}`,
-            headline: `${categoryProjects.length}+ ${categoryDisplayName} ${siteCopy.listingName.pluralTitle}`,
-            description: `Explore ${
-              categoryProjects.length
-            }+ curated ${categoryDisplayName.toLowerCase()} ${
+            headline: `${categoryCount}+ ${categoryDisplayName} ${siteCopy.listingName.pluralTitle}`,
+            description: `Explore ${categoryCount}+ curated ${categoryDisplayName.toLowerCase()} ${
               siteCopy.listingName.plural
             } from ${SITE_NAME}. ${category.description}`,
             url: categoryUrl,
@@ -164,8 +165,8 @@ export function CategoryRoutePage({
                 }
               ]
             },
-            numberOfItems: categoryProjects.length,
-            itemListElement: categoryProjects.slice(0, 10).map((project, index) => ({
+            numberOfItems: categoryCount,
+            itemListElement: leadingProjects.slice(0, 10).map((project, index) => ({
               '@type': 'ListItem',
               position: index + 1,
               url: project.website,
@@ -176,9 +177,9 @@ export function CategoryRoutePage({
               '@type': 'ItemList',
               name: `${categoryDisplayName} ${siteCopy.listingName.pluralTitle}`,
               description: category.description,
-              numberOfItems: categoryProjects.length,
+              numberOfItems: categoryCount,
               itemListOrder: 'https://schema.org/ItemListOrderAscending',
-              itemListElement: categoryProjects.slice(0, 20).map((project, index) => ({
+              itemListElement: leadingProjects.slice(0, 20).map((project, index) => ({
                 '@type': 'Thing',
                 position: index + 1,
                 url: project.website,
@@ -232,6 +233,7 @@ export function CategoryRoutePage({
                   <p className="text-muted-foreground mt-1">{seoContent.introText}</p>
                 </div>
                 <CategoryWebsitesList initialWebsites={listedCategoryProjectCards} />
+                {pagination}
               </section>
 
               {siteConfig.features.showExternalResources && <ExternalResourcesSection />}
