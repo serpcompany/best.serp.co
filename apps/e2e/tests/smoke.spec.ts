@@ -128,6 +128,54 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     ).toHaveAttribute('href', detailListing.path)
   })
 
+  test('paginates the directory and large categories with crawlable links', async ({
+    page,
+    request
+  }) => {
+    const pageSize = 48
+    const lastDirectoryPage = Math.ceil(site.listingCount / pageSize)
+    const pagination = page.getByRole('navigation', { name: /pages$/i })
+
+    // The homepage shows directory page 1 and links into /products/?page=N.
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await expect(pagination.getByRole('link', { name: 'Page 2' })).toHaveAttribute(
+      'href',
+      /^\/products\/\?page=2(?:#[\w-]+)?$/u
+    )
+    expect(await page.locator('main a[href^="/products/"]').count()).toBeGreaterThan(0)
+
+    const second = await page.goto('/products/?page=2', { waitUntil: 'domcontentloaded' })
+    expect(second?.status()).toBe(200)
+    await expectCanonical(page, '/products/?page=2')
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/u)
+    await expect(page).toHaveTitle(/Page 2/u)
+    await expect(pagination.getByRole('link', { name: /previous/i })).toHaveAttribute(
+      'href',
+      /^\/products\/(?:#[\w-]+)?$/u
+    )
+    await expect(pagination.getByRole('link', { name: /next/i })).toHaveAttribute(
+      'href',
+      /^\/products\/\?page=3(?:#[\w-]+)?$/u
+    )
+
+    const last = await request.get(`/products/?page=${lastDirectoryPage}`)
+    expect(last.status()).toBe(200)
+    expect((await request.get(`/products/?page=${lastDirectoryPage + 1}`)).status()).toBe(404)
+
+    const otherPath = categoryPath('other')
+    await page.goto(otherPath, { waitUntil: 'domcontentloaded' })
+    await expectCanonical(page, otherPath)
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /^index/u)
+    await expect(pagination.getByRole('link', { name: 'Page 2' })).toHaveAttribute(
+      'href',
+      `${otherPath}?page=2`
+    )
+    await page.goto(`${otherPath}?page=2`, { waitUntil: 'domcontentloaded' })
+    await expectCanonical(page, `${otherPath}?page=2`)
+    await expect(page.getByRole('heading', { level: 1, name: /other/i }).first()).toBeVisible()
+    expect(await page.locator('main a[href^="/products/"]').count()).toBeGreaterThan(0)
+  })
+
   test('renders static, commercial, and legal pages', async ({ page }) => {
     const pages: Array<{ path: string; heading: RegExp }> = [
       { path: '/about/', heading: /^about serp$/i },

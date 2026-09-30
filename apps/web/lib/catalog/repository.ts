@@ -6,6 +6,8 @@ import { createCatalogOperations } from '@serpdirectory/data-ops/catalog'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import type {
   CatalogObserver,
+  ListingNamePage,
+  ListingNamePageQuery,
   ListingPage,
   PublishedCategory
 } from '@serpdirectory/data-ops/contracts'
@@ -13,7 +15,7 @@ import type { WebsiteDetailMetadata, WebsiteMetadata } from '@serpdirectory/web-
 import { cache } from 'react'
 
 export type PublishedListingPage = ListingPage
-export type { PublishedCategory }
+export type { ListingNamePage, PublishedCategory }
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
@@ -64,6 +66,33 @@ export async function getPublishedListingPage(
   return (await getOperations()).getPublishedListingPage(page, pageSize)
 }
 
+/**
+ * One page of the directory (or of one category) in directory name order. This is how
+ * list pages read the catalog; never load `getPublishedListings()` for display.
+ */
+const readListingNamePage = cache(
+  async (category: string, page: number): Promise<ListingNamePage> =>
+    (await getOperations()).getListingNamePage({ category: category || undefined, page })
+)
+
+export async function getListingNamePage(
+  query: Pick<ListingNamePageQuery, 'category' | 'page'>
+): Promise<ListingNamePage> {
+  return readListingNamePage(query.category ?? '', query.page ?? 1)
+}
+
+/** Number of publicly visible listings (cached with the shell statistics). */
+export async function getPublishedListingCount(): Promise<number> {
+  return (await readShellStats()).listingCount
+}
+
+/** Categories that have public listings, in navigation (sort order, name) order. */
+export async function getListedCategorySlugs(): Promise<string[]> {
+  return (await readShellStats()).categories
+    .filter(category => category.count > 0)
+    .map(category => category.slug)
+}
+
 export async function getFeaturedListings(limit = 6): Promise<WebsiteMetadata[]> {
   return (await getOperations()).getFeaturedListings(limit)
 }
@@ -88,10 +117,6 @@ export async function getActiveCategories(): Promise<PublishedCategory[]> {
 
 export async function getCategoryBySlug(slug: string): Promise<PublishedCategory | null> {
   return (await readShellStats()).categories.find(category => category.slug === slug) || null
-}
-
-export async function getListingsByCategory(slug: string): Promise<WebsiteMetadata[]> {
-  return (await getOperations()).getListingsByCategory(slug)
 }
 
 export async function searchListings(query: string, limit = 50): Promise<WebsiteMetadata[]> {

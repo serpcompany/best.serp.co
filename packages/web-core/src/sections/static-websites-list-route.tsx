@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { WebsiteBrowseCardMetadata } from '../content-query'
 import { Section } from '../layout/section'
 import { WebsitesListWithSearchRoute } from '../websites-list-with-search-route'
@@ -7,18 +8,21 @@ interface StaticWebsitesListRouteProps {
   websites: WebsiteBrowseCardMetadata[]
   totalCount?: number
   displayLimit?: number
+  pagination?: ReactNode
 }
 
 export function StaticWebsitesListRoute({
   websites,
   totalCount,
-  displayLimit
+  displayLimit,
+  pagination
 }: StaticWebsitesListRouteProps) {
   return (
     <SharedStaticWebsitesList
       websites={websites}
       totalCount={totalCount}
       displayLimit={displayLimit}
+      pagination={pagination}
       slots={{
         Section,
         WebsitesListWithSearch: WebsitesListWithSearchRoute

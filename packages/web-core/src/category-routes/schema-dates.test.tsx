@@ -98,11 +98,18 @@ describe('collection page schema dates', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2099-01-01T00:00:00.000Z'))
 
+    const alphaListings = websites.filter(website => website.categories?.includes('alpha'))
     const { element } = CategoryRoutePage({
       activeCategorySlugs: ['alpha'],
-      allProjects: websites,
       category,
+      collection: {
+        count: alphaListings.length,
+        firstPublishedAt: '2026-01-01',
+        lastPublishedAt: '2026-01-03',
+        leadingProjects: alphaListings
+      },
       featuredGuides: [],
+      pageProjects: alphaListings,
       slots: {
         CategoryWebsitesList: NullComponent,
         ExternalResourcesSection: NullComponent,
@@ -115,6 +122,7 @@ describe('collection page schema dates', () => {
 
     expect(data.datePublished).toBe('2026-01-01')
     expect(data.dateModified).toBe('2026-01-03')
+    expect(data.numberOfItems).toBe(2)
     expect(JSON.stringify(data)).not.toContain('2099-01-01')
   })
 

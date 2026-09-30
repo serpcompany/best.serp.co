@@ -44,6 +44,7 @@
     "./layout/section": "./src/layout/section.tsx",
     "./llm/llm-grid": "./src/llm/llm-grid.tsx",
     "./listing-detail-template": "./src/listing-detail-template.ts",
+    "./listing-pagination": "./src/listing-pagination.tsx",
     "./listing-logo-presentation": "./src/listing-logo-presentation.ts",
     "./mode-toggle": "./src/mode-toggle.tsx",
     "./mdx-components": "./src/mdx-components.tsx",
