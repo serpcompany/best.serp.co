@@ -1,4 +1,4 @@
-import type { SiteExternalResourceIcon } from '@serpdirectory/site-contract/types'
+import type { SiteExternalResourceIcon } from '@serpdirectory/site-config/types'
 import type { LucideIcon } from 'lucide-react'
 import { Chrome, Code2, Command, GitBranch, Terminal } from 'lucide-react'
 import { siteContent } from './site-content'

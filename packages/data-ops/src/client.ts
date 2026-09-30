@@ -1,18 +1,13 @@
-import {
-  type ActiveCheckedInSiteId,
-  assertSiteIdIsSupported
-} from '@serpdirectory/site-contract/active-site-ids'
 import type { SQL } from 'drizzle-orm'
 import { type DrizzleD1Database, drizzle } from 'drizzle-orm/d1'
 import * as schema from './schema'
 
-export interface SiteDatabase {
+export interface Database {
   binding: D1Database
   database: DrizzleD1Database<typeof schema>
-  siteId: ActiveCheckedInSiteId
 }
 
-export interface CompiledSiteQuery {
+export interface CompiledQuery {
   toSQL(): { params: unknown[]; sql: string }
 }
 
@@ -22,9 +17,9 @@ export interface CompiledSiteQuery {
  * returns rows only, so Catalog queries that must report rows read/written use the
  * driver's raw response through `run()`.
  */
-export async function runSiteQuery<T>(
-  client: SiteDatabase,
-  query: CompiledSiteQuery | SQL<T>
+export async function runQuery<T>(
+  client: Database,
+  query: CompiledQuery | SQL<T>
 ): Promise<D1Result<T>> {
   if ('toSQL' in query) {
     const compiled = query.toSQL()
@@ -36,14 +31,9 @@ export async function runSiteQuery<T>(
   return (await client.database.run(query)) as D1Result<T>
 }
 
-export function createSiteDatabase(
-  binding: D1Database,
-  siteId: ActiveCheckedInSiteId
-): SiteDatabase {
-  assertSiteIdIsSupported(siteId)
+export function createDatabase(binding: D1Database): Database {
   return {
     binding,
-    database: drizzle(binding, { schema }),
-    siteId
+    database: drizzle(binding, { schema })
   }
 }

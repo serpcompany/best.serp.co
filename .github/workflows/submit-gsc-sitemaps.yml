@@ -12,16 +12,13 @@ on:
           - verify-credentials
           - list-sitemaps
           - submit
-      site_ids:
-        description: 'Optional newline or comma separated checked-in site ids to submit'
-        required: false
-        type: string
       stale_sitemap_urls:
         description: 'Optional newline or comma separated stale sitemap URLs to delete before submit'
         required: false
         type: string
-  schedule:
-    - cron: '17 9 * * *'
+  # Re-enable the daily schedule after the Worker cutover (serpcompany/best.serp.co#34):
+  # schedule:
+  #   - cron: '17 9 * * *'
 
 permissions:
   contents: read
@@ -29,7 +26,7 @@ permissions:
 jobs:
   submit:
     name: Submit sitemap indexes
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/install
@@ -66,7 +63,6 @@ jobs:
           GSC_QUOTA_PROJECT: ${{ secrets.GSC_QUOTA_PROJECT }}
           GSC_SERVICE_ACCOUNT_JSON: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}
           GSC_SITE_URL_MAP: ${{ vars.GSC_SITE_URL_MAP }}
-          GSC_SITE_IDS: ${{ github.event.inputs.site_ids }}
           GSC_STALE_SITEMAP_URLS: ${{ github.event.inputs.stale_sitemap_urls || vars.GSC_STALE_SITEMAP_URLS }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.mode }}" = "verify-credentials" ]; then

@@ -8,9 +8,7 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:fast": "playwright test --project=chromium",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:smoke": "playwright test tests/public-parity.spec.ts --project=chromium",
-    "test:e2e:multisite": "playwright test tests/multisite-smoke.spec.ts --project=chromium",
-    "test:e2e:pornvideodownloaders": "E2E_SITE_ID=pornvideodownloaders.com E2E_SITE_NAME='Porn Video Downloaders' E2E_LISTING_COUNT=286 E2E_LISTING_NAME='321tube Video Downloader' E2E_LISTING_SLUG=321tube-downloader E2E_CATEGORY_SLUG=video-downloaders playwright test tests/multisite-smoke.spec.ts --project=chromium",
+    "test:e2e:smoke": "playwright test tests/smoke.spec.ts tests/public-parity.spec.ts --project=chromium",
     "test:e2e:visual": "E2E_VISUAL=1 playwright test tests/visual.spec.ts --project=chromium",
     "test:e2e:ui": "playwright test --ui",
     "test:install": "playwright install chromium"

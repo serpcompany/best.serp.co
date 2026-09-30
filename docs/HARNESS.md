@@ -35,8 +35,8 @@ data-operation contracts and scan benchmark, fresh Drizzle migration/idempotency
 tests, deterministic local D1-to-D1 transfer/parity tests, D1 schema/publication
 contract tests,
 and TypeScript checks. Each step stops on failure and prints the governing document.
-The catalog contract also proves both Sites use one injected Site-bound Drizzle
-client while retaining per-statement D1 telemetry and reviewed query-plan bounds.
+The catalog contract also proves the injected Drizzle client retains per-statement
+D1 telemetry and reviewed query-plan bounds.
 
 ### Full loop
 
@@ -77,13 +77,9 @@ pnpm docs:check
 
 The checker enforces:
 
-- required docs, indexes, agent configuration, and repository skills exist;
+- required docs, indexes, and agent configuration exist;
 - the root agent map remains concise;
 - local Markdown links resolve;
-- migration SOP phase headings remain intact;
-- every active registry site appears in the core multisite operating documents;
-- retired single-site assertions do not return;
-- skill frontmatter supports progressive disclosure;
 - lint commands are read-only;
 - the root harness command surface remains available.
 
@@ -101,14 +97,6 @@ pnpm agent:evidence
 pnpm agent:ui:capture -- --name home --path /
 ```
 
-These root aliases select `serp.software`. The
-`agent:pornvideodownloaders:{manifest,doctor,dev,logs,evidence}` aliases select the
-second Worker. The underlying runtime command rejects a missing or unknown site.
-
-Run `pnpm test:e2e:pornvideodownloaders` for the dedicated browser smoke suite. The
-command explicitly selects the Porn Video Downloaders app, local D1 identity, port,
-parity counts, representative listing, and representative category.
-
 `agent:manifest` prints URLs, ports, D1 and Wrangler state paths, log/artifact paths,
 Git identity, Worker name, D1 binding, and runtime variables as JSON.
 
@@ -116,7 +104,7 @@ Git identity, Worker name, D1 binding, and runtime variables as JSON.
 local D1 preview on the manifest port, and mirrors output into
 `.runtime/<instance>/logs/runtime.log`. `agent:logs` returns the last 200 lines.
 The agent runtime, canonical local D1 aliases, app preview, and Playwright all resolve
-the same Site-specific `d1/drizzle/` state below the manifest's D1 directory. They do
+the same `d1/drizzle/` state below the manifest's D1 directory. They do
 not inspect or migrate a legacy local state directory.
 
 `agent:evidence` writes a timestamped JSON record containing the commit, dirty paths,
@@ -147,7 +135,7 @@ pnpm worktree:new -- feature-name
 
 The command:
 
-1. creates sibling worktree `directory-platform-d1-worktrees/feature-name`;
+1. creates sibling worktree `best.serp.co-worktrees/feature-name`;
 2. creates branch `codex/feature-name`;
 3. installs the frozen lockfile;
 4. allocates a deterministic, worktree-specific port;
@@ -177,25 +165,19 @@ and `.env` files are deliberately not copied.
 
 ## Migration harness
 
-The preflight reads a legacy site in place and writes nothing unless an explicit
-report path is supplied:
+The one-time import reads the legacy json-directory-template checkout in place:
 
 ```bash
 pnpm migration:preflight -- \
   --source-root /absolute/path/to/json-directory \
-  --site-id example.com
+  --site-id serp.co
+pnpm migration:generate -- --source-root /absolute/path/to/json-directory --site-id serp.co
 ```
 
-It reports source hashes, listing/category counts, supporting files, slug/category
-integrity, structural issues, and warnings. Passing means the source is coherent
-enough to map; it does not activate or deploy a site.
-
-Follow [the migration SOP](./MIGRATION_SOP.md) and the
-[migration skill](../.agents/skills/migrate-json-directory-site/SKILL.md).
-After a site is registered, use only its explicit local aliases or the canonical
-`--site <site-id>` commands. When the migration is merged and evidenced, remove its
-registered worktree with `pnpm worktree:destroy -- <name>` and delete the merged
-branch when no recovery work remains.
+The preflight reports source hashes, counts, and integrity issues; the generator
+writes the ignored `d1/artifacts/` SQL and must reproduce the committed parity
+report. `pnpm migration:compare -- <origin>` compares sampled pages between
+https://best.serp.co and a candidate origin.
 
 ## Issue-driven planning and review
 
@@ -212,7 +194,6 @@ risk on the governing ticket before closing it.
   otherwise.
 - Give every custom failure a violated rule, why it matters, approved remediation,
   and documentation path.
-- Update [the quality score](./QUALITY_SCORE.md) when evidence or known gaps change.
 - Garden docs when paths, commands, responsibilities, or external assumptions change.
 
 Run the deterministic garden locally with `pnpm docs:garden`. The scheduled
@@ -222,8 +203,8 @@ permission.
 
 ## Known boundaries
 
-- The repository has two explicit production sites; it is not a product-neutral
-  starter and has no default tenant.
+- The repository serves exactly one site, best.serp.co; it is not a multi-site
+  platform or starter.
 - Named route capture is available; scripted before/after interaction sequences remain
   a future improvement.
 - Local logs are file-queryable; a local metrics/tracing backend is not yet included.

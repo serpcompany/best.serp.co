@@ -16,7 +16,7 @@ accept = ["200", "429", "403", "404"]
 scheme = ["https"]
 
 #############################  Exclusions  ##########################
-base_url = "https://github.com/serpcompany/directory-platform-d1/"
+base_url = "https://github.com/serpcompany/best.serp.co/"
 exclude = [
   "https://openphone.com/",
   "https://www.openphone.com/docs/llms.txt",

@@ -1,120 +1,82 @@
 # Repository contract for coding agents
 
-This repository operates the production `serp.software` and `pornvideodownloaders.com` directories as isolated Next.js OpenNext Workers backed by distinct Cloudflare D1 databases. D1 is the only catalog database.
+This repository is the source of **best.serp.co**, a single Next.js OpenNext Worker on
+Cloudflare backed by one D1 database per environment. D1 is the only catalog store.
 
 ## Start here
 
-Read in this order:
-
-1. [Architecture](./docs/ARCHITECTURE.md) for stable responsibilities and boundaries.
+1. [Architecture](./docs/ARCHITECTURE.md) for responsibilities and boundaries.
 2. [Data model](./docs/DATA_MODEL.md) for D1 ownership and publication rules.
 3. [Development](./docs/DEVELOPMENT.md) for the local loop.
 4. [Harness](./docs/HARNESS.md) for validation, runtime evidence, and worktrees.
-5. [Migration SOP](./docs/MIGRATION_SOP.md) before examining a legacy JSON-directory site.
-6. [Deploy runbook](./docs/DEPLOY_RUNBOOK.md) before any Cloudflare operation.
+5. [Deploy runbook](./docs/DEPLOY_RUNBOOK.md) before any Cloudflare operation.
 
 ## Repository map
 
-- `apps/<site-id>/`: site-specific Next.js routes and OpenNext Worker boundary.
-- `apps/<site-id>/lib/catalog/`: server-only adapter that acquires and validates the
-  site's D1 binding.
-- `sites/<site-id>/`: checked-in presentation and route configuration.
-- `configs/wrangler/<site-id>/`: checked-in local, preview, and production Worker
-  templates.
-- `.wrangler/generated/`: ignored, environment-specific Worker configuration
-  materialized by protected release tooling.
-- `d1/drizzle/`: fresh history; `d1/migrations/`: immutable `0001`-`0009` legacy history.
-- `d1/publications/`: reviewed ongoing catalog mutation manifests.
-- `d1/artifacts/`: immutable initial-bootstrap and parity evidence.
-- `packages/web-core/`: shared page, navigation, search, sitemap, and RSS behavior.
-- `packages/data-ops/`: shared, explicitly site-bound catalog DTOs, D1 queries,
-  caching contracts, and safe query telemetry.
+- `apps/web/`: the best.serp.co Next.js routes and OpenNext Worker (`wrangler.jsonc`).
+- `apps/web/lib/catalog/`: server-only adapter that acquires and validates the `DB`
+  binding and delegates to `packages/data-ops/`.
+- `apps/e2e/`: Playwright suites that run against the local or deployed Worker.
+- `packages/site-config/`: the checked-in site definition (routes, copy, badges,
+  sitemap layout) and site-owned content such as the About page.
+- `packages/web-core/`: page, navigation, search, sitemap, and RSS building blocks.
+- `packages/data-ops/`: Drizzle schema, catalog and submission queries, caching.
+- `packages/design-system/`: UI primitives.
+- `d1/drizzle/`: forward-only migration history applied by Wrangler.
+- `d1/publications/`: reviewed catalog mutation manifests.
+- `d1/artifacts/`: one-time JSON import artifacts (generated, git-ignored except the
+  parity report).
+- `scripts/project.ts`: the single deployment target (app, local D1, artifacts).
+- `scripts/migration/`: the one-time json-directory-template → D1 import and the
+  live-vs-candidate page comparison.
 - `scripts/harness/`: deterministic agent feedback and runtime tooling.
-- `scripts/migration/`: read-only legacy source inspection.
-- `scripts/site-targets.ts`: exhaustive active-site identities and release targets.
-- `.agents/skills/`: progressively disclosed repeatable agent workflows.
-- `docs/`: repository-local source of truth and operating procedures.
+- `docs/`: operating procedures.
 
 Closer `AGENTS.md` files add local rules without replacing this contract.
 
-## Agent skills
-Repository-specific [issue-tracker](./docs/agents/issue-tracker.md),
-[triage-label](./docs/agents/triage-labels.md), and [domain-doc](./docs/agents/domain.md)
-configuration lives under `docs/agents/`; installed skills own their general workflows.
-
 ## Primary commands
 
-- `pnpm harness:fast`: docs, architecture, D1 contracts, and type boundaries.
-- `pnpm harness:check`: the full non-deployment validation loop.
-- `pnpm docs:check`: documentation links, indexes, commands, and skill contracts.
-- `pnpm agent:manifest`: machine-readable local runtime and binding information.
-- `pnpm agent:doctor`: prerequisite and isolation diagnostics.
-- `pnpm agent:dev`: logged, isolated local D1 Worker preview.
-- `pnpm agent:pornvideodownloaders:dev`: second-site local Worker preview.
-- `pnpm worktree:new -- <name>`: create an isolated `codex/<name>` worktree.
-- `pnpm worktree:destroy -- <name>`: safely remove a registered harness worktree.
-- `pnpm migration:preflight -- ...`: read-only legacy site inventory.
-
-Default root aliases select `serp.software` explicitly. Named `*:pornvideodownloaders*` aliases select `pornvideodownloaders.com`; lower-level multisite commands require `--site <site-id>` and reject missing or unknown sites.
+- `pnpm dev` / `pnpm worker:preview`: build and serve the Worker against local D1.
+- `pnpm d1:local:migrate`, `pnpm d1:local:import`, `pnpm d1:local:verify`: prepare
+  local D1 (run `pnpm migration:generate` first; see [Development](./docs/DEVELOPMENT.md)).
+- `pnpm harness:fast` / `pnpm harness:check`: fast and full validation loops.
+- `pnpm test:e2e`: Playwright against a local Worker.
+- `pnpm migration:compare -- <origin>`: structural page parity against best.serp.co.
+- `pnpm agent:manifest`, `pnpm agent:doctor`, `pnpm agent:dev`: machine-readable
+  runtime identity, prerequisite diagnostics, and a logged isolated Worker preview.
+- `pnpm worktree:new -- <name>` / `pnpm worktree:destroy -- <name>`: isolated
+  worktrees with their own D1 state and port.
 
 ## Planning and implementation
 
-GitHub Issues are the source of truth for active planning and execution.
-
-- For a clear substantial change, use `to-spec` to publish the PRD, then
-  `to-tickets` to create independently verifiable vertical slices with explicit
-  blocking relationships.
-- For a large effort whose decisions are not yet clear, use `wayfinder` to maintain
-  a GitHub map and decision tickets. Convert the settled result into a spec and
-  implementation tickets.
-- Implement one ready ticket at a time with `implement`; use a short-lived branch,
-  the repository harness, `code-review`, and a required-check pull request into
-  protected `main`. Never push directly or force-push to `main`.
-- Record acceptance evidence, operational results, recovery details, and residual
-  risks on the governing issue or ticket.
-- Issues and labels never grant production, database, deployment, deletion, or other
-  external-mutation authority. The deploy runbook's confirmation gates still apply.
+GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning.
+Use short-lived branches and pull requests into protected `main`; never force-push
+`main`. Issues and labels never grant production, database, or deployment authority.
 
 ## Non-negotiable architecture
 
-- Read listings and categories through `apps/<site-id>/lib/catalog/repository.ts`;
-  that adapter must delegate catalog SQL to `packages/data-ops/`.
-- Add or optimize public catalog queries once in `packages/data-ops/`; never copy
-  catalog SQL into a site application.
-- Add every executable site to `scripts/site-targets.ts`; never infer a default.
-- Obtain the database only through the server-only OpenNext `DB` binding.
-- Fail closed when the D1 binding or `D1_RUNTIME_ENV` is missing or invalid.
-- Parse untrusted input at its boundary and pass precise values inward.
+- Read catalog data through `apps/web/lib/catalog/repository.ts`, which delegates all
+  SQL to `packages/data-ops/`. Never put catalog SQL in the app.
+- Obtain the database only through the server-only OpenNext `DB` binding; fail closed
+  when the binding or `D1_RUNTIME_ENV` is missing or invalid.
 - Use prepared statements and bind every runtime value.
-- Model tables in `packages/data-ops/src/schema.ts`; generate fresh history under
-  `d1/drizzle/`. Never rewrite or scan legacy `d1/migrations/0001`-`0009` into it.
-- Add reviewed data changes as YAML manifests under `d1/publications/`.
+- Model tables in `packages/data-ops/src/schema.ts` and generate migrations into
+  `d1/drizzle/` with `pnpm d1:generate`; `drizzle-kit push` is forbidden.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
-- Preserve each site's separate local, Preview, and Production identities. SERP's
-  protected Preview resources were provisioned and rehearsed by Issue #72; do not
-  replace or mutate either Site's Preview identity during unrelated work.
+- Public URLs are part of the SEO contract: `/products/<slug>/reviews/`,
+  `/products/best/<category>/`. Changing a route requires permanent redirects.
 - Route production mutations through protected GitHub Actions only.
 
 ## Forbidden patterns
 
 Do not add a catalog JSON/YAML/CSV runtime, generated browser search index, filesystem
-fallback, static-directory build, GitHub Pages deploy path, or default/starter
-directory implementation. Do not add catalog files named `listings.json`,
-`products.json`, `categories.json`, or `search-index.json`.
-
-Do not treat migration source files as application inputs. The migration preflight is
-read-only and external-source-only. Never copy legacy catalog files into this repo.
-
-The SQL under `d1/artifacts/` is immutable bootstrap evidence, not an authoring
-format. Never regenerate an existing artifact from a catalog file.
+fallback, static export, or GitHub Pages deploy path. The legacy `products.json` is an
+import input read from an external checkout, never an application input.
 
 ## Completion contract
 
 Run targeted checks while editing and `pnpm harness:check` before claiming a
-substantial change is complete. For runtime behavior, also capture the relevant
-Playwright or live-route evidence. Read the diff, preserve unrelated user changes,
-and report residual risks.
-
-Production database or Worker operations require the confirmations and protected
-environments in [the deploy runbook](./docs/DEPLOY_RUNBOOK.md). A passing local
-harness never grants deployment authority.
+substantial change is complete. For runtime behavior, capture Playwright or live-route
+evidence. Production operations require the confirmations in
+[the deploy runbook](./docs/DEPLOY_RUNBOOK.md); a passing local harness never grants
+deployment authority.

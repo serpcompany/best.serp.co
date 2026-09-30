@@ -2,11 +2,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { deflateSync, inflateSync } from 'node:zlib'
-import { resolveCheckedInSiteConfig, siteConfigsById } from '@serpdirectory/site-contract'
+import { site } from '@serpdirectory/site-config'
+import { project } from './project'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(__dirname, '..')
-const SERP_ARROW_MARK_PATH = 'apps/serp.software/public/img/serp-arrow-logo-black.svg'
+const SERP_ARROW_MARK_PATH = `${project.appDirectory}/public/img/serp-arrow-logo-black.svg`
 const R2_BADGE_KEY_PREFIX = 'badge'
 const BADGE_WIDTH = 200
 const BADGE_HEIGHT = 50
@@ -19,25 +20,6 @@ const BADGE_ICON_SIZE = 20
 const BADGE_LABEL_FONT_SIZE = 8
 const BADGE_NAME_MAX_FONT_SIZE = 13
 const BADGE_NAME_MIN_FONT_SIZE = 7.5
-
-const SITE_TYPOGRAPHY_OVERRIDES: Record<
-  string,
-  {
-    labelFontSize?: number
-    letterSpacing?: string
-    nameMaxFontSize?: number
-  }
-> = {
-  'browserextensions.io': {
-    labelFontSize: 7,
-    nameMaxFontSize: 12
-  },
-  'pornvideodownloaders.com': {
-    labelFontSize: 7,
-    letterSpacing: '0',
-    nameMaxFontSize: 13
-  }
-}
 
 type BadgeLogoMark = {
   markup: string
@@ -318,15 +300,14 @@ function tryLoadBadgeLogoSource(assetPath: string): BadgeLogoSource | null {
 }
 
 function resolveBadgeLogoSource(opts: {
-  appPackageName: string
   brandingFaviconPath?: string
   brandingLogoPath?: string
 }): BadgeLogoSource {
   const candidatePaths = [
     opts.brandingLogoPath,
     opts.brandingFaviconPath,
-    `apps/${opts.appPackageName}/public/badge-logo.svg`,
-    `apps/${opts.appPackageName}/public/logo.svg`,
+    `${project.appDirectory}/public/badge-logo.svg`,
+    `${project.appDirectory}/public/logo.svg`,
     SERP_ARROW_MARK_PATH
   ].filter((path): path is string => Boolean(path))
 
@@ -338,7 +319,7 @@ function resolveBadgeLogoSource(opts: {
   }
 
   throw new Error(
-    `Missing usable badge logo mark for ${opts.appPackageName}. Add a transparent logo/fallback favicon or keep ${SERP_ARROW_MARK_PATH}.`
+    `Missing usable badge logo mark for ${project.domain}. Add a transparent logo/fallback favicon or keep ${SERP_ARROW_MARK_PATH}.`
   )
 }
 
@@ -490,11 +471,10 @@ function buildLogoMark(logoSource: BadgeLogoSource, fill: string): BadgeLogoMark
 
 function buildSvg(opts: {
   logoSource: BadgeLogoSource
-  siteId: string
   siteName: string
   variant: 'light' | 'dark'
 }): string {
-  const { logoSource, siteId, siteName, variant } = opts
+  const { logoSource, siteName, variant } = opts
 
   const bgFill = variant === 'light' ? '#ffffff' : '#1a1a1a'
   const strokeColor = variant === 'light' ? '#e5e7eb' : '#333333'
@@ -503,74 +483,54 @@ function buildSvg(opts: {
   const iconFill = variant === 'light' ? '#111111' : '#f5f5f5'
 
   const textX = BADGE_TEXT_X.toString()
-  const typography = SITE_TYPOGRAPHY_OVERRIDES[siteId]
-  const labelFontSize = typography?.labelFontSize ?? BADGE_LABEL_FONT_SIZE
-  const letterSpacingAttribute = typography?.letterSpacing
-    ? ` letter-spacing="${escapeSvgAttribute(typography.letterSpacing)}"`
-    : ''
   const safeSiteName = escapeSvgText(siteName)
-  const safeFullSiteName = escapeSvgText(siteName)
-  const nameFontSize = getBadgeNameFontSize(
-    siteName,
-    typography?.nameMaxFontSize ?? BADGE_NAME_MAX_FONT_SIZE
-  )
+  const nameFontSize = getBadgeNameFontSize(siteName, BADGE_NAME_MAX_FONT_SIZE)
   const logoMark = buildLogoMark(logoSource, iconFill)
 
   return `<svg width="${BADGE_WIDTH}" height="${BADGE_HEIGHT}" viewBox="0 0 ${BADGE_WIDTH} ${BADGE_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
-  <title>Featured on ${safeFullSiteName}</title>
+  <title>Featured on ${safeSiteName}</title>
   <rect x="1" y="1" width="198" height="48" rx="5" fill="${bgFill}" stroke="${strokeColor}" stroke-width="1"/>
   ${logoMark.markup}
-  <text x="${textX}" y="20" font-family="system-ui,-apple-system,sans-serif" font-size="${labelFontSize}" font-weight="500" fill="${labelFill}" opacity="0.8"${letterSpacingAttribute}>FEATURED ON</text>
-  <text x="${textX}" y="36" font-family="system-ui,-apple-system,sans-serif" font-size="${nameFontSize}" font-weight="700" fill="${nameFill}"${letterSpacingAttribute}>${safeSiteName}</text>
+  <text x="${textX}" y="20" font-family="system-ui,-apple-system,sans-serif" font-size="${BADGE_LABEL_FONT_SIZE}" font-weight="500" fill="${labelFill}" opacity="0.8">FEATURED ON</text>
+  <text x="${textX}" y="36" font-family="system-ui,-apple-system,sans-serif" font-size="${nameFontSize}" font-weight="700" fill="${nameFill}">${safeSiteName}</text>
 </svg>`
 }
 
 function main(): void {
-  const siteIds = Object.keys(siteConfigsById)
+  const siteName = site.badges?.featuredOn?.displayName ?? site.site.name
   const r2Assets: R2FeaturedBadgeAsset[] = []
+  const logoSource = site.branding.logo
+  const faviconSource = site.branding.favicon
+  const badgeLogoSource = resolveBadgeLogoSource({
+    brandingFaviconPath:
+      faviconSource && faviconSource.source === 'local-path' ? faviconSource.path : undefined,
+    brandingLogoPath: logoSource && logoSource.source === 'local-path' ? logoSource.path : undefined
+  })
 
-  for (const siteId of siteIds) {
-    const config = resolveCheckedInSiteConfig(siteId)
-    const siteName = config.badges?.featuredOn?.displayName ?? config.site?.name ?? siteId
-    const outputDir = join(REPO_ROOT, 'apps', config.build.appPackageName, 'public', 'badge')
-
-    if (!existsSync(outputDir)) {
-      mkdirSync(outputDir, { recursive: true })
-    }
-
-    const logoSource = config.branding?.logo
-    const faviconSource = config.branding?.favicon
-    const badgeLogoSource = resolveBadgeLogoSource({
-      appPackageName: config.build.appPackageName,
-      brandingFaviconPath:
-        faviconSource && faviconSource.source === 'local-path' ? faviconSource.path : undefined,
-      brandingLogoPath:
-        logoSource && logoSource.source === 'local-path' ? logoSource.path : undefined
+  for (const variant of ['light', 'dark'] as const) {
+    const key =
+      site.badges?.featuredOn?.[variant] ??
+      `${R2_BADGE_KEY_PREFIX}/featured-on-${site.id}-${variant}.svg`
+    const source = `${project.appDirectory}/public/${key}`
+    const outPath = join(REPO_ROOT, source)
+    mkdirSync(dirname(outPath), { recursive: true })
+    writeFileSync(outPath, buildSvg({ logoSource: badgeLogoSource, siteName, variant }), 'utf-8')
+    r2Assets.push({
+      contentType: 'image/svg+xml',
+      height: BADGE_HEIGHT,
+      key,
+      siteId: site.id,
+      source,
+      variant,
+      width: BADGE_WIDTH
     })
-
-    for (const variant of ['light', 'dark'] as const) {
-      const svg = buildSvg({ logoSource: badgeLogoSource, siteId, siteName, variant })
-      const filename = `featured-on-${siteId}-${variant}.svg`
-      const outPath = join(outputDir, filename)
-      const source = `apps/${config.build.appPackageName}/public/badge/${filename}`
-      writeFileSync(outPath, svg, 'utf-8')
-      r2Assets.push({
-        contentType: 'image/svg+xml',
-        height: BADGE_HEIGHT,
-        key: `${R2_BADGE_KEY_PREFIX}/${filename}`,
-        siteId,
-        source,
-        variant,
-        width: BADGE_WIDTH
-      })
-      console.log(`  wrote ${source}`)
-    }
+    console.log(`  wrote ${source}`)
   }
 
   const r2MapPath = join(REPO_ROOT, 'scripts', 'r2-featured-badge-assets.json')
   writeFileSync(r2MapPath, `${JSON.stringify(r2Assets, null, 2)}\n`, 'utf-8')
   console.log('  wrote scripts/r2-featured-badge-assets.json')
-  console.log(`\nDone — generated ${siteIds.length * 2} badge SVG(s) and the R2 asset map.`)
+  console.log(`\nDone — generated ${r2Assets.length} badge SVG(s) and the R2 asset map.`)
 }
 
 main()

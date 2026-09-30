@@ -2,18 +2,19 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
-import { resolveSiteTarget, siteIds } from './site-targets'
+import { project } from './project'
+import { categoryRoute, listingRoute } from './site-routes'
 
-export type HttpGateMode = 'preview' | 'production'
+export type HttpGateMode = 'staging' | 'production'
 const defaultRequestTimeoutMs = 15_000
 const maxBodyProbeBytes = 4_096
 
 function parseMode(value: string): HttpGateMode {
-  if (value === 'preview' || value === 'production') return value
-  throw new Error('HTTP gate mode must be exactly preview or production.')
+  if (value === 'staging' || value === 'production') return value
+  throw new Error('HTTP gate mode must be exactly staging or production.')
 }
 
-function validateBaseUrl(mode: HttpGateMode, siteId: string, value: string): URL {
+function validateBaseUrl(mode: HttpGateMode, value: string): URL {
   const baseUrl = new URL(value)
   if (
     baseUrl.protocol !== 'https:' ||
@@ -27,10 +28,10 @@ function validateBaseUrl(mode: HttpGateMode, siteId: string, value: string): URL
     throw new Error(
       `${mode} gates require a clean HTTPS origin with no credentials, port, path, query, or hash.`
     )
-  if (mode === 'production' && baseUrl.hostname !== siteId)
-    throw new Error(`Production gates require the exact https://${siteId} origin.`)
-  if (mode === 'preview' && siteIds.some(productionSiteId => baseUrl.hostname === productionSiteId))
-    throw new Error('Preview gates reject every registered Production hostname.')
+  if (mode === 'production' && baseUrl.hostname !== project.domain)
+    throw new Error(`Production gates require the exact https://${project.domain} origin.`)
+  if (mode === 'staging' && baseUrl.hostname === project.domain)
+    throw new Error('Staging gates reject the Production hostname.')
   return baseUrl
 }
 
@@ -128,14 +129,13 @@ async function expectLegacyRedirect(
 
 export async function runHttpGates(
   modeValue: string,
-  siteValue: string,
   baseUrlValue: string,
-  options: { timeoutMs?: number } = {}
+  options: { parityReportPath?: string; timeoutMs?: number } = {}
 ): Promise<void> {
   const mode = parseMode(modeValue)
-  const target = resolveSiteTarget(siteValue)
-  const baseUrl = validateBaseUrl(mode, target.siteId, baseUrlValue)
-  const report = parse(readFileSync(resolve(target.parityReportPath), 'utf8')) as {
+  const baseUrl = validateBaseUrl(mode, baseUrlValue)
+  const parityReportPath = options.parityReportPath ?? project.artifact.parityReportPath
+  const report = parse(readFileSync(resolve(parityReportPath), 'utf8')) as {
     parity: { categories: Array<{ slug: string }>; exactSlugSet: string[] }
   }
   const listingSlug = report.parity.exactSlugSet[0]
@@ -146,27 +146,27 @@ export async function runHttpGates(
     throw new Error('HTTP gate timeout must be a positive integer within the protected bound.')
   await Promise.all([
     expectRoute(mode, baseUrl, '/', timeoutMs),
-    expectRoute(mode, baseUrl, `/categories/${categorySlug}/`, timeoutMs),
-    expectRoute(mode, baseUrl, `/products/${listingSlug}/`, timeoutMs),
+    expectRoute(mode, baseUrl, categoryRoute(categorySlug), timeoutMs),
+    expectRoute(mode, baseUrl, listingRoute(listingSlug), timeoutMs),
     expectRoute(mode, baseUrl, `/api/search?q=${encodeURIComponent(listingSlug)}`, timeoutMs),
     expectRoute(mode, baseUrl, '/rss.xml', timeoutMs),
     expectRoute(mode, baseUrl, '/sitemap-index.xml', timeoutMs),
-    expectLegacyRedirect(mode, baseUrl, `/${listingSlug}/`, `/products/${listingSlug}/`, timeoutMs),
+    expectLegacyRedirect(mode, baseUrl, `/${listingSlug}/`, listingRoute(listingSlug), timeoutMs),
     expectRoute(mode, baseUrl, '/submit/', timeoutMs)
   ])
 }
 
-export async function runPreviewHttpGates(siteValue: string, baseUrlValue: string): Promise<void> {
-  return runHttpGates('preview', siteValue, baseUrlValue)
+export async function runStagingHttpGates(baseUrlValue: string): Promise<void> {
+  return runHttpGates('staging', baseUrlValue)
 }
 
 async function main(): Promise<void> {
-  const [modeValue, siteValue, baseUrlValue, output] = process.argv.slice(2)
-  if (!modeValue || !siteValue || !baseUrlValue)
+  const [modeValue, baseUrlValue, output] = process.argv.slice(2)
+  if (!modeValue || !baseUrlValue)
     throw new Error(
-      'Usage: d1-preview-http-gates.ts <preview|production> <site> <clean-https-origin> [output]'
+      'Usage: d1-preview-http-gates.ts <staging|production> <clean-https-origin> [output]'
     )
-  await runHttpGates(modeValue, siteValue, baseUrlValue)
+  await runHttpGates(modeValue, baseUrlValue)
   if (output)
     writeFileSync(
       resolve(output),

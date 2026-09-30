@@ -13,19 +13,10 @@ import {
 const currentTimestamp = sql`CURRENT_TIMESTAMP`
 const booleanCheck = (column: { name: string }) => sql`${sql.identifier(column.name)} IN (0, 1)`
 
-export const sites = sqliteTable('sites', {
-  id: text('id').primaryKey(),
-  createdAt: text('created_at').notNull().default(currentTimestamp),
-  updatedAt: text('updated_at').notNull().default(currentTimestamp)
-})
-
 export const categories = sqliteTable(
   'categories',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    siteId: text('site_id')
-      .notNull()
-      .references(() => sites.id, { onDelete: 'cascade' }),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
     description: text('description').notNull().default(''),
@@ -35,9 +26,9 @@ export const categories = sqliteTable(
     updatedAt: text('updated_at').notNull().default(currentTimestamp)
   },
   table => [
-    unique('categories_site_slug_unique').on(table.siteId, table.slug),
+    unique('categories_slug_unique').on(table.slug),
     check('categories_is_active_boolean', booleanCheck(table.isActive)),
-    index('categories_public_idx').on(table.siteId, table.isActive, table.sortOrder, table.name)
+    index('categories_public_idx').on(table.isActive, table.sortOrder, table.name)
   ]
 )
 
@@ -45,9 +36,6 @@ export const listings = sqliteTable(
   'listings',
   {
     id: text('id').primaryKey(),
-    siteId: text('site_id')
-      .notNull()
-      .references(() => sites.id, { onDelete: 'cascade' }),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
     description: text('description').notNull(),
@@ -71,7 +59,7 @@ export const listings = sqliteTable(
     displayOrder: integer('display_order').notNull().default(0)
   },
   table => [
-    unique('listings_site_slug_unique').on(table.siteId, table.slug),
+    unique('listings_slug_unique').on(table.slug),
     check(
       'listings_priority_valid',
       sql`${table.priority} IS NULL OR ${table.priority} IN ('high', 'medium', 'low')`
@@ -84,9 +72,7 @@ export const listings = sqliteTable(
       sql`${table.status} IN ('draft', 'review', 'approved', 'rejected')`
     ),
     check('listings_display_order_nonnegative', sql`${table.displayOrder} >= 0`),
-    index('listings_slug_lookup_idx').on(table.siteId, table.slug),
     index('listings_publication_idx').on(
-      table.siteId,
       table.status,
       table.isActive,
       sql`${table.publishedAt} DESC`,
@@ -94,16 +80,15 @@ export const listings = sqliteTable(
       table.slug
     ),
     index('listings_featured_idx').on(
-      table.siteId,
       table.status,
       table.isActive,
       table.isFeatured,
       sql`${table.publishedAt} DESC`,
       table.displayOrder
     ),
-    index('listings_name_idx').on(table.siteId, sql`${table.name} COLLATE NOCASE`),
+    index('listings_name_idx').on(sql`${table.name} COLLATE NOCASE`),
     index('listings_related_name_idx')
-      .on(table.siteId, table.name, table.slug)
+      .on(table.name, table.slug)
       .where(
         sql`${table.status} = 'approved' AND ${table.isActive} = 1 AND ${table.publishedAt} IS NOT NULL`
       )
@@ -192,24 +177,22 @@ export const listingFaqs = sqliteTable(
 export const publicationState = sqliteTable(
   'publication_state',
   {
-    siteId: text('site_id')
-      .primaryKey()
-      .references(() => sites.id, { onDelete: 'cascade' }),
+    id: integer('id').primaryKey().default(1),
     version: integer('version').notNull().default(0),
     manifestId: text('manifest_id'),
     checksum: text('checksum').notNull(),
     publishedAt: text('published_at').notNull().default(currentTimestamp)
   },
-  table => [check('publication_state_version_nonnegative', sql`${table.version} >= 0`)]
+  table => [
+    check('publication_state_singleton', sql`${table.id} = 1`),
+    check('publication_state_version_nonnegative', sql`${table.version} >= 0`)
+  ]
 )
 
 export const migrationRuns = sqliteTable(
   'migration_runs',
   {
     id: text('id').primaryKey(),
-    siteId: text('site_id')
-      .notNull()
-      .references(() => sites.id, { onDelete: 'cascade' }),
     schemaVersion: integer('schema_version').notNull(),
     manifestIdentity: text('manifest_identity').notNull(),
     inputChecksum: text('input_checksum').notNull(),
@@ -221,12 +204,12 @@ export const migrationRuns = sqliteTable(
     completedAt: text('completed_at')
   },
   table => [
-    unique('migration_runs_site_manifest_unique').on(table.siteId, table.manifestIdentity),
+    unique('migration_runs_manifest_unique').on(table.manifestIdentity),
     check(
       'migration_runs_outcome_valid',
       sql`${table.outcome} IN ('started', 'succeeded', 'failed')`
     ),
-    index('migration_runs_site_time_idx').on(table.siteId, sql`${table.startedAt} DESC`)
+    index('migration_runs_time_idx').on(sql`${table.startedAt} DESC`)
   ]
 )
 
@@ -234,9 +217,6 @@ export const publicationRuns = sqliteTable(
   'publication_runs',
   {
     id: text('id').primaryKey(),
-    siteId: text('site_id')
-      .notNull()
-      .references(() => sites.id, { onDelete: 'cascade' }),
     manifestId: text('manifest_id').notNull(),
     baseVersion: integer('base_version').notNull(),
     publishedVersion: integer('published_version'),
@@ -253,12 +233,12 @@ export const publicationRuns = sqliteTable(
     afterChecksum: text('after_checksum')
   },
   table => [
-    unique('publication_runs_site_manifest_unique').on(table.siteId, table.manifestId),
+    unique('publication_runs_manifest_unique').on(table.manifestId),
     check(
       'publication_runs_outcome_valid',
       sql`${table.outcome} IN ('started', 'succeeded', 'failed')`
     ),
-    index('publication_runs_site_time_idx').on(table.siteId, sql`${table.startedAt} DESC`)
+    index('publication_runs_time_idx').on(sql`${table.startedAt} DESC`)
   ]
 )
 
@@ -266,9 +246,6 @@ export const listingSlugRedirects = sqliteTable(
   'listing_slug_redirects',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    siteId: text('site_id')
-      .notNull()
-      .references(() => sites.id, { onDelete: 'cascade' }),
     listingId: text('listing_id')
       .notNull()
       .references(() => listings.id, { onDelete: 'cascade' }),
@@ -279,7 +256,7 @@ export const listingSlugRedirects = sqliteTable(
     createdAt: text('created_at').notNull().default(currentTimestamp)
   },
   table => [
-    unique('listing_slug_redirects_site_old_slug_unique').on(table.siteId, table.oldSlug),
+    unique('listing_slug_redirects_old_slug_unique').on(table.oldSlug),
     check('listing_slug_redirects_slug_change', sql`${table.oldSlug} != ${table.newSlug}`),
     index('listing_slug_redirects_listing_idx').on(table.listingId, sql`${table.createdAt} DESC`)
   ]
@@ -289,9 +266,6 @@ export const listingSubmissions = sqliteTable(
   'listing_submissions',
   {
     id: text('id').primaryKey(),
-    siteId: text('site_id')
-      .notNull()
-      .references(() => sites.id, { onDelete: 'cascade' }),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
     description: text('description').notNull(),
@@ -317,7 +291,7 @@ export const listingSubmissions = sqliteTable(
     updatedAt: text('updated_at').notNull().default(currentTimestamp)
   },
   table => [
-    unique('listing_submissions_site_token_unique').on(table.siteId, table.accessTokenHash),
+    unique('listing_submissions_token_unique').on(table.accessTokenHash),
     check(
       'listing_submissions_status_valid',
       sql`${table.status} IN ('pending_badge', 'verified', 'approved', 'rejected')`
@@ -327,10 +301,9 @@ export const listingSubmissions = sqliteTable(
       sql`${table.verificationAttempts} >= 0`
     ),
     uniqueIndex('listing_submissions_active_slug_idx')
-      .on(table.siteId, table.slug)
+      .on(table.slug)
       .where(sql`${table.status} IN ('pending_badge', 'verified')`),
     index('listing_submissions_review_queue_idx').on(
-      table.siteId,
       table.status,
       table.badgeVerifiedAt,
       table.createdAt
@@ -449,27 +422,15 @@ export const listingSubmissionNotifications = sqliteTable(
   ]
 )
 
-export const sitesRelations = relations(sites, ({ many, one }) => ({
-  categories: many(categories),
-  listings: many(listings),
-  migrationRuns: many(migrationRuns),
-  publicationRuns: many(publicationRuns),
-  publicationState: one(publicationState),
-  slugRedirects: many(listingSlugRedirects),
-  submissions: many(listingSubmissions)
+export const categoriesRelations = relations(categories, ({ many }) => ({
+  listings: many(listingCategories)
 }))
 
-export const categoriesRelations = relations(categories, ({ many, one }) => ({
-  listings: many(listingCategories),
-  site: one(sites, { fields: [categories.siteId], references: [sites.id] })
-}))
-
-export const listingsRelations = relations(listings, ({ many, one }) => ({
+export const listingsRelations = relations(listings, ({ many }) => ({
   categories: many(listingCategories),
   faqs: many(listingFaqs),
   media: many(listingMedia),
   resourceLinks: many(listingResourceLinks),
-  site: one(sites, { fields: [listings.siteId], references: [sites.id] }),
   slugRedirects: many(listingSlugRedirects),
   submissions: many(listingSubmissions)
 }))
@@ -500,24 +461,11 @@ export const listingFaqsRelations = relations(listingFaqs, ({ one }) => ({
   listing: one(listings, { fields: [listingFaqs.listingId], references: [listings.id] })
 }))
 
-export const publicationStateRelations = relations(publicationState, ({ one }) => ({
-  site: one(sites, { fields: [publicationState.siteId], references: [sites.id] })
-}))
-
-export const migrationRunsRelations = relations(migrationRuns, ({ one }) => ({
-  site: one(sites, { fields: [migrationRuns.siteId], references: [sites.id] })
-}))
-
-export const publicationRunsRelations = relations(publicationRuns, ({ one }) => ({
-  site: one(sites, { fields: [publicationRuns.siteId], references: [sites.id] })
-}))
-
 export const listingSlugRedirectsRelations = relations(listingSlugRedirects, ({ one }) => ({
   listing: one(listings, {
     fields: [listingSlugRedirects.listingId],
     references: [listings.id]
-  }),
-  site: one(sites, { fields: [listingSlugRedirects.siteId], references: [sites.id] })
+  })
 }))
 
 export const listingSubmissionsRelations = relations(listingSubmissions, ({ many, one }) => ({
@@ -528,8 +476,7 @@ export const listingSubmissionsRelations = relations(listingSubmissions, ({ many
     references: [listings.id]
   }),
   notifications: many(listingSubmissionNotifications),
-  resourceLinks: many(listingSubmissionResourceLinks),
-  site: one(sites, { fields: [listingSubmissions.siteId], references: [sites.id] })
+  resourceLinks: many(listingSubmissionResourceLinks)
 }))
 
 export const listingSubmissionResourceLinksRelations = relations(

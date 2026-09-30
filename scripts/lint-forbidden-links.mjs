@@ -3,36 +3,24 @@ import { ESLint } from 'eslint'
 import { isProtectedListingSurface } from './eslint-rules/no-forbidden-listing-links.mjs'
 
 const DEFAULT_PATTERNS = [
-  'sites/**/*.{json,jsonc,md,mdx,ts,tsx}',
   'apps/*/app/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
   'apps/*/components/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
   'apps/*/lib/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
   'apps/*/public/**/*.{html,json,js,txt,xml}',
-  'packages/site-contract/src/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
+  'packages/site-config/**/*.{js,jsx,json,jsonc,md,mdx,mjs,ts,tsx}',
   'packages/web-core/src/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
   'packages/content/data/**/*.{json,jsonc,md,mdx}'
 ]
 
-function readOption(name) {
-  const index = process.argv.indexOf(name)
-
-  return index === -1 ? undefined : process.argv[index + 1]
-}
+/** Pre-rendered OpenNext assets of the web app, linted with --generated after a Worker build. */
+const GENERATED_PATTERNS = ['apps/web/.open-next/assets/**/*.{html,json,js,txt,xml}']
 
 function hasFlag(name) {
   return process.argv.includes(name)
 }
 
 function readExplicitFiles() {
-  const optionNames = new Set(['--site'])
-
-  return process.argv.slice(2).filter((argument, index, allArguments) => {
-    if (argument.startsWith('--')) {
-      return false
-    }
-
-    return !optionNames.has(allArguments[index - 1])
-  })
+  return process.argv.slice(2).filter(argument => !argument.startsWith('--'))
 }
 
 function existingProtectedFiles(paths) {
@@ -45,17 +33,12 @@ function existingProtectedFiles(paths) {
   })
 }
 
-const siteId = readOption('--site')
 const explicitFiles = existingProtectedFiles(readExplicitFiles())
 const targets =
   explicitFiles.length > 0
     ? explicitFiles
     : hasFlag('--generated')
-      ? [
-          siteId
-            ? `dist/sites/${siteId}/**/*.{html,json,js,txt,xml}`
-            : 'dist/sites/**/*.{html,json,js,txt,xml}'
-        ]
+      ? GENERATED_PATTERNS
       : DEFAULT_PATTERNS
 const eslint = new ESLint({
   errorOnUnmatchedPattern: false,

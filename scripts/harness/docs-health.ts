@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { siteIds } from '../site-targets.ts'
 
 const REQUIRED_FILES = [
   'AGENTS.md',
@@ -16,45 +15,10 @@ const REQUIRED_FILES = [
   'docs/DEPLOY_RUNBOOK.md',
   'docs/DEPENDENCY_SECURITY.md',
   'docs/HARNESS.md',
-  'docs/MIGRATION_SOP.md',
-  'docs/QUALITY_SCORE.md',
   'docs/agents/domain.md',
   'docs/agents/issue-tracker.md',
   'docs/agents/triage-labels.md',
-  '.github/workflows/harness-gardening.yml',
-  '.agents/skills/migrate-json-directory-site/SKILL.md'
-] as const
-
-const REQUIRED_MIGRATION_HEADINGS = [
-  '# JSON-directory to D1 migration SOP',
-  '## Scope and support boundary',
-  '## Required evidence package',
-  '## Phase 0: choose the tenancy architecture',
-  '## Phase 1: freeze and inventory the source',
-  '## Phase 2: map and normalize',
-  '## Phase 3: construct deterministic D1 artifacts',
-  '## Phase 4: prove local parity',
-  '## Phase 5: provision Cloudflare safely',
-  '## Phase 6: rehearse and release',
-  '## Phase 7: remove the JSON architecture',
-  '## Rollback and recovery',
-  '## Completion checklist'
-] as const
-
-const MULTISITE_DOCUMENTS = [
-  'AGENTS.md',
-  'docs/ARCHITECTURE.md',
-  'docs/BUILD_PIPELINE.md',
-  'docs/DEPLOY_RUNBOOK.md',
-  'docs/MIGRATION_SOP.md',
-  'docs/ONBOARDING.md'
-] as const
-
-const RETIRED_SINGLE_SITE_ASSERTIONS = [
-  'The current repository deploys one application and one tenant',
-  'is the only application and deployable site in this repository',
-  'no second site is currently enabled',
-  'the current commands intentionally target only `serp.software`'
+  '.github/workflows/harness-gardening.yml'
 ] as const
 
 function repositoryFiles(root: string): string[] {
@@ -105,72 +69,6 @@ function validateSkill(root: string, file: string): string[] {
   return violations
 }
 
-export function validateMultisiteDocumentation(
-  documents: Readonly<Record<string, string>>,
-  activeSiteIds: readonly string[]
-): string[] {
-  const violations: string[] = []
-
-  for (const file of MULTISITE_DOCUMENTS) {
-    const source = documents[file]
-    if (source === undefined) continue
-    for (const siteId of activeSiteIds) {
-      if (!source.includes(siteId)) {
-        violations.push(`${file}: active site "${siteId}" is missing from multisite guidance`)
-      }
-    }
-  }
-
-  for (const file of MULTISITE_DOCUMENTS) {
-    const source = documents[file]
-    if (source === undefined) continue
-    for (const assertion of RETIRED_SINGLE_SITE_ASSERTIONS) {
-      if (source.includes(assertion)) {
-        violations.push(`${file}: retired single-site assertion "${assertion}"`)
-      }
-    }
-  }
-
-  return violations
-}
-
-export function validateReleaseDocumentation(
-  documents: Readonly<Record<string, string>>
-): string[] {
-  const violations: string[] = []
-  const requiredText = {
-    'docs/BUILD_PIPELINE.md': [
-      '`packages/data-ops/`',
-      '`worker-only`',
-      '`database-and-worker`',
-      '`check-schema`'
-    ],
-    'docs/DEPLOY_RUNBOOK.md': [
-      '`worker-only`',
-      '`database-and-worker`',
-      '`check-schema`',
-      'fails closed',
-      'Functional QA and D1 efficiency QA are separate gates'
-    ],
-    'docs/DATA_OPS_BENCHMARK.md': [
-      '## Production follow-up recorded 2026-07-31',
-      'actions/runs/30560826641',
-      'actions/runs/30561183257'
-    ]
-  } as const
-
-  for (const [file, requirements] of Object.entries(requiredText)) {
-    const source = documents[file]
-    if (source === undefined) continue
-    for (const requirement of requirements) {
-      if (!source.includes(requirement))
-        violations.push(`${file}: missing release guidance "${requirement}"`)
-    }
-  }
-
-  return violations
-}
-
 export function validatePlanningDocumentation(
   documents: Readonly<Record<string, string>>
 ): string[] {
@@ -205,22 +103,11 @@ export function checkDocumentation(root = resolve('.')): string[] {
     }
   }
 
-  const migrationPath = resolve(root, 'docs/MIGRATION_SOP.md')
-  if (existsSync(migrationPath)) {
-    const migration = readFileSync(migrationPath, 'utf8')
-    for (const heading of REQUIRED_MIGRATION_HEADINGS) {
-      if (!migration.includes(heading))
-        violations.push(`docs/MIGRATION_SOP.md: missing "${heading}"`)
-    }
-  }
-
   const documentationSources = Object.fromEntries(
     files
       .filter(file => extname(file) === '.md')
       .map(file => [file, readFileSync(resolve(root, file), 'utf8')])
   )
-  violations.push(...validateMultisiteDocumentation(documentationSources, siteIds))
-  violations.push(...validateReleaseDocumentation(documentationSources))
   violations.push(...validatePlanningDocumentation(documentationSources))
 
   for (const file of files.filter(candidate => extname(candidate) === '.md')) {
@@ -279,9 +166,7 @@ function main(): void {
     process.exitCode = 1
     return
   }
-  console.log(
-    `Documentation health passed: indexes, links, active sites (${siteIds.join(', ')}), skills, and commands agree.`
-  )
+  console.log('Documentation health passed: indexes, links, skills, and commands agree.')
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) main()

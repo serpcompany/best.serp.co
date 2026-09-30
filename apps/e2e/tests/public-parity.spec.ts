@@ -1,17 +1,25 @@
 import { expect, type Locator, type Page, test } from '@playwright/test'
 
 import { detailListing } from './listing-fixture'
+import { categoryPath, escapeRegExp, sampleCategory } from './site-fixture'
 
-const listingRouteBasePath = process.env.E2E_LISTING_ROUTE_BASE_PATH ?? 'products'
-const categoryRouteBasePath = process.env.E2E_CATEGORY_ROUTE_BASE_PATH ?? 'categories'
-const categorySlug = process.env.E2E_CATEGORY_SLUG ?? 'video-downloaders'
-const isPilotParityTarget =
-  (process.env.E2E_SITE_ID ?? 'serp.software') === 'serp.software' &&
-  listingRouteBasePath === 'products'
-
-async function gotoPilot(page: Page, path: string) {
+async function gotoPublicPage(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('main').first()).toBeVisible()
+  // Interactive controls are client components; let their chunks load before driving them.
+  await page.waitForLoadState('networkidle')
+}
+
+/**
+ * Client-side search controls ignore input typed before React hydrates the page, so re-type until
+ * the hydrated component reacts instead of racing hydration with a single fill.
+ */
+async function fillUntilVisible(input: Locator, value: string, expected: Locator) {
+  await expect(async () => {
+    await input.fill('')
+    await input.fill(value)
+    await expect(expected).toBeVisible({ timeout: 2_000 })
+  }).toPass()
 }
 
 async function expectInternalLink(link: Locator, expectedPath: RegExp | string) {
@@ -30,11 +38,9 @@ async function expectExternalLink(link: Locator) {
   expect(await link.getAttribute('rel')).toBe('noopener noreferrer')
 }
 
-test.describe('pilot public parity interactions', () => {
-  test.skip(!isPilotParityTarget, 'Public parity tests require the serp.software route env')
-
+test.describe('public parity interactions', () => {
   test('homepage search submit preserves search URL behavior', async ({ page }) => {
-    await gotoPilot(page, '/')
+    await gotoPublicPage(page, '/')
 
     const searchForm = page.getByRole('form', { name: /desktop search/i })
     const searchInput = searchForm.getByRole('textbox', { name: /^search$/i })
@@ -48,26 +54,27 @@ test.describe('pilot public parity interactions', () => {
   test('desktop autocomplete keyboard selection preserves navigation behavior', async ({
     page
   }) => {
-    await gotoPilot(page, '/')
+    await gotoPublicPage(page, '/')
 
     const searchForm = page.getByRole('form', { name: /desktop search/i })
     const searchInput = searchForm.getByRole('textbox', { name: /^search$/i })
-    await searchInput.fill('123movies')
-    await expect(
-      page.getByRole('option', { name: /123movies(?: video)? downloader/i })
-    ).toBeVisible()
+    await fillUntilVisible(
+      searchInput,
+      detailListing.searchQuery,
+      page.getByRole('option', { name: detailListing.namePattern })
+    )
 
     await page.keyboard.press('ArrowDown')
     await page.keyboard.press('Enter')
 
-    await expect(page).toHaveURL(new RegExp(`/${listingRouteBasePath}/123movies-downloader/?$`))
+    await expect(page).toHaveURL(new RegExp(`${escapeRegExp(detailListing.path)}$`))
   })
 
   test('mobile search overlay opens, submits, closes, and unlocks body scroll', async ({
     page
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await gotoPilot(page, '/')
+    await gotoPublicPage(page, '/')
 
     await page.getByRole('button', { name: /toggle search/i }).click()
 
@@ -85,7 +92,7 @@ test.describe('pilot public parity interactions', () => {
     page
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await gotoPilot(page, '/')
+    await gotoPublicPage(page, '/')
 
     await page.getByRole('button', { name: /open menu/i }).click()
     await expect(page.getByRole('heading', { name: /^menu$/i })).toBeVisible()
@@ -96,17 +103,14 @@ test.describe('pilot public parity interactions', () => {
     await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
 
     await page.getByRole('button', { name: /open menu/i }).click()
-    await page
-      .getByRole('link', { name: /video downloaders/i })
-      .first()
-      .click()
-    await expect(page).toHaveURL(new RegExp(`/${categoryRouteBasePath}/${categorySlug}/?$`))
+    await page.getByRole('link', { name: sampleCategory.name }).first().click()
+    await expect(page).toHaveURL(new RegExp(`${escapeRegExp(categoryPath(sampleCategory.slug))}$`))
   })
 
   test('favorite toggle and favorites-only filter preserve local state behavior', async ({
     page
   }) => {
-    await gotoPilot(page, '/')
+    await gotoPublicPage(page, '/')
     await page.evaluate(slug => {
       localStorage.setItem('llms-txt-hub-favorites', JSON.stringify([slug]))
     }, detailListing.slug)
@@ -130,7 +134,7 @@ test.describe('pilot public parity interactions', () => {
   test('homepage sort choice persists after reload with result count text intact', async ({
     page
   }) => {
-    await gotoPilot(page, '/')
+    await gotoPublicPage(page, '/')
 
     const browseSection = page.getByRole('heading', { name: /browse the directory/i })
     await browseSection.scrollIntoViewIfNeeded()
@@ -147,31 +151,33 @@ test.describe('pilot public parity interactions', () => {
   })
 
   test('empty search state action link preserves submit href semantics', async ({ page }) => {
-    await gotoPilot(page, '/')
+    await gotoPublicPage(page, '/')
 
     const browseSection = page.getByRole('heading', { name: /browse the directory/i })
     await browseSection.scrollIntoViewIfNeeded()
     const searchInput = page.getByPlaceholder('Search the directory...')
-    await searchInput.fill('phase-one-no-results-sentinel')
-
-    await expect(page.getByRole('heading', { name: /no results found/i })).toBeVisible()
+    await fillUntilVisible(
+      searchInput,
+      'phase-one-no-results-sentinel',
+      page.getByRole('heading', { name: /no results found/i })
+    )
     await page.getByRole('button', { name: /clear search/i }).click()
     await expect(page.getByRole('heading', { name: /no results found/i })).not.toBeVisible()
   })
 
   test('public link href target and rel semantics are preserved', async ({ page }) => {
-    await gotoPilot(page, '/')
+    await gotoPublicPage(page, '/')
 
     await expectInternalLink(
-      page.getByRole('link', { name: /submit yours/i }).first(),
-      /\/submit\/?$/
+      page.getByRole('banner').getByRole('link', { name: /^submit$/i }),
+      /^\/submit\/$/
     )
     await expectInternalLink(
       page.getByRole('link', { name: detailListing.namePattern }).first(),
-      new RegExp(`/${listingRouteBasePath}/${detailListing.slug}/?$`)
+      new RegExp(`^${escapeRegExp(detailListing.path)}$`)
     )
 
-    await gotoPilot(page, `/${listingRouteBasePath}/${detailListing.slug}`)
+    await gotoPublicPage(page, detailListing.path)
     await expectExternalLink(page.getByRole('link', { name: /install browser extension/i }).first())
   })
 })

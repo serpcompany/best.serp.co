@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, relative, resolve } from 'node:path'
-import { resolveCheckedInSiteConfig } from '@serpdirectory/site-contract'
+import { dirname, resolve } from 'node:path'
+import { site } from '@serpdirectory/site-config'
 import { afterEach, describe, expect, it } from 'vitest'
 import { auditArtifactSitemaps, parseSitemapLocs } from './audit-sitemaps.ts'
 
@@ -18,17 +18,11 @@ function writeFile(path: string, contents = 'test'): void {
   writeFileSync(path, contents)
 }
 
-function makeSiteConfig(artifactDir: string) {
-  const siteConfig = resolveCheckedInSiteConfig('serp.software')
-
+function makeSiteConfig() {
   return {
-    ...siteConfig,
-    build: {
-      ...siteConfig.build,
-      artifactDir: relative(process.cwd(), artifactDir)
-    },
+    ...site,
     site: {
-      ...siteConfig.site,
+      ...site.site,
       domain: 'example.com',
       publicUrl: 'https://example.com'
     }
@@ -83,7 +77,7 @@ describe('auditArtifactSitemaps', () => {
     writeFile(resolve(artifactDir, 'index.html'))
     writeFile(resolve(artifactDir, 'about/index.html'))
 
-    const audit = auditArtifactSitemaps(makeSiteConfig(artifactDir))
+    const audit = auditArtifactSitemaps(makeSiteConfig(), artifactDir)
 
     expect(audit.urlCount).toBe(2)
     expect(audit.issues).toEqual([])
@@ -103,7 +97,7 @@ describe('auditArtifactSitemaps', () => {
     )
     writeFile(resolve(artifactDir, 'index.html'))
 
-    const audit = auditArtifactSitemaps(makeSiteConfig(artifactDir))
+    const audit = auditArtifactSitemaps(makeSiteConfig(), artifactDir)
 
     expect(audit.issues).toContainEqual(
       expect.objectContaining({
@@ -126,7 +120,7 @@ describe('auditArtifactSitemaps', () => {
     writeFile(resolve(artifactDir, 'sitemap-index.xml'), sitemapIndex)
     writeFile(resolve(artifactDir, 'sitemap.xml'), sitemapIndex)
 
-    const audit = auditArtifactSitemaps(makeSiteConfig(artifactDir))
+    const audit = auditArtifactSitemaps(makeSiteConfig(), artifactDir)
 
     expect(audit.issues).toContainEqual(
       expect.objectContaining({
@@ -158,7 +152,7 @@ describe('auditArtifactSitemaps', () => {
     )
     writeFile(resolve(artifactDir, 'index.html'))
 
-    const audit = auditArtifactSitemaps(makeSiteConfig(artifactDir))
+    const audit = auditArtifactSitemaps(makeSiteConfig(), artifactDir)
 
     expect(audit.issues).toContainEqual(
       expect.objectContaining({
@@ -185,7 +179,7 @@ describe('auditArtifactSitemaps', () => {
       '<urlset><url><loc>https://example.com/missing-page/</loc><lastmod>2026-06-19</lastmod></url></urlset>'
     )
 
-    const audit = auditArtifactSitemaps(makeSiteConfig(artifactDir))
+    const audit = auditArtifactSitemaps(makeSiteConfig(), artifactDir)
 
     expect(audit.issues).toContainEqual(
       expect.objectContaining({
@@ -198,7 +192,7 @@ describe('auditArtifactSitemaps', () => {
 
   it('reports excluded paths that leak into sitemap output', () => {
     const artifactDir = makeTempArtifactDir()
-    const siteConfig = makeSiteConfig(artifactDir)
+    const siteConfig = makeSiteConfig()
 
     const sitemapIndex =
       '<sitemapindex><sitemap><loc>https://example.com/pages-sitemap.xml</loc><lastmod>2026-06-19</lastmod></sitemap></sitemapindex>'
@@ -214,13 +208,16 @@ describe('auditArtifactSitemaps', () => {
     )
     writeFile(resolve(artifactDir, 'search/index.html'))
 
-    const audit = auditArtifactSitemaps({
-      ...siteConfig,
-      sitemap: {
-        ...siteConfig.sitemap,
-        excludedPaths: ['/search']
-      }
-    })
+    const audit = auditArtifactSitemaps(
+      {
+        ...siteConfig,
+        sitemap: {
+          ...siteConfig.sitemap,
+          excludedPaths: ['/search']
+        }
+      },
+      artifactDir
+    )
 
     expect(audit.issues).toContainEqual(
       expect.objectContaining({
@@ -251,7 +248,7 @@ describe('auditArtifactSitemaps', () => {
       '<html><head><link rel="canonical" href="https://example.com/canonical/"></head></html>'
     )
 
-    const audit = auditArtifactSitemaps(makeSiteConfig(artifactDir))
+    const audit = auditArtifactSitemaps(makeSiteConfig(), artifactDir)
 
     expect(audit.issues).toContainEqual(
       expect.objectContaining({
@@ -282,7 +279,7 @@ describe('auditArtifactSitemaps', () => {
       '<html><head><meta name="robots" content="noindex, nofollow"></head></html>'
     )
 
-    const audit = auditArtifactSitemaps(makeSiteConfig(artifactDir))
+    const audit = auditArtifactSitemaps(makeSiteConfig(), artifactDir)
 
     expect(audit.issues).toContainEqual(
       expect.objectContaining({
@@ -310,7 +307,7 @@ describe('auditArtifactSitemaps', () => {
     )
     writeFile(resolve(artifactDir, 'index.html'))
 
-    const audit = auditArtifactSitemaps(makeSiteConfig(artifactDir))
+    const audit = auditArtifactSitemaps(makeSiteConfig(), artifactDir)
 
     expect(audit.issues).toContainEqual(
       expect.objectContaining({

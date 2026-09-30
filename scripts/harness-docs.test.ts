@@ -1,58 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import {
-  checkDocumentation,
-  validateMultisiteDocumentation,
-  validatePlanningDocumentation,
-  validateReleaseDocumentation
-} from './harness/docs-health.ts'
+import { checkDocumentation, validatePlanningDocumentation } from './harness/docs-health.ts'
 import { stepsForProfile } from './harness/runner.ts'
 
 describe('repository harness contract', () => {
   it('keeps documentation, indexes, skills, links, and commands healthy', () => {
     expect(checkDocumentation(resolve('.'))).toEqual([])
-  })
-
-  it('rejects a registered site omitted from core multisite guidance', () => {
-    expect(
-      validateMultisiteDocumentation(
-        {
-          'docs/ONBOARDING.md': 'The active sites are serp.software.'
-        },
-        ['serp.software', 'example.com']
-      )
-    ).toContain('docs/ONBOARDING.md: active site "example.com" is missing from multisite guidance')
-  })
-
-  it('rejects retired single-site assertions', () => {
-    expect(
-      validateMultisiteDocumentation(
-        {
-          'docs/MIGRATION_SOP.md':
-            'The current repository deploys one application and one tenant: serp.software.'
-        },
-        ['serp.software']
-      )
-    ).toContain(
-      'docs/MIGRATION_SOP.md: retired single-site assertion "The current repository deploys one application and one tenant"'
-    )
-  })
-
-  it('rejects stale or incomplete release handoff guidance', () => {
-    expect(
-      validateReleaseDocumentation({
-        'docs/BUILD_PIPELINE.md': 'Deploy with worker-only.',
-        'docs/DATA_OPS_BENCHMARK.md': 'Production untouched.',
-        'docs/DEPLOY_RUNBOOK.md': 'Functional checks passed.'
-      })
-    ).toEqual(
-      expect.arrayContaining([
-        'docs/BUILD_PIPELINE.md: missing release guidance "`packages/data-ops/`"',
-        'docs/DEPLOY_RUNBOOK.md: missing release guidance "`check-schema`"',
-        'docs/DATA_OPS_BENCHMARK.md: missing release guidance "## Production follow-up recorded 2026-07-31"'
-      ])
-    )
   })
 
   it('rejects retired Markdown planning references', () => {

@@ -1,9 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-import type { ActiveCheckedInSiteId } from '@serpdirectory/site-contract/active-site-ids'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createSiteDatabase } from './client'
-import { createSubmissionOperations, isSubmissionError, type SubmissionInput } from './submissions'
+import { createDatabase } from './client'
+import { createSubmissionOperations, type SubmissionInput } from './submissions'
 import { SqliteD1 } from './test-support'
 
 const input: SubmissionInput = {
@@ -33,70 +30,48 @@ describe('shared submission data operations', () => {
   let sqlite: SqliteD1
 
   beforeEach(() => {
-    sqlite = new SqliteD1(':memory:', false)
-    sqlite.database.exec(
-      readFileSync(
-        resolve(import.meta.dirname, '../../../d1/drizzle/0000_remarkable_manta.sql'),
-        'utf8'
+    sqlite = new SqliteD1()
+    sqlite.database
+      .prepare(
+        `INSERT INTO categories(slug,name,description,sort_order,is_active)
+        VALUES ('tools','Tools','Tools',0,1)`
       )
-    )
-    for (const siteId of ['serp.software', 'pornvideodownloaders.com'] as const) {
-      sqlite.database.prepare('INSERT INTO sites(id) VALUES (?)').run(siteId)
-      sqlite.database
-        .prepare(
-          `INSERT INTO categories(site_id,slug,name,description,sort_order,is_active)
-          VALUES (?,'tools','Tools','Tools',0,1)`
-        )
-        .run(siteId)
-      sqlite.database
-        .prepare(
-          `INSERT INTO publication_state(site_id,version,checksum,published_at)
-          VALUES (?,1,'before','2026-01-01T00:00:00.000Z')`
-        )
-        .run(siteId)
-    }
+      .run()
+    sqlite.database
+      .prepare(
+        `INSERT INTO publication_state(id,version,checksum,published_at)
+        VALUES (1,1,'before','2026-01-01T00:00:00.000Z')`
+      )
+      .run()
   })
 
-  function operations(siteId: ActiveCheckedInSiteId) {
+  function operations() {
     return createSubmissionOperations({
-      client: createSiteDatabase(sqlite.asD1Database(), siteId),
+      client: createDatabase(sqlite.asD1Database()),
       clock: () => new Date('2026-08-01T00:00:00.000Z')
     })
   }
 
-  function lock(siteId: ActiveCheckedInSiteId): void {
-    sqlite.database
-      .prepare(
-        `INSERT INTO migration_runs
-          (id,site_id,schema_version,manifest_identity,input_checksum,target_checksum,
-           affected_records,outcome)
-        VALUES (?,?,1,?,'before','before',0,'started')`
-      )
-      .run(`d1-cutover-lock-v1:${siteId}:run-1`, siteId, `d1-cutover-lock-v1:${siteId}:run-1`)
-  }
+  it('creates normalized submissions atomically and stores only hashes', async () => {
+    const saved = await operations().createSubmission(input)
 
-  it('creates normalized submissions atomically for both explicit Sites and stores only hashes', async () => {
-    const serp = await operations('serp.software').createSubmission(input)
-    const pvd = await operations('pornvideodownloaders.com').createSubmission(input)
-
-    expect(serp.slug).toBe('example.com')
-    expect(pvd.slug).toBe('example.com')
-    expect(serp.token).not.toBe(pvd.token)
+    expect(saved.slug).toBe('example.com')
     const rows = sqlite.database
-      .prepare(`SELECT site_id,access_token_hash FROM listing_submissions ORDER BY site_id`)
-      .all() as Array<{ access_token_hash: string; site_id: string }>
-    expect(rows).toEqual([
-      { site_id: 'pornvideodownloaders.com', access_token_hash: await hash(pvd.token) },
-      { site_id: 'serp.software', access_token_hash: await hash(serp.token) }
-    ])
-    expect(JSON.stringify(rows)).not.toContain(serp.token)
+      .prepare('SELECT access_token_hash FROM listing_submissions')
+      .all() as Array<{ access_token_hash: string }>
+    expect(rows).toEqual([{ access_token_hash: await hash(saved.token) }])
+    expect(JSON.stringify(rows)).not.toContain(saved.token)
+    await expect(operations().createSubmission(input)).rejects.toMatchObject({
+      code: 'duplicate_submission',
+      status: 409
+    })
     expect(
       sqlite.database
         .prepare(
           `SELECT label,sort_order FROM listing_submission_resource_links
           WHERE submission_id=? ORDER BY sort_order`
         )
-        .all(serp.id)
+        .all(saved.id)
     ).toEqual([
       { label: 'Docs', sort_order: 0 },
       { label: 'Support', sort_order: 1 }
@@ -107,38 +82,41 @@ describe('shared submission data operations', () => {
           `SELECT question,sort_order FROM listing_submission_faqs
           WHERE submission_id=? ORDER BY sort_order`
         )
-        .all(serp.id)
+        .all(saved.id)
     ).toEqual([
       { question: 'First?', sort_order: 0 },
       { question: 'Second?', sort_order: 1 }
     ])
   })
 
-  it('preserves public URL validation and Site-scoped capability access', async () => {
+  it('preserves public URL validation and capability access', async () => {
     await expect(
-      operations('serp.software').createSubmission({
+      operations().createSubmission({
         ...input,
         website: 'http://127.0.0.1/private'
       })
     ).rejects.toMatchObject({ code: 'invalid_url' })
 
-    const saved = await operations('serp.software').createSubmission(input)
-    await expect(
-      operations('pornvideodownloaders.com').getSubmission(saved.id, saved.token)
-    ).rejects.toMatchObject({ code: 'not_found', status: 404 })
-    await expect(
-      operations('serp.software').getSubmission(saved.id, 'wrong-capability')
-    ).rejects.toMatchObject({ code: 'not_found', status: 404 })
+    const saved = await operations().createSubmission(input)
+    await expect(operations().getSubmission(saved.id, saved.token)).resolves.toMatchObject({
+      id: saved.id,
+      slug: 'example.com',
+      status: 'pending_badge'
+    })
+    await expect(operations().getSubmission(saved.id, 'wrong-capability')).rejects.toMatchObject({
+      code: 'not_found',
+      status: 404
+    })
   })
 
   it('rolls back one of two concurrent verification transitions from the same snapshot', async () => {
-    const saved = await operations('serp.software').createSubmission(input)
+    const saved = await operations().createSubmission(input)
     const attempts = await Promise.allSettled([
-      operations('serp.software').finishVerification(saved.id, saved.token, {
+      operations().finishVerification(saved.id, saved.token, {
         code: 'badge_missing',
         ok: false
       }),
-      operations('serp.software').finishVerification(saved.id, saved.token, {
+      operations().finishVerification(saved.id, saved.token, {
         code: 'wrong_destination',
         ok: false
       })
@@ -162,8 +140,8 @@ describe('shared submission data operations', () => {
   })
 
   it('keeps transient failures out of the attempt count and enforces the rate limit', async () => {
-    const saved = await operations('serp.software').createSubmission(input)
-    const state = await operations('serp.software').finishVerification(saved.id, saved.token, {
+    const saved = await operations().createSubmission(input)
+    const state = await operations().finishVerification(saved.id, saved.token, {
       code: 'site_unreachable',
       ok: false
     })
@@ -172,64 +150,28 @@ describe('shared submission data operations', () => {
     expect(state.lastVerificationError).toBe('site_unreachable')
 
     for (let request = 0; request < 10; request += 1) {
-      await operations('serp.software').consumeRateLimit('203.0.113.10')
+      await operations().consumeRateLimit('203.0.113.10')
     }
-    await expect(
-      operations('serp.software').consumeRateLimit('203.0.113.10')
-    ).rejects.toMatchObject({ code: 'rate_limited', status: 429 })
-    await expect(
-      operations('pornvideodownloaders.com').consumeRateLimit('203.0.113.10')
-    ).resolves.toBeUndefined()
-  })
-
-  it('freezes every public write for only the locked Site without changing any row', async () => {
-    const saved = await operations('serp.software').createSubmission(input)
-    const eventCountBefore = sqlite.database
-      .prepare('SELECT COUNT(*) AS count FROM listing_submission_events')
-      .get()
-    lock('serp.software')
-
-    const frozen = await operations('serp.software')
-      .consumeRateLimit('203.0.113.20')
-      .catch(error => error as unknown)
-    expect(isSubmissionError(frozen)).toBe(true)
-    expect(frozen).toMatchObject({ code: 'cutover_frozen', status: 503 })
-    await expect(
-      operations('serp.software').createSubmission({
-        ...input,
-        website: 'https://another.example/'
-      })
-    ).rejects.toMatchObject({ code: 'cutover_frozen', status: 503 })
-    await expect(
-      operations('serp.software').beginVerification(saved.id, saved.token)
-    ).rejects.toMatchObject({ code: 'cutover_frozen', status: 503 })
-    await expect(
-      operations('serp.software').finishVerification(saved.id, saved.token, { ok: true })
-    ).rejects.toMatchObject({ code: 'cutover_frozen', status: 503 })
-
-    expect(
-      sqlite.database.prepare('SELECT COUNT(*) AS count FROM listing_submission_rate_limits').get()
-    ).toEqual({ count: 0 })
-    expect(
-      sqlite.database.prepare('SELECT COUNT(*) AS count FROM listing_submissions').get()
-    ).toEqual({ count: 1 })
-    expect(
-      sqlite.database.prepare('SELECT COUNT(*) AS count FROM listing_submission_events').get()
-    ).toEqual(eventCountBefore)
+    await expect(operations().consumeRateLimit('203.0.113.10')).rejects.toMatchObject({
+      code: 'rate_limited',
+      status: 429
+    })
+    await expect(operations().consumeRateLimit('203.0.113.11')).resolves.toBeUndefined()
     expect(
       sqlite.database
-        .prepare('SELECT status,verification_attempts FROM listing_submissions WHERE id=?')
-        .get(saved.id)
-    ).toEqual({ status: 'pending_badge', verification_attempts: 0 })
-
-    await expect(
-      operations('pornvideodownloaders.com').consumeRateLimit('203.0.113.20')
-    ).resolves.toBeUndefined()
+        .prepare(
+          'SELECT fingerprint_hash,request_count FROM listing_submission_rate_limits ORDER BY request_count'
+        )
+        .all()
+    ).toEqual([
+      { fingerprint_hash: await hash('203.0.113.11'), request_count: 1 },
+      { fingerprint_hash: await hash('203.0.113.10'), request_count: 11 }
+    ])
   })
 
-  it('gates private previews by Site, digest, and verified status and revokes them after decision', async () => {
-    const saved = await operations('serp.software').createSubmission(input)
-    await operations('serp.software').finishVerification(saved.id, saved.token, { ok: true })
+  it('gates private previews by digest and verified status and revokes them after decision', async () => {
+    const saved = await operations().createSubmission(input)
+    await operations().finishVerification(saved.id, saved.token, { ok: true })
     const previewToken = 'a'.repeat(43)
     sqlite.database
       .prepare(
@@ -240,13 +182,10 @@ describe('shared submission data operations', () => {
       .run(saved.id, await hash(previewToken))
 
     await expect(
-      operations('serp.software').getReviewPreview({ id: saved.id, token: 'b'.repeat(43) })
+      operations().getReviewPreview({ id: saved.id, token: 'b'.repeat(43) })
     ).resolves.toBeNull()
     await expect(
-      operations('pornvideodownloaders.com').getReviewPreview({ id: saved.id, token: previewToken })
-    ).resolves.toBeNull()
-    await expect(
-      operations('serp.software').getReviewPreview({ id: saved.id, token: previewToken })
+      operations().getReviewPreview({ id: saved.id, token: previewToken })
     ).resolves.toMatchObject({
       category: 'tools',
       resourceLinks: [
@@ -260,12 +199,12 @@ describe('shared submission data operations', () => {
       .prepare("UPDATE listing_submissions SET status='rejected' WHERE id=?")
       .run(saved.id)
     await expect(
-      operations('serp.software').getReviewPreview({ id: saved.id, token: previewToken })
+      operations().getReviewPreview({ id: saved.id, token: previewToken })
     ).resolves.toBeNull()
   })
 
   it('fails closed when a verified migrated preview row contains malformed fields', async () => {
-    const shared = operations('serp.software')
+    const shared = operations()
     const saved = await shared.createSubmission(input)
     await shared.finishVerification(saved.id, saved.token, { ok: true })
     const previewToken = 'c'.repeat(43)

@@ -3,24 +3,23 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { configuredFreshD1StateRoot } from './d1-local-state'
-import { resolveSiteTarget } from './site-targets'
+import { project } from './project'
 
-export function canonicalPreviewCommand(siteId: string | undefined): {
+export function canonicalPreviewCommand(): {
   args: string[]
   statePath: string
 } {
-  const target = resolveSiteTarget(siteId)
-  validateCanonicalLocalConfig(target)
-  const statePath = configuredFreshD1StateRoot(target.siteId)
+  validateCanonicalLocalConfig()
+  const statePath = configuredFreshD1StateRoot()
   return {
     args: [
       '--filter',
-      target.appPackageName,
+      project.appPackageName,
       'exec',
       'opennextjs-cloudflare',
       'preview',
       '--config',
-      resolve(target.local.configPath),
+      resolve(project.wranglerConfigPath),
       '--persist-to',
       statePath,
       '--port',
@@ -30,17 +29,24 @@ export function canonicalPreviewCommand(siteId: string | undefined): {
   }
 }
 
-export function runCanonicalPreview(siteId: string | undefined): void {
-  const command = canonicalPreviewCommand(siteId)
+export function runCanonicalPreview(): void {
+  const command = canonicalPreviewCommand()
   const result = spawnSync('pnpm', command.args, { env: process.env, stdio: 'inherit' })
   if (result.error) throw result.error
   if (result.status) process.exitCode = result.status
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
-  const [siteFlag, siteId] = process.argv.slice(2)
-  if (siteFlag !== '--site') {
-    throw new Error('Local preview requires an explicit --site argument.')
+  try {
+    const extra = process.argv.slice(2).filter(value => value !== '--')
+    if (extra.length > 0) {
+      throw new Error(
+        `Local preview takes no arguments (received ${extra.join(' ')}); it always serves ${project.domain} from the canonical local D1 state.`
+      )
+    }
+    runCanonicalPreview()
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exitCode = 1
   }
-  runCanonicalPreview(siteId)
 }

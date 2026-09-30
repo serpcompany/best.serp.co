@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "exports": {
+    "./asset-reference": "./asset-reference.ts",
     "./content-paths": "./content-paths.ts",
     "./cookies": "./cookies.ts",
     "./environment": "./constants/environment.ts",

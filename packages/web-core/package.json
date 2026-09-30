@@ -139,7 +139,7 @@
     "@serpdirectory/design-system": "workspace:*",
     "@serpdirectory/hooks": "workspace:*",
     "@serpdirectory/logging": "workspace:*",
-    "@serpdirectory/site-contract": "workspace:*",
+    "@serpdirectory/site-config": "workspace:*",
     "@serpdirectory/utils": "workspace:*",
     "lucide-react": "^0.486.0",
     "next": "catalog:",

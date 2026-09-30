@@ -1,0 +1,99 @@
+import type { SiteDefinition } from './types'
+
+export const site: SiteDefinition = {
+  analytics: {
+    gtmId: 'GTM-W59GNHXF'
+  },
+  badges: {
+    featuredOn: {
+      dark: 'badge/featured-on-serp.co-dark.svg',
+      light: 'badge/featured-on-serp.co-light.svg'
+    }
+  },
+  branding: {
+    favicon: { path: 'apps/web/public/favicon.ico', source: 'local-path' },
+    logo: { path: 'apps/web/public/logo.png', source: 'local-path' },
+    opengraphImage: { path: 'apps/web/public/opengraph-image.png', source: 'local-path' }
+  },
+  copy: {
+    brandsLabel: 'Brands',
+    categoryLabels: {},
+    docsLabel: 'Docs',
+    listingName: {
+      plural: 'products',
+      singular: 'product'
+    },
+    networkLabel: 'Network',
+    submitLabel: 'Submit'
+  },
+  features: {
+    showAuth: false,
+    showBrands: true,
+    showCreatorProjects: false,
+    showDocs: false,
+    showExternalResources: false,
+    showFavorites: false,
+    showFeaturedGuides: false,
+    showGuides: false,
+    showNewsletter: true,
+    showProjects: false
+  },
+  id: 'best.serp.co',
+  networkBrandGroup: 'all',
+  routes: {
+    brandsBasePath: 'brands',
+    docsBasePath: 'docs',
+    listingBasePath: 'products',
+    networkBasePath: 'network'
+  },
+  sitemap: {
+    categoryBasePath: 'products/best',
+    excludedPaths: [
+      '/legal/affiliate-disclosure',
+      '/legal/dmca',
+      '/legal/privacy-policy',
+      '/legal/terms-conditions',
+      '/products/best/featured',
+      '/products/best/other',
+      '/submit'
+    ],
+    listingDetailSuffix: 'reviews',
+    pathByGroup: {
+      listings: '/sitemaps/directory/1.xml',
+      pages: '/sitemaps/pages/1.xml',
+      taxonomies: '/sitemaps/categories/1.xml'
+    },
+    staticPagePaths: [
+      '/',
+      '/about',
+      '/brands',
+      '/contact',
+      '/legal',
+      '/legal/affiliate-disclosure',
+      '/legal/dmca',
+      '/legal/privacy-policy',
+      '/legal/terms-conditions',
+      '/pricing',
+      '/sponsor',
+      '/submit'
+    ]
+  },
+  site: {
+    description:
+      'SERP helps people discover software, AI tools, companies, resources, and projects from the SERP network.',
+    domain: 'best.serp.co',
+    name: 'SERP',
+    publicUrl: 'https://best.serp.co',
+    tagline: 'Software, AI tools, companies, resources, and SERP projects'
+  },
+  social: {
+    githubIssueOwner: null,
+    githubIssueRepo: null,
+    githubIssuesUrl: null,
+    githubRepoUrl: 'https://github.com/serpcompany',
+    githubUrl: 'https://github.com/serpcompany',
+    redditUrl: 'https://www.reddit.com/r/serpapps/',
+    twitterUrl: 'https://x.com/serpdotco'
+  },
+  version: 1
+}

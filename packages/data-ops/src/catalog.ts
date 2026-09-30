@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { and, eq, type SQL, sql } from 'drizzle-orm'
-import { type CompiledSiteQuery, runSiteQuery } from './client'
+import { type CompiledQuery, runQuery } from './client'
 import type {
   CatalogCacheEvent,
   CatalogOperation,
@@ -98,7 +98,7 @@ function finiteMetric(value: unknown): number | null {
 }
 
 function publicEligibilitySql(alias = 'l'): string {
-  return `${alias}.site_id = ? AND ${alias}.status = 'approved' AND ${alias}.is_active = 1 AND ${alias}.published_at IS NOT NULL AND ${alias}.published_at <= ?`
+  return `${alias}.status = 'approved' AND ${alias}.is_active = 1 AND ${alias}.published_at IS NOT NULL AND ${alias}.published_at <= ?`
 }
 
 const summaryColumns = `
@@ -115,7 +115,7 @@ const summaryColumns = `
     SELECT c.slug
     FROM listing_categories lc
     JOIN categories c ON c.id = lc.category_id
-    WHERE lc.listing_id = l.id AND lc.is_primary = 1 AND c.site_id = l.site_id AND c.is_active = 1
+    WHERE lc.listing_id = l.id AND lc.is_primary = 1 AND c.is_active = 1
     LIMIT 1
   ) AS category,
   (
@@ -124,7 +124,7 @@ const summaryColumns = `
       SELECT c.slug
       FROM listing_categories lc
       JOIN categories c ON c.id = lc.category_id
-      WHERE lc.listing_id = l.id AND c.site_id = l.site_id AND c.is_active = 1
+      WHERE lc.listing_id = l.id AND c.is_active = 1
       ORDER BY lc.is_primary DESC, lc.sort_order ASC, c.slug ASC
     ) ordered
   ) AS categories,
@@ -389,7 +389,6 @@ function isDetailCacheEntry(value: unknown, publicationVersion: number): value i
 
 export function createCatalogOperations(config: CatalogOperationsConfig): CatalogOperations {
   const { cache, client, clock, observe } = config
-  const { siteId } = client
   let publicationVersionPromise: Promise<number> | undefined
   let publishedListingsPromise: Promise<ListingSummary[]> | undefined
   let shellStatsPromise: Promise<CatalogShellStats> | undefined
@@ -398,12 +397,12 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   async function queryAll<T>(
     operation: CatalogOperation,
     queryShape: CatalogQueryShape,
-    statement: CompiledSiteQuery | SQL<T>
+    statement: CompiledQuery | SQL<T>
   ): Promise<T[]> {
     const startedAt = performance.now()
     let eventEmitted = false
     try {
-      const result = await runSiteQuery<T>(client, statement)
+      const result = await runQuery<T>(client, statement)
       const meta = result.meta as QueryMeta
       const event: CatalogQueryEvent = {
         d1DurationMs: finiteMetric(meta?.duration),
@@ -413,7 +412,6 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         resultRows: result.results.length,
         rowsRead: finiteMetric(meta?.rows_read),
         rowsWritten: finiteMetric(meta?.rows_written),
-        siteId,
         success: result.success,
         wallDurationMs: performance.now() - startedAt
       }
@@ -431,7 +429,6 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
           resultRows: 0,
           rowsRead: null,
           rowsWritten: null,
-          siteId,
           success: false,
           wallDurationMs: performance.now() - startedAt
         })
@@ -448,16 +445,16 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     try {
       const cached = await cache.get(cacheKey)
       if (cached === null) {
-        observe({ event: 'catalog_cache', operation, siteId, state: 'miss' })
+        observe({ event: 'catalog_cache', operation, state: 'miss' })
         return null
       }
       if (validate(cached)) {
-        observe({ event: 'catalog_cache', operation, siteId, state: 'hit' })
+        observe({ event: 'catalog_cache', operation, state: 'hit' })
         return cached
       }
-      observe({ event: 'catalog_cache', operation, siteId, state: 'corrupt' })
+      observe({ event: 'catalog_cache', operation, state: 'corrupt' })
     } catch {
-      observe({ event: 'catalog_cache', operation, siteId, state: 'error' })
+      observe({ event: 'catalog_cache', operation, state: 'error' })
     }
     return null
   }
@@ -469,9 +466,9 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   ): Promise<void> {
     try {
       await cache.put(cacheKey, value, CACHE_TTL_SECONDS)
-      observe({ event: 'catalog_cache', operation, siteId, state: 'written' })
+      observe({ event: 'catalog_cache', operation, state: 'written' })
     } catch {
-      observe({ event: 'catalog_cache', operation, siteId, state: 'write-error' })
+      observe({ event: 'catalog_cache', operation, state: 'write-error' })
     }
   }
 
@@ -499,7 +496,6 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       parameterizedQuery<SummaryRow>(
         `SELECT ${summaryColumns} FROM listings l WHERE ${publicEligibilitySql()}${extraWhere} ORDER BY ${orderBy}${pagination}`,
         [
-          siteId,
           asOf,
           ...extraBindings,
           ...(limit === undefined ? [] : [limit]),
@@ -517,10 +513,10 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       client.database
         .select({ version: publicationState.version })
         .from(publicationState)
-        .where(eq(publicationState.siteId, siteId))
+        .where(eq(publicationState.id, 1))
         .limit(1)
     )
-    return requireNonNegativeInteger(rows[0]?.version, `publication state for ${siteId}`)
+    return requireNonNegativeInteger(rows[0]?.version, 'publication state')
   }
 
   function getPublicationVersion(): Promise<number> {
@@ -530,7 +526,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
 
   async function loadShellStats(): Promise<CatalogShellStats> {
     const publicationVersion = await getPublicationVersion()
-    const cacheKey = `catalog-shell:${CACHE_SCHEMA}:${siteId}:${publicationVersion}`
+    const cacheKey = `catalog-shell:${CACHE_SCHEMA}:${publicationVersion}`
     const cached = await readCache('shell-stats', cacheKey, (value): value is CatalogShellStats =>
       isShellStats(value, publicationVersion)
     )
@@ -563,7 +559,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
                 WHERE lc.category_id = c.id AND ${publicEligibilitySql()}
               ) AS listing_count
             FROM categories c
-            WHERE c.site_id = ? AND c.is_active = 1
+            WHERE c.is_active = 1
             ORDER BY c.sort_order ASC, c.name ASC
           ) counts
         ), '[]') AS categories,
@@ -572,7 +568,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
           FROM listings l
           WHERE ${publicEligibilitySql()} AND l.is_featured = 1
         ) AS featured_count`,
-        [siteId, asOf, siteId, siteId, asOf]
+        [asOf, asOf]
       )
     )
     const row = rows[0]
@@ -671,7 +667,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       WHERE ${publicEligibilitySql()} AND ${branch.predicate}
       ORDER BY ${branch.order}
       LIMIT 1`,
-          [siteId, asOf, ...branch.bindings]
+          [asOf, ...branch.bindings]
         )
       )
       if (rows[0]) return mapNavigation(rows[0])
@@ -714,7 +710,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       FROM listings l
       WHERE ${publicEligibilitySql()} AND l.slug = ?
       LIMIT 1`,
-        [siteId, asOf, slug]
+        [asOf, slug]
       )
     )
     const row = rows[0]
@@ -759,7 +755,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
              )
            ORDER BY l.name ASC, l.slug ASC
            LIMIT 4`,
-            [siteId, asOf, row.id, row.id]
+            [asOf, row.id, row.id]
           )
         ))
       )
@@ -802,7 +798,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
            ) = ?
          ORDER BY l.name ASC, l.slug ASC
          LIMIT ?`,
-          [siteId, asOf, row.id, row.id, score, 4 - relatedRows.length]
+          [asOf, row.id, row.id, score, 4 - relatedRows.length]
         )
       )
       relatedRows.push(...scoreRows)
@@ -850,7 +846,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
 
   async function loadListingBySlug(slug: string): Promise<ListingDetail | null> {
     const publicationVersion = await getPublicationVersion()
-    const cacheKey = `catalog-detail:${CACHE_SCHEMA}:${siteId}:${publicationVersion}:${slug}`
+    const cacheKey = `catalog-detail:${CACHE_SCHEMA}:${publicationVersion}:${slug}`
     const cached = await readCache('listing-detail', cacheKey, (value): value is DetailCacheEntry =>
       isDetailCacheEntry(value, publicationVersion)
     )
@@ -871,7 +867,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
 
   async function loadPublishedListings(): Promise<ListingSummary[]> {
     const publicationVersion = await getPublicationVersion()
-    const cacheKey = `catalog-published:${CACHE_SCHEMA}:${siteId}:${publicationVersion}`
+    const cacheKey = `catalog-published:${CACHE_SCHEMA}:${publicationVersion}`
     const cached = await readCache(
       'published-summaries',
       cacheKey,
@@ -905,7 +901,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         'listing-page-items',
         parameterizedQuery<SummaryRow>(
           `SELECT ${summaryColumns} FROM listings l WHERE ${publicEligibilitySql()} ORDER BY ${PUBLICATION_ORDER} LIMIT ? OFFSET ?`,
-          [siteId, asOf, safePageSize, (safePage - 1) * safePageSize]
+          [asOf, safePageSize, (safePage - 1) * safePageSize]
         )
       ),
       queryAll<{ total: number }>(
@@ -913,7 +909,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         'listing-page-count',
         parameterizedQuery<{ total: number }>(
           `SELECT COUNT(*) AS total FROM listings l WHERE ${publicEligibilitySql()}`,
-          [siteId, asOf]
+          [asOf]
         )
       )
     ])
@@ -970,9 +966,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
           .innerJoin(listings, eq(listings.id, listingSlugRedirects.listingId))
           .where(
             and(
-              eq(listingSlugRedirects.siteId, siteId),
               eq(listingSlugRedirects.oldSlug, oldSlug),
-              sql`${listings.siteId} = ${siteId}`,
               sql`${listings.status} = 'approved'`,
               sql`${listings.isActive} = 1`,
               sql`${listings.publishedAt} IS NOT NULL`,

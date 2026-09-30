@@ -82,7 +82,9 @@ function checkFile(filePath: string): string[] {
         const cleanPath = importPath.replace(/^(\.\.\/)+/, '')
         const firstDir = cleanPath.split('/')[0]
 
-        if (['actions', 'auth', 'components', 'lib', 'hooks', 'contexts', 'utils'].includes(firstDir)) {
+        if (
+          ['actions', 'auth', 'components', 'lib', 'hooks', 'contexts', 'utils'].includes(firstDir)
+        ) {
           suggestion = `@/${cleanPath}`
         }
       }

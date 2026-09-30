@@ -2,8 +2,7 @@ import { createSign } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveCheckedInSiteConfig } from '@serpdirectory/site-contract'
-import { activeCheckedInSiteIds } from '@serpdirectory/site-contract/active-site-ids'
+import { site } from '@serpdirectory/site-config'
 
 type ServiceAccount = {
   client_email: string
@@ -19,7 +18,6 @@ type SubmitGscArgs = {
   deleteSitemapUrls: string[]
   dryRun: boolean
   listSitemaps: boolean
-  siteIds: string[]
   submitCanonical: boolean
   verifyCredentials: boolean
 }
@@ -34,17 +32,13 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, '')
 }
 
-export function getSitemapTargets(siteIds: string[] = []): SitemapTarget[] {
-  const targetSiteIds = siteIds.length > 0 ? siteIds : [...activeCheckedInSiteIds]
-
-  return targetSiteIds.map(siteId => {
-    const siteConfig = resolveCheckedInSiteConfig(siteId)
-
-    return {
-      domain: siteConfig.site.domain,
-      sitemapUrl: `${normalizeBaseUrl(siteConfig.site.publicUrl)}/sitemap-index.xml`
+export function getSitemapTargets(): SitemapTarget[] {
+  return [
+    {
+      domain: site.site.domain,
+      sitemapUrl: `${normalizeBaseUrl(site.site.publicUrl)}/sitemap-index.xml`
     }
-  })
+  ]
 }
 
 function parseArgs(argv: string[]): SubmitGscArgs {
@@ -52,7 +46,6 @@ function parseArgs(argv: string[]): SubmitGscArgs {
     deleteSitemapUrls: [],
     dryRun: false,
     listSitemaps: false,
-    siteIds: [],
     submitCanonical: true,
     verifyCredentials: false
   }
@@ -86,12 +79,6 @@ function parseArgs(argv: string[]): SubmitGscArgs {
       continue
     }
 
-    if (arg === '--site' && argv[index + 1]) {
-      args.siteIds.push(argv[index + 1])
-      index += 1
-      continue
-    }
-
     if (arg === '--delete-sitemap' && argv[index + 1]) {
       args.deleteSitemapUrls.push(argv[index + 1])
       index += 1
@@ -121,17 +108,6 @@ function parseDeleteSitemapUrls(value: string | undefined): string[] {
   return value
     .split(/[\n,]/)
     .map(url => url.trim())
-    .filter(Boolean)
-}
-
-function parseSiteIds(value: string | undefined): string[] {
-  if (!value) {
-    return []
-  }
-
-  return value
-    .split(/[\n,]/)
-    .map(siteId => siteId.trim())
     .filter(Boolean)
 }
 
@@ -380,14 +356,13 @@ export async function runSubmitGscSitemaps(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<void> {
   const args = parseArgs(argv)
-  const siteIds = args.siteIds.length > 0 ? args.siteIds : parseSiteIds(env.GSC_SITE_IDS)
   const deleteSitemapUrls = [
     ...args.deleteSitemapUrls,
     ...parseDeleteSitemapUrls(env.GSC_STALE_SITEMAP_URLS),
     ...parseDeleteSitemapUrls(env.GSC_DELETE_SITEMAP_URLS)
   ]
-  const submitTargets = args.submitCanonical ? getSitemapTargets(siteIds) : []
-  const listTargets = args.listSitemaps ? getSitemapTargets(siteIds) : []
+  const submitTargets = args.submitCanonical ? getSitemapTargets() : []
+  const listTargets = args.listSitemaps ? getSitemapTargets() : []
   const deleteTargets = deleteTargetsForSitemapUrls([...new Set(deleteSitemapUrls)])
 
   if (args.dryRun) {

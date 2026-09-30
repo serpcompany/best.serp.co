@@ -1,17 +1,8 @@
 import { readFileSync } from 'node:fs'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 describe('buildBadgeSubmissionInstructions', () => {
-  afterEach(() => {
-    delete process.env.SITE_ID
-    delete process.env.NEXT_PUBLIC_SITE_ID
-    vi.resetModules()
-  })
-
-  it('builds serp.software badge snippets for a D1 submission capability', async () => {
-    process.env.SITE_ID = 'serp.software'
-    vi.resetModules()
-
+  it('builds best.serp.co badge snippets for a D1 submission capability', async () => {
     const {
       buildBadgeSubmissionInstructions,
       buildSubmissionResumeHash,
@@ -27,16 +18,16 @@ describe('buildBadgeSubmissionInstructions', () => {
     expect(instructions.submissionId).toBe('submission-id')
     expect(instructions.token).toBe('capability-token')
     expect(instructions.website).toBe('https://www.serp.ai/')
-    expect(instructions.listingUrl).toBe('https://serp.software/products/serp.ai/')
-    expect(instructions.badgePreviewPaths.light).toBe('/badge/featured-on-serp.software-light.svg')
-    expect(instructions.badgePreviewPaths.dark).toBe('/badge/featured-on-serp.software-dark.svg')
+    expect(instructions.listingUrl).toBe('https://best.serp.co/products/serp.ai/reviews/')
+    expect(instructions.badgePreviewPaths.light).toBe('/badge/featured-on-serp.co-light.svg')
+    expect(instructions.badgePreviewPaths.dark).toBe('/badge/featured-on-serp.co-dark.svg')
     expect(
       instructions.badgeEmbeds.light
-    ).toBe(`<a href="https://serp.software/products/serp.ai/" target="_blank" rel="noopener noreferrer" title="Featured on SERP Software">
-  <img src="https://serp.software/badge/featured-on-serp.software-light.svg" alt="Featured on SERP Software" width="200" height="50" />
+    ).toBe(`<a href="https://best.serp.co/products/serp.ai/reviews/" target="_blank" rel="noopener noreferrer" title="Featured on SERP">
+  <img src="https://best.serp.co/badge/featured-on-serp.co-light.svg" alt="Featured on SERP" width="200" height="50" />
 </a>`)
     expect(instructions.badgeEmbeds.dark).toContain(
-      'https://serp.software/badge/featured-on-serp.software-dark.svg'
+      'https://best.serp.co/badge/featured-on-serp.co-dark.svg'
     )
 
     const resumeCapability = {
@@ -47,31 +38,7 @@ describe('buildBadgeSubmissionInstructions', () => {
     expect(resumeHash).toMatch(/^#submission=/)
     expect(parseSubmissionResumeHash(resumeHash)).toEqual(resumeCapability)
     expect(parseSubmissionResumeHash('#submission=invalid&token=short')).toBeNull()
-    expect(new URL(`https://serp.software/submit/${resumeHash}`).search).toBe('')
-  })
-
-  it('builds pornvideodownloaders.com badge snippets without selecting serp.software', async () => {
-    process.env.SITE_ID = 'pornvideodownloaders.com'
-    process.env.NEXT_PUBLIC_SITE_ID = 'pornvideodownloaders.com'
-    vi.resetModules()
-
-    const { buildBadgeSubmissionInstructions } = await import('./d1-submission-form')
-    const instructions = buildBadgeSubmissionInstructions({
-      submissionId: 'submission-id',
-      token: 'capability-token',
-      name: 'Example Downloader',
-      website: 'https://example.com/'
-    })
-
-    expect(instructions.listingUrl).toBe('https://pornvideodownloaders.com/products/example.com/')
-    expect(instructions.badgePreviewPaths.light).toBe(
-      '/badge/featured-on-pornvideodownloaders.com-light.svg'
-    )
-    expect(instructions.badgeEmbeds.dark).toContain(
-      'https://pornvideodownloaders.com/badge/featured-on-pornvideodownloaders.com-dark.svg'
-    )
-    expect(instructions.badgeEmbeds.light).toContain('Featured on PV Downloaders')
-    expect(instructions.badgeEmbeds.light).not.toContain('serp.software')
+    expect(new URL(`https://best.serp.co/submit/${resumeHash}`).search).toBe('')
   })
 
   it('makes the saved submission and resumable verification lifecycle explicit', () => {

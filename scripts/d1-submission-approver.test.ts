@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
-import { DatabaseSync } from 'node:sqlite'
+import { resolve } from 'node:path'
+import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { describe, expect, it, vi } from 'vitest'
+import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
 import { approveRemoteSubmission, validateApprovalContext } from './d1-submission-approver'
 
 const env = {
@@ -9,12 +11,34 @@ const env = {
   GITHUB_REF: 'refs/heads/main',
   GITHUB_SHA: 'a'.repeat(40),
   GITHUB_WORKFLOW_REF:
-    'serpcompany/directory-platform-d1/.github/workflows/approve-d1-submission.yml@refs/heads/main',
-  D1_SUBMISSION_APPROVAL_CONFIRM: 'approve-serp.software-submission-production',
-  DEPLOY_SITE_ID: 'serp.software',
+    'serpcompany/best.serp.co/.github/workflows/approve-d1-submission.yml@refs/heads/main',
+  D1_SUBMISSION_APPROVAL_CONFIRM: 'approve-best.serp.co-submission-production',
   CLOUDFLARE_ACCOUNT_ID: 'account',
-  CLOUDFLARE_D1_PRODUCTION_DATABASE_ID: 'database',
+  CLOUDFLARE_D1_DATABASE_ID: 'database',
   CLOUDFLARE_API_TOKEN: 'token'
+}
+
+const submissionId = '11111111-1111-4111-8111-111111111111'
+
+function d1Response(results: Array<Array<Record<string, unknown>>>): Response {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      result: results.map(rows => ({ success: true, results: rows }))
+    }),
+    { headers: { 'Content-Type': 'application/json' } }
+  )
+}
+
+function submissionRow(status: string): Record<string, unknown> {
+  return {
+    id: submissionId,
+    slug: 'example.com',
+    status,
+    listing_id: null,
+    version: 1,
+    checksum: 'before'
+  }
 }
 
 describe('D1 submission approval guard', () => {
@@ -32,154 +56,107 @@ describe('D1 submission approval guard', () => {
         GITHUB_WORKFLOW_REF: 'owner/repo/.github/workflows/release.yml@main'
       })
     ).toThrow(/approve-d1-submission/)
+    expect(() =>
+      validateApprovalContext({
+        ...env,
+        D1_SUBMISSION_APPROVAL_CONFIRM: 'approve-serp.software-submission-production'
+      })
+    ).toThrow(/approve-best\.serp\.co-submission-production/)
+    expect(() => validateApprovalContext({ ...env, GITHUB_REF: 'refs/heads/feature' })).toThrow(
+      /reviewed main/
+    )
+  })
+
+  it('requires the explicit D1 database identity before querying', async () => {
+    const { CLOUDFLARE_D1_DATABASE_ID: _databaseId, ...withoutDatabase } = env
+    const fetcher = vi.fn()
+    await expect(
+      approveRemoteSubmission(submissionId, 'reviewer', 'approve', withoutDatabase, fetcher)
+    ).rejects.toThrow(/CLOUDFLARE_D1_DATABASE_ID/)
+    expect(fetcher).not.toHaveBeenCalled()
   })
 
   it('refuses an unverified submission before sending mutation statements', async () => {
-    let calls = 0
-    const fetcher = async () => {
-      calls += 1
-      return new Response(
-        JSON.stringify({
-          success: true,
-          result: [
-            {
-              success: true,
-              results:
-                calls === 1
-                  ? []
-                  : [
-                      {
-                        id: '11111111-1111-4111-8111-111111111111',
-                        slug: 'example.com',
-                        status: 'pending_badge',
-                        listing_id: null,
-                        version: 1,
-                        checksum: 'before'
-                      }
-                    ]
-            }
-          ]
-        }),
-        { headers: { 'Content-Type': 'application/json' } }
-      )
-    }
+    const fetcher = vi.fn().mockResolvedValueOnce(d1Response([[submissionRow('pending_badge')]]))
     await expect(
-      approveRemoteSubmission(
-        '11111111-1111-4111-8111-111111111111',
-        'reviewer',
-        'approve',
-        env,
-        fetcher as typeof fetch
-      )
+      approveRemoteSubmission(submissionId, 'reviewer', 'approve', env, fetcher as typeof fetch)
     ).rejects.toThrow(/badge-verified/)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(String(fetcher.mock.calls[0]?.[1]?.body)).toContain('publication_state ps ON ps.id=1')
   })
 
   it('closes a pending submission without publishing it', async () => {
     const requests: string[] = []
-    const fetcher = async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetcher = async (_input: string | URL | Request, init?: RequestInit) => {
       requests.push(String(init?.body))
-      return new Response(
-        JSON.stringify({
-          success: true,
-          result:
-            requests.length === 1
-              ? [{ success: true, results: [] }]
-              : requests.length === 2
-                ? [
-                    {
-                      success: true,
-                      results: [
-                        {
-                          id: '11111111-1111-4111-8111-111111111111',
-                          slug: 'example.com',
-                          status: 'pending_badge',
-                          listing_id: null,
-                          version: 1,
-                          checksum: 'before'
-                        }
-                      ]
-                    }
-                  ]
-                : [
-                    { success: true, results: [] },
-                    { success: true, results: [] }
-                  ]
-        })
-      )
+      return requests.length === 1
+        ? d1Response([[submissionRow('pending_badge')]])
+        : d1Response([[], [], []])
     }
     await expect(
-      approveRemoteSubmission(
-        '11111111-1111-4111-8111-111111111111',
-        'reviewer',
-        'reject',
-        env,
-        fetcher as typeof fetch
-      )
+      approveRemoteSubmission(submissionId, 'reviewer', 'reject', env, fetcher as typeof fetch)
     ).resolves.toEqual({ idempotent: false, listingId: null })
-    expect(requests[2]).toContain("status='rejected'")
-    expect(requests[2]).not.toContain('INSERT INTO listings')
+    expect(requests).toHaveLength(2)
+    expect(requests[1]).toContain("status='rejected'")
+    expect(requests[1]).not.toContain('INSERT INTO listings')
   })
 
   it('atomically promotes a verified normalized submission', async () => {
     const db = new DatabaseSync(':memory:')
+    for (const migration of freshMigrationNames()) {
+      db.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
+    }
     db.exec(`
-      CREATE TABLE categories (id INTEGER PRIMARY KEY,site_id TEXT,slug TEXT,is_active INTEGER);
-      CREATE TABLE listing_submissions (id TEXT PRIMARY KEY,site_id TEXT,slug TEXT,name TEXT,description TEXT,website TEXT,content TEXT,category_slug TEXT,logo_url TEXT,video_url TEXT,status TEXT,listing_id TEXT,reviewed_at TEXT,reviewed_by TEXT,updated_at TEXT);
-      CREATE TABLE listing_submission_resource_links (submission_id TEXT,label TEXT,url TEXT,sort_order INTEGER);
-      CREATE TABLE listing_submission_faqs (submission_id TEXT,question TEXT,answer TEXT,sort_order INTEGER);
-      CREATE TABLE listing_submission_events (submission_id TEXT,event_type TEXT,actor TEXT);
-      CREATE TABLE listings (id TEXT PRIMARY KEY,site_id TEXT,slug TEXT,name TEXT,description TEXT,website TEXT,content TEXT,is_unofficial INTEGER,is_featured INTEGER,is_active INTEGER,status TEXT,source_kind TEXT,source_identity TEXT,checksum TEXT,display_order INTEGER,published_at TEXT,updated_at TEXT,UNIQUE(site_id,slug));
-      CREATE TABLE listing_categories (listing_id TEXT,category_id INTEGER,sort_order INTEGER,is_primary INTEGER);
-      CREATE TABLE listing_media (listing_id TEXT,kind TEXT,url TEXT,sort_order INTEGER);
-      CREATE TABLE listing_resource_links (listing_id TEXT,label TEXT,url TEXT,sort_order INTEGER);
-      CREATE TABLE listing_faqs (listing_id TEXT,question TEXT,answer TEXT,sort_order INTEGER);
-      CREATE TABLE publication_state (site_id TEXT PRIMARY KEY,version INTEGER,manifest_id TEXT,checksum TEXT,published_at TEXT);
-      CREATE TABLE publication_runs (id TEXT PRIMARY KEY,site_id TEXT,manifest_id TEXT,base_version INTEGER,published_version INTEGER,input_checksum TEXT,affected_records INTEGER,affected_routes TEXT,outcome TEXT,started_at TEXT,completed_at TEXT,actor TEXT,workflow TEXT,before_checksum TEXT,after_checksum TEXT);
-      CREATE TABLE migration_runs (id TEXT PRIMARY KEY,site_id TEXT,outcome TEXT,started_at TEXT);
-      INSERT INTO categories VALUES (1,'serp.software','adult',1);
-      INSERT INTO publication_state VALUES ('serp.software',1,NULL,'before','2026-01-01');
-      INSERT INTO listing_submissions VALUES ('11111111-1111-4111-8111-111111111111','serp.software','example.com','Example','Description','https://example.com','Content','adult','https://example.com/logo.png',NULL,'verified',NULL,NULL,NULL,'2026-01-01');
-      INSERT INTO listing_submission_resource_links VALUES ('11111111-1111-4111-8111-111111111111','Docs','https://example.com/docs',0);
-      INSERT INTO listing_submission_faqs VALUES ('11111111-1111-4111-8111-111111111111','Question','Answer',0);
+      INSERT INTO categories (id,slug,name) VALUES (1,'seo','SEO');
+      INSERT INTO publication_state (id,version,manifest_id,checksum) VALUES (1,1,NULL,'before');
+      INSERT INTO listing_submissions
+        (id,slug,name,description,website,content,category_slug,logo_url,video_url,status,access_token_hash,badge_verified_at)
+      VALUES
+        ('${submissionId}','example.com','Example','Description','https://example.com','Content','seo',
+         'https://example.com/logo.png',NULL,'verified','${'f'.repeat(64)}','2026-01-01');
+      INSERT INTO listing_submission_resource_links (submission_id,label,url,sort_order)
+        VALUES ('${submissionId}','Docs','https://example.com/docs',0);
+      INSERT INTO listing_submission_faqs (submission_id,question,answer,sort_order)
+        VALUES ('${submissionId}','Question','Answer',0);
     `)
-    const fetcher = async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetcher = async (_input: string | URL | Request, init?: RequestInit) => {
       const payload = JSON.parse(String(init?.body)) as {
-        batch: Array<{ sql: string; params: Array<string | number | null> }>
+        batch: Array<{ sql: string; params: SQLInputValue[] }>
       }
-      const results: Array<{ success: true; results: Array<Record<string, unknown>> }> = []
+      const results: Array<Array<Record<string, unknown>>> = []
       db.exec('BEGIN')
       try {
         for (const item of payload.batch) {
           const statement = db.prepare(item.sql)
-          let rows: Array<Record<string, unknown>> = []
           if (item.sql.trimStart().toUpperCase().startsWith('SELECT')) {
-            rows = statement.all(...item.params) as Array<Record<string, unknown>>
+            results.push(statement.all(...item.params) as Array<Record<string, unknown>>)
           } else {
             statement.run(...item.params)
+            results.push([])
           }
-          results.push({ success: true, results: rows })
         }
         db.exec('COMMIT')
       } catch (error) {
         db.exec('ROLLBACK')
         throw error
       }
-      return new Response(JSON.stringify({ success: true, result: results }))
+      return d1Response(results)
     }
     const result = await approveRemoteSubmission(
-      '11111111-1111-4111-8111-111111111111',
+      submissionId,
       'reviewer',
       'approve',
       env,
       fetcher as typeof fetch
     )
-    expect(result.idempotent).toBe(false)
+    expect(result).toEqual({ idempotent: false, listingId: `submission_${submissionId}` })
     expect(
-      db.prepare("SELECT status,source_kind FROM listings WHERE slug='example.com'").get()
-    ).toEqual({
-      status: 'approved',
-      source_kind: 'verified-submission'
-    })
+      db
+        .prepare(
+          "SELECT status,source_kind,published_at IS NOT NULL AS published FROM listings WHERE slug='example.com'"
+        )
+        .get()
+    ).toEqual({ status: 'approved', source_kind: 'verified-submission', published: 1 })
     expect(db.prepare('SELECT status,listing_id FROM listing_submissions').get()).toEqual({
       status: 'approved',
       listing_id: result.listingId
@@ -188,32 +165,19 @@ describe('D1 submission approval guard', () => {
       count: 1
     })
     expect(db.prepare('SELECT COUNT(*) count FROM listing_faqs').get()).toEqual({ count: 1 })
-    expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 2 })
-  })
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 2
+    })
+    expect(
+      db.prepare('SELECT outcome,affected_routes,published_version FROM publication_runs').get()
+    ).toEqual({
+      outcome: 'succeeded',
+      affected_routes: '/products/example.com/reviews/',
+      published_version: 2
+    })
 
-  it('refuses approval before selecting or mutating a submission while cutover is locked', async () => {
-    const fetcher = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          success: true,
-          result: [
-            {
-              success: true,
-              results: [{ id: 'd1-cutover-lock-v1:serp.software:run-1' }]
-            }
-          ]
-        })
-      )
-    )
     await expect(
-      approveRemoteSubmission(
-        '11111111-1111-4111-8111-111111111111',
-        'reviewer',
-        'approve',
-        env,
-        fetcher
-      )
-    ).rejects.toMatchObject({ code: 'cutover_frozen', status: 503 })
-    expect(fetcher).toHaveBeenCalledTimes(1)
+      approveRemoteSubmission(submissionId, 'reviewer', 'approve', env, fetcher as typeof fetch)
+    ).resolves.toEqual({ idempotent: true, listingId: result.listingId })
   })
 })

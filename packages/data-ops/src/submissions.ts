@@ -1,13 +1,7 @@
-import { isValidAssetReference } from '@serpdirectory/site-contract/asset-reference'
+import { isValidAssetReference } from '@serpdirectory/utils/asset-reference'
 import { and, eq, or, sql } from 'drizzle-orm'
-import type { CompiledSiteQuery, SiteDatabase } from './client'
+import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
-import {
-  assertCutoverUnlockedPlan,
-  CutoverFrozenError,
-  hasActiveCutoverLock,
-  selectActiveCutoverLockPlan
-} from './cutover-lock'
 import { validatePublicHttpUrl } from './public-url'
 import {
   categories,
@@ -123,12 +117,12 @@ export interface SubmissionReviewPreviewResourceRow {
   url: string
 }
 
-function prepare(client: SiteDatabase, query: CompiledSiteQuery): D1PreparedStatement {
+function prepare(client: Database, query: CompiledQuery): D1PreparedStatement {
   const compiled = query.toSQL()
   return client.binding.prepare(compiled.sql).bind(...compiled.params)
 }
 
-function prepareRaw(client: SiteDatabase, text: string, params: unknown[]): D1PreparedStatement {
+function prepareRaw(client: Database, text: string, params: unknown[]): D1PreparedStatement {
   return client.binding.prepare(text).bind(...params)
 }
 
@@ -230,27 +224,15 @@ function validClock(clock: () => Date): Date {
 }
 
 export function createSubmissionOperations(config: {
-  client: SiteDatabase
+  client: Database
   clock?: () => Date
 }): SubmissionOperations {
   const { client } = config
   const clock = config.clock ?? (() => new Date())
-  const { siteId } = client
 
-  async function queryFirst<T>(query: CompiledSiteQuery): Promise<T | null> {
+  async function queryFirst<T>(query: CompiledQuery): Promise<T | null> {
     const result = await prepare(client, query).first<T>()
     return result ?? null
-  }
-
-  async function throwIfCutoverLocked(): Promise<void> {
-    const plan = selectActiveCutoverLockPlan(siteId)
-    const result = await prepareRaw(client, plan.sql, plan.params).all<Record<string, unknown>>()
-    if (hasActiveCutoverLock(result.results ?? [])) throw new CutoverFrozenError()
-  }
-
-  function cutoverGuard(): D1PreparedStatement {
-    const plan = assertCutoverUnlockedPlan(siteId)
-    return prepareRaw(client, plan.sql, plan.params)
   }
 
   async function authorizedRow(id: string, token: string): Promise<SubmissionRow> {
@@ -271,7 +253,6 @@ export function createSubmissionOperations(config: {
         .where(
           and(
             eq(listingSubmissions.id, id),
-            eq(listingSubmissions.siteId, siteId),
             eq(listingSubmissions.accessTokenHash, await sha256(token))
           )
         )
@@ -287,7 +268,6 @@ export function createSubmissionOperations(config: {
 
   return {
     async createSubmission(input) {
-      await throwIfCutoverLocked()
       for (const value of [
         input.website,
         input.logoUrl,
@@ -307,25 +287,14 @@ export function createSubmissionOperations(config: {
           client.database
             .select({ id: categories.id })
             .from(categories)
-            .where(
-              and(
-                eq(categories.siteId, siteId),
-                eq(categories.slug, input.category),
-                eq(categories.isActive, true)
-              )
-            )
+            .where(and(eq(categories.slug, input.category), eq(categories.isActive, true)))
             .limit(1)
         ),
         queryFirst(
           client.database
             .select({ id: listings.id })
             .from(listings)
-            .where(
-              and(
-                eq(listings.siteId, siteId),
-                or(eq(listings.slug, slug), eq(listings.website, input.website))
-              )
-            )
+            .where(or(eq(listings.slug, slug), eq(listings.website, input.website)))
             .limit(1)
         )
       ])
@@ -339,7 +308,6 @@ export function createSubmissionOperations(config: {
       const token = bytesToBase64Url(tokenBytes)
       const tokenHash = await sha256(token)
       const statements = [
-        cutoverGuard(),
         prepare(
           client,
           client.database.insert(listingSubmissions).values({
@@ -350,7 +318,6 @@ export function createSubmissionOperations(config: {
             id,
             logoUrl: input.logoUrl,
             name: input.name,
-            siteId,
             slug,
             videoUrl: input.videoUrl || null,
             website: input.website
@@ -391,7 +358,6 @@ export function createSubmissionOperations(config: {
         const results = await client.binding.batch(statements)
         if (results.some(result => !result.success)) throw new Error('D1 batch failed.')
       } catch {
-        await throwIfCutoverLocked()
         throw new SubmissionError(
           'duplicate_submission',
           'A submission for this website is already awaiting review.',
@@ -412,12 +378,10 @@ export function createSubmissionOperations(config: {
     },
 
     async consumeRateLimit(fingerprint) {
-      await throwIfCutoverLocked()
-      const fingerprintHash = await sha256(`${siteId}:${fingerprint}`)
+      const fingerprintHash = await sha256(fingerprint)
       const now = Math.floor(validClock(clock).getTime() / 1000)
       const windowStart = now - SUBMISSION_WINDOW_SECONDS
       const statements = [
-        cutoverGuard(),
         prepare(
           client,
           client.database
@@ -444,10 +408,9 @@ export function createSubmissionOperations(config: {
       try {
         results = await client.binding.batch<{ request_count?: number }>(statements)
       } catch {
-        await throwIfCutoverLocked()
         throw new Error('D1 submission rate limit failed.')
       }
-      const count = results[2]?.results?.[0]?.request_count
+      const count = results[1]?.results?.[0]?.request_count
       if (typeof count !== 'number') throw new Error('D1 submission rate limit failed.')
       if (count > SUBMISSION_WINDOW_LIMIT) {
         throw new SubmissionError('rate_limited', 'Too many submissions. Try again later.', 429)
@@ -457,7 +420,6 @@ export function createSubmissionOperations(config: {
     getSubmission,
 
     async beginVerification(id, token) {
-      await throwIfCutoverLocked()
       const row = await authorizedRow(id, token)
       if (row.status !== 'pending_badge') return toState(row)
       const lastFailureWasConclusive =
@@ -477,7 +439,6 @@ export function createSubmissionOperations(config: {
     },
 
     async finishVerification(id, token, result) {
-      await throwIfCutoverLocked()
       const row = await authorizedRow(id, token)
       if (row.status !== 'pending_badge') return toState(row)
       const tokenHash = await sha256(token)
@@ -485,14 +446,13 @@ export function createSubmissionOperations(config: {
       const error = result.ok ? null : result.code
       const attemptIncrement = result.ok || CONTENT_VERIFICATION_FAILURES.has(result.code) ? 1 : 0
       const statements = [
-        cutoverGuard(),
         prepareRaw(
           client,
           `UPDATE listing_submissions SET status=?, verification_attempts=verification_attempts+?,
             last_verification_at=CURRENT_TIMESTAMP,last_verification_error=?,
             badge_verified_at=CASE WHEN ?='verified' THEN CURRENT_TIMESTAMP ELSE badge_verified_at END,
             updated_at=CURRENT_TIMESTAMP
-          WHERE id=? AND site_id=? AND access_token_hash=? AND status='pending_badge'
+          WHERE id=? AND access_token_hash=? AND status='pending_badge'
             AND verification_attempts=? AND last_verification_at IS ?`,
           [
             status,
@@ -500,7 +460,6 @@ export function createSubmissionOperations(config: {
             error,
             status,
             id,
-            siteId,
             tokenHash,
             row.verification_attempts,
             row.last_verification_at
@@ -518,7 +477,6 @@ export function createSubmissionOperations(config: {
       try {
         results = await client.binding.batch(statements)
       } catch {
-        await throwIfCutoverLocked()
         throw new Error('D1 verification update failed.')
       }
       if (results.some(item => !item.success)) throw new Error('D1 verification update failed.')
@@ -552,7 +510,6 @@ export function createSubmissionOperations(config: {
           .where(
             and(
               eq(listingSubmissions.id, access.id),
-              eq(listingSubmissions.siteId, siteId),
               eq(listingSubmissions.status, 'verified'),
               eq(listingSubmissionNotifications.previewTokenHash, tokenHash)
             )

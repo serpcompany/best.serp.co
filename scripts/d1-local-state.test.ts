@@ -3,23 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { resolveFreshD1StateRoot } from './d1-local-state'
 
 describe('fresh local D1 state root', () => {
-  it('derives isolated Site roots from an explicit harness state directory', () => {
+  it('derives the isolated state root from an explicit harness state directory', () => {
     const repositoryRoot = resolve('/workspace/repository')
     const harnessStateDirectory = resolve('/runtime/d1')
-    expect(
-      resolveFreshD1StateRoot({
-        harnessStateDirectory,
-        repositoryRoot,
-        siteId: 'serp.software'
-      })
-    ).toBe(resolve(harnessStateDirectory, 'drizzle/serp-software'))
-    expect(
-      resolveFreshD1StateRoot({
-        harnessStateDirectory,
-        repositoryRoot,
-        siteId: 'pornvideodownloaders.com'
-      })
-    ).toBe(resolve(harnessStateDirectory, 'drizzle/pornvideodownloaders-com'))
+    expect(resolveFreshD1StateRoot({ harnessStateDirectory, repositoryRoot })).toBe(
+      resolve(harnessStateDirectory, 'drizzle/best-serp-co')
+    )
   })
 
   it('uses only a manifest owned by the current worktree', () => {
@@ -28,30 +17,41 @@ describe('fresh local D1 state root', () => {
     expect(
       resolveFreshD1StateRoot({
         manifest: { d1StateDirectory, repositoryPath: repositoryRoot },
-        repositoryRoot,
-        siteId: 'serp.software'
+        repositoryRoot
       })
-    ).toBe(resolve(d1StateDirectory, 'drizzle/serp-software'))
+    ).toBe(resolve(d1StateDirectory, 'drizzle/best-serp-co'))
     expect(() =>
       resolveFreshD1StateRoot({
         manifest: { d1StateDirectory, repositoryPath: resolve('/workspace/other') },
-        repositoryRoot,
-        siteId: 'serp.software'
+        repositoryRoot
       })
     ).toThrow(/another worktree/u)
     expect(() =>
       resolveFreshD1StateRoot({
         manifest: { repositoryPath: repositoryRoot },
-        repositoryRoot,
-        siteId: 'serp.software'
+        repositoryRoot
       })
     ).toThrow(/no D1 state directory/u)
   })
 
+  it('prefers the harness state directory over a runtime manifest', () => {
+    const repositoryRoot = resolve('/workspace/repository')
+    expect(
+      resolveFreshD1StateRoot({
+        harnessStateDirectory: resolve('/runtime/harness'),
+        manifest: {
+          d1StateDirectory: resolve('/runtime/manifest'),
+          repositoryPath: repositoryRoot
+        },
+        repositoryRoot
+      })
+    ).toBe(resolve('/runtime/harness/drizzle/best-serp-co'))
+  })
+
   it('falls back to ignored repository-local fresh state', () => {
     const repositoryRoot = resolve('/workspace/repository')
-    expect(resolveFreshD1StateRoot({ repositoryRoot, siteId: 'serp.software' })).toBe(
-      resolve(repositoryRoot, '.wrangler/drizzle-state/serp-software')
+    expect(resolveFreshD1StateRoot({ repositoryRoot })).toBe(
+      resolve(repositoryRoot, '.wrangler/drizzle-state/best-serp-co')
     )
   })
 })

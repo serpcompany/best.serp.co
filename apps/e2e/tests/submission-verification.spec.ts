@@ -1,8 +1,11 @@
 import { expect, test } from '@playwright/test'
 
+import { absoluteUrl, featuredBadgeUrls, listingPath } from './site-fixture'
+
 const SUBMISSION_ID = '11111111-1111-4111-8111-111111111111'
 const TOKEN = 'a'.repeat(43)
 const WEBSITE = 'https://unreachable.example/'
+const FUTURE_LISTING_URL = absoluteUrl(listingPath('unreachable.example'))
 
 test('verification explains an unreachable website and preserves the diagnosis', async ({
   page
@@ -49,6 +52,16 @@ test('verification explains an unreachable website and preserves the diagnosis',
   const dialog = page.getByRole('dialog', { name: 'Step 2 of 2 — Install and verify your badge' })
   await expect(dialog).toBeVisible()
   await expect(dialog.getByText(`URL checked: ${WEBSITE}`)).toBeVisible()
+  await expect(dialog.getByText(FUTURE_LISTING_URL, { exact: true })).toBeVisible()
+  for (const theme of ['light', 'dark'] as const) {
+    const embedCode = await dialog
+      .getByRole('textbox', { name: `${theme} badge embed code` })
+      .inputValue()
+    expect(embedCode).toContain(`href="${FUTURE_LISTING_URL}"`)
+    expect(embedCode).toContain(`src="${featuredBadgeUrls[theme]}"`)
+    expect(embedCode).toContain('title="Featured on SERP"')
+    expect(embedCode).not.toContain('nofollow')
+  }
 
   await dialog.getByRole('button', { name: 'Verify installed badge' }).click()
   await expect(dialog.getByRole('alert')).toContainText('Website could not be reached')

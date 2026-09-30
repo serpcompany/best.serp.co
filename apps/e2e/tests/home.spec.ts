@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { site } from './site-fixture'
+
 test.describe('Homepage', () => {
   test('should load successfully', async ({ page }) => {
     // Navigate to the homepage
@@ -11,7 +13,7 @@ test.describe('Homepage', () => {
     // Verify that we're on the homepage by checking the URL
     await expect(page).toHaveURL(/\/$/)
 
-    // Check if the page is accessible
-    expect(await page.title()).toBeTruthy()
+    // Check that the best.serp.co homepage rendered
+    await expect(page).toHaveTitle(site.title)
   })
 })

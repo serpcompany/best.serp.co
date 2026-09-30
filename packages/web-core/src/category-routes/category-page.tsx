@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import type { ComponentType, ReactNode } from 'react'
 import type { Category } from '../categories'
-import { getCategoryDisplayName } from '../category-display'
 import {
   type CategoryLike,
   getFeaturedListingCount,
@@ -110,7 +109,7 @@ export function CategoryRoutePage({
   } = slots
 
   const seoContent = getCategorySEO(category.slug, category)
-  const categoryDisplayName = getCategoryDisplayName(category.slug)
+  const categoryDisplayName = seoContent.h1Title
   const categoryPath = getRoute('category.page', { category: category.slug })
   const categoryUrl = `${SITE_PUBLIC_URL}${categoryPath}`
 

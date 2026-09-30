@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { project } from './project'
 
 function trackedFiles(): string[] {
   return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
@@ -13,20 +14,50 @@ function trackedFiles(): string[] {
 
 const forbiddenExactCatalogPaths = [
   ['data', 'listings.json'].join('/'),
-  ['apps', 'serp.software', 'public', 'search', 'search-index.json'].join('/'),
-  ['apps', 'pornvideodownloaders.com', 'public', 'search', 'search-index.json'].join('/')
+  [project.appDirectory, 'public', 'search', 'search-index.json'].join('/')
 ]
 
 const guardedSourceRoots = [
-  'apps/serp.software/',
-  'apps/pornvideodownloaders.com/',
-  'packages/site-contract/',
+  `${project.appDirectory}/`,
+  'packages/site-config/',
   'packages/web-core/',
-  'sites/',
   '.github/workflows/'
 ]
 
-describe('D1-only repository architecture', () => {
+const sharedDataOperations = [
+  'packages/data-ops/src/catalog.ts',
+  'packages/data-ops/src/client.ts',
+  'packages/data-ops/src/contracts.ts',
+  'packages/data-ops/src/schema.ts',
+  'packages/data-ops/src/submission-plans.ts',
+  'packages/data-ops/src/submissions.ts'
+]
+
+describe('single-site D1-only repository architecture', () => {
+  it('builds exactly one web application from one checked-in site config', () => {
+    const appDirectories = readdirSync(resolve('apps'), { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name)
+      .sort()
+    expect(appDirectories).toEqual(['e2e', 'web'])
+    expect(project.appDirectory).toBe('apps/web')
+
+    const appManifest = JSON.parse(
+      readFileSync(resolve(project.appDirectory, 'package.json'), 'utf8')
+    ) as { dependencies?: Record<string, string>; name?: string }
+    expect(appManifest.name).toBe(project.appPackageName)
+    expect(appManifest.dependencies?.['@serpdirectory/site-config']).toBe('workspace:*')
+    expect(appManifest.dependencies?.['@serpdirectory/site-contract']).toBeUndefined()
+
+    expect(existsSync(resolve('packages/site-config/src/site.ts'))).toBe(true)
+    for (const retired of ['packages/site-contract', 'sites', 'configs/wrangler']) {
+      expect(existsSync(resolve(retired)), `${retired} must stay retired`).toBe(false)
+    }
+    const siteConfig = readFileSync(resolve('packages/site-config/src/site.ts'), 'utf8')
+    expect(siteConfig).toContain(`id: '${project.domain}'`)
+    expect(siteConfig).not.toMatch(/listingSource|appPackageName|artifactDir/u)
+  })
+
   it('keeps the retired workspace package scope out of live files', () => {
     const retiredScope = ['@', 'thedaviddias', '/'].join('')
     const violations = trackedFiles().filter(file => {
@@ -39,11 +70,7 @@ describe('D1-only repository architecture', () => {
 
   it('contains no checked-in or generated catalog files', () => {
     const files = trackedFiles()
-    const forbidden = files.filter(
-      file =>
-        forbiddenExactCatalogPaths.includes(file) ||
-        /^sites\/[^/]+\/(?:products|categories)\.json$/u.test(file)
-    )
+    const forbidden = files.filter(file => forbiddenExactCatalogPaths.includes(file))
 
     expect(forbidden).toEqual([])
     for (const file of forbiddenExactCatalogPaths) {
@@ -79,33 +106,44 @@ describe('D1-only repository architecture', () => {
   })
 
   it('keeps catalog access server-only and bound to D1', () => {
-    for (const siteId of ['pornvideodownloaders.com', 'serp.software']) {
-      const repository = readFileSync(resolve(`apps/${siteId}/lib/catalog/repository.ts`), 'utf8')
-      const config = readFileSync(resolve(`sites/${siteId}/site-config.ts`), 'utf8')
+    const repository = readFileSync(
+      resolve(project.appDirectory, 'lib/catalog/repository.ts'),
+      'utf8'
+    )
 
-      expect(repository).toContain("import 'server-only'")
-      expect(repository).toContain('getCloudflareContext')
-      expect(repository).toContain('env.DB')
-      expect(repository).toContain('@serpdirectory/data-ops/catalog')
-      expect(repository).toContain("from '@serpdirectory/data-ops/client'")
-      expect(repository).toContain(
-        'createSiteDatabase(assertCatalogBinding(cloudflareEnv), siteId)'
-      )
-      expect(repository).toContain('readListingBySlug = cache(')
-      expect(repository).not.toMatch(/\b(?:SELECT|WITH)\b/u)
-      expect(repository).not.toMatch(/node:fs|readFile|writeFile/u)
-      expect(config).toContain("kind: 'd1-listings'")
-      expect(config).toContain("binding: 'DB'")
+    expect(repository).toContain("import 'server-only'")
+    expect(repository).toContain('getCloudflareContext')
+    expect(repository).toContain('env.DB')
+    expect(repository).toContain('@serpdirectory/data-ops/catalog')
+    expect(repository).toContain("from '@serpdirectory/data-ops/client'")
+    expect(repository).toContain('createDatabase(assertCatalogBinding(cloudflareEnv))')
+    expect(repository).toContain('readListingBySlug = cache(')
+    expect(repository).not.toMatch(/\b(?:SELECT|WITH)\b/u)
+    expect(repository).not.toMatch(/node:fs|readFile|writeFile/u)
+
+    const wrangler = JSON.parse(readFileSync(resolve(project.wranglerConfigPath), 'utf8')) as {
+      d1_databases?: Array<{ binding?: string }>
     }
+    expect(wrangler.d1_databases?.map(binding => binding.binding)).toEqual(['DB'])
+
     const sharedOperations = readFileSync(resolve('packages/data-ops/src/catalog.ts'), 'utf8')
     expect(sharedOperations).toContain('createCatalogOperations')
-    expect(sharedOperations).toContain('runSiteQuery')
-    expect(sharedOperations).toContain('statement: CompiledSiteQuery | SQL<T>')
-    expect(sharedOperations).not.toContain('query: CompiledSiteQuery | SQL<T> | string')
-    expect(sharedOperations).toContain('siteId')
+    expect(sharedOperations).toContain('runQuery')
+    expect(sharedOperations).toContain('statement: CompiledQuery | SQL<T>')
+    expect(sharedOperations).not.toContain('query: CompiledQuery | SQL<T> | string')
     expect(sharedOperations).not.toContain('.prepare(')
     expect(sharedOperations).not.toContain('getCloudflareContext')
     expect(sharedOperations).not.toContain('process.env')
+  })
+
+  it('keeps shared data operations free of tenant scoping', () => {
+    for (const file of sharedDataOperations) {
+      const source = readFileSync(resolve(file), 'utf8')
+      expect(source, file).not.toMatch(/\bsite_id\b|\bsiteId\b|SiteDatabase|\bsites\b/u)
+    }
+    const schema = readFileSync(resolve('packages/data-ops/src/schema.ts'), 'utf8')
+    expect(schema).toContain("'publication_state'")
+    expect(schema).toContain('publication_state_singleton')
   })
 
   it('owns the only Drizzle schema and client in the shared data package', () => {
@@ -123,18 +161,17 @@ describe('D1-only repository architecture', () => {
       return readFileSync(resolve(file), 'utf8').includes('drizzle-orm')
     })
 
-    expect(schemaOrClientFiles).not.toContain('apps/serp.software/lib/catalog/schema.ts')
-    expect(schemaOrClientFiles).not.toContain('apps/pornvideodownloaders.com/lib/catalog/schema.ts')
+    expect(schemaOrClientFiles).not.toContain(`${project.appDirectory}/lib/catalog/schema.ts`)
     expect(drizzleSources.every(file => file.startsWith('packages/data-ops/'))).toBe(true)
     expect(files).toContain('packages/data-ops/src/schema.ts')
     expect(files).toContain('packages/data-ops/src/client.ts')
 
-    for (const siteId of ['pornvideodownloaders.com', 'serp.software']) {
-      const manifest = JSON.parse(readFileSync(resolve(`apps/${siteId}/package.json`), 'utf8')) as {
-        dependencies?: Record<string, string>
-      }
-      expect(manifest.dependencies?.['drizzle-orm']).toBeUndefined()
+    const manifest = JSON.parse(
+      readFileSync(resolve(project.appDirectory, 'package.json'), 'utf8')
+    ) as {
+      dependencies?: Record<string, string>
     }
+    expect(manifest.dependencies?.['drizzle-orm']).toBeUndefined()
     const dataOpsManifest = JSON.parse(
       readFileSync(resolve('packages/data-ops/package.json'), 'utf8')
     ) as { dependencies?: Record<string, string> }
@@ -142,31 +179,28 @@ describe('D1-only repository architecture', () => {
 
     const client = readFileSync(resolve('packages/data-ops/src/client.ts'), 'utf8')
     expect(client).toContain('binding: D1Database')
-    expect(client).toContain('siteId: ActiveCheckedInSiteId')
-    expect(client).toContain('assertSiteIdIsSupported(siteId)')
+    expect(client).toContain('export function createDatabase(binding: D1Database): Database')
     expect(client).not.toMatch(/getCloudflareContext|process\.env/u)
 
     const contracts = readFileSync(resolve('packages/data-ops/src/contracts.ts'), 'utf8')
-    expect(contracts).toContain('client: SiteDatabase')
+    expect(contracts).toContain('client: Database')
     expect(contracts).not.toContain('database: D1Database')
   })
 
   it('keeps Submission SQL and conditional mutation plans in the shared data package', () => {
-    for (const siteId of ['pornvideodownloaders.com', 'serp.software']) {
-      for (const file of ['repository.ts', 'review-preview-repository.ts']) {
-        const adapter = readFileSync(resolve(`apps/${siteId}/lib/submissions/${file}`), 'utf8')
-        expect(adapter).toContain('@serpdirectory/data-ops/submissions')
-        expect(adapter).toContain('createSiteDatabase(workerEnv.DB, siteId)')
-        expect(adapter).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE|WITH)\b/u)
-        expect(adapter).not.toContain('.prepare(')
-        expect(adapter).not.toContain('.batch(')
-      }
+    for (const file of ['repository.ts', 'review-preview-repository.ts']) {
+      const adapter = readFileSync(resolve(project.appDirectory, 'lib/submissions', file), 'utf8')
+      expect(adapter).toContain('@serpdirectory/data-ops/submissions')
+      expect(adapter).toContain('createDatabase(workerEnv.DB)')
+      expect(adapter).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE|WITH)\b/u)
+      expect(adapter).not.toContain('.prepare(')
+      expect(adapter).not.toContain('.batch(')
     }
 
     const operations = readFileSync(resolve('packages/data-ops/src/submissions.ts'), 'utf8')
     const plans = readFileSync(resolve('packages/data-ops/src/submission-plans.ts'), 'utf8')
     expect(operations).toContain('createSubmissionOperations')
-    expect(operations).toContain('client: SiteDatabase')
+    expect(operations).toContain('client: Database')
     expect(operations).toContain("from './public-url'")
     expect(operations).toContain('buildSubmissionReviewPreview')
     expect(operations).not.toMatch(/\bTEMP\b/iu)
@@ -183,23 +217,22 @@ describe('D1-only repository architecture', () => {
     expect(approver).toContain('validateApprovalContext')
     expect(notifier).toContain('validateNotificationContext')
 
-    for (const siteId of ['pornvideodownloaders.com', 'serp.software']) {
-      expect(existsSync(resolve(`apps/${siteId}/lib/url-safety.ts`))).toBe(false)
-      const verifier = readFileSync(
-        resolve(`apps/${siteId}/lib/submissions/badge-verifier.ts`),
-        'utf8'
-      )
-      expect(verifier).toContain('@serpdirectory/data-ops/public-url')
-    }
+    expect(existsSync(resolve(project.appDirectory, 'lib/url-safety.ts'))).toBe(false)
+    const verifier = readFileSync(
+      resolve(project.appDirectory, 'lib/submissions/badge-verifier.ts'),
+      'utf8'
+    )
+    expect(verifier).toContain('@serpdirectory/data-ops/public-url')
     const publicUrl = readFileSync(resolve('packages/data-ops/src/public-url.ts'), 'utf8')
     expect(publicUrl).toContain('validatePublicHttpUrl')
     expect(publicUrl).not.toMatch(/getCloudflareContext|process\.env|node:net/u)
   })
 
-  it('keeps fresh Drizzle migrations isolated and forbids push-based schema mutation', () => {
+  it('keeps one fresh Drizzle migration history and forbids push-based schema mutation', () => {
     const config = readFileSync(resolve('drizzle.config.ts'), 'utf8')
     expect(config).toContain("out: './d1/drizzle'")
     expect(config).not.toContain('d1/migrations')
+    expect(existsSync(resolve('d1/migrations'))).toBe(false)
 
     const guardedFiles = trackedFiles().filter(
       file =>
@@ -214,27 +247,45 @@ describe('D1-only repository architecture', () => {
     expect(pushViolations).toEqual([])
   })
 
-  it('keeps retired public static repositories out of live application links', () => {
-    const pornVideoDownloadersConfig = readFileSync(
-      resolve('sites/pornvideodownloaders.com/site-config.ts'),
-      'utf8'
-    )
-    const pornVideoDownloadersNotFound = readFileSync(
-      resolve('apps/pornvideodownloaders.com/app/not-found.tsx'),
-      'utf8'
-    )
-    const serpCookiePolicy = readFileSync(
-      resolve('packages/content/data/legal/cookies.mdx'),
-      'utf8'
-    )
+  it('keeps retired multi-site tooling out of repository scripts', () => {
+    const retiredScripts = [
+      'scripts/site-targets.ts',
+      'scripts/worker-release.ts',
+      'scripts/d1-replatform.ts',
+      'scripts/d1-replatform-inventory.ts',
+      'scripts/d1-replatform-cutover.ts'
+    ]
+    for (const file of retiredScripts) {
+      expect(existsSync(resolve(file)), `${file} must stay deleted`).toBe(false)
+    }
+    const violations = trackedFiles()
+      .filter(
+        file =>
+          file.startsWith('scripts/') &&
+          !file.startsWith('scripts/migration/') &&
+          file !== 'scripts/migration-preflight.test.ts' &&
+          file !== 'scripts/architecture-guard.test.ts' &&
+          /\.(?:m?js|ts)$/u.test(file) &&
+          existsSync(resolve(file))
+      )
+      .filter(file =>
+        /site-targets|resolveSiteTarget|cutover-lock|D1_RELEASE_GENERATION|DEPLOY_SITE_ID|d1-replatform/u.test(
+          readFileSync(resolve(file), 'utf8')
+        )
+      )
+    expect(violations).toEqual([])
+  })
 
-    expect(pornVideoDownloadersConfig).toContain('githubIssueOwner: null')
-    expect(pornVideoDownloadersConfig).toContain('githubIssueRepo: null')
-    expect(pornVideoDownloadersConfig).toContain('githubIssuesUrl: null')
-    expect(pornVideoDownloadersConfig).not.toContain(
-      'github.com/serpcompany/pornvideodownloaders.com'
+  it('keeps retired public static repositories out of live application links', () => {
+    const siteConfig = readFileSync(resolve('packages/site-config/src/site.ts'), 'utf8')
+    const cookiePolicy = readFileSync(resolve('packages/content/data/legal/cookies.mdx'), 'utf8')
+
+    expect(siteConfig).toContain('githubIssueOwner: null')
+    expect(siteConfig).toContain('githubIssueRepo: null')
+    expect(siteConfig).toContain('githubIssuesUrl: null')
+    expect(siteConfig).not.toMatch(
+      /github\.com\/serpcompany\/(?:serp\.software|pornvideodownloaders)/u
     )
-    expect(pornVideoDownloadersNotFound).not.toMatch(/GitHub|githubIssuesUrl/u)
-    expect(serpCookiePolicy).not.toContain('github.com/serpcompany/serp.software')
+    expect(cookiePolicy).not.toContain('github.com/serpcompany/serp.software')
   })
 })

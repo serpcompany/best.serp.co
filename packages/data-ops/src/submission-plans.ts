@@ -1,6 +1,3 @@
-import type { ActiveCheckedInSiteId } from '@serpdirectory/site-contract/active-site-ids'
-import { assertCutoverUnlockedPlan } from './cutover-lock'
-
 export interface SubmissionStatementPlan {
   params: unknown[]
   sql: string
@@ -28,30 +25,25 @@ export function assertPreviousStatementChangedOne(label: string): SubmissionStat
   }
 }
 
-export function selectSubmissionForDecisionPlan(
-  submissionId: string,
-  siteId: ActiveCheckedInSiteId
-): SubmissionStatementPlan {
+export function selectSubmissionForDecisionPlan(submissionId: string): SubmissionStatementPlan {
   return {
     sql: `SELECT s.id,s.slug,s.status,s.listing_id,ps.version,ps.checksum
-      FROM listing_submissions s JOIN publication_state ps ON ps.site_id=s.site_id
-      WHERE s.id=? AND s.site_id=?`,
-    params: [submissionId, siteId]
+      FROM listing_submissions s JOIN publication_state ps ON ps.id=1
+      WHERE s.id=?`,
+    params: [submissionId]
   }
 }
 
 export function buildRejectSubmissionPlans(input: {
   now: string
   reviewer: string
-  siteId: ActiveCheckedInSiteId
   submissionId: string
 }): SubmissionStatementPlan[] {
   return [
-    assertCutoverUnlockedPlan(input.siteId),
     {
       sql: `UPDATE listing_submissions SET status='rejected',reviewed_at=?,reviewed_by=?,updated_at=?
-        WHERE id=? AND site_id=? AND status IN ('pending_badge','verified')`,
-      params: [input.now, input.reviewer, input.now, input.submissionId, input.siteId]
+        WHERE id=? AND status IN ('pending_badge','verified')`,
+      params: [input.now, input.reviewer, input.now, input.submissionId]
     },
     assertPreviousStatementChangedOne('submission_rejected'),
     {
@@ -64,44 +56,39 @@ export function buildRejectSubmissionPlans(input: {
 
 export function buildApproveSubmissionPlans(input: {
   afterChecksum: string
+  affectedRoute: string
   beforeChecksum: string
   listingId: string
   manifestId: string
   now: string
   reviewer: string
   runId: string
-  siteId: ActiveCheckedInSiteId
-  slug: string
   submissionId: string
   version: number
 }): SubmissionStatementPlan[] {
   const nextVersion = input.version + 1
   return [
-    assertCutoverUnlockedPlan(input.siteId),
     {
       sql: `INSERT INTO publication_runs
-        (id,site_id,manifest_id,base_version,input_checksum,affected_records,affected_routes,outcome,
+        (id,manifest_id,base_version,input_checksum,affected_records,affected_routes,outcome,
          started_at,actor,workflow,before_checksum,after_checksum)
-        SELECT ?,?,?,?,?,1,?,'started',?,?,?, ?,?
+        SELECT ?,?,?,?,1,?,'started',?,?,?, ?,?
         WHERE EXISTS (SELECT 1 FROM listing_submissions
-          WHERE id=? AND site_id=? AND status='verified' AND listing_id IS NULL)
+          WHERE id=? AND status='verified' AND listing_id IS NULL)
           AND EXISTS (SELECT 1 FROM publication_state
-          WHERE site_id=? AND version=? AND checksum=?)`,
+          WHERE id=1 AND version=? AND checksum=?)`,
       params: [
         input.runId,
-        input.siteId,
         input.manifestId,
         input.version,
         input.afterChecksum,
-        `/products/${input.slug}/`,
+        input.affectedRoute,
         input.now,
         input.reviewer,
         'github/approve-d1-submission',
         input.beforeChecksum,
         input.afterChecksum,
         input.submissionId,
-        input.siteId,
-        input.siteId,
         input.version,
         input.beforeChecksum
       ]
@@ -109,41 +96,34 @@ export function buildApproveSubmissionPlans(input: {
     assertPreviousStatementChangedOne('approval_snapshot_current'),
     {
       sql: `INSERT INTO listings
-        (id,site_id,slug,name,description,website,content,is_unofficial,is_featured,is_active,status,
+        (id,slug,name,description,website,content,is_unofficial,is_featured,is_active,status,
          source_kind,source_identity,checksum,display_order)
-        SELECT ?,?,slug,name,description,website,content,0,0,1,'draft',
-          'verified-submission',id,?,COALESCE((SELECT MAX(display_order)+1 FROM listings WHERE site_id=?),0)
-        FROM listing_submissions WHERE id=? AND site_id=? AND status='verified' AND listing_id IS NULL`,
-      params: [
-        input.listingId,
-        input.siteId,
-        input.afterChecksum,
-        input.siteId,
-        input.submissionId,
-        input.siteId
-      ]
+        SELECT ?,slug,name,description,website,content,0,0,1,'draft',
+          'verified-submission',id,?,COALESCE((SELECT MAX(display_order)+1 FROM listings),0)
+        FROM listing_submissions WHERE id=? AND status='verified' AND listing_id IS NULL`,
+      params: [input.listingId, input.afterChecksum, input.submissionId]
     },
     assertPreviousStatementChangedOne('draft_listing_created'),
     {
       sql: `INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
         SELECT ?,c.id,0,1 FROM listing_submissions s JOIN categories c
-          ON c.site_id=s.site_id AND c.slug=s.category_slug AND c.is_active=1
-        WHERE s.id=? AND s.site_id=? AND s.status='verified'`,
-      params: [input.listingId, input.submissionId, input.siteId]
+          ON c.slug=s.category_slug AND c.is_active=1
+        WHERE s.id=? AND s.status='verified'`,
+      params: [input.listingId, input.submissionId]
     },
     assertPreviousStatementChangedOne('primary_category_created'),
     {
       sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
         SELECT ?,'logo',logo_url,0 FROM listing_submissions
-        WHERE id=? AND site_id=? AND status='verified'`,
-      params: [input.listingId, input.submissionId, input.siteId]
+        WHERE id=? AND status='verified'`,
+      params: [input.listingId, input.submissionId]
     },
     assertPreviousStatementChangedOne('logo_created'),
     {
       sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
         SELECT ?,'video',video_url,1 FROM listing_submissions
-        WHERE id=? AND site_id=? AND status='verified' AND video_url IS NOT NULL`,
-      params: [input.listingId, input.submissionId, input.siteId]
+        WHERE id=? AND status='verified' AND video_url IS NOT NULL`,
+      params: [input.listingId, input.submissionId]
     },
     {
       sql: `INSERT INTO listing_resource_links (listing_id,label,url,sort_order)
@@ -159,22 +139,15 @@ export function buildApproveSubmissionPlans(input: {
     },
     {
       sql: `UPDATE listings SET status='approved',published_at=?,updated_at=?
-        WHERE id=? AND site_id=? AND status='draft' AND source_kind='verified-submission'
+        WHERE id=? AND status='draft' AND source_kind='verified-submission'
           AND source_identity=?`,
-      params: [input.now, input.now, input.listingId, input.siteId, input.submissionId]
+      params: [input.now, input.now, input.listingId, input.submissionId]
     },
     assertPreviousStatementChangedOne('listing_published'),
     {
       sql: `UPDATE listing_submissions SET status='approved',listing_id=?,reviewed_at=?,reviewed_by=?,updated_at=?
-        WHERE id=? AND site_id=? AND status='verified' AND listing_id IS NULL`,
-      params: [
-        input.listingId,
-        input.now,
-        input.reviewer,
-        input.now,
-        input.submissionId,
-        input.siteId
-      ]
+        WHERE id=? AND status='verified' AND listing_id IS NULL`,
+      params: [input.listingId, input.now, input.reviewer, input.now, input.submissionId]
     },
     assertPreviousStatementChangedOne('submission_approved'),
     {
@@ -184,12 +157,11 @@ export function buildApproveSubmissionPlans(input: {
     },
     {
       sql: `UPDATE publication_state SET version=version+1,manifest_id=?,checksum=?,published_at=?
-        WHERE site_id=? AND version=? AND checksum=?`,
+        WHERE id=1 AND version=? AND checksum=?`,
       params: [
         input.manifestId,
         input.afterChecksum,
         input.now,
-        input.siteId,
         input.version,
         input.beforeChecksum
       ]
@@ -197,24 +169,23 @@ export function buildApproveSubmissionPlans(input: {
     assertPreviousStatementChangedOne('publication_state_advanced'),
     {
       sql: `UPDATE publication_runs SET outcome='succeeded',published_version=?,completed_at=?
-        WHERE id=? AND site_id=? AND outcome='started'`,
-      params: [nextVersion, input.now, input.runId, input.siteId]
+        WHERE id=? AND outcome='started'`,
+      params: [nextVersion, input.now, input.runId]
     },
     assertPreviousStatementChangedOne('publication_audit_completed')
   ]
 }
 
 export function selectVerifiedSubmissionNotificationPlans(
-  siteId: ActiveCheckedInSiteId,
   limit: number
 ): SubmissionStatementPlan[] {
   const pending = `SELECT candidate.id FROM listing_submissions candidate
     LEFT JOIN listing_submission_notifications notification
       ON notification.submission_id=candidate.id AND notification.channel=?
-    WHERE candidate.site_id=? AND candidate.status='verified'
+    WHERE candidate.status='verified'
       AND (notification.submission_id IS NULL OR notification.preview_token_hash IS NULL)
     ORDER BY candidate.badge_verified_at,candidate.created_at LIMIT ?`
-  const params = [CHANNEL, siteId, limit]
+  const params = [CHANNEL, limit]
   return [
     {
       sql: `SELECT s.id,s.slug,s.name,s.description,s.website,s.content,s.category_slug,
@@ -248,14 +219,13 @@ export function recordSubmissionNotificationPlan(input: {
   externalUrl: string
   previewTokenHash: string
   recipient: string
-  siteId: ActiveCheckedInSiteId
   submissionId: string
 }): SubmissionStatementPlan {
   return {
     sql: `INSERT INTO listing_submission_notifications
         (submission_id,channel,external_id,external_url,recipient,preview_token_hash)
       SELECT ?,?,?,?,?,? FROM listing_submissions
-      WHERE id=? AND site_id=? AND status='verified'
+      WHERE id=? AND status='verified'
       ON CONFLICT(submission_id,channel) DO UPDATE SET
         external_id=excluded.external_id,
         external_url=excluded.external_url,
@@ -263,7 +233,7 @@ export function recordSubmissionNotificationPlan(input: {
         preview_token_hash=excluded.preview_token_hash,
         updated_at=CURRENT_TIMESTAMP
       WHERE EXISTS (SELECT 1 FROM listing_submissions
-        WHERE id=excluded.submission_id AND site_id=? AND status='verified')`,
+        WHERE id=excluded.submission_id AND status='verified')`,
     params: [
       input.submissionId,
       CHANNEL,
@@ -271,20 +241,7 @@ export function recordSubmissionNotificationPlan(input: {
       input.externalUrl,
       input.recipient,
       input.previewTokenHash,
-      input.submissionId,
-      input.siteId,
-      input.siteId
+      input.submissionId
     ]
   }
-}
-
-export function buildRecordSubmissionNotificationPlans(input: {
-  externalId: string
-  externalUrl: string
-  previewTokenHash: string
-  recipient: string
-  siteId: ActiveCheckedInSiteId
-  submissionId: string
-}): SubmissionStatementPlan[] {
-  return [assertCutoverUnlockedPlan(input.siteId), recordSubmissionNotificationPlan(input)]
 }

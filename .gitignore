@@ -72,3 +72,9 @@ tmp/deploy/
 
 # Per-worktree harness state, logs, browser profiles, and evidence
 .runtime/
+
+# One-time JSON -> D1 import artifacts (~70 MB). Regenerate deterministically with
+# `pnpm migration:generate` from json-directory-template@25e2a8d; only the parity
+# report is committed.
+d1/artifacts/*
+!d1/artifacts/*-parity.yaml

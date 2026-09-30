@@ -1,44 +1,198 @@
 # Cookie Policy
 
-**Last updated: July 30, 2026**
+**Last updated: April 5, 2026**
 
-This policy explains how SERP Software uses cookies and browser storage on
-`serp.software`.
+This Cookie Policy explains how this directory site ("we," "us," or "our") uses cookies and similar tracking technologies when you visit the public site and any configured extensions of the starter.
 
-## Cookies and analytics
+## 1. What Are Cookies
 
-The site is delivered by Cloudflare, which may use strictly necessary cookies or
-similar signals for security and reliable delivery. SERP Software is configured with
-Google Tag Manager; tags enabled in that container may use cookies or collect usage
-events according to their own configuration and policies.
+Cookies are small text files that are stored on your device (computer, tablet, or mobile) when you visit a website. They are widely used to make websites work more efficiently and to provide information to website owners.
 
-Optional authentication features are currently disabled. If they are enabled later,
-the authentication provider may set essential session and security cookies.
+### 1.1 Types of Cookies We Use
 
-## Local storage
+- **Session Cookies**: Temporary cookies that are deleted when you close your browser
+- **Persistent Cookies**: Cookies that remain on your device for a set period or until you delete them
+- **First-Party Cookies**: Cookies set by our website directly
+- **Third-Party Cookies**: Cookies set by external services we use
 
-The application stores these preferences in your browser rather than in D1:
+## 2. How We Use Cookies
 
-| Stored preference | Purpose |
-| --- | --- |
-| `llms-txt-hub-favorites` | Saved products |
-| `websites-show-all` | Expanded directory preference |
-| `websites-sort-by` | Directory sort preference |
-| `category-sort-by` | Category sort preference |
-| `recentSearches` | Recent autocomplete searches |
+### 2.1 Essential Cookies
 
-Local-storage values remain on your device until you clear browser data. Clearing them
-removes saved favorites and resets search, sort, and display preferences.
+Most starter sites do not set login or analytics cookies by default. If you keep the default
+feature flags and do not configure authentication or analytics, the public site works without
+those cookies.
 
-## Managing your preferences
+If a site owner enables additional integrations later, that site may add cookies for those
+features and should update this policy to match the real deployment.
 
-You can delete cookies and local storage in your browser's privacy settings. Blocking
-strictly necessary storage may affect security or site operation. Blocking analytics
-storage should not prevent directory browsing.
+These cookies are only relevant when optional authentication is enabled:
 
-## Changes and questions
+| Cookie Name | Purpose | Duration | Type |
+| ----------- | ------- | -------- | ---- |
+| `next-auth.*` | Optional GitHub sign-in session state | Session/default auth lifetime | Essential |
 
-We may update this policy when hosting, analytics, authentication, or application
-storage changes. The date above identifies the current version.
+### 2.2 Analytics Cookies
 
-Any future change to how policy questions are handled will be published on this page.
+This starter does not ship analytics cookies by default.
+
+If a site owner later enables analytics, they should update this section to document the actual
+provider and consent behavior.
+
+### 2.3 Local Storage (Not Cookies)
+
+We use browser local storage (not cookies) to enhance your experience:
+
+| Stored Preference | Purpose | Duration | Type |
+| ----------------- | ------- | -------- | ---- |
+| `llms-txt-hub-favorites` | Store your saved listings locally | Until manually cleared | Local Storage |
+| `websites-show-all` | Remember whether the directory expands all listings | Until manually cleared | Local Storage |
+| `websites-sort-by` | Remember the default directory sort order | Until manually cleared | Local Storage |
+| `category-sort-by` | Remember category-page sort order | Until manually cleared | Local Storage |
+| `recentSearches` | Store recent search history for autocomplete | Until manually cleared | Local Storage |
+
+**Note**: Local storage data stays on your device and is not sent to our servers. This data persists until you clear your browser data or remove it manually.
+
+## 3. Cookie Consent
+
+### 3.1 Essential Cookies
+If optional authentication is enabled for your site, the auth provider may set essential session
+cookies while a user signs in or stays logged in.
+
+The default starter configuration does not enable sign-in.
+
+### 3.2 Non-Essential Cookies
+The default starter does not set non-essential analytics or marketing cookies.
+
+If a site owner adds them later, they should document the real provider and consent behavior here.
+
+## 4. Managing Your Cookie Preferences
+
+### 4.1 Browser Settings
+
+You can control cookies through your browser settings:
+
+- **Chrome**: Settings > Privacy and Security > Cookies and other site data
+- **Firefox**: Settings > Privacy & Security > Cookies and Site Data
+- **Safari**: Preferences > Privacy > Cookies and website data
+- **Edge**: Settings > Privacy, search, and services > Cookies and site permissions
+
+### 4.2 Cookie Categories
+
+- **Strictly Necessary**: Cannot be disabled as they are essential for website functionality
+- **Analytics**: Can be disabled; will not affect website functionality
+- **Functional**: Can be disabled; may affect some website features
+
+### 4.3 Impact of Disabling Cookies
+
+| Cookie Type | Impact if Disabled |
+| ----------- | ------------------ |
+| Essential (`next-auth.*`, if enabled) | Cannot log in or maintain sessions |
+| Analytics | No impact on functionality on the default starter |
+
+### 4.4 Impact of Clearing Local Storage
+
+| Storage Type | Impact if Cleared |
+| ------------ | ----------------- |
+| Favorites | Will lose all saved favorite listings |
+| Sort/Filter Preferences | Will reset to default sort and filter settings |
+| Recent Searches | Will lose search history and autocomplete suggestions |
+
+## 5. Third-Party Services
+
+### 5.1 Optional Authentication (NextAuth + GitHub)
+- **Purpose**: User authentication when a site owner enables sign-in
+- **Cookies Set**: Session and security cookies managed by the configured auth flow
+- **Data Processing**: Authentication and account-session data
+- **Privacy Policy**: Site owners should link the active auth provider policy when this is enabled
+
+### 5.2 Optional Analytics
+- **Purpose**: Usage measurement only when a site owner enables analytics
+- **Cookies Set**: Depends on the configured analytics provider
+- **Data Processing**: Depends on the configured analytics provider
+- **Privacy Policy**: Site owners should document the active provider here
+
+### 5.3 Hosting
+- **Purpose**: Static hosting, security, and performance
+- **Cookies Set**: Depends on the chosen host and CDN
+- **Data Processing**: Technical delivery logs and hosting telemetry
+- **Privacy Policy**: Site owners should link the active host or platform policy
+
+## 6. International Cookie Laws
+
+### 6.1 European Union (GDPR)
+Under EU law, we:
+- Obtain consent before setting non-essential cookies
+- Provide clear information about cookie purposes
+- Allow easy withdrawal of consent
+- Ensure cookies are necessary and proportionate
+
+### 6.2 United Kingdom (UK GDPR & PECR)
+We comply with UK cookie regulations by:
+- Following the same principles as EU GDPR
+- Respecting the ICO's cookie guidance
+- Providing appropriate consent mechanisms
+
+### 6.3 California (CCPA)
+For California residents:
+- Cookies may constitute "personal information" under CCPA
+- You have rights regarding cookie-based data collection
+- See our Privacy Policy for California-specific rights
+
+## 7. Cookie Security
+
+### 7.1 Security Measures
+We implement security measures for cookies:
+- Secure flag for HTTPS-only cookies
+- HttpOnly flag to prevent JavaScript access (where appropriate)
+- SameSite attribute to prevent CSRF attacks
+- Regular security reviews and updates
+
+### 7.2 Data Protection
+- Cookies containing personal data are encrypted
+- Authentication cookies have short expiration times
+- We regularly audit cookie usage and purposes
+
+## 8. Changes to This Cookie Policy
+
+### 8.1 Updates
+We may update this Cookie Policy to:
+- Reflect changes in our cookie usage
+- Comply with legal requirements
+- Improve clarity and transparency
+
+### 8.2 Notification
+When we make significant changes:
+- We will update the "Last updated" date
+- We may notify you via email or website banner
+- Continued use indicates acceptance of changes
+
+## 9. Contact Us
+
+For questions about your site's cookie usage:
+
+**Email**: [privacy@example.com](mailto:privacy@example.com)
+**Subject Line**: Cookie Policy Inquiry
+**Response Time**: Within 30 days
+
+For technical issues with cookies:
+**Email**: [support@example.com](mailto:support@example.com)
+
+## 10. Additional Resources
+
+### 10.1 Learn More About Cookies
+- [All About Cookies](https://www.allaboutcookies.org/)
+- [Your Online Choices](http://www.youronlinechoices.eu/)
+- [Network Advertising Initiative](http://www.networkadvertising.org/)
+
+### 10.2 Browser Cookie Information
+- [Google Chrome Cookie Settings](https://support.google.com/chrome/answer/95647)
+- [Mozilla Firefox Cookie Settings](https://support.mozilla.org/en-US/kb/enhanced-tracking-protection-firefox-desktop)
+- [Apple Safari Cookie Settings](https://support.apple.com/en-us/105082)
+- [Microsoft Edge Cookie Settings](https://support.microsoft.com/en-us/microsoft-edge/delete-cookies-in-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09)
+
+---
+
+**Effective Date**: April 5, 2026
+
+This Cookie Policy is effective as of April 5, 2026, and was last updated on April 5, 2026.

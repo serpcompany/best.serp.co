@@ -4,24 +4,23 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { canonicalLocalMigrationsDirectory, validateCanonicalLocalConfig } from './d1-local-config'
 import { configuredFreshD1StateRoot } from './d1-local-state'
-import { applicationTableNames } from './d1-replatform-inventory'
-import { resolveSiteTarget, type SiteTarget } from './site-targets'
+import { applicationTableNames } from './d1-table-inventory'
+import { project } from './project'
 
-export { applicationTableNames } from './d1-replatform-inventory'
+export { applicationTableNames } from './d1-table-inventory'
 
 export const freshMigrationsDirectory = canonicalLocalMigrationsDirectory
 
 export const d1TriggerNames = [
   'listing_categories_prevent_primary_demote',
   'listing_categories_prevent_primary_removal',
-  'listing_categories_same_site_insert',
-  'listing_categories_same_site_update',
   'listings_require_primary_on_insert',
   'listings_require_primary_on_publication'
 ] as const
 
 export const requiredIndexNames = [
   'categories_public_idx',
+  'categories_slug_unique',
   'listing_categories_category_idx',
   'listing_categories_listing_order_idx',
   'listing_categories_one_primary_idx',
@@ -32,7 +31,7 @@ export const requiredIndexNames = [
   'listing_resource_links_listing_idx',
   'listing_resource_links_listing_order_unique',
   'listing_slug_redirects_listing_idx',
-  'listing_slug_redirects_site_old_slug_unique',
+  'listing_slug_redirects_old_slug_unique',
   'listing_submission_events_submission_idx',
   'listing_submission_faqs_submission_order_unique',
   'listing_submission_notifications_channel_external_unique',
@@ -41,23 +40,17 @@ export const requiredIndexNames = [
   'listing_submission_resource_links_submission_order_unique',
   'listing_submissions_active_slug_idx',
   'listing_submissions_review_queue_idx',
-  'listing_submissions_site_token_unique',
+  'listing_submissions_token_unique',
   'listings_featured_idx',
   'listings_name_idx',
   'listings_publication_idx',
   'listings_related_name_idx',
-  'listings_site_slug_unique',
-  'listings_slug_lookup_idx',
-  'migration_runs_site_manifest_unique',
-  'migration_runs_site_time_idx',
-  'publication_runs_site_manifest_unique',
-  'publication_runs_site_time_idx'
+  'listings_slug_unique',
+  'migration_runs_manifest_unique',
+  'migration_runs_time_idx',
+  'publication_runs_manifest_unique',
+  'publication_runs_time_idx'
 ] as const
-
-export const legacyRecoveryLocalDatabaseIds = {
-  'pornvideodownloaders.com': '00000000-0000-0000-0000-000000000003',
-  'serp.software': '00000000-0000-0000-0000-000000000002'
-} as const
 
 interface SchemaObject {
   name: string
@@ -65,20 +58,16 @@ interface SchemaObject {
   type: 'index' | 'table' | 'trigger'
 }
 
-function statePath(target: SiteTarget): string {
-  return configuredFreshD1StateRoot(target.siteId)
-}
-
-export function canonicalLocalConfig(target: SiteTarget): {
+export function canonicalLocalConfig(): {
   configPath: string
   databaseName: string
 } {
-  validateCanonicalLocalConfig(target)
-  return { configPath: target.local.configPath, databaseName: target.local.databaseName }
+  validateCanonicalLocalConfig()
+  return { configPath: project.wranglerConfigPath, databaseName: project.local.databaseName }
 }
 
-function wrangler(target: SiteTarget, args: string[], capture = false): string {
-  const { configPath, databaseName } = canonicalLocalConfig(target)
+function wrangler(args: string[], capture = false): string {
+  const { configPath, databaseName } = canonicalLocalConfig()
   return (
     execFileSync(
       'pnpm',
@@ -89,7 +78,7 @@ function wrangler(target: SiteTarget, args: string[], capture = false): string {
         ...args.map(value => (value === '$DATABASE' ? databaseName : value)),
         '--local',
         '--persist-to',
-        statePath(target),
+        configuredFreshD1StateRoot(),
         '--config',
         configPath
       ],
@@ -102,8 +91,8 @@ function wrangler(target: SiteTarget, args: string[], capture = false): string {
   )
 }
 
-function query(target: SiteTarget, command: string): SchemaObject[] {
-  const output = wrangler(target, ['execute', '$DATABASE', '--command', command, '--json'], true)
+function query(command: string): SchemaObject[] {
+  const output = wrangler(['execute', '$DATABASE', '--command', command, '--json'], true)
   const parsed = JSON.parse(output) as Array<{ results?: SchemaObject[]; success?: boolean }>
   if (parsed.length !== 1 || parsed[0]?.success !== true || !Array.isArray(parsed[0].results)) {
     throw new Error('Local D1 returned an unsuccessful or malformed schema result.')
@@ -127,9 +116,8 @@ function assertExactNames(actual: string[], expected: readonly string[], label: 
   }
 }
 
-function verify(target: SiteTarget): void {
+function verify(): void {
   const objects = query(
-    target,
     `SELECT type, name, sql FROM sqlite_master
      WHERE name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'
      ORDER BY type, name`
@@ -158,7 +146,7 @@ function verify(target: SiteTarget): void {
   if (missingIndexes.length > 0) {
     throw new Error(`Fresh D1 is missing indexes: ${missingIndexes.join(', ')}.`)
   }
-  const ledger = query(target, 'SELECT name FROM d1_migrations ORDER BY name') as Array<{
+  const ledger = query('SELECT name FROM d1_migrations ORDER BY name') as Array<{
     name: string
   }>
   assertExactNames(
@@ -168,9 +156,9 @@ function verify(target: SiteTarget): void {
   )
   console.log(
     JSON.stringify({
-      database: target.local.databaseName,
+      database: project.local.databaseName,
+      domain: project.domain,
       migrations: freshMigrationNames(),
-      siteId: target.siteId,
       status: 'verified',
       tables: applicationTables.length
     })
@@ -178,11 +166,12 @@ function verify(target: SiteTarget): void {
 }
 
 export function runDrizzleLocalCommand(args: string[]): void {
-  const [command, siteFlag, siteValue] = args
-  if (siteFlag !== '--site') {
-    throw new Error('Fresh Drizzle D1 commands require an explicit --site argument.')
+  const [command, ...rest] = args.filter(value => value !== '--')
+  if (rest.length > 0) {
+    throw new Error(
+      `Unexpected arguments: ${rest.join(' ')}. Fresh Drizzle D1 commands target only the local ${project.domain} database and take no --site.`
+    )
   }
-  const target = resolveSiteTarget(siteValue)
   if (command === 'generate') {
     execFileSync('pnpm', ['exec', 'drizzle-kit', 'generate', '--config', 'drizzle.config.ts'], {
       env: process.env,
@@ -191,18 +180,20 @@ export function runDrizzleLocalCommand(args: string[]): void {
     return
   }
   if (command === 'list') {
-    wrangler(target, ['migrations', 'list', '$DATABASE'])
+    wrangler(['migrations', 'list', '$DATABASE'])
     return
   }
   if (command === 'apply') {
-    wrangler(target, ['migrations', 'apply', '$DATABASE'])
+    wrangler(['migrations', 'apply', '$DATABASE'])
     return
   }
   if (command === 'verify') {
-    verify(target)
+    verify()
     return
   }
-  throw new Error(`Unknown fresh Drizzle D1 command: ${command || 'missing'}`)
+  throw new Error(
+    `Unknown fresh Drizzle D1 command: ${command || 'missing'}. Use generate, list, apply, or verify.`
+  )
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

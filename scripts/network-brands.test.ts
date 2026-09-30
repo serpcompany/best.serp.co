@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { site } from '@serpdirectory/site-config'
 import { describe, expect, it } from 'vitest'
 import {
   getNetworkBrands,
@@ -123,45 +124,14 @@ describe('parseNetworkBrands', () => {
     }
   )
 
-  it('returns the committed adult-only brand group from the shared source data', () => {
-    const brands = getNetworkBrandsForGroup('adultsOnly')
+  it('resolves the brand group configured for best.serp.co from the shared source data', () => {
+    const brands = getNetworkBrandsForGroup(site.networkBrandGroup)
 
-    expect(brands).toHaveLength(62)
+    expect(brands.length).toBeGreaterThan(0)
     expect(brands.map(brand => brand.name)).toEqual(
       brands.map(brand => brand.name).toSorted((first, second) => first.localeCompare(second))
     )
-    expect(brands).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: 'SERP XXX',
-          url: 'https://serp.xxx'
-        }),
-        expect.objectContaining({
-          name: 'OnlyFans Video Downloader',
-          url: 'https://onlyfansvideodownloader.com'
-        }),
-        expect.objectContaining({
-          name: 'JustForFans Downloader',
-          url: 'https://justforfansdownloader.com'
-        }),
-        expect.objectContaining({
-          name: 'Porn Video Downloaders',
-          url: 'https://pornvideodownloaders.com'
-        }),
-        expect.objectContaining({
-          name: 'Porno Downloaders',
-          url: 'https://pornodownloaders.com'
-        }),
-        expect.objectContaining({
-          name: 'xHamster Video Downloader',
-          url: 'https://xhamstervideodownloader.com'
-        }),
-        expect.objectContaining({
-          name: 'Erome Video Downloader',
-          url: 'https://eromevideodownloader.com'
-        })
-      ])
-    )
+    expect(new Set(brands.map(brand => brand.slug)).size).toBe(brands.length)
   })
 
   it('rejects brand groups that reference missing brand entries', () => {

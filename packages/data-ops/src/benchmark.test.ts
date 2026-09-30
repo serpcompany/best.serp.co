@@ -3,9 +3,15 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { createSiteDatabase } from './client'
+import { createDatabase } from './client'
 import type { CatalogQueryEvent } from './contracts'
-import { MemoryCatalogCache, SqliteD1, seedContractFixture } from './test-support'
+import {
+  fixtureCategoryIds,
+  insertPublishedListing,
+  MemoryCatalogCache,
+  SqliteD1,
+  seedContractFixture
+} from './test-support'
 
 vi.mock('server-only', () => ({}))
 
@@ -90,70 +96,46 @@ function totalRows(evidence: ScanEvidence[]): number | null {
 
 function addBenchmarkRows(sqlite: SqliteD1): void {
   const { database } = sqlite
-  for (const siteId of ['pornvideodownloaders.com', 'serp.software'] as const) {
-    const prefix = siteId === 'serp.software' ? 'serp' : 'pvd'
-    const categories = database
-      .prepare('SELECT id, slug FROM categories WHERE site_id = ? ORDER BY sort_order')
-      .all(siteId) as Array<{ id: number; slug: string }>
-    const primary = categories.find(category => category.slug === 'primary')?.id
-    const secondary = categories.find(category => category.slug === 'secondary')?.id
-    if (!primary || !secondary) throw new Error('Missing benchmark categories.')
+  const categories = fixtureCategoryIds(database)
+  const primary = categories.get('primary')
+  const secondary = categories.get('secondary')
+  if (!primary || !secondary) throw new Error('Missing benchmark categories.')
 
-    for (let index = 0; index < 315; index += 1) {
-      const sequence = String(index).padStart(3, '0')
-      const id = `${prefix}-bench-${sequence}`
-      const slug = `bench-${sequence}`
-      const day = String(1 + Math.floor(index / 28)).padStart(2, '0')
+  for (let index = 0; index < 315; index += 1) {
+    const sequence = String(index).padStart(3, '0')
+    const id = `serp-bench-${sequence}`
+    const slug = `bench-${sequence}`
+    const day = String(1 + Math.floor(index / 28)).padStart(2, '0')
+    insertPublishedListing(database, {
+      categoryIds: index % 2 === 0 ? [primary, secondary] : [primary],
+      content: `Benchmark detail ${sequence}`,
+      description: `Benchmark description ${sequence}`,
+      displayOrder: index % 4,
+      id,
+      isFeatured: index < 6,
+      name: `Benchmark ${sequence}`,
+      publishedAt: `2026-06-${day}T00:00:00.000Z`,
+      slug,
+      website: `https://${slug}.example.com`
+    })
+    database
+      .prepare(
+        "INSERT INTO listing_media(listing_id, kind, url, sort_order) VALUES (?, 'logo', ?, 0)"
+      )
+      .run(id, `https://assets.example/${id}-logo.png`)
+    for (let resource = 0; resource < 6; resource += 1) {
       database
         .prepare(
-          `INSERT INTO listings(
-            id, site_id, slug, name, description, website, content, is_featured,
-            published_at, display_order
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          'INSERT INTO listing_resource_links(listing_id, label, url, sort_order) VALUES (?, ?, ?, ?)'
         )
-        .run(
-          id,
-          siteId,
-          slug,
-          `Benchmark ${sequence}`,
-          `Benchmark description ${sequence}`,
-          `https://${slug}.${siteId}`,
-          `Benchmark detail ${sequence}`,
-          index < 6 ? 1 : 0,
-          `2026-06-${day}T00:00:00.000Z`,
-          index % 4
-        )
+        .run(id, `Resource ${resource}`, `https://resources.example/${id}/${resource}`, resource)
+    }
+    for (let faq = 0; faq < 5; faq += 1) {
       database
         .prepare(
-          'INSERT INTO listing_categories(listing_id, category_id, sort_order, is_primary) VALUES (?, ?, 0, 1)'
+          'INSERT INTO listing_faqs(listing_id, question, answer, sort_order) VALUES (?, ?, ?, ?)'
         )
-        .run(id, primary)
-      if (index % 2 === 0) {
-        database
-          .prepare(
-            'INSERT INTO listing_categories(listing_id, category_id, sort_order, is_primary) VALUES (?, ?, 1, 0)'
-          )
-          .run(id, secondary)
-      }
-      database
-        .prepare(
-          "INSERT INTO listing_media(listing_id, kind, url, sort_order) VALUES (?, 'logo', ?, 0)"
-        )
-        .run(id, `https://assets.example/${id}-logo.png`)
-      for (let resource = 0; resource < 6; resource += 1) {
-        database
-          .prepare(
-            'INSERT INTO listing_resource_links(listing_id, label, url, sort_order) VALUES (?, ?, ?, ?)'
-          )
-          .run(id, `Resource ${resource}`, `https://resources.example/${id}/${resource}`, resource)
-      }
-      for (let faq = 0; faq < 5; faq += 1) {
-        database
-          .prepare(
-            'INSERT INTO listing_faqs(listing_id, question, answer, sort_order) VALUES (?, ?, ?, ?)'
-          )
-          .run(id, `Question ${faq}`, `Answer ${faq}`, faq)
-      }
+        .run(id, `Question ${faq}`, `Answer ${faq}`, faq)
     }
   }
 }
@@ -181,7 +163,7 @@ describe('representative D1 query benchmark', () => {
     const events: CatalogQueryEvent[] = []
     const catalog = createCatalogOperations({
       cache: new MemoryCatalogCache(),
-      client: createSiteDatabase(sqlite.asD1Database(), 'serp.software'),
+      client: createDatabase(sqlite.asD1Database()),
       clock: benchmarkNow,
       observe: event => {
         if (event.event === 'd1_query') events.push(event)
@@ -223,7 +205,7 @@ describe('representative D1 query benchmark', () => {
           LAG(id) OVER (ORDER BY published_at DESC, display_order ASC, slug ASC) AS previous_id,
           LEAD(id) OVER (ORDER BY published_at DESC, display_order ASC, slug ASC) AS next_id
         FROM listings l
-        WHERE l.site_id = 'serp.software' AND l.status = 'approved' AND l.is_active = 1
+        WHERE l.status = 'approved' AND l.is_active = 1
           AND l.published_at IS NOT NULL
           AND datetime(l.published_at) <= datetime('2026-07-30T00:00:00.000Z')
       )
@@ -242,7 +224,7 @@ describe('representative D1 query benchmark', () => {
        JOIN listing_categories candidate ON candidate.listing_id = l.id
        JOIN listing_categories current
          ON current.category_id = candidate.category_id AND current.listing_id = '${currentId}'
-       WHERE l.site_id = 'serp.software' AND l.status = 'approved' AND l.is_active = 1
+       WHERE l.status = 'approved' AND l.is_active = 1
          AND l.published_at IS NOT NULL
          AND datetime(l.published_at) <= datetime('2026-07-30T00:00:00.000Z')
          AND l.id != '${currentId}'
@@ -293,8 +275,7 @@ describe('representative D1 query benchmark', () => {
     const report = {
       fixture: {
         categories: 3,
-        eligibleListingsPerSite: 320,
-        sites: 2
+        eligibleListings: 320
       },
       navigation: {
         legacyScanRows: legacyAdjacent.rows,
@@ -351,6 +332,6 @@ describe('representative D1 query benchmark', () => {
       expect(warmShellRows).toBe(0)
     }
     expect(detailStatements.length).toBeLessThanOrEqual(10)
-    expect(events.every(event => event.siteId === 'serp.software')).toBe(true)
+    expect(events.every(event => event.success)).toBe(true)
   })
 })

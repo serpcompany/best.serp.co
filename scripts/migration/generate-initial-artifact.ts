@@ -5,7 +5,7 @@ import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stringify } from 'yaml'
 import { z } from 'zod'
-import { resolveSiteTarget } from '../site-targets'
+import { project } from '../project'
 import { inspectLegacySite } from './preflight'
 
 const httpUrl = z
@@ -80,7 +80,8 @@ interface NormalizedListing {
 
 interface GeneratorOptions {
   outputRoot: string
-  siteId: string
+  /** Site directory in the legacy json-directory-template checkout, e.g. `serp.co`. */
+  sourceSiteId: string
   sourceRoot: string
 }
 
@@ -131,14 +132,14 @@ function parseArgs(args: string[]): GeneratorOptions {
     return index < 0 ? undefined : values[index + 1]
   }
   const sourceRoot = valueFor('--source-root')
-  const siteId = valueFor('--site-id')
+  const sourceSiteId = valueFor('--site-id')
   const outputRoot = valueFor('--output-root') || '.'
-  if (!sourceRoot || !siteId) {
+  if (!sourceRoot || !sourceSiteId) {
     throw new Error(
-      'Usage: pnpm migration:generate -- --source-root /absolute/json-directory --site-id example.com [--output-root path]'
+      'Usage: pnpm migration:generate -- --source-root /absolute/json-directory --site-id serp.co [--output-root path]'
     )
   }
-  return { outputRoot: resolve(outputRoot), siteId, sourceRoot: resolve(sourceRoot) }
+  return { outputRoot: resolve(outputRoot), sourceRoot: resolve(sourceRoot), sourceSiteId }
 }
 
 function buildContent(
@@ -159,7 +160,7 @@ function normalize(
   products: z.infer<typeof productsSchema>,
   defaultCategory: string,
   featuredCount: number,
-  siteId: string,
+  sourceSiteId: string,
   sourceCommit: string,
   sourceChecksum: string
 ): {
@@ -217,8 +218,8 @@ function normalize(
       ...(record.media?.images || []).map(url => ({ kind: 'image' as const, url: url.trim() })),
       ...(record.media?.video ? [{ kind: 'video' as const, url: record.media.video.trim() }] : [])
     ]
-    const id = `lst_${sha256(`${siteId}\0legacy-product-map\0${mapKey}`).slice(0, 24)}`
-    const sourceIdentity = `${siteId}:${sourceCommit}:${sourceChecksum}:${mapKey}`
+    const id = `lst_${sha256(`legacy-product-map\0${mapKey}`).slice(0, 24)}`
+    const sourceIdentity = `${sourceSiteId}:${sourceCommit}:${sourceChecksum}:${mapKey}`
     const target = {
       categories,
       content: buildContent(record.content?.body, faqs),
@@ -256,16 +257,15 @@ function normalize(
 
 function listingStatements(
   listing: NormalizedListing,
-  siteId: string,
   publishedAt: string,
   sourceUpdatedAt: string
 ): string[] {
   const statements = [
-    `INSERT INTO listings (id, site_id, slug, name, description, website, content, entity_type, priority, is_unofficial, is_featured, is_active, status, published_at, display_order, source_kind, source_identity, source_updated_at, checksum, created_at, updated_at) VALUES (${sql(listing.id)}, ${sql(siteId)}, ${sql(listing.slug)}, ${sql(listing.name)}, ${sql(listing.description)}, ${sql(listing.website)}, ${sql(listing.content)}, NULL, NULL, 0, ${listing.featured ? 1 : 0}, 1, 'draft', ${sql(publishedAt)}, ${listing.displayOrder}, 'legacy-json-migration-v1', ${sql(listing.sourceIdentity)}, ${sql(sourceUpdatedAt)}, ${sql(listing.checksum)}, ${sql(sourceUpdatedAt)}, ${sql(sourceUpdatedAt)});`
+    `INSERT INTO listings (id, slug, name, description, website, content, entity_type, priority, is_unofficial, is_featured, is_active, status, published_at, display_order, source_kind, source_identity, source_updated_at, checksum, created_at, updated_at) VALUES (${sql(listing.id)}, ${sql(listing.slug)}, ${sql(listing.name)}, ${sql(listing.description)}, ${sql(listing.website)}, ${sql(listing.content)}, NULL, NULL, 0, ${listing.featured ? 1 : 0}, 1, 'draft', ${sql(publishedAt)}, ${listing.displayOrder}, 'legacy-json-migration-v1', ${sql(listing.sourceIdentity)}, ${sql(sourceUpdatedAt)}, ${sql(listing.checksum)}, ${sql(sourceUpdatedAt)}, ${sql(sourceUpdatedAt)});`
   ]
   listing.categories.forEach((category, index) => {
     statements.push(
-      `INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary) SELECT ${sql(listing.id)}, id, ${index}, ${index === 0 ? 1 : 0} FROM categories WHERE site_id = ${sql(siteId)} AND slug = ${sql(category)};`
+      `INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary) SELECT ${sql(listing.id)}, id, ${index}, ${index === 0 ? 1 : 0} FROM categories WHERE slug = ${sql(category)};`
     )
   })
   listing.media.forEach((media, index) => {
@@ -307,12 +307,15 @@ function batchStatements(groups: string[][], maxBytes = 90_000): string[] {
 }
 
 export function generateInitialArtifact(options: GeneratorOptions): GeneratedArtifact {
-  const target = resolveSiteTarget(options.siteId)
-  const preflight = inspectLegacySite(options.sourceRoot, target.siteId, '1970-01-01T00:00:00.000Z')
+  const preflight = inspectLegacySite(
+    options.sourceRoot,
+    options.sourceSiteId,
+    '1970-01-01T00:00:00.000Z'
+  )
   if (!preflight.readyForMapping || !preflight.adapter || !preflight.sourceGit) {
     throw new Error(`Source preflight is not ready: ${preflight.issues.join(' ')}`)
   }
-  const sourceSiteDirectory = resolve(options.sourceRoot, 'sites', target.siteId)
+  const sourceSiteDirectory = resolve(options.sourceRoot, 'sites', options.sourceSiteId)
   const categories = categoriesSchema.parse(
     JSON.parse(readFileSync(resolve(sourceSiteDirectory, 'categories.json'), 'utf8'))
   )
@@ -330,7 +333,7 @@ export function generateInitialArtifact(options: GeneratorOptions): GeneratedArt
     products,
     preflight.adapter.defaultCategory,
     preflight.adapter.featuredCount,
-    target.siteId,
+    options.sourceSiteId,
     preflight.sourceGit.commit,
     preflight.checksums.products
   )
@@ -354,38 +357,28 @@ export function generateInitialArtifact(options: GeneratorOptions): GeneratedArt
         id: listing.id,
         slug: listing.slug
       })),
-      siteId: target.siteId,
+      domain: project.domain,
       version: 1
     })
   )
-  const artifactId = target.parityReportPath
-    .split('/')
-    .at(-1)
-    ?.replace(/-parity\.yaml$/u, '') as string
+  const artifactId = project.artifact.name
   const setup = [
     'PRAGMA foreign_keys = ON;',
-    `INSERT INTO sites (id, created_at, updated_at) VALUES (${sql(target.siteId)}, ${sql(sourceUpdatedAt)}, ${sql(sourceUpdatedAt)});`,
     ...categories.map(
       (category, index) =>
-        `INSERT INTO categories (site_id, slug, name, description, sort_order, is_active, created_at, updated_at) VALUES (${sql(target.siteId)}, ${sql(category.slug)}, ${sql(category.name.trim())}, ${sql(category.description?.trim() || '')}, ${index}, 1, ${sql(sourceUpdatedAt)}, ${sql(sourceUpdatedAt)});`
+        `INSERT INTO categories (slug, name, description, sort_order, is_active, created_at, updated_at) VALUES (${sql(category.slug)}, ${sql(category.name.trim())}, ${sql(category.description?.trim() || '')}, ${index}, 1, ${sql(sourceUpdatedAt)}, ${sql(sourceUpdatedAt)});`
     ),
-    `INSERT INTO migration_runs (id, site_id, schema_version, manifest_identity, input_checksum, target_checksum, affected_records, outcome, started_at, completed_at) VALUES (${sql(`migration-${artifactId}`)}, ${sql(target.siteId)}, 1, ${sql(artifactId)}, ${sql(preflight.checksums.products)}, ${sql(targetChecksum)}, ${listings.length}, 'started', ${sql(sourceUpdatedAt)}, NULL);`
+    `INSERT INTO migration_runs (id, schema_version, manifest_identity, input_checksum, target_checksum, affected_records, outcome, started_at, completed_at) VALUES (${sql(`migration-${artifactId}`)}, 1, ${sql(artifactId)}, ${sql(preflight.checksums.products)}, ${sql(targetChecksum)}, ${listings.length}, 'started', ${sql(sourceUpdatedAt)}, NULL);`
   ]
   const listingGroups = listings.map(listing =>
-    listingStatements(
-      listing,
-      target.siteId,
-      preflight.adapter?.publishedAt as string,
-      sourceUpdatedAt
-    )
+    listingStatements(listing, preflight.adapter?.publishedAt as string, sourceUpdatedAt)
   )
   const finish = [
     ...listings.map(
-      listing =>
-        `UPDATE listings SET status = 'approved' WHERE id = ${sql(listing.id)} AND site_id = ${sql(target.siteId)};`
+      listing => `UPDATE listings SET status = 'approved' WHERE id = ${sql(listing.id)};`
     ),
-    `INSERT INTO publication_state (site_id, version, manifest_id, checksum, published_at) VALUES (${sql(target.siteId)}, 1, ${sql(artifactId)}, ${sql(targetChecksum)}, ${sql(sourceUpdatedAt)});`,
-    `UPDATE migration_runs SET outcome = 'succeeded', completed_at = ${sql(sourceUpdatedAt)} WHERE id = ${sql(`migration-${artifactId}`)} AND site_id = ${sql(target.siteId)};`
+    `INSERT INTO publication_state (id, version, manifest_id, checksum, published_at) VALUES (1, 1, ${sql(artifactId)}, ${sql(targetChecksum)}, ${sql(sourceUpdatedAt)});`,
+    `UPDATE migration_runs SET outcome = 'succeeded', completed_at = ${sql(sourceUpdatedAt)} WHERE id = ${sql(`migration-${artifactId}`)};`
   ]
   const batches = [
     `${setup.join('\n')}\n`,
@@ -393,20 +386,20 @@ export function generateInitialArtifact(options: GeneratorOptions): GeneratedArt
     `${finish.join('\n')}\n`
   ]
   const allSql = `${batches.join('\n')}`
-  const artifactPath = target.parityReportPath.replace(/-parity\.yaml$/u, '.sql')
+  const artifactPath = project.artifact.parityReportPath.replace(/-parity\.yaml$/u, '.sql')
   writeGenerated(resolve(options.outputRoot, artifactPath), allSql)
   batches.forEach((batch, index) => {
     writeGenerated(
       resolve(
         options.outputRoot,
-        target.artifactBatchDirectory,
+        project.artifact.batchDirectory,
         `${String(index + 1).padStart(4, '0')}.sql`
       ),
       batch
     )
   })
 
-  const sourcePublic = resolve(options.sourceRoot, 'apps', target.siteId, 'public')
+  const sourcePublic = resolve(options.sourceRoot, 'apps', options.sourceSiteId, 'public')
   const publicFiles = listFiles(sourcePublic)
   const referencedLocalAssets = [
     ...new Set(
@@ -433,7 +426,7 @@ export function generateInitialArtifact(options: GeneratorOptions): GeneratedArt
     sourceCommit: preflight.sourceGit.commit,
     sourceRemote: preflight.sourceGit.remote
   }
-  const evidenceRoot = resolve(options.outputRoot, 'tmp/migrations', target.siteId)
+  const evidenceRoot = resolve(options.outputRoot, 'tmp/migrations', project.artifact.name)
   writeGenerated(
     resolve(evidenceRoot, 'normalization-report.json'),
     `${JSON.stringify(
@@ -460,7 +453,7 @@ export function generateInitialArtifact(options: GeneratorOptions): GeneratedArt
     mapping: {
       adapter: preflight.adapter,
       excludedRecords: 0,
-      stableIdAlgorithm: 'sha256(site_id + NUL + legacy-product-map + NUL + source map key)[0:24]',
+      stableIdAlgorithm: 'sha256(legacy-product-map + NUL + source map key)[0:24]',
       version: 1
     },
     parity: {
@@ -493,18 +486,18 @@ export function generateInitialArtifact(options: GeneratorOptions): GeneratedArt
       checksums: preflight.checksums,
       commit: preflight.sourceGit.commit,
       remote: preflight.sourceGit.remote,
-      siteId: target.siteId
+      siteId: options.sourceSiteId
     },
     target: {
       categoryCount: categories.length,
       checksum: targetChecksum,
       listingCount: listings.length,
-      publicationVersion: 1,
-      siteId: target.siteId
+      domain: project.domain,
+      publicationVersion: 1
     }
   }
   writeGenerated(
-    resolve(options.outputRoot, target.parityReportPath),
+    resolve(options.outputRoot, project.artifact.parityReportPath),
     stringify(parity, { lineWidth: 0 })
   )
 

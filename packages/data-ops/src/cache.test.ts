@@ -16,11 +16,9 @@ describe('catalog data cache adapters', () => {
     } as unknown as Cache
     const adapter = createCacheApiDataCache(cache)
 
-    await adapter.put('catalog-published:v2:serp.software:4', { items: [] }, 3600)
+    await adapter.put('catalog-published:v2:4', { items: [] }, 3600)
 
-    expect(writtenRequest?.url).toBe(
-      'https://catalog-data-ops.invalid/catalog-published%3Av2%3Aserp.software%3A4'
-    )
+    expect(writtenRequest?.url).toBe('https://catalog-data-ops.invalid/catalog-published%3Av2%3A4')
     expect(writtenResponse?.headers.get('Cache-Control')).toBe('max-age=3600')
     expect(await writtenResponse?.json()).toEqual({ items: [] })
   })

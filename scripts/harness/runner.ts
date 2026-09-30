@@ -69,9 +69,9 @@ const fullOnlySteps: HarnessStep[] = [
   {
     name: 'Cloudflare configuration',
     command: 'pnpm',
-    args: ['worker:config:validate'],
+    args: ['tsx', 'scripts/d1-local-config.ts'],
     remediation:
-      'Restore environment isolation in the Wrangler configurations. See docs/DEPLOY_RUNBOOK.md.'
+      'Restore the isolated local Worker and D1 identity in apps/web/wrangler.jsonc. See docs/DEPLOY_RUNBOOK.md.'
   },
   {
     name: 'OpenNext Worker build',

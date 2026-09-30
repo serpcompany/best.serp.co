@@ -2,10 +2,10 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { assertCutoverUnlockedPlan } from '@serpdirectory/data-ops/cutover-lock'
 import { parse } from 'yaml'
 import { z } from 'zod'
-import { resolveSiteTarget, type SiteId, siteIds } from './site-targets'
+import { validateCanonicalLocalConfig } from './d1-local-config'
+import { catalogSitemapRoutes, categoryRoute, listingIndexRoute, listingRoute } from './site-routes'
 
 const slug = z.string().regex(/^[a-z0-9.-]+$/)
 const categorySlug = z.string().regex(/^[a-z0-9-]+$/)
@@ -109,7 +109,6 @@ export const manifestSchema = z
   .object({
     version: z.literal(1),
     id: z.string().regex(/^[a-z0-9][a-z0-9._-]+$/),
-    siteId: z.enum(siteIds),
     basePublicationVersion: z.number().int().nonnegative(),
     provenance,
     operations: z.array(operation).min(1)
@@ -126,7 +125,11 @@ export const manifestSchema = z
           message: 'Old and new slugs must differ.',
           path: ['operations', index, 'to']
         })
-      if (op.action.startsWith('category-')) {
+      if (
+        op.action === 'category-create' ||
+        op.action === 'category-update' ||
+        op.action === 'category-unpublish'
+      ) {
         const target = op.action === 'category-unpublish' ? op.slug : op.category.slug
         if (categoryTargets.has(target))
           context.addIssue({
@@ -184,18 +187,12 @@ export interface PublicationDatabase {
 
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex')
 const statement = (query: string, ...bindings: unknown[]): PlannedStatement => ({ query, bindings })
-function cutoverGuardStatement(siteId: SiteId): PlannedStatement {
-  const guard = assertCutoverUnlockedPlan(siteId)
-  return statement(guard.sql, ...guard.params)
-}
-function membershipGuard(id: string, expected: string[], siteId: SiteId): PlannedStatement {
+function membershipGuard(id: string, expected: string[]): PlannedStatement {
   return statement(
-    `INSERT INTO publication_guard SELECT CASE WHEN (SELECT COUNT(*) FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? AND c.site_id=? AND c.is_active=1)=? AND NOT EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? AND c.site_id=? AND c.is_active=1 AND c.slug NOT IN (${expected.map(() => '?').join(', ')})) THEN 1 ELSE 0 END`,
+    `INSERT INTO publication_guard SELECT CASE WHEN (SELECT COUNT(*) FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? AND c.is_active=1)=? AND NOT EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? AND c.is_active=1 AND c.slug NOT IN (${expected.map(() => '?').join(', ')})) THEN 1 ELSE 0 END`,
     id,
-    siteId,
     expected.length,
     id,
-    siteId,
     ...expected
   )
 }
@@ -203,16 +200,14 @@ function listingStatements(
   value: Listing,
   mode: 'create' | 'update',
   manifestId: string,
-  now: string,
-  siteId: SiteId
+  now: string
 ): PlannedStatement[] {
   const out: PlannedStatement[] = []
   if (mode === 'create')
     out.push(
       statement(
-        "INSERT INTO listings (id,site_id,slug,name,description,website,content,entity_type,priority,is_unofficial,is_featured,is_active,status,published_at,display_order,source_kind,source_identity,source_updated_at,checksum,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,'draft',?,(SELECT COALESCE(MAX(display_order),-1)+1 FROM listings WHERE site_id=?),'yaml-manifest-v1',?,?,?,?,?)",
+        "INSERT INTO listings (id,slug,name,description,website,content,entity_type,priority,is_unofficial,is_featured,is_active,status,published_at,display_order,source_kind,source_identity,source_updated_at,checksum,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,1,'draft',?,(SELECT COALESCE(MAX(display_order),-1)+1 FROM listings),'yaml-manifest-v1',?,?,?,?,?)",
         value.id,
-        siteId,
         value.slug,
         value.name,
         value.description,
@@ -223,7 +218,6 @@ function listingStatements(
         value.isUnofficial,
         value.featured,
         value.publishedAt,
-        siteId,
         manifestId,
         now,
         hash(JSON.stringify(value)),
@@ -234,8 +228,7 @@ function listingStatements(
   else
     out.push(
       statement(
-        "UPDATE listings SET status='draft' WHERE site_id=? AND id=? AND slug=? AND status='approved' AND is_active=1",
-        siteId,
+        "UPDATE listings SET status='draft' WHERE id=? AND slug=? AND status='approved' AND is_active=1",
         value.id,
         value.slug
       ),
@@ -265,11 +258,10 @@ function listingStatements(
   value.categories.forEach((cat, order) =>
     out.push(
       statement(
-        'INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) SELECT ?,id,?,? FROM categories WHERE site_id=? AND slug=? AND is_active=1',
+        'INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) SELECT ?,id,?,? FROM categories WHERE slug=? AND is_active=1',
         value.id,
         order,
         order === 0,
-        siteId,
         cat
       )
     )
@@ -339,26 +331,22 @@ export function buildPublicationPlan(
   source: string,
   now: string
 ): PublicationPlan {
-  const siteId = manifest.siteId
   const inputChecksum = hash(source)
   const afterChecksum = hash(`${manifest.provenance.beforeChecksum}\0${inputChecksum}`)
   const routes = new Set<string>()
   const addCategories = (values: string[]) =>
-    values.forEach(value => routes.add(`/categories/${value}/`))
+    values.forEach(value => routes.add(categoryRoute(value)))
   const statements: PlannedStatement[] = [
-    cutoverGuardStatement(siteId),
     statement('PRAGMA foreign_keys = ON'),
     statement('CREATE TEMP TABLE publication_guard (valid INTEGER NOT NULL CHECK (valid=1))'),
     statement(
-      'INSERT INTO publication_guard SELECT CASE WHEN version=? AND checksum=? THEN 1 ELSE 0 END FROM publication_state WHERE site_id=?',
+      'INSERT INTO publication_guard SELECT CASE WHEN COUNT(*)=1 AND MAX(version)=? AND MAX(checksum)=? THEN 1 ELSE 0 END FROM publication_state WHERE id=1',
       manifest.basePublicationVersion,
-      manifest.provenance.beforeChecksum,
-      siteId
+      manifest.provenance.beforeChecksum
     ),
     statement(
-      "INSERT INTO publication_runs (id,site_id,manifest_id,base_version,input_checksum,outcome,started_at,actor,workflow,before_checksum,after_checksum) VALUES (?,?,?,?,?,'started',?,?,?,?,?) ON CONFLICT(site_id,manifest_id) DO UPDATE SET base_version=excluded.base_version,input_checksum=excluded.input_checksum,outcome='started',error=NULL,started_at=excluded.started_at,completed_at=NULL,actor=excluded.actor,workflow=excluded.workflow,before_checksum=excluded.before_checksum,after_checksum=excluded.after_checksum WHERE publication_runs.outcome='failed'",
+      "INSERT INTO publication_runs (id,manifest_id,base_version,input_checksum,outcome,started_at,actor,workflow,before_checksum,after_checksum) VALUES (?,?,?,?,'started',?,?,?,?,?) ON CONFLICT(manifest_id) DO UPDATE SET base_version=excluded.base_version,input_checksum=excluded.input_checksum,outcome='started',error=NULL,started_at=excluded.started_at,completed_at=NULL,actor=excluded.actor,workflow=excluded.workflow,before_checksum=excluded.before_checksum,after_checksum=excluded.after_checksum WHERE publication_runs.outcome='failed'",
       `publish_${hash(manifest.id).slice(0, 24)}`,
-      siteId,
       manifest.id,
       manifest.basePublicationVersion,
       inputChecksum,
@@ -373,8 +361,7 @@ export function buildPublicationPlan(
     if (op.action === 'category-create') {
       statements.push(
         statement(
-          'INSERT INTO categories (site_id,slug,name,description,sort_order,is_active) VALUES (?,?,?,?,?,1)',
-          siteId,
+          'INSERT INTO categories (slug,name,description,sort_order,is_active) VALUES (?,?,?,?,1)',
           op.category.slug,
           op.category.name,
           op.category.description,
@@ -386,12 +373,11 @@ export function buildPublicationPlan(
     if (op.action === 'category-update') {
       statements.push(
         statement(
-          'UPDATE categories SET name=?,description=?,sort_order=?,is_active=1,updated_at=? WHERE site_id=? AND slug=?',
+          'UPDATE categories SET name=?,description=?,sort_order=?,is_active=1,updated_at=? WHERE slug=?',
           op.category.name,
           op.category.description,
           op.category.order,
           now,
-          siteId,
           op.category.slug
         ),
         statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)')
@@ -401,9 +387,8 @@ export function buildPublicationPlan(
     if (op.action === 'category-unpublish') {
       statements.push(
         statement(
-          "UPDATE categories SET is_active=0,updated_at=? WHERE site_id=? AND slug=? AND NOT EXISTS (SELECT 1 FROM listing_categories lc JOIN listings l ON l.id=lc.listing_id WHERE lc.category_id=categories.id AND l.status='approved' AND l.is_active=1)",
+          "UPDATE categories SET is_active=0,updated_at=? WHERE slug=? AND NOT EXISTS (SELECT 1 FROM listing_categories lc JOIN listings l ON l.id=lc.listing_id WHERE lc.category_id=categories.id AND l.status='approved' AND l.is_active=1)",
           now,
-          siteId,
           op.slug
         ),
         statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)')
@@ -412,7 +397,7 @@ export function buildPublicationPlan(
     }
     if (op.action === 'listing-create' || op.action === 'listing-update') {
       if (op.action === 'listing-update') {
-        statements.push(membershipGuard(op.listing.id, op.previousCategories, siteId))
+        statements.push(membershipGuard(op.listing.id, op.previousCategories))
         addCategories(op.previousCategories)
       }
       statements.push(
@@ -420,45 +405,40 @@ export function buildPublicationPlan(
           op.listing,
           op.action === 'listing-create' ? 'create' : 'update',
           manifest.id,
-          now,
-          siteId
+          now
         )
       )
-      routes.add(`/products/${op.listing.slug}/`)
+      routes.add(listingRoute(op.listing.slug))
       addCategories(op.listing.categories)
     }
     if (op.action === 'listing-unpublish') {
       statements.push(
-        membershipGuard(op.id, op.categories, siteId),
+        membershipGuard(op.id, op.categories),
         statement(
-          "UPDATE listings SET is_active=0,updated_at=? WHERE site_id=? AND id=? AND slug=? AND status='approved' AND is_active=1",
+          "UPDATE listings SET is_active=0,updated_at=? WHERE id=? AND slug=? AND status='approved' AND is_active=1",
           now,
-          siteId,
           op.id,
           op.slug
         ),
         statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)')
       )
-      routes.add(`/products/${op.slug}/`)
+      routes.add(listingRoute(op.slug))
       addCategories(op.categories)
     }
     if (op.action === 'listing-slug-change') {
       statements.push(
-        membershipGuard(op.id, op.categories, siteId),
+        membershipGuard(op.id, op.categories),
         statement(
-          "UPDATE listings SET slug=?,updated_at=? WHERE site_id=? AND id=? AND slug=? AND status='approved' AND is_active=1 AND NOT EXISTS (SELECT 1 FROM listings conflict WHERE conflict.site_id=? AND conflict.slug=?)",
+          "UPDATE listings SET slug=?,updated_at=? WHERE id=? AND slug=? AND status='approved' AND is_active=1 AND NOT EXISTS (SELECT 1 FROM listings conflict WHERE conflict.slug=?)",
           op.to,
           now,
-          siteId,
           op.id,
           op.from,
-          siteId,
           op.to
         ),
         statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
         statement(
-          'INSERT INTO listing_slug_redirects (site_id,listing_id,old_slug,new_slug,manifest_id,reason,created_at) VALUES (?,?,?,?,?,?,?)',
-          siteId,
+          'INSERT INTO listing_slug_redirects (listing_id,old_slug,new_slug,manifest_id,reason,created_at) VALUES (?,?,?,?,?,?)',
           op.id,
           op.from,
           op.to,
@@ -467,42 +447,40 @@ export function buildPublicationPlan(
           now
         )
       )
-      routes.add(`/products/${op.from}/`)
-      routes.add(`/products/${op.to}/`)
+      routes.add(listingRoute(op.from))
+      routes.add(listingRoute(op.to))
       addCategories(op.categories)
     }
   }
   const affectedRoutes = [
-    ...routes,
-    '/',
-    '/products/',
-    '/search/',
-    '/sitemap-index.xml',
-    '/listings-sitemap.xml',
-    '/taxonomies-sitemap.xml',
-    '/rss.xml'
+    ...new Set([
+      ...routes,
+      '/',
+      listingIndexRoute(),
+      '/search/',
+      ...catalogSitemapRoutes(),
+      '/rss.xml'
+    ])
   ]
     .sort()
     .join('\n')
   statements.push(
     statement(
-      'UPDATE publication_state SET version=?,manifest_id=?,checksum=?,published_at=? WHERE site_id=? AND version=? AND checksum=?',
+      'UPDATE publication_state SET version=?,manifest_id=?,checksum=?,published_at=? WHERE id=1 AND version=? AND checksum=?',
       manifest.basePublicationVersion + 1,
       manifest.id,
       afterChecksum,
       now,
-      siteId,
       manifest.basePublicationVersion,
       manifest.provenance.beforeChecksum
     ),
     statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
     statement(
-      "UPDATE publication_runs SET published_version=?,affected_records=?,affected_routes=?,outcome='succeeded',completed_at=? WHERE site_id=? AND manifest_id=? AND before_checksum=? AND after_checksum=?",
+      "UPDATE publication_runs SET published_version=?,affected_records=?,affected_routes=?,outcome='succeeded',completed_at=? WHERE manifest_id=? AND before_checksum=? AND after_checksum=?",
       manifest.basePublicationVersion + 1,
       manifest.operations.length,
       affectedRoutes,
       now,
-      siteId,
       manifest.id,
       manifest.provenance.beforeChecksum,
       afterChecksum
@@ -521,21 +499,7 @@ export async function executePublicationPlan(
 export function publishManifest(manifestPath: string): void {
   const source = readFileSync(resolve(manifestPath), 'utf8')
   const manifest = parseManifest(source)
-  const target = resolveSiteTarget(manifest.siteId)
-  const config = JSON.parse(readFileSync(resolve(target.local.configPath), 'utf8')) as {
-    name?: string
-    vars?: { D1_RUNTIME_ENV?: string; SITE_ID?: string }
-    d1_databases?: Array<{ binding?: string; database_id?: string; database_name?: string }>
-  }
-  const binding = config.d1_databases?.find(item => item.binding === 'DB')
-  if (
-    config.name !== target.local.workerName ||
-    config.vars?.D1_RUNTIME_ENV !== 'local' ||
-    config.vars.SITE_ID !== target.siteId ||
-    binding?.database_name !== target.local.databaseName ||
-    binding.database_id !== target.local.databaseId
-  )
-    throw new Error('Refusing to publish outside the dedicated local D1 binding.')
+  validateCanonicalLocalConfig()
   buildPublicationPlan(manifest, source, new Date().toISOString())
   throw new Error(
     'CLI publication is disabled: an atomic D1Database.batch binding is required. The manifest was validated but no changes were made.'

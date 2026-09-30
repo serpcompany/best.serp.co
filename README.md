@@ -1,56 +1,42 @@
-# Directory Platform on Cloudflare D1
+# best.serp.co
 
-This repository contains the production `serp.software` and
-`pornvideodownloaders.com` applications. Each is a distinct Next.js OpenNext Worker
-whose directory catalog is stored in its own Cloudflare D1 database.
+Source for [best.serp.co](https://best.serp.co), SERP's software and AI tools
+directory. It is a Next.js app deployed as a Cloudflare Worker (OpenNext) with its
+catalog in Cloudflare D1.
 
-There is one catalog authority:
+- Runtime listings, categories, search, RSS, and sitemaps read from the `DB` binding.
+- The schema lives in `packages/data-ops/src/schema.ts`; migrations live in `d1/drizzle/`.
+- Reviewed catalog changes live in `d1/publications/`; public submissions are staged
+  in D1 and approved by a maintainer (see [Submission flow](./docs/SUBMISSION_FLOW.md)).
 
-- runtime listings, categories, search, RSS, and sitemaps read from the `DB` binding;
-- the shared schema lives in `packages/data-ops/src/schema.ts` and fresh replacement
-  database migrations live in `d1/drizzle/`; released `d1/migrations/0001`-`0009`
-  remain immutable legacy history;
-- reviewed catalog mutations live in `d1/publications/`;
-- the initial SQL bootstrap and its parity evidence live in `d1/artifacts/`.
+The catalog was imported once from the JSON `serp.co` site in
+`serpcompany/json-directory-template@25e2a8d` (serpcompany/best.serp.co#34). D1 is now
+the source of truth.
 
-Catalog JSON files, static search indexes, JSON import adapters, starter wrappers, and
-static-directory deployment code are intentionally absent. `pnpm test:repo` enforces
-that boundary.
+## Local development
 
-## Local preview
-
-Use Node 24 and pnpm:
+Use Node 24 and pnpm. The import artifacts are generated from a local checkout of
+`serpcompany/json-directory-template` at the pinned commit:
 
 ```bash
 pnpm install
+pnpm migration:generate -- --source-root ../json-directory --site-id serp.co
 pnpm d1:local:migrate
 pnpm d1:local:import
 pnpm d1:local:verify
 pnpm dev
 ```
 
-These aliases select `serp.software`. Use the
-`d1:pornvideodownloaders:local:*`, `preview:pornvideodownloaders`, and
-`agent:pornvideodownloaders:*` commands for the second site.
-
-The guarded preview builds the OpenNext Worker and runs it with a local D1 database.
-It cannot target preview or production Cloudflare resources.
+`pnpm dev` builds the Worker and serves it on http://localhost:8787 against the local
+D1 database. It cannot reach staging or production resources.
 
 ## Verification
 
 ```bash
-pnpm worker:config:validate
-pnpm test:d1
-pnpm test:repo
-pnpm typecheck
-pnpm worker:build
+pnpm harness:fast
+pnpm test:e2e
+pnpm migration:compare -- http://localhost:8787
 ```
 
-Production releases run only from protected GitHub Actions workflows on `main`.
-
-For agent-first development, use `pnpm harness:fast` during implementation and
-`pnpm harness:check` before handoff. `pnpm agent:manifest` exposes the current local
-runtime and binding identity.
-
-See the [documentation index](./docs/README.md), [Harness](./docs/HARNESS.md), and
-[Migration SOP](./docs/MIGRATION_SOP.md).
+Production releases run only from protected GitHub Actions workflows on `main`; see
+the [deploy runbook](./docs/DEPLOY_RUNBOOK.md) and the [docs index](./docs/README.md).

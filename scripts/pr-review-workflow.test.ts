@@ -72,8 +72,9 @@ describe('pr-review workflow', () => {
     expect(checkoutStep?.with?.['fetch-depth']).toBe(0)
     expect(stepRuns).toContain('pnpm worker:config:validate')
     expect(stepRuns).toContain('pnpm test:repo')
+    expect(stepRuns).toContain('pnpm test:d1')
     expect(stepRuns).toContain('pnpm lint:forbidden-links')
-    const biomeStep = stepRuns.find(run => run.includes('pnpm exec biome check'))
+    const biomeStep = stepRuns?.find(run => run?.includes('pnpm exec biome check'))
     expect(biomeStep).toContain('git diff --name-only --diff-filter=ACMR -z origin/main...HEAD')
     expect(biomeStep).toContain(
       `pnpm exec biome check --no-errors-on-unmatched "\${changed_files[@]}"`
@@ -131,23 +132,21 @@ describe('pr-review workflow', () => {
     const filters = loadE2eRelevantFilters()
 
     expect(filters).toEqual([
-      'apps/serp.software/**',
-      'apps/pornvideodownloaders.com/**',
+      'apps/web/**',
       'apps/e2e/**',
       'd1/**',
       'packages/data-ops/**',
       'packages/web-core/**',
       'packages/design-system/**',
-      'sites/**'
+      'packages/site-config/**'
     ])
     expect(isE2eRelevant('apps/e2e/tests/home.spec.ts')).toBe(true)
-    expect(isE2eRelevant('apps/serp.software/app/page.tsx')).toBe(true)
-    expect(isE2eRelevant('apps/pornvideodownloaders.com/app/page.tsx')).toBe(true)
+    expect(isE2eRelevant('apps/web/app/page.tsx')).toBe(true)
     expect(isE2eRelevant('d1/publications/release.yaml')).toBe(true)
     expect(isE2eRelevant('packages/data-ops/src/catalog.ts')).toBe(true)
     expect(isE2eRelevant('packages/web-core/src/root-shell.tsx')).toBe(true)
     expect(isE2eRelevant('packages/design-system/components/button.tsx')).toBe(true)
-    expect(isE2eRelevant('sites/serp.software/site-config.ts')).toBe(true)
+    expect(isE2eRelevant('packages/site-config/src/site.ts')).toBe(true)
     expect(isE2eRelevant('docs/BUILD_PIPELINE.md')).toBe(false)
     expect(isE2eRelevant('.github/workflows/pr-review.yml')).toBe(false)
   })

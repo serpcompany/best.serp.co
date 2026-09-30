@@ -2,17 +2,13 @@ import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  CutoverFrozenError,
-  hasActiveCutoverLock,
-  selectActiveCutoverLockPlan
-} from '@serpdirectory/data-ops/cutover-lock'
-import {
   buildApproveSubmissionPlans,
   buildRejectSubmissionPlans,
   type SubmissionStatementPlan,
   selectSubmissionForDecisionPlan
 } from '@serpdirectory/data-ops/submission-plans'
-import { resolveSiteTarget, type SiteTarget } from './site-targets'
+import { project } from './project'
+import { listingRoute } from './site-routes'
 
 interface D1Result {
   results?: Array<Record<string, unknown>>
@@ -31,7 +27,7 @@ function required(env: NodeJS.ProcessEnv, name: string): string {
   return value
 }
 
-export function validateApprovalContext(env: NodeJS.ProcessEnv): SiteTarget {
+export function validateApprovalContext(env: NodeJS.ProcessEnv): void {
   if (env.CI !== 'true' || env.GITHUB_ACTIONS !== 'true') {
     throw new Error('Remote submission approval requires GitHub Actions.')
   }
@@ -41,11 +37,11 @@ export function validateApprovalContext(env: NodeJS.ProcessEnv): SiteTarget {
   if (env.GITHUB_REF !== 'refs/heads/main' || !env.GITHUB_SHA) {
     throw new Error('Remote submission approval requires reviewed main.')
   }
-  const target = resolveSiteTarget(env.DEPLOY_SITE_ID)
-  if (env.D1_SUBMISSION_APPROVAL_CONFIRM !== target.confirmation.submission) {
-    throw new Error('Explicit production submission approval confirmation is required.')
+  if (env.D1_SUBMISSION_APPROVAL_CONFIRM !== project.confirmation.submission) {
+    throw new Error(
+      `Explicit production submission approval confirmation ${project.confirmation.submission} is required.`
+    )
   }
-  return target
 }
 
 async function query(
@@ -54,7 +50,7 @@ async function query(
   fetcher: typeof fetch
 ): Promise<D1Result[]> {
   const response = await fetcher(
-    `https://api.cloudflare.com/client/v4/accounts/${required(env, 'CLOUDFLARE_ACCOUNT_ID')}/d1/database/${required(env, 'CLOUDFLARE_D1_PRODUCTION_DATABASE_ID')}/query`,
+    `https://api.cloudflare.com/client/v4/accounts/${required(env, 'CLOUDFLARE_ACCOUNT_ID')}/d1/database/${required(env, 'CLOUDFLARE_D1_DATABASE_ID')}/query`,
     {
       method: 'POST',
       headers: {
@@ -90,19 +86,11 @@ export async function approveRemoteSubmission(
   env: NodeJS.ProcessEnv = process.env,
   fetcher: typeof fetch = fetch
 ): Promise<{ idempotent: boolean; listingId: string | null }> {
-  const target = validateApprovalContext(env)
-  const siteId = target.siteId
+  validateApprovalContext(env)
   if (!/^[0-9a-f-]{36}$/i.test(submissionId)) throw new Error('Submission ID must be a UUID.')
   if (!reviewer.trim()) throw new Error('Reviewer identity is required.')
 
-  const lock = await query([selectActiveCutoverLockPlan(siteId)], env, fetcher)
-  if (hasActiveCutoverLock(lock[0]?.results ?? [])) throw new CutoverFrozenError()
-
-  const selected = await query(
-    [selectSubmissionForDecisionPlan(submissionId, siteId)],
-    env,
-    fetcher
-  )
+  const selected = await query([selectSubmissionForDecisionPlan(submissionId)], env, fetcher)
   const row = selected[0]?.results?.[0]
   if (!row) throw new Error('Submission does not exist.')
   if (decision === 'reject') {
@@ -111,7 +99,7 @@ export async function approveRemoteSubmission(
       throw new Error('Only a pending or verified submission can be rejected.')
     }
     const now = new Date().toISOString()
-    await query(buildRejectSubmissionPlans({ now, reviewer, siteId, submissionId }), env, fetcher)
+    await query(buildRejectSubmissionPlans({ now, reviewer, submissionId }), env, fetcher)
     return { idempotent: false, listingId: null }
   }
   const listingId =
@@ -121,7 +109,11 @@ export async function approveRemoteSubmission(
   }
   if (row.status !== 'verified')
     throw new Error('Only a badge-verified submission can be approved.')
-  if (typeof row.version !== 'number' || typeof row.checksum !== 'string') {
+  if (
+    typeof row.version !== 'number' ||
+    typeof row.checksum !== 'string' ||
+    typeof row.slug !== 'string'
+  ) {
     throw new Error('Invalid publication state.')
   }
   const manifestId = `verified-submission-${submissionId}`
@@ -134,14 +126,13 @@ export async function approveRemoteSubmission(
   await query(
     buildApproveSubmissionPlans({
       afterChecksum,
+      affectedRoute: listingRoute(row.slug),
       beforeChecksum: row.checksum,
       listingId,
       manifestId,
       now,
       reviewer,
       runId,
-      siteId,
-      slug: row.slug as string,
       submissionId,
       version: row.version
     }),

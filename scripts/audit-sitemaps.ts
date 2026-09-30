@@ -1,9 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveCheckedInSiteConfig } from '@serpdirectory/site-contract'
-import { activeCheckedInSiteIds } from '@serpdirectory/site-contract/active-site-ids'
-import type { CheckedInSiteConfig } from '@serpdirectory/site-contract/types'
+import { type SiteDefinition, site } from '@serpdirectory/site-config'
+import { project } from './project'
 
 type AuditScope = 'artifact' | 'live'
 type AuditSeverity = 'error' | 'warning'
@@ -49,11 +48,12 @@ type CliOptions = {
   json: boolean
   reportPath?: string
   scope: 'artifact' | 'live' | 'both'
-  siteIds: string[]
   timeoutMs: number
 }
 
 const DEFAULT_TIMEOUT_MS = 10_000
+/** OpenNext build output of the web app, audited by the artifact scope. */
+export const defaultArtifactDirectory = resolve(project.appDirectory, '.open-next')
 const SITEMAP_INDEX_PATH = '/sitemap-index.xml'
 const SITEMAP_COMPATIBILITY_PATH = '/sitemap.xml'
 const LEGACY_GROUP_SITEMAP_PATHS = [
@@ -131,7 +131,7 @@ function toAbsoluteUrl(baseUrl: string, path: string): string {
   return `${normalizeBaseUrl(baseUrl)}${path}`
 }
 
-function getSitemapIndexUrl(siteConfig: CheckedInSiteConfig): string {
+function getSitemapIndexUrl(siteConfig: SiteDefinition): string {
   return toAbsoluteUrl(siteConfig.site.publicUrl, SITEMAP_INDEX_PATH)
 }
 
@@ -222,7 +222,7 @@ function addIssue(
   })
 }
 
-function configuredExcludedPaths(siteConfig: CheckedInSiteConfig): Set<string> {
+function configuredExcludedPaths(siteConfig: SiteDefinition): Set<string> {
   return new Set(
     [
       ...(siteConfig.sitemap.excludedPaths ?? []),
@@ -278,7 +278,7 @@ function normalizeCanonicalUrl(value: string, baseUrl: string): string | null {
 
 function validatePageMetadata(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   sitemapUrl: string,
   url: string,
   html: string
@@ -314,7 +314,7 @@ function validatePageMetadata(
 
 function validateArtifactPageMetadata(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   sitemapUrl: string,
   url: string,
   routeIndexPath: string
@@ -324,7 +324,7 @@ function validateArtifactPageMetadata(
 
 function validateArtifactPageUrl(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   sitemapUrl: string,
   url: string,
   seenPageUrls: Set<string>
@@ -412,7 +412,7 @@ function validateSitemapLastmods(
 
 function auditArtifactSitemapFile(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   sitemapUrl: string,
   seenSitemaps: Set<string>,
   seenPageUrls: Set<string>,
@@ -482,7 +482,7 @@ function auditArtifactSitemapFile(
   }
 }
 
-function validateArtifactRobots(audit: SitemapSiteAudit, siteConfig: CheckedInSiteConfig): void {
+function validateArtifactRobots(audit: SitemapSiteAudit, siteConfig: SiteDefinition): void {
   const robotsPath = resolve(audit.artifactDir ?? '', 'robots.txt')
 
   if (!existsSync(robotsPath)) {
@@ -514,7 +514,7 @@ function validateArtifactRobots(audit: SitemapSiteAudit, siteConfig: CheckedInSi
 
 function validateArtifactCompatibilitySitemap(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig
+  siteConfig: SiteDefinition
 ): void {
   const compatibilityUrl = toAbsoluteUrl(siteConfig.site.publicUrl, '/sitemap.xml')
   const compatibilityPath = resolve(audit.artifactDir ?? '', 'sitemap.xml')
@@ -557,7 +557,7 @@ function validateArtifactCompatibilitySitemap(
 
 function validateArtifactUnreferencedSitemapFiles(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   referencedSitemapUrls: Set<string>
 ): void {
   const allowedSitemapUrls = new Set([
@@ -575,8 +575,11 @@ function validateArtifactUnreferencedSitemapFiles(
   }
 }
 
-export function auditArtifactSitemaps(siteConfig: CheckedInSiteConfig): SitemapSiteAudit {
-  const artifactDir = resolve(process.cwd(), siteConfig.build.artifactDir)
+export function auditArtifactSitemaps(
+  siteConfig: SiteDefinition,
+  artifactDirectory: string = defaultArtifactDirectory
+): SitemapSiteAudit {
+  const artifactDir = resolve(process.cwd(), artifactDirectory)
   const audit: SitemapSiteAudit = {
     artifactDir,
     childSitemaps: [],
@@ -643,7 +646,7 @@ async function fetchStatus(url: string, timeoutMs: number): Promise<number | str
 
 async function auditLivePageUrl(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   sitemapUrl: string,
   url: string,
   timeoutMs: number,
@@ -715,7 +718,7 @@ async function auditLivePageUrl(
 
 async function auditLiveSitemapFile(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   sitemapUrl: string,
   timeoutMs: number,
   seenSitemaps: Set<string>,
@@ -811,7 +814,7 @@ async function auditLiveSitemapFile(
 
 async function validateLiveRobots(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   timeoutMs: number
 ): Promise<void> {
   const robotsUrl = toAbsoluteUrl(siteConfig.site.publicUrl, '/robots.txt')
@@ -856,7 +859,7 @@ async function validateLiveRobots(
 
 async function validateLiveCompatibilitySitemap(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   timeoutMs: number
 ): Promise<void> {
   const compatibilityUrl = toAbsoluteUrl(siteConfig.site.publicUrl, '/sitemap.xml')
@@ -899,7 +902,7 @@ async function validateLiveCompatibilitySitemap(
 
 async function validateLiveKnownUnreferencedSitemapFiles(
   audit: SitemapSiteAudit,
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   timeoutMs: number,
   referencedSitemapUrls: Set<string>
 ): Promise<void> {
@@ -924,7 +927,7 @@ async function validateLiveKnownUnreferencedSitemapFiles(
 }
 
 export async function auditLiveSitemaps(
-  siteConfig: CheckedInSiteConfig,
+  siteConfig: SiteDefinition,
   timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<SitemapSiteAudit> {
   const audit: SitemapSiteAudit = {
@@ -1055,7 +1058,6 @@ function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     json: false,
     scope: 'artifact',
-    siteIds: [],
     timeoutMs: DEFAULT_TIMEOUT_MS
   }
 
@@ -1086,12 +1088,6 @@ function parseArgs(argv: string[]): CliOptions {
       continue
     }
 
-    if (arg === '--site' && argv[index + 1]) {
-      options.siteIds.push(argv[index + 1])
-      index += 1
-      continue
-    }
-
     if (arg === '--report' && argv[index + 1]) {
       options.reportPath = argv[index + 1]
       index += 1
@@ -1115,19 +1111,14 @@ function parseArgs(argv: string[]): CliOptions {
 }
 
 async function runAudit(options: CliOptions): Promise<SitemapSiteAudit[]> {
-  const siteIds = options.siteIds.length > 0 ? options.siteIds : [...activeCheckedInSiteIds]
   const audits: SitemapSiteAudit[] = []
 
-  for (const siteId of siteIds) {
-    const siteConfig = resolveCheckedInSiteConfig(siteId)
+  if (options.scope === 'artifact' || options.scope === 'both') {
+    audits.push(auditArtifactSitemaps(site))
+  }
 
-    if (options.scope === 'artifact' || options.scope === 'both') {
-      audits.push(auditArtifactSitemaps(siteConfig))
-    }
-
-    if (options.scope === 'live' || options.scope === 'both') {
-      audits.push(await auditLiveSitemaps(siteConfig, options.timeoutMs))
-    }
+  if (options.scope === 'live' || options.scope === 'both') {
+    audits.push(await auditLiveSitemaps(site, options.timeoutMs))
   }
 
   return audits

@@ -17,9 +17,7 @@ function readGitHead(): string | null {
   }
 }
 
-export function resolveDeterministicBuildId(
-  siteId = process.env.NEXT_PUBLIC_SITE_ID || process.env.SITE_ID || 'default'
-): string {
+export function resolveDeterministicBuildId(siteId = 'best.serp.co'): string {
   const sourceRevision =
     process.env.NEXT_BUILD_ID ||
     process.env.GITHUB_SHA ||

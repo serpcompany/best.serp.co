@@ -2,36 +2,18 @@
   {
     "contentType": "image/svg+xml",
     "height": 50,
-    "key": "badge/featured-on-pornvideodownloaders.com-light.svg",
-    "siteId": "pornvideodownloaders.com",
-    "source": "apps/pornvideodownloaders.com/public/badge/featured-on-pornvideodownloaders.com-light.svg",
+    "key": "badge/featured-on-serp.co-light.svg",
+    "siteId": "best.serp.co",
+    "source": "apps/web/public/badge/featured-on-serp.co-light.svg",
     "variant": "light",
     "width": 200
   },
   {
     "contentType": "image/svg+xml",
     "height": 50,
-    "key": "badge/featured-on-pornvideodownloaders.com-dark.svg",
-    "siteId": "pornvideodownloaders.com",
-    "source": "apps/pornvideodownloaders.com/public/badge/featured-on-pornvideodownloaders.com-dark.svg",
-    "variant": "dark",
-    "width": 200
-  },
-  {
-    "contentType": "image/svg+xml",
-    "height": 50,
-    "key": "badge/featured-on-serp.software-light.svg",
-    "siteId": "serp.software",
-    "source": "apps/serp.software/public/badge/featured-on-serp.software-light.svg",
-    "variant": "light",
-    "width": 200
-  },
-  {
-    "contentType": "image/svg+xml",
-    "height": 50,
-    "key": "badge/featured-on-serp.software-dark.svg",
-    "siteId": "serp.software",
-    "source": "apps/serp.software/public/badge/featured-on-serp.software-dark.svg",
+    "key": "badge/featured-on-serp.co-dark.svg",
+    "siteId": "best.serp.co",
+    "source": "apps/web/public/badge/featured-on-serp.co-dark.svg",
     "variant": "dark",
     "width": 200
   }

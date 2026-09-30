@@ -11,8 +11,7 @@ function parseArgs(rawArgs) {
     remote: true,
     backupPrefix: '',
     confirmCloudWrite: false,
-    mapPath: 'scripts/r2-featured-badge-assets.json',
-    siteIds: []
+    mapPath: 'scripts/r2-featured-badge-assets.json'
   }
 
   while (args.length > 0) {
@@ -54,10 +53,6 @@ function parseArgs(rawArgs) {
       options.mapPath = String(args.shift() || '').trim()
       continue
     }
-    if (token === '--site') {
-      options.siteIds.push(String(args.shift() || '').trim())
-      continue
-    }
     if (token === '-h' || token === '--help') {
       printHelp()
       process.exit(0)
@@ -83,16 +78,15 @@ Options:
   --local                  Use local R2 storage instead of remote.
   --backup-prefix <path>   Backup key prefix in the bucket.
   --map <path>             JSON asset map (default: scripts/r2-featured-badge-assets.json)
-  --site <site-id>         Only sync one site ID. Can be passed more than once.
   -h, --help               Show this help.
 
 Map JSON format:
 [
   {
-    "siteId": "serp.software",
+    "siteId": "best.serp.co",
     "variant": "light",
-    "key": "badge/featured-on-serp.software-light.svg",
-    "source": "apps/serp.software/public/badge/featured-on-serp.software-light.svg",
+    "key": "badge/featured-on-serp.co-light.svg",
+    "source": "apps/web/public/badge/featured-on-serp.co-light.svg",
     "contentType": "image/svg+xml",
     "width": 200,
     "height": 50
@@ -315,15 +309,7 @@ if (options.apply && !options.confirmCloudWrite) {
 }
 
 const publicBaseUrl = normalizePublicBaseUrl(options.publicBaseUrl)
-const assets = loadAssetMap(options.mapPath).filter(asset => {
-  return options.siteIds.length === 0 || options.siteIds.includes(asset.siteId)
-})
-
-if (assets.length === 0) {
-  throw new Error(
-    `No R2 badge assets matched${options.siteIds.length ? ` site filter(s): ${options.siteIds.join(', ')}` : ''}.`
-  )
-}
+const assets = loadAssetMap(options.mapPath)
 const stamp = nowStamp()
 const backupPrefix = options.backupPrefix || `_backup/featured-badges/${stamp}`
 const localBackupRoot = path.resolve(process.cwd(), 'tmp', 'r2-featured-badge-backups', stamp)

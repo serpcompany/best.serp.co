@@ -37,7 +37,7 @@ describe('no-forbidden-listing-links', () => {
   it('reports help.serp.co/en links in D1 repository code', () => {
     const messages = lintText(
       'const supportUrl = "https://help.serp.co/en/"\n',
-      'apps/serp.software/lib/catalog/repository.ts'
+      'apps/web/lib/catalog/repository.ts'
     )
 
     expect(messages).toEqual([
@@ -56,7 +56,7 @@ describe('no-forbidden-listing-links', () => {
         '  return <a href="https://help.serp.co/en/">Help</a>',
         '}'
       ].join('\n'),
-      'apps/browserextensions.io/app/products/[slug]/page.tsx'
+      'apps/web/app/products/[slug]/page.tsx'
     )
 
     expect(messages).toHaveLength(1)
@@ -72,10 +72,19 @@ describe('no-forbidden-listing-links', () => {
     expect(messages).toHaveLength(1)
   })
 
+  it('reports help.serp.co/en links in checked-in site configuration and content', () => {
+    const messages = lintText(
+      'export const supportUrl = "https://help.serp.co/en/"\n',
+      'packages/site-config/src/site.ts'
+    )
+
+    expect(messages).toHaveLength(1)
+  })
+
   it('reports help.serp.co/en links in generated product html', () => {
     const messages = lintText(
       ['<html>', '<body><a href="https://help.serp.co/en/">Help</a></body>', '</html>'].join('\n'),
-      'dist/sites/browserextensions.io/products/example-downloader/index.html'
+      'apps/web/.open-next/assets/products/example-downloader/reviews/index.html'
     )
 
     expect(messages).toHaveLength(1)
@@ -85,11 +94,11 @@ describe('no-forbidden-listing-links', () => {
   it('reports help.serp.co/en links in generated xml and public text assets', () => {
     const generatedMessages = lintText(
       '<url><loc>https://help.serp.co/en/articles/example</loc></url>\n',
-      'dist/sites/browserextensions.io/sitemap.xml'
+      'apps/web/.open-next/assets/sitemap.xml'
     )
     const publicMessages = lintText(
       'Support: https://help.serp.co/en/\n',
-      'apps/browserextensions.io/public/support.txt'
+      'apps/web/public/support.txt'
     )
 
     expect(generatedMessages).toHaveLength(1)

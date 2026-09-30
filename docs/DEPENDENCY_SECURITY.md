@@ -47,11 +47,11 @@ in this order:
 
 1. **Framework and runtime:** Node/pnpm constraints, Next.js, React, OpenNext,
    Cloudflare/Wrangler, and tightly coupled runtime packages. Validate type checks,
-   unit tests, both Worker builds, both local D1-backed apps, Preview deployment, and
+   unit tests, the Worker build, the local D1-backed app, staging deployment, and
    representative route/search/submission smoke tests.
 2. **Authentication:** Auth.js/NextAuth, Clerk, adapters, and session/cookie
    dependencies. Validate signed-out behavior, protected preview capabilities,
-   cookie/session boundaries, and both Sites independently before Production.
+   and cookie/session boundaries on staging before production.
 3. **Product libraries:** UI, forms, validation, parsing, image, feed, and other
    runtime libraries. Validate targeted package tests, full harness, browser smoke,
    sitemap/RSS output, and submission behavior.

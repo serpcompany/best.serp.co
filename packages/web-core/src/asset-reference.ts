@@ -1,1 +1,1 @@
-export { isValidAssetReference } from '@serpdirectory/site-contract/asset-reference'
+export { isValidAssetReference } from '@serpdirectory/utils/asset-reference'

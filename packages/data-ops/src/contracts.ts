@@ -1,5 +1,4 @@
-import type { ActiveCheckedInSiteId } from '@serpdirectory/site-contract/active-site-ids'
-import type { SiteDatabase } from './client'
+import type { Database } from './client'
 
 export type CatalogOperation =
   | 'autocomplete'
@@ -42,7 +41,6 @@ export interface CatalogQueryEvent {
   resultRows: number
   rowsRead: number | null
   rowsWritten: number | null
-  siteId: ActiveCheckedInSiteId
   success: boolean
   wallDurationMs: number
 }
@@ -50,7 +48,6 @@ export interface CatalogQueryEvent {
 export interface CatalogCacheEvent {
   event: 'catalog_cache'
   operation: 'listing-detail' | 'published-summaries' | 'shell-stats'
-  siteId: ActiveCheckedInSiteId
   state: 'corrupt' | 'error' | 'hit' | 'miss' | 'write-error' | 'written'
 }
 
@@ -157,7 +154,7 @@ export interface CatalogOperations {
 
 export interface CatalogOperationsConfig {
   cache: CatalogDataCache
-  client: SiteDatabase
+  client: Database
   clock: () => Date
   observe: CatalogObserver
 }

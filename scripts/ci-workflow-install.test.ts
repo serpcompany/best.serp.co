@@ -17,13 +17,6 @@ interface InstallAction {
   }
 }
 
-interface WorkflowDefinition {
-  concurrency?: {
-    'cancel-in-progress'?: boolean
-    group?: string
-  }
-}
-
 function loadYamlFile<T>(path: string): T {
   return yaml.load(readFileSync(resolve(process.cwd(), path), 'utf8')) as T
 }
@@ -47,27 +40,6 @@ describe('ci workflow install isolation', () => {
 
     expect(actionUses).toContain(pnpmAction)
     expect(actionUses).not.toContain('pnpm/action-setup@v4')
-  })
-
-  it('serializes every Production D1 workflow for a Site in the same non-canceling group', () => {
-    const buildWorkflow = loadYamlFile<WorkflowDefinition>('.github/workflows/build-and-deploy.yml')
-    const publishWorkflow = loadYamlFile<WorkflowDefinition>('.github/workflows/publish-d1.yml')
-    const approvalWorkflow = loadYamlFile<WorkflowDefinition>(
-      '.github/workflows/approve-d1-submission.yml'
-    )
-    const pvdWorkflow = loadYamlFile<WorkflowDefinition>(
-      '.github/workflows/deploy-pornvideodownloaders.yml'
-    )
-
-    const productionD1Group = `${githubExpression('{{ inputs.site_id }}')}-production-d1`
-    expect(buildWorkflow.concurrency?.group).toContain("'serp.software-production-d1'")
-    expect(buildWorkflow.concurrency?.group).not.toContain('inputs.site_id')
-    expect(publishWorkflow.concurrency?.group).toBe(productionD1Group)
-    expect(approvalWorkflow.concurrency?.group).toBe(productionD1Group)
-    expect(pvdWorkflow.concurrency?.group).toContain("'pornvideodownloaders.com-production-d1'")
-    expect(pvdWorkflow.concurrency?.group).not.toContain('inputs.site_id')
-    expect(buildWorkflow.concurrency?.['cancel-in-progress']).toBe(false)
-    expect(pvdWorkflow.concurrency?.['cancel-in-progress']).toBe(false)
   })
 
   it('persists app-level Next caches without caching generated artifacts', () => {

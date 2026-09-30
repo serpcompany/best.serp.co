@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
 import {
   type ApplicationTableName,
   applicationColumnInventory,
-  applicationTableNames,
-  canonicalLegacyMigrationNames
-} from './d1-replatform-inventory'
+  applicationTableNames
+} from './d1-table-inventory'
 
 export interface SqlStatement {
   params: unknown[]
@@ -48,7 +48,10 @@ export interface DatabaseProof {
   application: CanonicalApplicationSnapshot
   migrationNames: string[]
   schema: SchemaProof
-  siteIds: string[]
+}
+
+export interface SnapshotOptions {
+  pageSize?: number
 }
 
 const emptyChecksum = sha256('')
@@ -133,31 +136,20 @@ function parseEncodedValue(
   throw new Error(`Snapshot returned an invalid ${table} value at column index ${index}.`)
 }
 
-function exclusionClause(table: ApplicationTableName, excludedMigrationRunIds: readonly string[]) {
-  if (table !== 'migration_runs' || excludedMigrationRunIds.length === 0) {
-    return { params: [] as unknown[], sql: '' }
-  }
-  return {
-    params: [...excludedMigrationRunIds],
-    sql: ` WHERE id NOT IN (${excludedMigrationRunIds.map(() => '?').join(',')})`
-  }
-}
-
 export async function captureCanonicalTable(
   transport: SnapshotTransport,
   table: ApplicationTableName,
-  options: { excludedMigrationRunIds?: readonly string[]; pageSize?: number } = {}
+  options: SnapshotOptions = {}
 ): Promise<CanonicalTableSnapshot> {
   const pageSize = options.pageSize ?? 100
   assertPageSize(pageSize)
   const columns = applicationColumnInventory[table]
-  const exclusion = exclusionClause(table, options.excludedMigrationRunIds ?? [])
   const order = columns.map(quoteIdentifier).join(',')
   const rows: CanonicalValue[][] = []
   for (let offset = 0; ; offset += pageSize) {
     const page = await transport.query({
-      sql: `SELECT ${columns.map(encodedColumn).join(',')} FROM ${quoteIdentifier(table)}${exclusion.sql} ORDER BY ${order} LIMIT ? OFFSET ?`,
-      params: [...exclusion.params, pageSize, offset]
+      sql: `SELECT ${columns.map(encodedColumn).join(',')} FROM ${quoteIdentifier(table)} ORDER BY ${order} LIMIT ? OFFSET ?`,
+      params: [pageSize, offset]
     })
     for (const row of page) {
       rows.push(columns.map((_, index) => parseEncodedValue(row, index, table)))
@@ -173,7 +165,7 @@ export async function captureCanonicalTable(
 
 export async function captureApplicationSnapshot(
   transport: SnapshotTransport,
-  options: { excludedMigrationRunIds?: readonly string[]; pageSize?: number } = {}
+  options: SnapshotOptions = {}
 ): Promise<CanonicalApplicationSnapshot> {
   const entries = [] as Array<[ApplicationTableName, CanonicalTableSnapshot]>
   for (const table of applicationTableNames) {
@@ -293,7 +285,7 @@ export async function captureSchemaProof(transport: SnapshotTransport): Promise<
 
 export async function captureDatabaseProof(
   transport: SnapshotTransport,
-  options: { excludedMigrationRunIds?: readonly string[]; pageSize?: number } = {}
+  options: SnapshotOptions = {}
 ): Promise<DatabaseProof> {
   const schema = await captureSchemaProof(transport)
   const inventory = new Set(
@@ -308,16 +300,14 @@ export async function captureDatabaseProof(
       `Application schema inventory mismatch. Missing: ${missing.join(', ') || 'none'}; unexpected: ${unexpectedTables.join(', ') || 'none'}.`
     )
   }
-  const [application, migrationRows, siteRows] = await Promise.all([
+  const [application, migrationRows] = await Promise.all([
     captureApplicationSnapshot(transport, options),
-    transport.query({ sql: 'SELECT name FROM d1_migrations ORDER BY name', params: [] }),
-    transport.query({ sql: 'SELECT id FROM sites ORDER BY id', params: [] })
+    transport.query({ sql: 'SELECT name FROM d1_migrations ORDER BY name', params: [] })
   ])
   return {
     application,
     migrationNames: migrationRows.map(row => String(row.name)),
-    schema,
-    siteIds: siteRows.map(row => String(row.id))
+    schema
   }
 }
 
@@ -343,24 +333,9 @@ function localSchemaProof(migrationDirectory: string, names: readonly string[]):
   }
 }
 
-export function expectedLegacySchemaProof(): SchemaProof {
-  const actual = readdirSync(resolve('d1/migrations'))
-    .filter(name => name.endsWith('.sql'))
-    .sort()
-  if (actual.join('\0') !== canonicalLegacyMigrationNames.join('\0')) {
-    throw new Error('Legacy migration inventory must remain the canonical immutable 0001-0009 set.')
-  }
-  return localSchemaProof('d1/migrations', canonicalLegacyMigrationNames)
-}
-
-export function freshMigrationNames(): string[] {
-  return readdirSync(resolve('d1/drizzle'))
-    .filter(name => name.endsWith('.sql'))
-    .sort()
-}
-
-export function expectedFreshSchemaProof(): SchemaProof {
-  return localSchemaProof('d1/drizzle', freshMigrationNames())
+/** The schema proof a database reaches after applying every `d1/drizzle` migration. */
+export function expectedSchemaProof(): SchemaProof {
+  return localSchemaProof(freshMigrationsDirectory, freshMigrationNames())
 }
 
 export function emptyTableSnapshot(table: ApplicationTableName): CanonicalTableSnapshot {

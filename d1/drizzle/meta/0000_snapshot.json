@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "73d39ded-6f82-423c-b51b-5cb320ee9523",
+  "id": "0e26e3a2-7139-43df-8744-86ba8d23013c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "categories": {
@@ -13,13 +13,6 @@
           "primaryKey": true,
           "notNull": true,
           "autoincrement": true
-        },
-        "site_id": {
-          "name": "site_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
         },
         "slug": {
           "name": "slug",
@@ -79,26 +72,16 @@
       "indexes": {
         "categories_public_idx": {
           "name": "categories_public_idx",
-          "columns": ["site_id", "is_active", "sort_order", "name"],
+          "columns": ["is_active", "sort_order", "name"],
           "isUnique": false
         },
-        "categories_site_slug_unique": {
-          "name": "categories_site_slug_unique",
-          "columns": ["site_id", "slug"],
+        "categories_slug_unique": {
+          "name": "categories_slug_unique",
+          "columns": ["slug"],
           "isUnique": true
         }
       },
-      "foreignKeys": {
-        "categories_site_id_sites_id_fk": {
-          "name": "categories_site_id_sites_id_fk",
-          "tableFrom": "categories",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {
@@ -410,13 +393,6 @@
           "notNull": true,
           "autoincrement": true
         },
-        "site_id": {
-          "name": "site_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "listing_id": {
           "name": "listing_id",
           "type": "text",
@@ -467,22 +443,13 @@
           "columns": ["listing_id", "\"created_at\" DESC"],
           "isUnique": false
         },
-        "listing_slug_redirects_site_old_slug_unique": {
-          "name": "listing_slug_redirects_site_old_slug_unique",
-          "columns": ["site_id", "old_slug"],
+        "listing_slug_redirects_old_slug_unique": {
+          "name": "listing_slug_redirects_old_slug_unique",
+          "columns": ["old_slug"],
           "isUnique": true
         }
       },
       "foreignKeys": {
-        "listing_slug_redirects_site_id_sites_id_fk": {
-          "name": "listing_slug_redirects_site_id_sites_id_fk",
-          "tableFrom": "listing_slug_redirects",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
         "listing_slug_redirects_listing_id_listings_id_fk": {
           "name": "listing_slug_redirects_listing_id_listings_id_fk",
           "tableFrom": "listing_slug_redirects",
@@ -851,13 +818,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "site_id": {
-          "name": "site_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "slug": {
           "name": "slug",
           "type": "text",
@@ -999,31 +959,22 @@
       "indexes": {
         "listing_submissions_active_slug_idx": {
           "name": "listing_submissions_active_slug_idx",
-          "columns": ["site_id", "slug"],
+          "columns": ["slug"],
           "isUnique": true,
           "where": "\"listing_submissions\".\"status\" IN ('pending_badge', 'verified')"
         },
         "listing_submissions_review_queue_idx": {
           "name": "listing_submissions_review_queue_idx",
-          "columns": ["site_id", "status", "badge_verified_at", "created_at"],
+          "columns": ["status", "badge_verified_at", "created_at"],
           "isUnique": false
         },
-        "listing_submissions_site_token_unique": {
-          "name": "listing_submissions_site_token_unique",
-          "columns": ["site_id", "access_token_hash"],
+        "listing_submissions_token_unique": {
+          "name": "listing_submissions_token_unique",
+          "columns": ["access_token_hash"],
           "isUnique": true
         }
       },
       "foreignKeys": {
-        "listing_submissions_site_id_sites_id_fk": {
-          "name": "listing_submissions_site_id_sites_id_fk",
-          "tableFrom": "listing_submissions",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
         "listing_submissions_listing_id_listings_id_fk": {
           "name": "listing_submissions_listing_id_listings_id_fk",
           "tableFrom": "listing_submissions",
@@ -1054,13 +1005,6 @@
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "site_id": {
-          "name": "site_id",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -1206,27 +1150,14 @@
         }
       },
       "indexes": {
-        "listings_slug_lookup_idx": {
-          "name": "listings_slug_lookup_idx",
-          "columns": ["site_id", "slug"],
-          "isUnique": false
-        },
         "listings_publication_idx": {
           "name": "listings_publication_idx",
-          "columns": [
-            "site_id",
-            "status",
-            "is_active",
-            "\"published_at\" DESC",
-            "display_order",
-            "slug"
-          ],
+          "columns": ["status", "is_active", "\"published_at\" DESC", "display_order", "slug"],
           "isUnique": false
         },
         "listings_featured_idx": {
           "name": "listings_featured_idx",
           "columns": [
-            "site_id",
             "status",
             "is_active",
             "is_featured",
@@ -1237,32 +1168,22 @@
         },
         "listings_name_idx": {
           "name": "listings_name_idx",
-          "columns": ["site_id", "\"name\" COLLATE NOCASE"],
+          "columns": ["\"name\" COLLATE NOCASE"],
           "isUnique": false
         },
         "listings_related_name_idx": {
           "name": "listings_related_name_idx",
-          "columns": ["site_id", "name", "slug"],
+          "columns": ["name", "slug"],
           "isUnique": false,
           "where": "\"listings\".\"status\" = 'approved' AND \"listings\".\"is_active\" = 1 AND \"listings\".\"published_at\" IS NOT NULL"
         },
-        "listings_site_slug_unique": {
-          "name": "listings_site_slug_unique",
-          "columns": ["site_id", "slug"],
+        "listings_slug_unique": {
+          "name": "listings_slug_unique",
+          "columns": ["slug"],
           "isUnique": true
         }
       },
-      "foreignKeys": {
-        "listings_site_id_sites_id_fk": {
-          "name": "listings_site_id_sites_id_fk",
-          "tableFrom": "listings",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {
@@ -1299,13 +1220,6 @@
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "site_id": {
-          "name": "site_id",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -1375,28 +1289,18 @@
         }
       },
       "indexes": {
-        "migration_runs_site_time_idx": {
-          "name": "migration_runs_site_time_idx",
-          "columns": ["site_id", "\"started_at\" DESC"],
+        "migration_runs_time_idx": {
+          "name": "migration_runs_time_idx",
+          "columns": ["\"started_at\" DESC"],
           "isUnique": false
         },
-        "migration_runs_site_manifest_unique": {
-          "name": "migration_runs_site_manifest_unique",
-          "columns": ["site_id", "manifest_identity"],
+        "migration_runs_manifest_unique": {
+          "name": "migration_runs_manifest_unique",
+          "columns": ["manifest_identity"],
           "isUnique": true
         }
       },
-      "foreignKeys": {
-        "migration_runs_site_id_sites_id_fk": {
-          "name": "migration_runs_site_id_sites_id_fk",
-          "tableFrom": "migration_runs",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {
@@ -1413,13 +1317,6 @@
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "site_id": {
-          "name": "site_id",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -1526,28 +1423,18 @@
         }
       },
       "indexes": {
-        "publication_runs_site_time_idx": {
-          "name": "publication_runs_site_time_idx",
-          "columns": ["site_id", "\"started_at\" DESC"],
+        "publication_runs_time_idx": {
+          "name": "publication_runs_time_idx",
+          "columns": ["\"started_at\" DESC"],
           "isUnique": false
         },
-        "publication_runs_site_manifest_unique": {
-          "name": "publication_runs_site_manifest_unique",
-          "columns": ["site_id", "manifest_id"],
+        "publication_runs_manifest_unique": {
+          "name": "publication_runs_manifest_unique",
+          "columns": ["manifest_id"],
           "isUnique": true
         }
       },
-      "foreignKeys": {
-        "publication_runs_site_id_sites_id_fk": {
-          "name": "publication_runs_site_id_sites_id_fk",
-          "tableFrom": "publication_runs",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {
@@ -1560,12 +1447,13 @@
     "publication_state": {
       "name": "publication_state",
       "columns": {
-        "site_id": {
-          "name": "site_id",
-          "type": "text",
+        "id": {
+          "name": "id",
+          "type": "integer",
           "primaryKey": true,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": 1
         },
         "version": {
           "name": "version",
@@ -1599,58 +1487,19 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {
-        "publication_state_site_id_sites_id_fk": {
-          "name": "publication_state_site_id_sites_id_fk",
-          "tableFrom": "publication_state",
-          "tableTo": "sites",
-          "columnsFrom": ["site_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {
+        "publication_state_singleton": {
+          "name": "publication_state_singleton",
+          "value": "\"publication_state\".\"id\" = 1"
+        },
         "publication_state_version_nonnegative": {
           "name": "publication_state_version_nonnegative",
           "value": "\"publication_state\".\"version\" >= 0"
         }
       }
-    },
-    "sites": {
-      "name": "sites",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "CURRENT_TIMESTAMP"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "CURRENT_TIMESTAMP"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
     }
   },
   "views": {},
@@ -1690,14 +1539,14 @@
           }
         }
       },
-      "migration_runs_site_time_idx": {
+      "migration_runs_time_idx": {
         "columns": {
           "\"started_at\" DESC": {
             "isExpression": true
           }
         }
       },
-      "publication_runs_site_time_idx": {
+      "publication_runs_time_idx": {
         "columns": {
           "\"started_at\" DESC": {
             "isExpression": true

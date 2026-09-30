@@ -119,14 +119,13 @@ jobs:
         with:
           filters: |
             e2e_relevant:
-              - 'apps/serp.software/**'
-              - 'apps/pornvideodownloaders.com/**'
+              - 'apps/web/**'
               - 'apps/e2e/**'
               - 'd1/**'
               - 'packages/data-ops/**'
               - 'packages/web-core/**'
               - 'packages/design-system/**'
-              - 'sites/**'
+              - 'packages/site-config/**'
 
   e2e:
     name: E2E Tests

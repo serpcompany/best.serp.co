@@ -44,10 +44,8 @@ export function isProtectedListingSurface(filename) {
   }
 
   return (
-    path.startsWith('dist/sites/') ||
-    path.startsWith('sites/') ||
     path.startsWith('apps/') ||
-    path.startsWith('packages/site-contract/src/') ||
+    path.startsWith('packages/site-config/') ||
     path.startsWith('packages/web-core/src/') ||
     path.startsWith('packages/content/data/')
   )

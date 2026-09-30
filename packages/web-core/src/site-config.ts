@@ -1,11 +1,11 @@
-import { resolveCheckedInSiteConfig, resolveRuntimeSiteId } from '@serpdirectory/site-contract'
+import { site } from '@serpdirectory/site-config'
 import type {
   AssetSource,
   SiteBadgesConfig,
   SiteCopyConfig,
   SiteFeatureFlags,
   SiteSitemapConfig
-} from '@serpdirectory/site-contract/types'
+} from '@serpdirectory/site-config/types'
 
 type SiteBrandingConfig = {
   appleTouchIconUrl?: string
@@ -118,9 +118,7 @@ function resolveRuntimeBrandAssetUrl(
   return runtimeBrandAssetPaths[kind]
 }
 
-export function resolveSiteConfig(siteId = resolveRuntimeSiteId()): SiteConfig {
-  const configuredSite = resolveCheckedInSiteConfig(siteId)
-
+function resolveSiteConfig(configuredSite = site): SiteConfig {
   return {
     badges: {
       featuredOn: resolveFeaturedOnBadges(

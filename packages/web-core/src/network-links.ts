@@ -1,4 +1,4 @@
-import type { SiteNetworkLink, SiteOwnedContent } from '@serpdirectory/site-contract/types'
+import type { SiteNetworkLink, SiteOwnedContent } from '@serpdirectory/site-config/types'
 import {
   hasConfiguredGitHubIssueTarget,
   hasConfiguredPublicSocialLinks,

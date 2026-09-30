@@ -44,9 +44,9 @@ describe('labels workflow', () => {
         ?.flatMap(rule => rule['changed-files'] || [])
         .flatMap(rule => rule['any-glob-to-any-file'] || []) || []
 
-    expect(globs).toContain('d1/migrations/**')
-    expect(globs).toContain('apps/serp.software/lib/submissions/**')
-    expect(globs).toContain('apps/pornvideodownloaders.com/lib/submissions/**')
-    expect(globs).toContain('d1/publications/**')
+    expect(globs).toEqual(
+      expect.arrayContaining(['d1/drizzle/**', 'apps/web/lib/submissions/**', 'd1/publications/**'])
+    )
+    expect(globs.join('\n')).not.toMatch(/d1\/migrations|serp\.software|pornvideodownloaders/u)
   })
 })

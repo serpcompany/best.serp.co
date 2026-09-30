@@ -1,42 +1,36 @@
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
-import type { ActiveCheckedInSiteId } from '@serpdirectory/site-contract/active-site-ids'
 import { describe, expect, it } from 'vitest'
 import {
   buildApproveSubmissionPlans,
-  buildRecordSubmissionNotificationPlans,
   buildRejectSubmissionPlans,
-  type SubmissionStatementPlan
+  recordSubmissionNotificationPlan,
+  type SubmissionStatementPlan,
+  selectSubmissionForDecisionPlan,
+  selectVerifiedSubmissionNotificationPlans
 } from './submission-plans'
+import { applyBaselineMigration } from './test-support'
 
 const submissionId = '11111111-1111-4111-8111-111111111111'
 
-function database(siteId: ActiveCheckedInSiteId): DatabaseSync {
+function database(): DatabaseSync {
   const db = new DatabaseSync(':memory:')
-  db.exec(
-    readFileSync(
-      resolve(import.meta.dirname, '../../../d1/drizzle/0000_remarkable_manta.sql'),
-      'utf8'
-    )
-  )
-  db.prepare('INSERT INTO sites(id) VALUES (?)').run(siteId)
+  applyBaselineMigration(db)
   db.prepare(
-    `INSERT INTO categories(site_id,slug,name,description,sort_order,is_active)
-    VALUES (?,'tools','Tools','Tools',0,1)`
-  ).run(siteId)
+    `INSERT INTO categories(slug,name,description,sort_order,is_active)
+    VALUES ('tools','Tools','Tools',0,1)`
+  ).run()
   db.prepare(
-    `INSERT INTO publication_state(site_id,version,checksum,published_at)
-    VALUES (?,1,'before','2026-01-01T00:00:00.000Z')`
-  ).run(siteId)
+    `INSERT INTO publication_state(id,version,checksum,published_at)
+    VALUES (1,1,'before','2026-01-01T00:00:00.000Z')`
+  ).run()
   db.prepare(
     `INSERT INTO listing_submissions
-      (id,site_id,slug,name,description,website,content,category_slug,logo_url,status,
+      (id,slug,name,description,website,content,category_slug,logo_url,status,
        access_token_hash,badge_verified_at)
-    VALUES (?,?,'example.com','Example','Description','https://example.com/','Content','tools',
+    VALUES (?,'example.com','Example','Description','https://example.com/','Content','tools',
       'https://example.com/logo.png','verified','hash','2026-08-01T00:00:00.000Z')`
-  ).run(submissionId, siteId)
+  ).run(submissionId)
   db.prepare(
     `INSERT INTO listing_submission_resource_links(submission_id,label,url,sort_order)
     VALUES (?,'Docs','https://example.com/docs',0)`
@@ -64,56 +58,80 @@ function execute(db: DatabaseSync, plans: SubmissionStatementPlan[]): void {
   }
 }
 
-function approvalPlans(siteId: ActiveCheckedInSiteId) {
+function query(db: DatabaseSync, plan: SubmissionStatementPlan): unknown[] {
+  return db.prepare(plan.sql).all(...(plan.params as SQLInputValue[]))
+}
+
+function approvalPlans() {
   const afterChecksum = createHash('sha256').update('after').digest('hex')
   return buildApproveSubmissionPlans({
     afterChecksum,
+    affectedRoute: '/products/example.com/reviews/',
     beforeChecksum: 'before',
     listingId: `submission_${submissionId}`,
     manifestId: `verified-submission-${submissionId}`,
     now: '2026-08-01T01:00:00.000Z',
     reviewer: 'reviewer',
     runId: `submission_publish_${submissionId}`,
-    siteId,
-    slug: 'example.com',
     submissionId,
     version: 1
   })
 }
 
-describe('protected submission statement plans', () => {
-  for (const siteId of ['serp.software', 'pornvideodownloaders.com'] as const) {
-    it(`atomically promotes normalized data for ${siteId}`, () => {
-      const db = database(siteId)
-      execute(db, approvalPlans(siteId))
+function rejectionPlans() {
+  return buildRejectSubmissionPlans({
+    now: '2026-08-01T01:00:00.000Z',
+    reviewer: 'reviewer',
+    submissionId
+  })
+}
 
-      expect(db.prepare('SELECT status,site_id FROM listings').get()).toEqual({
-        site_id: siteId,
-        status: 'approved'
-      })
-      expect(db.prepare('SELECT status,listing_id FROM listing_submissions').get()).toEqual({
-        listing_id: `submission_${submissionId}`,
-        status: 'approved'
-      })
-      expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 2 })
-      expect(db.prepare('SELECT outcome FROM publication_runs').get()).toEqual({
-        outcome: 'succeeded'
-      })
-      expect(
-        db
-          .prepare(
-            "SELECT COUNT(*) AS count FROM listing_submission_events WHERE event_type='approved'"
-          )
-          .get()
-      ).toEqual({ count: 1 })
+describe('protected submission statement plans', () => {
+  it('reads the decision snapshot from the singleton publication state', () => {
+    const db = database()
+    expect(query(db, selectSubmissionForDecisionPlan(submissionId))).toEqual([
+      {
+        checksum: 'before',
+        id: submissionId,
+        listing_id: null,
+        slug: 'example.com',
+        status: 'verified',
+        version: 1
+      }
+    ])
+  })
+
+  it('atomically promotes normalized data', () => {
+    const db = database()
+    execute(db, approvalPlans())
+
+    expect(db.prepare('SELECT status,source_identity FROM listings').get()).toEqual({
+      source_identity: submissionId,
+      status: 'approved'
     })
-  }
+    expect(db.prepare('SELECT status,listing_id FROM listing_submissions').get()).toEqual({
+      listing_id: `submission_${submissionId}`,
+      status: 'approved'
+    })
+    expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 2 })
+    expect(db.prepare('SELECT outcome,affected_routes FROM publication_runs').get()).toEqual({
+      affected_routes: '/products/example.com/reviews/',
+      outcome: 'succeeded'
+    })
+    expect(
+      db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM listing_submission_events WHERE event_type='approved'"
+        )
+        .get()
+    ).toEqual({ count: 1 })
+  })
 
   it('rolls back every approval side effect when publication state becomes stale', () => {
-    const db = database('serp.software')
+    const db = database()
     db.prepare("UPDATE publication_state SET version=2,checksum='concurrent'").run()
 
-    expect(() => execute(db, approvalPlans('serp.software'))).toThrow(/malformed JSON/u)
+    expect(() => execute(db, approvalPlans())).toThrow(/malformed JSON/u)
     expect(db.prepare('SELECT COUNT(*) AS count FROM listings').get()).toEqual({ count: 0 })
     expect(db.prepare('SELECT COUNT(*) AS count FROM publication_runs').get()).toEqual({ count: 0 })
     expect(
@@ -134,13 +152,8 @@ describe('protected submission statement plans', () => {
   })
 
   it('rolls back a rejection event when a concurrent decision wins', () => {
-    const db = database('serp.software')
-    const plans = buildRejectSubmissionPlans({
-      now: '2026-08-01T01:00:00.000Z',
-      reviewer: 'reviewer',
-      siteId: 'serp.software',
-      submissionId
-    })
+    const db = database()
+    const plans = rejectionPlans()
     db.prepare("UPDATE listing_submissions SET status='approved' WHERE id=?").run(submissionId)
 
     expect(() => execute(db, plans)).toThrow(/malformed JSON/u)
@@ -157,84 +170,45 @@ describe('protected submission statement plans', () => {
     ).toEqual({ count: 0 })
   })
 
-  it('rolls back approval and rejection before any row mutation while cutover is locked', () => {
-    for (const plans of [
-      approvalPlans('serp.software'),
-      buildRejectSubmissionPlans({
-        now: '2026-08-01T01:00:00.000Z',
-        reviewer: 'reviewer',
-        siteId: 'serp.software',
-        submissionId
-      })
-    ]) {
-      const db = database('serp.software')
-      db.prepare(
-        `INSERT INTO migration_runs
-          (id,site_id,schema_version,manifest_identity,input_checksum,target_checksum,
-           affected_records,outcome)
-        VALUES (?,?,1,?,'before','before',0,'started')`
-      ).run(
-        'd1-cutover-lock-v1:serp.software:run-1',
-        'serp.software',
-        'd1-cutover-lock-v1:serp.software:run-1'
-      )
+  it('records the notification ledger only for verified submissions', () => {
+    const db = database()
+    const pending = selectVerifiedSubmissionNotificationPlans(10)
+    expect(query(db, pending[0] as SubmissionStatementPlan)).toMatchObject([{ id: submissionId }])
 
-      expect(() => execute(db, plans)).toThrow(/malformed JSON/u)
-      expect(db.prepare('SELECT COUNT(*) AS count FROM listings').get()).toEqual({ count: 0 })
-      expect(db.prepare('SELECT COUNT(*) AS count FROM publication_runs').get()).toEqual({
-        count: 0
-      })
-      expect(db.prepare('SELECT status,listing_id FROM listing_submissions').get()).toEqual({
-        listing_id: null,
-        status: 'verified'
-      })
-      expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 1 })
-      expect(db.prepare('SELECT COUNT(*) AS count FROM listing_submission_events').get()).toEqual({
-        count: 0
-      })
-    }
-  })
-
-  it('atomically blocks the notification ledger write while cutover is locked', () => {
-    const db = database('serp.software')
-    db.prepare(
-      `INSERT INTO migration_runs
-        (id,site_id,schema_version,manifest_identity,input_checksum,target_checksum,
-         affected_records,outcome)
-      VALUES (?,?,1,?,'before','before',0,'started')`
-    ).run(
-      'd1-cutover-lock-v1:serp.software:run-1',
-      'serp.software',
-      'd1-cutover-lock-v1:serp.software:run-1'
-    )
-    const plans = buildRecordSubmissionNotificationPlans({
+    const notification = {
       externalId: '42',
       externalUrl: 'https://github.com/example/issues/42',
       previewTokenHash: 'a'.repeat(64),
       recipient: 'reviewer',
-      siteId: 'serp.software',
       submissionId
-    })
-    expect(() => execute(db, plans)).toThrow(/malformed JSON/u)
+    }
+    execute(db, [recordSubmissionNotificationPlan(notification)])
+    execute(db, [recordSubmissionNotificationPlan({ ...notification, externalId: '43' })])
     expect(
-      db.prepare('SELECT COUNT(*) AS count FROM listing_submission_notifications').get()
-    ).toEqual({ count: 0 })
+      db
+        .prepare(
+          'SELECT channel,external_id,preview_token_hash FROM listing_submission_notifications'
+        )
+        .all()
+    ).toEqual([{ channel: 'github_issue', external_id: '43', preview_token_hash: 'a'.repeat(64) }])
+    expect(query(db, pending[0] as SubmissionStatementPlan)).toEqual([])
+
+    db.prepare("UPDATE listing_submissions SET status='rejected' WHERE id=?").run(submissionId)
+    execute(db, [recordSubmissionNotificationPlan({ ...notification, externalId: '44' })])
+    expect(db.prepare('SELECT external_id FROM listing_submission_notifications').all()).toEqual([
+      { external_id: '43' }
+    ])
   })
 
-  it('requires explicit Site identity throughout decision mutations', () => {
-    const approvalSql = approvalPlans('serp.software')
+  it('guards decision mutations with single-row assertions and no Site scoping', () => {
+    const approvalSql = approvalPlans()
       .map(plan => plan.sql)
       .join('\n')
-    const rejectionSql = buildRejectSubmissionPlans({
-      now: '2026-08-01T01:00:00.000Z',
-      reviewer: 'reviewer',
-      siteId: 'serp.software',
-      submissionId
-    })
+    const rejectionSql = rejectionPlans()
       .map(plan => plan.sql)
       .join('\n')
-    expect(approvalSql).toContain('site_id=?')
-    expect(rejectionSql).toContain('site_id=?')
+    expect(approvalSql).not.toContain('site_id')
+    expect(rejectionSql).not.toContain('site_id')
     expect(approvalSql).not.toMatch(/\bTEMP\b/iu)
     expect(rejectionSql).not.toMatch(/\bTEMP\b/iu)
     expect(approvalSql).toContain("json_extract('', '$')")

@@ -1,0 +1,23 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "best-serp-co-local",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-07-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "AUTH_TRUST_HOST": "true",
+    "D1_RUNTIME_ENV": "local"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "best-serp-co-local",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "../../d1/drizzle"
+    }
+  ]
+}

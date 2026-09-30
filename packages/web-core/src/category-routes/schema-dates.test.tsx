@@ -7,11 +7,6 @@ import { CategoryRoutePage } from './category-page'
 import { FeaturedCategoryRoutePage } from './featured-page'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
 
-vi.hoisted(() => {
-  process.env.SITE_ID = 'serp.software'
-  process.env.NEXT_PUBLIC_SITE_ID = 'serp.software'
-})
-
 const category: Category = {
   description: 'Alpha listings.',
   icon: Package,

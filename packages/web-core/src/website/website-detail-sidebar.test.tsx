@@ -104,15 +104,8 @@ describe('WebsiteDetailSidebar', () => {
     expect(collectHrefProps(sidebar)).toContain('https://vendor.example.com/pricing?plan=pro#buy')
   })
 
-  it('passes suffix-aware listing URLs into copied badge embeds for suffix-based sites', async () => {
-    vi.stubEnv('NEXT_PUBLIC_SITE_ID', 'serp.co')
-    vi.stubEnv('SITE_ID', 'serp.co')
-    vi.resetModules()
-
-    const { WebsiteDetailSidebar: SerpCoWebsiteDetailSidebar } = await import(
-      './website-detail-sidebar'
-    )
-    const sidebar = SerpCoWebsiteDetailSidebar({
+  it('passes suffix-aware listing URLs and badge names into copied badge embeds', () => {
+    const sidebar = WebsiteDetailSidebar({
       website: {
         name: 'LaunchBuzz',
         slug: 'launchbuzz.io',
@@ -121,30 +114,12 @@ describe('WebsiteDetailSidebar', () => {
     })
 
     expect(collectStringProp(sidebar, 'listingUrl')).toContain(
-      'https://serp.co/products/launchbuzz.io/reviews/'
+      'https://best.serp.co/products/launchbuzz.io/reviews/'
     )
     expect(collectRecordProp<Record<string, string>>(sidebar, 'badgeUrls')).toContainEqual({
-      dark: 'https://serp.co/badge/featured-on-serp.co-dark.svg',
-      light: 'https://serp.co/badge/featured-on-serp.co-light.svg'
+      dark: 'https://best.serp.co/badge/featured-on-serp.co-dark.svg',
+      light: 'https://best.serp.co/badge/featured-on-serp.co-light.svg'
     })
-  })
-
-  it('passes the configured badge display name into copied badge embeds', async () => {
-    vi.stubEnv('NEXT_PUBLIC_SITE_ID', 'pornvideodownloaders.com')
-    vi.stubEnv('SITE_ID', 'pornvideodownloaders.com')
-    vi.resetModules()
-
-    const { WebsiteDetailSidebar: PvdWebsiteDetailSidebar } = await import(
-      './website-detail-sidebar'
-    )
-    const sidebar = PvdWebsiteDetailSidebar({
-      website: {
-        name: 'LaunchBuzz',
-        slug: 'launchbuzz.io',
-        website: 'https://launchbuzz.io'
-      }
-    })
-
-    expect(collectStringProp(sidebar, 'siteName')).toContain('PV Downloaders')
+    expect(collectStringProp(sidebar, 'siteName')).toContain('SERP')
   })
 })

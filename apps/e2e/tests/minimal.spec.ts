@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { site } from './site-fixture'
+
 // Minimal tests that should always pass
 test.describe('Minimal Tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -12,12 +14,11 @@ test.describe('Minimal Tests', () => {
     expect(response?.status()).toBeLessThan(400)
 
     // Basic content check
-    const title = await page.title()
-    expect(title).toContain('SERP Software')
+    await expect(page).toHaveTitle(site.title)
   })
 
   test('about page loads', async ({ page }) => {
-    const response = await page.goto('/about', { waitUntil: 'networkidle' })
+    const response = await page.goto('/about/', { waitUntil: 'networkidle' })
     expect(response?.status()).toBeLessThan(400)
 
     // Has heading
@@ -42,8 +43,7 @@ test.describe('Minimal Tests', () => {
     const response = await page.goto('/this-does-not-exist-404-page', {
       waitUntil: 'networkidle'
     })
-    // In dev mode, Next.js might return 200 with 404 page
-    const status = response?.status()
-    expect(status).toBeLessThanOrEqual(404)
+    // The OpenNext Worker preview serves the not-found page with a real 404 status
+    expect(response?.status()).toBe(404)
   })
 })

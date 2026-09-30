@@ -1,8 +1,8 @@
 #!/usr/bin/env tsx
 
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
 
 type PackageScripts = {
   test?: string
@@ -41,7 +41,7 @@ function getAppPackages(): AppPackage[] {
       return {
         dir,
         name: packageJson.name ?? entry.name,
-        scripts: packageJson.scripts ?? {},
+        scripts: packageJson.scripts ?? {}
       }
     })
     .filter((app): app is AppPackage => app !== null)
@@ -50,7 +50,7 @@ function getAppPackages(): AppPackage[] {
 function runInApp(app: AppPackage, command: string, args: string[]): void {
   const result = spawnSync('pnpm', [command, ...args], {
     cwd: app.dir,
-    stdio: 'inherit',
+    stdio: 'inherit'
   })
 
   if (result.status !== 0) {
