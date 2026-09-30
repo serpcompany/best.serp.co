@@ -8,7 +8,9 @@ updates:
       day: monday
       time: "06:00"
       timezone: Etc/UTC
-    open-pull-requests-limit: 5
+    # Paused during the D1 refactor (serpcompany/best.serp.co#34). After cutover, run one
+    # dependency-upgrade pass, then restore a limit and group minor/patch updates.
+    open-pull-requests-limit: 0
     versioning-strategy: increase
   - package-ecosystem: github-actions
     directory: /

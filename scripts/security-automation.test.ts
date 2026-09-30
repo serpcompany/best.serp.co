@@ -51,7 +51,7 @@ describe('security automation', () => {
     expect(workflow.permissions).toEqual({ contents: 'read' })
   })
 
-  it('configures bounded weekly pnpm and GitHub Actions updates', () => {
+  it('configures weekly GitHub Actions updates and pauses pnpm updates during the refactor', () => {
     const dependabot = yaml.load(readFileSync(resolve('.github/dependabot.yml'), 'utf8')) as {
       version: number
       updates: DependabotUpdate[]
@@ -68,8 +68,8 @@ describe('security automation', () => {
     }
 
     const npm = dependabot.updates[0]
-    expect(npm?.['open-pull-requests-limit']).toBe(5)
-    expect(npm?.groups).toBeUndefined()
+    // npm version updates are paused until the post-cutover upgrade pass (#34).
+    expect(npm?.['open-pull-requests-limit']).toBe(0)
 
     const actions = dependabot.updates[1]
     expect(Object.keys(actions?.groups ?? {})).not.toHaveLength(0)
