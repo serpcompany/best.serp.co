@@ -18,12 +18,12 @@ describe('buildBadgeSubmissionInstructions', () => {
     expect(instructions.submissionId).toBe('submission-id')
     expect(instructions.token).toBe('capability-token')
     expect(instructions.website).toBe('https://www.serp.ai/')
-    expect(instructions.listingUrl).toBe('https://best.serp.co/products/serp.ai/reviews/')
+    expect(instructions.listingUrl).toBe('https://best.serp.co/products/serp.ai/')
     expect(instructions.badgePreviewPaths.light).toBe('/badge/featured-on-serp.co-light.svg')
     expect(instructions.badgePreviewPaths.dark).toBe('/badge/featured-on-serp.co-dark.svg')
     expect(
       instructions.badgeEmbeds.light
-    ).toBe(`<a href="https://best.serp.co/products/serp.ai/reviews/" target="_blank" rel="noopener noreferrer" title="Featured on SERP">
+    ).toBe(`<a href="https://best.serp.co/products/serp.ai/" target="_blank" rel="noopener noreferrer" title="Featured on SERP">
   <img src="https://best.serp.co/badge/featured-on-serp.co-light.svg" alt="Featured on SERP" width="200" height="50" />
 </a>`)
     expect(instructions.badgeEmbeds.dark).toContain(

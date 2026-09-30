@@ -36,12 +36,18 @@ function canonical(value: string): string {
   return url.toString().replace(/\/$/, '')
 }
 
-export function scanFeaturedBadge(
-  html: string,
-  expected: { badgeUrls: readonly string[]; listingUrl: string }
-): ScanResult {
+export interface BadgeTargets {
+  badgeUrls: readonly string[]
+  /** Earlier listing URLs that now redirect to `listingUrl` and still count as correct. */
+  legacyListingUrls?: readonly string[]
+  listingUrl: string
+}
+
+export function scanFeaturedBadge(html: string, expected: BadgeTargets): ScanResult {
   const expectedBadges = new Set(expected.badgeUrls.map(canonical))
-  const expectedListing = canonical(expected.listingUrl)
+  const expectedListings = new Set(
+    [expected.listingUrl, ...(expected.legacyListingUrls ?? [])].map(canonical)
+  )
   let sawBadge = false
   let sawWrongDestination = false
 
@@ -65,7 +71,7 @@ export function scanFeaturedBadge(
         continue
       }
       try {
-        if (canonical(href) !== expectedListing) {
+        if (!expectedListings.has(canonical(href))) {
           sawWrongDestination = true
           continue
         }
@@ -105,7 +111,7 @@ async function readBoundedHtml(response: Response): Promise<string> {
 
 export async function verifyFeaturedBadge(
   website: string,
-  expected: { badgeUrls: readonly string[]; listingUrl: string },
+  expected: BadgeTargets,
   fetcher: typeof fetch = fetch
 ): Promise<BadgeVerificationResult> {
   let current = website

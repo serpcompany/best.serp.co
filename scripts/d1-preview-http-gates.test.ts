@@ -31,7 +31,7 @@ function successfulResponse(url: URL, redirectLocation?: string, emptyBody = fal
   if (url.pathname === `/${slug}/`)
     return new Response(null, {
       status: 308,
-      headers: { location: redirectLocation ?? `/products/${slug}/reviews/` }
+      headers: { location: redirectLocation ?? `/products/${slug}/` }
     })
   return new Response(emptyBody ? '' : 'ok', { status: 200 })
 }
@@ -58,8 +58,8 @@ describe('environment-specific HTTP gates', () => {
     expect(urls.map(url => url.pathname)).toEqual(
       expect.arrayContaining([
         '/',
-        `/products/best/${category}/`,
-        `/products/${slug}/reviews/`,
+        `/products/categories/${category}/`,
+        `/products/${slug}/`,
         '/api/search',
         '/rss.xml',
         '/sitemap-index.xml',
@@ -124,12 +124,12 @@ describe('environment-specific HTTP gates', () => {
     async variant => {
       const location =
         variant === 'other-origin'
-          ? `https://other-host.example/products/${slug}/reviews/`
+          ? `https://other-host.example/products/${slug}/`
           : variant === 'wrong-path'
-            ? `/products/${slug}/`
+            ? `/products/${slug}/reviews/`
             : variant === 'query'
-              ? `/products/${slug}/reviews/?unexpected=1`
-              : `/products/${slug}/reviews/#unexpected`
+              ? `/products/${slug}/?unexpected=1`
+              : `/products/${slug}/#unexpected`
       installSuccessfulFetch(location)
       await expect(gates('production', origin)).rejects.toThrow('did not redirect')
     }

@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Category } from '../categories'
 import type { WebsiteMetadata } from '../content-query'
 import { CategoryRoutePage } from './category-page'
-import { FeaturedCategoryRoutePage } from './featured-page'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
 
 const category: Category = {
@@ -104,37 +103,12 @@ describe('collection page schema dates', () => {
       allProjects: websites,
       category,
       featuredGuides: [],
-      featuredProjects: websites.filter(website => website.featured === true),
       slots: {
         CategoryWebsitesList: NullComponent,
         ExternalResourcesSection: NullComponent,
         FeaturedGuidesSection: NullComponent,
         JsonLd,
         breadcrumb: null
-      }
-    })
-    const data = getCollectionPageData(element)
-
-    expect(data.datePublished).toBe('2026-01-01')
-    expect(data.dateModified).toBe('2026-01-03')
-    expect(JSON.stringify(data)).not.toContain('2099-01-01')
-  })
-
-  it('uses source listing dates for featured JSON-LD instead of the build clock', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2099-01-01T00:00:00.000Z'))
-
-    const element = FeaturedCategoryRoutePage({
-      activeCategorySlugs: ['alpha'],
-      featuredGuides: [],
-      featuredProjects: websites.filter(website => website.featured === true),
-      slots: {
-        CategoryWebsitesList: NullComponent,
-        ExternalResourcesSection: NullComponent,
-        FeaturedGuidesSection: NullComponent,
-        JsonLd,
-        breadcrumb: null,
-        headingIcon: null
       }
     })
     const data = getCollectionPageData(element)

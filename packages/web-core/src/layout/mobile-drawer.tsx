@@ -13,7 +13,7 @@ import { externalResources } from '@serpdirectory/web-core/external-resources'
 import { getRoute } from '@serpdirectory/web-core/routes'
 import { siteConfig } from '@serpdirectory/web-core/site-config'
 import { siteCopy } from '@serpdirectory/web-core/site-copy'
-import { ExternalLink, Trophy, X } from 'lucide-react'
+import { ExternalLink, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { type ReactNode, useEffect, useRef } from 'react'
@@ -25,9 +25,7 @@ interface MobileDrawerProps {
   authState?: HeaderAuthState
   isOpen: boolean
   onClose: () => void
-  featuredCount?: number
   signOutButton?: ReactNode
-  showFeaturedCategory?: boolean
 }
 
 /**
@@ -38,9 +36,7 @@ export function MobileDrawer({
   authState,
   isOpen,
   onClose,
-  featuredCount,
-  signOutButton,
-  showFeaturedCategory = Boolean(featuredCount)
+  signOutButton
 }: MobileDrawerProps) {
   const pathname = usePathname()
   const drawerRef = useRef<HTMLDivElement>(null)
@@ -255,36 +251,6 @@ export function MobileDrawer({
 
             {/* Categories */}
             <DirectoryNavigationSection title="Categories" titleClassName="mb-3">
-              {showFeaturedCategory ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (pathname === '/') {
-                      onClose()
-                      setTimeout(() => {
-                        document.getElementById('featured')?.scrollIntoView()
-                      }, 100)
-                    } else {
-                      window.location.href = '/#featured'
-                    }
-                  }}
-                  className={cn(directoryNavigationInteractiveClassName, 'w-full text-left')}
-                >
-                  <DirectoryNavigationItem
-                    className="py-1.5"
-                    icon={<Trophy className="h-4 w-4" />}
-                    trailing={
-                      featuredCount ? (
-                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs">
-                          {featuredCount}
-                        </span>
-                      ) : null
-                    }
-                  >
-                    Featured
-                  </DirectoryNavigationItem>
-                </button>
-              ) : null}
               {availableCategories.map(category => {
                 const isActive = isCategoryPage(category.slug)
 

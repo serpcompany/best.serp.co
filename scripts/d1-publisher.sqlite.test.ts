@@ -123,9 +123,9 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
       expect.arrayContaining([
         '/',
         '/products/',
-        '/products/old-slug/reviews/',
-        '/products/new-slug/reviews/',
-        '/products/best/seo/',
+        '/products/old-slug/',
+        '/products/new-slug/',
+        '/products/categories/seo/',
         '/sitemap-index.xml',
         '/rss.xml'
       ])

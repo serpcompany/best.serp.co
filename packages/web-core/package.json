@@ -14,7 +14,6 @@
     "./category-display": "./src/category-display.ts",
     "./category-navigation": "./src/category-navigation.ts",
     "./category-routes/category-page": "./src/category-routes/category-page.tsx",
-    "./category-routes/featured-page": "./src/category-routes/featured-page.tsx",
     "./category-seo": "./src/category-seo.ts",
     "./content-query": "./src/content-query.ts",
     "./docs/doc-page": "./src/docs/doc-page.tsx",

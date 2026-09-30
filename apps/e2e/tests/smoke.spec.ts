@@ -3,6 +3,7 @@ import { type APIRequestContext, expect, type Page, test } from '@playwright/tes
 import { detailListing } from './listing-fixture'
 import {
   absoluteUrl,
+  categoriesIndexPath,
   categoryPath,
   escapeRegExp,
   featuredBadgeUrls,
@@ -59,7 +60,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     await expectCanonical(page, '/')
   })
 
-  test('renders a listing detail page at its canonical reviews URL', async ({ page }) => {
+  test('renders a listing detail page at its canonical URL', async ({ page }) => {
     const response = await page.goto(detailListing.path, { waitUntil: 'networkidle' })
     expect(response?.status()).toBe(200)
     await expect(
@@ -81,23 +82,21 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     }
   })
 
-  test('redirects bare listing and legacy category routes to best.serp.co routes', async ({
-    request
-  }) => {
-    await expectRedirect(
-      request,
-      `/products/${detailListing.slug}/`,
-      new RegExp(`^${escapeRegExp(detailListing.path)}$`)
-    )
-    await expectRedirect(
-      request,
-      `/categories/${sampleCategory.slug}/`,
-      new RegExp(`^/products/best/${sampleCategory.slug}/?$`)
-    )
+  test('permanently redirects the pre-D1 URL scheme to the current routes', async ({ request }) => {
+    const redirects: Array<[string, string]> = [
+      [`/products/${detailListing.slug}/reviews/`, detailListing.path],
+      [`/products/best/${sampleCategory.slug}/`, categoryPath(sampleCategory.slug)],
+      [`/categories/${sampleCategory.slug}/`, categoryPath(sampleCategory.slug)],
+      ['/products/best/featured/', categoriesIndexPath],
+      ['/products/best/', categoriesIndexPath]
+    ]
+    for (const [from, to] of redirects) {
+      await expectRedirect(request, from, new RegExp(`^${escapeRegExp(to)}$`))
+    }
   })
 
-  test('renders category, featured, product index, and search routes', async ({ page }) => {
-    const listingLinks = page.locator('main a[href^="/products/"][href$="/reviews/"]')
+  test('renders category, categories index, product index, and search routes', async ({ page }) => {
+    const listingLinks = page.locator('main a[href^="/products/"]')
 
     await page.goto(categoryPath(sampleCategory.slug), { waitUntil: 'networkidle' })
     await expect(
@@ -106,10 +105,16 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     await expectCanonical(page, categoryPath(sampleCategory.slug))
     await expect(page.locator(`main a[href="${detailListing.path}"]`).first()).toBeVisible()
 
-    await page.goto(categoryPath('featured'), { waitUntil: 'networkidle' })
-    await expect(page.getByRole('heading', { level: 1, name: /featured products/i })).toBeVisible()
-    await expectCanonical(page, categoryPath('featured'))
-    expect(await listingLinks.count()).toBeGreaterThan(0)
+    await page.goto(categoriesIndexPath, { waitUntil: 'networkidle' })
+    await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible()
+    await expectCanonical(page, categoriesIndexPath)
+    // Every published category is linked, including `other`, which the sitemap omits.
+    expect(
+      await page.locator('main a[href^="/products/categories/"]').count()
+    ).toBeGreaterThanOrEqual(site.categoryCount)
+    await expect(
+      page.locator(`main a[href="${categoryPath(sampleCategory.slug)}"]`).first()
+    ).toBeVisible()
 
     await page.goto('/products/', { waitUntil: 'networkidle' })
     await expectCanonical(page, '/products/')
@@ -121,16 +126,6 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     await expect(
       page.getByRole('link', { name: detailListing.namePattern }).first()
     ).toHaveAttribute('href', detailListing.path)
-  })
-
-  test.fixme('featured route lists every featured listing', async ({ page }) => {
-    // App bug: `/products/best/featured/` renders `getHomePageData().featuredProjects`, which
-    // `getFeaturedProjects()` (packages/web-core/src/home-page.tsx) caps at 8 for the homepage
-    // carousel, so only 8 of the catalog's featured listings are reachable here.
-    await page.goto(categoryPath('featured'), { waitUntil: 'networkidle' })
-    expect(
-      await page.locator('main a[href^="/products/"][href$="/reviews/"]').count()
-    ).toBeGreaterThanOrEqual(site.featuredListingCount)
   })
 
   test('renders static, commercial, and legal pages', async ({ page }) => {
@@ -169,6 +164,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     const pages = await getSitemap(request, '/sitemaps/pages/1.xml')
     expect(pages).toContain(absoluteUrl('/'))
     expect(pages).toContain(absoluteUrl('/about/'))
+    expect(pages).toContain(absoluteUrl(categoriesIndexPath))
     for (const excluded of ['/submit/', '/legal/privacy-policy/', '/legal/terms-conditions/']) {
       expect(pages).not.toContain(absoluteUrl(excluded))
     }
@@ -177,14 +173,14 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     expect(listings).toHaveLength(site.listingCount)
     expect(new Set(listings).size).toBe(site.listingCount)
     for (const location of listings) {
-      expect(location).toMatch(/^https:\/\/best\.serp\.co\/products\/[^/]+\/reviews\/$/u)
+      expect(location).toMatch(/^https:\/\/best\.serp\.co\/products\/[^/]+\/$/u)
     }
     expect(listings).toContain(absoluteUrl(detailListing.path))
 
     const categories = await getSitemap(request, '/sitemaps/categories/1.xml')
     expect(categories).toHaveLength(site.categoryCount)
     for (const location of categories) {
-      expect(location).toMatch(/^https:\/\/best\.serp\.co\/products\/best\/[^/]+\/$/u)
+      expect(location).toMatch(/^https:\/\/best\.serp\.co\/products\/categories\/[^/]+\/$/u)
     }
     expect(categories).toContain(absoluteUrl(categoryPath(sampleCategory.slug)))
     expect(categories).not.toContain(absoluteUrl(categoryPath('featured')))

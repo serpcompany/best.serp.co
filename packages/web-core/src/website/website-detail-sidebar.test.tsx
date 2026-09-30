@@ -114,7 +114,7 @@ describe('WebsiteDetailSidebar', () => {
     })
 
     expect(collectStringProp(sidebar, 'listingUrl')).toContain(
-      'https://best.serp.co/products/launchbuzz.io/reviews/'
+      'https://best.serp.co/products/launchbuzz.io/'
     )
     expect(collectRecordProp<Record<string, string>>(sidebar, 'badgeUrls')).toContainEqual({
       dark: 'https://best.serp.co/badge/featured-on-serp.co-dark.svg',

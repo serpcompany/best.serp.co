@@ -1,6 +1,5 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
 import { getCategoryIcon } from '@serpdirectory/web-core/categories'
-import { getCategoryDisplayName } from '@serpdirectory/web-core/category-display'
 import {
   CategoryRoutePage,
   generateCategoryRouteMetadata
@@ -16,7 +15,6 @@ import { notFound } from 'next/navigation'
 import {
   getActiveCategories,
   getCategoryBySlug,
-  getFeaturedListings,
   getListingsByCategory
 } from '@/lib/catalog/repository'
 import { getGuides } from '@/lib/content-loader'
@@ -59,9 +57,8 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     notFound()
   }
 
-  const [allProjects, featuredProjects, featuredGuides, activeCategories] = await Promise.all([
+  const [allProjects, featuredGuides, activeCategories] = await Promise.all([
     getListingsByCategory(storedCategory.slug),
-    getFeaturedListings(100),
     getGuides(),
     getActiveCategories()
   ])
@@ -77,7 +74,6 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     allProjects,
     category,
     featuredGuides,
-    featuredProjects,
     slots: {
       CategoryWebsitesList,
       ExternalResourcesSection,
@@ -85,7 +81,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       JsonLd,
       breadcrumb: (
         <Breadcrumb
-          items={[{ name: getCategoryDisplayName(category.slug), href: categoryPath }]}
+          items={[{ name: category.name, href: categoryPath }]}
           baseUrl={SITE_PUBLIC_URL}
         />
       )

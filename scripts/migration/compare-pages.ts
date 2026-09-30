@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { project } from '../project'
+import { categoryRoute, listingRoute } from '../site-routes'
 
 /**
  * Structural parity check between the legacy static site and a D1-backed
@@ -10,8 +11,20 @@ import { project } from '../project'
  * SEO-relevant shape of each page (status, title, h1, canonical path,
  * meta description, JSON-LD types, FAQ count).
  *
+ * The baseline is the legacy static site, which used /products/<slug>/reviews/ and
+ * /products/best/<category>/; those paths are translated to the current routes before
+ * fetching the candidate and before comparing canonical paths.
+ *
  * Usage: pnpm tsx scripts/migration/compare-pages.ts <candidate-origin> [--baseline <origin>] [--sample 25]
  */
+
+export function translateLegacyPath(path: string): string {
+  const detail = /^\/products\/([^/]+)\/reviews\/?$/u.exec(path)
+  if (detail?.[1]) return listingRoute(detail[1])
+  const category = /^\/products\/best\/([^/]+)\/?$/u.exec(path)
+  if (category?.[1]) return categoryRoute(category[1])
+  return path
+}
 
 interface PageShape {
   canonicalPath: string | null
@@ -78,7 +91,6 @@ function samplePaths(sampleSize: number): string[] {
   return [
     '/',
     '/products/',
-    '/products/best/featured/',
     '/brands/',
     '/about/',
     '/submit/',
@@ -116,10 +128,14 @@ export async function comparePages(options: {
 }): Promise<number> {
   let differences = 0
   for (const path of samplePaths(options.sample)) {
-    const [baseline, candidate] = await Promise.all([
+    const [legacy, candidate] = await Promise.all([
       fetchShape(options.baseline, path),
-      fetchShape(options.candidate, path)
+      fetchShape(options.candidate, translateLegacyPath(path))
     ])
+    const baseline = {
+      ...legacy,
+      canonicalPath: legacy.canonicalPath && translateLegacyPath(legacy.canonicalPath)
+    }
     const fields = (Object.keys(baseline) as Array<keyof PageShape>).filter(
       field => JSON.stringify(baseline[field]) !== JSON.stringify(candidate[field])
     )

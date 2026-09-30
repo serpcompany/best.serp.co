@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { scanFeaturedBadge, verifyFeaturedBadge } from './badge-verifier'
 
 const lightBadgeUrl = 'https://best.serp.co/badge/featured-on-serp.co-light.svg'
-const listingUrl = 'https://best.serp.co/products/example.com/reviews/'
+const listingUrl = 'https://best.serp.co/products/example.com/'
 const validBadgeHtml = `<a href="${listingUrl}"><img src="${lightBadgeUrl}"></a>`
 
 const expected = {
@@ -36,13 +36,24 @@ describe('badge scanner', () => {
     ).toEqual({ ok: false, code: 'wrong_destination' })
     expect(
       scanFeaturedBadge(
-        `<a href="https://best.serp.co/products/example.com/"><img src="${lightBadgeUrl}"></a>`,
+        `<a href="https://best.serp.co/products/example.com/reviews/"><img src="${lightBadgeUrl}"></a>`,
         expected
       )
     ).toEqual({ ok: false, code: 'wrong_destination' })
     expect(scanFeaturedBadge('<p>No badge</p>', expected)).toEqual({
       ok: false,
       code: 'badge_missing'
+    })
+  })
+})
+
+describe('legacy listing URLs', () => {
+  it('accepts badges that still link to the pre-simplification reviews URL', () => {
+    const legacyHref = 'https://best.serp.co/products/example.com/reviews/'
+    const html = `<a href="${legacyHref}"><img src="${lightBadgeUrl}"></a>`
+    expect(scanFeaturedBadge(html, expected)).toEqual({ ok: false, code: 'wrong_destination' })
+    expect(scanFeaturedBadge(html, { ...expected, legacyListingUrls: [legacyHref] })).toEqual({
+      ok: true
     })
   })
 })

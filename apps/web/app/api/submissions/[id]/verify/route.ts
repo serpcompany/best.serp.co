@@ -1,7 +1,10 @@
 import { submissionCapabilitySchema } from '@serpdirectory/web-core/forms/submission-contract'
 import { NextResponse } from 'next/server'
 import { verifyFeaturedBadge } from '@/lib/submissions/badge-verifier'
-import { submissionBadgeTargets } from '@/lib/submissions/presentation'
+import {
+  submissionBadgeTargets,
+  submissionBadgeVerificationTargets
+} from '@/lib/submissions/presentation'
 import {
   beginVerification,
   finishVerification,
@@ -25,11 +28,13 @@ export async function POST(
     if (state.status !== 'pending_badge') {
       return NextResponse.json({ ...state, ...submissionBadgeTargets(state.slug) })
     }
-    const targets = submissionBadgeTargets(state.slug)
-    const result = await verifyFeaturedBadge(state.website, targets)
+    const result = await verifyFeaturedBadge(
+      state.website,
+      submissionBadgeVerificationTargets(state.slug)
+    )
     const updated = await finishVerification(id, parsed.data.token, result)
     return NextResponse.json(
-      { ...updated, ...targets },
+      { ...updated, ...submissionBadgeTargets(state.slug) },
       { status: result.ok ? 200 : 422, headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {

@@ -11,6 +11,8 @@ badge**. `POST /api/submissions/<id>/verify` authenticates the capability, enfor
 10-attempt limit and a 30-second cooldown, and fetches the submitted website. It
 succeeds only when the badge image links to the future listing URL without
 `nofollow`. Success moves the row to `verified`; it does not publish anything.
+Badges embedded before the URL simplification link to `/products/<slug>/reviews/`; that
+URL redirects to the listing and is still accepted.
 
 Transient failures (connection, timeout, HTTP status, redirects, non-HTML) update the
 last-check time but do not consume an attempt; conclusive HTML results

@@ -19,3 +19,12 @@ export function submissionBadgeTargets(slug: string) {
     })
   }
 }
+
+/**
+ * Badges embedded before the route simplification link to /products/<slug>/reviews/.
+ * That URL now redirects to the listing, so verification still accepts it.
+ */
+export function submissionBadgeVerificationTargets(slug: string) {
+  const targets = submissionBadgeTargets(slug)
+  return { ...targets, legacyListingUrls: [`${targets.listingUrl}reviews/`] }
+}

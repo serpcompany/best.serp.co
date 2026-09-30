@@ -6,28 +6,21 @@ import {
   DirectoryNavigationSection,
   directoryNavigationInteractiveClassName
 } from '@serpdirectory/design-system/shadcnblocks/directory-navigation'
-import { ExternalLink, Trophy } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import { resolveCategories } from '../categories'
 import { getCategoryDisplayName } from '../category-display'
 import { externalResources } from '../external-resources'
-import { getFeaturedCategoryRoute, getRoute } from '../routes'
+import { getRoute } from '../routes'
 import { siteConfig } from '../site-config'
 import { FavoritesLink } from '../ui/favorites-link'
 
 export interface AppSidebarProps {
   availableCategorySlugs?: string[]
   currentCategory?: string
-  featuredCount?: number
-  showFeaturedCategory?: boolean
 }
 
-export function AppSidebar({
-  availableCategorySlugs,
-  currentCategory,
-  featuredCount = 0,
-  showFeaturedCategory = featuredCount > 0
-}: AppSidebarProps) {
+export function AppSidebar({ availableCategorySlugs, currentCategory }: AppSidebarProps) {
   const showExternalResources =
     siteConfig.features.showExternalResources && externalResources.length > 0
   const availableCategories = resolveCategories(availableCategorySlugs || [])
@@ -45,25 +38,6 @@ export function AppSidebar({
           ) : null}
 
           <DirectoryNavigationSection title="Categories">
-            {showFeaturedCategory ? (
-              <Link
-                href={getFeaturedCategoryRoute()}
-                className={directoryNavigationInteractiveClassName}
-              >
-                <DirectoryNavigationItem
-                  icon={<Trophy className="h-4 w-4" />}
-                  trailing={
-                    featuredCount > 0 ? (
-                      <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs">
-                        {featuredCount}
-                      </span>
-                    ) : null
-                  }
-                >
-                  Featured
-                </DirectoryNavigationItem>
-              </Link>
-            ) : null}
             {availableCategories.map(category => {
               const isActive = category.slug === currentCategory
 

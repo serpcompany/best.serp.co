@@ -172,7 +172,7 @@ describe('D1 submission approval guard', () => {
       db.prepare('SELECT outcome,affected_routes,published_version FROM publication_runs').get()
     ).toEqual({
       outcome: 'succeeded',
-      affected_routes: '/products/example.com/reviews/',
+      affected_routes: '/products/example.com/',
       published_version: 2
     })
 

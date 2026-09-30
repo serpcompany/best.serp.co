@@ -119,15 +119,24 @@ let nextConfig: NextConfig = {
         destination: '/',
         permanent: false
       },
+      // Pre-D1 URL scheme (serpcompany/best.serp.co#34): /products/<slug>/reviews/ and
+      // /products/best/<category>/. "featured" is a placement flag, not a public page.
       {
-        source: '/categories/:path*',
-        destination: '/products/best/:path*',
+        source: '/products/:slug/reviews',
+        destination: '/products/:slug/',
+        permanent: true
+      },
+      ...['/products/best', '/products/best/featured', '/categories', '/categories/featured'].map(
+        source => ({ source, destination: '/products/categories/', permanent: true })
+      ),
+      {
+        source: '/products/best/:category',
+        destination: '/products/categories/:category/',
         permanent: true
       },
       {
-        // Listing details live at /products/[slug]/reviews/; forward bare slugs there.
-        source: '/products/:slug((?!best(?:/|$))[^/]+)',
-        destination: '/products/:slug/reviews/',
+        source: '/categories/:category',
+        destination: '/products/categories/:category/',
         permanent: true
       },
       {

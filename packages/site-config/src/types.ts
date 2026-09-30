@@ -82,7 +82,6 @@ export type SiteSitemapConfig = {
   artifactExcludedPaths?: string[]
   categoryBasePath?: string
   excludedPaths?: string[]
-  featuredCategoryPath?: string
   indexGroupOrder?: SiteSitemapGroupKey[]
   listingDetailSuffix?: string
   pathByGroup?: Partial<Record<SiteSitemapGroupKey, string>>

@@ -47,17 +47,15 @@ export const site: SiteDefinition = {
     networkBasePath: 'network'
   },
   sitemap: {
-    categoryBasePath: 'products/best',
+    categoryBasePath: 'products/categories',
     excludedPaths: [
       '/legal/affiliate-disclosure',
       '/legal/dmca',
       '/legal/privacy-policy',
       '/legal/terms-conditions',
-      '/products/best/featured',
-      '/products/best/other',
+      '/products/categories/other',
       '/submit'
     ],
-    listingDetailSuffix: 'reviews',
     pathByGroup: {
       listings: '/sitemaps/directory/1.xml',
       pages: '/sitemaps/pages/1.xml',
@@ -74,6 +72,7 @@ export const site: SiteDefinition = {
       '/legal/privacy-policy',
       '/legal/terms-conditions',
       '/pricing',
+      '/products/categories',
       '/sponsor',
       '/submit'
     ]

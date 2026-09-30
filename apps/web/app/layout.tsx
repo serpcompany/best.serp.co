@@ -9,7 +9,7 @@ import { siteConfig } from '@serpdirectory/web-core/site-config'
 import { siteCopy } from '@serpdirectory/web-core/site-copy'
 import { SignOutButton } from '@/components/auth/sign-out-button'
 import { getHeaderAuthState } from '@/lib/auth'
-import { getActiveCategories, getFeaturedListingCount } from '@/lib/catalog/repository'
+import { getActiveCategories } from '@/lib/catalog/repository'
 
 export const metadata = rootLayoutMetadata
 export const dynamic = 'force-dynamic'
@@ -20,10 +20,9 @@ type RootLayoutProps = {
 
 export default async function RootLayout({ children }: RootLayoutProps): Promise<ReactElement> {
   const gtmId = resolveGoogleTagManagerId(siteConfig)
-  const [authState, activeCategories, featuredCount] = await Promise.all([
+  const [authState, activeCategories] = await Promise.all([
     getHeaderAuthState(),
-    getActiveCategories(),
-    getFeaturedListingCount()
+    getActiveCategories()
   ])
   const activeCategorySlugs = activeCategories.map(category => category.slug)
 
@@ -40,7 +39,6 @@ export default async function RootLayout({ children }: RootLayoutProps): Promise
           desktopSignOutButton={
             <SignOutButton className="hidden sm:inline-flex rounded-none text-sm font-bold h-9 px-4" />
           }
-          featuredCount={featuredCount}
           mobileSignOutButton={
             <SignOutButton className="w-full justify-start rounded-md px-2 py-1.5 text-sm font-normal" />
           }

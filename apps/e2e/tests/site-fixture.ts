@@ -5,7 +5,6 @@
  */
 export const site = {
   categoryCount: 140,
-  featuredListingCount: 335,
   listingCount: 3422,
   name: 'SERP',
   publicUrl: 'https://best.serp.co',
@@ -23,12 +22,14 @@ export const sampleCategory = {
 } as const
 
 export function listingPath(slug: string): string {
-  return `/products/${slug}/reviews/`
+  return `/products/${slug}/`
 }
 
 export function categoryPath(slug: string): string {
-  return `/products/best/${slug}/`
+  return `/products/categories/${slug}/`
 }
+
+export const categoriesIndexPath = '/products/categories/'
 
 export function absoluteUrl(path: string): string {
   return `${site.publicUrl}${path}`

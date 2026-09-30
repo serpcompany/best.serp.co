@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import type { ComponentType, ReactElement } from 'react'
-import { getActiveCategories, getFeaturedListingCount } from './category-navigation'
+import { getActiveCategories } from './category-navigation'
 import {
   type GuideMetadata,
   toWebsiteBrowseCardMetadata,
@@ -142,10 +142,7 @@ export function HomePageRoute({ data, slots }: HomePageRouteProps): ReactElement
       </div>
       <div className="border-t">
         <div className="relative flex h-full w-full max-w-full flex-row flex-nowrap">
-          <AppSidebar
-            availableCategorySlugs={activeCategorySlugs}
-            featuredCount={getFeaturedListingCount(featuredProjects)}
-          />
+          <AppSidebar availableCategorySlugs={activeCategorySlugs} />
 
           <div className="relative flex h-full w-full flex-col px-6 pt-6 pb-16 space-y-8">
             <section>

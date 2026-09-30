@@ -63,8 +63,8 @@ Use short-lived branches and pull requests into protected `main`; never force-pu
 - Model tables in `packages/data-ops/src/schema.ts` and generate migrations into
   `d1/drizzle/` with `pnpm d1:generate`; `drizzle-kit push` is forbidden.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
-- Public URLs are part of the SEO contract: `/products/<slug>/reviews/`,
-  `/products/best/<category>/`. Changing a route requires permanent redirects.
+- Public URLs are part of the SEO contract: `/products/<slug>/`,
+  `/products/categories/<category>/`. Changing a route requires permanent redirects.
 - Route production mutations through protected GitHub Actions only.
 
 ## Forbidden patterns

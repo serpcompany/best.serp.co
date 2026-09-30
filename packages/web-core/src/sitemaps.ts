@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { NextResponse } from 'next/server'
-import { getActiveCategories, hasFeaturedListings } from './category-navigation'
-import { getFeaturedCategoryRoute, getRoute } from './routes'
+import { getActiveCategories } from './category-navigation'
+import { getRoute } from './routes'
 import { SITE_PUBLIC_URL } from './seo-config'
 import { siteConfig } from './site-config'
 
@@ -243,10 +243,6 @@ async function getTaxonomyPaths(
     }
 
     paths.push(getRoute('category.page', { category: category.slug }))
-  }
-
-  if (hasFeaturedListings(websites)) {
-    paths.push(getFeaturedCategoryRoute())
   }
 
   return withoutConfiguredExcludedPaths([

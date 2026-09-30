@@ -29,13 +29,11 @@ export function Header({
   activeCategorySlugs = [],
   authState,
   desktopSignOutButton,
-  featuredCount = 0,
   mobileSignOutButton
 }: {
   activeCategorySlugs?: string[]
   authState?: HeaderAuthState
   desktopSignOutButton?: ReactNode
-  featuredCount?: number
   mobileSignOutButton?: ReactNode
 }) {
   const [showMobileSearch, setShowMobileSearch] = useState(false)
@@ -251,8 +249,6 @@ export function Header({
         availableCategorySlugs={activeCategorySlugs}
         isOpen={showMobileDrawer}
         onClose={() => setShowMobileDrawer(false)}
-        featuredCount={featuredCount}
-        showFeaturedCategory={featuredCount > 0}
         authState={authState}
         signOutButton={mobileSignOutButton}
       />

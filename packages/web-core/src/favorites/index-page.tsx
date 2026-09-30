@@ -81,10 +81,7 @@ export function FavoritesIndexPage({
 
       <div className="border-t">
         <div className="relative flex h-full w-full max-w-full flex-row flex-nowrap">
-          <AppSidebar
-            availableCategorySlugs={activeCategorySlugs}
-            featuredCount={featuredProjects.length}
-          />
+          <AppSidebar availableCategorySlugs={activeCategorySlugs} />
 
           <div className="relative flex h-full w-full flex-col gap-3 px-6 pt-6 pb-16">
             <Breadcrumb

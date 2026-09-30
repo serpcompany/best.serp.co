@@ -1,11 +1,7 @@
 import type { Metadata } from 'next'
 import type { ComponentType, ReactNode } from 'react'
 import type { Category } from '../categories'
-import {
-  type CategoryLike,
-  getFeaturedListingCount,
-  listingMatchesCategory
-} from '../category-navigation'
+import { type CategoryLike, listingMatchesCategory } from '../category-navigation'
 import { getCategorySEO } from '../category-seo'
 import {
   type GuideMetadata,
@@ -90,14 +86,12 @@ export function CategoryRoutePage({
   allProjects,
   category,
   featuredGuides,
-  featuredProjects,
   slots
 }: {
   activeCategorySlugs: string[]
   allProjects: Array<WebsiteMetadata & CategoryLike>
   category: Category
   featuredGuides: GuideMetadata[]
-  featuredProjects: WebsiteMetadata[]
   slots: CategoryRouteSlots
 }) {
   const {
@@ -224,7 +218,6 @@ export function CategoryRoutePage({
             <AppSidebar
               availableCategorySlugs={activeCategorySlugs}
               currentCategory={category.slug}
-              featuredCount={getFeaturedListingCount(featuredProjects)}
             />
 
             <div className="relative flex h-full w-full flex-col gap-3 px-6 pt-6">

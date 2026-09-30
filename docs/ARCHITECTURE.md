@@ -21,11 +21,13 @@ Browser
 ## Responsibility map
 
 - `apps/web/app/` adapts HTTP routes to page behavior. Public URLs:
-  `/products/<slug>/reviews/` (detail), `/products/best/<category>/` (category),
-  `/products/best/featured/`, `/products/`, `/brands/`, `/search/`, `/submit/`,
-  `/legal/*`, `/rss.xml`, `/sitemap-index.xml`, `/sitemaps/{pages,directory,categories}/1.xml`.
-  Legacy aliases (`/products/<slug>/`, `/categories/<x>/`) redirect permanently in
-  `apps/web/next.config.ts`.
+  `/products/<slug>/` (detail), `/products/categories/` (index),
+  `/products/categories/<category>/` (category), `/products/`, `/brands/`, `/search/`,
+  `/submit/`, `/legal/*`, `/rss.xml`, `/sitemap-index.xml`,
+  `/sitemaps/{pages,directory,categories}/1.xml`. The pre-D1 scheme
+  (`/products/<slug>/reviews/`, `/products/best/<category>/`, `/categories/<x>/`) redirects
+  permanently in `apps/web/next.config.ts`. "Featured" is a listing flag used for
+  placements (the homepage section), not a public category page.
 - `apps/web/lib/catalog/` acquires the binding, validates the runtime environment,
   and deduplicates reads per request. It contains no SQL.
 - `apps/web/lib/submissions/` validates the binding, performs bounded badge HTTP

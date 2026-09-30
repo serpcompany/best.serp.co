@@ -82,6 +82,7 @@ export const routes = {
     withCategory: `${buildListingRoute()}?category=[category]`
   },
   category: {
+    index: buildCategoryRoute(''),
     page: buildCategoryRoute()
   },
   about: '/about/',
@@ -120,19 +121,10 @@ export function getCanonicalListingListRoute(): string {
   return isConfiguredSitemapExcludedPath(routes.listing.list) ? routes.home : routes.listing.list
 }
 
-export function getFeaturedCategoryRoute(): string {
-  const configuredPath = siteConfig.sitemap.featuredCategoryPath?.trim()
-
-  if (configuredPath) {
-    return withTrailingSlash(configuredPath.startsWith('/') ? configuredPath : `/${configuredPath}`)
-  }
-
-  return getRoute('category.page', { category: 'featured' })
-}
-
 type StaticRoutes =
   | 'home'
   | 'account'
+  | 'category.index'
   | 'listing.list'
   | 'listing.featured'
   | 'listing.latest'
