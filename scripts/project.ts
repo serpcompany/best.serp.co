@@ -12,7 +12,10 @@ export const project = {
     name: 'best-serp-co-v1',
     parityReportPath: 'd1/artifacts/best-serp-co-v1-parity.yaml'
   },
+  /** Typed confirmations the protected production workflows require. */
   confirmation: {
+    bootstrap: 'bootstrap-best.serp.co-production',
+    deploy: 'deploy-best.serp.co-production',
     publish: 'publish-best.serp.co-production',
     submission: 'approve-best.serp.co-submission-production'
   },
@@ -27,7 +30,29 @@ export const project = {
     staging: 'staging'
   },
   publicUrl: 'https://best.serp.co',
+  /**
+   * Remote Worker and D1 identities, mirrored from `env.staging` / `env.production` in
+   * `wrangler.jsonc` (IDs are not secrets). Release tooling refuses a config that differs.
+   */
+  remote: {
+    production: {
+      databaseId: '404ec437-53a2-4fbc-8b5f-b5e69065708e',
+      databaseName: 'best-serp-co-production',
+      origin: 'https://best.serp.co',
+      workerName: 'best-serp-co-production',
+      workersDev: false
+    },
+    staging: {
+      databaseId: '8e6b67e5-9c58-4fa9-aca1-25b0020c0833',
+      databaseName: 'best-serp-co-staging',
+      origin: 'https://best-serp-co-staging.serpcompany.workers.dev',
+      workerName: 'best-serp-co-staging',
+      workersDev: true
+    }
+  },
+  repository: 'serpcompany/best.serp.co',
   wranglerConfigPath: 'apps/web/wrangler.jsonc'
 } as const
 
 export type Project = typeof project
+export type RemoteEnvironment = keyof typeof project.remote
