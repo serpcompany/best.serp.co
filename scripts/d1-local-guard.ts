@@ -1,25 +1,21 @@
 import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
+import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
-import { brotliDecompressSync } from 'node:zlib'
-import { parse } from 'yaml'
-import { captureApplicationSnapshot, type SnapshotTransport } from './d1-application-snapshot'
-import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
+import { captureApplicationSnapshot } from './d1-application-snapshot'
+import {
+  expectedBootstrapSnapshot,
+  readParityReport,
+  readReviewedImportSql,
+  sqliteTransport
+} from './d1-import-artifact'
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { runCanonicalPreview } from './d1-local-preview'
 import { configuredFreshD1StateRoot } from './d1-local-state'
 import { applicationTableNames } from './d1-table-inventory'
 import { project } from './project'
-
-interface ParityReport {
-  artifact?: { batchChecksums?: string[]; sqlChecksum?: string }
-  parity: { importBatches: number }
-  target: { checksum: string }
-}
 
 function wrangler(args: string[], capture = false): string {
   try {
@@ -58,61 +54,6 @@ function query(command: string): unknown[] {
   )
   const parsed = JSON.parse(output) as Array<{ results?: unknown[] }>
   return parsed[0]?.results || []
-}
-
-function readParityReport(): ParityReport {
-  const reportPath = resolve(project.artifact.parityReportPath)
-  if (!existsSync(reportPath)) {
-    throw new Error(
-      `Missing initial import parity report ${project.artifact.parityReportPath}. Generate the reviewed artifact with pnpm migration:generate first.`
-    )
-  }
-  return parse(readFileSync(reportPath, 'utf8')) as ParityReport
-}
-
-function importBatchPath(index: number): string {
-  return `${project.artifact.batchDirectory}/${String(index).padStart(4, '0')}.sql`
-}
-
-function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex')
-}
-
-/** Reads every reviewed import batch, refusing any batch whose bytes differ from the report. */
-function readReviewedBatches(report: ParityReport): string[] {
-  const batches: string[] = []
-  for (let index = 1; index <= report.parity.importBatches; index += 1) {
-    const batch = readFileSync(resolve(importBatchPath(index)), 'utf8')
-    const expected = report.artifact?.batchChecksums?.[index - 1]
-    if (expected && sha256(batch) !== expected) {
-      throw new Error(`${importBatchPath(index)} does not match its reviewed checksum.`)
-    }
-    batches.push(batch)
-  }
-  return batches
-}
-
-/**
- * The combined import SQL, from the locally generated batches when present, otherwise from
- * the committed brotli artifact. Either way it must match the reviewed artifact checksum.
- */
-export function readReviewedImportSql(report: ParityReport): string {
-  const combined = existsSync(resolve(importBatchPath(1)))
-    ? readReviewedBatches(report).join('\n')
-    : existsSync(resolve(project.artifact.compressedSqlPath))
-      ? brotliDecompressSync(readFileSync(resolve(project.artifact.compressedSqlPath))).toString(
-          'utf8'
-        )
-      : undefined
-  if (combined === undefined) {
-    throw new Error(
-      `Missing import SQL: neither ${project.artifact.batchDirectory} nor ${project.artifact.compressedSqlPath} exists. Run pnpm migration:generate.`
-    )
-  }
-  if (report.artifact?.sqlChecksum && sha256(combined) !== report.artifact.sqlChecksum) {
-    throw new Error('Import SQL does not reproduce the reviewed artifact checksum.')
-  }
-  return combined
 }
 
 function migrate(): void {
@@ -172,51 +113,17 @@ function localSqlitePath(directory: string): string {
   return matches[0]!
 }
 
-function databaseTransport(database: DatabaseSync): {
-  close: () => void
-  transport: SnapshotTransport
-} {
-  return {
-    close: () => database.close(),
-    transport: {
-      async query(statement) {
-        return database
-          .prepare(statement.sql)
-          .all(...(statement.params as SQLInputValue[])) as Array<Record<string, unknown>>
-      }
-    }
-  }
-}
-
-function localSnapshotTransport() {
-  return databaseTransport(
-    new DatabaseSync(localSqlitePath(configuredFreshD1StateRoot()), { readOnly: true })
-  )
-}
-
-function expectedBootstrapTransport(report: ParityReport) {
-  const database = new DatabaseSync(':memory:')
-  database.exec('PRAGMA foreign_keys = ON')
-  for (const migration of freshMigrationNames()) {
-    database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
-  }
-  database.exec(readReviewedImportSql(report))
-  return databaseTransport(database)
+function localSnapshotDatabase(): DatabaseSync {
+  return new DatabaseSync(localSqlitePath(configuredFreshD1StateRoot()), { readOnly: true })
 }
 
 async function verify(): Promise<void> {
   const report = readParityReport()
-  const expectedDatabase = expectedBootstrapTransport(report)
-  let expected
-  try {
-    expected = await captureApplicationSnapshot(expectedDatabase.transport)
-  } finally {
-    expectedDatabase.close()
-  }
-  const actualDatabase = localSnapshotTransport()
+  const expected = await expectedBootstrapSnapshot(readReviewedImportSql(report))
+  const actualDatabase = localSnapshotDatabase()
   let actual
   try {
-    actual = await captureApplicationSnapshot(actualDatabase.transport)
+    actual = await captureApplicationSnapshot(sqliteTransport(actualDatabase))
   } finally {
     actualDatabase.close()
   }
