@@ -79,3 +79,6 @@ tmp/deploy/
 d1/artifacts/*
 !d1/artifacts/*-parity.yaml
 !d1/artifacts/*.sql.br
+
+# Claude Code agent worktrees
+.claude/worktrees/
