@@ -1,0 +1,78 @@
+name: Bootstrap Production D1
+
+# One-time initial catalog import into the EMPTY production D1. The import refuses any existing
+# publication or catalog rows before changing anything, applies the d1/drizzle migrations,
+# imports d1/artifacts/best-serp-co-v1.sql.br only if its sha256 matches the parity report, then
+# proves exact parity with the report. See docs/DEPLOY_RUNBOOK.md.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type bootstrap-best.serp.co-production to import the reviewed catalog into the empty production D1'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: best-serp-co-production
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Check ref and confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main and the typed confirmation
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::The production bootstrap runs only from main, not $GITHUB_REF."
+            exit 1
+          fi
+          if [ "$CONFIRMATION" != "bootstrap-best.serp.co-production" ]; then
+            echo "::error::Type bootstrap-best.serp.co-production to bootstrap production D1."
+            exit 1
+          fi
+
+  bootstrap:
+    name: Import and verify the reviewed catalog
+    needs: [authorize]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+    steps:
+      - name: Require Cloudflare credentials
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::The production environment needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/DEPLOY_RUNBOOK.md)."
+            exit 1
+          fi
+
+      - name: Checkout reviewed source
+        uses: actions/checkout@v7
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Validate D1 import and release contracts
+        run: pnpm test:d1
+
+      - name: Import the reviewed catalog into empty production D1
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RELEASE_CONFIRM: ${{ inputs.confirmation }}
+        run: pnpm tsx scripts/cloudflare-release.ts import production
+
+      - name: Verify production D1 against the parity report
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm tsx scripts/cloudflare-release.ts verify-import production

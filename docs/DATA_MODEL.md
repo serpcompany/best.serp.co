@@ -40,7 +40,7 @@ related-listings ranking (`name, slug`) a bounded seek.
 
 Ongoing changes use reviewed YAML manifests under `d1/publications/`. The publisher
 validates the base version, prior checksum, IDs, slugs, URLs, and categories before
-sending one batch. Verification, rejection, and approval batches assert
+sending one batch; `publish-d1.yml` applies a manifest to production after a D1 backup. Verification, rejection, and approval batches assert
 `changes() = 1` after every compare-and-swap step, so stale decisions roll back.
 
 ## Initial import
@@ -52,4 +52,6 @@ The catalog was bootstrapped once from `serpcompany/json-directory-template@25e2
 produces identical rows. `best-serp-co-v1-parity.yaml` records source checksums,
 counts, the SQL checksum, and the target checksum written to `publication_state`;
 `best-serp-co-v1.sql.br` is the committed brotli copy of the SQL that seeds local D1 and
-CI. The uncompressed SQL and per-batch files are git-ignored.
+CI. The uncompressed SQL and per-batch files are git-ignored. Remote environments are
+bootstrapped from the same checksum-verified SQL by `bootstrap-production-d1.yml`, which
+imports only into an empty database and then verifies exact parity with the report.
