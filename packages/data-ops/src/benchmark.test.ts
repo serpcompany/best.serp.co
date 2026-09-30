@@ -161,14 +161,44 @@ describe('representative D1 query benchmark', () => {
 
   it('records bounded optimized scans and statement counts against legacy hotspots', async () => {
     const events: CatalogQueryEvent[] = []
-    const catalog = createCatalogOperations({
-      cache: new MemoryCatalogCache(),
-      client: createDatabase(sqlite.asD1Database()),
-      clock: benchmarkNow,
-      observe: event => {
-        if (event.event === 'd1_query') events.push(event)
-      }
-    })
+    const cache = new MemoryCatalogCache()
+    const operations = () =>
+      createCatalogOperations({
+        cache,
+        client: createDatabase(sqlite.asD1Database()),
+        clock: benchmarkNow,
+        observe: event => {
+          if (event.event === 'd1_query') events.push(event)
+        }
+      })
+    const scanStatements = (statements: typeof sqlite.statements) =>
+      statements.map(statement => scan(databasePath, bindSql(statement.sql, statement.bindings)))
+
+    // Shell statistics: one cold aggregate, then an epoch probe plus a cache hit.
+    const shellStart = sqlite.statements.length
+    await operations().getShellStats()
+    const coldShellStatements = sqlite.statements.slice(shellStart)
+    const warmStart = sqlite.statements.length
+    await operations().getShellStats()
+    const warmShellStatements = sqlite.statements.slice(warmStart)
+    const coldShellRows = totalRows(scanStatements(coldShellStatements))
+    const warmShellRows = totalRows(scanStatements(warmShellStatements))
+    const oneColdPlus99WarmAverage =
+      coldShellRows === null || warmShellRows === null
+        ? null
+        : (coldShellRows + warmShellRows * 99) / 100
+    // The previous shell query counted each category with a correlated subquery.
+    const legacyShell = scan(
+      databasePath,
+      `SELECT c.slug, (
+        SELECT COUNT(*) FROM listing_categories lc JOIN listings l ON l.id = lc.listing_id
+        WHERE lc.category_id = c.id AND l.status = 'approved' AND l.is_active = 1
+          AND l.published_at IS NOT NULL AND l.published_at <= '2026-07-30T00:00:00.000Z'
+      ) FROM categories c WHERE c.is_active = 1`
+    )
+
+    // Multi-category detail: related listings and both neighbours after the detail row.
+    const catalog = operations()
     const currentId = 'serp-bench-160'
     const currentSlug = 'bench-160'
     const statementStart = sqlite.statements.length
@@ -180,23 +210,11 @@ describe('representative D1 query benchmark', () => {
       statement.sql.includes('l.slug < ?')
     )
     const optimizedNext = detailStatements.find(statement => statement.sql.includes('l.slug > ?'))
-    const optimizedRelatedIndex = detailStatements.findIndex(statement =>
-      statement.sql.includes('FROM listing_categories shared')
+    const optimizedRelated = detailStatements.find(statement =>
+      statement.sql.includes('related.score')
     )
-    const firstNavigationIndex = detailStatements.findIndex(
-      statement => statement.sql.includes('l.slug < ?') || statement.sql.includes('l.slug > ?')
-    )
-    if (
-      !optimizedPrevious ||
-      !optimizedNext ||
-      optimizedRelatedIndex < 0 ||
-      firstNavigationIndex < 0
-    )
+    if (!optimizedPrevious || !optimizedNext || !optimizedRelated)
       throw new Error('Missing optimized benchmark statements.')
-    const optimizedRelatedStatements = detailStatements.slice(
-      optimizedRelatedIndex,
-      firstNavigationIndex
-    )
 
     const legacyAdjacent = scan(
       databasePath,
@@ -211,10 +229,7 @@ describe('representative D1 query benchmark', () => {
       )
       SELECT previous_id, next_id FROM ordered WHERE slug = '${currentSlug}'`
     )
-    const optimizedAdjacent = [
-      scan(databasePath, bindSql(optimizedPrevious.sql, optimizedPrevious.bindings)),
-      scan(databasePath, bindSql(optimizedNext.sql, optimizedNext.bindings))
-    ]
+    const optimizedAdjacent = scanStatements([optimizedPrevious, optimizedNext])
     const optimizedAdjacentRows = totalRows(optimizedAdjacent)
 
     const legacyRelated = scan(
@@ -232,45 +247,41 @@ describe('representative D1 query benchmark', () => {
        ORDER BY COUNT(*) DESC, l.name
        LIMIT 4`
     )
-    const optimizedRelatedEvidence = optimizedRelatedStatements.map(statement =>
-      scan(databasePath, bindSql(statement.sql, statement.bindings))
-    )
+    const optimizedRelatedEvidence = scanStatements([optimizedRelated])
     const optimizedRelatedRows = totalRows(optimizedRelatedEvidence)
-    const singleCategoryStart = sqlite.statements.length
-    await catalog.getListingBySlug('bench-161')
-    const singleCategoryStatements = sqlite.statements
-      .slice(singleCategoryStart)
-      .filter(
-        statement =>
-          statement.sql.includes('INDEXED BY listings_related_name_idx') ||
-          statement.sql.includes('FROM listing_media')
-      )
-    const singleCategoryRows = totalRows(
-      singleCategoryStatements.map(statement =>
-        scan(databasePath, bindSql(statement.sql, statement.bindings))
-      )
+    // The shared-category plan visits each membership of the listing's categories once in
+    // the category index and once for the candidate row, so this bounds its cost.
+    const sharedMemberships = Number(
+      (
+        sqlite.database
+          .prepare(
+            `SELECT COUNT(*) AS total FROM listing_categories current
+             JOIN listing_categories shared ON shared.category_id = current.category_id
+             WHERE current.listing_id = ?`
+          )
+          .get(currentId) as { total: number }
+      ).total
     )
 
-    const shellStart = sqlite.statements.length
-    await catalog.getShellStats()
-    const coldShellStatements = sqlite.statements.slice(shellStart)
-    const warmStart = sqlite.statements.length
-    await catalog.getShellStats()
-    const warmShellStatements = sqlite.statements.slice(warmStart)
-    const coldShellRows = totalRows(
-      coldShellStatements.map(statement =>
-        scan(databasePath, bindSql(statement.sql, statement.bindings))
-      )
-    )
-    const warmShellRows = totalRows(
-      warmShellStatements.map(statement =>
-        scan(databasePath, bindSql(statement.sql, statement.bindings))
-      )
-    )
-    const oneColdPlus99WarmAverage =
-      coldShellRows === null || warmShellRows === null
-        ? null
-        : (coldShellRows + warmShellRows * 99) / 100
+    // Single-category detail in a dense category: the public name index seek.
+    const singleCategoryStart = sqlite.statements.length
+    const single = await catalog.getListingBySlug('bench-161')
+    const singleCategoryStatements = sqlite.statements
+      .slice(singleCategoryStart)
+      .filter(statement => statement.sql.includes('related.score'))
+    const singleCategoryEvidence = scanStatements(singleCategoryStatements)
+    const singleCategoryRows = totalRows(singleCategoryEvidence)
+    const expectedSingleRelated = (
+      sqlite.database
+        .prepare(
+          `SELECT l.slug FROM listings l
+           JOIN listing_categories lc ON lc.listing_id = l.id
+           WHERE lc.category_id = ? AND l.slug != 'bench-161' AND l.status = 'approved'
+             AND l.published_at <= '2026-07-30T00:00:00.000Z'
+           ORDER BY l.name, l.slug LIMIT 4`
+        )
+        .all(fixtureCategoryIds(sqlite.database).get('primary') ?? -1) as Array<{ slug: string }>
+    ).map(row => row.slug)
 
     const report = {
       fixture: {
@@ -292,10 +303,12 @@ describe('representative D1 query benchmark', () => {
           )
         ],
         optimizedScanRows: optimizedRelatedRows,
+        sharedMemberships,
         singleCategoryOptimizedScanRows: singleCategoryRows
       },
       shell: {
         coldScanRows: coldShellRows,
+        legacyScanRows: legacyShell.rows,
         warmScanRows: warmShellRows,
         oneColdPlus99WarmAverage
       },
@@ -303,21 +316,24 @@ describe('representative D1 query benchmark', () => {
     }
     console.info(`DATA_OPS_BENCHMARK ${JSON.stringify(report)}`)
 
+    expect(single?.relatedWebsites.map(related => related.slug)).toEqual(expectedSingleRelated)
     expect(optimizedAdjacent.flatMap(evidence => evidence.plan).join('\n')).toContain(
       'listings_publication_idx'
     )
-    const optimizedRelatedPlan = optimizedRelatedEvidence
-      .flatMap(evidence => evidence.plan)
-      .join('\n')
-    expect(optimizedRelatedPlan).toContain('listings_related_name_idx')
-    expect(optimizedRelatedPlan).not.toContain('USE TEMP B-TREE')
+    expect(optimizedRelatedEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
+      'listing_categories_category_idx'
+    )
+    expect(singleCategoryEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
+      'listings_related_name_idx'
+    )
     if (scanStatsAvailable) {
       expect(legacyAdjacent.rows).not.toBeNull()
       expect(optimizedAdjacentRows).not.toBeNull()
       expect(legacyAdjacent.rows as number).toBeGreaterThan(optimizedAdjacentRows as number)
       expect(optimizedAdjacentRows as number).toBeLessThanOrEqual(100)
-      expect(optimizedRelatedRows as number).toBeLessThanOrEqual(700)
+      expect(optimizedRelatedRows as number).toBeLessThanOrEqual(2 * sharedMemberships + 50)
       expect(singleCategoryRows as number).toBeLessThanOrEqual(100)
+      expect(legacyShell.rows as number).toBeGreaterThan(coldShellRows as number)
       expect(warmShellRows as number).toBeLessThanOrEqual(10)
       expect(oneColdPlus99WarmAverage as number).toBeLessThanOrEqual(25)
     } else {
@@ -329,9 +345,9 @@ describe('representative D1 query benchmark', () => {
         coldShellRows,
         oneColdPlus99WarmAverage
       ]).toEqual(Array(6).fill(null))
-      expect(warmShellRows).toBe(0)
     }
-    expect(detailStatements.length).toBeLessThanOrEqual(10)
+    // Epoch probe, detail row, related listings, previous, next.
+    expect(detailStatements.length).toBeLessThanOrEqual(5)
     expect(events.every(event => event.success)).toBe(true)
   })
 })
