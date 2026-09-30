@@ -176,7 +176,9 @@ describe('fresh Drizzle D1 history', () => {
     expect(runLocal('migrate', stateDirectory)).toContain('No migrations to apply')
   }, 180_000)
 
-  it.runIf(existsSync(resolve(project.artifact.parityReportPath)))(
+  // The import batches are generated locally (`pnpm migration:generate`) and git-ignored,
+  // so this only runs where they exist.
+  it.runIf(existsSync(resolve(project.artifact.batchDirectory, '0001.sql')))(
     'bootstraps the reviewed initial artifact with exact repeatable parity',
     () => {
       const stateDirectory = temporaryDirectory('best-serp-co-bootstrap-')
