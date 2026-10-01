@@ -29,12 +29,33 @@ those predicates; only the protected approval workflow promotes a verified row, 
 records publication provenance.
 
 List and card operations return summary projections; only detail operations hydrate
-content, media, and resource links. Summaries, details, category counts, and featured
-counts are cached in the Workers Cache API under keys that include the publication
-version, with one-hour retention and live D1 fallback on cache failure.
+content, media, and resource links. List pages read one page at a time
+(`getListingNamePage`): the public ids of the directory or of one category in name order
+are cached per epoch, and only the requested page's summaries are then read by id.
 
-`listings_related_name_idx` is a partial index over public listings that keeps the
-related-listings ranking (`name, slug`) a bounded seek.
+The **catalog epoch** is `publication_state.version` plus the newest public
+`published_at` (`packages/data-ops/src/catalog-epoch.ts`), so it also changes when a
+listing scheduled for the future becomes due. Shell counts, name order and pages,
+featured and latest heads, details, and the full summary list are cached in the Workers
+Cache API under epoch-scoped keys (24-hour retention, live D1 fallback on cache failure),
+and the edge HTML cache uses the same epoch (see [Architecture](./ARCHITECTURE.md#caching)).
+
+Shell statistics (category counts, listing and featured totals) come from one `GROUP BY`
+pass over public memberships: ~15k rows read for the imported catalog instead of ~487k
+for the previous correlated count per category. The totals sum primary memberships, which
+the baseline triggers keep at exactly one per published listing.
+
+Related listings rank by shared categories, then `name, slug`, in one statement:
+
+- several categories: count shared memberships starting from the listing's own
+  categories through `listing_categories_category_idx` (bounded by those categories'
+  sizes; ~1.2k rows read at most on the live catalog, previously up to ~42k);
+- one category of at most 128 listings: read that category's members;
+- one larger category: walk `listings_related_name_idx`, a partial index over public
+  listings, which finds four members of a dense category within a few rows.
+
+Previous/next navigation evaluates its three keyset branches inside one `COALESCE`, which
+stops at the first branch that finds a row.
 
 ## Changing data
 

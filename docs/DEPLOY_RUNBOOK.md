@@ -171,6 +171,30 @@ against staging both produced the exact 16-table snapshot `69a7bae9…e477` (3,4
 141 categories, 18,096 rows). The staging HTTP gates and the 17-test Playwright smoke suite
 passed against the staging Worker.
 
+## Caching after a deploy
+
+`wrangler.jsonc` points `main` at `apps/web/worker.ts`, which wraps the generated
+`.open-next/worker.js`, so `opennextjs-cloudflare deploy` (and therefore
+`deploy-staging.yml` / `deploy-production.yml`) ships the edge HTML cache with the Worker
+(see [Architecture](./ARCHITECTURE.md#caching)). Confirm it after a deploy:
+
+```bash
+curl -sI https://best-serp-co-staging.serpcompany.workers.dev/about/ | grep -i x-edge-cache  # MISS
+curl -sI https://best-serp-co-staging.serpcompany.workers.dev/about/ | grep -i x-edge-cache  # HIT
+```
+
+A deploy starts with a cold HTML cache (the Worker version is part of every key): the first
+request per page and data center renders, later ones are served from the cache. A
+publication or approval reaches cached pages within about a minute; nothing is purged.
+
+| Resource | Staging | Production |
+|---|---|---|
+| Workers Cache API (edge HTML and data cache) | built in, nothing to create | built in, nothing to create |
+| `version_metadata` binding `CF_VERSION_METADATA` | declared in `wrangler.jsonc` | declared in `wrangler.jsonc` |
+
+Caching needs no R2 bucket, KV namespace, Durable Object, or queue, and no API token
+permission beyond the deploy token above.
+
 ## Cutover checklist
 
 1. Staging passes `pnpm migration:compare -- <staging-origin> --sample 60` with zero
