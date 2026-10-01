@@ -223,7 +223,8 @@ describe('remote Wrangler identity', () => {
     expect(() => validateRemoteConfig('staging')).not.toThrow()
     expect(() => validateRemoteConfig('production')).not.toThrow()
     expect(project.remote.production.origin).toBe(project.publicUrl)
-    expect(project.remote.production.workersDev).toBe(false)
+    // Pre-cutover review URL; *.workers.dev responses carry X-Robots-Tag noindex.
+    expect(project.remote.production.workersDev).toBe(true)
   })
 
   it('refuses a drifted environment identity', () => {
@@ -235,7 +236,7 @@ describe('remote Wrangler identity', () => {
       [
         'workers_dev',
         config => {
-          config.env.production.workers_dev = true
+          config.env.production.workers_dev = false
         }
       ],
       [

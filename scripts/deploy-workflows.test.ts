@@ -198,10 +198,13 @@ describe('production deploy workflow', () => {
     )
   })
 
-  it('gates the production origin only once the Worker serves best.serp.co', () => {
+  it('gates best.serp.co once the Worker serves it, and the workers.dev review origin before', () => {
     const gates = stepRunning(release, 'd1-preview-http-gates.ts')
     expect(gates.run).toContain('if [ "$server" = "GitHub.com" ]; then')
-    expect(gates.run).toContain('::notice title=HTTP gates skipped::')
+    expect(gates.run).toContain('d1-preview-http-gates.ts staging "$PRODUCTION_REVIEW_ORIGIN"')
+    expect(gates.env?.PRODUCTION_REVIEW_ORIGIN).toBe(
+      'https://best-serp-co-production.serpcompany.workers.dev'
+    )
   })
 })
 

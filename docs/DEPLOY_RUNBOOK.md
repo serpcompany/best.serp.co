@@ -18,6 +18,7 @@ Status (serpcompany/best.serp.co#34):
 | Worker | `best-serp-co-staging` (workers.dev) | `best-serp-co-production` (no workers.dev) |
 | D1 | `best-serp-co-staging` `8e6b67e5-9c58-4fa9-aca1-25b0020c0833` | `best-serp-co-production` `404ec437-53a2-4fbc-8b5f-b5e69065708e` |
 | Origin | https://best-serp-co-staging.serpcompany.workers.dev | https://best.serp.co (Worker Custom Domain on `serp.co`, at cutover) |
+| Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`; `*.workers.dev` responses are `noindex`). Production HTTP gates run here until best.serp.co stops returning `server: GitHub.com`. After cutover, set `workers_dev: false` (and `project.remote.production.workersDev`) to retire it. |
 | GitHub environment | `staging` | `production` (required reviewers, `main` only) |
 
 The identities live in `env.staging` / `env.production` of `apps/web/wrangler.jsonc` and in

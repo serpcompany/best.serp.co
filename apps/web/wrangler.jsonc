@@ -48,7 +48,7 @@
     },
     "production": {
       "name": "best-serp-co-production",
-      "workers_dev": false,
+      "workers_dev": true,
       "observability": {
         "enabled": true
       },

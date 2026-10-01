@@ -39,8 +39,10 @@ export const project = {
       databaseId: '404ec437-53a2-4fbc-8b5f-b5e69065708e',
       databaseName: 'best-serp-co-production',
       origin: 'https://best.serp.co',
+      /** noindex review URL until the best.serp.co Custom Domain is attached (#34 Phase 4b). */
+      reviewOrigin: 'https://best-serp-co-production.serpcompany.workers.dev',
       workerName: 'best-serp-co-production',
-      workersDev: false
+      workersDev: true
     },
     staging: {
       databaseId: '8e6b67e5-9c58-4fa9-aca1-25b0020c0833',
