@@ -8,6 +8,8 @@ import { categoryRoute, listingRoute } from './site-routes'
 export type HttpGateMode = 'staging' | 'production'
 const defaultRequestTimeoutMs = 15_000
 const maxBodyProbeBytes = 4_096
+const maxTextProbeBytes = 16_384
+const sitemapIndexPath = '/sitemap-index.xml'
 
 function parseMode(value: string): HttpGateMode {
   if (value === 'staging' || value === 'production') return value
@@ -98,6 +100,71 @@ async function expectRoute(
   })
 }
 
+async function readBoundedText(response: Response, label: string): Promise<string> {
+  if (!response.body) throw new Error(`${label} returned an empty body.`)
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let observed = 0
+  let text = ''
+  try {
+    while (observed < maxTextProbeBytes) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const bounded = value.subarray(0, maxTextProbeBytes - observed)
+      observed += bounded.byteLength
+      text += decoder.decode(bounded, { stream: true })
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined)
+  }
+  return text + decoder.decode()
+}
+
+function blocksIndexing(response: Response): boolean {
+  return /\b(?:noindex|none)\b/iu.test(response.headers.get('x-robots-tag') ?? '')
+}
+
+/**
+ * Environment-specific crawl policy (serp docs/engineering/standards/environment-configuration.md):
+ * Staging must send noindex; Production must not, and its robots.txt must allow crawling and
+ * list the sitemap index. A noindex reaching best.serp.co would deindex the site.
+ */
+async function expectIndexingPolicy(
+  mode: HttpGateMode,
+  baseUrl: URL,
+  timeoutMs: number
+): Promise<void> {
+  if (mode === 'staging') {
+    await boundedFetch(routeUrl(baseUrl, '/'), timeoutMs, async response => {
+      await response.body?.cancel().catch(() => undefined)
+      if (!blocksIndexing(response))
+        throw new Error('staging route / did not send X-Robots-Tag: noindex.')
+    })
+    return
+  }
+  await Promise.all(
+    ['/', sitemapIndexPath].map(path =>
+      boundedFetch(routeUrl(baseUrl, path), timeoutMs, async response => {
+        await response.body?.cancel().catch(() => undefined)
+        if (blocksIndexing(response))
+          throw new Error(`production route ${path} sent X-Robots-Tag noindex.`)
+      })
+    )
+  )
+  await boundedFetch(routeUrl(baseUrl, '/robots.txt'), timeoutMs, async response => {
+    if (response.status !== 200)
+      throw new Error(`production route /robots.txt returned ${response.status}.`)
+    if (blocksIndexing(response))
+      throw new Error('production route /robots.txt sent X-Robots-Tag noindex.')
+    const robots = await readBoundedText(response, 'production route /robots.txt')
+    const sitemapLine = `Sitemap: ${new URL(sitemapIndexPath, baseUrl).href}`
+    if (!robots.split(/\r?\n/u).some(line => line.trim() === sitemapLine))
+      throw new Error(`production robots.txt does not list "${sitemapLine}".`)
+    if (/^\s*disallow:\s*\/\s*$/imu.test(robots))
+      throw new Error('production robots.txt disallows the whole site.')
+  })
+}
+
 async function expectLegacyRedirect(
   mode: HttpGateMode,
   baseUrl: URL,
@@ -150,9 +217,10 @@ export async function runHttpGates(
     expectRoute(mode, baseUrl, listingRoute(listingSlug), timeoutMs),
     expectRoute(mode, baseUrl, `/api/search?q=${encodeURIComponent(listingSlug)}`, timeoutMs),
     expectRoute(mode, baseUrl, '/rss.xml', timeoutMs),
-    expectRoute(mode, baseUrl, '/sitemap-index.xml', timeoutMs),
+    expectRoute(mode, baseUrl, sitemapIndexPath, timeoutMs),
     expectLegacyRedirect(mode, baseUrl, `/${listingSlug}/`, listingRoute(listingSlug), timeoutMs),
-    expectRoute(mode, baseUrl, '/submit/', timeoutMs)
+    expectRoute(mode, baseUrl, '/submit/', timeoutMs),
+    expectIndexingPolicy(mode, baseUrl, timeoutMs)
   ])
 }
 
@@ -170,7 +238,7 @@ async function main(): Promise<void> {
   if (output)
     writeFileSync(
       resolve(output),
-      `${JSON.stringify({ home: true, category: true, detail: true, search: true, rss: true, sitemap: true, legacyRedirect: true, submit: true })}\n`
+      `${JSON.stringify({ home: true, category: true, detail: true, search: true, rss: true, sitemap: true, legacyRedirect: true, submit: true, indexingPolicy: true })}\n`
     )
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]))
