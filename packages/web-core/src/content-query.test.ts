@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
@@ -255,13 +256,19 @@ describe('applyLegalContentBranding', () => {
     ).toBe('dmca[@]best.serp.co')
   })
 
-  it('still rebrands bare serp.co and SERP references for another site', () => {
+  it('rebrands bare serp.co hostnames and SERP for another site, never an address', () => {
     expect(
-      applyLegalContentBranding('Write to privacy@serp.co or see https://serp.co/terms.', {
-        domain: 'example.com',
-        siteName: 'Example'
+      applyLegalContentBranding(
+        'Write to privacy@serp.co or dmca[@]serp.co, or see https://serp.co/terms.',
+        { domain: 'example.com', siteName: 'Example' }
+      )
+    ).toBe('Write to privacy@serp.co or dmca[@]serp.co, or see https://example.com/terms.')
+    expect(
+      applyLegalContentBranding('privacy@serp.co and dmca[@]serp.co', {
+        domain: 'best.serp.co',
+        siteName: 'SERP'
       })
-    ).toBe('Write to privacy@example.com or see https://example.com/terms.')
+    ).toBe('privacy@serp.co and dmca[@]serp.co')
     expect(
       applyLegalContentBranding('SERP operates {{siteName}}.', {
         domain: 'example.com',
@@ -270,24 +277,44 @@ describe('applyLegalContentBranding', () => {
     ).toBe('Best SERP operates Best SERP.')
   })
 
-  it.each(['dmca', 'privacy', 'terms'])(
-    'renders %s.mdx with contact addresses at the configured legal email domain',
-    file => {
-      const source = readFileSync(
-        fileURLToPath(new URL(`../../content/data/legal/${file}.mdx`, import.meta.url)),
-        'utf8'
-      )
-      const branded = applyLegalContentBranding(source, {
-        domain: siteConfig.domain,
-        legalEmailDomain: siteConfig.legalEmailDomain,
-        siteName: siteConfig.name
-      })
-      const addresses = branded.match(/\b[a-z]+\[@\][a-z0-9.-]*[a-z0-9]/gu) ?? []
+  const legalDirectory = fileURLToPath(new URL('../../content/data/legal/', import.meta.url))
+  const legalFiles = readdirSync(legalDirectory).filter(file => file.endsWith('.mdx'))
+  // /legal/cookies/ still names placeholder example.com addresses, as best.serp.co does today
+  // (serpcompany/best.serp.co#42, T-3). Nothing else may name an address off the legal domain.
+  const placeholderAddresses: Record<string, string[]> = {
+    'cookies.mdx': ['privacy@example.com', 'support@example.com']
+  }
 
-      expect(branded).not.toMatch(/\{\{\w+\}\}/u)
+  it('covers every legal page', () => {
+    expect(legalFiles.sort()).toEqual([
+      'affiliate-disclosure.mdx',
+      'cookies.mdx',
+      'dmca.mdx',
+      'privacy.mdx',
+      'terms.mdx'
+    ])
+  })
+
+  it.each(legalFiles)('renders %s with contact addresses at the legal email domain', file => {
+    const branded = applyLegalContentBranding(readFileSync(join(legalDirectory, file), 'utf8'), {
+      domain: siteConfig.domain,
+      legalEmailDomain: siteConfig.legalEmailDomain,
+      siteName: siteConfig.name
+    })
+    const addresses = [
+      ...new Set(
+        [...branded.matchAll(/\b([a-z0-9._%+-]+)(?:@|\[@\])([a-z0-9-]+(?:\.[a-z0-9-]+)+)/giu)].map(
+          ([, local, domain]) => `${local}@${domain}`.toLowerCase()
+        )
+      )
+    ]
+
+    expect(branded).not.toMatch(/\{\{\w+\}\}/u)
+    expect(branded).not.toContain('best.best.')
+    expect(
+      addresses.filter(address => !address.endsWith(`@${siteConfig.legalEmailDomain}`)).sort()
+    ).toEqual(placeholderAddresses[file] ?? [])
+    if (['dmca.mdx', 'privacy.mdx', 'terms.mdx'].includes(file))
       expect(addresses.length).toBeGreaterThan(0)
-      for (const address of addresses)
-        expect(address.slice(address.indexOf('[@]') + 3)).toBe(siteConfig.legalEmailDomain)
-    }
-  )
+  })
 })
