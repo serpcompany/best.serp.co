@@ -11,7 +11,8 @@ and detail DTOs. There is no filesystem fallback.
 
 ```text
 Browser
-  -> Cloudflare Worker entry (apps/web/worker.ts): epoch-keyed edge HTML cache
+  -> Cloudflare Worker entry (apps/web/worker.ts): trailing-slash redirects,
+     then the epoch-keyed edge HTML cache
   -> OpenNext / Next.js routes (apps/web), on a cache miss
      -> server-only catalog adapter (apps/web/lib/catalog)
         -> catalog operations (packages/data-ops) -> D1 (DB) public catalog tables
@@ -27,10 +28,12 @@ Browser
   `/submit/`, `/legal/*`, `/rss.xml`, `/sitemap-index.xml`,
   `/sitemaps/{pages,directory,categories}/1.xml`. The pre-D1 scheme
   (`/products/<slug>/reviews/`, `/products/best/<category>/`, `/categories/<x>/`) redirects
-  permanently in `apps/web/next.config.ts`. "Featured" is a listing flag used for
-  placements (the homepage section), not a public category page.
-- `apps/web/worker.ts` is the Worker entry: it serves anonymous pages from the edge
-  HTML cache (`apps/web/lib/edge-cache/`) and otherwise delegates to the generated
+  permanently through `apps/web/next.config.ts` (rules in `apps/web/lib/routing/redirects.ts`).
+  "Featured" is a listing flag used for placements (the homepage section), not a public
+  category page.
+- `apps/web/worker.ts` is the Worker entry: it redirects non-canonical page and file URLs
+  (`apps/web/lib/routing/`), serves anonymous pages from the edge HTML cache
+  (`apps/web/lib/edge-cache/`), and otherwise delegates to the generated
   `.open-next/worker.js`. It reads only the catalog epoch, through `packages/data-ops/`.
 - `apps/web/lib/catalog/` acquires the binding, validates the runtime environment,
   and deduplicates reads per request. It contains no SQL.
@@ -51,6 +54,59 @@ Browser
   are the only layer that acquires credentials or calls remote APIs.
 - `scripts/migration/` holds the one-time JSON import and page comparison tooling. It
   is never imported by runtime or build code.
+
+## URL canonicalization
+
+Every URL has one canonical form, per the SERP URL trailing-slash and sitemap standards
+(serpcompany/serp `docs/engineering/standards/url-trailing-slash.md` and
+`docs/engineering/websites/features/xml-sitemaps.md`):
+
+| URL | Canonical form | Non-canonical request |
+| --- | --- | --- |
+| Homepage | `https://best.serp.co` (written without a slash) | none: `/` is the only path |
+| Page | ends with `/`: `/about/`, `/products/autoenhance.ai/` | `/about` -> 308 `/about/` |
+| File | never ends with `/`: `/robots.txt`, `/sitemaps/pages/1.xml` | `/robots.txt/` -> 308 `/robots.txt` |
+| `/api`, `/api/*`, `/.well-known/*`, `/_next/*` | served exactly as requested | never redirected |
+
+`packages/web-core/src/canonical-url.ts` defines the rule. A file is a path whose last
+segment ends in a known file extension (`FILE_EXTENSIONS`), not any dot: most listing slugs
+are domain names (`autoenhance.ai`), and their pages keep the slash. Never add an extension
+that is also a top-level domain.
+
+- **Redirects.** The Worker entry answers a non-canonical request with one 308 before the
+  edge cache and before OpenNext (`apps/web/lib/routing/trailing-slash.ts`), so slash
+  variants are never rendered or cached. The `Location` is relative and keeps the query
+  string byte for byte. `skipTrailingSlashRedirect` (in `configs/next`) keeps the framework's
+  own slash redirect off: it differs between Next.js and OpenNext and has no `/api`
+  exception. OpenNext Node middleware is not used (it is experimental on Cloudflare).
+- **Moved URLs.** `apps/web/lib/routing/redirects.ts` lists them and `next.config.ts`
+  applies them. Next.js matches each source with or without a slash and every destination
+  is canonical, so the Worker leaves any request a moved-URL rule matches to OpenNext (it
+  reads the same compiled patterns from `.next/routes-manifest.json`), and the request
+  reaches its page in one hop. Add new moved URLs there; `redirects.test.ts` checks that
+  each destination is canonical and each source is matched in both slash forms. OpenNext
+  re-serializes the query string of these redirects from decoded values, so a query that
+  contains an encoded `&`, `=`, `#`, or `+` is not preserved exactly; the pre-D1 URLs never
+  carried one.
+- **Written URLs.** Canonical tags, `og:url`, sitemaps, `robots.txt`, and JSON-LD build
+  absolute URLs with `absoluteUrl` (`siteUrl` in `seo-config.ts`), which writes the homepage
+  as the bare origin. With `trailingSlash`, the Next.js metadata API appends `/` to every
+  same-origin URL, so the homepage leaves `alternates.canonical` and `openGraph.url` unset
+  and renders both tags itself (`HomePageRoute`). JSON-LD node identifiers keep their
+  fragment form (`https://best.serp.co/#website`); they name a graph node, not the page.
+- **Origin.** Sitemaps, canonical tags, and structured data always use the production
+  origin from `packages/site-config` (`https://best.serp.co`), also locally and on the
+  noindex `*.workers.dev` hosts. This is deliberate: the e2e suite and the HTTP gates then
+  verify on staging exactly the URLs production publishes, and those hosts are never
+  indexed.
+- **Sitemaps.** `/robots.txt` advertises `/sitemap-index.xml`, which lists the URL-set files
+  `/sitemaps/pages/1.xml`, `/sitemaps/directory/1.xml`, and `/sitemaps/categories/1.xml`
+  directly (no nested index). `/sitemap.xml` is a compatibility redirect to the index.
+  Listing entries carry `published_at` as `lastmod`; the static page and category sets carry
+  the generation time.
+
+The Playwright smoke suite (staging) and `scripts/d1-preview-http-gates.ts` (staging and
+production) assert the redirects, the `/api` exemption, and the homepage form.
 
 ## Pagination
 
