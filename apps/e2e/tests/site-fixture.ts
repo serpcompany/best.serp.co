@@ -31,8 +31,9 @@ export function categoryPath(slug: string): string {
 
 export const categoriesIndexPath = '/products/categories/'
 
+/** The canonical absolute URL: the homepage is the bare origin, never `https://best.serp.co/`. */
 export function absoluteUrl(path: string): string {
-  return `${site.publicUrl}${path}`
+  return path === '/' ? site.publicUrl : `${site.publicUrl}${path}`
 }
 
 export function escapeRegExp(value: string): string {
