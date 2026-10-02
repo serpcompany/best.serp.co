@@ -69,6 +69,43 @@ function validateSkill(root: string, file: string): string[] {
   return violations
 }
 
+const WRAP_COLUMNS = 100
+const MAP_LINE_BUDGET = 120
+const LEAF_LINE_BUDGET = 300
+
+/** Lines as read at 100 columns, so a long paragraph counts for its real length. */
+export function wrappedLineCount(source: string): number {
+  return source
+    .trimEnd()
+    .split('\n')
+    .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / WRAP_COLUMNS)), 0)
+}
+
+/**
+ * Size budgets from serpcompany/serp docs/engineering/standards/agent-harness/docs-are-maps.md:
+ * maps (`AGENTS.md`, `README.md`) stay at or under 120 wrapped lines and every other doc under
+ * `docs/` at or under 300. Split an oversized leaf by topic instead of squeezing it.
+ */
+export function validateDocumentationBudgets(
+  documents: Readonly<Record<string, string>>
+): string[] {
+  const violations: string[] = []
+  for (const [file, source] of Object.entries(documents)) {
+    const name = file.split('/').at(-1)
+    const isMap = name === 'AGENTS.md' || name === 'README.md'
+    if (!isMap && !file.startsWith('docs/')) continue
+    const budget = isMap ? MAP_LINE_BUDGET : LEAF_LINE_BUDGET
+    const lines = wrappedLineCount(source)
+    if (lines > budget)
+      violations.push(
+        `${file}: ${lines} wrapped lines exceeds the ${isMap ? 'map' : 'leaf'} budget of ${budget}; ${
+          isMap ? 'move detail into a leaf doc' : 'split it by topic'
+        }`
+      )
+  }
+  return violations
+}
+
 export function validatePlanningDocumentation(
   documents: Readonly<Record<string, string>>
 ): string[] {
@@ -109,6 +146,7 @@ export function checkDocumentation(root = resolve('.')): string[] {
       .map(file => [file, readFileSync(resolve(root, file), 'utf8')])
   )
   violations.push(...validatePlanningDocumentation(documentationSources))
+  violations.push(...validateDocumentationBudgets(documentationSources))
 
   for (const file of files.filter(candidate => extname(candidate) === '.md')) {
     const source = readFileSync(resolve(root, file), 'utf8')

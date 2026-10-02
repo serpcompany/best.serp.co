@@ -1,12 +1,37 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { checkDocumentation, validatePlanningDocumentation } from './harness/docs-health.ts'
+import {
+  checkDocumentation,
+  validateDocumentationBudgets,
+  validatePlanningDocumentation,
+  wrappedLineCount
+} from './harness/docs-health.ts'
 import { stepsForProfile } from './harness/runner.ts'
 
 describe('repository harness contract', () => {
   it('keeps documentation, indexes, skills, links, and commands healthy', () => {
     expect(checkDocumentation(resolve('.'))).toEqual([])
+  })
+
+  it('holds maps and leaves to the docs-are-maps size budgets at 100 columns', () => {
+    expect(wrappedLineCount(`short\n${'x'.repeat(250)}\n\n`)).toBe(4)
+    const lines = (count: number) => Array.from({ length: count }, () => 'line').join('\n')
+    expect(
+      validateDocumentationBudgets({
+        'AGENTS.md': lines(120),
+        'apps/web/AGENTS.md': `${lines(119)}\n${'x'.repeat(101)}`,
+        'docs/README.md': lines(121),
+        'docs/HARNESS.md': lines(300),
+        'docs/DEPLOY_RUNBOOK.md': lines(301),
+        'packages/content/data/legal/terms.mdx': lines(500),
+        'SECURITY.md': lines(500)
+      })
+    ).toEqual([
+      'apps/web/AGENTS.md: 121 wrapped lines exceeds the map budget of 120; move detail into a leaf doc',
+      'docs/README.md: 121 wrapped lines exceeds the map budget of 120; move detail into a leaf doc',
+      'docs/DEPLOY_RUNBOOK.md: 301 wrapped lines exceeds the leaf budget of 300; split it by topic'
+    ])
   })
 
   it('rejects retired Markdown planning references', () => {
