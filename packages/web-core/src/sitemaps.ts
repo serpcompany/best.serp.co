@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { NextResponse } from 'next/server'
+import { absoluteUrl } from './canonical-url'
 import { getActiveCategories } from './category-navigation'
 import { getRoute } from './routes'
 import { SITE_PUBLIC_URL } from './seo-config'
@@ -33,35 +34,13 @@ type SitemapContentLoaders = {
 }
 
 const CANONICAL_SITEMAP_INDEX_PATH = '/sitemap-index.xml'
-const PUBLIC_FILE_EXTENSION_PATTERN =
-  /\.(?:css|gif|ico|jpeg|jpg|js|json|map|png|svg|txt|webp|woff2?|xml)$/i
 
-function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, '')
-}
-
-function withTrailingSlash(path: string): string {
-  if (path === '/') {
-    return path
-  }
-
-  const lastSegment = path.split('/').at(-1) ?? ''
-
-  if (path.endsWith('/') || PUBLIC_FILE_EXTENSION_PATTERN.test(lastSegment)) {
-    return path
-  }
-
-  return `${path}/`
-}
-
-function toAbsoluteUrl(
-  path: string,
-  baseUrl = SITE_PUBLIC_URL,
-  options: { trailingSlash?: boolean } = {}
-): string {
-  const normalizedBaseUrl = normalizeBaseUrl(baseUrl)
-  const normalizedPath = options.trailingSlash ? withTrailingSlash(path) : path
-  return normalizedPath === '/' ? `${normalizedBaseUrl}/` : `${normalizedBaseUrl}${normalizedPath}`
+/**
+ * Sitemap entries match the page canonical exactly: the homepage is the bare origin, pages
+ * end with a slash, and sitemap files never do (see `./canonical-url`).
+ */
+function toAbsoluteUrl(path: string, baseUrl = SITE_PUBLIC_URL): string {
+  return absoluteUrl(baseUrl, path)
 }
 
 function appendPathSegment(path: string, segment: string | undefined): string {
@@ -161,7 +140,7 @@ function buildUrlEntries(paths: string[], baseUrl = SITE_PUBLIC_URL): SitemapEnt
 
   return sortUniquePaths(paths).map(path => ({
     lastmod: buildDate,
-    loc: toAbsoluteUrl(path, baseUrl, { trailingSlash: true })
+    loc: toAbsoluteUrl(path, baseUrl)
   }))
 }
 
@@ -216,9 +195,7 @@ async function getListingPaths(
         appendPathSegment(
           getRoute('listing.detail', { slug: website.slug }),
           siteConfig.sitemap.listingDetailSuffix
-        ),
-        SITE_PUBLIC_URL,
-        { trailingSlash: true }
+        )
       )
     }))
     .filter(entry => {

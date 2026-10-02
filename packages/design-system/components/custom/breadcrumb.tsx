@@ -25,6 +25,16 @@ export interface BreadcrumbProps {
 }
 
 /**
+ * The JSON-LD URL of a breadcrumb link. The homepage is written as the bare origin
+ * (`https://example.com`, not `https://example.com/`), per the SERP URL trailing-slash standard.
+ */
+function absoluteHref(href: string, baseUrl: string | undefined): string {
+  if (!baseUrl) return href
+  const origin = baseUrl.replace(/\/+$/u, '')
+  return href === '/' ? origin : `${origin}${href}`
+}
+
+/**
  * Breadcrumb component for navigation hierarchy with JSON-LD support
  *
  * @param props - Component properties
@@ -78,13 +88,13 @@ export function Breadcrumb({
                   '@type': 'ListItem',
                   position: 1,
                   name: 'Home',
-                  item: `${baseUrl || ''}${homeHref}`
+                  item: absoluteHref(homeHref, baseUrl)
                 },
                 ...items.map((item, index) => ({
                   '@type': 'ListItem',
                   position: index + 2,
                   name: item.name,
-                  item: `${baseUrl || ''}${item.href}`
+                  item: absoluteHref(item.href, baseUrl)
                 }))
               ]
             })

@@ -1,4 +1,8 @@
-import { HomePageRoute, homePageMetadata } from '@serpdirectory/web-core/home-page'
+import {
+  HomePageCanonicalTags,
+  HomePageRoute,
+  homePageMetadata
+} from '@serpdirectory/web-core/home-page'
 import { JsonLd } from '@serpdirectory/web-core/json-ld'
 import { CreatorProjectsSectionRoute as CreatorProjectsSection } from '@serpdirectory/web-core/sections/creator-projects-section-route'
 import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@serpdirectory/web-core/sections/external-resources-section-route'
@@ -18,17 +22,20 @@ export default async function Home() {
   if (!data) notFound()
 
   return (
-    <HomePageRoute
-      data={data}
-      slots={{
-        CreatorProjectsSection,
-        ExternalResourcesSection,
-        FeaturedGuidesSection,
-        FeaturedProjectsSection,
-        JsonLd,
-        RecentlyAddedSection,
-        StaticWebsitesList
-      }}
-    />
+    <>
+      <HomePageCanonicalTags />
+      <HomePageRoute
+        data={data}
+        slots={{
+          CreatorProjectsSection,
+          ExternalResourcesSection,
+          FeaturedGuidesSection,
+          FeaturedProjectsSection,
+          JsonLd,
+          RecentlyAddedSection,
+          StaticWebsitesList
+        }}
+      />
+    </>
   )
 }

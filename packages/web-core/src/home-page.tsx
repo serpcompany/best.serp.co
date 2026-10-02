@@ -11,7 +11,7 @@ import { type ListingPageInfo, ListingPagination } from './listing-pagination'
 import { getRoute } from './routes'
 import { HeroSection } from './sections/hero-section'
 import { NewsletterSection } from './sections/newsletter-section'
-import { generateBaseMetadata, generateWebsiteSchema, KEYWORDS } from './seo-config'
+import { generateBaseMetadata, generateWebsiteSchema, KEYWORDS, siteUrl } from './seo-config'
 import { siteConfig } from './site-config'
 import { siteCopy } from './site-copy'
 
@@ -96,7 +96,14 @@ export interface HomePageSlots {
   StaticWebsitesList: ComponentType<StaticWebsitesListProps>
 }
 
-export const homePageMetadata: Metadata = generateBaseMetadata({
+/** The homepage URL is the bare origin, `https://best.serp.co`, never `https://best.serp.co/`. */
+const HOME_URL = siteUrl('/')
+
+const {
+  alternates: _homeAlternates,
+  openGraph: homeOpenGraph,
+  ...homeMetadata
+} = generateBaseMetadata({
   title: `${siteConfig.name} Directory of ${siteCopy.listingName.pluralTitle} and Resources`,
   description: `${siteConfig.tagline}. Browse curated ${siteCopy.listingName.plural}, resources, and documentation links in one searchable directory.`,
   keywords: [
@@ -110,6 +117,31 @@ export const homePageMetadata: Metadata = generateBaseMetadata({
   ],
   path: '/'
 })
+
+/**
+ * With `trailingSlash`, the Next.js metadata API appends `/` to every same-origin URL, so it
+ * would write the homepage canonical and `og:url` as `https://best.serp.co/`. The homepage
+ * therefore leaves both unset here and renders `HomePageCanonicalTags` instead. See the URL
+ * trailing-slash standard.
+ */
+export const homePageMetadata: Metadata = {
+  ...homeMetadata,
+  openGraph: { ...homeOpenGraph, url: undefined }
+}
+
+/**
+ * The homepage canonical and `og:url`, written as the bare origin. React hoists both tags
+ * into `<head>`. Only the homepage renders this: `/products/` reuses `HomePageRoute` with
+ * its own canonical metadata.
+ */
+export function HomePageCanonicalTags(): ReactElement {
+  return (
+    <>
+      <link rel="canonical" href={HOME_URL} />
+      <meta property="og:url" content={HOME_URL} />
+    </>
+  )
+}
 
 interface HomePageRouteProps {
   data: HomePageData
