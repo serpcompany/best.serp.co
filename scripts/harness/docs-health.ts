@@ -74,15 +74,12 @@ const MAP_LINE_BUDGET = 120
 const LEAF_LINE_BUDGET = 300
 
 /**
- * Docs allowed over budget, at the size they had when they were let in. Each may shrink but
- * not grow; split it by topic and delete its entry. An entry is only ever a ceiling, so the
- * result never depends on whether the PR that grew the doc merges before or after this table.
+ * Docs allowed over budget, at the size they had when they were let in (serp's allowance
+ * rule). Each may shrink but not grow, and docs:check fails once it fits its budget, so the
+ * entry gets deleted. Record only a doc that is already over budget on `main`; split a doc that
+ * a pull request grows past its budget instead of adding an entry for it.
  */
-export const DOC_LINE_ALLOWANCES: Readonly<Record<string, number>> = {
-  // serpcompany/best.serp.co#43 (database commands and staging-before-production) grows the
-  // runbook to 304 lines. Split the pre-cutover and cutover sections into their own leaf.
-  'docs/DEPLOY_RUNBOOK.md': 304
-}
+export const DOC_LINE_ALLOWANCES: Readonly<Record<string, number>> = {}
 
 /** Lines as read at 100 columns, so a long paragraph counts for its real length. */
 export function wrappedLineCount(source: string): number {
@@ -101,8 +98,9 @@ function documentationBudget(file: string): { budget: number; kind: 'leaf' | 'ma
 
 /**
  * Size budgets: maps (`AGENTS.md`, `README.md`) stay at or under 120 wrapped lines and every
- * other doc under `docs/` at or under 300, unless `allowances` lets a doc stay at a recorded
- * size. The numbers come from the docs-are-maps principle drafted for serpcompany/serp
+ * other doc under `docs/` at or under 300, unless `allowances` holds a doc at a recorded size.
+ * An allowance whose doc fits its budget or no longer exists fails too, so it gets deleted.
+ * The numbers come from the docs-are-maps principle drafted for serpcompany/serp
  * (`docs/engineering/standards/agent-harness/docs-are-maps.md` on the unpublished
  * `agent-harness-principles` branch); serp `main` says only that docs stay under "a few
  * hundred lines" (`docs/engineering/standards/agent-harness.md`).
@@ -126,23 +124,17 @@ export function validateDocumentationBudgets(
         : `${file}: ${lines} wrapped lines exceeds its allowance of ${allowance}; an over-budget doc may shrink but not grow, so split it by topic`
     )
   }
-  return violations
-}
-
-/**
- * Allowances that no longer hold a doc back: it fits its budget or no longer exists. docs:check
- * lists them so the entry gets deleted; they are not failures, because an allowance recorded
- * for an open pull request is unused until that pull request merges.
- */
-export function unusedDocumentationAllowances(
-  documents: Readonly<Record<string, string>>,
-  allowances: Readonly<Record<string, number>> = DOC_LINE_ALLOWANCES
-): string[] {
-  return Object.keys(allowances).filter(file => {
+  for (const [file, allowance] of Object.entries(allowances)) {
     const source = documents[file]
     const limit = documentationBudget(file)
-    return source === undefined || !limit || wrappedLineCount(source) <= limit.budget
-  })
+    if (source !== undefined && limit && wrappedLineCount(source) > limit.budget) continue
+    violations.push(
+      `${file}: its allowance of ${allowance} lines is no longer needed (${
+        source === undefined || !limit ? 'no such budgeted doc' : 'it fits its budget'
+      }); delete its DOC_LINE_ALLOWANCES entry in scripts/harness/docs-health.ts`
+    )
+  }
+  return violations
 }
 
 export function validatePlanningDocumentation(
@@ -244,15 +236,6 @@ function main(): void {
     return
   }
   console.log('Documentation health passed: indexes, links, skills, and commands agree.')
-  const allowedDocuments = Object.fromEntries(
-    Object.keys(DOC_LINE_ALLOWANCES)
-      .filter(file => existsSync(resolve(file)))
-      .map(file => [file, readFileSync(resolve(file), 'utf8')])
-  )
-  for (const file of unusedDocumentationAllowances(allowedDocuments))
-    console.log(
-      `Unused allowance: ${file} fits its budget. Delete its DOC_LINE_ALLOWANCES entry (scripts/harness/docs-health.ts) once the pull request named beside it has merged or split the doc.`
-    )
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) main()

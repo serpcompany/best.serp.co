@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest'
 import {
   checkDocumentation,
   DOC_LINE_ALLOWANCES,
-  unusedDocumentationAllowances,
   validateDocumentationBudgets,
   validatePlanningDocumentation,
   wrappedLineCount
@@ -39,39 +38,40 @@ describe('repository harness contract', () => {
     ])
   })
 
-  it('lets an allowed doc shrink but not grow, whichever pull request lands first', () => {
+  it('lets an allowed doc shrink but not grow', () => {
     const lines = (count: number) => Array.from({ length: count }, () => 'line').join('\n')
-    const allowances = { 'docs/DEPLOY_RUNBOOK.md': 304 }
-    // Before the growing pull request merges, after it, and after a later split.
-    for (const size of [231, 304, 290, 120])
-      expect(
-        validateDocumentationBudgets({ 'docs/DEPLOY_RUNBOOK.md': lines(size) }, allowances)
-      ).toEqual([])
-    expect(
-      validateDocumentationBudgets({ 'docs/DEPLOY_RUNBOOK.md': lines(305) }, allowances)
-    ).toEqual([
-      'docs/DEPLOY_RUNBOOK.md: 305 wrapped lines exceeds its allowance of 304; an over-budget doc may shrink but not grow, so split it by topic'
+    const allowances = { 'docs/LEGACY.md': 340 }
+    for (const size of [340, 320, 301])
+      expect(validateDocumentationBudgets({ 'docs/LEGACY.md': lines(size) }, allowances)).toEqual(
+        []
+      )
+    expect(validateDocumentationBudgets({ 'docs/LEGACY.md': lines(341) }, allowances)).toEqual([
+      'docs/LEGACY.md: 341 wrapped lines exceeds its allowance of 340; an over-budget doc may shrink but not grow, so split it by topic'
     ])
     // An allowance covers only its own file.
-    expect(validateDocumentationBudgets({ 'docs/HARNESS.md': lines(301) }, allowances)).toEqual([
+    expect(
+      validateDocumentationBudgets(
+        { 'docs/LEGACY.md': lines(320), 'docs/HARNESS.md': lines(301) },
+        allowances
+      )
+    ).toEqual([
       'docs/HARNESS.md: 301 wrapped lines exceeds the leaf budget of 300; split it by topic'
     ])
   })
 
-  it('lists allowances that no longer hold a doc back, without failing the check', () => {
+  it('fails on an allowance that is no longer needed, so its entry gets deleted', () => {
     const lines = (count: number) => Array.from({ length: count }, () => 'line').join('\n')
-    const allowances = {
-      'docs/DEPLOY_RUNBOOK.md': 304,
-      'docs/GONE.md': 400,
-      'docs/HARNESS.md': 350
-    }
     expect(
-      unusedDocumentationAllowances(
-        { 'docs/DEPLOY_RUNBOOK.md': lines(231), 'docs/HARNESS.md': lines(320) },
-        allowances
+      validateDocumentationBudgets(
+        { 'docs/LEGACY.md': lines(300), 'docs/HARNESS.md': lines(320) },
+        { 'docs/GONE.md': 400, 'docs/HARNESS.md': 350, 'docs/LEGACY.md': 340 }
       )
-    ).toEqual(['docs/DEPLOY_RUNBOOK.md', 'docs/GONE.md'])
-    expect(Object.values(DOC_LINE_ALLOWANCES).every(allowance => allowance > 300)).toBe(true)
+    ).toEqual([
+      'docs/GONE.md: its allowance of 400 lines is no longer needed (no such budgeted doc); delete its DOC_LINE_ALLOWANCES entry in scripts/harness/docs-health.ts',
+      'docs/LEGACY.md: its allowance of 340 lines is no longer needed (it fits its budget); delete its DOC_LINE_ALLOWANCES entry in scripts/harness/docs-health.ts'
+    ])
+    // Every doc fits today, so the table is empty; an entry is for a doc already over budget.
+    expect(DOC_LINE_ALLOWANCES).toEqual({})
   })
 
   it('rejects retired Markdown planning references', () => {
