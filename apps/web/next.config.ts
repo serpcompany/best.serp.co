@@ -4,6 +4,7 @@ import withMDX from '@next/mdx'
 import { baseConfig, withAnalyzer } from '@serpdirectory/config-next'
 import { site } from '@serpdirectory/site-config'
 import type { NextConfig } from 'next'
+import { movedUrlRedirects } from './lib/routing/redirects'
 
 export const INTERNAL_PACKAGES = [
   '@serpdirectory/design-system',
@@ -41,7 +42,6 @@ function createAliasRewrites(sourceBasePath: string, destinationBasePath: string
   ]
 }
 
-const listingBasePath = normalizeBasePath(site.routes.listingBasePath)
 const docsBasePath = normalizeBasePath(site.routes.docsBasePath)
 const networkBasePath = normalizeBasePath(site.routes.networkBasePath)
 const brandsBasePath = normalizeBasePath(site.routes.brandsBasePath)
@@ -90,6 +90,10 @@ let nextConfig: NextConfig = {
     ]
   },
 
+  // Pages are written with a trailing slash. `skipTrailingSlashRedirect` (from
+  // `@serpdirectory/config-next`) turns off the framework's own slash redirect, which differs
+  // between Next.js and OpenNext and has no /api exception; the Worker entry enforces the
+  // URL trailing-slash standard instead (`lib/routing/trailing-slash.ts`).
   trailingSlash: true,
 
   headers: async () => [
@@ -118,60 +122,8 @@ let nextConfig: NextConfig = {
     ]
   }),
 
-  redirects: async () => {
-    return [
-      {
-        source: '/news',
-        destination: '/',
-        permanent: false
-      },
-      // Pre-D1 URL scheme (serpcompany/best.serp.co#34): /products/<slug>/reviews/ and
-      // /products/best/<category>/. "featured" is a placement flag, not a public page.
-      {
-        source: '/products/:slug/reviews',
-        destination: '/products/:slug/',
-        permanent: true
-      },
-      ...['/products/best', '/products/best/featured', '/categories', '/categories/featured'].map(
-        source => ({ source, destination: '/products/categories/', permanent: true })
-      ),
-      {
-        source: '/products/best/:category',
-        destination: '/products/categories/:category/',
-        permanent: true
-      },
-      {
-        source: '/categories/:category',
-        destination: '/products/categories/:category/',
-        permanent: true
-      },
-      {
-        source: '/website/:path*',
-        destination: `${buildPublicRoute(listingBasePath)}/:path*`,
-        permanent: true
-      },
-      ...createAliasRewrites('websites', listingBasePath).map(rule => ({
-        ...rule,
-        permanent: true
-      })),
-      ...createAliasRewrites('docs', docsBasePath).map(rule => ({
-        ...rule,
-        permanent: true
-      })),
-      ...createAliasRewrites('projects', networkBasePath).map(rule => ({
-        ...rule,
-        permanent: true
-      })),
-      ...createAliasRewrites('brands', brandsBasePath).map(rule => ({
-        ...rule,
-        permanent: true
-      })),
-      ...createAliasRewrites('guides', 'posts').map(rule => ({
-        ...rule,
-        permanent: true
-      }))
-    ]
-  }
+  // Moved URLs (legacy routes and aliases): see lib/routing/redirects.ts.
+  redirects: async () => movedUrlRedirects()
 }
 
 // Apply other plugins first

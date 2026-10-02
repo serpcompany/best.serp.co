@@ -27,12 +27,21 @@ function gates(mode: string, baseUrl: string, timeoutMs?: number): Promise<void>
   return runHttpGates(mode, baseUrl, { parityReportPath, timeoutMs })
 }
 
+/** Canonical redirects the URL trailing-slash standard requires. */
+const slashRedirects: Record<string, string> = {
+  '/about': '/about/',
+  '/robots.txt/': '/robots.txt'
+}
+
 function successfulResponse(url: URL, redirectLocation?: string, emptyBody = false): Response {
   if (url.pathname === `/${slug}/`)
     return new Response(null, {
       status: 308,
       headers: { location: redirectLocation ?? `/products/${slug}/` }
     })
+  const slashRedirect = slashRedirects[url.pathname]
+  if (slashRedirect)
+    return new Response(null, { status: 308, headers: { location: slashRedirect } })
   return new Response(emptyBody ? '' : 'ok', { status: 200 })
 }
 
@@ -53,7 +62,7 @@ describe('environment-specific HTTP gates', () => {
   it('passes the exact Production origin and best.serp.co route contracts', async () => {
     const urls = installSuccessfulFetch()
     await expect(gates('production', origin)).resolves.toBeUndefined()
-    expect(urls).toHaveLength(8)
+    expect(urls).toHaveLength(11)
     expect(urls.every(url => url.origin === origin)).toBe(true)
     expect(urls.map(url => url.pathname)).toEqual(
       expect.arrayContaining([
@@ -64,12 +73,53 @@ describe('environment-specific HTTP gates', () => {
         '/rss.xml',
         '/sitemap-index.xml',
         `/${slug}/`,
-        '/submit/'
+        '/submit/',
+        '/about',
+        '/robots.txt/',
+        '/api/search/'
       ])
     )
     expect(urls.some(url => url.pathname === '/api/search' && url.search.startsWith('?q='))).toBe(
       true
     )
+    expect(urls.some(url => url.pathname === '/api/search/' && url.search.startsWith('?q='))).toBe(
+      true
+    )
+  })
+
+  it('requires a permanent redirect to the canonical form of page and file URLs', async () => {
+    for (const [path, wrong] of [
+      ['/about', { location: '/about/', status: 301 }],
+      ['/about', { location: '/about', status: 308 }],
+      ['/robots.txt/', { location: '/robots.txt/', status: 308 }],
+      ['/robots.txt/', { location: '/robots.txt', status: 200 }]
+    ] as const) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string | URL | Request) => {
+          const url = new URL(String(input))
+          if (url.pathname === path)
+            return new Response(null, {
+              status: wrong.status,
+              headers: { location: wrong.location }
+            })
+          return successfulResponse(url)
+        })
+      )
+      await expect(gates('production', origin), `${path} ${wrong.status}`).rejects.toThrow(
+        wrong.status === 308 ? 'did not redirect' : 'not a 308 redirect'
+      )
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = new URL(String(input))
+        if (url.pathname === '/api/search/')
+          return new Response(null, { status: 308, headers: { location: '/api/search' } })
+        return successfulResponse(url)
+      })
+    )
+    await expect(gates('production', origin)).rejects.toThrow('/api/search/')
   })
 
   it('keeps Staging isolated from the Production hostname', async () => {
