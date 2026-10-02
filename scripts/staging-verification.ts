@@ -4,18 +4,28 @@
  *
  *   GITHUB_TOKEN=<token with actions: read> pnpm tsx scripts/staging-verification.ts [<sha>]
  *
- * The commit defaults to GITHUB_SHA. Read-only: it asks the GitHub Actions API for a successful
- * `deploy-staging.yml` run on main whose head is that commit, then requires the run's staging
- * migration, deploy, HTTP gate, and Playwright smoke steps to have succeeded. A green run that
- * skipped those steps (for example, before the staging credentials existed) does not count.
- * deploy-production.yml runs it before reviewer approval, and `cloudflare-release.ts` repeats
- * it before every production migration and Worker deploy.
+ * The commit defaults to GITHUB_SHA. Read-only: it asks the GitHub Actions API for the
+ * `deploy-staging.yml` runs on main whose head is that commit, and accepts the commit when any
+ * attempt of any of those runs completed the staging migration, deploy, HTTP gate, and
+ * Playwright smoke steps successfully. A green attempt that skipped those steps (for example,
+ * before the staging credentials existed) does not count.
+ *
+ * Verification is monotonic on purpose: once an attempt has proven the commit on staging, a
+ * later attempt or run of the same commit (a re-run in progress, a flaky smoke test, a revoked
+ * staging token, or an older commit replayed over a newer staging schema) does not withdraw
+ * that proof. Those later failures describe the staging environment, not the commit, and a
+ * non-monotonic rule could let `migrate production` pass and `deploy production` refuse
+ * within one release.
+ *
+ * deploy-production.yml and bootstrap-production-d1.yml run it before reviewer approval, and
+ * `cloudflare-release.ts` repeats it before every production migration, import, and Worker
+ * deploy.
  */
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { project } from './project'
 
-/** The staging workflow whose successful run a production release requires. */
+/** The staging workflow whose verified run a production release requires. */
 export const stagingWorkflow = {
   branch: 'main',
   file: 'deploy-staging.yml',
@@ -41,6 +51,7 @@ interface WorkflowRun {
   html_url?: string
   id?: number
   path?: string
+  run_attempt?: number
   status?: string | null
 }
 
@@ -51,6 +62,7 @@ interface WorkflowJob {
 }
 
 export interface StagingVerification {
+  runAttempt: number
   runId: number
   runUrl: string
   sha: string
@@ -73,9 +85,12 @@ function isVerifiedStagingJob(job: WorkflowJob): boolean {
   )
 }
 
+/** The remediation every refusal ends with. */
+const rerunHint = `Start a new run for the head of ${stagingWorkflow.branch} with \`gh workflow run ${stagingWorkflow.file} --ref ${stagingWorkflow.branch}\` (or wait for the push-triggered run), let it finish, then dispatch the production workflow again. See docs/DEPLOY_RUNBOOK.md#staging-before-production.`
+
 /**
- * Resolves with the newest Deploy Staging run that verified `sha`, or throws a remediation
- * message when no such run exists.
+ * Resolves with the newest run attempt of Deploy Staging that verified `sha`, or throws a
+ * remediation message when none did.
  */
 export async function assertStagingVerified(
   options: StagingVerificationOptions
@@ -111,11 +126,12 @@ export async function assertStagingVerified(
   }
 
   const workflowPath = `.github/workflows/${stagingWorkflow.file}`
+  // Every run of the commit, whatever its current attempt's outcome: an earlier attempt may
+  // have verified it even when a later re-run is in progress or failed.
   const listed = (await get(`actions/workflows/${stagingWorkflow.file}/runs`, {
     branch: stagingWorkflow.branch,
     head_sha: sha,
-    per_page: '100',
-    status: 'success'
+    per_page: '100'
   })) as { workflow_runs?: WorkflowRun[] }
   const runs = (listed.workflow_runs ?? [])
     .filter(
@@ -123,34 +139,42 @@ export async function assertStagingVerified(
         run.head_sha === sha &&
         run.head_branch === stagingWorkflow.branch &&
         run.path === workflowPath &&
-        run.status === 'completed' &&
-        run.conclusion === 'success' &&
         typeof run.id === 'number'
     )
     .sort((left, right) => (right.id ?? 0) - (left.id ?? 0))
   if (runs.length === 0) {
     throw new Error(
-      `${stagingWorkflow.name} has no successful run for ${sha} on ${stagingWorkflow.branch}. Production releases only a commit that ${stagingWorkflow.name} has migrated, deployed, and smoke-tested on staging: wait for (or re-run) ${stagingWorkflow.name} on this commit, then dispatch the production workflow again. See docs/DEPLOY_RUNBOOK.md.`
+      `${stagingWorkflow.name} has no run for ${sha} on ${stagingWorkflow.branch}. Production releases only a commit that ${stagingWorkflow.name} has migrated, deployed, and smoke-tested on staging. ${rerunHint}`
     )
   }
   for (const run of runs) {
-    const { jobs } = (await get(`actions/runs/${run.id}/jobs`, {
-      filter: 'latest',
-      per_page: '100'
-    })) as { jobs?: WorkflowJob[] }
-    if ((jobs ?? []).some(isVerifiedStagingJob)) {
-      return {
-        runId: run.id as number,
-        runUrl:
-          run.html_url ?? `https://github.com/${project.repository}/actions/runs/${String(run.id)}`,
-        sha
+    const latestAttempt =
+      typeof run.run_attempt === 'number' && run.run_attempt > 1 ? run.run_attempt : 1
+    for (let attempt = latestAttempt; attempt >= 1; attempt -= 1) {
+      const { jobs } = (await get(`actions/runs/${run.id}/attempts/${attempt}/jobs`, {
+        per_page: '100'
+      })) as { jobs?: WorkflowJob[] }
+      if ((jobs ?? []).some(isVerifiedStagingJob)) {
+        return {
+          runAttempt: attempt,
+          runId: run.id as number,
+          runUrl:
+            run.html_url ??
+            `https://github.com/${project.repository}/actions/runs/${String(run.id)}`,
+          sha
+        }
       }
     }
   }
-  const links = runs.map(run => run.html_url ?? String(run.id)).join(', ')
+  const seen = runs
+    .map(
+      run =>
+        `${run.html_url ?? String(run.id)} (attempt ${run.run_attempt ?? 1}: ${run.conclusion ?? run.status ?? 'unknown'})`
+    )
+    .join(', ')
   const steps = stagingWorkflow.requiredSteps.join(', ')
   throw new Error(
-    `${stagingWorkflow.name} succeeded for ${sha} without completing every staging step (${steps}): ${links}. Re-run ${stagingWorkflow.name} on this commit with the staging credentials in place, then dispatch the production workflow again.`
+    `No ${stagingWorkflow.name} attempt for ${sha} has completed every staging step (${steps}) yet: ${seen}. ${rerunHint}`
   )
 }
 
@@ -162,7 +186,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     token: process.env.GITHUB_TOKEN || process.env.GH_TOKEN
   })
     .then(result => {
-      console.log(`${stagingWorkflow.name} verified ${result.sha} on staging: ${result.runUrl}`)
+      console.log(
+        `${stagingWorkflow.name} verified ${result.sha} on staging: ${result.runUrl} (attempt ${result.runAttempt})`
+      )
     })
     .catch(error => {
       console.error(error instanceof Error ? error.message : String(error))

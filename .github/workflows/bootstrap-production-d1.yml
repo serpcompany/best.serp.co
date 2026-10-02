@@ -1,10 +1,10 @@
 name: Bootstrap Production D1
 
-# One-time initial catalog import into the EMPTY production D1. The import refuses any existing
-# publication or catalog rows before changing anything, applies the d1/drizzle migrations,
-# imports d1/artifacts/best-serp-co-v1.sql.br only if its sha256 matches the parity report, then
-# proves exact parity with the report. It is the one documented exception to staging before
-# production: it ran once (run 36800330629) and cannot import into a populated database again.
+# Initial catalog import into an EMPTY production D1 (first run: 36800330629). The import refuses
+# any existing publication or catalog rows before changing anything, applies the d1/drizzle
+# migrations, imports d1/artifacts/best-serp-co-v1.sql.br only if its sha256 matches the parity
+# report, then proves exact parity with the report. Because it applies every migration at this
+# commit, it runs only for a commit that Deploy Staging verified (staging before production).
 # See docs/DEPLOY_RUNBOOK.md.
 on:
   workflow_dispatch:
@@ -15,6 +15,8 @@ on:
         type: string
 
 permissions:
+  # actions: read lets the staging verification read this commit's Deploy Staging run.
+  actions: read
   contents: read
 
 concurrency:
@@ -23,7 +25,7 @@ concurrency:
 
 jobs:
   authorize:
-    name: Check ref and confirmation
+    name: Check ref, confirmation & staging verification
     runs-on: ubuntu-latest
     steps:
       - name: Require main and the typed confirmation
@@ -38,6 +40,17 @@ jobs:
             echo "::error::Type bootstrap-best.serp.co-production to bootstrap production D1."
             exit 1
           fi
+
+      - name: Checkout reviewed source
+        uses: actions/checkout@v7
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Require a verified staging deploy of this commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm tsx scripts/staging-verification.ts
 
   bootstrap:
     name: Import and verify the reviewed catalog
@@ -70,6 +83,7 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           RELEASE_CONFIRM: ${{ inputs.confirmation }}
         run: pnpm tsx scripts/cloudflare-release.ts import production
 

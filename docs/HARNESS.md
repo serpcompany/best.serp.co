@@ -56,11 +56,19 @@ database.
 Run a focused test while implementing, the fast loop at milestone boundaries, and the
 full loop before a substantial completion claim.
 
-Pull requests targeting protected `main` run `pr-review.yml`. Its repository policy,
-type, test, Worker-build, and conditional browser jobs are required before merge.
-The branch must be current with `main`, conversations must be resolved, and neither
-administrators nor agents may bypass the pull-request requirement with a direct or
-force push.
+Pull requests targeting `main` run `pr-review.yml`. The repository ruleset `main` (id
+24391799) applies these rules:
+
+- Every change needs a pull request, merged by squash, or by merge commit for promotions.
+- Five checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
+  `OpenNext Worker Build`, and `E2E Tests`.
+- Force pushes and branch deletion are blocked.
+
+The ruleset requires no approving review, no up-to-date branch, and no resolved
+conversations. Repository admins can bypass it only through a pull request, never with a
+direct push. `E2E Tests` still runs only when browser-relevant paths change, and a skipped
+job satisfies the required check; #42 decision c drops that filter. Agents never merge: the
+owner approves every merge.
 
 After a reviewed pull request merges, `main-validation.yml` runs the full loop again
 on the exact resulting `main` revision. It supplies the before/after push revisions

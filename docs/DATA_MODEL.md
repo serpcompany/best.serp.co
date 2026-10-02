@@ -13,9 +13,11 @@ history. A migration is applied locally (`pnpm db:migrate:local`), then to stagi
 Deploy Staging, then to production by Deploy Production only after Deploy Staging verified
 that commit (see [Deploy runbook](./DEPLOY_RUNBOOK.md#staging-before-production)).
 
-Local D1 is seeded with the real public catalog from the committed import rather than
-fixture data; keeping that or adding a fixture seed is an open decision in
-serpcompany/best.serp.co#42. The import holds no submissions or other user data.
+Local data is a documented exception to the standard's "seeded fake/fixture data" rule
+(owner decision a, serpcompany/best.serp.co#42). Local D1 is seeded with the real public
+catalog from the committed import. That data is public and pinned, contains no submissions
+or other user data, and the parity checks and Playwright suites need it. Submissions and any
+future user data are seeded from fixtures only, never copied from staging or production.
 
 `d1/drizzle/0000_baseline.sql` is hand-finished after generation: every table is
 `STRICT`, `PRAGMA foreign_keys = ON` leads the file, and four triggers enforce that a

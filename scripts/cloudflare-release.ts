@@ -17,9 +17,10 @@
  *
  * Mutating commands run only inside the protected workflow that owns them
  * (`releaseAuthorizations`), from a clean checkout of main at GITHUB_SHA, with that workflow's
- * typed confirmation in RELEASE_CONFIRM. Production migrations and Worker deploys also require a
- * successful Deploy Staging run of that same commit (`staging-verification.ts`, GITHUB_TOKEN with
- * actions: read). Wrangler authenticates with CLOUDFLARE_API_TOKEN and
+ * typed confirmation in RELEASE_CONFIRM. Production migrations, the bootstrap import, and Worker
+ * deploys also require Deploy Staging to have verified that same commit
+ * (`staging-verification.ts`, GITHUB_TOKEN with actions: read). Wrangler authenticates with
+ * CLOUDFLARE_API_TOKEN and
  * CLOUDFLARE_ACCOUNT_ID. `--rehearse <directory>` runs migrate, import, verify-import, and
  * check-database with `--local --persist-to <directory>` instead of `--remote`; it never
  * contacts Cloudflare.
@@ -74,8 +75,8 @@ export interface ReleaseAuthorization {
   confirmation: string | null
   environment: RemoteEnvironment
   /**
-   * Commands that ship schema or code and therefore also require a successful Deploy Staging
-   * run of the same commit (staging before production).
+   * Commands that ship schema or code and therefore also require Deploy Staging to have verified
+   * the same commit (staging before production).
    */
   requireVerifiedStaging: readonly ReleaseCommand[]
 }
@@ -95,14 +96,12 @@ export const releaseAuthorizations: Readonly<Record<string, ReleaseAuthorization
     requireVerifiedStaging: ['migrate', 'deploy']
   },
   'bootstrap-production-d1.yml': {
-    // `import` applies migrations itself, and only after proving the database is empty.
+    // `import` applies migrations itself, and only after proving the database is empty. It
+    // applies every migration at this commit, so it needs the same staging proof as `migrate`.
     commands: ['import'],
     confirmation: project.confirmation.bootstrap,
     environment: 'production',
-    // One-time exception to staging before production: the import refuses any database that
-    // already holds a catalog, and production was bootstrapped once (run 36800330629) from the
-    // same checksum-verified import that staging received.
-    requireVerifiedStaging: []
+    requireVerifiedStaging: ['import']
   },
   'publish-d1.yml': {
     // A reviewed data change to production, not a schema or code release.
@@ -714,18 +713,38 @@ function git(args: string[]): string {
   return execFileSync('git', args, { encoding: 'utf8' })
 }
 
+/** External effects `runRelease` uses; tests replace them to observe the guard order. */
+export interface ReleaseDependencies {
+  /** GitHub Actions API client for the staging-before-production check. */
+  fetch?: FetchLike
+  /** Git in the repository root; proves a clean checkout of GITHUB_SHA. */
+  git?: (args: string[]) => string
+  /** Runs Wrangler and OpenNext; every D1 and Cloudflare call goes through it. */
+  runner?: ProcessRunner
+  /** The built Worker `deploy` ships; defaults to the OpenNext output. */
+  workerEntrypoint?: string
+}
+
+/**
+ * Parses, validates the reviewed Wrangler identity, authorizes, proves staging verification
+ * where required, and only then touches D1 or Cloudflare.
+ */
 export async function runRelease(
   argv: string[],
   env: NodeJS.ProcessEnv = process.env,
-  runner: ProcessRunner = processRunner,
-  fetch?: FetchLike
+  dependencies: ReleaseDependencies = {}
 ): Promise<unknown> {
+  const runner = dependencies.runner ?? processRunner
   const args = parseReleaseArguments(argv)
   validateRemoteConfig(args.environment)
   if (args.rehearse === undefined) {
-    authorizeRelease(args.command, args.environment, env, git)
-    const staging = await requireVerifiedStaging(args.command, env, fetch)
-    if (staging) console.error(`Deploy Staging verified ${staging.sha}: ${staging.runUrl}`)
+    authorizeRelease(args.command, args.environment, env, dependencies.git ?? git)
+    const staging = await requireVerifiedStaging(args.command, env, dependencies.fetch)
+    if (staging) {
+      console.error(
+        `Deploy Staging verified ${staging.sha}: ${staging.runUrl} (attempt ${staging.runAttempt})`
+      )
+    }
   }
   const d1 = wranglerD1(
     args.environment,
@@ -763,7 +782,7 @@ export async function runRelease(
         ...(await importReviewedCatalog(d1, args.environment))
       }
     case 'deploy':
-      await deployWorker(d1, args.environment, runner)
+      await deployWorker(d1, args.environment, runner, dependencies.workerEntrypoint)
       return {
         deployed: project.remote[args.environment].workerName,
         environment: args.environment

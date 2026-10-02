@@ -199,24 +199,6 @@ describe('production deploy workflow', () => {
     expect(release.environment).toEqual({ name: 'production', url: project.publicUrl })
   })
 
-  it('releases only a commit Deploy Staging verified, before asking for reviewer approval', () => {
-    expect(workflow.permissions).toEqual({ actions: 'read', contents: 'read' })
-    const authorize = workflow.jobs.authorize as WorkflowJob
-    expect(authorize.environment).toBeUndefined()
-    const verify = stepRunning(authorize, 'pnpm tsx scripts/staging-verification.ts')
-    expect(verify.run).toBe('pnpm tsx scripts/staging-verification.ts')
-    expect(verify.env).toEqual({ GITHUB_TOKEN: expression('github.token') })
-    expect(stepIndex(authorize, 'staging-verification.ts')).toBeGreaterThan(
-      stepIndex(authorize, '"$CONFIRMATION"')
-    )
-    // The release script repeats the check before each production migration and Worker deploy.
-    for (const command of ['migrate production', 'deploy production']) {
-      expect(stepRunning(release, `cloudflare-release.ts ${command}`).env?.GITHUB_TOKEN).toBe(
-        expression('github.token')
-      )
-    }
-  })
-
   it('runs the same production migration as pnpm db:migrate:production', () => {
     expect(packageScripts['db:migrate:production']).toBe(
       stepRunning(release, 'cloudflare-release.ts migrate production').run
@@ -278,15 +260,44 @@ describe('production D1 bootstrap workflow', () => {
     ])
     expect(JSON.stringify(workflow)).not.toMatch(/deploy production|opennextjs-cloudflare/u)
   })
+})
 
-  it('is the documented one-time exception to staging before production', () => {
-    expect(releaseAuthorizations['bootstrap-production-d1.yml']?.requireVerifiedStaging).toEqual([])
-    expect(readFileSync(resolve(workflowDirectory, 'bootstrap-production-d1.yml'), 'utf8')).toMatch(
-      /one documented exception to staging before\n# production/u
-    )
-    expect(readFileSync(resolve('docs/DEPLOY_RUNBOOK.md'), 'utf8')).toContain(
-      'The production bootstrap is the one exception'
-    )
+describe('staging before production in the workflows', () => {
+  const gated = Object.entries(releaseAuthorizations).filter(
+    ([, authorization]) => authorization.requireVerifiedStaging.length > 0
+  )
+
+  it('gates the production deploy and the bootstrap, which both apply migrations', () => {
+    expect(gated.map(([file]) => file)).toEqual([
+      'deploy-production.yml',
+      'bootstrap-production-d1.yml'
+    ])
+  })
+
+  it('verifies staging before reviewer approval and again in every gated release step', () => {
+    for (const [file, authorization] of gated) {
+      const workflow = loadWorkflow(file)
+      expect(workflow.permissions, file).toEqual({ actions: 'read', contents: 'read' })
+      const authorize = workflow.jobs.authorize as WorkflowJob
+      expect(authorize.environment, file).toBeUndefined()
+      const verify = stepRunning(authorize, 'pnpm tsx scripts/staging-verification.ts')
+      expect(verify.run, file).toBe('pnpm tsx scripts/staging-verification.ts')
+      expect(verify.env, file).toEqual({ GITHUB_TOKEN: expression('github.token') })
+      expect(stepIndex(authorize, 'staging-verification.ts'), file).toBeGreaterThan(
+        stepIndex(authorize, '"$CONFIRMATION"')
+      )
+      // cloudflare-release.ts repeats the check, so each gated step needs the token too.
+      const gatedSteps = Object.values(workflow.jobs)
+        .flatMap(job => job.steps ?? [])
+        .filter(step => {
+          const command = step.run?.match(/cloudflare-release\.ts ([a-z-]+) production/u)?.[1]
+          return authorization.requireVerifiedStaging.some(gatedCommand => gatedCommand === command)
+        })
+      expect(gatedSteps.length, file).toBe(authorization.requireVerifiedStaging.length)
+      for (const step of gatedSteps) {
+        expect(step.env?.GITHUB_TOKEN, `${file}: ${step.name}`).toBe(expression('github.token'))
+      }
+    }
   })
 })
 
@@ -486,8 +497,9 @@ describe('protected deployment boundaries', () => {
     }
     for (const file of newWorkflows) {
       const workflow = loadWorkflow(file)
+      // Only the staging-gated workflows read Actions runs (staging before production).
       expect(workflow.permissions, file).toEqual(
-        file === 'deploy-production.yml'
+        releaseAuthorizations[file]?.requireVerifiedStaging.length
           ? { actions: 'read', contents: 'read' }
           : { contents: 'read' }
       )

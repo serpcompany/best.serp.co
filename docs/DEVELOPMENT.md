@@ -16,9 +16,9 @@ pnpm db:verify:local
 `pnpm db:migrations:list:local` shows the migrations local D1 has not applied yet.
 
 The import is the real public catalog (3,422 listings, no submissions or other user data),
-which the parity comparison and the Playwright suites rely on. The database standard asks for
-fake or fixture data locally; whether to keep the public catalog as a documented exception
-or add a small fixture seed is an open owner decision in serpcompany/best.serp.co#42.
+which the parity comparison and the Playwright suites rely on. It is a documented exception
+to the database standard's fake/fixture rule (owner decision a in serpcompany/best.serp.co#42).
+Submissions and any future user data use fixtures only; see [Data model](./DATA_MODEL.md).
 
 To rebuild the artifacts from the source, check out `serpcompany/json-directory-template`
 at `25e2a8d` and run

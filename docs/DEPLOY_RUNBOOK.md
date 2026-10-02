@@ -56,33 +56,62 @@ and `migrations_table: "d1_migrations"`. `pnpm worker:config:validate` and every
 
 ## Staging before production
 
-Deploy Production releases only a commit that Deploy Staging has verified. That means a
-successful `deploy-staging.yml` run on `main` whose head is the same commit, and whose steps
-**Apply staging D1 migrations**, **Deploy staging Worker**, **Run staging HTTP gates**, and
-**Run Playwright smoke against staging** all succeeded. A green run that skipped those steps
-(for example, without staging credentials) does not count.
+Deploy Production and Bootstrap Production D1 release only a commit that Deploy Staging has
+verified. A commit is verified when **any attempt** of a `deploy-staging.yml` run on `main`
+for that exact commit completed all four steps successfully:
+
+- **Apply staging D1 migrations**
+- **Deploy staging Worker**
+- **Run staging HTTP gates**
+- **Run Playwright smoke against staging**
+
+A green attempt that skipped those steps (for example, without staging credentials) does not
+count.
+
+Verification is permanent once earned. A later attempt or run of the same commit cannot
+withdraw it, whether that attempt is a re-run still in progress, a flaky smoke test, a broken
+staging token, or an older commit replayed over a newer staging schema. Those failures
+describe the staging environment, not the commit. A rule that let them withdraw verification
+could let `migrate production` pass and `deploy production` refuse within one release.
 
 The check runs twice, and both use the workflow's `GITHUB_TOKEN` with `actions: read`:
 
 1. The `authorize` job runs `scripts/staging-verification.ts` before the `production`
    environment asks for reviewer approval.
-2. `cloudflare-release.ts` repeats it before `migrate production` and `deploy production`.
+2. `cloudflare-release.ts` repeats it immediately before `migrate production`,
+   `deploy production`, and `import production`, and before any Wrangler call.
 
-A dispatch always releases the head of `main`, and only a pushed head gets its own Deploy
-Staging run. When several commits land in one push, only the last one is verified. If Deploy
-Staging is still running, wait for it. If it failed (a flaky smoke test, for example),
-re-run its failed job, then dispatch Deploy Production again. To check a commit from a
-maintainer machine:
+A dispatch always releases the head of `main`. Only a pushed head gets its own Deploy Staging
+run, so when several commits land in one push, only the last one is verified. If Deploy
+Staging is still running, wait for it.
+
+If the head has no verified attempt (the run failed, a push skipped CI, or Actions had an
+outage), start a new run on the head of `main`, wait for it to pass, then dispatch the
+production workflow again:
+
+```bash
+gh workflow run deploy-staging.yml --ref main
+```
+
+Re-running the commit's own failed run also works. Don't re-run an older commit's run: it
+would deploy that older Worker to staging.
+
+To check a commit from a maintainer machine:
 
 ```bash
 GITHUB_TOKEN="$(gh auth token)" pnpm tsx scripts/staging-verification.ts <commit-sha>
 ```
 
-The production bootstrap is the one exception. `bootstrap-production-d1.yml` imported the
-reviewed catalog once (run 36800330629). It refuses any database that already holds a
-catalog, and staging had already received the same checksum-verified import. The publication
-and submission workflows change production data, not schema or code, so they are not gated
-on staging.
+The bootstrap gate matters even after the first import (run 36800330629). The bootstrap
+applies every migration at its commit to an empty production database, for example a
+re-created one. The publication and submission workflows change production data, not schema
+or code, so they are not gated on staging.
+
+Today this is a process control, not a security boundary. Both GitHub environments hold an
+account-wide Cloudflare token, and the `staging` environment has no deployment-branch
+policy or reviewers. A workflow on any branch that uses the `staging` environment could
+therefore reach production directly. Restricting the `staging` environment's branches and
+splitting the token (#42 decisions b and d) close that gap.
 
 ## Setup
 
@@ -107,17 +136,28 @@ add Workers R2 Storage → Edit or Workers KV Storage → Edit, because the depl
 
 Cloudflare's current Workers roles map Workers Scripts → Edit to Workers **Editor**, which
 cannot create a Worker. The first production deploy created `best-serp-co-production` with
-an account-wide token. Both Workers now exist, so per-Worker Editor scopes are enough; the
-narrowing proposal is an open owner decision in serpcompany/best.serp.co#42.
+an account-wide token. Both Workers now exist, so per-Worker Editor scopes are enough. The
+owner approved splitting the token right after cutover (serpcompany/best.serp.co#42,
+decision b; see [GitHub environments](#github-environments)).
 
 ### GitHub environments
 
-The `staging` and `production` environments exist. `production` requires reviewer approval
-and allows deployments only from `main`. Each holds two environment secrets:
+The `staging` and `production` environments exist:
+
+- `production` requires reviewer approval and allows deployments only from `main`.
+- `staging` has no reviewers and no deployment-branch policy yet.
+
+Each holds two environment secrets:
 
 - `CLOUDFLARE_ACCOUNT_ID`: `cec5f04e1d18bcc65f2be0aefb04f059`
-- `CLOUDFLARE_API_TOKEN`: the token above (separate staging and production tokens limit
-  the blast radius of a leak)
+- `CLOUDFLARE_API_TOKEN`: today, **both environments hold the account-wide token**
+  described above (#34), with Edit on every Worker and D1 database in the SERP account. A leak from
+  either environment therefore reaches staging and production alike.
+
+The planned fix is #42 decision b, scheduled right after cutover. It gives each environment
+its own token, scoped to that environment's Worker and D1 database, plus a D1-only token for
+`production-notifier`. Each new token is proven in its workflow before the account-wide
+token is revoked. Until then, separate secrets do not limit the blast radius.
 
 Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "Staging deploy
 skipped" notice. After they exist, the next push to `main` deploys staging.
@@ -141,7 +181,7 @@ approval. When production accepts submissions:
 |---|---|---|---|---|
 | `deploy-staging.yml` | push to `main`, manual | `staging` | none | `pnpm harness:fast` → Worker build → staging D1 migrations → deploy → HTTP gates → Playwright smoke |
 | `deploy-production.yml` | manual, `main` | `production` | `deploy-best.serp.co-production` | Staging verification → `pnpm harness:fast` → Worker build → (database-and-worker: D1 backup → migrations) → deploy → HTTP gates |
-| `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | One-time initial catalog import into the empty production D1, then parity verification |
+| `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → initial catalog import into an empty production D1 → parity verification |
 | `publish-d1.yml` | manual, `main` | `production` | `publish-best.serp.co-production` | D1 backup → apply one `d1/publications/*.yaml` manifest |
 | `approve-d1-submission.yml` | manual, `main` | `production` | `approve-best.serp.co-submission-production` | D1 backup → approve or reject one submission → close its review issue |
 | `notify-d1-submissions.yml` | every 15 minutes, manual | `production-notifier` | none | Open an assigned review issue per badge-verified submission |
@@ -150,14 +190,14 @@ Guards, in order:
 
 1. An `authorize` job with no secrets checks `main` and the typed confirmation (and the
    manifest path or submission UUID), so a mistyped dispatch never requests reviewer approval.
-   In Deploy Production it also requires a verified Deploy Staging run of the commit
-   (see [Staging before production](#staging-before-production)).
+   Deploy Production and Bootstrap Production D1 also require Deploy Staging to have verified
+   the commit (see [Staging before production](#staging-before-production)).
 2. The GitHub `production` environment requires reviewer approval.
 3. `scripts/cloudflare-release.ts` refuses every mutating command (`backup`, `migrate`,
    `import`, `deploy`) unless it runs in the workflow file that owns it, against that
    workflow's environment, on `main` at a clean `GITHUB_SHA`, with the confirmation in
-   `RELEASE_CONFIRM`. Production `migrate` and `deploy` also require the verified Deploy
-   Staging run. `d1-remote-publisher.ts`, `d1-submission-approver.ts`, and
+   `RELEASE_CONFIRM`. Production `migrate`, `deploy`, and `import` also require the
+   verified Deploy Staging run. `d1-remote-publisher.ts`, `d1-submission-approver.ts`, and
    `d1-submission-notifier.ts` apply their own workflow and confirmation guards.
 4. `deploy` first proves that every `d1/drizzle` migration is applied, that no unknown
    migration is present, and that a catalog publication exists.

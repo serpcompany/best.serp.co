@@ -22,6 +22,7 @@ import {
   releaseAuthorizations,
   releaseCommands,
   requireVerifiedStaging,
+  runRelease,
   validateRemoteConfig,
   verifyImportedCatalog,
   wranglerD1
@@ -264,12 +265,16 @@ describe('staging before production', () => {
     return { fetch, requests }
   }
 
-  it('requires a verified staging run only for production migrations and Worker deploys', async () => {
+  it('requires a verified staging run for every production migration, import, and deploy', async () => {
     expect(
       Object.entries(releaseAuthorizations).flatMap(([workflow, authorization]) =>
         authorization.requireVerifiedStaging.map(command => `${workflow} ${command}`)
       )
-    ).toEqual(['deploy-production.yml migrate', 'deploy-production.yml deploy'])
+    ).toEqual([
+      'deploy-production.yml migrate',
+      'deploy-production.yml deploy',
+      'bootstrap-production-d1.yml import'
+    ])
     for (const [workflow, authorization] of Object.entries(releaseAuthorizations)) {
       expect(
         authorization.requireVerifiedStaging.every(command =>
@@ -277,9 +282,10 @@ describe('staging before production', () => {
         ),
         workflow
       ).toBe(true)
-      // Any workflow that may migrate production or deploy its Worker must prove staging first.
+      // Any workflow that may apply migrations to production (migrate, or import, which migrates
+      // first) or deploy its Worker must prove staging first.
       if (authorization.environment === 'production') {
-        for (const command of ['migrate', 'deploy'] as const) {
+        for (const command of ['migrate', 'import', 'deploy'] as const) {
           if (authorization.commands.includes(command)) {
             expect(authorization.requireVerifiedStaging, `${workflow} ${command}`).toContain(
               command
@@ -297,7 +303,7 @@ describe('staging before production', () => {
         const result = requireVerifiedStaging(command, env, api.fetch)
         if (authorization.requireVerifiedStaging.includes(command)) {
           await expect(result, `${workflow} ${command}`).rejects.toThrow(
-            `Deploy Staging has no successful run for ${sha}`
+            `Deploy Staging has no run for ${sha}`
           )
         } else {
           await expect(result, `${workflow} ${command}`).resolves.toBeNull()
@@ -319,6 +325,17 @@ describe('staging before production', () => {
       ).resolves.toMatchObject({ runId: 1, sha })
     }
     await expect(
+      requireVerifiedStaging(
+        'import',
+        {
+          ...workflowEnv('bootstrap-production-d1.yml', project.confirmation.bootstrap),
+          GITHUB_SHA: sha,
+          GITHUB_TOKEN: 'ghs_test'
+        },
+        stagingApi(true).fetch
+      )
+    ).resolves.toMatchObject({ runId: 1, sha })
+    await expect(
       requireVerifiedStaging('deploy', { ...env, GITHUB_TOKEN: '' }, stagingApi(true).fetch)
     ).rejects.toThrow('GITHUB_TOKEN')
   })
@@ -332,6 +349,176 @@ describe('staging before production', () => {
     await expect(
       requireVerifiedStaging('deploy', workflowEnv('main-validation.yml'), api.fetch)
     ).rejects.toThrow('protected release workflow')
+  })
+})
+
+describe('release entry point', () => {
+  const sha = '0123456789abcdef0123456789abcdef01234567'
+  const builtWorker = join(fixtureDirectory, 'built-worker.js')
+  writeFileSync(builtWorker, '')
+
+  /**
+   * Records, in order, every GitHub API request and every Wrangler/OpenNext invocation, and
+   * answers D1 queries as a fully migrated, bootstrapped database would.
+   */
+  function harness(verified: boolean) {
+    const events: string[] = []
+    const fetch: FetchLike = async url => {
+      events.push(`fetch ${new URL(url).pathname}`)
+      const body = url.includes('/workflows/')
+        ? {
+            workflow_runs: verified
+              ? [
+                  {
+                    conclusion: 'success',
+                    head_branch: 'main',
+                    head_sha: sha,
+                    id: 1,
+                    path: '.github/workflows/deploy-staging.yml',
+                    run_attempt: 1,
+                    status: 'completed'
+                  }
+                ]
+              : []
+          }
+        : {
+            jobs: [
+              {
+                conclusion: 'success',
+                steps: stagingWorkflow.requiredSteps.map(name => ({ conclusion: 'success', name }))
+              }
+            ]
+          }
+      return { json: async () => body, ok: true, status: 200 }
+    }
+    const runs: string[][] = []
+    const runner: ProcessRunner = {
+      run(command, args, { capture }) {
+        runs.push([command, ...args])
+        events.push(`run ${args.slice(0, 6).join(' ')}`)
+        if (!capture) return ''
+        const sql = args[args.indexOf('--command') + 1] ?? ''
+        const rows = sql.includes('sqlite_master')
+          ? [{ name: 'd1_migrations' }, { name: 'publication_state' }]
+          : sql.includes('FROM d1_migrations')
+            ? freshMigrationNames().map(name => ({ name }))
+            : [{ checksum: 'c', rows: 1, version: 1 }]
+        return JSON.stringify([{ results: rows, success: true }])
+      }
+    }
+    return { events, fetch, runner, runs }
+  }
+
+  const productionEnv = (workflow: string, confirmation: string) => ({
+    ...workflowEnv(workflow, confirmation),
+    GITHUB_SHA: sha,
+    GITHUB_TOKEN: 'ghs_test'
+  })
+  const productionReleases: Array<[string, string, string]> = [
+    ['migrate', 'deploy-production.yml', project.confirmation.deploy],
+    ['deploy', 'deploy-production.yml', project.confirmation.deploy],
+    ['import', 'bootstrap-production-d1.yml', project.confirmation.bootstrap]
+  ]
+
+  it('refuses an unverified production release before any Wrangler or D1 call', async () => {
+    for (const [command, workflow, confirmation] of productionReleases) {
+      const run = harness(false)
+      await expect(
+        runRelease([command, 'production'], productionEnv(workflow, confirmation), {
+          fetch: run.fetch,
+          git: cleanGit,
+          runner: run.runner,
+          workerEntrypoint: builtWorker
+        }),
+        command
+      ).rejects.toThrow(`Deploy Staging has no run for ${sha}`)
+      expect(run.runs, command).toEqual([])
+      expect(run.events.length, command).toBeGreaterThan(0)
+    }
+  })
+
+  it('checks staging first, then migrates or deploys a verified production commit', async () => {
+    for (const [command] of productionReleases.filter(([name]) => name !== 'import')) {
+      const run = harness(true)
+      await runRelease(
+        [command, 'production'],
+        productionEnv('deploy-production.yml', project.confirmation.deploy),
+        { fetch: run.fetch, git: cleanGit, runner: run.runner, workerEntrypoint: builtWorker }
+      )
+      const firstRun = run.events.findIndex(event => event.startsWith('run '))
+      expect(firstRun, command).toBeGreaterThan(0)
+      expect(
+        run.events.slice(0, firstRun).every(event => event.startsWith('fetch ')),
+        command
+      ).toBe(true)
+      expect(
+        run.events.slice(firstRun).some(event => event.startsWith('fetch ')),
+        command
+      ).toBe(false)
+      const expected =
+        command === 'migrate'
+          ? ['pnpm', 'exec', 'wrangler', 'd1', 'migrations', 'apply', 'best-serp-co-production']
+          : ['pnpm', '--filter', 'web', 'exec', 'opennextjs-cloudflare', 'deploy']
+      const mutation = run.runs.find(call => call.includes(expected[4] ?? ''))
+      expect(mutation?.slice(0, expected.length), command).toEqual(expected)
+    }
+  })
+
+  it('never consults GitHub for staging releases or read-only listings', async () => {
+    const staging = harness(false)
+    await runRelease(['deploy', 'staging'], workflowEnv('deploy-staging.yml'), {
+      fetch: staging.fetch,
+      git: cleanGit,
+      runner: staging.runner,
+      workerEntrypoint: builtWorker
+    })
+    expect(staging.events.filter(event => event.startsWith('fetch '))).toEqual([])
+    expect(staging.runs.at(-1)).toEqual([
+      'pnpm',
+      '--filter',
+      'web',
+      'exec',
+      'opennextjs-cloudflare',
+      'deploy',
+      '--env',
+      'staging'
+    ])
+
+    const listing = harness(false)
+    const refuse = () => {
+      throw new Error('list-migrations never inspects the checkout')
+    }
+    await expect(
+      runRelease(
+        ['list-migrations', 'production'],
+        {},
+        {
+          fetch: listing.fetch,
+          git: refuse,
+          runner: listing.runner
+        }
+      )
+    ).resolves.toEqual({
+      appliedMigrations: freshMigrationNames(),
+      environment: 'production',
+      ledger: 'd1_migrations',
+      missingMigrations: [],
+      unknownMigrations: []
+    })
+    expect(listing.events.filter(event => event.startsWith('fetch '))).toEqual([])
+    expect(listing.runs.length).toBeGreaterThan(0)
+    for (const call of listing.runs) {
+      expect(call.slice(0, 5)).toEqual(['pnpm', 'exec', 'wrangler', 'd1', 'execute'])
+      expect(call.slice(5, 11)).toEqual([
+        'best-serp-co-production',
+        '--remote',
+        '--env',
+        'production',
+        '--config',
+        'apps/web/wrangler.jsonc'
+      ])
+      expect(call[call.indexOf('--command') + 1]).toMatch(/^SELECT\b/u)
+    }
   })
 })
 

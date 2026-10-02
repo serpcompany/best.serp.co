@@ -56,8 +56,10 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 ## Planning and implementation
 
 GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning.
-Use short-lived branches and pull requests into protected `main`; never force-push
-`main`. Issues and labels never grant production, database, or deployment authority.
+Use short-lived branches and pull requests into `main`. Ruleset `main` requires a PR and
+the five PR Review checks, and blocks force pushes and deletion. Agents never merge; the owner
+approves every merge. Issues and labels never grant production, database, or deployment
+authority.
 
 ## Non-negotiable architecture
 
