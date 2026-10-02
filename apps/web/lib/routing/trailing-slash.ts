@@ -16,26 +16,65 @@
  */
 import { canonicalPathname } from '@serpdirectory/web-core/canonical-url'
 
-/** The part of Next.js's generated `.next/routes-manifest.json` this module reads. */
-export interface RoutesManifestRedirects {
-  redirects?: ReadonlyArray<{
-    has?: unknown[]
-    internal?: boolean
-    missing?: unknown[]
-    regex: string
-  }>
+/**
+ * Paths no moved-URL rule may match. Each has many segments and ends in both a page and a
+ * file form, so only a pattern that matches (nearly) everything matches them; such a
+ * pattern would make the Worker skip every slash redirect.
+ */
+const SELF_CHECK_PATHS = [
+  '/canonical-url-self-check/a/b/c',
+  '/canonical-url-self-check/a/b/c/',
+  '/canonical-url-self-check/a/b/c.txt/'
+]
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function invalidManifest(detail: string): Error {
+  return new Error(
+    `Invalid .next/routes-manifest.json: ${detail}. The Worker cannot tell which requests ` +
+      'next.config.ts redirects, so it refuses to start rather than skip the trailing-slash ' +
+      'rule; see apps/web/lib/routing/trailing-slash.ts.'
+  )
 }
 
 /**
- * The patterns OpenNext tests for the `next.config.ts` redirects. OpenNext evaluates each
- * compiled `regex` with `new RegExp(regex)`, so these match exactly the requests it
- * redirects. Rules with `has`/`missing` conditions are excluded: they redirect only some
- * requests, and those requests are still answered, one hop later.
+ * The patterns OpenNext tests for the `next.config.ts` redirects, read from Next.js's
+ * generated `.next/routes-manifest.json`. OpenNext evaluates each compiled `regex` with
+ * `new RegExp(regex)`, so these match exactly the requests it redirects. Rules with
+ * `has`/`missing` conditions are excluded: they redirect only some requests, and those
+ * requests are still answered, one hop later.
+ *
+ * Fails closed: a manifest whose shape is not the expected one (no `redirects` array, a rule
+ * without a non-empty string `regex`, a pattern that does not compile or that matches every
+ * path) throws instead of producing patterns that would silently turn the rule off.
  */
-export function configRedirectPatterns(manifest: RoutesManifestRedirects): RegExp[] {
-  return (manifest.redirects ?? [])
-    .filter(rule => !rule.internal && !rule.has?.length && !rule.missing?.length)
-    .map(rule => new RegExp(rule.regex))
+export function configRedirectPatterns(manifest: unknown): RegExp[] {
+  const redirects = isRecord(manifest) ? manifest.redirects : undefined
+  if (!Array.isArray(redirects)) throw invalidManifest('`redirects` is not an array')
+  const patterns: RegExp[] = []
+  redirects.forEach((rule: unknown, index) => {
+    if (!isRecord(rule)) throw invalidManifest(`redirects[${index}] is not an object`)
+    const conditional =
+      (Array.isArray(rule.has) && rule.has.length > 0) ||
+      (Array.isArray(rule.missing) && rule.missing.length > 0)
+    if (rule.internal === true || conditional) return
+    if (typeof rule.regex !== 'string' || rule.regex === '') {
+      throw invalidManifest(`redirects[${index}].regex is not a non-empty string`)
+    }
+    let pattern: RegExp
+    try {
+      pattern = new RegExp(rule.regex)
+    } catch {
+      throw invalidManifest(`redirects[${index}].regex does not compile`)
+    }
+    if (SELF_CHECK_PATHS.some(path => pattern.test(path))) {
+      throw invalidManifest(`redirects[${index}].regex matches every path`)
+    }
+    patterns.push(pattern)
+  })
+  return patterns
 }
 
 /**

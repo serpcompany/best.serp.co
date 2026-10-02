@@ -27,8 +27,12 @@ import { configRedirectPatterns, trailingSlashRedirect } from './lib/routing/tra
 export { BucketCachePurge, DOQueueHandler, DOShardedTagCache } from './.open-next/worker.js'
 
 const EDGE_CACHE_NAME = 'edge-html'
-/** next.config.ts redirects, which send moved URLs to their canonical page in one hop. */
-const configRedirects = configRedirectPatterns(routesManifest)
+/**
+ * next.config.ts redirects, which send moved URLs to their canonical page in one hop. A
+ * malformed manifest throws here, at startup, so the deploy and every request fail loudly
+ * instead of the trailing-slash rule silently switching off.
+ */
+const configRedirects = loadConfigRedirects()
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
 interface WorkerEnv {
@@ -38,6 +42,20 @@ interface WorkerEnv {
 }
 
 let epochMemo: EpochMemo | undefined
+
+function loadConfigRedirects(): RegExp[] {
+  try {
+    return configRedirectPatterns(routesManifest)
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: 'routes_manifest_invalid',
+        message: error instanceof Error ? error.message : String(error)
+      })
+    )
+    throw error
+  }
+}
 
 function log(event: object): void {
   console.info(JSON.stringify(event))

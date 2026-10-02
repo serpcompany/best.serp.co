@@ -52,7 +52,13 @@ describe('moved-URL redirects', () => {
       '/products/best/featured/',
       '/categories/video-downloaders',
       '/categories/video-downloaders/',
-      '/categories/'
+      '/categories/',
+      '/privacy',
+      '/privacy/',
+      '/terms',
+      '/terms/',
+      '/cookies',
+      '/cookies/'
     ]) {
       expect(covered(path), path).toBe(true)
     }
@@ -62,9 +68,21 @@ describe('moved-URL redirects', () => {
       '/products/autoenhance.ai/',
       '/products/categories/',
       '/products/categories/video-downloaders/',
-      '/about/'
+      '/about/',
+      '/legal/privacy/',
+      '/legal/terms/',
+      '/legal/cookies/'
     ]) {
       expect(covered(path), path).toBe(false)
+    }
+  })
+
+  it('send the static-site legal pages to /legal/ in one hop', () => {
+    for (const page of ['cookies', 'privacy', 'terms']) {
+      expect(rules.find(rule => rule.source === `/${page}`)).toMatchObject({
+        destination: `/legal/${page}/`,
+        permanent: true
+      })
     }
   })
 

@@ -130,6 +130,28 @@ describe('trailing-slash redirects', () => {
     expect(configRedirects.map(pattern => pattern.source)).toHaveLength(3)
     expect(redirect('/internal-only')).toEqual({ location: '/internal-only/', status: 308 })
     expect(redirect('/conditional')).toEqual({ location: '/conditional/', status: 308 })
-    expect(configRedirectPatterns({})).toEqual([])
+    expect(configRedirectPatterns({ redirects: [] })).toEqual([])
+  })
+
+  it('fails closed when the manifest is not the shape OpenNext reads', () => {
+    const rule = manifest.redirects[1]
+    const { regex, ...withoutRegex } = rule
+    for (const [label, broken] of [
+      ['no manifest', undefined],
+      ['renamed redirects field', { redirect: manifest.redirects }],
+      ['redirects is not an array', { redirects: {} }],
+      ['rule is not an object', { redirects: ['^/news$'] }],
+      ['renamed regex field', { redirects: [{ ...withoutRegex, pattern: regex }] }],
+      ['missing regex', { redirects: [withoutRegex] }],
+      ['empty regex', { redirects: [{ ...rule, regex: '' }] }],
+      ['non-string regex', { redirects: [{ ...rule, regex: 42 }] }],
+      ['regex that does not compile', { redirects: [{ ...rule, regex: '^/products(' }] }],
+      ['regex that matches everything', { redirects: [{ ...rule, regex: '(?:)' }] }],
+      ['catch-all source', { redirects: [{ ...rule, regex: '^(?!/_next)(?:/(.*))?(?:/)?$' }] }]
+    ] as const) {
+      expect(() => configRedirectPatterns(broken), label).toThrow(/routes-manifest\.json/u)
+    }
+    // The shape Next.js writes today passes.
+    expect(configRedirectPatterns(manifest)).toHaveLength(3)
   })
 })

@@ -58,6 +58,12 @@ export function movedUrlRedirects(): Redirect[] {
       destination: '/products/categories/:category/',
       permanent: true
     },
+    // Top-level legal pages of the static site (still 200 on it), now under /legal/.
+    ...['/cookies', '/privacy', '/terms'].map(source => ({
+      source,
+      destination: `/legal${source}/`,
+      permanent: true
+    })),
     ...aliasRedirects('website', listingBasePath),
     ...aliasRedirects('websites', listingBasePath),
     ...aliasRedirects('docs', site.routes.docsBasePath),
