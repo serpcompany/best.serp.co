@@ -1,11 +1,15 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
+  applyLegalContentBranding,
   buildWebsiteLookupIndex,
   resolveWebsiteBySlug,
   resolveWebsiteBySlugFromIndex,
   toWebsiteBrowseCardMetadata,
   type WebsiteMetadata
 } from './content-query'
+import { siteConfig } from './site-config'
 
 const websites: WebsiteMetadata[] = [
   {
@@ -224,4 +228,66 @@ describe('website lookup index', () => {
       resolveWebsiteBySlugFromIndex(buildWebsiteLookupIndex(websites), 'target-listing')
     )
   })
+})
+
+describe('applyLegalContentBranding', () => {
+  it('never rewrites a domain that already ends in serp.co', () => {
+    const branded = applyLegalContentBranding(
+      'Visit {{domain}} or https://best.serp.co/about/. {{siteName}} runs it.',
+      { domain: 'best.serp.co', siteName: 'SERP' }
+    )
+
+    expect(branded).toBe('Visit best.serp.co or https://best.serp.co/about/. SERP runs it.')
+  })
+
+  it('names contact addresses at the legal email domain, defaulting to the site domain', () => {
+    expect(
+      applyLegalContentBranding(
+        'Email dmca[@]{{legalEmailDomain}}. Opt out at privacy[@]{{legalEmailDomain}}.',
+        { domain: 'best.serp.co', legalEmailDomain: 'serp.co', siteName: 'SERP' }
+      )
+    ).toBe('Email dmca[@]serp.co. Opt out at privacy[@]serp.co.')
+    expect(
+      applyLegalContentBranding('dmca[@]{{legalEmailDomain}}', {
+        domain: 'best.serp.co',
+        siteName: 'SERP'
+      })
+    ).toBe('dmca[@]best.serp.co')
+  })
+
+  it('still rebrands bare serp.co and SERP references for another site', () => {
+    expect(
+      applyLegalContentBranding('Write to privacy@serp.co or see https://serp.co/terms.', {
+        domain: 'example.com',
+        siteName: 'Example'
+      })
+    ).toBe('Write to privacy@example.com or see https://example.com/terms.')
+    expect(
+      applyLegalContentBranding('SERP operates {{siteName}}.', {
+        domain: 'example.com',
+        siteName: 'Best SERP'
+      })
+    ).toBe('Best SERP operates Best SERP.')
+  })
+
+  it.each(['dmca', 'privacy', 'terms'])(
+    'renders %s.mdx with contact addresses at the configured legal email domain',
+    file => {
+      const source = readFileSync(
+        fileURLToPath(new URL(`../../content/data/legal/${file}.mdx`, import.meta.url)),
+        'utf8'
+      )
+      const branded = applyLegalContentBranding(source, {
+        domain: siteConfig.domain,
+        legalEmailDomain: siteConfig.legalEmailDomain,
+        siteName: siteConfig.name
+      })
+      const addresses = branded.match(/\b[a-z]+\[@\][a-z0-9.-]*[a-z0-9]/gu) ?? []
+
+      expect(branded).not.toMatch(/\{\{\w+\}\}/u)
+      expect(addresses.length).toBeGreaterThan(0)
+      for (const address of addresses)
+        expect(address.slice(address.indexOf('[@]') + 3)).toBe(siteConfig.legalEmailDomain)
+    }
+  )
 })

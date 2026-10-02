@@ -38,6 +38,7 @@ export type SiteConfig = {
   githubRepoUrl: string
   githubUrl: string
   id: string
+  legalEmailDomain: string
   listingRouteBasePath: string
   name: string
   networkBrandGroup: string | null
@@ -151,6 +152,7 @@ function resolveSiteConfig(configuredSite = site): SiteConfig {
     githubRepoUrl: configuredSite.social.githubRepoUrl,
     githubUrl: configuredSite.social.githubUrl,
     id: configuredSite.id,
+    legalEmailDomain: configuredSite.site.legalEmailDomain ?? configuredSite.site.domain,
     listingRouteBasePath: configuredSite.routes.listingBasePath,
     name: configuredSite.site.name,
     networkBrandGroup: configuredSite.networkBrandGroup,

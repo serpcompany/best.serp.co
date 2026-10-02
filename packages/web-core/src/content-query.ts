@@ -417,15 +417,23 @@ export function resolveAboutPage(aboutPages: AboutPageEntry[]): AboutPageMetadat
   }
 }
 
+/**
+ * Brands the shared legal templates. A bare `serp.co` (not part of a longer hostname)
+ * becomes the site domain, then placeholders are filled last, so a domain that itself
+ * ends in `serp.co` (best.serp.co) is never rewritten a second time.
+ *
+ * `{{legalEmailDomain}}` is the domain of the published contact addresses (`dmca@`,
+ * `privacy@`). It defaults to the site domain; a site keeps it on a domain whose
+ * mailboxes already receive mail until Email Routing forwards its own addresses.
+ */
 export function applyLegalContentBranding(
   content: string,
-  options: { siteName: string; domain: string }
+  options: { siteName: string; domain: string; legalEmailDomain?: string }
 ): string {
   return content
+    .replace(/(?<![\w.-])serp\.co(?![\w-])/gi, options.domain)
+    .replace(/\bSERP\b/g, options.siteName)
     .replace(/\{\{siteName\}\}/g, options.siteName)
     .replace(/\{\{domain\}\}/g, options.domain)
-    .replace(/privacy@serp\.co/gi, `privacy@${options.domain}`)
-    .replace(/legal@serp\.co/gi, `legal@${options.domain}`)
-    .replace(/serp\.co/gi, options.domain)
-    .replace(/\bSERP\b/g, options.siteName)
+    .replace(/\{\{legalEmailDomain\}\}/g, options.legalEmailDomain ?? options.domain)
 }
