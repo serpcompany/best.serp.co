@@ -1,9 +1,21 @@
 # D1 data model
 
-The schema is modeled once in `packages/data-ops/src/schema.ts`. `pnpm d1:generate`
+The schema is modeled once in `packages/data-ops/src/schema.ts`. `pnpm db:generate`
 (`drizzle-kit generate`) writes reviewable SQL into `d1/drizzle/`, and Wrangler applies
-it while recording the `d1_migrations` ledger. `drizzle-kit push` is not an approved
+it while recording the `d1_migrations` ledger. Every D1 binding in
+`apps/web/wrangler.jsonc` (local, staging, production) declares the same `DB` binding,
+`migrations_dir`, and `migrations_table: "d1_migrations"`; the local config check and the
+release script refuse a binding that drifts. `drizzle-kit push` is not an approved
 migration path.
+
+Local, staging, and production are separate databases with the same schema and migration
+history. A migration is applied locally (`pnpm db:migrate:local`), then to staging by
+Deploy Staging, then to production by Deploy Production only after Deploy Staging verified
+that commit (see [Deploy runbook](./DEPLOY_RUNBOOK.md#staging-before-production)).
+
+Local D1 is seeded with the real public catalog from the committed import rather than
+fixture data; keeping that or adding a fixture seed is an open decision in
+serpcompany/best.serp.co#42. The import holds no submissions or other user data.
 
 `d1/drizzle/0000_baseline.sql` is hand-finished after generation: every table is
 `STRICT`, `PRAGMA foreign_keys = ON` leads the file, and four triggers enforce that a

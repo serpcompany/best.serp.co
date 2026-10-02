@@ -8,10 +8,17 @@ Local D1 is seeded from the committed import (`d1/artifacts/best-serp-co-v1.sql.
 checked against the parity report):
 
 ```bash
-pnpm d1:local:migrate
-pnpm d1:local:import
-pnpm d1:local:verify
+pnpm db:migrate:local
+pnpm db:import:local
+pnpm db:verify:local
 ```
+
+`pnpm db:migrations:list:local` shows the migrations local D1 has not applied yet.
+
+The import is the real public catalog (3,422 listings, no submissions or other user data),
+which the parity comparison and the Playwright suites rely on. The database standard asks for
+fake or fixture data locally; whether to keep the public catalog as a documented exception
+or add a small fixture seed is an open owner decision in serpcompany/best.serp.co#42.
 
 To rebuild the artifacts from the source, check out `serpcompany/json-directory-template`
 at `25e2a8d` and run
@@ -34,14 +41,22 @@ exercises the real D1 binding.
 
 ## Schema changes
 
-Edit `packages/data-ops/src/schema.ts`, then generate a migration:
+Edit `packages/data-ops/src/schema.ts`, then generate and apply a migration locally:
 
 ```bash
-pnpm d1:generate
+pnpm db:generate
+pnpm db:migrate:local
 ```
 
 Review the SQL and keep the D1 specifics described in [Data model](./DATA_MODEL.md)
-(`STRICT` tables and triggers). Never use `drizzle-kit push`.
+(`STRICT` tables and triggers). Never use `drizzle-kit push`. Then run
+`pnpm harness:check` (typecheck, tests, and the Worker build).
+
+After merge, Deploy Staging applies the migration to staging (`pnpm db:migrate:staging` in
+the workflow), and Deploy Production with `database-and-worker` applies the same migration
+to production only after Deploy Staging verified that commit. Check either remote database
+read-only with `pnpm db:migrations:list:staging` or `pnpm db:migrations:list:production`
+after `wrangler login`; see [Deploy runbook](./DEPLOY_RUNBOOK.md#database-commands).
 
 ## Parity against the live site
 

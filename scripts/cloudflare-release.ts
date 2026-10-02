@@ -5,20 +5,27 @@
  *   pnpm tsx scripts/cloudflare-release.ts <command> <staging|production> [options]
  *
  * Commands:
+ *   list-migrations read-only: applied, pending, and unknown migrations in the D1 ledger
+ *                   (`pnpm db:migrations:list:<env>`)
  *   check-database  read-only: every d1/drizzle migration is applied and a publication exists
  *   verify-import   read-only: exact 16-table parity with the reviewed import and parity report
  *   backup          `wrangler d1 export` to --output <file>
- *   migrate         `wrangler d1 migrations apply`
+ *   migrate         `wrangler d1 migrations apply` (`pnpm db:migrate:<env>`)
  *   import          one-time bootstrap of an empty D1: refuse existing data, migrate, then
  *                   import the checksum-verified reviewed SQL
  *   deploy          check-database, then `opennextjs-cloudflare deploy` of the built Worker
  *
  * Mutating commands run only inside the protected workflow that owns them
  * (`releaseAuthorizations`), from a clean checkout of main at GITHUB_SHA, with that workflow's
- * typed confirmation in RELEASE_CONFIRM. Wrangler authenticates with CLOUDFLARE_API_TOKEN and
+ * typed confirmation in RELEASE_CONFIRM. Production migrations and Worker deploys also require a
+ * successful Deploy Staging run of that same commit (`staging-verification.ts`, GITHUB_TOKEN with
+ * actions: read). Wrangler authenticates with CLOUDFLARE_API_TOKEN and
  * CLOUDFLARE_ACCOUNT_ID. `--rehearse <directory>` runs migrate, import, verify-import, and
  * check-database with `--local --persist-to <directory>` instead of `--remote`; it never
  * contacts Cloudflare.
+ *
+ * `list-migrations` reads the ledger with a SELECT instead of `wrangler d1 migrations list`,
+ * because Wrangler's list first runs `CREATE TABLE IF NOT EXISTS` on the ledger table.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -38,12 +45,18 @@ import {
 } from './d1-import-artifact'
 import { applicationTableNames } from './d1-table-inventory'
 import { project, type RemoteEnvironment } from './project'
+import {
+  assertStagingVerified,
+  type FetchLike,
+  type StagingVerification
+} from './staging-verification'
 
 export const releaseCommands = [
   'backup',
   'check-database',
   'deploy',
   'import',
+  'list-migrations',
   'migrate',
   'verify-import'
 ] as const
@@ -51,6 +64,7 @@ export type ReleaseCommand = (typeof releaseCommands)[number]
 
 export const readOnlyCommands: ReadonlySet<ReleaseCommand> = new Set([
   'check-database',
+  'list-migrations',
   'verify-import'
 ])
 
@@ -59,6 +73,11 @@ export interface ReleaseAuthorization {
   /** Typed confirmation required in RELEASE_CONFIRM; staging deploys on reviewed pushes. */
   confirmation: string | null
   environment: RemoteEnvironment
+  /**
+   * Commands that ship schema or code and therefore also require a successful Deploy Staging
+   * run of the same commit (staging before production).
+   */
+  requireVerifiedStaging: readonly ReleaseCommand[]
 }
 
 /** The only workflows that may mutate a remote environment, and what each may do. */
@@ -66,28 +85,37 @@ export const releaseAuthorizations: Readonly<Record<string, ReleaseAuthorization
   'deploy-staging.yml': {
     commands: ['migrate', 'deploy'],
     confirmation: null,
-    environment: 'staging'
+    environment: 'staging',
+    requireVerifiedStaging: []
   },
   'deploy-production.yml': {
     commands: ['backup', 'migrate', 'deploy'],
     confirmation: project.confirmation.deploy,
-    environment: 'production'
+    environment: 'production',
+    requireVerifiedStaging: ['migrate', 'deploy']
   },
   'bootstrap-production-d1.yml': {
     // `import` applies migrations itself, and only after proving the database is empty.
     commands: ['import'],
     confirmation: project.confirmation.bootstrap,
-    environment: 'production'
+    environment: 'production',
+    // One-time exception to staging before production: the import refuses any database that
+    // already holds a catalog, and production was bootstrapped once (run 36800330629) from the
+    // same checksum-verified import that staging received.
+    requireVerifiedStaging: []
   },
   'publish-d1.yml': {
+    // A reviewed data change to production, not a schema or code release.
     commands: ['backup'],
     confirmation: project.confirmation.publish,
-    environment: 'production'
+    environment: 'production',
+    requireVerifiedStaging: []
   },
   'approve-d1-submission.yml': {
     commands: ['backup'],
     confirmation: project.confirmation.submission,
-    environment: 'production'
+    environment: 'production',
+    requireVerifiedStaging: []
   }
 }
 
@@ -121,6 +149,7 @@ interface WranglerEnvironmentConfig {
     database_id?: string
     database_name?: string
     migrations_dir?: string
+    migrations_table?: string
   }>
   name?: string
   vars?: Record<string, string | undefined>
@@ -140,7 +169,8 @@ function parseCommand(value: string | undefined): ReleaseCommand {
 
 /**
  * Refuses a Wrangler config whose `env.<environment>` block no longer matches the reviewed
- * remote identity in `project.ts` (Worker name, workers.dev exposure, D1 binding, runtime env).
+ * remote identity in `project.ts` (Worker name, workers.dev exposure, D1 binding, migration
+ * history and ledger table, runtime env).
  */
 export function validateRemoteConfig(
   environment: RemoteEnvironment,
@@ -169,6 +199,8 @@ export function validateRemoteConfig(
     resolve(dirname(resolve(configPath)), binding.migrations_dir) !== resolve('d1/drizzle')
   )
     problems.push('the DB binding must apply d1/drizzle migrations')
+  if (binding?.migrations_table !== project.migrationsTable)
+    problems.push(`the DB binding must declare migrations_table ${project.migrationsTable}`)
   if (problems.length > 0) {
     throw new Error(
       `${configPath} env.${environment} does not match the reviewed ${environment} identity in scripts/project.ts: ${problems.join('; ')}.`
@@ -181,6 +213,30 @@ function protectedWorkflowFile(workflowRef: string | undefined): string | undefi
   const suffix = '@refs/heads/main'
   if (!workflowRef?.startsWith(prefix) || !workflowRef.endsWith(suffix)) return undefined
   return workflowRef.slice(prefix.length, -suffix.length)
+}
+
+/**
+ * Staging before production: when the owning workflow requires it for this command, resolves
+ * only if Deploy Staging verified GITHUB_SHA. Call after `authorizeRelease`.
+ */
+export async function requireVerifiedStaging(
+  command: ReleaseCommand,
+  env: NodeJS.ProcessEnv,
+  fetch?: FetchLike
+): Promise<StagingVerification | null> {
+  if (readOnlyCommands.has(command)) return null
+  const workflow = protectedWorkflowFile(env.GITHUB_WORKFLOW_REF)
+  const authorization = workflow ? releaseAuthorizations[workflow] : undefined
+  if (!authorization) {
+    throw new Error(`Remote ${command} runs only inside a protected release workflow.`)
+  }
+  if (!authorization.requireVerifiedStaging.includes(command)) return null
+  return assertStagingVerified({
+    apiUrl: env.GITHUB_API_URL,
+    fetch,
+    sha: env.GITHUB_SHA,
+    token: env.GITHUB_TOKEN
+  })
 }
 
 /** Throws unless a mutating command runs from its owning protected workflow on reviewed main. */
@@ -309,12 +365,34 @@ function integer(value: unknown): number | null {
   return typeof value === 'number' && Number.isSafeInteger(value) ? value : null
 }
 
-export async function checkDatabase(d1: D1Target): Promise<DatabaseReadiness> {
-  const tables = await tableNames(d1)
-  const appliedMigrations = tables.has('d1_migrations')
-    ? (await d1.query('SELECT name FROM d1_migrations ORDER BY name')).map(row => String(row.name))
+export interface MigrationLedger {
+  appliedMigrations: string[]
+  missingMigrations: string[]
+  unknownMigrations: string[]
+}
+
+/** Compares the D1 migration ledger with d1/drizzle using SELECTs only. */
+export async function readMigrationLedger(
+  d1: D1Target,
+  tables?: Set<string>
+): Promise<MigrationLedger> {
+  const present = tables ?? (await tableNames(d1))
+  const appliedMigrations = present.has(project.migrationsTable)
+    ? (await d1.query(`SELECT name FROM ${project.migrationsTable} ORDER BY name`)).map(row =>
+        String(row.name)
+      )
     : []
   const required = freshMigrationNames()
+  return {
+    appliedMigrations,
+    missingMigrations: required.filter(name => !appliedMigrations.includes(name)),
+    unknownMigrations: appliedMigrations.filter(name => !required.includes(name))
+  }
+}
+
+export async function checkDatabase(d1: D1Target): Promise<DatabaseReadiness> {
+  const tables = await tableNames(d1)
+  const ledger = await readMigrationLedger(d1, tables)
   const publication = tables.has('publication_state')
     ? (
         await d1.query(
@@ -323,14 +401,12 @@ export async function checkDatabase(d1: D1Target): Promise<DatabaseReadiness> {
       )[0]
     : undefined
   return {
-    appliedMigrations,
-    missingMigrations: required.filter(name => !appliedMigrations.includes(name)),
+    ...ledger,
     publication: {
       checksum: typeof publication?.checksum === 'string' ? publication.checksum : null,
       rows: integer(publication?.rows) ?? 0,
       version: integer(publication?.version)
-    },
-    unknownMigrations: appliedMigrations.filter(name => !required.includes(name))
+    }
   }
 }
 
@@ -641,11 +717,16 @@ function git(args: string[]): string {
 export async function runRelease(
   argv: string[],
   env: NodeJS.ProcessEnv = process.env,
-  runner: ProcessRunner = processRunner
+  runner: ProcessRunner = processRunner,
+  fetch?: FetchLike
 ): Promise<unknown> {
   const args = parseReleaseArguments(argv)
   validateRemoteConfig(args.environment)
-  if (args.rehearse === undefined) authorizeRelease(args.command, args.environment, env, git)
+  if (args.rehearse === undefined) {
+    authorizeRelease(args.command, args.environment, env, git)
+    const staging = await requireVerifiedStaging(args.command, env, fetch)
+    if (staging) console.error(`Deploy Staging verified ${staging.sha}: ${staging.runUrl}`)
+  }
   const d1 = wranglerD1(
     args.environment,
     args.rehearse === undefined
@@ -654,6 +735,12 @@ export async function runRelease(
     runner
   )
   switch (args.command) {
+    case 'list-migrations':
+      return {
+        environment: args.environment,
+        ledger: project.migrationsTable,
+        ...(await readMigrationLedger(d1))
+      }
     case 'check-database': {
       const readiness = await checkDatabase(d1)
       assertDatabaseReady(readiness, args.environment)

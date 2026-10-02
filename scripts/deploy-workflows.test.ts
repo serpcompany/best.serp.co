@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { releaseAuthorizations } from './cloudflare-release'
 import { buildReviewIssue } from './d1-submission-notifier'
 import { project } from './project'
+import { stagingWorkflow } from './staging-verification'
 
 interface WorkflowStep {
   env?: Record<string, string>
@@ -37,6 +38,7 @@ interface WorkflowInput {
 interface WorkflowDefinition {
   concurrency?: { 'cancel-in-progress'?: boolean; group?: string }
   jobs: Record<string, WorkflowJob>
+  name?: string
   on: {
     push?: { branches?: string[]; paths?: string[] }
     schedule?: Array<{ cron: string }>
@@ -46,6 +48,9 @@ interface WorkflowDefinition {
 }
 
 const workflowDirectory = resolve('.github/workflows')
+const packageScripts = (
+  JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as { scripts: Record<string, string> }
+).scripts
 
 function loadWorkflow(file: string): WorkflowDefinition {
   return yaml.load(readFileSync(resolve(workflowDirectory, file), 'utf8')) as WorkflowDefinition
@@ -137,6 +142,29 @@ describe('staging deploy workflow', () => {
     expect(String(evidence?.with?.path)).toContain('apps/e2e/playwright-report/')
   })
 
+  it('names the steps production requires as proof that staging verified a commit', () => {
+    expect(workflow.name).toBe(stagingWorkflow.name)
+    expect(stagingWorkflow.file).toBe('deploy-staging.yml')
+    const proof: Record<(typeof stagingWorkflow.requiredSteps)[number], string> = {
+      'Apply staging D1 migrations': 'pnpm tsx scripts/cloudflare-release.ts migrate staging',
+      'Deploy staging Worker': 'pnpm tsx scripts/cloudflare-release.ts deploy staging',
+      'Run staging HTTP gates': 'pnpm tsx scripts/d1-preview-http-gates.ts staging',
+      'Run Playwright smoke against staging': 'pnpm --filter e2e test:e2e:smoke'
+    }
+    expect(Object.keys(proof)).toEqual([...stagingWorkflow.requiredSteps])
+    for (const [name, command] of Object.entries(proof)) {
+      const steps = (job.steps ?? []).filter(step => step.name === name)
+      expect(steps, name).toHaveLength(1)
+      expect(steps[0]?.run, name).toContain(command)
+    }
+  })
+
+  it('runs the same staging migration as pnpm db:migrate:staging', () => {
+    expect(packageScripts['db:migrate:staging']).toBe(
+      stepRunning(job, 'cloudflare-release.ts migrate staging').run
+    )
+  })
+
   it('skips cleanly, without failing main, until Cloudflare credentials exist', () => {
     const [check, ...rest] = job.steps ?? []
     expect(check?.id).toBe('credentials')
@@ -169,6 +197,30 @@ describe('production deploy workflow', () => {
     expect(authorize).toContain(`"$CONFIRMATION" != "${project.confirmation.deploy}"`)
     expect(release.needs).toEqual(['authorize'])
     expect(release.environment).toEqual({ name: 'production', url: project.publicUrl })
+  })
+
+  it('releases only a commit Deploy Staging verified, before asking for reviewer approval', () => {
+    expect(workflow.permissions).toEqual({ actions: 'read', contents: 'read' })
+    const authorize = workflow.jobs.authorize as WorkflowJob
+    expect(authorize.environment).toBeUndefined()
+    const verify = stepRunning(authorize, 'pnpm tsx scripts/staging-verification.ts')
+    expect(verify.run).toBe('pnpm tsx scripts/staging-verification.ts')
+    expect(verify.env).toEqual({ GITHUB_TOKEN: expression('github.token') })
+    expect(stepIndex(authorize, 'staging-verification.ts')).toBeGreaterThan(
+      stepIndex(authorize, '"$CONFIRMATION"')
+    )
+    // The release script repeats the check before each production migration and Worker deploy.
+    for (const command of ['migrate production', 'deploy production']) {
+      expect(stepRunning(release, `cloudflare-release.ts ${command}`).env?.GITHUB_TOKEN).toBe(
+        expression('github.token')
+      )
+    }
+  })
+
+  it('runs the same production migration as pnpm db:migrate:production', () => {
+    expect(packageScripts['db:migrate:production']).toBe(
+      stepRunning(release, 'cloudflare-release.ts migrate production').run
+    )
   })
 
   it('backs up and migrates D1 only in database-and-worker mode, then deploys and gates', () => {
@@ -226,6 +278,16 @@ describe('production D1 bootstrap workflow', () => {
     ])
     expect(JSON.stringify(workflow)).not.toMatch(/deploy production|opennextjs-cloudflare/u)
   })
+
+  it('is the documented one-time exception to staging before production', () => {
+    expect(releaseAuthorizations['bootstrap-production-d1.yml']?.requireVerifiedStaging).toEqual([])
+    expect(readFileSync(resolve(workflowDirectory, 'bootstrap-production-d1.yml'), 'utf8')).toMatch(
+      /one documented exception to staging before\n# production/u
+    )
+    expect(readFileSync(resolve('docs/DEPLOY_RUNBOOK.md'), 'utf8')).toContain(
+      'The production bootstrap is the one exception'
+    )
+  })
 })
 
 describe('recreated D1 operation workflows', () => {
@@ -249,16 +311,16 @@ describe('recreated D1 operation workflows', () => {
       [
         'approve-d1-submission.yml',
         'review',
-        'pnpm d1:approve:production',
+        'pnpm db:approve:production',
         'scripts/d1-submission-approver.ts'
       ],
       [
         'notify-d1-submissions.yml',
         'notify',
-        'pnpm d1:notify:production',
+        'pnpm db:notify:production',
         'scripts/d1-submission-notifier.ts'
       ],
-      ['publish-d1.yml', 'publish', 'pnpm d1:publish:production', 'scripts/d1-remote-publisher.ts']
+      ['publish-d1.yml', 'publish', 'pnpm db:publish:production', 'scripts/d1-remote-publisher.ts']
     ]
     for (const [file, jobName, command, script] of contracts) {
       const step = stepRunning(loadWorkflow(file).jobs[jobName] as WorkflowJob, command)
@@ -272,18 +334,18 @@ describe('recreated D1 operation workflows', () => {
       expect(step.env?.CLOUDFLARE_ACCOUNT_ID).toBe(secret('CLOUDFLARE_ACCOUNT_ID'))
     }
     const publish = loadWorkflow('publish-d1.yml').jobs.publish as WorkflowJob
-    expect(stepRunning(publish, 'd1:publish:production').env?.D1_PUBLICATION_CONFIRM).toBe(
+    expect(stepRunning(publish, 'db:publish:production').env?.D1_PUBLICATION_CONFIRM).toBe(
       expression('inputs.confirmation')
     )
-    expect(stepRunning(publish, 'd1:publish:production').run).toBe(
-      'pnpm d1:publish:production -- "$MANIFEST_PATH"'
+    expect(stepRunning(publish, 'db:publish:production').run).toBe(
+      'pnpm db:publish:production -- "$MANIFEST_PATH"'
     )
     const review = loadWorkflow('approve-d1-submission.yml').jobs.review as WorkflowJob
-    expect(stepRunning(review, 'd1:approve:production').env?.D1_SUBMISSION_APPROVAL_CONFIRM).toBe(
+    expect(stepRunning(review, 'db:approve:production').env?.D1_SUBMISSION_APPROVAL_CONFIRM).toBe(
       expression('inputs.confirmation')
     )
-    expect(stepRunning(review, 'd1:approve:production').run).toBe(
-      'pnpm d1:approve:production -- "$SUBMISSION_ID" "$DECISION"'
+    expect(stepRunning(review, 'db:approve:production').run).toBe(
+      'pnpm db:approve:production -- "$SUBMISSION_ID" "$DECISION"'
     )
   })
 
@@ -293,9 +355,9 @@ describe('recreated D1 operation workflows', () => {
         'approve-d1-submission.yml',
         'review',
         project.confirmation.submission,
-        'd1:approve:production'
+        'db:approve:production'
       ],
-      ['publish-d1.yml', 'publish', project.confirmation.publish, 'd1:publish:production']
+      ['publish-d1.yml', 'publish', project.confirmation.publish, 'db:publish:production']
     ]
     for (const [file, jobName, confirmation, command] of cases) {
       const workflow = loadWorkflow(file)
@@ -369,7 +431,7 @@ describe('recreated D1 operation workflows', () => {
     expect(check?.id).toBe('credentials')
     expect(check?.run).not.toMatch(/exit 1/u)
     for (const step of rest) expect(step.if, step.name).toBe(credentialsGate)
-    expect(stepRunning(notify, 'd1:notify:production').env).toMatchObject({
+    expect(stepRunning(notify, 'db:notify:production').env).toMatchObject({
       GITHUB_TOKEN: expression('github.token'),
       SUBMISSION_REVIEWER_GITHUB_LOGIN: expression('vars.SUBMISSION_REVIEWER_GITHUB_LOGIN')
     })
@@ -403,7 +465,7 @@ describe('protected deployment boundaries', () => {
 
   it('never mutates production outside a manual dispatch', () => {
     const productionMutation =
-      /cloudflare-release\.ts (?:backup|migrate|import|deploy) production|d1:(?:approve|publish):production|opennextjs-cloudflare deploy/u
+      /cloudflare-release\.ts (?:backup|migrate|import|deploy) production|db:(?:migrate|approve|publish):production|opennextjs-cloudflare deploy/u
     for (const [file, workflow] of allWorkflows()) {
       const triggers = Object.keys(workflow.on)
       const automatic = triggers.some(trigger => trigger !== 'workflow_dispatch')
@@ -424,7 +486,11 @@ describe('protected deployment boundaries', () => {
     }
     for (const file of newWorkflows) {
       const workflow = loadWorkflow(file)
-      expect(workflow.permissions, file).toEqual({ contents: 'read' })
+      expect(workflow.permissions, file).toEqual(
+        file === 'deploy-production.yml'
+          ? { actions: 'read', contents: 'read' }
+          : { contents: 'read' }
+      )
       for (const job of Object.values(workflow.jobs)) {
         expect(JSON.stringify(job.env ?? {}), file).not.toContain('secrets.')
         for (const step of job.steps ?? []) {
@@ -446,12 +512,33 @@ describe('protected deployment boundaries', () => {
   })
 
   it('runs these workflow and release contracts in the repository and D1 test suites', () => {
-    const scripts = JSON.parse(readFileSync(resolve('package.json'), 'utf8')).scripts as Record<
-      string,
-      string
-    >
-    expect(scripts['test:repo']).toContain('scripts/deploy-workflows.test.ts')
-    expect(scripts['test:d1']).toContain('scripts/cloudflare-release.test.ts')
+    expect(packageScripts['test:repo']).toContain('scripts/deploy-workflows.test.ts')
+    expect(packageScripts['test:d1']).toContain('scripts/cloudflare-release.test.ts')
+    expect(packageScripts['test:d1']).toContain('scripts/staging-verification.test.ts')
+  })
+
+  it('names every database command after its target, routing remote mutations through the guard', () => {
+    expect(Object.keys(packageScripts).filter(name => name.startsWith('d1:'))).toEqual([])
+    for (const environment of ['staging', 'production'] as const) {
+      expect(packageScripts[`db:migrate:${environment}`]).toBe(
+        `pnpm tsx scripts/cloudflare-release.ts migrate ${environment}`
+      )
+      expect(packageScripts[`db:migrations:list:${environment}`]).toBe(
+        `pnpm tsx scripts/cloudflare-release.ts list-migrations ${environment}`
+      )
+    }
+    expect(packageScripts['db:migrate']).toBeUndefined()
+    expect(
+      Object.entries(packageScripts)
+        .filter(([name]) => name.startsWith('db:') && name.endsWith(':production'))
+        .map(([, command]) => command.split(' ').slice(0, 3).join(' '))
+    ).toEqual([
+      'pnpm tsx scripts/cloudflare-release.ts',
+      'pnpm tsx scripts/cloudflare-release.ts',
+      'pnpm tsx scripts/d1-remote-publisher.ts',
+      'pnpm tsx scripts/d1-submission-approver.ts',
+      'pnpm tsx scripts/d1-submission-notifier.ts'
+    ])
   })
 
   it('passes each production mutation the confirmation the release script requires', () => {

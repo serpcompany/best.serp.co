@@ -38,8 +38,13 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 ## Primary commands
 
 - `pnpm dev` / `pnpm worker:preview`: build and serve the Worker against local D1.
-- `pnpm d1:local:migrate`, `pnpm d1:local:import`, `pnpm d1:local:verify`: prepare
+- `pnpm db:migrate:local`, `pnpm db:import:local`, `pnpm db:verify:local`: prepare
   local D1 from the committed import (see [Development](./docs/DEVELOPMENT.md)).
+- `pnpm db:generate`: generate a reviewed migration from the Drizzle schema.
+- `pnpm db:migrations:list:{local,staging,production}`: read-only migration status.
+  `pnpm db:migrate:{staging,production}` runs only inside the protected deploy workflows,
+  and production only after Deploy Staging verified the same commit
+  (see [the deploy runbook](./docs/DEPLOY_RUNBOOK.md#database-commands)).
 - `pnpm harness:fast` / `pnpm harness:check`: fast and full validation loops.
 - `pnpm test:e2e`: Playwright against a local Worker.
 - `pnpm migration:compare -- <origin>`: structural page parity against best.serp.co.
@@ -62,7 +67,7 @@ Use short-lived branches and pull requests into protected `main`; never force-pu
   when the binding or `D1_RUNTIME_ENV` is missing or invalid.
 - Use prepared statements and bind every runtime value.
 - Model tables in `packages/data-ops/src/schema.ts` and generate migrations into
-  `d1/drizzle/` with `pnpm d1:generate`; `drizzle-kit push` is forbidden.
+  `d1/drizzle/` with `pnpm db:generate`; `drizzle-kit push` is forbidden.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
 - Public URLs are part of the SEO contract: `/products/<slug>/`,
   `/products/categories/<category>/`. Changing a route requires permanent redirects.

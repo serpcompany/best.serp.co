@@ -105,7 +105,7 @@ jobs:
           D1_SUBMISSION_APPROVAL_CONFIRM: ${{ inputs.confirmation }}
           DECISION: ${{ inputs.decision }}
           SUBMISSION_ID: ${{ inputs.submission_id }}
-        run: pnpm d1:approve:production -- "$SUBMISSION_ID" "$DECISION"
+        run: pnpm db:approve:production -- "$SUBMISSION_ID" "$DECISION"
 
       - name: Close the review issue
         uses: actions/github-script@v9

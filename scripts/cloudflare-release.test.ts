@@ -17,9 +17,11 @@ import {
   type ProcessRunner,
   parseReleaseArguments,
   parseWranglerRows,
+  readMigrationLedger,
   readOnlyCommands,
   releaseAuthorizations,
   releaseCommands,
+  requireVerifiedStaging,
   validateRemoteConfig,
   verifyImportedCatalog,
   wranglerD1
@@ -28,6 +30,7 @@ import { freshMigrationNames } from './d1-drizzle-local'
 import type { ImportArtifactPaths, ParityReport } from './d1-import-artifact'
 import { sha256 } from './d1-import-artifact'
 import { project } from './project'
+import { type FetchLike, stagingWorkflow } from './staging-verification'
 
 const fixtureDirectory = mkdtempSync(join(tmpdir(), 'best-serp-co-release-'))
 afterAll(() => rmSync(fixtureDirectory, { force: true, recursive: true }))
@@ -130,8 +133,14 @@ describe('release authorization', () => {
     const git = () => {
       throw new Error('read-only commands never inspect the checkout')
     }
-    expect(() => authorizeRelease('check-database', 'production', {}, git)).not.toThrow()
-    expect(() => authorizeRelease('verify-import', 'production', {}, git)).not.toThrow()
+    expect([...readOnlyCommands].sort()).toEqual([
+      'check-database',
+      'list-migrations',
+      'verify-import'
+    ])
+    for (const command of readOnlyCommands) {
+      expect(() => authorizeRelease(command, 'production', {}, git)).not.toThrow()
+    }
     for (const command of mutatingCommands) {
       expect(() => authorizeRelease(command, 'staging', {}, cleanGit)).toThrow(
         'protected GitHub Actions workflow'
@@ -186,7 +195,8 @@ describe('release authorization', () => {
     expect(releaseAuthorizations['deploy-staging.yml']).toEqual({
       commands: ['migrate', 'deploy'],
       confirmation: null,
-      environment: 'staging'
+      environment: 'staging',
+      requireVerifiedStaging: []
     })
     expect(
       Object.entries(releaseAuthorizations)
@@ -218,10 +228,128 @@ describe('release authorization', () => {
   })
 })
 
+describe('staging before production', () => {
+  const sha = '0123456789abcdef0123456789abcdef01234567'
+
+  function stagingApi(verified: boolean) {
+    const requests: string[] = []
+    const fetch: FetchLike = async url => {
+      requests.push(url)
+      const body = url.includes('/workflows/')
+        ? {
+            workflow_runs: verified
+              ? [
+                  {
+                    conclusion: 'success',
+                    head_branch: 'main',
+                    head_sha: sha,
+                    html_url: 'https://github.com/run/1',
+                    id: 1,
+                    path: '.github/workflows/deploy-staging.yml',
+                    status: 'completed'
+                  }
+                ]
+              : []
+          }
+        : {
+            jobs: [
+              {
+                conclusion: 'success',
+                steps: stagingWorkflow.requiredSteps.map(name => ({ conclusion: 'success', name }))
+              }
+            ]
+          }
+      return { json: async () => body, ok: true, status: 200 }
+    }
+    return { fetch, requests }
+  }
+
+  it('requires a verified staging run only for production migrations and Worker deploys', async () => {
+    expect(
+      Object.entries(releaseAuthorizations).flatMap(([workflow, authorization]) =>
+        authorization.requireVerifiedStaging.map(command => `${workflow} ${command}`)
+      )
+    ).toEqual(['deploy-production.yml migrate', 'deploy-production.yml deploy'])
+    for (const [workflow, authorization] of Object.entries(releaseAuthorizations)) {
+      expect(
+        authorization.requireVerifiedStaging.every(command =>
+          authorization.commands.includes(command)
+        ),
+        workflow
+      ).toBe(true)
+      // Any workflow that may migrate production or deploy its Worker must prove staging first.
+      if (authorization.environment === 'production') {
+        for (const command of ['migrate', 'deploy'] as const) {
+          if (authorization.commands.includes(command)) {
+            expect(authorization.requireVerifiedStaging, `${workflow} ${command}`).toContain(
+              command
+            )
+          }
+        }
+      }
+      for (const command of authorization.commands) {
+        const api = stagingApi(false)
+        const env = {
+          ...workflowEnv(workflow, authorization.confirmation),
+          GITHUB_SHA: sha,
+          GITHUB_TOKEN: 'ghs_test'
+        }
+        const result = requireVerifiedStaging(command, env, api.fetch)
+        if (authorization.requireVerifiedStaging.includes(command)) {
+          await expect(result, `${workflow} ${command}`).rejects.toThrow(
+            `Deploy Staging has no successful run for ${sha}`
+          )
+        } else {
+          await expect(result, `${workflow} ${command}`).resolves.toBeNull()
+          expect(api.requests).toEqual([])
+        }
+      }
+    }
+  })
+
+  it('lets a production release proceed once Deploy Staging verified the commit', async () => {
+    const env = {
+      ...workflowEnv('deploy-production.yml', project.confirmation.deploy),
+      GITHUB_SHA: sha,
+      GITHUB_TOKEN: 'ghs_test'
+    }
+    for (const command of ['migrate', 'deploy'] as const) {
+      await expect(
+        requireVerifiedStaging(command, env, stagingApi(true).fetch)
+      ).resolves.toMatchObject({ runId: 1, sha })
+    }
+    await expect(
+      requireVerifiedStaging('deploy', { ...env, GITHUB_TOKEN: '' }, stagingApi(true).fetch)
+    ).rejects.toThrow('GITHUB_TOKEN')
+  })
+
+  it('never consults GitHub for read-only checks and refuses unknown workflows', async () => {
+    const api = stagingApi(false)
+    for (const command of readOnlyCommands) {
+      await expect(requireVerifiedStaging(command, {}, api.fetch)).resolves.toBeNull()
+    }
+    expect(api.requests).toEqual([])
+    await expect(
+      requireVerifiedStaging('deploy', workflowEnv('main-validation.yml'), api.fetch)
+    ).rejects.toThrow('protected release workflow')
+  })
+})
+
 describe('remote Wrangler identity', () => {
   it('accepts the reviewed staging and production blocks of wrangler.jsonc', () => {
     expect(() => validateRemoteConfig('staging')).not.toThrow()
     expect(() => validateRemoteConfig('production')).not.toThrow()
+    // The ledger is declared explicitly, and is the one Wrangler and the release checks read.
+    expect(project.migrationsTable).toBe('d1_migrations')
+    const config = JSON.parse(readFileSync(resolve(project.wranglerConfigPath), 'utf8'))
+    for (const bindings of [
+      config.d1_databases,
+      config.env.staging.d1_databases,
+      config.env.production.d1_databases
+    ]) {
+      expect(bindings).toHaveLength(1)
+      expect(bindings[0].migrations_table).toBe(project.migrationsTable)
+    }
     expect(project.remote.production.origin).toBe(project.publicUrl)
     // Pre-cutover review URL; *.workers.dev responses carry X-Robots-Tag noindex.
     expect(project.remote.production.workersDev).toBe(true)
@@ -261,6 +389,18 @@ describe('remote Wrangler identity', () => {
         'migrations',
         config => {
           config.env.production.d1_databases[0].migrations_dir = '/tmp/other'
+        }
+      ],
+      [
+        'migrations_table d1_migrations',
+        config => {
+          config.env.production.d1_databases[0].migrations_table = 'migrations'
+        }
+      ],
+      [
+        'migrations_table d1_migrations',
+        config => {
+          delete config.env.production.d1_databases[0].migrations_table
         }
       ]
     ]
@@ -476,6 +616,31 @@ describe('one-time catalog bootstrap', () => {
     ).rejects.toThrow('Tables: listings.')
   })
 
+  it('lists applied, pending, and unknown migrations with SELECTs only', async () => {
+    const { database, target } = sqliteD1()
+    const statements: string[] = []
+    const recording: D1Target = {
+      ...target,
+      query: sql => {
+        statements.push(sql)
+        return target.query(sql)
+      }
+    }
+    await expect(readMigrationLedger(recording)).resolves.toEqual({
+      appliedMigrations: [],
+      missingMigrations: freshMigrationNames(),
+      unknownMigrations: []
+    })
+    target.applyMigrations()
+    database.exec("INSERT INTO d1_migrations (name) VALUES ('9999_future.sql')")
+    await expect(readMigrationLedger(recording)).resolves.toEqual({
+      appliedMigrations: [...freshMigrationNames(), '9999_future.sql'],
+      missingMigrations: [],
+      unknownMigrations: ['9999_future.sql']
+    })
+    expect(statements.every(sql => /^SELECT\b/u.test(sql))).toBe(true)
+  })
+
   it('refuses to deploy older code over a database with unknown migrations', async () => {
     const { database, target } = sqliteD1()
     target.applyMigrations()
@@ -549,6 +714,10 @@ describe('release arguments', () => {
     })
     expect(parseReleaseArguments(['import', 'production', '--rehearse', '/tmp/r'])).toMatchObject({
       rehearse: '/tmp/r'
+    })
+    expect(parseReleaseArguments(['list-migrations', 'production'])).toEqual({
+      command: 'list-migrations',
+      environment: 'production'
     })
     expect(() => parseReleaseArguments(['publish', 'production'])).toThrow('command must be')
     expect(() => parseReleaseArguments(['migrate', 'preview'])).toThrow('staging or production')

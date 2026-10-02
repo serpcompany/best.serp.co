@@ -3,7 +3,9 @@ name: Bootstrap Production D1
 # One-time initial catalog import into the EMPTY production D1. The import refuses any existing
 # publication or catalog rows before changing anything, applies the d1/drizzle migrations,
 # imports d1/artifacts/best-serp-co-v1.sql.br only if its sha256 matches the parity report, then
-# proves exact parity with the report. See docs/DEPLOY_RUNBOOK.md.
+# proves exact parity with the report. It is the one documented exception to staging before
+# production: it ran once (run 36800330629) and cannot import into a populated database again.
+# See docs/DEPLOY_RUNBOOK.md.
 on:
   workflow_dispatch:
     inputs:

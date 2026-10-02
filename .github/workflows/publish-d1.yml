@@ -94,4 +94,4 @@ jobs:
           CLOUDFLARE_D1_DATABASE_ID: 404ec437-53a2-4fbc-8b5f-b5e69065708e
           D1_PUBLICATION_CONFIRM: ${{ inputs.confirmation }}
           MANIFEST_PATH: ${{ inputs.manifest_path }}
-        run: pnpm d1:publish:production -- "$MANIFEST_PATH"
+        run: pnpm db:publish:production -- "$MANIFEST_PATH"

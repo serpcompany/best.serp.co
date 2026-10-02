@@ -148,7 +148,7 @@ async function main(): Promise<void> {
     .filter(value => value !== '--')
   const decision = requestedDecision
   if (!submissionId || (decision !== 'approve' && decision !== 'reject')) {
-    throw new Error('Usage: pnpm d1:approve:production -- <submission-id> [approve|reject]')
+    throw new Error('Usage: pnpm db:approve:production -- <submission-id> [approve|reject]')
   }
   console.log(
     JSON.stringify(

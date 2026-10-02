@@ -155,7 +155,7 @@ export async function publishRemoteManifest(
 async function main(): Promise<void> {
   const [manifestPath] = process.argv.slice(2).filter(value => value !== '--')
   if (!manifestPath)
-    throw new Error('Usage: pnpm d1:publish:production -- d1/publications/<manifest>.yaml')
+    throw new Error('Usage: pnpm db:publish:production -- d1/publications/<manifest>.yaml')
   console.log(JSON.stringify(await publishRemoteManifest(manifestPath)))
 }
 

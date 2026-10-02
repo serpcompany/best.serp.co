@@ -89,6 +89,7 @@ interface LocalConfigFixture {
     database_id: string
     database_name: string
     migrations_dir: string
+    migrations_table?: string
   }>
   main: string
   name: string
@@ -106,7 +107,8 @@ function validLocalConfig(): LocalConfigFixture {
         binding: 'DB',
         database_id: project.local.databaseId,
         database_name: project.local.databaseName,
-        migrations_dir: resolve('d1/drizzle')
+        migrations_dir: resolve('d1/drizzle'),
+        migrations_table: project.migrationsTable
       }
     ],
     main: resolve(project.workerEntryPath),
@@ -171,8 +173,11 @@ describe('fresh Drizzle D1 history', () => {
 
   it('migrates empty canonical local state and verifies the exact fresh schema', () => {
     const stateDirectory = temporaryDirectory('best-serp-co-drizzle-')
+    // pnpm db:migrations:list:local lists what pnpm db:migrate:local will apply.
+    expect(runLocal('list', stateDirectory)).toContain('0000_baseline.sql')
     expect(runLocal('migrate', stateDirectory)).toContain('0000_baseline.sql')
     expect(runDrizzle('verify', stateDirectory)).toContain('"status":"verified"')
+    expect(runLocal('list', stateDirectory)).toContain('No migrations to apply')
     expect(runLocal('migrate', stateDirectory)).toContain('No migrations to apply')
   }, 180_000)
 
@@ -214,7 +219,7 @@ describe('fresh Drizzle D1 history', () => {
       databaseName: 'best-serp-co-local'
     })
     const config = JSON.parse(readFileSync(local.configPath, 'utf8')) as {
-      d1_databases: Array<{ database_id: string; migrations_dir: string }>
+      d1_databases: Array<{ database_id: string; migrations_dir: string; migrations_table: string }>
       main: string
       name: string
       vars: Record<string, string>
@@ -224,6 +229,7 @@ describe('fresh Drizzle D1 history', () => {
     expect(config.d1_databases).toHaveLength(1)
     expect(config.d1_databases[0]?.database_id).toBe('00000000-0000-0000-0000-000000000001')
     expect(config.d1_databases[0]?.migrations_dir).toBe('../../d1/drizzle')
+    expect(config.d1_databases[0]?.migrations_table).toBe('d1_migrations')
     expect(config.vars.D1_RUNTIME_ENV).toBe('local')
     expect(Object.keys(config.vars)).not.toContain('SITE_ID')
     expect(Object.keys(config.vars)).not.toContain('NEXT_PUBLIC_SITE_ID')
@@ -304,6 +310,22 @@ describe('fresh Drizzle D1 history', () => {
       },
       /d1\/drizzle/u
     )
+    assertRejected(
+      'migrations-table',
+      config => {
+        const binding = config.d1_databases[0]
+        if (binding) delete binding.migrations_table
+      },
+      /migrations_table "d1_migrations"/u
+    )
+    assertRejected(
+      'other-migrations-table',
+      config => {
+        const binding = config.d1_databases[0]
+        if (binding) binding.migrations_table = 'migrations'
+      },
+      /migrations_table "d1_migrations"/u
+    )
   })
 
   it('makes direct app preview and Playwright consume canonical initialized state', () => {
@@ -333,9 +355,9 @@ describe('fresh Drizzle D1 history', () => {
       expect(appPackage.scripts['preview:worker']).not.toContain('--site')
 
       const playwright = readFileSync(resolve('apps/e2e/playwright.config.ts'), 'utf8')
-      expect(playwright).toContain('pnpm d1:local:migrate')
-      expect(playwright).toContain('pnpm d1:local:import')
-      expect(playwright).toContain('pnpm d1:local:verify')
+      expect(playwright).toContain('pnpm db:migrate:local')
+      expect(playwright).toContain('pnpm db:import:local')
+      expect(playwright).toContain('pnpm db:verify:local')
       expect(playwright).toContain('pnpm worker:preview')
       expect(playwright).not.toContain('pornvideodownloaders')
     } finally {
@@ -350,10 +372,11 @@ describe('fresh Drizzle D1 history', () => {
         scripts: Record<string, string>
       }
     ).scripts
-    expect(scripts['d1:generate']).toBe('pnpm exec drizzle-kit generate --config drizzle.config.ts')
-    expect(Object.keys(scripts).filter(name => name.startsWith('d1:drizzle:'))).toEqual([])
+    expect(scripts['db:generate']).toBe('pnpm exec drizzle-kit generate --config drizzle.config.ts')
+    expect(Object.keys(scripts).filter(name => name.startsWith('d1:'))).toEqual([])
+    expect(scripts['db:migrations:list:local']).toBe('pnpm tsx scripts/d1-local-guard.ts list')
     for (const command of ['migrate', 'import', 'verify', 'publish']) {
-      expect(scripts[`d1:local:${command}`]).toBe(`pnpm tsx scripts/d1-local-guard.ts ${command}`)
+      expect(scripts[`db:${command}:local`]).toBe(`pnpm tsx scripts/d1-local-guard.ts ${command}`)
     }
     expect(Object.values(scripts).join('\n')).not.toMatch(/--site\b/u)
   })

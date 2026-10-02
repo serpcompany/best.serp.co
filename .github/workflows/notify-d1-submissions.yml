@@ -60,4 +60,4 @@ jobs:
           CLOUDFLARE_D1_DATABASE_ID: 404ec437-53a2-4fbc-8b5f-b5e69065708e
           GITHUB_TOKEN: ${{ github.token }}
           SUBMISSION_REVIEWER_GITHUB_LOGIN: ${{ vars.SUBMISSION_REVIEWER_GITHUB_LOGIN }}
-        run: pnpm d1:notify:production
+        run: pnpm db:notify:production

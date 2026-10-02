@@ -28,7 +28,7 @@ advances the publication version; either decision revokes the preview link.
 
 Both steps run against production D1 only:
 
-- `notify-d1-submissions.yml` runs `pnpm d1:notify:production` every 15 minutes in the
+- `notify-d1-submissions.yml` runs `pnpm db:notify:production` every 15 minutes in the
   `production-notifier` environment. It stays off until the repository variable
   `SUBMISSION_REVIEWER_GITHUB_LOGIN` names the reviewer, and it skips until that environment
   holds `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
@@ -36,7 +36,7 @@ Both steps run against production D1 only:
   submission UUID, `approve` or `reject`, and the confirmation
   `approve-best.serp.co-submission-production`. After reviewer approval of the `production`
   environment, it exports a D1 backup (an Actions artifact kept 30 days), runs
-  `pnpm d1:approve:production`, and comments on and closes the review issue.
+  `pnpm db:approve:production`, and comments on and closes the review issue.
 
 Setup and guards are in [the deploy runbook](./DEPLOY_RUNBOOK.md#workflows).
 
