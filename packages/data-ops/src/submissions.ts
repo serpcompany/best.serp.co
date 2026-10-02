@@ -1,4 +1,5 @@
 import { isValidAssetReference } from '@serpdirectory/utils/asset-reference'
+import { hasFileExtension } from '@serpdirectory/utils/file-extensions'
 import { and, eq, or, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
@@ -282,6 +283,14 @@ export function createSubmissionOperations(config: {
         }
       }
       const slug = submissionSlug(input.website)
+      // `/products/<slug>/` must stay a page URL; a slug ending in a file extension
+      // (`chart.js`) would be treated as a file and lose its trailing slash.
+      if (hasFileExtension(slug)) {
+        throw new SubmissionError(
+          'invalid_url',
+          'This website address cannot be listed: it ends in a file extension.'
+        )
+      }
       const [category, existing] = await Promise.all([
         queryFirst(
           client.database

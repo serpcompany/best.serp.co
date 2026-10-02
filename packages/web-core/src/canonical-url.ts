@@ -14,51 +14,18 @@
  * Next.js.
  */
 
+import { FILE_EXTENSIONS, hasFileExtension } from '@serpdirectory/utils/file-extensions'
+
 /**
- * Extensions that make a path a file. Listing slugs are domain names (`autoenhance.ai`,
- * `aws.amazon.com`), so "has an extension" cannot mean "contains a dot": only these mark a
- * file. None of them is a top-level domain; never add one that is (`.zip`, `.mov`, `.md`,
- * `.app`, ...), or listing pages under that TLD would lose their trailing slash.
+ * Extensions that make a path a file (`@serpdirectory/utils/file-extensions`). Listing slugs
+ * are domain names (`autoenhance.ai`), so a dot alone never makes a file, and slug
+ * validation rejects a slug ending in one of these.
  */
-export const FILE_EXTENSIONS: ReadonlySet<string> = new Set([
-  'atom',
-  'avif',
-  'css',
-  'csv',
-  'eot',
-  'gif',
-  'htm',
-  'html',
-  'ico',
-  'jpeg',
-  'jpg',
-  'js',
-  'json',
-  'map',
-  'mjs',
-  'mp3',
-  'mp4',
-  'otf',
-  'pdf',
-  'png',
-  'rss',
-  'svg',
-  'ttf',
-  'txt',
-  'wasm',
-  'webm',
-  'webmanifest',
-  'webp',
-  'woff',
-  'woff2',
-  'xml'
-])
+export { FILE_EXTENSIONS, hasFileExtension }
 
 /** True when the last path segment ends in a known file extension. */
 export function isFilePath(pathname: string): boolean {
-  const lastSegment = pathname.replace(/\/+$/u, '').split('/').at(-1) ?? ''
-  const extension = /\.([a-z0-9]+)$/iu.exec(lastSegment)?.[1]
-  return extension !== undefined && FILE_EXTENSIONS.has(extension.toLowerCase())
+  return hasFileExtension(pathname.replace(/\/+$/u, '').split('/').at(-1) ?? '')
 }
 
 /**

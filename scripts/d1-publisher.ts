@@ -2,12 +2,20 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hasFileExtension } from '@serpdirectory/web-core/canonical-url'
 import { parse } from 'yaml'
 import { z } from 'zod'
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { catalogSitemapRoutes, categoryRoute, listingIndexRoute, listingRoute } from './site-routes'
 
-const slug = z.string().regex(/^[a-z0-9.-]+$/)
+/** A slug that already exists; renaming or unpublishing it must stay possible. */
+const existingSlug = z.string().regex(/^[a-z0-9.-]+$/)
+// A listing page is `/products/<slug>/`; a slug ending in a file extension (`chart.js`) would
+// make it a file URL without its trailing slash, so a published slug never ends in one.
+// Category slugs have no dots.
+const slug = existingSlug.refine(value => !hasFileExtension(value), {
+  message: 'A listing slug cannot end in a file extension; its page would be served as a file.'
+})
 const categorySlug = z.string().regex(/^[a-z0-9-]+$/)
 const listingId = z.string().regex(/^lst_[a-z0-9][a-z0-9_-]{7,63}$/)
 const checksum = z.string().regex(/^[a-f0-9]{64}$/)
@@ -83,12 +91,19 @@ const operation = z.discriminatedUnion('action', [
   z
     .object({ action: z.literal('listing-update'), listing, previousCategories: categories })
     .strict(),
-  z.object({ action: z.literal('listing-unpublish'), id: listingId, slug, categories }).strict(),
+  z
+    .object({
+      action: z.literal('listing-unpublish'),
+      id: listingId,
+      slug: existingSlug,
+      categories
+    })
+    .strict(),
   z
     .object({
       action: z.literal('listing-slug-change'),
       id: listingId,
-      from: slug,
+      from: existingSlug,
       to: slug,
       categories,
       reason: z.string().min(1)
