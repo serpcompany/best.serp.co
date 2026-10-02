@@ -44,7 +44,7 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 - `pnpm db:migrations:list:{local,staging,production}`: read-only migration status.
   `pnpm db:migrate:{staging,production}` runs only inside the protected deploy workflows,
   and production only after Deploy Staging verified the same commit
-  (see [the deploy runbook](./docs/DEPLOY_RUNBOOK.md#database-commands)).
+  (see [Release guards](./docs/RELEASE_GUARDS.md)).
 - `pnpm harness:fast` / `pnpm harness:check`: fast and full validation loops.
 - `pnpm test:e2e`: Playwright against a local Worker.
 - `pnpm migration:compare -- <origin>`: structural page parity against best.serp.co.

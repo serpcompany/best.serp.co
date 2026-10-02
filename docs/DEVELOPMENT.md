@@ -56,7 +56,7 @@ After merge, Deploy Staging applies the migration to staging (`pnpm db:migrate:s
 the workflow), and Deploy Production with `database-and-worker` applies the same migration
 to production only after Deploy Staging verified that commit. Check either remote database
 read-only with `pnpm db:migrations:list:staging` or `pnpm db:migrations:list:production`
-after `wrangler login`; see [Deploy runbook](./DEPLOY_RUNBOOK.md#database-commands).
+after `wrangler login`; see [Release guards](./RELEASE_GUARDS.md).
 
 ## Parity against the live site
 

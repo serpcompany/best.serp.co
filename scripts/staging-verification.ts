@@ -86,7 +86,7 @@ function isVerifiedStagingJob(job: WorkflowJob): boolean {
 }
 
 /** The remediation every refusal ends with. */
-const rerunHint = `Start a new run for the head of ${stagingWorkflow.branch} with \`gh workflow run ${stagingWorkflow.file} --ref ${stagingWorkflow.branch}\` (or wait for the push-triggered run), let it finish, then dispatch the production workflow again. See docs/DEPLOY_RUNBOOK.md#staging-before-production.`
+const rerunHint = `Start a new run for the head of ${stagingWorkflow.branch} with \`gh workflow run ${stagingWorkflow.file} --ref ${stagingWorkflow.branch}\` (or wait for the push-triggered run), let it finish, then dispatch the production workflow again. See docs/RELEASE_GUARDS.md#staging-before-production.`
 
 /**
  * Resolves with the newest run attempt of Deploy Staging that verified `sha`, or throws a

@@ -11,7 +11,7 @@ migration path.
 Local, staging, and production are separate databases with the same schema and migration
 history. A migration is applied locally (`pnpm db:migrate:local`), then to staging by
 Deploy Staging, then to production by Deploy Production only after Deploy Staging verified
-that commit (see [Deploy runbook](./DEPLOY_RUNBOOK.md#staging-before-production)).
+that commit (see [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
 
 Local data is a documented exception to the standard's "seeded fake/fixture data" rule
 (owner decision a, serpcompany/best.serp.co#42). Local D1 is seeded with the real public
