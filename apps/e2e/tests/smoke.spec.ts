@@ -128,7 +128,11 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       [`/products/best/${sampleCategory.slug}/`, categoryPath(sampleCategory.slug)],
       [`/categories/${sampleCategory.slug}/`, categoryPath(sampleCategory.slug)],
       ['/products/best/featured/', categoriesIndexPath],
-      ['/products/best/', categoriesIndexPath]
+      ['/products/best/', categoriesIndexPath],
+      // Top-level legal pages of the static site, now under /legal/.
+      ['/privacy/', '/legal/privacy/'],
+      ['/terms/', '/legal/terms/'],
+      ['/cookies/', '/legal/cookies/']
     ]
     for (const [from, to] of redirects) {
       // Both slash forms of a moved URL reach the canonical page directly.
@@ -310,6 +314,8 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       expect(response?.status(), path).toBe(200)
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
       await expect(page).toHaveTitle(/\| SERP$/)
+      // Legal pages pass slashless paths to their breadcrumb; its JSON-LD must still be canonical.
+      if (path.startsWith('/legal/')) await expectCanonicalStructuredData(page)
     }
   })
 

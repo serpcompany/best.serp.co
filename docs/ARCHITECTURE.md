@@ -69,9 +69,13 @@ Every URL has one canonical form, per the SERP URL trailing-slash and sitemap st
 | `/api`, `/api/*`, `/.well-known/*`, `/_next/*` | served exactly as requested | never redirected |
 
 `packages/web-core/src/canonical-url.ts` defines the rule. A file is a path whose last
-segment ends in a known file extension (`FILE_EXTENSIONS`), not any dot: most listing slugs
-are domain names (`autoenhance.ai`), and their pages keep the slash. Never add an extension
-that is also a top-level domain.
+segment ends in a known file extension (`FILE_EXTENSIONS` in
+`packages/utils/file-extensions.ts`), not any dot: most listing slugs are domain names
+(`autoenhance.ai`), and their pages keep the slash. Never add an extension that is also a
+top-level domain. The data side holds the invariant: submission intake
+(`packages/data-ops/src/submissions.ts`), the submission approver, and the publication
+manifest schema (`scripts/d1-publisher.ts`) refuse a listing slug that ends in one of these
+extensions (`chart.js`), and a test checks the committed import.
 
 - **Redirects.** The Worker entry answers a non-canonical request with one 308 before the
   edge cache and before OpenNext (`apps/web/lib/routing/trailing-slash.ts`), so slash
@@ -83,16 +87,23 @@ that is also a top-level domain.
   applies them. Next.js matches each source with or without a slash and every destination
   is canonical, so the Worker leaves any request a moved-URL rule matches to OpenNext (it
   reads the same compiled patterns from `.next/routes-manifest.json`), and the request
-  reaches its page in one hop. Add new moved URLs there; `redirects.test.ts` checks that
-  each destination is canonical and each source is matched in both slash forms. OpenNext
-  re-serializes the query string of these redirects from decoded values, so a query that
-  contains an encoded `&`, `=`, `#`, or `+` is not preserved exactly; the pre-D1 URLs never
-  carried one.
+  reaches its page in one hop. Add static moved URLs there (not as a page that calls
+  `permanentRedirect()`); `redirects.test.ts` checks that each destination is canonical and
+  each source is matched in both slash forms. Redirects that need D1 (renamed listing
+  slugs) stay in their pages and must write a canonical destination (`getRoute`). The Worker
+  validates the manifest at startup and refuses to start if its shape is unexpected (no
+  `redirects` array, a rule without a string `regex`, a pattern that does not compile or
+  matches every path), so a framework upgrade cannot silently turn the slash rule off.
+  OpenNext re-serializes the query string of config redirects from decoded values, so a
+  query that contains an encoded `&`, `=`, `#`, or `+` is not preserved exactly; the pre-D1
+  URLs never carried one.
 - **Written URLs.** Canonical tags, `og:url`, sitemaps, `robots.txt`, and JSON-LD build
   absolute URLs with `absoluteUrl` (`siteUrl` in `seo-config.ts`), which writes the homepage
   as the bare origin. With `trailingSlash`, the Next.js metadata API appends `/` to every
   same-origin URL, so the homepage leaves `alternates.canonical` and `openGraph.url` unset
-  and renders both tags itself (`HomePageRoute`). JSON-LD node identifiers keep their
+  and `apps/web/app/page.tsx` renders both tags with `HomePageCanonicalTags`. Never render
+  them in `HomePageRoute`: `/products/` reuses it with its own canonical. JSON-LD node
+  identifiers keep their
   fragment form (`https://best.serp.co/#website`); they name a graph node, not the page.
 - **Origin.** Sitemaps, canonical tags, and structured data always use the production
   origin from `packages/site-config` (`https://best.serp.co`), also locally and on the

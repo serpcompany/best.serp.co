@@ -99,22 +99,62 @@ async function expectRoute(
 }
 
 /**
- * `path` answers a redirect to exactly `expectedPath`. `permanentOnly` requires the 308 the
- * URL trailing-slash standard prescribes for a non-canonical page or file URL.
+ * URL trailing-slash standard (serp docs/engineering/standards/url-trailing-slash.md): a page
+ * URL without its slash and a file URL with one answer exactly one 308 to the canonical form,
+ * and /api is served as requested.
  */
-async function expectRedirect(
+async function expectTrailingSlashPolicy(
   mode: HttpGateMode,
   baseUrl: URL,
-  path: string,
-  expectedPath: string,
-  timeoutMs: number,
-  permanentOnly = false
+  searchQuery: string,
+  timeoutMs: number
 ): Promise<void> {
-  await boundedFetch(routeUrl(baseUrl, path), timeoutMs, async response => {
-    const allowed = permanentOnly ? [308] : [301, 302, 303, 307, 308]
-    if (!allowed.includes(response.status))
+  const expectPermanentRedirect = (path: string, expectedPath: string) =>
+    boundedFetch(routeUrl(baseUrl, path), timeoutMs, async response => {
+      await response.body?.cancel().catch(() => undefined)
+      const location = response.headers.get('location')
+      const observed = location ? new URL(location, baseUrl) : undefined
+      const expected = routeUrl(baseUrl, expectedPath)
+      if (response.status !== 308 || observed?.href !== expected.href)
+        throw new Error(
+          `${mode} route ${path} returned ${response.status} ${location ?? ''}, not a 308 to ${expectedPath}.`
+        )
+    })
+  await Promise.all([
+    expectPermanentRedirect('/about', '/about/'),
+    expectPermanentRedirect('/robots.txt/', '/robots.txt'),
+    expectRoute(mode, baseUrl, `/api/search/?q=${encodeURIComponent(searchQuery)}`, timeoutMs)
+  ])
+}
+
+/**
+ * Awaits the route contracts with the trailing-slash checks running alongside them; a route
+ * contract failure is reported first.
+ */
+async function withTrailingSlashPolicy(
+  mode: HttpGateMode,
+  baseUrl: URL,
+  searchQuery: string,
+  timeoutMs: number,
+  routeContracts: Promise<void>[]
+): Promise<void> {
+  const trailingSlash = expectTrailingSlashPolicy(mode, baseUrl, searchQuery, timeoutMs)
+  trailingSlash.catch(() => undefined)
+  await Promise.all(routeContracts)
+  await trailingSlash
+}
+
+async function expectLegacyRedirect(
+  mode: HttpGateMode,
+  baseUrl: URL,
+  legacyPath: string,
+  expectedPath: string,
+  timeoutMs: number
+): Promise<void> {
+  await boundedFetch(routeUrl(baseUrl, legacyPath), timeoutMs, async response => {
+    if (![301, 302, 303, 307, 308].includes(response.status))
       throw new Error(
-        `${mode} route ${path} returned ${response.status}, not a ${permanentOnly ? '308 ' : ''}redirect.`
+        `${mode} legacy route ${legacyPath} returned ${response.status}, not a redirect.`
       )
     await response.body?.cancel().catch(() => undefined)
     const location = response.headers.get('location')
@@ -129,7 +169,7 @@ async function expectRedirect(
       observed.username ||
       observed.password
     )
-      throw new Error(`${mode} route ${path} did not redirect to ${expectedPath}.`)
+      throw new Error(`${mode} legacy route ${legacyPath} did not redirect to ${expectedPath}.`)
   })
 }
 
@@ -150,19 +190,15 @@ export async function runHttpGates(
   const timeoutMs = options.timeoutMs ?? defaultRequestTimeoutMs
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > defaultRequestTimeoutMs)
     throw new Error('HTTP gate timeout must be a positive integer within the protected bound.')
-  await Promise.all([
+  await withTrailingSlashPolicy(mode, baseUrl, listingSlug, timeoutMs, [
     expectRoute(mode, baseUrl, '/', timeoutMs),
     expectRoute(mode, baseUrl, categoryRoute(categorySlug), timeoutMs),
     expectRoute(mode, baseUrl, listingRoute(listingSlug), timeoutMs),
     expectRoute(mode, baseUrl, `/api/search?q=${encodeURIComponent(listingSlug)}`, timeoutMs),
     expectRoute(mode, baseUrl, '/rss.xml', timeoutMs),
     expectRoute(mode, baseUrl, '/sitemap-index.xml', timeoutMs),
-    expectRedirect(mode, baseUrl, `/${listingSlug}/`, listingRoute(listingSlug), timeoutMs),
-    expectRoute(mode, baseUrl, '/submit/', timeoutMs),
-    // URL trailing-slash standard: pages gain the slash, files lose it, /api is never redirected.
-    expectRedirect(mode, baseUrl, '/about', '/about/', timeoutMs, true),
-    expectRedirect(mode, baseUrl, '/robots.txt/', '/robots.txt', timeoutMs, true),
-    expectRoute(mode, baseUrl, `/api/search/?q=${encodeURIComponent(listingSlug)}`, timeoutMs)
+    expectLegacyRedirect(mode, baseUrl, `/${listingSlug}/`, listingRoute(listingSlug), timeoutMs),
+    expectRoute(mode, baseUrl, '/submit/', timeoutMs)
   ])
 }
 
@@ -180,7 +216,7 @@ async function main(): Promise<void> {
   if (output)
     writeFileSync(
       resolve(output),
-      `${JSON.stringify({ home: true, category: true, detail: true, search: true, rss: true, sitemap: true, legacyRedirect: true, submit: true, trailingSlash: true })}\n`
+      `${JSON.stringify({ home: true, category: true, detail: true, search: true, rss: true, sitemap: true, legacyRedirect: true, submit: true })}\n`
     )
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]))
