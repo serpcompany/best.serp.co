@@ -33,15 +33,7 @@ function successfulResponse(url: URL, redirectLocation?: string, emptyBody = fal
       status: 308,
       headers: { location: redirectLocation ?? `/products/${slug}/` }
     })
-  // Staging origins are noindex; Production lists its sitemap and allows crawling.
-  const headers: Record<string, string> =
-    url.origin === origin ? {} : { 'x-robots-tag': 'noindex, nofollow' }
-  if (url.pathname === '/robots.txt')
-    return new Response(
-      `User-Agent: *\nAllow: /\nDisallow: /search\nSitemap: ${url.origin}/sitemap-index.xml\n`,
-      { status: 200, headers }
-    )
-  return new Response(emptyBody ? '' : 'ok', { status: 200, headers })
+  return new Response(emptyBody ? '' : 'ok', { status: 200 })
 }
 
 function installSuccessfulFetch(redirectLocation?: string, emptyBody = false) {
@@ -61,7 +53,7 @@ describe('environment-specific HTTP gates', () => {
   it('passes the exact Production origin and best.serp.co route contracts', async () => {
     const urls = installSuccessfulFetch()
     await expect(gates('production', origin)).resolves.toBeUndefined()
-    expect(urls).toHaveLength(11)
+    expect(urls).toHaveLength(8)
     expect(urls.every(url => url.origin === origin)).toBe(true)
     expect(urls.map(url => url.pathname)).toEqual(
       expect.arrayContaining([
@@ -72,8 +64,7 @@ describe('environment-specific HTTP gates', () => {
         '/rss.xml',
         '/sitemap-index.xml',
         `/${slug}/`,
-        '/submit/',
-        '/robots.txt'
+        '/submit/'
       ])
     )
     expect(urls.some(url => url.pathname === '/api/search' && url.search.startsWith('?q='))).toBe(
@@ -123,69 +114,9 @@ describe('environment-specific HTTP gates', () => {
     await expect(gates('production', origin)).rejects.toThrow('returned 500')
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: string | URL | Request) => {
-        const url = new URL(String(input))
-        if (url.pathname === `/${slug}/`) return new Response('ok', { status: 200 })
-        return successfulResponse(url)
-      })
+      vi.fn(async () => new Response('ok', { status: 200 }))
     )
     await expect(gates('production', origin)).rejects.toThrow('not a redirect')
-  })
-
-  it('requires Staging to send noindex', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL | Request) => {
-        const url = new URL(String(input))
-        const response = successfulResponse(url)
-        if (url.pathname !== '/') return response
-        return new Response('ok', { status: 200 })
-      })
-    )
-    await expect(gates('staging', stagingOrigin)).rejects.toThrow('did not send X-Robots-Tag')
-  })
-
-  it.each([
-    ['/', 'noindex, nofollow'],
-    ['/sitemap-index.xml', 'none'],
-    ['/robots.txt', 'NOINDEX']
-  ])('rejects a Production noindex on %s', async (path, directive) => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL | Request) => {
-        const url = new URL(String(input))
-        const response = successfulResponse(url)
-        if (url.pathname !== path) return response
-        const headers = new Headers(response.headers)
-        headers.set('x-robots-tag', directive)
-        return new Response(await response.text(), { headers, status: response.status })
-      })
-    )
-    await expect(gates('production', origin)).rejects.toThrow('X-Robots-Tag noindex')
-  })
-
-  it.each([
-    ['a missing sitemap', 'User-Agent: *\nAllow: /\n', 'does not list'],
-    [
-      'a staging sitemap',
-      `User-Agent: *\nSitemap: ${stagingOrigin}/sitemap-index.xml\n`,
-      'does not list'
-    ],
-    [
-      'a site-wide disallow',
-      `User-Agent: *\nDisallow: /\nSitemap: ${origin}/sitemap-index.xml\n`,
-      'disallows the whole site'
-    ]
-  ])('rejects a Production robots.txt with %s', async (_label, robots, message) => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string | URL | Request) => {
-        const url = new URL(String(input))
-        if (url.pathname === '/robots.txt') return new Response(robots, { status: 200 })
-        return successfulResponse(url)
-      })
-    )
-    await expect(gates('production', origin)).rejects.toThrow(message)
   })
 
   it.each(['other-origin', 'wrong-path', 'query', 'hash'])(

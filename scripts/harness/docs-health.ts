@@ -73,6 +73,17 @@ const WRAP_COLUMNS = 100
 const MAP_LINE_BUDGET = 120
 const LEAF_LINE_BUDGET = 300
 
+/**
+ * Docs allowed over budget, at the size they had when they were let in. Each may shrink but
+ * not grow; split it by topic and delete its entry. An entry is only ever a ceiling, so the
+ * result never depends on whether the PR that grew the doc merges before or after this table.
+ */
+export const DOC_LINE_ALLOWANCES: Readonly<Record<string, number>> = {
+  // serpcompany/best.serp.co#43 (database commands and staging-before-production) grows the
+  // runbook to 304 lines. Split the pre-cutover and cutover sections into their own leaf.
+  'docs/DEPLOY_RUNBOOK.md': 304
+}
+
 /** Lines as read at 100 columns, so a long paragraph counts for its real length. */
 export function wrappedLineCount(source: string): number {
   return source
@@ -81,29 +92,57 @@ export function wrappedLineCount(source: string): number {
     .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / WRAP_COLUMNS)), 0)
 }
 
+function documentationBudget(file: string): { budget: number; kind: 'leaf' | 'map' } | null {
+  const name = file.split('/').at(-1)
+  if (name === 'AGENTS.md' || name === 'README.md') return { budget: MAP_LINE_BUDGET, kind: 'map' }
+  if (file.startsWith('docs/')) return { budget: LEAF_LINE_BUDGET, kind: 'leaf' }
+  return null
+}
+
 /**
- * Size budgets from serpcompany/serp docs/engineering/standards/agent-harness/docs-are-maps.md:
- * maps (`AGENTS.md`, `README.md`) stay at or under 120 wrapped lines and every other doc under
- * `docs/` at or under 300. Split an oversized leaf by topic instead of squeezing it.
+ * Size budgets: maps (`AGENTS.md`, `README.md`) stay at or under 120 wrapped lines and every
+ * other doc under `docs/` at or under 300, unless `allowances` lets a doc stay at a recorded
+ * size. The numbers come from the docs-are-maps principle drafted for serpcompany/serp
+ * (`docs/engineering/standards/agent-harness/docs-are-maps.md` on the unpublished
+ * `agent-harness-principles` branch); serp `main` says only that docs stay under "a few
+ * hundred lines" (`docs/engineering/standards/agent-harness.md`).
  */
 export function validateDocumentationBudgets(
-  documents: Readonly<Record<string, string>>
+  documents: Readonly<Record<string, string>>,
+  allowances: Readonly<Record<string, number>> = DOC_LINE_ALLOWANCES
 ): string[] {
   const violations: string[] = []
   for (const [file, source] of Object.entries(documents)) {
-    const name = file.split('/').at(-1)
-    const isMap = name === 'AGENTS.md' || name === 'README.md'
-    if (!isMap && !file.startsWith('docs/')) continue
-    const budget = isMap ? MAP_LINE_BUDGET : LEAF_LINE_BUDGET
+    const limit = documentationBudget(file)
+    if (!limit) continue
     const lines = wrappedLineCount(source)
-    if (lines > budget)
-      violations.push(
-        `${file}: ${lines} wrapped lines exceeds the ${isMap ? 'map' : 'leaf'} budget of ${budget}; ${
-          isMap ? 'move detail into a leaf doc' : 'split it by topic'
-        }`
-      )
+    const allowance = allowances[file]
+    if (lines <= Math.max(limit.budget, allowance ?? 0)) continue
+    violations.push(
+      allowance === undefined
+        ? `${file}: ${lines} wrapped lines exceeds the ${limit.kind} budget of ${limit.budget}; ${
+            limit.kind === 'map' ? 'move detail into a leaf doc' : 'split it by topic'
+          }`
+        : `${file}: ${lines} wrapped lines exceeds its allowance of ${allowance}; an over-budget doc may shrink but not grow, so split it by topic`
+    )
   }
   return violations
+}
+
+/**
+ * Allowances that no longer hold a doc back: it fits its budget or no longer exists. docs:check
+ * lists them so the entry gets deleted; they are not failures, because an allowance recorded
+ * for an open pull request is unused until that pull request merges.
+ */
+export function unusedDocumentationAllowances(
+  documents: Readonly<Record<string, string>>,
+  allowances: Readonly<Record<string, number>> = DOC_LINE_ALLOWANCES
+): string[] {
+  return Object.keys(allowances).filter(file => {
+    const source = documents[file]
+    const limit = documentationBudget(file)
+    return source === undefined || !limit || wrappedLineCount(source) <= limit.budget
+  })
 }
 
 export function validatePlanningDocumentation(
@@ -205,6 +244,15 @@ function main(): void {
     return
   }
   console.log('Documentation health passed: indexes, links, skills, and commands agree.')
+  const allowedDocuments = Object.fromEntries(
+    Object.keys(DOC_LINE_ALLOWANCES)
+      .filter(file => existsSync(resolve(file)))
+      .map(file => [file, readFileSync(resolve(file), 'utf8')])
+  )
+  for (const file of unusedDocumentationAllowances(allowedDocuments))
+    console.log(
+      `Unused allowance: ${file} fits its budget. Delete its DOC_LINE_ALLOWANCES entry (scripts/harness/docs-health.ts) once the pull request named beside it has merged or split the doc.`
+    )
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) main()

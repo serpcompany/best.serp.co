@@ -82,7 +82,10 @@ The checker enforces:
 - required docs, indexes, and agent configuration exist;
 - the root agent map remains concise;
 - maps (`AGENTS.md`, `README.md`) stay within 120 lines and leaves under `docs/` within
-  300, counted at 100 columns (serpcompany/serp `standards/agent-harness/docs-are-maps.md`);
+  300, counted at 100 columns; a doc listed in `DOC_LINE_ALLOWANCES` may shrink but not grow
+  until it is split. serp `main` asks for "a few hundred lines"
+  (`docs/engineering/standards/agent-harness.md`); the numbers are from serp's docs-are-maps
+  draft, not yet merged;
 - local Markdown links resolve;
 - lint commands are read-only;
 - the root harness command surface remains available.
