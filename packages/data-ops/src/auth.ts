@@ -162,6 +162,38 @@ export function createAuthOperations({
   const bucketColumn = sql.identifier('bucket')
   const hitAtColumn = sql.identifier('hit_at')
 
+  async function readUser(
+    userId: string
+  ): Promise<{ email: string; email_verified: number; role: UserRole } | null> {
+    const result = await runQuery<{ email: string; email_verified: number; role: UserRole }>(
+      client,
+      client.database
+        .select({ email: users.email, email_verified: users.emailVerified, role: users.role })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1)
+    )
+    return result.results[0] ?? null
+  }
+
+  /**
+   * Whether this exact email is on the allowlist (rows are stored normalized). The email is a
+   * bound value, never a column of an outer query: in a single-table query Drizzle writes
+   * columns unqualified, so a correlated `admin_allowlist.email = users.email` became
+   * `"email" = "email"` and matched every user while the allowlist had any row (#78).
+   */
+  async function allowlistContains(email: string): Promise<boolean> {
+    const result = await runQuery<{ email: string }>(
+      client,
+      client.database
+        .select({ email: adminAllowlist.email })
+        .from(adminAllowlist)
+        .where(eq(adminAllowlist.email, email))
+        .limit(1)
+    )
+    return result.results.length === 1
+  }
+
   return {
     async consumeRateLimit(rules) {
       if (rules.length === 0) return { allowed: true, retryAfterSeconds: 0 }
@@ -229,34 +261,13 @@ export function createAuthOperations({
     },
 
     async getAdminStatus(userId) {
-      const result = await runQuery<{
-        allowlisted: number
-        email: string
-        email_verified: number
-        role: UserRole
-      }>(
-        client,
-        client.database
-          .select({
-            allowlisted:
-              sql<number>`EXISTS (SELECT 1 FROM ${adminAllowlist} WHERE ${adminAllowlist.email} = ${users.email})`.as(
-                'allowlisted'
-              ),
-            email: users.email,
-            email_verified: users.emailVerified,
-            role: users.role
-          })
-          .from(users)
-          .where(eq(users.id, userId))
-          .limit(1)
-      )
-      const row = result.results[0]
-      if (!row) return null
+      const user = await readUser(userId)
+      if (!user) return null
       return {
-        allowlisted: Number(row.allowlisted) === 1,
-        email: row.email,
-        emailVerified: Number(row.email_verified) === 1,
-        role: row.role
+        allowlisted: await allowlistContains(user.email),
+        email: user.email,
+        emailVerified: Number(user.email_verified) === 1,
+        role: user.role
       }
     },
 
@@ -274,26 +285,22 @@ export function createAuthOperations({
     },
 
     async isAllowlistedEmail(email) {
-      const result = await runQuery<{ email: string }>(
-        client,
-        client.database
-          .select({ email: adminAllowlist.email })
-          .from(adminAllowlist)
-          .where(eq(adminAllowlist.email, normalizeEmail(email)))
-          .limit(1)
-      )
-      return result.results.length === 1
+      return allowlistContains(normalizeEmail(email))
     },
 
     async syncUserRole(userId) {
+      const user = await readUser(userId)
+      if (!user) return null
+      // The allowlist is read inside the UPDATE against the bound email, so the role reflects
+      // the allowlist at write time; `email = ?` skips the write if the email changed meanwhile.
       const result = await runQuery<{ role: UserRole }>(
         client,
         client.database
           .update(users)
           .set({
-            role: sql`CASE WHEN EXISTS (SELECT 1 FROM ${adminAllowlist} WHERE ${adminAllowlist.email} = ${users.email}) THEN 'admin' ELSE 'user' END`
+            role: sql`CASE WHEN EXISTS (SELECT 1 FROM ${adminAllowlist} WHERE ${adminAllowlist.email} = ${user.email}) THEN 'admin' ELSE 'user' END`
           })
-          .where(eq(users.id, userId))
+          .where(and(eq(users.id, userId), eq(users.email, user.email)))
           .returning({ role: users.role })
       )
       return result.results[0]?.role ?? null

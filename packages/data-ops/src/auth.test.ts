@@ -230,4 +230,66 @@ describe('auth data operations', () => {
     expect((await operations.getAdminStatus('owner'))?.allowlisted).toBe(false)
     expect(await operations.syncUserRole('owner')).toBe('user')
   })
+
+  // #78: with more than one allowlisted email, only a user's own email may count.
+  it('reports a user as allowlisted only for their own email while other admins exist', async () => {
+    const { insertUser, operations, sqlite } = setup()
+    sqlite.database
+      .prepare(
+        "INSERT INTO admin_allowlist (email, added_by) VALUES ('second@example.com', 'test')"
+      )
+      .run()
+    insertUser('owner', 'devin@serp.co')
+    insertUser('second', 'second@example.com')
+    insertUser('visitor', 'visitor@example.com')
+
+    expect(await operations.getAdminStatus('visitor')).toEqual({
+      allowlisted: false,
+      email: 'visitor@example.com',
+      emailVerified: true,
+      role: 'user'
+    })
+    expect(await operations.syncUserRole('visitor')).toBe('user')
+    for (const id of ['owner', 'second']) {
+      expect(await operations.syncUserRole(id)).toBe('admin')
+      expect((await operations.getAdminStatus(id))?.allowlisted).toBe(true)
+    }
+
+    // Removing one admin revokes only that admin, on the next read, while another remains.
+    sqlite.database.prepare("DELETE FROM admin_allowlist WHERE email = 'devin@serp.co'").run()
+    expect(await operations.getAdminStatus('owner')).toEqual({
+      allowlisted: false,
+      email: 'devin@serp.co',
+      emailVerified: true,
+      role: 'admin'
+    })
+    expect((await operations.getAdminStatus('second'))?.allowlisted).toBe(true)
+    expect((await operations.getAdminStatus('visitor'))?.allowlisted).toBe(false)
+    expect(await operations.syncUserRole('owner')).toBe('user')
+    expect(await operations.syncUserRole('second')).toBe('admin')
+  })
+
+  it('binds the email in every allowlist check and never compares a column to itself', async () => {
+    const { insertUser, operations, sqlite } = setup()
+    insertUser('owner', 'devin@serp.co')
+    insertUser('visitor', 'visitor@example.com')
+    sqlite.statements.length = 0
+    await operations.getAdminStatus('visitor')
+    await operations.syncUserRole('visitor')
+    await operations.isAllowlistedEmail('Visitor@Example.com')
+    await operations.findVerifiedAccount('visitor@example.com')
+    await operations.consumeRateLimit(otpRules('visitor@example.com', '1.1.1.1'))
+
+    const selfComparison = /("[a-z_]+"(?:\."[a-z_]+")?)\s*(?:=|!=|<>|IS)\s*\1(?![."\w])/iu
+    for (const statement of sqlite.statements) {
+      expect(statement.sql, statement.sql).not.toMatch(selfComparison)
+    }
+    const allowlistChecks = sqlite.statements.filter(statement =>
+      statement.sql.includes('"admin_allowlist"')
+    )
+    expect(allowlistChecks).toHaveLength(3)
+    for (const statement of allowlistChecks) {
+      expect(statement.bindings, statement.sql).toContain('visitor@example.com')
+    }
+  })
 })
