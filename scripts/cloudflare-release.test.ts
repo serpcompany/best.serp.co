@@ -859,6 +859,38 @@ describe('release entry point', () => {
     ).rejects.toThrow('does not contain (9999_future.sql)')
   })
 
+  it('refuses a stale release at the plan, before any backup or D1 call', async () => {
+    const pending = freshMigrationNames().slice(-1)
+    for (const event of ['push', 'workflow_dispatch']) {
+      const stale = harness(false, { mainHead: newerSha, pending })
+      await expect(
+        runRelease(
+          ['plan-release', 'production'],
+          productionEnv('deploy-production.yml', project.confirmation.deploy, event),
+          dependencies(stale)
+        ),
+        event
+      ).rejects.toThrow(`main now points at ${newerSha}, not ${sha}, so this release is stale`)
+      // Refused from the GitHub API alone: no Wrangler call, so nothing is exported.
+      expect(stale.runs, event).toEqual([])
+      expect(stale.events, event).toContain(`fetch /repos/${project.repository}/git/ref/heads/main`)
+    }
+    // A current release still plans its migrations, and a maintainer's read-only plan outside
+    // the workflow never consults GitHub.
+    await expect(
+      runRelease(
+        ['plan-release', 'production'],
+        productionEnv('deploy-production.yml', null, 'push'),
+        dependencies(harness(false, { pending }))
+      )
+    ).resolves.toMatchObject({ mode: 'database-and-worker', pendingMigrations: pending })
+    const maintainer = harness(false, { mainHead: newerSha, pending })
+    await expect(
+      runRelease(['plan-release', 'production'], {}, dependencies(maintainer))
+    ).resolves.toMatchObject({ mode: 'database-and-worker' })
+    expect(maintainer.events.filter(entry => entry.startsWith('fetch '))).toEqual([])
+  })
+
   it('refuses a hotfix with pending migrations at the plan, before any backup', async () => {
     const pending = freshMigrationNames().slice(-1)
     const hotfix = productionEnv('deploy-production.yml', project.confirmation.hotfix)

@@ -95,10 +95,10 @@ The check runs twice, and both use the workflow's `GITHUB_TOKEN` with `actions: 
 2. `cloudflare-release.ts` repeats it immediately before `migrate production`,
    `deploy production`, and `import production`, and before any Wrangler call.
 
-**A release must still be current.** Every push to `main` queues its own release, so before
-those commands `cloudflare-release.ts` also refuses a release once `main` points at a commit
-with a different tree: an older run approved late, or re-run, never overwrites a newer
-Worker. Reject a release you don't intend to ship rather than leaving it waiting; a job
+**A release must still be current.** Every push to `main` queues its own release, so
+`cloudflare-release.ts` also refuses a release once `main` points at a commit with a
+different tree: first in `plan-release`, before any backup export, then again before those
+commands. An older run approved late, or re-run, never overwrites a newer Worker. Reject a release you don't intend to ship rather than leaving it waiting; a job
 waiting for review stays queued for up to 30 days. Roll back with Cloudflare, not by
 re-running an older release.
 
@@ -143,7 +143,8 @@ staging check because staging never verified that tree. To release it anyway:
    the hotfix out of `staging`'s history, so the promotion's merge base stays before it, and
    any later `staging` change to the same lines makes every `staging` → `main` promotion
    conflict, with no way to resolve it through a pull request. With a merge commit, Deploy
-   Staging verifies the merged tree and the next promotion carries it.
+   Staging verifies the merged tree and the next promotion carries it. GitHub remembers the
+   last merge method, so switch the button back to **Squash and merge** for the next PR.
 
 ## Security boundary
 

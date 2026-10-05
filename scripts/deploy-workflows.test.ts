@@ -231,10 +231,12 @@ describe('production deploy workflow', () => {
     expect(releaseAuthorizations['deploy-production.yml']?.hotfixConfirmation).toBe(
       project.confirmation.hotfix
     )
-    // The plan sees the confirmation, so a hotfix with pending migrations stops before backup.
-    expect(stepRunning(release, 'plan-release production').env?.RELEASE_CONFIRM).toBe(
-      expression('inputs.confirmation')
-    )
+    // The plan sees the confirmation and a token, so a hotfix with pending migrations and a
+    // stale release both stop before the backup.
+    expect(stepRunning(release, 'plan-release production').env).toMatchObject({
+      GITHUB_TOKEN: expression('github.token'),
+      RELEASE_CONFIRM: expression('inputs.confirmation')
+    })
   })
 
   it('runs the same production migration as pnpm db:migrate:production', () => {

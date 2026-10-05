@@ -25,8 +25,9 @@
  * migrations, the bootstrap import, and Worker deploys also require Deploy Staging to have
  * verified the same source tree on `staging` (`staging-verification.ts`, GITHUB_TOKEN with
  * actions: read and contents: read), except for an owner-approved hotfix dispatch of a merged
- * `hotfix-*` pull request, which may deploy the Worker but never migrate. They also refuse a
- * stale release: `main` must still point at GITHUB_SHA or a commit with its tree.
+ * `hotfix-*` pull request, which may deploy the Worker but never migrate. They, and
+ * `plan-release` inside the release workflow (before any backup), also refuse a stale
+ * release: `main` must still point at GITHUB_SHA or a commit with its tree.
  * Wrangler authenticates with CLOUDFLARE_API_TOKEN and
  * CLOUDFLARE_ACCOUNT_ID. `--rehearse <directory>` runs the D1 commands except backup with
  * `--local --persist-to <directory>` instead of `--remote`; it never contacts Cloudflare.
@@ -901,6 +902,17 @@ export async function runRelease(
     case 'plan-release': {
       // Read-only and unauthorized, so the hotfix flag can only make the plan stricter.
       const running = protectedWorkflow(env.GITHUB_WORKFLOW_REF)
+      // Inside a staging-gated release workflow, refuse a stale release here, before the
+      // backup step exports (and blocks) the database for a release that cannot ship.
+      if (running && running.authorization.requireVerifiedStaging.length > 0) {
+        await assertCurrentRelease({
+          apiUrl: env.GITHUB_API_URL,
+          branch: running.authorization.branch,
+          fetch: dependencies.fetch,
+          sha: env.GITHUB_SHA,
+          token: env.GITHUB_TOKEN
+        })
+      }
       return {
         environment: args.environment,
         ...planRelease(await readMigrationLedger(d1), args.environment, {
