@@ -269,7 +269,8 @@ describe('auth data operations', () => {
     expect(await operations.syncUserRole('second')).toBe('admin')
   })
 
-  it('binds the email in every allowlist check and never compares a column to itself', async () => {
+  // `SqliteD1` itself refuses any statement that compares a column with itself (test-support).
+  it('binds the email in every allowlist check', async () => {
     const { insertUser, operations, sqlite } = setup()
     insertUser('owner', 'devin@serp.co')
     insertUser('visitor', 'visitor@example.com')
@@ -280,10 +281,6 @@ describe('auth data operations', () => {
     await operations.findVerifiedAccount('visitor@example.com')
     await operations.consumeRateLimit(otpRules('visitor@example.com', '1.1.1.1'))
 
-    const selfComparison = /("[a-z_]+"(?:\."[a-z_]+")?)\s*(?:=|!=|<>|IS)\s*\1(?![."\w])/iu
-    for (const statement of sqlite.statements) {
-      expect(statement.sql, statement.sql).not.toMatch(selfComparison)
-    }
     const allowlistChecks = sqlite.statements.filter(statement =>
       statement.sql.includes('"admin_allowlist"')
     )
