@@ -30,10 +30,10 @@ function d1Response(results: Array<Array<Record<string, unknown>>>): Response {
   )
 }
 
-function submissionRow(status: string): Record<string, unknown> {
+function submissionRow(status: string, slug = 'example.com'): Record<string, unknown> {
   return {
     id: submissionId,
-    slug: 'example.com',
+    slug,
     status,
     listing_id: null,
     version: 1,
@@ -83,6 +83,16 @@ describe('D1 submission approval guard', () => {
     ).rejects.toThrow(/badge-verified/)
     expect(fetcher).toHaveBeenCalledTimes(1)
     expect(String(fetcher.mock.calls[0]?.[1]?.body)).toContain('publication_state ps ON ps.id=1')
+  })
+
+  it('refuses to publish a slug that ends in a file extension', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(d1Response([[submissionRow('verified', 'chart.js')]]))
+    await expect(
+      approveRemoteSubmission(submissionId, 'reviewer', 'approve', env, fetcher as typeof fetch)
+    ).rejects.toThrow(/file extension/)
+    expect(fetcher).toHaveBeenCalledTimes(1)
   })
 
   it('closes a pending submission without publishing it', async () => {

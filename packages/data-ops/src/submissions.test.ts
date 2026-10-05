@@ -109,6 +109,29 @@ describe('shared submission data operations', () => {
     })
   })
 
+  it('refuses a website whose slug would end in a file extension', async () => {
+    for (const website of [
+      'https://chart.js/',
+      'https://www.p5.JS/',
+      'https://feed.example.xml/'
+    ]) {
+      await expect(
+        operations().createSubmission({ ...input, website }),
+        website
+      ).rejects.toMatchObject({
+        code: 'invalid_url',
+        status: 400
+      })
+    }
+    expect(
+      sqlite.database.prepare('SELECT COUNT(*) AS count FROM listing_submissions').get()
+    ).toEqual({ count: 0 })
+    // Domain-name slugs whose TLD is not a file extension stay valid pages.
+    await expect(
+      operations().createSubmission({ ...input, website: 'https://autoenhance.ai/' })
+    ).resolves.toMatchObject({ slug: 'autoenhance.ai' })
+  })
+
   it('rolls back one of two concurrent verification transitions from the same snapshot', async () => {
     const saved = await operations().createSubmission(input)
     const attempts = await Promise.allSettled([

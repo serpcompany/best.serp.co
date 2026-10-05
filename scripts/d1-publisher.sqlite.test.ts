@@ -2,9 +2,12 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
+import { hasFileExtension } from '@serpdirectory/web-core/canonical-url'
 import { describe, expect, it } from 'vitest'
+import { parse } from 'yaml'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
 import { buildPublicationPlan, manifestSchema, type PublicationPlan } from './d1-publisher.ts'
+import { project } from './project'
 
 const beforeChecksum = 'a'.repeat(64)
 const afterChecksum = createHash('sha256')
@@ -91,6 +94,58 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
         operations: [{ action: 'category-unpublish', slug: 'seo' }]
       })
     ).toThrow(/siteId/u)
+  })
+
+  it('refuses a published listing slug that ends in a file extension', () => {
+    const manifest = (operation: Record<string, unknown>) => ({
+      version: 1,
+      id: 'sqlite-release',
+      basePublicationVersion: 4,
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite', beforeChecksum },
+      operations: [operation]
+    })
+    const rename = (from: string, to: string) =>
+      manifest({
+        action: 'listing-slug-change',
+        id: 'lst_sqlite_test',
+        from,
+        to,
+        categories: ['seo'],
+        reason: 'Rename'
+      })
+    for (const to of ['chart.js', 'p5.js', 'feed.xml', 'data.JSON']) {
+      expect(() => manifestSchema.parse(rename('old-slug', to)), to).toThrow(/file extension/u)
+    }
+    expect(() =>
+      manifestSchema.parse(
+        manifest({
+          action: 'listing-create',
+          listing: {
+            id: 'lst_sqlite_test_create',
+            slug: 'd3.js',
+            name: 'D3',
+            description: 'Charts',
+            website: 'https://d3js.org/',
+            publishedAt: now,
+            categories: ['seo']
+          }
+        })
+      )
+    ).toThrow(/file extension/u)
+    // Domain-name slugs are pages, and an existing bad slug can still be renamed away.
+    expect(() => manifestSchema.parse(rename('old-slug', 'autoenhance.ai'))).not.toThrow()
+    expect(() => manifestSchema.parse(rename('chart.js', 'chart-js'))).not.toThrow()
+  })
+
+  it('keeps every slug in the reviewed initial import a page URL', () => {
+    const report = parse(readFileSync(resolve(project.artifact.parityReportPath), 'utf8')) as {
+      parity: { categories: Array<{ slug: string }>; exactSlugSet: string[] }
+    }
+    expect(report.parity.exactSlugSet.length).toBeGreaterThan(3000)
+    expect(report.parity.exactSlugSet.filter(value => hasFileExtension(value))).toEqual([])
+    expect(
+      report.parity.categories.map(category => category.slug).filter(hasFileExtension)
+    ).toEqual([])
   })
 
   it('commits a verified checksum transition and audited redirect', () => {

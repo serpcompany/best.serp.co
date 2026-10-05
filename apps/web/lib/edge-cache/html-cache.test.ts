@@ -134,6 +134,30 @@ describe('edge HTML cache', () => {
     )
   })
 
+  it('answers a stored redirect only for the exact URL that produced it', async () => {
+    const edge = harness()
+    const moved = () =>
+      new Response(null, {
+        headers: { location: '/products/categories/video-downloaders/' },
+        status: 308
+      })
+    await edge.serve(page('/categories/video-downloaders'), moved)
+
+    // The slash variant and another query are different keys, so they render themselves.
+    const slashed = await edge.serve(page('/categories/video-downloaders/'))
+    expect(slashed.status).toBe(200)
+    expect(slashed.headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
+    const withQuery = await edge.serve(page('/categories/video-downloaders?ref=1'))
+    expect(withQuery.headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
+    expect(edge.renders).toBe(3)
+
+    const hit = await edge.serve(page('/categories/video-downloaders'))
+    expect(hit.headers.get(EDGE_CACHE_HEADER)).toBe('HIT')
+    expect(hit.status).toBe(308)
+    expect(hit.headers.get('location')).toBe('/products/categories/video-downloaders/')
+    expect(edge.renders).toBe(3)
+  })
+
   it('keeps React Server Components payloads apart from documents and router states', async () => {
     const documentKey = await cacheKeyFor(page(), 'v', 'e')
     const rscKey = await cacheKeyFor(page('/', { headers: { rsc: '1' } }), 'v', 'e')

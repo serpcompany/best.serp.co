@@ -7,9 +7,13 @@ import {
   categoryPath,
   escapeRegExp,
   featuredBadgeUrls,
+  listingPath,
   sampleCategory,
   site
 } from './site-fixture'
+
+/** Most listing slugs are domain names; their dot is not a file extension. */
+const domainSlugListingPath = listingPath('autoenhance.ai')
 
 function sitemapLocations(xml: string): string[] {
   return [...xml.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(match => match[1])
@@ -22,12 +26,24 @@ async function getSitemap(request: APIRequestContext, path: string): Promise<str
   return sitemapLocations(await response.text())
 }
 
-async function expectRedirect(request: APIRequestContext, from: string, to: RegExp) {
+/**
+ * `from` answers one 308 whose Location is exactly `to` (path and query), and `to` answers 200
+ * without another redirect: one hop to the canonical URL.
+ */
+async function expectOneHop(request: APIRequestContext, from: string, to: string) {
   const response = await request.get(from, { maxRedirects: 0 })
   expect(response.status(), from).toBe(308)
   const location = response.headers().location
   expect(location, `${from} Location header`).toBeTruthy()
-  expect(new URL(location, 'http://placeholder.invalid').pathname).toMatch(to)
+  const target = new URL(location, 'http://placeholder.invalid')
+  expect(`${target.pathname}${target.search}`, `${from} Location header`).toBe(to)
+  const destination = await request.get(to, { maxRedirects: 0 })
+  expect(destination.status(), `${from} -> ${to}`).toBe(200)
+}
+
+async function expectServedAsRequested(request: APIRequestContext, path: string) {
+  const response = await request.get(path, { maxRedirects: 0 })
+  expect(response.status(), path).toBe(200)
 }
 
 function structuredDataUrls(value: unknown): string[] {
@@ -41,7 +57,31 @@ function structuredDataUrls(value: unknown): string[] {
 }
 
 async function expectCanonical(page: Page, path: string) {
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(1)
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', absoluteUrl(path))
+}
+
+/**
+ * Every best.serp.co URL in the page's JSON-LD is canonical: the homepage is the bare origin,
+ * pages end with a slash (node identifiers may add a `#fragment`), and files have none. A
+ * file is a known extension, not any dot: `/products/autoenhance.ai` is a page without its
+ * slash.
+ */
+async function expectCanonicalStructuredData(page: Page): Promise<string[]> {
+  const structuredData = await page
+    .locator('script[type="application/ld+json"]')
+    .evaluateAll(scripts => scripts.map(script => JSON.parse(script.textContent ?? 'null')))
+  expect(structuredData.length).toBeGreaterThan(0)
+  const linkedUrls = structuredDataUrls(structuredData)
+  for (const url of linkedUrls.filter(url => url.startsWith(site.publicUrl))) {
+    expect(url, 'structured data writes the homepage as the bare origin').not.toBe(
+      `${site.publicUrl}/`
+    )
+    expect(url, 'structured data should only use canonical best.serp.co URLs').toMatch(
+      /^https:\/\/best\.serp\.co(?:\/(?:[^#?]*\/)?(?:#[\w-]+)?|\/[^#?]*\.(?:avif|gif|ico|jpe?g|json|png|svg|txt|webp|xml))?$/iu
+    )
+  }
+  return linkedUrls
 }
 
 test.describe('best.serp.co D1 Worker smoke', () => {
@@ -57,7 +97,12 @@ test.describe('best.serp.co D1 Worker smoke', () => {
         name: new RegExp(`^${site.listingCount}\\s+products in directory$`, 'i')
       })
     ).toBeVisible()
+    // The homepage is the bare origin in its canonical, og:url, and structured data.
     await expectCanonical(page, '/')
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', site.publicUrl)
+    await expect(page.locator('meta[property="og:url"]')).toHaveCount(1)
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', site.publicUrl)
+    expect(await expectCanonicalStructuredData(page)).toContain(site.publicUrl)
   })
 
   test('renders a listing detail page at its canonical URL', async ({ page }) => {
@@ -69,29 +114,84 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     await expect(page).toHaveTitle(new RegExp(`${escapeRegExp(detailListing.name)}.*\\| SERP$`))
     await expectCanonical(page, detailListing.path)
 
-    const structuredData = await page
-      .locator('script[type="application/ld+json"]')
-      .evaluateAll(scripts => scripts.map(script => JSON.parse(script.textContent ?? 'null')))
-    expect(structuredData.length).toBeGreaterThan(0)
-    const linkedUrls = structuredDataUrls(structuredData)
+    const linkedUrls = await expectCanonicalStructuredData(page)
     expect(linkedUrls).toContain(absoluteUrl(detailListing.path))
-    for (const url of linkedUrls.filter(url => url.startsWith('https://best.serp.co/'))) {
-      expect(url, 'structured data should only use trailing-slash best.serp.co URLs').toMatch(
-        /\/(?:#[^/]*)?$|\.[a-z0-9]+$/iu
-      )
-    }
+    // The breadcrumb's Home item is the bare origin.
+    expect(linkedUrls).toContain(site.publicUrl)
   })
 
-  test('permanently redirects the pre-D1 URL scheme to the current routes', async ({ request }) => {
+  test('permanently redirects the pre-D1 URL scheme to the current routes in one hop', async ({
+    request
+  }) => {
     const redirects: Array<[string, string]> = [
       [`/products/${detailListing.slug}/reviews/`, detailListing.path],
       [`/products/best/${sampleCategory.slug}/`, categoryPath(sampleCategory.slug)],
       [`/categories/${sampleCategory.slug}/`, categoryPath(sampleCategory.slug)],
       ['/products/best/featured/', categoriesIndexPath],
-      ['/products/best/', categoriesIndexPath]
+      ['/products/best/', categoriesIndexPath],
+      // Top-level legal pages of the static site, now under /legal/.
+      ['/privacy/', '/legal/privacy/'],
+      ['/terms/', '/legal/terms/'],
+      ['/cookies/', '/legal/cookies/']
     ]
     for (const [from, to] of redirects) {
-      await expectRedirect(request, from, new RegExp(`^${escapeRegExp(to)}$`))
+      // Both slash forms of a moved URL reach the canonical page directly.
+      await expectOneHop(request, from, to)
+      await expectOneHop(request, from.slice(0, -1), to)
+    }
+  })
+
+  test('serves one canonical form per URL under the trailing-slash standard', async ({
+    request
+  }) => {
+    for (const path of [
+      '/',
+      '/about/',
+      '/products/',
+      detailListing.path,
+      domainSlugListingPath,
+      '/robots.txt',
+      '/sitemap-index.xml',
+      '/sitemaps/pages/1.xml'
+    ]) {
+      await expectServedAsRequested(request, path)
+    }
+
+    // Pages gain the slash, files lose it, and the query string is kept exactly.
+    const redirects: Array<[string, string]> = [
+      ['/about', '/about/'],
+      ['/products', '/products/'],
+      [detailListing.path.slice(0, -1), detailListing.path],
+      [domainSlugListingPath.slice(0, -1), domainSlugListingPath],
+      [categoryPath(sampleCategory.slug).slice(0, -1), categoryPath(sampleCategory.slug)],
+      ['/products?page=2', '/products/?page=2'],
+      ['/about?q=c%23%20%2B%2B&x=a%26b', '/about/?q=c%23%20%2B%2B&x=a%26b'],
+      ['/robots.txt/', '/robots.txt'],
+      ['/sitemap-index.xml/', '/sitemap-index.xml'],
+      ['/sitemaps/pages/1.xml/', '/sitemaps/pages/1.xml']
+    ]
+    for (const [from, to] of redirects) {
+      await expectOneHop(request, from, to)
+    }
+
+    // /api is served exactly as requested, with or without a trailing slash.
+    for (const path of ['/api/search?q=video', '/api/search/?q=video']) {
+      await expectServedAsRequested(request, path)
+    }
+    for (const path of ['/api/submissions', '/api/submissions/']) {
+      // An oversized body is refused before the handler touches D1, so this writes nothing.
+      const response = await request.post(path, {
+        data: 'x'.repeat(33_000),
+        headers: { 'content-type': 'application/json' },
+        maxRedirects: 0
+      })
+      expect(response.status(), `POST ${path}`).toBe(413)
+    }
+
+    // /.well-known paths are never redirected.
+    for (const path of ['/.well-known/security.txt', '/.well-known/security.txt/']) {
+      const response = await request.get(path, { maxRedirects: 0 })
+      expect(response.status() >= 300 && response.status() < 400, path).toBe(false)
     }
   })
 
@@ -103,6 +203,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       page.getByRole('heading', { level: 1, name: sampleCategory.name, exact: true })
     ).toBeVisible()
     await expectCanonical(page, categoryPath(sampleCategory.slug))
+    await expectCanonicalStructuredData(page)
     await expect(page.locator(`main a[href="${detailListing.path}"]`).first()).toBeVisible()
 
     await page.goto(categoriesIndexPath, { waitUntil: 'networkidle' })
@@ -213,6 +314,8 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       expect(response?.status(), path).toBe(200)
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
       await expect(page).toHaveTitle(/\| SERP$/)
+      // Legal pages pass slashless paths to their breadcrumb; its JSON-LD must still be canonical.
+      if (path.startsWith('/legal/')) await expectCanonicalStructuredData(page)
     }
   })
 
@@ -228,7 +331,12 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     ])
 
     const pages = await getSitemap(request, '/sitemaps/pages/1.xml')
-    expect(pages).toContain(absoluteUrl('/'))
+    // The homepage entry is the bare origin; every other page ends with a slash.
+    expect(pages).toContain(site.publicUrl)
+    expect(pages).not.toContain(`${site.publicUrl}/`)
+    for (const location of pages.filter(location => location !== site.publicUrl)) {
+      expect(location).toMatch(/^https:\/\/best\.serp\.co\/.+\/$/u)
+    }
     expect(pages).toContain(absoluteUrl('/about/'))
     expect(pages).toContain(absoluteUrl(categoriesIndexPath))
     for (const excluded of ['/submit/', '/legal/privacy-policy/', '/legal/terms-conditions/']) {

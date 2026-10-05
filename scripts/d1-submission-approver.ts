@@ -7,6 +7,7 @@ import {
   type SubmissionStatementPlan,
   selectSubmissionForDecisionPlan
 } from '@serpdirectory/data-ops/submission-plans'
+import { hasFileExtension } from '@serpdirectory/web-core/canonical-url'
 import { project } from './project'
 import { listingRoute } from './site-routes'
 
@@ -116,6 +117,9 @@ export async function approveRemoteSubmission(
   ) {
     throw new Error('Invalid publication state.')
   }
+  // `/products/<slug>/` must stay a page URL (intake already refuses such slugs).
+  if (hasFileExtension(row.slug))
+    throw new Error(`Refusing to publish slug ${row.slug}: it ends in a file extension.`)
   const manifestId = `verified-submission-${submissionId}`
   const afterChecksum = createHash('sha256')
     .update(`${row.checksum}\n${manifestId}\n${row.version + 1}`)

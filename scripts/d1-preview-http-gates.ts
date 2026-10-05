@@ -105,6 +105,52 @@ async function expectRoute(
   })
 }
 
+/**
+ * URL trailing-slash standard (serp docs/engineering/standards/url-trailing-slash.md): a page
+ * URL without its slash and a file URL with one answer exactly one 308 to the canonical form,
+ * and /api is served as requested.
+ */
+async function expectTrailingSlashPolicy(
+  mode: HttpGateMode,
+  baseUrl: URL,
+  searchQuery: string,
+  timeoutMs: number
+): Promise<void> {
+  const expectPermanentRedirect = (path: string, expectedPath: string) =>
+    boundedFetch(routeUrl(baseUrl, path), timeoutMs, async response => {
+      await response.body?.cancel().catch(() => undefined)
+      const location = response.headers.get('location')
+      const observed = location ? new URL(location, baseUrl) : undefined
+      const expected = routeUrl(baseUrl, expectedPath)
+      if (response.status !== 308 || observed?.href !== expected.href)
+        throw new Error(
+          `${mode} route ${path} returned ${response.status} ${location ?? ''}, not a 308 to ${expectedPath}.`
+        )
+    })
+  await Promise.all([
+    expectPermanentRedirect('/about', '/about/'),
+    expectPermanentRedirect('/robots.txt/', '/robots.txt'),
+    expectRoute(mode, baseUrl, `/api/search/?q=${encodeURIComponent(searchQuery)}`, timeoutMs)
+  ])
+}
+
+/**
+ * Awaits the route contracts with the trailing-slash checks running alongside them; a route
+ * contract failure is reported first.
+ */
+async function withTrailingSlashPolicy(
+  mode: HttpGateMode,
+  baseUrl: URL,
+  searchQuery: string,
+  timeoutMs: number,
+  routeContracts: Promise<void>[]
+): Promise<void> {
+  const trailingSlash = expectTrailingSlashPolicy(mode, baseUrl, searchQuery, timeoutMs)
+  trailingSlash.catch(() => undefined)
+  await Promise.all(routeContracts)
+  await trailingSlash
+}
+
 async function expectLegacyRedirect(
   mode: HttpGateMode,
   baseUrl: URL,
@@ -219,7 +265,7 @@ export async function runHttpGates(
   const timeoutMs = options.timeoutMs ?? defaultRequestTimeoutMs
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > defaultRequestTimeoutMs)
     throw new Error('HTTP gate timeout must be a positive integer within the protected bound.')
-  await Promise.all([
+  await withTrailingSlashPolicy(mode, baseUrl, listingSlug, timeoutMs, [
     expectRoute(mode, baseUrl, '/', timeoutMs),
     expectRoute(mode, baseUrl, categoryRoute(categorySlug), timeoutMs),
     expectRoute(mode, baseUrl, listingRoute(listingSlug), timeoutMs),

@@ -32,7 +32,16 @@ function gates(mode: string, baseUrl: string, timeoutMs?: number): Promise<void>
   return runHttpGates(mode, baseUrl, { parityReportPath, timeoutMs })
 }
 
+/** Requests the trailing-slash gates make, and the canonical redirects they require. */
+const trailingSlashGatePaths = ['/about', '/robots.txt/', '/api/search/']
+const canonicalRedirects: Record<string, string> = {
+  '/about': '/about/',
+  '/robots.txt/': '/robots.txt'
+}
+
 function successfulResponse(url: URL, redirectLocation?: string, emptyBody = false): Response {
+  const canonical = canonicalRedirects[url.pathname]
+  if (canonical) return new Response(null, { status: 308, headers: { location: canonical } })
   if (url.pathname === `/${slug}/`)
     return new Response(null, {
       status: 308,
@@ -58,7 +67,7 @@ describe('environment-specific HTTP gates', () => {
   it('passes the exact Production origin and best.serp.co route contracts', async () => {
     const urls = installSuccessfulFetch()
     await expect(gates('production', origin)).resolves.toBeUndefined()
-    expect(urls).toHaveLength(8 + CRAWL_POLICY_REQUESTS.production)
+    expect(urls).toHaveLength(8 + trailingSlashGatePaths.length + CRAWL_POLICY_REQUESTS.production)
     expect(urls.every(url => url.origin === origin)).toBe(true)
     expect(urls.map(url => url.pathname)).toEqual(
       expect.arrayContaining([
@@ -163,6 +172,37 @@ describe('environment-specific HTTP gates', () => {
     )
     await expect(gates('production', origin, 5)).rejects.toThrow('bounded deadline')
     expect(aborted).toHaveBeenCalled()
+  })
+
+  it('checks the trailing-slash standard on page, file, and /api URLs', async () => {
+    const urls = installSuccessfulFetch()
+    await expect(gates('production', origin)).resolves.toBeUndefined()
+    expect(urls.map(url => url.pathname)).toEqual(expect.arrayContaining(trailingSlashGatePaths))
+    expect(urls.some(url => url.pathname === '/api/search/' && url.search.startsWith('?q='))).toBe(
+      true
+    )
+  })
+
+  it.each([
+    ['/about', { location: '/about/', status: 301 }],
+    ['/about', { location: '/about', status: 308 }],
+    ['/about', { location: 'https://other.example/about/', status: 308 }],
+    ['/robots.txt/', { location: '/robots.txt/', status: 308 }],
+    ['/robots.txt/', { location: '', status: 200 }],
+    ['/api/search/', { location: '/api/search', status: 308 }]
+  ])('rejects %s answering %o', async (path, answer) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = new URL(String(input))
+        if (url.pathname !== path) return successfulResponse(url)
+        return new Response(null, {
+          status: answer.status,
+          headers: answer.location ? { location: answer.location } : {}
+        })
+      })
+    )
+    await expect(gates('production', origin)).rejects.toThrow(path)
   })
 })
 
