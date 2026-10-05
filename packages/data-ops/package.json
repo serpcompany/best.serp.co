@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./admin-plans": "./src/admin-plans.ts",
+    "./admin-queries": "./src/admin-queries.ts",
     "./auth": "./src/auth.ts",
     "./cache": "./src/cache.ts",
     "./catalog": "./src/catalog.ts",
@@ -13,6 +15,7 @@
     "./draft-plans": "./src/draft-plans.ts",
     "./email-deliveries": "./src/email-deliveries.ts",
     "./listing-plans": "./src/listing-plans.ts",
+    "./plan-runner": "./src/plan-runner.ts",
     "./plan-support": "./src/plan-support.ts",
     "./public-url": "./src/public-url.ts",
     "./revision-plans": "./src/revision-plans.ts",
@@ -24,7 +27,7 @@
   },
   "scripts": {
     "benchmark": "vitest run src/benchmark.test.ts",
-    "test": "vitest run src/auth.test.ts src/test-support.test.ts src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/draft-plans.test.ts src/listing-plans.test.ts src/revision-plans.test.ts src/schema-invariants.test.ts src/url-key.test.ts src/benchmark.test.ts",
+    "test": "vitest run src/admin-plans.test.ts src/admin-queries.test.ts src/auth.test.ts src/test-support.test.ts src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/draft-plans.test.ts src/listing-plans.test.ts src/revision-plans.test.ts src/schema-invariants.test.ts src/url-key.test.ts src/benchmark.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {

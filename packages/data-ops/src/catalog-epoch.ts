@@ -101,6 +101,45 @@ export function sharedCatalogEpoch(
 }
 
 /**
+ * Whether `slug` names a listing that was published and is now unpublished (`status =
+ * 'approved'`, `is_active = 0`), whose URL answers 410 Gone (#64). One seek on the unique slug.
+ * The Worker entry asks only after a listing page rendered 404, before Next.js knows the status.
+ */
+export async function isUnpublishedListingSlug(input: {
+  client: Database
+  observe?: CatalogObserver
+  slug: string
+}): Promise<boolean> {
+  const startedAt = performance.now()
+  let success = false
+  let resultRows = 0
+  try {
+    const result = await runQuery<{ found: number }>(
+      input.client,
+      sql<{ found: number }>`SELECT 1 AS found FROM listings
+        WHERE slug = ${input.slug} AND status = 'approved' AND is_active = 0
+          AND published_at IS NOT NULL
+        LIMIT 1`
+    )
+    success = result.success
+    resultRows = result.results.length
+    return result.results.length === 1
+  } finally {
+    input.observe?.({
+      d1DurationMs: null,
+      event: 'd1_query',
+      operation: 'unpublished-listing-status',
+      queryShape: 'unpublished-listing-status',
+      resultRows,
+      rowsRead: null,
+      rowsWritten: 0,
+      success,
+      wallDurationMs: performance.now() - startedAt
+    })
+  }
+}
+
+/**
  * Reads the epoch with one prepared statement (two index seeks) and reports the same
  * `d1_query` telemetry the catalog operations emit.
  */

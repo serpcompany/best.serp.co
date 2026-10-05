@@ -4,6 +4,7 @@ import {
   accessLockServerCommand,
   accessLockServersEnabled
 } from './tests/access-lock-fixture'
+import { adminOrigin, adminServerCommand, adminSuiteEnabled } from './tests/admin-fixture'
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`
@@ -120,6 +121,18 @@ export default defineConfig({
               timeout: 180000,
               env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
             }))
+          : []),
+        // The admin panel suite's own Worker and D1 (tests/admin-fixture.ts).
+        ...(adminSuiteEnabled
+          ? [
+              {
+                command: adminServerCommand(),
+                url: `${adminOrigin()}/robots.txt`,
+                reuseExistingServer: !process.env.CI,
+                timeout: 180000,
+                env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
+              }
+            ]
           : [])
       ]
 })

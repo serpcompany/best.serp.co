@@ -8,6 +8,7 @@ import {
   type StatementPlan
 } from './plan-support'
 import {
+  type ListingEventType,
   type ListingLinkRel,
   type ListingOwnerVerification,
   listingLinkRels,
@@ -35,6 +36,25 @@ export function selectListingForPublicationPlan(listingId: string): StatementPla
   }
 }
 
+/** A row in the listing activity log (`listing_events`), written by the same batch. */
+function listingEvent(
+  listingId: string,
+  eventType: ListingEventType,
+  actor: string,
+  detail: Record<string, unknown> | null = null
+): StatementPlan {
+  return {
+    sql: `INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,?,?,?)`,
+    params: [listingId, eventType, detail ? JSON.stringify(detail) : null, actor]
+  }
+}
+
+/** True while the listing's originating submission stands rejected (either category). */
+function listingSubmissionRejected(listingIdSql: string): string {
+  return `EXISTS (SELECT 1 FROM listing_submissions rejected
+    WHERE rejected.listing_id=${listingIdSql} AND rejected.status='rejected')`
+}
+
 function submissionEvent(
   listingId: string,
   eventType: string,
@@ -56,10 +76,13 @@ function submissionEvent(
  */
 export function buildUnpublishListingPlans(input: {
   listingId: string
+  /** An admin's note for the activity log (optional). */
+  note?: string
   publication: CatalogPublication
   reason: string
 }): StatementPlan[] {
   if (!input.reason.trim()) throw new Error('Unpublishing a listing needs a reason.')
+  const note = input.note?.trim() || null
   return [
     ...beginCatalogPublicationPlans(input.publication, {
       sql: `${listingIsLiveGuard('?')} AND NOT ${listingHasQueuedSubmission('?')}`,
@@ -72,21 +95,30 @@ export function buildUnpublishListingPlans(input: {
     },
     assertPreviousStatementChangedOne('listing_unpublished'),
     submissionEvent(input.listingId, 'unpublished', input.publication.actor, input.reason),
+    listingEvent(input.listingId, 'unpublished', input.publication.actor, {
+      note,
+      reason: input.reason
+    }),
     ...finishCatalogPublicationPlans(input.publication)
   ]
 }
 
-/** Unpublished → live again at the same URL. The triggers re-check its primary category. */
+/**
+ * Unpublished → live again at the same URL. The triggers re-check its primary category. A
+ * listing whose submission was rejected stays down: it returns only through a new submission
+ * (and, after a prohibited rejection, only once an admin has lifted the block).
+ */
 export function buildRepublishListingPlans(input: {
   listingId: string
   publication: CatalogPublication
 }): StatementPlan[] {
   const unpublished = `EXISTS (SELECT 1 FROM listings
-    WHERE id=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL)`
+    WHERE id=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL)
+    AND NOT ${listingSubmissionRejected('?')}`
   return [
     ...beginCatalogPublicationPlans(input.publication, {
       sql: unpublished,
-      params: [input.listingId]
+      params: [input.listingId, input.listingId]
     }),
     {
       sql: `UPDATE listings SET is_active=1,updated_at=?
@@ -94,6 +126,7 @@ export function buildRepublishListingPlans(input: {
       params: [input.publication.now, input.listingId]
     },
     assertPreviousStatementChangedOne('listing_republished'),
+    listingEvent(input.listingId, 'republished', input.publication.actor),
     ...finishCatalogPublicationPlans(input.publication)
   ]
 }
@@ -113,6 +146,12 @@ export function buildSetListingLinkRelPlans(input: {
       sql: changes,
       params: [input.listingId, input.linkRel]
     }),
+    {
+      sql: `INSERT INTO listing_events (listing_id,event_type,detail,actor)
+        SELECT id,'link_rel_changed',json_object('from',link_rel,'to',?),? FROM listings
+        WHERE id=? AND link_rel!=?`,
+      params: [input.linkRel, input.publication.actor, input.listingId, input.linkRel]
+    },
     {
       sql: `UPDATE listings SET link_rel=?,updated_at=? WHERE id=? AND link_rel!=?`,
       params: [input.linkRel, input.publication.now, input.listingId, input.linkRel]
@@ -155,6 +194,10 @@ export function buildGrantListingOwnerPlans(input: {
       ]
     },
     assertPreviousStatementChangedOne('listing_owner_granted'),
+    listingEvent(input.listingId, 'owner_granted', input.publication.actor, {
+      userId: input.userId,
+      verifiedVia: input.verifiedVia
+    }),
     ...finishCatalogPublicationPlans(input.publication)
   ]
 }
@@ -181,6 +224,154 @@ export function buildRevokeListingOwnerPlans(input: {
       params: [input.publication.now, input.reason, input.listingId, input.userId]
     },
     assertPreviousStatementChangedOne('listing_owner_revoked'),
+    listingEvent(input.listingId, 'owner_revoked', input.publication.actor, {
+      reason: input.reason,
+      userId: input.userId
+    }),
+    ...finishCatalogPublicationPlans(input.publication)
+  ]
+}
+
+/**
+ * An admin moves a listing to another account (#64): the current owner, if any, is revoked
+ * (`transferred`) and `toUserId` becomes the owner (`verified_via = 'admin'`). It compares and
+ * swaps on the owner the admin saw (`fromUserId`, null for an ownerless listing). The new owner
+ * needs an account with a verified email.
+ */
+export function buildTransferListingOwnerPlans(input: {
+  fromUserId: string | null
+  listingId: string
+  publication: CatalogPublication
+  toUserId: string
+}): StatementPlan[] {
+  if (input.fromUserId === input.toUserId) {
+    throw new Error('The listing already belongs to that account.')
+  }
+  const currentOwner =
+    input.fromUserId === null
+      ? {
+          params: [input.listingId],
+          sql: `NOT EXISTS (SELECT 1 FROM listing_owners o
+            WHERE o.listing_id=? AND o.role='owner' AND o.revoked_at IS NULL)`
+        }
+      : {
+          params: [input.listingId, input.fromUserId],
+          sql: `EXISTS (SELECT 1 FROM listing_owners o
+            WHERE o.listing_id=? AND o.user_id=? AND o.role='owner' AND o.revoked_at IS NULL)`
+        }
+  const plans: StatementPlan[] = [
+    ...beginCatalogPublicationPlans(input.publication, {
+      sql: `${currentOwner.sql}
+        AND EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved')
+        AND EXISTS (SELECT 1 FROM users WHERE id=? AND email_verified=1)`,
+      params: [...currentOwner.params, input.listingId, input.toUserId]
+    })
+  ]
+  if (input.fromUserId !== null) {
+    plans.push(
+      {
+        sql: `UPDATE listing_owners SET revoked_at=?,revoked_reason='transferred'
+          WHERE listing_id=? AND user_id=? AND role='owner' AND revoked_at IS NULL`,
+        params: [input.publication.now, input.listingId, input.fromUserId]
+      },
+      assertPreviousStatementChangedOne('previous_owner_revoked')
+    )
+  }
+  plans.push(
+    {
+      sql: `INSERT INTO listing_owners (listing_id,user_id,role,verified_via,verified_at)
+        VALUES (?,?,'owner','admin',?)`,
+      params: [input.listingId, input.toUserId, input.publication.now]
+    },
+    assertPreviousStatementChangedOne('listing_owner_transferred'),
+    listingEvent(input.listingId, 'owner_transferred', input.publication.actor, {
+      fromUserId: input.fromUserId,
+      toUserId: input.toUserId
+    }),
+    ...finishCatalogPublicationPlans(input.publication)
+  )
+  return plans
+}
+
+/** The listing fields an admin edits on the listing page (#64 screen 12). */
+export interface ListingDetailsEdit {
+  categorySlug: string
+  description: string
+  logoUrl: string
+  name: string
+  website: string
+}
+
+/**
+ * An admin's edit of a listing's details: name, short description, website, primary category,
+ * and logo. It compares and swaps on the checksum the admin saw, so a concurrent change is never
+ * overwritten, and writes the publication's checksum. Refused while the listing's own submission
+ * is in review (that submission is the listing's edit channel: edit it on the review page) and
+ * while its submission stands rejected. The listing moves to `draft` inside the batch so the
+ * primary-category triggers allow the change, then back to `approved`. `fields` names what
+ * changed, for the activity log.
+ */
+export function buildUpdateListingDetailsPlans(input: {
+  details: ListingDetailsEdit
+  expectedChecksum: string
+  fields: readonly string[]
+  listingId: string
+  publication: CatalogPublication
+}): StatementPlan[] {
+  const { details, listingId } = input
+  for (const [field, value] of Object.entries(details)) {
+    if (!value.trim()) throw new Error(`A listing's ${field} cannot be empty.`)
+  }
+  if (input.fields.length === 0) throw new Error('A listing edit must change something.')
+  const category = `(SELECT id FROM categories WHERE slug=? AND is_active=1)`
+  return [
+    ...beginCatalogPublicationPlans(input.publication, {
+      sql: `EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved' AND checksum=?)
+        AND EXISTS (SELECT 1 FROM categories WHERE slug=? AND is_active=1)
+        AND NOT ${listingHasQueuedSubmission('?')} AND NOT ${listingSubmissionRejected('?')}`,
+      params: [listingId, input.expectedChecksum, details.categorySlug, listingId, listingId]
+    }),
+    {
+      sql: `UPDATE listings SET status='draft' WHERE id=? AND status='approved' AND checksum=?`,
+      params: [listingId, input.expectedChecksum]
+    },
+    assertPreviousStatementChangedOne('listing_opened_for_edit'),
+    {
+      sql: `UPDATE listings SET name=?,description=?,website=?,checksum=?,updated_at=?
+        WHERE id=? AND status='draft'`,
+      params: [
+        details.name.trim(),
+        details.description.trim(),
+        details.website.trim(),
+        input.publication.afterChecksum,
+        input.publication.now,
+        listingId
+      ]
+    },
+    assertPreviousStatementChangedOne('listing_details_replaced'),
+    {
+      sql: `DELETE FROM listing_categories
+        WHERE listing_id=? AND is_primary=1 AND category_id IS NOT ${category}`,
+      params: [listingId, details.categorySlug]
+    },
+    {
+      sql: `INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+        SELECT ?,id,0,1 FROM categories WHERE slug=? AND is_active=1
+        ON CONFLICT(listing_id,category_id) DO UPDATE SET is_primary=1,sort_order=0`,
+      params: [listingId, details.categorySlug]
+    },
+    assertPreviousStatementChangedOne('listing_primary_category_set'),
+    { sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'`, params: [listingId] },
+    {
+      sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order) VALUES (?,'logo',?,0)`,
+      params: [listingId, details.logoUrl.trim()]
+    },
+    {
+      sql: `UPDATE listings SET status='approved' WHERE id=? AND status='draft'`,
+      params: [listingId]
+    },
+    assertPreviousStatementChangedOne('listing_returned_after_edit'),
+    listingEvent(listingId, 'edited', input.publication.actor, { fields: [...input.fields] }),
     ...finishCatalogPublicationPlans(input.publication)
   ]
 }

@@ -288,6 +288,62 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     expect(() => approvalPlans(0)).toThrow(/positive integer/u)
   })
 
+  it("approves with a reviewer's edits and chosen link in one batch (#64)", () => {
+    const db = database('verified')
+    const edits = buildReplaceSubmissionContentPlans({
+      actor: 'reviewer',
+      content,
+      eventDetail: JSON.stringify({ fields: ['name'] }),
+      expectedContentVersion: 1,
+      expectedStatuses: ['verified'],
+      now: NOW,
+      submissionId
+    })
+    const approve = buildApproveSubmissionPlans({
+      afterChecksum: createHash('sha256').update('after').digest('hex'),
+      affectedRoute: '/products/example.com/',
+      beforeChecksum: 'before',
+      expectedContentVersion: 2,
+      linkRel: 'sponsored',
+      listingId: liveListingId,
+      manifestId: `admin-approve-${submissionId}`,
+      now: NOW,
+      reviewer: 'reviewer',
+      runId: `admin_approve_${submissionId}`,
+      submissionId,
+      version: 1,
+      workflow: 'app/admin'
+    })
+    execute(db, [...edits, ...approve])
+    expect(listing(db)).toMatchObject({ link_rel: 'sponsored', name: 'New name' })
+    expect(
+      db
+        .prepare(
+          "SELECT detail FROM listing_submission_events WHERE event_type='edited' ORDER BY id"
+        )
+        .all()
+    ).toEqual([{ detail: JSON.stringify({ fields: ['name'] }) }])
+    // A replay of the same batch is refused whole: the version moved on.
+    expect(() => execute(db, [...edits, ...approve])).toThrow(/malformed JSON/u)
+    expect(count(db, 'SELECT COUNT(*) AS count FROM listings')).toBe(1)
+    expect(() =>
+      buildApproveSubmissionPlans({
+        afterChecksum: 'a',
+        affectedRoute: '/',
+        beforeChecksum: 'b',
+        expectedContentVersion: 1,
+        linkRel: 'ugc' as 'follow',
+        listingId: 'l',
+        manifestId: 'm',
+        now: NOW,
+        reviewer: 'r',
+        runId: 'r',
+        submissionId,
+        version: 1
+      })
+    ).toThrow(/follow, nofollow, or sponsored/u)
+  })
+
   it('records a payment as live and queued, or held for review, from every payable status', () => {
     expectTransition({
       after: db => {

@@ -58,7 +58,8 @@ const RSC_VARIANT_HEADERS = [
  */
 const RENDER_REQUEST_HEADERS = ['accept', 'user-agent', ...RSC_VARIANT_HEADERS] as const
 
-const CACHEABLE_STATUSES = new Set([200, 301, 308, 404])
+// 410: an unpublished listing's gone page (#64, `lib/routing/gone-listing.ts`).
+const CACHEABLE_STATUSES = new Set([200, 301, 308, 404, 410])
 
 export type EdgeCacheState = 'BYPASS' | 'HIT' | 'MISS'
 

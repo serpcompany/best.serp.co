@@ -20,10 +20,14 @@ Browser
         -> submission operations (packages/data-ops) -> D1 (DB) private intake tables
      -> server-only account adapter (apps/web/lib/auth): Better Auth, requireUser/requireAdmin
         -> account operations (packages/data-ops/auth) -> D1 (DB) users, sessions, allowlist
+     -> server-only admin adapter (apps/web/lib/admin), /admin and /api/admin only
+        -> admin reads and statement plans (packages/data-ops) -> D1 (DB), production included
 ```
 
 `/admin` and `/api/admin` pass the Worker entry's Cloudflare Access and session-cookie gate
-first ([Accounts](./ACCOUNTS.md)).
+first ([Accounts](./ACCOUNTS.md)). The admin panel is the one place the app writes production
+D1 ([Admin panel](./ADMIN_PANEL.md#the-production-write-exception)); every other production
+change runs in a protected workflow.
 
 ## Responsibility map
 
@@ -41,7 +45,9 @@ first ([Accounts](./ACCOUNTS.md)).
   and URLs (`apps/web/lib/routing/`), applies the environment's crawl policy
   (`apps/web/lib/environment/`), serves anonymous pages from the edge HTML cache
   (`apps/web/lib/edge-cache/`), and otherwise delegates to the generated
-  `.open-next/worker.js`. It reads only the catalog epoch, through `packages/data-ops/`.
+  `.open-next/worker.js`. It reads only the catalog epoch and, after a listing page
+  rendered 404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is
+  rendered again as the 410 gone page), both through `packages/data-ops/`.
 - `apps/web/lib/catalog/` acquires the binding, validates the runtime environment,
   and deduplicates reads per request. It contains no SQL.
 - `apps/web/lib/submissions/` validates the binding, performs bounded badge HTTP
@@ -50,6 +56,8 @@ first ([Accounts](./ACCOUNTS.md)).
   response, claims each template and event key in the `email_deliveries` ledger
   (`packages/data-ops/`) so it never sends twice, and only logs locally
   ([Email](./EMAIL.md)).
+- `apps/web/lib/admin/` validates the binding for the admin panel, parses `/api/admin/*`
+  bodies, and runs each decision as reviewed plans from `packages/data-ops/` (no SQL here).
 - `apps/web/lib/auth/` configures Better Auth (email sign-in codes) on the `DB` binding,
   serves `/api/auth/*`, guards admin routes, and verifies Cloudflare Access JWTs; account SQL
   lives in `packages/data-ops/src/auth.ts` ([Accounts](./ACCOUNTS.md)).
@@ -227,7 +235,7 @@ reads it with one statement (two index seeks). Four layers, from the edge inward
    the Workers Cache API under a key of Worker version (`CF_VERSION_METADATA`), catalog
    epoch, host, path and query (and, for React Server Components requests, the router
    headers Next.js varies on). A hit loads neither Next.js nor D1. Misses render normally
-   and 200/301/308/404 responses without `Set-Cookie` are stored for 24 hours; visitors
+   and 200/301/308/404/410 responses without `Set-Cookie` are stored for 24 hours; visitors
    still receive the origin `Cache-Control`. A cacheable request reaches OpenNext with only
    `accept`, `host`, `user-agent`, and the router headers; every other request header
    (cookies, `x-nonce`, forwarded and framework-internal headers) is dropped, so nothing a

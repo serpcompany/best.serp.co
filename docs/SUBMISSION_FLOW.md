@@ -86,7 +86,24 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
   `changes_requested`, then `approved` (applied atomically to the listing), `rejected`, or
   `withdrawn` (`revision-plans.ts`).
 
+## Review in the admin panel (#64)
+
+Admins decide in `/admin` ([Admin panel](./ADMIN_PANEL.md)). The review queue lists
+`verified` and `paid_pending_review` submissions and `pending_review` revisions, oldest first.
+On a submission an admin can approve (optionally editing the name, category, short and long
+description, and logo first, and choosing the outbound link; the edit and the approval are one
+batch), request changes with a note, or reject with a reason and a category; on a rejected
+prohibited URL, "Allow resubmission" lifts the block. Each decision is these plans with the
+`content_version` guard, is idempotent (a replay answers `replayed: true` and sends nothing),
+records the admin's email in the events, and emails the submitter once ("approved", "changes
+requested", "rejected", or "rejected: prohibited"). Rejecting a paid submission as `other`
+waits for #68's refund. These decisions write production D1 directly: the documented
+production-write exception ([Admin panel](./ADMIN_PANEL.md#the-production-write-exception)).
+
 ## Legacy capability flow (until #63 and #69)
+
+The admin panel replaces the protected approver below for decisions; the notifier and the
+private preview keep working until the legacy flow is retired.
 
 The public `/submit/` page lists active categories from D1. Its form posts to
 `POST /api/submissions`, which writes the submission, resource links, FAQs, and a

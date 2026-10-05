@@ -219,7 +219,8 @@ export const applicationColumnInventory = {
   listing_revision_resource_links: ['id', 'revision_id', 'label', 'url', 'sort_order'],
   listing_revision_faqs: ['id', 'revision_id', 'question', 'answer', 'sort_order'],
   listing_revision_events: ['id', 'revision_id', 'event_type', 'detail', 'actor', 'created_at'],
-  badge_checks: ['id', 'listing_id', 'checked_at', 'outcome', 'reason', 'conclusive']
+  badge_checks: ['id', 'listing_id', 'checked_at', 'outcome', 'reason', 'conclusive'],
+  listing_events: ['id', 'listing_id', 'event_type', 'detail', 'actor', 'created_at']
 } as const
 
 export type ApplicationTableName = keyof typeof applicationColumnInventory
@@ -281,7 +282,8 @@ export const importOrder: ApplicationTableName[] = [
   'listing_revision_resource_links',
   'listing_revision_faqs',
   'listing_revision_events',
-  'badge_checks'
+  'badge_checks',
+  'listing_events'
 ]
 
 export const toolOwnedTableNames = ['d1_migrations'] as const

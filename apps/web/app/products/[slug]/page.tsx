@@ -12,8 +12,12 @@ import {
   WebsiteDetailRoutePage
 } from '@serpdirectory/web-core/website-routes/detail-page'
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
+import { GoneListing } from '@/components/listing/gone-listing'
+import { getUnpublishedListing } from '@/lib/catalog/repository'
 import { getWebsiteBySlug, getWebsiteCanonicalRedirect } from '@/lib/content-loader'
+import { GONE_RENDER_HEADER } from '@/lib/routing/gone-listing'
 
 interface ProjectPageProps {
   params: Promise<{ slug: string }>
@@ -30,9 +34,23 @@ export async function generateMetadata({ params }: ProjectPageProps): Promise<Me
 
   const project = await getWebsiteBySlug(slug)
 
-  if (!project) return {}
+  if (!project) {
+    const gone = await goneListing(slug)
+    return gone
+      ? { robots: { follow: true, index: false }, title: `${gone.name} is no longer listed` }
+      : {}
+  }
 
   return generateWebsiteDetailRouteMetadata(project)
+}
+
+/**
+ * The unpublished listing to show on the 410 page, only when the Worker entry asks for that
+ * render (`lib/routing/gone-listing.ts`); otherwise the page answers 404 as before.
+ */
+async function goneListing(slug: string) {
+  if ((await headers()).get(GONE_RENDER_HEADER) !== '1') return null
+  return getUnpublishedListing(slug)
 }
 
 /**
@@ -49,6 +67,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   if (!project) {
     const canonicalSlug = await getWebsiteCanonicalRedirect(slug)
     if (canonicalSlug) permanentRedirect(getRoute('listing.detail', { slug: canonicalSlug }))
+    const gone = await goneListing(slug)
+    if (gone) return <GoneListing listing={gone} />
     notFound()
   }
 

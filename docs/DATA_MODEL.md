@@ -83,6 +83,9 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   `listing_submission_url_blocks` holds prohibited-URL blocks.
 - `listing_owners`, `listing_revisions` (with resource, FAQ, and event tables), and
   `badge_checks` hold ownership, owner edits, and badge program history (#62, below).
+- `listing_events` is the listing activity log (#64): admin edits, unpublish (with the note),
+  republish, link changes, and ownership grants, revocations, and transfers, each with its
+  actor, written by the plan that makes the change (`listing-plans.ts`).
 - `email_deliveries` is the transactional email ledger: one row per template and event key
   (status, attempts, provider message id, error code), never a recipient or content
   (see [Email](./EMAIL.md)). Each sign-in code send prunes `sign-in-code` rows older than 24
@@ -117,7 +120,8 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 ## Ownership, plans, revisions, and badge checks (#62)
 
 - `listing_owners`: listing, user, `role` (`owner`; more roles can be added for teams),
-  `verified_via` (`submission` | `badge_claim` | `paid_claim`), `verified_at`, and
+  `verified_via` (`submission` | `badge_claim` | `paid_claim` | `admin`, a transfer in the
+  admin panel; added by `0005_admin_panel`, which rebuilds the table), `verified_at`, and
   `revoked_at`/`revoked_reason`. A partial unique index allows one current owner per listing;
   revoking keeps the row, so the table is the ownership history. User references are
   `ON DELETE RESTRICT`: account deletion must resolve ownership first.
@@ -190,7 +194,7 @@ submission tables (`scripts/d1-table-inventory.ts`).
 
 Every transition is a credential-free statement plan in `packages/data-ops`
 (`submission-plans.ts`, `draft-plans.ts`, `listing-plans.ts`, `revision-plans.ts`,
-`plan-support.ts`) sent as
+`admin-plans.ts`, `plan-support.ts`; the admin panel's reads are `admin-queries.ts`) sent as
 one D1 batch. Each mutation repeats its expected state in the `WHERE` and is followed by a
 `changes() = 1` assertion, so a stale or concurrent decision fails the whole batch. A plan that
 changes public output (publishing, unpublishing, content, `link_rel`, ownership) also records

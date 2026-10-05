@@ -94,7 +94,16 @@ const isoInstantCheck = (column: { name: string }) =>
   sql`${sql.identifier(column.name)} IS strftime('%Y-%m-%dT%H:%M:%fZ', ${sql.identifier(column.name)})`
 
 export const listingOwnerRoles = ['owner'] as const
-export const listingOwnerVerifications = ['submission', 'badge_claim', 'paid_claim'] as const
+/**
+ * How a listing's owner was established: their approved submission, a badge or paid claim (#67),
+ * or an admin who transferred the listing to them (#64).
+ */
+export const listingOwnerVerifications = [
+  'submission',
+  'badge_claim',
+  'paid_claim',
+  'admin'
+] as const
 export type ListingOwnerVerification = (typeof listingOwnerVerifications)[number]
 
 export const revisionStatuses = [
@@ -122,6 +131,22 @@ export const revisionEventTypes = [
   'rejected'
 ] as const
 export type RevisionEventType = (typeof revisionEventTypes)[number]
+
+/**
+ * The listing activity log (#64): admin and ownership changes of a listing, each written by the
+ * plan that makes the change (`listing-plans.ts`). Submission decisions stay in
+ * `listing_submission_events`.
+ */
+export const listingEventTypes = [
+  'edited',
+  'unpublished',
+  'republished',
+  'link_rel_changed',
+  'owner_granted',
+  'owner_revoked',
+  'owner_transferred'
+] as const
+export type ListingEventType = (typeof listingEventTypes)[number]
 
 export const badgeCheckOutcomes = ['pass', 'fail'] as const
 export type BadgeCheckOutcome = (typeof badgeCheckOutcomes)[number]
@@ -1071,6 +1096,29 @@ export const badgeChecks = sqliteTable(
   ]
 )
 
+/**
+ * One row per admin or ownership change of a listing (`listingEventTypes`), with the actor and a
+ * JSON detail (the note, the fields edited, the old and new link). The admin listing page reads
+ * it as the activity log, together with the listing's submission events.
+ */
+export const listingEvents = sqliteTable(
+  'listing_events',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    listingId: text('listing_id')
+      .notNull()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    eventType: text('event_type', { enum: listingEventTypes }).notNull(),
+    detail: text('detail'),
+    actor: text('actor').notNull(),
+    createdAt: text('created_at').notNull().default(currentTimestamp)
+  },
+  table => [
+    check('listing_events_type_valid', sql`${table.eventType} IN (${sqlList(listingEventTypes)})`),
+    index('listing_events_listing_idx').on(table.listingId, table.createdAt)
+  ]
+)
+
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   listingOwnerships: many(listingOwners),
@@ -1093,6 +1141,7 @@ export const categoriesRelations = relations(categories, ({ many }) => ({
 
 export const listingsRelations = relations(listings, ({ many }) => ({
   badgeChecks: many(badgeChecks),
+  events: many(listingEvents),
   categories: many(listingCategories),
   faqs: many(listingFaqs),
   media: many(listingMedia),
@@ -1232,4 +1281,8 @@ export const listingRevisionEventsRelations = relations(listingRevisionEvents, (
 
 export const badgeChecksRelations = relations(badgeChecks, ({ one }) => ({
   listing: one(listings, { fields: [badgeChecks.listingId], references: [listings.id] })
+}))
+
+export const listingEventsRelations = relations(listingEvents, ({ one }) => ({
+  listing: one(listings, { fields: [listingEvents.listingId], references: [listings.id] })
 }))

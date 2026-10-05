@@ -16,7 +16,8 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `apps/web/`: the best.serp.co Next.js routes and OpenNext Worker (`wrangler.jsonc`).
   `worker.ts` is the Worker entry: an epoch-keyed edge HTML cache in front of OpenNext.
 - `apps/web/lib/catalog/`: server-only adapter that acquires and validates the `DB`
-  binding and delegates to `packages/data-ops/`.
+  binding and delegates to `packages/data-ops/`. `apps/web/lib/admin/` does the same for the
+  admin panel's decisions.
 - `apps/web/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
   the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/ACCOUNTS.md)).
 - `apps/e2e/`: Playwright suites that run against the local or deployed Worker.
@@ -79,7 +80,11 @@ Issues and labels never grant production, database, or deployment authority.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
 - Public URLs are part of the SEO contract: `/products/<slug>/`,
   `/products/categories/<category>/`. Changing a route requires permanent redirects.
-- Route production mutations through protected GitHub Actions only.
+- Route production mutations through protected GitHub Actions only. The one exception is the
+  admin panel (`/admin`, #64): an admin's decision writes production D1 from the Worker
+  through the reviewed plans, behind Cloudflare Access, the allowlist, and an `Origin` check
+  ([Admin panel](./docs/ADMIN_PANEL.md#the-production-write-exception)). Agents never use it
+  on production; recovery is D1 Time Travel ([D1 recovery](./docs/D1_RECOVERY.md)).
 
 ## Forbidden patterns
 

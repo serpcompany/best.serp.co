@@ -183,9 +183,8 @@ one you won't ship instead of leaving it waiting. Hotfixes follow
   named `best-serp-co-production-d1-pre-{deploy,publication,review}-<run id>`, kept 30 days
   and downloadable by anyone with read access to this repository. Running an export blocks
   other queries to that database until it finishes.
-- Point-in-time recovery: D1 Time Travel, for example `wrangler d1 time-travel restore
-  best-serp-co-production --env production --timestamp <before the run>`, run by a
-  maintainer after reviewer agreement.
+- Point-in-time recovery, including undoing an admin panel write (no backup is taken per
+  decision): D1 Time Travel, run by the owner only ([D1 recovery](./D1_RECOVERY.md)).
 - Worker rollback: Cloudflare dashboard → Workers → `best-serp-co-production` →
   Deployments → Rollback, or `wrangler rollback --env production`. A rollback does not undo
   a migration.

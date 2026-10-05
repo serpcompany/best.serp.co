@@ -5,7 +5,9 @@ import {
   buildRepublishListingPlans,
   buildRevokeListingOwnerPlans,
   buildSetListingLinkRelPlans,
+  buildTransferListingOwnerPlans,
   buildUnpublishListingPlans,
+  buildUpdateListingDetailsPlans,
   selectListingForPublicationPlan
 } from './listing-plans'
 import { prepareCatalogPublication } from './plan-support'
@@ -299,5 +301,293 @@ describe('listing ownership transitions', () => {
     const db = database()
     execute(db, buildUnpublishListingPlans({ listingId, publication: prepared, reason: 'admin' }))
     expect(publicationState(db)).toEqual({ checksum: prepared.afterChecksum, version: 2 })
+  })
+})
+
+describe('listing activity log and admin edits (#64)', () => {
+  const at = (db: DatabaseSync, version: number, action: string) =>
+    publication(action, { checksum: publicationState(db).checksum, version })
+
+  function listingEvents(db: DatabaseSync): Array<Record<string, unknown>> {
+    return db
+      .prepare('SELECT event_type,detail,actor FROM listing_events WHERE listing_id=? ORDER BY id')
+      .all(listingId) as Array<Record<string, unknown>>
+  }
+
+  it('records every listing change in listing_events with its actor and detail', () => {
+    const db = database()
+    execute(
+      db,
+      buildUnpublishListingPlans({
+        listingId,
+        note: '  Owner asked to take it down.  ',
+        publication: publication('listing-unpublish'),
+        reason: 'admin'
+      })
+    )
+    execute(db, buildRepublishListingPlans({ listingId, publication: at(db, 2, 'republish') }))
+    execute(
+      db,
+      buildSetListingLinkRelPlans({
+        linkRel: 'nofollow',
+        listingId,
+        publication: at(db, 3, 'link')
+      })
+    )
+    execute(
+      db,
+      buildGrantListingOwnerPlans({
+        listingId,
+        publication: at(db, 4, 'grant'),
+        userId: 'user_owner',
+        verifiedVia: 'badge_claim'
+      })
+    )
+    execute(
+      db,
+      buildRevokeListingOwnerPlans({
+        listingId,
+        publication: at(db, 5, 'revoke'),
+        reason: 'badge_removed',
+        userId: 'user_owner'
+      })
+    )
+    expect(listingEvents(db)).toEqual([
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({ note: 'Owner asked to take it down.', reason: 'admin' }),
+        event_type: 'unpublished'
+      },
+      { actor: 'reviewer', detail: null, event_type: 'republished' },
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({ from: 'follow', to: 'nofollow' }),
+        event_type: 'link_rel_changed'
+      },
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({ userId: 'user_owner', verifiedVia: 'badge_claim' }),
+        event_type: 'owner_granted'
+      },
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({ reason: 'badge_removed', userId: 'user_owner' }),
+        event_type: 'owner_revoked'
+      }
+    ])
+  })
+
+  it('keeps a listing whose submission was rejected down', () => {
+    const db = database()
+    db.exec(`
+      INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+        logo_url,status,plan,listing_id,rejection_reason,rejection_category)
+      VALUES ('sub','lst_live.example','Live','d','https://lst_live.example/','c','tools','l',
+        'rejected','free','lst_live','Spam','other')`)
+    db.prepare('UPDATE listings SET is_active=0 WHERE id=?').run(listingId)
+    expectRefused(
+      db,
+      buildRepublishListingPlans({ listingId, publication: publication('listing-republish') })
+    )
+  })
+
+  it('transfers ownership to another verified account and compares the current owner', () => {
+    const db = database()
+    // An ownerless listing: the admin assigns its first owner.
+    execute(
+      db,
+      buildTransferListingOwnerPlans({
+        fromUserId: null,
+        listingId,
+        publication: publication('transfer'),
+        toUserId: 'user_owner'
+      })
+    )
+    expect(query(db, selectListingForPublicationPlan(listingId))).toMatchObject([
+      { owner_user_id: 'user_owner', version: 2 }
+    ])
+    // A stale view of the owner (the admin saw none) is refused.
+    expectRefused(
+      db,
+      buildTransferListingOwnerPlans({
+        fromUserId: null,
+        listingId,
+        publication: at(db, 2, 'transfer-stale'),
+        toUserId: 'user_other'
+      })
+    )
+    execute(
+      db,
+      buildTransferListingOwnerPlans({
+        fromUserId: 'user_owner',
+        listingId,
+        publication: at(db, 2, 'transfer-again'),
+        toUserId: 'user_other'
+      })
+    )
+    expect(
+      db.prepare('SELECT user_id,verified_via,revoked_reason FROM listing_owners ORDER BY id').all()
+    ).toEqual([
+      { revoked_reason: 'transferred', user_id: 'user_owner', verified_via: 'admin' },
+      { revoked_reason: null, user_id: 'user_other', verified_via: 'admin' }
+    ])
+    expect(listingEvents(db).map(event => event.event_type)).toEqual([
+      'owner_transferred',
+      'owner_transferred'
+    ])
+    // The new owner needs a verified account.
+    db.exec(`INSERT INTO users (id,name,email,email_verified)
+      VALUES ('user_unverified','U','u@example.com',0)`)
+    expectRefused(
+      db,
+      buildTransferListingOwnerPlans({
+        fromUserId: 'user_other',
+        listingId,
+        publication: at(db, 3, 'transfer-unverified'),
+        toUserId: 'user_unverified'
+      })
+    )
+    expect(() =>
+      buildTransferListingOwnerPlans({
+        fromUserId: 'user_other',
+        listingId,
+        publication: at(db, 3, 'transfer-same'),
+        toUserId: 'user_other'
+      })
+    ).toThrow(/already belongs/u)
+  })
+
+  const edit = {
+    categorySlug: 'apps',
+    description: 'A new short description.',
+    logoUrl: 'https://assets.example/new-logo.png',
+    name: 'Renamed',
+    website: 'https://lst_live.example/home'
+  }
+
+  it("edits a live listing's details, keeps it live, and logs the fields", () => {
+    const db = database()
+    execute(
+      db,
+      buildUpdateListingDetailsPlans({
+        details: edit,
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['name', 'description', 'category', 'logo', 'website'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    )
+    const prepared = publication('listing-edit')
+    expect(listing(db)).toMatchObject({
+      checksum: prepared.afterChecksum,
+      description: edit.description,
+      is_active: 1,
+      name: 'Renamed',
+      status: 'approved',
+      website: edit.website
+    })
+    expect(
+      db
+        .prepare(
+          `SELECT c.slug,lc.is_primary FROM listing_categories lc JOIN categories c
+          ON c.id=lc.category_id WHERE lc.listing_id=? ORDER BY c.slug`
+        )
+        .all(listingId)
+    ).toEqual([{ is_primary: 1, slug: 'apps' }])
+    expect(
+      db.prepare("SELECT url FROM listing_media WHERE listing_id=? AND kind='logo'").all(listingId)
+    ).toEqual([{ url: edit.logoUrl }])
+    // Other media stay.
+    expect(
+      count(
+        db,
+        "SELECT COUNT(*) AS count FROM listing_media WHERE kind='image' AND listing_id=?",
+        listingId
+      )
+    ).toBe(1)
+    expect(listingEvents(db)).toEqual([
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({ fields: ['name', 'description', 'category', 'logo', 'website'] }),
+        event_type: 'edited'
+      }
+    ])
+    expectPublished(db, 2)
+    // The checksum the admin saw is now stale.
+    expectRefused(
+      db,
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, name: 'Again' },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['name'],
+        listingId,
+        publication: at(db, 2, 'listing-edit-stale')
+      })
+    )
+  })
+
+  it('edits an unpublished listing and leaves it unpublished', () => {
+    const db = database()
+    db.prepare('UPDATE listings SET is_active=0 WHERE id=?').run(listingId)
+    execute(
+      db,
+      buildUpdateListingDetailsPlans({
+        details: edit,
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['name'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    )
+    expect(listing(db)).toMatchObject({ is_active: 0, name: 'Renamed', status: 'approved' })
+  })
+
+  it('refuses an edit while a submission is queued, after a rejection, or to an unknown category', () => {
+    for (const status of ['paid_pending_review', 'changes_requested', 'rejected'] as const) {
+      const db = database()
+      db.prepare(
+        `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+          logo_url,status,plan,paid_at,listing_id,published_checksum,rejection_reason,
+          rejection_category)
+        VALUES ('sub','lst_live.example','Live','d','https://lst_live.example/','c','tools','l',
+          ?,'paid',?,'lst_live',?,?,?)`
+      ).run(
+        status,
+        NOW,
+        status === 'rejected' ? null : 'checksum-lst_live',
+        status === 'rejected' ? 'Spam' : null,
+        status === 'rejected' ? 'other' : null
+      )
+      expectRefused(
+        db,
+        buildUpdateListingDetailsPlans({
+          details: edit,
+          expectedChecksum: 'checksum-lst_live',
+          fields: ['name'],
+          listingId,
+          publication: publication('listing-edit')
+        })
+      )
+    }
+    const db = database()
+    expectRefused(
+      db,
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, categorySlug: 'missing' },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['category'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    )
+    expect(() =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, name: ' ' },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['name'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    ).toThrow(/name cannot be empty/u)
   })
 })

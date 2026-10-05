@@ -113,6 +113,7 @@ interface DetailRow extends SummaryRow {
 
 interface UnpublishedRow {
   category: string | null
+  category_name: string | null
   name: string
   slug: string
 }
@@ -1031,7 +1032,14 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
           JOIN categories c ON c.id = lc.category_id
           WHERE lc.listing_id = l.id AND lc.is_primary = 1 AND c.is_active = 1
           LIMIT 1
-        ) AS category
+        ) AS category,
+        (
+          SELECT c.name
+          FROM listing_categories lc
+          JOIN categories c ON c.id = lc.category_id
+          WHERE lc.listing_id = l.id AND lc.is_primary = 1 AND c.is_active = 1
+          LIMIT 1
+        ) AS category_name
       FROM listings l
       WHERE l.slug = ? AND l.status = 'approved' AND l.is_active = 0
         AND l.published_at IS NOT NULL
@@ -1043,6 +1051,9 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     if (!row) return null
     return {
       category: row.category ? requireString(row.category, 'unpublished listing category') : null,
+      categoryName: row.category_name
+        ? requireString(row.category_name, 'unpublished listing category name')
+        : null,
       name: requireString(row.name, 'unpublished listing name'),
       slug: requireString(row.slug, 'unpublished listing slug')
     }
