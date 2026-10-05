@@ -8,7 +8,7 @@ import { createAuthOperations } from '@serpdirectory/data-ops/auth'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import { SqliteD1 } from '@serpdirectory/data-ops/test-support'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { emailSender } from '../email/config'
+import { EMAIL_SENDER } from '../email/config'
 import { createAuth } from './config'
 import { selectOtpSender } from './otp-sender'
 import { OTP_EXPIRES_IN_SECONDS, OTP_LENGTH } from './rate-limits'
@@ -118,8 +118,8 @@ describe('sign-in codes on staging', () => {
     const headers = init?.headers as Record<string, string>
     expect(headers.authorization).toBe(`Bearer ${FAKE_USESEND_KEY}`)
     const sent = JSON.parse(String(init?.body)) as Record<string, string>
-    const sender = emailSender('staging')
-    expect(sent.from).toBe(`${sender.name} <${sender.email}>`)
+    expect(sent.from).toBe('SERP Directory <noreply@mail.serp.co>')
+    expect(sent.from).toBe(`${EMAIL_SENDER.name} <${EMAIL_SENDER.email}>`)
     expect(sent.to).toBe('devin@serp.co')
     const code = /^\[staging\] (\d+) is your SERP sign-in code$/u.exec(sent.subject ?? '')?.[1]
     expect(code).toMatch(new RegExp(`^\\d{${OTP_LENGTH}}$`, 'u'))

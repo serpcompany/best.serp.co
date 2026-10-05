@@ -109,10 +109,10 @@ export type SiteDefinition = {
      */
     dashboardPath: string
     /**
-     * The sender per deployed environment, each on a domain verified in useSend; local logs
-     * use the staging one. Sent with no Reply-To.
+     * The sender in every environment (staging and production send from the same domain
+     * verified in useSend; local logs show it). Sent with no Reply-To.
      */
-    from: { name: string; production: string; staging: string }
+    from: { address: string; name: string }
   }
   features: SiteFeatureFlags
   id: string

@@ -114,10 +114,7 @@ describe('email delivery', () => {
       'https://best-serp-co-staging.serpcompany.workers.dev/products/autoenhance.ai/'
     )
     expect(sender.sent[0]?.to).toBe('owner@serp.co')
-    expect(sender.sent[0]?.from).toEqual({
-      email: 'noreply@mail-staging.serp.co',
-      name: 'SERP Directory'
-    })
+    expect(sender.sent[0]?.from).toEqual({ email: 'noreply@mail.serp.co', name: 'SERP Directory' })
     expect(logs.find(entry => entry.event === 'email_skipped')).toMatchObject({
       eventKey: 'fixture:blocked',
       level: 'warn',
@@ -452,13 +449,9 @@ describe('Worker email service', () => {
     return logs
   }
 
-  it('sends through useSend from each environment’s own domain, with no Reply-To', async () => {
+  it('sends through useSend from mail.serp.co in staging and production, with no Reply-To', async () => {
     const cases = [
-      [
-        staging,
-        'SERP Directory <noreply@mail-staging.serp.co>',
-        '[staging] Fixture: Secret body text'
-      ],
+      [staging, 'SERP Directory <noreply@mail.serp.co>', '[staging] Fixture: Secret body text'],
       [production, 'SERP Directory <noreply@mail.serp.co>', 'Fixture: Secret body text']
     ] as const
     for (const [vars, from, subject] of cases) {
@@ -493,7 +486,7 @@ describe('Worker email service', () => {
     const logged = JSON.parse(String(info.mock.calls[0]?.[0])) as Record<string, unknown>
     expect(logged).toMatchObject({
       event: 'email_logged',
-      from: 'SERP Directory <noreply@mail-staging.serp.co>',
+      from: 'SERP Directory <noreply@mail.serp.co>',
       subject: 'Fixture: Secret body text',
       text: 'Secret body text\n\nhttp://localhost:8787/products/autoenhance.ai/\n\nhttp://localhost:8787/account/',
       to: 'owner@serp.co'

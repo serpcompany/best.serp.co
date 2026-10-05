@@ -3,9 +3,10 @@
 best.serp.co sends transactional email through [useSend](https://usesend.com) (open source,
 backed by Amazon SES), using the hosted instance at `https://app.usesend.com`. This replaces
 the "Cloudflare Email Sending" choice in serpcompany/best.serp.co#59 (owner decision). Staging
-sends from `SERP Directory <noreply@mail-staging.serp.co>`, production from
-`SERP Directory <noreply@mail.serp.co>`, both with **no Reply-To**. Dedicated sending
-subdomains keep this mail's reputation separate from `serp.co`.
+and production both send from `SERP Directory <noreply@mail.serp.co>`, with **no Reply-To**
+(owner decision: the staging useSend key is restricted to `mail.serp.co`). Staging mail is
+marked by a `[staging]` subject prefix and goes only to its allowlist. The dedicated sending
+subdomain keeps this mail's reputation separate from `serp.co`.
 
 Nothing receives mail for these emails. Receiving at a best.serp.co address would break
 serp.co's Gmail MX, and `support@serp.co` is not used. So every footer says the address isn't
@@ -31,15 +32,15 @@ Worker handler outside Next.js.
 | `registry.ts` | The site's 18 emails, built to #70; catalog in [Email templates](./EMAIL_TEMPLATES.md) |
 
 The idempotency ledger lives in `packages/data-ops/src/email-deliveries.ts` (table
-`email_deliveries`), like every other SQL statement. Senders and the dashboard path come from
-`packages/site-config` (`email.from`, `email.dashboardPath`).
+`email_deliveries`), like every other SQL statement. The sender and the dashboard paths come
+from `packages/site-config` (`email.from`, `email.dashboardPath`, `email.adminDashboardPath`).
 
 ## Environments
 
 | | local | staging | production |
 |---|---|---|---|
 | Delivery | written to the Worker log, never sent | useSend API | useSend API |
-| From | (logged as the staging sender) | `noreply@mail-staging.serp.co` | `noreply@mail.serp.co` |
+| From | (logged as `noreply@mail.serp.co`) | `noreply@mail.serp.co` | `noreply@mail.serp.co` |
 | Recipients | anyone (logged only) | only `EMAIL_STAGING_ALLOWLIST` | anyone |
 | Subject | as rendered | `[staging] ` + subject | as rendered |
 | Link origin | `http://localhost:8787` | `https://best-serp-co-staging.serpcompany.workers.dev` | `https://best.serp.co` |
@@ -223,25 +224,23 @@ before they are done is safe: email is then disabled and logged.
    `best-serp-co-staging` and `best-serp-co-production`
    (`wrangler secret put USESEND_API_KEY --env staging` and `--env production`, from
    `apps/web`). Rotate a key the same way.
-   - **To do: restrict each key to its own sending domain** in useSend (API keys can be limited
-     to one domain): the staging key to `mail-staging.serp.co`, the production key to
-     `mail.serp.co`. Then a misconfigured staging Worker can never send as `mail.serp.co`. This
-     is the platform-level guard behind the staging allowlist.
+   - **Restrict each key to `mail.serp.co`**, the only sending domain, in useSend (API keys can
+     be limited to one domain). The staging key is. Because staging and production share the
+     domain, what keeps a staging Worker from emailing real people is `EMAIL_STAGING_ALLOWLIST`;
+     the `[staging]` prefix and environment-scoped idempotency keys keep its mail apart.
 2. **Done: `USESEND_BASE_URL`.** The owner chose the hosted instance; `apps/web/wrangler.jsonc`
    sets it to `https://app.usesend.com` for both environments.
-3. **Confirm both sending domains are verified** in app.usesend.com → Domains:
-   - `mail.serp.co`, with DKIM at `usesend._domainkey.mail.serp.co` and SES MAIL FROM
-     `mail.mail.serp.co`;
-   - `mail-staging.serp.co`.
+3. **Confirm the sending domain is verified** in app.usesend.com → Domains: `mail.serp.co`,
+   with DKIM at `usesend._domainkey.mail.serp.co` and SES MAIL FROM `mail.mail.serp.co`.
 4. **Verify DKIM and DMARC** once staging is deployed and the first template (#60's sign-in
    code) sends to an allowlisted inbox. In Gmail, open the message → Show original. It must
-   show `SPF: PASS`, `DKIM: 'PASS'` with domain `mail-staging.serp.co` (production:
-   `mail.serp.co`), and `DMARC: 'PASS'`.
+   show `SPF: PASS`, `DKIM: 'PASS'` with domain `mail.serp.co`, and `DMARC: 'PASS'`. Both
+   environments send from that domain, so this also checks production's signing.
 
 **DMARC.** `serp.co` publishes one record, `v=DMARC1; p=reject; rua=...; ruf=...; fo=1;`, with
-no `sp=`. `mail.serp.co` and `mail-staging.serp.co` have no `_dmarc` record of their own, so
-they inherit `p=reject` with the reports, and no separate record is needed. useSend signs with
-DKIM `d=mail.serp.co` (staging: `d=mail-staging.serp.co`), which aligns with the From domain.
+no `sp=`. `mail.serp.co` has no `_dmarc` record of its own, so it inherits `p=reject` with the
+reports, and no separate record is needed. useSend signs with DKIM `d=mail.serp.co` in both
+environments, which aligns with the From domain.
 The SES MAIL FROM `mail.mail.serp.co` aligns SPF under relaxed alignment. Under `p=reject`, a
 message that fails both is rejected, so check step 4 before production sends.
 
