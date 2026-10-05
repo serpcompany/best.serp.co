@@ -25,6 +25,13 @@ vi.mock('@next/mdx', () => ({ default: () => (config: unknown) => config }))
 // Runtime modules of the layout and pages (fonts, auth, D1); their metadata does not use them.
 vi.mock('@serpdirectory/design-system/lib/fonts', () => ({ fonts: '' }))
 vi.mock('@/lib/auth/header-state', () => ({ getHeaderAuthState: async () => null }))
+vi.mock('@/components/auth/sign-out-button', () => ({
+  DrawerSignOutButton: () => null,
+  HeaderSignOutButton: () => null
+}))
+vi.mock('@/components/layout/public-chrome', () => ({
+  PublicChrome: ({ children }: { children: unknown }) => children
+}))
 vi.mock('@/lib/catalog/repository', () => ({ getActiveCategories: async () => [] }))
 vi.mock('@/lib/environment/request-environment', () => ({
   googleTagManagerIdForRequest: async () => undefined

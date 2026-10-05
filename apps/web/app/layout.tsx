@@ -6,6 +6,8 @@ import { Header } from '@serpdirectory/web-core/layout/header'
 import { RootAppShell, rootLayoutMetadata } from '@serpdirectory/web-core/root-shell'
 import { siteConfig } from '@serpdirectory/web-core/site-config'
 import { siteCopy } from '@serpdirectory/web-core/site-copy'
+import { DrawerSignOutButton, HeaderSignOutButton } from '@/components/auth/sign-out-button'
+import { PublicChrome } from '@/components/layout/public-chrome'
 import { getHeaderAuthState } from '@/lib/auth/header-state'
 import { getActiveCategories } from '@/lib/catalog/repository'
 import { googleTagManagerIdForRequest } from '@/lib/environment/request-environment'
@@ -31,9 +33,22 @@ export default async function RootLayout({ children }: RootLayoutProps): Promise
     <RootAppShell
       bodyClassName={fonts}
       feedTitle={`${siteConfig.name} - New ${siteCopy.listingName.pluralTitle}`}
-      footer={<Footer />}
+      footer={
+        <PublicChrome>
+          <Footer />
+        </PublicChrome>
+      }
       gtmId={gtmId}
-      header={<Header activeCategorySlugs={activeCategorySlugs} authState={authState} />}
+      header={
+        <PublicChrome>
+          <Header
+            activeCategorySlugs={activeCategorySlugs}
+            authState={authState}
+            desktopSignOutButton={<HeaderSignOutButton />}
+            mobileSignOutButton={<DrawerSignOutButton />}
+          />
+        </PublicChrome>
+      }
     >
       {children}
     </RootAppShell>

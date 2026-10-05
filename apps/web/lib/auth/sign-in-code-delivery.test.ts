@@ -6,6 +6,7 @@
  */
 import { createAuthOperations } from '@serpdirectory/data-ops/auth'
 import { createDatabase } from '@serpdirectory/data-ops/client'
+import { pruneEmailDeliveries } from '@serpdirectory/data-ops/email-deliveries'
 import { SqliteD1 } from '@serpdirectory/data-ops/test-support'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EMAIL_SENDER } from '../email/config'
@@ -13,7 +14,7 @@ import { createAuth } from './config'
 import { selectOtpSender } from './otp-sender'
 import { OTP_EXPIRES_IN_SECONDS, OTP_LENGTH } from './rate-limits'
 import { resolveAuthSettings } from './settings'
-import { signInCodeEmail } from './sign-in-code-email'
+import { createSignInCodeEmail } from './sign-in-code-email'
 
 const { getCloudflareContext } = vi.hoisted(() => ({ getCloudflareContext: vi.fn() }))
 
@@ -23,6 +24,12 @@ vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext }))
 const STAGING_ORIGIN = 'https://best-serp-co-staging.serpcompany.workers.dev'
 const SECRET = 'test-secret-'.repeat(4)
 const FAKE_USESEND_KEY = 'us_fake_key_for_tests'
+
+/** The bridge as `server.ts` builds it, for checks that send nothing. */
+const signInCodeEmail = createSignInCodeEmail({
+  afterResponse: async () => undefined,
+  pruneStale: async () => 0
+})
 
 interface Staging {
   auth: ReturnType<typeof createAuth>
@@ -65,7 +72,17 @@ function staging(allowlist: string, overrides: EmailOverrides = {}): Staging {
     auth: createAuth({
       client,
       operations: createAuthOperations({ client, rateLimitKey: SECRET }),
-      sender: selectOtpSender(settings.environment, signInCodeEmail),
+      // Wired like server.ts: the prune runs on the same D1, after the response.
+      sender: selectOtpSender(
+        settings.environment,
+        createSignInCodeEmail({
+          afterResponse: async task => {
+            pending.push(task)
+          },
+          pruneStale: ({ before, limit }) =>
+            pruneEmailDeliveries(client, { before, limit, templateId: 'sign-in-code' })
+        })
+      ),
       settings
     }),
     fetch: fakeFetch,

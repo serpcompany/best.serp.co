@@ -1,8 +1,8 @@
 # Accounts and admin access
 
-Decisions: serpcompany/best.serp.co#59. Implementation: #60 (this backend), with the sign-in
-screens, `/account`, and the header's signed-in state following the mockups approved in #70.
-Sign-in code email is #61.
+Decisions: serpcompany/best.serp.co#59. Implementation: #60, with the sign-in screens,
+`/account`, and the header's signed-in state built to the mockups approved in #70. Sign-in code
+email is #61.
 
 ## Shape
 
@@ -28,6 +28,7 @@ Sign-in code email is #61.
 | `requireUser()` / `requireAdmin()` | `apps/web/lib/auth/{guards,server}.ts` |
 | Worker gate: Access JWT and session cookie | `apps/web/lib/auth/{admin-gate,cloudflare-access}.ts` |
 | Endpoints | `apps/web/app/api/auth/[...all]/route.ts` (`/api/auth/*`) |
+| `/login`, `/account`, header sign-out | `apps/web/app/{login,account}/page.tsx`, `apps/web/components/{auth,account}/` |
 
 ## Sign-in over HTTP
 
@@ -94,6 +95,11 @@ site can plant one that the browser sends first), and any that verifies counts.
   per email). Flooding past 300 codes an hour for new addresses pauses new sign-ups for up to
   an hour. That ceiling bounds the mail (cost and sender reputation) and never applies to
   existing accounts. Neither limit tells the requester that it applied.
+- **Timing (accepted).** A request a per-email limit denies skips Better Auth's code insert
+  and user lookup, so it can answer measurably faster than a sent one, and two requests from
+  two clients might still tell a member from a new email by latency. This is accepted: every
+  probe spends the email's own budget (1 a minute, 5 an hour for a new email), which rations
+  the probes, and the answer itself never differs.
 
 Rate-limit rows hold HMAC-SHA256 digests under a key derived from `BETTER_AUTH_SECRET`
 (`HMAC(secret, "best.serp.co/auth-rate-limit/v1")`, `keys.ts`), never an email or address.
@@ -114,10 +120,41 @@ request, before any limit is counted (`emailDeliveryConfigured`: matching enviro
 `DB` binding, a valid `USESEND_BASE_URL` and `USESEND_API_KEY`). So a rotated or missing key
 stops sign-in visibly instead of issuing codes that never arrive.
 
+Every code adds an `email_deliveries` row, so each send also deletes up to 20 `sign-in-code`
+rows older than 24 hours (the provider's idempotency window), oldest first, with one prepared
+statement (`pruneEmailDeliveries`), until #66 adds a scheduled job. Like the email, the prune
+runs after the response (`waitUntil`), so it never delays a code request or widens the timing
+gap above.
+
 On staging, a code for an address outside `EMAIL_STAGING_ALLOWLIST` is skipped
 (`email_skipped`) while the request answers 200 like any other, so testers must be on the
 allowlist to receive codes. `sign-in-code-delivery.test.ts` runs a staging code request
 through Better Auth, the email module, and the D1 ledger with a fake `fetch`.
+
+## Screens
+
+`showAuth` is on (`packages/site-config/src/site.ts`). Signed out, the header offers "Sign up /
+Sign in"; signed in, "Account" and "Sign out" (desktop) or the mobile menu's Account and Sign
+out. Sign-out posts to `/api/auth/sign-out` and reloads. The header reads a session only when
+the request carries a session cookie, so anonymous pages never load Better Auth or read D1.
+
+- **`/login`** (`components/auth/login-card.tsx`, shadcn login-01): email, then the code
+  (InputOTP), then "You're signed in" and a redirect to `?callbackUrl=` (a path on this site,
+  else `/account/`; `lib/auth/callback-url.ts`, which checks the path after normalization). The code step says a code is on its way *if*
+  the address is valid, because a per-email limit answers like a sent code. It counts wrong
+  guesses locally (only this browser can guess its code). After a resend that a per-email limit
+  may have dropped, it shows no count and lets the server's `TOO_MANY_ATTEMPTS` end the code. A
+  full code is sent as soon as it is typed, pasted, or autofilled, but never the one just
+  rejected. It shows the expired, too-many-codes, per-client 429 (with
+  `Retry-After`), and 503 `OTP_DELIVERY_UNAVAILABLE` (email delivery not configured) states. Its
+  code length, lifetime, and attempts come from `lib/email/sign-in-code.ts`, like Better Auth's.
+- **`/account`** (`components/account/account-shell.tsx`, shadcn dashboard-01): the sidebar
+  shell without the public header and footer, the user's email and sign-out, and the empty
+  overview. Signed out, it redirects to `/login?callbackUrl=/account/`. Its other pages are #65,
+  so their sidebar entries are disabled.
+
+Both pages are noindex and bypass the edge cache. `apps/e2e/tests/login.spec.ts` covers them
+in a browser.
 
 ## Admin gate
 

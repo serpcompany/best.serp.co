@@ -55,7 +55,12 @@ function DirectoryProductCard({
   contentClassName
 }: DirectoryProductCardProps) {
   return (
-    <Card className={cn('relative h-full rounded-none border-border/50 p-4', className)}>
+    <Card
+      className={cn(
+        'relative h-full rounded-none border-border/50 p-4 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-foreground/10 hover:shadow-lg',
+        className
+      )}
+    >
       <CardContent className={cn('flex h-full flex-col gap-1.5 p-0', contentClassName)}>
         <div className="flex items-start justify-between">
           {media}

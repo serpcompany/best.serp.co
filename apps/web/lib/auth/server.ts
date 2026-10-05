@@ -15,6 +15,7 @@ import 'server-only'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { createAuthOperations } from '@serpdirectory/data-ops/auth'
 import { createDatabase } from '@serpdirectory/data-ops/client'
+import { pruneEmailDeliveries } from '@serpdirectory/data-ops/email-deliveries'
 import { headers } from 'next/headers'
 import { forbidden, unauthorized } from 'next/navigation'
 import { cache } from 'react'
@@ -28,7 +29,7 @@ import {
   type SessionUser
 } from './guards'
 import { deriveKey, RATE_LIMIT_KEY_LABEL } from './keys'
-import { selectOtpSender } from './otp-sender'
+import { SIGN_IN_CODE_TEMPLATE_ID, selectOtpSender } from './otp-sender'
 import {
   AuthConfigurationError,
   type AuthEnv,
@@ -36,7 +37,7 @@ import {
   isTrustedOrigin,
   resolveAuthSettings
 } from './settings'
-import { signInCodeEmail } from './sign-in-code-email'
+import { createSignInCodeEmail } from './sign-in-code-email'
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
@@ -85,7 +86,17 @@ export async function getAccountRuntime(): Promise<AccountRuntime> {
     auth: createAuth({
       client,
       operations,
-      sender: selectOtpSender(settings.environment, signInCodeEmail),
+      sender: selectOtpSender(
+        settings.environment,
+        createSignInCodeEmail({
+          afterResponse: async task => {
+            const { ctx } = await getCloudflareContext({ async: true })
+            ctx.waitUntil(task)
+          },
+          pruneStale: ({ before, limit }) =>
+            pruneEmailDeliveries(client, { before, limit, templateId: SIGN_IN_CODE_TEMPLATE_ID })
+        })
+      ),
       settings
     }),
     operations,
