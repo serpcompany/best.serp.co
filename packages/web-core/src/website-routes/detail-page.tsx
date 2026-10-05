@@ -42,7 +42,8 @@ type WebsiteHeroProps = {
 type WebsiteDetailSidebarWebsite = Pick<
   WebsiteDetailMetadata,
   'category' | 'categories' | 'name' | 'publishedAt' | 'slug' | 'website'
->
+> &
+  Required<Pick<WebsiteDetailMetadata, 'linkRel'>>
 
 type WebsiteDetailSidebarProps = {
   website: WebsiteDetailSidebarWebsite
@@ -171,6 +172,8 @@ export function WebsiteDetailRoutePage({
     slug: project.slug,
     name: project.name,
     website: project.website,
+    // D1 details always carry the setting; a missing one fails safe to nofollow.
+    linkRel: project.linkRel ?? 'nofollow',
     category: project.category,
     publishedAt: project.publishedAt,
     ...(project.categories?.length ? { categories: project.categories } : {})

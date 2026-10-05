@@ -185,7 +185,7 @@ describe('shared catalog data operations', () => {
     expect(after.listingCount).toBe(6)
     expect(after.publicationVersion).toBe(before.publicationVersion)
     expect((await later.getListingNamePage()).items.map(item => item.slug)).toContain('future')
-    expect([...cache.values.keys()]).toContain('catalog-shell:v3:1.2027-01-01T00:00:00.000Z')
+    expect([...cache.values.keys()]).toContain('catalog-shell:v4:1.2027-01-01T00:00:00.000Z')
   })
 
   it('reads the catalog epoch for the Worker edge cache with query telemetry', async () => {
@@ -268,14 +268,14 @@ describe('shared catalog data operations', () => {
       )
     ).toHaveLength(1)
     expect([...cache.values.keys()].sort()).toEqual([
-      `catalog-shell:v3:${epoch(1)}`,
-      `catalog-shell:v3:${epoch(2)}`
+      `catalog-shell:v4:${epoch(1)}`,
+      `catalog-shell:v4:${epoch(2)}`
     ])
   })
 
   it('falls back to live D1 when cached shell data is corrupt or unavailable', async () => {
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-shell:v3:${epoch(1)}`, { featuredCount: 'wrong' })
+    corrupt.values.set(`catalog-shell:v4:${epoch(1)}`, { featuredCount: 'wrong' })
     const corruptCatalog = operations(corrupt)
     expect((await corruptCatalog.operations.getShellStats()).featuredCount).toBe(2)
     expect(corruptCatalog.events).toContainEqual({
@@ -387,8 +387,8 @@ describe('shared catalog data operations', () => {
     ).toHaveLength(2)
 
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-published:v3:${epoch(2)}`, { items: 'wrong' })
-    corrupt.values.set(`catalog-detail:v3:${epoch(2)}:charlie`, { detail: 'wrong' })
+    corrupt.values.set(`catalog-published:v4:${epoch(2)}`, { items: 'wrong' })
+    corrupt.values.set(`catalog-detail:v4:${epoch(2)}:charlie`, { detail: 'wrong' })
     const recovered = operations(corrupt)
     expect(await recovered.operations.getPublishedListings()).toHaveLength(5)
     expect((await recovered.operations.getListingBySlug('charlie'))?.slug).toBe('charlie')
@@ -421,5 +421,61 @@ describe('shared catalog data operations', () => {
     expect(queryEvent).not.toHaveProperty('sql')
     expect(queryEvent).not.toHaveProperty('bindings')
     expect(queryEvent).not.toHaveProperty('requestId')
+  })
+})
+
+describe('listing link rel, verified owner, and unpublished state (#62)', () => {
+  function catalogFor(sqlite: SqliteD1) {
+    return createCatalogOperations({
+      cache: new MemoryCatalogCache(),
+      client: createDatabase(sqlite.asD1Database()),
+      clock: now,
+      observe: () => {}
+    })
+  }
+
+  function seeded(): SqliteD1 {
+    const sqlite = new SqliteD1()
+    seedContractFixture(sqlite)
+    sqlite.database.exec(`
+      INSERT INTO users (id, name, email) VALUES ('owner', 'Owner', 'owner@example.com');
+      UPDATE listings SET link_rel = 'sponsored' WHERE slug = 'delta';
+      INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+        VALUES ('serp-delta', 'owner', 'badge_claim', '2026-07-01T00:00:00.000Z');
+      UPDATE listings SET is_active = 0 WHERE slug = 'echo';
+    `)
+    return sqlite
+  }
+
+  it('renders listings as follow by default and derives the owner badge from listing_owners', async () => {
+    const sqlite = seeded()
+    const catalog = catalogFor(sqlite)
+    const charlie = await catalog.getListingBySlug('charlie')
+    expect(charlie).toMatchObject({ linkRel: 'follow' })
+    expect(charlie?.verifiedOwner).toBeUndefined()
+    expect(await catalog.getListingBySlug('delta')).toMatchObject({
+      linkRel: 'sponsored',
+      verifiedOwner: true
+    })
+
+    sqlite.database.exec(
+      "UPDATE listing_owners SET revoked_at = '2026-07-02', revoked_reason = 'badge_removed'"
+    )
+    expect((await catalogFor(sqlite).getListingBySlug('delta'))?.verifiedOwner).toBeUndefined()
+  })
+
+  it('tells an unpublished listing (410) from a live, scheduled, or unknown slug', async () => {
+    const catalog = catalogFor(seeded())
+    expect(await catalog.getListingBySlug('echo')).toBeNull()
+    expect(await catalog.getUnpublishedListing('echo')).toEqual({
+      category: 'primary',
+      name: 'echo listing',
+      slug: 'echo'
+    })
+    for (const slug of ['charlie', 'future', 'missing']) {
+      expect(await catalog.getUnpublishedListing(slug), slug).toBeNull()
+    }
+    expect((await catalog.getPublishedListings()).map(item => item.slug)).not.toContain('echo')
+    expect(await catalog.searchListings('echo')).toEqual([])
   })
 })

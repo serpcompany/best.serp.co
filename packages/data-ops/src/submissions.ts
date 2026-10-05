@@ -1,6 +1,6 @@
 import { isValidAssetReference } from '@serpdirectory/utils/asset-reference'
 import { hasFileExtension } from '@serpdirectory/utils/file-extensions'
-import { and, eq, or, sql } from 'drizzle-orm'
+import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
 import { validatePublicHttpUrl } from './public-url'
@@ -12,7 +12,9 @@ import {
   listingSubmissionRateLimits,
   listingSubmissionResourceLinks,
   listingSubmissions,
-  listings
+  listingSubmissionUrlBlocks,
+  listings,
+  type SubmissionStatus
 } from './schema'
 import { assertPreviousStatementChangedOne } from './submission-plans'
 
@@ -62,7 +64,7 @@ export interface SubmissionState {
   lastVerificationError: string | null
   name: string
   slug: string
-  status: 'approved' | 'pending_badge' | 'rejected' | 'verified'
+  status: SubmissionStatus
   verificationAttempts: number
   website: string
 }
@@ -207,6 +209,8 @@ export function buildSubmissionReviewPreview(
       logo,
       ...(video ? { video } : {})
     },
+    // New submissions are listed with a nofollow outbound link (#59); preview it that way.
+    linkRel: 'nofollow',
     name: requiredTrimmedText(row.name, 'name'),
     nextWebsite: null,
     previousWebsite: null,
@@ -291,7 +295,7 @@ export function createSubmissionOperations(config: {
           'This website address cannot be listed: it ends in a file extension.'
         )
       }
-      const [category, existing] = await Promise.all([
+      const [category, existing, blocked] = await Promise.all([
         queryFirst(
           client.database
             .select({ id: categories.id })
@@ -305,11 +309,32 @@ export function createSubmissionOperations(config: {
             .from(listings)
             .where(or(eq(listings.slug, slug), eq(listings.website, input.website)))
             .limit(1)
+        ),
+        // A prohibited rejection blocks the URL key until an admin lifts it (DATA_MODEL.md);
+        // the `listing_submissions_refuse_blocked_url` trigger enforces the same rule.
+        queryFirst(
+          client.database
+            .select({ id: listingSubmissionUrlBlocks.id })
+            .from(listingSubmissionUrlBlocks)
+            .where(
+              and(
+                eq(listingSubmissionUrlBlocks.urlKey, slug),
+                isNull(listingSubmissionUrlBlocks.liftedAt)
+              )
+            )
+            .limit(1)
         )
       ])
       if (!category) throw new SubmissionError('invalid_category', 'Choose an active category.')
       if (existing)
         throw new SubmissionError('listing_exists', 'This website is already listed.', 409)
+      if (blocked) {
+        throw new SubmissionError(
+          'url_blocked',
+          'This website cannot be submitted. Contact support if you think this is a mistake.',
+          403
+        )
+      }
 
       const id = crypto.randomUUID()
       const tokenBytes = new Uint8Array(32)
@@ -327,7 +352,10 @@ export function createSubmissionOperations(config: {
             id,
             logoUrl: input.logoUrl,
             name: input.name,
+            // The legacy capability flow is the free badge flow; it predates drafts (#63).
+            plan: 'free',
             slug,
+            status: 'pending_badge',
             videoUrl: input.videoUrl || null,
             website: input.website
           })

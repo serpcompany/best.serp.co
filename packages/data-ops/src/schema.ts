@@ -12,6 +12,102 @@ import {
 
 const currentTimestamp = sql`CURRENT_TIMESTAMP`
 const booleanCheck = (column: { name: string }) => sql`${sql.identifier(column.name)} IN (0, 1)`
+const sqlList = (values: readonly string[]) => sql.raw(values.map(value => `'${value}'`).join(', '))
+
+/**
+ * Who added a listing (serpcompany/best.serp.co#62). `admin` covers the imported catalog and
+ * publication manifests; `submission` is a listing promoted from `listing_submissions`.
+ */
+export const listingSources = ['admin', 'submission'] as const
+export type ListingSource = (typeof listingSources)[number]
+
+/** The `rel` of our outbound link to the listing's website, an admin setting per listing. */
+export const listingLinkRels = ['follow', 'nofollow', 'sponsored'] as const
+export type ListingLinkRel = (typeof listingLinkRels)[number]
+
+/**
+ * Submission lifecycle (docs/SUBMISSION_FLOW.md). `draft` is saved with no plan chosen yet
+ * (or paid chosen and checkout not completed); `pending_badge` means free was chosen and the
+ * badge is not verified yet. `verified` and `paid_pending_review` are the review queue;
+ * `paid_pending_review` is the only queue state whose listing is already live.
+ */
+export const submissionStatuses = [
+  'draft',
+  'pending_badge',
+  'verified',
+  'paid_pending_review',
+  'changes_requested',
+  'approved',
+  'rejected',
+  'withdrawn'
+] as const
+export type SubmissionStatus = (typeof submissionStatuses)[number]
+
+/** Statuses that hold the submission's normalized URL key against duplicates. */
+export const activeSubmissionStatuses = [
+  'draft',
+  'pending_badge',
+  'verified',
+  'paid_pending_review',
+  'changes_requested'
+] as const satisfies readonly SubmissionStatus[]
+
+export const submissionPlans = ['free', 'paid'] as const
+export type SubmissionPlan = (typeof submissionPlans)[number]
+
+/** `prohibited` (by the Terms: no refund, URL blocked) or `other` (refund, may resubmit). */
+export const rejectionCategories = ['prohibited', 'other'] as const
+export type RejectionCategory = (typeof rejectionCategories)[number]
+
+export const submissionEventTypes = [
+  'created',
+  'verification_failed',
+  'badge_verified',
+  'approved',
+  'rejected',
+  'edited',
+  'resubmitted',
+  'changes_requested',
+  'withdrawn',
+  'paid',
+  'refunded',
+  'unpublished',
+  'plan_chosen'
+] as const
+export type SubmissionEventType = (typeof submissionEventTypes)[number]
+
+export const listingOwnerRoles = ['owner'] as const
+export const listingOwnerVerifications = ['submission', 'badge_claim', 'paid_claim'] as const
+export type ListingOwnerVerification = (typeof listingOwnerVerifications)[number]
+
+export const revisionStatuses = [
+  'pending_review',
+  'changes_requested',
+  'approved',
+  'rejected',
+  'withdrawn'
+] as const
+export type RevisionStatus = (typeof revisionStatuses)[number]
+
+/** A listing has at most one revision in these statuses. */
+export const openRevisionStatuses = [
+  'pending_review',
+  'changes_requested'
+] as const satisfies readonly RevisionStatus[]
+
+export const revisionEventTypes = [
+  'created',
+  'edited',
+  'changes_requested',
+  'resubmitted',
+  'withdrawn',
+  'approved',
+  'rejected'
+] as const
+export type RevisionEventType = (typeof revisionEventTypes)[number]
+
+export const badgeCheckOutcomes = ['pass', 'fail'] as const
+export type BadgeCheckOutcome = (typeof badgeCheckOutcomes)[number]
 
 export const categories = sqliteTable(
   'categories',
@@ -56,10 +152,14 @@ export const listings = sqliteTable(
     checksum: text('checksum').notNull(),
     createdAt: text('created_at').notNull().default(currentTimestamp),
     updatedAt: text('updated_at').notNull().default(currentTimestamp),
-    displayOrder: integer('display_order').notNull().default(0)
+    displayOrder: integer('display_order').notNull().default(0),
+    source: text('source', { enum: listingSources }).notNull().default('admin'),
+    linkRel: text('link_rel', { enum: listingLinkRels }).notNull().default('follow')
   },
   table => [
     unique('listings_slug_unique').on(table.slug),
+    check('listings_source_valid', sql`${table.source} IN (${sqlList(listingSources)})`),
+    check('listings_link_rel_valid', sql`${table.linkRel} IN (${sqlList(listingLinkRels)})`),
     check(
       'listings_priority_valid',
       sql`${table.priority} IS NULL OR ${table.priority} IN ('high', 'medium', 'low')`
@@ -274,12 +374,9 @@ export const listingSubmissions = sqliteTable(
     categorySlug: text('category_slug').notNull(),
     logoUrl: text('logo_url').notNull(),
     videoUrl: text('video_url'),
-    status: text('status', {
-      enum: ['pending_badge', 'verified', 'approved', 'rejected']
-    })
-      .notNull()
-      .default('pending_badge'),
-    accessTokenHash: text('access_token_hash').notNull(),
+    status: text('status', { enum: submissionStatuses }).notNull().default('draft'),
+    /** Digest of the legacy anonymous capability; signed-in submissions (#63) carry none. */
+    accessTokenHash: text('access_token_hash'),
     verificationAttempts: integer('verification_attempts').notNull().default(0),
     lastVerificationAt: text('last_verification_at'),
     lastVerificationError: text('last_verification_error'),
@@ -288,26 +385,84 @@ export const listingSubmissions = sqliteTable(
     reviewedBy: text('reviewed_by'),
     listingId: text('listing_id').references(() => listings.id, { onDelete: 'set null' }),
     createdAt: text('created_at').notNull().default(currentTimestamp),
-    updatedAt: text('updated_at').notNull().default(currentTimestamp)
+    updatedAt: text('updated_at').notNull().default(currentTimestamp),
+    ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'restrict' }),
+    /** The plan the submitter chose; null only while a draft has not chosen one. */
+    plan: text('plan', { enum: submissionPlans }),
+    paidAt: text('paid_at'),
+    refundedAt: text('refunded_at'),
+    reviewerNote: text('reviewer_note'),
+    rejectionReason: text('rejection_reason'),
+    rejectionCategory: text('rejection_category', { enum: rejectionCategories })
   },
   table => [
     unique('listing_submissions_token_unique').on(table.accessTokenHash),
     check(
       'listing_submissions_status_valid',
-      sql`${table.status} IN ('pending_badge', 'verified', 'approved', 'rejected')`
+      sql`${table.status} IN (${sqlList(submissionStatuses)})`
     ),
     check(
       'listing_submissions_verification_attempts_nonnegative',
       sql`${table.verificationAttempts} >= 0`
     ),
+    check(
+      'listing_submissions_plan_valid',
+      sql`${table.plan} IS NULL OR ${table.plan} IN (${sqlList(submissionPlans)})`
+    ),
+    check(
+      'listing_submissions_plan_chosen',
+      sql`${table.status} IN ('draft', 'withdrawn') OR ${table.plan} IS NOT NULL`
+    ),
+    check(
+      'listing_submissions_draft_unpaid',
+      sql`${table.status} != 'draft' OR (${table.paidAt} IS NULL AND ${table.listingId} IS NULL)`
+    ),
+    check(
+      'listing_submissions_pending_badge_free',
+      sql`${table.status} != 'pending_badge' OR ${table.plan} = 'free'`
+    ),
+    check(
+      'listing_submissions_payment_matches_plan',
+      sql`${table.paidAt} IS NULL OR ${table.plan} = 'paid' OR ${table.refundedAt} IS NOT NULL`
+    ),
+    check(
+      'listing_submissions_refund_after_payment',
+      sql`${table.refundedAt} IS NULL OR ${table.paidAt} IS NOT NULL`
+    ),
+    check(
+      'listing_submissions_verified_qualified',
+      sql`${table.status} != 'verified' OR ${table.plan} = 'free' OR ${table.paidAt} IS NOT NULL`
+    ),
+    check(
+      'listing_submissions_rejection_category_valid',
+      sql`${table.rejectionCategory} IS NULL OR ${table.rejectionCategory} IN (${sqlList(rejectionCategories)})`
+    ),
+    check(
+      'listing_submissions_rejection_complete',
+      sql`(${table.rejectionReason} IS NULL) = (${table.rejectionCategory} IS NULL)`
+    ),
+    check(
+      'listing_submissions_rejection_when_rejected',
+      sql`${table.rejectionCategory} IS NULL OR ${table.status} = 'rejected'`
+    ),
+    check(
+      'listing_submissions_live_review_paid',
+      sql`${table.status} != 'paid_pending_review' OR (${table.listingId} IS NOT NULL AND ${table.plan} = 'paid' AND ${table.paidAt} IS NOT NULL AND ${table.refundedAt} IS NULL)`
+    ),
     uniqueIndex('listing_submissions_active_slug_idx')
       .on(table.slug)
-      .where(sql`${table.status} IN ('pending_badge', 'verified')`),
+      .where(sql`${table.status} IN (${sqlList(activeSubmissionStatuses)})`),
     index('listing_submissions_review_queue_idx').on(
       table.status,
       table.badgeVerifiedAt,
       table.createdAt
-    )
+    ),
+    index('listing_submissions_owner_idx')
+      .on(table.ownerUserId, table.createdAt)
+      .where(sql`${table.ownerUserId} IS NOT NULL`),
+    index('listing_submissions_listing_idx')
+      .on(table.listingId)
+      .where(sql`${table.listingId} IS NOT NULL`)
   ]
 )
 
@@ -356,9 +511,7 @@ export const listingSubmissionEvents = sqliteTable(
     submissionId: text('submission_id')
       .notNull()
       .references(() => listingSubmissions.id, { onDelete: 'cascade' }),
-    eventType: text('event_type', {
-      enum: ['created', 'verification_failed', 'badge_verified', 'approved', 'rejected']
-    }).notNull(),
+    eventType: text('event_type', { enum: submissionEventTypes }).notNull(),
     detail: text('detail'),
     actor: text('actor').notNull(),
     createdAt: text('created_at').notNull().default(currentTimestamp)
@@ -366,7 +519,7 @@ export const listingSubmissionEvents = sqliteTable(
   table => [
     check(
       'listing_submission_events_type_valid',
-      sql`${table.eventType} IN ('created', 'verification_failed', 'badge_verified', 'approved', 'rejected')`
+      sql`${table.eventType} IN (${sqlList(submissionEventTypes)})`
     ),
     index('listing_submission_events_submission_idx').on(table.submissionId, table.createdAt)
   ]
@@ -595,9 +748,225 @@ export const authRateLimitHits = sqliteTable(
   ]
 )
 
+/**
+ * A prohibited rejection blocks its normalized URL key (today the submission slug: the
+ * lowercase hostname without `www.`) from any new submission, free or paid, until an admin
+ * lifts the block (#59 owner amendment, 2026-10-06). The trigger
+ * `listing_submissions_refuse_blocked_url` enforces it. Lifting keeps the row as history.
+ */
+export const listingSubmissionUrlBlocks = sqliteTable(
+  'listing_submission_url_blocks',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    urlKey: text('url_key').notNull(),
+    submissionId: text('submission_id').references(() => listingSubmissions.id, {
+      onDelete: 'set null'
+    }),
+    reason: text('reason').notNull(),
+    blockedBy: text('blocked_by').notNull(),
+    blockedAt: text('blocked_at').notNull(),
+    liftedAt: text('lifted_at'),
+    liftedBy: text('lifted_by'),
+    liftNote: text('lift_note')
+  },
+  table => [
+    check(
+      'listing_submission_url_blocks_lift_complete',
+      sql`(${table.liftedAt} IS NULL) = (${table.liftedBy} IS NULL)`
+    ),
+    uniqueIndex('listing_submission_url_blocks_active_idx')
+      .on(table.urlKey)
+      .where(sql`${table.liftedAt} IS NULL`)
+  ]
+)
+
+/**
+ * Who owns a listing. One current `owner` per listing (a partial unique index); revoking keeps
+ * the row with `revoked_at`, so the table is also the ownership history. Further roles can be
+ * added for teams. The public "Verified owner" badge is derived from a current owner row, so a
+ * change here advances the catalog epoch in the same batch (see DATA_MODEL.md).
+ */
+export const listingOwners = sqliteTable(
+  'listing_owners',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    listingId: text('listing_id')
+      .notNull()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    role: text('role', { enum: listingOwnerRoles }).notNull().default('owner'),
+    verifiedVia: text('verified_via', { enum: listingOwnerVerifications }).notNull(),
+    verifiedAt: text('verified_at').notNull(),
+    revokedAt: text('revoked_at'),
+    revokedReason: text('revoked_reason'),
+    createdAt: text('created_at').notNull().default(currentTimestamp)
+  },
+  table => [
+    check('listing_owners_role_valid', sql`${table.role} IN (${sqlList(listingOwnerRoles)})`),
+    check(
+      'listing_owners_verified_via_valid',
+      sql`${table.verifiedVia} IN (${sqlList(listingOwnerVerifications)})`
+    ),
+    check(
+      'listing_owners_revocation_complete',
+      sql`(${table.revokedAt} IS NULL) = (${table.revokedReason} IS NULL)`
+    ),
+    uniqueIndex('listing_owners_current_owner_idx')
+      .on(table.listingId)
+      .where(sql`${table.role} = 'owner' AND ${table.revokedAt} IS NULL`),
+    uniqueIndex('listing_owners_current_member_idx')
+      .on(table.listingId, table.userId)
+      .where(sql`${table.revokedAt} IS NULL`),
+    index('listing_owners_user_idx')
+      .on(table.userId, table.listingId)
+      .where(sql`${table.revokedAt} IS NULL`)
+  ]
+)
+
+/**
+ * A staged edit of a live listing by its owner. It is reviewed like a submission and applied
+ * by the approval plan in `revision-plans.ts`, which refuses a revision whose `base_checksum`
+ * no longer matches the listing. Website and slug are not editable through a revision.
+ */
+export const listingRevisions = sqliteTable(
+  'listing_revisions',
+  {
+    id: text('id').primaryKey(),
+    listingId: text('listing_id')
+      .notNull()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    authorUserId: text('author_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    status: text('status', { enum: revisionStatuses }).notNull().default('pending_review'),
+    baseChecksum: text('base_checksum').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    content: text('content'),
+    categorySlug: text('category_slug').notNull(),
+    logoUrl: text('logo_url'),
+    videoUrl: text('video_url'),
+    reviewerNote: text('reviewer_note'),
+    rejectionReason: text('rejection_reason'),
+    reviewedAt: text('reviewed_at'),
+    reviewedBy: text('reviewed_by'),
+    createdAt: text('created_at').notNull().default(currentTimestamp),
+    updatedAt: text('updated_at').notNull().default(currentTimestamp)
+  },
+  table => [
+    check('listing_revisions_status_valid', sql`${table.status} IN (${sqlList(revisionStatuses)})`),
+    check(
+      'listing_revisions_rejection_when_rejected',
+      sql`${table.rejectionReason} IS NULL OR ${table.status} = 'rejected'`
+    ),
+    uniqueIndex('listing_revisions_open_idx')
+      .on(table.listingId)
+      .where(sql`${table.status} IN (${sqlList(openRevisionStatuses)})`),
+    index('listing_revisions_review_queue_idx').on(table.status, table.createdAt),
+    index('listing_revisions_author_idx').on(table.authorUserId, table.createdAt)
+  ]
+)
+
+export const listingRevisionResourceLinks = sqliteTable(
+  'listing_revision_resource_links',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    revisionId: text('revision_id')
+      .notNull()
+      .references(() => listingRevisions.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    url: text('url').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0)
+  },
+  table => [
+    unique('listing_revision_resource_links_revision_order_unique').on(
+      table.revisionId,
+      table.sortOrder
+    )
+  ]
+)
+
+export const listingRevisionFaqs = sqliteTable(
+  'listing_revision_faqs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    revisionId: text('revision_id')
+      .notNull()
+      .references(() => listingRevisions.id, { onDelete: 'cascade' }),
+    question: text('question').notNull(),
+    answer: text('answer').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0)
+  },
+  table => [
+    unique('listing_revision_faqs_revision_order_unique').on(table.revisionId, table.sortOrder)
+  ]
+)
+
+export const listingRevisionEvents = sqliteTable(
+  'listing_revision_events',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    revisionId: text('revision_id')
+      .notNull()
+      .references(() => listingRevisions.id, { onDelete: 'cascade' }),
+    eventType: text('event_type', { enum: revisionEventTypes }).notNull(),
+    detail: text('detail'),
+    actor: text('actor').notNull(),
+    createdAt: text('created_at').notNull().default(currentTimestamp)
+  },
+  table => [
+    check(
+      'listing_revision_events_type_valid',
+      sql`${table.eventType} IN (${sqlList(revisionEventTypes)})`
+    ),
+    index('listing_revision_events_revision_idx').on(table.revisionId, table.createdAt)
+  ]
+)
+
+/**
+ * Badge program history (#66). It sits outside the catalog: writing a check never touches
+ * `publication_state` or `published_at`, so it never changes the catalog epoch. A network
+ * error or timeout is recorded as an inconclusive `fail` and never counts as a miss.
+ */
+export const badgeChecks = sqliteTable(
+  'badge_checks',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    listingId: text('listing_id')
+      .notNull()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    checkedAt: text('checked_at').notNull(),
+    outcome: text('outcome', { enum: badgeCheckOutcomes }).notNull(),
+    reason: text('reason'),
+    conclusive: integer('conclusive', { mode: 'boolean' }).notNull()
+  },
+  table => [
+    check('badge_checks_outcome_valid', sql`${table.outcome} IN (${sqlList(badgeCheckOutcomes)})`),
+    check('badge_checks_conclusive_boolean', booleanCheck(table.conclusive)),
+    check(
+      'badge_checks_pass_conclusive',
+      sql`${table.outcome} = 'fail' OR (${table.conclusive} = 1 AND ${table.reason} IS NULL)`
+    ),
+    check(
+      'badge_checks_fail_reason',
+      sql`${table.outcome} = 'pass' OR ${table.reason} IS NOT NULL`
+    ),
+    index('badge_checks_listing_time_idx').on(
+      table.listingId,
+      sql`${table.checkedAt} DESC`,
+      sql`${table.id} DESC`
+    )
+  ]
+)
+
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
-  sessions: many(sessions)
+  listingOwnerships: many(listingOwners),
+  revisions: many(listingRevisions),
+  sessions: many(sessions),
+  submissions: many(listingSubmissions)
 }))
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -613,10 +982,13 @@ export const categoriesRelations = relations(categories, ({ many }) => ({
 }))
 
 export const listingsRelations = relations(listings, ({ many }) => ({
+  badgeChecks: many(badgeChecks),
   categories: many(listingCategories),
   faqs: many(listingFaqs),
   media: many(listingMedia),
+  owners: many(listingOwners),
   resourceLinks: many(listingResourceLinks),
+  revisions: many(listingRevisions),
   slugRedirects: many(listingSlugRedirects),
   submissions: many(listingSubmissions)
 }))
@@ -662,7 +1034,9 @@ export const listingSubmissionsRelations = relations(listingSubmissions, ({ many
     references: [listings.id]
   }),
   notifications: many(listingSubmissionNotifications),
-  resourceLinks: many(listingSubmissionResourceLinks)
+  owner: one(users, { fields: [listingSubmissions.ownerUserId], references: [users.id] }),
+  resourceLinks: many(listingSubmissionResourceLinks),
+  urlBlocks: many(listingSubmissionUrlBlocks)
 }))
 
 export const listingSubmissionResourceLinksRelations = relations(
@@ -698,3 +1072,54 @@ export const listingSubmissionNotificationsRelations = relations(
     })
   })
 )
+
+export const listingSubmissionUrlBlocksRelations = relations(
+  listingSubmissionUrlBlocks,
+  ({ one }) => ({
+    submission: one(listingSubmissions, {
+      fields: [listingSubmissionUrlBlocks.submissionId],
+      references: [listingSubmissions.id]
+    })
+  })
+)
+
+export const listingOwnersRelations = relations(listingOwners, ({ one }) => ({
+  listing: one(listings, { fields: [listingOwners.listingId], references: [listings.id] }),
+  user: one(users, { fields: [listingOwners.userId], references: [users.id] })
+}))
+
+export const listingRevisionsRelations = relations(listingRevisions, ({ many, one }) => ({
+  author: one(users, { fields: [listingRevisions.authorUserId], references: [users.id] }),
+  events: many(listingRevisionEvents),
+  faqs: many(listingRevisionFaqs),
+  listing: one(listings, { fields: [listingRevisions.listingId], references: [listings.id] }),
+  resourceLinks: many(listingRevisionResourceLinks)
+}))
+
+export const listingRevisionResourceLinksRelations = relations(
+  listingRevisionResourceLinks,
+  ({ one }) => ({
+    revision: one(listingRevisions, {
+      fields: [listingRevisionResourceLinks.revisionId],
+      references: [listingRevisions.id]
+    })
+  })
+)
+
+export const listingRevisionFaqsRelations = relations(listingRevisionFaqs, ({ one }) => ({
+  revision: one(listingRevisions, {
+    fields: [listingRevisionFaqs.revisionId],
+    references: [listingRevisions.id]
+  })
+}))
+
+export const listingRevisionEventsRelations = relations(listingRevisionEvents, ({ one }) => ({
+  revision: one(listingRevisions, {
+    fields: [listingRevisionEvents.revisionId],
+    references: [listingRevisions.id]
+  })
+}))
+
+export const badgeChecksRelations = relations(badgeChecks, ({ one }) => ({
+  listing: one(listings, { fields: [badgeChecks.listingId], references: [listings.id] })
+}))

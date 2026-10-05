@@ -100,7 +100,18 @@ export async function approveRemoteSubmission(
       throw new Error('Only a pending or verified submission can be rejected.')
     }
     const now = new Date().toISOString()
-    await query(buildRejectSubmissionPlans({ now, reviewer, submissionId }), env, fetcher)
+    // The legacy workflow takes no reason; `other` keeps the URL open for resubmission.
+    await query(
+      buildRejectSubmissionPlans({
+        category: 'other',
+        now,
+        reason: 'Rejected through the Review D1 Submission workflow.',
+        reviewer,
+        submissionId
+      }),
+      env,
+      fetcher
+    )
     return { idempotent: false, listingId: null }
   }
   const listingId =

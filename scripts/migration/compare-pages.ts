@@ -13,7 +13,9 @@ import { categoryRoute, listingRoute } from '../site-routes'
  *
  * The baseline is the legacy static site, which used /products/<slug>/reviews/ and
  * /products/best/<category>/; those paths are translated to the current routes before
- * fetching the candidate and before comparing canonical paths.
+ * fetching the candidate and before comparing canonical paths. Since the cutover (#50),
+ * best.serp.co is itself the D1 Worker and redirects those paths permanently, so a baseline
+ * that answers a legacy path with 301/308 is compared at the current route instead.
  *
  * Usage: pnpm tsx scripts/migration/compare-pages.ts <candidate-origin> [--baseline <origin>] [--sample 25]
  */
@@ -128,10 +130,14 @@ export async function comparePages(options: {
 }): Promise<number> {
   let differences = 0
   for (const path of samplePaths(options.sample)) {
-    const [legacy, candidate] = await Promise.all([
+    const translated = translateLegacyPath(path)
+    let [legacy, candidate] = await Promise.all([
       fetchShape(options.baseline, path),
-      fetchShape(options.candidate, translateLegacyPath(path))
+      fetchShape(options.candidate, translated)
     ])
+    if (translated !== path && (legacy.status === 301 || legacy.status === 308)) {
+      legacy = await fetchShape(options.baseline, translated)
+    }
     const baseline = {
       ...legacy,
       canonicalPath: legacy.canonicalPath && translateLegacyPath(legacy.canonicalPath)

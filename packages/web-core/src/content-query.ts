@@ -10,11 +10,16 @@ export interface ContentMeta {
   content?: string
 }
 
+/** The `rel` of our outbound link to a listing's website (#62). */
+export type WebsiteLinkRel = 'follow' | 'nofollow' | 'sponsored'
+
 export interface WebsiteMetadata {
   slug: string
   name: string
   description: string
   website: string
+  /** Detail pages from D1 always carry it; imported and admin listings are `follow`. */
+  linkRel?: WebsiteLinkRel
   category: string
   categories?: string[]
   publishedAt: string

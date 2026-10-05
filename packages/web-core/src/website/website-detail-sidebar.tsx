@@ -1,6 +1,7 @@
 import { Download, ExternalLink, Hash } from 'lucide-react'
 import Link from 'next/link'
 import { getCategoryDisplayName } from '../category-display'
+import type { WebsiteLinkRel } from '../content-query'
 import { getRoute } from '../routes'
 import { siteConfig } from '../site-config'
 import { siteContent } from '../site-content'
@@ -14,6 +15,7 @@ import {
 type WebsiteSidebarMetadata = {
   category?: string
   categories?: string[]
+  linkRel: WebsiteLinkRel
   name: string
   publishedAt?: string
   slug: string
@@ -75,6 +77,20 @@ function getOutboundUrlWithVia(url: string, config: OutboundViaConfig): string {
   }
 }
 
+const OUTBOUND_REL: Record<WebsiteLinkRel, string> = {
+  follow: 'noopener noreferrer',
+  nofollow: 'nofollow noopener noreferrer',
+  sponsored: 'sponsored noopener noreferrer'
+}
+
+/**
+ * The `rel` of the outbound "Visit Site" link, from the listing's admin setting (#62).
+ * `follow` keeps the attribute every listing rendered before the setting existed.
+ */
+export function outboundWebsiteRel(linkRel: WebsiteLinkRel): string {
+  return OUTBOUND_REL[linkRel] ?? OUTBOUND_REL.nofollow
+}
+
 export function WebsiteDetailSidebar({ website }: WebsiteDetailSidebarProps) {
   const outboundWebsiteUrl = getOutboundUrlWithVia(website.website, siteConfig)
   const listingUrl = getFeaturedOnBadgeListingUrl({
@@ -103,7 +119,7 @@ export function WebsiteDetailSidebar({ website }: WebsiteDetailSidebarProps) {
       <Link
         href={outboundWebsiteUrl}
         target="_blank"
-        rel="noopener noreferrer"
+        rel={outboundWebsiteRel(website.linkRel)}
         className="sticky top-20 z-20 flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <span>Visit Site</span>
