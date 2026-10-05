@@ -4,6 +4,7 @@ import {
   apiError,
   authorizationFailure,
   json,
+  payloadTooLarge,
   readJson,
   submissionFailure,
   toAvailability,
@@ -24,6 +25,8 @@ export const dynamic = 'force-dynamic'
  * (`status = 'draft'`, no plan yet) and answers where to go next: the plan choice (2b).
  */
 export async function POST(request: Request) {
+  const tooLarge = payloadTooLarge(request)
+  if (tooLarge) return tooLarge
   const authorization = await authorizeUserRequest(request)
   if (!authorization.ok) return authorizationFailure(authorization)
   const parsed = newDraftSchema.safeParse((await readJson(request)) ?? {})

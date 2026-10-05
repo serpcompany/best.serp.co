@@ -9,6 +9,7 @@ import {
   apiError,
   authorizationFailure,
   json,
+  payloadTooLarge,
   readJson,
   submissionFailure,
   toSummary
@@ -33,6 +34,8 @@ function notFound() {
  * details") while it is a draft or waiting for its badge. The website never changes.
  */
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  const tooLarge = payloadTooLarge(request)
+  if (tooLarge) return tooLarge
   const authorization = await authorizeUserRequest(request)
   if (!authorization.ok) return authorizationFailure(authorization)
   const { id } = await context.params

@@ -38,6 +38,13 @@ export function authorizationFailure(result: Exclude<Authorization, { ok: true }
   return apiError(503, 'auth_unavailable', 'Accounts are unavailable right now.')
 }
 
+/** 413 for a body declared larger than `maxBytes`, answered before any session or D1 work. */
+export function payloadTooLarge(request: Request, maxBytes = 32_000) {
+  return Number(request.headers.get('content-length') || '0') > maxBytes
+    ? apiError(413, 'payload_too_large', 'The submission is too large.')
+    : null
+}
+
 /** Reads a JSON body of at most `maxBytes`, or null when it is missing, too large, or invalid. */
 export async function readJson(request: Request, maxBytes = 32_000): Promise<unknown | null> {
   const declared = Number(request.headers.get('content-length') || '0')
