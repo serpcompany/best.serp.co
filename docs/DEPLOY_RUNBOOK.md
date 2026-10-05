@@ -226,10 +226,6 @@ A deploy starts with a cold HTML cache (the Worker version is part of every key)
 request per page and data center renders, later ones are served from the cache. A
 publication or approval reaches cached pages within about a minute; nothing is purged.
 
-The same deploy registers the Cron Triggers in `wrangler.jsonc` (`triggers.crons`, the daily
-draft job at `0 14 * * *`); the dashboard's Worker → Settings → Triggers lists them, and each
-run logs `scheduled_job_finished` or `scheduled_job_failed`.
-
 | Resource | Staging | Production |
 |---|---|---|
 | Workers Cache API (edge HTML and data cache) | built in, nothing to create | built in, nothing to create |

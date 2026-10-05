@@ -165,8 +165,10 @@ Worker's `scheduled()` handler (`apps/web/lib/worker/scheduled.ts`). Its draft j
 first withdraws drafts 30 days old as `expired` and sends `draft-expired`, then claims and sends
 the latest due `draft-reminder` of each remaining draft. A run handles at most 100 of each and
 logs whether more remain. The weekly badge program (#66) adds its own cron expression and job
-to `scheduledJobs`. Locally, `wrangler dev --test-scheduled` exposes `/__scheduled`; the job's
-behavior is covered by `scheduled.test.ts` against SQLite.
+to `scheduledJobs`. The deploy that ships the Worker registers the trigger (the dashboard lists
+it under the Worker's Settings → Triggers), and each run logs `scheduled_job_finished` or
+`scheduled_job_failed`. Locally, `wrangler dev --test-scheduled` exposes `/__scheduled`; the
+job's behavior is covered by `scheduled.test.ts` against SQLite.
 
 ## Legacy review (until #69)
 
