@@ -8,9 +8,17 @@
  * binding) and the `Origin` Better Auth checks.
  */
 
-export const CODE_LENGTH = 6
-export const CODE_LIFETIME_SECONDS = 10 * 60
-export const CODE_ATTEMPTS = 3
+import {
+  SIGN_IN_CODE_ATTEMPTS,
+  SIGN_IN_CODE_LENGTH,
+  SIGN_IN_CODE_TTL_SECONDS
+} from '../../lib/email/sign-in-code'
+
+/** The code contract Better Auth enforces (`lib/email/sign-in-code.ts`). */
+export const CODE_LENGTH = SIGN_IN_CODE_LENGTH
+export const CODE_LIFETIME_SECONDS = SIGN_IN_CODE_TTL_SECONDS
+export const CODE_LIFETIME_MINUTES = Math.ceil(SIGN_IN_CODE_TTL_SECONDS / 60)
+export const CODE_ATTEMPTS = SIGN_IN_CODE_ATTEMPTS
 /** One code a minute per email and client; the resend link waits this long. */
 export const RESEND_COOLDOWN_SECONDS = 60
 

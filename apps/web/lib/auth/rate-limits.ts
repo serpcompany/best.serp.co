@@ -24,20 +24,24 @@
  *     cookie cannot remove the inbox cap.
  */
 import type { AuthRateLimitRule } from '@serpdirectory/data-ops/auth'
-import { SIGN_IN_CODE_LENGTH, SIGN_IN_CODE_TTL_SECONDS } from '../email/sign-in-code'
+import {
+  SIGN_IN_CODE_ATTEMPTS,
+  SIGN_IN_CODE_LENGTH,
+  SIGN_IN_CODE_TTL_SECONDS
+} from '../email/sign-in-code'
 
 const SECOND = 1000
 const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
 
 /**
- * Six digits, valid for ten minutes, three guesses each. The length and lifetime are the sign-in
- * code email's (`lib/email/sign-in-code.ts`), defined once so the email always describes the
- * code Better Auth issues.
+ * Six digits, valid for ten minutes, three guesses each, from `lib/email/sign-in-code.ts`:
+ * defined once, so the email and the `/login` screen always describe the code Better Auth
+ * issues.
  */
 export const OTP_LENGTH = SIGN_IN_CODE_LENGTH
 export const OTP_EXPIRES_IN_SECONDS = SIGN_IN_CODE_TTL_SECONDS
-export const OTP_ALLOWED_ATTEMPTS = 3
+export const OTP_ALLOWED_ATTEMPTS = SIGN_IN_CODE_ATTEMPTS
 
 export const OTP_REQUEST_LIMITS = {
   /** One code a minute and five an hour, per email (new) or per email and client (members). */

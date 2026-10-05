@@ -1,5 +1,33 @@
 import { describe, expect, it, vi } from 'vitest'
-import { formatCountdown, formatWait, requestCode, signOut, verifyCode } from './sign-in-api'
+import {
+  OTP_ALLOWED_ATTEMPTS,
+  OTP_EXPIRES_IN_SECONDS,
+  OTP_LENGTH,
+  OTP_REQUEST_LIMITS
+} from '../../lib/auth/rate-limits'
+import {
+  CODE_ATTEMPTS,
+  CODE_LENGTH,
+  CODE_LIFETIME_MINUTES,
+  CODE_LIFETIME_SECONDS,
+  formatCountdown,
+  formatWait,
+  RESEND_COOLDOWN_SECONDS,
+  requestCode,
+  signOut,
+  verifyCode
+} from './sign-in-api'
+
+// PR #76 review, finding 6: the screen reads the code contract Better Auth is configured with.
+describe('the code contract', () => {
+  it('matches what Better Auth enforces', () => {
+    expect(CODE_LENGTH).toBe(OTP_LENGTH)
+    expect(CODE_LIFETIME_SECONDS).toBe(OTP_EXPIRES_IN_SECONDS)
+    expect(CODE_LIFETIME_MINUTES).toBe(10)
+    expect(CODE_ATTEMPTS).toBe(OTP_ALLOWED_ATTEMPTS)
+    expect(RESEND_COOLDOWN_SECONDS * 1000).toBe(OTP_REQUEST_LIMITS.emailCooldown.windowMs)
+  })
+})
 
 function answer(status: number, body?: unknown, headers: Record<string, string> = {}) {
   return vi.fn(

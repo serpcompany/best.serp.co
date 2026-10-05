@@ -33,6 +33,7 @@ import { callbackDestination } from '@/lib/auth/callback-url'
 import {
   CODE_ATTEMPTS,
   CODE_LENGTH,
+  CODE_LIFETIME_MINUTES,
   CODE_LIFETIME_SECONDS,
   formatCountdown,
   formatWait,
@@ -44,7 +45,7 @@ import {
 
 /**
  * `/login`: the email-code sign-in from the #70 mockups (screen 1, shadcn login-01: Card +
- * Field). One form signs people up and in: email, then the 6-digit code, then a short
+ * Field). One form signs people up and in: email, then the emailed code, then a short
  * signed-in screen that returns to `callbackPath`.
  */
 
@@ -265,8 +266,8 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
             Check your email
           </CardTitle>
           <CardDescription>
-            If <b className="font-medium text-foreground">{email}</b> is a valid address, a 6-digit
-            code is on its way. It expires in 10 minutes.
+            If <b className="font-medium text-foreground">{email}</b> is a valid address, a{' '}
+            {CODE_LENGTH}-digit code is on its way. It expires in {CODE_LIFETIME_MINUTES} minutes.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -395,8 +396,8 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
           Sign up or sign in
         </CardTitle>
         <CardDescription>
-          Enter your email and we’ll send you a 6-digit code. New to SERP? The same code creates
-          your account.
+          Enter your email and we’ll send you a {CODE_LENGTH}-digit code. New to SERP? The same code
+          creates your account.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -499,7 +500,7 @@ function codeErrorMessage(error: CodeError, limitSeconds: number): string | null
     case 'wrong':
       return `That code isn’t right. Check the most recent email and try again. ${error.attemptsLeft} ${error.attemptsLeft === 1 ? 'attempt' : 'attempts'} left.`
     case 'expired':
-      return 'This code has expired. Codes work for 10 minutes.'
+      return `This code has expired. Codes work for ${CODE_LIFETIME_MINUTES} minutes.`
     case 'attempts':
       return 'Too many incorrect codes. Request a new code to try again.'
     case 'limited':

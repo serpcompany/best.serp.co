@@ -140,10 +140,12 @@ the request carries a session cookie, so anonymous pages never load Better Auth 
 
 - **`/login`** (`components/auth/login-card.tsx`, shadcn login-01): email, then the code
   (InputOTP), then "You're signed in" and a redirect to `?callbackUrl=` (a path on this site,
-  else `/account/`; `lib/auth/callback-url.ts`). The code step says a code is on its way *if*
+  else `/account/`; `lib/auth/callback-url.ts`, which checks the path after normalization). The code step says a code is on its way *if*
   the address is valid, because a per-email limit answers like a sent code. It counts wrong
-  guesses locally (only this browser can guess its code) and shows the expired, too-many-codes,
-  per-client 429 (with `Retry-After`), and 503 `OTP_DELIVERY_UNAVAILABLE` states.
+  guesses locally (only this browser can guess its code, and a resend within the minute keeps
+  the old code's count) and shows the expired, too-many-codes, per-client 429 (with
+  `Retry-After`), and 503 `OTP_DELIVERY_UNAVAILABLE` (email delivery not configured) states. Its
+  code length, lifetime, and attempts come from `lib/email/sign-in-code.ts`, like Better Auth's.
 - **`/account`** (`components/account/account-shell.tsx`, shadcn dashboard-01): the sidebar
   shell without the public header and footer, the user's email and sign-out, and the empty
   overview. Signed out, it redirects to `/login?callbackUrl=/account/`. Its other pages are #65,
