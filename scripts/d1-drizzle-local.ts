@@ -123,7 +123,7 @@ function verify(): void {
      ORDER BY type, name`
   )
   const applicationTables = objects.filter(
-    object => object.type === 'table' && object.name !== 'd1_migrations'
+    object => object.type === 'table' && object.name !== project.migrationsTable
   )
   assertExactNames(
     applicationTables.map(object => object.name),
@@ -146,7 +146,7 @@ function verify(): void {
   if (missingIndexes.length > 0) {
     throw new Error(`Fresh D1 is missing indexes: ${missingIndexes.join(', ')}.`)
   }
-  const ledger = query('SELECT name FROM d1_migrations ORDER BY name') as Array<{
+  const ledger = query(`SELECT name FROM ${project.migrationsTable} ORDER BY name`) as Array<{
     name: string
   }>
   assertExactNames(

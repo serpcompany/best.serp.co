@@ -81,7 +81,7 @@ describe('pr-review workflow', () => {
     )
     expect(biomeStep).toContain(`if ((\${#changed_files[@]} == 0)); then`)
     expect(biomeStep).toContain('No Biome-supported files changed; skipping.')
-    expect(stepRuns).not.toContain('pnpm d1:local:migrate')
+    expect(stepRuns).not.toContain('pnpm db:migrate:local')
     expect(stepRuns).not.toContain('pnpm worker:deploy:production')
     expect(stepRuns).not.toContain('pnpm typecheck')
     expect(stepRuns).not.toContain('pnpm test')

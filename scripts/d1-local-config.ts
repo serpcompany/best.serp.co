@@ -12,6 +12,7 @@ interface WranglerConfig {
     database_id?: string
     database_name?: string
     migrations_dir?: string
+    migrations_table?: string
   }>
   main?: string
   name?: string
@@ -23,8 +24,9 @@ const retiredSiteVariables = ['NEXT_PUBLIC_SITE_ID', 'SITE_ID'] as const
 
 /**
  * Validates that the top level of the Wrangler config is the dedicated local
- * best.serp.co Worker: local identity, local D1 binding, `d1/drizzle` history,
- * the `apps/web` Worker entry (which wraps the OpenNext build), and its assets.
+ * best.serp.co Worker: local identity, local D1 binding, `d1/drizzle` history recorded in the
+ * declared `d1_migrations` ledger, the `apps/web` Worker entry (which wraps the OpenNext
+ * build), and its assets.
  */
 export function validateCanonicalLocalConfig(
   configPath: string = project.wranglerConfigPath
@@ -69,6 +71,11 @@ export function validateCanonicalLocalConfig(
       canonicalLocalMigrationsDirectory
   ) {
     throw new Error('Canonical local D1 must apply the d1/drizzle migration history.')
+  }
+  if (binding.migrations_table !== project.migrationsTable) {
+    throw new Error(
+      `Canonical local D1 must declare migrations_table "${project.migrationsTable}", the ledger staging and production use.`
+    )
   }
   return config
 }

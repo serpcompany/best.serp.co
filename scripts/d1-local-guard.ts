@@ -56,6 +56,11 @@ function query(command: string): unknown[] {
   return parsed[0]?.results || []
 }
 
+/** `pnpm db:migrations:list:local`: the d1/drizzle migrations local D1 has not applied yet. */
+function listMigrations(): void {
+  wrangler(['d1', 'migrations', 'list', project.local.databaseName])
+}
+
 function migrate(): void {
   wrangler(['d1', 'migrations', 'apply', project.local.databaseName])
 }
@@ -152,7 +157,7 @@ async function verify(): Promise<void> {
 function publish(args: string[]): void {
   const manifestPath = args[0]
   if (!manifestPath || args.length > 1)
-    throw new Error('Usage: pnpm d1:local:publish -- <manifest.yaml>')
+    throw new Error('Usage: pnpm db:publish:local -- <manifest.yaml>')
   execFileSync('pnpm', ['tsx', 'scripts/d1-publisher.ts', manifestPath], { stdio: 'inherit' })
 }
 
@@ -176,6 +181,10 @@ export async function runLocalD1Command(args: string[]): Promise<void> {
     return
   }
   if (rest.length > 0) throw new Error(`Unexpected arguments: ${rest.join(' ')}.`)
+  if (command === 'list') {
+    listMigrations()
+    return
+  }
   if (command === 'migrate') {
     migrate()
     return
@@ -193,7 +202,7 @@ export async function runLocalD1Command(args: string[]): Promise<void> {
     return
   }
   throw new Error(
-    `Unknown local D1 command: ${command || 'missing'}. Use migrate, import, verify, publish, or preview.`
+    `Unknown local D1 command: ${command || 'missing'}. Use list, migrate, import, verify, publish, or preview.`
   )
 }
 
