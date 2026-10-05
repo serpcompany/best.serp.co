@@ -42,9 +42,9 @@ Browser
 - `apps/web/lib/submissions/` validates the binding, performs bounded badge HTTP
   verification, and delegates every submission write to `packages/data-ops/`.
 - `apps/web/lib/email/` sends transactional email through the `EMAIL` (Cloudflare Email
-  Sending) binding after the response, claims each event key in the `email_deliveries`
-  ledger (`packages/data-ops/`) so it never sends twice, and only logs locally
-  ([Email](./EMAIL.md)).
+  Sending) binding after the response, claims each template and event key in the
+  `email_deliveries` ledger (`packages/data-ops/`) so it never sends twice, and only logs
+  locally ([Email](./EMAIL.md)).
 - `packages/site-config/` is the checked-in site definition (name, domain, copy,
   routes, sitemap layout, badges, feature flags) and site-owned content.
 - `packages/web-core/` owns reusable page/view behavior and reads the site definition

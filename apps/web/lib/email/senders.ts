@@ -88,6 +88,7 @@ export function createLogEmailSender(
           event: 'email_logged',
           from: message.from,
           htmlLength: message.html.length,
+          replyTo: message.replyTo ?? null,
           subject: message.subject,
           text: message.text,
           to: message.to

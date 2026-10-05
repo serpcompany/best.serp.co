@@ -423,15 +423,16 @@ export const listingSubmissionNotifications = sqliteTable(
 )
 
 /**
- * The idempotency ledger for transactional email (`apps/web/lib/email/`): one row per event
- * key, claimed atomically before a send so a retried event never sends twice. Rows hold no
- * recipient, subject, or body; event keys may not contain an email address.
+ * The idempotency ledger for transactional email (`apps/web/lib/email/`): one row per template
+ * and event key, claimed atomically before a send so a retried event never sends the same
+ * email twice. Rows hold no recipient, subject, or body; event keys may not contain an email
+ * address. Timestamps use SQLite's `YYYY-MM-DD HH:MM:SS` (UTC).
  */
 export const emailDeliveries = sqliteTable(
   'email_deliveries',
   {
-    eventKey: text('event_key').primaryKey(),
     templateId: text('template_id').notNull(),
+    eventKey: text('event_key').notNull(),
     provider: text('provider').notNull(),
     status: text('status', { enum: ['sending', 'sent', 'failed'] }).notNull(),
     attempts: integer('attempts').notNull().default(1),
@@ -441,6 +442,7 @@ export const emailDeliveries = sqliteTable(
     updatedAt: text('updated_at').notNull().default(currentTimestamp)
   },
   table => [
+    primaryKey({ columns: [table.templateId, table.eventKey] }),
     check(
       'email_deliveries_event_key_valid',
       sql`length(${table.eventKey}) BETWEEN 3 AND 200 AND instr(${table.eventKey}, '@') = 0`

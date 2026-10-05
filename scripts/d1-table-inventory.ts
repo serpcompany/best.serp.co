@@ -117,8 +117,8 @@ export const applicationColumnInventory = {
     'preview_token_hash'
   ],
   email_deliveries: [
-    'event_key',
     'template_id',
+    'event_key',
     'provider',
     'status',
     'attempts',

@@ -1,6 +1,7 @@
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import {
   createEmailDeliveryLedger,
+  EMAIL_DELIVERY_MAX_ATTEMPTS,
   type EmailDeliveryLedger
 } from '@serpdirectory/data-ops/email-deliveries'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -8,7 +9,12 @@ import { SqliteD1 } from '../../../../packages/data-ops/src/test-support'
 import { EMAIL_FROM, type EmailEnvironmentVars, resolveEmailPolicy } from './config'
 import { createWorkerEmailService } from './runtime'
 import { createCapturingEmailSender, type SendEmailBinding } from './senders'
-import { createEmailService, type EmailLogEntry, emailEventKey } from './service'
+import {
+  createDisabledEmailService,
+  createEmailService,
+  type EmailLogEntry,
+  emailEventKey
+} from './service'
 import { fixtureTemplates } from './test-fixture'
 
 const production: EmailEnvironmentVars = {
@@ -26,7 +32,10 @@ const input = { path: '/products/autoenhance.ai', title: 'Secret body text' }
 
 function harness(
   vars: EmailEnvironmentVars,
-  options: { ledger?: (real: EmailDeliveryLedger) => EmailDeliveryLedger } = {}
+  options: {
+    ledger?: (real: EmailDeliveryLedger) => EmailDeliveryLedger
+    waitUntil?: (promise: Promise<unknown>) => void
+  } = {}
 ) {
   const d1 = new SqliteD1()
   const realLedger = createEmailDeliveryLedger({ client: createDatabase(d1.asD1Database()) })
@@ -39,18 +48,21 @@ function harness(
     policy: resolveEmailPolicy(vars),
     sender,
     templates: fixtureTemplates,
-    waitUntil: promise => {
-      pending.push(promise)
-    }
+    waitUntil:
+      options.waitUntil ??
+      (promise => {
+        pending.push(promise)
+      })
   })
   const send = (eventKey: string, to = 'Owner@Serp.co') =>
     service.enqueue('test-fixture', { eventKey, input, to })
   const settle = async () => {
     await Promise.all(pending.splice(0))
   }
-  const rows = () => d1.database.prepare('SELECT * FROM email_deliveries ORDER BY event_key').all()
+  const rows = () =>
+    d1.database.prepare('SELECT * FROM email_deliveries ORDER BY template_id, event_key').all()
   const events = () => logs.map(entry => entry.event)
-  return { events, logs, pending, rows, send, sender, settle }
+  return { events, logs, pending, rows, send, sender, service, settle }
 }
 
 afterEach(() => {
@@ -69,6 +81,7 @@ describe('email delivery', () => {
         from: EMAIL_FROM,
         headers: { 'Auto-Submitted': 'auto-generated' },
         html: '<p>Secret body text</p><p><a href="https://best.serp.co/products/autoenhance.ai/">https://best.serp.co/products/autoenhance.ai/</a></p><p>support@serp.co</p>',
+        replyTo: 'support@serp.co',
         subject: 'Fixture: Secret body text',
         text: 'Secret body text\n\nhttps://best.serp.co/products/autoenhance.ai/\n\nsupport@serp.co',
         to: 'owner@serp.co'
@@ -110,7 +123,7 @@ describe('email delivery', () => {
     expect(rows().map(row => row.event_key)).toEqual(['fixture:allowed'])
   })
 
-  it('never sends one event key twice', async () => {
+  it('never sends one template and event key twice', async () => {
     const { events, logs, rows, send, sender, settle } = harness(production)
     send('fixture:once')
     send('fixture:once')
@@ -123,14 +136,27 @@ describe('email delivery', () => {
       'email_duplicate_suppressed',
       'email_duplicate_suppressed'
     ])
-    expect(logs[1]).toMatchObject({ status: 'sending' })
-    expect(logs[2]).toMatchObject({ attempts: 1, status: 'sent' })
+    expect(logs[1]).toMatchObject({ level: 'info', status: 'sending' })
+    expect(logs[2]).toMatchObject({ attempts: 1, level: 'info', status: 'sent' })
     send('fixture:other')
     await settle()
     expect(sender.sent).toHaveLength(2)
     expect(rows().map(row => [row.event_key, row.status])).toEqual([
       ['fixture:once', 'sent'],
       ['fixture:other', 'sent']
+    ])
+  })
+
+  it('sends each template once for the same event', async () => {
+    const { send, sender, service, settle } = harness(production)
+    const eventKey = emailEventKey('submission-created', 'sub-1')
+    send(eventKey)
+    service.enqueue('test-fixture-notice', { eventKey, input, to: 'admin@serp.co' })
+    service.enqueue('test-fixture-notice', { eventKey, input, to: 'admin@serp.co' })
+    await settle()
+    expect(sender.sent.map(message => [message.subject, message.to])).toEqual([
+      ['Fixture: Secret body text', 'owner@serp.co'],
+      ['Notice: Secret body text', 'admin@serp.co']
     ])
   })
 
@@ -161,6 +187,23 @@ describe('email delivery', () => {
     expect(rows()[0]).toMatchObject({ attempts: 2, status: 'sent' })
   })
 
+  it('warns once an event has used up its attempts', async () => {
+    const { events, logs, send, sender, settle } = harness(production)
+    for (let attempt = 1; attempt <= EMAIL_DELIVERY_MAX_ATTEMPTS; attempt++) {
+      sender.failNext(Object.assign(new Error('quota'), { code: 'E_DAILY_LIMIT_EXCEEDED' }))
+      send('fixture:quota')
+      await settle()
+    }
+    send('fixture:quota')
+    await settle()
+    expect(sender.sent).toHaveLength(0)
+    expect(events()).toEqual([
+      ...Array.from({ length: EMAIL_DELIVERY_MAX_ATTEMPTS }, () => 'email_send_failed'),
+      'email_attempts_exhausted'
+    ])
+    expect(logs.at(-1)).toMatchObject({ attempts: EMAIL_DELIVERY_MAX_ATTEMPTS, level: 'warn' })
+  })
+
   it('sends nothing when the ledger cannot claim the event', async () => {
     const { logs, send, sender, settle } = harness(production, {
       ledger: real => ({
@@ -182,7 +225,7 @@ describe('email delivery', () => {
     let failCompletion = true
     const { events, send, sender, settle } = harness(production, {
       ledger: real => ({
-        claim: input => real.claim(input),
+        claim: claim => real.claim(claim),
         complete: async completion => {
           if (failCompletion) throw new Error('D1 unavailable')
           return real.complete(completion)
@@ -204,30 +247,17 @@ describe('email delivery', () => {
     expect(() => send('fixture:bad-recipient', 'a@b.co, c@d.co')).not.toThrow()
     send('fixture:valid')
     await settle()
-    expect(logs.map(entry => [entry.event, entry.reason])).toEqual([
-      ['email_rejected', 'invalid_event_key'],
-      ['email_rejected', 'invalid_recipient'],
-      ['email_sent', undefined]
+    expect(logs.map(entry => [entry.event, entry.reason, entry.eventKey])).toEqual([
+      ['email_rejected', 'invalid_event_key', '[invalid]'],
+      ['email_rejected', 'invalid_recipient', 'fixture:bad-recipient'],
+      ['email_sent', undefined, 'fixture:valid']
     ])
     expect(sender.sent).toHaveLength(1)
     expect(rows()).toHaveLength(1)
   })
 
   it('logs a render failure and an unknown template without claiming the event', async () => {
-    const d1 = new SqliteD1()
-    const logs: EmailLogEntry[] = []
-    const pending: Promise<unknown>[] = []
-    const sender = createCapturingEmailSender()
-    const service = createEmailService({
-      ledger: createEmailDeliveryLedger({ client: createDatabase(d1.asD1Database()) }),
-      log: entry => logs.push(entry),
-      policy: resolveEmailPolicy(production),
-      sender,
-      templates: fixtureTemplates,
-      waitUntil: promise => {
-        pending.push(promise)
-      }
-    })
+    const { logs, rows, sender, service, settle } = harness(production)
     service.enqueue('test-fixture', {
       eventKey: 'fixture:render',
       input: { path: 'https://evil.example/', title: 'x' },
@@ -238,27 +268,17 @@ describe('email delivery', () => {
       input: {},
       to: 'owner@serp.co'
     })
-    await Promise.all(pending)
+    await settle()
     expect(logs.map(entry => [entry.event, entry.reason])).toEqual([
       ['email_render_failed', undefined],
       ['email_rejected', 'unknown_template']
     ])
     expect(sender.sent).toHaveLength(0)
-    expect(d1.database.prepare('SELECT count(*) AS n FROM email_deliveries').get()).toEqual({
-      n: 0
-    })
+    expect(rows()).toHaveLength(0)
   })
 
   it('logs when waitUntil is unavailable instead of throwing', () => {
-    const logs: EmailLogEntry[] = []
-    const service = createEmailService({
-      ledger: createEmailDeliveryLedger({
-        client: createDatabase(new SqliteD1().asD1Database())
-      }),
-      log: entry => logs.push(entry),
-      policy: resolveEmailPolicy(production),
-      sender: createCapturingEmailSender(),
-      templates: fixtureTemplates,
+    const { logs, service } = harness(production, {
       waitUntil: () => {
         throw new Error('no execution context')
       }
@@ -268,16 +288,82 @@ describe('email delivery', () => {
     ).not.toThrow()
     expect(logs[0]).toMatchObject({ event: 'email_wait_until_failed', level: 'error' })
   })
+})
 
-  it('keeps addresses and bodies out of deployed logs', async () => {
-    const { logs, send, sender, settle } = harness(staging)
-    sender.failNext(new Error('E: owner@serp.co bounced'))
-    send('fixture:private-1')
-    send('fixture:private-2')
-    send('fixture:private-3', 'stranger@example.com')
-    await settle()
-    const serialized = JSON.stringify(logs)
-    expect(serialized).not.toMatch(/owner@serp\.co|stranger@example\.com|Secret body text/u)
+describe('email logs', () => {
+  // Recipient domains are allowed; local parts, full addresses, and bodies are not.
+  const address = /@|person|owner|stranger|Secret body text/iu
+
+  it('never carry an address, a body, or an unvalidated key on any path', async () => {
+    const logs: EmailLogEntry[] = []
+    const collect = (entry: EmailLogEntry) => logs.push(entry)
+
+    // Delivery paths, including a send failure that names the recipient.
+    const deployed = harness(staging)
+    deployed.sender.failNext(new Error('E: owner@serp.co bounced'))
+    deployed.send('fixture:private-1')
+    deployed.send('fixture:private-2')
+    deployed.send('fixture:private-3', 'stranger@example.com')
+    // An address passed as the event key or the template id.
+    deployed.send('sign-in-code:Person@Example.com')
+    ;(deployed.service.enqueue as (id: string, request: unknown) => void)('person@example.com', {
+      eventKey: 'fixture:x',
+      input,
+      to: 'owner@serp.co'
+    })
+    // An unexpected throw inside delivery whose message holds an address.
+    deployed.service.enqueue('test-fixture', {
+      eventKey: 'otp:person@example.com',
+      input,
+      get to(): string {
+        throw new Error('getter failed for person@example.com')
+      }
+    })
+    deployed.service.enqueue('test-fixture', {
+      eventKey: 'fixture:getter',
+      input,
+      get to(): string {
+        throw new Error('getter failed for person@example.com')
+      }
+    })
+    await deployed.settle()
+    logs.push(...deployed.logs)
+
+    // waitUntil failing with an address in its message and the key.
+    const noContext = harness(production, {
+      waitUntil: () => {
+        throw new Error('no context for owner@serp.co')
+      }
+    })
+    noContext.send('otp:owner@serp.co')
+    logs.push(...noContext.logs)
+
+    // The disabled service, with an address in the key and in the reason.
+    createDisabledEmailService<typeof fixtureTemplates>(
+      'Email is disabled: config for person@example.com',
+      collect
+    ).enqueue('test-fixture', { eventKey: 'otp:person@example.com', input, to: 'a@b.co' })
+
+    const events = logs.map(entry => entry.event)
+    for (const event of [
+      'email_send_failed',
+      'email_sent',
+      'email_skipped',
+      'email_rejected',
+      'email_delivery_failed',
+      'email_wait_until_failed',
+      'email_disabled'
+    ]) {
+      expect(events, event).toContain(event)
+    }
+    for (const entry of logs) {
+      expect(JSON.stringify(entry), entry.event).not.toMatch(address)
+    }
+    expect(logs.filter(entry => entry.eventKey === '[invalid]').length).toBeGreaterThanOrEqual(4)
+    expect(logs.find(entry => entry.event === 'email_delivery_failed')).toMatchObject({
+      error: 'getter failed for [redacted]',
+      eventKey: 'fixture:getter'
+    })
   })
 })
 
@@ -309,7 +395,7 @@ describe('Worker email service', () => {
     return logs
   }
 
-  it('sends through the EMAIL binding in staging and production', async () => {
+  it('sends through the EMAIL binding in staging and production, replying to support', async () => {
     for (const vars of [staging, production]) {
       const { calls, email } = binding()
       const logs = await run({ ...vars, DB: new SqliteD1().asD1Database(), EMAIL: email })
@@ -318,6 +404,7 @@ describe('Worker email service', () => {
           from: { email: 'noreply@mail.serp.co', name: 'SERP Directory' },
           headers: { 'Auto-Submitted': 'auto-generated' },
           html: expect.stringContaining('/products/autoenhance.ai/'),
+          replyTo: 'support@serp.co',
           subject:
             vars === staging ? '[staging] Fixture: Secret body text' : 'Fixture: Secret body text',
           text: expect.stringContaining('/products/autoenhance.ai/'),
@@ -339,6 +426,7 @@ describe('Worker email service', () => {
     const logged = JSON.parse(String(info.mock.calls[0]?.[0])) as Record<string, unknown>
     expect(logged).toMatchObject({
       event: 'email_logged',
+      replyTo: 'support@serp.co',
       subject: 'Fixture: Secret body text',
       text: 'Secret body text\n\nhttp://localhost:8787/products/autoenhance.ai/\n\nsupport@serp.co',
       to: 'owner@serp.co'
@@ -352,6 +440,7 @@ describe('Worker email service', () => {
       { ...production, DB, SITE_ENVIRONMENT: 'prod' },
       { ...production, D1_RUNTIME_ENV: 'staging', DB },
       { ...staging, DB: undefined },
+      { ...staging, DB, EMAIL_STAGING_ALLOWLIST: 'not an address' },
       { ...staging, DB, withoutBinding: true },
       { ...production, DB, withoutBinding: true }
     ]

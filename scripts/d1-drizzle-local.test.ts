@@ -128,6 +128,19 @@ describe('fresh Drizzle D1 history', () => {
     expect(freshMigrationNames()).toEqual(['0000_baseline.sql', '0001_email_deliveries.sql'])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
 
+    // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
+    const journal = JSON.parse(
+      readFileSync(resolve(freshMigrationsDirectory, 'meta/_journal.json'), 'utf8')
+    ) as { entries: Array<{ idx: number; tag: string }> }
+    expect(journal.entries.map(entry => `${entry.tag}.sql`)).toEqual(freshMigrationNames())
+    expect(journal.entries.map(entry => entry.idx)).toEqual(
+      freshMigrationNames().map((_, index) => index)
+    )
+    for (const entry of journal.entries) {
+      const snapshot = `meta/${entry.tag.slice(0, 4)}_snapshot.json`
+      expect(existsSync(resolve(freshMigrationsDirectory, snapshot)), snapshot).toBe(true)
+    }
+
     // Every table any migration creates is hand-finished as STRICT.
     const history = freshMigrationNames()
       .map(name => readFileSync(resolve(freshMigrationsDirectory, name), 'utf8'))
@@ -178,9 +191,13 @@ describe('fresh Drizzle D1 history', () => {
 
   it('migrates empty canonical local state and verifies the exact fresh schema', () => {
     const stateDirectory = temporaryDirectory('best-serp-co-drizzle-')
-    // pnpm db:migrations:list:local lists what pnpm db:migrate:local will apply.
-    expect(runLocal('list', stateDirectory)).toContain('0000_baseline.sql')
-    expect(runLocal('migrate', stateDirectory)).toContain('0000_baseline.sql')
+    // pnpm db:migrations:list:local lists what pnpm db:migrate:local will apply: every migration.
+    const listed = runLocal('list', stateDirectory)
+    const migrated = runLocal('migrate', stateDirectory)
+    for (const name of freshMigrationNames()) {
+      expect(listed, name).toContain(name)
+      expect(migrated, name).toContain(name)
+    }
     expect(runDrizzle('verify', stateDirectory)).toContain('"status":"verified"')
     expect(runLocal('list', stateDirectory)).toContain('No migrations to apply')
     expect(runLocal('migrate', stateDirectory)).toContain('No migrations to apply')

@@ -1,6 +1,6 @@
 /**
- * A neutral template that exercises the email contract in tests. It is not a product email
- * and is never registered in `./registry.ts`.
+ * Neutral templates that exercise the email contract in tests. They are not product emails
+ * and are never registered in `./registry.ts`.
  */
 import { createEmailTemplateRegistry, defineEmailTemplate, html } from './templates'
 
@@ -22,4 +22,20 @@ export const fixtureTemplate = defineEmailTemplate<FixtureInput>({
   }
 })
 
-export const fixtureTemplates = createEmailTemplateRegistry({ 'test-fixture': fixtureTemplate })
+/** A second template, so tests can send two emails for one event. */
+export const fixtureNoticeTemplate = defineEmailTemplate<FixtureInput>({
+  id: 'test-fixture-notice',
+  render(input, { links }) {
+    const url = links.url(input.path)
+    return {
+      html: html`<p><a href="${url}">${input.title}</a></p>`,
+      subject: `Notice: ${input.title}`,
+      text: `${input.title}: ${url}`
+    }
+  }
+})
+
+export const fixtureTemplates = createEmailTemplateRegistry({
+  'test-fixture': fixtureTemplate,
+  'test-fixture-notice': fixtureNoticeTemplate
+})

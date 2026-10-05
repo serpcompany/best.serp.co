@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "be769148-c4b3-4154-a29f-21b8d3a8a7e3",
+  "id": "3ab38cab-b1f7-465b-bfd0-3ec7f3207d10",
   "prevId": "0e26e3a2-7139-43df-8744-86ba8d23013c",
   "tables": {
     "categories": {
@@ -94,15 +94,15 @@
     "email_deliveries": {
       "name": "email_deliveries",
       "columns": {
-        "event_key": {
-          "name": "event_key",
+        "template_id": {
+          "name": "template_id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "template_id": {
-          "name": "template_id",
+        "event_key": {
+          "name": "event_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -163,7 +163,12 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "email_deliveries_template_id_event_key_pk": {
+          "columns": ["template_id", "event_key"],
+          "name": "email_deliveries_template_id_event_key_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {
         "email_deliveries_event_key_valid": {

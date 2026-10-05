@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const emailDirectory = import.meta.dirname
@@ -8,6 +8,33 @@ const appDirectory = resolve(emailDirectory, '../..')
 
 function source(file: string): string {
   return readFileSync(resolve(emailDirectory, file), 'utf8')
+}
+
+function appFiles(): string[] {
+  return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
+    cwd: appDirectory,
+    encoding: 'utf8'
+  })
+    .split('\n')
+    .filter(file => /\.(?:ts|tsx|js|jsx|mjs)$/u.test(file))
+}
+
+/** Every module specifier a file imports or re-exports, statically or dynamically. */
+function importSpecifiers(code: string): string[] {
+  return [
+    ...code.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*)['"]([^'"]+)['"]/gu),
+    ...code.matchAll(/\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/gu)
+  ].map(match => match[1] ?? '')
+}
+
+/** True when a specifier in `file` (relative to apps/web) points into `lib/email`. */
+function importsEmailModule(file: string, specifier: string): boolean {
+  let target: string | null = null
+  if (specifier.startsWith('@/')) target = resolve(appDirectory, specifier.slice(2))
+  else if (specifier.startsWith('.')) target = resolve(appDirectory, dirname(file), specifier)
+  if (!target) return false
+  const fromApp = relative(appDirectory, target)
+  return fromApp === 'lib/email' || fromApp.startsWith('lib/email/')
 }
 
 describe('email module boundary', () => {
@@ -37,25 +64,50 @@ describe('email module boundary', () => {
     }
   })
 
-  it('keeps SQL in packages/data-ops and the test fixture out of the registry', () => {
+  it('reads D1 only after resolving the environment policy, and holds no SQL', () => {
+    const runtime = source('runtime.ts')
+    const policy = runtime.indexOf('resolveEmailPolicy(env)')
+    const binding = runtime.indexOf('if (!env.DB)')
+    const database = runtime.indexOf('createDatabase(env.DB)')
+    expect(policy).toBeGreaterThan(-1)
+    expect(binding).toBeGreaterThan(policy)
+    expect(database).toBeGreaterThan(binding)
+    expect(runtime).toContain('@serpdirectory/data-ops/email-deliveries')
+
     for (const file of readdirSync(emailDirectory).filter(name => name.endsWith('.ts'))) {
-      const code = source(file)
       if (file.endsWith('.test.ts')) continue
-      expect(code, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
+      expect(source(file), file).not.toMatch(
+        /\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(|drizzle[-]orm/u
+      )
     }
-    expect(source('registry.ts')).not.toContain('test-fixture')
   })
 
-  it('is never imported by a Client Component', () => {
-    const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
-      cwd: appDirectory,
-      encoding: 'utf8'
-    })
-      .split('\n')
-      .filter(file => /\.(?:ts|tsx)$/u.test(file))
-    const violations = files.filter(file => {
+  it('keeps markup minting private and test fixtures out of app code', () => {
+    const templates = source('templates.ts')
+    expect(templates).not.toMatch(/export\s+(?:const|let|var)\s+MINT\b|fromTrustedMarkup/u)
+    expect(source('registry.ts')).not.toContain('test-fixture')
+    const fixtureImports = appFiles().filter(
+      file =>
+        !/\.test\.tsx?$/u.test(file) &&
+        importSpecifiers(readFileSync(resolve(appDirectory, file), 'utf8')).some(specifier =>
+          /(?:^|\/)test-fixture$/u.test(specifier)
+        )
+    )
+    expect(fixtureImports).toEqual([])
+  })
+
+  it('is never imported by a Client Component, by any path', () => {
+    expect(importsEmailModule('app/page.tsx', '@/lib/email/server')).toBe(true)
+    expect(importsEmailModule('lib/auth/client.tsx', '../email/config')).toBe(true)
+    expect(importsEmailModule('components/form.tsx', '../lib/email')).toBe(true)
+    expect(importsEmailModule('lib/emailer.ts', './emailer-utils')).toBe(false)
+
+    const violations = appFiles().filter(file => {
       const code = readFileSync(resolve(appDirectory, file), 'utf8')
-      return /^['"]use client['"]/mu.test(code) && /lib\/email\b/u.test(code)
+      return (
+        /^\s*['"]use client['"]/mu.test(code) &&
+        importSpecifiers(code).some(specifier => importsEmailModule(file, specifier))
+      )
     })
     expect(violations).toEqual([])
   })

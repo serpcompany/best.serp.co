@@ -8,7 +8,7 @@ import {
   escapeHtml,
   html,
   renderEmail,
-  type SafeHtml
+  SafeHtml
 } from './templates'
 import { fixtureTemplate } from './test-fixture'
 
@@ -40,11 +40,20 @@ describe('email links', () => {
       'https://evil.example/',
       'javascript:alert(1)',
       '/\\evil.example',
-      ''
+      '',
+      // Whitespace and control characters would split or break the plain-text body.
+      '/x\r\ny',
+      '/foo bar',
+      '/\tevil.example',
+      '/a\u0000b',
+      '/a\u007fb',
+      '/a b'
     ]) {
-      expect(() => links.url(path), path).toThrow(EmailTemplateError)
+      expect(() => links.url(path), JSON.stringify(path)).toThrow(EmailTemplateError)
     }
     expect(() => createEmailLinks('https://best.serp.co/')).toThrow(EmailTemplateError)
+    // Odd but harmless paths stay on the origin.
+    expect(links.url('/@evil.example')).toBe('https://best.serp.co/@evil.example/')
   })
 })
 
@@ -57,6 +66,60 @@ describe('html bodies', () => {
       '<p>&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &#39;co&#39;</p><ul><li>a&lt;b</li><li>c</li></ul>0'
     )
     expect(escapeHtml('"&\'<>')).toBe('&quot;&amp;&#39;&lt;&gt;')
+  })
+
+  it('accepts only http(s) and mailto URLs in href and src', () => {
+    const site = 'https://best.serp.co/products/a.ai/?x=1&y=2'
+    expect(html`<a href="${site}">x</a>`.toString()).toBe(
+      '<a href="https://best.serp.co/products/a.ai/?x=1&amp;y=2">x</a>'
+    )
+    expect(html`<a href='${'mailto:support@serp.co'}'>x</a>`.toString()).toBe(
+      "<a href='mailto:support@serp.co'>x</a>"
+    )
+    expect(html`<img src="${'http://localhost:8787/logo.png'}" alt="">`.toString()).toContain(
+      'src="http://localhost:8787/logo.png"'
+    )
+    for (const value of [
+      'javascript:alert(1)',
+      'JaVaScRiPt:alert(1)',
+      ' javascript:alert(1)',
+      'java\tscript:alert(1)',
+      'data:text/html;base64,PHNjcmlwdD4=',
+      'vbscript:x',
+      '/relative/path',
+      '//evil.example/',
+      'not a url'
+    ]) {
+      expect(() => html`<a href="${value}">x</a>`, value).toThrow(EmailTemplateError)
+      expect(() => html`<img SRC = "${value}">`, value).toThrow(EmailTemplateError)
+    }
+    expect(() => html`<a href="${html`https://best.serp.co`}">x</a>`).toThrow(EmailTemplateError)
+  })
+
+  it('refuses a value in an unquoted attribute', () => {
+    expect(() => html`<td width=${'100 onmouseover=alert(1)'}>x</td>`).toThrow(EmailTemplateError)
+    expect(() => html`<a href=${'https://best.serp.co'}>x</a>`).toThrow(EmailTemplateError)
+    expect(() => html`<a ${'onclick=alert(1)'}>x</a>`).toThrow(EmailTemplateError)
+    // Browsers strip leading spaces from URLs, so the value still picks the scheme here.
+    expect(() => html`<a href=" ${'javascript:alert(1)'}">x</a>`).toThrow(EmailTemplateError)
+    expect(() => html`<p title="${html`<b>x</b>`}">x</p>`).toThrow(EmailTemplateError)
+    // Once the literal fixes the scheme, a value is escaped attribute text.
+    expect(
+      html`<a href="https://best.serp.co/products/${'a"b<c'}/" title="${'Tom & Jerry'}">x</a>`.toString()
+    ).toBe('<a href="https://best.serp.co/products/a&quot;b&lt;c/" title="Tom &amp; Jerry">x</a>')
+    // An equals sign in text content is fine.
+    expect(html`<p>1 + 1 = ${2}</p>`.toString()).toBe('<p>1 + 1 = 2</p>')
+  })
+
+  it('mints SafeHtml only through the html tag', () => {
+    const Constructor = SafeHtml as unknown as new (mint: symbol, markup: string) => SafeHtml
+    expect(() => new Constructor(Symbol('SafeHtml'), '<img src=x onerror=alert(1)>')).toThrow(
+      EmailTemplateError
+    )
+    const forged = Object.create(SafeHtml.prototype) as SafeHtml
+    expect(SafeHtml.is(forged)).toBe(false)
+    expect(SafeHtml.is(html`<p>x</p>`)).toBe(true)
+    expect('fromTrustedMarkup' in SafeHtml).toBe(false)
   })
 })
 
@@ -105,7 +168,8 @@ describe('template contract', () => {
       { ...ok, subject: 'x'.repeat(201) },
       { ...ok, subject: 's', text: '  ' },
       { html: html``, subject: 's', text: 'x' },
-      { html: '<p>raw</p>', subject: 's', text: 'x' }
+      { html: '<p>raw</p>', subject: 's', text: 'x' },
+      { html: Object.create(SafeHtml.prototype), subject: 's', text: 'x' }
     ]) {
       expect(() => renderEmail(template(content), null, context('https://best.serp.co'))).toThrow(
         EmailTemplateError

@@ -35,8 +35,8 @@ Drizzle cannot express them.
 - `listing_slug_redirects` maps retired slugs to their listing.
 - `listing_submissions` and its resource, FAQ, event, rate-limit, and notification
   tables hold private intake. Only a digest of each access capability is stored.
-- `email_deliveries` is the transactional email ledger: one row per event key (status,
-  attempts, provider message id, error code), never a recipient or content
+- `email_deliveries` is the transactional email ledger: one row per template and event key
+  (status, attempts, provider message id, error code), never a recipient or content
   (see [Email](./EMAIL.md)).
 
 ## Public eligibility

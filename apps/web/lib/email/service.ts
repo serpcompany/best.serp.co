@@ -8,19 +8,21 @@
  * 2. Apply the environment policy (`./config.ts`): staging skips recipients that are not on
  *    its allowlist.
  * 3. Render the template, with links for this environment and the `[staging]` prefix.
- * 4. Claim the event key in the D1 ledger (`email_deliveries`). A key that is in flight or
- *    already sent is a duplicate and is not sent again; a failed one may be retried by
- *    enqueueing the same key again. If the ledger cannot be reached, nothing is sent.
+ * 4. Claim the template and event key in the D1 ledger (`email_deliveries`). A pair that is
+ *    in flight or already sent is a duplicate and is not sent again; a failed one may be
+ *    retried by enqueueing it again. If the ledger cannot be reached, nothing is sent.
  * 5. Send once through the configured provider (no automatic retry), then record the outcome.
  *
- * Logs carry the event key, template id, environment, provider, and the recipient's domain,
- * never the full address or the body (the local log sender is the one exception).
+ * Logs carry the event key and template id (only when well-formed; anything else is logged
+ * as `[invalid]`), environment, provider, and the recipient's domain: never the full address
+ * or the body (the local log sender is the one exception).
  */
 import {
   EMAIL_EVENT_KEY_PATTERN,
   type EmailDeliveryClaim,
   type EmailDeliveryLedger,
-  isEmailEventKey
+  isEmailEventKey,
+  isEmailTemplateId
 } from '@serpdirectory/data-ops/email-deliveries'
 import {
   EMAIL_FROM,
@@ -63,8 +65,9 @@ export const consoleEmailLogger: EmailLogger = ({ level, ...entry }) => {
 
 export interface EmailRequest<Input> {
   /**
-   * Names the event this email reports, built with `emailEventKey`, for example
-   * `emailEventKey('submission-received', submissionId)`. The same key never sends twice.
+   * Names the event occurrence this email reports, built with `emailEventKey`, for example
+   * `emailEventKey('submission-created', submissionId)`. The same template and key never
+   * send twice; different templates may share a key.
    */
   eventKey: string
   input: Input
@@ -96,10 +99,12 @@ export interface EmailServiceOptions<R extends EmailTemplateRegistry> {
 const EVENT_KEY_PART = /^[a-z0-9][a-z0-9._-]*$/u
 
 /**
- * An event key from an event name and the ids that identify one occurrence:
- * `emailEventKey('submission-received', id)` is `submission-received:<id>`. Parts are
- * lower-case letters, digits, `.`, `_`, and `-`, so an address can never become a key; hash
- * anything else (for example a sign-in code) before passing it.
+ * An event key from an event name and the non-secret ids that identify one occurrence:
+ * `emailEventKey('submission-created', id)` is `submission-created:<id>`. Parts are lower-case
+ * letters, digits, `.`, `_`, and `-`, so an address can never become a key. Keys are logged
+ * and kept in D1: never derive one from a secret such as a sign-in code (use the verification
+ * row's id). To send one event to several recipients with the same template, add a recipient
+ * id (a user id, never the address).
  */
 export function emailEventKey(event: string, ...ids: string[]): string {
   const parts = [event, ...ids]
@@ -111,12 +116,40 @@ export function emailEventKey(event: string, ...ids: string[]): string {
   return key
 }
 
+const INVALID = '[invalid]'
+
+/**
+ * The fields every log line starts with. The event key and template id appear only when they
+ * are well-formed, so a malformed one (an address passed as a key) never reaches a log.
+ */
+export function emailLogContext(
+  templateId: unknown,
+  request: unknown,
+  fields: Record<string, unknown>
+): Record<string, unknown> {
+  let eventKey: unknown
+  try {
+    eventKey =
+      typeof request === 'object' && request !== null && 'eventKey' in request
+        ? request.eventKey
+        : undefined
+  } catch {
+    eventKey = undefined
+  }
+  return {
+    ...fields,
+    eventKey: isEmailEventKey(eventKey) ? eventKey : INVALID,
+    templateId: isEmailTemplateId(templateId) ? templateId : INVALID
+  }
+}
+
 export function createEmailService<R extends EmailTemplateRegistry>(
   options: EmailServiceOptions<R>
 ): EmailService<R> {
   const { ledger, policy, sender, templates } = options
   const log = options.log ?? consoleEmailLogger
   const links = createEmailLinks(policy.linkOrigin)
+  const provider = sender.provider
 
   async function deliver(
     templateId: string,
@@ -130,9 +163,10 @@ export function createEmailService<R extends EmailTemplateRegistry>(
     }
     // Templates declare `render` as a method, so any registered template accepts `unknown`
     // here; the caller's input type was already checked by `enqueue`'s signature.
-    const template: EmailTemplate<unknown> | undefined = Object.hasOwn(templates, templateId)
-      ? templates[templateId]
-      : undefined
+    const template: EmailTemplate<unknown> | undefined =
+      isEmailTemplateId(templateId) && Object.hasOwn(templates, templateId)
+        ? templates[templateId]
+        : undefined
     if (!template) {
       log({ ...context, event: 'email_rejected', level: 'error', reason: 'unknown_template' })
       return
@@ -167,7 +201,7 @@ export function createEmailService<R extends EmailTemplateRegistry>(
 
     let claim: EmailDeliveryClaim
     try {
-      claim = await ledger.claim({ eventKey, provider: sender.provider, templateId })
+      claim = await ledger.claim({ eventKey, provider, templateId })
     } catch (error) {
       log({
         ...recipient,
@@ -179,13 +213,22 @@ export function createEmailService<R extends EmailTemplateRegistry>(
       return
     }
     if (claim.outcome === 'duplicate') {
-      log({
-        ...recipient,
-        attempts: claim.attempts,
-        event: 'email_duplicate_suppressed',
-        level: 'info',
-        status: claim.status
-      })
+      log(
+        claim.exhausted
+          ? {
+              ...recipient,
+              attempts: claim.attempts,
+              event: 'email_attempts_exhausted',
+              level: 'warn'
+            }
+          : {
+              ...recipient,
+              attempts: claim.attempts,
+              event: 'email_duplicate_suppressed',
+              level: 'info',
+              status: claim.status
+            }
+      )
       return
     }
 
@@ -193,6 +236,7 @@ export function createEmailService<R extends EmailTemplateRegistry>(
       from: { ...EMAIL_FROM },
       headers: { 'Auto-Submitted': 'auto-generated' },
       html: rendered.html,
+      replyTo: EMAIL_SUPPORT_ADDRESS,
       subject: prefixedSubject(policy, rendered.subject),
       text: rendered.text,
       to
@@ -220,7 +264,8 @@ export function createEmailService<R extends EmailTemplateRegistry>(
         errorCode: outcome.errorCode,
         eventKey,
         providerMessageId: outcome.messageId,
-        status: outcome.status
+        status: outcome.status,
+        templateId
       })
       if (!recorded) {
         log({ ...attempt, event: 'email_ledger_failed', level: 'warn', stage: 'complete_stale' })
@@ -239,22 +284,20 @@ export function createEmailService<R extends EmailTemplateRegistry>(
 
   return {
     enqueue(templateId, request) {
-      const context = {
+      const context = emailLogContext(templateId, request, {
         environment: policy.environment,
-        eventKey: typeof request?.eventKey === 'string' ? request.eventKey.slice(0, 200) : null,
-        provider: sender.provider,
-        templateId: String(templateId).slice(0, 64)
-      }
-      // `deliver` is async, so even a malformed request becomes a rejection logged here.
-      const delivery = deliver(templateId, request ?? {}, context).catch(error => {
-        log({
-          ...context,
-          error: redactedErrorMessage(error),
-          event: 'email_delivery_failed',
-          level: 'error'
-        })
+        provider
       })
       try {
+        // `deliver` is async, so even a malformed request becomes a rejection logged here.
+        const delivery = deliver(templateId, request ?? {}, context).catch(error => {
+          log({
+            ...context,
+            error: redactedErrorMessage(error),
+            event: 'email_delivery_failed',
+            level: 'error'
+          })
+        })
         options.waitUntil(delivery)
       } catch (error) {
         log({
@@ -279,11 +322,9 @@ export function createDisabledEmailService<R extends EmailTemplateRegistry>(
   return {
     enqueue(templateId, request) {
       log({
+        ...emailLogContext(templateId, request, { reason: redactedErrorMessage(reason) }),
         event: 'email_disabled',
-        eventKey: typeof request?.eventKey === 'string' ? request.eventKey.slice(0, 200) : null,
-        level: 'error',
-        reason: reason.slice(0, 300),
-        templateId: String(templateId).slice(0, 64)
+        level: 'error'
       })
     }
   }
