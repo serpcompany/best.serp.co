@@ -4,8 +4,8 @@ import { project } from '../../../../scripts/project'
 import {
   EMAIL_DASHBOARD_PATH,
   EMAIL_LINK_ORIGINS,
+  EMAIL_SENDER,
   EmailConfigError,
-  emailSender,
   normalizeEmailAddress,
   parseRecipientAllowlist,
   prefixedSubject,
@@ -23,7 +23,7 @@ describe('email environment policy', () => {
     expect(local).toEqual({
       delivery: 'log',
       environment: 'local',
-      from: { email: 'noreply@mail-staging.serp.co', name: 'SERP Directory' },
+      from: { email: 'noreply@mail.serp.co', name: 'SERP Directory' },
       linkOrigin: 'http://localhost:8787',
       recipientAllowlist: null,
       subjectPrefix: null
@@ -124,26 +124,20 @@ describe('email environment policy', () => {
 })
 
 describe('email senders and useSend settings', () => {
-  it('sends from each environment’s verified useSend domain', () => {
+  it('sends from mail.serp.co in every environment', () => {
     // serpcompany/best.serp.co#59 (provider changed to useSend): no Reply-To; the footer sends
-    // people to the dashboard instead (#73).
-    expect(emailSender('production')).toEqual({
-      email: 'noreply@mail.serp.co',
-      name: 'SERP Directory'
-    })
-    expect(emailSender('staging')).toEqual({
-      email: 'noreply@mail-staging.serp.co',
-      name: 'SERP Directory'
-    })
-    expect(emailSender('local')).toEqual(emailSender('staging'))
-    expect(
-      resolveEmailPolicy({ D1_RUNTIME_ENV: 'production', SITE_ENVIRONMENT: 'production' }).from
-    ).toEqual(emailSender('production'))
-    expect(
-      resolveEmailPolicy({ D1_RUNTIME_ENV: 'staging', SITE_ENVIRONMENT: 'staging' }).from
-    ).toEqual(emailSender('staging'))
+    // people to the dashboard instead (#73). Staging shares the production sender (owner
+    // decision: its useSend key is restricted to mail.serp.co); the `[staging]` prefix and the
+    // allowlist mark and limit its mail.
+    expect(EMAIL_SENDER).toEqual({ email: 'noreply@mail.serp.co', name: 'SERP Directory' })
+    for (const environment of ['local', 'staging', 'production'] as const) {
+      expect(
+        resolveEmailPolicy({ D1_RUNTIME_ENV: environment, SITE_ENVIRONMENT: environment }).from,
+        environment
+      ).toEqual(EMAIL_SENDER)
+    }
     // A plain display name needs no quoting in `Name <address>`.
-    expect(emailSender('production').name).toMatch(/^[A-Za-z0-9 ]+$/u)
+    expect(EMAIL_SENDER.name).toMatch(/^[A-Za-z0-9 ]+$/u)
     expect(EMAIL_DASHBOARD_PATH).toBe('/account/')
   })
 

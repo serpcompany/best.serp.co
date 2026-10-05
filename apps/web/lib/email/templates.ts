@@ -119,9 +119,13 @@ const CSS_PROPERTIES = new Set([
   'margin-left',
   'margin-right',
   'margin-top',
+  'max-height',
   'max-width',
   'min-width',
+  'mso-hide',
   'mso-line-height-rule',
+  'opacity',
+  'overflow',
   'padding',
   'padding-bottom',
   'padding-left',
@@ -138,7 +142,7 @@ const CSS_PROPERTIES = new Set([
 // Colours as hex, lengths, numbers, keywords, and font stacks. No `(`, `)`, `\`, `:`, `;`,
 // `/`, `@`, `<`, or `>`, so no `url()`, `expression()`, escapes, or a second declaration.
 const CSS_VALUE =
-  /^(?:#[0-9a-f]{3,8}|-?\d*\.?\d+(?:px|em|rem|%)?|[a-z][a-z-]*|'[a-z0-9 -]+'|"[a-z0-9 -]+")(?:\s*,?\s+|\s*,\s*)?/iu
+  /^(?:#[0-9a-f]{3,8}|-?\d*\.?\d+(?:px|em|rem|%)?|-?[a-z][a-z-]*|'[a-z0-9 -]+'|"[a-z0-9 -]+")(?:\s*,?\s+|\s*,\s*)?/iu
 
 function isCssValue(value: string): boolean {
   let rest = value.trim()
@@ -520,11 +524,14 @@ export function createEmailLinks(origin: string): EmailLinks {
 export interface EmailRenderContext {
   /**
    * The absolute dashboard URL every footer must link to, in both bodies: the sender is not
-   * monitored, so the footer says so and points here (serpcompany/best.serp.co#73).
+   * monitored, so the footer says so and points here (serpcompany/best.serp.co#73). Users get
+   * their dashboard, admins (`audience: 'admin'`) the admin one.
    */
   dashboardUrl: string
   environment: SiteEnvironment
   links: EmailLinks
+  /** The normalized address this email goes to, for "you're getting this because" lines. */
+  recipient: string
 }
 
 export interface EmailContent {
@@ -534,6 +541,13 @@ export interface EmailContent {
 }
 
 export interface EmailTemplate<Input> {
+  /** Who reads it, which picks the footer's dashboard link. Defaults to `user`. */
+  readonly audience?: 'admin' | 'user'
+  /**
+   * A root-relative footer link for this email instead of the audience's dashboard, for an
+   * email about one dashboard location (a conversation thread).
+   */
+  footerPath?(input: Input): string
   /** Stable id, recorded with each delivery: lower-case letters, digits, and dashes. */
   readonly id: string
   render(input: Input, context: EmailRenderContext): EmailContent
@@ -571,6 +585,19 @@ export interface RenderedEmail {
 
 const MAX_SUBJECT_LENGTH = 200
 
+/**
+ * The text, cut to at most `max` characters with a trailing ellipsis when it is longer, so a
+ * long submitter-supplied name shortens an email instead of stopping it.
+ */
+export function clip(text: string, max: number): string {
+  const characters = Array.from(text)
+  if (characters.length <= max) return text
+  return `${characters
+    .slice(0, max - 1)
+    .join('')
+    .trimEnd()}…`
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
 }
@@ -588,9 +615,10 @@ function containsToken(text: string, url: string): boolean {
 
 /**
  * Renders a template and checks the result: a non-empty single-line subject (line breaks
- * and runs of whitespace collapse to one space) of at most 200 characters, non-empty text
- * and HTML bodies, and the dashboard link in both: an `<a href>` of exactly `dashboardUrl` in
- * the HTML and the URL as a whole token in the text (the footer every email carries).
+ * and runs of whitespace collapse to one space; over 200 characters it is cut with an
+ * ellipsis), non-empty text and HTML bodies, and the dashboard link in both: an `<a href>` of
+ * exactly `dashboardUrl` in the HTML and the URL as a whole token in the text (the footer
+ * every email carries).
  */
 export function renderEmail<Input>(
   template: EmailTemplate<Input>,
@@ -598,9 +626,9 @@ export function renderEmail<Input>(
   context: EmailRenderContext
 ): RenderedEmail {
   const content = template.render(input, context)
-  const subject = content.subject.replace(/\s+/gu, ' ').trim()
-  if (!subject || subject.length > MAX_SUBJECT_LENGTH) {
-    throw new EmailTemplateError(`Template ${template.id} rendered an empty or overlong subject.`)
+  const subject = clip(content.subject.replace(/\s+/gu, ' ').trim(), MAX_SUBJECT_LENGTH)
+  if (!subject) {
+    throw new EmailTemplateError(`Template ${template.id} rendered an empty subject.`)
   }
   if (!SafeHtml.is(content.html)) {
     throw new EmailTemplateError(`Template ${template.id} must build its HTML with the html tag.`)

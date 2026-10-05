@@ -42,6 +42,28 @@ function runLocal(command: string, stateDirectory: string): string {
   })
 }
 
+/**
+ * Runs a local D1 command that must fail and returns its stderr. The stderr is captured, not
+ * passed through, so an expected failure never reads like a real one in the harness output.
+ */
+function failingLocalStderr(command: string, stateDirectory: string): string {
+  try {
+    execFileSync('pnpm', ['tsx', 'scripts/d1-local-guard.ts', command], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+      env: {
+        ...process.env,
+        HARNESS_D1_STATE_DIRECTORY: stateDirectory,
+        WRANGLER_SEND_METRICS: 'false'
+      },
+      stdio: 'pipe'
+    })
+  } catch (error) {
+    return String((error as { stderr?: unknown }).stderr ?? '')
+  }
+  throw new Error(`d1-local-guard ${command} succeeded, but it was expected to fail.`)
+}
+
 function runDrizzle(command: string, stateDirectory: string): string {
   return execFileSync('pnpm', ['tsx', 'scripts/d1-drizzle-local.ts', command], {
     encoding: 'utf8',
@@ -263,7 +285,10 @@ describe('fresh Drizzle D1 history', () => {
       )
       expect(runLocal('verify', stateDirectory)).toContain('exact 17-table snapshot')
       mutateCanonicalState(stateDirectory)
-      expect(() => runLocal('verify', stateDirectory)).toThrow()
+      // The tampered table, and nothing else, must fail parity (not a crash or a missing report).
+      expect(failingLocalStderr('verify', stateDirectory)).toContain(
+        'Local D1 exact 17-table bootstrap parity failed: listing_resource_links.'
+      )
     },
     240_000
   )

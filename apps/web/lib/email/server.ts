@@ -2,7 +2,7 @@ import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { type AppEmailTemplates, appEmailTemplates } from './registry'
-import { createWorkerEmailService } from './runtime'
+import { createWorkerEmailService, isEmailDeliveryConfigured } from './runtime'
 import { redactedErrorMessage } from './senders'
 import { consoleEmailLogger, type EmailRequest, emailLogContext } from './service'
 import type { TemplateInput } from './templates'
@@ -41,4 +41,19 @@ export async function enqueueEmail<K extends keyof AppEmailTemplates & string>(
   }
 }
 
+/**
+ * Whether this request's Worker can deliver email (`isEmailDeliveryConfigured`). False, never
+ * a rejection, when the Cloudflare context is unavailable. Better Auth checks it before
+ * creating a sign-in code, so a code is never created without a way to send it.
+ */
+export async function emailDeliveryConfigured(): Promise<boolean> {
+  try {
+    const { env } = await getCloudflareContext({ async: true })
+    return isEmailDeliveryConfigured(env)
+  } catch {
+    return false
+  }
+}
+
+export { EMAIL_ADMIN_RECIPIENT } from './config'
 export { emailEventKey } from './service'

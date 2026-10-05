@@ -12,8 +12,10 @@ import { createEmailDeliveryLedger } from '@serpdirectory/data-ops/email-deliver
 import {
   EmailConfigError,
   type EmailEnvironmentVars,
+  type EmailPolicy,
   resolveEmailPolicy,
-  resolveUseSendConfig
+  resolveUseSendConfig,
+  type UseSendConfig
 } from './config'
 import { createLogEmailSender, createUseSendSender } from './senders'
 import {
@@ -37,6 +39,40 @@ export interface WaitUntilContext {
   waitUntil(promise: Promise<unknown>): void
 }
 
+interface WorkerDelivery {
+  database: D1Database
+  policy: EmailPolicy
+  /** Staging and production: where and how to call useSend. Local logs instead. */
+  useSend: UseSendConfig | null
+}
+
+/** What `env` delivers with, or an `EmailConfigError` naming why email is disabled. */
+function resolveWorkerDelivery(env: EmailWorkerEnv): WorkerDelivery {
+  const policy = resolveEmailPolicy(env)
+  if (!env.DB) throw new EmailConfigError('Email is disabled: the D1 binding DB is required.')
+  return {
+    database: env.DB,
+    policy,
+    useSend: policy.delivery === 'provider' ? resolveUseSendConfig(env) : null
+  }
+}
+
+/**
+ * True when `createWorkerEmailService(env)` would deliver mail instead of disabling itself: the
+ * environment vars agree, the `DB` binding is present, and staging and production have a valid
+ * `USESEND_BASE_URL` and `USESEND_API_KEY`. It sends nothing and queries nothing, so a caller
+ * can check it before creating something only an email can deliver (a sign-in code).
+ * Recipient rules are separate: staging still skips addresses outside its allowlist.
+ */
+export function isEmailDeliveryConfigured(env: EmailWorkerEnv): boolean {
+  try {
+    resolveWorkerDelivery(env)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function createWorkerEmailService<R extends EmailTemplateRegistry>(options: {
   clock?: () => Date
   context: WaitUntilContext
@@ -49,14 +85,12 @@ export function createWorkerEmailService<R extends EmailTemplateRegistry>(option
   const { context, env, templates } = options
   const log = options.log ?? consoleEmailLogger
   try {
-    const policy = resolveEmailPolicy(env)
-    if (!env.DB) throw new EmailConfigError('Email is disabled: the D1 binding DB is required.')
-    const sender =
-      policy.delivery === 'provider'
-        ? createUseSendSender({ ...resolveUseSendConfig(env), fetch: options.fetch })
-        : createLogEmailSender()
+    const { database, policy, useSend } = resolveWorkerDelivery(env)
+    const sender = useSend
+      ? createUseSendSender({ ...useSend, fetch: options.fetch })
+      : createLogEmailSender()
     return createEmailService({
-      ledger: createEmailDeliveryLedger({ client: createDatabase(env.DB), clock: options.clock }),
+      ledger: createEmailDeliveryLedger({ client: createDatabase(database), clock: options.clock }),
       log,
       policy,
       sender,

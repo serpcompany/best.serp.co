@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { SIGN_IN_CODE_LENGTH, SIGN_IN_CODE_TTL_SECONDS } from '../email/sign-in-code'
 import {
   clientIp,
+  OTP_EXPIRES_IN_SECONDS,
+  OTP_LENGTH,
   OTP_REQUEST_LIMITS,
   otpClientRules,
   otpEmailRules,
@@ -8,6 +11,19 @@ import {
   signInAttemptRules,
   UNKNOWN_IP
 } from './rate-limits'
+
+describe('sign-in code shape', () => {
+  it('issues the code the sign-in email describes: six digits for ten minutes', () => {
+    // One definition (lib/email/sign-in-code.ts): Better Auth and the email both read it, and
+    // changing either side without the other fails here.
+    expect(OTP_LENGTH).toBe(SIGN_IN_CODE_LENGTH)
+    expect(OTP_EXPIRES_IN_SECONDS).toBe(SIGN_IN_CODE_TTL_SECONDS)
+    expect({ length: OTP_LENGTH, lifetime: OTP_EXPIRES_IN_SECONDS }).toEqual({
+      length: 6,
+      lifetime: 600
+    })
+  })
+})
 
 describe('client address keys', () => {
   it('keeps IPv4 addresses as they are', () => {

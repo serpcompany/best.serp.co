@@ -3,9 +3,9 @@
  * same rule as `../environment/site-environment.ts`: nothing is inferred from the host).
  *
  * - local: nothing is sent; each message is written to the Worker log.
- * - staging: sent through useSend from `noreply@mail-staging.serp.co`; subjects start with
- *   `[staging]`, and mail goes only to the recipients listed in `EMAIL_STAGING_ALLOWLIST`
- *   (comma-separated; empty or missing means nobody).
+ * - staging: sent through useSend from `noreply@mail.serp.co`, like production (owner
+ *   decision); subjects start with `[staging]`, and mail goes only to the recipients listed in
+ *   `EMAIL_STAGING_ALLOWLIST` (comma-separated; empty or missing means nobody).
  * - production: sent through useSend from `noreply@mail.serp.co` to any valid recipient.
  *
  * An unknown, missing, or mismatched `SITE_ENVIRONMENT` / `D1_RUNTIME_ENV` disables email
@@ -25,16 +25,14 @@ export interface EmailSenderIdentity {
 }
 
 /**
- * The sender for an environment, from site-config: `SERP Directory
- * <noreply@mail-staging.serp.co>` on staging (and in local logs), `SERP Directory
- * <noreply@mail.serp.co>` in production.
+ * The sender in every environment, from site-config: `SERP Directory <noreply@mail.serp.co>`.
+ * Staging shares it (owner decision: the staging useSend key is restricted to `mail.serp.co`);
+ * its `[staging]` subject prefix and recipient allowlist tell the two apart.
  */
-export function emailSender(environment: SiteEnvironment): Readonly<EmailSenderIdentity> {
-  return {
-    email: environment === 'production' ? site.email.from.production : site.email.from.staging,
-    name: site.email.from.name
-  }
-}
+export const EMAIL_SENDER: Readonly<EmailSenderIdentity> = Object.freeze({
+  email: site.email.from.address,
+  name: site.email.from.name
+})
 
 /** The Worker secret holding the useSend API key (staging and production). */
 export const USESEND_API_KEY_SECRET = 'USESEND_API_KEY'
@@ -78,10 +76,23 @@ export function resolveUseSendConfig(env: {
 }
 
 /**
- * The dashboard every email footer links to (`/account/`). The sender is not monitored and
- * emails carry no Reply-To; replies happen in the dashboard (serpcompany/best.serp.co#73).
+ * The dashboard every user email footer links to (`/account/`; `/account/messages/` once #73
+ * adds the inbox). The sender is not monitored and emails carry no Reply-To; replies happen in
+ * the dashboard (serpcompany/best.serp.co#73).
  */
 export const EMAIL_DASHBOARD_PATH = site.email.dashboardPath
+
+/**
+ * The page admin email footers link to: the review queue (`/admin/submissions/`, #64), and
+ * `/admin/inbox/` once #73 lands.
+ */
+export const EMAIL_ADMIN_DASHBOARD_PATH = site.email.adminDashboardPath
+
+/**
+ * The address admin alerts go to (`devin@serp.co`, serpcompany/best.serp.co#59). Callers pass
+ * it as the recipient; templates never hold an address.
+ */
+export const EMAIL_ADMIN_RECIPIENT = site.email.adminRecipient
 
 export const STAGING_SUBJECT_PREFIX = '[staging]'
 
@@ -173,7 +184,7 @@ export function resolveEmailPolicy(vars: EmailEnvironmentVars): EmailPolicy {
     )
   }
   const linkOrigin = EMAIL_LINK_ORIGINS[environment]
-  const from = emailSender(environment)
+  const from = EMAIL_SENDER
   if (environment === 'local') {
     return {
       delivery: 'log',

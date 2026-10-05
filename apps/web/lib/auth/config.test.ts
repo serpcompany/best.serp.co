@@ -674,6 +674,7 @@ describe('staging and production', () => {
   it('sends the code as the sign-in-code email once that template is registered', async () => {
     const enqueued: unknown[] = []
     const email = {
+      deliveryConfigured: async () => true,
       async enqueue(request: unknown) {
         enqueued.push(request)
       },
@@ -707,6 +708,31 @@ describe('staging and production', () => {
     ])
     const { code } = (enqueued[0] as { input: { code: string } }).input
     expect((await guess(h, 'devin@serp.co', code, browser)).status).toBe(200)
+  })
+
+  it('answers 503 and creates no code while the Worker cannot deliver email', async () => {
+    const enqueue = async () => {
+      throw new Error('a code must not be sent')
+    }
+    const h = harness({
+      environment: 'staging',
+      sender: selectOtpSender('staging', {
+        deliveryConfigured: async () => false,
+        enqueue,
+        eventKey: () => 'sign-in-code:00000000-0000-4000-8000-000000000001',
+        templateRegistered: true
+      })
+    })
+    const response = await h.call(SEND, { body: { email: 'devin@serp.co', type: 'sign-in' } })
+    expect(response.status).toBe(503)
+    expect(((await response.json()) as { code: string }).code).toBe('OTP_DELIVERY_UNAVAILABLE')
+    expect(h.sqlite.database.prepare('SELECT count(*) AS n FROM verification').get()).toEqual({
+      n: 0
+    })
+    // Refused before any limit is counted, so fixing the configuration restores sign-in at once.
+    expect(
+      h.sqlite.database.prepare('SELECT count(*) AS n FROM auth_rate_limit_hits').get()
+    ).toEqual({ n: 0 })
   })
 
   it('uses __Secure- cookies on https origins', async () => {

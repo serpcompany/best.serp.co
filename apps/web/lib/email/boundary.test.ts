@@ -54,24 +54,50 @@ describe('email module boundary', () => {
       'runtime.ts',
       'senders.ts',
       'service.ts',
+      'sign-in-code.ts',
       'templates.ts',
       'test-fixture.ts'
     ])
-    for (const file of modules) {
+    const emails = readdirSync(resolve(emailDirectory, 'emails'))
+      .filter(file => file.endsWith('.ts'))
+      .map(file => `emails/${file}`)
+    for (const file of [...modules, ...emails]) {
       expect(source(file), file).not.toMatch(
         /import 'server-only'|from '(?:@opennextjs\/[^']+|next(?:\/[^']+)?)'|process\.env/u
       )
     }
   })
 
+  it('never depends on the auth module, which depends on it', () => {
+    const emailFiles = appFiles().filter(file => file.startsWith('lib/email/'))
+    expect(emailFiles.length).toBeGreaterThan(10)
+    const authImports = emailFiles.filter(file =>
+      importSpecifiers(readFileSync(resolve(appDirectory, file), 'utf8')).some(specifier => {
+        const target = specifier.startsWith('@/')
+          ? resolve(appDirectory, specifier.slice(2))
+          : specifier.startsWith('.')
+            ? resolve(appDirectory, dirname(file), specifier)
+            : null
+        const fromApp = target ? relative(appDirectory, target) : ''
+        return fromApp === 'lib/auth' || fromApp.startsWith('lib/auth/')
+      })
+    )
+    expect(authImports).toEqual([])
+    // The sign-in code contract imports nothing, so Better Auth's config can load it anywhere.
+    expect(importSpecifiers(source('sign-in-code.ts'))).toEqual([])
+  })
+
   it('reads D1 only after resolving the environment policy, and holds no SQL', () => {
     const runtime = source('runtime.ts')
     const policy = runtime.indexOf('resolveEmailPolicy(env)')
     const binding = runtime.indexOf('if (!env.DB)')
-    const database = runtime.indexOf('createDatabase(env.DB)')
+    const resolved = runtime.indexOf('= resolveWorkerDelivery(env)')
+    const database = runtime.indexOf('createDatabase(database)')
     expect(policy).toBeGreaterThan(-1)
     expect(binding).toBeGreaterThan(policy)
-    expect(database).toBeGreaterThan(binding)
+    expect(resolved).toBeGreaterThan(binding)
+    expect(database).toBeGreaterThan(resolved)
+    expect(runtime.match(/createDatabase\(/gu)).toHaveLength(1)
     expect(runtime).toContain('@serpdirectory/data-ops/email-deliveries')
 
     for (const file of readdirSync(emailDirectory).filter(name => name.endsWith('.ts'))) {
@@ -90,10 +116,15 @@ describe('email module boundary', () => {
       file =>
         !/\.test\.tsx?$/u.test(file) &&
         importSpecifiers(readFileSync(resolve(appDirectory, file), 'utf8')).some(specifier =>
-          /(?:^|\/)test-fixture$/u.test(specifier)
+          /(?:^|\/)(?:test-fixture|samples)$/u.test(specifier)
         )
     )
     expect(fixtureImports).toEqual([])
+    // Templates take every address as input or from config; none holds one.
+    for (const file of readdirSync(resolve(emailDirectory, 'emails'))) {
+      if (!file.endsWith('.ts') || file.endsWith('.test.ts') || file === 'samples.ts') continue
+      expect(source(`emails/${file}`), file).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/u)
+    }
   })
 
   it('is never imported by a Client Component, by any path', () => {

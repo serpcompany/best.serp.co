@@ -25,6 +25,7 @@ import {
   isEmailTemplateId
 } from '@serpdirectory/data-ops/email-deliveries'
 import {
+  EMAIL_ADMIN_DASHBOARD_PATH,
   EMAIL_DASHBOARD_PATH,
   type EmailPolicy,
   normalizeEmailAddress,
@@ -40,6 +41,7 @@ import {
 } from './senders'
 import {
   createEmailLinks,
+  type EmailRenderContext,
   type EmailTemplate,
   type EmailTemplateRegistry,
   type RenderedEmail,
@@ -117,6 +119,31 @@ export function emailEventKey(event: string, ...ids: string[]): string {
   return key
 }
 
+/**
+ * The context a template renders with: this environment's links, the recipient, and the
+ * footer's dashboard link: the template's own `footerPath` for this input, else its audience's
+ * dashboard (the user dashboard, or the admin one).
+ */
+export function emailRenderContext<Input>(
+  policy: EmailPolicy,
+  template: Pick<EmailTemplate<Input>, 'audience' | 'footerPath'>,
+  recipient: string,
+  input: Input
+): EmailRenderContext {
+  const links = createEmailLinks(policy.linkOrigin)
+  const footerPath = template.footerPath
+    ? template.footerPath(input)
+    : template.audience === 'admin'
+      ? EMAIL_ADMIN_DASHBOARD_PATH
+      : EMAIL_DASHBOARD_PATH
+  return {
+    dashboardUrl: links.url(footerPath),
+    environment: policy.environment,
+    links,
+    recipient
+  }
+}
+
 const INVALID = '[invalid]'
 const MAX_IDEMPOTENCY_KEY_LENGTH = 256
 
@@ -170,7 +197,6 @@ export function createEmailService<R extends EmailTemplateRegistry>(
 ): EmailService<R> {
   const { ledger, policy, sender, templates } = options
   const log = options.log ?? consoleEmailLogger
-  const links = createEmailLinks(policy.linkOrigin)
   const provider = sender.provider
 
   async function deliver(
@@ -206,11 +232,11 @@ export function createEmailService<R extends EmailTemplateRegistry>(
 
     let rendered: RenderedEmail
     try {
-      rendered = renderEmail(template, request.input, {
-        dashboardUrl: links.url(EMAIL_DASHBOARD_PATH),
-        environment: policy.environment,
-        links
-      })
+      rendered = renderEmail(
+        template,
+        request.input,
+        emailRenderContext(policy, template, to, request.input)
+      )
     } catch (error) {
       log({
         ...recipient,

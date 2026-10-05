@@ -7,7 +7,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SqliteD1 } from '../../../../packages/data-ops/src/test-support'
 import { type EmailEnvironmentVars, resolveEmailPolicy } from './config'
-import { createWorkerEmailService } from './runtime'
+import { createWorkerEmailService, isEmailDeliveryConfigured } from './runtime'
 import { createCapturingEmailSender } from './senders'
 import {
   createDisabledEmailService,
@@ -114,10 +114,7 @@ describe('email delivery', () => {
       'https://best-serp-co-staging.serpcompany.workers.dev/products/autoenhance.ai/'
     )
     expect(sender.sent[0]?.to).toBe('owner@serp.co')
-    expect(sender.sent[0]?.from).toEqual({
-      email: 'noreply@mail-staging.serp.co',
-      name: 'SERP Directory'
-    })
+    expect(sender.sent[0]?.from).toEqual({ email: 'noreply@mail.serp.co', name: 'SERP Directory' })
     expect(logs.find(entry => entry.event === 'email_skipped')).toMatchObject({
       eventKey: 'fixture:blocked',
       level: 'warn',
@@ -452,13 +449,9 @@ describe('Worker email service', () => {
     return logs
   }
 
-  it('sends through useSend from each environment’s own domain, with no Reply-To', async () => {
+  it('sends through useSend from mail.serp.co in staging and production, with no Reply-To', async () => {
     const cases = [
-      [
-        staging,
-        'SERP Directory <noreply@mail-staging.serp.co>',
-        '[staging] Fixture: Secret body text'
-      ],
+      [staging, 'SERP Directory <noreply@mail.serp.co>', '[staging] Fixture: Secret body text'],
       [production, 'SERP Directory <noreply@mail.serp.co>', 'Fixture: Secret body text']
     ] as const
     for (const [vars, from, subject] of cases) {
@@ -493,7 +486,7 @@ describe('Worker email service', () => {
     const logged = JSON.parse(String(info.mock.calls[0]?.[0])) as Record<string, unknown>
     expect(logged).toMatchObject({
       event: 'email_logged',
-      from: 'SERP Directory <noreply@mail-staging.serp.co>',
+      from: 'SERP Directory <noreply@mail.serp.co>',
       subject: 'Fixture: Secret body text',
       text: 'Secret body text\n\nhttp://localhost:8787/products/autoenhance.ai/\n\nhttp://localhost:8787/account/',
       to: 'owner@serp.co'
@@ -523,7 +516,30 @@ describe('Worker email service', () => {
       ])
       expect(JSON.stringify(logs)).not.toContain(useSend.USESEND_API_KEY)
       expect(calls).toEqual([])
+      // The no-send check agrees, so Better Auth refuses a code it could not deliver.
+      expect(isEmailDeliveryConfigured(env), JSON.stringify({ ...env, DB: undefined })).toBe(false)
     }
+  })
+
+  it('reports delivery as configured exactly when the service would deliver', async () => {
+    const DB = new SqliteD1().asD1Database()
+    for (const env of [
+      { ...local, DB },
+      { ...local, DB, USESEND_API_KEY: '' },
+      { ...staging, ...useSend, DB },
+      { ...staging, ...useSend, DB, EMAIL_STAGING_ALLOWLIST: '' },
+      { ...production, ...useSend, DB }
+    ]) {
+      expect(isEmailDeliveryConfigured(env), String(env.SITE_ENVIRONMENT)).toBe(true)
+      const logs = await run(env, fakeFetch().fetcher)
+      expect(logs.map(entry => entry.event)).not.toContain('email_disabled')
+    }
+    // It never sends or touches D1.
+    const statements = new SqliteD1()
+    expect(
+      isEmailDeliveryConfigured({ ...production, ...useSend, DB: statements.asD1Database() })
+    ).toBe(true)
+    expect(statements.statements).toEqual([])
   })
 })
 
