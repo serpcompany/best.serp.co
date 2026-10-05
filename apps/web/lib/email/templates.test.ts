@@ -103,12 +103,92 @@ describe('html bodies', () => {
     // Browsers strip leading spaces from URLs, so the value still picks the scheme here.
     expect(() => html`<a href=" ${'javascript:alert(1)'}">x</a>`).toThrow(EmailTemplateError)
     expect(() => html`<p title="${html`<b>x</b>`}">x</p>`).toThrow(EmailTemplateError)
-    // Once the literal fixes the scheme, a value is escaped attribute text.
+    // Once the literal fixes the scheme, a value must be one encoded URL component.
     expect(
-      html`<a href="https://best.serp.co/products/${'a"b<c'}/" title="${'Tom & Jerry'}">x</a>`.toString()
-    ).toBe('<a href="https://best.serp.co/products/a&quot;b&lt;c/" title="Tom &amp; Jerry">x</a>')
+      html`<a href="https://best.serp.co/products/${encodeURIComponent('a"b<c')}/" title="${'Tom & Jerry'}">x</a>`.toString()
+    ).toBe('<a href="https://best.serp.co/products/a%22b%3Cc/" title="Tom &amp; Jerry">x</a>')
+    expect(() => html`<a href="https://best.serp.co/products/${'a"b'}/">x</a>`).toThrow(
+      EmailTemplateError
+    )
     // An equals sign in text content is fine.
     expect(html`<p>1 + 1 = ${2}</p>`.toString()).toBe('<p>1 + 1 = 2</p>')
+  })
+
+  it('tracks quotes from the start, so an earlier quoted > cannot hide a link', () => {
+    expect(() => html`<a title="a>b" href="${'javascript:alert(1)'}">x</a>`).toThrow(
+      EmailTemplateError
+    )
+    expect(() => html`<a title='a>"b' href="${'javascript:alert(1)'}">x</a>`).toThrow(
+      EmailTemplateError
+    )
+    expect(() => html`<a title="a>b" href="${html`x" onmouseover="alert(1)`}">x</a>`).toThrow(
+      EmailTemplateError
+    )
+    // A nested fragment that leaves a tag open is tracked too.
+    const open = html`<a title="x`
+    expect(() => html`${open}" href="${'javascript:alert(1)'}">y</a>`).toThrow(EmailTemplateError)
+    // Quotes and > in text content don't start an attribute.
+    expect(html`<p>"a > b" ${'c'}</p>`.toString()).toBe('<p>"a > b" c</p>')
+    expect(html`<p>${'a'}</p><a href="${'https://best.serp.co'}">x</a>`.toString()).toBe(
+      '<p>a</p><a href="https://best.serp.co">x</a>'
+    )
+  })
+
+  it('checks every URL attribute and refuses values in style, handlers, and raw text', () => {
+    const bad = 'javascript:alert(1)'
+    expect(() => html`<td background="${bad}">x</td>`).toThrow(EmailTemplateError)
+    expect(() => html`<form action="${bad}"></form>`).toThrow(EmailTemplateError)
+    expect(() => html`<button formaction="${bad}">x</button>`).toThrow(EmailTemplateError)
+    expect(() => html`<video poster="${bad}"></video>`).toThrow(EmailTemplateError)
+    expect(() => html`<q cite="${bad}">x</q>`).toThrow(EmailTemplateError)
+    expect(() => html`<img SRCSET="${bad}">`).toThrow(EmailTemplateError)
+    expect(() => html`<form action="${'data:text/html,x'}"></form>`).toThrow(EmailTemplateError)
+    expect(html`<td background="${'https://best.serp.co/bg.png'}">x</td>`.toString()).toBe(
+      '<td background="https://best.serp.co/bg.png">x</td>'
+    )
+    expect(() => html`<p style="background:url(${'https://best.serp.co/x.png'})">x</p>`).toThrow(
+      EmailTemplateError
+    )
+    expect(() => html`<p style="${'color: red'}">x</p>`).toThrow(EmailTemplateError)
+    expect(() => html`<p onclick="${'x'}">x</p>`).toThrow(EmailTemplateError)
+    expect(() => html`<style>p { color: ${'red'} }</style>`).toThrow(EmailTemplateError)
+    expect(() => html`<script>${'1'}</script>`).toThrow(EmailTemplateError)
+    expect(() => html`<!-- ${'note'} -->`).toThrow(EmailTemplateError)
+    // After a raw-text element closes, content is text again.
+    expect(html`<style>p { color: red }</style><p>${'a<b'}</p>`.toString()).toBe(
+      '<style>p { color: red }</style><p>a&lt;b</p>'
+    )
+  })
+
+  it('accepts only mailto links to one plain address', () => {
+    expect(html`<a href="${'mailto:support@serp.co'}">x</a>`.toString()).toBe(
+      '<a href="mailto:support@serp.co">x</a>'
+    )
+    for (const value of [
+      'mailto:support@serp.co?bcc=attacker@example.com',
+      'mailto:support@serp.co%0D%0ABcc:attacker@example.com',
+      'mailto:support@serp.co\r\nBcc: attacker@example.com',
+      'mailto:a@b.co,c@d.co',
+      'mailto:?to=a@b.co',
+      'mailto:'
+    ]) {
+      expect(() => html`<a href="${value}">x</a>`, JSON.stringify(value)).toThrow(
+        EmailTemplateError
+      )
+    }
+    // A value after a literal `mailto:` must be encoded, so it can't add a query.
+    expect(() => html`<a href="mailto:${'support@serp.co?bcc=x@y.co'}">x</a>`).toThrow(
+      EmailTemplateError
+    )
+  })
+
+  it('refuses a hand-built strings array', () => {
+    const forged = Object.assign(['<img src=x onerror=alert(1)>'], {
+      raw: ['<img src=x onerror=alert(1)>']
+    }) as unknown as TemplateStringsArray
+    expect(() => html(forged)).toThrow(EmailTemplateError)
+    expect(() => html(Object.freeze(forged))).toThrow(EmailTemplateError)
+    expect(() => html(['<b>'] as unknown as TemplateStringsArray)).toThrow(EmailTemplateError)
   })
 
   it('mints SafeHtml only through the html tag', () => {

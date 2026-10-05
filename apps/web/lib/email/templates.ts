@@ -6,9 +6,9 @@
  *
  * HTML is built with the `html` tag, which escapes every interpolated value, so submitter
  * text (a product name, a rejection reason) can never inject markup. Values go in element
- * content or in quoted attributes only; a value in an `href` or `src` must be an `http:`,
- * `https:`, or `mailto:` URL. The real templates and their copy follow the mockups approved in
- * serpcompany/best.serp.co#70.
+ * content or in quoted attributes only, and a value that forms a URL must be an absolute
+ * `http(s)` URL or a `mailto:` with one plain address (see `html`). The real templates and
+ * their copy follow the mockups approved in serpcompany/best.serp.co#70.
  */
 import { isEmailTemplateId } from '@serpdirectory/data-ops/email-deliveries'
 import { absoluteUrl } from '@serpdirectory/web-core/canonical-url'
@@ -61,11 +61,40 @@ function htmlValue(value: HtmlValue): string {
   return escapeHtml(String(value))
 }
 
-const LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
-const URL_ATTRIBUTES = new Set(['href', 'src'])
+const LINK_PROTOCOLS = new Set(['http:', 'https:'])
+/** Attributes whose value is a URL, so a value there could pick the scheme. */
+const URL_ATTRIBUTES = new Set([
+  'action',
+  'background',
+  'cite',
+  'codebase',
+  'data',
+  'dynsrc',
+  'formaction',
+  'href',
+  'icon',
+  'longdesc',
+  'lowsrc',
+  'manifest',
+  'poster',
+  'profile',
+  'src',
+  'srcset',
+  'usemap',
+  'xlink:href'
+])
+/** Elements whose content is not HTML text (CSS, script), where escaping does not protect. */
+const RAW_TEXT_ELEMENTS = new Set(['iframe', 'noembed', 'noscript', 'script', 'style', 'xmp'])
+// One plain recipient and nothing else: no `?` query (cc, bcc, body, or headers) or escapes.
+const MAILTO =
+  /^mailto:[a-z0-9._+-]+@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/iu
+// What `encodeURIComponent` can output: a value after a fixed scheme stays one URL component.
+const URL_COMPONENT = /^[A-Za-z0-9\-_.!~*'()%]*$/u
 
+/** A whole link: an absolute `http(s)` URL, or `mailto:` one plain address. */
 function isLinkUrl(value: string): boolean {
   if (/[\s\p{Cc}]/u.test(value)) return false
+  if (/^mailto:/iu.test(value)) return MAILTO.test(value)
   try {
     return LINK_PROTOCOLS.has(new URL(value).protocol)
   } catch {
@@ -75,28 +104,134 @@ function isLinkUrl(value: string): boolean {
 
 type ValueContext =
   | { kind: 'content' }
-  | { kind: 'tag' }
-  | { kind: 'attribute'; prefix: string; url: boolean }
+  | { kind: 'rejected'; reason: string }
+  | { kind: 'attribute'; name: string; prefix: string }
 
-/** Where the next interpolated value lands, judged from the markup written so far. */
+type ScanState =
+  | 'text'
+  | 'comment'
+  | 'tag-name'
+  | 'before-attribute'
+  | 'attribute-name'
+  | 'after-attribute-name'
+  | 'before-value'
+  | 'quoted-value'
+  | 'unquoted-value'
+
+interface Scan {
+  attributeName: string
+  closing: boolean
+  quote: string
+  /** The raw-text element (`style`, `script`, ...) whose content the scan is in. */
+  rawText: string | null
+  state: ScanState
+  tagName: string
+  valueStart: number
+}
+
+/** The scan after a tag's `>`: back to text, inside a raw-text element if one just opened. */
+function afterTag(scan: Scan): void {
+  const name = scan.tagName.toLowerCase()
+  scan.rawText = !scan.closing && RAW_TEXT_ELEMENTS.has(name) ? name : null
+  scan.state = 'text'
+}
+
+/** Advances the scan over one character; returns how many extra characters it consumed. */
+function step(scan: Scan, markup: string, index: number): number {
+  const character = markup[index] ?? ''
+  switch (scan.state) {
+    case 'text': {
+      const rawText = scan.rawText
+      if (rawText !== null) {
+        if (markup.slice(index, index + rawText.length + 2).toLowerCase() === `</${rawText}`) {
+          Object.assign(scan, { closing: true, rawText: null, state: 'tag-name', tagName: '' })
+          return 1
+        }
+      } else if (markup.startsWith('<!--', index)) {
+        scan.state = 'comment'
+        return 3
+      } else if (character === '<' && /[A-Za-z/!?]/u.test(markup[index + 1] ?? '')) {
+        Object.assign(scan, { closing: false, state: 'tag-name', tagName: '' })
+      }
+      return 0
+    }
+    case 'comment':
+      if (!markup.startsWith('-->', index)) return 0
+      scan.state = 'text'
+      return 2
+    case 'tag-name':
+      if (character === '>') afterTag(scan)
+      else if (/\s/u.test(character)) scan.state = 'before-attribute'
+      else if (character === '/' && scan.tagName === '') scan.closing = true
+      else scan.tagName += character
+      return 0
+    case 'before-attribute':
+    case 'after-attribute-name':
+      if (character === '>') afterTag(scan)
+      else if (character === '=' && scan.state === 'after-attribute-name') {
+        scan.state = 'before-value'
+      } else if (!/[\s/]/u.test(character)) {
+        Object.assign(scan, { attributeName: character, state: 'attribute-name' })
+      }
+      return 0
+    case 'attribute-name':
+      if (character === '>') afterTag(scan)
+      else if (character === '=') scan.state = 'before-value'
+      else if (/\s/u.test(character)) scan.state = 'after-attribute-name'
+      else scan.attributeName += character
+      return 0
+    case 'before-value':
+      if (character === '>') afterTag(scan)
+      else if (character === '"' || character === "'") {
+        Object.assign(scan, { quote: character, state: 'quoted-value', valueStart: index + 1 })
+      } else if (!/\s/u.test(character)) scan.state = 'unquoted-value'
+      return 0
+    case 'quoted-value':
+      if (character === scan.quote) scan.state = 'before-attribute'
+      return 0
+    case 'unquoted-value':
+      if (character === '>') afterTag(scan)
+      else if (/\s/u.test(character)) scan.state = 'before-attribute'
+      return 0
+  }
+}
+
+/**
+ * Where the next interpolated value lands. Scans the whole markup written so far, tracking
+ * tags, attribute names, and quotes in one pass, so a `>` or a quote inside an earlier quoted
+ * attribute cannot hide the real context.
+ */
 function valueContext(markup: string): ValueContext {
-  const open = markup.lastIndexOf('<')
-  if (open < 0 || open < markup.lastIndexOf('>')) return { kind: 'content' }
-  const tag = markup.slice(open)
-  let quote: string | null = null
-  let valueStart = 0
-  for (let index = 0; index < tag.length; index++) {
-    const character = tag[index]
-    if (quote) {
-      if (character === quote) quote = null
-    } else if (character === '"' || character === "'") {
-      quote = character
-      valueStart = index + 1
+  const scan: Scan = {
+    attributeName: '',
+    closing: false,
+    quote: '',
+    rawText: null,
+    state: 'text',
+    tagName: '',
+    valueStart: 0
+  }
+  for (let index = 0; index < markup.length; index++) index += step(scan, markup, index)
+
+  if (scan.state === 'text') {
+    return scan.rawText === null
+      ? { kind: 'content' }
+      : { kind: 'rejected', reason: `Email HTML takes no values inside <${scan.rawText}>.` }
+  }
+  if (scan.state === 'quoted-value') {
+    return {
+      kind: 'attribute',
+      name: scan.attributeName.toLowerCase(),
+      prefix: markup.slice(scan.valueStart)
     }
   }
-  if (!quote) return { kind: 'tag' }
-  const name = /([^\s=]+)\s*=\s*$/u.exec(tag.slice(0, valueStart - 1))?.[1]?.toLowerCase()
-  return { kind: 'attribute', prefix: tag.slice(valueStart), url: URL_ATTRIBUTES.has(name ?? '') }
+  if (scan.state === 'comment') {
+    return { kind: 'rejected', reason: 'Email HTML takes no values in comments.' }
+  }
+  return {
+    kind: 'rejected',
+    reason: 'Email HTML takes values in element content or quoted attributes only.'
+  }
 }
 
 function attributeValue(value: HtmlValue): string {
@@ -108,26 +243,57 @@ function attributeValue(value: HtmlValue): string {
 function interpolate(markup: string, value: HtmlValue): string {
   const context = valueContext(markup)
   if (context.kind === 'content') return htmlValue(value)
-  if (context.kind === 'tag') {
-    throw new EmailTemplateError('Email HTML takes values in element content or quoted attributes.')
+  if (context.kind === 'rejected') throw new EmailTemplateError(context.reason)
+  if (context.name === 'style' || context.name.startsWith('on')) {
+    throw new EmailTemplateError(`Email HTML takes no values in a ${context.name} attribute.`)
   }
-  if (context.url && !context.prefix.includes(':')) {
-    // The value decides the URL's scheme, so it must be a whole, allowed link.
-    if (context.prefix !== '' || typeof value !== 'string' || !isLinkUrl(value)) {
-      throw new EmailTemplateError('Links in email HTML must be absolute http(s) or mailto URLs.')
+  if (URL_ATTRIBUTES.has(context.name)) {
+    const prefix = context.prefix.trimStart()
+    if (prefix === '') {
+      // The value is the whole URL, so it must be a whole, allowed link.
+      if (context.prefix !== '' || typeof value !== 'string' || !isLinkUrl(value)) {
+        throw new EmailTemplateError('Links in email HTML must be absolute http(s) or mailto URLs.')
+      }
+    } else if (!/^[a-z][a-z0-9+.-]*:/iu.test(prefix)) {
+      throw new EmailTemplateError('A link value must be the whole URL or follow its scheme.')
+    } else if (
+      !(typeof value === 'string' || typeof value === 'number') ||
+      !URL_COMPONENT.test(String(value))
+    ) {
+      throw new EmailTemplateError('A value inside a link must be encodeURIComponent-encoded.')
     }
   }
   return attributeValue(value)
 }
 
+/** A real tagged-template call: frozen strings with frozen `raw`, never a hand-built array. */
+function isTemplateStrings(strings: unknown): strings is TemplateStringsArray {
+  return (
+    Array.isArray(strings) &&
+    Object.isFrozen(strings) &&
+    'raw' in strings &&
+    Array.isArray(strings.raw) &&
+    Object.isFrozen(strings.raw) &&
+    strings.raw.length === strings.length
+  )
+}
+
 /**
  * Tagged template for HTML bodies: the literal parts are trusted markup, every interpolated
  * value is escaped unless it is itself `SafeHtml` (a nested `html` result). Arrays are joined;
- * `null`, `undefined`, and `false` render nothing. Values go in element content or in quoted
- * attributes only. An `href` or `src` value must be a whole absolute `http:`, `https:`, or
- * `mailto:` URL (use `links.url()` for site links). Anything else throws `EmailTemplateError`.
+ * `null`, `undefined`, and `false` render nothing.
+ *
+ * Values go in element content or in quoted attributes only: never in a tag, an unquoted
+ * attribute, a comment, `<style>` or `<script>`, a `style` attribute, or an `on*` handler. In a
+ * URL attribute (`href`, `src`, `background`, `action`, `poster`, ...) a value is either the
+ * whole URL (an absolute `http(s)` URL, or `mailto:` one plain address; use `links.url()` for
+ * site links) or an `encodeURIComponent`-encoded part after a scheme the literal fixes.
+ * Anything else throws `EmailTemplateError`.
  */
 export function html(strings: TemplateStringsArray, ...values: HtmlValue[]): SafeHtml {
+  if (!isTemplateStrings(strings)) {
+    throw new EmailTemplateError('html is a tagged template: call it as html`...`.')
+  }
   let markup = strings[0] ?? ''
   values.forEach((value, index) => {
     markup += interpolate(markup, value) + (strings[index + 1] ?? '')

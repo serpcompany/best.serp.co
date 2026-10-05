@@ -102,9 +102,11 @@ const EVENT_KEY_PART = /^[a-z0-9][a-z0-9._-]*$/u
  * An event key from an event name and the non-secret ids that identify one occurrence:
  * `emailEventKey('submission-created', id)` is `submission-created:<id>`. Parts are lower-case
  * letters, digits, `.`, `_`, and `-`, so an address can never become a key. Keys are logged
- * and kept in D1: never derive one from a secret such as a sign-in code (use the verification
- * row's id). To send one event to several recipients with the same template, add a recipient
- * id (a user id, never the address).
+ * and kept in D1: never derive one from a secret such as a sign-in code. A code email is a new
+ * event on every call, so key it per call: `emailEventKey('sign-in-code', crypto.randomUUID())`
+ * (Better Auth's `sendVerificationOTP` gets only `{ email, otp, type }`), or use an HMAC under
+ * a Worker secret. To send one event to several recipients with the same template, add a
+ * recipient id (a user id, never the address).
  */
 export function emailEventKey(event: string, ...ids: string[]): string {
   const parts = [event, ...ids]

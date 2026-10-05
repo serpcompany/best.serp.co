@@ -107,6 +107,39 @@ describe('email delivery ledger', () => {
     })
   })
 
+  it('does not report exhaustion when a concurrent attempt fails below the limit', async () => {
+    const d1 = new SqliteD1()
+    const binding = d1.asD1Database()
+    let beforeNextSelect: (() => void) | null = null
+    const racing = {
+      ...binding,
+      prepare(query: string) {
+        const hook = beforeNextSelect
+        if (hook && /^select/iu.test(query.trim())) {
+          beforeNextSelect = null
+          hook()
+        }
+        return binding.prepare(query)
+      }
+    } as D1Database
+    const operations = createEmailDeliveryLedger({ client: createDatabase(racing) })
+    await operations.claim(claim)
+    await operations.complete({ ...done, attempt: 1, status: 'failed' })
+    expect(await operations.claim(claim)).toEqual({ attempt: 2, outcome: 'claimed' })
+    // B's upsert sees attempt 2 `sending`; A then records it failed before B reads the row.
+    beforeNextSelect = () => {
+      d1.database.exec("UPDATE email_deliveries SET status = 'failed' WHERE attempts = 2")
+    }
+    expect(await operations.claim(claim)).toEqual({
+      attempts: 2,
+      exhausted: false,
+      outcome: 'duplicate',
+      status: 'failed'
+    })
+    // The next enqueue may retry it.
+    expect(await operations.claim(claim)).toEqual({ attempt: 3, outcome: 'claimed' })
+  })
+
   it('ignores a completion for an attempt the row no longer holds', async () => {
     const { operations, row } = ledger()
     await operations.claim(claim)

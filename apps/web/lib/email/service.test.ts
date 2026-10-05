@@ -187,6 +187,51 @@ describe('email delivery', () => {
     expect(rows()[0]).toMatchObject({ attempts: 2, status: 'sent' })
   })
 
+  it('treats a failed duplicate below the limit as a duplicate, not exhaustion', async () => {
+    const { logs, send, sender, settle } = harness(production, {
+      ledger: real => ({
+        ...real,
+        claim: async () => ({
+          attempts: 2,
+          exhausted: false,
+          outcome: 'duplicate',
+          status: 'failed'
+        })
+      })
+    })
+    send('fixture:race')
+    await settle()
+    expect(sender.sent).toHaveLength(0)
+    expect(logs).toEqual([
+      expect.objectContaining({
+        attempts: 2,
+        event: 'email_duplicate_suppressed',
+        level: 'info',
+        status: 'failed'
+      })
+    ])
+  })
+
+  it('sends every code email keyed per call, with the code only in the message', async () => {
+    const { logs, rows, sender, service, settle } = harness(production)
+    const code = { path: '/login', title: '482913' }
+    for (let call = 0; call < 2; call++) {
+      service.enqueue('test-fixture', {
+        eventKey: emailEventKey('sign-in-code', crypto.randomUUID()),
+        input: code,
+        to: 'owner@serp.co'
+      })
+    }
+    await settle()
+    expect(sender.sent.map(message => message.subject)).toEqual([
+      'Fixture: 482913',
+      'Fixture: 482913'
+    ])
+    expect(new Set(rows().map(row => row.event_key)).size).toBe(2)
+    expect(JSON.stringify(logs)).not.toContain('482913')
+    expect(JSON.stringify(rows())).not.toContain('482913')
+  })
+
   it('warns once an event has used up its attempts', async () => {
     const { events, logs, send, sender, settle } = harness(production)
     for (let attempt = 1; attempt <= EMAIL_DELIVERY_MAX_ATTEMPTS; attempt++) {
@@ -456,6 +501,13 @@ describe('Worker email service', () => {
 })
 
 describe('email event keys', () => {
+  it('accepts a per-call random UUID for code emails', () => {
+    const first = emailEventKey('sign-in-code', crypto.randomUUID())
+    const second = emailEventKey('sign-in-code', crypto.randomUUID())
+    expect(first).toMatch(/^sign-in-code:[0-9a-f-]{36}$/u)
+    expect(second).not.toBe(first)
+  })
+
   it('joins an event name and ids, and refuses anything that could hold an address', () => {
     expect(emailEventKey('submission-received', '0b7c2d9e-1f4a-4c3b-9a8e-123456789abc')).toBe(
       'submission-received:0b7c2d9e-1f4a-4c3b-9a8e-123456789abc'

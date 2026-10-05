@@ -67,10 +67,13 @@ throws and never fails the request. A cron or other Worker handler calls
 
 The event key names one occurrence of an event (`submission-created:<submission id>`,
 `review-decision:<decision id>`). Parts are `[a-z0-9._-]`, so an address can never be a key.
-Keys appear in logs and stay in D1, so build them from non-secret ids only: never derive one
-from a sign-in code (a hash of a 6-digit code is reversed instantly); use the verification
-row's id, a random nonce, or an HMAC under a Worker secret. Idempotency is per template and
-key, so one event can send the submitter's receipt and the admin notice. Sending one template
+Keys appear in logs and stay in D1, so build them from non-secret ids only, and never derive
+one from a sign-in or claim code (a hash of a 6-digit code is reversed instantly). Every code
+email is a new event, and Better Auth's `sendVerificationOTP` receives only
+`{ email, otp, type }`, so key each call with
+`emailEventKey('sign-in-code', crypto.randomUUID())` (dedupe then stops only a repeat of that
+same call), or with an HMAC under a Worker secret. Idempotency is per template and key, so
+one event can send the submitter's receipt and the admin notice. Sending one template
 to several recipients for one event needs a recipient id in the key (a user id, never the
 address). Each template and key sends at most once:
 
@@ -111,14 +114,21 @@ the address), and the template id and event key when they are well-formed (other
 A template is `defineEmailTemplate<Input>({ id, render(input, context) })` returning
 `{ subject, text, html }`; `context` holds `environment`, `links`, and `supportAddress`.
 
-- `html` must come from the `html` tag, which escapes every interpolated value. Values go in
-  element content or quoted attributes only. An `href` or `src` value must be a whole
-  absolute `http:`, `https:`, or `mailto:` URL. Anything else throws.
+- `html` must come from the `html` tag (a real tagged-template call), which escapes every
+  interpolated value. Values go in element content or quoted attributes only: never in a
+  tag, an unquoted attribute, a comment, `<style>` or `<script>`, a `style` attribute, or an
+  `on*` handler. In a URL attribute (`href`, `src`, `background`, `action`, `formaction`,
+  `poster`, `cite`, ...) a value is either the whole URL (an absolute `http(s)` URL, or
+  `mailto:` with one plain address and no query) or an `encodeURIComponent`-encoded part after
+  a scheme the template's literal text fixes. Anything else throws.
 - `links.url('/account/')` returns the absolute, canonical URL on the sending environment's
   origin. It refuses anything but a root-relative path, and any whitespace or control
   character.
 - Register each template in `registry.ts` under its id, with a test of its rendered subject,
   bodies, and links in every environment.
+- Sign-in and claim code emails put the code in the subject (owner decision), for example
+  `482913 is your SERP sign-in code`. Subjects and bodies never reach deployed logs, and the
+  event key is per call, so the code is stored nowhere by this module.
 
 ## Local development
 

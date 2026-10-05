@@ -147,8 +147,9 @@ export function createEmailDeliveryLedger(config: {
       if (!existing) throw new Error('Email delivery claim neither inserted nor found its row.')
       return {
         attempts: existing.attempts,
-        // A failed row is re-claimed until it reaches the limit, so a failed duplicate is done.
-        exhausted: existing.status === 'failed',
+        // Only a failed row at the limit is done: a failed row below it may have just been
+        // completed by a concurrent attempt after this claim's upsert saw it `sending`.
+        exhausted: existing.status === 'failed' && existing.attempts >= EMAIL_DELIVERY_MAX_ATTEMPTS,
         outcome: 'duplicate',
         status: existing.status
       }
