@@ -342,6 +342,104 @@ test.describe('submit v2', () => {
     await visitor.close()
   })
 
+  test('reports each badge check outcome and only counts conclusive ones', async ({
+    baseURL,
+    browser
+  }) => {
+    const origin = new URL(baseURL ?? '').origin
+    const id = unique()
+    const owner = await newClient(browser)
+    await signInContext(owner, baseURL ?? '', `e2e-submit-checks-${id}@example.com`)
+    const headers = { origin }
+
+    async function pendingBadge(label: string, product: Parameters<FixtureSite['set']>[1]) {
+      fixture.set(label, product)
+      const created = await owner.request.post('/api/submissions', {
+        data: {
+          categorySlug: 'video-downloaders',
+          content: '',
+          description: product.description,
+          logoUrl: `${fixture.website(label)}icon.png`,
+          name: product.name,
+          website: fixture.website(label)
+        },
+        headers
+      })
+      expect(created.status(), await created.text()).toBe(201)
+      const { submission } = (await created.json()) as { submission: { id: string } }
+      const chosen = await owner.request.post(`/api/submissions/${submission.id}/plan`, {
+        data: { plan: 'free' },
+        headers
+      })
+      expect(chosen.status(), await chosen.text()).toBe(200)
+      return submission.id
+    }
+
+    async function verify(submissionId: string) {
+      const response = await owner.request.post(`/api/submissions/${submissionId}/verify`, {
+        data: {},
+        headers
+      })
+      return { body: await response.json(), status: response.status() }
+    }
+
+    const nofollow = await pendingBadge(`nofollow-${id}`, {
+      badge: 'nofollow',
+      description: 'Nofollow badge.',
+      name: 'Nofollow'
+    })
+    const wrong = await pendingBadge(`wrong-${id}`, {
+      badge: 'wrong',
+      description: 'Wrong destination.',
+      name: 'Wrong'
+    })
+    const down = await pendingBadge(`down-${id}`, {
+      badge: 'valid',
+      description: 'Site down.',
+      name: 'Down'
+    })
+    fixture.update(`down-${id}`, { status: 503 })
+
+    expect(await verify(nofollow)).toMatchObject({
+      body: {
+        result: { code: 'nofollow', ok: false },
+        submission: { status: 'pending_badge', verificationAttempts: 1 }
+      },
+      status: 200
+    })
+    expect(await verify(wrong)).toMatchObject({
+      body: {
+        result: { code: 'wrong_destination', href: `${site.publicUrl}/`, ok: false },
+        submission: { verificationAttempts: 1 }
+      }
+    })
+    // A site that cannot be loaded never uses up a check.
+    expect(await verify(down)).toMatchObject({
+      body: { result: { code: 'http_503', ok: false }, submission: { verificationAttempts: 0 } }
+    })
+    // One check every 30 seconds.
+    expect(await verify(nofollow)).toMatchObject({ body: { code: 'cooldown' }, status: 429 })
+    // Nobody else can check, choose a plan for, or edit the submission.
+    const stranger = await newClient(browser)
+    await signInContext(stranger, baseURL ?? '', `e2e-submit-stranger-${id}@example.com`)
+    const foreign = await stranger.request.post(`/api/submissions/${nofollow}/verify`, {
+      data: {},
+      headers
+    })
+    expect(foreign.status()).toBe(404)
+    const page = await stranger.newPage()
+    const response = await page.goto(`/submit/${nofollow}/badge/`)
+    expect(response?.status()).toBe(404)
+    // A plan is chosen once.
+    const again = await owner.request.post(`/api/submissions/${nofollow}/plan`, {
+      data: { plan: 'free' },
+      headers
+    })
+    expect(again.status()).toBe(409)
+    await owner.close()
+    await stranger.close()
+  })
+
   test('refuses writes without a session or from another origin', async ({ baseURL, request }) => {
     const body = {
       categorySlug: 'video-downloaders',

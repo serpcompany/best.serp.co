@@ -52,6 +52,9 @@ import { ProductLogo, StepProgress, ToneAlert } from './submit-ui'
  */
 
 export interface BadgeStepProps {
+  /** Same-origin copies of the badges, for the previews on this page. */
+  badgePreviewUrls: { dark: string; light: string }
+  /** The public badge URLs the snippets embed. */
   badgeUrls: { dark: string; light: string }
   listingUrl: string
   showPaid: boolean
@@ -95,11 +98,11 @@ function useNow(active: boolean): number {
 }
 
 function BadgeCard({
-  badgeUrl,
   embed,
+  previewUrl,
   theme
 }: {
-  badgeUrl: string
+  previewUrl: string
   embed: string
   theme: 'dark' | 'light'
 }) {
@@ -132,7 +135,7 @@ function BadgeCard({
       <CardContent>
         <div className="flex flex-col gap-3">
           <img
-            src={badgeUrl}
+            src={previewUrl}
             alt={`Featured on SERP badge, ${theme}`}
             width={180}
             height={45}
@@ -143,7 +146,7 @@ function BadgeCard({
             aria-label={`${theme} badge snippet`}
             className="w-full overflow-x-auto rounded-md border border-input bg-transparent px-3 py-2 font-mono text-[11px] leading-relaxed shadow-xs dark:bg-input/30"
           >
-            <pre className="whitespace-pre">{embed}</pre>
+            <div className="whitespace-pre">{embed}</div>
           </figure>
         </div>
       </CardContent>
@@ -152,6 +155,7 @@ function BadgeCard({
 }
 
 export function BadgeStep({
+  badgePreviewUrls,
   badgeUrls,
   listingUrl,
   showPaid,
@@ -363,8 +367,8 @@ export function BadgeStep({
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BadgeCard badgeUrl={badgeUrls.light} embed={embeds.light} theme="light" />
-          <BadgeCard badgeUrl={badgeUrls.dark} embed={embeds.dark} theme="dark" />
+          <BadgeCard embed={embeds.light} previewUrl={badgePreviewUrls.light} theme="light" />
+          <BadgeCard embed={embeds.dark} previewUrl={badgePreviewUrls.dark} theme="dark" />
         </div>
         <p className="break-all text-muted-foreground text-xs">
           Both badges link to your future listing: {listingUrl}

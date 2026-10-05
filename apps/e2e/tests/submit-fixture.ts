@@ -57,9 +57,14 @@ export function pngImage(size: number, rgb: [number, number, number] = [31, 111,
 }
 
 export interface FixtureProduct {
-  badge: 'missing' | 'nofollow' | 'valid'
+  /** `wrong`: the badge links to the site's home page instead of the listing. */
+  badge: 'missing' | 'nofollow' | 'valid' | 'wrong'
+  /** Delays the home page this long (a slow site; the Worker gives up after 8 seconds). */
+  delayMs?: number
   description: string
   name: string
+  /** The home page's HTTP status (default 200). */
+  status?: number
 }
 
 export interface FixtureSite {
@@ -73,7 +78,8 @@ export interface FixtureSite {
 }
 
 function page(product: FixtureProduct, slug: string): string {
-  const listingUrl = `${site.publicUrl}${listingPath(slug)}`
+  const listingUrl =
+    product.badge === 'wrong' ? `${site.publicUrl}/` : `${site.publicUrl}${listingPath(slug)}`
   const badge =
     product.badge === 'missing'
       ? ''
@@ -102,9 +108,12 @@ export async function startFixtureSite(): Promise<FixtureSite> {
     }
     const path = (request.url ?? '/').split('?')[0]
     if (path === '/') {
-      response
-        .writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-        .end(page(product, host))
+      const respond = () =>
+        response
+          .writeHead(product.status ?? 200, { 'content-type': 'text/html; charset=utf-8' })
+          .end(page(product, host))
+      if (product.delayMs) setTimeout(respond, product.delayMs)
+      else respond()
     } else if (path === '/icon.png') {
       response.writeHead(200, { 'content-type': 'image/png' }).end(icon)
     } else if (path === '/og.png') {

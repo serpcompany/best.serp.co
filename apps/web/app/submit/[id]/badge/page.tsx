@@ -1,6 +1,7 @@
 import { site } from '@serpdirectory/site-config'
 import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import { siteConfig } from '@serpdirectory/web-core/site-config'
+import { getFeaturedOnBadgePreviewPathFromKey } from '@serpdirectory/web-core/website/featured-on-badge-url'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { BadgeStep } from '@/components/submit/badge-step'
@@ -31,6 +32,10 @@ export default async function BadgePage({ params }: BadgePageProps) {
   const [light = '', dark = ''] = targets.badgeUrls
   return (
     <BadgeStep
+      badgePreviewUrls={{
+        dark: getFeaturedOnBadgePreviewPathFromKey(siteConfig.badges.featuredOn.dark),
+        light: getFeaturedOnBadgePreviewPathFromKey(siteConfig.badges.featuredOn.light)
+      }}
       badgeUrls={{ dark, light }}
       listingUrl={targets.listingUrl}
       showPaid={site.features.showPaidListings}
