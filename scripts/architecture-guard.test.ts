@@ -190,9 +190,13 @@ describe('single-site D1-only repository architecture', () => {
 
   it('keeps email delivery SQL in the shared data package behind a fail-closed adapter', () => {
     const runtime = readFileSync(resolve(project.appDirectory, 'lib/email/runtime.ts'), 'utf8')
+    // The environment policy, then the DB binding check, then the only database client.
     const policy = runtime.indexOf('resolveEmailPolicy(env)')
+    const binding = runtime.indexOf('if (!env.DB) throw')
     expect(policy).toBeGreaterThan(-1)
-    expect(runtime.indexOf('createDatabase(env.DB)')).toBeGreaterThan(policy)
+    expect(binding).toBeGreaterThan(policy)
+    expect(runtime.indexOf('createDatabase(')).toBeGreaterThan(binding)
+    expect(runtime.match(/createDatabase\(/gu)).toHaveLength(1)
     expect(runtime).toContain("from '@serpdirectory/data-ops/client'")
     expect(runtime).toContain("from '@serpdirectory/data-ops/email-deliveries'")
     expect(runtime).toContain('createDisabledEmailService')
