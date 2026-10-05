@@ -640,6 +640,31 @@ describe('roles from the admin allowlist', () => {
     expect(await guard(h, ownerCookie)).toMatchObject({ status: 403 })
   })
 
+  // #78: revocation must not depend on the allowlist becoming empty.
+  it('revokes one admin on the next request while another admin stays allowlisted', async () => {
+    const h = harness()
+    h.sqlite.database
+      .prepare(
+        "INSERT INTO admin_allowlist (email, added_by) VALUES ('second@example.com', 'test')"
+      )
+      .run()
+    const ownerCookie = await signIn(h, 'devin@serp.co', new Browser('192.0.2.4'))
+    const secondCookie = await signIn(h, 'second@example.com', new Browser('192.0.2.5'))
+    const visitorCookie = await signIn(h, 'visitor@example.com', new Browser('192.0.2.6'))
+    expect(await guard(h, ownerCookie)).toMatchObject({ ok: true })
+    expect(await guard(h, secondCookie)).toMatchObject({ ok: true })
+    expect(await guard(h, visitorCookie)).toMatchObject({ reason: 'admin_required', status: 403 })
+
+    h.sqlite.database.prepare("DELETE FROM admin_allowlist WHERE email = 'devin@serp.co'").run()
+    // Same session, role still `admin` in D1 until the next sign-in: the live check decides.
+    expect(
+      h.sqlite.database.prepare("SELECT role FROM users WHERE email = 'devin@serp.co'").get()
+    ).toEqual({ role: 'admin' })
+    expect(await guard(h, ownerCookie)).toMatchObject({ reason: 'admin_required', status: 403 })
+    expect(await guard(h, secondCookie)).toMatchObject({ ok: true })
+    expect(await guard(h, visitorCookie)).toMatchObject({ reason: 'admin_required', status: 403 })
+  })
+
   it('never lets a user choose their own role', async () => {
     const h = harness()
     const browser = new Browser('192.0.2.3')
