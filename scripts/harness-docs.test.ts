@@ -1,12 +1,77 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { checkDocumentation, validatePlanningDocumentation } from './harness/docs-health.ts'
+import {
+  checkDocumentation,
+  DOC_LINE_ALLOWANCES,
+  validateDocumentationBudgets,
+  validatePlanningDocumentation,
+  wrappedLineCount
+} from './harness/docs-health.ts'
 import { stepsForProfile } from './harness/runner.ts'
 
 describe('repository harness contract', () => {
   it('keeps documentation, indexes, skills, links, and commands healthy', () => {
     expect(checkDocumentation(resolve('.'))).toEqual([])
+  })
+
+  it('holds maps and leaves to the docs-are-maps size budgets at 100 columns', () => {
+    expect(wrappedLineCount(`short\n${'x'.repeat(250)}\n\n`)).toBe(4)
+    const lines = (count: number) => Array.from({ length: count }, () => 'line').join('\n')
+    expect(
+      validateDocumentationBudgets(
+        {
+          'AGENTS.md': lines(120),
+          'apps/web/AGENTS.md': `${lines(119)}\n${'x'.repeat(101)}`,
+          'docs/README.md': lines(121),
+          'docs/HARNESS.md': lines(300),
+          'docs/DEPLOY_RUNBOOK.md': lines(301),
+          'packages/content/data/legal/terms.mdx': lines(500),
+          'SECURITY.md': lines(500)
+        },
+        {}
+      )
+    ).toEqual([
+      'apps/web/AGENTS.md: 121 wrapped lines exceeds the map budget of 120; move detail into a leaf doc',
+      'docs/README.md: 121 wrapped lines exceeds the map budget of 120; move detail into a leaf doc',
+      'docs/DEPLOY_RUNBOOK.md: 301 wrapped lines exceeds the leaf budget of 300; split it by topic'
+    ])
+  })
+
+  it('lets an allowed doc shrink but not grow', () => {
+    const lines = (count: number) => Array.from({ length: count }, () => 'line').join('\n')
+    const allowances = { 'docs/LEGACY.md': 340 }
+    for (const size of [340, 320, 301])
+      expect(validateDocumentationBudgets({ 'docs/LEGACY.md': lines(size) }, allowances)).toEqual(
+        []
+      )
+    expect(validateDocumentationBudgets({ 'docs/LEGACY.md': lines(341) }, allowances)).toEqual([
+      'docs/LEGACY.md: 341 wrapped lines exceeds its allowance of 340; an over-budget doc may shrink but not grow, so split it by topic'
+    ])
+    // An allowance covers only its own file.
+    expect(
+      validateDocumentationBudgets(
+        { 'docs/LEGACY.md': lines(320), 'docs/HARNESS.md': lines(301) },
+        allowances
+      )
+    ).toEqual([
+      'docs/HARNESS.md: 301 wrapped lines exceeds the leaf budget of 300; split it by topic'
+    ])
+  })
+
+  it('fails on an allowance that is no longer needed, so its entry gets deleted', () => {
+    const lines = (count: number) => Array.from({ length: count }, () => 'line').join('\n')
+    expect(
+      validateDocumentationBudgets(
+        { 'docs/LEGACY.md': lines(300), 'docs/HARNESS.md': lines(320) },
+        { 'docs/GONE.md': 400, 'docs/HARNESS.md': 350, 'docs/LEGACY.md': 340 }
+      )
+    ).toEqual([
+      'docs/GONE.md: its allowance of 400 lines is no longer needed (no such budgeted doc); delete its DOC_LINE_ALLOWANCES entry in scripts/harness/docs-health.ts',
+      'docs/LEGACY.md: its allowance of 340 lines is no longer needed (it fits its budget); delete its DOC_LINE_ALLOWANCES entry in scripts/harness/docs-health.ts'
+    ])
+    // Every doc fits today, so the table is empty; an entry is for a doc already over budget.
+    expect(DOC_LINE_ALLOWANCES).toEqual({})
   })
 
   it('rejects retired Markdown planning references', () => {

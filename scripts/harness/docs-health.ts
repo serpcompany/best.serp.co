@@ -69,6 +69,74 @@ function validateSkill(root: string, file: string): string[] {
   return violations
 }
 
+const WRAP_COLUMNS = 100
+const MAP_LINE_BUDGET = 120
+const LEAF_LINE_BUDGET = 300
+
+/**
+ * Docs allowed over budget, at the size they had when they were let in (serp's allowance
+ * rule). Each may shrink but not grow, and docs:check fails once it fits its budget, so the
+ * entry gets deleted. Record only a doc that is already over budget on `main`; split a doc that
+ * a pull request grows past its budget instead of adding an entry for it.
+ */
+export const DOC_LINE_ALLOWANCES: Readonly<Record<string, number>> = {}
+
+/** Lines as read at 100 columns, so a long paragraph counts for its real length. */
+export function wrappedLineCount(source: string): number {
+  return source
+    .trimEnd()
+    .split('\n')
+    .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / WRAP_COLUMNS)), 0)
+}
+
+function documentationBudget(file: string): { budget: number; kind: 'leaf' | 'map' } | null {
+  const name = file.split('/').at(-1)
+  if (name === 'AGENTS.md' || name === 'README.md') return { budget: MAP_LINE_BUDGET, kind: 'map' }
+  if (file.startsWith('docs/')) return { budget: LEAF_LINE_BUDGET, kind: 'leaf' }
+  return null
+}
+
+/**
+ * Size budgets: maps (`AGENTS.md`, `README.md`) stay at or under 120 wrapped lines and every
+ * other doc under `docs/` at or under 300, unless `allowances` holds a doc at a recorded size.
+ * An allowance whose doc fits its budget or no longer exists fails too, so it gets deleted.
+ * The numbers come from the docs-are-maps principle drafted for serpcompany/serp
+ * (`docs/engineering/standards/agent-harness/docs-are-maps.md` on the unpublished
+ * `agent-harness-principles` branch); serp `main` says only that docs stay under "a few
+ * hundred lines" (`docs/engineering/standards/agent-harness.md`).
+ */
+export function validateDocumentationBudgets(
+  documents: Readonly<Record<string, string>>,
+  allowances: Readonly<Record<string, number>> = DOC_LINE_ALLOWANCES
+): string[] {
+  const violations: string[] = []
+  for (const [file, source] of Object.entries(documents)) {
+    const limit = documentationBudget(file)
+    if (!limit) continue
+    const lines = wrappedLineCount(source)
+    const allowance = allowances[file]
+    if (lines <= Math.max(limit.budget, allowance ?? 0)) continue
+    violations.push(
+      allowance === undefined
+        ? `${file}: ${lines} wrapped lines exceeds the ${limit.kind} budget of ${limit.budget}; ${
+            limit.kind === 'map' ? 'move detail into a leaf doc' : 'split it by topic'
+          }`
+        : `${file}: ${lines} wrapped lines exceeds its allowance of ${allowance}; an over-budget doc may shrink but not grow, so split it by topic`
+    )
+  }
+  for (const [file, allowance] of Object.entries(allowances)) {
+    const source = documents[file]
+    const limit = documentationBudget(file)
+    if (source !== undefined && limit && wrappedLineCount(source) > limit.budget) continue
+    violations.push(
+      `${file}: its allowance of ${allowance} lines is no longer needed (${
+        source === undefined || !limit ? 'no such budgeted doc' : 'it fits its budget'
+      }); delete its DOC_LINE_ALLOWANCES entry in scripts/harness/docs-health.ts`
+    )
+  }
+  return violations
+}
+
 export function validatePlanningDocumentation(
   documents: Readonly<Record<string, string>>
 ): string[] {
@@ -109,6 +177,7 @@ export function checkDocumentation(root = resolve('.')): string[] {
       .map(file => [file, readFileSync(resolve(root, file), 'utf8')])
   )
   violations.push(...validatePlanningDocumentation(documentationSources))
+  violations.push(...validateDocumentationBudgets(documentationSources))
 
   for (const file of files.filter(candidate => extname(candidate) === '.md')) {
     const source = readFileSync(resolve(root, file), 'utf8')

@@ -109,6 +109,12 @@ export type SiteDefinition = {
   site: {
     description: string
     domain: string
+    /**
+     * Domain of the contact addresses on the legal pages (`dmca@`, `privacy@`). Defaults to
+     * `domain`; keep it on a domain whose mailboxes receive mail until Email Routing forwards
+     * the site's own addresses.
+     */
+    legalEmailDomain?: string
     name: string
     publicUrl: string
     tagline: string
