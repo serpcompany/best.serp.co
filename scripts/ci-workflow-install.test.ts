@@ -7,6 +7,8 @@ interface InstallAction {
   runs: {
     steps: Array<{
       id?: string
+      if?: string
+      run?: string
       uses?: string
       with?: {
         dest?: string
@@ -32,6 +34,15 @@ describe('ci workflow install isolation', () => {
     expect(pnpmStep?.with?.dest).toContain('runner.temp')
     expect(pnpmStep?.with?.dest).toContain('github.run_id')
     expect(pnpmStep?.with?.dest).toContain('github.job')
+  })
+
+  it('scopes temporary files to the job on a self-hosted runner, first', () => {
+    const action = loadYamlFile<InstallAction>('.github/actions/install/action.yml')
+    const [first] = action.runs.steps
+
+    // Tests and tools leave files in os.tmpdir(); RUNNER_TEMP is emptied per job.
+    expect(first?.if).toBe("runner.environment == 'self-hosted'")
+    expect(first?.run).toBe('echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"')
   })
 
   it('uses the Node 24-compatible pnpm setup action', () => {

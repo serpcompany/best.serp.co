@@ -14,10 +14,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Every job except E2E runs where CI_RUNNER_LABELS points, and a fork's pull request always runs
+# on ubuntu-latest (docs/HARNESS.md#ci-runners).
 jobs:
   validate:
     name: Validate Site & Policy
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER_LABELS || '"ubuntu-latest"') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -81,7 +83,7 @@ jobs:
 
   typecheck:
     name: Type Check
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER_LABELS || '"ubuntu-latest"') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -94,7 +96,7 @@ jobs:
 
   test:
     name: Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER_LABELS || '"ubuntu-latest"') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -107,7 +109,7 @@ jobs:
 
   worker-build:
     name: OpenNext Worker Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER_LABELS || '"ubuntu-latest"') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -118,21 +120,9 @@ jobs:
       - name: Build OpenNext Worker
         run: pnpm worker:build
 
-  # links:
-  #   name: Check Links
-  #   runs-on: self-hosted
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v7
-
-  #     - name: Check Links
-  #       uses: lycheeverse/lychee-action@v2.2.0
-  #       with:
-  #         args: --config ./lychee.toml --verbose --no-progress .
-  #         fail: true
-
   e2e:
     name: E2E Tests
+    # Installs Playwright browsers, so it never leaves GitHub-hosted runners.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
