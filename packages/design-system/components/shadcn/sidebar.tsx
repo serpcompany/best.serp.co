@@ -26,6 +26,8 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  /** The SidebarTrigger, so the mobile Sheet can return focus to it on close (local addition). */
+  triggerRef: React.RefObject<HTMLButtonElement | null>
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -54,6 +56,7 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null)
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -103,7 +106,8 @@ function SidebarProvider({
       isMobile,
       openMobile,
       setOpenMobile,
-      toggleSidebar
+      toggleSidebar,
+      triggerRef
     }),
     [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
   )
@@ -145,7 +149,7 @@ function Sidebar({
   variant?: 'sidebar' | 'floating' | 'inset'
   collapsible?: 'offcanvas' | 'icon' | 'none'
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { isMobile, state, openMobile, setOpenMobile, triggerRef } = useSidebar()
 
   if (collapsible === 'none') {
     return (
@@ -176,6 +180,13 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
+          // Local addition: the trigger lives outside the Sheet, so Radix has nothing to return
+          // focus to and would leave it on <body> after Escape or a followed link.
+          onCloseAutoFocus={event => {
+            if (!triggerRef.current) return
+            event.preventDefault()
+            triggerRef.current.focus()
+          }}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Sidebar</SheetTitle>
@@ -235,11 +246,25 @@ function Sidebar({
   )
 }
 
-function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+function SidebarTrigger({
+  className,
+  onClick,
+  ref,
+  ...props
+}: React.ComponentProps<typeof Button>) {
+  const { toggleSidebar, triggerRef } = useSidebar()
+  const setRef = React.useCallback(
+    (node: HTMLButtonElement | null) => {
+      triggerRef.current = node
+      if (typeof ref === 'function') ref(node)
+      else if (ref) ref.current = node
+    },
+    [ref, triggerRef]
+  )
 
   return (
     <Button
+      ref={setRef}
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
