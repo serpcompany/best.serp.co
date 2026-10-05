@@ -332,6 +332,33 @@ describe('staging before production in the workflows', () => {
   })
 })
 
+describe('version-pinned HTTP gates', () => {
+  it('hands the version Wrangler deployed to the gates in both deploy workflows', () => {
+    // Outside the checkout (runner.temp), because the release script refuses an unclean tree.
+    const wranglerOutput = `${expression('runner.temp')}/wrangler-output.ndjson`
+    const cases: Array<[string, string, string]> = [
+      ['deploy-staging.yml', 'deploy', 'staging'],
+      ['deploy-production.yml', 'release', 'production']
+    ]
+    for (const [file, jobName, environment] of cases) {
+      const job = loadWorkflow(file).jobs[jobName] as WorkflowJob
+      const deploy = stepRunning(job, `cloudflare-release.ts deploy ${environment}`)
+      const gates = stepRunning(job, 'd1-preview-http-gates.ts')
+      expect(deploy.env?.WRANGLER_OUTPUT_FILE_PATH, file).toBe(wranglerOutput)
+      expect(gates.env?.WRANGLER_OUTPUT_FILE_PATH, file).toBe(wranglerOutput)
+      expect(
+        (job.steps ?? [])
+          .filter(step => step.env?.WRANGLER_OUTPUT_FILE_PATH !== undefined)
+          .map(step => step.name),
+        file
+      ).toEqual([deploy.name, gates.name])
+      expect(stepIndex(job, 'd1-preview-http-gates.ts'), file).toBeGreaterThan(
+        stepIndex(job, `cloudflare-release.ts deploy ${environment}`)
+      )
+    }
+  })
+})
+
 describe('recreated D1 operation workflows', () => {
   it('names the exact workflow files the script guards require', () => {
     const guards: Array<[string, string]> = [

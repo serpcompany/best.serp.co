@@ -152,11 +152,15 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
           RELEASE_CONFIRM: ${{ inputs.confirmation }}
+          # Wrangler records the new version here; the gates wait for it. Outside the checkout,
+          # because the release script refuses an unclean tree.
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
         run: pnpm tsx scripts/cloudflare-release.ts deploy production
 
       - name: Run production HTTP gates
         env:
           PRODUCTION_REVIEW_ORIGIN: https://best-serp-co-production.serpcompany.workers.dev
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
         run: |
           server="$(curl -sSI https://best.serp.co | tr -d '\r' | awk -F': ' 'tolower($1) == "server" { print $2 }')"
           if [ "$server" = "GitHub.com" ]; then
