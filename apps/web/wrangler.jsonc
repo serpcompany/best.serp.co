@@ -37,7 +37,8 @@
         "AUTH_TRUST_HOST": "true",
         "D1_RUNTIME_ENV": "staging",
         "EMAIL_STAGING_ALLOWLIST": "devin@serp.co",
-        "SITE_ENVIRONMENT": "staging"
+        "SITE_ENVIRONMENT": "staging",
+        "USESEND_BASE_URL": "https://app.usesend.com"
       },
       "version_metadata": {
         "binding": "CF_VERSION_METADATA"
@@ -49,12 +50,6 @@
           "database_id": "8e6b67e5-9c58-4fa9-aca1-25b0020c0833",
           "migrations_dir": "../../d1/drizzle",
           "migrations_table": "d1_migrations"
-        }
-      ],
-      "send_email": [
-        {
-          "name": "EMAIL",
-          "allowed_sender_addresses": ["noreply@mail.serp.co"]
         }
       ]
     },
@@ -69,7 +64,8 @@
         "AUTH_TRUST_HOST": "true",
         "CANONICAL_HOST_REDIRECT": "on",
         "D1_RUNTIME_ENV": "production",
-        "SITE_ENVIRONMENT": "production"
+        "SITE_ENVIRONMENT": "production",
+        "USESEND_BASE_URL": "https://app.usesend.com"
       },
       "version_metadata": {
         "binding": "CF_VERSION_METADATA"
@@ -81,12 +77,6 @@
           "database_id": "404ec437-53a2-4fbc-8b5f-b5e69065708e",
           "migrations_dir": "../../d1/drizzle",
           "migrations_table": "d1_migrations"
-        }
-      ],
-      "send_email": [
-        {
-          "name": "EMAIL",
-          "allowed_sender_addresses": ["noreply@mail.serp.co"]
         }
       ]
     }

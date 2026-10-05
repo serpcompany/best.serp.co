@@ -26,7 +26,6 @@ import {
 } from '@serpdirectory/data-ops/email-deliveries'
 import {
   EMAIL_DASHBOARD_PATH,
-  EMAIL_FROM,
   type EmailPolicy,
   normalizeEmailAddress,
   prefixedSubject,
@@ -119,6 +118,20 @@ export function emailEventKey(event: string, ...ids: string[]): string {
 }
 
 const INVALID = '[invalid]'
+const MAX_IDEMPOTENCY_KEY_LENGTH = 256
+
+/**
+ * The provider idempotency key for one template and event key: the same for every attempt, so
+ * a retry after a lost response is answered with the original message instead of a second one.
+ * `<template id>:<event key>`, or its SHA-256 when that would exceed 256 characters.
+ */
+export async function emailIdempotencyKey(templateId: string, eventKey: string): Promise<string> {
+  const key = `${templateId}:${eventKey}`
+  if (key.length <= MAX_IDEMPOTENCY_KEY_LENGTH) return key
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key))
+  const hex = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+  return `sha256:${hex}`
+}
 
 /**
  * The fields every log line starts with. The event key and template id appear only when they
@@ -201,6 +214,7 @@ export function createEmailService<R extends EmailTemplateRegistry>(
       return
     }
 
+    const idempotencyKey = await emailIdempotencyKey(templateId, eventKey)
     let claim: EmailDeliveryClaim
     try {
       claim = await ledger.claim({ eventKey, provider, templateId })
@@ -235,9 +249,10 @@ export function createEmailService<R extends EmailTemplateRegistry>(
     }
 
     const message: OutgoingEmail = {
-      from: { ...EMAIL_FROM },
+      from: { ...policy.from },
       headers: { 'Auto-Submitted': 'auto-generated' },
       html: rendered.html,
+      idempotencyKey,
       subject: prefixedSubject(policy, rendered.subject),
       text: rendered.text,
       to

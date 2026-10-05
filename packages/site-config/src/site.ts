@@ -26,12 +26,16 @@ export const site: SiteDefinition = {
     networkLabel: 'Network',
     submitLabel: 'Submit'
   },
-  // mail.serp.co is a dedicated sending subdomain, so this mail's reputation stays separate
-  // from serp.co (serpcompany/best.serp.co#59). Nothing receives mail for it: emails carry no
+  // Dedicated sending subdomains (verified in useSend) keep this mail's reputation separate from
+  // serp.co (serpcompany/best.serp.co#59). Nothing receives mail for them: emails carry no
   // Reply-To, and their footer sends people to the dashboard (#73 adds its inbox).
   email: {
     dashboardPath: '/account/',
-    from: { address: 'noreply@mail.serp.co', name: 'SERP Directory' }
+    from: {
+      name: 'SERP Directory',
+      production: 'noreply@mail.serp.co',
+      staging: 'noreply@mail-staging.serp.co'
+    }
   },
   features: {
     showAuth: false,

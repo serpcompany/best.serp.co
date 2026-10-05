@@ -3,9 +3,10 @@
  * same rule as `../environment/site-environment.ts`: nothing is inferred from the host).
  *
  * - local: nothing is sent; each message is written to the Worker log.
- * - staging: subjects start with `[staging]`, and mail goes only to the recipients listed in
- *   `EMAIL_STAGING_ALLOWLIST` (comma-separated; empty or missing means nobody).
- * - production: mail goes to any valid recipient.
+ * - staging: sent through useSend from `noreply@mail-staging.serp.co`; subjects start with
+ *   `[staging]`, and mail goes only to the recipients listed in `EMAIL_STAGING_ALLOWLIST`
+ *   (comma-separated; empty or missing means nobody).
+ * - production: sent through useSend from `noreply@mail.serp.co` to any valid recipient.
  *
  * An unknown, missing, or mismatched `SITE_ENVIRONMENT` / `D1_RUNTIME_ENV` disables email
  * (fail closed). This module has no Next.js or `server-only` imports, so the Worker entry (a
@@ -18,13 +19,63 @@ import {
   type SiteEnvironment
 } from '../environment/site-environment'
 
+export interface EmailSenderIdentity {
+  email: string
+  name: string
+}
+
 /**
- * The sender every email uses (`SERP Directory <noreply@mail.serp.co>`, from site-config). The
- * `EMAIL` binding in `wrangler.jsonc` may send only from this address.
+ * The sender for an environment, from site-config: `SERP Directory
+ * <noreply@mail-staging.serp.co>` on staging (and in local logs), `SERP Directory
+ * <noreply@mail.serp.co>` in production.
  */
-export const EMAIL_FROM: Readonly<{ email: string; name: string }> = {
-  email: site.email.from.address,
-  name: site.email.from.name
+export function emailSender(environment: SiteEnvironment): Readonly<EmailSenderIdentity> {
+  return {
+    email: environment === 'production' ? site.email.from.production : site.email.from.staging,
+    name: site.email.from.name
+  }
+}
+
+/** The Worker secret holding the useSend API key (staging and production). */
+export const USESEND_API_KEY_SECRET = 'USESEND_API_KEY'
+/** The Worker var holding the useSend instance origin (`https://app.usesend.com`). */
+export const USESEND_BASE_URL_VAR = 'USESEND_BASE_URL'
+
+export interface UseSendConfig {
+  apiKey: string
+  /** The instance origin; the API lives under `/api`. */
+  baseUrl: string
+}
+
+/**
+ * The useSend settings from Worker bindings. Throws `EmailConfigError` (email is then disabled)
+ * unless `USESEND_BASE_URL` is an `https:` origin and `USESEND_API_KEY` is set.
+ */
+export function resolveUseSendConfig(env: {
+  USESEND_API_KEY?: unknown
+  USESEND_BASE_URL?: unknown
+}): UseSendConfig {
+  const rawBase = typeof env.USESEND_BASE_URL === 'string' ? env.USESEND_BASE_URL.trim() : ''
+  let baseUrl: string | null = null
+  try {
+    const url = new URL(rawBase)
+    const origin = rawBase.replace(/\/+$/u, '')
+    if (url.protocol === 'https:' && url.origin === origin) baseUrl = origin
+  } catch {
+    baseUrl = null
+  }
+  if (!baseUrl) {
+    throw new EmailConfigError(
+      `Email is disabled: ${USESEND_BASE_URL_VAR} must be an https origin such as https://app.usesend.com.`
+    )
+  }
+  const apiKey = typeof env.USESEND_API_KEY === 'string' ? env.USESEND_API_KEY.trim() : ''
+  if (!apiKey || apiKey.length > 512 || /[\s\p{Cc}]/u.test(apiKey)) {
+    throw new EmailConfigError(
+      `Email is disabled: the ${USESEND_API_KEY_SECRET} secret is not set.`
+    )
+  }
+  return { apiKey, baseUrl }
 }
 
 /**
@@ -62,6 +113,7 @@ export interface EmailPolicy {
   /** `log` writes each message to the Worker log instead of sending it (local only). */
   delivery: 'log' | 'provider'
   environment: SiteEnvironment
+  from: Readonly<EmailSenderIdentity>
   linkOrigin: string
   /** Staging only: the recipients mail may go to. `null` allows every valid recipient. */
   recipientAllowlist: ReadonlySet<string> | null
@@ -122,10 +174,12 @@ export function resolveEmailPolicy(vars: EmailEnvironmentVars): EmailPolicy {
     )
   }
   const linkOrigin = EMAIL_LINK_ORIGINS[environment]
+  const from = emailSender(environment)
   if (environment === 'local') {
     return {
       delivery: 'log',
       environment,
+      from,
       linkOrigin,
       recipientAllowlist: null,
       subjectPrefix: null
@@ -135,6 +189,7 @@ export function resolveEmailPolicy(vars: EmailEnvironmentVars): EmailPolicy {
     return {
       delivery: 'provider',
       environment,
+      from,
       linkOrigin,
       recipientAllowlist: parseRecipientAllowlist(vars.EMAIL_STAGING_ALLOWLIST),
       subjectPrefix: STAGING_SUBJECT_PREFIX
@@ -143,6 +198,7 @@ export function resolveEmailPolicy(vars: EmailEnvironmentVars): EmailPolicy {
   return {
     delivery: 'provider',
     environment,
+    from,
     linkOrigin,
     recipientAllowlist: null,
     subjectPrefix: null

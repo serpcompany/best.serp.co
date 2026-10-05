@@ -2,23 +2,26 @@
  * Email providers behind one interface, so the provider can change without touching callers
  * or templates:
  *
- * - `createCloudflareEmailSender`: Cloudflare Email Service through the Workers `send_email`
- *   binding (`EMAIL`), staging and production.
+ * - `createUseSendSender`: useSend's send-email API (SES-backed), staging and production.
+ *   https://docs.usesend.com/api-reference/emails/send-email
  * - `createLogEmailSender`: writes each message to the Worker log; local development only.
  * - `createCapturingEmailSender`: records messages in memory for tests.
- *
- * Workers API: https://developers.cloudflare.com/email-service/api/send-emails/workers-api/
  */
 
 export interface EmailSenderAddress {
   email: string
-  name?: string
+  name: string
 }
 
 export interface OutgoingEmail {
   from: EmailSenderAddress
   headers: Readonly<Record<string, string>>
   html: string
+  /**
+   * Stable for one template and event key across attempts, so a provider that supports
+   * idempotency keys (useSend) never sends a retried message twice.
+   */
+  idempotencyKey: string
   subject: string
   text: string
   /** One recipient, already validated and normalized. */
@@ -31,41 +34,124 @@ export interface EmailSendReceipt {
 }
 
 export interface EmailSender {
-  /** Recorded with each delivery: `cloudflare`, `log`, or `capture`. */
+  /** Recorded with each delivery: `usesend`, `log`, or `capture`. */
   readonly provider: string
   /** Resolves once the provider accepted the message; rejects when it did not. */
   send(message: OutgoingEmail): Promise<EmailSendReceipt>
 }
 
-/**
- * The structured `send()` of a Workers `send_email` binding (the subset this module uses).
- * It resolves with the accepted message's id and throws an Error with a `code` such as
- * `E_SENDER_NOT_VERIFIED`, `E_RECIPIENT_SUPPRESSED`, or `E_RATE_LIMIT_EXCEEDED`.
- */
-export interface SendEmailBinding {
-  send(message: {
-    from: EmailSenderAddress | string
-    headers?: Record<string, string>
-    html?: string
-    subject: string
-    text?: string
-    to: string | string[]
-  }): Promise<{ messageId: string }>
+/** A provider refusal with a stable code for logs and the ledger (`RATE_LIMITED`, ...). */
+export class EmailProviderError extends Error {
+  override name = 'EmailProviderError'
+
+  constructor(
+    readonly code: string,
+    message: string
+  ) {
+    super(message)
+  }
 }
 
-export function createCloudflareEmailSender(binding: SendEmailBinding): EmailSender {
+/** `Name <address>`; site-config names are plain words, so no quoting is needed. */
+export function formatSender(from: EmailSenderAddress): string {
+  return `${from.name} <${from.email}>`
+}
+
+const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/u
+const DEFAULT_USESEND_TIMEOUT_MS = 10_000
+
+function useSendErrorCode(body: unknown, status: number): string {
+  const code =
+    typeof body === 'object' &&
+    body !== null &&
+    'error' in body &&
+    typeof body.error === 'object' &&
+    body.error !== null &&
+    'code' in body.error
+      ? body.error.code
+      : undefined
+  return typeof code === 'string' && ERROR_CODE_PATTERN.test(code) ? code : `HTTP_${status}`
+}
+
+function useSendErrorMessage(body: unknown): string {
+  const message =
+    typeof body === 'object' &&
+    body !== null &&
+    'error' in body &&
+    typeof body.error === 'object' &&
+    body.error !== null &&
+    'message' in body.error
+      ? body.error.message
+      : undefined
+  return typeof message === 'string' ? message.slice(0, 200) : ''
+}
+
+async function jsonBody(response: Response): Promise<unknown> {
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * useSend's `POST {baseUrl}/api/v1/emails` with `Authorization: Bearer <key>` and an
+ * `Idempotency-Key`: useSend returns the original `emailId` for a repeated key and body for
+ * 24 hours, on top of this module's ledger. Errors arrive as
+ * `{ error: { code, message } }` (`BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_UNIQUE`,
+ * `RATE_LIMITED`, `INTERNAL_SERVER_ERROR`, ...) and become `EmailProviderError`s with that
+ * code; a network failure is `NETWORK_ERROR` and a timeout `TIMEOUT`. The API key never
+ * appears in an error.
+ */
+export function createUseSendSender(options: {
+  apiKey: string
+  baseUrl: string
+  fetch?: typeof fetch
+  timeoutMs?: number
+}): EmailSender {
+  const endpoint = `${options.baseUrl.replace(/\/+$/u, '')}/api/v1/emails`
+  const send = options.fetch ?? ((input, init) => fetch(input, init))
+  const timeoutMs = options.timeoutMs ?? DEFAULT_USESEND_TIMEOUT_MS
   return {
-    provider: 'cloudflare',
+    provider: 'usesend',
     async send(message) {
-      const result = await binding.send({
-        from: { ...message.from },
-        headers: { ...message.headers },
-        html: message.html,
-        subject: message.subject,
-        text: message.text,
-        to: message.to
-      })
-      return { messageId: typeof result?.messageId === 'string' ? result.messageId : null }
+      let response: Response
+      try {
+        response = await send(endpoint, {
+          body: JSON.stringify({
+            from: formatSender(message.from),
+            headers: { ...message.headers },
+            html: message.html,
+            subject: message.subject,
+            text: message.text,
+            to: message.to
+          }),
+          headers: {
+            authorization: `Bearer ${options.apiKey}`,
+            'content-type': 'application/json',
+            'idempotency-key': message.idempotencyKey
+          },
+          method: 'POST',
+          signal: AbortSignal.timeout(timeoutMs)
+        })
+      } catch (error) {
+        const timedOut =
+          error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+        throw timedOut
+          ? new EmailProviderError('TIMEOUT', `useSend did not answer within ${timeoutMs} ms.`)
+          : new EmailProviderError('NETWORK_ERROR', 'useSend could not be reached.')
+      }
+      const body = await jsonBody(response)
+      if (!response.ok) {
+        const detail = useSendErrorMessage(body)
+        throw new EmailProviderError(
+          useSendErrorCode(body, response.status),
+          `useSend answered ${response.status}${detail ? `: ${detail}` : ''}`
+        )
+      }
+      const emailId =
+        typeof body === 'object' && body !== null && 'emailId' in body ? body.emailId : null
+      return { messageId: typeof emailId === 'string' ? emailId : null }
     }
   }
 }
@@ -83,7 +169,7 @@ export function createLogEmailSender(
       write(
         JSON.stringify({
           event: 'email_logged',
-          from: message.from,
+          from: formatSender(message.from),
           htmlLength: message.html.length,
           subject: message.subject,
           text: message.text,
@@ -119,11 +205,10 @@ export function createCapturingEmailSender(): CapturingEmailSender {
   }
 }
 
-const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/u
-
-/** The provider error code (`E_RATE_LIMIT_EXCEEDED`), or `E_UNKNOWN`. */
+/** The provider error code (`RATE_LIMITED`), or `E_UNKNOWN`. */
 export function emailErrorCode(error: unknown): string {
-  const code = (error as { code?: unknown } | null)?.code
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
   return typeof code === 'string' && ERROR_CODE_PATTERN.test(code) ? code : 'E_UNKNOWN'
 }
 

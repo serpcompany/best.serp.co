@@ -3,15 +3,18 @@ import { describe, expect, it } from 'vitest'
 import { project } from '../../../../scripts/project'
 import {
   EMAIL_DASHBOARD_PATH,
-  EMAIL_FROM,
   EMAIL_LINK_ORIGINS,
   EmailConfigError,
+  emailSender,
   normalizeEmailAddress,
   parseRecipientAllowlist,
   prefixedSubject,
   recipientAllowed,
   resolveEmailPolicy,
-  STAGING_ALLOWLIST_VAR
+  resolveUseSendConfig,
+  STAGING_ALLOWLIST_VAR,
+  USESEND_API_KEY_SECRET,
+  USESEND_BASE_URL_VAR
 } from './config'
 
 describe('email environment policy', () => {
@@ -20,6 +23,7 @@ describe('email environment policy', () => {
     expect(local).toEqual({
       delivery: 'log',
       environment: 'local',
+      from: { email: 'noreply@mail-staging.serp.co', name: 'SERP Directory' },
       linkOrigin: 'http://localhost:8787',
       recipientAllowlist: null,
       subjectPrefix: null
@@ -119,8 +123,66 @@ describe('email environment policy', () => {
   })
 })
 
+describe('email senders and useSend settings', () => {
+  it('sends from each environment’s verified useSend domain', () => {
+    // serpcompany/best.serp.co#59 (provider changed to useSend): no Reply-To; the footer sends
+    // people to the dashboard instead (#73).
+    expect(emailSender('production')).toEqual({
+      email: 'noreply@mail.serp.co',
+      name: 'SERP Directory'
+    })
+    expect(emailSender('staging')).toEqual({
+      email: 'noreply@mail-staging.serp.co',
+      name: 'SERP Directory'
+    })
+    expect(emailSender('local')).toEqual(emailSender('staging'))
+    expect(
+      resolveEmailPolicy({ D1_RUNTIME_ENV: 'production', SITE_ENVIRONMENT: 'production' }).from
+    ).toEqual(emailSender('production'))
+    expect(
+      resolveEmailPolicy({ D1_RUNTIME_ENV: 'staging', SITE_ENVIRONMENT: 'staging' }).from
+    ).toEqual(emailSender('staging'))
+    // A plain display name needs no quoting in `Name <address>`.
+    expect(emailSender('production').name).toMatch(/^[A-Za-z0-9 ]+$/u)
+    expect(EMAIL_DASHBOARD_PATH).toBe('/account/')
+  })
+
+  it('needs an https useSend origin and an API key, or email is disabled', () => {
+    expect(
+      resolveUseSendConfig({
+        USESEND_API_KEY: ' us_key ',
+        USESEND_BASE_URL: 'https://app.usesend.com/'
+      })
+    ).toEqual({ apiKey: 'us_key', baseUrl: 'https://app.usesend.com' })
+    const invalid = [
+      {},
+      { USESEND_API_KEY: 'us_key' },
+      { USESEND_BASE_URL: 'https://app.usesend.com' },
+      { USESEND_API_KEY: '', USESEND_BASE_URL: 'https://app.usesend.com' },
+      { USESEND_API_KEY: 'us key', USESEND_BASE_URL: 'https://app.usesend.com' },
+      { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: '' },
+      { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'http://app.usesend.com' },
+      { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'https://app.usesend.com/api' },
+      { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'https://app.usesend.com?x=1' },
+      { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'app.usesend.com' }
+    ]
+    for (const env of invalid) {
+      expect(() => resolveUseSendConfig(env), JSON.stringify(env)).toThrow(EmailConfigError)
+    }
+    try {
+      resolveUseSendConfig({
+        USESEND_API_KEY: 'us key',
+        USESEND_BASE_URL: 'https://app.usesend.com'
+      })
+    } catch (error) {
+      expect(String(error)).toContain(USESEND_API_KEY_SECRET)
+      expect(String(error)).not.toContain('us key')
+    }
+  })
+})
+
 interface WranglerBlock {
-  send_email?: Array<{ allowed_sender_addresses?: string[]; name?: string }>
+  send_email?: unknown
   vars?: Record<string, string>
 }
 
@@ -129,17 +191,16 @@ describe('apps/web/wrangler.jsonc email bindings', () => {
     readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8')
   ) as WranglerBlock & { env: Record<'production' | 'staging', WranglerBlock> }
 
-  it('binds EMAIL to the noreply sender in staging and production only', () => {
+  it('points staging and production at hosted useSend, with no Cloudflare email binding', () => {
     expect(config.send_email).toBeUndefined()
+    expect(config.vars?.[USESEND_BASE_URL_VAR]).toBeUndefined()
     for (const name of ['staging', 'production'] as const) {
-      expect(config.env[name].send_email, name).toEqual([
-        { allowed_sender_addresses: [EMAIL_FROM.email], name: 'EMAIL' }
-      ])
+      expect(config.env[name].send_email, name).toBeUndefined()
+      expect(config.env[name].vars?.[USESEND_BASE_URL_VAR], name).toBe('https://app.usesend.com')
+      // The API key is a Worker secret, never a var.
+      expect(config.env[name].vars?.[USESEND_API_KEY_SECRET], name).toBeUndefined()
     }
-    // serpcompany/best.serp.co#59: SERP Directory <noreply@mail.serp.co>, with no Reply-To; the
-    // footer sends people to the dashboard instead (#73).
-    expect(EMAIL_FROM).toEqual({ email: 'noreply@mail.serp.co', name: 'SERP Directory' })
-    expect(EMAIL_DASHBOARD_PATH).toBe('/account/')
+    expect(config.vars?.[USESEND_API_KEY_SECRET]).toBeUndefined()
   })
 
   it('gives staging a valid, non-empty allowlist and production none', () => {

@@ -4,13 +4,18 @@
  * `createWorkerEmailService` with its own `env` and `ExecutionContext`.
  *
  * Fails closed: an unknown environment, a missing `DB` binding, or (in staging and production)
- * a missing `EMAIL` binding yields a service that sends nothing and logs `email_disabled` on
- * every enqueue. Local never sends, even with an `EMAIL` binding.
+ * a missing or invalid `USESEND_BASE_URL` var or `USESEND_API_KEY` secret yields a service that
+ * sends nothing and logs `email_disabled` on every enqueue. Local never sends, even with a key.
  */
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import { createEmailDeliveryLedger } from '@serpdirectory/data-ops/email-deliveries'
-import { EmailConfigError, type EmailEnvironmentVars, resolveEmailPolicy } from './config'
-import { createCloudflareEmailSender, createLogEmailSender, type SendEmailBinding } from './senders'
+import {
+  EmailConfigError,
+  type EmailEnvironmentVars,
+  resolveEmailPolicy,
+  resolveUseSendConfig
+} from './config'
+import { createLogEmailSender, createUseSendSender } from './senders'
 import {
   consoleEmailLogger,
   createDisabledEmailService,
@@ -22,7 +27,10 @@ import type { EmailTemplateRegistry } from './templates'
 
 export interface EmailWorkerEnv extends EmailEnvironmentVars {
   DB?: D1Database
-  EMAIL?: SendEmailBinding
+  /** Worker secret (staging, production). */
+  USESEND_API_KEY?: string
+  /** Worker var: the useSend instance origin, `https://app.usesend.com`. */
+  USESEND_BASE_URL?: string
 }
 
 export interface WaitUntilContext {
@@ -33,6 +41,8 @@ export function createWorkerEmailService<R extends EmailTemplateRegistry>(option
   clock?: () => Date
   context: WaitUntilContext
   env: EmailWorkerEnv
+  /** The `fetch` the useSend sender uses (tests inject one). */
+  fetch?: typeof fetch
   log?: EmailLogger
   templates: R
 }): EmailService<R> {
@@ -41,15 +51,10 @@ export function createWorkerEmailService<R extends EmailTemplateRegistry>(option
   try {
     const policy = resolveEmailPolicy(env)
     if (!env.DB) throw new EmailConfigError('Email is disabled: the D1 binding DB is required.')
-    let sender = createLogEmailSender()
-    if (policy.delivery === 'provider') {
-      if (!env.EMAIL) {
-        throw new EmailConfigError(
-          `Email is disabled: the EMAIL send_email binding is required in ${policy.environment}.`
-        )
-      }
-      sender = createCloudflareEmailSender(env.EMAIL)
-    }
+    const sender =
+      policy.delivery === 'provider'
+        ? createUseSendSender({ ...resolveUseSendConfig(env), fetch: options.fetch })
+        : createLogEmailSender()
     return createEmailService({
       ledger: createEmailDeliveryLedger({ client: createDatabase(env.DB), clock: options.clock }),
       log,

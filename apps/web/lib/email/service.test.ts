@@ -6,14 +6,15 @@ import {
 } from '@serpdirectory/data-ops/email-deliveries'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SqliteD1 } from '../../../../packages/data-ops/src/test-support'
-import { EMAIL_FROM, type EmailEnvironmentVars, resolveEmailPolicy } from './config'
+import { type EmailEnvironmentVars, resolveEmailPolicy } from './config'
 import { createWorkerEmailService } from './runtime'
-import { createCapturingEmailSender, type SendEmailBinding } from './senders'
+import { createCapturingEmailSender } from './senders'
 import {
   createDisabledEmailService,
   createEmailService,
   type EmailLogEntry,
-  emailEventKey
+  emailEventKey,
+  emailIdempotencyKey
 } from './service'
 import { fixtureTemplates } from './test-fixture'
 
@@ -78,9 +79,10 @@ describe('email delivery', () => {
     await settle()
     expect(sender.sent).toEqual([
       {
-        from: EMAIL_FROM,
+        from: { email: 'noreply@mail.serp.co', name: 'SERP Directory' },
         headers: { 'Auto-Submitted': 'auto-generated' },
         html: '<p>Secret body text</p><p><a href="https://best.serp.co/products/autoenhance.ai/">https://best.serp.co/products/autoenhance.ai/</a></p><p><a href="https://best.serp.co/account/">https://best.serp.co/account/</a></p>',
+        idempotencyKey: 'test-fixture:fixture:delivery',
         subject: 'Fixture: Secret body text',
         text: 'Secret body text\n\nhttps://best.serp.co/products/autoenhance.ai/\n\nhttps://best.serp.co/account/',
         to: 'owner@serp.co'
@@ -112,6 +114,10 @@ describe('email delivery', () => {
       'https://best-serp-co-staging.serpcompany.workers.dev/products/autoenhance.ai/'
     )
     expect(sender.sent[0]?.to).toBe('owner@serp.co')
+    expect(sender.sent[0]?.from).toEqual({
+      email: 'noreply@mail-staging.serp.co',
+      name: 'SERP Directory'
+    })
     expect(logs.find(entry => entry.event === 'email_skipped')).toMatchObject({
       eventKey: 'fixture:blocked',
       level: 'warn',
@@ -130,13 +136,14 @@ describe('email delivery', () => {
     send('fixture:once')
     await settle()
     expect(sender.sent).toHaveLength(1)
-    expect(events()).toEqual([
-      'email_sent',
+    expect([...events()].sort()).toEqual([
       'email_duplicate_suppressed',
-      'email_duplicate_suppressed'
+      'email_duplicate_suppressed',
+      'email_sent'
     ])
-    expect(logs[1]).toMatchObject({ level: 'info', status: 'sending' })
-    expect(logs[2]).toMatchObject({ attempts: 1, level: 'info', status: 'sent' })
+    const duplicates = logs.filter(entry => entry.event === 'email_duplicate_suppressed')
+    expect(duplicates[0]).toMatchObject({ level: 'info', status: 'sending' })
+    expect(duplicates[1]).toMatchObject({ attempts: 1, level: 'info', status: 'sent' })
     send('fixture:other')
     await settle()
     expect(sender.sent).toHaveLength(2)
@@ -412,19 +419,24 @@ describe('email logs', () => {
 })
 
 describe('Worker email service', () => {
-  function binding() {
-    const calls: unknown[] = []
-    const email: SendEmailBinding = {
-      send: async message => {
-        calls.push(message)
-        return { messageId: `cf-${calls.length}` }
-      }
+  const useSend = { USESEND_API_KEY: 'us_test_key', USESEND_BASE_URL: 'https://app.usesend.com' }
+
+  function fakeFetch() {
+    const calls: Array<{ body: Record<string, unknown>; headers: Headers; url: string }> = []
+    const fetcher: typeof fetch = async (input, init) => {
+      calls.push({
+        body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+        headers: new Headers(init?.headers),
+        url: String(input)
+      })
+      return Response.json({ emailId: `us-${calls.length}` })
     }
-    return { calls, email }
+    return { calls, fetcher }
   }
 
   async function run(
     env: Parameters<typeof createWorkerEmailService>[0]['env'],
+    fetcher: typeof fetch,
     to = 'owner@serp.co'
   ) {
     const logs: EmailLogEntry[] = []
@@ -432,6 +444,7 @@ describe('Worker email service', () => {
     createWorkerEmailService({
       context: { waitUntil: promise => pending.push(promise) },
       env,
+      fetch: fetcher,
       log: entry => logs.push(entry),
       templates: fixtureTemplates
     }).enqueue('test-fixture', { eventKey: 'fixture:worker', input, to })
@@ -439,65 +452,89 @@ describe('Worker email service', () => {
     return logs
   }
 
-  it('sends through the EMAIL binding in staging and production, with no Reply-To', async () => {
-    for (const vars of [staging, production]) {
-      const { calls, email } = binding()
-      const logs = await run({ ...vars, DB: new SqliteD1().asD1Database(), EMAIL: email })
-      expect(calls).toEqual([
-        {
-          from: { email: 'noreply@mail.serp.co', name: 'SERP Directory' },
-          headers: { 'Auto-Submitted': 'auto-generated' },
-          html: expect.stringContaining('/products/autoenhance.ai/'),
-          subject:
-            vars === staging ? '[staging] Fixture: Secret body text' : 'Fixture: Secret body text',
-          text: expect.stringContaining('/products/autoenhance.ai/'),
-          to: 'owner@serp.co'
-        }
-      ])
+  it('sends through useSend from each environment’s own domain, with no Reply-To', async () => {
+    const cases = [
+      [
+        staging,
+        'SERP Directory <noreply@mail-staging.serp.co>',
+        '[staging] Fixture: Secret body text'
+      ],
+      [production, 'SERP Directory <noreply@mail.serp.co>', 'Fixture: Secret body text']
+    ] as const
+    for (const [vars, from, subject] of cases) {
+      const { calls, fetcher } = fakeFetch()
+      const logs = await run({ ...vars, ...useSend, DB: new SqliteD1().asD1Database() }, fetcher)
+      expect(calls).toHaveLength(1)
+      expect(calls[0]?.url).toBe('https://app.usesend.com/api/v1/emails')
+      expect(calls[0]?.headers.get('authorization')).toBe('Bearer us_test_key')
+      expect(calls[0]?.headers.get('idempotency-key')).toBe('test-fixture:fixture:worker')
+      expect(calls[0]?.body).toEqual({
+        from,
+        headers: { 'Auto-Submitted': 'auto-generated' },
+        html: expect.stringContaining('/products/autoenhance.ai/'),
+        subject,
+        text: expect.stringContaining('/products/autoenhance.ai/'),
+        to: 'owner@serp.co'
+      })
       expect(logs).toEqual([
-        expect.objectContaining({ event: 'email_sent', messageId: 'cf-1', provider: 'cloudflare' })
+        expect.objectContaining({ event: 'email_sent', messageId: 'us-1', provider: 'usesend' })
       ])
     }
   })
 
-  it('writes local mail to the log and never calls a binding', async () => {
+  it('writes local mail to the log and never calls useSend', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-    const { calls, email } = binding()
-    const logs = await run({ ...local, DB: new SqliteD1().asD1Database(), EMAIL: email })
+    const { calls, fetcher } = fakeFetch()
+    const logs = await run({ ...local, ...useSend, DB: new SqliteD1().asD1Database() }, fetcher)
     expect(calls).toEqual([])
     expect(logs).toEqual([expect.objectContaining({ event: 'email_sent', provider: 'log' })])
     const logged = JSON.parse(String(info.mock.calls[0]?.[0])) as Record<string, unknown>
     expect(logged).toMatchObject({
       event: 'email_logged',
+      from: 'SERP Directory <noreply@mail-staging.serp.co>',
       subject: 'Fixture: Secret body text',
       text: 'Secret body text\n\nhttp://localhost:8787/products/autoenhance.ai/\n\nhttp://localhost:8787/account/',
       to: 'owner@serp.co'
     })
   })
 
-  it('fails closed without a valid environment or the bindings it needs', async () => {
+  it('fails closed without a valid environment, D1, the useSend key, or its base URL', async () => {
     const DB = new SqliteD1().asD1Database()
     const cases = [
-      { DB },
-      { ...production, DB, SITE_ENVIRONMENT: 'prod' },
-      { ...production, D1_RUNTIME_ENV: 'staging', DB },
-      { ...staging, DB: undefined },
-      { ...staging, DB, EMAIL_STAGING_ALLOWLIST: 'not an address' },
-      { ...staging, DB, withoutBinding: true },
-      { ...production, DB, withoutBinding: true }
+      { DB, ...useSend },
+      { ...production, ...useSend, DB, SITE_ENVIRONMENT: 'prod' },
+      { ...production, ...useSend, D1_RUNTIME_ENV: 'staging', DB },
+      { ...staging, ...useSend, DB: undefined },
+      { ...staging, ...useSend, DB, EMAIL_STAGING_ALLOWLIST: 'not an address' },
+      { ...staging, DB, USESEND_BASE_URL: useSend.USESEND_BASE_URL },
+      { ...production, DB, USESEND_API_KEY: '', USESEND_BASE_URL: useSend.USESEND_BASE_URL },
+      { ...production, DB, USESEND_API_KEY: useSend.USESEND_API_KEY },
+      { ...production, ...useSend, DB, USESEND_BASE_URL: '' },
+      { ...production, ...useSend, DB, USESEND_BASE_URL: 'http://app.usesend.com' },
+      { ...production, ...useSend, DB, USESEND_BASE_URL: 'https://app.usesend.com/api' }
     ]
-    for (const { withoutBinding, ...vars } of cases) {
-      const { calls, email } = binding()
-      const logs = await run({ ...vars, EMAIL: withoutBinding ? undefined : email })
-      expect(logs, JSON.stringify(vars)).toEqual([
+    for (const env of cases) {
+      const { calls, fetcher } = fakeFetch()
+      const logs = await run(env, fetcher)
+      expect(logs, JSON.stringify({ ...env, DB: undefined })).toEqual([
         expect.objectContaining({ event: 'email_disabled', level: 'error' })
       ])
+      expect(JSON.stringify(logs)).not.toContain(useSend.USESEND_API_KEY)
       expect(calls).toEqual([])
     }
   })
 })
 
 describe('email event keys', () => {
+  it('derives a stable provider idempotency key of at most 256 characters', async () => {
+    expect(await emailIdempotencyKey('test-fixture', 'fixture:a')).toBe('test-fixture:fixture:a')
+    const long = `fixture:${'x'.repeat(192)}`
+    const hashed = await emailIdempotencyKey('t'.repeat(64), long)
+    expect(hashed).toMatch(/^sha256:[0-9a-f]{64}$/u)
+    expect(await emailIdempotencyKey('t'.repeat(64), long)).toBe(hashed)
+    expect(await emailIdempotencyKey('u'.repeat(64), long)).not.toBe(hashed)
+  })
+
   it('accepts a per-call random UUID for code emails', () => {
     const first = emailEventKey('sign-in-code', crypto.randomUUID())
     const second = emailEventKey('sign-in-code', crypto.randomUUID())

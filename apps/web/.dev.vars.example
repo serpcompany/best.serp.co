@@ -1,0 +1,7 @@
+# Names of the Worker secrets this app reads. Copy to apps/web/.dev.vars only if you need one
+# locally; never commit .dev.vars or a real value.
+#
+# USESEND_API_KEY: the useSend API key for transactional email (docs/EMAIL.md). Staging and
+# production read it from a Worker secret (`wrangler secret put USESEND_API_KEY --env staging`
+# or `--env production`). Local development never sends email, so it does not need one.
+USESEND_API_KEY=

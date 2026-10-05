@@ -1,18 +1,19 @@
 # Email
 
-best.serp.co sends transactional email through
-[Cloudflare Email Sending](https://developers.cloudflare.com/email-service/) from
-`SERP Directory <noreply@mail.serp.co>`, with **no Reply-To** (owner decision). The sending
-subdomain `mail.serp.co` keeps this mail's reputation separate from `serp.co`
-(serpcompany/best.serp.co#59).
+best.serp.co sends transactional email through [useSend](https://usesend.com) (open source,
+backed by Amazon SES), using the hosted instance at `https://app.usesend.com`. This replaces
+the "Cloudflare Email Sending" choice in serpcompany/best.serp.co#59 (owner decision). Staging
+sends from `SERP Directory <noreply@mail-staging.serp.co>`, production from
+`SERP Directory <noreply@mail.serp.co>`, both with **no Reply-To**. Dedicated sending
+subdomains keep this mail's reputation separate from `serp.co`.
 
 Nothing receives mail for these emails. Receiving at a best.serp.co address would break
 serp.co's Gmail MX, and `support@serp.co` is not used. So every footer says the address isn't
 monitored and links to the dashboard, for example "This address isn't monitored. Reply from
 your dashboard: https://best.serp.co/account/". Two-way conversation moves to an inbox in the
-dashboard (serpcompany/best.serp.co#73). The emails themselves (sign-in code, submission received,
-changes requested, approved, rejected, badge missing, unlisted, claim verification code, and
-the admin review notice) follow the mockups approved in #70.
+dashboard (serpcompany/best.serp.co#73). The emails themselves (sign-in code, submission
+received, changes requested, approved, rejected, badge missing, unlisted, claim verification
+code, and the admin review notice) follow the mockups approved in #70.
 
 ## Module
 
@@ -24,36 +25,60 @@ Worker handler outside Next.js.
 | `server.ts` | `enqueueEmail(templateId, { eventKey, to, input })` for route handlers and actions (`server-only`) |
 | `runtime.ts` | `createWorkerEmailService({ env, context, templates })` from Worker bindings |
 | `service.ts` | Validation, environment policy, rendering, the ledger claim, one send, logs; `emailEventKey` |
-| `config.ts` | Environment policy, link origins, the staging allowlist; sender and dashboard path from `packages/site-config` |
-| `senders.ts` | Providers: Cloudflare (`EMAIL` binding), log (local), capture (tests) |
+| `config.ts` | Environment policy, senders, link origins, the staging allowlist, useSend settings |
+| `senders.ts` | Providers behind one interface: useSend (API), log (local), capture (tests) |
 | `templates.ts` | Template contract: `defineEmailTemplate`, the escaping `html` tag, `css`, absolute links |
 | `registry.ts` | The site's templates, empty until #70 is approved |
 
 The idempotency ledger lives in `packages/data-ops/src/email-deliveries.ts` (table
-`email_deliveries`), like every other SQL statement.
+`email_deliveries`), like every other SQL statement. Senders and the dashboard path come from
+`packages/site-config` (`email.from`, `email.dashboardPath`).
 
 ## Environments
 
 | | local | staging | production |
 |---|---|---|---|
-| Delivery | written to the Worker log, never sent | `EMAIL` binding | `EMAIL` binding |
+| Delivery | written to the Worker log, never sent | useSend API | useSend API |
+| From | (logged as the staging sender) | `noreply@mail-staging.serp.co` | `noreply@mail.serp.co` |
 | Recipients | anyone (logged only) | only `EMAIL_STAGING_ALLOWLIST` | anyone |
 | Subject | as rendered | `[staging] ` + subject | as rendered |
 | Link origin | `http://localhost:8787` | `https://best-serp-co-staging.serpcompany.workers.dev` | `https://best.serp.co` |
 
-`apps/web/wrangler.jsonc` declares the binding in `env.staging` and `env.production` only:
+Configuration, per deployed environment:
 
-```jsonc
-"send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["noreply@mail.serp.co"] }]
-```
+- `USESEND_BASE_URL`: a non-secret var in `env.staging.vars` and `env.production.vars` of
+  `apps/web/wrangler.jsonc`, set to `https://app.usesend.com`. It must be an `https:` origin.
+- `USESEND_API_KEY`: a **Worker secret** (name only in `apps/web/.dev.vars.example`; never
+  commit a value). Local development does not need one.
+- `EMAIL_STAGING_ALLOWLIST`: a non-secret var in `env.staging.vars`. Comma-separated plain
+  addresses, matched case-insensitively. Empty or missing sends to nobody, and a malformed
+  entry disables staging email. Change it with a pull request.
 
-`EMAIL_STAGING_ALLOWLIST` is a non-secret var in `env.staging.vars`: comma-separated plain
-addresses, matched case-insensitively. Empty or missing sends to nobody; a malformed entry
-disables staging email. Change it with a pull request.
+Email fails closed. In each of these cases every enqueue sends nothing and logs
+`email_disabled`:
 
-Email fails closed. Unless `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` name the same known
-environment, the `DB` binding exists, and (staging, production) the `EMAIL` binding exists,
-every enqueue sends nothing and logs `email_disabled`.
+- `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` don't name the same known environment;
+- the `DB` binding is missing;
+- (staging, production) `USESEND_BASE_URL` is missing or not an `https:` origin;
+- (staging, production) `USESEND_API_KEY` is missing.
+
+So deploying without the secret is safe.
+
+**useSend API.** `POST https://app.usesend.com/api/v1/emails` with `Authorization: Bearer
+<key>` and a JSON body: `from`, `to`, `subject`, `text`, `html`, and `headers`
+(`Auto-Submitted: auto-generated`). No `replyTo` is sent.
+([send email](https://docs.usesend.com/api-reference/emails/send-email),
+[authentication](https://docs.usesend.com/api-reference/introduction)).
+
+- **Idempotency.** Each request carries `Idempotency-Key: <template id>:<event key>` (hashed
+  if over 256 characters). useSend returns the original `emailId` for a repeated key and body
+  for 24 hours, so a retry after a lost response never sends twice. This is on top of the
+  ledger.
+- **Errors.** useSend errors (`{ error: { code, message } }`) are logged as
+  `email_send_failed` with that code: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`,
+  `NOT_UNIQUE`, `RATE_LIMITED`, `INTERNAL_SERVER_ERROR`. An unreadable error body is logged
+  as `HTTP_<status>`, an unreachable API as `NETWORK_ERROR`, and a request that takes over 10
+  seconds as `TIMEOUT`.
 
 ## Sending
 
@@ -73,25 +98,31 @@ throws and never fails the request. A cron or other Worker handler calls
 
 The event key names one occurrence of an event (`submission-created:<submission id>`,
 `review-decision:<decision id>`). Parts are `[a-z0-9._-]`, so an address can never be a key.
-Keys appear in logs and stay in D1, so build them from non-secret ids only, and never derive
-one from a sign-in or claim code (a hash of a 6-digit code is reversed instantly). Every code
-email is a new event, and Better Auth's `sendVerificationOTP` receives only
-`{ email, otp, type }`, so key each call with
-`emailEventKey('sign-in-code', crypto.randomUUID())` (dedupe then stops only a repeat of that
-same call), or with an HMAC under a Worker secret. Idempotency is per template and key, so
-one event can send the submitter's receipt and the admin notice. Sending one template
-to several recipients for one event needs a recipient id in the key (a user id, never the
-address). Each template and key sends at most once:
+
+- **No secrets in keys.** Keys appear in logs, stay in D1, and are sent to useSend. Build them
+  from non-secret ids only, and never derive one from a sign-in or claim code (a hash of a
+  6-digit code is reversed instantly).
+- **Code emails.** Every code email is a new event, and Better Auth's `sendVerificationOTP`
+  receives only `{ email, otp, type }`. Key each call with
+  `emailEventKey('sign-in-code', crypto.randomUUID())` (dedupe then stops only a repeat of that
+  same call), or with an HMAC under a Worker secret.
+- **Several emails per event.** Idempotency is per template and key, so one event can send
+  the submitter's receipt and the admin notice. Sending one template to several recipients
+  for one event needs a recipient id in the key (a user id, never the address).
+
+Each template and key sends at most once:
 
 1. Before sending, the service claims the pair in `email_deliveries` with one atomic upsert.
 2. A pair that is `sending` or `sent` is a duplicate: a retried request, a re-run cron, or a
    double submit logs `email_duplicate_suppressed` and sends nothing.
-3. A `failed` pair (the provider refused the message) is sent again the next time it is
-   enqueued, up to 5 attempts; then it logs `email_attempts_exhausted`. Nothing retries on
-   its own, and the ledger holds no recipient or input, so only the caller can retry.
-4. If the ledger cannot be reached, nothing is sent. If a send's outcome is never recorded
-   (the provider accepted it but D1 failed, or the isolate stopped or `send` hung past the
-   `waitUntil` budget after the claim), the row stays `sending` and the email is never resent.
+3. A `failed` pair (the provider refused the message, or the request failed) is sent again
+   the next time it is enqueued, up to 5 attempts; then it logs `email_attempts_exhausted`.
+   Nothing retries on its own, and the ledger holds no recipient or input, so only the caller
+   can retry.
+4. If the ledger cannot be reached, nothing is sent.
+5. If a send's outcome is never recorded, the row stays `sending` and the email is never
+   resent. That happens when useSend accepted it but D1 failed, or when the isolate stopped or
+   the request hung past the `waitUntil` budget after the claim.
 
 The ledger holds the template id, key, provider, status, attempts, provider message id, the
 provider error code, and SQLite-format UTC timestamps; never a recipient, subject, or body.
@@ -105,15 +136,16 @@ pnpm exec wrangler d1 execute best-serp-co-staging --remote --env staging \
   'sending' AND updated_at < datetime('now', '-15 minutes')) ORDER BY updated_at DESC LIMIT 100"
 ```
 
-Every outcome is one JSON log line with the environment, provider, recipient domain (never
-the address), and the template id and event key when they are well-formed (otherwise
-`[invalid]`); error messages have addresses redacted. Query them in Workers Logs:
+Every outcome is one JSON log line with the environment, provider, and recipient domain
+(never the address), plus the template id and event key when they are well-formed (otherwise
+`[invalid]`). Error messages have addresses redacted, and the API key is never logged. Query
+them in Workers Logs:
 
 | Level | Events |
 |---|---|
 | info | `email_sent`, `email_duplicate_suppressed` |
 | warn | `email_skipped` (staging allowlist), `email_attempts_exhausted` |
-| error | `email_send_failed` (with `errorCode`, e.g. `E_RECIPIENT_SUPPRESSED`), `email_rejected`, `email_render_failed`, `email_ledger_failed`, `email_delivery_failed`, `email_wait_until_failed`, `email_disabled`, `email_context_unavailable` |
+| error | `email_send_failed` (with `errorCode`, e.g. `RATE_LIMITED`), `email_rejected`, `email_render_failed`, `email_ledger_failed`, `email_delivery_failed`, `email_wait_until_failed`, `email_disabled`, `email_context_unavailable` |
 
 ## Templates
 
@@ -153,79 +185,55 @@ absolute `/account/` URL for the sending environment).
   bodies, and links in every environment.
 - Sign-in and claim code emails put the code in the subject (owner decision), for example
   `482913 is your SERP sign-in code`. This module never logs or stores a subject, body, or
-  code (keys are per call), but the platform can keep them:
-  - Cloudflare's **Email preview**, on by default for new sending domains, keeps every sent
-    message (HTML, text, headers, raw source) in the dashboard's Activity log for about
-    seven days. That includes codes, recipient addresses, and reviewer notes.
+  code (keys are per call), but others can keep them:
+  - Hosted useSend stores every sent email (recipients, subject, text, and HTML) for its
+    dashboard. Codes, addresses, and reviewer notes are therefore held by useSend, under its
+    retention.
   - serp.co's DMARC record has `ruf=mailto:abuse@serp.co; fo=1`, so a receiver that sends
     forensic reports may include a failing message's headers, subject (and code) included.
-
-  See owner prerequisite 3.
 
 ## Local development
 
 Apply migrations (`pnpm db:migrate:local`) so `email_deliveries` exists, then run
 `pnpm dev`. Each email appears in the Worker output as an `email_logged` line with the
-recipient, subject, and text body. Nothing is sent locally, even with an `EMAIL` binding.
+sender, recipient, subject, and text body. Nothing is sent locally, even with a useSend key.
 Local links always use `http://localhost:8787`; a `pnpm worktree:init` worktree serves on
 its own port (`pnpm agent:manifest` → `webUrl`), so swap the port when following one.
 
 ## Owner prerequisites
 
-These are dashboard and DNS changes in the SERP account; agents do not make them.
+These are useSend dashboard and Cloudflare secret changes; agents do not make them. Merging
+before they are done is safe: email is then disabled and logged.
 
-**Before merging the pull request that adds the binding**, do steps 1 and 2 and check that
-`wrangler email sending list serp.co` lists `mail.serp.co`. Every merge to `staging` deploys
-staging; if Cloudflare refuses a `send_email` binding for a domain that is not onboarded,
-Deploy Staging would fail for every later merge.
+1. **Done (2026-10-06): `USESEND_API_KEY`.** One API key per environment, created in
+   app.usesend.com → Developer settings → API keys and set as a Worker secret on
+   `best-serp-co-staging` and `best-serp-co-production`
+   (`wrangler secret put USESEND_API_KEY --env staging` and `--env production`, from
+   `apps/web`). Rotate a key the same way.
+2. **Done: `USESEND_BASE_URL`.** The owner chose the hosted instance; `apps/web/wrangler.jsonc`
+   sets it to `https://app.usesend.com` for both environments.
+3. **Confirm both sending domains are verified** in app.usesend.com → Domains:
+   - `mail.serp.co`, with DKIM at `usesend._domainkey.mail.serp.co` and SES MAIL FROM
+     `mail.mail.serp.co`;
+   - `mail-staging.serp.co`.
+4. **Verify DKIM and DMARC** once staging is deployed and the first template (#60's sign-in
+   code) sends to an allowlisted inbox. In Gmail, open the message → Show original. It must
+   show `SPF: PASS`, `DKIM: 'PASS'` with domain `mail-staging.serp.co` (production:
+   `mail.serp.co`), and `DMARC: 'PASS'`.
 
-1. **Workers Paid plan.** Email Sending to arbitrary recipients needs it; without it the
-   account can send only to its verified destination addresses. Check Workers & Pages →
-   Plans in the SERP account dashboard.
-2. **Onboard `mail.serp.co`.** Compute → Email Service → Email Sending → Onboard Domain →
-   choose `mail.serp.co` (or `wrangler email sending enable mail.serp.co` after
-   `wrangler login`). Cloudflare adds MX and SPF (`v=spf1 include:_spf.mx.cloudflare.net
-   ~all`) on `cf-bounce.mail.serp.co` and DKIM on `cf-bounce._domainkey.mail.serp.co`.
-   Confirm:
+**DMARC.** `serp.co` publishes one record, `v=DMARC1; p=reject; rua=...; ruf=...; fo=1;`, with
+no `sp=`. `mail.serp.co` and `mail-staging.serp.co` have no `_dmarc` record of their own, so
+they inherit `p=reject` with the reports, and no separate record is needed. useSend signs with
+DKIM `d=mail.serp.co` (staging: `d=mail-staging.serp.co`), which aligns with the From domain.
+The SES MAIL FROM `mail.mail.serp.co` aligns SPF under relaxed alignment. Under `p=reject`, a
+message that fails both is rejected, so check step 4 before production sends.
 
-   ```bash
-   wrangler email sending list serp.co
-   wrangler email sending dns get mail.serp.co
-   dig TXT cf-bounce.mail.serp.co +short             # v=spf1 include:_spf.mx.cloudflare.net ~all
-   dig TXT cf-bounce._domainkey.mail.serp.co +short  # v=DKIM1; h=sha256; k=rsa; p=...
-   dig TXT _dmarc.serp.co +short                     # v=DMARC1; p=reject; rua=...; ruf=...; fo=1;
-   ```
-
-   **DMARC:** `serp.co` publishes one record, `v=DMARC1; p=reject; rua=...; ruf=...; fo=1;`.
-   `mail.serp.co` has no `_dmarc` record of its own and inherits it, reports included; no
-   separate record is needed. If onboarding adds `_dmarc.mail.serp.co` (Cloudflare's default
-   is `v=DMARC1; p=reject;`), that record applies to the subdomain instead: still
-   `p=reject`, but without serp.co's reports. Email Sending → Settings lists the sending
-   records as Locked or Unlocked (both are correct).
-3. **Email preview** (owner decision): disable it on `mail.serp.co` after onboarding
-   (recommended, because codes and reviewer notes are in the messages). Go to Compute →
-   Email Service → Email Sending → `mail.serp.co` → Settings → Enable email preview. Turn it
-   on briefly only while debugging; previews last about seven days
-   ([logs](https://developers.cloudflare.com/email-service/observability/logs/#message-preview)).
-4. **Verify DKIM and DMARC** once staging is deployed: trigger an email to an allowlisted
-   inbox (the first template, the sign-in code, is #60's acceptance test), or send a one-off
-   check yourself with
-   `wrangler email sending send --from noreply@mail.serp.co --from-name "SERP Directory" --to <your inbox> --subject "mail.serp.co check" --text "check"`.
-   In Gmail, open the message → Show original. It must show `SPF: PASS`,
-   `DKIM: 'PASS' with domain mail.serp.co`, and `DMARC: 'PASS'`; the
-   `Authentication-Results` header reads `dkim=pass header.d=mail.serp.co`, `spf=pass`, and
-   `dmarc=pass header.from=mail.serp.co`. With `p=reject`, a DKIM failure means the message
-   is rejected, so check this before production sends. Email Sending → Logs shows each send.
+```bash
+dig TXT _dmarc.serp.co +short                      # v=DMARC1; p=reject; rua=...; ruf=...; fo=1;
+dig TXT usesend._domainkey.mail.serp.co +short     # the DKIM key useSend shows
+```
 
 ## Follow-ups
 
-- Once `mail.serp.co` is onboarded, also restrict the staging binding at the platform with
-  `"allowed_destination_addresses"` equal to `EMAIL_STAGING_ALLOWLIST` (the docs do not say
-  whether those addresses must be verified destinations; verifying one is free), with a test
-  that keeps the two lists equal.
 - Whether decision emails (approved, rejected) need a caller-side retry after
   `email_attempts_exhausted` or a stuck `sending` row is an owner decision.
-
-Pricing: 3,000 emails a month are included with Workers Paid, then $0.35 per 1,000; new
-accounts also start with a daily quota that grows with good sending
-([limits](https://developers.cloudflare.com/email-service/platform/limits/)).

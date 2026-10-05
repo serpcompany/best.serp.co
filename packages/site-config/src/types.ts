@@ -104,8 +104,11 @@ export type SiteDefinition = {
      * monitored, so replies happen there (serpcompany/best.serp.co#73).
      */
     dashboardPath: string
-    /** The sender, on the domain onboarded to Cloudflare Email Sending. Sent with no Reply-To. */
-    from: { address: string; name: string }
+    /**
+     * The sender per deployed environment, each on a domain verified in useSend; local logs
+     * use the staging one. Sent with no Reply-To.
+     */
+    from: { name: string; production: string; staging: string }
   }
   features: SiteFeatureFlags
   id: string
