@@ -154,9 +154,8 @@ PR Review already gates every merge, and Main Validation re-runs the full loop o
    report's `artifact.sqlChecksum`, and imports it in one D1 execution. If the execution
    fails, D1 rolls it back and the run can be repeated. A repeat after success is a no-op.
    `verify-import` then requires the six runtime tables (accounts, limits, email ledger) to be
-   empty, compares the 24 others (catalog, submissions and #62 tables, admin allowlist) with an
-   in-memory bootstrap of the same SQL, and checks the publication checksum (`669f264f…0af5a`),
-   version, and every count in the report.
+   empty, compares the 24 others with an in-memory bootstrap of the same SQL, and checks the
+   publication checksum (`669f264f…0af5a`), version, and every count in the report.
 2. Run **Deploy Production** (the bootstrap already applied the migrations, so it plans
    `worker-only`). While GitHub Pages still serves best.serp.co, the HTTP gates run against
    the noindex review origin instead.

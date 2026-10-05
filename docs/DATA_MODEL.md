@@ -26,7 +26,7 @@ adding migrations (later migrations end each `CREATE TABLE` with `STRICT` by han
 Drizzle cannot express them. `0002_better_auth.sql` also seeds the admin allowlist with a
 fixed `created_at`, so bootstrap parity stays exact.
 
-`0002_submissions_data_model.sql` (serpcompany/best.serp.co#62) is hand-finished in two more
+`0003_submissions_data_model.sql` (serpcompany/best.serp.co#62) is hand-finished in two more
 ways, because D1 enforces foreign keys and runs a migration in one transaction, where
 `PRAGMA foreign_keys=OFF` has no effect:
 

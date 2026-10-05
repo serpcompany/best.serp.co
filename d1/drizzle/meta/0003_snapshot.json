@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2ffaea63-6268-48eb-9ef7-959f4d98c877",
+  "id": "440bcd5d-f409-4392-b6dd-eccd8bfa9ba4",
   "prevId": "689b2ba9-a683-4bc3-a2ff-c18f8b9f4810",
   "tables": {
     "accounts": {
@@ -383,6 +383,100 @@
         "categories_is_active_boolean": {
           "name": "categories_is_active_boolean",
           "value": "\"is_active\" IN (0, 1)"
+        }
+      }
+    },
+    "email_deliveries": {
+      "name": "email_deliveries",
+      "columns": {
+        "template_id": {
+          "name": "template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_key": {
+          "name": "event_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "provider_message_id": {
+          "name": "provider_message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_error_code": {
+          "name": "last_error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "email_deliveries_template_id_event_key_pk": {
+          "columns": ["template_id", "event_key"],
+          "name": "email_deliveries_template_id_event_key_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "email_deliveries_event_key_valid": {
+          "name": "email_deliveries_event_key_valid",
+          "value": "length(\"email_deliveries\".\"event_key\") BETWEEN 3 AND 200 AND instr(\"email_deliveries\".\"event_key\", '@') = 0"
+        },
+        "email_deliveries_status_valid": {
+          "name": "email_deliveries_status_valid",
+          "value": "\"email_deliveries\".\"status\" IN ('sending', 'sent', 'failed')"
+        },
+        "email_deliveries_attempts_positive": {
+          "name": "email_deliveries_attempts_positive",
+          "value": "\"email_deliveries\".\"attempts\" >= 1"
         }
       }
     },

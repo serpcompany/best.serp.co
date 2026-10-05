@@ -151,7 +151,7 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
   it('applied every migration to the persisted database', async () => {
     const migrations = await db.prepare('SELECT name FROM d1_migrations ORDER BY id').all()
     expect(migrations.results.map(row => (row as { name: string }).name)).toContain(
-      '0002_submissions_data_model.sql'
+      '0003_submissions_data_model.sql'
     )
   })
 
