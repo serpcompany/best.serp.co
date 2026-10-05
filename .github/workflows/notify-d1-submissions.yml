@@ -1,8 +1,10 @@
 name: Notify Verified D1 Submissions
 
 # Every 15 minutes, opens an assigned review issue for each badge-verified production
-# submission (scripts/d1-submission-notifier.ts). The job is skipped until the repository
-# variable SUBMISSION_REVIEWER_GITHUB_LOGIN is set, and its steps are skipped until the
+# submission (scripts/d1-submission-notifier.ts). GitHub runs schedules on the default branch;
+# when that is staging, the relay job re-dispatches this workflow on main, so only main's code
+# ever touches production data. Both jobs are skipped until the repository variable
+# SUBMISSION_REVIEWER_GITHUB_LOGIN is set, and the notify steps are skipped until the
 # production-notifier environment holds Cloudflare credentials. It uses its own environment
 # because the production environment requires reviewer approval. See docs/DEPLOY_RUNBOOK.md.
 on:
@@ -13,14 +15,27 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: best-serp-co-production-notifier
-  cancel-in-progress: false
-
 jobs:
+  relay:
+    name: Run the scheduled notifier on main
+    if: github.event_name == 'schedule' && github.ref != 'refs/heads/main' && vars.SUBMISSION_REVIEWER_GITHUB_LOGIN != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch this workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run notify-d1-submissions.yml --ref main --repo "$GITHUB_REPOSITORY"
+
   notify:
     name: Notify the submission reviewer
     if: github.ref == 'refs/heads/main' && vars.SUBMISSION_REVIEWER_GITHUB_LOGIN != ''
+    # Job-level, so a skipped run never joins the group or replaces a queued notification.
+    concurrency:
+      group: best-serp-co-production-notifier
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

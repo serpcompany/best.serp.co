@@ -17,6 +17,7 @@ import {
   type ProcessRunner,
   parseReleaseArguments,
   parseWranglerRows,
+  type ReleaseCommand,
   readMigrationLedger,
   readOnlyCommands,
   releaseAuthorizations,
@@ -114,20 +115,101 @@ function sqliteD1(database = new DatabaseSync(':memory:')) {
 }
 
 const sha = '0123456789abcdef0123456789abcdef01234567'
+const tree = 'a'.repeat(40)
 
-function workflowEnv(workflow: string, confirmation?: string | null): NodeJS.ProcessEnv {
+/** The Actions environment of `workflow` on its own release branch, dispatched by default. */
+function workflowEnv(
+  workflow: string,
+  confirmation?: string | null,
+  event = 'workflow_dispatch'
+): NodeJS.ProcessEnv {
+  const branch = releaseAuthorizations[workflow]?.branch ?? 'main'
   return {
     CI: 'true',
     GITHUB_ACTIONS: 'true',
-    GITHUB_REF: 'refs/heads/main',
+    GITHUB_EVENT_NAME: event,
+    GITHUB_REF: `refs/heads/${branch}`,
     GITHUB_SHA: sha,
-    GITHUB_WORKFLOW_REF: `${project.repository}/.github/workflows/${workflow}@refs/heads/main`,
+    GITHUB_WORKFLOW_REF: `${project.repository}/.github/workflows/${workflow}@refs/heads/${branch}`,
     ...(confirmation ? { RELEASE_CONFIRM: confirmation } : {})
   }
 }
 
 const cleanGit = (args: string[]): string => (args[0] === 'status' ? '' : `${sha}\n`)
 const mutatingCommands = releaseCommands.filter(command => !readOnlyCommands.has(command))
+
+/** A newer commit with different source, for a `main` that has moved on. */
+const newerSha = '2'.repeat(40)
+const newerTree = 'b'.repeat(40)
+
+/** A merged pull request into main, as the closed-pulls listing reports it. */
+function mergedPull(headRef: string, mergeCommit = sha) {
+  return {
+    base: { ref: 'main' },
+    head: { ref: headRef, repo: { full_name: project.repository } },
+    html_url: 'https://github.com/pull/9',
+    merge_commit_sha: mergeCommit,
+    merged_at: '2026-10-05T00:00:00Z',
+    number: 9
+  }
+}
+
+/**
+ * A fake GitHub API for the release checks, recording every request path. When `verified`, a
+ * push run of Deploy Staging on `staging` verified `stagingSha` (the released commit itself by
+ * default, or a staging commit with the same tree, as a promotion merge commit would carry).
+ * `main` points at `mainHead` (the released commit by default), and `pulls` are the closed
+ * pull requests into main.
+ */
+function stagingApi(
+  verified: boolean,
+  options: { mainHead?: string; pulls?: unknown[]; stagingSha?: string } = {}
+) {
+  const { mainHead = sha, pulls = [], stagingSha = sha } = options
+  const requests: string[] = []
+  const fetch: FetchLike = async url => {
+    const { pathname, searchParams } = new URL(url)
+    requests.push(pathname)
+    const headSha = searchParams.get('head_sha')
+    const runs = verified
+      ? [
+          {
+            conclusion: 'success',
+            event: 'push',
+            head_branch: 'staging',
+            head_commit: { id: stagingSha, tree_id: tree },
+            head_sha: stagingSha,
+            html_url: 'https://github.com/run/1',
+            id: 1,
+            path: '.github/workflows/deploy-staging.yml',
+            run_attempt: 1,
+            status: 'completed'
+          }
+        ]
+      : []
+    const body = pathname.includes('/git/commits/')
+      ? { tree: { sha: pathname.endsWith(newerSha) ? newerTree : tree } }
+      : pathname.endsWith('/git/ref/heads/main')
+        ? { object: { sha: mainHead, type: 'commit' } }
+        : pathname.endsWith('/pulls')
+          ? pulls
+          : pathname.includes('/workflows/')
+            ? { workflow_runs: runs.filter(run => !headSha || run.head_sha === headSha) }
+            : {
+                jobs: [
+                  {
+                    conclusion: 'success',
+                    steps: stagingWorkflow.requiredSteps.map(name => ({
+                      conclusion: 'success',
+                      name
+                    }))
+                  }
+                ]
+              }
+    return { json: async () => body, ok: true, status: 200 }
+  }
+  return { fetch, requests }
+}
 
 describe('release authorization', () => {
   it('allows read-only checks without a workflow and refuses mutations outside Actions', () => {
@@ -137,6 +219,7 @@ describe('release authorization', () => {
     expect([...readOnlyCommands].sort()).toEqual([
       'check-database',
       'list-migrations',
+      'plan-release',
       'verify-import'
     ])
     for (const command of readOnlyCommands) {
@@ -192,13 +275,28 @@ describe('release authorization', () => {
     ])
     for (const [, authorization] of production) {
       expect(authorization.confirmation).toMatch(/-production$/u)
+      // main is production: every production mutation runs from main.
+      expect(authorization.branch).toBe('main')
     }
     expect(releaseAuthorizations['deploy-staging.yml']).toEqual({
+      branch: 'staging',
       commands: ['migrate', 'deploy'],
       confirmation: null,
       environment: 'staging',
+      events: ['push', 'workflow_dispatch'],
       requireVerifiedStaging: []
     })
+    // Only the two deploy workflows run on push; every other remote mutation is a dispatch.
+    expect(
+      Object.entries(releaseAuthorizations)
+        .filter(([, authorization]) => authorization.events.includes('push'))
+        .map(([workflow]) => workflow)
+    ).toEqual(['deploy-staging.yml', 'deploy-production.yml'])
+    expect(
+      Object.entries(releaseAuthorizations)
+        .filter(([, authorization]) => authorization.hotfixConfirmation)
+        .map(([workflow, authorization]) => [workflow, authorization.hotfixConfirmation])
+    ).toEqual([['deploy-production.yml', project.confirmation.hotfix]])
     expect(
       Object.entries(releaseAuthorizations)
         .filter(([, authorization]) => authorization.commands.includes('import'))
@@ -222,48 +320,118 @@ describe('release authorization', () => {
     refuse({
       GITHUB_WORKFLOW_REF: `${project.repository}/.github/workflows/main-validation.yml@refs/heads/main`
     }).toThrow('not a protected')
+    refuse({
+      GITHUB_WORKFLOW_REF: `${project.repository}/.github/workflows/deploy-production.yml`
+    }).toThrow('not a protected')
+    refuse({
+      GITHUB_WORKFLOW_REF: `${project.repository}/.github/workflows/toString@refs/heads/main`
+    }).toThrow('not a protected')
     refuse({ GITHUB_REF: 'refs/heads/feature' }).toThrow('reviewed main')
     refuse({ GITHUB_SHA: '' }).toThrow('reviewed main')
     refuse({}, args => (args[0] === 'status' ? '?? stray.txt\n' : sha)).toThrow('clean checkout')
     refuse({}, args => (args[0] === 'status' ? '' : 'f'.repeat(40))).toThrow('GITHUB_SHA')
   })
+
+  it('runs staging releases only from staging and production releases only from main', () => {
+    const staging = workflowEnv('deploy-staging.yml', null, 'push')
+    expect(staging.GITHUB_REF).toBe('refs/heads/staging')
+    expect(() => authorizeRelease('migrate', 'staging', staging, cleanGit)).not.toThrow()
+    // The staging workflow loaded from main (the old flow) or a feature branch is not protected.
+    for (const branch of ['main', 'feature']) {
+      expect(() =>
+        authorizeRelease(
+          'deploy',
+          'staging',
+          {
+            ...staging,
+            GITHUB_REF: `refs/heads/${branch}`,
+            GITHUB_WORKFLOW_REF: `${project.repository}/.github/workflows/deploy-staging.yml@refs/heads/${branch}`
+          },
+          cleanGit
+        )
+      ).toThrow('not a protected')
+    }
+    expect(() =>
+      authorizeRelease('deploy', 'staging', { ...staging, GITHUB_REF: 'refs/heads/main' }, cleanGit)
+    ).toThrow('reviewed staging')
+    // A production workflow loaded from staging is not protected either.
+    for (const workflow of Object.keys(releaseAuthorizations).filter(
+      file => releaseAuthorizations[file]?.environment === 'production'
+    )) {
+      const authorization = releaseAuthorizations[workflow]
+      const command = authorization?.commands[0] ?? 'deploy'
+      expect(
+        () =>
+          authorizeRelease(
+            command,
+            'production',
+            {
+              ...workflowEnv(workflow, authorization?.confirmation),
+              GITHUB_REF: 'refs/heads/staging',
+              GITHUB_WORKFLOW_REF: `${project.repository}/.github/workflows/${workflow}@refs/heads/staging`
+            },
+            cleanGit
+          ),
+        workflow
+      ).toThrow('not a protected')
+    }
+  })
+
+  it('needs no typed confirmation on a push, and runs only on each workflow’s own events', () => {
+    for (const command of ['backup', 'migrate', 'deploy'] as const) {
+      expect(() =>
+        authorizeRelease(
+          command,
+          'production',
+          workflowEnv('deploy-production.yml', null, 'push'),
+          cleanGit
+        )
+      ).not.toThrow()
+    }
+    // A dispatch of the same workflow still needs its confirmation.
+    expect(() =>
+      authorizeRelease('deploy', 'production', workflowEnv('deploy-production.yml'), cleanGit)
+    ).toThrow(project.confirmation.deploy)
+    for (const [workflow, authorization] of Object.entries(releaseAuthorizations)) {
+      const command = authorization.commands[0] ?? 'deploy'
+      for (const event of ['push', 'schedule', 'workflow_run', 'pull_request_target', '']) {
+        const env = workflowEnv(workflow, authorization.confirmation, event)
+        const run = () => authorizeRelease(command, authorization.environment, env, cleanGit)
+        if (authorization.events.some(allowed => allowed === event)) expect(run).not.toThrow()
+        else expect(run, `${workflow} ${event}`).toThrow('runs remote commands only on')
+      }
+    }
+  })
+
+  it('accepts the hotfix confirmation only on a deploy-production.yml dispatch', () => {
+    const hotfix = workflowEnv('deploy-production.yml', project.confirmation.hotfix)
+    for (const command of ['backup', 'migrate', 'deploy'] as const) {
+      expect(() => authorizeRelease(command, 'production', hotfix, cleanGit)).not.toThrow()
+    }
+    for (const workflow of [
+      'bootstrap-production-d1.yml',
+      'publish-d1.yml',
+      'approve-d1-submission.yml'
+    ]) {
+      const authorization = releaseAuthorizations[workflow]
+      expect(
+        () =>
+          authorizeRelease(
+            authorization?.commands[0] ?? 'backup',
+            'production',
+            workflowEnv(workflow, project.confirmation.hotfix),
+            cleanGit
+          ),
+        workflow
+      ).toThrow(authorization?.confirmation ?? '')
+    }
+  })
 })
 
 describe('staging before production', () => {
-  const sha = '0123456789abcdef0123456789abcdef01234567'
-
-  function stagingApi(verified: boolean) {
-    const requests: string[] = []
-    const fetch: FetchLike = async url => {
-      requests.push(url)
-      const body = url.includes('/workflows/')
-        ? {
-            workflow_runs: verified
-              ? [
-                  {
-                    conclusion: 'success',
-                    head_branch: 'main',
-                    head_sha: sha,
-                    html_url: 'https://github.com/run/1',
-                    id: 1,
-                    path: '.github/workflows/deploy-staging.yml',
-                    status: 'completed'
-                  }
-                ]
-              : []
-          }
-        : {
-            jobs: [
-              {
-                conclusion: 'success',
-                steps: stagingWorkflow.requiredSteps.map(name => ({ conclusion: 'success', name }))
-              }
-            ]
-          }
-      return { json: async () => body, ok: true, status: 200 }
-    }
-    return { fetch, requests }
-  }
+  /** A promotion merge commit's second parent: a different commit with the released tree. */
+  const stagingSha = '1'.repeat(40)
+  const withToken = (env: NodeJS.ProcessEnv) => ({ ...env, GITHUB_TOKEN: 'ghs_test' })
 
   it('requires a verified staging run for every production migration, import, and deploy', async () => {
     expect(
@@ -293,51 +461,129 @@ describe('staging before production', () => {
           }
         }
       }
-      for (const command of authorization.commands) {
-        const api = stagingApi(false)
-        const env = {
-          ...workflowEnv(workflow, authorization.confirmation),
-          GITHUB_SHA: sha,
-          GITHUB_TOKEN: 'ghs_test'
-        }
-        const result = requireVerifiedStaging(command, env, api.fetch)
-        if (authorization.requireVerifiedStaging.includes(command)) {
-          await expect(result, `${workflow} ${command}`).rejects.toThrow(
-            `Deploy Staging has no run for ${sha}`
-          )
-        } else {
-          await expect(result, `${workflow} ${command}`).resolves.toBeNull()
-          expect(api.requests).toEqual([])
+      for (const event of authorization.events) {
+        for (const command of authorization.commands) {
+          const api = stagingApi(false)
+          const env = withToken(workflowEnv(workflow, authorization.confirmation, event))
+          const result = requireVerifiedStaging(command, env, api.fetch)
+          if (authorization.requireVerifiedStaging.includes(command)) {
+            await expect(result, `${workflow} ${event} ${command}`).rejects.toThrow(
+              `Deploy Staging has no run on staging for ${sha}`
+            )
+          } else {
+            await expect(result, `${workflow} ${event} ${command}`).resolves.toBeNull()
+            expect(api.requests).toEqual([])
+          }
         }
       }
     }
   })
 
-  it('lets a production release proceed once Deploy Staging verified the commit', async () => {
-    const env = {
-      ...workflowEnv('deploy-production.yml', project.confirmation.deploy),
-      GITHUB_SHA: sha,
-      GITHUB_TOKEN: 'ghs_test'
-    }
-    for (const command of ['migrate', 'deploy'] as const) {
-      await expect(
-        requireVerifiedStaging(command, env, stagingApi(true).fetch)
-      ).resolves.toMatchObject({ runId: 1, sha })
+  it('lets a production release proceed once Deploy Staging verified the commit or its tree', async () => {
+    for (const event of ['push', 'workflow_dispatch']) {
+      const env = withToken(
+        workflowEnv('deploy-production.yml', project.confirmation.deploy, event)
+      )
+      for (const command of ['migrate', 'deploy'] as const) {
+        // A fast-forward promotion releases the staging commit itself.
+        await expect(
+          requireVerifiedStaging(command, env, stagingApi(true).fetch)
+        ).resolves.toMatchObject({ match: 'commit', runId: 1, sha, stagingSha: sha, tree })
+        // A merge-commit promotion releases a new commit with a verified staging commit's tree.
+        await expect(
+          requireVerifiedStaging(command, env, stagingApi(true, { stagingSha }).fetch)
+        ).resolves.toMatchObject({ match: 'tree', runId: 1, sha, stagingSha, tree })
+      }
     }
     await expect(
       requireVerifiedStaging(
         'import',
-        {
-          ...workflowEnv('bootstrap-production-d1.yml', project.confirmation.bootstrap),
-          GITHUB_SHA: sha,
-          GITHUB_TOKEN: 'ghs_test'
-        },
+        withToken(workflowEnv('bootstrap-production-d1.yml', project.confirmation.bootstrap)),
+        stagingApi(true, { stagingSha }).fetch
+      )
+    ).resolves.toMatchObject({ match: 'tree', runId: 1, sha })
+    await expect(
+      requireVerifiedStaging(
+        'deploy',
+        workflowEnv('deploy-production.yml', null, 'push'),
         stagingApi(true).fetch
       )
-    ).resolves.toMatchObject({ runId: 1, sha })
-    await expect(
-      requireVerifiedStaging('deploy', { ...env, GITHUB_TOKEN: '' }, stagingApi(true).fetch)
     ).rejects.toThrow('GITHUB_TOKEN')
+  })
+
+  it('lets only a hotfix dispatch of a merged hotfix-* pull request skip staging, to deploy', async () => {
+    const hotfix = withToken(workflowEnv('deploy-production.yml', project.confirmation.hotfix))
+    const api = stagingApi(false, { pulls: [mergedPull('hotfix-12-search')] })
+    await expect(requireVerifiedStaging('deploy', hotfix, api.fetch)).resolves.toBe('hotfix')
+    // The hotfix proof replaces staging verification; no Actions run is consulted.
+    expect(api.requests.some(path => path.includes('/actions/'))).toBe(false)
+    expect(api.requests.some(path => path.endsWith('/pulls'))).toBe(true)
+    await expect(requireVerifiedStaging('migrate', hotfix, api.fetch)).rejects.toThrow(
+      'may only deploy the Worker, never migrate'
+    )
+    await expect(requireVerifiedStaging('backup', hotfix, api.fetch)).resolves.toBeNull()
+    // The confirmation alone is not enough: main's head must be a hotfix-* merge.
+    for (const pulls of [
+      [],
+      [mergedPull('issue-12-search')],
+      [mergedPull('staging')],
+      [mergedPull('hotfix-12-search', newerSha)]
+    ]) {
+      await expect(
+        requireVerifiedStaging('deploy', hotfix, stagingApi(false, { pulls }).fetch),
+        JSON.stringify(pulls)
+      ).rejects.toThrow('not the merge commit of a merged hotfix-* pull request')
+    }
+    // A push never carries a confirmation, so a stray RELEASE_CONFIRM cannot make it a hotfix.
+    await expect(
+      requireVerifiedStaging(
+        'deploy',
+        withToken(workflowEnv('deploy-production.yml', project.confirmation.hotfix, 'push')),
+        api.fetch
+      )
+    ).rejects.toThrow('has no run on staging')
+    // The bootstrap offers no hotfix: its import always needs staging.
+    await expect(
+      requireVerifiedStaging(
+        'import',
+        withToken(workflowEnv('bootstrap-production-d1.yml', project.confirmation.hotfix)),
+        stagingApi(false, { pulls: [mergedPull('hotfix-12-search')] }).fetch
+      )
+    ).rejects.toThrow('has no run on staging')
+  })
+
+  it('refuses a stale release once main has moved on to different source', async () => {
+    const releases: Array<[string, NodeJS.ProcessEnv, ReleaseCommand]> = [
+      ['deploy', withToken(workflowEnv('deploy-production.yml', null, 'push')), 'deploy'],
+      ['migrate', withToken(workflowEnv('deploy-production.yml', null, 'push')), 'migrate'],
+      [
+        'hotfix deploy',
+        withToken(workflowEnv('deploy-production.yml', project.confirmation.hotfix)),
+        'deploy'
+      ],
+      [
+        'bootstrap import',
+        withToken(workflowEnv('bootstrap-production-d1.yml', project.confirmation.bootstrap)),
+        'import'
+      ]
+    ]
+    const pulls = [mergedPull('hotfix-12-search')]
+    for (const [label, env, command] of releases) {
+      // main moved to a commit with other source: an older release must not overwrite it.
+      await expect(
+        requireVerifiedStaging(command, env, stagingApi(true, { mainHead: newerSha, pulls }).fetch),
+        label
+      ).rejects.toThrow(`main now points at ${newerSha}, not ${sha}, so this release is stale`)
+      // main moved to a commit with the same tree (an empty promotion): the source is current.
+      await expect(
+        requireVerifiedStaging(
+          command,
+          env,
+          stagingApi(true, { mainHead: '3'.repeat(40), pulls }).fetch
+        ),
+        label
+      ).resolves.toBeTruthy()
+    }
   })
 
   it('never consults GitHub for read-only checks and refuses unknown workflows', async () => {
@@ -353,43 +599,33 @@ describe('staging before production', () => {
 })
 
 describe('release entry point', () => {
-  const sha = '0123456789abcdef0123456789abcdef01234567'
   const builtWorker = join(fixtureDirectory, 'built-worker.js')
   writeFileSync(builtWorker, '')
+  const rehearsal = join(fixtureDirectory, 'rehearsal-state')
 
   /**
-   * Records, in order, every GitHub API request and every Wrangler/OpenNext invocation, and
-   * answers D1 queries as a fully migrated, bootstrapped database would.
+   * Records, in order, every GitHub API request, git call, and Wrangler/OpenNext invocation,
+   * and answers D1 queries as a bootstrapped database missing `pending` migrations would.
    */
-  function harness(verified: boolean) {
+  function harness(
+    verified: boolean,
+    options: {
+      mainHead?: string
+      pending?: string[]
+      pulls?: unknown[]
+      stagingSha?: string
+      unknown?: string[]
+    } = {}
+  ) {
     const events: string[] = []
-    const fetch: FetchLike = async url => {
+    const api = stagingApi(verified, options)
+    const fetch: FetchLike = async (url, init) => {
       events.push(`fetch ${new URL(url).pathname}`)
-      const body = url.includes('/workflows/')
-        ? {
-            workflow_runs: verified
-              ? [
-                  {
-                    conclusion: 'success',
-                    head_branch: 'main',
-                    head_sha: sha,
-                    id: 1,
-                    path: '.github/workflows/deploy-staging.yml',
-                    run_attempt: 1,
-                    status: 'completed'
-                  }
-                ]
-              : []
-          }
-        : {
-            jobs: [
-              {
-                conclusion: 'success',
-                steps: stagingWorkflow.requiredSteps.map(name => ({ conclusion: 'success', name }))
-              }
-            ]
-          }
-      return { json: async () => body, ok: true, status: 200 }
+      return api.fetch(url, init)
+    }
+    const git = (args: string[]) => {
+      events.push(`git ${args.join(' ')}`)
+      return cleanGit(args)
     }
     const runs: string[][] = []
     const runner: ProcessRunner = {
@@ -401,17 +637,25 @@ describe('release entry point', () => {
         const rows = sql.includes('sqlite_master')
           ? [{ name: 'd1_migrations' }, { name: 'publication_state' }]
           : sql.includes('FROM d1_migrations')
-            ? freshMigrationNames().map(name => ({ name }))
+            ? [
+                ...freshMigrationNames().filter(name => !options.pending?.includes(name)),
+                ...(options.unknown ?? [])
+              ].map(name => ({ name }))
             : [{ checksum: 'c', rows: 1, version: 1 }]
         return JSON.stringify([{ results: rows, success: true }])
       }
     }
-    return { events, fetch, runner, runs }
+    return { events, fetch, git, runner, runs }
   }
+  const dependencies = (run: ReturnType<typeof harness>) => ({
+    fetch: run.fetch,
+    git: run.git,
+    runner: run.runner,
+    workerEntrypoint: builtWorker
+  })
 
-  const productionEnv = (workflow: string, confirmation: string) => ({
-    ...workflowEnv(workflow, confirmation),
-    GITHUB_SHA: sha,
+  const productionEnv = (workflow: string, confirmation: string | null, event?: string) => ({
+    ...workflowEnv(workflow, confirmation, event),
     GITHUB_TOKEN: 'ghs_test'
   })
   const productionReleases: Array<[string, string, string]> = [
@@ -420,58 +664,263 @@ describe('release entry point', () => {
     ['import', 'bootstrap-production-d1.yml', project.confirmation.bootstrap]
   ]
 
-  it('refuses an unverified production release before any Wrangler or D1 call', async () => {
-    for (const [command, workflow, confirmation] of productionReleases) {
-      const run = harness(false)
-      await expect(
-        runRelease([command, 'production'], productionEnv(workflow, confirmation), {
-          fetch: run.fetch,
-          git: cleanGit,
-          runner: run.runner,
-          workerEntrypoint: builtWorker
-        }),
-        command
-      ).rejects.toThrow(`Deploy Staging has no run for ${sha}`)
-      expect(run.runs, command).toEqual([])
-      expect(run.events.length, command).toBeGreaterThan(0)
+  it('refuses every remote mutation outside its protected workflow before any runner call', async () => {
+    const argv = (command: string, environment: string) =>
+      command === 'backup'
+        ? [command, environment, '--output', join(fixtureDirectory, 'refused.sql')]
+        : [command, environment]
+    for (const command of mutatingCommands) {
+      for (const environment of ['staging', 'production']) {
+        const run = harness(true)
+        await expect(
+          runRelease(argv(command, environment), {}, dependencies(run)),
+          `${command} ${environment}`
+        ).rejects.toThrow('runs only inside a protected GitHub Actions workflow')
+        expect(run.events, `${command} ${environment}`).toEqual([])
+      }
+    }
+    // The bootstrap workflow itself, without its typed confirmation.
+    const unconfirmed = harness(true)
+    await expect(
+      runRelease(
+        ['import', 'production'],
+        productionEnv('bootstrap-production-d1.yml', null),
+        dependencies(unconfirmed)
+      )
+    ).rejects.toThrow(project.confirmation.bootstrap)
+    expect(unconfirmed.events).toEqual([])
+    // An unprotected workflow on main, and a production workflow dispatched from staging.
+    for (const env of [
+      productionEnv('main-validation.yml', project.confirmation.deploy),
+      {
+        ...productionEnv('deploy-production.yml', project.confirmation.deploy),
+        GITHUB_REF: 'refs/heads/staging',
+        GITHUB_WORKFLOW_REF: `${project.repository}/.github/workflows/deploy-production.yml@refs/heads/staging`
+      }
+    ]) {
+      const run = harness(true)
+      await expect(runRelease(['deploy', 'production'], env, dependencies(run))).rejects.toThrow(
+        'not a protected'
+      )
+      expect(run.events).toEqual([])
     }
   })
 
-  it('checks staging first, then migrates or deploys a verified production commit', async () => {
-    for (const [command] of productionReleases.filter(([name]) => name !== 'import')) {
-      const run = harness(true)
-      await runRelease(
-        [command, 'production'],
-        productionEnv('deploy-production.yml', project.confirmation.deploy),
-        { fetch: run.fetch, git: cleanGit, runner: run.runner, workerEntrypoint: builtWorker }
-      )
-      const firstRun = run.events.findIndex(event => event.startsWith('run '))
-      expect(firstRun, command).toBeGreaterThan(0)
+  it('rehearses locally without contacting GitHub or Cloudflare', async () => {
+    for (const command of [
+      'migrate',
+      'import',
+      'list-migrations',
+      'plan-release',
+      'check-database'
+    ]) {
+      const run = harness(false)
+      await runRelease([command, 'production', '--rehearse', rehearsal], {}, dependencies(run))
+      expect(run.runs.length, command).toBeGreaterThan(0)
       expect(
-        run.events.slice(0, firstRun).every(event => event.startsWith('fetch ')),
+        run.events.filter(event => !event.startsWith('run ')),
         command
-      ).toBe(true)
-      expect(
-        run.events.slice(firstRun).some(event => event.startsWith('fetch ')),
-        command
-      ).toBe(false)
-      const expected =
-        command === 'migrate'
-          ? ['pnpm', 'exec', 'wrangler', 'd1', 'migrations', 'apply', 'best-serp-co-production']
-          : ['pnpm', '--filter', 'web', 'exec', 'opennextjs-cloudflare', 'deploy']
-      const mutation = run.runs.find(call => call.includes(expected[4] ?? ''))
-      expect(mutation?.slice(0, expected.length), command).toEqual(expected)
+      ).toEqual([])
+      for (const call of run.runs) {
+        expect(call, command).not.toContain('--remote')
+        expect(call.slice(call.indexOf('--local'), call.indexOf('--local') + 3), command).toEqual([
+          '--local',
+          '--persist-to',
+          rehearsal
+        ])
+      }
     }
+    // Deploying and exporting always reach Cloudflare, so neither can be rehearsed.
+    for (const argv of [
+      ['deploy', 'production', '--rehearse', rehearsal],
+      ['backup', 'production', '--output', '/tmp/b.sql', '--rehearse', rehearsal]
+    ]) {
+      const run = harness(true)
+      await expect(runRelease(argv, {}, dependencies(run))).rejects.toThrow('cannot be rehearsed')
+      expect(run.events).toEqual([])
+    }
+  })
+
+  it('refuses an unverified production release before any Wrangler or D1 call', async () => {
+    for (const [command, workflow, confirmation] of productionReleases) {
+      for (const event of releaseAuthorizations[workflow]?.events ?? []) {
+        const run = harness(false)
+        await expect(
+          runRelease(
+            [command, 'production'],
+            productionEnv(workflow, confirmation, event),
+            dependencies(run)
+          ),
+          `${command} ${event}`
+        ).rejects.toThrow(`Deploy Staging has no run on staging for ${sha}`)
+        expect(run.runs, `${command} ${event}`).toEqual([])
+        expect(
+          run.events.some(entry => entry.startsWith('fetch ')),
+          command
+        ).toBe(true)
+      }
+    }
+  })
+
+  it('checks staging first, then migrates or deploys a verified or promoted commit', async () => {
+    for (const [command] of productionReleases.filter(([name]) => name !== 'import')) {
+      for (const stagingSha of [sha, '1'.repeat(40)]) {
+        for (const event of ['push', 'workflow_dispatch']) {
+          const label = `${command} ${event} ${stagingSha.slice(0, 4)}`
+          const run = harness(true, { stagingSha })
+          await runRelease(
+            [command, 'production'],
+            productionEnv('deploy-production.yml', project.confirmation.deploy, event),
+            dependencies(run)
+          )
+          const firstRun = run.events.findIndex(entry => entry.startsWith('run '))
+          expect(firstRun, label).toBeGreaterThan(0)
+          expect(
+            run.events.slice(0, firstRun).every(entry => !entry.startsWith('run ')),
+            label
+          ).toBe(true)
+          expect(
+            run.events.slice(firstRun).some(entry => !entry.startsWith('run ')),
+            label
+          ).toBe(false)
+          const expected =
+            command === 'migrate'
+              ? ['pnpm', 'exec', 'wrangler', 'd1', 'migrations', 'apply', 'best-serp-co-production']
+              : ['pnpm', '--filter', 'web', 'exec', 'opennextjs-cloudflare', 'deploy']
+          const mutation = run.runs.find(call => call.includes(expected[4] ?? ''))
+          expect(mutation?.slice(0, expected.length), label).toEqual(expected)
+        }
+      }
+    }
+  })
+
+  it('refuses a stale production release before any Wrangler or D1 call', async () => {
+    for (const command of ['migrate', 'deploy']) {
+      const run = harness(true, { mainHead: newerSha })
+      await expect(
+        runRelease(
+          [command, 'production'],
+          productionEnv('deploy-production.yml', null, 'push'),
+          dependencies(run)
+        ),
+        command
+      ).rejects.toThrow('this release is stale')
+      expect(run.runs, command).toEqual([])
+    }
+  })
+
+  it('deploys a hotfix-* merge without the staging check but never migrates one', async () => {
+    const hotfix = productionEnv('deploy-production.yml', project.confirmation.hotfix)
+    const pulls = [mergedPull('hotfix-12-search')]
+    const deploy = harness(false, { pulls })
+    await expect(
+      runRelease(['deploy', 'production'], hotfix, dependencies(deploy))
+    ).resolves.toMatchObject({ deployed: 'best-serp-co-production' })
+    expect(deploy.events.filter(entry => entry.includes('/actions/'))).toEqual([])
+    const notHotfix = harness(false, { pulls: [mergedPull('issue-12-search')] })
+    await expect(
+      runRelease(['deploy', 'production'], hotfix, dependencies(notHotfix))
+    ).rejects.toThrow('not the merge commit of a merged hotfix-* pull request')
+    expect(notHotfix.runs).toEqual([])
+    expect(deploy.runs.at(-1)?.slice(0, 6)).toEqual([
+      'pnpm',
+      '--filter',
+      'web',
+      'exec',
+      'opennextjs-cloudflare',
+      'deploy'
+    ])
+    const migrate = harness(false)
+    await expect(
+      runRelease(['migrate', 'production'], hotfix, dependencies(migrate))
+    ).rejects.toThrow('hotfix release skips staging')
+    expect(migrate.runs).toEqual([])
+  })
+
+  it('plans a Worker-only release unless migrations are pending, read-only', async () => {
+    const pending = freshMigrationNames().slice(-1)
+    const cases: Array<[ReturnType<typeof harness>, unknown]> = [
+      [harness(false), { mode: 'worker-only', pendingMigrations: [] }],
+      [harness(false, { pending }), { mode: 'database-and-worker', pendingMigrations: pending }]
+    ]
+    for (const [run, plan] of cases) {
+      await expect(
+        runRelease(['plan-release', 'production'], {}, dependencies(run))
+      ).resolves.toEqual({ environment: 'production', ...(plan as object) })
+      expect(run.events.filter(entry => !entry.startsWith('run '))).toEqual([])
+      for (const call of run.runs) expect(call[call.indexOf('--command') + 1]).toMatch(/^SELECT\b/u)
+    }
+    await expect(
+      runRelease(
+        ['plan-release', 'production'],
+        {},
+        dependencies(harness(false, { unknown: ['9999_future.sql'] }))
+      )
+    ).rejects.toThrow('does not contain (9999_future.sql)')
+  })
+
+  it('refuses a stale release at the plan, before any backup or D1 call', async () => {
+    const pending = freshMigrationNames().slice(-1)
+    for (const event of ['push', 'workflow_dispatch']) {
+      const stale = harness(false, { mainHead: newerSha, pending })
+      await expect(
+        runRelease(
+          ['plan-release', 'production'],
+          productionEnv('deploy-production.yml', project.confirmation.deploy, event),
+          dependencies(stale)
+        ),
+        event
+      ).rejects.toThrow(`main now points at ${newerSha}, not ${sha}, so this release is stale`)
+      // Refused from the GitHub API alone: no Wrangler call, so nothing is exported.
+      expect(stale.runs, event).toEqual([])
+      expect(stale.events, event).toContain(`fetch /repos/${project.repository}/git/ref/heads/main`)
+    }
+    // A current release still plans its migrations, and a maintainer's read-only plan outside
+    // the workflow never consults GitHub.
+    await expect(
+      runRelease(
+        ['plan-release', 'production'],
+        productionEnv('deploy-production.yml', null, 'push'),
+        dependencies(harness(false, { pending }))
+      )
+    ).resolves.toMatchObject({ mode: 'database-and-worker', pendingMigrations: pending })
+    const maintainer = harness(false, { mainHead: newerSha, pending })
+    await expect(
+      runRelease(['plan-release', 'production'], {}, dependencies(maintainer))
+    ).resolves.toMatchObject({ mode: 'database-and-worker' })
+    expect(maintainer.events.filter(entry => entry.startsWith('fetch '))).toEqual([])
+  })
+
+  it('refuses a hotfix with pending migrations at the plan, before any backup', async () => {
+    const pending = freshMigrationNames().slice(-1)
+    const hotfix = productionEnv('deploy-production.yml', project.confirmation.hotfix)
+    const run = harness(false, { pending })
+    await expect(
+      runRelease(['plan-release', 'production'], hotfix, dependencies(run))
+    ).rejects.toThrow(
+      `A hotfix release may not migrate, and production D1 is missing ${pending[0]}`
+    )
+    for (const call of run.runs) expect(call[call.indexOf('--command') + 1]).toMatch(/^SELECT\b/u)
+    // Without pending migrations a hotfix plans worker-only; a promotion still migrates.
+    await expect(
+      runRelease(['plan-release', 'production'], hotfix, dependencies(harness(false)))
+    ).resolves.toMatchObject({ mode: 'worker-only' })
+    await expect(
+      runRelease(
+        ['plan-release', 'production'],
+        productionEnv('deploy-production.yml', null, 'push'),
+        dependencies(harness(false, { pending }))
+      )
+    ).resolves.toMatchObject({ mode: 'database-and-worker' })
   })
 
   it('never consults GitHub for staging releases or read-only listings', async () => {
     const staging = harness(false)
-    await runRelease(['deploy', 'staging'], workflowEnv('deploy-staging.yml'), {
-      fetch: staging.fetch,
-      git: cleanGit,
-      runner: staging.runner,
-      workerEntrypoint: builtWorker
-    })
+    await runRelease(
+      ['deploy', 'staging'],
+      workflowEnv('deploy-staging.yml', null, 'push'),
+      dependencies(staging)
+    )
     expect(staging.events.filter(event => event.startsWith('fetch '))).toEqual([])
     expect(staging.runs.at(-1)).toEqual([
       'pnpm',
@@ -485,19 +934,8 @@ describe('release entry point', () => {
     ])
 
     const listing = harness(false)
-    const refuse = () => {
-      throw new Error('list-migrations never inspects the checkout')
-    }
     await expect(
-      runRelease(
-        ['list-migrations', 'production'],
-        {},
-        {
-          fetch: listing.fetch,
-          git: refuse,
-          runner: listing.runner
-        }
-      )
+      runRelease(['list-migrations', 'production'], {}, dependencies(listing))
     ).resolves.toEqual({
       appliedMigrations: freshMigrationNames(),
       environment: 'production',
@@ -505,7 +943,8 @@ describe('release entry point', () => {
       missingMigrations: [],
       unknownMigrations: []
     })
-    expect(listing.events.filter(event => event.startsWith('fetch '))).toEqual([])
+    // Read-only listings never inspect the checkout or consult GitHub.
+    expect(listing.events.filter(event => !event.startsWith('run '))).toEqual([])
     expect(listing.runs.length).toBeGreaterThan(0)
     for (const call of listing.runs) {
       expect(call.slice(0, 5)).toEqual(['pnpm', 'exec', 'wrangler', 'd1', 'execute'])

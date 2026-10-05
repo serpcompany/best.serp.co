@@ -16,6 +16,8 @@ export const project = {
   confirmation: {
     bootstrap: 'bootstrap-best.serp.co-production',
     deploy: 'deploy-best.serp.co-production',
+    /** Owner-approved Worker hotfix from main that skips the staging check; see RELEASE_GUARDS. */
+    hotfix: 'hotfix-best.serp.co-production',
     publish: 'publish-best.serp.co-production',
     submission: 'approve-best.serp.co-submission-production'
   },
