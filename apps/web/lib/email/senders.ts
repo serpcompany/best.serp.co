@@ -19,7 +19,6 @@ export interface OutgoingEmail {
   from: EmailSenderAddress
   headers: Readonly<Record<string, string>>
   html: string
-  replyTo?: string
   subject: string
   text: string
   /** One recipient, already validated and normalized. */
@@ -48,7 +47,6 @@ export interface SendEmailBinding {
     from: EmailSenderAddress | string
     headers?: Record<string, string>
     html?: string
-    replyTo?: EmailSenderAddress | string
     subject: string
     text?: string
     to: string | string[]
@@ -63,7 +61,6 @@ export function createCloudflareEmailSender(binding: SendEmailBinding): EmailSen
         from: { ...message.from },
         headers: { ...message.headers },
         html: message.html,
-        ...(message.replyTo ? { replyTo: message.replyTo } : {}),
         subject: message.subject,
         text: message.text,
         to: message.to
@@ -88,7 +85,6 @@ export function createLogEmailSender(
           event: 'email_logged',
           from: message.from,
           htmlLength: message.html.length,
-          replyTo: message.replyTo ?? null,
           subject: message.subject,
           text: message.text,
           to: message.to

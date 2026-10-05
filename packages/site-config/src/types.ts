@@ -99,10 +99,13 @@ export type SiteDefinition = {
   copy: SiteCopyConfig
   /** Transactional email identity (`apps/web/lib/email/`). */
   email: {
-    /** The sender, on the domain onboarded to Cloudflare Email Sending. */
+    /**
+     * Root-relative path of the dashboard every email footer links to. The sender is not
+     * monitored, so replies happen there (serpcompany/best.serp.co#73).
+     */
+    dashboardPath: string
+    /** The sender, on the domain onboarded to Cloudflare Email Sending. Sent with no Reply-To. */
     from: { address: string; name: string }
-    /** The contact address emails name in their footer. */
-    supportAddress: string
   }
   features: SiteFeatureFlags
   id: string

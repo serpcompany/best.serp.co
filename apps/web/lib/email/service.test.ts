@@ -80,10 +80,9 @@ describe('email delivery', () => {
       {
         from: EMAIL_FROM,
         headers: { 'Auto-Submitted': 'auto-generated' },
-        html: '<p>Secret body text</p><p><a href="https://best.serp.co/products/autoenhance.ai/">https://best.serp.co/products/autoenhance.ai/</a></p><p>support@serp.co</p>',
-        replyTo: 'support@serp.co',
+        html: '<p>Secret body text</p><p><a href="https://best.serp.co/products/autoenhance.ai/">https://best.serp.co/products/autoenhance.ai/</a></p><p><a href="https://best.serp.co/account/">https://best.serp.co/account/</a></p>',
         subject: 'Fixture: Secret body text',
-        text: 'Secret body text\n\nhttps://best.serp.co/products/autoenhance.ai/\n\nsupport@serp.co',
+        text: 'Secret body text\n\nhttps://best.serp.co/products/autoenhance.ai/\n\nhttps://best.serp.co/account/',
         to: 'owner@serp.co'
       }
     ])
@@ -440,7 +439,7 @@ describe('Worker email service', () => {
     return logs
   }
 
-  it('sends through the EMAIL binding in staging and production, replying to support', async () => {
+  it('sends through the EMAIL binding in staging and production, with no Reply-To', async () => {
     for (const vars of [staging, production]) {
       const { calls, email } = binding()
       const logs = await run({ ...vars, DB: new SqliteD1().asD1Database(), EMAIL: email })
@@ -449,7 +448,6 @@ describe('Worker email service', () => {
           from: { email: 'noreply@mail.serp.co', name: 'SERP Directory' },
           headers: { 'Auto-Submitted': 'auto-generated' },
           html: expect.stringContaining('/products/autoenhance.ai/'),
-          replyTo: 'support@serp.co',
           subject:
             vars === staging ? '[staging] Fixture: Secret body text' : 'Fixture: Secret body text',
           text: expect.stringContaining('/products/autoenhance.ai/'),
@@ -471,9 +469,8 @@ describe('Worker email service', () => {
     const logged = JSON.parse(String(info.mock.calls[0]?.[0])) as Record<string, unknown>
     expect(logged).toMatchObject({
       event: 'email_logged',
-      replyTo: 'support@serp.co',
       subject: 'Fixture: Secret body text',
-      text: 'Secret body text\n\nhttp://localhost:8787/products/autoenhance.ai/\n\nsupport@serp.co',
+      text: 'Secret body text\n\nhttp://localhost:8787/products/autoenhance.ai/\n\nhttp://localhost:8787/account/',
       to: 'owner@serp.co'
     })
   })

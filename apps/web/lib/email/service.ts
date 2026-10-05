@@ -25,8 +25,8 @@ import {
   isEmailTemplateId
 } from '@serpdirectory/data-ops/email-deliveries'
 import {
+  EMAIL_DASHBOARD_PATH,
   EMAIL_FROM,
-  EMAIL_SUPPORT_ADDRESS,
   type EmailPolicy,
   normalizeEmailAddress,
   prefixedSubject,
@@ -187,9 +187,9 @@ export function createEmailService<R extends EmailTemplateRegistry>(
     let rendered: RenderedEmail
     try {
       rendered = renderEmail(template, request.input, {
+        dashboardUrl: links.url(EMAIL_DASHBOARD_PATH),
         environment: policy.environment,
-        links,
-        supportAddress: EMAIL_SUPPORT_ADDRESS
+        links
       })
     } catch (error) {
       log({
@@ -238,7 +238,6 @@ export function createEmailService<R extends EmailTemplateRegistry>(
       from: { ...EMAIL_FROM },
       headers: { 'Auto-Submitted': 'auto-generated' },
       html: rendered.html,
-      replyTo: EMAIL_SUPPORT_ADDRESS,
       subject: prefixedSubject(policy, rendered.subject),
       text: rendered.text,
       to

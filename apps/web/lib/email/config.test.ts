@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { project } from '../../../../scripts/project'
 import {
+  EMAIL_DASHBOARD_PATH,
   EMAIL_FROM,
   EMAIL_LINK_ORIGINS,
-  EMAIL_SUPPORT_ADDRESS,
   EmailConfigError,
   normalizeEmailAddress,
   parseRecipientAllowlist,
@@ -136,9 +136,10 @@ describe('apps/web/wrangler.jsonc email bindings', () => {
         { allowed_sender_addresses: [EMAIL_FROM.email], name: 'EMAIL' }
       ])
     }
-    // serpcompany/best.serp.co#59: SERP Directory <noreply@mail.serp.co>, footer support@serp.co.
+    // serpcompany/best.serp.co#59: SERP Directory <noreply@mail.serp.co>, with no Reply-To; the
+    // footer sends people to the dashboard instead (#73).
     expect(EMAIL_FROM).toEqual({ email: 'noreply@mail.serp.co', name: 'SERP Directory' })
-    expect(EMAIL_SUPPORT_ADDRESS).toBe('support@serp.co')
+    expect(EMAIL_DASHBOARD_PATH).toBe('/account/')
   })
 
   it('gives staging a valid, non-empty allowlist and production none', () => {

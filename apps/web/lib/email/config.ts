@@ -27,8 +27,11 @@ export const EMAIL_FROM: Readonly<{ email: string; name: string }> = {
   name: site.email.from.name
 }
 
-/** The contact address emails name in their footer (`support@serp.co`). */
-export const EMAIL_SUPPORT_ADDRESS = site.email.supportAddress
+/**
+ * The dashboard every email footer links to (`/account/`). The sender is not monitored and
+ * emails carry no Reply-To; replies happen in the dashboard (serpcompany/best.serp.co#73).
+ */
+export const EMAIL_DASHBOARD_PATH = site.email.dashboardPath
 
 export const STAGING_SUBJECT_PREFIX = '[staging]'
 

@@ -27,10 +27,11 @@ export const site: SiteDefinition = {
     submitLabel: 'Submit'
   },
   // mail.serp.co is a dedicated sending subdomain, so this mail's reputation stays separate
-  // from serp.co (serpcompany/best.serp.co#59).
+  // from serp.co (serpcompany/best.serp.co#59). Nothing receives mail for it: emails carry no
+  // Reply-To, and their footer sends people to the dashboard (#73 adds its inbox).
   email: {
-    from: { address: 'noreply@mail.serp.co', name: 'SERP Directory' },
-    supportAddress: 'support@serp.co'
+    dashboardPath: '/account/',
+    from: { address: 'noreply@mail.serp.co', name: 'SERP Directory' }
   },
   features: {
     showAuth: false,

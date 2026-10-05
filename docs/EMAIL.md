@@ -2,9 +2,15 @@
 
 best.serp.co sends transactional email through
 [Cloudflare Email Sending](https://developers.cloudflare.com/email-service/) from
-`SERP Directory <noreply@mail.serp.co>`, with `Reply-To: support@serp.co`, the footer contact.
-The sending subdomain `mail.serp.co` keeps this mail's reputation separate from `serp.co`
-(serpcompany/best.serp.co#59). The emails themselves (sign-in code, submission received,
+`SERP Directory <noreply@mail.serp.co>`, with **no Reply-To** (owner decision). The sending
+subdomain `mail.serp.co` keeps this mail's reputation separate from `serp.co`
+(serpcompany/best.serp.co#59).
+
+Nothing receives mail for these emails. Receiving at a best.serp.co address would break
+serp.co's Gmail MX, and `support@serp.co` is not used. So every footer says the address isn't
+monitored and links to the dashboard, for example "This address isn't monitored. Reply from
+your dashboard: https://best.serp.co/account/". Two-way conversation moves to an inbox in the
+dashboard (serpcompany/best.serp.co#73). The emails themselves (sign-in code, submission received,
 changes requested, approved, rejected, badge missing, unlisted, claim verification code, and
 the admin review notice) follow the mockups approved in #70.
 
@@ -18,9 +24,9 @@ Worker handler outside Next.js.
 | `server.ts` | `enqueueEmail(templateId, { eventKey, to, input })` for route handlers and actions (`server-only`) |
 | `runtime.ts` | `createWorkerEmailService({ env, context, templates })` from Worker bindings |
 | `service.ts` | Validation, environment policy, rendering, the ledger claim, one send, logs; `emailEventKey` |
-| `config.ts` | Environment policy, link origins, the staging allowlist; sender and support address from `packages/site-config` |
+| `config.ts` | Environment policy, link origins, the staging allowlist; sender and dashboard path from `packages/site-config` |
 | `senders.ts` | Providers: Cloudflare (`EMAIL` binding), log (local), capture (tests) |
-| `templates.ts` | Template contract: `defineEmailTemplate`, the escaping `html` tag, absolute links |
+| `templates.ts` | Template contract: `defineEmailTemplate`, the escaping `html` tag, `css`, absolute links |
 | `registry.ts` | The site's templates, empty until #70 is approved |
 
 The idempotency ledger lives in `packages/data-ops/src/email-deliveries.ts` (table
@@ -112,23 +118,49 @@ the address), and the template id and event key when they are well-formed (other
 ## Templates
 
 A template is `defineEmailTemplate<Input>({ id, render(input, context) })` returning
-`{ subject, text, html }`; `context` holds `environment`, `links`, and `supportAddress`.
+`{ subject, text, html }`; `context` holds `environment`, `links`, and `dashboardUrl` (the
+absolute `/account/` URL for the sending environment).
 
-- `html` must come from the `html` tag (a real tagged-template call), which escapes every
-  interpolated value. Values go in element content or quoted attributes only: never in a
-  tag, an unquoted attribute, a comment, `<style>` or `<script>`, a `style` attribute, or an
-  `on*` handler. In a URL attribute (`href`, `src`, `background`, `action`, `formaction`,
-  `poster`, `cite`, ...) a value is either the whole URL (an absolute `http(s)` URL, or
-  `mailto:` with one plain address and no query) or an `encodeURIComponent`-encoded part after
-  a scheme the template's literal text fixes. Anything else throws.
+- **Footer.** Every email says the address isn't monitored and links to `dashboardUrl`;
+  `renderEmail` refuses a template whose text or HTML body lacks that link.
+- **`html` tag.** HTML must come from the `html` tag (a real tagged-template call), which
+  escapes every interpolated value. Values go in element content or quoted attributes only.
+  They are refused in a tag, an unquoted attribute, a comment, `<style>` or `<script>`, an
+  `on*` handler, `<svg>` or `<math>`, and `<meta>`, `<base>`, `<link>`, `<object>`, or
+  `<embed>`.
+- **Links.** In a URL attribute (`href`, `src`, `background`, `action`, `formaction`,
+  `poster`, `cite`, ...) a value is one of three things:
+  - the whole URL: an absolute `http(s)` URL, or `mailto:` with one plain address and no query;
+  - the address after a literal `mailto:`;
+  - an `encodeURIComponent`-encoded part after a literal `http:`, `https:`, or `mailto:`.
+
+  A literal `javascript:` or `data:` never takes a value. Each `srcset` candidate is a whole
+  `http(s)` URL: `srcset="${a} 1x, ${b} 2x"`.
+- **Inline styles.** A `style` value must be `css({ color: tokens.ink, padding: '12px 24px' })`
+  output, at the start or after a literal `;`. `css` allows common email properties and value
+  shapes: hex colours, lengths, numbers, keywords, and quoted font stacks. Anything with
+  `url()`, `expression()`, parentheses, or a second declaration is refused; literal style
+  text in the template is fine.
+- **Buttons.** Outlook conditional comments (VML buttons) are not supported, because values
+  are refused in comments. Use a bulletproof table button: a `<table role="presentation">`
+  cell with `bgcolor` and padding, holding an `<a>` styled with
+  `css({ display: 'inline-block', padding: ..., color: ... })`. It renders in Outlook without
+  VML, apart from rounded corners.
 - `links.url('/account/')` returns the absolute, canonical URL on the sending environment's
   origin. It refuses anything but a root-relative path, and any whitespace or control
   character.
 - Register each template in `registry.ts` under its id, with a test of its rendered subject,
   bodies, and links in every environment.
 - Sign-in and claim code emails put the code in the subject (owner decision), for example
-  `482913 is your SERP sign-in code`. Subjects and bodies never reach deployed logs, and the
-  event key is per call, so the code is stored nowhere by this module.
+  `482913 is your SERP sign-in code`. This module never logs or stores a subject, body, or
+  code (keys are per call), but the platform can keep them:
+  - Cloudflare's **Email preview**, on by default for new sending domains, keeps every sent
+    message (HTML, text, headers, raw source) in the dashboard's Activity log for about
+    seven days. That includes codes, recipient addresses, and reviewer notes.
+  - serp.co's DMARC record has `ruf=mailto:abuse@serp.co; fo=1`, so a receiver that sends
+    forensic reports may include a failing message's headers, subject (and code) included.
+
+  See owner prerequisite 3.
 
 ## Local development
 
@@ -170,8 +202,11 @@ Deploy Staging would fail for every later merge.
    is `v=DMARC1; p=reject;`), that record applies to the subdomain instead: still
    `p=reject`, but without serp.co's reports. Email Sending → Settings lists the sending
    records as Locked or Unlocked (both are correct).
-3. **`support@serp.co` exists** and receives mail (send it a message): every email names it
-   in the footer and replies go to it.
+3. **Email preview** (owner decision): disable it on `mail.serp.co` after onboarding
+   (recommended, because codes and reviewer notes are in the messages). Go to Compute →
+   Email Service → Email Sending → `mail.serp.co` → Settings → Enable email preview. Turn it
+   on briefly only while debugging; previews last about seven days
+   ([logs](https://developers.cloudflare.com/email-service/observability/logs/#message-preview)).
 4. **Verify DKIM and DMARC** once staging is deployed: trigger an email to an allowlisted
    inbox (the first template, the sign-in code, is #60's acceptance test), or send a one-off
    check yourself with
