@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
+import { routedRunsOn } from './ci-runners'
 
 interface WorkflowStep {
   name?: string
@@ -50,7 +51,8 @@ describe('main validation workflow', () => {
     expect(workflow.permissions).toEqual({ contents: 'read' })
     expect(workflow.concurrency?.['cancel-in-progress']).not.toBe(true)
 
-    expect(job['runs-on']).toBe('ubuntu-latest')
+    // No browsers, sudo, apt, or credentials: it follows CI_RUNNER_LABELS.
+    expect(job['runs-on']).toBe(routedRunsOn)
     expect(job.environment).toBeUndefined()
     // A push that creates the branch (staging, once) has an all-zero `before`; it compares the
     // already validated head with itself instead of linting the whole repository.

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
+import { githubHostedRunner } from './ci-runners'
 import { type ReleaseCommand, readOnlyCommands, releaseAuthorizations } from './cloudflare-release'
 import { buildReviewIssue } from './d1-submission-notifier'
 import { project } from './project'
@@ -662,6 +663,16 @@ describe('protected deployment boundaries', () => {
           if (step.uses)
             expect(JSON.stringify(step), `${file}:${step.name}`).not.toContain('secrets.')
         }
+      }
+    }
+  })
+
+  it('runs every credentialed or deploying job on an ephemeral GitHub-hosted runner', () => {
+    // CI_RUNNER_LABELS never moves these, so no secret, D1 backup, or Wrangler session lands on
+    // a persistent host (docs/HARNESS.md#ci-runners).
+    for (const file of [...newWorkflows, 'submit-gsc-sitemaps.yml']) {
+      for (const [name, job] of Object.entries(loadWorkflow(file).jobs)) {
+        expect(job['runs-on'], `${file}:${name}`).toBe(githubHostedRunner)
       }
     }
   })

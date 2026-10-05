@@ -5,6 +5,13 @@ description: "Setup project dependencies"
 runs:
   using: "composite"
   steps:
+    # A self-hosted runner keeps the host between jobs: give each job its own temporary
+    # directory, which the runner empties when the job starts and ends.
+    - name: Scope temporary files to this job
+      if: runner.environment == 'self-hosted'
+      shell: bash
+      run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
     - name: Install pnpm
       uses: pnpm/action-setup@v6
       id: pnpm-install

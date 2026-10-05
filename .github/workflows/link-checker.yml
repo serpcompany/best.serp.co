@@ -4,14 +4,15 @@ on:
   repository_dispatch:
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * 1" # bi weekly on Monday
+    - cron: "0 0 * * 1" # weekly on Monday
 
 env:
   HUSKY: 0
 
 jobs:
   links-checker:
-    runs-on: self-hosted
+    # CI_RUNNER_LABELS picks the runner; fork pull requests stay on ubuntu-latest (docs/HARNESS.md).
+    runs-on: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER_LABELS || '"ubuntu-latest"') }}
     name: Links Checker
     permissions:
       contents: read
@@ -26,12 +27,17 @@ jobs:
         uses: lycheeverse/lychee-action@v2.9.0
         with:
           args: --config ./lychee.toml --verbose --no-progress .
-          fail: true
+          # Don't fail here, so the report step runs; the last step fails the job instead.
+          fail: false
 
       - name: Create Issue From File
-        if: env.exit_code != 0
+        if: steps.lychee.outputs.exit_code != 0
         uses: peter-evans/create-issue-from-file@v6
         with:
           title: Link Checker Report
-          content-filepath: ./lychee-out.md
+          content-filepath: ./lychee/out.md
           labels: report, automated issue
+
+      - name: Fail on broken links
+        if: steps.lychee.outputs.exit_code != 0
+        run: exit 1

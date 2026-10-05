@@ -25,7 +25,7 @@
     "server-only": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260923.1",
+    "@cloudflare/workers-types": "5.20261001.1",
     "@serpdirectory/config-typescript": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
