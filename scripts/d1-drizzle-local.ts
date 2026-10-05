@@ -40,6 +40,7 @@ export const requiredIndexNames = [
   'listing_submission_notifications_recipient_idx',
   'listing_submission_resource_links_submission_order_unique',
   'listing_submissions_active_slug_idx',
+  'listing_submissions_draft_clock_idx',
   'listing_submissions_listing_idx',
   'listing_submissions_owner_idx',
   'listing_submissions_review_queue_idx',

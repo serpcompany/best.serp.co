@@ -14,14 +14,17 @@ function insertSubmission(
   values: Record<string, string | null>,
   slug = 'example.com'
 ): void {
-  const columns = Object.keys(values)
+  const row = { ...values }
+  // A draft (the default status) needs its clock.
+  if ((row.status ?? 'draft') === 'draft' && !('draft_saved_at' in row)) row.draft_saved_at = NOW
+  const columns = Object.keys(row)
   db.prepare(
     `INSERT INTO listing_submissions
       (id,slug,name,description,website,content,category_slug,logo_url${columns.map(c => `,${c}`).join('')})
     VALUES (?,?,'Example','d','https://example.com/','c','tools','https://example.com/l.png'${columns
       .map(() => ',?')
       .join('')})`
-  ).run(crypto.randomUUID(), slug, ...Object.values(values))
+  ).run(crypto.randomUUID(), slug, ...Object.values(row))
 }
 
 describe('listing columns', () => {
@@ -62,6 +65,32 @@ describe('submission status, plan, and decision invariants', () => {
     expect(() =>
       insertSubmission(db, { paid_at: NOW, plan: 'paid', status: 'draft' }, 'd.example')
     ).toThrow(/listing_submissions_draft_unpaid/u)
+  })
+
+  it('keeps a draft clock in ISO form, a bounded reminder count, and a withdrawal reason', () => {
+    const db = database()
+    expect(() => insertSubmission(db, { draft_saved_at: null })).toThrow(
+      /listing_submissions_draft_clock/u
+    )
+    expect(() => insertSubmission(db, { draft_saved_at: '2026-10-06 12:00:00' })).toThrow(
+      /listing_submissions_draft_saved_at_iso/u
+    )
+    expect(() =>
+      insertSubmission(db, { draft_last_reminder_at: NOW, draft_reminders_sent: '6' })
+    ).toThrow(/listing_submissions_draft_reminders_range/u)
+    expect(() => insertSubmission(db, { draft_reminders_sent: '1' })).toThrow(
+      /listing_submissions_draft_reminder_recorded/u
+    )
+    expect(() => insertSubmission(db, { status: 'withdrawn' })).toThrow(
+      /listing_submissions_withdrawal_reason_when_withdrawn/u
+    )
+    expect(() =>
+      insertSubmission(db, { plan: 'free', status: 'pending_badge', withdrawal_reason: 'owner' })
+    ).toThrow(/listing_submissions_withdrawal_reason_when_withdrawn/u)
+    expect(() => insertSubmission(db, { status: 'withdrawn', withdrawal_reason: 'spam' })).toThrow(
+      /listing_submissions_withdrawal_reason_valid/u
+    )
+    insertSubmission(db, { status: 'withdrawn', withdrawal_reason: 'expired' })
   })
 
   it('ties payment and refund timestamps to the plan', () => {
@@ -117,7 +146,7 @@ describe('submission status, plan, and decision invariants', () => {
     expect(() => insertSubmission(db, { plan: 'free', status: 'pending_badge' })).toThrow(
       /UNIQUE constraint failed: listing_submissions.slug/u
     )
-    db.exec("UPDATE listing_submissions SET status = 'withdrawn'")
+    db.exec("UPDATE listing_submissions SET status = 'withdrawn', withdrawal_reason = 'owner'")
     insertSubmission(db, { plan: 'free', status: 'pending_badge' })
   })
 

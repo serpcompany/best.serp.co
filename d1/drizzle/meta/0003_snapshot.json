@@ -1331,7 +1331,7 @@
       "checkConstraints": {
         "listing_submission_events_type_valid": {
           "name": "listing_submission_events_type_valid",
-          "value": "\"listing_submission_events\".\"event_type\" IN ('created', 'verification_failed', 'badge_verified', 'approved', 'rejected', 'edited', 'resubmitted', 'changes_requested', 'withdrawn', 'paid', 'refunded', 'unpublished', 'plan_chosen')"
+          "value": "\"listing_submission_events\".\"event_type\" IN ('created', 'verification_failed', 'badge_verified', 'approved', 'rejected', 'edited', 'resubmitted', 'changes_requested', 'withdrawn', 'paid', 'refunded', 'unpublished', 'plan_chosen', 'expired')"
         }
       }
     },
@@ -1890,6 +1890,35 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "draft_saved_at": {
+          "name": "draft_saved_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "draft_reminders_sent": {
+          "name": "draft_reminders_sent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "draft_last_reminder_at": {
+          "name": "draft_last_reminder_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "withdrawal_reason": {
+          "name": "withdrawal_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -1915,6 +1944,12 @@
           "columns": ["listing_id"],
           "isUnique": false,
           "where": "\"listing_submissions\".\"listing_id\" IS NOT NULL"
+        },
+        "listing_submissions_draft_clock_idx": {
+          "name": "listing_submissions_draft_clock_idx",
+          "columns": ["draft_saved_at"],
+          "isUnique": false,
+          "where": "\"listing_submissions\".\"status\" = 'draft'"
         },
         "listing_submissions_token_unique": {
           "name": "listing_submissions_token_unique",
@@ -1996,6 +2031,30 @@
         "listing_submissions_live_review_paid": {
           "name": "listing_submissions_live_review_paid",
           "value": "\"listing_submissions\".\"status\" != 'paid_pending_review' OR (\"listing_submissions\".\"listing_id\" IS NOT NULL AND \"listing_submissions\".\"plan\" = 'paid' AND \"listing_submissions\".\"paid_at\" IS NOT NULL AND \"listing_submissions\".\"refunded_at\" IS NULL)"
+        },
+        "listing_submissions_draft_clock": {
+          "name": "listing_submissions_draft_clock",
+          "value": "\"listing_submissions\".\"status\" != 'draft' OR \"listing_submissions\".\"draft_saved_at\" IS NOT NULL"
+        },
+        "listing_submissions_draft_saved_at_iso": {
+          "name": "listing_submissions_draft_saved_at_iso",
+          "value": "\"listing_submissions\".\"draft_saved_at\" IS NULL OR \"listing_submissions\".\"draft_saved_at\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z'"
+        },
+        "listing_submissions_draft_reminders_range": {
+          "name": "listing_submissions_draft_reminders_range",
+          "value": "\"listing_submissions\".\"draft_reminders_sent\" BETWEEN 0 AND 5"
+        },
+        "listing_submissions_draft_reminder_recorded": {
+          "name": "listing_submissions_draft_reminder_recorded",
+          "value": "(\"listing_submissions\".\"draft_reminders_sent\" = 0) = (\"listing_submissions\".\"draft_last_reminder_at\" IS NULL)"
+        },
+        "listing_submissions_withdrawal_reason_valid": {
+          "name": "listing_submissions_withdrawal_reason_valid",
+          "value": "\"listing_submissions\".\"withdrawal_reason\" IS NULL OR \"listing_submissions\".\"withdrawal_reason\" IN ('owner', 'expired')"
+        },
+        "listing_submissions_withdrawal_reason_when_withdrawn": {
+          "name": "listing_submissions_withdrawal_reason_when_withdrawn",
+          "value": "(\"listing_submissions\".\"status\" = 'withdrawn') = (\"listing_submissions\".\"withdrawal_reason\" IS NOT NULL)"
         }
       }
     },

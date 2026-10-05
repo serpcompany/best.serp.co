@@ -1,3 +1,4 @@
+import { draftClockCutoffs } from './draft-plans'
 import {
   applyStagedContentPlans,
   assertGuard,
@@ -42,6 +43,8 @@ export const submissionTransitions = {
     from: ['draft', 'pending_badge', 'verified', 'paid_pending_review', 'changes_requested'],
     to: null
   },
+  /** System transition after 30 days (`draft-plans.ts`, `buildExpireDraftPlans`). */
+  expire: { from: ['draft'], to: 'withdrawn' },
   payHold: { from: ['draft'], to: 'verified' },
   payPublish: { from: ['draft'], to: 'paid_pending_review' },
   refund: { from: ['approved', 'rejected'], to: null },
@@ -219,7 +222,8 @@ export function buildApproveSubmissionPlans(input: {
  * The submitter's plan choice on a `draft` (#59 owner decision, 2026-10-06). `free` moves it to
  * `pending_badge` (install and verify the badge); `paid` records the choice and keeps it a draft
  * until checkout completes (`buildRecordSubmissionPaymentPlans`). A paid draft may still switch
- * to free before paying.
+ * to free before paying. An expired draft (30 days, even before the job withdraws it) cannot
+ * choose a plan.
  */
 export function buildChooseSubmissionPlanPlans(input: {
   now: string
@@ -231,12 +235,13 @@ export function buildChooseSubmissionPlanPlans(input: {
     throw new Error('A submission plan must be free or paid.')
   }
   const status = input.plan === 'free' ? 'pending_badge' : 'draft'
+  const { expiryCutoff } = draftClockCutoffs(input.now)
   return [
     {
       sql: `UPDATE listing_submissions SET status=?,plan=?,updated_at=?
         WHERE id=? AND owner_user_id=? AND status='draft' AND paid_at IS NULL
-          AND listing_id IS NULL`,
-      params: [status, input.plan, input.now, input.submissionId, input.ownerUserId]
+          AND listing_id IS NULL AND draft_saved_at>?`,
+      params: [status, input.plan, input.now, input.submissionId, input.ownerUserId, expiryCutoff]
     },
     assertPreviousStatementChangedOne('submission_plan_chosen'),
     event(input.submissionId, 'plan_chosen', input.ownerUserId, input.plan)
@@ -380,7 +385,7 @@ export function buildWithdrawSubmissionPlans(input: {
 }): StatementPlan[] {
   return [
     {
-      sql: `UPDATE listing_submissions SET status='withdrawn',updated_at=?
+      sql: `UPDATE listing_submissions SET status='withdrawn',withdrawal_reason='owner',updated_at=?
         WHERE id=? AND owner_user_id=?
           AND status IN (${statusList(submissionTransitions.withdraw.from)})
           AND listing_id IS NULL AND paid_at IS NULL`,

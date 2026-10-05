@@ -109,7 +109,11 @@ export const applicationColumnInventory = {
     'refunded_at',
     'reviewer_note',
     'rejection_reason',
-    'rejection_category'
+    'rejection_category',
+    'draft_saved_at',
+    'draft_reminders_sent',
+    'draft_last_reminder_at',
+    'withdrawal_reason'
   ],
   listing_submission_resource_links: ['id', 'submission_id', 'label', 'url', 'sort_order'],
   listing_submission_faqs: ['id', 'submission_id', 'question', 'answer', 'sort_order'],

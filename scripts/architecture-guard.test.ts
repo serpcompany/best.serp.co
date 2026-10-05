@@ -223,7 +223,13 @@ describe('single-site D1-only repository architecture', () => {
 
     const operations = readFileSync(resolve('packages/data-ops/src/submissions.ts'), 'utf8')
     // Statement plans (#62): submissions, listings, revisions, and their shared support.
-    const plans = ['submission-plans', 'listing-plans', 'revision-plans', 'plan-support']
+    const plans = [
+      'submission-plans',
+      'draft-plans',
+      'listing-plans',
+      'revision-plans',
+      'plan-support'
+    ]
       .map(name => readFileSync(resolve(`packages/data-ops/src/${name}.ts`), 'utf8'))
       .join('\n')
     expect(operations).toContain('createSubmissionOperations')

@@ -34,9 +34,14 @@ import {
 const submissionId = '11111111-1111-4111-8111-111111111111'
 const liveListingId = `submission_${submissionId}`
 
+/** A draft saved one day before `NOW`: inside the 30-day draft clock. */
+const RECENT_DRAFT = '2026-10-05T12:00:00.000Z'
+
 interface SeedOptions {
   /** The plan a draft has chosen so far (default: none). */
   draftPlan?: 'free' | 'paid' | null
+  /** When a draft was saved (default: `RECENT_DRAFT`). */
+  draftSavedAt?: string
   live?: boolean
   owner?: string | null
   paid?: boolean
@@ -45,8 +50,8 @@ interface SeedOptions {
 /**
  * Inserts the fixture submission in `status`, satisfying the table's CHECK constraints:
  * `paid_pending_review` is always live and paid, `approved` is live, `rejected` carries a
- * category, a `draft` is never paid or live and `pending_badge` never paid. Other statuses are
- * free, unpaid, and not live unless asked.
+ * category, a `draft` is never paid or live and has a draft clock, `pending_badge` is never paid,
+ * and `withdrawn` has a reason. Other statuses are free, unpaid, and not live unless asked.
  */
 function seedSubmission(
   db: DatabaseSync,
@@ -70,9 +75,9 @@ function seedSubmission(
     `INSERT INTO listing_submissions
       (id,slug,name,description,website,content,category_slug,logo_url,status,
        access_token_hash,badge_verified_at,listing_id,owner_user_id,plan,paid_at,
-       rejection_reason,rejection_category)
+       rejection_reason,rejection_category,draft_saved_at,withdrawal_reason)
     VALUES (?,'example.com','Example','Description','https://example.com/','Content','tools',
-      'https://example.com/logo.png',?,'hash','2026-08-01T00:00:00.000Z',?,?,?,?,?,?)`
+      'https://example.com/logo.png',?,'hash','2026-08-01T00:00:00.000Z',?,?,?,?,?,?,?,?)`
   ).run(
     submissionId,
     status,
@@ -81,7 +86,9 @@ function seedSubmission(
     plan,
     paid ? '2026-08-01T00:00:00.000Z' : null,
     status === 'rejected' ? 'Spam' : null,
-    status === 'rejected' ? 'other' : null
+    status === 'rejected' ? 'other' : null,
+    status === 'draft' ? (options.draftSavedAt ?? RECENT_DRAFT) : null,
+    status === 'withdrawn' ? 'owner' : null
   )
   db.prepare(
     `INSERT INTO listing_submission_resource_links(submission_id,label,url,sort_order)
@@ -317,12 +324,13 @@ describe('submission status transitions (compare-and-swap with changes() asserti
       db
         .prepare(
           `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
-            logo_url) VALUES (?,'example.com','Again','d','https://example.com/','c','tools','l')`
+            logo_url,draft_saved_at) VALUES (?,'example.com','Again','d','https://example.com/','c',
+            'tools','l',?)`
         )
-        .run(crypto.randomUUID())
+        .run(crypto.randomUUID(), NOW)
     ).toThrow(/UNIQUE constraint failed: listing_submissions.slug/u)
     execute(db, buildWithdrawSubmissionPlans({ now: NOW, ownerUserId: 'user_owner', submissionId }))
-    expect(submission(db).status).toBe('withdrawn')
+    expect(submission(db)).toMatchObject({ status: 'withdrawn', withdrawal_reason: 'owner' })
   })
 
   it('approves a live paid submission by applying its staged content', () => {
@@ -499,10 +507,10 @@ describe('submission status transitions (compare-and-swap with changes() asserti
       db
         .prepare(
           `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
-            logo_url,plan,paid_at) VALUES (?,'example.com','Again','d','https://example.com/','c',
-            'tools','https://example.com/logo.png',?,?)`
+            logo_url,plan,paid_at,draft_saved_at) VALUES (?,'example.com','Again','d',
+            'https://example.com/','c','tools','https://example.com/logo.png',?,?,?)`
         )
-        .run(crypto.randomUUID(), 'free', null)
+        .run(crypto.randomUUID(), 'free', null, NOW)
     expect(resubmit).toThrow(/blocked until an admin lifts the block/u)
 
     execute(
@@ -544,9 +552,10 @@ describe('submission status transitions (compare-and-swap with changes() asserti
       db
         .prepare(
           `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
-            logo_url) VALUES (?,'example.com','Again','d','https://example.com/','c','tools','l')`
+            logo_url,draft_saved_at) VALUES (?,'example.com','Again','d','https://example.com/','c',
+            'tools','l',?)`
         )
-        .run(crypto.randomUUID())
+        .run(crypto.randomUUID(), NOW)
     ).not.toThrow()
   })
 

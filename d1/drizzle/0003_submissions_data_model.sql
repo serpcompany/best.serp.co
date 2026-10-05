@@ -29,6 +29,10 @@ CREATE TABLE `__new_listing_submissions` (
 	`reviewer_note` text,
 	`rejection_reason` text,
 	`rejection_category` text,
+	`draft_saved_at` text,
+	`draft_reminders_sent` integer DEFAULT 0 NOT NULL,
+	`draft_last_reminder_at` text,
+	`withdrawal_reason` text,
 	FOREIGN KEY (`listing_id`) REFERENCES `listings`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`owner_user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE restrict,
 	CONSTRAINT "listing_submissions_status_valid" CHECK("status" IN ('draft', 'pending_badge', 'verified', 'paid_pending_review', 'changes_requested', 'approved', 'rejected', 'withdrawn')),
@@ -43,7 +47,13 @@ CREATE TABLE `__new_listing_submissions` (
 	CONSTRAINT "listing_submissions_rejection_category_valid" CHECK("rejection_category" IS NULL OR "rejection_category" IN ('prohibited', 'other')),
 	CONSTRAINT "listing_submissions_rejection_complete" CHECK(("rejection_reason" IS NULL) = ("rejection_category" IS NULL)),
 	CONSTRAINT "listing_submissions_rejection_when_rejected" CHECK("rejection_category" IS NULL OR "status" = 'rejected'),
-	CONSTRAINT "listing_submissions_live_review_paid" CHECK("status" != 'paid_pending_review' OR ("listing_id" IS NOT NULL AND "plan" = 'paid' AND "paid_at" IS NOT NULL AND "refunded_at" IS NULL))
+	CONSTRAINT "listing_submissions_live_review_paid" CHECK("status" != 'paid_pending_review' OR ("listing_id" IS NOT NULL AND "plan" = 'paid' AND "paid_at" IS NOT NULL AND "refunded_at" IS NULL)),
+	CONSTRAINT "listing_submissions_draft_clock" CHECK("status" != 'draft' OR "draft_saved_at" IS NOT NULL),
+	CONSTRAINT "listing_submissions_draft_saved_at_iso" CHECK("draft_saved_at" IS NULL OR "draft_saved_at" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z'),
+	CONSTRAINT "listing_submissions_draft_reminders_range" CHECK("draft_reminders_sent" BETWEEN 0 AND 5),
+	CONSTRAINT "listing_submissions_draft_reminder_recorded" CHECK(("draft_reminders_sent" = 0) = ("draft_last_reminder_at" IS NULL)),
+	CONSTRAINT "listing_submissions_withdrawal_reason_valid" CHECK("withdrawal_reason" IS NULL OR "withdrawal_reason" IN ('owner', 'expired')),
+	CONSTRAINT "listing_submissions_withdrawal_reason_when_withdrawn" CHECK(("status" = 'withdrawn') = ("withdrawal_reason" IS NOT NULL))
 ) STRICT;
 --> statement-breakpoint
 INSERT INTO `__new_listing_submissions`("id", "slug", "name", "description", "website", "content", "category_slug", "logo_url", "video_url", "status", "access_token_hash", "verification_attempts", "last_verification_at", "last_verification_error", "badge_verified_at", "reviewed_at", "reviewed_by", "listing_id", "created_at", "updated_at", "plan") SELECT "id", "slug", "name", "description", "website", "content", "category_slug", "logo_url", "video_url", "status", "access_token_hash", "verification_attempts", "last_verification_at", "last_verification_error", "badge_verified_at", "reviewed_at", "reviewed_by", "listing_id", "created_at", "updated_at", 'free' FROM `listing_submissions`;--> statement-breakpoint
@@ -75,7 +85,7 @@ CREATE TABLE `__new_listing_submission_events` (
 	`actor` text NOT NULL,
 	`created_at` text DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	FOREIGN KEY (`submission_id`) REFERENCES `__new_listing_submissions`(`id`) ON UPDATE no action ON DELETE cascade,
-	CONSTRAINT "listing_submission_events_type_valid" CHECK("event_type" IN ('created', 'verification_failed', 'badge_verified', 'approved', 'rejected', 'edited', 'resubmitted', 'changes_requested', 'withdrawn', 'paid', 'refunded', 'unpublished', 'plan_chosen'))
+	CONSTRAINT "listing_submission_events_type_valid" CHECK("event_type" IN ('created', 'verification_failed', 'badge_verified', 'approved', 'rejected', 'edited', 'resubmitted', 'changes_requested', 'withdrawn', 'paid', 'refunded', 'unpublished', 'plan_chosen', 'expired'))
 ) STRICT;
 --> statement-breakpoint
 INSERT INTO `__new_listing_submission_events`("id", "submission_id", "event_type", "detail", "actor", "created_at") SELECT "id", "submission_id", "event_type", "detail", "actor", "created_at" FROM `listing_submission_events`;--> statement-breakpoint
@@ -108,6 +118,7 @@ CREATE UNIQUE INDEX `listing_submissions_active_slug_idx` ON `listing_submission
 CREATE INDEX `listing_submissions_review_queue_idx` ON `listing_submissions` (`status`,`badge_verified_at`,`created_at`);--> statement-breakpoint
 CREATE INDEX `listing_submissions_owner_idx` ON `listing_submissions` (`owner_user_id`,`created_at`) WHERE "listing_submissions"."owner_user_id" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX `listing_submissions_listing_idx` ON `listing_submissions` (`listing_id`) WHERE "listing_submissions"."listing_id" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX `listing_submissions_draft_clock_idx` ON `listing_submissions` (`draft_saved_at`) WHERE "listing_submissions"."status" = 'draft';--> statement-breakpoint
 CREATE UNIQUE INDEX `listing_submissions_token_unique` ON `listing_submissions` (`access_token_hash`);--> statement-breakpoint
 CREATE UNIQUE INDEX `listing_submission_resource_links_submission_order_unique` ON `listing_submission_resource_links` (`submission_id`,`sort_order`);--> statement-breakpoint
 CREATE UNIQUE INDEX `listing_submission_faqs_submission_order_unique` ON `listing_submission_faqs` (`submission_id`,`sort_order`);--> statement-breakpoint

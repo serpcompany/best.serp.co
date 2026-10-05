@@ -72,9 +72,18 @@ export const submissionEventTypes = [
   'paid',
   'refunded',
   'unpublished',
-  'plan_chosen'
+  'plan_chosen',
+  'expired'
 ] as const
 export type SubmissionEventType = (typeof submissionEventTypes)[number]
+
+/** Why a submission is `withdrawn`: by its owner, or automatically when its draft expired. */
+export const withdrawalReasons = ['owner', 'expired'] as const
+export type WithdrawalReason = (typeof withdrawalReasons)[number]
+
+/** `strftime('%Y-%m-%dT%H:%M:%fZ')` / `Date#toISOString()`, so instants compare as text. */
+const isoInstantGlob =
+  '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z'
 
 export const listingOwnerRoles = ['owner'] as const
 export const listingOwnerVerifications = ['submission', 'badge_claim', 'paid_claim'] as const
@@ -393,7 +402,16 @@ export const listingSubmissions = sqliteTable(
     refundedAt: text('refunded_at'),
     reviewerNote: text('reviewer_note'),
     rejectionReason: text('rejection_reason'),
-    rejectionCategory: text('rejection_category', { enum: rejectionCategories })
+    rejectionCategory: text('rejection_category', { enum: rejectionCategories }),
+    /**
+     * When the submission was first saved as a draft: the start of the 30-day draft clock and of
+     * the reminder schedule. Edits never reset it. Null for rows that were never drafts.
+     */
+    draftSavedAt: text('draft_saved_at'),
+    /** How many of the five draft reminders have been claimed (`draft-plans.ts`). */
+    draftRemindersSent: integer('draft_reminders_sent').notNull().default(0),
+    draftLastReminderAt: text('draft_last_reminder_at'),
+    withdrawalReason: text('withdrawal_reason', { enum: withdrawalReasons })
   },
   table => [
     unique('listing_submissions_token_unique').on(table.accessTokenHash),
@@ -449,6 +467,30 @@ export const listingSubmissions = sqliteTable(
       'listing_submissions_live_review_paid',
       sql`${table.status} != 'paid_pending_review' OR (${table.listingId} IS NOT NULL AND ${table.plan} = 'paid' AND ${table.paidAt} IS NOT NULL AND ${table.refundedAt} IS NULL)`
     ),
+    check(
+      'listing_submissions_draft_clock',
+      sql`${table.status} != 'draft' OR ${table.draftSavedAt} IS NOT NULL`
+    ),
+    check(
+      'listing_submissions_draft_saved_at_iso',
+      sql`${table.draftSavedAt} IS NULL OR ${table.draftSavedAt} GLOB ${sql.raw(`'${isoInstantGlob}'`)}`
+    ),
+    check(
+      'listing_submissions_draft_reminders_range',
+      sql`${table.draftRemindersSent} BETWEEN 0 AND 5`
+    ),
+    check(
+      'listing_submissions_draft_reminder_recorded',
+      sql`(${table.draftRemindersSent} = 0) = (${table.draftLastReminderAt} IS NULL)`
+    ),
+    check(
+      'listing_submissions_withdrawal_reason_valid',
+      sql`${table.withdrawalReason} IS NULL OR ${table.withdrawalReason} IN (${sqlList(withdrawalReasons)})`
+    ),
+    check(
+      'listing_submissions_withdrawal_reason_when_withdrawn',
+      sql`(${table.status} = 'withdrawn') = (${table.withdrawalReason} IS NOT NULL)`
+    ),
     uniqueIndex('listing_submissions_active_slug_idx')
       .on(table.slug)
       .where(sql`${table.status} IN (${sqlList(activeSubmissionStatuses)})`),
@@ -462,7 +504,10 @@ export const listingSubmissions = sqliteTable(
       .where(sql`${table.ownerUserId} IS NOT NULL`),
     index('listing_submissions_listing_idx')
       .on(table.listingId)
-      .where(sql`${table.listingId} IS NOT NULL`)
+      .where(sql`${table.listingId} IS NOT NULL`),
+    index('listing_submissions_draft_clock_idx')
+      .on(table.draftSavedAt)
+      .where(sql`${table.status} = 'draft'`)
   ]
 )
 

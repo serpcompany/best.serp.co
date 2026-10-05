@@ -29,13 +29,23 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
 | approve | `paid_pending_review` | `approved`; its staged content replaces the live listing's |
 | request changes | `verified`, `paid_pending_review` | `changes_requested` |
 | resubmit | `changes_requested` | `paid_pending_review` if live, otherwise `verified` |
-| withdraw | `draft`, `pending_badge`, `verified`, `changes_requested`, unpaid and not live | `withdrawn` |
+| withdraw (owner) | `draft`, `pending_badge`, `verified`, `changes_requested`, unpaid and not live | `withdrawn` (`withdrawal_reason = 'owner'`) |
+| expire (system) | `draft` saved 30 days ago or more | `withdrawn` (`withdrawal_reason = 'expired'`, event `expired`) |
 | reject | `pending_badge`, `verified`, `paid_pending_review`, `changes_requested` | `rejected` |
 | edit staged content | `draft` to `changes_requested` (any non-final status) | unchanged (`edited` event) |
 
 - Drafts never enter the review queue, are never badge-checked, and trigger no badge or review
   email. Like every non-final status, a draft holds its URL key against duplicates (the
   `listing_submissions_active_slug_idx` partial unique index).
+- Drafts expire (#59 owner decision, `draft-plans.ts`). The clock is `draft_saved_at`, the first
+  save; edits never reset it. Reminders are due 12 hours, 48 hours, 7, 14, and 21 days after it,
+  only while no plan is chosen; a run that missed some sends only the latest one due. At 30 days
+  every draft is withdrawn as `expired`, including a paid draft that never completed checkout,
+  which frees its URL, and gets the "draft expired" email; an expired draft cannot choose a plan.
+  The scheduled job (#63) reads `selectDraftRemindersDuePlan` and `selectExpiredDraftsPlan`,
+  claims each reminder with `buildMarkDraftReminderSentPlans` (a compare-and-swap, so a reminder
+  is claimed once), and then sends through the email ledger with `draftReminderEmailKey` or
+  `draftExpiredEmailKey` as the idempotency key.
 - An approved submission creates its listing with `source = 'submission'` and a `nofollow`
   outbound link, and makes the signed-in submitter its owner (`verified_via = 'submission'`).
 - Rejecting a live submission unpublishes its listing (410) and revokes the submitter's
@@ -47,7 +57,7 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
   `plan = 'free'`; or otherwise by unpublishing the listing.
 - Events (`listing_submission_events`): `created`, `plan_chosen`, `verification_failed`,
   `badge_verified`, `paid`, `edited`, `changes_requested`, `resubmitted`, `approved`,
-  `rejected`, `withdrawn`, `refunded`, `unpublished`.
+  `rejected`, `withdrawn`, `expired`, `refunded`, `unpublished`.
 - Owners edit a live listing through a revision (`listing_revisions`): `pending_review`,
   `changes_requested`, then `approved` (applied atomically to the listing), `rejected`, or
   `withdrawn` (`revision-plans.ts`).

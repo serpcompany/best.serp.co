@@ -98,6 +98,12 @@ SQL with the hand-finished form and check that a second `pnpm db:generate` repor
   (`owner_user_id`), `reviewer_note`, and `rejection_reason` with `rejection_category`
   (`prohibited` | `other`) complete the review record. CHECK constraints tie these together;
   the statuses and transitions are in [Submission flow](./SUBMISSION_FLOW.md).
+- **Draft clock** (#59 amendment): `draft_saved_at` (an ISO instant, required for a draft)
+  starts when the draft is first saved, and edits never reset it, so editing cannot extend a
+  hold on a URL. `draft_reminders_sent` (0 to 5) and `draft_last_reminder_at` record the claimed
+  reminders; `withdrawal_reason` (`owner` | `expired`) is set exactly when the status is
+  `withdrawn`. `listing_submissions_draft_clock_idx` (drafts only) serves the reminder and
+  expiry queries in `draft-plans.ts`; the schedule is in [Submission flow](./SUBMISSION_FLOW.md).
 - **Prohibited URLs** (#59 amendment): a `prohibited` rejection inserts an active row in
   `listing_submission_url_blocks` for its URL key (today the submission slug: the lowercase
   hostname without `www.`). The trigger `listing_submissions_refuse_blocked_url` refuses any new
@@ -116,7 +122,8 @@ submission tables (`scripts/d1-table-inventory.ts`).
 ## Statement plans
 
 Every transition is a credential-free statement plan in `packages/data-ops`
-(`submission-plans.ts`, `listing-plans.ts`, `revision-plans.ts`, `plan-support.ts`) sent as
+(`submission-plans.ts`, `draft-plans.ts`, `listing-plans.ts`, `revision-plans.ts`,
+`plan-support.ts`) sent as
 one D1 batch. Each mutation repeats its expected state in the `WHERE` and is followed by a
 `changes() = 1` assertion, so a stale or concurrent decision fails the whole batch. A plan that
 changes public output (publishing, unpublishing, content, `link_rel`, ownership) also records
