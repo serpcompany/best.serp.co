@@ -170,7 +170,9 @@ extensions (`chart.js`), and a test checks the committed import.
   noindex `*.workers.dev` hosts. This is deliberate: the e2e suite and the HTTP gates then
   verify on staging exactly the URLs production publishes, and those hosts are never
   indexed.
-- **Sitemaps.** `/robots.txt` advertises `/sitemap-index.xml`, which lists the URL-set files
+- **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other
+  host serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)).
+  The index lists the URL-set files
   `/sitemaps/pages/1.xml`, `/sitemaps/directory/1.xml`, and `/sitemaps/categories/1.xml`
   directly (no nested index). `/sitemap.xml` is a compatibility redirect to the index.
   Listing entries carry `published_at` as `lastmod`; the static page and category sets carry
