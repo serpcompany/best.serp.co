@@ -106,9 +106,9 @@ enqueueEmail(SIGN_IN_CODE_TEMPLATE_ID, {
 HTML and text with the mockups' sample data (`apps/web/lib/email/emails/samples.ts`), plus an
 index. It never sends anything.
 
-## Waiting for owner approval in #70
+## Differences from the mockups (approved)
 
-These differ from the approved mockups and need the owner's approval:
+The owner approved these differences from the #70 mockups, together with Revision 5:
 
 - **Footer links:** the dashboard (`/account/`) and the review queue
   (`/admin/submissions/`) rather than the inboxes, until #73.

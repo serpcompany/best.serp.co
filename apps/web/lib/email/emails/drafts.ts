@@ -103,8 +103,8 @@ export const draftExpiredEmail = defineEmailTemplate<DraftExpiredInput>({
     return composeEmail(
       {
         body: [
-          // Neutral for both draft kinds (no plan chosen, or checkout not finished); awaiting
-          // owner approval in #70.
+          // Neutral for both draft kinds (no plan chosen, or checkout not finished), as the
+          // owner approved in #70.
           paragraph(
             'Your draft for ',
             bold(name),
