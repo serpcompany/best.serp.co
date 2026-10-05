@@ -41,7 +41,7 @@ export const site: SiteDefinition = {
     from: { address: 'noreply@mail.serp.co', name: 'SERP Directory' }
   },
   features: {
-    showAuth: false,
+    showAuth: true,
     showBrands: true,
     showCreatorProjects: false,
     showDocs: false,
