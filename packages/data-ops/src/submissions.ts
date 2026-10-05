@@ -1,6 +1,7 @@
 import { isValidAssetReference } from '@serpdirectory/utils/asset-reference'
 import { hasFileExtension } from '@serpdirectory/utils/file-extensions'
-import { and, eq, isNull, or, sql } from 'drizzle-orm'
+import { type UrlKey, urlKey } from '@serpdirectory/utils/url-key'
+import { and, eq, or, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
 import { validatePublicHttpUrl } from './public-url'
@@ -12,7 +13,6 @@ import {
   listingSubmissionRateLimits,
   listingSubmissionResourceLinks,
   listingSubmissions,
-  listingSubmissionUrlBlocks,
   listings,
   type SubmissionStatus
 } from './schema'
@@ -153,8 +153,27 @@ async function sha256(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-function submissionSlug(website: string): string {
-  return new URL(website).hostname.replace(/^www\./u, '').toLowerCase()
+function submissionUrlKey(website: string): UrlKey {
+  try {
+    return urlKey(website)
+  } catch {
+    throw new SubmissionError('invalid_url', 'All submitted URLs must be public HTTP(S) URLs.')
+  }
+}
+
+/**
+ * An active prohibited-URL block that covers the host: one on its block key (registrable
+ * domain), on the host itself, or on any parent domain of the host. Mirrors the
+ * `listing_submissions_refuse_blocked_url` trigger, which enforces the same rule on insert.
+ */
+export function selectActiveUrlBlockStatement(key: UrlKey): { params: unknown[]; sql: string } {
+  return {
+    sql: `SELECT id FROM listing_submission_url_blocks
+      WHERE lifted_at IS NULL
+        AND (url_key=? OR url_key=? OR substr(?, -1 - length(url_key))='.' || url_key)
+      LIMIT 1`,
+    params: [key.blockKey, key.hostKey, key.hostKey]
+  }
 }
 
 function requiredText(value: unknown, field: string): string {
@@ -286,7 +305,9 @@ export function createSubmissionOperations(config: {
           )
         }
       }
-      const slug = submissionSlug(input.website)
+      // One normalization for the slug, the duplicate check, and the prohibited-URL block.
+      const key = submissionUrlKey(input.website)
+      const slug = key.hostKey
       // `/products/<slug>/` must stay a page URL; a slug ending in a file extension
       // (`chart.js`) would be treated as a file and lose its trailing slash.
       if (hasFileExtension(slug)) {
@@ -310,20 +331,12 @@ export function createSubmissionOperations(config: {
             .where(or(eq(listings.slug, slug), eq(listings.website, input.website)))
             .limit(1)
         ),
-        // A prohibited rejection blocks the URL key until an admin lifts it (DATA_MODEL.md);
-        // the `listing_submissions_refuse_blocked_url` trigger enforces the same rule.
-        queryFirst(
-          client.database
-            .select({ id: listingSubmissionUrlBlocks.id })
-            .from(listingSubmissionUrlBlocks)
-            .where(
-              and(
-                eq(listingSubmissionUrlBlocks.urlKey, slug),
-                isNull(listingSubmissionUrlBlocks.liftedAt)
-              )
-            )
-            .limit(1)
-        )
+        // A prohibited rejection blocks the registrable domain and its subdomains until an admin
+        // lifts it (DATA_MODEL.md); the insert trigger enforces the same rule.
+        (async () => {
+          const block = selectActiveUrlBlockStatement(key)
+          return (await prepareRaw(client, block.sql, block.params).first()) ?? null
+        })()
       ])
       if (!category) throw new SubmissionError('invalid_category', 'Choose an active category.')
       if (existing)
@@ -352,6 +365,7 @@ export function createSubmissionOperations(config: {
             id,
             logoUrl: input.logoUrl,
             name: input.name,
+            blockKey: key.blockKey,
             // The legacy capability flow is the free badge flow; it predates drafts (#63).
             plan: 'free',
             slug,

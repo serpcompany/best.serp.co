@@ -3,6 +3,7 @@ import {
   beginCatalogPublicationPlans,
   type CatalogPublication,
   finishCatalogPublicationPlans,
+  listingHasQueuedSubmission,
   listingIsLiveGuard,
   type StatementPlan
 } from './plan-support'
@@ -48,7 +49,11 @@ function submissionEvent(
   }
 }
 
-/** Live → unpublished, with a reason code (for example `admin` or `badge_missing`). */
+/**
+ * Live → unpublished, with a reason code (for example `admin` or `badge_missing`). Refused while
+ * the listing's own submission is still in review: the reviewer rejects it instead, so
+ * `paid_pending_review` stays live.
+ */
 export function buildUnpublishListingPlans(input: {
   listingId: string
   publication: CatalogPublication
@@ -57,8 +62,8 @@ export function buildUnpublishListingPlans(input: {
   if (!input.reason.trim()) throw new Error('Unpublishing a listing needs a reason.')
   return [
     ...beginCatalogPublicationPlans(input.publication, {
-      sql: listingIsLiveGuard('?'),
-      params: [input.listingId]
+      sql: `${listingIsLiveGuard('?')} AND NOT ${listingHasQueuedSubmission('?')}`,
+      params: [input.listingId, input.listingId]
     }),
     {
       sql: `UPDATE listings SET is_active=0,updated_at=?

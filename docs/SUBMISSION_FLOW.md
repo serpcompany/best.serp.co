@@ -16,23 +16,27 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
 | `changes_requested` | A reviewer asked for edits (`reviewer_note`) | if it was | no |
 | `approved` | Accepted; its listing was published | yes | no |
 | `rejected` | Refused with `rejection_reason` and `rejection_category` | no | no |
-| `withdrawn` | Withdrawn by its owner | no | no |
+| `withdrawn` | Withdrawn by its owner, expired, or cleared by an admin (`withdrawal_reason`) | no | no |
 
 | Transition | From | To |
 | --- | --- | --- |
 | choose free | `draft` | `pending_badge` (`plan = 'free'`) |
 | choose paid | `draft` | `draft` (`plan = 'paid'`, awaiting checkout) |
 | badge verified | `pending_badge` | `verified` |
-| payment, checks passed | `draft` with `plan = 'paid'` | `paid_pending_review`; the listing is published |
-| payment, a check failed | `draft` with `plan = 'paid'` | `verified` |
+| payment, checks passed | `draft` with `plan = 'paid'`, `pending_badge`, or free `verified` | `paid_pending_review`; the listing is published |
+| payment, a check failed | the same | `verified` with `plan = 'paid'` |
+| payment after withdrawal | `withdrawn`, unpaid | unchanged; payment and full refund recorded together |
+| upgrade | `approved`, free, live | unchanged; `plan = 'paid'` |
 | approve | `verified` | `approved`; the listing is created and published |
 | approve | `paid_pending_review` | `approved`; its staged content replaces the live listing's |
 | request changes | `verified`, `paid_pending_review` | `changes_requested` |
-| resubmit | `changes_requested` | `paid_pending_review` if live, otherwise `verified` |
-| withdraw (owner) | `draft`, `pending_badge`, `verified`, `changes_requested`, unpaid and not live | `withdrawn` (`withdrawal_reason = 'owner'`) |
-| expire (system) | `draft` saved 30 days ago or more | `withdrawn` (`withdrawal_reason = 'expired'`, event `expired`) |
+| resubmit | `changes_requested` | `paid_pending_review` when it has a listing (still live), otherwise `verified` |
+| withdraw (owner) | `draft`, `pending_badge`, `verified`, `changes_requested`, unpaid and not live | `withdrawn` (`owner`) |
+| clear draft (admin) | `draft` | `withdrawn` (`admin`) |
+| expire (system) | `draft` saved 30 days ago or more | `withdrawn` (`expired`, event `expired`) |
 | reject | `pending_badge`, `verified`, `paid_pending_review`, `changes_requested` | `rejected` |
-| edit staged content | `draft` to `changes_requested` (any non-final status) | unchanged (`edited` event) |
+| edit (owner) | `draft`, `pending_badge`, `changes_requested` | unchanged (`edited`, `content_version` + 1) |
+| edit (reviewer) | any non-final status | unchanged (`edited`, `content_version` + 1) |
 
 - Drafts never enter the review queue, are never badge-checked, and trigger no badge or review
   email. Like every non-final status, a draft holds its URL key against duplicates (the
@@ -51,13 +55,24 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
   `draftReminderEmailKey` or `draftExpiredEmailKey` as the idempotency key.
 - An approved submission creates its listing with `source = 'submission'` and a `nofollow`
   outbound link, and makes the signed-in submitter its owner (`verified_via = 'submission'`).
-- Rejecting a live submission unpublishes its listing (410) and revokes the submitter's
-  ownership in the same batch. A `prohibited` rejection blocks the URL key from new free and
+- Approvals compare and swap on the `content_version` the reviewer saw. The live approval also
+  requires the listing to be unchanged since it was published (`published_checksum`). While a
+  listing's own submission is in review (`paid_pending_review` or `changes_requested`) it has no
+  other edit channel: revisions are refused and unpublishing is refused (reject it instead).
+- Payment races: a draft that switched to free while its checkout was open is upgraded by the
+  payment from `pending_badge`; a payment that completes after withdrawal or expiry is recorded
+  with its refund (#68's webhook issues it). Once paid, the owner cannot withdraw; they message
+  the team (#73) and an admin decides.
+- Rejecting a submission with a listing (pass `live` whenever `listing_id` is set) unpublishes
+  it (410) if it is still up and revokes the submitter's ownership in the same batch. A
+  `prohibited` rejection blocks the registrable domain and its subdomains from new free and
   paid submissions until an admin lifts the block; an `other` rejection may be submitted again
   as a new submission.
-- Refunds (`buildRefundSubmissionPlans`) record `refunded_at`: after a rejection; for an
-  approved paid listing whose latest conclusive badge check passed, which stays live with
-  `plan = 'free'`; or otherwise by unpublishing the listing.
+- Refunds (`buildRefundSubmissionPlans`) record `refunded_at`: after an `other` rejection (never
+  a `prohibited` one); for an approved paid listing whose latest conclusive badge check passed in
+  the last 7 days, which stays live with `plan = 'free'` (the event records that check); by
+  unpublishing a live listing without such a pass; or, for a listing already down, without
+  touching the catalog.
 - Events (`listing_submission_events`): `created`, `plan_chosen`, `verification_failed`,
   `badge_verified`, `paid`, `edited`, `changes_requested`, `resubmitted`, `approved`,
   `rejected`, `withdrawn`, `expired`, `refunded`, `unpublished`.

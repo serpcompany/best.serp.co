@@ -285,6 +285,10 @@
           "name": "badge_checks_conclusive_boolean",
           "value": "\"conclusive\" IN (0, 1)"
         },
+        "badge_checks_checked_at_iso": {
+          "name": "badge_checks_checked_at_iso",
+          "value": "\"badge_checks\".\"checked_at\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z'"
+        },
         "badge_checks_pass_conclusive": {
           "name": "badge_checks_pass_conclusive",
           "value": "\"badge_checks\".\"outcome\" = 'fail' OR (\"badge_checks\".\"conclusive\" = 1 AND \"badge_checks\".\"reason\" IS NULL)"
@@ -1069,7 +1073,7 @@
           "name": "logo_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "video_url": {
@@ -1122,6 +1126,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "CURRENT_TIMESTAMP"
+        },
+        "content_version": {
+          "name": "content_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
         }
       },
       "indexes": {
@@ -1168,6 +1180,10 @@
         "listing_revisions_status_valid": {
           "name": "listing_revisions_status_valid",
           "value": "\"listing_revisions\".\"status\" IN ('pending_review', 'changes_requested', 'approved', 'rejected', 'withdrawn')"
+        },
+        "listing_revisions_content_version_positive": {
+          "name": "listing_revisions_content_version_positive",
+          "value": "\"listing_revisions\".\"content_version\" >= 1"
         },
         "listing_revisions_rejection_when_rejected": {
           "name": "listing_revisions_rejection_when_rejected",
@@ -1767,7 +1783,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'draft'"
+          "default": "'pending_badge'"
         },
         "access_token_hash": {
           "name": "access_token_hash",
@@ -1854,7 +1870,8 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "'free'"
         },
         "paid_at": {
           "name": "paid_at",
@@ -1919,6 +1936,28 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "block_key": {
+          "name": "block_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "published_checksum": {
+          "name": "published_checksum",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "content_version": {
+          "name": "content_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
         }
       },
       "indexes": {
@@ -2030,7 +2069,31 @@
         },
         "listing_submissions_live_review_paid": {
           "name": "listing_submissions_live_review_paid",
-          "value": "\"listing_submissions\".\"status\" != 'paid_pending_review' OR (\"listing_submissions\".\"listing_id\" IS NOT NULL AND \"listing_submissions\".\"plan\" = 'paid' AND \"listing_submissions\".\"paid_at\" IS NOT NULL AND \"listing_submissions\".\"refunded_at\" IS NULL)"
+          "value": "\"listing_submissions\".\"status\" != 'paid_pending_review' OR (\"listing_submissions\".\"listing_id\" IS NOT NULL AND \"listing_submissions\".\"plan\" = 'paid' AND \"listing_submissions\".\"paid_at\" IS NOT NULL AND \"listing_submissions\".\"refunded_at\" IS NULL AND \"listing_submissions\".\"published_checksum\" IS NOT NULL)"
+        },
+        "listing_submissions_draft_plan": {
+          "name": "listing_submissions_draft_plan",
+          "value": "\"listing_submissions\".\"status\" != 'draft' OR \"listing_submissions\".\"plan\" IS NULL OR \"listing_submissions\".\"plan\" = 'paid'"
+        },
+        "listing_submissions_draft_native": {
+          "name": "listing_submissions_draft_native",
+          "value": "\"listing_submissions\".\"status\" != 'draft' OR (\"listing_submissions\".\"owner_user_id\" IS NOT NULL AND \"listing_submissions\".\"block_key\" IS NOT NULL)"
+        },
+        "listing_submissions_block_key_matches": {
+          "name": "listing_submissions_block_key_matches",
+          "value": "\"listing_submissions\".\"block_key\" IS NULL OR \"listing_submissions\".\"slug\" = \"listing_submissions\".\"block_key\" OR substr(\"listing_submissions\".\"slug\", -1 - length(\"listing_submissions\".\"block_key\")) = '.' || \"listing_submissions\".\"block_key\""
+        },
+        "listing_submissions_withdrawn_unpaid": {
+          "name": "listing_submissions_withdrawn_unpaid",
+          "value": "\"listing_submissions\".\"status\" != 'withdrawn' OR \"listing_submissions\".\"paid_at\" IS NULL OR \"listing_submissions\".\"refunded_at\" IS NOT NULL"
+        },
+        "listing_submissions_no_refund_when_prohibited": {
+          "name": "listing_submissions_no_refund_when_prohibited",
+          "value": "\"listing_submissions\".\"refunded_at\" IS NULL OR \"listing_submissions\".\"rejection_category\" IS NULL OR \"listing_submissions\".\"rejection_category\" != 'prohibited'"
+        },
+        "listing_submissions_content_version_positive": {
+          "name": "listing_submissions_content_version_positive",
+          "value": "\"listing_submissions\".\"content_version\" >= 1"
         },
         "listing_submissions_draft_clock": {
           "name": "listing_submissions_draft_clock",
@@ -2050,7 +2113,7 @@
         },
         "listing_submissions_withdrawal_reason_valid": {
           "name": "listing_submissions_withdrawal_reason_valid",
-          "value": "\"listing_submissions\".\"withdrawal_reason\" IS NULL OR \"listing_submissions\".\"withdrawal_reason\" IN ('owner', 'expired')"
+          "value": "\"listing_submissions\".\"withdrawal_reason\" IS NULL OR \"listing_submissions\".\"withdrawal_reason\" IN ('owner', 'expired', 'admin')"
         },
         "listing_submissions_withdrawal_reason_when_withdrawn": {
           "name": "listing_submissions_withdrawal_reason_when_withdrawn",

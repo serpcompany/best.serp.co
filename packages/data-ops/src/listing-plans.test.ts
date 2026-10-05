@@ -110,6 +110,36 @@ describe('listing publication transitions', () => {
     )
   })
 
+  it("refuses to unpublish while the listing's own submission is in review", () => {
+    for (const status of ['paid_pending_review', 'changes_requested'] as const) {
+      const db = database()
+      db.prepare(
+        `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+          logo_url,status,plan,paid_at,listing_id,published_checksum)
+        VALUES ('sub','lst_live.example','Live','d','https://lst_live.example/','c','tools','l',
+          ?,'paid',?,'lst_live','checksum-lst_live')`
+      ).run(status, NOW)
+      expectRefused(
+        db,
+        buildUnpublishListingPlans({
+          listingId,
+          publication: publication('listing-unpublish'),
+          reason: 'admin'
+        })
+      )
+      db.prepare("UPDATE listing_submissions SET status='approved' WHERE id='sub'").run()
+      execute(
+        db,
+        buildUnpublishListingPlans({
+          listingId,
+          publication: publication('listing-unpublish'),
+          reason: 'admin'
+        })
+      )
+      expect(listing(db)).toMatchObject({ is_active: 0 })
+    }
+  })
+
   it('refuses a stale publication snapshot', () => {
     const db = database()
     db.prepare("UPDATE publication_state SET version=5, checksum='concurrent'").run()

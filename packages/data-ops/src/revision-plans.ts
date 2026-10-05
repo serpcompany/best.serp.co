@@ -4,6 +4,7 @@ import {
   beginCatalogPublicationPlans,
   type CatalogPublication,
   finishCatalogPublicationPlans,
+  listingHasQueuedSubmission,
   listingIsLiveGuard,
   replaceStagedChildrenPlans,
   revisionContentSource,
@@ -50,7 +51,7 @@ const currentOwner = (listingIdSql: string, userIdSql: string) => `EXISTS (
 
 export function selectRevisionForDecisionPlan(revisionId: string): StatementPlan {
   return {
-    sql: `SELECT r.id,r.status,r.listing_id,r.author_user_id,r.base_checksum,
+    sql: `SELECT r.id,r.status,r.listing_id,r.author_user_id,r.base_checksum,r.content_version,
         l.slug,l.checksum AS listing_checksum,ps.version,ps.checksum,
         CASE WHEN ${listingIsLiveGuard('r.listing_id')} THEN 1 ELSE 0 END AS listing_live
       FROM listing_revisions r JOIN listings l ON l.id=r.listing_id
@@ -62,7 +63,9 @@ export function selectRevisionForDecisionPlan(revisionId: string): StatementPlan
 
 /**
  * A listing's current owner stages an edit of the live listing. `base_checksum` records the
- * listing content it was based on; a listing has at most one open revision.
+ * listing content it was based on; a listing has at most one open revision, and none while its
+ * own submission is still in review (`paid_pending_review` or `changes_requested`), so a listing
+ * has one staged-edit channel at a time.
  */
 export function buildCreateRevisionPlans(input: {
   authorUserId: string
@@ -79,7 +82,8 @@ export function buildCreateRevisionPlans(input: {
          category_slug,logo_url,video_url,created_at,updated_at)
         SELECT ?,l.id,?,'pending_review',l.checksum,?,?,?,?,?,?,?,?
         FROM listings l
-        WHERE l.id=? AND ${listingIsLiveGuard('l.id')} AND ${currentOwner('l.id', '?')}`,
+        WHERE l.id=? AND ${listingIsLiveGuard('l.id')} AND ${currentOwner('l.id', '?')}
+          AND NOT ${listingHasQueuedSubmission('l.id')}`,
       params: [
         input.revisionId,
         input.authorUserId,
@@ -101,7 +105,10 @@ export function buildCreateRevisionPlans(input: {
   ]
 }
 
-/** Replaces an open revision's staged content; only its author edits it. */
+/**
+ * Replaces an open revision's staged content and increments its `content_version`; only its
+ * author edits it. Approval compares and swaps on the version the reviewer saw.
+ */
 export function buildReplaceRevisionContentPlans(input: {
   authorUserId: string
   content: StagedListingContent
@@ -112,7 +119,8 @@ export function buildReplaceRevisionContentPlans(input: {
   return [
     {
       sql: `UPDATE listing_revisions
-        SET name=?,description=?,content=?,category_slug=?,logo_url=?,video_url=?,updated_at=?
+        SET name=?,description=?,content=?,category_slug=?,logo_url=?,video_url=?,updated_at=?,
+          content_version=content_version+1
         WHERE id=? AND author_user_id=? AND status IN (${statusList(revisionTransitions.edit.from)})`,
       params: [
         content.name,
@@ -208,23 +216,30 @@ export function buildRejectRevisionPlans(input: {
 
 /**
  * `pending_review` → `approved`: the revision replaces the live listing's content in the same
- * batch. It is refused when the listing changed since the revision was based on it
- * (`base_checksum`), when the listing is no longer live, or when the author no longer owns it.
+ * batch. It is refused when the revision's content is not the version the reviewer saw
+ * (`expectedContentVersion`), when the listing changed since the revision was based on it
+ * (`base_checksum`), when the listing is no longer live or its submission is back in review, or
+ * when the author no longer owns it.
  */
 export function buildApproveRevisionPlans(input: {
+  expectedContentVersion: number
   listingId: string
   now: string
   publication: CatalogPublication
   reviewer: string
   revisionId: string
 }): StatementPlan[] {
+  if (!Number.isSafeInteger(input.expectedContentVersion) || input.expectedContentVersion < 1) {
+    throw new Error('A content version is a positive integer read with the revision.')
+  }
   return [
     ...beginCatalogPublicationPlans(input.publication, {
       sql: `EXISTS (SELECT 1 FROM listing_revisions r JOIN listings l ON l.id=r.listing_id
-        WHERE r.id=? AND r.listing_id=? AND r.status='pending_review'
+        WHERE r.id=? AND r.listing_id=? AND r.status='pending_review' AND r.content_version=?
           AND l.checksum=r.base_checksum AND ${listingIsLiveGuard('l.id')}
+          AND NOT ${listingHasQueuedSubmission('l.id')}
           AND ${currentOwner('l.id', 'r.author_user_id')})`,
-      params: [input.revisionId, input.listingId]
+      params: [input.revisionId, input.listingId, input.expectedContentVersion]
     }),
     ...applyStagedContentPlans({
       checksum: input.publication.afterChecksum,

@@ -77,8 +77,11 @@ export const submissionEventTypes = [
 ] as const
 export type SubmissionEventType = (typeof submissionEventTypes)[number]
 
-/** Why a submission is `withdrawn`: by its owner, or automatically when its draft expired. */
-export const withdrawalReasons = ['owner', 'expired'] as const
+/**
+ * Why a submission is `withdrawn`: by its owner (only before payment), automatically when its
+ * draft expired, or by an admin clearing a draft.
+ */
+export const withdrawalReasons = ['owner', 'expired', 'admin'] as const
 export type WithdrawalReason = (typeof withdrawalReasons)[number]
 
 /** `strftime('%Y-%m-%dT%H:%M:%fZ')` / `Date#toISOString()`, so instants compare as text. */
@@ -383,7 +386,11 @@ export const listingSubmissions = sqliteTable(
     categorySlug: text('category_slug').notNull(),
     logoUrl: text('logo_url').notNull(),
     videoUrl: text('video_url'),
-    status: text('status', { enum: submissionStatuses }).notNull().default('draft'),
+    /**
+     * Defaults to the legacy free flow, as before #62, so a Worker deployed before this migration
+     * keeps inserting valid rows between migrate and deploy. Native intake (#63) writes `draft`.
+     */
+    status: text('status', { enum: submissionStatuses }).notNull().default('pending_badge'),
     /** Digest of the legacy anonymous capability; signed-in submissions (#63) carry none. */
     accessTokenHash: text('access_token_hash'),
     verificationAttempts: integer('verification_attempts').notNull().default(0),
@@ -397,7 +404,7 @@ export const listingSubmissions = sqliteTable(
     updatedAt: text('updated_at').notNull().default(currentTimestamp),
     ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'restrict' }),
     /** The plan the submitter chose; null only while a draft has not chosen one. */
-    plan: text('plan', { enum: submissionPlans }),
+    plan: text('plan', { enum: submissionPlans }).default('free'),
     paidAt: text('paid_at'),
     refundedAt: text('refunded_at'),
     reviewerNote: text('reviewer_note'),
@@ -411,7 +418,17 @@ export const listingSubmissions = sqliteTable(
     /** How many of the five draft reminders have been claimed (`draft-plans.ts`). */
     draftRemindersSent: integer('draft_reminders_sent').notNull().default(0),
     draftLastReminderAt: text('draft_last_reminder_at'),
-    withdrawalReason: text('withdrawal_reason', { enum: withdrawalReasons })
+    withdrawalReason: text('withdrawal_reason', { enum: withdrawalReasons }),
+    /**
+     * The registrable domain of `slug` (`urlKey()` in `@serpdirectory/utils/url-key`): what a
+     * prohibited rejection blocks. Null only on rows written before #62 (or by a pre-#62 Worker),
+     * which fall back to their slug.
+     */
+    blockKey: text('block_key'),
+    /** The listing checksum written when a paid submission was published before review. */
+    publishedChecksum: text('published_checksum'),
+    /** Increments on every edit of the staged content; approval compares and swaps on it. */
+    contentVersion: integer('content_version').notNull().default(1)
   },
   table => [
     unique('listing_submissions_token_unique').on(table.accessTokenHash),
@@ -465,8 +482,29 @@ export const listingSubmissions = sqliteTable(
     ),
     check(
       'listing_submissions_live_review_paid',
-      sql`${table.status} != 'paid_pending_review' OR (${table.listingId} IS NOT NULL AND ${table.plan} = 'paid' AND ${table.paidAt} IS NOT NULL AND ${table.refundedAt} IS NULL)`
+      sql`${table.status} != 'paid_pending_review' OR (${table.listingId} IS NOT NULL AND ${table.plan} = 'paid' AND ${table.paidAt} IS NOT NULL AND ${table.refundedAt} IS NULL AND ${table.publishedChecksum} IS NOT NULL)`
     ),
+    check(
+      'listing_submissions_draft_plan',
+      sql`${table.status} != 'draft' OR ${table.plan} IS NULL OR ${table.plan} = 'paid'`
+    ),
+    check(
+      'listing_submissions_draft_native',
+      sql`${table.status} != 'draft' OR (${table.ownerUserId} IS NOT NULL AND ${table.blockKey} IS NOT NULL)`
+    ),
+    check(
+      'listing_submissions_block_key_matches',
+      sql`${table.blockKey} IS NULL OR ${table.slug} = ${table.blockKey} OR substr(${table.slug}, -1 - length(${table.blockKey})) = '.' || ${table.blockKey}`
+    ),
+    check(
+      'listing_submissions_withdrawn_unpaid',
+      sql`${table.status} != 'withdrawn' OR ${table.paidAt} IS NULL OR ${table.refundedAt} IS NOT NULL`
+    ),
+    check(
+      'listing_submissions_no_refund_when_prohibited',
+      sql`${table.refundedAt} IS NULL OR ${table.rejectionCategory} IS NULL OR ${table.rejectionCategory} != 'prohibited'`
+    ),
+    check('listing_submissions_content_version_positive', sql`${table.contentVersion} >= 1`),
     check(
       'listing_submissions_draft_clock',
       sql`${table.status} != 'draft' OR ${table.draftSavedAt} IS NOT NULL`
@@ -891,17 +929,20 @@ export const listingRevisions = sqliteTable(
     description: text('description').notNull(),
     content: text('content'),
     categorySlug: text('category_slug').notNull(),
-    logoUrl: text('logo_url'),
+    logoUrl: text('logo_url').notNull(),
     videoUrl: text('video_url'),
     reviewerNote: text('reviewer_note'),
     rejectionReason: text('rejection_reason'),
     reviewedAt: text('reviewed_at'),
     reviewedBy: text('reviewed_by'),
     createdAt: text('created_at').notNull().default(currentTimestamp),
-    updatedAt: text('updated_at').notNull().default(currentTimestamp)
+    updatedAt: text('updated_at').notNull().default(currentTimestamp),
+    /** Increments on every edit; approval compares and swaps on the version the reviewer saw. */
+    contentVersion: integer('content_version').notNull().default(1)
   },
   table => [
     check('listing_revisions_status_valid', sql`${table.status} IN (${sqlList(revisionStatuses)})`),
+    check('listing_revisions_content_version_positive', sql`${table.contentVersion} >= 1`),
     check(
       'listing_revisions_rejection_when_rejected',
       sql`${table.rejectionReason} IS NULL OR ${table.status} = 'rejected'`
@@ -990,6 +1031,11 @@ export const badgeChecks = sqliteTable(
   table => [
     check('badge_checks_outcome_valid', sql`${table.outcome} IN (${sqlList(badgeCheckOutcomes)})`),
     check('badge_checks_conclusive_boolean', booleanCheck(table.conclusive)),
+    // ISO instants compare as text: the keep-free refund window reads `checked_at`.
+    check(
+      'badge_checks_checked_at_iso',
+      sql`${table.checkedAt} GLOB ${sql.raw(`'${isoInstantGlob}'`)}`
+    ),
     check(
       'badge_checks_pass_conclusive',
       sql`${table.outcome} = 'fail' OR (${table.conclusive} = 1 AND ${table.reason} IS NULL)`

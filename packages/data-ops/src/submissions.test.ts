@@ -132,6 +132,60 @@ describe('shared submission data operations', () => {
     ).resolves.toMatchObject({ slug: 'autoenhance.ai' })
   })
 
+  it('blocks every variant and subdomain of a prohibited registrable domain', async () => {
+    sqlite.database.exec(`INSERT INTO listing_submission_url_blocks
+      (url_key,reason,blocked_by,blocked_at) VALUES
+      ('casino.com','Prohibited','admin','2026-08-01T00:00:00.000Z'),
+      ('xn--bcher-kva.de','Prohibited','admin','2026-08-01T00:00:00.000Z')`)
+    for (const website of [
+      'https://casino.com/',
+      'https://casino.com./',
+      'https://casino.com%2E/',
+      'https://CASINO.com/',
+      'https://www.Casino.com./',
+      'https://ｃａｓｉｎｏ.com/',
+      'https://go.casino.com/',
+      'https://www2.casino.com/',
+      'https://bücher.de/'
+    ]) {
+      await expect(
+        operations().createSubmission({ ...input, website }),
+        website
+      ).rejects.toMatchObject({ code: 'url_blocked', status: 403 })
+    }
+    expect(
+      sqlite.database.prepare('SELECT COUNT(*) AS count FROM listing_submissions').get()
+    ).toEqual({ count: 0 })
+    await expect(
+      operations().createSubmission({ ...input, website: 'https://notcasino.com/' })
+    ).resolves.toMatchObject({ slug: 'notcasino.com' })
+  })
+
+  it('normalizes the slug and block key, so host variants count as duplicates', async () => {
+    const saved = await operations().createSubmission({
+      ...input,
+      website: 'https://www.Example.COM./'
+    })
+    expect(saved.slug).toBe('example.com')
+    expect(
+      sqlite.database.prepare('SELECT slug, block_key FROM listing_submissions').get()
+    ).toEqual({ block_key: 'example.com', slug: 'example.com' })
+    await expect(
+      operations().createSubmission({ ...input, website: 'https://example.com%2E/' })
+    ).rejects.toMatchObject({ code: 'duplicate_submission' })
+
+    const sub = await operations().createSubmission({
+      ...input,
+      website: 'https://go.example.com/'
+    })
+    expect(sub.slug).toBe('go.example.com')
+    expect(
+      sqlite.database
+        .prepare('SELECT block_key FROM listing_submissions WHERE slug=?')
+        .get('go.example.com')
+    ).toEqual({ block_key: 'example.com' })
+  })
+
   it('rolls back one of two concurrent verification transitions from the same snapshot', async () => {
     const saved = await operations().createSubmission(input)
     const attempts = await Promise.allSettled([
@@ -283,11 +337,14 @@ describe('shared submission data operations', () => {
       {
         corrupt: () =>
           sqlite.database
-            .prepare("UPDATE listing_submissions SET slug=' ' WHERE id=?")
+            // The block key must match the slug (a CHECK), so the corruption clears it too.
+            .prepare("UPDATE listing_submissions SET slug=' ', block_key=NULL WHERE id=?")
             .run(saved.id),
         restore: () =>
           sqlite.database
-            .prepare("UPDATE listing_submissions SET slug='example.com' WHERE id=?")
+            .prepare(
+              "UPDATE listing_submissions SET slug='example.com', block_key='example.com' WHERE id=?"
+            )
             .run(saved.id)
       },
       {

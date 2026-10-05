@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { submissionRequestSchema, submissionSlug } from './submission-contract'
+import { submissionRequestSchema } from './submission-contract'
 
 const valid = {
   category: 'seo-tools',
@@ -14,8 +15,9 @@ const valid = {
 }
 
 describe('submission contract', () => {
-  it('normalizes the future listing slug from the website host', () => {
-    expect(submissionSlug(valid.website)).toBe('example.com')
+  it('leaves slug normalization (and the Public Suffix List) out of the browser bundle', () => {
+    const source = readFileSync(new URL('./submission-contract.ts', import.meta.url), 'utf8')
+    expect(source).not.toMatch(/from '(?:@serpdirectory\/utils\/url-key|tldts)'/u)
   })
 
   it('accepts normalized repeatable fields and rejects non-http URLs', () => {

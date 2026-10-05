@@ -113,7 +113,10 @@ export const applicationColumnInventory = {
     'draft_saved_at',
     'draft_reminders_sent',
     'draft_last_reminder_at',
-    'withdrawal_reason'
+    'withdrawal_reason',
+    'block_key',
+    'published_checksum',
+    'content_version'
   ],
   listing_submission_resource_links: ['id', 'submission_id', 'label', 'url', 'sort_order'],
   listing_submission_faqs: ['id', 'submission_id', 'question', 'answer', 'sort_order'],
@@ -208,7 +211,8 @@ export const applicationColumnInventory = {
     'reviewed_at',
     'reviewed_by',
     'created_at',
-    'updated_at'
+    'updated_at',
+    'content_version'
   ],
   listing_revision_resource_links: ['id', 'revision_id', 'label', 'url', 'sort_order'],
   listing_revision_faqs: ['id', 'revision_id', 'question', 'answer', 'sort_order'],

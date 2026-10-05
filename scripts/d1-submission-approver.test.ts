@@ -36,6 +36,7 @@ function submissionRow(status: string, slug = 'example.com'): Record<string, unk
     slug,
     status,
     listing_id: null,
+    content_version: 1,
     version: 1,
     checksum: 'before'
   }

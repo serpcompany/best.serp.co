@@ -24,6 +24,10 @@ import {
   selectRevisionForDecisionPlan
 } from './revision-plans'
 import { type RevisionStatus, revisionStatuses } from './schema'
+import {
+  buildApproveLiveSubmissionPlans,
+  buildRecordSubmissionPaymentPlans
+} from './submission-plans'
 
 const listingId = 'lst_owned'
 const revisionId = '22222222-2222-4222-8222-222222222222'
@@ -273,6 +277,7 @@ describe('revision status transitions (compare-and-swap with changes() assertion
       event: 'approved',
       plans: () =>
         buildApproveRevisionPlans({
+          expectedContentVersion: 1,
           listingId,
           now: NOW,
           publication: publication('revision-approval'),
@@ -304,6 +309,7 @@ describe('revision status transitions (compare-and-swap with changes() assertion
     execute(
       db,
       buildApproveRevisionPlans({
+        expectedContentVersion: 1,
         listingId,
         now: NOW,
         publication: publication('revision-approval'),
@@ -340,6 +346,7 @@ describe('revision status transitions (compare-and-swap with changes() assertion
       execute(
         db,
         buildApproveRevisionPlans({
+          expectedContentVersion: 1,
           listingId,
           now: NOW,
           publication: publication('revision-approval'),
@@ -359,6 +366,7 @@ describe('revision status transitions (compare-and-swap with changes() assertion
   it('refuses approval when the listing changed, went offline, or changed owner', () => {
     const approve = () =>
       buildApproveRevisionPlans({
+        expectedContentVersion: 1,
         listingId,
         now: NOW,
         publication: publication('revision-approval'),
@@ -378,5 +386,150 @@ describe('revision status transitions (compare-and-swap with changes() assertion
       expect(publicationState(db).version).toBe(1)
       expect(count(db, 'SELECT COUNT(*) AS count FROM publication_runs')).toBe(0)
     }
+  })
+
+  it('approves only the revision version the reviewer saw', () => {
+    const db = database()
+    seedRevision(db, 'pending_review')
+    execute(
+      db,
+      buildReplaceRevisionContentPlans({
+        authorUserId: 'user_owner',
+        content: { ...content, name: 'Changed after review began' },
+        now: NOW,
+        revisionId
+      })
+    )
+    expect(revision(db)?.content_version).toBe(2)
+    const approve = (expectedContentVersion: number) =>
+      buildApproveRevisionPlans({
+        expectedContentVersion,
+        listingId,
+        now: NOW,
+        publication: publication('revision-approval'),
+        reviewer: 'reviewer',
+        revisionId
+      })
+    expect(() => execute(db, approve(1))).toThrow(/malformed JSON/u)
+    expect(db.prepare('SELECT name FROM listings').get()).toEqual({ name: `Live ${listingId}` })
+    execute(db, approve(2))
+    expect(db.prepare('SELECT name FROM listings').get()).toEqual({
+      name: 'Changed after review began'
+    })
+  })
+
+  it('requires a logo on every revision, so approval never removes the listing logo', () => {
+    const db = database()
+    seedRevision(db, 'pending_review')
+    expect(() =>
+      db.prepare('UPDATE listing_revisions SET logo_url=NULL WHERE id=?').run(revisionId)
+    ).toThrow(/NOT NULL constraint failed: listing_revisions.logo_url/u)
+  })
+})
+
+describe('one staged-edit channel per listing (#62 review, finding 1)', () => {
+  const submissionId = '44444444-4444-4444-8444-444444444444'
+  const paidListing = `submission_${submissionId}`
+
+  /** A paid draft published before review: live, owned by the payer, `paid_pending_review`. */
+  function paidLiveListing(): DatabaseSync {
+    const db = planDatabase()
+    db.prepare(
+      `INSERT INTO listing_submissions (id,slug,block_key,name,description,website,content,
+        category_slug,logo_url,status,plan,owner_user_id,draft_saved_at)
+      VALUES (?,'paid.example','paid.example','Paid','Submitted description',
+        'https://paid.example/','Submitted content','tools','https://paid.example/logo.png',
+        'draft','paid','user_owner',?)`
+    ).run(submissionId, NOW)
+    execute(
+      db,
+      buildRecordSubmissionPaymentPlans({
+        actor: 'stripe',
+        listingId: paidListing,
+        now: NOW,
+        outcome: 'publish',
+        publication: publication('paid-listing'),
+        submissionId
+      })
+    )
+    return db
+  }
+
+  const create = () =>
+    buildCreateRevisionPlans({
+      authorUserId: 'user_owner',
+      content: { ...content, name: 'Revised by owner' },
+      listingId: paidListing,
+      now: NOW,
+      revisionId
+    })
+
+  it("refuses a revision while the listing's own submission is in review", () => {
+    const db = paidLiveListing()
+    expect(db.prepare('SELECT status FROM listing_submissions').get()).toEqual({
+      status: 'paid_pending_review'
+    })
+    expect(() => execute(db, create())).toThrow(/malformed JSON/u)
+    db.prepare("UPDATE listing_submissions SET status='changes_requested' WHERE id=?").run(
+      submissionId
+    )
+    expect(() => execute(db, create())).toThrow(/malformed JSON/u)
+    expect(count(db, 'SELECT COUNT(*) AS count FROM listing_revisions')).toBe(0)
+  })
+
+  it('opens revisions once the submission is approved, without losing either edit', () => {
+    const db = paidLiveListing()
+    const state = publicationState(db)
+    execute(
+      db,
+      buildApproveLiveSubmissionPlans({
+        expectedContentVersion: 1,
+        listingId: paidListing,
+        now: NOW,
+        publication: publication('live-approval', state),
+        reviewer: 'reviewer',
+        submissionId
+      })
+    )
+    execute(db, create())
+    const approved = publicationState(db)
+    execute(
+      db,
+      buildApproveRevisionPlans({
+        expectedContentVersion: 1,
+        listingId: paidListing,
+        now: NOW,
+        publication: publication('revision-approval', approved),
+        reviewer: 'reviewer',
+        revisionId
+      })
+    )
+    expect(db.prepare('SELECT name FROM listings WHERE id=?').get(paidListing)).toEqual({
+      name: 'Revised by owner'
+    })
+  })
+
+  it('refuses a live approval after the listing changed under the submission', () => {
+    const db = paidLiveListing()
+    // An admin manifest edit while the submission waits for review.
+    db.prepare("UPDATE listings SET name='Admin edit', checksum='manifest' WHERE id=?").run(
+      paidListing
+    )
+    expect(() =>
+      execute(
+        db,
+        buildApproveLiveSubmissionPlans({
+          expectedContentVersion: 1,
+          listingId: paidListing,
+          now: NOW,
+          publication: publication('live-approval', publicationState(db)),
+          reviewer: 'reviewer',
+          submissionId
+        })
+      )
+    ).toThrow(/malformed JSON/u)
+    expect(db.prepare('SELECT name FROM listings WHERE id=?').get(paidListing)).toEqual({
+      name: 'Admin edit'
+    })
   })
 })

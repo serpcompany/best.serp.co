@@ -14,9 +14,18 @@ function insertSubmission(
   values: Record<string, string | null>,
   slug = 'example.com'
 ): void {
-  const row = { ...values }
-  // A draft (the default status) needs its clock.
-  if ((row.status ?? 'draft') === 'draft' && !('draft_saved_at' in row)) row.draft_saved_at = NOW
+  // Native intake writes drafts explicitly: owner, clock, block key, and no plan yet.
+  const row: Record<string, string | null> = { status: 'draft', ...values }
+  if (row.status === 'draft') {
+    for (const [column, value] of Object.entries({
+      block_key: slug,
+      draft_saved_at: NOW,
+      owner_user_id: 'user_owner',
+      plan: null
+    })) {
+      if (!(column in row)) row[column] = value
+    }
+  }
   const columns = Object.keys(row)
   db.prepare(
     `INSERT INTO listing_submissions
@@ -49,14 +58,37 @@ describe('listing columns', () => {
 })
 
 describe('submission status, plan, and decision invariants', () => {
-  it('starts as a draft with no plan, and every later status has a chosen plan', () => {
+  it('keeps a pre-#62 insert valid: it defaults to the legacy free flow, never a draft', () => {
+    const db = database()
+    // Exactly the columns the Worker deployed before this migration writes.
+    db.prepare(
+      `INSERT INTO listing_submissions (access_token_hash,category_slug,content,description,id,
+        logo_url,name,slug,video_url,website)
+      VALUES ('digest','tools','c','d',?,'https://example.com/l.png','Example','example.com',NULL,
+        'https://example.com/')`
+    ).run(crypto.randomUUID())
+    expect(
+      db.prepare('SELECT status, plan, block_key, owner_user_id FROM listing_submissions').get()
+    ).toEqual({ block_key: null, owner_user_id: null, plan: 'free', status: 'pending_badge' })
+  })
+
+  it('requires a draft to be native (owner, block key) and every later status to have a plan', () => {
     const db = database()
     insertSubmission(db, {})
     expect(db.prepare('SELECT status, plan FROM listing_submissions').get()).toEqual({
       plan: null,
       status: 'draft'
     })
-    expect(() => insertSubmission(db, { status: 'verified' }, 'b.example')).toThrow(
+    for (const [values, constraint] of [
+      [{ owner_user_id: null }, 'listing_submissions_draft_native'],
+      [{ block_key: null }, 'listing_submissions_draft_native'],
+      [{ plan: 'free' }, 'listing_submissions_draft_plan']
+    ] as const) {
+      expect(() => insertSubmission(db, values, 'a.example'), constraint).toThrow(
+        new RegExp(constraint, 'u')
+      )
+    }
+    expect(() => insertSubmission(db, { plan: null, status: 'verified' }, 'b.example')).toThrow(
       /listing_submissions_plan_chosen/u
     )
     expect(() =>
@@ -91,6 +123,42 @@ describe('submission status, plan, and decision invariants', () => {
       /listing_submissions_withdrawal_reason_valid/u
     )
     insertSubmission(db, { status: 'withdrawn', withdrawal_reason: 'expired' })
+  })
+
+  it('keeps the block key on the slug or a parent domain of it', () => {
+    const db = database()
+    insertSubmission(
+      db,
+      { block_key: 'example.com', plan: 'free', status: 'pending_badge' },
+      'go.example.com'
+    )
+    for (const [slug, blockKey] of [
+      ['other.example', 'example.com'],
+      ['notexample.com', 'example.com']
+    ] as const) {
+      expect(() =>
+        insertSubmission(db, { block_key: blockKey, plan: 'free', status: 'pending_badge' }, slug)
+      ).toThrow(/listing_submissions_block_key_matches/u)
+    }
+  })
+
+  it('never withdraws a paid submission unless its payment was refunded', () => {
+    const db = database()
+    expect(() =>
+      insertSubmission(db, {
+        paid_at: NOW,
+        plan: 'paid',
+        status: 'withdrawn',
+        withdrawal_reason: 'owner'
+      })
+    ).toThrow(/listing_submissions_withdrawn_unpaid/u)
+    insertSubmission(db, {
+      paid_at: NOW,
+      plan: 'paid',
+      refunded_at: NOW,
+      status: 'withdrawn',
+      withdrawal_reason: 'owner'
+    })
   })
 
   it('ties payment and refund timestamps to the plan', () => {
@@ -146,7 +214,7 @@ describe('submission status, plan, and decision invariants', () => {
     expect(() => insertSubmission(db, { plan: 'free', status: 'pending_badge' })).toThrow(
       /UNIQUE constraint failed: listing_submissions.slug/u
     )
-    db.exec("UPDATE listing_submissions SET status = 'withdrawn', withdrawal_reason = 'owner'")
+    db.exec("UPDATE listing_submissions SET status = 'withdrawn', withdrawal_reason = 'admin'")
     insertSubmission(db, { plan: 'free', status: 'pending_badge' })
   })
 
@@ -219,6 +287,13 @@ describe('ownership, URL blocks, and badge checks', () => {
     expect(() => check('pass', null, 0)).toThrow(/badge_checks_pass_conclusive/u)
     expect(() => check('fail', null, 1)).toThrow(/badge_checks_fail_reason/u)
     expect(() => check('error', 'timeout', 0)).toThrow(/badge_checks_outcome_valid/u)
+    expect(() =>
+      db
+        .prepare(
+          'INSERT INTO badge_checks (listing_id,checked_at,outcome,reason,conclusive) VALUES (?,?,?,?,?)'
+        )
+        .run('lst_a', '2026-10-06 12:00:00', 'pass', null, 1)
+    ).toThrow(/badge_checks_checked_at_iso/u)
     // Badge history sits outside the catalog: the publication state never moves.
     expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 1 })
   })

@@ -124,7 +124,8 @@ export async function approveRemoteSubmission(
   if (
     typeof row.version !== 'number' ||
     typeof row.checksum !== 'string' ||
-    typeof row.slug !== 'string'
+    typeof row.slug !== 'string' ||
+    typeof row.content_version !== 'number'
   ) {
     throw new Error('Invalid publication state.')
   }
@@ -143,6 +144,8 @@ export async function approveRemoteSubmission(
       afterChecksum,
       affectedRoute: listingRoute(row.slug),
       beforeChecksum: row.checksum,
+      // The legacy flow has no edit path, so the reviewed preview is the snapshot's version.
+      expectedContentVersion: row.content_version,
       listingId,
       manifestId,
       now,

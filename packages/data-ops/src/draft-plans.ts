@@ -1,4 +1,4 @@
-import { assertPreviousStatementChangedOne, type StatementPlan } from './plan-support'
+import { assertPreviousStatementChangedOne, hoursBefore, type StatementPlan } from './plan-support'
 
 /**
  * Draft expiry and reminders (#59 owner decision, 2026-10-06). A draft is withdrawn
@@ -16,9 +16,6 @@ import { assertPreviousStatementChangedOne, type StatementPlan } from './plan-su
 export const DRAFT_REMINDER_OFFSETS_HOURS = [12, 48, 7 * 24, 14 * 24, 21 * 24] as const
 export const DRAFT_EXPIRY_HOURS = 30 * 24
 export const DRAFT_REMINDER_COUNT = DRAFT_REMINDER_OFFSETS_HOURS.length
-
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u
-const HOUR_MS = 60 * 60 * 1000
 
 export type DraftReminderNumber = 1 | 2 | 3 | 4 | 5
 
@@ -46,9 +43,7 @@ export function draftClockCutoffs(now: string): {
   expiryCutoff: string
   reminderCutoffs: string[]
 } {
-  const time = ISO_INSTANT.test(now) ? Date.parse(now) : Number.NaN
-  if (Number.isNaN(time)) throw new Error('The draft clock needs an ISO instant (toISOString()).')
-  const before = (hours: number) => new Date(time - hours * HOUR_MS).toISOString()
+  const before = (hours: number) => hoursBefore(now, hours)
   return {
     expiryCutoff: before(DRAFT_EXPIRY_HOURS),
     reminderCutoffs: DRAFT_REMINDER_OFFSETS_HOURS.map(before)

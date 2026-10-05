@@ -36,6 +36,28 @@ export function assertGuard(label: string, guard: PlanGuard): StatementPlan {
   }
 }
 
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u
+
+/**
+ * The ISO instant `hours` before `now`. Plans compare stored ISO instants as text, so `now` must
+ * be `Date#toISOString()` output.
+ */
+export function hoursBefore(now: string, hours: number): string {
+  const time = ISO_INSTANT.test(now) ? Date.parse(now) : Number.NaN
+  if (Number.isNaN(time)) throw new Error('Plans need an ISO instant (toISOString()).')
+  return new Date(time - hours * 60 * 60 * 1000).toISOString()
+}
+
+/**
+ * True while a listing's own submission is still in review with its listing live
+ * (`paid_pending_review` or `changes_requested`): the submission is then the listing's only
+ * staged-edit channel, so revisions and unpublishing wait for its decision.
+ */
+export function listingHasQueuedSubmission(listingIdSql: string): string {
+  return `EXISTS (SELECT 1 FROM listing_submissions queued WHERE queued.listing_id=${listingIdSql}
+    AND queued.status IN ('paid_pending_review','changes_requested'))`
+}
+
 /** A listing that anonymous visitors can see (the catalog's public eligibility, minus time). */
 export function listingIsLiveGuard(listingIdSql: string): string {
   return `EXISTS (SELECT 1 FROM listings live WHERE live.id=${listingIdSql}
@@ -166,7 +188,7 @@ export interface StagedListingContent {
   content: string | null
   description: string
   faqs: Array<{ answer: string; question: string }>
-  logoUrl: string | null
+  logoUrl: string
   name: string
   resourceLinks: Array<{ label: string; url: string }>
   videoUrl?: string | null
@@ -279,9 +301,10 @@ export function applyStagedContentPlans(input: {
     },
     {
       sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
-        SELECT ?,'logo',logo_url,0 FROM ${source.table} WHERE id=? AND logo_url IS NOT NULL`,
+        SELECT ?,'logo',logo_url,0 FROM ${source.table} WHERE id=?`,
       params: [listingId, source.id]
     },
+    assertPreviousStatementChangedOne('staged_logo_applied'),
     {
       sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
         SELECT ?,'video',video_url,1 FROM ${source.table} WHERE id=? AND video_url IS NOT NULL`,

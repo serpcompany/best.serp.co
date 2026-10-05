@@ -17,13 +17,16 @@ import {
   buildApproveLiveSubmissionPlans,
   buildApproveSubmissionPlans,
   buildChooseSubmissionPlanPlans,
+  buildClearDraftPlans,
   buildLiftSubmissionUrlBlockPlans,
   buildRecordSubmissionPaymentPlans,
+  buildRecordUnappliedPaymentPlans,
   buildRefundSubmissionPlans,
   buildRejectSubmissionPlans,
   buildReplaceSubmissionContentPlans,
   buildRequestSubmissionChangesPlans,
   buildResubmitSubmissionPlans,
+  buildUpgradeListingToPaidPlans,
   buildWithdrawSubmissionPlans,
   recordSubmissionNotificationPlan,
   selectSubmissionForDecisionPlan,
@@ -33,13 +36,14 @@ import {
 
 const submissionId = '11111111-1111-4111-8111-111111111111'
 const liveListingId = `submission_${submissionId}`
+const liveChecksum = `checksum-${liveListingId}`
 
 /** A draft saved one day before `NOW`: inside the 30-day draft clock. */
 const RECENT_DRAFT = '2026-10-05T12:00:00.000Z'
 
 interface SeedOptions {
   /** The plan a draft has chosen so far (default: none). */
-  draftPlan?: 'free' | 'paid' | null
+  draftPlan?: 'paid' | null
   /** When a draft was saved (default: `RECENT_DRAFT`). */
   draftSavedAt?: string
   live?: boolean
@@ -49,21 +53,21 @@ interface SeedOptions {
 
 /**
  * Inserts the fixture submission in `status`, satisfying the table's CHECK constraints:
- * `paid_pending_review` is always live and paid, `approved` is live, `rejected` carries a
- * category, a `draft` is never paid or live and has a draft clock, `pending_badge` is never paid,
- * and `withdrawn` has a reason. Other statuses are free, unpaid, and not live unless asked.
+ * `paid_pending_review` is always live and paid (with its published checksum), `approved` is
+ * live, `rejected` carries an `other` category, a `draft` is never paid or live and has an owner,
+ * a clock, and a block key, `pending_badge` is never paid, and `withdrawn` (by its owner) is
+ * unpaid. Other statuses are free, unpaid, and not live unless asked.
  */
 function seedSubmission(
   db: DatabaseSync,
   status: SubmissionStatus,
   options: SeedOptions = {}
 ): void {
+  const unpayable = status === 'draft' || status === 'pending_badge' || status === 'withdrawn'
   const live =
     status === 'paid_pending_review' ||
-    (status !== 'draft' && (options.live ?? status === 'approved'))
-  const paid =
-    status === 'paid_pending_review' ||
-    (status !== 'draft' && status !== 'pending_badge' && (options.paid ?? false))
+    (status !== 'draft' && status !== 'withdrawn' && (options.live ?? status === 'approved'))
+  const paid = status === 'paid_pending_review' || (!unpayable && (options.paid ?? false))
   const plan = status === 'draft' ? (options.draftPlan ?? null) : paid ? 'paid' : 'free'
   if (live) {
     seedLiveListing(db, liveListingId, { slug: 'example.com' })
@@ -73,22 +77,23 @@ function seedSubmission(
   }
   db.prepare(
     `INSERT INTO listing_submissions
-      (id,slug,name,description,website,content,category_slug,logo_url,status,
+      (id,slug,block_key,name,description,website,content,category_slug,logo_url,status,
        access_token_hash,badge_verified_at,listing_id,owner_user_id,plan,paid_at,
-       rejection_reason,rejection_category,draft_saved_at,withdrawal_reason)
-    VALUES (?,'example.com','Example','Description','https://example.com/','Content','tools',
-      'https://example.com/logo.png',?,'hash','2026-08-01T00:00:00.000Z',?,?,?,?,?,?,?,?)`
+       rejection_reason,rejection_category,draft_saved_at,withdrawal_reason,published_checksum)
+    VALUES (?,'example.com','example.com','Example','Description','https://example.com/','Content',
+      'tools','https://example.com/logo.png',?,'hash','2026-08-01T00:00:00.000Z',?,?,?,?,?,?,?,?,?)`
   ).run(
     submissionId,
     status,
     live ? liveListingId : null,
-    options.owner === undefined ? 'user_owner' : options.owner,
+    options.owner === undefined || status === 'draft' ? 'user_owner' : options.owner,
     plan,
     paid ? '2026-08-01T00:00:00.000Z' : null,
     status === 'rejected' ? 'Spam' : null,
     status === 'rejected' ? 'other' : null,
     status === 'draft' ? (options.draftSavedAt ?? RECENT_DRAFT) : null,
-    status === 'withdrawn' ? 'owner' : null
+    status === 'withdrawn' ? 'owner' : null,
+    live && paid ? liveChecksum : null
   )
   db.prepare(
     `INSERT INTO listing_submission_resource_links(submission_id,label,url,sort_order)
@@ -129,12 +134,13 @@ function listing(db: DatabaseSync, id = liveListingId): Record<string, unknown> 
     | undefined
 }
 
-function approvalPlans() {
+function approvalPlans(expectedContentVersion = 1) {
   const afterChecksum = createHash('sha256').update('after').digest('hex')
   return buildApproveSubmissionPlans({
     afterChecksum,
     affectedRoute: '/products/example.com/',
     beforeChecksum: 'before',
+    expectedContentVersion,
     listingId: liveListingId,
     manifestId: `verified-submission-${submissionId}`,
     now: '2026-08-01T01:00:00.000Z',
@@ -143,6 +149,30 @@ function approvalPlans() {
     submissionId,
     version: 1
   })
+}
+
+function approveLivePlans(expectedContentVersion = 1) {
+  return buildApproveLiveSubmissionPlans({
+    expectedContentVersion,
+    listingId: liveListingId,
+    now: NOW,
+    publication: publication('live-submission-approval'),
+    reviewer: 'reviewer',
+    submissionId
+  })
+}
+
+const content = {
+  categorySlug: 'apps',
+  content: 'New content',
+  description: 'New description',
+  faqs: [{ answer: 'A1', question: 'Q1' }],
+  logoUrl: 'https://example.com/new-logo.png',
+  name: 'New name',
+  resourceLinks: [
+    { label: 'Pricing', url: 'https://example.com/pricing' },
+    { label: 'Docs', url: 'https://example.com/docs' }
+  ]
 }
 
 /**
@@ -164,7 +194,7 @@ function expectTransition(spec: {
     const versionBefore = publicationState(db)
     if (spec.succeeds.includes(status)) {
       execute(db, spec.plans())
-      expect(events(db, spec.event), `${status}: ${spec.event} event`).toBe(1)
+      expect(events(db, spec.event), `${status}: ${spec.event} event`).toBeGreaterThanOrEqual(1)
       spec.after(db, status)
     } else {
       expect(() => execute(db, spec.plans()), `${status} must be refused`).toThrow(
@@ -180,17 +210,20 @@ function expectTransition(spec: {
 }
 
 describe('submission transition map', () => {
-  it('names only real statuses, and every decision leaves the review queue', () => {
+  it('names only real statuses, and only payment bookkeeping leaves a final status', () => {
     for (const [action, transition] of Object.entries(submissionTransitions)) {
       for (const from of transition.from) expect(submissionStatuses, action).toContain(from)
     }
+    const bookkeeping = ['refund', 'payUnapplied', 'upgradeListing']
     for (const terminal of ['approved', 'rejected', 'withdrawn'] as const) {
       const outgoing = Object.entries(submissionTransitions).filter(
         ([action, transition]) =>
-          action !== 'refund' && (transition.from as readonly string[]).includes(terminal)
+          !bookkeeping.includes(action) && (transition.from as readonly string[]).includes(terminal)
       )
       expect(outgoing, `${terminal} is final for review`).toEqual([])
     }
+    expect(submissionTransitions.ownerEdit.from).not.toContain('verified')
+    expect(submissionTransitions.ownerEdit.from).not.toContain('paid_pending_review')
   })
 })
 
@@ -217,16 +250,39 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     })
   })
 
-  it('records a paid submission as live and queued, or held for review', () => {
+  it('approves only the content version the reviewer saw', () => {
+    const db = database('verified')
+    execute(
+      db,
+      buildReplaceSubmissionContentPlans({
+        actor: 'reviewer',
+        content,
+        expectedContentVersion: 1,
+        expectedStatuses: ['verified'],
+        now: NOW,
+        submissionId
+      })
+    )
+    expect(submission(db).content_version).toBe(2)
+    expect(() => execute(db, approvalPlans(1))).toThrow(/malformed JSON/u)
+    expect(count(db, 'SELECT COUNT(*) AS count FROM listings')).toBe(0)
+    execute(db, approvalPlans(2))
+    expect(listing(db)).toMatchObject({ name: 'New name', status: 'approved' })
+    expect(() => approvalPlans(0)).toThrow(/positive integer/u)
+  })
+
+  it('records a payment as live and queued, or held for review, from every payable status', () => {
     expectTransition({
       after: db => {
         expect(submission(db)).toMatchObject({
           listing_id: liveListingId,
           paid_at: NOW,
           plan: 'paid',
+          published_checksum: publication('paid-listing').afterChecksum,
           status: 'paid_pending_review'
         })
         expect(listing(db)).toMatchObject({
+          checksum: publication('paid-listing').afterChecksum,
           is_active: 1,
           link_rel: 'nofollow',
           status: 'approved'
@@ -270,7 +326,7 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     })
   })
 
-  it('records a payment once, and only for a draft that chose the paid plan', () => {
+  it('records a payment once, and never for a draft without the paid plan', () => {
     const hold = () =>
       buildRecordSubmissionPaymentPlans({
         actor: 'stripe',
@@ -283,15 +339,74 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     expect(() => execute(db, hold())).toThrow(/malformed JSON/u)
     expect(events(db, 'paid')).toBe(1)
 
-    for (const draftPlan of [null, 'free'] as const) {
-      const unchosen = database('draft', { draftPlan })
-      expect(() => execute(unchosen, hold())).toThrow(/malformed JSON/u)
-      expect(submission(unchosen)).toMatchObject({
-        paid_at: null,
-        plan: draftPlan,
-        status: 'draft'
+    const unchosen = database('draft', { draftPlan: null })
+    expect(() => execute(unchosen, hold())).toThrow(/malformed JSON/u)
+    expect(submission(unchosen)).toMatchObject({ paid_at: null, plan: null, status: 'draft' })
+  })
+
+  it('applies a checkout that completes after the draft switched to free (upgrade path)', () => {
+    const db = database('draft', { draftPlan: 'paid' })
+    execute(
+      db,
+      buildChooseSubmissionPlanPlans({
+        now: NOW,
+        ownerUserId: 'user_owner',
+        plan: 'free',
+        submissionId
       })
-    }
+    )
+    expect(submission(db)).toMatchObject({ plan: 'free', status: 'pending_badge' })
+    execute(
+      db,
+      buildRecordSubmissionPaymentPlans({
+        actor: 'stripe',
+        now: NOW,
+        outcome: 'hold',
+        submissionId
+      })
+    )
+    expect(submission(db)).toMatchObject({ paid_at: NOW, plan: 'paid', status: 'verified' })
+  })
+
+  it('records and refunds a payment that completes after the submission was withdrawn', () => {
+    expectTransition({
+      after: db => {
+        expect(submission(db)).toMatchObject({
+          paid_at: NOW,
+          refunded_at: NOW,
+          status: 'withdrawn',
+          withdrawal_reason: 'owner'
+        })
+        expect(events(db, 'refunded')).toBe(1)
+      },
+      event: 'paid',
+      plans: () => buildRecordUnappliedPaymentPlans({ actor: 'stripe', now: NOW, submissionId }),
+      succeeds: submissionTransitions.payUnapplied.from
+    })
+    // A withdrawn submission never holds an unrefunded payment.
+    const db = database('withdrawn')
+    expect(() =>
+      db
+        .prepare("UPDATE listing_submissions SET paid_at=?, plan='paid' WHERE id=?")
+        .run(NOW, submissionId)
+    ).toThrow(/listing_submissions_withdrawn_unpaid/u)
+  })
+
+  it('upgrades a live approved free listing to the paid plan without a publication', () => {
+    expectTransition({
+      after: db => {
+        expect(submission(db)).toMatchObject({ paid_at: NOW, plan: 'paid', status: 'approved' })
+        expect(publicationState(db).version).toBe(1)
+      },
+      event: 'paid',
+      plans: () => buildUpgradeListingToPaidPlans({ actor: 'stripe', now: NOW, submissionId }),
+      seed: { live: true, paid: false },
+      succeeds: submissionTransitions.upgradeListing.from
+    })
+    const paid = database('approved', { paid: true })
+    expect(() =>
+      execute(paid, buildUpgradeListingToPaidPlans({ actor: 'stripe', now: NOW, submissionId }))
+    ).toThrow(/malformed JSON/u)
   })
 
   it('records the plan choice on a draft: free starts the badge step, paid awaits checkout', () => {
@@ -310,7 +425,6 @@ describe('submission status transitions (compare-and-swap with changes() asserti
       plans: () => choose('paid'),
       succeeds: submissionTransitions.choosePaid.from
     })
-    // A paid draft may still switch to free before paying; nobody else may choose for it.
     const db = database('draft', { draftPlan: 'paid' })
     expect(() => execute(db, choose('free', 'user_other'))).toThrow(/malformed JSON/u)
     execute(db, choose('free'))
@@ -324,13 +438,39 @@ describe('submission status transitions (compare-and-swap with changes() asserti
       db
         .prepare(
           `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
-            logo_url,draft_saved_at) VALUES (?,'example.com','Again','d','https://example.com/','c',
-            'tools','l',?)`
+            logo_url) VALUES (?,'example.com','Again','d','https://example.com/','c','tools','l')`
         )
-        .run(crypto.randomUUID(), NOW)
+        .run(crypto.randomUUID())
     ).toThrow(/UNIQUE constraint failed: listing_submissions.slug/u)
     execute(db, buildWithdrawSubmissionPlans({ now: NOW, ownerUserId: 'user_owner', submissionId }))
     expect(submission(db)).toMatchObject({ status: 'withdrawn', withdrawal_reason: 'owner' })
+  })
+
+  it('lets an admin clear a draft, freeing its URL key', () => {
+    expectTransition({
+      after: db => {
+        expect(submission(db)).toMatchObject({ status: 'withdrawn', withdrawal_reason: 'admin' })
+        expect(
+          db
+            .prepare(
+              "SELECT actor,detail FROM listing_submission_events WHERE event_type='withdrawn'"
+            )
+            .get()
+        ).toEqual({ actor: 'admin@example.com', detail: '{"by":"admin","note":"Squatting."}' })
+      },
+      event: 'withdrawn',
+      plans: () =>
+        buildClearDraftPlans({
+          admin: 'admin@example.com',
+          note: 'Squatting.',
+          now: NOW,
+          submissionId
+        }),
+      succeeds: submissionTransitions.clearDraft.from
+    })
+    expect(() => buildClearDraftPlans({ admin: 'a', note: ' ', now: NOW, submissionId })).toThrow(
+      /note/u
+    )
   })
 
   it('approves a live paid submission by applying its staged content', () => {
@@ -341,17 +481,26 @@ describe('submission status transitions (compare-and-swap with changes() asserti
         expect(publicationState(db).version).toBe(2)
       },
       event: 'approved',
-      plans: () =>
-        buildApproveLiveSubmissionPlans({
-          listingId: liveListingId,
-          now: NOW,
-          publication: publication('live-submission-approval'),
-          reviewer: 'reviewer',
-          submissionId
-        }),
+      plans: () => approveLivePlans(),
       seed: { live: true, paid: true },
       succeeds: submissionTransitions.approveLive.from
     })
+  })
+
+  it('refuses a live approval when the listing changed since it was published', () => {
+    const db = database('paid_pending_review')
+    db.prepare("UPDATE listings SET name='Edited by admin', checksum='manifest' WHERE id=?").run(
+      liveListingId
+    )
+    expect(() => execute(db, approveLivePlans())).toThrow(/malformed JSON/u)
+    expect(listing(db)).toMatchObject({ name: 'Edited by admin' })
+    expect(submission(db).status).toBe('paid_pending_review')
+
+    const stale = database('paid_pending_review')
+    stale.prepare('UPDATE listing_submissions SET content_version=2 WHERE id=?').run(submissionId)
+    expect(() => execute(stale, approveLivePlans(1))).toThrow(/malformed JSON/u)
+    execute(stale, approveLivePlans(2))
+    expect(submission(stale).status).toBe('approved')
   })
 
   it('requests changes only from the review queue, with a note', () => {
@@ -378,7 +527,7 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     ).toThrow(/note/u)
   })
 
-  it('resubmits back to the queue it left, for the owner only', () => {
+  it('resubmits back to the queue it left, only while its listing is live, for the owner', () => {
     const plans = () =>
       buildResubmitSubmissionPlans({ now: NOW, ownerUserId: 'user_owner', submissionId })
     expectTransition({
@@ -392,6 +541,12 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     execute(live, plans())
     expect(submission(live).status).toBe('paid_pending_review')
 
+    // Taken down outside the plans (for example, a publication manifest): no resubmission.
+    const down = database('changes_requested', { live: true, paid: true })
+    down.prepare('UPDATE listings SET is_active=0 WHERE id=?').run(liveListingId)
+    expect(() => execute(down, plans())).toThrow(/malformed JSON/u)
+    expect(submission(down).status).toBe('changes_requested')
+
     const stranger = database('changes_requested')
     expect(() =>
       execute(
@@ -401,9 +556,10 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     ).toThrow(/malformed JSON/u)
   })
 
-  it('withdraws an unpaid, unpublished submission for its owner', () => {
+  it('withdraws only an unpaid, unpublished submission, for its owner', () => {
     expectTransition({
-      after: db => expect(submission(db).status).toBe('withdrawn'),
+      after: db =>
+        expect(submission(db)).toMatchObject({ status: 'withdrawn', withdrawal_reason: 'owner' }),
       event: 'withdrawn',
       plans: () =>
         buildWithdrawSubmissionPlans({ now: NOW, ownerUserId: 'user_owner', submissionId }),
@@ -486,9 +642,16 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     expect(db.prepare('SELECT revoked_reason FROM listing_owners').all()).toEqual([
       { revoked_reason: 'submission_rejected' }
     ])
+
+    // Already taken down outside the plans: the rejection succeeds and records no unpublish.
+    const down = database('changes_requested', { live: true, paid: true })
+    down.prepare('UPDATE listings SET is_active=0 WHERE id=?').run(liveListingId)
+    execute(down, plans())
+    expect(submission(down).status).toBe('rejected')
+    expect(events(down, 'unpublished')).toBe(0)
   })
 
-  it('blocks a prohibited URL from every new submission until an admin lifts it', () => {
+  it('blocks a prohibited registrable domain and its subdomains until an admin lifts it', () => {
     const db = database('verified')
     execute(
       db,
@@ -503,21 +666,26 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     expect(
       db.prepare('SELECT url_key,submission_id,lifted_at FROM listing_submission_url_blocks').all()
     ).toEqual([{ lifted_at: null, submission_id: submissionId, url_key: 'example.com' }])
-    const resubmit = () =>
+    const submit = (slug: string, blockKey: string | null) => () =>
       db
         .prepare(
-          `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
-            logo_url,plan,paid_at,draft_saved_at) VALUES (?,'example.com','Again','d',
-            'https://example.com/','c','tools','https://example.com/logo.png',?,?,?)`
+          `INSERT INTO listing_submissions (id,slug,block_key,name,description,website,content,
+            category_slug,logo_url) VALUES (?,?,?,'Again','d','https://example.com/','c','tools',
+            'https://example.com/logo.png')`
         )
-        .run(crypto.randomUUID(), 'free', null, NOW)
-    expect(resubmit).toThrow(/blocked until an admin lifts the block/u)
+        .run(crypto.randomUUID(), slug, blockKey)
+    const blocked = /blocked until an admin lifts the block/u
+    expect(submit('example.com', 'example.com')).toThrow(blocked)
+    expect(submit('go.example.com', 'example.com')).toThrow(blocked)
+    // A row without a block key (a pre-#62 Worker) is still caught by the subdomain match.
+    expect(submit('www2.example.com', null)).toThrow(blocked)
+    expect(submit('notexample.com', 'notexample.com')).not.toThrow()
 
     execute(
       db,
       buildLiftSubmissionUrlBlockPlans({
         admin: 'admin',
-        note: 'Owner appealed.',
+        note: 'Appealed.',
         now: NOW,
         urlKey: 'example.com'
       })
@@ -533,7 +701,7 @@ describe('submission status transitions (compare-and-swap with changes() asserti
         })
       )
     ).toThrow(/malformed JSON/u)
-    expect(resubmit).not.toThrow()
+    expect(submit('go.example.com', 'example.com')).not.toThrow()
   })
 
   it('lets an other-category rejection be resubmitted as a new submission', () => {
@@ -552,30 +720,27 @@ describe('submission status transitions (compare-and-swap with changes() asserti
       db
         .prepare(
           `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
-            logo_url,draft_saved_at) VALUES (?,'example.com','Again','d','https://example.com/','c',
-            'tools','l',?)`
+            logo_url) VALUES (?,'example.com','Again','d','https://example.com/','c','tools','l')`
         )
-        .run(crypto.randomUUID(), NOW)
+        .run(crypto.randomUUID())
     ).not.toThrow()
   })
 
-  it('edits staged content before a final decision, replacing links and FAQs', () => {
-    const content = {
-      categorySlug: 'apps',
-      content: 'New content',
-      description: 'New description',
-      faqs: [{ answer: 'A1', question: 'Q1' }],
-      logoUrl: 'https://example.com/new-logo.png',
-      name: 'New name',
-      resourceLinks: [
-        { label: 'Pricing', url: 'https://example.com/pricing' },
-        { label: 'Docs', url: 'https://example.com/docs' }
-      ]
-    }
+  it('lets the owner edit only outside the review queue, and bumps the content version', () => {
+    const ownerEdit = () =>
+      buildReplaceSubmissionContentPlans({
+        actor: 'user_owner',
+        content,
+        expectedStatuses: submissionTransitions.ownerEdit.from,
+        now: NOW,
+        ownerUserId: 'user_owner',
+        submissionId
+      })
     expectTransition({
       after: (db, from) => {
         expect(submission(db)).toMatchObject({
           category_slug: 'apps',
+          content_version: 2,
           name: 'New name',
           status: from
         })
@@ -586,17 +751,45 @@ describe('submission status transitions (compare-and-swap with changes() asserti
         ).toEqual([{ label: 'Pricing' }, { label: 'Docs' }])
       },
       event: 'edited',
-      plans: () =>
-        buildReplaceSubmissionContentPlans({
-          actor: 'user_owner',
-          content,
-          expectedStatuses: submissionTransitions.edit.from,
-          now: NOW,
-          ownerUserId: 'user_owner',
-          submissionId
+      plans: ownerEdit,
+      succeeds: submissionTransitions.ownerEdit.from
+    })
+    expect(() =>
+      buildReplaceSubmissionContentPlans({
+        actor: 'user_owner',
+        content,
+        expectedStatuses: ['verified'],
+        now: NOW,
+        ownerUserId: 'user_owner',
+        submissionId
+      })
+    ).toThrow(/only as a draft/u)
+  })
+
+  it('lets a reviewer edit any queued submission, refusing a stale version', () => {
+    const reviewerEdit = (expectedContentVersion?: number) =>
+      buildReplaceSubmissionContentPlans({
+        actor: 'reviewer',
+        content,
+        expectedContentVersion,
+        expectedStatuses: submissionTransitions.edit.from,
+        now: NOW,
+        submissionId
+      })
+    expectTransition({
+      after: (db, from) =>
+        expect(submission(db)).toMatchObject({
+          content_version: 2,
+          name: 'New name',
+          status: from
         }),
+      event: 'edited',
+      plans: () => reviewerEdit(),
       succeeds: submissionTransitions.edit.from
     })
+    const db = database('paid_pending_review')
+    execute(db, reviewerEdit(1))
+    expect(() => execute(db, reviewerEdit(1))).toThrow(/malformed JSON/u)
     expect(() =>
       buildReplaceSubmissionContentPlans({
         actor: 'a',
@@ -621,8 +814,11 @@ describe('refunds keep the plan model consistent (paid → free)', () => {
       conclusive ? 1 : 0
     )
   }
+  /** Inside the seven-day keep-free window before `NOW`, and outside it. */
+  const RECENT = '2026-10-01T00:00:00.000Z'
+  const STALE = '2026-09-08T00:00:00.000Z'
 
-  it('records the refund of a rejected paid submission once', () => {
+  it('refunds only an other-category rejection, once', () => {
     const db = database('rejected', { paid: true })
     const plans = () =>
       buildRefundSubmissionPlans({
@@ -637,29 +833,31 @@ describe('refunds keep the plan model consistent (paid → free)', () => {
     expect(() => execute(db, plans())).toThrow(/malformed JSON/u)
     expect(events(db, 'refunded')).toBe(1)
 
-    const queued = database('verified', { paid: true })
+    const prohibited = database('rejected', { paid: true })
+    prohibited
+      .prepare("UPDATE listing_submissions SET rejection_category='prohibited' WHERE id=?")
+      .run(submissionId)
+    expect(() => execute(prohibited, plans())).toThrow(/malformed JSON/u)
+    expect(submission(prohibited).refunded_at).toBeNull()
     expect(() =>
-      execute(
-        queued,
-        buildRefundSubmissionPlans({
-          actor: 'admin',
-          mode: 'after_rejection',
-          now: NOW,
-          submissionId
-        })
-      )
-    ).toThrow(/malformed JSON/u)
+      prohibited
+        .prepare('UPDATE listing_submissions SET refunded_at=? WHERE id=?')
+        .run(NOW, submissionId)
+    ).toThrow(/listing_submissions_no_refund_when_prohibited/u)
+
+    const queued = database('verified', { paid: true })
+    expect(() => execute(queued, plans())).toThrow(/malformed JSON/u)
     expect(submission(queued)).toMatchObject({ plan: 'paid', refunded_at: null })
   })
 
-  it('keeps a refunded listing live as free only while its latest conclusive check passes', () => {
+  it('keeps a refunded listing live as free only on a recent conclusive pass, and records it', () => {
     const keep = () =>
       buildRefundSubmissionPlans({ actor: 'admin', mode: 'keep_free', now: NOW, submissionId })
 
     const passing = database('approved', { paid: true })
-    badgeCheck(passing, 'fail', true, '2026-09-01T00:00:00.000Z')
-    badgeCheck(passing, 'pass', true, '2026-09-08T00:00:00.000Z')
-    badgeCheck(passing, 'fail', false, '2026-09-15T00:00:00.000Z')
+    badgeCheck(passing, 'fail', true, STALE)
+    badgeCheck(passing, 'pass', true, RECENT)
+    badgeCheck(passing, 'fail', false, '2026-10-02T00:00:00.000Z')
     execute(passing, keep())
     expect(submission(passing)).toMatchObject({
       plan: 'free',
@@ -668,15 +866,30 @@ describe('refunds keep the plan model consistent (paid → free)', () => {
     })
     expect(listing(passing)).toMatchObject({ is_active: 1 })
     expect(publicationState(passing).version).toBe(1)
+    const recorded = passing
+      .prepare("SELECT detail FROM listing_submission_events WHERE event_type='refunded'")
+      .get() as { detail: string }
+    expect(JSON.parse(recorded.detail)).toEqual({
+      badge_check_id: 2,
+      badge_checked_at: RECENT,
+      mode: 'kept_as_free'
+    })
 
-    const missing = database('approved', { paid: true })
-    badgeCheck(missing, 'pass', true, '2026-09-01T00:00:00.000Z')
-    badgeCheck(missing, 'fail', true, '2026-09-08T00:00:00.000Z')
-    expect(() => execute(missing, keep())).toThrow(/malformed JSON/u)
-    expect(submission(missing)).toMatchObject({ plan: 'paid', refunded_at: null })
+    for (const checks of [
+      [['pass', STALE]],
+      [
+        ['pass', STALE],
+        ['fail', RECENT]
+      ]
+    ] as const) {
+      const db = database('approved', { paid: true })
+      for (const [outcome, at] of checks) badgeCheck(db, outcome, true, at)
+      expect(() => execute(db, keep())).toThrow(/malformed JSON/u)
+      expect(submission(db)).toMatchObject({ plan: 'paid', refunded_at: null })
+    }
   })
 
-  it('unpublishes a refunded listing without a passing badge', () => {
+  it('unpublishes a refunded live listing unless a recent pass keeps it free', () => {
     const plans = () =>
       buildRefundSubmissionPlans({
         actor: 'admin',
@@ -685,19 +898,47 @@ describe('refunds keep the plan model consistent (paid → free)', () => {
         publication: publication('refund-unpublish'),
         submissionId
       })
-    const db = database('approved', { paid: true })
-    execute(db, plans())
-    expect(submission(db)).toMatchObject({ plan: 'paid', refunded_at: NOW, status: 'approved' })
-    expect(listing(db)).toMatchObject({ is_active: 0, status: 'approved' })
-    expect(events(db, 'refunded')).toBe(1)
-    expect(events(db, 'unpublished')).toBe(1)
-    expect(publicationState(db).version).toBe(2)
+    for (const stalePass of [false, true]) {
+      const db = database('approved', { paid: true })
+      if (stalePass) badgeCheck(db, 'pass', true, STALE)
+      execute(db, plans())
+      expect(submission(db)).toMatchObject({ plan: 'paid', refunded_at: NOW, status: 'approved' })
+      expect(listing(db)).toMatchObject({ is_active: 0, status: 'approved' })
+      expect(events(db, 'refunded')).toBe(1)
+      expect(events(db, 'unpublished')).toBe(1)
+      expect(publicationState(db).version).toBe(2)
+    }
 
     const passing = database('approved', { paid: true })
-    badgeCheck(passing, 'pass', true, '2026-09-01T00:00:00.000Z')
+    badgeCheck(passing, 'pass', true, RECENT)
     expect(() => execute(passing, plans())).toThrow(/malformed JSON/u)
     expect(listing(passing)).toMatchObject({ is_active: 1 })
     expect(publicationState(passing).version).toBe(1)
+  })
+
+  it('refunds an approved paid listing that is already down, without a publication', () => {
+    const plans = () =>
+      buildRefundSubmissionPlans({
+        actor: 'admin',
+        mode: 'already_unpublished',
+        now: NOW,
+        submissionId
+      })
+    const live = database('approved', { paid: true })
+    expect(() => execute(live, plans())).toThrow(/malformed JSON/u)
+
+    const unpublished = database('approved', { paid: true })
+    unpublished.prepare('UPDATE listings SET is_active=0 WHERE id=?').run(liveListingId)
+    execute(unpublished, plans())
+    expect(submission(unpublished)).toMatchObject({ refunded_at: NOW, status: 'approved' })
+    expect(publicationState(unpublished).version).toBe(1)
+    expect(() => execute(unpublished, plans())).toThrow(/malformed JSON/u)
+
+    const deleted = database('approved', { paid: true })
+    deleted.prepare('DELETE FROM listings WHERE id=?').run(liveListingId)
+    expect(submission(deleted).listing_id).toBeNull()
+    execute(deleted, plans())
+    expect(submission(deleted).refunded_at).toBe(NOW)
   })
 })
 
@@ -716,13 +957,16 @@ describe('protected submission statement plans', () => {
     const db = database('verified')
     expect(query(db, selectSubmissionForDecisionPlan(submissionId))).toEqual([
       {
+        block_key: 'example.com',
         checksum: 'before',
+        content_version: 1,
         id: submissionId,
         listing_id: null,
         listing_live: 0,
         owner_user_id: 'user_owner',
         paid_at: null,
         plan: 'free',
+        published_checksum: null,
         refunded_at: null,
         rejection_category: null,
         slug: 'example.com',

@@ -35,7 +35,7 @@ function insert(
   db: DatabaseSync,
   values: {
     id?: string
-    plan?: 'free' | 'paid' | null
+    plan?: 'paid' | null
     savedAt?: string
     slug?: string
     status?: SubmissionStatus
@@ -51,12 +51,14 @@ function insert(
   }
   db.prepare(
     `INSERT INTO listing_submissions
-      (id,slug,name,description,website,content,category_slug,logo_url,status,owner_user_id,
-       plan,paid_at,listing_id,draft_saved_at,rejection_reason,rejection_category,withdrawal_reason)
-    VALUES (?,?,'Example','d','https://example.com/','c','tools','https://example.com/l.png',?,
-      'user_owner',?,?,?,?,?,?,?)`
+      (id,slug,block_key,name,description,website,content,category_slug,logo_url,status,
+       owner_user_id,plan,paid_at,listing_id,draft_saved_at,rejection_reason,rejection_category,
+       withdrawal_reason,published_checksum)
+    VALUES (?,?,?,'Example','d','https://example.com/','c','tools','https://example.com/l.png',?,
+      'user_owner',?,?,?,?,?,?,?,?)`
   ).run(
     submission,
+    values.slug ?? `${submission}.example`,
     values.slug ?? `${submission}.example`,
     status,
     status === 'draft' ? (values.plan ?? null) : status === 'paid_pending_review' ? 'paid' : 'free',
@@ -65,7 +67,8 @@ function insert(
     status === 'draft' ? (values.savedAt ?? SAVED) : null,
     status === 'rejected' ? 'Spam' : null,
     status === 'rejected' ? 'other' : null,
-    status === 'withdrawn' ? 'owner' : null
+    status === 'withdrawn' ? 'owner' : null,
+    status === 'paid_pending_review' ? 'c' : null
   )
   return submission
 }
@@ -165,8 +168,10 @@ describe('draft clock schedule', () => {
     insert(db, { id: 'paid', plan: 'paid' })
     insert(db, { id: 'open' })
     insert(db, { id: 'free', status: 'pending_badge' })
-    // Only reachable by a direct write (choosing free leaves `draft`), and never reminded.
-    insert(db, { id: 'odd', plan: 'free' })
+    // Choosing free leaves `draft`, and the schema refuses a free draft outright.
+    expect(() => insert(db, { id: 'odd', plan: 'free' as 'paid' })).toThrow(
+      /listing_submissions_draft_plan/u
+    )
     expect(due(db, atHour(24)).map(item => [item.id, item.reminder, item.variant])).toEqual([
       ['open', 1, 'choose_plan'],
       ['paid', 1, 'complete_checkout']
@@ -190,7 +195,7 @@ describe('draft clock schedule', () => {
     const expired = query(db, selectExpiredDraftsPlan({ limit: 10, now: atHour(720) })) as Array<{
       id: string
     }>
-    expect(expired.map(item => item.id)).toEqual(['odd', 'open', 'paid'])
+    expect(expired.map(item => item.id)).toEqual(['open', 'paid'])
   })
 
   it('claims the variant the draft is in when the plan changes between read and claim', () => {

@@ -94,28 +94,48 @@ SQL with the hand-finished form and check that a second `pnpm db:generate` repor
   `ON DELETE RESTRICT`: account deletion must resolve ownership first.
 - `listing_submissions.plan` is the plan the submitter chose (`free` | `paid`, null while a
   draft has not chosen); `paid_at` and `refunded_at` record payment. A refund that keeps a
-  listing live with a passing badge sets the plan to `free` (paid → free). Owners
+  listing live with a recent badge pass sets the plan to `free` (paid → free). Owners
   (`owner_user_id`), `reviewer_note`, and `rejection_reason` with `rejection_category`
-  (`prohibited` | `other`) complete the review record. CHECK constraints tie these together;
-  the statuses and transitions are in [Submission flow](./SUBMISSION_FLOW.md).
+  (`prohibited` | `other`) complete the review record. CHECK constraints tie these together:
+  a refund never coexists with a `prohibited` rejection, a withdrawn row never holds an
+  unrefunded payment (the owner cannot withdraw once paid), and a draft is native (owner and
+  block key, no plan or `paid`). The statuses and transitions are in
+  [Submission flow](./SUBMISSION_FLOW.md).
+- `content_version` (submissions and revisions) increments on every content edit; approvals
+  compare and swap on the version the reviewer saw. `published_checksum` is the listing
+  checksum written when a paid submission went live before review; the live approval requires
+  the listing to still have it, so an admin edit made meanwhile is never overwritten.
+- **Deploy window.** The column defaults stay `status = 'pending_badge'` and `plan = 'free'`,
+  as before #62, so a Worker deployed before this migration keeps writing valid legacy rows
+  between migrate and deploy. Native intake (#63) writes `draft` explicitly.
 - **Draft clock** (#59 amendment): `draft_saved_at` (an ISO instant, required for a draft)
   starts when the draft is first saved, and edits never reset it, so editing cannot extend a
   hold on a URL. `draft_reminders_sent` (0 to 5) and `draft_last_reminder_at` record the claimed
-  reminders; `withdrawal_reason` (`owner` | `expired`) is set exactly when the status is
-  `withdrawn`. `listing_submissions_draft_clock_idx` (drafts only) serves the reminder and
+  reminders; `withdrawal_reason` (`owner` | `expired` | `admin`) is set exactly when the status
+  is `withdrawn`. `listing_submissions_draft_clock_idx` (drafts only) serves the reminder and
   expiry queries in `draft-plans.ts`; the schedule and the two reminder variants are in
   [Submission flow](./SUBMISSION_FLOW.md).
-- **Prohibited URLs** (#59 amendment): a `prohibited` rejection inserts an active row in
-  `listing_submission_url_blocks` for its URL key (today the submission slug: the lowercase
-  hostname without `www.`). The trigger `listing_submissions_refuse_blocked_url` refuses any new
-  submission with that key, free or paid, until an admin lifts the block (`lifted_at`). `other`
-  rejections block nothing.
+- **URL keys and prohibited URLs** (#59 amendments). `urlKey()`
+  (`packages/utils/url-key.ts`) normalizes every website once: the WHATWG URL parser (as in
+  workerd) percent-decodes, punycodes, and lowercases the host; trailing dots and a leading
+  `www.` are removed. The host is the slug and the duplicate key. `block_key` is its registrable
+  domain per the Public Suffix List, private section included (`tldts` 7.4.16, 128 KB minified,
+  46 KB gzipped, no Node APIs), so `user.github.io` is its own site. The app computes it at
+  intake and stores it, because SQLite cannot evaluate the PSL; a CHECK keeps it equal to the
+  slug or a parent domain of it. Rows written before #62 have none and fall back to their slug.
+  A `prohibited` rejection inserts an active block for the block key; the trigger
+  `listing_submissions_refuse_blocked_url` then refuses any new submission, free or paid, whose
+  block key is blocked or whose slug is that domain or a subdomain of it (so it also holds for a
+  row without a block key, or after a PSL update), until an admin lifts the block (`lifted_at`).
+  `other` rejections block nothing.
 - `listing_revisions` stage an owner's edit of a live listing (name, description, content,
   primary category, logo, video, resource links, FAQs; never website or slug) against the
-  listing's `checksum` at the time (`base_checksum`). A listing has at most one open revision.
+  listing's `checksum` at the time (`base_checksum`). A listing has at most one open revision,
+  and none while its own submission is still in review; the logo is required, like a
+  submission's.
 - `badge_checks` (listing, `checked_at`, `outcome` `pass` | `fail`, `reason`, `conclusive`) is
   the badge program history. A network error or timeout is an inconclusive `fail` and never
-  counts as a miss. It is outside the catalog: writing it never changes the catalog epoch.
+  counts as a miss; `checked_at` is an ISO instant (a CHECK), compared as text. It is outside the catalog: writing it never changes the catalog epoch.
 
 These tables are empty in the initial import, so bootstrap parity compares them like the
 submission tables (`scripts/d1-table-inventory.ts`).
