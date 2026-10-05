@@ -11,6 +11,7 @@ import type {
   CatalogQueryEvent,
   CatalogQueryShape
 } from '@serpdirectory/data-ops/contracts'
+import { createDraftJobOperations } from '@serpdirectory/data-ops/draft-jobs'
 import { createEmailDeliveryLedger } from '@serpdirectory/data-ops/email-deliveries'
 import { assertD1StatementLimits } from '@serpdirectory/data-ops/sql-limits'
 import { createSubmissionOperations } from '@serpdirectory/data-ops/submissions'
@@ -287,33 +288,66 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
       createSubmissionOperations({ client, clock: () => NOW })
     )
     await submissions.consumeRateLimit(`fingerprint-${'f'.repeat(500)}`)
-    const created = await submissions.createSubmission({
-      category: 'other',
+    // Native intake (#63) with the longest values the form and the API accept.
+    const owner = 'wq_user'
+    const website = `https://workerd-queries.example/${'p'.repeat(1_900)}`
+    const content = {
+      categorySlug: 'other',
       content: 'c'.repeat(5_000),
-      description: 'd'.repeat(300),
-      faqs: Array.from({ length: 5 }, (_, index) => ({
-        answer: 'a'.repeat(1_200),
-        question: `${'q'.repeat(150)}${index}?`
-      })),
-      logoUrl: 'https://workerd-queries.example/logo.png',
-      name: 'n'.repeat(120),
-      resourceLinks: Array.from({ length: 5 }, (_, index) => ({
-        label: 'l'.repeat(80),
-        url: `https://workerd-queries.example/${index}`
-      })),
-      website: 'https://workerd-queries.example/'
+      description: 'd'.repeat(160),
+      logoUrl: `https://workerd-queries.example/${'l'.repeat(1_900)}.png`,
+      name: 'n'.repeat(120)
+    }
+    expect(await submissions.checkUrl(website, owner)).toMatchObject({ kind: 'available' })
+    expect(await submissions.checkUrl('https://www.jasper.ai/pricing', owner)).toMatchObject({
+      kind: 'listed',
+      listing: { public: true, slug: 'jasper.ai' }
     })
-    expect(await submissions.getSubmission(created.id, created.token)).toMatchObject({
+    const draft = await submissions.createDraft({
+      ownerUserId: owner,
+      submission: { ...content, website }
+    })
+    expect(draft).toMatchObject({ plan: null, status: 'draft' })
+    await submissions.updateDraft({
+      content: { ...content, name: 'm'.repeat(120) },
+      expectedContentVersion: draft.contentVersion,
+      ownerUserId: owner,
+      submissionId: draft.id
+    })
+    expect(await submissions.getOwnSubmission(draft.id, owner)).toMatchObject({
+      contentVersion: 2
+    })
+    expect(await submissions.chooseFreePlan(draft.id, owner)).toMatchObject({
       status: 'pending_badge'
     })
-    await submissions.beginVerification(created.id, created.token)
+    await submissions.beginVerification(draft.id, owner)
     expect(
-      await submissions.finishVerification(created.id, created.token, {
-        code: 'badge_missing',
-        ok: false
-      })
+      await submissions.finishVerification(draft.id, owner, { code: 'badge_missing', ok: false })
     ).toMatchObject({ verificationAttempts: 1 })
-    expect(await submissions.getReviewPreview({ id: created.id, token: created.token })).toBeNull()
+    expect(await submissions.getReviewPreview({ id: draft.id, token: 't'.repeat(43) })).toBeNull()
+
+    // The daily draft job (#63): a reminder at +13 hours, expiry after 30 days.
+    const waiting = await submissions.createDraft({
+      ownerUserId: owner,
+      submission: { ...content, website: 'https://workerd-queries-2.example/' }
+    })
+    expect(await submissions.listOwnSubmissions(owner, 10_000)).toHaveLength(2)
+    const jobs = tracked('draftJobs', createDraftJobOperations({ client }))
+    const later = (hours: number) => new Date(NOW.getTime() + hours * 3_600_000).toISOString()
+    const due = await jobs.remindersDue({ limit: 100, now: later(13) })
+    expect(due.map(item => [item.id, item.reminder])).toEqual([[waiting.id, 1]])
+    expect(
+      await jobs.claimReminder({
+        now: later(13),
+        reminder: 1,
+        submissionId: waiting.id,
+        variant: 'choose_plan'
+      })
+    ).toBe(true)
+    expect(
+      (await jobs.expiredDrafts({ limit: 100, now: later(31 * 24) })).map(item => item.id)
+    ).toEqual([waiting.id])
+    expect(await jobs.expireDraft({ now: later(31 * 24), submissionId: waiting.id })).toBe(true)
   }, 120_000)
 
   it('kept every catalog query successful and within its budget, and ran every operation', () => {
