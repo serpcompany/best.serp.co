@@ -22,7 +22,8 @@ future user data are seeded from fixtures only, never copied from staging or pro
 `d1/drizzle/0000_baseline.sql` is hand-finished after generation: every table is
 `STRICT`, `PRAGMA foreign_keys = ON` leads the file, and four triggers enforce that a
 published listing always has exactly one primary category. Keep those properties when
-adding migrations; Drizzle cannot express them.
+adding migrations (later migrations end each `CREATE TABLE` with `STRICT` by hand too);
+Drizzle cannot express them.
 
 - `categories` stores taxonomy rows and display order (unique `slug`).
 - `listings` stores public product fields, status, publication time, and stable IDs
@@ -34,6 +35,9 @@ adding migrations; Drizzle cannot express them.
 - `listing_slug_redirects` maps retired slugs to their listing.
 - `listing_submissions` and its resource, FAQ, event, rate-limit, and notification
   tables hold private intake. Only a digest of each access capability is stored.
+- `email_deliveries` is the transactional email ledger: one row per event key (status,
+  attempts, provider message id, error code), never a recipient or content
+  (see [Email](./EMAIL.md)).
 
 ## Public eligibility
 

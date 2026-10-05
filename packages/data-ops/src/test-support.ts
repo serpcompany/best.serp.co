@@ -1,12 +1,9 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import type { CatalogDataCache } from './contracts'
 
-const BASELINE_MIGRATION_PATH = resolve(
-  import.meta.dirname,
-  '../../../d1/drizzle/0000_baseline.sql'
-)
+const MIGRATIONS_DIRECTORY = resolve(import.meta.dirname, '../../../d1/drizzle')
 
 export class MemoryCatalogCache implements CatalogDataCache {
   readonly ttlSeconds = new Map<string, number>()
@@ -23,16 +20,21 @@ export class MemoryCatalogCache implements CatalogDataCache {
 }
 
 /**
- * Apply the checked-in D1 baseline migration statement by statement, exactly as
+ * Apply every checked-in D1 migration in order, statement by statement, exactly as
  * Drizzle/Wrangler do, so tests exercise the real STRICT tables, indexes, and
  * primary-category triggers instead of a hand-maintained copy.
  */
-export function applyBaselineMigration(database: DatabaseSync): void {
-  const statements = readFileSync(BASELINE_MIGRATION_PATH, 'utf8')
-    .split('--> statement-breakpoint')
-    .map(statement => statement.trim())
-    .filter(Boolean)
-  for (const statement of statements) database.exec(statement)
+export function applyMigrations(database: DatabaseSync): void {
+  const migrations = readdirSync(MIGRATIONS_DIRECTORY)
+    .filter(name => name.endsWith('.sql'))
+    .sort()
+  for (const migration of migrations) {
+    const statements = readFileSync(resolve(MIGRATIONS_DIRECTORY, migration), 'utf8')
+      .split('--> statement-breakpoint')
+      .map(statement => statement.trim())
+      .filter(Boolean)
+    for (const statement of statements) database.exec(statement)
+  }
 }
 
 export interface RecordedStatement {
@@ -46,7 +48,7 @@ export class SqliteD1 {
 
   constructor(path = ':memory:') {
     this.database = new DatabaseSync(path)
-    applyBaselineMigration(this.database)
+    applyMigrations(this.database)
   }
 
   asD1Database(): D1Database {

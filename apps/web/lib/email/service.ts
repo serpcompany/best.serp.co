@@ -1,0 +1,290 @@
+/**
+ * The email service: callers enqueue a template with an event key and a recipient, and the
+ * service delivers it after the response through `waitUntil`.
+ *
+ * Delivery order (each step logs and stops on failure; nothing is ever thrown to the caller):
+ *
+ * 1. Validate the event key, the template id, and the recipient.
+ * 2. Apply the environment policy (`./config.ts`): staging skips recipients that are not on
+ *    its allowlist.
+ * 3. Render the template, with links for this environment and the `[staging]` prefix.
+ * 4. Claim the event key in the D1 ledger (`email_deliveries`). A key that is in flight or
+ *    already sent is a duplicate and is not sent again; a failed one may be retried by
+ *    enqueueing the same key again. If the ledger cannot be reached, nothing is sent.
+ * 5. Send once through the configured provider (no automatic retry), then record the outcome.
+ *
+ * Logs carry the event key, template id, environment, provider, and the recipient's domain,
+ * never the full address or the body (the local log sender is the one exception).
+ */
+import {
+  EMAIL_EVENT_KEY_PATTERN,
+  type EmailDeliveryClaim,
+  type EmailDeliveryLedger,
+  isEmailEventKey
+} from '@serpdirectory/data-ops/email-deliveries'
+import {
+  EMAIL_FROM,
+  EMAIL_SUPPORT_ADDRESS,
+  type EmailPolicy,
+  normalizeEmailAddress,
+  prefixedSubject,
+  recipientAllowed,
+  recipientDomain
+} from './config'
+import {
+  type EmailSender,
+  emailErrorCode,
+  type OutgoingEmail,
+  redactedErrorMessage
+} from './senders'
+import {
+  createEmailLinks,
+  type EmailTemplate,
+  type EmailTemplateRegistry,
+  type RenderedEmail,
+  renderEmail,
+  type TemplateInput
+} from './templates'
+
+export interface EmailLogEntry {
+  [field: string]: unknown
+  event: string
+  level: 'error' | 'info' | 'warn'
+}
+
+export type EmailLogger = (entry: EmailLogEntry) => void
+
+export const consoleEmailLogger: EmailLogger = ({ level, ...entry }) => {
+  const line = JSON.stringify(entry)
+  if (level === 'error') console.error(line)
+  else if (level === 'warn') console.warn(line)
+  else console.info(line)
+}
+
+export interface EmailRequest<Input> {
+  /**
+   * Names the event this email reports, built with `emailEventKey`, for example
+   * `emailEventKey('submission-received', submissionId)`. The same key never sends twice.
+   */
+  eventKey: string
+  input: Input
+  /** One recipient address. */
+  to: string
+}
+
+export interface EmailService<R extends EmailTemplateRegistry> {
+  /**
+   * Schedules an email for delivery after the response (`waitUntil`). Returns immediately,
+   * never throws, and never fails the caller's request; every outcome is logged.
+   */
+  enqueue<K extends keyof R & string>(
+    templateId: K,
+    request: EmailRequest<TemplateInput<R[K]>>
+  ): void
+}
+
+export interface EmailServiceOptions<R extends EmailTemplateRegistry> {
+  ledger: EmailDeliveryLedger
+  log?: EmailLogger
+  policy: EmailPolicy
+  sender: EmailSender
+  templates: R
+  /** The request's (or cron event's) `ExecutionContext.waitUntil`. */
+  waitUntil(promise: Promise<unknown>): void
+}
+
+const EVENT_KEY_PART = /^[a-z0-9][a-z0-9._-]*$/u
+
+/**
+ * An event key from an event name and the ids that identify one occurrence:
+ * `emailEventKey('submission-received', id)` is `submission-received:<id>`. Parts are
+ * lower-case letters, digits, `.`, `_`, and `-`, so an address can never become a key; hash
+ * anything else (for example a sign-in code) before passing it.
+ */
+export function emailEventKey(event: string, ...ids: string[]): string {
+  const parts = [event, ...ids]
+  if (ids.length === 0 || parts.some(part => !EVENT_KEY_PART.test(part))) {
+    throw new Error('Email event keys take an event name and ids of [a-z0-9._-].')
+  }
+  const key = parts.join(':')
+  if (!EMAIL_EVENT_KEY_PATTERN.test(key)) throw new Error('Email event key is too long.')
+  return key
+}
+
+export function createEmailService<R extends EmailTemplateRegistry>(
+  options: EmailServiceOptions<R>
+): EmailService<R> {
+  const { ledger, policy, sender, templates } = options
+  const log = options.log ?? consoleEmailLogger
+  const links = createEmailLinks(policy.linkOrigin)
+
+  async function deliver(
+    templateId: string,
+    request: Partial<EmailRequest<unknown>>,
+    context: Record<string, unknown>
+  ): Promise<void> {
+    const eventKey = request.eventKey
+    if (!isEmailEventKey(eventKey)) {
+      log({ ...context, event: 'email_rejected', level: 'error', reason: 'invalid_event_key' })
+      return
+    }
+    // Templates declare `render` as a method, so any registered template accepts `unknown`
+    // here; the caller's input type was already checked by `enqueue`'s signature.
+    const template: EmailTemplate<unknown> | undefined = Object.hasOwn(templates, templateId)
+      ? templates[templateId]
+      : undefined
+    if (!template) {
+      log({ ...context, event: 'email_rejected', level: 'error', reason: 'unknown_template' })
+      return
+    }
+    const to = normalizeEmailAddress(request.to)
+    if (!to) {
+      log({ ...context, event: 'email_rejected', level: 'error', reason: 'invalid_recipient' })
+      return
+    }
+    const recipient = { ...context, recipientDomain: recipientDomain(to) }
+    if (!recipientAllowed(policy, to)) {
+      log({ ...recipient, event: 'email_skipped', level: 'warn', reason: 'recipient_not_allowed' })
+      return
+    }
+
+    let rendered: RenderedEmail
+    try {
+      rendered = renderEmail(template, request.input, {
+        environment: policy.environment,
+        links,
+        supportAddress: EMAIL_SUPPORT_ADDRESS
+      })
+    } catch (error) {
+      log({
+        ...recipient,
+        error: redactedErrorMessage(error),
+        event: 'email_render_failed',
+        level: 'error'
+      })
+      return
+    }
+
+    let claim: EmailDeliveryClaim
+    try {
+      claim = await ledger.claim({ eventKey, provider: sender.provider, templateId })
+    } catch (error) {
+      log({
+        ...recipient,
+        error: redactedErrorMessage(error),
+        event: 'email_ledger_failed',
+        level: 'error',
+        stage: 'claim'
+      })
+      return
+    }
+    if (claim.outcome === 'duplicate') {
+      log({
+        ...recipient,
+        attempts: claim.attempts,
+        event: 'email_duplicate_suppressed',
+        level: 'info',
+        status: claim.status
+      })
+      return
+    }
+
+    const message: OutgoingEmail = {
+      from: { ...EMAIL_FROM },
+      headers: { 'Auto-Submitted': 'auto-generated' },
+      html: rendered.html,
+      subject: prefixedSubject(policy, rendered.subject),
+      text: rendered.text,
+      to
+    }
+    const attempt = { ...recipient, attempt: claim.attempt }
+    let outcome: { errorCode: string | null; messageId: string | null; status: 'failed' | 'sent' }
+    try {
+      const receipt = await sender.send(message)
+      outcome = { errorCode: null, messageId: receipt.messageId, status: 'sent' }
+      log({ ...attempt, event: 'email_sent', level: 'info', messageId: receipt.messageId })
+    } catch (error) {
+      outcome = { errorCode: emailErrorCode(error), messageId: null, status: 'failed' }
+      log({
+        ...attempt,
+        error: redactedErrorMessage(error),
+        errorCode: outcome.errorCode,
+        event: 'email_send_failed',
+        level: 'error'
+      })
+    }
+
+    try {
+      const recorded = await ledger.complete({
+        attempt: claim.attempt,
+        errorCode: outcome.errorCode,
+        eventKey,
+        providerMessageId: outcome.messageId,
+        status: outcome.status
+      })
+      if (!recorded) {
+        log({ ...attempt, event: 'email_ledger_failed', level: 'warn', stage: 'complete_stale' })
+      }
+    } catch (error) {
+      // A sent email whose outcome cannot be recorded stays `sending`, so it is never resent.
+      log({
+        ...attempt,
+        error: redactedErrorMessage(error),
+        event: 'email_ledger_failed',
+        level: 'error',
+        stage: 'complete'
+      })
+    }
+  }
+
+  return {
+    enqueue(templateId, request) {
+      const context = {
+        environment: policy.environment,
+        eventKey: typeof request?.eventKey === 'string' ? request.eventKey.slice(0, 200) : null,
+        provider: sender.provider,
+        templateId: String(templateId).slice(0, 64)
+      }
+      // `deliver` is async, so even a malformed request becomes a rejection logged here.
+      const delivery = deliver(templateId, request ?? {}, context).catch(error => {
+        log({
+          ...context,
+          error: redactedErrorMessage(error),
+          event: 'email_delivery_failed',
+          level: 'error'
+        })
+      })
+      try {
+        options.waitUntil(delivery)
+      } catch (error) {
+        log({
+          ...context,
+          error: redactedErrorMessage(error),
+          event: 'email_wait_until_failed',
+          level: 'error'
+        })
+      }
+    }
+  }
+}
+
+/**
+ * A service that sends nothing and logs every enqueue: what the Worker gets when its email
+ * configuration is invalid (fail closed).
+ */
+export function createDisabledEmailService<R extends EmailTemplateRegistry>(
+  reason: string,
+  log: EmailLogger = consoleEmailLogger
+): EmailService<R> {
+  return {
+    enqueue(templateId, request) {
+      log({
+        event: 'email_disabled',
+        eventKey: typeof request?.eventKey === 'string' ? request.eventKey.slice(0, 200) : null,
+        level: 'error',
+        reason: reason.slice(0, 300),
+        templateId: String(templateId).slice(0, 64)
+      })
+    }
+  }
+}

@@ -26,6 +26,12 @@ export const site: SiteDefinition = {
     networkLabel: 'Network',
     submitLabel: 'Submit'
   },
+  // mail.serp.co is a dedicated sending subdomain, so this mail's reputation stays separate
+  // from serp.co (serpcompany/best.serp.co#59).
+  email: {
+    from: { address: 'noreply@mail.serp.co', name: 'SERP Directory' },
+    supportAddress: 'support@serp.co'
+  },
   features: {
     showAuth: false,
     showBrands: true,

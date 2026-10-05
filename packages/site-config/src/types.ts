@@ -97,6 +97,13 @@ export type SiteDefinition = {
     opengraphImage?: AssetSource
   }
   copy: SiteCopyConfig
+  /** Transactional email identity (`apps/web/lib/email/`). */
+  email: {
+    /** The sender, on the domain onboarded to Cloudflare Email Sending. */
+    from: { address: string; name: string }
+    /** The contact address emails name in their footer. */
+    supportAddress: string
+  }
   features: SiteFeatureFlags
   id: string
   networkBrandGroup: string | null

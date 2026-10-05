@@ -59,6 +59,13 @@ migration, only after Deploy Staging verified that source tree. Check either rem
 read-only with `pnpm db:migrations:list:staging` or `pnpm db:migrations:list:production`
 after `wrangler login`; see [Release guards](./RELEASE_GUARDS.md).
 
+## Email
+
+Locally, email is never sent: each message is written to the Worker output as an
+`email_logged` line (recipient, subject, text body). Apply migrations first so the
+`email_deliveries` ledger exists. Environment behavior, the template contract, and the owner
+prerequisites for staging and production are in [Email](./EMAIL.md).
+
 ## Parity against the live site
 
 ```bash

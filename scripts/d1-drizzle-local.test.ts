@@ -120,17 +120,22 @@ function validLocalConfig(): LocalConfigFixture {
 }
 
 describe('fresh Drizzle D1 history', () => {
-  it('uses a credential-free generator and one baseline Wrangler history', () => {
+  it('uses a credential-free generator and one forward-only Wrangler history', () => {
     const config = readFileSync(resolve('drizzle.config.ts'), 'utf8')
     expect(config).toContain("out: './d1/drizzle'")
     expect(config).toContain("schema: './packages/data-ops/src/schema.ts'")
     expect(config).not.toMatch(/accountId|databaseId|token|process\.env/u)
-    expect(freshMigrationNames()).toEqual(['0000_baseline.sql'])
+    expect(freshMigrationNames()).toEqual(['0000_baseline.sql', '0001_email_deliveries.sql'])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
 
+    // Every table any migration creates is hand-finished as STRICT.
+    const history = freshMigrationNames()
+      .map(name => readFileSync(resolve(freshMigrationsDirectory, name), 'utf8'))
+      .join('\n')
+    expect(history.match(/^CREATE TABLE/gmu)).toHaveLength(applicationTableNames.length)
+    expect(history.match(/^\) STRICT;/gmu)).toHaveLength(applicationTableNames.length)
+
     const migration = readFileSync(resolve(freshMigrationsDirectory, '0000_baseline.sql'), 'utf8')
-    expect(migration.match(/^CREATE TABLE/gmu)).toHaveLength(applicationTableNames.length)
-    expect(migration.match(/^\) STRICT;/gmu)).toHaveLength(applicationTableNames.length)
     for (const trigger of d1TriggerNames) expect(migration).toContain(`CREATE TRIGGER ${trigger}`)
     for (const index of requiredIndexNames) expect(migration).toContain(`\`${index}\``)
     expect(migration).toContain('COLLATE NOCASE')
