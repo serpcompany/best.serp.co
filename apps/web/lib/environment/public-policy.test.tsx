@@ -5,7 +5,7 @@
  * stubbed: the Cloudflare env and the request headers the layout reads.
  */
 import { readFileSync } from 'node:fs'
-import { RootAppShell, rootLayoutMetadata } from '@serpdirectory/web-core/root-shell'
+import { RootAppShell } from '@serpdirectory/web-core/root-shell'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -96,8 +96,8 @@ describe('public crawl and analytics policy through the Worker and the root layo
     const layout = readFileSync(new URL('../../app/layout.tsx', import.meta.url), 'utf8')
     expect(layout).toContain('googleTagManagerIdForRequest()')
     expect(layout).toContain('gtmId={gtmId}')
-    // The layout's metadata never noindexes a page; only the Worker header does, by host.
-    expect(rootLayoutMetadata.robots).toBeUndefined()
+    // The layout's and pages' robots metadata and next.config.ts headers() are checked from
+    // the real modules in noindex-sources.test.ts.
   })
 
   it('serves best.serp.co on the production Worker indexable, with Google Tag Manager', async () => {
@@ -108,7 +108,6 @@ describe('public crawl and analytics policy through the Worker and the root layo
       expect(page.headers.get('x-robots-tag')).toBeNull()
       expect(page.headers.get(SITE_ENVIRONMENT_HEADER)).toBe('production')
       expect(page.html).toContain(GTM_CONTAINER)
-      expect(page.html).not.toMatch(/<meta[^>]+name="robots"/u)
     }
   })
 
