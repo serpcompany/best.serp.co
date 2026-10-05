@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import type { CatalogPublication, StatementPlan } from './plan-support'
-import { applyMigrations, insertPublishedListing } from './test-support'
+import { applyMigrations, assertNoSelfComparison, insertPublishedListing } from './test-support'
 
 /** Fixture database for statement-plan tests: two categories, two users, version 1. */
 export function planDatabase(): DatabaseSync {
@@ -67,6 +67,7 @@ export function execute(db: DatabaseSync, plans: StatementPlan[]): void {
   db.exec('BEGIN')
   try {
     for (const plan of plans) {
+      assertNoSelfComparison(plan.sql)
       const statement = db.prepare(plan.sql)
       const params = plan.params as SQLInputValue[]
       if (statement.columns().length > 0) statement.all(...params)
@@ -80,6 +81,7 @@ export function execute(db: DatabaseSync, plans: StatementPlan[]): void {
 }
 
 export function query(db: DatabaseSync, plan: StatementPlan): unknown[] {
+  assertNoSelfComparison(plan.sql)
   return db.prepare(plan.sql).all(...(plan.params as SQLInputValue[]))
 }
 

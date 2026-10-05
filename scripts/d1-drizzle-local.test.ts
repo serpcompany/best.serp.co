@@ -15,7 +15,7 @@ import {
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { canonicalPreviewCommand, localPreviewVarArgs } from './d1-local-preview'
 import { resolveFreshD1StateRoot } from './d1-local-state'
-import { applicationColumnInventory, importOrder } from './d1-table-inventory'
+import { applicationColumnInventory, importOrder, parityTableNames } from './d1-table-inventory'
 import { project } from './project'
 
 const temporaryDirectories: string[] = []
@@ -379,11 +379,14 @@ describe('fresh Drizzle D1 history', () => {
         stateDirectory,
         "INSERT INTO users (id, name, email, email_verified) VALUES ('u1', '', 'a@example.com', 1); INSERT INTO auth_rate_limit_hits (bucket, hit_at) VALUES ('b', 1)"
       )
-      expect(runLocal('verify', stateDirectory)).toContain('exact 24-table snapshot')
+      // The count comes from the table inventory, so a migration that adds a table cannot
+      // leave a stale number here (#77).
+      const parityTables = `${parityTableNames.length}-table`
+      expect(runLocal('verify', stateDirectory)).toContain(`exact ${parityTables} snapshot`)
       mutateCanonicalState(stateDirectory)
       // The tampered table, and nothing else, must fail parity (not a crash or a missing report).
       expect(failingLocalStderr('verify', stateDirectory)).toContain(
-        'Local D1 exact 24-table bootstrap parity failed: listing_resource_links.'
+        `Local D1 exact ${parityTables} bootstrap parity failed: listing_resource_links.`
       )
     },
     240_000
