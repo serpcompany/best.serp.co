@@ -74,6 +74,9 @@ importers:
       '@serpdirectory/site-config':
         specifier: workspace:*
         version: link:packages/site-config
+      '@serpdirectory/utils':
+        specifier: workspace:*
+        version: link:packages/utils
       '@serpdirectory/web-core':
         specifier: workspace:*
         version: link:packages/web-core
