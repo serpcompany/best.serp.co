@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
+import { githubHostedRunner, routedRunsOn } from './ci-runners'
 import { project } from './project'
 import { hotfixBranch } from './staging-verification'
 
@@ -137,7 +138,7 @@ describe('pr-review workflow', () => {
     const stepRuns = validateJob.steps?.map(step => step.run).filter(Boolean)
     const checkoutStep = validateJob.steps?.find(step => step.uses === 'actions/checkout@v7')
 
-    expect(validateJob['runs-on']).toBe('ubuntu-latest')
+    expect(validateJob['runs-on']).toBe(routedRunsOn)
     expect(checkoutStep?.with?.['fetch-depth']).toBe(0)
     expect(stepRuns).toContain('pnpm worker:config:validate')
     expect(stepRuns).toContain('pnpm test:repo')
@@ -159,26 +160,27 @@ describe('pr-review workflow', () => {
     expect(stepRuns).not.toContain('pnpm test')
   })
 
-  it('runs PR typecheck and unit tests as separate GitHub-hosted jobs', () => {
+  it('runs PR typecheck and unit tests as separate jobs', () => {
     const workflow = loadWorkflow()
     const typecheckJob = workflow.jobs.typecheck
     const testJob = workflow.jobs.test
 
-    expect(typecheckJob['runs-on']).toBe('ubuntu-latest')
-    expect(testJob['runs-on']).toBe('ubuntu-latest')
     expect(typecheckJob.steps?.map(step => step.run)).toContain('pnpm typecheck')
     expect(testJob.steps?.map(step => step.run)).toContain('pnpm test')
     expect(typecheckJob.needs).toBeUndefined()
     expect(testJob.needs).toBeUndefined()
   })
 
-  it('uses GitHub-hosted runners for PR review jobs so checks can run concurrently', () => {
+  it('routes every check but E2E through CI_RUNNER_LABELS, behind the fork guard', () => {
     const workflow = loadWorkflow()
+    const source = readFileSync(resolve(process.cwd(), '.github/workflows/pr-review.yml'), 'utf8')
 
-    expect(workflow.jobs.validate['runs-on']).toBe('ubuntu-latest')
-    expect(workflow.jobs.typecheck['runs-on']).toBe('ubuntu-latest')
-    expect(workflow.jobs.test['runs-on']).toBe('ubuntu-latest')
-    expect(workflow.jobs.e2e['runs-on']).toBe('ubuntu-latest')
+    for (const job of ['validate', 'typecheck', 'test', 'worker-build']) {
+      expect(workflow.jobs[job]?.['runs-on'], job).toBe(routedRunsOn)
+    }
+    // E2E installs Playwright browsers: GitHub-hosted, whatever the variable says.
+    expect(workflow.jobs.e2e['runs-on']).toBe(githubHostedRunner)
+    expect(source).not.toMatch(/self-hosted/u)
   })
 
   it('installs Playwright browsers without sudo-only system dependency escalation', () => {

@@ -9,7 +9,8 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
-    runs-on: self-hosted
+    # CI_RUNNER_LABELS picks the runner; fork pull requests stay on ubuntu-latest (docs/HARNESS.md).
+    runs-on: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER_LABELS || '"ubuntu-latest"') }}
 
     steps:
       - name: Ensure managed labels exist
@@ -60,6 +61,16 @@ jobs:
                 })
               }
             }
+
+      # The labeler prefers a local .github/labeler.yml, and a persistent runner's workspace keeps
+      # the previous job's checkout. Check out only the rules, from the base commit that
+      # pull_request_target runs (never the pull request's head), and run none of it.
+      - name: Check out the base labeler rules
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/labeler.yml
+          sparse-checkout-cone-mode: false
 
       - uses: actions/labeler@v7
         with:
