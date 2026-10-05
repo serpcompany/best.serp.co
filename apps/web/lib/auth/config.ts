@@ -29,6 +29,7 @@ import { APIError, createAuthEndpoint, createAuthMiddleware } from 'better-auth/
 import { betterAuth } from 'better-auth/minimal'
 import { emailOTP } from 'better-auth/plugins/email-otp'
 import type { BetterAuthPlugin } from 'better-auth/types'
+import { signInCodeDigits } from '../email/sign-in-code'
 import {
   type BoundCode,
   clearCodeBindingSetCookie,
@@ -367,6 +368,12 @@ export function createAuth({ client, operations, sender, settings }: CreateAuthO
           const cookieHeader = headers?.get('cookie')
           if (!(await holdsCodeBinding(ctx.context.adapter, email.toLowerCase(), cookieHeader))) {
             throw invalidCode()
+          }
+          // A code copied as "482 913" or "482-913" is the code: keep only its digits, as the
+          // /login field does, before Better Auth checks it.
+          const otp = (ctx.body as { otp?: unknown }).otp
+          if (typeof otp === 'string' && otp !== signInCodeDigits(otp)) {
+            return { context: { body: { ...ctx.body, otp: signInCodeDigits(otp) } } }
           }
         }
       })

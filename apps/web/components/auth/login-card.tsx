@@ -35,9 +35,11 @@ import {
   CODE_LENGTH,
   CODE_LIFETIME_MINUTES,
   CODE_LIFETIME_SECONDS,
+  codeDigits,
   formatCountdown,
   formatWait,
   RESEND_COOLDOWN_SECONDS,
+  readCodeText,
   requestCode,
   signOut,
   verifyCode
@@ -116,6 +118,12 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
   const codeInput = useRef<HTMLInputElement>(null)
   /** Set synchronously, so a paste and a keystroke in the same tick cannot both submit. */
   const verifying = useRef(false)
+  /**
+   * Set while `onInput` has already read the field's whole value, so input-otp's change for the
+   * same event (which keeps the first six digits of anything) is dropped. React runs `onInput`
+   * before `onChange` for one input event; a microtask clears it after both.
+   */
+  const inputRead = useRef(false)
   const now = useNow(step.kind !== 'done')
 
   const destination = callbackDestination(callbackPath)
@@ -192,6 +200,50 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
       wrongGuesses: step.wrongGuesses
     })
   }
+
+  /** Every change to the code field ends here, already reduced to at most six digits. */
+  function onCodeChange(value: string) {
+    setOtp(value)
+    if (value !== rejectedCode && codeError?.kind === 'wrong') setCodeError(null)
+    // A full code that differs from the rejected one is sent at once, whether it was typed,
+    // pasted, or autofilled (onComplete misses a replaced value).
+    if (value.length === CODE_LENGTH && value !== rejectedCode) void onVerify(value)
+  }
+
+  /**
+   * Pasted or inserted text, read by `readCodeText`: one standalone code ("Code: 719208",
+   * "482 913") replaces whatever the slots hold and is sent at once; a fragment (" 482 ") goes in
+   * at the caret; anything ambiguous (two codes, seven digits) changes nothing and sends nothing.
+   */
+  function onCodeText(text: string, input: HTMLInputElement) {
+    const read = readCodeText(text)
+    if (read.kind === 'code') {
+      onCodeChange(read.code)
+      return
+    }
+    if (read.kind === 'ignore' || !read.digits) return
+    const start = input.selectionStart ?? otp.length
+    const end = input.selectionEnd ?? start
+    onCodeChange((otp.slice(0, start) + read.digits + otp.slice(end)).slice(0, CODE_LENGTH))
+  }
+
+  // Text typed or inserted in one go (a keyboard's clipboard suggestion, drag and drop) is read
+  // like a paste. input-otp would drop it for its separators, or keep its first six digits.
+  // A single typed character stays with input-otp. Native `beforeinput`: React's
+  // `onBeforeInput` is not that event and cannot be cancelled.
+  useEffect(() => {
+    const input = codeInput.current
+    if (!input) return undefined
+    function onBeforeInput(event: InputEvent) {
+      if (!input || !event.cancelable || event.inputType === 'insertFromPaste') return
+      const text = event.data ?? event.dataTransfer?.getData('text/plain') ?? ''
+      if (!text || (text.length === 1 && codeDigits(text) === text)) return
+      event.preventDefault()
+      onCodeText(text, input)
+    }
+    input.addEventListener('beforeinput', onBeforeInput)
+    return () => input.removeEventListener('beforeinput', onBeforeInput)
+  })
 
   async function onVerify(code: string) {
     if (step.kind !== 'code' || verifying.current || code.length !== CODE_LENGTH) return
@@ -344,13 +396,36 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                   aria-invalid={message ? true : undefined}
                   aria-describedby={message ? 'code-error' : 'code-description'}
                   pattern={DIGITS_ONLY}
+                  // Never reached while onPasteCapture reads every paste; if it were, it keeps
+                  // only a fragment's digits, never the first six digits of a sentence.
+                  pasteTransformer={text => {
+                    const read = readCodeText(text)
+                    return read.kind === 'digits' ? read.digits : ''
+                  }}
                   value={otp}
                   onChange={value => {
-                    setOtp(value)
-                    if (value !== rejectedCode && codeError?.kind === 'wrong') setCodeError(null)
-                    // A full code that differs from the rejected one is sent at once, whether
-                    // it was typed, pasted, or autofilled (onComplete misses a replaced value).
-                    if (value.length === CODE_LENGTH && value !== rejectedCode) void onVerify(value)
+                    if (!inputRead.current) onCodeChange(value)
+                  }}
+                  onPasteCapture={event => {
+                    // Every paste is read here, before input-otp's own paste handling.
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onCodeText(event.clipboardData.getData('text/plain'), event.currentTarget)
+                  }}
+                  onInput={event => {
+                    // Autofill and password managers set the whole value at once, past the
+                    // digits-only pattern and the six-character limit: read it like pasted
+                    // text, so seven digits or a spaced code are never cut to their first six.
+                    // Anything ambiguous is dropped, and React restores the previous value.
+                    const value = event.currentTarget.value
+                    if (codeDigits(value) === value && value.length <= CODE_LENGTH) return
+                    inputRead.current = true
+                    queueMicrotask(() => {
+                      inputRead.current = false
+                    })
+                    const read = readCodeText(value)
+                    if (read.kind === 'code') onCodeChange(read.code)
+                    else if (read.kind === 'digits') onCodeChange(read.digits)
                   }}
                 >
                   <InputOTPGroup>

@@ -57,7 +57,10 @@ export interface EmailLayout {
   /** Sentences after the button or code. */
   after?: readonly Block[]
   body: readonly Block[]
-  /** A one-time code, shown large; `481902` renders as `481 902`. */
+  /**
+   * A one-time code, shown large. It is rendered as one unbroken run of digits, spaced only by
+   * CSS `letter-spacing`, so copying it from any mail client yields exactly the code.
+   */
   code?: string
   cta?: { label: string; url: string }
   heading: string
@@ -126,11 +129,6 @@ function blockText(block: Block): string {
     case 'rows':
       return plain(block.rows.map(([label, value]) => `${label}: ${value}`).join('\n'))
   }
-}
-
-/** `481902` → `481 902` (pairs of three), as the code block shows it. */
-export function spacedCode(code: string): string {
-  return code.replace(/(\d{3})(?=\d)/gu, '$1 ')
 }
 
 /** The host of a URL, for subjects and labels (`https://ledgerly.app/` → `ledgerly.app`). */
@@ -212,8 +210,13 @@ export function sitePath(...segments: string[]): string {
   return `/${segments.map(segment => encodeURIComponent(required(segment, 'a link segment'))).join('/')}/`
 }
 
+/**
+ * The code block. The code is one text node with no space, separator, per-digit element, or
+ * zero-width character: the mockup's spacing comes from `letter-spacing` alone, so selecting
+ * and copying it (Gmail, Apple Mail, Outlook) gives the bare digits the code field accepts.
+ */
 function codeHtml(code: string): SafeHtml {
-  return html`<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="${css({ 'border-collapse': 'separate', 'margin-top': '24px' })}"><tr><td bgcolor="${T.panel}" style="${css({ 'background-color': T.panel, border: `1px solid ${T.line}`, 'border-radius': '6px', 'font-family': T.mono, 'font-size': '30px', 'font-weight': '600', 'letter-spacing': '0.3em', 'line-height': '36px', padding: '16px 24px' })}">${spacedCode(code)}</td></tr></table>`
+  return html`<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="${css({ 'border-collapse': 'separate', 'margin-top': '24px' })}"><tr><td bgcolor="${T.panel}" style="${css({ 'background-color': T.panel, border: `1px solid ${T.line}`, 'border-radius': '6px', 'font-family': T.mono, 'font-size': '30px', 'font-weight': '600', 'letter-spacing': '0.3em', 'line-height': '36px', padding: '16px 24px' })}">${code}</td></tr></table>`
 }
 
 function ctaHtml(cta: { label: string; url: string }): SafeHtml {

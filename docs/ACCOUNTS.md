@@ -120,6 +120,20 @@ request, before any limit is counted (`emailDeliveryConfigured`: matching enviro
 `DB` binding, a valid `USESEND_BASE_URL` and `USESEND_API_KEY`). So a rotated or missing key
 stops sign-in visibly instead of issuing codes that never arrive.
 
+**Copied codes.** The email shows the code as one unbroken run of digits, so copying it yields
+`482913`. The `/login` field reads pasted, inserted, and autofilled text with `readCodeText`
+(`components/auth/sign-in-api.ts`):
+- **One standalone code:** six digits, optionally split 3+3 by one space, NBSP or dash ("Code:
+  719208", `482 913`). No digit may touch it, directly or across one such separator, so part of
+  a phone number ("Call 555 123 4567") doesn't count. It replaces the slots and is sent at once.
+- **A fragment of digits and separators** (` 482 `): its digits go in at the caret.
+- **Anything ambiguous** (two different codes, seven digits, digits in another shape): nothing
+  changes and nothing is sent, so stray digits can never spend one of the three attempts. This
+  includes an autofilled value of more than six plain digits.
+
+The sign-in hook in `config.ts` keeps only the digits of `otp` (`signInCodeDigits`) before Better
+Auth checks it. A formatted wrong code still counts as a guess.
+
 Every code adds an `email_deliveries` row, so each send also deletes up to 20 `sign-in-code`
 rows older than 24 hours (the provider's idempotency window), oldest first, with one prepared
 statement (`pruneEmailDeliveries`), until #66 adds a scheduled job. Like the email, the prune

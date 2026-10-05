@@ -27,6 +27,26 @@ function attributeUrls(html: string): string[] {
   return [...html.matchAll(/\s(?:href|src)="([^"]*)"/gu)].map(match => match[1] ?? '')
 }
 
+/**
+ * The code must copy as exactly its digits from any mail client: one unbroken run in the HTML
+ * code cell and the text body, with no space, NBSP, separator, per-digit element, or
+ * zero-width character anywhere near it (owner bug: "482 913" did not paste into /login).
+ */
+function expectCopyableCode(email: { html: string; subject: string; text: string }, code: string) {
+  const split = `${code.slice(0, 3)}[\\s\\u00a0\\u2009\\u202f.\\-–—]+${code.slice(3)}`
+  const spaced = new RegExp(split, 'u')
+  expect(email.subject.startsWith(`${code} `)).toBe(true)
+  expect(email.text).toContain(`\n    ${code}\n`)
+  // The code cell holds the code as its only content: no child elements, no extra characters.
+  const cells = [...email.html.matchAll(/<td[^>]*>(\d[^<]*)<\/td>/gu)].map(match => match[1])
+  expect(cells).toEqual([code])
+  expect(email.html).toMatch(/letter-spacing:0\.3em[^"]*">\d{6}<\/td>/u)
+  for (const part of [email.html, email.text, email.subject]) {
+    expect(part).not.toMatch(spaced)
+    expect(part).not.toMatch(/[\u200b-\u200d\u2060\ufeff\u00ad]/u)
+  }
+}
+
 /** The HTML must link `url` from a real anchor, the button. */
 function linksTo(html: string, url: string): boolean {
   return html.includes(`<a href="${url}"`)
@@ -165,7 +185,8 @@ It expires in 10 minutes and works once. If you didn't try to sign in, you can i
 SERP Directory · https://best.serp.co
 This address isn't monitored. Reply from your dashboard: https://best.serp.co/account/
 You're getting this because this address was entered at best.serp.co/login.`)
-    expect(email.html).toContain('>481 902</td>')
+    expectCopyableCode(email, '481902')
+    expect(email.html).toContain('>481902</td>')
     expect(email.html).toContain('It expires in 10 minutes and works once.')
     expect(email.html).toContain(
       'You’re getting this because this address was entered at best.serp.co/login.'
@@ -377,7 +398,8 @@ describe('claim code', () => {
     expect(email.text).toContain(
       "You're getting this because this address was entered to claim a listing on best.serp.co."
     )
-    expect(email.html).toContain('>730 514</td>')
+    expectCopyableCode(email, '730514')
+    expect(email.html).toContain('>730514</td>')
   })
 })
 

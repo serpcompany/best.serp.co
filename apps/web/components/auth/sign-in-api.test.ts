@@ -5,18 +5,99 @@ import {
   OTP_LENGTH,
   OTP_REQUEST_LIMITS
 } from '../../lib/auth/rate-limits'
+import { signInCodeDigits } from '../../lib/email/sign-in-code'
 import {
   CODE_ATTEMPTS,
   CODE_LENGTH,
   CODE_LIFETIME_MINUTES,
   CODE_LIFETIME_SECONDS,
+  codeDigits,
   formatCountdown,
   formatWait,
   RESEND_COOLDOWN_SECONDS,
+  readCodeText,
   requestCode,
   signOut,
   verifyCode
 } from './sign-in-api'
+
+// Owner bug: a code copied from the email as "482 913" did not paste into /login.
+describe('signInCodeDigits', () => {
+  it('keeps only the digits of a pasted, typed, or autofilled code', () => {
+    for (const pasted of [
+      '482913',
+      '482 913',
+      '482-913',
+      ' 482913\n',
+      '482\u00a0913',
+      '482\u2009913',
+      '\u200b482\u200c913\u200d\ufeff',
+      '482\r\n913\t',
+      '48–29—13'
+    ]) {
+      expect(signInCodeDigits(pasted), JSON.stringify(pasted)).toBe('482913')
+    }
+    expect(signInCodeDigits('')).toBe('')
+    expect(signInCodeDigits('code: 12')).toBe('12')
+    // The /login field uses exactly the normalization the server applies.
+    expect(codeDigits).toBe(signInCodeDigits)
+  })
+})
+
+// PR #82 review, finding 1: "It expires in 10 minutes. Code: 719208" must never send 107192.
+describe('readCodeText', () => {
+  it('finds the one standalone code in pasted text', () => {
+    for (const text of [
+      '719208',
+      'It expires in 10 minutes. Code: 719208',
+      'Your code: 719 208.',
+      '719-208',
+      '719\u00a0208',
+      '719\u2009208',
+      ' 719208\n',
+      '\u200b719\u200b208\ufeff',
+      '719208 is your SERP sign-in code',
+      // The same code twice (subject and body) is still one code.
+      '719208 is your SERP sign-in code\n\n    719208',
+      'Call 555-1234 and enter 719208',
+      'Enter this code:\n\n    719208\n\n\nIt expires in 10 minutes'
+    ]) {
+      expect(readCodeText(text), JSON.stringify(text)).toEqual({ code: '719208', kind: 'code' })
+    }
+  })
+
+  it('changes nothing when the text is ambiguous', () => {
+    for (const text of [
+      'Old code 111 111, new code 719208',
+      '719208 or 482913',
+      '7192081',
+      '719 2081',
+      '1719208',
+      '71 92 08',
+      '719 - 208',
+      '719\n208',
+      'It expires in 10 minutes.',
+      'Call 12345',
+      'abc',
+      // PR #82 review 2: part of a phone number is not a code.
+      'Call 555 123 4567',
+      '555-123-4567',
+      '(555) 123-4567',
+      '+1 555 123 4567',
+      '4567 555 123',
+      'Code 1 719208'
+    ]) {
+      expect(readCodeText(text), JSON.stringify(text)).toEqual({ kind: 'ignore' })
+    }
+  })
+
+  it('passes a fragment of digits and separators to the caret', () => {
+    expect(readCodeText(' 482 ')).toEqual({ digits: '482', kind: 'digits' })
+    expect(readCodeText('48-29')).toEqual({ digits: '4829', kind: 'digits' })
+    expect(readCodeText('5')).toEqual({ digits: '5', kind: 'digits' })
+    expect(readCodeText('')).toEqual({ digits: '', kind: 'digits' })
+  })
+})
 
 // PR #76 review, finding 6: the screen reads the code contract Better Auth is configured with.
 describe('the code contract', () => {
