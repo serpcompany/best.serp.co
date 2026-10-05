@@ -39,8 +39,6 @@
     "@serpdirectory/web-core": "workspace:*",
     "@tailwindcss/typography": "^0.5.19",
     "@vercel/functions": "^3.4.3",
-    "@vercel/toolbar": "catalog:",
-    "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "fast-xml-parser": "^5.3.5",
