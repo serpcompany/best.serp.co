@@ -1,48 +1,52 @@
-import { submissionRequestSchema } from '@serpdirectory/web-core/forms/submission-contract'
-import { NextResponse } from 'next/server'
-import { submissionBadgeTargets } from '@/lib/submissions/presentation'
+import { authorizeUserRequest } from '@/lib/auth/server'
+import { fieldErrors, LOGO_MESSAGES, newDraftSchema } from '@/lib/submissions/contract'
 import {
+  apiError,
+  authorizationFailure,
+  json,
+  readJson,
+  submissionFailure,
+  toAvailability,
+  toSummary,
+  unavailableResponse
+} from '@/lib/submissions/http'
+import { checkLogoUrl } from '@/lib/submissions/prefill'
+import {
+  checkSubmissionUrl,
   consumeSubmissionRateLimit,
-  createSubmission,
-  isSubmissionError
+  createDraft
 } from '@/lib/submissions/repository'
 
-function failure(error: unknown): NextResponse {
-  if (isSubmissionError(error)) {
-    return NextResponse.json({ code: error.code, error: error.message }, { status: error.status })
-  }
-  return NextResponse.json(
-    {
-      code: 'internal_error',
-      error: 'Unable to create submission.'
-    },
-    { status: 500 }
-  )
-}
+export const dynamic = 'force-dynamic'
 
-export async function POST(request: Request): Promise<NextResponse> {
-  const length = Number(request.headers.get('content-length') || '0')
-  if (length > 32_000) {
-    return NextResponse.json(
-      { code: 'payload_too_large', error: 'Submission is too large.' },
-      { status: 413 }
-    )
+/**
+ * `POST /api/submissions` (serpcompany/best.serp.co#63): saves the signed-in owner's draft
+ * (`status = 'draft'`, no plan yet) and answers where to go next: the plan choice (2b).
+ */
+export async function POST(request: Request) {
+  const authorization = await authorizeUserRequest(request)
+  if (!authorization.ok) return authorizationFailure(authorization)
+  const parsed = newDraftSchema.safeParse((await readJson(request)) ?? {})
+  if (!parsed.success) {
+    return apiError(400, 'invalid_submission', 'Check the highlighted fields.', {
+      fields: fieldErrors(parsed.error)
+    })
   }
+  const owner = authorization.user.id
   try {
-    await consumeSubmissionRateLimit(request.headers.get('cf-connecting-ip') || 'local-development')
-    const parsed = submissionRequestSchema.safeParse(await request.json())
-    if (!parsed.success) {
-      return NextResponse.json(
-        { code: 'invalid_submission', error: 'Check the submitted fields.' },
-        { status: 400 }
-      )
+    await consumeSubmissionRateLimit(`user:${owner}`)
+    // Answer duplicates and blocks before fetching the logo.
+    const availability = toAvailability(await checkSubmissionUrl(parsed.data.website, owner))
+    if (availability.kind !== 'available') return unavailableResponse(availability)
+    const logo = await checkLogoUrl(parsed.data.logoUrl)
+    if (!logo.ok) {
+      return apiError(400, logo.code, LOGO_MESSAGES[logo.code], {
+        fields: { logoUrl: LOGO_MESSAGES[logo.code] }
+      })
     }
-    const submission = await createSubmission(parsed.data)
-    return NextResponse.json(
-      { ...submission, ...submissionBadgeTargets(submission.slug) },
-      { status: 201, headers: { 'Cache-Control': 'no-store' } }
-    )
+    const draft = await createDraft(owner, parsed.data)
+    return json({ next: `/submit/${draft.id}/choose/?saved=1`, submission: toSummary(draft) }, 201)
   } catch (error) {
-    return failure(error)
+    return submissionFailure(error, 'Unable to save the draft.')
   }
 }

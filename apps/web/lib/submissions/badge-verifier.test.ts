@@ -33,13 +33,21 @@ describe('badge scanner', () => {
         `<a href="https://best.serp.co/"><img src="${lightBadgeUrl}"></a>`,
         expected
       )
-    ).toEqual({ ok: false, code: 'wrong_destination' })
+    ).toEqual({ ok: false, code: 'wrong_destination', href: 'https://best.serp.co/' })
     expect(
       scanFeaturedBadge(
         `<a href="https://best.serp.co/products/example.com/reviews/"><img src="${lightBadgeUrl}"></a>`,
         expected
       )
-    ).toEqual({ ok: false, code: 'wrong_destination' })
+    ).toEqual({
+      ok: false,
+      code: 'wrong_destination',
+      href: 'https://best.serp.co/products/example.com/reviews/'
+    })
+    expect(scanFeaturedBadge(`<a><img src="${lightBadgeUrl}"></a>`, expected)).toEqual({
+      ok: false,
+      code: 'wrong_destination'
+    })
     expect(scanFeaturedBadge('<p>No badge</p>', expected)).toEqual({
       ok: false,
       code: 'badge_missing'
@@ -51,7 +59,11 @@ describe('legacy listing URLs', () => {
   it('accepts badges that still link to the pre-simplification reviews URL', () => {
     const legacyHref = 'https://best.serp.co/products/example.com/reviews/'
     const html = `<a href="${legacyHref}"><img src="${lightBadgeUrl}"></a>`
-    expect(scanFeaturedBadge(html, expected)).toEqual({ ok: false, code: 'wrong_destination' })
+    expect(scanFeaturedBadge(html, expected)).toEqual({
+      ok: false,
+      code: 'wrong_destination',
+      href: legacyHref
+    })
     expect(scanFeaturedBadge(html, { ...expected, legacyListingUrls: [legacyHref] })).toEqual({
       ok: true
     })

@@ -48,7 +48,8 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
   choosing free (`pending_badge`), withdrawal, or expiry; a run that missed some sends only the
   latest one due. At 30 days every draft is withdrawn as `expired`, including a paid draft that
   never completed checkout, which frees its URL, and gets the "draft expired" email; an expired
-  draft cannot choose a plan. The scheduled job (#63) reads `selectDraftRemindersDuePlan` (which
+  draft cannot choose a plan. The daily scheduled job ([below](#draft-reminders-and-expiry))
+  reads `selectDraftRemindersDuePlan` (which
   returns the `variant`) and `selectExpiredDraftsPlan`, claims each reminder with
   `buildMarkDraftReminderSentPlans` for that variant (a compare-and-swap, so a reminder is claimed
   once and matches the current state), and then sends through the email ledger with
@@ -100,29 +101,77 @@ requested", "rejected", or "rejected: prohibited"). Rejecting a paid submission 
 waits for #68's refund. These decisions write production D1 directly: the documented
 production-write exception ([Admin panel](./ADMIN_PANEL.md#the-production-write-exception)).
 
-## Legacy capability flow (until #63 and #69)
+## Submit v2 (#63)
+
+The flow follows the approved #70 mockups (screens 2, 2b, 3). Every step needs the signed-in
+owner except filling in the form; the anonymous capability-token flow is gone.
+
+1. **`/submit/`** (screen 2). The form works signed out. Required: website, name, short
+   description (160 characters at most), primary category (from D1), and logo; the long
+   description is optional, and FAQs and links come later from the dashboard (#65). Signed out,
+   the form is kept in this browser's `localStorage` (`bsc_submit_draft_v1`: only what was
+   typed, never a token or an id), "Sign in and continue" goes to
+   `/login/?callbackUrl=/submit/`, and the login card says the draft is waiting.
+2. **Prefill** (`POST /api/submissions/prefill`, no AI). The Worker reads the page through the
+   safe fetcher (`apps/web/lib/submissions/safe-fetch.ts`: every hop must pass
+   `validatePublicHttpUrl`, at most 3 manual redirects, 8-second timeout, 1 MB cap) and
+   proposes the name (`og:site_name`, `application-name`, or the title), the short description
+   (meta, `og:`, or `twitter:` description, shortened to 160 characters), a site icon (largest
+   declared, 128 px or more) and the social image, each checked as an image. All stay editable;
+   the category is never filled in. It answers the URL's availability first and reads nothing
+   for a duplicate or blocked URL. It is rate-limited in D1 per signed-in user (40 an hour) or
+   per client address for visitors (60 an hour), 10 a minute either way (`limits.ts`).
+3. **Duplicates and blocks** use the URL key (`urlKey()`): the host is the slug and the
+   duplicate key, so `brieflow.ai/pricing` counts as `brieflow.ai`. An existing listing
+   (by slug, or by its exact website) offers "Claim this listing" (a link to the listing until
+   #67 builds claims); a pending submission says "You already submitted" (with a link) to its
+   owner and "already in review" to anyone else; an active prohibited block refuses the URL
+   with its own message. The insert repeats the same checks (the active-slug index and the
+   block trigger), so a race still ends in the same answer.
+4. **Continue** (`POST /api/submissions`) saves a native draft per the #62 contract
+   (`status = 'draft'`, `plan = NULL`, `owner_user_id`, `draft_saved_at` from this first save,
+   `block_key` and `block_covers_subdomains` from `urlKey()`), after checking the logo URL is
+   an image. Draft saves count against 10 an hour per owner. The owner can edit the details
+   (`PATCH /api/submissions/<id>`, `/submit/?edit=<id>`) as a draft or while waiting for the
+   badge; the website never changes, and edits never reset the draft clock.
+5. **`/submit/<id>/choose/`** (screen 2b): "Get the badge code" chooses free
+   (`POST /api/submissions/<id>/plan`, `draft` → `pending_badge`). The paid card and every $49
+   link stay hidden while `features.showPaidListings` is off (until #68). "Decide later" leaves
+   the draft in the account (`/account/` lists it with "Expires in N days" and Continue).
+6. **`/submit/<id>/badge/`** (screen 3): the light and dark snippets link to the future listing.
+   `POST /api/submissions/<id>/verify` fetches the website and requires the badge inside a
+   dofollow link to `/products/<slug>/` (badges linking to the old `/reviews/` URL still count).
+   At most 10 conclusive checks (`badge_missing`, `nofollow`, `wrong_destination`), one every 30
+   seconds; connection problems (timeouts, HTTP errors, redirects, non-HTML) never use one up.
+   A pass moves the submission to `verified` (the review queue) and sends "submission received"
+   to the submitter and "ready for review" to `EMAIL_ADMIN_RECIPIENT`, both keyed
+   `submission-verified:<id>` in the email ledger.
+
+### Logos
+
+A logo is stored as the public URL of an image on the submitter's site or wherever they host it
+(the catalog's logos are URLs too): the site icon, the social image, or a pasted image link,
+checked on save to be a PNG, JPEG, WebP, or SVG of at most 1 MB and at least 128 px on its
+shorter side when its size can be read. Nothing is uploaded. Copying logos into R2 (an
+"Upload" option, and protection against a site changing or removing its image) needs an R2
+bucket and binding, which only the owner can create: see the owner steps in the #63 pull
+request.
+
+### Draft reminders and expiry
+
+A daily Cron Trigger (`0 14 * * *`, `triggers.crons` in `apps/web/wrangler.jsonc`) runs the
+Worker's `scheduled()` handler (`apps/web/lib/worker/scheduled.ts`). Its draft job
+(`apps/web/lib/submissions/draft-jobs.ts`, D1 side in `packages/data-ops/src/draft-jobs.ts`)
+first withdraws drafts 30 days old as `expired` and sends `draft-expired`, then claims and sends
+the latest due `draft-reminder` of each remaining draft. A run handles at most 100 of each and
+logs whether more remain. The weekly badge program (#66) adds its own cron expression and job
+to `scheduledJobs`. Locally, `wrangler dev --test-scheduled` exposes `/__scheduled`; the job's
+behavior is covered by `scheduled.test.ts` against SQLite.
+
+## Legacy review (until #69)
 
 The admin panel replaces the protected approver below for decisions; the notifier and the
-private preview keep working until the legacy flow is retired.
-
-The public `/submit/` page lists active categories from D1. Its form posts to
-`POST /api/submissions`, which writes the submission, resource links, FAQs, and a
-creation event to D1 staging tables and returns an opaque capability token (only its
-SHA-256 digest is stored). These rows start at `pending_badge` with the free plan. The
-page keeps the capability in browser storage and a URL fragment so the submitter can
-resume later.
-
-The submitter installs a "Featured on SERP" badge and selects **Verify installed
-badge**. `POST /api/submissions/<id>/verify` authenticates the capability, enforces a
-10-attempt limit and a 30-second cooldown, and fetches the submitted website. It
-succeeds only when the badge image links to the future listing URL without
-`nofollow`. Success moves the row to `verified`; it does not publish anything.
-Badges embedded before the URL simplification link to `/products/<slug>/reviews/`; that
-URL redirects to the listing and is still accepted.
-
-Transient failures (connection, timeout, HTTP status, redirects, non-HTML) update the
-last-check time but do not consume an attempt; conclusive HTML results
-(`badge_missing`, `nofollow`, `wrong_destination`) do.
+private preview keep working until #69 retires them.
 
 A notifier (`scripts/d1-submission-notifier.ts`) reads verified rows with no
 notification entry, opens an assigned issue in this private repository, and stores its
@@ -147,6 +196,6 @@ Both steps run against production D1 only:
 
 Setup and guards are in [the deploy runbook](./DEPLOY_RUNBOOK.md#workflows).
 
-Code: `packages/web-core/src/forms/d1-submission-form.tsx`,
+Code: `apps/web/app/submit/`, `apps/web/components/submit/`, `apps/web/app/api/submissions/`,
 `apps/web/lib/submissions/`, `packages/data-ops/src/submissions.ts`, and
 `packages/data-ops/src/submission-plans.ts`.

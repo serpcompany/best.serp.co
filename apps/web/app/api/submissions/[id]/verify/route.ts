@@ -1,49 +1,56 @@
-import { submissionCapabilitySchema } from '@serpdirectory/web-core/forms/submission-contract'
-import { NextResponse } from 'next/server'
+import { authorizeUserRequest } from '@/lib/auth/server'
 import { verifyFeaturedBadge } from '@/lib/submissions/badge-verifier'
+import { sendSubmissionVerifiedEmails } from '@/lib/submissions/emails'
 import {
-  submissionBadgeTargets,
-  submissionBadgeVerificationTargets
-} from '@/lib/submissions/presentation'
-import {
-  beginVerification,
-  finishVerification,
-  isSubmissionError
-} from '@/lib/submissions/repository'
+  apiError,
+  authorizationFailure,
+  json,
+  submissionFailure,
+  toSummary
+} from '@/lib/submissions/http'
+import { submissionBadgeVerificationTargets } from '@/lib/submissions/presentation'
+import { beginVerification, finishVerification } from '@/lib/submissions/repository'
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ id: string }> }
-): Promise<NextResponse> {
+export const dynamic = 'force-dynamic'
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
+
+/**
+ * `POST /api/submissions/<id>/verify` (#63): the owner asks us to check the badge. At most ten
+ * conclusive checks, one every 30 seconds; connection problems never use one up. A pass moves
+ * the submission to `verified` (the review queue) and sends "submission received" to the
+ * submitter and "ready for review" to the admin recipient.
+ */
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const authorization = await authorizeUserRequest(request)
+  if (!authorization.ok) return authorizationFailure(authorization)
   const { id } = await context.params
+  if (!UUID.test(id)) return apiError(404, 'not_found', 'Submission not found.')
+  const { user } = authorization
   try {
-    const parsed = submissionCapabilitySchema.safeParse(await request.json())
-    if (!parsed.success) {
-      return NextResponse.json(
-        { code: 'not_found', error: 'Submission not found.' },
-        { status: 404 }
-      )
-    }
-    const state = await beginVerification(id, parsed.data.token)
-    if (state.status !== 'pending_badge') {
-      return NextResponse.json({ ...state, ...submissionBadgeTargets(state.slug) })
+    const current = await beginVerification(id, user.id)
+    if (current.status !== 'pending_badge') {
+      return apiError(409, 'not_pending_badge', 'This submission isn’t waiting for its badge.', {})
     }
     const result = await verifyFeaturedBadge(
-      state.website,
-      submissionBadgeVerificationTargets(state.slug)
+      current.website,
+      submissionBadgeVerificationTargets(current.slug)
     )
-    const updated = await finishVerification(id, parsed.data.token, result)
-    return NextResponse.json(
-      { ...updated, ...submissionBadgeTargets(state.slug) },
-      { status: result.ok ? 200 : 422, headers: { 'Cache-Control': 'no-store' } }
+    const updated = await finishVerification(
+      id,
+      user.id,
+      result.ok ? { ok: true } : { code: result.code, ok: false }
     )
-  } catch (error) {
-    if (isSubmissionError(error)) {
-      return NextResponse.json({ code: error.code, error: error.message }, { status: error.status })
+    if (result.ok && updated.status === 'verified') {
+      await sendSubmissionVerifiedEmails({ submission: updated, submitterEmail: user.email })
     }
-    return NextResponse.json(
-      { code: 'internal_error', error: 'Unable to verify badge.' },
-      { status: 500 }
-    )
+    return json({
+      result: result.ok
+        ? { ok: true }
+        : { code: result.code, ok: false, ...('href' in result ? { href: result.href } : {}) },
+      submission: toSummary(updated)
+    })
+  } catch (error) {
+    return submissionFailure(error, 'Unable to check the badge.')
   }
 }

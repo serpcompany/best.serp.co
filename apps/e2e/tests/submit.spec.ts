@@ -1,0 +1,371 @@
+import {
+  type APIRequestContext,
+  type BrowserContext,
+  expect,
+  type Page,
+  test
+} from '@playwright/test'
+import { listingPath, site } from './site-fixture'
+import { executeLocalD1, type FixtureSite, startFixtureSite } from './submit-fixture'
+
+/**
+ * Submit v2 in a browser against the local Worker (serpcompany/best.serp.co#63, #70 screens
+ * 2, 2b, 3): fill the form signed out, sign in with the emailed code, save the draft, choose
+ * free, and verify the badge on a local fixture website; URL prefill; duplicate and prohibited
+ * URLs. Codes and emails come from the local dev outboxes.
+ */
+
+const ADMIN_RECIPIENT = 'devin@serp.co'
+const CATEGORY = 'Video Downloaders'
+
+function unique(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
+}
+
+/** A documentation-range client address, so each test has its own per-client limits. */
+function uniqueIp(): string {
+  const octet = () => Math.floor(Math.random() * 250) + 1
+  return `198.18.${octet()}.${octet()}`
+}
+
+let fixture: FixtureSite
+
+test.beforeAll(async () => {
+  fixture = await startFixtureSite()
+})
+
+test.afterAll(async () => {
+  await fixture.close()
+})
+
+async function newClient(browser: import('@playwright/test').Browser): Promise<BrowserContext> {
+  return browser.newContext({ extraHTTPHeaders: { 'cf-connecting-ip': uniqueIp() } })
+}
+
+async function outboxCode(request: APIRequestContext, email: string): Promise<string> {
+  const response = await request.get(`/api/auth/dev/otp-outbox?email=${encodeURIComponent(email)}`)
+  const { otp } = (await response.json()) as { otp: string | null }
+  expect(otp).toMatch(/^\d{6}$/u)
+  return otp as string
+}
+
+/** Signs a context in over HTTP; its pages then share the session cookie. */
+async function signInContext(context: BrowserContext, baseURL: string, email: string) {
+  const headers = { origin: new URL(baseURL).origin }
+  const requested = await context.request.post('/api/auth/email-otp/send-verification-otp', {
+    data: { email, type: 'sign-in' },
+    headers
+  })
+  expect(requested.status(), await requested.text()).toBe(200)
+  const signedIn = await context.request.post('/api/auth/sign-in/email-otp', {
+    data: { email, otp: await outboxCode(context.request, email) },
+    headers
+  })
+  expect(signedIn.status(), await signedIn.text()).toBe(200)
+}
+
+interface OutboxMessage {
+  subject: string
+  text: string
+}
+
+async function emailsTo(request: APIRequestContext, to: string): Promise<OutboxMessage[]> {
+  const response = await request.get(`/api/dev/email-outbox?to=${encodeURIComponent(to)}`)
+  expect(response.status()).toBe(200)
+  return ((await response.json()) as { messages: OutboxMessage[] }).messages
+}
+
+async function chooseCategory(page: Page, name: string) {
+  await page.getByRole('combobox', { name: 'Primary category' }).click()
+  await page.getByRole('option', { name, exact: true }).click()
+}
+
+async function typeWebsite(page: Page, website: string) {
+  const field = page.getByLabel('Website URL')
+  await field.fill(website)
+  await field.blur()
+}
+
+test.describe('submit v2', () => {
+  test('fills the form signed out, signs in, saves the draft, chooses free, and verifies the badge', async ({
+    baseURL,
+    browser
+  }) => {
+    test.setTimeout(150_000)
+    const label = `quill-${unique()}`
+    const productName = `Quillmate ${label.slice(-5)}`
+    const email = `e2e-submit-${unique()}@example.com`
+    fixture.set(label, {
+      badge: 'missing',
+      description: 'Turns rough product notes into on-brand landing pages, emails, and ads.',
+      name: productName
+    })
+    const slug = fixture.slug(label)
+    const context = await newClient(browser)
+    const page = await context.newPage()
+
+    // Signed out: the form is open, and says sign-in comes when continuing.
+    await page.goto('/submit/')
+    await expect(page.getByRole('heading', { level: 1, name: 'Submit a product' })).toBeVisible()
+    await expect(page.getByText('Sign in when you’re ready')).toBeVisible()
+
+    // Prefill proposes the name, short description, and logo; the category stays empty.
+    await typeWebsite(page, fixture.website(label))
+    await expect(page.getByText('Details found')).toBeVisible()
+    await expect(page.getByText(`We filled in 3 fields from ${slug}`)).toBeVisible()
+    await expect(page.getByLabel('Name')).toHaveValue(productName)
+    await expect(page.getByText('From og:site_name')).toBeVisible()
+    await expect(page.getByLabel('Short description')).toHaveValue(
+      'Turns rough product notes into on-brand landing pages, emails, and ads.'
+    )
+    await expect(page.getByText('From meta description')).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'Site icon' })).toHaveAttribute('data-state', 'on')
+    await expect(page.getByText('Pick the closest match. We don’t fill this in.')).toBeVisible()
+
+    // Every proposal stays editable.
+    const description = 'Drafts landing pages and emails from product notes, in your voice.'
+    await page.getByLabel('Short description').fill(description)
+    await expect(page.getByText('From meta description')).toHaveCount(0)
+    await chooseCategory(page, CATEGORY)
+
+    // Continue signed out: the draft stays in this browser through the email-code sign-in.
+    await page.getByRole('button', { name: 'Sign in and continue' }).click()
+    await page.waitForURL(/\/login\/\?callbackUrl=%2Fsubmit%2F$/u)
+    await expect(page.getByText(`Your ${productName} draft is saved`)).toBeVisible()
+    await expect(page.getByText('Sign in to finish submitting it.')).toBeVisible()
+    await page.getByLabel('Email').fill(email)
+    await page.getByRole('button', { name: 'Email me a code' }).click()
+    await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
+    await page.locator('#code').fill(await outboxCode(page.request, email))
+    await expect(
+      page.getByText('Taking you back to Submit, where your draft is waiting.')
+    ).toBeVisible()
+    await page.waitForURL(url => url.pathname === '/submit/')
+
+    // Back on Submit, signed in, with the draft restored.
+    await expect(page.getByLabel('Website URL')).toHaveValue(fixture.website(label))
+    await expect(page.getByLabel('Name')).toHaveValue(productName)
+    await expect(page.getByLabel('Short description')).toHaveValue(description)
+    await expect(page.getByRole('combobox', { name: 'Primary category' })).toHaveText(CATEGORY)
+    await expect(page.getByText('Sign in when you’re ready')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Continue' }).click()
+
+    // 2b: the draft is saved (no plan yet); paid stays hidden until #68.
+    await page.waitForURL(/\/submit\/[0-9a-f-]{36}\/choose\/\?saved=1$/u)
+    const submissionId = new URL(page.url()).pathname.split('/')[2] as string
+    await expect(page.getByText('Details saved')).toBeVisible()
+    await expect(page.getByText(`Signed in as ${email}.`)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose how to get listed' })).toBeVisible()
+    await expect(page.getByText('$49')).toHaveCount(0)
+
+    // The account lists the draft, which can be continued from there.
+    await page.goto('/account/')
+    const row = page.getByRole('row', { name: new RegExp(productName) })
+    await expect(row.getByText('Draft – choose a plan')).toBeVisible()
+    await expect(row.getByText('Expires in 30 days')).toBeVisible()
+    await row.getByRole('link', { name: 'Continue' }).click()
+    await page.waitForURL(`**/submit/${submissionId}/choose/`)
+    await expect(page.getByText('Welcome back')).toBeVisible()
+
+    // Free: the badge step, with snippets that link to the future listing.
+    await page.getByRole('button', { name: 'Get the badge code' }).click()
+    await page.waitForURL(`**/submit/${submissionId}/badge/`)
+    await expect(page.getByRole('heading', { name: `Add the badge to ${slug}` })).toBeVisible()
+    const listingUrl = `${site.publicUrl}${listingPath(slug)}`
+    await expect(page.getByLabel('light badge snippet')).toContainText(listingUrl)
+    await expect(page.getByText(`10 of 10`)).toBeVisible()
+
+    // A check before the badge is published: page reached, badge not found, one check used.
+    await page.getByRole('button', { name: 'Verify badge' }).click()
+    await expect(page.getByText('Page reached, badge not found')).toBeVisible()
+    await expect(page.getByText('9 of 10')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Check again in 0:[0-3]\d/u })).toBeDisabled()
+
+    // Publish the badge; after the 30-second cooldown, the check passes.
+    fixture.update(label, { badge: 'valid' })
+    await expect(page.getByRole('button', { name: 'Verify badge' })).toBeEnabled({
+      timeout: 40_000
+    })
+    await page.getByRole('button', { name: 'Verify badge' }).click()
+    await expect(page.getByText('Badge verified')).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: `${productName} is in the review queue` })
+    ).toBeVisible()
+    await expect(page.getByText(`We’ll email ${email} with the result.`)).toBeVisible()
+
+    // Both emails went out: "submission received" to the submitter, "ready for review" to the
+    // admin recipient.
+    await expect
+      .poll(async () => (await emailsTo(page.request, email)).map(message => message.subject))
+      .toContain(`We received ${productName}`)
+    await expect
+      .poll(async () =>
+        (await emailsTo(page.request, ADMIN_RECIPIENT)).map(message => message.subject)
+      )
+      .toContain(`Ready for review: ${productName} (free, badge verified)`)
+    const adminEmail = (await emailsTo(page.request, ADMIN_RECIPIENT)).find(message =>
+      message.subject.includes(productName)
+    )
+    expect(adminEmail?.text).toContain(email)
+    expect(adminEmail?.text).toContain(`/admin/submissions/${submissionId}`)
+
+    await page.goto('/account/')
+    await expect(
+      page.getByRole('row', { name: new RegExp(productName) }).getByText('In review')
+    ).toBeVisible()
+    await context.close()
+  })
+
+  test('shows every missing field before saving', async ({ baseURL, browser }) => {
+    const context = await newClient(browser)
+    await signInContext(context, baseURL ?? '', `e2e-submit-empty-${unique()}@example.com`)
+    const page = await context.newPage()
+    await page.goto('/submit/')
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByText('Fix 5 fields to continue')).toBeVisible()
+    for (const message of [
+      'Enter your website address, starting with https://.',
+      'Enter the product name.',
+      'Choose a primary category.',
+      'Add a short description.',
+      'Add a logo. Use the one from your site or paste an image link.'
+    ]) {
+      await expect(page.getByText(message)).toBeVisible()
+    }
+    await page.getByLabel('Short description').fill('x'.repeat(170))
+    await expect(page.getByText('Keep it to 160 characters or fewer. It’s 170 now.')).toBeVisible()
+    await expect(page.getByText('170/160')).toBeVisible()
+    await context.close()
+  })
+
+  test('blocks already listed, already submitted, and prohibited websites', async ({
+    baseURL,
+    browser
+  }) => {
+    test.setTimeout(120_000)
+    const origin = new URL(baseURL ?? '').origin
+    const id = unique()
+    const owner = await newClient(browser)
+    await signInContext(owner, baseURL ?? '', `e2e-submit-owner-${id}@example.com`)
+
+    // The owner saves a draft for a domain over the API.
+    const iconLabel = `icon-${id}`
+    fixture.set(iconLabel, { badge: 'missing', description: 'Icon host.', name: 'Icon host' })
+    const pendingWebsite = `https://pending-${id}.example/`
+    const created = await owner.request.post('/api/submissions', {
+      data: {
+        categorySlug: 'video-downloaders',
+        content: '',
+        description: 'A pending product.',
+        logoUrl: `${fixture.website(iconLabel)}icon.png`,
+        name: 'Pending product',
+        website: pendingWebsite
+      },
+      headers: { origin }
+    })
+    expect(created.status(), await created.text()).toBe(201)
+    const { submission } = (await created.json()) as { submission: { id: string; status: string } }
+    expect(submission.status).toBe('draft')
+
+    // The same domain again (another path, www.) is a duplicate, even over the API.
+    const again = await owner.request.post('/api/submissions', {
+      data: {
+        categorySlug: 'video-downloaders',
+        content: '',
+        description: 'Again.',
+        logoUrl: `${fixture.website(iconLabel)}icon.png`,
+        name: 'Again',
+        website: `https://www.pending-${id}.example/pricing`
+      },
+      headers: { origin }
+    })
+    expect(again.status()).toBe(409)
+    expect(await again.json()).toMatchObject({
+      availability: { kind: 'pending', mine: { id: submission.id } },
+      code: 'duplicate_submission'
+    })
+
+    // The owner sees their own submission and can open it.
+    const ownerPage = await owner.newPage()
+    await ownerPage.goto('/submit/')
+    await typeWebsite(ownerPage, pendingWebsite)
+    await expect(ownerPage.getByText(`You already submitted pending-${id}.example`)).toBeVisible()
+    await expect(ownerPage.getByRole('link', { name: 'Open submission' })).toHaveAttribute(
+      'href',
+      `/submit/${submission.id}/choose/`
+    )
+    await expect(ownerPage.getByRole('button', { name: 'Continue' })).toBeDisabled()
+
+    // Anyone else is told it is already in review.
+    const visitor = await newClient(browser)
+    const page = await visitor.newPage()
+    await page.goto('/submit/')
+    await typeWebsite(page, `pending-${id}.example/about`)
+    await expect(page.getByText(`pending-${id}.example is already in review`)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in and continue' })).toBeDisabled()
+
+    // An imported listing: matched on the domain, with a link to claim it (#67).
+    await typeWebsite(page, 'https://www.frase.io/pricing')
+    await expect(page.getByText(/is already listed on SERP$/u)).toBeVisible()
+    await expect(
+      page.getByText('We match on the domain, so frase.io/pricing counts as frase.io.')
+    ).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Claim this listing' })).toHaveAttribute(
+      'href',
+      '/products/frase.io/#claim'
+    )
+
+    // A prohibited block covers the registrable domain and its subdomains.
+    executeLocalD1(
+      `INSERT INTO listing_submission_url_blocks (url_key,covers_subdomains,reason,blocked_by,blocked_at) VALUES ('prohibited-${id}.example',1,'Prohibited by the Terms','e2e','${new Date().toISOString()}')`
+    )
+    await typeWebsite(page, `https://go.prohibited-${id}.example/`)
+    await expect(page.getByText(`go.prohibited-${id}.example can’t be submitted`)).toBeVisible()
+    await expect(
+      page.getByText(/rejected this site as prohibited by our Terms of Service/u)
+    ).toBeVisible()
+    const blocked = await owner.request.post('/api/submissions', {
+      data: {
+        categorySlug: 'video-downloaders',
+        content: '',
+        description: 'Blocked.',
+        logoUrl: `${fixture.website(iconLabel)}icon.png`,
+        name: 'Blocked',
+        website: `https://prohibited-${id}.example/`
+      },
+      headers: { origin }
+    })
+    expect(blocked.status()).toBe(403)
+    expect(await blocked.json()).toMatchObject({ code: 'url_blocked' })
+
+    await owner.close()
+    await visitor.close()
+  })
+
+  test('refuses writes without a session or from another origin', async ({ baseURL, request }) => {
+    const body = {
+      categorySlug: 'video-downloaders',
+      content: '',
+      description: 'x',
+      logoUrl: 'https://example.com/logo.png',
+      name: 'x',
+      website: 'https://example.com/'
+    }
+    const signedOut = await request.post('/api/submissions', {
+      data: body,
+      headers: { origin: new URL(baseURL ?? '').origin }
+    })
+    expect(signedOut.status()).toBe(401)
+    const crossSite = await request.post('/api/submissions', {
+      data: body,
+      headers: { origin: 'https://evil.example' }
+    })
+    expect(crossSite.status()).toBe(403)
+    // The prefill reads pages for this site's form only.
+    const prefill = await request.post('/api/submissions/prefill', {
+      data: { url: 'https://example.com/' },
+      headers: { origin: 'https://evil.example' }
+    })
+    expect(prefill.status()).toBe(403)
+  })
+})

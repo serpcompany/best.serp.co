@@ -1,33 +1,34 @@
 ---
 title: 'Submit Workflow'
-description: 'How badge-verified submissions move through Cloudflare D1'
+description: 'How a signed-in submitter saves a draft, chooses how to get listed, and verifies the badge'
 order: 4
 published: true
 ---
 
 # Submit Workflow
 
-The `/submit` form loads active category options from D1 and sends validated fields to
-a server route that writes normalized private submission rows to D1. After that write,
-the page visibly confirms that the submission is saved and provides a private resume
-link. The submitter can close the badge instructions and finish verification later;
-the same browser also remembers the unfinished verification automatically.
+Anyone can fill in the `/submit` form. Typing the website address reads the page, without AI,
+and proposes the product name, a short description, and a logo (the site icon or the social
+image); every proposal stays editable, and the category is always chosen by hand. A website
+that is already listed, already submitted, or blocked as prohibited is refused before anything
+is saved, with a way forward: claim the listing, open your own submission, or message us.
 
-The submitter installs the supplied badge and asks the server to verify the live
-website. The verifier names and loads the exact submitted URL. The UI distinguishes a
-page that loaded without the badge from an unreachable site, timeout, HTTP error,
-redirect problem, or malformed response and gives a specific next step. Temporary
-fetch failures do not consume the limited badge-content attempts. Only a successful
-dofollow badge check enters the maintainer review queue.
-A scheduled workflow assigns the maintainer one private GitHub review issue within a
-few minutes and records that notification in D1. That issue includes a private,
-uncached draft link so the maintainer can see the staged submission in the real
-listing-detail layout before deciding. The link works only while the D1 row is
-awaiting review and stops working after approval or rejection. The protected
-production review workflow can then approve and promote that normalized submission
-into the public D1 catalog, or decline it without publishing. The issue is an inbox
-entry; D1 remains the submission source of truth.
+Saving needs an account. A visitor who is not signed in continues to a 6-digit email code; the
+form stays in their browser meanwhile and comes back filled in after sign-in. Continuing then
+saves a draft to their account. Nothing is reviewed or published yet.
 
-The application form lives in
-`packages/web-core/src/forms/d1-submission-form.tsx`. The server-only write boundary
-lives in `apps/serp.software/lib/submissions/repository.ts`.
+Next, the submitter chooses how to get listed. The free listing asks them to add the "Featured
+on SERP" badge to their site with a dofollow link to their future listing page. They copy a
+snippet, publish it, and ask us to check. A check loads the website and reports exactly what it
+found: the badge missing, a nofollow link, a link to the wrong page, or a site that could not be
+reached. Connection problems never use up one of the ten checks, and checks are limited to one
+every 30 seconds. When the badge checks out, the submission enters the review queue, the
+submitter gets a confirmation email, and the SERP team is alerted.
+
+A draft that is never finished gets reminder emails and expires 30 days after it was first
+saved, which frees its website for anyone to submit. Drafts and submissions are listed in the
+submitter's account, where they can pick up where they left off.
+
+Submissions live in Cloudflare D1. The pages are in `apps/web/app/submit/` and
+`apps/web/components/submit/`, the server boundary in `apps/web/lib/submissions/`, and the
+data rules in `packages/data-ops/src/submissions.ts`.

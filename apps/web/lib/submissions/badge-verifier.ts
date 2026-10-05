@@ -1,13 +1,17 @@
-import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
-import { BADGE_VERIFIER_USER_AGENT } from '@serpdirectory/web-core/forms/submission-contract'
+import { safeFetch } from './safe-fetch'
 
+/**
+ * Badge verification (serpcompany/best.serp.co#59): load the submitted website through the
+ * safe fetcher (`./safe-fetch.ts`, which applies the shared public-URL policy to every
+ * hop) and look for the Featured badge inside a dofollow link to the listing.
+ */
 const MAX_HTML_BYTES = 1_000_000
-const MAX_REDIRECTS = 3
-const FETCH_TIMEOUT_MS = 8_000
 
 type ScanResult =
   | { ok: true }
-  | { ok: false; code: 'badge_missing' | 'nofollow' | 'wrong_destination' }
+  | { ok: false; code: 'badge_missing' | 'nofollow' }
+  /** `href`: where the first misdirected badge links, when it is an absolute URL. */
+  | { href?: string; ok: false; code: 'wrong_destination' }
 
 export type BadgeVerificationResult =
   | ScanResult
@@ -50,6 +54,7 @@ export function scanFeaturedBadge(html: string, expected: BadgeTargets): ScanRes
   )
   let sawBadge = false
   let sawWrongDestination = false
+  let wrongHref: string | null = null
 
   for (const match of html.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a\s*>/gi)) {
     const anchor = match[0]
@@ -73,6 +78,7 @@ export function scanFeaturedBadge(html: string, expected: BadgeTargets): ScanRes
       try {
         if (!expectedListings.has(canonical(href))) {
           sawWrongDestination = true
+          wrongHref ??= new URL(href).toString()
           continue
         }
       } catch {
@@ -84,29 +90,10 @@ export function scanFeaturedBadge(html: string, expected: BadgeTargets): ScanRes
       return { ok: true }
     }
   }
-  if (sawBadge || sawWrongDestination) return { ok: false, code: 'wrong_destination' }
-  return { ok: false, code: 'badge_missing' }
-}
-
-async function readBoundedHtml(response: Response): Promise<string> {
-  const declaredLength = Number(response.headers.get('content-length') || '0')
-  if (declaredLength > MAX_HTML_BYTES) throw new Error('response_too_large')
-  if (!response.body) return ''
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let total = 0
-  let html = ''
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    total += value.byteLength
-    if (total > MAX_HTML_BYTES) {
-      await reader.cancel()
-      throw new Error('response_too_large')
-    }
-    html += decoder.decode(value, { stream: true })
+  if (sawBadge || sawWrongDestination) {
+    return { ok: false, code: 'wrong_destination', ...(wrongHref ? { href: wrongHref } : {}) }
   }
-  return html + decoder.decode()
+  return { ok: false, code: 'badge_missing' }
 }
 
 export async function verifyFeaturedBadge(
@@ -114,52 +101,20 @@ export async function verifyFeaturedBadge(
   expected: BadgeTargets,
   fetcher: typeof fetch = fetch
 ): Promise<BadgeVerificationResult> {
-  let current = website
-  for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
-    const safe = validatePublicHttpUrl(current)
-    if (!safe.ok) return { ok: false, code: 'invalid_target' }
-
-    let response: Response
-    try {
-      response = await fetcher(safe.url, {
-        headers: { 'User-Agent': BADGE_VERIFIER_USER_AGENT },
-        redirect: 'manual',
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-      })
-    } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'name' in error &&
-        error.name === 'TimeoutError'
-      ) {
-        return { ok: false, code: 'fetch_timeout' }
-      }
-      return { ok: false, code: 'site_unreachable' }
-    }
-
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location')
-      if (!location) return { ok: false, code: 'invalid_redirect' }
-      if (redirect === MAX_REDIRECTS) return { ok: false, code: 'too_many_redirects' }
-      try {
-        current = new URL(location, safe.url).toString()
-      } catch {
-        return { ok: false, code: 'invalid_redirect' }
-      }
-      continue
-    }
-    if (!response.ok) return { ok: false, code: `http_${response.status}` }
-    const contentType = response.headers.get('content-type') || ''
-    if (!contentType.toLowerCase().includes('text/html')) return { ok: false, code: 'not_html' }
-    try {
-      return scanFeaturedBadge(await readBoundedHtml(response), expected)
-    } catch (error) {
-      if (error instanceof Error && error.message === 'response_too_large') {
-        return { ok: false, code: 'response_too_large' }
-      }
-      return { ok: false, code: 'verification_service_error' }
-    }
+  const page = await safeFetch(website, {
+    accept: type => type === 'text/html',
+    acceptHeader: 'text/html',
+    fetcher,
+    maxBytes: MAX_HTML_BYTES
+  })
+  if (!page.ok) {
+    if (page.code === 'unexpected_type') return { ok: false, code: 'not_html' }
+    if (page.code === 'read_failed') return { ok: false, code: 'verification_service_error' }
+    return { ok: false, code: page.code }
   }
-  return { ok: false, code: 'verification_service_error' }
+  try {
+    return scanFeaturedBadge(new TextDecoder().decode(page.body), expected)
+  } catch {
+    return { ok: false, code: 'verification_service_error' }
+  }
 }
