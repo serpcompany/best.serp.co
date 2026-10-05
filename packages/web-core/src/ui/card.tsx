@@ -1,17 +1,28 @@
 import * as DesignSystemCard from '@serpdirectory/design-system/card'
 import { cn } from '@serpdirectory/design-system/lib/utils'
 
+/**
+ * The site's public card. The design-system card is the stock shadcn one; these classes keep
+ * the public pages' look: square corners, a lighter border, p-4, and the hover lift.
+ */
+const publicCardClassName =
+  'rounded-none border-border/50 p-4 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-foreground/10 hover:shadow-lg'
+
 export function Card({ className, ...props }: React.ComponentProps<typeof DesignSystemCard.Card>) {
-  return (
-    <DesignSystemCard.Card className={cn('rounded-none border-border/50', className)} {...props} />
-  )
+  return <DesignSystemCard.Card className={cn(publicCardClassName, className)} {...props} />
 }
 
+/** The stock header is a grid; public pages keep their stacked header with a 1.5 gap. */
 export function CardHeader({
   className,
   ...props
 }: React.ComponentProps<typeof DesignSystemCard.CardHeader>) {
-  return <DesignSystemCard.CardHeader className={className} {...props} />
+  return (
+    <DesignSystemCard.CardHeader
+      className={cn('flex flex-col items-stretch gap-1.5', className)}
+      {...props}
+    />
+  )
 }
 
 export function CardTitle({
