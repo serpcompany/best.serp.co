@@ -32,6 +32,13 @@ export const SMOKE_TEST_HEADER = 'x-best-serp-co-smoke-test'
 /** The Worker version (`CF_VERSION_METADATA.id`) that answered; the HTTP gates wait for it. */
 export const WORKER_VERSION_HEADER = 'x-worker-version'
 
+/**
+ * The `SITE_ENVIRONMENT` the answering Worker is configured with (`unset` when missing or
+ * invalid). The HTTP gates read it through the platform host, where the crawl policy is always
+ * non-production, to prove the production Worker would serve best.serp.co as production.
+ */
+export const SITE_ENVIRONMENT_HEADER = 'x-site-environment'
+
 export const NON_PRODUCTION_X_ROBOTS_TAG = 'noindex, nofollow'
 export const NON_PRODUCTION_ROBOTS_TXT = 'User-agent: *\nDisallow: /\n'
 
@@ -72,16 +79,18 @@ export function nonProductionRobotsTxt(request: Request): Response | null {
 }
 
 /**
- * The response with the environment headers every Worker response carries: the Worker version
- * when it is known and, outside public production, `X-Robots-Tag: noindex, nofollow` (an
- * existing value that already says `noindex`, such as the admin preview's, is kept).
+ * The response with the environment headers every Worker response carries: the configured
+ * environment, the Worker version when it is known and, outside public production,
+ * `X-Robots-Tag: noindex, nofollow` (an existing value that already says `noindex`, such as the
+ * admin preview's, is kept).
  */
 export function withEnvironmentHeaders(
   response: Response,
-  options: { publicProduction: boolean; versionId?: string }
+  options: { environment: SiteEnvironment | null; publicProduction: boolean; versionId?: string }
 ): Response {
   if (response.status < 200) return response
   const headers = new Headers(response.headers)
+  headers.set(SITE_ENVIRONMENT_HEADER, options.environment ?? 'unset')
   if (options.versionId) headers.set(WORKER_VERSION_HEADER, options.versionId)
   if (!options.publicProduction && !blocksIndexing(headers.get('x-robots-tag')))
     headers.set('x-robots-tag', NON_PRODUCTION_X_ROBOTS_TAG)

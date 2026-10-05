@@ -1,22 +1,35 @@
 /**
- * Post-deploy HTTP gates for the staging and production Workers.
+ * Post-deploy HTTP gates for the staging and production Workers, plus a manual check of the
+ * public site.
  *
- *   pnpm tsx scripts/d1-preview-http-gates.ts <staging|production> <clean-https-origin> [output]
+ *   pnpm tsx scripts/d1-preview-http-gates.ts <staging|production|public> <https-origin> [output]
+ *
+ * - `staging <origin>`: the staging Worker on its workers.dev origin.
+ * - `production <origin>`: the production Worker. The origin may be `https://best.serp.co` or
+ *   the production workers.dev origin; either way every request goes to the workers.dev origin
+ *   with the smoke-test header, so the gates never depend on the `serp.co` zone (Bot Fight
+ *   Mode or WAF rules there may challenge CI runners; serp standards/environment-configuration.md).
+ * - `public https://best.serp.co`: the manual cutover check of best.serp.co itself (indexable,
+ *   robots.txt lists the sitemap index, Google Tag Manager loads). CI never runs it.
  *
  * Every request sends the smoke-test header, so the production Worker's `*.workers.dev` host
- * answers it instead of redirecting to best.serp.co (#42 decision e).
+ * answers it instead of redirecting to best.serp.co (#42 decision e); the redirect itself is
+ * checked with one request without it.
  *
- * When the deploy's Worker version is known, the gates first wait (at most 60 s) until that
- * version answers, then require it on every response, so they never pass or fail against the
- * previous deployment while the edge still serves it. The version comes from
- * `EXPECTED_WORKER_VERSION`, or from the `deploy` entry Wrangler writes to
- * `WRANGLER_OUTPUT_FILE_PATH` when the deploy step ran with that variable set.
+ * When the deploy's Worker version is known, the gates first wait until that version answers
+ * three probes in a row, then require it on every response, retrying a response from another
+ * version until the same 60 s budget runs out. They therefore never pass or fail against the
+ * previous deployment while the edge still serves it; they assume a deploy to 100% of traffic
+ * (`wrangler deploy`), not a gradual split. The version comes from `EXPECTED_WORKER_VERSION`,
+ * or from the `deploy` entry Wrangler writes to `WRANGLER_OUTPUT_FILE_PATH` when the deploy
+ * step ran with that variable set.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import {
+  SITE_ENVIRONMENT_HEADER,
   SMOKE_TEST_HEADER,
   WORKER_VERSION_HEADER
 } from '../apps/web/lib/environment/site-environment'
@@ -30,7 +43,7 @@ import {
 import { project } from './project'
 import { categoryRoute, listingRoute } from './site-routes'
 
-export type HttpGateMode = 'staging' | 'production'
+export type HttpGateMode = 'staging' | 'production' | 'public'
 const defaultRequestTimeoutMs = 15_000
 const maxVersionWaitMs = 60_000
 const defaultVersionPollIntervalMs = 2_000
@@ -44,30 +57,56 @@ const maxTextProbeBytes = 131_072
 const maxDocumentProbeBytes = 4 * 1_048_576
 const googleTagManagerMarker = 'googletagmanager.com'
 const workerVersionPattern = /^[A-Za-z0-9-]{1,64}$/u
+/** The production Worker's platform host: where CI reaches it, with the smoke-test header. */
+const productionPlatformOrigin = new URL(project.remote.production.reviewOrigin)
+const canonicalOrigin = new URL(project.publicUrl)
+
+/** Time source for the version budget; tests pass a virtual clock. */
+export interface GateClock {
+  now(): number
+  sleep(milliseconds: number): Promise<void>
+}
+
+const realClock: GateClock = {
+  now: () => Date.now(),
+  sleep: milliseconds =>
+    new Promise<void>(done => {
+      setTimeout(done, milliseconds)
+    })
+}
 
 export interface HttpGateOptions {
+  clock?: GateClock
   /** The deployed Worker version; gates wait for it and require it on every response. */
   expectedVersion?: string
   parityReportPath?: string
-  sleep?: (milliseconds: number) => Promise<void>
   timeoutMs?: number
   versionPollIntervalMs?: number
-  /** Bound on waiting for `expectedVersion` (at most 60 s). */
+  /** Budget for the expected version to answer, shared by the wait and every retry (≤ 60 s). */
   versionWaitMs?: number
   /** Wrangler config whose production `CANONICAL_HOST_REDIRECT` decides the host-redirect gate. */
   wranglerConfigPath?: string
 }
 
+/** The deployed version every response must come from, and the time left to wait for it. */
+interface VersionPin {
+  budgetMs: number
+  clock: GateClock
+  deadline: number
+  expected: string
+  intervalMs: number
+}
+
 interface GateTarget {
   baseUrl: URL
-  expectedVersion?: string
   mode: HttpGateMode
   timeoutMs: number
+  version?: VersionPin
 }
 
 function parseMode(value: string): HttpGateMode {
-  if (value === 'staging' || value === 'production') return value
-  throw new Error('HTTP gate mode must be exactly staging or production.')
+  if (value === 'staging' || value === 'production' || value === 'public') return value
+  throw new Error('HTTP gate mode must be exactly staging, production, or public.')
 }
 
 function validateBaseUrl(mode: HttpGateMode, value: string): URL {
@@ -84,8 +123,16 @@ function validateBaseUrl(mode: HttpGateMode, value: string): URL {
     throw new Error(
       `${mode} gates require a clean HTTPS origin with no credentials, port, path, query, or hash.`
     )
-  if (mode === 'production' && baseUrl.hostname !== project.domain)
-    throw new Error(`Production gates require the exact https://${project.domain} origin.`)
+  if (
+    mode === 'production' &&
+    baseUrl.hostname !== project.domain &&
+    baseUrl.origin !== productionPlatformOrigin.origin
+  )
+    throw new Error(
+      `Production gates require https://${project.domain} or ${productionPlatformOrigin.origin}; either way they gate through ${productionPlatformOrigin.origin}.`
+    )
+  if (mode === 'public' && baseUrl.hostname !== project.domain)
+    throw new Error(`The public check requires the exact https://${project.domain} origin.`)
   if (mode === 'staging' && baseUrl.hostname === project.domain)
     throw new Error('Staging gates reject the Production hostname.')
   return baseUrl
@@ -127,73 +174,80 @@ async function boundedRequest<T>(
   }
 }
 
-/** A gate request: bounded, and answered by the expected Worker version when one is known. */
-function boundedFetch<T>(
+type PinnedAnswer<T> = { kind: 'answered'; value: T } | { kind: 'stale'; version: string }
+
+/**
+ * A gate request: bounded, and answered by the expected Worker version when one is known. An
+ * answer from another version (an isolate still running the previous deployment) is retried
+ * until the version budget runs out, then fails closed.
+ */
+async function boundedFetch<T>(
   target: GateTarget,
   url: URL,
   inspect: (response: Response) => Promise<T>,
   smoke = true
 ): Promise<T> {
-  return boundedRequest(
-    url,
-    target.timeoutMs,
-    async response => {
-      const version = response.headers.get(WORKER_VERSION_HEADER)
-      if (target.expectedVersion && version !== target.expectedVersion) {
-        await response.body?.cancel().catch(() => undefined)
-        throw new Error(
-          `${target.mode} route ${url.pathname}${url.search} was answered by Worker version ${version ?? '(none)'}, not the deployed ${target.expectedVersion}.`
-        )
-      }
-      return inspect(response)
-    },
-    smoke
-  )
+  const pin = target.version
+  for (let attempt = 1; ; attempt += 1) {
+    const answer = await boundedRequest<PinnedAnswer<T>>(
+      url,
+      target.timeoutMs,
+      async response => {
+        const version = response.headers.get(WORKER_VERSION_HEADER)
+        if (pin && version !== pin.expected) {
+          await response.body?.cancel().catch(() => undefined)
+          return { kind: 'stale', version: version ?? '(none)' }
+        }
+        return { kind: 'answered', value: await inspect(response) }
+      },
+      smoke
+    )
+    if (answer.kind === 'answered') return answer.value
+    if (!pin || pin.clock.now() + pin.intervalMs > pin.deadline)
+      throw new Error(
+        `${target.mode} route ${url.pathname}${url.search} was answered by Worker version ${answer.version}, not the deployed ${pin?.expected}, on all ${attempt} attempt(s) before the ${(pin?.budgetMs ?? 0) / 1000} s version budget ran out.`
+      )
+    await pin.clock.sleep(pin.intervalMs)
+  }
 }
-
-const realSleep = (milliseconds: number) =>
-  new Promise<void>(done => {
-    setTimeout(done, milliseconds)
-  })
 
 /**
  * Waits until `expectedVersion` answers `versionConfirmations` probes in a row, for at most
- * `waitMs`. Right after `wrangler deploy` the edge can still run the previous version for a
- * few seconds (Deploy Staging once gated it about 4 s after the deploy).
+ * `waitMs`, and returns the probes it took and the deadline of the version budget that the
+ * gate requests then share. Right after `wrangler deploy` the edge can still run the previous
+ * version for a few seconds (Deploy Staging once gated it about 4 s after the deploy).
  */
 export async function waitForWorkerVersion(
   baseUrl: URL,
   expectedVersion: string,
   options: {
+    clock?: GateClock
     intervalMs?: number
-    sleep?: (milliseconds: number) => Promise<void>
     timeoutMs?: number
     waitMs?: number
   } = {}
-): Promise<number> {
+): Promise<{ deadline: number; probes: number }> {
   const waitMs = options.waitMs ?? maxVersionWaitMs
   const intervalMs = options.intervalMs ?? defaultVersionPollIntervalMs
-  const sleep = options.sleep ?? realSleep
+  const clock = options.clock ?? realClock
   const timeoutMs = Math.min(options.timeoutMs ?? defaultRequestTimeoutMs, waitMs)
   if (!Number.isSafeInteger(waitMs) || waitMs < 1 || waitMs > maxVersionWaitMs)
     throw new Error('Worker version wait must be a positive integer of at most 60 seconds.')
+  const deadline = clock.now() + waitMs
   const probe = routeUrl(baseUrl, '/robots.txt')
-  let elapsed = 0
   let confirmed = 0
   let observed = '(no answer)'
   let probes = 0
   while (true) {
     probes += 1
-    const started = Date.now()
     observed = await boundedRequest(probe, timeoutMs, async response => {
       await response.body?.cancel().catch(() => undefined)
       return response.headers.get(WORKER_VERSION_HEADER) ?? '(none)'
     }).catch((error: unknown) => `(${error instanceof Error ? error.message : String(error)})`)
     confirmed = observed === expectedVersion ? confirmed + 1 : 0
-    if (confirmed >= versionConfirmations) return probes
-    elapsed += Math.max(Date.now() - started, 0) + intervalMs
-    if (elapsed > waitMs) break
-    await sleep(intervalMs)
+    if (confirmed >= versionConfirmations) return { deadline, probes }
+    if (clock.now() + intervalMs > deadline) break
+    await clock.sleep(intervalMs)
   }
   throw new Error(
     `Worker version ${expectedVersion} did not answer ${baseUrl.origin} within ${waitMs / 1000} s (last answer: ${observed}); the previous deployment may still be serving.`
@@ -384,83 +438,47 @@ async function readDocument(
   }
 }
 
+/** The `SITE_ENVIRONMENT` a deployment must report, or null when the origin does not say. */
+function expectedSiteEnvironment(target: GateTarget): string | null {
+  if (target.mode === 'production') return 'production'
+  if (target.baseUrl.origin === productionPlatformOrigin.origin) return 'production'
+  if (target.baseUrl.origin === new URL(project.remote.staging.origin).origin) return 'staging'
+  return null
+}
+
 /**
- * Crawl and analytics policy per environment (serp standards/environment-configuration.md).
- *
- * - Staging (and any non-production origin): `X-Robots-Tag` noindex on `/`, robots.txt and
- *   the sitemap index; robots.txt disallows Google and `*`; no Google Tag Manager; and `/`
- *   without the smoke header is not redirected away (staging never redirects, and the
- *   production review origin must not redirect before the cutover).
- * - Production: no noindex on `/`, robots.txt or the sitemap index; robots.txt lets Google and
- *   `*` crawl and lists the sitemap index; Google Tag Manager loads. A noindex reaching
- *   best.serp.co would deindex the site.
+ * Crawl and analytics policy of a workers.dev origin, which is never the public site (serp
+ * standards/environment-configuration.md): `X-Robots-Tag` noindex on `/`, robots.txt and the
+ * sitemap index; robots.txt disallows Google and `*`; no Google Tag Manager. The Worker also
+ * reports the `SITE_ENVIRONMENT` it was deployed with, which proves through this host that the
+ * production Worker would serve best.serp.co as production.
  */
-async function expectCrawlPolicy(target: GateTarget, contentPath: string): Promise<void> {
+async function expectNonProductionPolicy(target: GateTarget): Promise<void> {
   const { baseUrl, mode } = target
-  if (mode === 'staging') {
-    for (const path of ['/', '/sitemap-index.xml', '/robots.txt']) {
-      await boundedFetch(target, routeUrl(baseUrl, path), async response => {
-        if (!xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag'))) {
-          await response.body?.cancel().catch(() => undefined)
-          throw new Error(`staging route ${path} sent no noindex in its X-Robots-Tag header.`)
-        }
-        if (path === '/' && (await readDocument(response, 'staging route /')).loadsGoogleTagManager)
-          throw new Error('staging route / loads Google Tag Manager.')
-        if (path === '/robots.txt') {
-          const groups = parseRobotsTxt(await readBoundedText(response, 'staging robots.txt'))
-          const crawlable = ['*', 'googlebot'].find(agent => robotsTxtAllows(groups, agent, '/'))
-          if (crawlable) throw new Error(`staging robots.txt lets user-agent ${crawlable} crawl /.`)
-        }
+  const environment = expectedSiteEnvironment(target)
+  for (const path of ['/', '/sitemap-index.xml', '/robots.txt']) {
+    await boundedFetch(target, routeUrl(baseUrl, path), async response => {
+      if (!xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag'))) {
         await response.body?.cancel().catch(() => undefined)
-      })
-    }
-    await boundedFetch(
-      target,
-      routeUrl(baseUrl, '/'),
-      async response => {
+        throw new Error(`${mode} route ${path} sent no noindex in its X-Robots-Tag header.`)
+      }
+      const reported = response.headers.get(SITE_ENVIRONMENT_HEADER)
+      if (path === '/' && environment && reported !== environment) {
         await response.body?.cancel().catch(() => undefined)
-        if (response.status !== 200)
-          throw new Error(
-            `staging route / without the smoke-test header returned ${response.status} ${response.headers.get('location') ?? ''}; this origin must not redirect.`
-          )
-      },
-      false
-    )
-    return
+        throw new Error(
+          `${mode} Worker at ${baseUrl.origin} reports SITE_ENVIRONMENT ${reported ?? '(none)'}, not ${environment}.`
+        )
+      }
+      if (path === '/' && (await readDocument(response, `${mode} route /`)).loadsGoogleTagManager)
+        throw new Error(`${mode} route / loads Google Tag Manager.`)
+      if (path === '/robots.txt') {
+        const groups = parseRobotsTxt(await readBoundedText(response, `${mode} robots.txt`))
+        const crawlable = ['*', 'googlebot'].find(agent => robotsTxtAllows(groups, agent, '/'))
+        if (crawlable) throw new Error(`${mode} robots.txt lets user-agent ${crawlable} crawl /.`)
+      }
+      await response.body?.cancel().catch(() => undefined)
+    })
   }
-  await boundedFetch(target, routeUrl(baseUrl, '/'), async response => {
-    const header = xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag'))
-    const document = await readDocument(response, 'production route /')
-    if (header || metaRobotsBlocksIndexing(document.head))
-      throw new Error(
-        `production route / sent noindex in its ${header ? 'X-Robots-Tag header' : 'robots meta'}.`
-      )
-    if (!document.loadsGoogleTagManager)
-      throw new Error('production route / does not load Google Tag Manager.')
-  })
-  const sitemapIndex = routeUrl(baseUrl, '/sitemap-index.xml')
-  await boundedFetch(target, sitemapIndex, async response => {
-    await response.body?.cancel().catch(() => undefined)
-    if (xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag')))
-      throw new Error('production route /sitemap-index.xml sent X-Robots-Tag noindex.')
-  })
-  await boundedFetch(target, routeUrl(baseUrl, '/robots.txt'), async response => {
-    if (response.status !== 200)
-      throw new Error(`production route /robots.txt returned ${response.status}.`)
-    if (xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag')))
-      throw new Error('production route /robots.txt sent X-Robots-Tag noindex.')
-    const robots = await readBoundedText(response, 'production route /robots.txt')
-    const listsSitemapIndex = robots
-      .split(/\r?\n/u)
-      .some(line => /^\s*sitemap\s*:\s*(\S+)\s*$/iu.exec(line)?.[1] === sitemapIndex.href)
-    if (!listsSitemapIndex)
-      throw new Error(`production robots.txt does not list "Sitemap: ${sitemapIndex.href}".`)
-    const blocked = robotsTxtBlockedPath(robots, ['/', contentPath])
-    if (blocked)
-      throw new Error(
-        `production robots.txt blocks ${blocked.path} for user-agent ${blocked.agent}.`
-      )
-  })
 }
 
 /** Whether the checked-in production config turns the canonical-host redirect on. */
@@ -477,34 +495,92 @@ export function canonicalHostRedirectConfigured(
 }
 
 /**
- * With `CANONICAL_HOST_REDIRECT=on`, the production platform host answers a request without
- * the smoke-test header with one 308 to the same canonical URL on best.serp.co, and serves a
- * request that carries it.
+ * The host redirect, checked with the one request that omits the smoke-test header. With
+ * `CANONICAL_HOST_REDIRECT=on` (production only), `/about?gate=canonical-host` answers one 308
+ * to the same canonical URL on best.serp.co; best.serp.co itself is not requested. Otherwise
+ * `/` is served (staging never redirects, and the production workers.dev origin must not
+ * redirect before the switch is on).
  */
-async function expectCanonicalHostRedirect(target: GateTarget): Promise<void> {
-  const platform = new URL(project.remote.production.reviewOrigin)
-  const platformTarget: GateTarget = { ...target, baseUrl: platform }
+async function expectHostRedirectPolicy(target: GateTarget, redirectOn: boolean): Promise<void> {
+  const { baseUrl, mode } = target
+  if (!redirectOn) {
+    await boundedFetch(
+      target,
+      routeUrl(baseUrl, '/'),
+      async response => {
+        await response.body?.cancel().catch(() => undefined)
+        if (response.status !== 200)
+          throw new Error(
+            `${mode} route / without the smoke-test header returned ${response.status} ${response.headers.get('location') ?? ''}; this origin must not redirect.`
+          )
+      },
+      false
+    )
+    return
+  }
   await boundedFetch(
-    platformTarget,
-    routeUrl(platform, '/about?gate=canonical-host'),
+    target,
+    routeUrl(baseUrl, '/about?gate=canonical-host'),
     async response => {
       await response.body?.cancel().catch(() => undefined)
-      const expected = `${target.baseUrl.origin}/about/?gate=canonical-host`
+      const expected = `${canonicalOrigin.origin}/about/?gate=canonical-host`
       const location = response.headers.get('location')
       if (response.status !== 308 || location !== expected)
         throw new Error(
-          `production platform host ${platform.host}/about returned ${response.status} ${location ?? ''}, not a 308 to ${expected}.`
+          `${mode} platform host ${baseUrl.host}/about without the smoke-test header returned ${response.status} ${location ?? ''}, not a 308 to ${expected}.`
         )
     },
     false
   )
-  await boundedFetch(platformTarget, routeUrl(platform, '/'), async response => {
-    await response.body?.cancel().catch(() => undefined)
-    if (response.status !== 200)
+}
+
+/**
+ * The public site (`public` mode, run by hand at cutover; never by CI): no noindex on `/`,
+ * robots.txt or the sitemap index; robots.txt lets Google and `*` crawl and lists the sitemap
+ * index; Google Tag Manager loads. A noindex reaching best.serp.co would deindex the site.
+ */
+async function expectPublicPolicy(target: GateTarget, contentPath: string): Promise<void> {
+  const { baseUrl, mode } = target
+  await boundedFetch(target, routeUrl(baseUrl, '/'), async response => {
+    if (response.status !== 200) {
+      await response.body?.cancel().catch(() => undefined)
+      throw new Error(`${mode} route / returned ${response.status}.`)
+    }
+    const header = xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag'))
+    const document = await readDocument(response, `${mode} route /`)
+    if (header || metaRobotsBlocksIndexing(document.head))
       throw new Error(
-        `production platform host ${platform.host}/ with the smoke-test header returned ${response.status}.`
+        `${mode} route / sent noindex in its ${header ? 'X-Robots-Tag header' : 'robots meta'}.`
       )
+    if (!document.loadsGoogleTagManager)
+      throw new Error(`${mode} route / does not load Google Tag Manager.`)
   })
+  const sitemapIndex = routeUrl(baseUrl, '/sitemap-index.xml')
+  await boundedFetch(target, sitemapIndex, async response => {
+    await response.body?.cancel().catch(() => undefined)
+    if (xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag')))
+      throw new Error(`${mode} route /sitemap-index.xml sent X-Robots-Tag noindex.`)
+  })
+  await boundedFetch(target, routeUrl(baseUrl, '/robots.txt'), async response => {
+    if (response.status !== 200)
+      throw new Error(`${mode} route /robots.txt returned ${response.status}.`)
+    if (xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag')))
+      throw new Error(`${mode} route /robots.txt sent X-Robots-Tag noindex.`)
+    const robots = await readBoundedText(response, `${mode} route /robots.txt`)
+    const listsSitemapIndex = robots
+      .split(/\r?\n/u)
+      .some(line => /^\s*sitemap\s*:\s*(\S+)\s*$/iu.exec(line)?.[1] === sitemapIndex.href)
+    if (!listsSitemapIndex)
+      throw new Error(`${mode} robots.txt does not list "Sitemap: ${sitemapIndex.href}".`)
+    const blocked = robotsTxtBlockedPath(robots, ['/', contentPath])
+    if (blocked)
+      throw new Error(`${mode} robots.txt blocks ${blocked.path} for user-agent ${blocked.agent}.`)
+  })
+}
+
+/** The origin the gates request: production always goes through its platform host. */
+export function gateOrigin(mode: HttpGateMode, baseUrl: URL): URL {
+  return mode === 'production' ? productionPlatformOrigin : baseUrl
 }
 
 export async function runHttpGates(
@@ -513,7 +589,7 @@ export async function runHttpGates(
   options: HttpGateOptions = {}
 ): Promise<void> {
   const mode = parseMode(modeValue)
-  const baseUrl = validateBaseUrl(mode, baseUrlValue)
+  const baseUrl = gateOrigin(mode, validateBaseUrl(mode, baseUrlValue))
   const parityReportPath = options.parityReportPath ?? project.artifact.parityReportPath
   const report = parse(readFileSync(resolve(parityReportPath), 'utf8')) as {
     parity: { categories: Array<{ slug: string }>; exactSlugSet: string[] }
@@ -526,17 +602,25 @@ export async function runHttpGates(
     throw new Error('HTTP gate timeout must be a positive integer within the protected bound.')
   if (options.expectedVersion !== undefined && !workerVersionPattern.test(options.expectedVersion))
     throw new Error('The expected Worker version is not a Worker version id.')
-  const redirectHost =
+  const redirectOn =
     mode === 'production' && canonicalHostRedirectConfigured(options.wranglerConfigPath)
-  const target: GateTarget = { baseUrl, expectedVersion: options.expectedVersion, mode, timeoutMs }
-  if (target.expectedVersion) {
-    const probes = await waitForWorkerVersion(baseUrl, target.expectedVersion, {
-      intervalMs: options.versionPollIntervalMs,
-      sleep: options.sleep,
+  const target: GateTarget = { baseUrl, mode, timeoutMs }
+  if (options.expectedVersion) {
+    const clock = options.clock ?? realClock
+    const intervalMs = options.versionPollIntervalMs ?? defaultVersionPollIntervalMs
+    const budgetMs = options.versionWaitMs ?? maxVersionWaitMs
+    const { deadline, probes } = await waitForWorkerVersion(baseUrl, options.expectedVersion, {
+      clock,
+      intervalMs,
       timeoutMs,
-      waitMs: options.versionWaitMs
+      waitMs: budgetMs
     })
-    console.info(`Worker version ${target.expectedVersion} answered ${probes} probe(s).`)
+    target.version = { budgetMs, clock, deadline, expected: options.expectedVersion, intervalMs }
+    console.info(`Worker version ${options.expectedVersion} answered ${probes} probe(s).`)
+  }
+  if (mode === 'public') {
+    await expectPublicPolicy(target, listingRoute(listingSlug))
+    return
   }
   await withTrailingSlashPolicy(target, listingSlug, [
     expectRoute(target, '/'),
@@ -548,8 +632,8 @@ export async function runHttpGates(
     expectLegacyRedirect(target, `/${listingSlug}/`, listingRoute(listingSlug)),
     expectRoute(target, '/submit/')
   ])
-  await expectCrawlPolicy(target, listingRoute(listingSlug))
-  if (redirectHost) await expectCanonicalHostRedirect(target)
+  await expectNonProductionPolicy(target)
+  await expectHostRedirectPolicy(target, redirectOn)
 }
 
 export async function runStagingHttpGates(baseUrlValue: string): Promise<void> {
@@ -560,12 +644,16 @@ async function main(): Promise<void> {
   const [modeValue, baseUrlValue, output] = process.argv.slice(2)
   if (!modeValue || !baseUrlValue)
     throw new Error(
-      'Usage: d1-preview-http-gates.ts <staging|production> <clean-https-origin> [output]'
+      'Usage: d1-preview-http-gates.ts <staging|production|public> <clean-https-origin> [output]'
     )
   const expectedVersion = expectedWorkerVersionFromEnvironment(process.env)
   if (!expectedVersion)
     console.info(
       'No expected Worker version (EXPECTED_WORKER_VERSION or WRANGLER_OUTPUT_FILE_PATH): gating whichever version answers.'
+    )
+  if (modeValue === 'production')
+    console.info(
+      `Gating the production Worker through ${productionPlatformOrigin.origin} with the smoke-test header; best.serp.co itself is checked by hand at cutover (docs/DEPLOY_RUNBOOK.md).`
     )
   await runHttpGates(modeValue, baseUrlValue, { expectedVersion })
   if (output)

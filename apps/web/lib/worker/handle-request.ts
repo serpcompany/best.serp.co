@@ -10,13 +10,14 @@
  * 3. Outside public production, `/robots.txt` disallows every crawler.
  * 4. Everything else is served through the edge HTML cache and OpenNext (`serve`).
  *
- * Every response then carries the Worker version and, outside public production,
- * `X-Robots-Tag: noindex, nofollow` (`lib/environment/site-environment.ts`). These headers are
+ * Every response then carries the configured environment, the Worker version and, outside
+ * public production, `X-Robots-Tag: noindex, nofollow` (`lib/environment/site-environment.ts`). These headers are
  * added after the edge cache, so they always describe the Worker and host that answered.
  */
 import {
   isPublicProduction,
   nonProductionRobotsTxt,
+  parseSiteEnvironment,
   withEnvironmentHeaders
 } from '../environment/site-environment'
 import { type CanonicalHostEnv, canonicalHostRedirect } from '../routing/canonical-host'
@@ -45,6 +46,7 @@ export async function handleWorkerRequest(
     (publicProduction ? null : nonProductionRobotsTxt(request)) ??
     (await pipeline.serve(request))
   return withEnvironmentHeaders(response, {
+    environment: parseSiteEnvironment(env.SITE_ENVIRONMENT),
     publicProduction,
     versionId: env.CF_VERSION_METADATA?.id
   })

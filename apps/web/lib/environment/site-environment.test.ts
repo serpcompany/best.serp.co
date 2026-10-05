@@ -7,6 +7,7 @@ import {
   NON_PRODUCTION_X_ROBOTS_TAG,
   nonProductionRobotsTxt,
   parseSiteEnvironment,
+  SITE_ENVIRONMENT_HEADER,
   WORKER_VERSION_HEADER,
   withEnvironmentHeaders
 } from './site-environment'
@@ -61,21 +62,33 @@ describe('site environment', () => {
   it('adds the Worker version and, outside production, noindex to every response', async () => {
     const page = () =>
       new Response('<html></html>', { headers: { 'content-type': 'text/html' }, status: 404 })
-    const staging = withEnvironmentHeaders(page(), { publicProduction: false, versionId: 'v-1' })
+    const staging = withEnvironmentHeaders(page(), {
+      environment: 'staging',
+      publicProduction: false,
+      versionId: 'v-1'
+    })
     expect(staging.status).toBe(404)
     expect(await staging.text()).toBe('<html></html>')
     expect(staging.headers.get('content-type')).toBe('text/html')
     expect(staging.headers.get(WORKER_VERSION_HEADER)).toBe('v-1')
+    expect(staging.headers.get(SITE_ENVIRONMENT_HEADER)).toBe('staging')
     expect(staging.headers.get('x-robots-tag')).toBe(NON_PRODUCTION_X_ROBOTS_TAG)
 
-    const production = withEnvironmentHeaders(page(), { publicProduction: true, versionId: 'v-1' })
+    const production = withEnvironmentHeaders(page(), {
+      environment: 'production',
+      publicProduction: true,
+      versionId: 'v-1'
+    })
     expect(production.headers.get('x-robots-tag')).toBeNull()
     expect(production.headers.get(WORKER_VERSION_HEADER)).toBe('v-1')
-    const unversioned = withEnvironmentHeaders(page(), { publicProduction: true })
-    expect(unversioned.headers.has(WORKER_VERSION_HEADER)).toBe(false)
+    expect(production.headers.get(SITE_ENVIRONMENT_HEADER)).toBe('production')
+    const unset = withEnvironmentHeaders(page(), { environment: null, publicProduction: false })
+    expect(unset.headers.has(WORKER_VERSION_HEADER)).toBe(false)
+    expect(unset.headers.get(SITE_ENVIRONMENT_HEADER)).toBe('unset')
 
     // Redirects (immutable headers) keep their Location.
     const redirect = withEnvironmentHeaders(Response.redirect('https://best.serp.co/about/', 308), {
+      environment: 'production',
       publicProduction: false
     })
     expect(redirect.status).toBe(308)
@@ -86,6 +99,7 @@ describe('site environment', () => {
   it('keeps a stricter noindex and replaces a value that would let a page be indexed', () => {
     const tagged = (value: string) =>
       withEnvironmentHeaders(new Response('x', { headers: { 'x-robots-tag': value } }), {
+        environment: 'staging',
         publicProduction: false
       }).headers.get('x-robots-tag')
     expect(tagged('noindex, nofollow, noarchive')).toBe('noindex, nofollow, noarchive')

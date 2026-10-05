@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { EDGE_CACHE_HEADER, withEdgeCache } from '../edge-cache/html-cache'
 import {
   NON_PRODUCTION_ROBOTS_TXT,
+  SITE_ENVIRONMENT_HEADER,
   SMOKE_TEST_HEADER,
   WORKER_VERSION_HEADER
 } from '../environment/site-environment'
@@ -41,15 +42,16 @@ describe('Worker request pipeline', () => {
     expect(await served.text()).toBe('User-Agent: *\nAllow: /\n')
     expect(served.headers.get('x-robots-tag')).toBeNull()
     expect(served.headers.get(WORKER_VERSION_HEADER)).toBe(version.id)
+    expect(served.headers.get(SITE_ENVIRONMENT_HEADER)).toBe('production')
     expect(handler.serve).toHaveBeenCalledOnce()
   })
 
   it.each([
-    ['staging', staging, { SITE_ENVIRONMENT: 'staging' }],
-    ['the production review URL', review, productionEnv],
-    ['a Worker without SITE_ENVIRONMENT', production, { CF_VERSION_METADATA: version }],
-    ['a misspelled SITE_ENVIRONMENT', production, { SITE_ENVIRONMENT: 'Production' }]
-  ])('keeps %s out of indexes', async (_label, origin, env: WorkerRequestEnv) => {
+    ['staging', staging, { SITE_ENVIRONMENT: 'staging' }, 'staging'],
+    ['the production review URL', review, productionEnv, 'production'],
+    ['a Worker without SITE_ENVIRONMENT', production, { CF_VERSION_METADATA: version }, 'unset'],
+    ['a misspelled SITE_ENVIRONMENT', production, { SITE_ENVIRONMENT: 'Production' }, 'unset']
+  ])('keeps %s out of indexes', async (_label, origin, env: WorkerRequestEnv, reported) => {
     const robots = run(`${origin}/robots.txt`, env)
     const answered = await robots.response
     expect(await answered.text()).toBe(NON_PRODUCTION_ROBOTS_TXT)
@@ -59,6 +61,7 @@ describe('Worker request pipeline', () => {
     for (const path of ['/', '/sitemap-index.xml', '/about']) {
       const response = await run(`${origin}${path}`, env).response
       expect(response.headers.get('x-robots-tag'), path).toBe('noindex, nofollow')
+      expect(response.headers.get(SITE_ENVIRONMENT_HEADER), path).toBe(reported)
     }
   })
 

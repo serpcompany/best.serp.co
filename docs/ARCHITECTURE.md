@@ -88,13 +88,17 @@ host alone. A test (`apps/web/lib/environment/site-environment.test.ts`) pins th
   `*.workers.dev` are not redirected (they never reach the Worker; they stay `noindex`).
   Staging never redirects. Both deployed environments set `workers_dev: true` and
   `preview_urls: false`.
-- **Worker version.** Every Worker response carries `x-worker-version`
-  (`CF_VERSION_METADATA.id`). Given the deployed version (`EXPECTED_WORKER_VERSION`, or the
-  `deploy` entry Wrangler writes to `WRANGLER_OUTPUT_FILE_PATH`), the HTTP gates
-  (`scripts/d1-preview-http-gates.ts`) wait up to 60 seconds until it answers three probes
-  in a row, then require it on every response. They also send the smoke-test header and
-  assert each environment's crawl and analytics policy, including the platform-host 308 once
-  the switch is `on`.
+- **Worker version and gates.** Every Worker response carries `x-worker-version`
+  (`CF_VERSION_METADATA.id`) and `x-site-environment` (the configured `SITE_ENVIRONMENT`, or
+  `unset`). Given the deployed version (`EXPECTED_WORKER_VERSION`, or the `deploy` entry
+  Wrangler writes to `WRANGLER_OUTPUT_FILE_PATH`), the HTTP gates
+  (`scripts/d1-preview-http-gates.ts`) wait until it answers three probes in a row, then
+  require it on every response, retrying an answer from the previous version within the same
+  60-second budget. They send the smoke-test header and go only through workers.dev hosts:
+  production is gated on its platform host (non-production policy, `x-site-environment:
+  production`, and the 308 once the switch is `on`), never on best.serp.co, so `serp.co` zone
+  protection cannot fail a deploy. best.serp.co itself is checked by hand at cutover (`public`
+  mode; see the deploy runbook).
 
 ## URL canonicalization
 

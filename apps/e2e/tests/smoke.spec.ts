@@ -348,6 +348,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       const response = await request.get(path, { maxRedirects: 0 })
       expect(response.headers()['x-robots-tag'], path).toMatch(/\bnoindex\b/u)
       expect(response.headers()['x-worker-version'], path).toMatch(/^[\w-]+$/u)
+      expect(response.headers()['x-site-environment'], path).toMatch(/^(?:local|staging)$/u)
     }
     const robots = await request.get('/robots.txt')
     expect(await robots.text()).toBe('User-agent: *\nDisallow: /\n')
