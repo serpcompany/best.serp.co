@@ -66,7 +66,7 @@ host alone. A test (`apps/web/lib/environment/site-environment.test.ts`) pins th
 | Var | local | staging | production |
 | --- | --- | --- | --- |
 | `SITE_ENVIRONMENT` | `local` | `staging` | `production` |
-| `CANONICAL_HOST_REDIRECT` | unset | unset | `off` until the cutover, then `on` |
+| `CANONICAL_HOST_REDIRECT` | unset | unset | `on` since the cutover (`off` before it) |
 
 - **Public production** is `SITE_ENVIRONMENT=production` on the canonical host
   `best.serp.co`: indexable, `robots.txt` lists the sitemap index, and Google Tag Manager

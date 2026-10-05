@@ -9,10 +9,11 @@
  * `/about?x=1` -> `https://best.serp.co/about/?x=1`. Requests that carry the smoke-test header
  * are served normally so CI can test the deployment through its platform host.
  *
- * The switch stays `off` until the cutover, while the workers.dev URL is the production review
- * origin. Staging and local never redirect, whatever the switch says. Running before the edge
- * cache means a stored response can never answer the wrong client: the redirect is never
- * stored, and the cache only sees workers.dev requests that carry the smoke header.
+ * The switch was `off` until the cutover, while the workers.dev URL was the production review
+ * origin, and is `on` since (deploy runbook, cutover step 5). Staging and local never redirect,
+ * whatever the switch says. Running before the edge cache means a stored response can never
+ * answer the wrong client: the redirect is never stored, and the cache only sees workers.dev
+ * requests that carry the smoke header.
  */
 import { canonicalPathname } from '@serpdirectory/web-core/canonical-url'
 import {
