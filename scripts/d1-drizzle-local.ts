@@ -15,7 +15,8 @@ export const d1TriggerNames = [
   'listing_categories_prevent_primary_demote',
   'listing_categories_prevent_primary_removal',
   'listings_require_primary_on_insert',
-  'listings_require_primary_on_publication'
+  'listings_require_primary_on_publication',
+  'listing_submissions_refuse_blocked_url'
 ] as const
 
 export const requiredIndexNames = [
@@ -39,8 +40,22 @@ export const requiredIndexNames = [
   'listing_submission_notifications_recipient_idx',
   'listing_submission_resource_links_submission_order_unique',
   'listing_submissions_active_slug_idx',
+  'listing_submissions_draft_clock_idx',
+  'listing_submissions_listing_idx',
+  'listing_submissions_owner_idx',
   'listing_submissions_review_queue_idx',
   'listing_submissions_token_unique',
+  'listing_submission_url_blocks_active_idx',
+  'listing_owners_current_member_idx',
+  'listing_owners_current_owner_idx',
+  'listing_owners_user_idx',
+  'listing_revisions_author_idx',
+  'listing_revisions_open_idx',
+  'listing_revisions_review_queue_idx',
+  'listing_revision_events_revision_idx',
+  'listing_revision_faqs_revision_order_unique',
+  'listing_revision_resource_links_revision_order_unique',
+  'badge_checks_listing_time_idx',
   'accounts_user_idx',
   'auth_rate_limit_hits_bucket_idx',
   'auth_rate_limit_hits_time_idx',

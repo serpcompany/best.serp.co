@@ -61,10 +61,10 @@ describe('D1 submission notifier', () => {
     }
     db.exec(`
       INSERT INTO listing_submissions
-        (id,slug,name,description,website,content,category_slug,logo_url,status,access_token_hash)
+        (id,slug,name,description,website,content,category_slug,logo_url,status,plan,access_token_hash)
       VALUES
         ('${submission.id}','example.com','Example','Description','https://example.com','Content',
-         'seo','https://example.com/logo.png','verified','${'f'.repeat(64)}');
+         'seo','https://example.com/logo.png','verified','free','${'f'.repeat(64)}');
       INSERT INTO listing_submission_notifications
         (submission_id,channel,external_id,external_url,recipient,preview_token_hash)
       VALUES

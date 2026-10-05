@@ -35,7 +35,9 @@ export const applicationColumnInventory = {
     'checksum',
     'created_at',
     'updated_at',
-    'display_order'
+    'display_order',
+    'source',
+    'link_rel'
   ],
   listing_categories: ['listing_id', 'category_id', 'sort_order', 'is_primary'],
   listing_media: ['id', 'listing_id', 'kind', 'url', 'sort_order'],
@@ -100,7 +102,22 @@ export const applicationColumnInventory = {
     'reviewed_by',
     'listing_id',
     'created_at',
-    'updated_at'
+    'updated_at',
+    'owner_user_id',
+    'plan',
+    'paid_at',
+    'refunded_at',
+    'reviewer_note',
+    'rejection_reason',
+    'rejection_category',
+    'draft_saved_at',
+    'draft_reminders_sent',
+    'draft_last_reminder_at',
+    'withdrawal_reason',
+    'block_key',
+    'block_covers_subdomains',
+    'published_checksum',
+    'content_version'
   ],
   listing_submission_resource_links: ['id', 'submission_id', 'label', 'url', 'sort_order'],
   listing_submission_faqs: ['id', 'submission_id', 'question', 'answer', 'sort_order'],
@@ -155,7 +172,54 @@ export const applicationColumnInventory = {
   ],
   verification: ['id', 'identifier', 'value', 'expires_at', 'created_at', 'updated_at'],
   admin_allowlist: ['email', 'note', 'added_by', 'created_at'],
-  auth_rate_limit_hits: ['id', 'bucket', 'hit_at']
+  auth_rate_limit_hits: ['id', 'bucket', 'hit_at'],
+  listing_submission_url_blocks: [
+    'id',
+    'url_key',
+    'submission_id',
+    'reason',
+    'blocked_by',
+    'blocked_at',
+    'lifted_at',
+    'lifted_by',
+    'lift_note',
+    'covers_subdomains'
+  ],
+  listing_owners: [
+    'id',
+    'listing_id',
+    'user_id',
+    'role',
+    'verified_via',
+    'verified_at',
+    'revoked_at',
+    'revoked_reason',
+    'created_at'
+  ],
+  listing_revisions: [
+    'id',
+    'listing_id',
+    'author_user_id',
+    'status',
+    'base_checksum',
+    'name',
+    'description',
+    'content',
+    'category_slug',
+    'logo_url',
+    'video_url',
+    'reviewer_note',
+    'rejection_reason',
+    'reviewed_at',
+    'reviewed_by',
+    'created_at',
+    'updated_at',
+    'content_version'
+  ],
+  listing_revision_resource_links: ['id', 'revision_id', 'label', 'url', 'sort_order'],
+  listing_revision_faqs: ['id', 'revision_id', 'question', 'answer', 'sort_order'],
+  listing_revision_events: ['id', 'revision_id', 'event_type', 'detail', 'actor', 'created_at'],
+  badge_checks: ['id', 'listing_id', 'checked_at', 'outcome', 'reason', 'conclusive']
 } as const
 
 export type ApplicationTableName = keyof typeof applicationColumnInventory
@@ -198,6 +262,12 @@ export const importOrder: ApplicationTableName[] = [
   'migration_runs',
   'publication_runs',
   'listing_slug_redirects',
+  'users',
+  'sessions',
+  'accounts',
+  'verification',
+  'admin_allowlist',
+  'auth_rate_limit_hits',
   'listing_submissions',
   'listing_submission_resource_links',
   'listing_submission_faqs',
@@ -205,12 +275,13 @@ export const importOrder: ApplicationTableName[] = [
   'listing_submission_rate_limits',
   'listing_submission_notifications',
   'email_deliveries',
-  'users',
-  'sessions',
-  'accounts',
-  'verification',
-  'admin_allowlist',
-  'auth_rate_limit_hits'
+  'listing_submission_url_blocks',
+  'listing_owners',
+  'listing_revisions',
+  'listing_revision_resource_links',
+  'listing_revision_faqs',
+  'listing_revision_events',
+  'badge_checks'
 ]
 
 export const toolOwnedTableNames = ['d1_migrations'] as const

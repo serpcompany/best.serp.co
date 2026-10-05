@@ -14,6 +14,7 @@ export type CatalogOperation =
   | 'publication-version'
   | 'search-summaries'
   | 'shell-stats'
+  | 'unpublished-listing'
 
 export type CatalogQueryShape =
   | 'canonical-redirect'
@@ -34,6 +35,7 @@ export type CatalogQueryShape =
   | 'related-single-category-seek'
   | 'search-summaries'
   | 'shell-stats'
+  | 'unpublished-listing'
 
 export interface CatalogQueryEvent {
   d1DurationMs: number | null
@@ -111,15 +113,33 @@ export interface RelatedListing {
   website: string
 }
 
+/** The `rel` of our outbound link to the listing's website (an admin setting per listing). */
+export type ListingLinkRel = 'follow' | 'nofollow' | 'sponsored'
+
 export interface ListingDetail extends ListingSummary {
   content?: string
   entityType?: string
+  /** Rendered on the outbound "Visit Site" link; imported and admin listings are `follow`. */
+  linkRel: ListingLinkRel
   media?: ListingMedia
   nextWebsite: ListingNavigation | null
   previousWebsite: ListingNavigation | null
   priority?: 'high' | 'medium' | 'low'
   relatedWebsites: RelatedListing[]
   resourceLinks?: ListingResourceLink[]
+  /** Present when the listing has a current owner (`listing_owners`): the "Verified owner" badge. */
+  verifiedOwner?: true
+}
+
+/**
+ * A listing that was published and is now unpublished (`status = 'approved'`, `is_active = 0`).
+ * Its URL answers 410 Gone, not 404, until it is republished.
+ */
+export interface UnpublishedListing {
+  /** Primary category slug when that category is still active. */
+  category: string | null
+  name: string
+  slug: string
 }
 
 export interface ListingPage {
@@ -183,6 +203,8 @@ export interface CatalogOperations {
   getPublishedListings(): Promise<ListingSummary[]>
   getShellStats(): Promise<CatalogShellStats>
   getSitemapListings(): Promise<ListingSummary[]>
+  /** The unpublished listing at `slug`, or null when the slug is live or never existed. */
+  getUnpublishedListing(slug: string): Promise<UnpublishedListing | null>
   searchListings(query: string, limit?: number): Promise<ListingSummary[]>
 }
 

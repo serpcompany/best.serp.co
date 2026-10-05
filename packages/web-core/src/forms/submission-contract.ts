@@ -40,6 +40,5 @@ export const submissionCapabilitySchema = z.object({
 
 export type SubmissionRequest = z.infer<typeof submissionRequestSchema>
 
-export function submissionSlug(website: string): string {
-  return new URL(website).hostname.replace(/^www\./, '').toLowerCase()
-}
+// The listing slug is derived on the server only, by `urlKey()` (`@serpdirectory/utils/url-key`):
+// this module also reaches the browser bundle, and the Public Suffix List must not.

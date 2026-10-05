@@ -36,6 +36,7 @@ function submissionRow(status: string, slug = 'example.com'): Record<string, unk
     slug,
     status,
     listing_id: null,
+    content_version: 1,
     version: 1,
     checksum: 'before'
   }
@@ -120,10 +121,10 @@ describe('D1 submission approval guard', () => {
       INSERT INTO categories (id,slug,name) VALUES (1,'seo','SEO');
       INSERT INTO publication_state (id,version,manifest_id,checksum) VALUES (1,1,NULL,'before');
       INSERT INTO listing_submissions
-        (id,slug,name,description,website,content,category_slug,logo_url,video_url,status,access_token_hash,badge_verified_at)
+        (id,slug,name,description,website,content,category_slug,logo_url,video_url,status,plan,access_token_hash,badge_verified_at)
       VALUES
         ('${submissionId}','example.com','Example','Description','https://example.com','Content','seo',
-         'https://example.com/logo.png',NULL,'verified','${'f'.repeat(64)}','2026-01-01');
+         'https://example.com/logo.png',NULL,'verified','free','${'f'.repeat(64)}','2026-01-01');
       INSERT INTO listing_submission_resource_links (submission_id,label,url,sort_order)
         VALUES ('${submissionId}','Docs','https://example.com/docs',0);
       INSERT INTO listing_submission_faqs (submission_id,question,answer,sort_order)

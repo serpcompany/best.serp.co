@@ -1,5 +1,6 @@
 import { isValidAssetReference } from '@serpdirectory/utils/asset-reference'
 import { hasFileExtension } from '@serpdirectory/utils/file-extensions'
+import { type UrlKey, urlKey } from '@serpdirectory/utils/url-key'
 import { and, eq, or, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
@@ -12,7 +13,8 @@ import {
   listingSubmissionRateLimits,
   listingSubmissionResourceLinks,
   listingSubmissions,
-  listings
+  listings,
+  type SubmissionStatus
 } from './schema'
 import { assertPreviousStatementChangedOne } from './submission-plans'
 
@@ -62,7 +64,7 @@ export interface SubmissionState {
   lastVerificationError: string | null
   name: string
   slug: string
-  status: 'approved' | 'pending_badge' | 'rejected' | 'verified'
+  status: SubmissionStatus
   verificationAttempts: number
   website: string
 }
@@ -151,8 +153,27 @@ async function sha256(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-function submissionSlug(website: string): string {
-  return new URL(website).hostname.replace(/^www\./u, '').toLowerCase()
+function submissionUrlKey(website: string): UrlKey {
+  try {
+    return urlKey(website)
+  } catch {
+    throw new SubmissionError('invalid_url', 'All submitted URLs must be public HTTP(S) URLs.')
+  }
+}
+
+/**
+ * An active prohibited-URL block that covers the host: one on the host itself, or a
+ * subdomain-covering block on a parent domain of the host. Mirrors the
+ * `listing_submissions_refuse_blocked_url` trigger, which enforces the same rule on insert.
+ */
+export function selectActiveUrlBlockStatement(key: UrlKey): { params: unknown[]; sql: string } {
+  return {
+    sql: `SELECT id FROM listing_submission_url_blocks
+      WHERE lifted_at IS NULL
+        AND (url_key=? OR (covers_subdomains=1 AND substr(?, -1 - length(url_key))='.' || url_key))
+      LIMIT 1`,
+    params: [key.hostKey, key.hostKey]
+  }
 }
 
 function requiredText(value: unknown, field: string): string {
@@ -207,6 +228,8 @@ export function buildSubmissionReviewPreview(
       logo,
       ...(video ? { video } : {})
     },
+    // New submissions are listed with a nofollow outbound link (#59); preview it that way.
+    linkRel: 'nofollow',
     name: requiredTrimmedText(row.name, 'name'),
     nextWebsite: null,
     previousWebsite: null,
@@ -282,7 +305,9 @@ export function createSubmissionOperations(config: {
           )
         }
       }
-      const slug = submissionSlug(input.website)
+      // One normalization for the slug, the duplicate check, and the prohibited-URL block.
+      const key = submissionUrlKey(input.website)
+      const slug = key.hostKey
       // `/products/<slug>/` must stay a page URL; a slug ending in a file extension
       // (`chart.js`) would be treated as a file and lose its trailing slash.
       if (hasFileExtension(slug)) {
@@ -291,7 +316,7 @@ export function createSubmissionOperations(config: {
           'This website address cannot be listed: it ends in a file extension.'
         )
       }
-      const [category, existing] = await Promise.all([
+      const [category, existing, blocked] = await Promise.all([
         queryFirst(
           client.database
             .select({ id: categories.id })
@@ -305,11 +330,24 @@ export function createSubmissionOperations(config: {
             .from(listings)
             .where(or(eq(listings.slug, slug), eq(listings.website, input.website)))
             .limit(1)
-        )
+        ),
+        // A prohibited rejection blocks the registrable domain and its subdomains until an admin
+        // lifts it (DATA_MODEL.md); the insert trigger enforces the same rule.
+        (async () => {
+          const block = selectActiveUrlBlockStatement(key)
+          return (await prepareRaw(client, block.sql, block.params).first()) ?? null
+        })()
       ])
       if (!category) throw new SubmissionError('invalid_category', 'Choose an active category.')
       if (existing)
         throw new SubmissionError('listing_exists', 'This website is already listed.', 409)
+      if (blocked) {
+        throw new SubmissionError(
+          'url_blocked',
+          'This website cannot be submitted. Contact support if you think this is a mistake.',
+          403
+        )
+      }
 
       const id = crypto.randomUUID()
       const tokenBytes = new Uint8Array(32)
@@ -327,7 +365,12 @@ export function createSubmissionOperations(config: {
             id,
             logoUrl: input.logoUrl,
             name: input.name,
+            blockCoversSubdomains: key.coversSubdomains,
+            blockKey: key.blockKey,
+            // The legacy capability flow is the free badge flow; it predates drafts (#63).
+            plan: 'free',
             slug,
+            status: 'pending_badge',
             videoUrl: input.videoUrl || null,
             website: input.website
           })

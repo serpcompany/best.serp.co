@@ -171,7 +171,8 @@ describe('fresh Drizzle D1 history', () => {
     expect(freshMigrationNames()).toEqual([
       '0000_baseline.sql',
       '0001_email_deliveries.sql',
-      '0002_better_auth.sql'
+      '0002_better_auth.sql',
+      '0003_submissions_data_model.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
@@ -188,16 +189,32 @@ describe('fresh Drizzle D1 history', () => {
     }
 
     const baseline = readFileSync(resolve(freshMigrationsDirectory, '0000_baseline.sql'), 'utf8')
-    for (const trigger of d1TriggerNames) expect(baseline).toContain(`CREATE TRIGGER ${trigger}`)
+    // The primary-category triggers live in the baseline; later triggers in their migration.
+    for (const trigger of d1TriggerNames.filter(name => name.includes('primary'))) {
+      expect(baseline).toContain(`CREATE TRIGGER ${trigger}`)
+    }
     expect(baseline).toContain('COLLATE NOCASE')
 
     // Every table of every migration is STRICT (Drizzle cannot express it; see DATA_MODEL.md).
+    // A rebuild creates `__new_<table>` and renames it over the table it replaces.
     const history = freshMigrationNames()
       .map(name => readFileSync(resolve(freshMigrationsDirectory, name), 'utf8'))
       .join('\n')
-    expect(history.match(/^CREATE TABLE/gmu)).toHaveLength(applicationTableNames.length)
-    expect(history.match(/^\) STRICT;/gmu)).toHaveLength(applicationTableNames.length)
+    const created = [...history.matchAll(/^CREATE TABLE `([^`]+)`/gmu)].map(match => match[1])
+    const rebuilt = created.filter(name => name?.startsWith('__new_'))
+    expect(created.filter(name => !name?.startsWith('__new_')).sort()).toEqual(
+      [...applicationTableNames].sort()
+    )
+    expect(history.match(/^\) STRICT;/gmu)).toHaveLength(created.length)
+    for (const name of rebuilt) {
+      expect(history).toContain(`ALTER TABLE \`${name}\` RENAME TO \`${name?.slice(6)}\`;`)
+    }
+    // SQLite cannot add a CHECK constraint to an existing table without a rebuild, and
+    // rebuilding `listings` would cascade-delete its children: it only ever gains columns.
+    expect(rebuilt).not.toContain('__new_listings')
+    expect(history).not.toMatch(/PRAGMA foreign_keys\s*=\s*OFF/iu)
     for (const index of requiredIndexNames) expect(history).toContain(`\`${index}\``)
+    for (const trigger of d1TriggerNames) expect(history).toContain(`CREATE TRIGGER ${trigger}`)
     expect(history).not.toMatch(/site_id|`sites`/u)
   })
 
@@ -252,6 +269,85 @@ describe('fresh Drizzle D1 history', () => {
     database.close()
   })
 
+  it('upgrades a populated database to the #62 data model with foreign keys enforced', () => {
+    // D1 enforces foreign keys and runs a migration in one transaction, so a rebuild that dropped
+    // a parent still referenced by a child would cascade-delete the child rows.
+    const database = new DatabaseSync(':memory:')
+    const names = freshMigrationNames()
+    const dataModel = names.at(-1)
+    expect(dataModel).toBe('0003_submissions_data_model.sql')
+    for (const migration of names.slice(0, -1)) {
+      database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
+    }
+    database.exec(`
+      INSERT INTO categories (slug, name) VALUES ('tools', 'Tools');
+      INSERT INTO listings (id, slug, name, description, website, status, source_kind,
+        source_identity, checksum)
+      VALUES ('lst_imported', 'imported.example', 'Imported', 'd', 'https://imported.example/',
+        'draft', 'legacy-json-migration-v1', 'imported', 'c'),
+        ('lst_submitted', 'submitted.example', 'Submitted', 'd', 'https://submitted.example/',
+        'draft', 'verified-submission', 'sub', 'c');
+      INSERT INTO listing_categories VALUES ('lst_imported', 1, 0, 1), ('lst_submitted', 1, 0, 1);
+      UPDATE listings SET status = 'approved', published_at = '2026-05-16';
+      INSERT INTO listing_submissions (id, slug, name, description, website, content,
+        category_slug, logo_url, status, access_token_hash, listing_id)
+      VALUES ('sub', 'submitted.example', 'Submitted', 'd', 'https://submitted.example/', 'c',
+        'tools', 'https://submitted.example/logo.png', 'approved', 'digest', 'lst_submitted');
+      INSERT INTO listing_submission_resource_links (submission_id, label, url)
+        VALUES ('sub', 'Docs', 'https://submitted.example/docs');
+      INSERT INTO listing_submission_faqs (submission_id, question, answer)
+        VALUES ('sub', 'Q', 'A');
+      INSERT INTO listing_submission_events (submission_id, event_type, actor)
+        VALUES ('sub', 'approved', 'reviewer');
+      INSERT INTO listing_submission_notifications (submission_id, channel, external_id,
+        external_url, recipient) VALUES ('sub', 'github_issue', '1', 'https://example.com/1', 'r');
+    `)
+    expect(database.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 })
+    database.exec('BEGIN')
+    database.exec(readFileSync(resolve(freshMigrationsDirectory, String(dataModel)), 'utf8'))
+    database.exec('COMMIT')
+
+    for (const table of [
+      'listing_submissions',
+      'listing_submission_resource_links',
+      'listing_submission_faqs',
+      'listing_submission_events',
+      'listing_submission_notifications'
+    ]) {
+      expect(database.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get(), table).toEqual({
+        count: 1
+      })
+    }
+    expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect(database.prepare('SELECT id, source, link_rel FROM listings ORDER BY id').all()).toEqual(
+      [
+        { id: 'lst_imported', link_rel: 'follow', source: 'admin' },
+        { id: 'lst_submitted', link_rel: 'follow', source: 'submission' }
+      ]
+    )
+    expect(
+      database
+        .prepare('SELECT status, plan, owner_user_id, access_token_hash FROM listing_submissions')
+        .get()
+    ).toEqual({
+      access_token_hash: 'digest',
+      owner_user_id: null,
+      plan: 'free',
+      status: 'approved'
+    })
+    // The rebuilt children follow the renamed parent, so cascades still reach them.
+    expect(
+      database.prepare("SELECT sql FROM sqlite_master WHERE name='listing_submission_faqs'").get()
+    ).toMatchObject({ sql: expect.stringContaining('REFERENCES "listing_submissions"') })
+    database.exec("DELETE FROM listing_submissions WHERE id = 'sub'")
+    expect(database.prepare('SELECT COUNT(*) AS count FROM listing_submission_faqs').get()).toEqual(
+      {
+        count: 0
+      }
+    )
+    database.close()
+  })
+
   it('migrates empty canonical local state and verifies the exact fresh schema', () => {
     const stateDirectory = temporaryDirectory('best-serp-co-drizzle-')
     // pnpm db:migrations:list:local lists what pnpm db:migrate:local will apply: every migration.
@@ -283,7 +379,7 @@ describe('fresh Drizzle D1 history', () => {
         stateDirectory,
         "INSERT INTO users (id, name, email, email_verified) VALUES ('u1', '', 'a@example.com', 1); INSERT INTO auth_rate_limit_hits (bucket, hit_at) VALUES ('b', 1)"
       )
-      expect(runLocal('verify', stateDirectory)).toContain('exact 17-table snapshot')
+      expect(runLocal('verify', stateDirectory)).toContain('exact 24-table snapshot')
       mutateCanonicalState(stateDirectory)
       // The tampered table, and nothing else, must fail parity (not a crash or a missing report).
       expect(failingLocalStderr('verify', stateDirectory)).toContain(

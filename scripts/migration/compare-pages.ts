@@ -13,7 +13,10 @@ import { categoryRoute, listingRoute } from '../site-routes'
  *
  * The baseline is the legacy static site, which used /products/<slug>/reviews/ and
  * /products/best/<category>/; those paths are translated to the current routes before
- * fetching the candidate and before comparing canonical paths.
+ * fetching the candidate and before comparing canonical paths. Since the cutover (#50),
+ * best.serp.co is itself the D1 Worker and redirects those paths permanently, so a baseline
+ * that answers a legacy path with 301/308 must redirect to exactly the translated route, and is
+ * then compared at that route. Outbound link `rel` values are compared too (#62).
  *
  * Usage: pnpm tsx scripts/migration/compare-pages.ts <candidate-origin> [--baseline <origin>] [--sample 25]
  */
@@ -32,8 +35,16 @@ interface PageShape {
   faqCount: number
   h1: string | null
   jsonLdTypes: string[]
+  /** `rel` of every link to another site, sorted: covers the listing's outbound link (#62). */
+  outboundRels: string[]
   status: number
   title: string | null
+}
+
+interface FetchedPage {
+  /** The `Location` of a redirect, resolved against the request URL. */
+  location: string | null
+  shape: PageShape
 }
 
 function decode(value: string): string {
@@ -65,19 +76,61 @@ function jsonLdTypes(html: string): string[] {
   return [...types].sort()
 }
 
-async function fetchShape(origin: string, path: string): Promise<PageShape> {
-  const response = await fetch(new URL(path, origin), { redirect: 'manual' })
+/** The `rel` of every `<a>` that links to another site (not the page's origin or best.serp.co). */
+export function outboundRels(html: string, origin: string): string[] {
+  const ownHosts = new Set([new URL(origin).host, new URL(project.publicUrl).host])
+  const rels: string[] = []
+  for (const tag of html.matchAll(/<a\b[^>]*>/gu)) {
+    const href = /\shref="([^"]+)"/u.exec(tag[0])?.[1]
+    if (!href || !/^https?:\/\//u.test(href)) continue
+    let host: string
+    try {
+      host = new URL(decode(href)).host
+    } catch {
+      continue
+    }
+    if (ownHosts.has(host)) continue
+    rels.push(/\srel="([^"]*)"/u.exec(tag[0])?.[1] ?? '(none)')
+  }
+  return rels.sort()
+}
+
+async function fetchShape(origin: string, path: string): Promise<FetchedPage> {
+  const url = new URL(path, origin)
+  const response = await fetch(url, { redirect: 'manual' })
   const html = response.status === 200 ? await response.text() : ''
   const canonical = firstMatch(html, /<link[^>]*rel="canonical"[^>]*href="([^"]+)"/u)
+  const location = response.headers.get('location')
   return {
-    canonicalPath: canonical ? new URL(canonical).pathname : null,
-    description: firstMatch(html, /<meta[^>]*name="description"[^>]*content="([^"]*)"/u),
-    faqCount: (html.match(/"@type"\s*:\s*"Question"/gu) ?? []).length,
-    h1: firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/u),
-    jsonLdTypes: jsonLdTypes(html),
-    status: response.status,
-    title: firstMatch(html, /<title[^>]*>([\s\S]*?)<\/title>/u)
+    location: location ? new URL(location, url).toString() : null,
+    shape: {
+      canonicalPath: canonical ? new URL(canonical).pathname : null,
+      description: firstMatch(html, /<meta[^>]*name="description"[^>]*content="([^"]*)"/u),
+      faqCount: (html.match(/"@type"\s*:\s*"Question"/gu) ?? []).length,
+      h1: firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/u),
+      jsonLdTypes: jsonLdTypes(html),
+      outboundRels: outboundRels(html, origin),
+      status: response.status,
+      title: firstMatch(html, /<title[^>]*>([\s\S]*?)<\/title>/u)
+    }
   }
+}
+
+/**
+ * Since the cutover the baseline is itself the D1 Worker and redirects legacy paths. Such a
+ * redirect must point at exactly the translated route on the baseline's own origin.
+ */
+export function redirectsToTranslated(
+  location: string | null,
+  baseline: string,
+  translated: string
+) {
+  if (!location) return false
+  const target = new URL(location)
+  return (
+    target.origin === new URL(baseline).origin &&
+    `${target.pathname}${target.search}` === translated
+  )
 }
 
 function samplePaths(sampleSize: number): string[] {
@@ -128,10 +181,22 @@ export async function comparePages(options: {
 }): Promise<number> {
   let differences = 0
   for (const path of samplePaths(options.sample)) {
-    const [legacy, candidate] = await Promise.all([
+    const translated = translateLegacyPath(path)
+    const [fetchedLegacy, fetchedCandidate] = await Promise.all([
       fetchShape(options.baseline, path),
-      fetchShape(options.candidate, translateLegacyPath(path))
+      fetchShape(options.candidate, translated)
     ])
+    let legacy = fetchedLegacy.shape
+    const candidate = fetchedCandidate.shape
+    const problems: string[] = []
+    if (translated !== path && (legacy.status === 301 || legacy.status === 308)) {
+      if (!redirectsToTranslated(fetchedLegacy.location, options.baseline, translated)) {
+        problems.push(
+          `      location: ${JSON.stringify(fetchedLegacy.location)} -> expected ${JSON.stringify(translated)}`
+        )
+      }
+      legacy = (await fetchShape(options.baseline, translated)).shape
+    }
     const baseline = {
       ...legacy,
       canonicalPath: legacy.canonicalPath && translateLegacyPath(legacy.canonicalPath)
@@ -139,12 +204,13 @@ export async function comparePages(options: {
     const fields = (Object.keys(baseline) as Array<keyof PageShape>).filter(
       field => JSON.stringify(baseline[field]) !== JSON.stringify(candidate[field])
     )
-    if (fields.length === 0) {
+    if (fields.length === 0 && problems.length === 0) {
       console.log(`ok    ${path}`)
       continue
     }
     differences += 1
     console.log(`DIFF  ${path}`)
+    for (const problem of problems) console.log(problem)
     for (const field of fields) {
       console.log(
         `      ${field}: ${JSON.stringify(baseline[field])} -> ${JSON.stringify(candidate[field])}`

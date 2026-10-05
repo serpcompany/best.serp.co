@@ -26,16 +26,41 @@ adding migrations (later migrations end each `CREATE TABLE` with `STRICT` by han
 Drizzle cannot express them. `0002_better_auth.sql` also seeds the admin allowlist with a
 fixed `created_at`, so bootstrap parity stays exact.
 
+`0003_submissions_data_model.sql` (serpcompany/best.serp.co#62) is hand-finished in two more
+ways, because D1 enforces foreign keys and runs a migration in one transaction, where
+`PRAGMA foreign_keys=OFF` has no effect:
+
+- `listings` only gains columns (`ALTER TABLE ... ADD ... CHECK`). Drizzle generates a
+  rebuild for a new CHECK; dropping `listings` would cascade-delete its memberships, media,
+  links, and FAQs and drop the primary-category triggers. Never rebuild `listings`.
+- `listing_submissions` and its four child tables are rebuilt as `__new_*` tables that
+  reference the new parent; the old children are dropped before the old parent, so no drop
+  cascades, and the renames carry the references over. Copy that order for any future rebuild
+  of a referenced table, and recreate its triggers.
+
+A test applies the migration to a populated database inside a transaction with foreign keys
+enforced (`scripts/d1-drizzle-local.test.ts`). After `pnpm db:generate`, replace the generated
+SQL with the hand-finished form and check that a second `pnpm db:generate` reports no changes.
+
+D1 has limits that `node:sqlite` does not apply: LIKE and GLOB patterns of at most 50 bytes, at
+most 100 bound parameters per statement, and at most 32 arguments per function. So no CHECK or
+trigger uses LIKE or GLOB (ISO instants are checked with `x IS strftime('%Y-%m-%dT%H:%M:%fZ', x)`),
+and `scripts/d1-workerd-plans.test.ts` (harness step "D1 contracts") runs the #62 plans, draft
+writes, badge checks, and URL blocks on Wrangler-local D1 (workerd).
+
 - `categories` stores taxonomy rows and display order (unique `slug`).
 - `listings` stores public product fields, status, publication time, and stable IDs
-  (unique `slug`).
+  (unique `slug`), plus `source` and `link_rel` (see [Listings](#listings-source-link-and-unpublishing)).
 - `listing_categories` stores ordered category membership with one primary category.
 - `listing_media`, `listing_resource_links`, and `listing_faqs` store detail content.
 - `publication_state` is a single row (`id = 1`) with the current version and checksum.
 - `migration_runs` and `publication_runs` record imports and applied manifests.
 - `listing_slug_redirects` maps retired slugs to their listing.
 - `listing_submissions` and its resource, FAQ, event, rate-limit, and notification
-  tables hold private intake. Only a digest of each access capability is stored.
+  tables hold private intake. Only a digest of each legacy access capability is stored.
+  `listing_submission_url_blocks` holds prohibited-URL blocks.
+- `listing_owners`, `listing_revisions` (with resource, FAQ, and event tables), and
+  `badge_checks` hold ownership, owner edits, and badge program history (#62, below).
 - `email_deliveries` is the transactional email ledger: one row per template and event key
   (status, attempts, provider message id, error code), never a recipient or content
   (see [Email](./EMAIL.md)).
@@ -49,6 +74,107 @@ fixed `created_at`, so bootstrap parity stays exact.
   a key derived from `BETTER_AUTH_SECRET`, never an email or IP address. `sessions` stores
   the client's raw `ip_address` and `user_agent` (Better Auth's default)
   ([Accounts](./ACCOUNTS.md)).
+
+## Listings: source, link, and unpublishing
+
+- `source` is `admin` (the 3,422 imported listings, publication manifests, admin-added) or
+  `submission` (promoted from `listing_submissions`). The migration backfilled `admin`, and
+  `submission` for any listing an approval created (`source_kind = 'verified-submission'`).
+- `link_rel` is the admin setting for our outbound "Visit Site" link: `follow`, `nofollow`,
+  or `sponsored`. It defaults to `follow`, which renders `rel="noopener noreferrer"` exactly as
+  before; submission approvals write `nofollow`. Detail DTOs carry it as `linkRel`.
+- **Unpublished** is `status = 'approved'` with `is_active = 0`: the row, slug, and
+  memberships stay, every public query (pages, sitemap, search, RSS, category pages, counts)
+  drops it, and `getUnpublishedListing(slug)` finds it so the route can answer 410 Gone
+  instead of 404 (#64). Republishing sets `is_active = 1` and the URL works again. The
+  publisher's `listing-unpublish` reaches the same state.
+- A listing has a **verified owner** when `listing_owners` has a current `owner` row; detail
+  DTOs carry `verifiedOwner: true` (one probe of `listing_owners_current_owner_idx`).
+
+## Ownership, plans, revisions, and badge checks (#62)
+
+- `listing_owners`: listing, user, `role` (`owner`; more roles can be added for teams),
+  `verified_via` (`submission` | `badge_claim` | `paid_claim`), `verified_at`, and
+  `revoked_at`/`revoked_reason`. A partial unique index allows one current owner per listing;
+  revoking keeps the row, so the table is the ownership history. User references are
+  `ON DELETE RESTRICT`: account deletion must resolve ownership first.
+- `listing_submissions.plan` is the plan the submitter chose (`free` | `paid`, null while a
+  draft has not chosen); `paid_at` and `refunded_at` record payment. A refund that keeps a
+  listing live with a recent badge pass sets the plan to `free` (paid → free). Owners
+  (`owner_user_id`), `reviewer_note`, and `rejection_reason` with `rejection_category`
+  (`prohibited` | `other`) complete the review record. CHECK constraints tie these together:
+  a refund never coexists with a `prohibited` rejection, a withdrawn row never holds an
+  unrefunded payment (the owner cannot withdraw once paid), and a draft is native (owner and
+  block key, no plan or `paid`). The statuses and transitions are in
+  [Submission flow](./SUBMISSION_FLOW.md).
+- `content_version` (submissions and revisions) increments on every content edit; approvals
+  compare and swap on the version the reviewer saw. `published_checksum` is the listing
+  checksum written when a paid submission went live before review; the live approval requires
+  the listing to still have it, so an admin edit made meanwhile is never overwritten.
+- **Deploy window.** The column defaults stay `status = 'pending_badge'` and `plan = 'free'`,
+  as before #62, so a Worker deployed before this migration keeps writing valid legacy rows
+  between migrate and deploy. **Contract for #63:** native intake writes a draft explicitly:
+  `status = 'draft'`, `plan = NULL` (the column default `free` is refused for a draft),
+  `owner_user_id`, `draft_saved_at` (`Date#toISOString()`), and `block_key` with
+  `block_covers_subdomains` from `urlKey()`.
+- **Draft clock** (#59 amendment): `draft_saved_at` (an ISO instant, required for a draft)
+  starts when the draft is first saved. Edits never reset it or the reminders (the owner
+  confirmed on 2026-10-06: the 30 days run from the first save), so editing cannot extend a
+  hold on a URL. `draft_reminders_sent` (0 to 5) and `draft_last_reminder_at` record the claimed
+  reminders; `withdrawal_reason` (`owner` | `expired` | `admin`) is set exactly when the status
+  is `withdrawn`. `listing_submissions_draft_clock_idx` (drafts only) serves the reminder and
+  expiry queries in `draft-plans.ts`; the schedule and the two reminder variants are in
+  [Submission flow](./SUBMISSION_FLOW.md).
+- **URL keys and prohibited URLs** (#59 amendments). `urlKey()`
+  (`packages/utils/url-key.ts`) normalizes every website once: the WHATWG URL parser (as in
+  workerd) percent-decodes, punycodes, and lowercases the host; trailing dots and a leading
+  `www.` are removed. The host is the slug and the duplicate key. `block_key` is its registrable
+  domain per the Public Suffix List, private section included (`tldts` 7.4.16, 128 KB minified,
+  46 KB gzipped, no Node APIs), so `user.github.io` is its own site. The app computes it at
+  intake and stores it with its scope (`block_covers_subdomains`), because SQLite cannot evaluate
+  the PSL; CHECKs keep it equal to the slug or a parent domain of it. A host with no registrable
+  domain (a public suffix such as `github.io`, or an IP address) is its own block key with an
+  exact-host scope, so a block on it never covers the separate sites under it.
+  A `prohibited` rejection inserts an active block for the block key with that scope; the trigger
+  `listing_submissions_refuse_blocked_url` then refuses any new submission, free or paid, whose
+  slug is the blocked key, or a subdomain of it when the block covers subdomains, until an admin
+  lifts the block (`lifted_at`). `other` rejections block nothing. **Limitation:** a row written
+  before #62 has no block key, so a prohibited rejection of it blocks its exact host only. Such
+  rows exist only on staging (production had no submissions before #62), so there is no backfill.
+- **Charges are recorded in #68's `orders`.** `paid_at` and `refunded_at` describe a payment
+  applied to this submission, nothing more. **Contract for #68:** `orders` is the ledger of record
+  for every charge and refund, including the ones a submission row cannot represent: a checkout
+  that completes after a reviewer requested changes or rejected the submission, a duplicate
+  checkout session, an upgrade of a listing unpublished during checkout, or a charge after a
+  `prohibited` rejection (the row refuses `refunded_at` there). The webhook records the charge in
+  `orders` first, applies it with `buildRecordSubmissionPaymentPlans` (or
+  `buildRecordUnappliedPaymentPlans` for a withdrawn row) when the submission accepts it, and
+  otherwise refunds it from `orders` alone.
+- `listing_revisions` stage an owner's edit of a live listing (name, description, content,
+  primary category, logo, video, resource links, FAQs; never website or slug) against the
+  listing's `checksum` at the time (`base_checksum`). A listing has at most one open revision,
+  and none while its own submission is still in review; the logo is required, like a
+  submission's.
+- `badge_checks` (listing, `checked_at`, `outcome` `pass` | `fail`, `reason`, `conclusive`) is
+  the badge program history. A network error or timeout is an inconclusive `fail` and never
+  counts as a miss; `checked_at` is an ISO instant (a CHECK), compared as text. It is outside
+  the catalog: writing it never changes the catalog epoch.
+
+These tables are empty in the initial import, so bootstrap parity compares them like the
+submission tables (`scripts/d1-table-inventory.ts`).
+
+## Statement plans
+
+Every transition is a credential-free statement plan in `packages/data-ops`
+(`submission-plans.ts`, `draft-plans.ts`, `listing-plans.ts`, `revision-plans.ts`,
+`plan-support.ts`) sent as
+one D1 batch. Each mutation repeats its expected state in the `WHERE` and is followed by a
+`changes() = 1` assertion, so a stale or concurrent decision fails the whole batch. A plan that
+changes public output (publishing, unpublishing, content, `link_rel`, ownership) also records
+a `publication_runs` row and advances `publication_state.version` with a compare-and-swap
+(`prepareCatalogPublication` derives the ids and checksum), so cached pages turn over.
+Revision and live-submission approvals move the listing to `draft` inside the batch, replace
+its content, and publish it again, so the primary-category triggers stay in force.
 
 ## Public eligibility
 

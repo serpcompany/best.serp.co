@@ -17,6 +17,7 @@ import type {
   CatalogQueryShape,
   CatalogShellStats,
   ListingDetail,
+  ListingLinkRel,
   ListingNamePage,
   ListingNamePageQuery,
   ListingNavigation,
@@ -24,11 +25,13 @@ import type {
   ListingResourceLink,
   ListingSummary,
   PublishedCategory,
-  RelatedListing
+  RelatedListing,
+  UnpublishedListing
 } from './contracts'
 import { listingSlugRedirects, listings } from './schema'
 
-const CACHE_SCHEMA = 'v3'
+/** v4: listing details carry `linkRel` and `verifiedOwner` (#62). */
+const CACHE_SCHEMA = 'v4'
 /**
  * Keys include the catalog epoch (publication version plus the latest public
  * `published_at`), so an entry can never outlive the content it was built from; the TTL
@@ -47,6 +50,7 @@ const MAX_LISTING_PAGE_SIZE = 100
  */
 const RELATED_MEMBER_SCAN_LIMIT = 128
 const runtimePriorities = new Set(['high', 'medium', 'low'])
+const runtimeLinkRels = new Set<string>(['follow', 'nofollow', 'sponsored'])
 /** Directory name order is the locale order the pages have always used (`localeCompare`). */
 const nameCollator = new Intl.Collator()
 
@@ -75,9 +79,17 @@ interface DetailRow extends SummaryRow {
   content: string | null
   entity_type: string | null
   images: string
+  link_rel: string
   priority: string | null
   resource_links: string
+  verified_owner: number
   video: string | null
+}
+
+interface UnpublishedRow {
+  category: string | null
+  name: string
+  slug: string
 }
 
 interface NavigationRow {
@@ -247,11 +259,14 @@ function mapDetail(
       : undefined
   const logo = summary.media?.logo
   const video = row.video || undefined
+  if (!runtimeLinkRels.has(row.link_rel))
+    throw new Error(`Invalid D1 listing ${row.slug} link rel.`)
 
   return {
     ...summary,
     content: row.content || undefined,
     entityType: row.entity_type || undefined,
+    linkRel: row.link_rel as ListingLinkRel,
     media:
       logo || video || images.length
         ? {
@@ -261,7 +276,8 @@ function mapDetail(
           }
         : undefined,
     priority,
-    resourceLinks: resources.length ? resources : undefined
+    resourceLinks: resources.length ? resources : undefined,
+    verifiedOwner: row.verified_owner === 1 || undefined
   }
 }
 
@@ -385,6 +401,8 @@ function isListingDetail(value: unknown): value is ListingDetail {
   return (
     isOptionalString(candidate.content) &&
     isOptionalString(candidate.entityType) &&
+    runtimeLinkRels.has(candidate.linkRel) &&
+    (candidate.verifiedOwner === undefined || candidate.verifiedOwner === true) &&
     isDetailMedia(candidate.media) &&
     (candidate.nextWebsite === null || isNavigation(candidate.nextWebsite)) &&
     (candidate.previousWebsite === null || isNavigation(candidate.previousWebsite)) &&
@@ -801,6 +819,11 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         l.content,
         l.entity_type,
         l.priority,
+        l.link_rel,
+        EXISTS (
+          SELECT 1 FROM listing_owners o
+          WHERE o.listing_id = l.id AND o.role = 'owner' AND o.revoked_at IS NULL
+        ) AS verified_owner,
         COALESCE((
           SELECT json_group_array(ordered.url)
           FROM (
@@ -959,6 +982,41 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     const detail = await queryListingBySlug(slug)
     await writeCache('listing-detail', cacheKey, { detail, publicationVersion })
     return detail
+  }
+
+  /**
+   * One index seek on the unique slug. Uncached: it only runs after a detail lookup missed,
+   * and an unpublished listing has no public epoch-keyed content to share.
+   */
+  async function getUnpublishedListing(slug: string): Promise<UnpublishedListing | null> {
+    const rows = await queryAll<UnpublishedRow>(
+      'unpublished-listing',
+      'unpublished-listing',
+      parameterizedQuery<UnpublishedRow>(
+        `SELECT
+        l.slug,
+        l.name,
+        (
+          SELECT c.slug
+          FROM listing_categories lc
+          JOIN categories c ON c.id = lc.category_id
+          WHERE lc.listing_id = l.id AND lc.is_primary = 1 AND c.is_active = 1
+          LIMIT 1
+        ) AS category
+      FROM listings l
+      WHERE l.slug = ? AND l.status = 'approved' AND l.is_active = 0
+        AND l.published_at IS NOT NULL
+      LIMIT 1`,
+        [slug]
+      )
+    )
+    const row = rows[0]
+    if (!row) return null
+    return {
+      category: row.category ? requireString(row.category, 'unpublished listing category') : null,
+      name: requireString(row.name, 'unpublished listing name'),
+      slug: requireString(row.slug, 'unpublished listing slug')
+    }
   }
 
   function getListingBySlug(slug: string): Promise<ListingDetail | null> {
@@ -1244,6 +1302,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     getPublishedListings,
     getShellStats,
     getSitemapListings: getPublishedListings,
+    getUnpublishedListing,
     searchListings
   }
 }

@@ -100,7 +100,18 @@ export async function approveRemoteSubmission(
       throw new Error('Only a pending or verified submission can be rejected.')
     }
     const now = new Date().toISOString()
-    await query(buildRejectSubmissionPlans({ now, reviewer, submissionId }), env, fetcher)
+    // The legacy workflow takes no reason; `other` keeps the URL open for resubmission.
+    await query(
+      buildRejectSubmissionPlans({
+        category: 'other',
+        now,
+        reason: 'Rejected through the Review D1 Submission workflow.',
+        reviewer,
+        submissionId
+      }),
+      env,
+      fetcher
+    )
     return { idempotent: false, listingId: null }
   }
   const listingId =
@@ -113,7 +124,8 @@ export async function approveRemoteSubmission(
   if (
     typeof row.version !== 'number' ||
     typeof row.checksum !== 'string' ||
-    typeof row.slug !== 'string'
+    typeof row.slug !== 'string' ||
+    typeof row.content_version !== 'number'
   ) {
     throw new Error('Invalid publication state.')
   }
@@ -132,6 +144,8 @@ export async function approveRemoteSubmission(
       afterChecksum,
       affectedRoute: listingRoute(row.slug),
       beforeChecksum: row.checksum,
+      // The legacy flow has no edit path, so the reviewed preview is the snapshot's version.
+      expectedContentVersion: row.content_version,
       listingId,
       manifestId,
       now,

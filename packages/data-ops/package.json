@@ -10,8 +10,12 @@
     "./catalog-epoch": "./src/catalog-epoch.ts",
     "./client": "./src/client.ts",
     "./contracts": "./src/contracts.ts",
+    "./draft-plans": "./src/draft-plans.ts",
     "./email-deliveries": "./src/email-deliveries.ts",
+    "./listing-plans": "./src/listing-plans.ts",
+    "./plan-support": "./src/plan-support.ts",
     "./public-url": "./src/public-url.ts",
+    "./revision-plans": "./src/revision-plans.ts",
     "./schema": "./src/schema.ts",
     "./submissions": "./src/submissions.ts",
     "./submission-plans": "./src/submission-plans.ts",
@@ -19,7 +23,7 @@
   },
   "scripts": {
     "benchmark": "vitest run src/benchmark.test.ts",
-    "test": "vitest run src/auth.test.ts src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/benchmark.test.ts",
+    "test": "vitest run src/auth.test.ts src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/draft-plans.test.ts src/listing-plans.test.ts src/revision-plans.test.ts src/schema-invariants.test.ts src/url-key.test.ts src/benchmark.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
