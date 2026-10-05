@@ -103,7 +103,8 @@ SQL with the hand-finished form and check that a second `pnpm db:generate` repor
   hold on a URL. `draft_reminders_sent` (0 to 5) and `draft_last_reminder_at` record the claimed
   reminders; `withdrawal_reason` (`owner` | `expired`) is set exactly when the status is
   `withdrawn`. `listing_submissions_draft_clock_idx` (drafts only) serves the reminder and
-  expiry queries in `draft-plans.ts`; the schedule is in [Submission flow](./SUBMISSION_FLOW.md).
+  expiry queries in `draft-plans.ts`; the schedule and the two reminder variants are in
+  [Submission flow](./SUBMISSION_FLOW.md).
 - **Prohibited URLs** (#59 amendment): a `prohibited` rejection inserts an active row in
   `listing_submission_url_blocks` for its URL key (today the submission slug: the lowercase
   hostname without `www.`). The trigger `listing_submissions_refuse_blocked_url` refuses any new

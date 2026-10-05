@@ -37,15 +37,18 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
 - Drafts never enter the review queue, are never badge-checked, and trigger no badge or review
   email. Like every non-final status, a draft holds its URL key against duplicates (the
   `listing_submissions_active_slug_idx` partial unique index).
-- Drafts expire (#59 owner decision, `draft-plans.ts`). The clock is `draft_saved_at`, the first
-  save; edits never reset it. Reminders are due 12 hours, 48 hours, 7, 14, and 21 days after it,
-  only while no plan is chosen; a run that missed some sends only the latest one due. At 30 days
-  every draft is withdrawn as `expired`, including a paid draft that never completed checkout,
-  which frees its URL, and gets the "draft expired" email; an expired draft cannot choose a plan.
-  The scheduled job (#63) reads `selectDraftRemindersDuePlan` and `selectExpiredDraftsPlan`,
-  claims each reminder with `buildMarkDraftReminderSentPlans` (a compare-and-swap, so a reminder
-  is claimed once), and then sends through the email ledger with `draftReminderEmailKey` or
-  `draftExpiredEmailKey` as the idempotency key.
+- Drafts expire (#59 owner decisions, `draft-plans.ts`). The clock is `draft_saved_at`, the
+  first save; edits never reset it. Reminders are due 12 hours, 48 hours, 7, 14, and 21 days
+  after it, in two variants: `choose_plan` (no plan chosen; CTA "Choose a plan") and
+  `complete_checkout` (paid chosen, not paid; CTA "Complete checkout"). They stop on payment,
+  choosing free (`pending_badge`), withdrawal, or expiry; a run that missed some sends only the
+  latest one due. At 30 days every draft is withdrawn as `expired`, including a paid draft that
+  never completed checkout, which frees its URL, and gets the "draft expired" email; an expired
+  draft cannot choose a plan. The scheduled job (#63) reads `selectDraftRemindersDuePlan` (which
+  returns the `variant`) and `selectExpiredDraftsPlan`, claims each reminder with
+  `buildMarkDraftReminderSentPlans` for that variant (a compare-and-swap, so a reminder is claimed
+  once and matches the current state), and then sends through the email ledger with
+  `draftReminderEmailKey` or `draftExpiredEmailKey` as the idempotency key.
 - An approved submission creates its listing with `source = 'submission'` and a `nofollow`
   outbound link, and makes the signed-in submitter its owner (`verified_via = 'submission'`).
 - Rejecting a live submission unpublishes its listing (410) and revokes the submitter's

@@ -3,8 +3,10 @@ import { assertPreviousStatementChangedOne, type StatementPlan } from './plan-su
 /**
  * Draft expiry and reminders (#59 owner decision, 2026-10-06). A draft is withdrawn
  * automatically 30 days after it was saved, which frees its URL key; reminders go out 12 hours,
- * 48 hours, 7, 14, and 21 days after it was saved, and stop once a plan is chosen or the draft is
- * withdrawn. The clock is `listing_submissions.draft_saved_at`; edits never reset it.
+ * 48 hours, 7, 14, and 21 days after it was saved, to a draft with no plan ("Choose a plan") and
+ * to a draft that chose paid and has not paid ("Complete checkout"). They stop on payment,
+ * choosing free (the row leaves `draft`), withdrawal, or expiry. The clock is
+ * `listing_submissions.draft_saved_at`; edits never reset it.
  *
  * The scheduled job (#63) reads the due drafts, claims each reminder with
  * `buildMarkDraftReminderSentPlans` (a compare-and-swap, so two runs cannot both claim it), and
@@ -19,6 +21,21 @@ const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u
 const HOUR_MS = 60 * 60 * 1000
 
 export type DraftReminderNumber = 1 | 2 | 3 | 4 | 5
+
+/** Which reminder email applies: no plan chosen yet, or paid chosen and checkout not completed. */
+export const draftReminderVariants = ['choose_plan', 'complete_checkout'] as const
+export type DraftReminderVariant = (typeof draftReminderVariants)[number]
+
+/** The SQL condition for each variant (`alias` is the `listing_submissions` alias, or empty). */
+function variantCondition(variant: DraftReminderVariant, alias = ''): string {
+  const column = (name: string) => (alias ? `${alias}.${name}` : name)
+  return variant === 'choose_plan'
+    ? `${column('plan')} IS NULL`
+    : `(${column('plan')}='paid' AND ${column('paid_at')} IS NULL)`
+}
+
+const reminderEligible = (alias: string) =>
+  `(${draftReminderVariants.map(variant => variantCondition(variant, alias)).join(' OR ')})`
 
 /**
  * Cutoffs for `now`: a draft saved at or before `reminderCutoffs[n - 1]` is due for reminder `n`,
@@ -56,11 +73,12 @@ export function draftExpiredEmailKey(submissionId: string): string {
 }
 
 /**
- * Drafts with no plan chosen whose next reminder is due at `now`, with the reminder to send:
- * the latest one due. A job that missed a run sends only that one (earlier ones are skipped,
- * not sent late). Pass `reminder` to read only the drafts due for that reminder. Expired drafts
+ * Drafts whose next reminder is due at `now`, with the reminder to send: the latest one due. A
+ * job that missed a run sends only that one (earlier ones are skipped, not sent late). Pass
+ * `reminder` to read only the drafts due for that reminder. `variant` picks the email:
+ * `choose_plan` (no plan chosen) or `complete_checkout` (paid chosen, not paid). Expired drafts
  * are left to `selectExpiredDraftsPlan`. Rows: `id`, `slug`, `name`, `owner_user_id`,
- * `owner_email`, `draft_saved_at`, `draft_reminders_sent`, `reminder`.
+ * `owner_email`, `draft_saved_at`, `draft_reminders_sent`, `reminder`, `variant`.
  */
 export function selectDraftRemindersDuePlan(input: {
   limit: number
@@ -76,13 +94,16 @@ export function selectDraftRemindersDuePlan(input: {
     .map(index => `WHEN s.draft_saved_at <= ? THEN ${index + 1}`)
     .join(' ')
   return {
-    sql: `SELECT id,slug,name,owner_user_id,owner_email,draft_saved_at,draft_reminders_sent,reminder
+    sql: `SELECT id,slug,name,owner_user_id,owner_email,draft_saved_at,draft_reminders_sent,reminder,
+        variant
       FROM (
         SELECT s.id,s.slug,s.name,s.owner_user_id,u.email AS owner_email,s.draft_saved_at,
-          s.draft_reminders_sent,CASE ${latestDue} ELSE 0 END AS reminder
+          s.draft_reminders_sent,CASE ${latestDue} ELSE 0 END AS reminder,
+          CASE WHEN ${variantCondition('choose_plan', 's')} THEN 'choose_plan'
+            ELSE 'complete_checkout' END AS variant
         FROM listing_submissions s INDEXED BY listing_submissions_draft_clock_idx
         JOIN users u ON u.id=s.owner_user_id
-        WHERE s.status='draft' AND s.plan IS NULL
+        WHERE s.status='draft' AND ${reminderEligible('s')}
           AND s.draft_saved_at > ? AND s.draft_saved_at <= ?
       ) due
       WHERE due.reminder > due.draft_reminders_sent${reminder === null ? '' : ' AND due.reminder=?'}
@@ -117,22 +138,27 @@ export function selectExpiredDraftsPlan(input: { limit: number; now: string }): 
 }
 
 /**
- * Claims reminder `reminder` for a draft: only while the draft is still a draft with no plan,
- * that reminder is due and not yet claimed, and the draft has not expired. A second claim of the
- * same reminder (a concurrent or repeated run) fails the batch, so the email is sent once.
+ * Claims reminder `reminder` of `variant` for a draft: only while the draft is still a draft in
+ * that variant (so the email sent matches the state claimed), that reminder is due and not yet
+ * claimed, and the draft has not expired. A second claim of the same reminder (a concurrent or
+ * repeated run, or after the plan changed) fails the batch, so the email is sent once.
  */
 export function buildMarkDraftReminderSentPlans(input: {
   now: string
   reminder: number
   submissionId: string
+  variant: DraftReminderVariant
 }): StatementPlan[] {
   const reminder = reminderNumber(input.reminder)
+  if (!(draftReminderVariants as readonly string[]).includes(input.variant)) {
+    throw new Error('A draft reminder variant is choose_plan or complete_checkout.')
+  }
   const { expiryCutoff, reminderCutoffs } = draftClockCutoffs(input.now)
   return [
     {
       sql: `UPDATE listing_submissions SET draft_reminders_sent=?,draft_last_reminder_at=?
-        WHERE id=? AND status='draft' AND plan IS NULL AND draft_reminders_sent<?
-          AND draft_saved_at<=? AND draft_saved_at>?`,
+        WHERE id=? AND status='draft' AND ${variantCondition(input.variant)}
+          AND draft_reminders_sent<? AND draft_saved_at<=? AND draft_saved_at>?`,
       params: [
         reminder,
         input.now,

@@ -5,6 +5,7 @@ import {
   buildMarkDraftReminderSentPlans,
   DRAFT_EXPIRY_HOURS,
   DRAFT_REMINDER_OFFSETS_HOURS,
+  type DraftReminderVariant,
   draftClockCutoffs,
   draftExpiredEmailKey,
   draftReminderEmailKey,
@@ -15,7 +16,9 @@ import { count, execute, planDatabase, query } from './plan-test-support'
 import { type SubmissionStatus, submissionStatuses } from './schema'
 import {
   buildChooseSubmissionPlanPlans,
+  buildRecordSubmissionPaymentPlans,
   buildReplaceSubmissionContentPlans,
+  buildWithdrawSubmissionPlans,
   submissionTransitions
 } from './submission-plans'
 
@@ -79,11 +82,18 @@ function due(db: DatabaseSync, now: string, reminder?: number) {
     id: string
     owner_email: string
     reminder: number
+    variant: DraftReminderVariant
   }>
 }
 
-function claim(db: DatabaseSync, now: string, reminder: number, submission = id): void {
-  execute(db, buildMarkDraftReminderSentPlans({ now, reminder, submissionId: submission }))
+function claim(
+  db: DatabaseSync,
+  now: string,
+  reminder: number,
+  submission = id,
+  variant: DraftReminderVariant = 'choose_plan'
+): void {
+  execute(db, buildMarkDraftReminderSentPlans({ now, reminder, submissionId: submission, variant }))
 }
 
 describe('draft clock schedule', () => {
@@ -107,7 +117,7 @@ describe('draft clock schedule', () => {
     for (const [index, hours] of DRAFT_REMINDER_OFFSETS_HOURS.entries()) {
       const reminder = index + 1
       expect(due(db, atHour(hours)), `reminder ${reminder}`).toMatchObject([
-        { id, owner_email: 'owner@example.com', reminder }
+        { id, owner_email: 'owner@example.com', reminder, variant: 'choose_plan' }
       ])
       expect(due(db, atHour(hours), reminder)).toHaveLength(1)
       expect(due(db, atHour(hours), reminder === 5 ? 1 : reminder + 1)).toEqual([])
@@ -141,21 +151,103 @@ describe('draft clock schedule', () => {
     expect(() => claim(db, atHour(720), 5)).toThrow(/malformed JSON/u)
     expect(row(db)).toMatchObject({ draft_last_reminder_at: null, draft_reminders_sent: 0 })
     expect(() =>
-      buildMarkDraftReminderSentPlans({ now: atHour(12), reminder: 0, submissionId: id })
+      buildMarkDraftReminderSentPlans({
+        now: atHour(12),
+        reminder: 0,
+        submissionId: id,
+        variant: 'choose_plan'
+      })
     ).toThrow(/1 to 5/u)
   })
 
-  it('stops reminding once a plan is chosen, but still expires a paid draft that never paid', () => {
+  it('reminds an unpaid paid draft to complete checkout and an open draft to choose a plan', () => {
     const db = planDatabase()
     insert(db, { id: 'paid', plan: 'paid' })
-    insert(db, { id: 'free', status: 'pending_badge' })
     insert(db, { id: 'open' })
-    expect(due(db, atHour(24)).map(item => item.id)).toEqual(['open'])
-    expect(() => claim(db, atHour(24), 1, 'paid')).toThrow(/malformed JSON/u)
+    insert(db, { id: 'free', status: 'pending_badge' })
+    // Only reachable by a direct write (choosing free leaves `draft`), and never reminded.
+    insert(db, { id: 'odd', plan: 'free' })
+    expect(due(db, atHour(24)).map(item => [item.id, item.reminder, item.variant])).toEqual([
+      ['open', 1, 'choose_plan'],
+      ['paid', 1, 'complete_checkout']
+    ])
+    expect(() => claim(db, atHour(24), 1, 'paid', 'choose_plan')).toThrow(/malformed JSON/u)
+    expect(() => claim(db, atHour(24), 1, 'open', 'complete_checkout')).toThrow(/malformed JSON/u)
+    claim(db, atHour(24), 1, 'paid', 'complete_checkout')
+    claim(db, atHour(24), 1, 'open', 'choose_plan')
+    expect(due(db, atHour(48)).map(item => [item.id, item.reminder, item.variant])).toEqual([
+      ['open', 2, 'choose_plan'],
+      ['paid', 2, 'complete_checkout']
+    ])
+    expect(() =>
+      buildMarkDraftReminderSentPlans({
+        now: atHour(48),
+        reminder: 2,
+        submissionId: 'paid',
+        variant: 'pay_now' as DraftReminderVariant
+      })
+    ).toThrow(/choose_plan or complete_checkout/u)
     const expired = query(db, selectExpiredDraftsPlan({ limit: 10, now: atHour(720) })) as Array<{
       id: string
     }>
-    expect(expired.map(item => item.id)).toEqual(['open', 'paid'])
+    expect(expired.map(item => item.id)).toEqual(['odd', 'open', 'paid'])
+  })
+
+  it('claims the variant the draft is in when the plan changes between read and claim', () => {
+    const db = planDatabase()
+    insert(db)
+    expect(due(db, atHour(12))).toMatchObject([{ reminder: 1, variant: 'choose_plan' }])
+    execute(
+      db,
+      buildChooseSubmissionPlanPlans({
+        now: atHour(12),
+        ownerUserId: 'user_owner',
+        plan: 'paid',
+        submissionId: id
+      })
+    )
+    expect(() => claim(db, atHour(12), 1, id, 'choose_plan')).toThrow(/malformed JSON/u)
+    expect(due(db, atHour(12))).toMatchObject([{ reminder: 1, variant: 'complete_checkout' }])
+    claim(db, atHour(12), 1, id, 'complete_checkout')
+    expect(row(db)).toMatchObject({ draft_reminders_sent: 1, plan: 'paid', status: 'draft' })
+  })
+
+  it('stops reminders on payment, on choosing free, and on withdrawal', () => {
+    const db = planDatabase()
+    insert(db, { id: 'paid', plan: 'paid' })
+    insert(db, { id: 'free' })
+    insert(db, { id: 'gone' })
+    execute(
+      db,
+      buildRecordSubmissionPaymentPlans({
+        actor: 'stripe',
+        now: atHour(6),
+        outcome: 'hold',
+        submissionId: 'paid'
+      })
+    )
+    execute(
+      db,
+      buildChooseSubmissionPlanPlans({
+        now: atHour(6),
+        ownerUserId: 'user_owner',
+        plan: 'free',
+        submissionId: 'free'
+      })
+    )
+    execute(
+      db,
+      buildWithdrawSubmissionPlans({
+        now: atHour(6),
+        ownerUserId: 'user_owner',
+        submissionId: 'gone'
+      })
+    )
+    expect(due(db, atHour(24 * 22))).toEqual([])
+    expect(() => claim(db, atHour(12), 1, 'paid', 'complete_checkout')).toThrow(/malformed JSON/u)
+    expect(() => claim(db, atHour(12), 1, 'free', 'choose_plan')).toThrow(/malformed JSON/u)
+    expect(() => claim(db, atHour(12), 1, 'gone', 'choose_plan')).toThrow(/malformed JSON/u)
+    expect(query(db, selectExpiredDraftsPlan({ limit: 10, now: atHour(720) }))).toEqual([])
   })
 
   it('keeps the clock when the draft is edited', () => {
