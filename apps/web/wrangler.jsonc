@@ -36,7 +36,9 @@
       "vars": {
         "AUTH_TRUST_HOST": "true",
         "D1_RUNTIME_ENV": "staging",
-        "SITE_ENVIRONMENT": "staging"
+        "EMAIL_STAGING_ALLOWLIST": "devin@serp.co",
+        "SITE_ENVIRONMENT": "staging",
+        "USESEND_BASE_URL": "https://app.usesend.com"
       },
       "version_metadata": {
         "binding": "CF_VERSION_METADATA"
@@ -62,7 +64,8 @@
         "AUTH_TRUST_HOST": "true",
         "CANONICAL_HOST_REDIRECT": "on",
         "D1_RUNTIME_ENV": "production",
-        "SITE_ENVIRONMENT": "production"
+        "SITE_ENVIRONMENT": "production",
+        "USESEND_BASE_URL": "https://app.usesend.com"
       },
       "version_metadata": {
         "binding": "CF_VERSION_METADATA"

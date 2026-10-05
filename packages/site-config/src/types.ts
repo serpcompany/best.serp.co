@@ -97,6 +97,19 @@ export type SiteDefinition = {
     opengraphImage?: AssetSource
   }
   copy: SiteCopyConfig
+  /** Transactional email identity (`apps/web/lib/email/`). */
+  email: {
+    /**
+     * Root-relative path of the dashboard every email footer links to. The sender is not
+     * monitored, so replies happen there (serpcompany/best.serp.co#73).
+     */
+    dashboardPath: string
+    /**
+     * The sender per deployed environment, each on a domain verified in useSend; local logs
+     * use the staging one. Sent with no Reply-To.
+     */
+    from: { name: string; production: string; staging: string }
+  }
   features: SiteFeatureFlags
   id: string
   networkBrandGroup: string | null

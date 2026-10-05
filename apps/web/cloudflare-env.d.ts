@@ -29,6 +29,12 @@ interface CloudflareEnv {
   CANONICAL_HOST_REDIRECT?: 'on' | 'off'
   DB: D1Database
   D1_RUNTIME_ENV: 'local' | 'staging' | 'production'
+  /** Staging only: comma-separated recipients email may go to (`lib/email/config.ts`). */
+  EMAIL_STAGING_ALLOWLIST?: string
   /** Crawl and analytics policy; anything but `production` is non-production. */
   SITE_ENVIRONMENT?: 'local' | 'staging' | 'production'
+  /** Worker secret: the useSend API key (staging and production; local logs mail). */
+  USESEND_API_KEY?: string
+  /** The useSend instance origin, `https://app.usesend.com` (staging and production). */
+  USESEND_BASE_URL?: string
 }

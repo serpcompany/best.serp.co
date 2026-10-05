@@ -1,6 +1,6 @@
 /**
  * Exact application table and column inventory of the D1 schema in
- * `packages/data-ops/src/schema.ts` (applied by `d1/drizzle/0000_baseline.sql`).
+ * `packages/data-ops/src/schema.ts` (applied by the `d1/drizzle` migrations).
  * Snapshot, parity, and verification tooling reads every column listed here, so
  * a schema change must update this inventory in the same change.
  */
@@ -115,6 +115,17 @@ export const applicationColumnInventory = {
     'created_at',
     'updated_at',
     'preview_token_hash'
+  ],
+  email_deliveries: [
+    'template_id',
+    'event_key',
+    'provider',
+    'status',
+    'attempts',
+    'provider_message_id',
+    'last_error_code',
+    'created_at',
+    'updated_at'
   ]
 } as const
 
@@ -141,7 +152,8 @@ export const importOrder: ApplicationTableName[] = [
   'listing_submission_faqs',
   'listing_submission_events',
   'listing_submission_rate_limits',
-  'listing_submission_notifications'
+  'listing_submission_notifications',
+  'email_deliveries'
 ]
 
 export const toolOwnedTableNames = ['d1_migrations'] as const

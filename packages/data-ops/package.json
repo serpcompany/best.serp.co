@@ -9,6 +9,7 @@
     "./catalog-epoch": "./src/catalog-epoch.ts",
     "./client": "./src/client.ts",
     "./contracts": "./src/contracts.ts",
+    "./email-deliveries": "./src/email-deliveries.ts",
     "./public-url": "./src/public-url.ts",
     "./schema": "./src/schema.ts",
     "./submissions": "./src/submissions.ts",
@@ -16,7 +17,7 @@
   },
   "scripts": {
     "benchmark": "vitest run src/benchmark.test.ts",
-    "test": "vitest run src/cache.test.ts src/catalog.test.ts src/client.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/benchmark.test.ts",
+    "test": "vitest run src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/benchmark.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {

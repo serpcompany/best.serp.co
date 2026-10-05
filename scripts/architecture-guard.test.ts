@@ -28,6 +28,7 @@ const sharedDataOperations = [
   'packages/data-ops/src/catalog.ts',
   'packages/data-ops/src/client.ts',
   'packages/data-ops/src/contracts.ts',
+  'packages/data-ops/src/email-deliveries.ts',
   'packages/data-ops/src/schema.ts',
   'packages/data-ops/src/submission-plans.ts',
   'packages/data-ops/src/submissions.ts'
@@ -185,6 +186,29 @@ describe('single-site D1-only repository architecture', () => {
     const contracts = readFileSync(resolve('packages/data-ops/src/contracts.ts'), 'utf8')
     expect(contracts).toContain('client: Database')
     expect(contracts).not.toContain('database: D1Database')
+  })
+
+  it('keeps email delivery SQL in the shared data package behind a fail-closed adapter', () => {
+    const runtime = readFileSync(resolve(project.appDirectory, 'lib/email/runtime.ts'), 'utf8')
+    const policy = runtime.indexOf('resolveEmailPolicy(env)')
+    expect(policy).toBeGreaterThan(-1)
+    expect(runtime.indexOf('createDatabase(env.DB)')).toBeGreaterThan(policy)
+    expect(runtime).toContain("from '@serpdirectory/data-ops/client'")
+    expect(runtime).toContain("from '@serpdirectory/data-ops/email-deliveries'")
+    expect(runtime).toContain('createDisabledEmailService')
+
+    const emailDirectory = resolve(project.appDirectory, 'lib/email')
+    for (const file of readdirSync(emailDirectory).filter(name => /\.tsx?$/u.test(name))) {
+      const code = readFileSync(resolve(emailDirectory, file), 'utf8')
+      if (file.endsWith('.test.ts')) continue
+      expect(code, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE|WITH)\b/u)
+      expect(code, file).not.toMatch(/\.prepare\(|\.batch\(|drizzle-orm/u)
+    }
+
+    const ledger = readFileSync(resolve('packages/data-ops/src/email-deliveries.ts'), 'utf8')
+    expect(ledger).toContain('createEmailDeliveryLedger')
+    expect(ledger).toContain('client: Database')
+    expect(ledger).not.toMatch(/getCloudflareContext|process\.env|sql\.raw/u)
   })
 
   it('keeps Submission SQL and conditional mutation plans in the shared data package', () => {

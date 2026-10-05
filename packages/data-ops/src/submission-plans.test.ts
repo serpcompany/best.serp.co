@@ -9,13 +9,13 @@ import {
   selectSubmissionForDecisionPlan,
   selectVerifiedSubmissionNotificationPlans
 } from './submission-plans'
-import { applyBaselineMigration } from './test-support'
+import { applyMigrations } from './test-support'
 
 const submissionId = '11111111-1111-4111-8111-111111111111'
 
 function database(): DatabaseSync {
   const db = new DatabaseSync(':memory:')
-  applyBaselineMigration(db)
+  applyMigrations(db)
   db.prepare(
     `INSERT INTO categories(slug,name,description,sort_order,is_active)
     VALUES ('tools','Tools','Tools',0,1)`

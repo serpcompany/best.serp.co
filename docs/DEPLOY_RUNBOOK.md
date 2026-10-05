@@ -22,6 +22,7 @@ Status (serpcompany/best.serp.co#34):
 | Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`, noindex). The production HTTP gates run here with the smoke-test header and, after cutover, on best.serp.co, where they skip only zone protection (`cf-mitigated`, or a 403 or 429 without Worker headers) and GitHub Pages ([Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)). It stays after cutover: `CANONICAL_HOST_REDIRECT` flips to `on` and it 308s to best.serp.co except for smoke-test requests (#42 decision e). |
 | Branch | `staging` (the base branch; PRs squash-merge here, hotfix merge-backs use a merge commit) | `main` (promotions from `staging`, and `hotfix-*` PRs) |
 | GitHub environment | `staging` (`staging` branch only, no reviewers) | `production` (required reviewers, `main` only) |
+| Email ([useSend](./EMAIL.md)) | `mail-staging.serp.co`, allowlist | `mail.serp.co` |
 
 The identities live in `env.staging` / `env.production` of `apps/web/wrangler.jsonc` and in
 `scripts/project.ts` (IDs are not secrets). `scripts/cloudflare-release.ts` refuses to run
