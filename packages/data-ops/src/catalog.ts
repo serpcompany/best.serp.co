@@ -63,16 +63,6 @@ export function normalizeSearchQuery(query: string): { phrase: string; terms: st
   return { phrase, terms }
 }
 
-/**
- * The lowercased host of `l.website` (`https://www.jasper.ai/x` -> `www.jasper.ai`), so a term
- * matches the domain but not the scheme or path. Only string functions on the same row: no
- * extra rows read.
- */
-const WEBSITE_AFTER_SCHEME = "substr(l.website, instr(l.website, '://') + 3)"
-const WEBSITE_HOST_SQL = `lower(CASE WHEN instr(${WEBSITE_AFTER_SCHEME}, '/') > 0
-  THEN substr(${WEBSITE_AFTER_SCHEME}, 1, instr(${WEBSITE_AFTER_SCHEME}, '/') - 1)
-  ELSE ${WEBSITE_AFTER_SCHEME} END)`
-
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
@@ -1231,9 +1221,10 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   }
 
   /**
-   * Every normalized term must occur in the listing's name, short description, slug (its
-   * domain), website host, or the slug or name of one of its active categories (owner
-   * decisions on #77 and #81: never the long content).
+   * Every normalized term must occur in the listing's name, short description, slug (the
+   * product's domain), or the slug or name of one of its active categories (owner decisions on
+   * #77 and #81). Never the long content, and never the website URL: almost every website is a
+   * `serp.ly` affiliate link, so its host would match nearly every short term.
    * The terms are one JSON binding that each term reads with `json_extract(?1, '$[i]')`, and
    * matching uses `instr()`, so the statement binds four values whatever the query and has no
    * LIKE/GLOB pattern for D1's 50-byte limit. A term that matches no category name skips the
@@ -1261,7 +1252,6 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
             instr(lower(l.name), ${term}) > 0
             OR instr(lower(l.description), ${term}) > 0
             OR instr(lower(l.slug), ${term}) > 0
-            OR instr(${WEBSITE_HOST_SQL}, ${term}) > 0
             OR (
               EXISTS (SELECT 1 FROM categories any_c WHERE any_c.is_active = 1 AND ${categoryText('any_c')})
               AND EXISTS (

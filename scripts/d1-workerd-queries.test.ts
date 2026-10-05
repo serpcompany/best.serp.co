@@ -216,12 +216,24 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
       expect(results.length, query.slice(0, 30)).toBeLessThanOrEqual(MAX_SEARCH_LIMIT)
     }
     expect((await ops.searchListings('video downloader')).length).toBeGreaterThan(0)
-    // Domains find their listings: the slug and the website host match (owner decision, #81).
+    // A product's domain finds it through the slug (owner decision, #81).
     const slugsFor = async (query: string) =>
       (await ops.searchListings(query, 100)).map(listing => listing.slug)
     expect((await slugsFor('jasper.ai'))[0]).toBe('jasper.ai')
     expect(await slugsFor('orderdesk')).toContain('orderdesk.com')
-    expect(await slugsFor('serp.ly')).toHaveLength(MAX_SEARCH_LIMIT)
+    // The website URL is not searched: 3,359 of 3,422 websites are serp.ly affiliate links, so
+    // matching their host returned ~3,360 listings for "erp", "serp", or "ly" (#81 round 2).
+    expect(await slugsFor('erp')).toHaveLength(79)
+    expect(await slugsFor('serp')).toHaveLength(12)
+    expect(await slugsFor('serp.ly')).toEqual([])
+    const ly = await ops.searchListings('ly', 100)
+    expect(ly).toHaveLength(MAX_SEARCH_LIMIT)
+    for (const listing of ly) {
+      const text = [listing.name, listing.description, listing.slug, ...listing.categories]
+        .join(' ')
+        .replace(/[A-Z]+/gu, letters => letters.toLowerCase())
+      expect(text, listing.slug).toContain('ly')
+    }
     // Non-ASCII letters match as typed, the way SQLite's lower() leaves them (#81 review).
     expect(await slugsFor('OÜ')).toContain('instant-portrait.com')
     expect(await ops.searchListings('  \n\t ')).toEqual([])

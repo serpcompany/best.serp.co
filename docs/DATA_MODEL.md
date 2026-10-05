@@ -57,8 +57,9 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   `scripts/d1-workerd-queries.test.ts` runs every catalog, search, account, email, and
   submission operation on workerd with the full import and worst-case inputs, with a
   rows-read budget per catalog query shape (both in harness step "D1 contracts").
-- Search matches a listing's name, short description, slug (its domain), website host, and
-  active category slugs and names, never its long content. The query is cut to 100 characters
+- Search matches a listing's name, short description, slug (the product's domain), and active
+  category slugs and names, never its long content or website URL (nearly all are `serp.ly`
+  affiliate links). The query is cut to 100 characters
   and 8 distinct terms (truncated, never rejected); ASCII letters fold like SQLite's `lower()`
   and other characters match as typed. The terms are one JSON binding read with `json_extract`,
   matched with `instr()`, so a search binds four values whatever its length. Results are
