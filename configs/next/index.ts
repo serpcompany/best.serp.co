@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import withBundleAnalyzer from '@next/bundle-analyzer'
-import withVercelToolbar from '@vercel/toolbar/plugins/next'
 import type { NextConfig } from 'next'
 
 const BUILD_ID_HASH_LENGTH = 20
@@ -41,9 +40,3 @@ export const baseConfig: NextConfig = {
  * Wraps a Next.js config with bundle analyzer support
  */
 export const withAnalyzer = (sourceConfig: NextConfig) => withBundleAnalyzer()(sourceConfig)
-
-/**
- * Wraps a Next.js config with Vercel toolbar support
- */
-export const withVercelToolbarConfig = (sourceConfig: NextConfig) =>
-  withVercelToolbar()(sourceConfig)
