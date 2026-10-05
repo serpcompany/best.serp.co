@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { stringify } from 'yaml'
 import {
   SITE_ENVIRONMENT_HEADER,
@@ -84,14 +84,19 @@ function installSuccessfulFetch(redirectLocation?: string, emptyBody = false) {
 
 describe('environment-specific HTTP gates', () => {
   it.each([origin, platformOrigin])(
-    'gates Production given %s through its platform host only',
+    'gates Production given %s through its platform host, then best.serp.co',
     async given => {
       const urls = installSuccessfulFetch()
       await expect(gates('production', given)).resolves.toBeUndefined()
       expect(urls).toHaveLength(
         8 + trailingSlashGatePaths.length + CRAWL_POLICY_REQUESTS.production
       )
-      // Never best.serp.co: the serp.co zone's bot protection must not decide a deploy.
+      // Routes and versions go through the platform host; only the public policy probes, last,
+      // ask best.serp.co itself.
+      const publicProbes = urls.splice(-PUBLIC_POLICY_PATHS.length)
+      expect(publicProbes.map(url => url.href)).toEqual(
+        PUBLIC_POLICY_PATHS.map(path => `${origin}${path}`)
+      )
       expect(urls.every(url => url.origin === platformOrigin)).toBe(true)
       expect(urls.map(url => url.pathname)).toEqual(
         expect.arrayContaining([
@@ -236,9 +241,11 @@ describe('environment-specific HTTP gates', () => {
 
 // Crawl and analytics policy (serp standards/environment-configuration.md). Kept apart from the
 // route contracts above: after them, Staging and Production (through its platform host) fetch
-// /, /sitemap-index.xml, /robots.txt, and / without the smoke header. The manual public check of
-// best.serp.co fetches only /, /sitemap-index.xml and /robots.txt.
-const CRAWL_POLICY_REQUESTS = { production: 4, public: 3, staging: 4 } as const
+// /, /sitemap-index.xml, /robots.txt, and / without the smoke header; Production then fetches
+// /, /sitemap-index.xml and /robots.txt on best.serp.co, which is all the manual public check
+// does.
+const PUBLIC_POLICY_PATHS = ['/', '/sitemap-index.xml', '/robots.txt']
+const CRAWL_POLICY_REQUESTS = { production: 4 + 3, public: 3, staging: 4 } as const
 
 function correctRobotsTxt(robotsOrigin: string): string {
   if (robotsOrigin !== origin) return 'User-agent: *\nDisallow: /\n'
@@ -292,11 +299,14 @@ describe('environment-specific crawl policy gates', () => {
   it('reads the crawl policy after the route contracts', async () => {
     const production = stubCrawlPolicy((_url, response) => response)
     await expect(gates('production', origin)).resolves.toBeUndefined()
-    expect(production.slice(-CRAWL_POLICY_REQUESTS.production).map(url => url.pathname)).toEqual([
-      '/',
-      '/sitemap-index.xml',
-      '/robots.txt',
-      '/'
+    expect(production.slice(-CRAWL_POLICY_REQUESTS.production).map(url => url.href)).toEqual([
+      `${platformOrigin}/`,
+      `${platformOrigin}/sitemap-index.xml`,
+      `${platformOrigin}/robots.txt`,
+      `${platformOrigin}/`,
+      `${origin}/`,
+      `${origin}/sitemap-index.xml`,
+      `${origin}/robots.txt`
     ])
     const publicSite = stubCrawlPolicy((_url, response) => response)
     await expect(gates('public', origin)).resolves.toBeUndefined()
@@ -372,11 +382,14 @@ describe('environment-specific crawl policy gates', () => {
       'production route / loads Google Tag Manager'
     )
     stubCrawlPolicy((url, response) =>
-      url.pathname === '/' ? new Response('<html><head></head><body>ok</body></html>') : response
+      url.pathname === '/'
+        ? new Response('<html><head></head><body>ok</body></html>', { headers: response.headers })
+        : response
     )
-    await expect(gates('public', origin)).rejects.toThrow(
-      'public route / does not load Google Tag Manager'
-    )
+    for (const mode of ['production', 'public'])
+      await expect(gates(mode, origin)).rejects.toThrow(
+        'best.serp.co route / does not load Google Tag Manager'
+      )
   })
 
   it.each([
@@ -446,7 +459,9 @@ describe('environment-specific crawl policy gates', () => {
   ])('rejects a public best.serp.co home page carrying %s', async tag => {
     stubCrawlPolicy((url, response) =>
       url.pathname === '/'
-        ? new Response(`<html><head><title>SERP</title>${tag}</head><body></body></html>`)
+        ? new Response(`<html><head><title>SERP</title>${tag}</head><body></body></html>`, {
+            headers: response.headers
+          })
         : response
     )
     await expect(gates('public', origin)).rejects.toThrow('sent noindex in its robots meta')
@@ -486,7 +501,9 @@ describe('environment-specific crawl policy gates', () => {
     ]
   ])('rejects a public best.serp.co robots.txt with %s', async (_label, robots, message) => {
     stubCrawlPolicy((url, response) =>
-      url.pathname === '/robots.txt' ? new Response(robots) : response
+      url.pathname === '/robots.txt'
+        ? new Response(robots, { headers: response.headers })
+        : response
     )
     await expect(gates('public', origin)).rejects.toThrow(message)
   })
@@ -506,7 +523,9 @@ describe('environment-specific crawl policy gates', () => {
     ]
   ])('accepts a public best.serp.co robots.txt with %s', async (_label, robots) => {
     stubCrawlPolicy((url, response) =>
-      url.pathname === '/robots.txt' ? new Response(robots) : response
+      url.pathname === '/robots.txt'
+        ? new Response(robots, { headers: response.headers })
+        : response
     )
     await expect(gates('public', origin)).resolves.toBeUndefined()
   })
@@ -591,17 +610,18 @@ describe('smoke-test header and deployed Worker version', () => {
     versionPollIntervalMs: 1_000
   })
 
-  it('sends the smoke-test header on every gate request but the host-redirect check', async () => {
-    for (const [mode, given] of [
-      ['staging', stagingOrigin],
-      ['production', origin]
-    ]) {
-      const requests = stubVersioned(() => null)
-      await expect(gates(mode, given)).resolves.toBeUndefined()
-      expect(
-        requests.filter(request => !request.smoke).map(request => request.url.pathname)
-      ).toEqual(['/'])
-    }
+  it('sends the smoke-test header on every gate request but the host checks', async () => {
+    const staging = stubVersioned(() => null)
+    await expect(gates('staging', stagingOrigin)).resolves.toBeUndefined()
+    expect(staging.filter(request => !request.smoke).map(request => request.url.href)).toEqual([
+      `${stagingOrigin}/`
+    ])
+    const production = stubVersioned(() => null)
+    await expect(gates('production', origin)).resolves.toBeUndefined()
+    expect(production.filter(request => !request.smoke).map(request => request.url.href)).toEqual([
+      `${platformOrigin}/`,
+      ...PUBLIC_POLICY_PATHS.map(path => `${origin}${path}`)
+    ])
   })
 
   it('waits until the deployed version answers, then requires it on every response', async () => {
@@ -619,13 +639,21 @@ describe('smoke-test header and deployed Worker version', () => {
     expect(requests[5]?.url.pathname).not.toBe('/robots.txt')
   })
 
-  it('waits on the production platform host, never best.serp.co', async () => {
-    const requests = stubVersioned(() => deployed)
+  it('waits on the production platform host, and pins best.serp.co to the same version', async () => {
+    let publicAnswers = 0
+    const requests = stubVersioned(url => {
+      if (url.origin !== origin) return deployed
+      publicAnswers += 1
+      return publicAnswers === 1 ? previous : deployed
+    })
     await expect(gates('production', origin, undefined, pinned())).resolves.toBeUndefined()
     expect(requests.slice(0, 3).map(request => request.url.href)).toEqual(
       Array(3).fill(`${platformOrigin}/robots.txt`)
     )
-    expect(requests.every(request => request.url.origin === platformOrigin)).toBe(true)
+    // best.serp.co's first answer came from the previous version and was retried.
+    expect(
+      requests.filter(request => request.url.origin === origin).map(request => request.url.pathname)
+    ).toEqual(['/', '/', '/sitemap-index.xml', '/robots.txt'])
   })
 
   it('fails when the deployed version never answers within the bound', async () => {
@@ -728,7 +756,7 @@ describe('production canonical-host redirect gate', () => {
         const url = new URL(String(input))
         const smoke = new Headers(init?.headers).has(SMOKE_TEST_HEADER)
         requests.push({ smoke, url })
-        if (redirecting && !smoke)
+        if (redirecting && !smoke && url.origin === platformOrigin)
           return new Response(null, { status: 308, headers: { location: location(url) } })
         return withCrawlPolicy(url, successfulResponse(url))
       })
@@ -738,12 +766,12 @@ describe('production canonical-host redirect gate', () => {
 
   const withSwitch = (value: string) => ({ wranglerConfigPath: wranglerConfig(value) })
 
-  it('checks the 308 when the checked-in switch is on, without requesting best.serp.co', async () => {
+  it('checks the 308 on the platform host when the checked-in switch is on', async () => {
     const on = stubPlatform(true)
     await expect(gates('production', origin, undefined, withSwitch('on'))).resolves.toBeUndefined()
-    expect(on.every(request => request.url.origin === platformOrigin)).toBe(true)
     expect(on.filter(request => !request.smoke).map(request => request.url.href)).toEqual([
-      `${platformOrigin}/about?gate=canonical-host`
+      `${platformOrigin}/about?gate=canonical-host`,
+      ...PUBLIC_POLICY_PATHS.map(path => `${origin}${path}`)
     ])
   })
 
@@ -751,7 +779,8 @@ describe('production canonical-host redirect gate', () => {
     const off = stubPlatform(false)
     await expect(gates('production', origin, undefined, withSwitch('off'))).resolves.toBeUndefined()
     expect(off.filter(request => !request.smoke).map(request => request.url.href)).toEqual([
-      `${platformOrigin}/`
+      `${platformOrigin}/`,
+      ...PUBLIC_POLICY_PATHS.map(path => `${origin}${path}`)
     ])
     stubPlatform(true)
     await expect(gates('production', origin, undefined, withSwitch('off'))).rejects.toThrow(
@@ -775,6 +804,151 @@ describe('production canonical-host redirect gate', () => {
     stubPlatform(false)
     await expect(gates('production', origin, undefined, withSwitch('yes'))).rejects.toThrow(
       'CANONICAL_HOST_REDIRECT must be on or off'
+    )
+  })
+})
+
+describe('best.serp.co public policy in the production gates', () => {
+  const warnings = () =>
+    vi
+      .mocked(console.log)
+      .mock.calls.map(([line]) => String(line))
+      .filter(line => line.startsWith('::warning'))
+
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+
+  afterEach(() => vi.restoreAllMocks())
+
+  /** best.serp.co answers with `answer(url, response)`; the platform host is a correct Worker. */
+  function stubPublic(answer: (url: URL, response: Response) => Response | Promise<Response>) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = new URL(String(input))
+        const response = withCrawlPolicy(url, successfulResponse(url))
+        return url.origin === origin ? answer(url, response) : response
+      })
+    )
+  }
+
+  const switchOn = () => {
+    const path = join(fixtureDirectory, 'wrangler-public-on.jsonc')
+    writeFileSync(
+      path,
+      JSON.stringify({ env: { production: { vars: { CANONICAL_HOST_REDIRECT: 'on' } } } })
+    )
+    return { wranglerConfigPath: path }
+  }
+
+  it.each([
+    [
+      'a Cloudflare challenge',
+      () =>
+        new Response('Just a moment...', {
+          headers: { 'cf-mitigated': 'challenge', server: 'cloudflare' },
+          status: 403
+        }),
+      'cf-mitigated: challenge'
+    ],
+    [
+      'a 503 without Worker headers',
+      () => new Response('busy', { headers: { server: 'cloudflare' }, status: 503 }),
+      'a 503 without Worker headers (server: cloudflare)'
+    ],
+    [
+      'GitHub Pages before the cutover',
+      () => new Response('<html></html>', { headers: { server: 'GitHub.com' } }),
+      'GitHub Pages (server: GitHub.com'
+    ],
+    [
+      'no answer',
+      () => {
+        throw new TypeError('fetch failed')
+      },
+      'no answer (fetch failed)'
+    ]
+  ])('skips with a warning when best.serp.co answers with %s', async (_label, answer, seen) => {
+    stubPublic(() => answer())
+    await expect(gates('production', origin)).resolves.toBeUndefined()
+    expect(warnings()).toHaveLength(3)
+    for (const warning of warnings()) {
+      expect(warning).toContain('::warning title=best.serp.co check skipped::')
+      expect(warning).toContain(seen)
+    }
+  })
+
+  it('fails on GitHub Pages while CANONICAL_HOST_REDIRECT is on', async () => {
+    // A switch flipped before the cutover: the platform host redirects to GitHub Pages.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input))
+        if (url.origin === origin)
+          return new Response('<html></html>', { headers: { server: 'GitHub.com' } })
+        if (!new Headers(init?.headers).has(SMOKE_TEST_HEADER))
+          return new Response(null, {
+            headers: { location: `${origin}/about/?gate=canonical-host` },
+            status: 308
+          })
+        return withCrawlPolicy(url, successfulResponse(url))
+      })
+    )
+    await expect(gates('production', origin, undefined, switchOn())).rejects.toThrow(
+      'CANONICAL_HOST_REDIRECT is on, but best.serp.co/ is still GitHub Pages'
+    )
+  })
+
+  it.each([
+    [
+      'noindex in its X-Robots-Tag',
+      (url: URL, response: Response) =>
+        url.pathname === '/' ? withHeader(response, 'x-robots-tag', 'noindex') : response,
+      'best.serp.co route / sent noindex in its X-Robots-Tag header'
+    ],
+    [
+      'no Google Tag Manager',
+      (url: URL, response: Response) =>
+        url.pathname === '/'
+          ? new Response('<html><head></head><body>ok</body></html>', { headers: response.headers })
+          : response,
+      'best.serp.co route / does not load Google Tag Manager'
+    ],
+    [
+      'a robots.txt without the sitemap index',
+      (url: URL, response: Response) =>
+        url.pathname === '/robots.txt'
+          ? new Response('User-agent: *\nAllow: /\n', { headers: response.headers })
+          : response,
+      'best.serp.co robots.txt does not list'
+    ],
+    [
+      'a staging Worker',
+      (_url: URL, response: Response) => withHeader(response, SITE_ENVIRONMENT_HEADER, 'staging'),
+      'best.serp.co route / was not answered by the production Worker (x-site-environment staging'
+    ],
+    [
+      'something else without Worker headers',
+      () => new Response('<html></html>', { headers: { server: 'cloudflare' } }),
+      'best.serp.co route / was not answered by the production Worker (x-site-environment (none), status 200, server cloudflare)'
+    ]
+  ])('fails when best.serp.co serves %s', async (_label, answer, message) => {
+    stubPublic(answer)
+    await expect(gates('production', origin)).rejects.toThrow(message)
+    expect(warnings()).toEqual([])
+  })
+
+  it('never skips in the manual public check', async () => {
+    stubPublic(
+      () =>
+        new Response('Just a moment...', {
+          headers: { 'cf-mitigated': 'challenge', server: 'cloudflare' },
+          status: 403
+        })
+    )
+    await expect(gates('public', origin)).rejects.toThrow(
+      'best.serp.co route / was not answered by the production Worker (x-site-environment (none), status 403, server cloudflare, cf-mitigated challenge)'
     )
   })
 })

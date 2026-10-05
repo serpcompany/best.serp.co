@@ -4,13 +4,20 @@
  *
  *   pnpm tsx scripts/d1-preview-http-gates.ts <staging|production|public> <https-origin> [output]
  *
- * - `staging <origin>`: the staging Worker on its workers.dev origin.
+ * - `staging <origin>`: the staging Worker on its workers.dev origin. `deploy-production.yml`
+ *   also runs it on the production workers.dev origin while best.serp.co is still GitHub Pages;
+ *   that branch is the step-order guard for the canonical-host switch (an early flip fails its
+ *   "`/` is not redirected" check).
  * - `production <origin>`: the production Worker. The origin may be `https://best.serp.co` or
- *   the production workers.dev origin; either way every request goes to the workers.dev origin
- *   with the smoke-test header, so the gates never depend on the `serp.co` zone (Bot Fight
- *   Mode or WAF rules there may challenge CI runners; serp standards/environment-configuration.md).
- * - `public https://best.serp.co`: the manual cutover check of best.serp.co itself (indexable,
- *   robots.txt lists the sitemap index, Google Tag Manager loads). CI never runs it.
+ *   the production workers.dev origin. Routes, versions, and the workers.dev policy are gated
+ *   through the workers.dev origin with the smoke-test header. best.serp.co's public policy
+ *   (indexable, robots.txt lists the sitemap index, Google Tag Manager loads) is then checked
+ *   on best.serp.co itself, without the header: strictly whenever the Worker answers, and
+ *   skipped with a `::warning::` when the answer is clearly not the Worker's (a Cloudflare
+ *   challenge or block from `serp.co` zone protection, or GitHub Pages before the cutover). Zone
+ *   protection therefore never fails a deploy (serp standards/environment-configuration.md).
+ * - `public https://best.serp.co`: the same best.serp.co checks, run by hand at cutover, with
+ *   no skipping.
  *
  * Every request sends the smoke-test header, so the production Worker's `*.workers.dev` host
  * answers it instead of redirecting to best.serp.co (#42 decision e); the redirect itself is
@@ -99,6 +106,8 @@ interface VersionPin {
 
 interface GateTarget {
   baseUrl: URL
+  /** How failures name the request; defaults to `<mode> route`. */
+  label?: string
   mode: HttpGateMode
   timeoutMs: number
   version?: VersionPin
@@ -174,41 +183,111 @@ async function boundedRequest<T>(
   }
 }
 
-type PinnedAnswer<T> = { kind: 'answered'; value: T } | { kind: 'stale'; version: string }
+/** Why a response clearly did not come from the Worker. */
+export interface NotTheWorker {
+  githubPages: boolean
+  reason: string
+}
+
+/**
+ * A response the Worker did not answer, or null when it may have: the Worker's responses carry
+ * `x-worker-version` and `x-site-environment`, and the clear exceptions are a Cloudflare
+ * challenge (`cf-mitigated`), GitHub Pages, and a 403/429/503 from zone protection. Any other
+ * answer is treated as the Worker's and enforced.
+ */
+export function notAnsweredByWorker(response: Response): NotTheWorker | null {
+  const headers = response.headers
+  if (headers.has(WORKER_VERSION_HEADER) || headers.has(SITE_ENVIRONMENT_HEADER)) return null
+  const server = headers.get('server') ?? '(none)'
+  const mitigated = headers.get('cf-mitigated')
+  if (mitigated)
+    return {
+      githubPages: false,
+      reason: `a Cloudflare ${mitigated} (cf-mitigated: ${mitigated}, status ${response.status})`
+    }
+  if (server.trim().toLowerCase() === 'github.com')
+    return {
+      githubPages: true,
+      reason: `GitHub Pages (server: ${server}, status ${response.status}), before the cutover`
+    }
+  if ([403, 429, 503].includes(response.status))
+    return {
+      githubPages: false,
+      reason: `a ${response.status} without Worker headers (server: ${server}), most likely zone protection`
+    }
+  return null
+}
+
+type GateAnswer<T> = { kind: 'answered'; value: T } | ({ kind: 'skipped' } & NotTheWorker)
+
+type Attempt<T> =
+  | GateAnswer<T>
+  | { kind: 'failed'; error: unknown }
+  | { kind: 'stale'; version: string }
 
 /**
  * A gate request: bounded, and answered by the expected Worker version when one is known. An
  * answer from another version (an isolate still running the previous deployment) is retried
- * until the version budget runs out, then fails closed.
+ * until the version budget runs out, then fails closed. With `skipNonWorker`, an answer that is
+ * clearly not the Worker's (`notAnsweredByWorker`), or no answer at all, comes back `skipped`.
  */
+async function pinnedFetch<T>(
+  target: GateTarget,
+  url: URL,
+  inspect: (response: Response) => Promise<T>,
+  options: { skipNonWorker?: boolean; smoke?: boolean } = {}
+): Promise<GateAnswer<T>> {
+  const pin = target.version
+  for (let attempt = 1; ; attempt += 1) {
+    let outcome: Attempt<T>
+    try {
+      outcome = await boundedRequest<Attempt<T>>(
+        url,
+        target.timeoutMs,
+        async response => {
+          const notWorker = options.skipNonWorker ? notAnsweredByWorker(response) : null
+          if (notWorker) {
+            await response.body?.cancel().catch(() => undefined)
+            return { kind: 'skipped', ...notWorker }
+          }
+          const version = response.headers.get(WORKER_VERSION_HEADER)
+          if (pin && version !== pin.expected) {
+            await response.body?.cancel().catch(() => undefined)
+            return { kind: 'stale', version: version ?? '(none)' }
+          }
+          try {
+            return { kind: 'answered', value: await inspect(response) }
+          } catch (error) {
+            return { kind: 'failed', error }
+          }
+        },
+        options.smoke ?? true
+      )
+    } catch (error) {
+      if (!options.skipNonWorker) throw error
+      const message = error instanceof Error ? error.message : String(error)
+      return { githubPages: false, kind: 'skipped', reason: `no answer (${message})` }
+    }
+    if (outcome.kind === 'failed') throw outcome.error
+    if (outcome.kind !== 'stale') return outcome
+    if (!pin || pin.clock.now() + pin.intervalMs > pin.deadline)
+      throw new Error(
+        `${target.label ?? `${target.mode} route`} ${url.pathname}${url.search} was answered by Worker version ${outcome.version}, not the deployed ${pin?.expected}, on all ${attempt} attempt(s) before the ${(pin?.budgetMs ?? 0) / 1000} s version budget ran out.`
+      )
+    await pin.clock.sleep(pin.intervalMs)
+  }
+}
+
+/** A gate request that must be answered (see `pinnedFetch`). */
 async function boundedFetch<T>(
   target: GateTarget,
   url: URL,
   inspect: (response: Response) => Promise<T>,
   smoke = true
 ): Promise<T> {
-  const pin = target.version
-  for (let attempt = 1; ; attempt += 1) {
-    const answer = await boundedRequest<PinnedAnswer<T>>(
-      url,
-      target.timeoutMs,
-      async response => {
-        const version = response.headers.get(WORKER_VERSION_HEADER)
-        if (pin && version !== pin.expected) {
-          await response.body?.cancel().catch(() => undefined)
-          return { kind: 'stale', version: version ?? '(none)' }
-        }
-        return { kind: 'answered', value: await inspect(response) }
-      },
-      smoke
-    )
-    if (answer.kind === 'answered') return answer.value
-    if (!pin || pin.clock.now() + pin.intervalMs > pin.deadline)
-      throw new Error(
-        `${target.mode} route ${url.pathname}${url.search} was answered by Worker version ${answer.version}, not the deployed ${pin?.expected}, on all ${attempt} attempt(s) before the ${(pin?.budgetMs ?? 0) / 1000} s version budget ran out.`
-      )
-    await pin.clock.sleep(pin.intervalMs)
-  }
+  const answer = await pinnedFetch(target, url, inspect, { smoke })
+  if (answer.kind === 'skipped') throw new Error(`${url.href} was not answered: ${answer.reason}.`)
+  return answer.value
 }
 
 /**
@@ -535,46 +614,86 @@ async function expectHostRedirectPolicy(target: GateTarget, redirectOn: boolean)
 }
 
 /**
- * The public site (`public` mode, run by hand at cutover; never by CI): no noindex on `/`,
- * robots.txt or the sitemap index; robots.txt lets Google and `*` crawl and lists the sitemap
- * index; Google Tag Manager loads. A noindex reaching best.serp.co would deindex the site.
+ * best.serp.co's public policy (#44, E-4), requested on best.serp.co itself without the
+ * smoke-test header, as visitors and crawlers see it: answered by the production Worker
+ * (`x-site-environment: production`); no noindex on `/`, robots.txt or the sitemap index;
+ * robots.txt lets Google and `*` crawl and lists the sitemap index; Google Tag Manager loads.
+ * A noindex reaching best.serp.co would deindex the site.
+ *
+ * Every answer from the Worker is enforced. With `skipNonWorker` (production gates), an answer
+ * that is clearly not the Worker's is skipped with a `::warning::`, so `serp.co` zone protection
+ * never fails a deploy; GitHub Pages still fails it while `CANONICAL_HOST_REDIRECT` is on, since
+ * the workers.dev host would then send visitors there. Without it (`public` mode, run by hand),
+ * every check must pass.
  */
-async function expectPublicPolicy(target: GateTarget, contentPath: string): Promise<void> {
-  const { baseUrl, mode } = target
-  await boundedFetch(target, routeUrl(baseUrl, '/'), async response => {
+async function expectPublicPolicy(
+  target: GateTarget,
+  contentPath: string,
+  options: { redirectOn: boolean; skipNonWorker: boolean }
+): Promise<void> {
+  const site: GateTarget = { ...target, baseUrl: canonicalOrigin, label: 'best.serp.co route' }
+  const check = async (path: string, inspect: (response: Response) => Promise<void>) => {
+    const answer = await pinnedFetch(
+      site,
+      routeUrl(canonicalOrigin, path),
+      async response => {
+        const environment = response.headers.get(SITE_ENVIRONMENT_HEADER)
+        if (environment !== 'production') {
+          await response.body?.cancel().catch(() => undefined)
+          const mitigated = response.headers.get('cf-mitigated')
+          throw new Error(
+            `best.serp.co route ${path} was not answered by the production Worker (x-site-environment ${environment ?? '(none)'}, status ${response.status}, server ${response.headers.get('server') ?? '(none)'}${mitigated ? `, cf-mitigated ${mitigated}` : ''}).`
+          )
+        }
+        await inspect(response)
+      },
+      { skipNonWorker: options.skipNonWorker, smoke: false }
+    )
+    if (answer.kind === 'answered') return
+    if (options.redirectOn && answer.githubPages)
+      throw new Error(
+        `CANONICAL_HOST_REDIRECT is on, but best.serp.co${path} is still ${answer.reason}: the production workers.dev host would send visitors there. Finish the cutover or turn the switch off.`
+      )
+    console.log(
+      `::warning title=best.serp.co check skipped::best.serp.co${path} was not answered by the Worker but by ${answer.reason}; its crawl and analytics check was skipped. Check it by hand (docs/DEPLOY_RUNBOOK.md, cutover step 4).`
+    )
+  }
+  await check('/', async response => {
     if (response.status !== 200) {
       await response.body?.cancel().catch(() => undefined)
-      throw new Error(`${mode} route / returned ${response.status}.`)
+      throw new Error(`best.serp.co route / returned ${response.status}.`)
     }
     const header = xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag'))
-    const document = await readDocument(response, `${mode} route /`)
+    const document = await readDocument(response, 'best.serp.co route /')
     if (header || metaRobotsBlocksIndexing(document.head))
       throw new Error(
-        `${mode} route / sent noindex in its ${header ? 'X-Robots-Tag header' : 'robots meta'}.`
+        `best.serp.co route / sent noindex in its ${header ? 'X-Robots-Tag header' : 'robots meta'}.`
       )
     if (!document.loadsGoogleTagManager)
-      throw new Error(`${mode} route / does not load Google Tag Manager.`)
+      throw new Error('best.serp.co route / does not load Google Tag Manager.')
   })
-  const sitemapIndex = routeUrl(baseUrl, '/sitemap-index.xml')
-  await boundedFetch(target, sitemapIndex, async response => {
+  const sitemapIndex = routeUrl(canonicalOrigin, '/sitemap-index.xml')
+  await check('/sitemap-index.xml', async response => {
     await response.body?.cancel().catch(() => undefined)
     if (xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag')))
-      throw new Error(`${mode} route /sitemap-index.xml sent X-Robots-Tag noindex.`)
+      throw new Error('best.serp.co route /sitemap-index.xml sent X-Robots-Tag noindex.')
   })
-  await boundedFetch(target, routeUrl(baseUrl, '/robots.txt'), async response => {
+  await check('/robots.txt', async response => {
     if (response.status !== 200)
-      throw new Error(`${mode} route /robots.txt returned ${response.status}.`)
+      throw new Error(`best.serp.co route /robots.txt returned ${response.status}.`)
     if (xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag')))
-      throw new Error(`${mode} route /robots.txt sent X-Robots-Tag noindex.`)
-    const robots = await readBoundedText(response, `${mode} route /robots.txt`)
+      throw new Error('best.serp.co route /robots.txt sent X-Robots-Tag noindex.')
+    const robots = await readBoundedText(response, 'best.serp.co route /robots.txt')
     const listsSitemapIndex = robots
       .split(/\r?\n/u)
       .some(line => /^\s*sitemap\s*:\s*(\S+)\s*$/iu.exec(line)?.[1] === sitemapIndex.href)
     if (!listsSitemapIndex)
-      throw new Error(`${mode} robots.txt does not list "Sitemap: ${sitemapIndex.href}".`)
+      throw new Error(`best.serp.co robots.txt does not list "Sitemap: ${sitemapIndex.href}".`)
     const blocked = robotsTxtBlockedPath(robots, ['/', contentPath])
     if (blocked)
-      throw new Error(`${mode} robots.txt blocks ${blocked.path} for user-agent ${blocked.agent}.`)
+      throw new Error(
+        `best.serp.co robots.txt blocks ${blocked.path} for user-agent ${blocked.agent}.`
+      )
   })
 }
 
@@ -619,7 +738,10 @@ export async function runHttpGates(
     console.info(`Worker version ${options.expectedVersion} answered ${probes} probe(s).`)
   }
   if (mode === 'public') {
-    await expectPublicPolicy(target, listingRoute(listingSlug))
+    await expectPublicPolicy(target, listingRoute(listingSlug), {
+      redirectOn: false,
+      skipNonWorker: false
+    })
     return
   }
   await withTrailingSlashPolicy(target, listingSlug, [
@@ -634,6 +756,8 @@ export async function runHttpGates(
   ])
   await expectNonProductionPolicy(target)
   await expectHostRedirectPolicy(target, redirectOn)
+  if (mode === 'production')
+    await expectPublicPolicy(target, listingRoute(listingSlug), { redirectOn, skipNonWorker: true })
 }
 
 export async function runStagingHttpGates(baseUrlValue: string): Promise<void> {
@@ -653,7 +777,7 @@ async function main(): Promise<void> {
     )
   if (modeValue === 'production')
     console.info(
-      `Gating the production Worker through ${productionPlatformOrigin.origin} with the smoke-test header; best.serp.co itself is checked by hand at cutover (docs/DEPLOY_RUNBOOK.md).`
+      `Gating the production Worker through ${productionPlatformOrigin.origin} with the smoke-test header, then best.serp.co's crawl and analytics policy (enforced when the Worker answers; zone challenges are skipped with a warning).`
     )
   await runHttpGates(modeValue, baseUrlValue, { expectedVersion })
   if (output)

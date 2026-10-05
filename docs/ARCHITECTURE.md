@@ -92,13 +92,18 @@ host alone. A test (`apps/web/lib/environment/site-environment.test.ts`) pins th
   (`CF_VERSION_METADATA.id`) and `x-site-environment` (the configured `SITE_ENVIRONMENT`, or
   `unset`). Given the deployed version (`EXPECTED_WORKER_VERSION`, or the `deploy` entry
   Wrangler writes to `WRANGLER_OUTPUT_FILE_PATH`), the HTTP gates
-  (`scripts/d1-preview-http-gates.ts`) wait until it answers three probes in a row, then
-  require it on every response, retrying an answer from the previous version within the same
-  60-second budget. They send the smoke-test header and go only through workers.dev hosts:
-  production is gated on its platform host (non-production policy, `x-site-environment:
-  production`, and the 308 once the switch is `on`), never on best.serp.co, so `serp.co` zone
-  protection cannot fail a deploy. best.serp.co itself is checked by hand at cutover (`public`
-  mode; see the deploy runbook).
+  (`scripts/d1-preview-http-gates.ts`) wait until it answers three probes in a row (logging
+  `Worker version <id> answered N probe(s)`), then require it on every response, retrying an
+  answer from the previous version within the same 60-second budget; they assume
+  `wrangler deploy` to 100% of traffic. Production is gated on its platform host with the
+  smoke-test header (non-production policy, `x-site-environment: production`, and the 308 once
+  the switch is `on`), then on best.serp.co itself without it: no noindex, robots.txt lists the
+  sitemap index, Google Tag Manager loads. Every answer from the Worker is enforced; a
+  Cloudflare challenge or block, or GitHub Pages before the cutover, is skipped with a
+  `best.serp.co check skipped` warning, so `serp.co` zone protection never fails a deploy
+  (GitHub Pages does fail it while the switch is `on`). `public-policy.test.tsx` in
+  `apps/web/lib/environment/` runs that policy through the Worker pipeline and the root
+  layout's decision.
 
 ## URL canonicalization
 
