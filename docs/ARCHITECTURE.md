@@ -18,7 +18,12 @@ Browser
         -> catalog operations (packages/data-ops) -> D1 (DB) public catalog tables
      -> server-only submission adapter (apps/web/lib/submissions)
         -> submission operations (packages/data-ops) -> D1 (DB) private intake tables
+     -> server-only account adapter (apps/web/lib/auth): Better Auth, requireUser/requireAdmin
+        -> account operations (packages/data-ops/auth) -> D1 (DB) users, sessions, allowlist
 ```
+
+`/admin` and `/api/admin` pass the Worker entry's Cloudflare Access and session-cookie gate
+first ([Accounts](./ACCOUNTS.md)).
 
 ## Responsibility map
 
@@ -45,6 +50,9 @@ Browser
   response, claims each template and event key in the `email_deliveries` ledger
   (`packages/data-ops/`) so it never sends twice, and only logs locally
   ([Email](./EMAIL.md)).
+- `apps/web/lib/auth/` configures Better Auth (email sign-in codes) on the `DB` binding,
+  serves `/api/auth/*`, guards admin routes, and verifies Cloudflare Access JWTs; account SQL
+  lives in `packages/data-ops/src/auth.ts` ([Accounts](./ACCOUNTS.md)).
 - `packages/site-config/` is the checked-in site definition (name, domain, copy,
   routes, sitemap layout, badges, feature flags) and site-owned content.
 - `packages/web-core/` owns reusable page/view behavior and reads the site definition
@@ -216,9 +224,11 @@ reads it with one statement (two index seeks). Four layers, from the edge inward
    still receive the origin `Cache-Control`. A cacheable request reaches OpenNext with only
    `accept`, `host`, `user-agent`, and the router headers; every other request header
    (cookies, `x-nonce`, forwarded and framework-internal headers) is dropped, so nothing a
-   client sends can be stored and served to others (`renderRequestFor`). Bypassed: `/api`, `/admin`, `/account`,
-   `/login`, `/search`, `/_next`, requests with `Authorization`, and Auth.js or preview
-   cookies. Responses carry `x-edge-cache: HIT | MISS | BYPASS`.
+   client sends can be stored and served to others (`renderRequestFor`). Bypassed: `/api`
+   (including `/api/auth`), `/admin`, `/account`, `/login`, `/search`, `/_next` (first path
+   segment in any case), requests with `Authorization`, and requests carrying a Better Auth
+   (`better-auth.*`) or preview cookie, so a signed-in request is never served from or
+   stored in the cache. Responses carry `x-edge-cache: HIT | MISS | BYPASS`.
 2. **Epoch memo.** Each isolate reuses its epoch for 30 seconds and revalidates it in the
    background for up to 5 minutes; isolates in one data center share it through the Cache
    API for 30 seconds. D1 therefore sees about one one-row epoch read per data center per

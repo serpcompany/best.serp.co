@@ -14,7 +14,7 @@ import {
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { runCanonicalPreview } from './d1-local-preview'
 import { configuredFreshD1StateRoot } from './d1-local-state'
-import { applicationTableNames } from './d1-table-inventory'
+import { parityTableNames } from './d1-table-inventory'
 import { project } from './project'
 
 function wrangler(args: string[], capture = false): string {
@@ -132,14 +132,14 @@ async function verify(): Promise<void> {
   } finally {
     actualDatabase.close()
   }
-  const mismatches = applicationTableNames.filter(
+  const mismatches = parityTableNames.filter(
     table =>
       actual.tables[table].count !== expected.tables[table].count ||
       actual.tables[table].checksum !== expected.tables[table].checksum
   )
   if (actual.checksum !== expected.checksum || mismatches.length > 0) {
     throw new Error(
-      `Local D1 exact ${applicationTableNames.length}-table bootstrap parity failed${mismatches.length > 0 ? `: ${mismatches.join(', ')}` : ''}.`
+      `Local D1 exact ${parityTableNames.length}-table bootstrap parity failed${mismatches.length > 0 ? `: ${mismatches.join(', ')}` : ''}.`
     )
   }
   const state = query('SELECT version, checksum FROM publication_state WHERE id=1') as Array<{
@@ -150,7 +150,7 @@ async function verify(): Promise<void> {
     throw new Error('D1 publication checksum does not match the migration report.')
   }
   console.log(
-    `Verified local D1 publication v${state[0]?.version}: exact ${applicationTableNames.length}-table snapshot ${actual.checksum}, checksum ${state[0]?.checksum}`
+    `Verified local D1 publication v${state[0]?.version}: exact ${parityTableNames.length}-table snapshot ${actual.checksum}, checksum ${state[0]?.checksum}`
   )
 }
 

@@ -37,6 +37,11 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import {
+  type AccessEnv,
+  accessConfig,
+  accessRequired
+} from '../apps/web/lib/auth/cloudflare-access'
+import {
   SITE_ENVIRONMENT_HEADER,
   SMOKE_TEST_HEADER,
   WORKER_VERSION_HEADER
@@ -416,6 +421,64 @@ async function expectRoute(target: GateTarget, path: string): Promise<void> {
 }
 
 /**
+ * The admin lock (serpcompany/best.serp.co#60, docs/ACCOUNTS.md): an anonymous request for
+ * `/admin/` or `/api/admin` must get exactly the answer the environment's checked-in vars
+ * imply. Where Access is required (always in production; on staging with
+ * `CF_ACCESS_REQUIRED=on`) that is 403 when the team domain and AUD tag are valid (the platform
+ * host never carries an Access JWT) and 503 when they are not; without Access it is 401 (no
+ * session). Any other answer, including a 503 from a production Worker whose Access vars are
+ * set, means the lock is misconfigured and fails the deploy.
+ */
+export function expectedAdminLockStatus(vars: AccessEnv): 401 | 403 | 503 {
+  if (!accessRequired(vars)) return 401
+  return accessConfig(vars) ? 403 : 503
+}
+
+export interface AdminLockStatuses {
+  production: 401 | 403 | 503
+  staging: 401 | 403 | 503
+}
+
+/** The expected admin-lock answer of each deployed environment, from `wrangler.jsonc`. */
+export function adminLockStatusesFromConfig(
+  configPath: string = project.wranglerConfigPath
+): AdminLockStatuses {
+  const config = JSON.parse(readFileSync(resolve(configPath), 'utf8')) as {
+    env?: Record<'production' | 'staging', { vars?: Record<string, string> } | undefined>
+  }
+  return {
+    production: expectedAdminLockStatus({
+      ...config.env?.production?.vars,
+      SITE_ENVIRONMENT: 'production'
+    }),
+    staging: expectedAdminLockStatus({ ...config.env?.staging?.vars, SITE_ENVIRONMENT: 'staging' })
+  }
+}
+
+/** The answers an admin path may give on this target: exact for a known environment. */
+export function allowedAdminLockStatuses(
+  environment: string | null,
+  statuses: AdminLockStatuses
+): readonly number[] {
+  if (environment === 'production') return [statuses.production]
+  if (environment === 'staging') return [statuses.staging]
+  return [401, 403, 503]
+}
+
+async function expectAdminLock(target: GateTarget, statuses: AdminLockStatuses): Promise<void> {
+  const allowed = allowedAdminLockStatuses(expectedSiteEnvironment(target), statuses)
+  for (const path of ['/admin/', '/api/admin']) {
+    await boundedFetch(target, routeUrl(target.baseUrl, path), async response => {
+      await response.body?.cancel().catch(() => undefined)
+      if (!allowed.includes(response.status))
+        throw new Error(
+          `${target.mode} admin route ${path} returned ${response.status}, not ${allowed.join(' or ')}; the admin lock does not match wrangler.jsonc.`
+        )
+    })
+  }
+}
+
+/**
  * URL trailing-slash standard (serp docs/engineering/standards/url-trailing-slash.md): a page
  * URL without its slash and a file URL with one answer exactly one 308 to the canonical form,
  * and /api is served as requested.
@@ -777,7 +840,8 @@ export async function runHttpGates(
     expectRoute(target, '/rss.xml'),
     expectRoute(target, '/sitemap-index.xml'),
     expectLegacyRedirect(target, `/${listingSlug}/`, listingRoute(listingSlug)),
-    expectRoute(target, '/submit/')
+    expectRoute(target, '/submit/'),
+    expectAdminLock(target, adminLockStatusesFromConfig(options.wranglerConfigPath))
   ])
   await expectNonProductionPolicy(target, listingRoute(listingSlug))
   await expectHostRedirectPolicy(target, redirectOn)

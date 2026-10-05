@@ -126,7 +126,36 @@ export const applicationColumnInventory = {
     'last_error_code',
     'created_at',
     'updated_at'
-  ]
+  ],
+  users: ['id', 'name', 'email', 'email_verified', 'image', 'role', 'created_at', 'updated_at'],
+  sessions: [
+    'id',
+    'expires_at',
+    'token',
+    'created_at',
+    'updated_at',
+    'ip_address',
+    'user_agent',
+    'user_id'
+  ],
+  accounts: [
+    'id',
+    'account_id',
+    'provider_id',
+    'user_id',
+    'access_token',
+    'refresh_token',
+    'id_token',
+    'access_token_expires_at',
+    'refresh_token_expires_at',
+    'scope',
+    'password',
+    'created_at',
+    'updated_at'
+  ],
+  verification: ['id', 'identifier', 'value', 'expires_at', 'created_at', 'updated_at'],
+  admin_allowlist: ['email', 'note', 'added_by', 'created_at'],
+  auth_rate_limit_hits: ['id', 'bucket', 'hit_at']
 } as const
 
 export type ApplicationTableName = keyof typeof applicationColumnInventory
@@ -134,6 +163,28 @@ export type ApplicationTableName = keyof typeof applicationColumnInventory
 export const applicationTableNames = Object.keys(
   applicationColumnInventory
 ) as ApplicationTableName[]
+
+/**
+ * Tables written at runtime: Better Auth and its sign-in limits (#60) and the transactional
+ * email ledger (#71). They belong to the exact schema inventory, but not to bootstrap parity:
+ * the import never writes them, and a database that has served a sign-in or sent an email
+ * (local preview, Playwright, a deployed Worker) holds rows.
+ */
+export const runtimeTableNames = [
+  'users',
+  'sessions',
+  'accounts',
+  'verification',
+  'auth_rate_limit_hits',
+  'email_deliveries'
+] as const satisfies readonly ApplicationTableName[]
+
+export type ParityTableName = Exclude<ApplicationTableName, (typeof runtimeTableNames)[number]>
+
+/** Tables whose rows bootstrap parity (`db:verify:local`, `verify-import`) compares exactly. */
+export const parityTableNames = applicationTableNames.filter(
+  (table): table is ParityTableName => !(runtimeTableNames as readonly string[]).includes(table)
+)
 
 /** Foreign-key-safe order for loading or replaying application rows. */
 export const importOrder: ApplicationTableName[] = [
@@ -153,7 +204,13 @@ export const importOrder: ApplicationTableName[] = [
   'listing_submission_events',
   'listing_submission_rate_limits',
   'listing_submission_notifications',
-  'email_deliveries'
+  'email_deliveries',
+  'users',
+  'sessions',
+  'accounts',
+  'verification',
+  'admin_allowlist',
+  'auth_rate_limit_hits'
 ]
 
 export const toolOwnedTableNames = ['d1_migrations'] as const

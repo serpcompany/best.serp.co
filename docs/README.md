@@ -7,6 +7,7 @@
 | [Development](./DEVELOPMENT.md) | Local catalog, Worker preview, schema changes |
 | [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review |
 | [Email](./EMAIL.md) | Transactional email, environments, owner prerequisites |
+| [Accounts](./ACCOUNTS.md) | Better Auth sign-in codes, admins, Cloudflare Access |
 | [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, release flow, cutover checklist |
 | [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, staging before production |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees |

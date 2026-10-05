@@ -11,6 +11,7 @@
  * This module has no Next.js or `server-only` imports so it can run before the Next.js
  * server is loaded, and every dependency (cache, epoch reader, clock) is injected.
  */
+import { hasAuthCookie } from '../auth/cookies'
 
 /** How long a stored response may be reused under the same epoch and deployment. */
 export const HTML_CACHE_TTL_SECONDS = 24 * 60 * 60
@@ -34,9 +35,8 @@ const BYPASS_PATH_SEGMENTS = new Set([
   'search'
 ])
 
-/** Cookies that mean the response may depend on who is asking. */
-const PERSONAL_COOKIE_PATTERN =
-  /(?:^|;\s*)(?:__Secure-|__Host-)?(?:authjs\.|next-auth\.)|__prerender_bypass|__next_preview_data/u
+/** Next.js preview cookies; Better Auth cookies are matched by `hasAuthCookie`. */
+const PREVIEW_COOKIE_PATTERN = /__prerender_bypass|__next_preview_data/u
 
 /** Request headers that select a different React Server Components payload. */
 const RSC_VARIANT_HEADERS = [
@@ -85,9 +85,10 @@ export interface EdgeCacheEvent {
 export function isCacheableRequest(request: Request): boolean {
   if (request.method !== 'GET' && request.method !== 'HEAD') return false
   if (request.headers.has('authorization')) return false
+  // A signed-in visitor (any Better Auth cookie) is never served from, or stored in, the cache.
   const cookie = request.headers.get('cookie')
-  if (cookie && PERSONAL_COOKIE_PATTERN.test(cookie)) return false
-  const firstSegment = new URL(request.url).pathname.split('/')[1] ?? ''
+  if (hasAuthCookie(cookie) || (cookie && PREVIEW_COOKIE_PATTERN.test(cookie))) return false
+  const firstSegment = (new URL(request.url).pathname.split('/')[1] ?? '').toLowerCase()
   return !BYPASS_PATH_SEGMENTS.has(firstSegment)
 }
 

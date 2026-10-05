@@ -50,6 +50,12 @@ let nextConfig: NextConfig = {
 
   transpilePackages: INTERNAL_PACKAGES,
 
+  // `unauthorized()` / `forbidden()` give admin pages real 401 and 403 responses
+  // (`requireAdmin()` in lib/auth/server.ts; docs/ACCOUNTS.md).
+  experimental: {
+    authInterrupts: true
+  },
+
   pageExtensions: ['mdx', 'ts', 'tsx'],
 
   // Configure logging behavior

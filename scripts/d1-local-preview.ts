@@ -5,6 +5,37 @@ import { validateCanonicalLocalConfig } from './d1-local-config'
 import { configuredFreshD1StateRoot } from './d1-local-state'
 import { project } from './project'
 
+/**
+ * Vars a local preview may override, as `NAME=value` pairs separated by commas in
+ * `LOCAL_PREVIEW_VARS`: only the Cloudflare Access switches, so Playwright can run the built
+ * Worker with the production Access lock (apps/e2e/tests/access-lock.spec.ts). Identity and
+ * environment vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`) can never be overridden here.
+ */
+export const LOCAL_PREVIEW_OVERRIDABLE_VARS = [
+  'CF_ACCESS_AUD',
+  'CF_ACCESS_REQUIRED',
+  'CF_ACCESS_TEAM_DOMAIN'
+] as const
+
+export function localPreviewVarArgs(value: string | undefined): string[] {
+  if (!value?.trim()) return []
+  return value.split(',').flatMap(pair => {
+    const separator = pair.indexOf('=')
+    const name = pair.slice(0, separator).trim()
+    const varValue = pair.slice(separator + 1).trim()
+    if (
+      separator < 1 ||
+      !(LOCAL_PREVIEW_OVERRIDABLE_VARS as readonly string[]).includes(name) ||
+      !/^[\w.-]*$/u.test(varValue)
+    ) {
+      throw new Error(
+        `LOCAL_PREVIEW_VARS accepts only ${LOCAL_PREVIEW_OVERRIDABLE_VARS.join(', ')} with plain values; received ${pair.trim()}.`
+      )
+    }
+    return ['--var', `${name}:${varValue}`]
+  })
+}
+
 export function canonicalPreviewCommand(): {
   args: string[]
   statePath: string
@@ -23,7 +54,8 @@ export function canonicalPreviewCommand(): {
       '--persist-to',
       statePath,
       '--port',
-      process.env.PORT || '8787'
+      process.env.PORT || '8787',
+      ...localPreviewVarArgs(process.env.LOCAL_PREVIEW_VARS)
     ],
     statePath
   }

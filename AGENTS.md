@@ -17,6 +17,8 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
   `worker.ts` is the Worker entry: an epoch-keyed edge HTML cache in front of OpenNext.
 - `apps/web/lib/catalog/`: server-only adapter that acquires and validates the `DB`
   binding and delegates to `packages/data-ops/`.
+- `apps/web/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
+  the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/ACCOUNTS.md)).
 - `apps/e2e/`: Playwright suites that run against the local or deployed Worker.
 - `packages/site-config/`: the checked-in site definition (routes, copy, badges,
   sitemap layout) and site-owned content such as the About page.
