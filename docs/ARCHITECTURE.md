@@ -98,12 +98,15 @@ host alone. A test (`apps/web/lib/environment/site-environment.test.ts`) pins th
   `wrangler deploy` to 100% of traffic. Production is gated on its platform host with the
   smoke-test header (non-production policy, `x-site-environment: production`, and the 308 once
   the switch is `on`), then on best.serp.co itself without it: no noindex, robots.txt lists the
-  sitemap index, Google Tag Manager loads. Every answer from the Worker is enforced; a
-  Cloudflare challenge or block, or GitHub Pages before the cutover, is skipped with a
-  `best.serp.co check skipped` warning, so `serp.co` zone protection never fails a deploy
-  (GitHub Pages does fail it while the switch is `on`). `public-policy.test.tsx` in
-  `apps/web/lib/environment/` runs that policy through the Worker pipeline and the root
-  layout's decision.
+  sitemap index, Google Tag Manager loads. Every answer from the Worker is enforced. Only
+  these are skipped, with a `best.serp.co check skipped` warning: a `cf-mitigated` challenge,
+  a 403 or 429 without Worker headers (zone protection), and GitHub Pages before the cutover
+  (which fails while the switch is `on`). A 503 without Worker headers (for example, a Worker
+  over its limits), no answer, or any other answer fails. The workers.dev pass also rejects a
+  robots-meta noindex on `/` and a listing page, which is the same on every host. In
+  `apps/web/lib/environment/`, `public-policy.test.tsx` runs the policy through the Worker
+  pipeline and the root layout's analytics decision, and `noindex-sources.test.ts` checks the
+  real `next.config.ts` headers and the layout's and pages' robots metadata.
 
 ## URL canonicalization
 

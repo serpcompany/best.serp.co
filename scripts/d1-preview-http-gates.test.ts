@@ -241,11 +241,11 @@ describe('environment-specific HTTP gates', () => {
 
 // Crawl and analytics policy (serp standards/environment-configuration.md). Kept apart from the
 // route contracts above: after them, Staging and Production (through its platform host) fetch
-// /, /sitemap-index.xml, /robots.txt, and / without the smoke header; Production then fetches
-// /, /sitemap-index.xml and /robots.txt on best.serp.co, which is all the manual public check
-// does.
+// /, /sitemap-index.xml, /robots.txt, a listing page, and / without the smoke header;
+// Production then fetches /, /sitemap-index.xml and /robots.txt on best.serp.co, which is all
+// the manual public check does.
 const PUBLIC_POLICY_PATHS = ['/', '/sitemap-index.xml', '/robots.txt']
-const CRAWL_POLICY_REQUESTS = { production: 4 + 3, public: 3, staging: 4 } as const
+const CRAWL_POLICY_REQUESTS = { production: 5 + 3, public: 3, staging: 5 } as const
 
 function correctRobotsTxt(robotsOrigin: string): string {
   if (robotsOrigin !== origin) return 'User-agent: *\nDisallow: /\n'
@@ -303,6 +303,7 @@ describe('environment-specific crawl policy gates', () => {
       `${platformOrigin}/`,
       `${platformOrigin}/sitemap-index.xml`,
       `${platformOrigin}/robots.txt`,
+      `${platformOrigin}/products/${slug}/`,
       `${platformOrigin}/`,
       `${origin}/`,
       `${origin}/sitemap-index.xml`,
@@ -321,8 +322,28 @@ describe('environment-specific crawl policy gates', () => {
       '/',
       '/sitemap-index.xml',
       '/robots.txt',
+      `/products/${slug}/`,
       '/'
     ])
+  })
+
+  // PR #47 review round 3: page markup is host-independent, so a robots meta noindex on `/` or
+  // a listing is caught on the workers.dev pass even when best.serp.co meets zone protection.
+  it.each([
+    ['/', 'production'],
+    [`/products/${slug}/`, 'production'],
+    ['/', 'staging']
+  ])('rejects a robots meta noindex on %s in %s gates', async (path, mode) => {
+    stubCrawlPolicy((url, response) =>
+      url.origin !== origin && url.pathname === path
+        ? new Response('<html><head><meta name="robots" content="noindex"></head></html>', {
+            headers: response.headers
+          })
+        : response
+    )
+    await expect(gates(mode, mode === 'staging' ? stagingOrigin : origin)).rejects.toThrow(
+      `${mode} route ${path} sent noindex in its robots meta, on every host`
+    )
   })
 
   it.each(['/', '/sitemap-index.xml', '/robots.txt'])(
@@ -821,14 +842,25 @@ describe('best.serp.co public policy in the production gates', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  /** best.serp.co answers with `answer(url, response)`; the platform host is a correct Worker. */
-  function stubPublic(answer: (url: URL, response: Response) => Response | Promise<Response>) {
+  /**
+   * best.serp.co answers with `answer(url, response)`; the platform host is a correct Worker,
+   * which with `redirecting` (CANONICAL_HOST_REDIRECT=on) 308s requests without the smoke header.
+   */
+  function stubPublic(
+    answer: (url: URL, response: Response) => Response | Promise<Response>,
+    redirecting = false
+  ) {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: string | URL | Request) => {
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         const url = new URL(String(input))
-        const response = withCrawlPolicy(url, successfulResponse(url))
-        return url.origin === origin ? answer(url, response) : response
+        if (url.origin === origin) return answer(url, withCrawlPolicy(url, successfulResponse(url)))
+        if (redirecting && !new Headers(init?.headers).has(SMOKE_TEST_HEADER))
+          return new Response(null, {
+            headers: { location: `${origin}/about/?gate=canonical-host` },
+            status: 308
+          })
+        return withCrawlPolicy(url, successfulResponse(url))
       })
     )
   }
@@ -853,21 +885,19 @@ describe('best.serp.co public policy in the production gates', () => {
       'cf-mitigated: challenge'
     ],
     [
-      'a 503 without Worker headers',
-      () => new Response('busy', { headers: { server: 'cloudflare' }, status: 503 }),
-      'a 503 without Worker headers (server: cloudflare)'
+      'a 403 block without Worker headers',
+      () => new Response('Forbidden', { headers: { server: 'cloudflare' }, status: 403 }),
+      'a 403 without Worker headers (server: cloudflare), zone protection'
+    ],
+    [
+      'a 429 rate limit without Worker headers',
+      () => new Response('Slow down', { headers: { server: 'cloudflare' }, status: 429 }),
+      'a 429 without Worker headers (server: cloudflare), zone protection'
     ],
     [
       'GitHub Pages before the cutover',
       () => new Response('<html></html>', { headers: { server: 'GitHub.com' } }),
       'GitHub Pages (server: GitHub.com'
-    ],
-    [
-      'no answer',
-      () => {
-        throw new TypeError('fetch failed')
-      },
-      'no answer (fetch failed)'
     ]
   ])('skips with a warning when best.serp.co answers with %s', async (_label, answer, seen) => {
     stubPublic(() => answer())
@@ -877,6 +907,36 @@ describe('best.serp.co public policy in the production gates', () => {
       expect(warning).toContain('::warning title=best.serp.co check skipped::')
       expect(warning).toContain(seen)
     }
+  })
+
+  // PR #47 review round 3: only zone protection is skipped. A Worker over its limits (Cloudflare
+  // 1102, a 503 without Worker headers) or a best.serp.co that does not answer (a timeout, a
+  // detached Custom Domain, missing DNS) fails, whether the switch is on or off.
+  it.each([
+    [
+      'a 503 without Worker headers',
+      () =>
+        new Response('Worker exceeded resource limits', {
+          headers: { server: 'cloudflare' },
+          status: 503
+        }),
+      'best.serp.co route / was not answered by the production Worker (x-site-environment (none), status 503, server cloudflare)'
+    ],
+    [
+      'no answer',
+      () => {
+        throw new TypeError('fetch failed')
+      },
+      'best.serp.co route / got no answer (fetch failed)'
+    ]
+  ])('fails when best.serp.co answers with %s', async (_label, answer, message) => {
+    for (const redirecting of [false, true]) {
+      stubPublic(() => answer(), redirecting)
+      await expect(
+        gates('production', origin, undefined, redirecting ? switchOn() : {})
+      ).rejects.toThrow(message)
+    }
+    expect(warnings()).toEqual([])
   })
 
   it('fails on GitHub Pages while CANONICAL_HOST_REDIRECT is on', async () => {

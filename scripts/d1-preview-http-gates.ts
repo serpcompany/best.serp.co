@@ -13,9 +13,10 @@
  *   through the workers.dev origin with the smoke-test header. best.serp.co's public policy
  *   (indexable, robots.txt lists the sitemap index, Google Tag Manager loads) is then checked
  *   on best.serp.co itself, without the header: strictly whenever the Worker answers, and
- *   skipped with a `::warning::` when the answer is clearly not the Worker's (a Cloudflare
- *   challenge or block from `serp.co` zone protection, or GitHub Pages before the cutover). Zone
- *   protection therefore never fails a deploy (serp standards/environment-configuration.md).
+ *   skipped with a `::warning::` only for `serp.co` zone protection (a `cf-mitigated`
+ *   challenge, or a 403 or 429 without Worker headers) and for GitHub Pages before the cutover
+ *   (`notAnsweredByWorker`). Zone protection therefore never fails a deploy (serp
+ *   standards/environment-configuration.md); a 503 without Worker headers or no answer does.
  * - `public https://best.serp.co`: the same best.serp.co checks, run by hand at cutover, with
  *   no skipping.
  *
@@ -190,10 +191,15 @@ export interface NotTheWorker {
 }
 
 /**
- * A response the Worker did not answer, or null when it may have: the Worker's responses carry
- * `x-worker-version` and `x-site-environment`, and the clear exceptions are a Cloudflare
- * challenge (`cf-mitigated`), GitHub Pages, and a 403/429/503 from zone protection. Any other
- * answer is treated as the Worker's and enforced.
+ * A best.serp.co response the gates skip, or null when they enforce it. Only two kinds are
+ * skipped, and only without the Worker's headers (`x-worker-version`, `x-site-environment`):
+ * - `serp.co` zone protection: a Cloudflare challenge (`cf-mitigated`), or a 403 block or 429
+ *   rate limit;
+ * - GitHub Pages (`server: GitHub.com`), before the cutover.
+ * Anything else is enforced, so it fails unless the production Worker answered correctly: a
+ * 503 without Worker headers (for example, Cloudflare error 1102, a Worker over its resource
+ * limits), any other status, and no answer at all (a timeout, a detached Custom Domain, missing
+ * DNS).
  */
 export function notAnsweredByWorker(response: Response): NotTheWorker | null {
   const headers = response.headers
@@ -205,15 +211,15 @@ export function notAnsweredByWorker(response: Response): NotTheWorker | null {
       githubPages: false,
       reason: `a Cloudflare ${mitigated} (cf-mitigated: ${mitigated}, status ${response.status})`
     }
+  if (response.status === 403 || response.status === 429)
+    return {
+      githubPages: false,
+      reason: `a ${response.status} without Worker headers (server: ${server}), zone protection`
+    }
   if (server.trim().toLowerCase() === 'github.com')
     return {
       githubPages: true,
       reason: `GitHub Pages (server: ${server}, status ${response.status}), before the cutover`
-    }
-  if ([403, 429, 503].includes(response.status))
-    return {
-      githubPages: false,
-      reason: `a ${response.status} without Worker headers (server: ${server}), most likely zone protection`
     }
   return null
 }
@@ -228,8 +234,9 @@ type Attempt<T> =
 /**
  * A gate request: bounded, and answered by the expected Worker version when one is known. An
  * answer from another version (an isolate still running the previous deployment) is retried
- * until the version budget runs out, then fails closed. With `skipNonWorker`, an answer that is
- * clearly not the Worker's (`notAnsweredByWorker`), or no answer at all, comes back `skipped`.
+ * until the version budget runs out, then fails closed. With `skipNonWorker`, an answer
+ * `notAnsweredByWorker` classifies (zone protection, GitHub Pages) comes back `skipped`; no
+ * answer at all still fails.
  */
 async function pinnedFetch<T>(
   target: GateTarget,
@@ -264,9 +271,12 @@ async function pinnedFetch<T>(
         options.smoke ?? true
       )
     } catch (error) {
+      // No answer is never skipped: zone protection answers, with a challenge or a block.
       if (!options.skipNonWorker) throw error
       const message = error instanceof Error ? error.message : String(error)
-      return { githubPages: false, kind: 'skipped', reason: `no answer (${message})` }
+      throw new Error(
+        `${target.label ?? `${target.mode} route`} ${url.pathname}${url.search} got no answer (${message}).`
+      )
     }
     if (outcome.kind === 'failed') throw outcome.error
     if (outcome.kind !== 'stale') return outcome
@@ -531,8 +541,12 @@ function expectedSiteEnvironment(target: GateTarget): string | null {
  * sitemap index; robots.txt disallows Google and `*`; no Google Tag Manager. The Worker also
  * reports the `SITE_ENVIRONMENT` it was deployed with, which proves through this host that the
  * production Worker would serve best.serp.co as production.
+ *
+ * Page markup does not depend on the host, so `/` and a listing page must also carry no robots
+ * meta noindex here: that keeps a page-level noindex out of best.serp.co even when every
+ * best.serp.co probe meets zone protection.
  */
-async function expectNonProductionPolicy(target: GateTarget): Promise<void> {
+async function expectNonProductionPolicy(target: GateTarget, listingPath: string): Promise<void> {
   const { baseUrl, mode } = target
   const environment = expectedSiteEnvironment(target)
   for (const path of ['/', '/sitemap-index.xml', '/robots.txt']) {
@@ -548,8 +562,13 @@ async function expectNonProductionPolicy(target: GateTarget): Promise<void> {
           `${mode} Worker at ${baseUrl.origin} reports SITE_ENVIRONMENT ${reported ?? '(none)'}, not ${environment}.`
         )
       }
-      if (path === '/' && (await readDocument(response, `${mode} route /`)).loadsGoogleTagManager)
-        throw new Error(`${mode} route / loads Google Tag Manager.`)
+      if (path === '/') {
+        const document = await readDocument(response, `${mode} route /`)
+        if (document.loadsGoogleTagManager)
+          throw new Error(`${mode} route / loads Google Tag Manager.`)
+        if (metaRobotsBlocksIndexing(document.head))
+          throw new Error(`${mode} route / sent noindex in its robots meta, on every host.`)
+      }
       if (path === '/robots.txt') {
         const groups = parseRobotsTxt(await readBoundedText(response, `${mode} robots.txt`))
         const crawlable = ['*', 'googlebot'].find(agent => robotsTxtAllows(groups, agent, '/'))
@@ -558,6 +577,12 @@ async function expectNonProductionPolicy(target: GateTarget): Promise<void> {
       await response.body?.cancel().catch(() => undefined)
     })
   }
+  await boundedFetch(target, routeUrl(baseUrl, listingPath), async response => {
+    if (metaRobotsBlocksIndexing(await readBoundedText(response, `${mode} route ${listingPath}`)))
+      throw new Error(
+        `${mode} route ${listingPath} sent noindex in its robots meta, on every host.`
+      )
+  })
 }
 
 /** Whether the checked-in production config turns the canonical-host redirect on. */
@@ -620,11 +645,11 @@ async function expectHostRedirectPolicy(target: GateTarget, redirectOn: boolean)
  * robots.txt lets Google and `*` crawl and lists the sitemap index; Google Tag Manager loads.
  * A noindex reaching best.serp.co would deindex the site.
  *
- * Every answer from the Worker is enforced. With `skipNonWorker` (production gates), an answer
- * that is clearly not the Worker's is skipped with a `::warning::`, so `serp.co` zone protection
- * never fails a deploy; GitHub Pages still fails it while `CANONICAL_HOST_REDIRECT` is on, since
- * the workers.dev host would then send visitors there. Without it (`public` mode, run by hand),
- * every check must pass.
+ * Every answer from the Worker is enforced. With `skipNonWorker` (production gates), zone
+ * protection and GitHub Pages (`notAnsweredByWorker`) are skipped with a `::warning::`, so
+ * `serp.co` zone protection never fails a deploy; GitHub Pages still fails it while
+ * `CANONICAL_HOST_REDIRECT` is on, since the workers.dev host would then send visitors there.
+ * Without it (`public` mode, run by hand), every check must pass.
  */
 async function expectPublicPolicy(
   target: GateTarget,
@@ -754,7 +779,7 @@ export async function runHttpGates(
     expectLegacyRedirect(target, `/${listingSlug}/`, listingRoute(listingSlug)),
     expectRoute(target, '/submit/')
   ])
-  await expectNonProductionPolicy(target)
+  await expectNonProductionPolicy(target, listingRoute(listingSlug))
   await expectHostRedirectPolicy(target, redirectOn)
   if (mode === 'production')
     await expectPublicPolicy(target, listingRoute(listingSlug), { redirectOn, skipNonWorker: true })
