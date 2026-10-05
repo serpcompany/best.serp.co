@@ -74,7 +74,7 @@
     "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20260923.1",
+    "@cloudflare/workers-types": "5.20261001.1",
     "@content-collections/mdx": "^0.2.2",
     "@swc/jest": "^0.2.39",
     "@tailwindcss/postcss": "^4.1.18",
@@ -97,6 +97,6 @@
     "tailwindcss": "catalog:",
     "ts-jest": "^29.4.6",
     "typescript": "catalog:",
-    "wrangler": "4.140.0"
+    "wrangler": "4.147.0"
   }
 }

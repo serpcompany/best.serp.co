@@ -5,7 +5,7 @@
   "reviewGroups": {
     "framework-edge-runtime": {
       "batch": "framework-runtime",
-      "modules": ["path-to-regexp", "undici", "ws"],
+      "modules": ["path-to-regexp", "ws"],
       "rationale": "These packages are transitive runtime dependencies of the current Next.js, Vercel, and Cloudflare stack. They require upgrades through their direct framework owners plus both Worker builds and Preview verification.",
       "target": "Issue #93 — framework/runtime upgrade batch"
     },
@@ -15,18 +15,6 @@
       "rationale": "Rollup and Vite enter the production graph through the framework deployment toolchain. Updating them independently would create an unsupported build combination, so they move with the coordinated runtime stack.",
       "target": "Issue #93 — framework/runtime upgrade batch"
     },
-    "authentication-clerk": {
-      "batch": "authentication",
-      "modules": [
-        "@clerk/backend",
-        "@clerk/clerk-react",
-        "@clerk/nextjs",
-        "@clerk/shared",
-        "js-cookie"
-      ],
-      "rationale": "The Clerk packages and their cookie helper are version-coupled authentication dependencies. They remain only until a dedicated authentication batch can verify session and protected-route behavior for both Sites.",
-      "target": "Issue #92 follow-up — authentication upgrade batch"
-    },
     "authentication-authjs": {
       "batch": "authentication",
       "modules": ["@auth/core", "next-auth"],
@@ -35,19 +23,19 @@
     },
     "product-parsing-and-transport": {
       "batch": "product-libraries",
-      "modules": ["fast-xml-parser", "fast-uri", "form-data", "js-yaml", "serialize-javascript"],
+      "modules": ["fast-xml-parser", "form-data", "js-yaml", "serialize-javascript"],
       "rationale": "These parsers and transport helpers are transitive dependencies of current product packages. The safe remediation is to upgrade their owning direct dependencies and validate sitemap, feed, submission, and serialization behavior.",
       "target": "Issue #92 follow-up — product-libraries upgrade batch"
     },
     "product-utilities": {
       "batch": "product-libraries",
-      "modules": ["lodash", "lodash-es", "nanoid"],
+      "modules": ["lodash", "lodash-es"],
       "rationale": "These utilities are transitively pinned by shipped product dependencies. They remain pending owner-package upgrades that preserve generated identifiers and shared UI behavior across both Sites.",
       "target": "Issue #92 follow-up — product-libraries upgrade batch"
     },
     "production-graph-tooling": {
       "batch": "build-tooling",
-      "modules": ["brace-expansion", "browserslist", "minimatch", "picomatch", "postcss"],
+      "modules": ["browserslist", "minimatch"],
       "rationale": "These build-oriented packages appear in pnpm’s production dependency graph because runtime packages declare them. They require direct-owner upgrades and clean-build verification, not unsupported transitive resolutions.",
       "target": "Issue #92 follow-up — build-tooling upgrade batch"
     }
@@ -66,40 +54,10 @@
       "batch": "product-libraries"
     },
     {
-      "id": "GHSA-28wg-ghj8-5hjv",
-      "module": "nanoid",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-2v37-7h3g-55p8",
-      "module": "nanoid",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-3jxr-9vmj-r5cp",
-      "module": "brace-expansion",
-      "severity": "high",
-      "batch": "build-tooling"
-    },
-    {
       "id": "GHSA-3ppc-4f35-3m26",
       "module": "minimatch",
       "severity": "high",
       "batch": "build-tooling"
-    },
-    {
-      "id": "GHSA-4c8g-83qw-93j6",
-      "module": "fast-uri",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-4cwx-7wf7-3272",
-      "module": "undici",
-      "severity": "high",
-      "batch": "framework-runtime"
     },
     {
       "id": "GHSA-52cp-r559-cp3m",
@@ -120,22 +78,10 @@
       "batch": "product-libraries"
     },
     {
-      "id": "GHSA-6g55-p6wh-862q",
-      "module": "postcss",
-      "severity": "high",
-      "batch": "build-tooling"
-    },
-    {
       "id": "GHSA-73wf-gq98-2v4g",
       "module": "browserslist",
       "severity": "high",
       "batch": "build-tooling"
-    },
-    {
-      "id": "GHSA-7p8r-x3mc-p8w7",
-      "module": "fast-uri",
-      "severity": "high",
-      "batch": "product-libraries"
     },
     {
       "id": "GHSA-7r86-cg39-jmmj",
@@ -180,22 +126,10 @@
       "batch": "framework-runtime"
     },
     {
-      "id": "GHSA-c2c7-rcm5-vvqj",
-      "module": "picomatch",
-      "severity": "high",
-      "batch": "build-tooling"
-    },
-    {
       "id": "GHSA-c83g-rgw3-j3cx",
       "module": "browserslist",
       "severity": "high",
       "batch": "build-tooling"
-    },
-    {
-      "id": "GHSA-f65p-4m7j-42xc",
-      "module": "fast-uri",
-      "severity": "high",
-      "batch": "product-libraries"
     },
     {
       "id": "GHSA-fx2h-pf6j-xcff",
@@ -216,18 +150,6 @@
       "batch": "product-libraries"
     },
     {
-      "id": "GHSA-jqff-g426-hqxp",
-      "module": "fast-uri",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-mh99-v99m-4gvg",
-      "module": "brace-expansion",
-      "severity": "high",
-      "batch": "build-tooling"
-    },
-    {
       "id": "GHSA-mw96-cpmx-2vgc",
       "module": "rollup",
       "severity": "high",
@@ -238,24 +160,6 @@
       "module": "vite",
       "severity": "high",
       "batch": "framework-runtime"
-    },
-    {
-      "id": "GHSA-q3j6-qgpj-74h6",
-      "module": "fast-uri",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-qjx8-664m-686j",
-      "module": "js-cookie",
-      "severity": "high",
-      "batch": "authentication"
-    },
-    {
-      "id": "GHSA-r28c-9q8g-f849",
-      "module": "postcss",
-      "severity": "high",
-      "batch": "build-tooling"
     },
     {
       "id": "GHSA-r5fr-rjxr-66jc",
@@ -270,64 +174,10 @@
       "batch": "product-libraries"
     },
     {
-      "id": "GHSA-rgw5-rvv9-x895",
-      "module": "brace-expansion",
-      "severity": "high",
-      "batch": "build-tooling"
-    },
-    {
-      "id": "GHSA-v2hh-gcrm-f6hx",
-      "module": "fast-uri",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
       "id": "GHSA-v2wj-q39q-566r",
       "module": "vite",
       "severity": "high",
       "batch": "framework-runtime"
-    },
-    {
-      "id": "GHSA-v39h-62p7-jpjc",
-      "module": "fast-uri",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-vqx2-fgx2-5wq9",
-      "module": "@clerk/nextjs",
-      "severity": "critical",
-      "batch": "authentication"
-    },
-    {
-      "id": "GHSA-vqx2-fgx2-5wq9",
-      "module": "@clerk/shared",
-      "severity": "critical",
-      "batch": "authentication"
-    },
-    {
-      "id": "GHSA-w24r-5266-9c3c",
-      "module": "@clerk/backend",
-      "severity": "high",
-      "batch": "authentication"
-    },
-    {
-      "id": "GHSA-w24r-5266-9c3c",
-      "module": "@clerk/clerk-react",
-      "severity": "high",
-      "batch": "authentication"
-    },
-    {
-      "id": "GHSA-w24r-5266-9c3c",
-      "module": "@clerk/nextjs",
-      "severity": "high",
-      "batch": "authentication"
-    },
-    {
-      "id": "GHSA-w24r-5266-9c3c",
-      "module": "@clerk/shared",
-      "severity": "high",
-      "batch": "authentication"
     },
     {
       "id": "GHSA-xmf8-cvqr-rfgj",
@@ -340,12 +190,6 @@
       "module": "next-auth",
       "severity": "high",
       "batch": "authentication"
-    },
-    {
-      "id": "GHSA-xwg4-73v4-xw9w",
-      "module": "nanoid",
-      "severity": "high",
-      "batch": "product-libraries"
     }
   ]
 }
