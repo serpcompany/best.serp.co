@@ -47,6 +47,17 @@ const RSC_VARIANT_HEADERS = [
   'next-url'
 ] as const
 
+/**
+ * The only client request headers a cacheable request is rendered with. Every other header a
+ * client sends is dropped before OpenNext sees it, so no request-controlled value (an
+ * `x-nonce`, a forwarded host, a framework-internal `x-middleware-*` or `x-opennext-*`
+ * header, a cookie) can reach a response that the cache then serves to everyone. The RSC
+ * router headers are part of the cache key; `accept` and `user-agent` only choose between
+ * framework behaviors (for example, blocking metadata for crawlers) and are never copied into
+ * a page. `host` is not copied either: `renderRequestFor` sets it from the request URL.
+ */
+const RENDER_REQUEST_HEADERS = ['accept', 'user-agent', ...RSC_VARIANT_HEADERS] as const
+
 const CACHEABLE_STATUSES = new Set([200, 301, 308, 404])
 
 export type EdgeCacheState = 'BYPASS' | 'HIT' | 'MISS'
@@ -78,6 +89,23 @@ export function isCacheableRequest(request: Request): boolean {
   if (cookie && PERSONAL_COOKIE_PATTERN.test(cookie)) return false
   const firstSegment = new URL(request.url).pathname.split('/')[1] ?? ''
   return !BYPASS_PATH_SEGMENTS.has(firstSegment)
+}
+
+/**
+ * The request a cacheable request is rendered from: same URL, method, and signal, only the
+ * allowlisted headers (`RENDER_REQUEST_HEADERS`), and a `Host` equal to the normalized URL host
+ * the cache key uses (lowercase, no default port). The page (for example, whether the root
+ * layout loads analytics on best.serp.co) then always matches the key it is stored under, even
+ * if the client spelled the host differently (`BEST.SERP.CO:443`).
+ */
+export function renderRequestFor(request: Request): Request {
+  const headers = new Headers()
+  for (const name of RENDER_REQUEST_HEADERS) {
+    const value = request.headers.get(name)
+    if (value !== null) headers.set(name, value)
+  }
+  headers.set('host', new URL(request.url).host)
+  return new Request(request, { headers })
 }
 
 export function isCacheableResponse(response: Response): boolean {
@@ -158,19 +186,22 @@ function servedCopy(cached: Response, method: string): Response {
 
 /**
  * Serves `request` from the edge cache when possible, otherwise from `render`, storing
- * cacheable responses in the background.
+ * cacheable responses in the background. A cacheable request is rendered from
+ * `renderRequestFor(request)`, so what is stored depends only on the cache key; a bypassed
+ * request is rendered as sent.
  */
 export async function withEdgeCache(
   request: Request,
   context: EdgeCacheContext,
   options: EdgeCacheOptions,
-  render: () => Promise<Response>
+  render: (request: Request) => Promise<Response>
 ): Promise<Response> {
   const observe = options.observe ?? (() => {})
   if (!isCacheableRequest(request)) {
     observe({ event: 'edge_cache', state: 'BYPASS' })
-    return withState(await render(), 'BYPASS')
+    return withState(await render(request), 'BYPASS')
   }
+  const renderRequest = renderRequestFor(request)
 
   let epoch: string | null = null
   try {
@@ -180,7 +211,7 @@ export async function withEdgeCache(
   }
   if (!epoch) {
     observe({ event: 'edge_cache', state: 'BYPASS' })
-    return withState(await render(), 'BYPASS')
+    return withState(await render(renderRequest), 'BYPASS')
   }
 
   const key = await cacheKeyFor(request, options.deploymentId, epoch)
@@ -190,7 +221,7 @@ export async function withEdgeCache(
     return servedCopy(cached, request.method)
   }
 
-  const response = await render()
+  const response = await render(renderRequest)
   observe({ event: 'edge_cache', state: 'MISS', status: response.status })
   if (request.method !== 'GET' || !isCacheableResponse(response)) {
     return withState(response, 'MISS')

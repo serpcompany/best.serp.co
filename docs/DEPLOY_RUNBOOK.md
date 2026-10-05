@@ -19,7 +19,7 @@ Status (serpcompany/best.serp.co#34):
 | Worker | `best-serp-co-staging` (workers.dev) | `best-serp-co-production` (workers.dev review URL until cutover) |
 | D1 | `best-serp-co-staging` `8e6b67e5-9c58-4fa9-aca1-25b0020c0833` | `best-serp-co-production` `404ec437-53a2-4fbc-8b5f-b5e69065708e` |
 | Origin | https://best-serp-co-staging.serpcompany.workers.dev | https://best.serp.co (Worker Custom Domain on `serp.co`, at cutover) |
-| Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`; `*.workers.dev` responses are `noindex`). Production HTTP gates run here until best.serp.co stops returning `server: GitHub.com`. After cutover, set `workers_dev: false` (and `project.remote.production.workersDev`) to retire it. |
+| Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`, noindex). The production HTTP gates run here with the smoke-test header and, after cutover, on best.serp.co, where they skip only zone protection (`cf-mitigated`, or a 403 or 429 without Worker headers) and GitHub Pages ([Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)). It stays after cutover: `CANONICAL_HOST_REDIRECT` flips to `on` and it 308s to best.serp.co except for smoke-test requests (#42 decision e). |
 | Branch | `staging` (the base branch; PRs squash-merge here, hotfix merge-backs use a merge commit) | `main` (promotions from `staging`, and `hotfix-*` PRs) |
 | GitHub environment | `staging` (`staging` branch only, no reviewers) | `production` (required reviewers, `main` only) |
 
@@ -127,6 +127,8 @@ Guards, in order:
 4. `plan-release` refuses a database with migrations this commit lacks. `deploy` first proves
    that every `d1/drizzle` migration is applied and that a catalog publication exists.
 
+The HTTP gates: [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts).
+
 Concurrency sits on the privileged job, after its guards: production jobs share
 `deploy-best-serp-co-production`, staging uses `deploy-best-serp-co-staging`, the notifier its
 own group, and none cancels a running job. A run refused by `authorize` or skipped by a branch
@@ -156,7 +158,7 @@ PR Review already gates every merge, and Main Validation re-runs the full loop o
    `worker-only`). While GitHub Pages still serves best.serp.co, the HTTP gates run against
    the noindex review origin instead.
 3. Continue with the cutover checklist below, then re-run **Deploy Production** so the HTTP
-   gates run against https://best.serp.co.
+   gates run in production mode: through the workers.dev host, then on best.serp.co.
 
 ### Routine releases (promotion)
 
@@ -240,11 +242,35 @@ permission beyond the deploy token above.
 3. Bootstrap and deploy production as described in [First release](#first-release-phase-4b).
 4. Attach the Custom Domain `best.serp.co` to the production Worker (replaces the
    GitHub Pages CNAME), confirm `curl -I https://best.serp.co` no longer shows
-   `server: GitHub.com`, re-run **Deploy Production** for the HTTP gates,
-   and submit `sitemap-index.xml` in Search Console.
-5. Set up the submission notifier and re-enable the `submit-gsc-sitemaps.yml` schedule.
-6. Disable GitHub Pages and delete the `legacy-static` branch.
-7. Remove `apps/serp.co` and `sites/serp.co` from `json-directory-template`.
+   `server: GitHub.com`, and re-run **Deploy Production** for the HTTP gates. Then check
+   the custom domain **by hand** from a maintainer machine, a manual cutover step (and after
+   any run that logged `best.serp.co check skipped`; what each check compares is in
+   [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)):
+
+   ```bash
+   pnpm tsx scripts/d1-preview-http-gates.ts public https://best.serp.co
+   curl -sI https://best.serp.co/ | grep -i -e x-worker-version -e x-site-environment
+   ```
+
+   If either fails, roll the Custom Domain back to GitHub Pages before investigating. Then
+   submit `sitemap-index.xml` in Search Console.
+5. Only after step 4, switch the platform host to the canonical host. Merge a reviewed PR
+   into `staging` that sets `env.production.vars.CANONICAL_HOST_REDIRECT` to `"on"` in
+   `apps/web/wrangler.jsonc`, wait for Deploy Staging to go green, then merge a `staging` →
+   `main` promotion PR with a merge commit ([Routine releases](#routine-releases-promotion)).
+   That push runs Deploy Production, which releases it after the owner's approval; its gates
+   then also require the workers.dev host to answer one 308 to best.serp.co. Do not dispatch
+   Deploy Production before the promotion is merged: it would release the `main` head with
+   the switch still `off` and never check the 308. Keep `workers_dev: true`; CI reaches the
+   Worker there with the `x-best-serp-co-smoke-test` header. A flip before step 4 is live as
+   soon as the deploy finishes (the review URL sends every visitor to GitHub Pages); the gates
+   fail only afterwards. Recover by rolling the Worker back (see
+   [Backups and recovery](#backups-and-recovery)), then set the switch back to `"off"` with a
+   `hotfix-*` PR into `main` ([Release guards](./RELEASE_GUARDS.md#hotfixes)) or a change
+   merged into `staging` and promoted.
+6. Set up the submission notifier and re-enable the `submit-gsc-sitemaps.yml` schedule.
+7. Disable GitHub Pages and delete the `legacy-static` branch.
+8. Remove `apps/serp.co` and `sites/serp.co` from `json-directory-template`.
 
 Production database or Worker operations require explicit maintainer confirmation;
 a passing local harness never grants deployment authority.
