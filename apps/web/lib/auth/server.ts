@@ -36,6 +36,7 @@ import {
   isTrustedOrigin,
   resolveAuthSettings
 } from './settings'
+import { signInCodeEmail } from './sign-in-code-email'
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
@@ -84,7 +85,7 @@ export async function getAccountRuntime(): Promise<AccountRuntime> {
     auth: createAuth({
       client,
       operations,
-      sender: selectOtpSender(settings.environment),
+      sender: selectOtpSender(settings.environment, signInCodeEmail),
       settings
     }),
     operations,

@@ -23,7 +23,7 @@ Sign-in code email is #61.
 | Schema, adapter, allowlist, role sync, rate limiter | `packages/data-ops/src/{schema,auth}.ts` |
 | Better Auth configuration | `apps/web/lib/auth/config.ts` |
 | Settings per environment (vars, secret) | `apps/web/lib/auth/settings.ts` |
-| Code delivery (`OtpSender`) | `apps/web/lib/auth/otp-sender.ts` |
+| Code delivery (`OtpSender`) | `apps/web/lib/auth/{otp-sender,sign-in-code-email}.ts` |
 | Limits, code binding, known devices | `apps/web/lib/auth/{rate-limits,code-binding,known-device}.ts` |
 | `requireUser()` / `requireAdmin()` | `apps/web/lib/auth/{guards,server}.ts` |
 | Worker gate: Access JWT and session cookie | `apps/web/lib/auth/{admin-gate,cloudflare-access}.ts` |
@@ -101,8 +101,13 @@ Rate-limit rows hold HMAC-SHA256 digests under a key derived from `BETTER_AUTH_S
 
 **Delivery.** Locally, the dev sender logs each code and `GET /api/auth/dev/otp-outbox?email=`
 returns the latest one and when it was sent (the endpoint exists only when the dev sender
-runs, which is refused outside `local`). Staging and production have no sender until #61, so a
-code request answers 503 `OTP_DELIVERY_UNAVAILABLE` and no code is created or logged.
+runs, which is refused outside `local`). Staging and production send the code as the
+`sign-in-code` email through `enqueueEmail` ([Email](./EMAIL.md)), keyed
+`emailEventKey('sign-in-code', crypto.randomUUID())`: every code is a new event, and no key
+derives from a code. The template arrives with #61's templates; until it is in the email
+registry, a code request answers 503 `OTP_DELIVERY_UNAVAILABLE` and no code is created or
+logged. Once it is registered, a typed check makes the build fail if its input differs from
+`{ code, expiresInMinutes }`.
 
 ## Admin gate
 

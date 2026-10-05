@@ -1,15 +1,42 @@
 /**
  * Delivery of sign-in codes (serpcompany/best.serp.co#60). Better Auth's email OTP plugin hands
- * every code to an `OtpSender`. Real email (Cloudflare Email Sending from noreply@mail.serp.co)
- * is serpcompany/best.serp.co#61; until it lands, only local development can deliver codes:
+ * every code to an `OtpSender`:
  *
  * - `local`: the dev sender logs the code and keeps the latest code per email in an in-memory
  *   outbox, which the local-only `/api/auth/dev/otp-outbox` endpoint returns to tests. Local
  *   `wrangler dev` runs one isolate, so the outbox is shared by every request.
- * - `staging`, `production`: no sender is configured, so requesting a code fails with 503 and
- *   no code is ever logged or exposed.
+ * - `staging`, `production`: the email sender enqueues the `sign-in-code` email through the
+ *   email module (`lib/email`, #61), keyed `emailEventKey('sign-in-code', crypto.randomUUID())`
+ *   because every code is a new event and a key must never derive from the code. Until that
+ *   template is registered, no sender is configured: requesting a code fails with 503
+ *   `OTP_DELIVERY_UNAVAILABLE` and no code is created, logged, or exposed.
  */
 import type { SiteEnvironment } from '../environment/site-environment'
+
+/** The email template that carries a sign-in code (`lib/email/registry.ts`, #61). */
+export const SIGN_IN_CODE_TEMPLATE_ID = 'sign-in-code'
+
+/** What the `sign-in-code` template renders: the code and how long it lasts. */
+export interface SignInCodeEmailInput {
+  code: string
+  expiresInMinutes: number
+}
+
+/** Enqueues one `sign-in-code` email (`enqueueEmail`, which never throws). */
+export type SignInCodeEnqueue = (request: {
+  eventKey: string
+  input: SignInCodeEmailInput
+  to: string
+}) => Promise<void>
+
+/** How staging and production deliver codes, from `lib/auth/sign-in-code-email.ts`. */
+export interface SignInCodeEmail {
+  enqueue: SignInCodeEnqueue
+  /** A new event key per code: `emailEventKey('sign-in-code', crypto.randomUUID())`. */
+  eventKey(): string
+  /** False until the `sign-in-code` template is in the email registry. */
+  templateRegistered: boolean
+}
 
 export type OtpPurpose = 'sign-in' | 'email-verification' | 'forget-password' | 'change-email'
 
@@ -89,10 +116,32 @@ export const unavailableOtpSender: OtpSender = {
   }
 }
 
+/** Sends sign-in codes as the `sign-in-code` email. */
+export function createEmailOtpSender({
+  enqueue,
+  eventKey
+}: Pick<SignInCodeEmail, 'enqueue' | 'eventKey'>): OtpSender {
+  return {
+    kind: 'email',
+    async send(message) {
+      if (message.purpose !== 'sign-in') throw new OtpDeliveryUnavailableError()
+      await enqueue({
+        eventKey: eventKey(),
+        input: {
+          code: message.otp,
+          expiresInMinutes: Math.round(message.expiresInSeconds / 60)
+        },
+        to: message.email
+      })
+    }
+  }
+}
+
 /**
- * The sender for an environment. #61 adds the email sender for staging and production here;
- * the dev sender is refused anywhere but local.
+ * The sender for an environment: the dev sender locally (it is refused anywhere else), and in
+ * staging and production the email sender once the `sign-in-code` template is registered.
  */
-export function selectOtpSender(environment: SiteEnvironment): OtpSender {
-  return environment === 'local' ? createDevOtpSender() : unavailableOtpSender
+export function selectOtpSender(environment: SiteEnvironment, email?: SignInCodeEmail): OtpSender {
+  if (environment === 'local') return createDevOtpSender()
+  return email?.templateRegistered ? createEmailOtpSender(email) : unavailableOtpSender
 }

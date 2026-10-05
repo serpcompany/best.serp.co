@@ -23,6 +23,7 @@ import {
   createDevOtpSender,
   type OtpMessage,
   type OtpSender,
+  selectOtpSender,
   unavailableOtpSender
 } from './otp-sender'
 import { OTP_REQUEST_LIMITS } from './rate-limits'
@@ -668,6 +669,44 @@ describe('staging and production', () => {
       n: 0
     })
     expect((await h.call(`${DEV_OTP_OUTBOX_PATH}?email=devin@serp.co`)).status).toBe(404)
+  })
+
+  it('sends the code as the sign-in-code email once that template is registered', async () => {
+    const enqueued: unknown[] = []
+    const email = {
+      async enqueue(request: unknown) {
+        enqueued.push(request)
+      },
+      eventKey: () => 'sign-in-code:00000000-0000-4000-8000-000000000001'
+    }
+    const unregistered = harness({
+      environment: 'staging',
+      sender: selectOtpSender('staging', { ...email, templateRegistered: false })
+    })
+    const refused = await unregistered.call(SEND, {
+      body: { email: 'devin@serp.co', type: 'sign-in' }
+    })
+    expect(refused.status).toBe(503)
+
+    const h = harness({
+      environment: 'staging',
+      sender: selectOtpSender('staging', { ...email, templateRegistered: true })
+    })
+    const browser = new Browser('203.0.113.20')
+    const requested = await h.call(SEND, {
+      body: { email: 'Devin@Serp.co', type: 'sign-in' },
+      browser
+    })
+    expect(requested.status).toBe(200)
+    expect(enqueued).toEqual([
+      {
+        eventKey: 'sign-in-code:00000000-0000-4000-8000-000000000001',
+        input: { code: expect.stringMatching(/^\d{6}$/u), expiresInMinutes: 10 },
+        to: 'devin@serp.co'
+      }
+    ])
+    const { code } = (enqueued[0] as { input: { code: string } }).input
+    expect((await guess(h, 'devin@serp.co', code, browser)).status).toBe(200)
   })
 
   it('uses __Secure- cookies on https origins', async () => {
