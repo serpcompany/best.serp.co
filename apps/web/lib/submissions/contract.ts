@@ -214,7 +214,13 @@ export function verificationInstant(value: string | null): number | null {
   return Number.isNaN(parsed) ? null : parsed
 }
 
-const CONCLUSIVE_FAILURES = new Set(['badge_missing', 'nofollow', 'wrong_destination'])
+/** `nofollow` is the code stored before `link_not_followed` (#84). */
+const CONCLUSIVE_FAILURES = new Set([
+  'badge_missing',
+  'link_not_followed',
+  'nofollow',
+  'wrong_destination'
+])
 
 export function isConclusiveFailure(code: string | null): boolean {
   return code !== null && CONCLUSIVE_FAILURES.has(code)

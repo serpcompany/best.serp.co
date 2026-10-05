@@ -442,14 +442,28 @@ describe('native submission intake', () => {
     now = new Date(now.getTime() + 30_000)
     await expect(operations().beginVerification(saved.id, OWNER)).resolves.toBeTruthy()
 
-    sqlite.database
-      .prepare(
-        "UPDATE listing_submissions SET verification_attempts=10,last_verification_error='nofollow',last_verification_at=NULL WHERE id=?"
-      )
-      .run(saved.id)
-    await expect(operations().beginVerification(saved.id, OWNER)).rejects.toMatchObject({
-      code: 'attempt_limit',
-      status: 429
+    // Every conclusive result counts toward the limit, including the code stored before #84.
+    for (const code of ['link_not_followed', 'nofollow', 'badge_missing', 'wrong_destination']) {
+      sqlite.database
+        .prepare(
+          'UPDATE listing_submissions SET verification_attempts=10,last_verification_error=?,last_verification_at=NULL WHERE id=?'
+        )
+        .run(code, saved.id)
+      await expect(operations().beginVerification(saved.id, OWNER), code).rejects.toMatchObject({
+        code: 'attempt_limit',
+        status: 429
+      })
+    }
+  })
+
+  it('counts an unfollowed badge link as a conclusive check', async () => {
+    const saved = await pendingBadge()
+    await expect(
+      operations().finishVerification(saved.id, OWNER, { code: 'link_not_followed', ok: false })
+    ).resolves.toMatchObject({
+      lastVerificationError: 'link_not_followed',
+      status: 'pending_badge',
+      verificationAttempts: 1
     })
   })
 

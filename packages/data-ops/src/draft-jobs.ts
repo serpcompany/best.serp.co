@@ -11,7 +11,7 @@ import {
 import type { StatementPlan } from './plan-support'
 
 /**
- * The D1 side of the daily draft job (#59, #63): read the drafts due for a reminder or past
+ * The D1 side of the hourly draft job (#59, #63): read the drafts due for a reminder or past
  * expiry, and claim each reminder or expiry with its compare-and-swap plan
  * (`draft-plans.ts`). The Worker's scheduled handler sends the email only after a claim
  * succeeded (`apps/web/lib/submissions/draft-jobs.ts`), so a repeated or concurrent run never

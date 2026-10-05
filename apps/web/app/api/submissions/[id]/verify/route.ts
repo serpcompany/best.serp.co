@@ -47,7 +47,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return json({
       result: result.ok
         ? { ok: true }
-        : { code: result.code, ok: false, ...('href' in result ? { href: result.href } : {}) },
+        : {
+            code: result.code,
+            ok: false,
+            ...('href' in result ? { href: result.href } : {}),
+            ...('rel' in result ? { rel: result.rel } : {})
+          },
       submission: toSummary(updated)
     })
   } catch (error) {

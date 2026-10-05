@@ -48,7 +48,7 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
   choosing free (`pending_badge`), withdrawal, or expiry; a run that missed some sends only the
   latest one due. At 30 days every draft is withdrawn as `expired`, including a paid draft that
   never completed checkout, which frees its URL, and gets the "draft expired" email; an expired
-  draft cannot choose a plan. The daily scheduled job ([below](#draft-reminders-and-expiry))
+  draft cannot choose a plan. The hourly scheduled job ([below](#draft-reminders-and-expiry))
   reads `selectDraftRemindersDuePlan` (which
   returns the `variant`) and `selectExpiredDraftsPlan`, claims each reminder with
   `buildMarkDraftReminderSentPlans` for that variant (a compare-and-swap, so a reminder is claimed
@@ -140,9 +140,13 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    the draft in the account (`/account/` lists it with "Expires in N days" and Continue).
 6. **`/submit/<id>/badge/`** (screen 3): the light and dark snippets link to the future listing.
    `POST /api/submissions/<id>/verify` fetches the website and requires the badge inside a
-   dofollow link to `/products/<slug>/` (badges linking to the old `/reviews/` URL still count).
-   At most 10 conclusive checks (`badge_missing`, `nofollow`, `wrong_destination`), one every 30
-   seconds; connection problems (timeouts, HTTP errors, redirects, non-HTML) never use one up.
+   plain, followed link to `/products/<slug>/` (badges linking to the old `/reviews/` URL still
+   count): a `rel` with `nofollow`, `sponsored`, or `ugc`, in any case or token order, fails as
+   `link_not_followed`, and the answer names the tokens found (owner decision on #84). One
+   followed badge link anywhere on the page passes. At most 10 conclusive checks
+   (`badge_missing`, `link_not_followed`, `wrong_destination`; rows from before #84 may hold
+   `nofollow`), one every 30 seconds; connection problems (timeouts, HTTP errors, redirects,
+   non-HTML) never use one up.
    A pass moves the submission to `verified` (the review queue) and sends "submission received"
    to the submitter and "ready for review" to `EMAIL_ADMIN_RECIPIENT`, both keyed
    `submission-verified:<id>` in the email ledger.
@@ -159,12 +163,14 @@ request.
 
 ### Draft reminders and expiry
 
-A daily Cron Trigger (`0 14 * * *`, `triggers.crons` in `apps/web/wrangler.jsonc`) runs the
+An hourly Cron Trigger (`0 * * * *`, `triggers.crons` in `apps/web/wrangler.jsonc`) runs the
 Worker's `scheduled()` handler (`apps/web/lib/worker/scheduled.ts`). Its draft job
 (`apps/web/lib/submissions/draft-jobs.ts`, D1 side in `packages/data-ops/src/draft-jobs.ts`)
 first withdraws drafts 30 days old as `expired` and sends `draft-expired`, then claims and sends
-the latest due `draft-reminder` of each remaining draft. A run handles at most 100 of each and
-logs whether more remain. The weekly badge program (#66) adds its own cron expression and job
+the latest due `draft-reminder` of each remaining draft, so a reminder goes out within the hour
+it falls due. The reminder copy follows `features.showPaidListings`: while it is off it offers
+the free badge listing only, with no price, and sends a draft left in checkout to the plan
+choice. A run handles at most 100 of each and logs whether more remain. The weekly badge program (#66) adds its own cron expression and job
 to `scheduledJobs`. The deploy that ships the Worker registers the trigger (the dashboard lists
 it under the Worker's Settings → Triggers), and each run logs `scheduled_job_finished` or
 `scheduled_job_failed`. Locally, `wrangler dev --test-scheduled` exposes `/__scheduled`; the

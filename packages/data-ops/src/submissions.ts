@@ -45,7 +45,13 @@ export const SUBMISSION_LIMITS = {
 } as const
 
 const REVIEW_CHANNEL = 'github_issue'
-const CONTENT_VERIFICATION_FAILURES = new Set(['badge_missing', 'nofollow', 'wrong_destination'])
+/** Conclusive check results; `nofollow` is the code stored before `link_not_followed` (#84). */
+const CONTENT_VERIFICATION_FAILURES = new Set([
+  'badge_missing',
+  'link_not_followed',
+  'nofollow',
+  'wrong_destination'
+])
 const PUBLISHED_AT_PATTERN = /^\d{4}-\d{2}-\d{2}$/u
 
 export class SubmissionError extends Error {

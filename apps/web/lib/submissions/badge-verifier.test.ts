@@ -21,10 +21,50 @@ describe('badge scanner', () => {
     ).toEqual({ ok: true })
     expect(
       scanFeaturedBadge(
-        `<a rel="nofollow" href="${listingUrl}"><img src="${lightBadgeUrl}"></a>`,
+        `<a rel="noopener noreferrer" target="_blank" href="${listingUrl}"><img src="${lightBadgeUrl}"></a>`,
         expected
       )
-    ).toEqual({ ok: false, code: 'nofollow' })
+    ).toEqual({ ok: true })
+  })
+
+  // Owner decision on #84: the badge must be a plain followed link.
+  it('fails a link marked nofollow, sponsored, or ugc, in any case or token order', () => {
+    const badge = (rel: string) =>
+      scanFeaturedBadge(`<a href="${listingUrl}" ${rel}><img src="${lightBadgeUrl}"></a>`, expected)
+    const cases: Array<[string, string[]]> = [
+      ['rel="nofollow"', ['nofollow']],
+      ['rel="sponsored"', ['sponsored']],
+      ['rel="ugc"', ['ugc']],
+      ['rel="NoFollow"', ['nofollow']],
+      ["rel='UGC noopener'", ['ugc']],
+      ['rel=sponsored', ['sponsored']],
+      ['rel="noopener\tSponsored\nnoreferrer"', ['sponsored']],
+      ['rel="ugc nofollow"', ['nofollow', 'ugc']],
+      ['rel="noopener sponsored nofollow ugc"', ['nofollow', 'sponsored', 'ugc']],
+      ['rel="&#110;ofollow"', ['nofollow']]
+    ]
+    for (const [rel, tokens] of cases) {
+      expect(badge(rel), rel).toEqual({ code: 'link_not_followed', ok: false, rel: tokens })
+    }
+    // Tokens only count whole: neither `nofollower` nor a `data-rel` attribute is a rel token.
+    for (const rel of ['rel="nofollower ugc-like"', 'data-rel="nofollow"', 'rel=""', '']) {
+      expect(badge(rel), rel).toEqual({ ok: true })
+    }
+    // The first rel attribute wins, as in a browser.
+    expect(badge('rel="noopener" rel="nofollow"')).toEqual({ ok: true })
+    expect(badge('rel="nofollow" rel="noopener"')).toMatchObject({ code: 'link_not_followed' })
+  })
+
+  it('passes when any badge on the page has a followed link to the listing', () => {
+    const marked = `<a rel="nofollow" href="${listingUrl}"><img src="${lightBadgeUrl}"></a>`
+    expect(scanFeaturedBadge(`${marked}${validBadgeHtml}`, expected)).toEqual({ ok: true })
+    // An unfollowed listing link is reported before a badge that links elsewhere.
+    const elsewhere = `<a href="https://best.serp.co/"><img src="${lightBadgeUrl}"></a>`
+    expect(scanFeaturedBadge(`${elsewhere}${marked}`, expected)).toEqual({
+      code: 'link_not_followed',
+      ok: false,
+      rel: ['nofollow']
+    })
   })
 
   it('rejects the wrong destination and absent badge', () => {

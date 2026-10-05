@@ -63,7 +63,7 @@ describe('scheduled handler', () => {
       .get(id)
   }
 
-  it('declares the same daily cron in every wrangler environment as the jobs it runs', () => {
+  it('declares the same hourly cron in every wrangler environment as the jobs it runs', () => {
     const config = JSON.parse(
       readFileSync(resolve(import.meta.dirname, '../../wrangler.jsonc'), 'utf8')
     ) as {
@@ -82,7 +82,10 @@ describe('scheduled handler', () => {
   })
 
   it('expires 30-day drafts and sends the due reminder of each draft, once', async () => {
-    await run(13)
+    // Hourly: nothing is due an hour early, and the +12h reminder goes out on the hour it falls due.
+    await run(11)
+    expect(status('waiting')).toMatchObject({ draft_reminders_sent: 0, status: 'draft' })
+    await run(12)
 
     expect(status('old')).toEqual({
       draft_reminders_sent: 0,
@@ -102,13 +105,19 @@ describe('scheduled handler', () => {
       'Finish your submission: Waiting',
       'Your Old draft expired'
     ])
+    // The paid listing is off (`features.showPaidListings`): no price, and a draft left in
+    // checkout is sent to the plan choice.
     const checkout = readDevEmailOutbox(OWNER).find(message => message.subject.endsWith('Checkout'))
-    expect(checkout?.text).toContain('/submit/checkout/checkout/')
+    expect(checkout?.text).toContain('/submit/checkout/choose/')
+    for (const message of readDevEmailOutbox(OWNER)) {
+      expect(message.text, message.subject).not.toMatch(/\$49|one-off|Complete checkout/u)
+    }
     const waiting = readDevEmailOutbox(OWNER).find(message => message.subject.endsWith('Waiting'))
     expect(waiting?.text).toContain('/submit/waiting/choose/')
     expect(waiting?.text).toContain('expires in 30 days')
 
     // The same run again (an overlapping or retried trigger) claims and sends nothing new.
+    await run(12)
     await run(13)
     expect(readDevEmailOutbox(OWNER)).toHaveLength(3)
 

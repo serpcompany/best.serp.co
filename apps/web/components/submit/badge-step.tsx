@@ -63,7 +63,16 @@ export interface BadgeStepProps {
   submission: SubmissionSummary
 }
 
-type Outcome = { code: string; href?: string } | null
+type Outcome = { code: string; href?: string; rel?: string[] } | null
+
+/** Every `rel` token that keeps a link from being followed (the verifier's list). */
+const UNFOLLOWED_REL = ['nofollow', 'sponsored', 'ugc']
+
+/** "nofollow", "nofollow and ugc", "nofollow, sponsored, or ugc" */
+function joinTokens(tokens: string[], last: 'and' | 'or'): string {
+  if (tokens.length <= 1) return tokens[0] ?? ''
+  return `${tokens.slice(0, -1).join(', ')}${tokens.length > 2 ? ',' : ''} ${last} ${tokens.at(-1)}`
+}
 
 const UNREACHABLE: Record<string, string> = {
   fetch_timeout: 'The site didn’t respond within 8 seconds.',
@@ -311,17 +320,32 @@ export function BadgeStep({
         </p>
       </ToneAlert>
     )
-  } else if (code === 'nofollow') {
+  } else if (code === 'link_not_followed' || code === 'nofollow') {
+    // The tokens the check found; after a reload only the code is known, so name all three.
+    const found = outcome?.rel?.length ? outcome.rel : code === 'nofollow' ? ['nofollow'] : null
+    const tokens = found ?? UNFOLLOWED_REL
+    const marked = joinTokens(tokens, found ? 'and' : 'or')
     result = (
-      <ToneAlert tone="warning" title="Badge found, but the link is nofollow">
+      <ToneAlert tone="warning" title={`Badge found, but the link is marked ${marked}`}>
         <p>
-          Remove <code>nofollow</code> from the badge link, publish the change, then check again.
+          The badge has to be a plain link that search engines follow. Remove{' '}
+          {tokens.map((token, index) => (
+            <span key={token}>
+              {index > 0 ? (index === tokens.length - 1 ? (found ? ' and ' : ' or ') : ', ') : ''}
+              <code>{token}</code>
+            </span>
+          ))}{' '}
+          from its <code>rel</code>, publish the change, then check again.
         </p>
         <div className="mt-2 w-full overflow-x-auto rounded-md border bg-muted/50 px-3 py-2 font-mono text-[11px] text-foreground">
           &lt;a href="{listingUrl}" rel="
-          <span className="rounded bg-red-500/15 px-0.5 text-red-700 line-through dark:text-red-400">
-            nofollow
-          </span>{' '}
+          {tokens.map(token => (
+            <span key={token}>
+              <span className="rounded bg-red-500/15 px-0.5 text-red-700 line-through dark:text-red-400">
+                {token}
+              </span>{' '}
+            </span>
+          ))}
           noopener"&gt;
         </div>
       </ToneAlert>

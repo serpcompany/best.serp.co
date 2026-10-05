@@ -3,8 +3,8 @@
  * `apps/web/wrangler.jsonc`). `apps/web/worker.ts` only wires `scheduled()` to
  * `handleScheduled`; the jobs live here so they are type-checked and unit-tested.
  *
- * Each cron expression maps to the jobs it runs. Today one daily trigger runs the draft
- * reminders and expiry (#63). The weekly badge program (#66) adds its own expression and job
+ * Each cron expression maps to the jobs it runs. Today one hourly trigger runs the draft
+ * reminders and expiry (#63), so the +12h reminder goes out within the hour it falls due. The weekly badge program (#66) adds its own expression and job
  * to `scheduledJobs` and to `triggers.crons`; a trigger with no jobs here is logged and ignored.
  *
  * Like the request path, it fails closed: without a valid `DB` binding and `D1_RUNTIME_ENV`,
@@ -18,8 +18,8 @@ import { appEmailTemplates } from '../email/registry'
 import { createWorkerEmailService, type EmailWorkerEnv } from '../email/runtime'
 import { runDraftJobs } from '../submissions/draft-jobs'
 
-/** Daily at 14:00 UTC (morning in the Americas, afternoon in Europe). */
-export const DRAFT_JOBS_CRON = '0 14 * * *'
+/** Hourly, on the hour: each draft reminder goes out within an hour of falling due. */
+export const DRAFT_JOBS_CRON = '0 * * * *'
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
@@ -64,6 +64,7 @@ export const draftJobs: ScheduledJob = {
       email: createWorkerEmailService({ context, env, templates: appEmailTemplates }),
       jobs: createDraftJobOperations({ client: createDatabase(database(env)) }),
       now,
+      paidListings: site.features.showPaidListings,
       priceCents: site.submissions.paidListingPriceCents
     })
     return { ...result }

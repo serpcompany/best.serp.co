@@ -80,7 +80,7 @@ export function chooseFreePlan(id: string) {
 }
 
 export interface VerifyResponse {
-  result: { ok: true } | { code: string; href?: string; ok: false }
+  result: { ok: true } | { code: string; href?: string; ok: false; rel?: string[] }
   submission: SubmissionSummary
 }
 

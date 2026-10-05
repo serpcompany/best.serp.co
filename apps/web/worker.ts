@@ -4,7 +4,7 @@
  *
  * Admin paths pass the Cloudflare Access and session-cookie gate first (`lib/auth/admin-gate.ts`).
  *
- * `scheduled()` serves the Cron Triggers in `wrangler.jsonc` (`triggers.crons`): the daily draft
+ * `scheduled()` serves the Cron Triggers in `wrangler.jsonc` (`triggers.crons`): the hourly draft
  * reminders and expiry (#63), and later the weekly badge program (#66), in
  * `lib/worker/scheduled.ts`.
  *

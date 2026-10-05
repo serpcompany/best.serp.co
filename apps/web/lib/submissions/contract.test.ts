@@ -74,8 +74,14 @@ describe('submit contract', () => {
     expect(draftExpiresInDays('2026-08-01T00:00:00.000Z', now)).toBe(0)
     expect(draftExpiresInDays(null, now)).toBeNull()
     expect(verificationInstant('2026-10-06 12:00:00')).toBe(Date.parse('2026-10-06T12:00:00Z'))
-    expect(checksLeft({ lastVerificationError: 'nofollow', verificationAttempts: 3 })).toBe(7)
-    expect(checksPaused({ lastVerificationError: 'nofollow', verificationAttempts: 10 })).toBe(true)
+    expect(
+      checksLeft({ lastVerificationError: 'link_not_followed', verificationAttempts: 3 })
+    ).toBe(7)
+    for (const code of ['badge_missing', 'link_not_followed', 'nofollow', 'wrong_destination']) {
+      expect(checksPaused({ lastVerificationError: code, verificationAttempts: 10 }), code).toBe(
+        true
+      )
+    }
     // A connection problem after the tenth miss does not pause checks.
     expect(checksPaused({ lastVerificationError: 'fetch_timeout', verificationAttempts: 10 })).toBe(
       false

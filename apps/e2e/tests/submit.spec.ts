@@ -402,7 +402,7 @@ test.describe('submit v2', () => {
 
     expect(await verify(nofollow)).toMatchObject({
       body: {
-        result: { code: 'nofollow', ok: false },
+        result: { code: 'link_not_followed', ok: false, rel: ['nofollow'] },
         submission: { status: 'pending_badge', verificationAttempts: 1 }
       },
       status: 200

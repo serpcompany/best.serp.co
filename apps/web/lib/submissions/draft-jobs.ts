@@ -9,7 +9,7 @@ import type { EmailService } from '../email/service'
 import { draftExpiresInDays } from './contract'
 
 /**
- * The daily draft job (serpcompany/best.serp.co#59, #63), run by the Worker's scheduled handler
+ * The hourly draft job (serpcompany/best.serp.co#59, #63), run by the Worker's scheduled handler
  * (`lib/worker/scheduled.ts`):
  *
  * 1. Expire drafts 30 days after they were first saved (`withdrawn`, reason `expired`), which
@@ -38,9 +38,11 @@ export async function runDraftJobs(input: {
   jobs: DraftJobOperations
   limit?: number
   now: Date
+  /** `features.showPaidListings`: the reminder copy follows the site's paid flag. */
+  paidListings: boolean
   priceCents: number
 }): Promise<DraftJobResult> {
-  const { email, jobs, now, priceCents } = input
+  const { email, jobs, now, paidListings, priceCents } = input
   const limit = input.limit ?? DRAFT_JOB_LIMIT
   const at = now.toISOString()
   const result: DraftJobResult = { expired: 0, more: false, reminded: 0, skipped: 0 }
@@ -79,6 +81,7 @@ export async function runDraftJobs(input: {
       input: {
         expiresInDays: draftExpiresInDays(draft.draftSavedAt, now) ?? 0,
         lastReminder: draft.reminder === DRAFT_REMINDER_COUNT,
+        paidListings,
         priceCents,
         productName: draft.name,
         submissionId: draft.id,
