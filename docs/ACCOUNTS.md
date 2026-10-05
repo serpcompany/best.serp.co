@@ -123,11 +123,13 @@ stops sign-in visibly instead of issuing codes that never arrive.
 **Copied codes.** The email shows the code as one unbroken run of digits, so copying it yields
 `482913`. The `/login` field reads pasted, inserted, and autofilled text with `readCodeText`
 (`components/auth/sign-in-api.ts`):
-- **One standalone code:** six digits, optionally split 3+3 by one space, NBSP or dash, with no
-  digit next to them ("Code: 719208", `482 913`). It replaces the slots and is sent at once.
+- **One standalone code:** six digits, optionally split 3+3 by one space, NBSP or dash ("Code:
+  719208", `482 913`). No digit may touch it, directly or across one such separator, so part of
+  a phone number ("Call 555 123 4567") doesn't count. It replaces the slots and is sent at once.
 - **A fragment of digits and separators** (` 482 `): its digits go in at the caret.
 - **Anything ambiguous** (two different codes, seven digits, digits in another shape): nothing
-  changes and nothing is sent, so stray digits can never spend one of the three attempts.
+  changes and nothing is sent, so stray digits can never spend one of the three attempts. This
+  includes an autofilled value of more than six plain digits.
 
 The sign-in hook in `config.ts` keeps only the digits of `otp` (`signInCodeDigits`) before Better
 Auth checks it. A formatted wrong code still counts as a guess.

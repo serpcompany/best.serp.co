@@ -55,6 +55,18 @@ async function pasteIntoCode(page: Page, text: string): Promise<void> {
   await page.keyboard.press('ControlOrMeta+V')
 }
 
+/**
+ * Sets the code field's whole value the way browser autofill does: through the native setter,
+ * so React sees a real change, then one input event.
+ */
+async function autofillCode(page: Page, value: string): Promise<void> {
+  await page.locator('#code').evaluate((input: HTMLInputElement, text) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+    setter?.call(input, text)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }, value)
+}
+
 /** Counts the page's code guesses (`/api/auth/sign-in/email-otp` requests). */
 function countGuesses(page: Page): { readonly count: number } {
   const guesses = { count: 0 }
@@ -312,7 +324,9 @@ test.describe('sign-in screens', () => {
       'two different codes',
       (code: string) => `Old code ${code === '111111' ? '222 222' : '111 111'}, new code ${code}`
     ],
-    ['seven digits', (code: string) => `${code}1`]
+    ['seven digits', (code: string) => `${code}1`],
+    // PR #82 review 2: part of a phone number is not a code.
+    ['a phone number', (_code: string) => 'Call 555 123 4567']
   ] as const) {
     test(`sends nothing for a paste with ${label}`, async ({ context, page }) => {
       await context.grantPermissions(['clipboard-read', 'clipboard-write'])
@@ -330,6 +344,22 @@ test.describe('sign-in screens', () => {
       expect(guesses.count).toBe(1)
     })
   }
+
+  // PR #82 review 2: seven autofilled digits were cut to their first six and sent.
+  test('sends nothing for an autofilled value of seven digits', async ({ page }) => {
+    const code = await codeStep(page, 'autofill7')
+    const guesses = countGuesses(page)
+    // The extra digit first, so its first six digits are a wrong code.
+    await autofillCode(page, `${code === '000000' ? '1' : '0'}${code}`)
+    await page.waitForTimeout(750)
+    expect(guesses.count).toBe(0)
+    await expect(page.locator('#code')).toHaveValue('')
+    await expect(page.getByText(/attempts? left/u)).toHaveCount(0)
+    // A six-digit autofill still signs in at once.
+    await autofillCode(page, code)
+    await expect(page.getByRole('heading', { name: 'You’re signed in' })).toBeVisible()
+    expect(guesses.count).toBe(1)
+  })
 
   test('keeps only the digits of a code typed or autofilled with separators', async ({
     context,
@@ -354,13 +384,7 @@ test.describe('sign-in screens', () => {
     await page.goto('/login/')
     await requestCodeInPage(page, email)
     const code = await outboxCode(page, email)
-    await page.locator('#code').evaluate(
-      (input: HTMLInputElement, value) => {
-        input.value = value
-        input.dispatchEvent(new Event('input', { bubbles: true }))
-      },
-      `${code.slice(0, 3)} ${code.slice(3)}`
-    )
+    await autofillCode(page, `${code.slice(0, 3)} ${code.slice(3)}`)
     await expect(page.getByRole('heading', { name: 'You’re signed in' })).toBeVisible()
   })
 

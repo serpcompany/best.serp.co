@@ -59,7 +59,8 @@ describe('readCodeText', () => {
       '719208 is your SERP sign-in code',
       // The same code twice (subject and body) is still one code.
       '719208 is your SERP sign-in code\n\n    719208',
-      'Call 555-1234 and enter 719208'
+      'Call 555-1234 and enter 719208',
+      'Enter this code:\n\n    719208\n\n\nIt expires in 10 minutes'
     ]) {
       expect(readCodeText(text), JSON.stringify(text)).toEqual({ code: '719208', kind: 'code' })
     }
@@ -77,7 +78,14 @@ describe('readCodeText', () => {
       '719\n208',
       'It expires in 10 minutes.',
       'Call 12345',
-      'abc'
+      'abc',
+      // PR #82 review 2: part of a phone number is not a code.
+      'Call 555 123 4567',
+      '555-123-4567',
+      '(555) 123-4567',
+      '+1 555 123 4567',
+      '4567 555 123',
+      'Code 1 719208'
     ]) {
       expect(readCodeText(text), JSON.stringify(text)).toEqual({ kind: 'ignore' })
     }

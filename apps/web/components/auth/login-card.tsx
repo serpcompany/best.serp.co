@@ -118,6 +118,12 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
   const codeInput = useRef<HTMLInputElement>(null)
   /** Set synchronously, so a paste and a keystroke in the same tick cannot both submit. */
   const verifying = useRef(false)
+  /**
+   * Set while `onInput` has already read the field's whole value, so input-otp's change for the
+   * same event (which keeps the first six digits of anything) is dropped. React runs `onInput`
+   * before `onChange` for one input event; a microtask clears it after both.
+   */
+  const inputRead = useRef(false)
   const now = useNow(step.kind !== 'done')
 
   const destination = callbackDestination(callbackPath)
@@ -397,7 +403,9 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                     return read.kind === 'digits' ? read.digits : ''
                   }}
                   value={otp}
-                  onChange={onCodeChange}
+                  onChange={value => {
+                    if (!inputRead.current) onCodeChange(value)
+                  }}
                   onPasteCapture={event => {
                     // Every paste is read here, before input-otp's own paste handling.
                     event.preventDefault()
@@ -406,10 +414,15 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                   }}
                   onInput={event => {
                     // Autofill and password managers set the whole value at once, past the
-                    // digits-only pattern: read it like pasted text. Anything ambiguous is
-                    // dropped, and React restores the previous value.
+                    // digits-only pattern and the six-character limit: read it like pasted
+                    // text, so seven digits or a spaced code are never cut to their first six.
+                    // Anything ambiguous is dropped, and React restores the previous value.
                     const value = event.currentTarget.value
-                    if (codeDigits(value) === value) return
+                    if (codeDigits(value) === value && value.length <= CODE_LENGTH) return
+                    inputRead.current = true
+                    queueMicrotask(() => {
+                      inputRead.current = false
+                    })
                     const read = readCodeText(value)
                     if (read.kind === 'code') onCodeChange(read.code)
                     else if (read.kind === 'digits') onCodeChange(read.digits)

@@ -37,9 +37,11 @@ export type CodeText =
 
 /**
  * A standalone code in text: six digits, optionally split 3+3 by one space, NBSP, thin space,
- * or dash, with no digit right before or after ("Code: 719208", "482 913", "482-913").
+ * or dash ("Code: 719208", "482 913", "482-913"). No digit may touch it, directly or across one
+ * such separator, so part of a phone number ("Call 555 123 4567") is not a code.
  */
-const CODE_IN_TEXT = /(?<!\d)\d{3}[ \u00a0\u2009\u202f\-\u2013]?\d{3}(?!\d)/gu
+const CODE_IN_TEXT =
+  /(?<!\d[ \t\u00a0\u2009\u202f\-\u2013]?)\d{3}[ \t\u00a0\u2009\u202f\-\u2013]?\d{3}(?![ \t\u00a0\u2009\u202f\-\u2013]?\d)/gu
 /** Text that is only a fragment of a code: digits, whitespace, and dashes. */
 const CODE_FRAGMENT = /^[\d\s\-\u2013]*$/u
 
