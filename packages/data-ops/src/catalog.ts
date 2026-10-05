@@ -47,21 +47,31 @@ export const MAX_SEARCH_TERMS = 8
 export const MAX_SEARCH_LIMIT = 100
 
 /**
- * The search phrase and its distinct terms: NFKC, lowercase, control characters and runs of
- * whitespace collapsed to one space, cut to `MAX_SEARCH_QUERY_CHARS` code points and
- * `MAX_SEARCH_TERMS` terms. Matching is case-insensitive for ASCII; SQLite's `lower()` does not
- * fold other scripts, so those match as typed.
+ * The search phrase and its distinct terms: ASCII letters lowercased, control characters and
+ * runs of whitespace collapsed to one space, cut to `MAX_SEARCH_QUERY_CHARS` code points and
+ * `MAX_SEARCH_TERMS` terms. Both sides fold the same way: SQLite's `lower()` folds only ASCII,
+ * so matching is case-insensitive for ASCII letters and exact (as typed, no Unicode case
+ * folding or normalization) for every other character (#81 review).
  */
 export function normalizeSearchQuery(query: string): { phrase: string; terms: string[] } {
   const collapsed = query
-    .normalize('NFKC')
-    .toLowerCase()
+    .replace(/[A-Z]+/gu, letters => letters.toLowerCase())
     .replace(/[\p{Cc}\s]+/gu, ' ')
     .trim()
   const phrase = Array.from(collapsed).slice(0, MAX_SEARCH_QUERY_CHARS).join('').trim()
   const terms = [...new Set(phrase.split(' ').filter(Boolean))].slice(0, MAX_SEARCH_TERMS)
   return { phrase, terms }
 }
+
+/**
+ * The lowercased host of `l.website` (`https://www.jasper.ai/x` -> `www.jasper.ai`), so a term
+ * matches the domain but not the scheme or path. Only string functions on the same row: no
+ * extra rows read.
+ */
+const WEBSITE_AFTER_SCHEME = "substr(l.website, instr(l.website, '://') + 3)"
+const WEBSITE_HOST_SQL = `lower(CASE WHEN instr(${WEBSITE_AFTER_SCHEME}, '/') > 0
+  THEN substr(${WEBSITE_AFTER_SCHEME}, 1, instr(${WEBSITE_AFTER_SCHEME}, '/') - 1)
+  ELSE ${WEBSITE_AFTER_SCHEME} END)`
 
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
@@ -1221,8 +1231,9 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   }
 
   /**
-   * Every normalized term must occur in the listing's name, short description, or the slug
-   * or name of one of its active categories (owner decision, #77: never the long content).
+   * Every normalized term must occur in the listing's name, short description, slug (its
+   * domain), website host, or the slug or name of one of its active categories (owner
+   * decisions on #77 and #81: never the long content).
    * The terms are one JSON binding that each term reads with `json_extract(?1, '$[i]')`, and
    * matching uses `instr()`, so the statement binds four values whatever the query and has no
    * LIKE/GLOB pattern for D1's 50-byte limit. A term that matches no category name skips the
@@ -1249,6 +1260,8 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       return `(
             instr(lower(l.name), ${term}) > 0
             OR instr(lower(l.description), ${term}) > 0
+            OR instr(lower(l.slug), ${term}) > 0
+            OR instr(${WEBSITE_HOST_SQL}, ${term}) > 0
             OR (
               EXISTS (SELECT 1 FROM categories any_c WHERE any_c.is_active = 1 AND ${categoryText('any_c')})
               AND EXISTS (
@@ -1269,7 +1282,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
           AND ${termClauses.join('\n          AND ')}
         ORDER BY
           CASE
-            WHEN lower(l.name) = ?3 THEN 0
+            WHEN lower(l.name) = ?3 OR lower(l.slug) = ?3 THEN 0
             WHEN instr(lower(l.name), ?3) = 1 THEN 1
             WHEN instr(lower(l.name), ?3) > 0 THEN 2
             ELSE 3

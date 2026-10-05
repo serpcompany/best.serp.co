@@ -34,5 +34,10 @@ test.describe('search API', () => {
     expect(results.length).toBeLessThanOrEqual(5)
     for (const result of results) expect(result.url).toBe(`/products/${result.slug}/`)
     expect(await (await request.get('/api/search?q=%20%20')).json()).toEqual([])
+    // A domain finds its listing through the slug and the website host (owner decision, #81).
+    const domain = (await (await request.get('/api/search?q=jasper.ai&limit=5')).json()) as Array<{
+      slug: string
+    }>
+    expect(domain[0]?.slug).toBe('jasper.ai')
   })
 })

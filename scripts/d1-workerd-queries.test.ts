@@ -216,6 +216,14 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
       expect(results.length, query.slice(0, 30)).toBeLessThanOrEqual(MAX_SEARCH_LIMIT)
     }
     expect((await ops.searchListings('video downloader')).length).toBeGreaterThan(0)
+    // Domains find their listings: the slug and the website host match (owner decision, #81).
+    const slugsFor = async (query: string) =>
+      (await ops.searchListings(query, 100)).map(listing => listing.slug)
+    expect((await slugsFor('jasper.ai'))[0]).toBe('jasper.ai')
+    expect(await slugsFor('orderdesk')).toContain('orderdesk.com')
+    expect(await slugsFor('serp.ly')).toHaveLength(MAX_SEARCH_LIMIT)
+    // Non-ASCII letters match as typed, the way SQLite's lower() leaves them (#81 review).
+    expect(await slugsFor('OÜ')).toContain('instant-portrait.com')
     expect(await ops.searchListings('  \n\t ')).toEqual([])
     expect((await ops.getAutocomplete('jas', 5)).length).toBeLessThanOrEqual(5)
   }, 120_000)

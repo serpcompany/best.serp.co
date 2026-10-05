@@ -256,9 +256,12 @@ describe('shared catalog data operations', () => {
     // A name match ranks first: exact, then prefix, then anywhere in the name.
     expect(await slugs('delta listing')).toEqual(['delta'])
     expect((await slugs('listing')).slice(0, 2)).toEqual(['alpha', 'bravo'])
-    // Long content and the website are not searched (owner decision, #77).
+    // The slug (domain) and the website host match too (owner decision, #81)...
+    expect(await slugs('charlie.example.com')).toEqual(['charlie'])
+    expect(await slugs('example.com')).toEqual(['alpha', 'bravo', 'charlie', 'delta', 'echo'])
+    // ...but never the long content, the scheme, or a URL path (owner decision, #77).
     expect(await slugs('detail content')).toEqual([])
-    expect(await slugs('example.com')).toEqual([])
+    expect(await slugs('https')).toEqual([])
     expect(await slugs('100%_off')).toEqual([])
   })
 
@@ -295,9 +298,10 @@ describe('shared catalog data operations', () => {
   })
 
   it('normalizes and caps search input instead of rejecting it', () => {
-    expect(normalizeSearchQuery('  Ｆｕｌｌ\u0000Width   QUERY ')).toEqual({
-      phrase: 'full width query',
-      terms: ['full', 'width', 'query']
+    // Only ASCII letters fold, exactly like SQLite's lower(); everything else matches as typed.
+    expect(normalizeSearchQuery('  Ｆｕｌｌ\u0000Width   QUERY OÜ ')).toEqual({
+      phrase: 'Ｆｕｌｌ width query oÜ',
+      terms: ['Ｆｕｌｌ', 'width', 'query', 'oÜ']
     })
     const capped = normalizeSearchQuery(`${'🎬'.repeat(99)}xyz`)
     expect(Array.from(capped.phrase)).toHaveLength(100)

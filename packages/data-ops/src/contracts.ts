@@ -202,9 +202,9 @@ export interface CatalogOperations {
   /** The unpublished listing at `slug`, or null when the slug is live or never existed. */
   getUnpublishedListing(slug: string): Promise<UnpublishedListing | null>
   /**
-   * Public listings whose name, short description, or an active category (slug or name)
-   * contains every term of the normalized query (`normalizeSearchQuery`), at most
-   * `MAX_SEARCH_LIMIT`.
+   * Public listings whose name, short description, slug, website host, or an active category
+   * (slug or name) contains every term of the normalized query (`normalizeSearchQuery`), at
+   * most `MAX_SEARCH_LIMIT`.
    */
   searchListings(query: string, limit?: number): Promise<ListingSummary[]>
 }
