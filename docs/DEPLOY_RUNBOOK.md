@@ -6,8 +6,9 @@ Status (serpcompany/best.serp.co#34):
   `best-serp-co-staging`, catalog imported and verified against the parity report). Every
   `*.workers.dev` response carries `X-Robots-Tag: noindex, nofollow`. It was first deployed
   by hand with `wrangler login`; from now on `deploy-staging.yml` deploys every push to `main`.
-- **Production** D1 `best-serp-co-production` exists with no data; the production Worker
-  is not deployed.
+- **Production** D1 `best-serp-co-production` is bootstrapped and verified (run
+  36800330629), and the production Worker is deployed (run 36802748585) at its noindex
+  review URL. DNS has not moved.
 - **best.serp.co** is still served by GitHub Pages from the `legacy-static` branch, whose
   deploy workflow runs on pushes to that branch.
 
@@ -15,15 +16,22 @@ Status (serpcompany/best.serp.co#34):
 
 | | Staging | Production |
 |---|---|---|
-| Worker | `best-serp-co-staging` (workers.dev) | `best-serp-co-production` (no workers.dev) |
+| Worker | `best-serp-co-staging` (workers.dev) | `best-serp-co-production` (workers.dev review URL until cutover) |
 | D1 | `best-serp-co-staging` `8e6b67e5-9c58-4fa9-aca1-25b0020c0833` | `best-serp-co-production` `404ec437-53a2-4fbc-8b5f-b5e69065708e` |
 | Origin | https://best-serp-co-staging.serpcompany.workers.dev | https://best.serp.co (Worker Custom Domain on `serp.co`, at cutover) |
 | Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`; `*.workers.dev` responses are `noindex`). Production HTTP gates run here until best.serp.co stops returning `server: GitHub.com`. After cutover, set `workers_dev: false` (and `project.remote.production.workersDev`) to retire it. |
-| GitHub environment | `staging` | `production` (required reviewers, `main` only) |
+| GitHub environment | `staging` (`main` only, no reviewers) | `production` (required reviewers, `main` only) |
 
 The identities live in `env.staging` / `env.production` of `apps/web/wrangler.jsonc` and in
 `scripts/project.ts` (IDs are not secrets). `scripts/cloudflare-release.ts` refuses to run
 when the two disagree. Cloudflare account: `SERP`, `cec5f04e1d18bcc65f2be0aefb04f059`.
+
+## Database commands and staging before production
+
+[Release guards](./RELEASE_GUARDS.md) lists every `db:*` command with its target and
+explains the staging-before-production check that gates production migrations, imports, and
+Worker deploys. It also covers how to re-verify a commit with
+`gh workflow run deploy-staging.yml --ref main`.
 
 ## Setup
 
@@ -47,18 +55,29 @@ Zone → Workers Routes → Edit (zone `serp.co`) only if routes or the Custom D
 add Workers R2 Storage → Edit or Workers KV Storage → Edit, because the deploy populates it.
 
 Cloudflare's current Workers roles map Workers Scripts → Edit to Workers **Editor**, which
-cannot create a Worker. `best-serp-co-production` does not exist yet. If the first production
-deploy fails with an authorization error while creating it, raise the token's Workers
-permission to Admin (all Workers) for that one run, then lower it again.
+cannot create a Worker. The first production deploy created `best-serp-co-production` with
+an account-wide token. Both Workers now exist, so per-Worker Editor scopes are enough. The
+owner approved splitting the token right after cutover (serpcompany/best.serp.co#42,
+decision b; see [GitHub environments](#github-environments)).
 
 ### GitHub environments
 
-The `staging` and `production` environments exist. `production` requires reviewer approval
-and allows deployments only from `main`. Each holds two environment secrets:
+The `staging` and `production` environments exist:
+
+- `production` requires reviewer approval and allows deployments only from `main`.
+- `staging` allows deployments only from `main` and has no reviewers.
+
+Each holds two environment secrets:
 
 - `CLOUDFLARE_ACCOUNT_ID`: `cec5f04e1d18bcc65f2be0aefb04f059`
-- `CLOUDFLARE_API_TOKEN`: the token above (separate staging and production tokens limit
-  the blast radius of a leak)
+- `CLOUDFLARE_API_TOKEN`: today, **both environments hold the account-wide token**
+  described above (#34), with Edit on every Worker and D1 database in the SERP account. A leak from
+  either environment therefore reaches staging and production alike.
+
+The planned fix is #42 decision b, scheduled right after cutover. It gives each environment
+its own token, scoped to that environment's Worker and D1 database, plus a D1-only token for
+`production-notifier`. Each new token is proven in its workflow before the account-wide
+token is revoked. Until then, separate secrets do not limit the blast radius.
 
 Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "Staging deploy
 skipped" notice. After they exist, the next push to `main` deploys staging.
@@ -81,8 +100,8 @@ approval. When production accepts submissions:
 | Workflow | Trigger | Environment | Typed confirmation | Does |
 |---|---|---|---|---|
 | `deploy-staging.yml` | push to `main`, manual | `staging` | none | `pnpm harness:fast` → Worker build → staging D1 migrations → deploy → HTTP gates → Playwright smoke |
-| `deploy-production.yml` | manual, `main` | `production` | `deploy-best.serp.co-production` | `pnpm harness:fast` → Worker build → (database-and-worker: D1 backup → migrations) → deploy → HTTP gates |
-| `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | One-time initial catalog import into the empty production D1, then parity verification |
+| `deploy-production.yml` | manual, `main` | `production` | `deploy-best.serp.co-production` | Staging verification → `pnpm harness:fast` → Worker build → (database-and-worker: D1 backup → migrations) → deploy → HTTP gates |
+| `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → initial catalog import into an empty production D1 → parity verification |
 | `publish-d1.yml` | manual, `main` | `production` | `publish-best.serp.co-production` | D1 backup → apply one `d1/publications/*.yaml` manifest |
 | `approve-d1-submission.yml` | manual, `main` | `production` | `approve-best.serp.co-submission-production` | D1 backup → approve or reject one submission → close its review issue |
 | `notify-d1-submissions.yml` | every 15 minutes, manual | `production-notifier` | none | Open an assigned review issue per badge-verified submission |
@@ -91,11 +110,14 @@ Guards, in order:
 
 1. An `authorize` job with no secrets checks `main` and the typed confirmation (and the
    manifest path or submission UUID), so a mistyped dispatch never requests reviewer approval.
+   Deploy Production and Bootstrap Production D1 also require Deploy Staging to have verified
+   the commit (see [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
 2. The GitHub `production` environment requires reviewer approval.
 3. `scripts/cloudflare-release.ts` refuses every mutating command (`backup`, `migrate`,
    `import`, `deploy`) unless it runs in the workflow file that owns it, against that
    workflow's environment, on `main` at a clean `GITHUB_SHA`, with the confirmation in
-   `RELEASE_CONFIRM`. `d1-remote-publisher.ts`, `d1-submission-approver.ts`, and
+   `RELEASE_CONFIRM`. Production `migrate`, `deploy`, and `import` also require the
+   verified Deploy Staging run. `d1-remote-publisher.ts`, `d1-submission-approver.ts`, and
    `d1-submission-notifier.ts` apply their own workflow and confirmation guards.
 4. `deploy` first proves that every `d1/drizzle` migration is applied, that no unknown
    migration is present, and that a catalog publication exists.
@@ -132,7 +154,8 @@ commit in parallel.
 
 ### Routine releases
 
-- Merging to `main` deploys staging. Check the staging run before releasing production.
+- Merging to `main` deploys staging. Deploy Production refuses the commit until that
+  Deploy Staging run has succeeded.
 - Use `database-and-worker` when the release adds a `d1/drizzle` migration. `worker-only`
   refuses a database with pending migrations and says so.
 - Migrations are forward-only and applied before the new Worker deploys, so each migration
@@ -162,8 +185,8 @@ pnpm tsx scripts/cloudflare-release.ts verify-import production --rehearse "$dir
 pnpm tsx scripts/cloudflare-release.ts check-database production --rehearse "$dir"
 ```
 
-`check-database <env>` and `verify-import <env>` are read-only and may run against a remote
-database from a maintainer machine after `wrangler login`. `verify-import` issues about 90
+`list-migrations <env>`, `check-database <env>`, and `verify-import <env>` are read-only and
+may run against a remote database from a maintainer machine after `wrangler login`. `verify-import` issues about 90
 paged reads and takes about a minute and a half. Every other command refuses to run outside
 its protected workflow.
 

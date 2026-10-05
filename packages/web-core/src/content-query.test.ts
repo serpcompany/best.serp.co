@@ -1,11 +1,16 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
+  applyLegalContentBranding,
   buildWebsiteLookupIndex,
   resolveWebsiteBySlug,
   resolveWebsiteBySlugFromIndex,
   toWebsiteBrowseCardMetadata,
   type WebsiteMetadata
 } from './content-query'
+import { siteConfig } from './site-config'
 
 const websites: WebsiteMetadata[] = [
   {
@@ -223,5 +228,93 @@ describe('website lookup index', () => {
     expect(resolveWebsiteBySlug(websites, 'target-listing')).toEqual(
       resolveWebsiteBySlugFromIndex(buildWebsiteLookupIndex(websites), 'target-listing')
     )
+  })
+})
+
+describe('applyLegalContentBranding', () => {
+  it('never rewrites a domain that already ends in serp.co', () => {
+    const branded = applyLegalContentBranding(
+      'Visit {{domain}} or https://best.serp.co/about/. {{siteName}} runs it.',
+      { domain: 'best.serp.co', siteName: 'SERP' }
+    )
+
+    expect(branded).toBe('Visit best.serp.co or https://best.serp.co/about/. SERP runs it.')
+  })
+
+  it('names contact addresses at the legal email domain, defaulting to the site domain', () => {
+    expect(
+      applyLegalContentBranding(
+        'Email dmca[@]{{legalEmailDomain}}. Opt out at privacy[@]{{legalEmailDomain}}.',
+        { domain: 'best.serp.co', legalEmailDomain: 'serp.co', siteName: 'SERP' }
+      )
+    ).toBe('Email dmca[@]serp.co. Opt out at privacy[@]serp.co.')
+    expect(
+      applyLegalContentBranding('dmca[@]{{legalEmailDomain}}', {
+        domain: 'best.serp.co',
+        siteName: 'SERP'
+      })
+    ).toBe('dmca[@]best.serp.co')
+  })
+
+  it('rebrands bare serp.co hostnames and SERP for another site, never an address', () => {
+    expect(
+      applyLegalContentBranding(
+        'Write to privacy@serp.co or dmca[@]serp.co, or see https://serp.co/terms.',
+        { domain: 'example.com', siteName: 'Example' }
+      )
+    ).toBe('Write to privacy@serp.co or dmca[@]serp.co, or see https://example.com/terms.')
+    expect(
+      applyLegalContentBranding('privacy@serp.co and dmca[@]serp.co', {
+        domain: 'best.serp.co',
+        siteName: 'SERP'
+      })
+    ).toBe('privacy@serp.co and dmca[@]serp.co')
+    expect(
+      applyLegalContentBranding('SERP operates {{siteName}}.', {
+        domain: 'example.com',
+        siteName: 'Best SERP'
+      })
+    ).toBe('Best SERP operates Best SERP.')
+  })
+
+  const legalDirectory = fileURLToPath(new URL('../../content/data/legal/', import.meta.url))
+  const legalFiles = readdirSync(legalDirectory).filter(file => file.endsWith('.mdx'))
+  // /legal/cookies/ still names placeholder example.com addresses, as best.serp.co does today
+  // (serpcompany/best.serp.co#42, T-3). Nothing else may name an address off the legal domain.
+  const placeholderAddresses: Record<string, string[]> = {
+    'cookies.mdx': ['privacy@example.com', 'support@example.com']
+  }
+
+  it('covers every legal page', () => {
+    expect(legalFiles.sort()).toEqual([
+      'affiliate-disclosure.mdx',
+      'cookies.mdx',
+      'dmca.mdx',
+      'privacy.mdx',
+      'terms.mdx'
+    ])
+  })
+
+  it.each(legalFiles)('renders %s with contact addresses at the legal email domain', file => {
+    const branded = applyLegalContentBranding(readFileSync(join(legalDirectory, file), 'utf8'), {
+      domain: siteConfig.domain,
+      legalEmailDomain: siteConfig.legalEmailDomain,
+      siteName: siteConfig.name
+    })
+    const addresses = [
+      ...new Set(
+        [...branded.matchAll(/\b([a-z0-9._%+-]+)(?:@|\[@\])([a-z0-9-]+(?:\.[a-z0-9-]+)+)/giu)].map(
+          ([, local, domain]) => `${local}@${domain}`.toLowerCase()
+        )
+      )
+    ]
+
+    expect(branded).not.toMatch(/\{\{\w+\}\}/u)
+    expect(branded).not.toContain('best.best.')
+    expect(
+      addresses.filter(address => !address.endsWith(`@${siteConfig.legalEmailDomain}`)).sort()
+    ).toEqual(placeholderAddresses[file] ?? [])
+    if (['dmca.mdx', 'privacy.mdx', 'terms.mdx'].includes(file))
+      expect(addresses.length).toBeGreaterThan(0)
   })
 })

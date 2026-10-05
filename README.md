@@ -19,9 +19,9 @@ Use Node 24 and pnpm. Local D1 is seeded from the committed initial import:
 
 ```bash
 pnpm install
-pnpm d1:local:migrate
-pnpm d1:local:import
-pnpm d1:local:verify
+pnpm db:migrate:local
+pnpm db:import:local
+pnpm db:verify:local
 pnpm dev
 ```
 

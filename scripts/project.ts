@@ -20,6 +20,11 @@ export const project = {
     submission: 'approve-best.serp.co-submission-production'
   },
   domain: 'best.serp.co',
+  /**
+   * Wrangler's applied-migration ledger. Every D1 binding in `wrangler.jsonc` declares it as
+   * `migrations_table`, and release tooling reads it to compare applied and pending migrations.
+   */
+  migrationsTable: 'd1_migrations',
   local: {
     databaseId: '00000000-0000-0000-0000-000000000001',
     databaseName: 'best-serp-co-local',

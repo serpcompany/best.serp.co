@@ -2,12 +2,19 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
+import {
+  metaRobotsBlocksIndexing,
+  robotsTxtBlockedPath,
+  xRobotsTagBlocksIndexing
+} from './crawl-policy'
 import { project } from './project'
 import { categoryRoute, listingRoute } from './site-routes'
 
 export type HttpGateMode = 'staging' | 'production'
 const defaultRequestTimeoutMs = 15_000
 const maxBodyProbeBytes = 4_096
+// Enough for robots.txt and for the <head> of the home page (its robots meta sits near 6 KB).
+const maxTextProbeBytes = 131_072
 
 function parseMode(value: string): HttpGateMode {
   if (value === 'staging' || value === 'production') return value
@@ -173,6 +180,74 @@ async function expectLegacyRedirect(
   })
 }
 
+async function readBoundedText(response: Response, label: string): Promise<string> {
+  if (!response.body) throw new Error(`${label} returned an empty body.`)
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let observed = 0
+  let text = ''
+  try {
+    while (observed < maxTextProbeBytes && !/<\/head>/iu.test(text)) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const bounded = value.subarray(0, maxTextProbeBytes - observed)
+      observed += bounded.byteLength
+      text += decoder.decode(bounded, { stream: true })
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined)
+  }
+  return text + decoder.decode()
+}
+
+/**
+ * Crawl policy per environment (serp standards/environment-configuration.md): Staging must
+ * send noindex (header or meta). Production must not send noindex on `/`, robots.txt or the
+ * sitemap index, and robots.txt must let Google and `*` crawl and list the sitemap index.
+ * A noindex reaching best.serp.co would deindex the site.
+ */
+async function expectCrawlPolicy(
+  mode: HttpGateMode,
+  baseUrl: URL,
+  timeoutMs: number,
+  contentPath: string
+): Promise<void> {
+  await boundedFetch(routeUrl(baseUrl, '/'), timeoutMs, async response => {
+    const header = xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag'))
+    const meta = metaRobotsBlocksIndexing(await readBoundedText(response, `${mode} route /`))
+    if (mode === 'staging' && !header && !meta)
+      throw new Error('staging route / sent no noindex (X-Robots-Tag or robots meta).')
+    if (mode === 'production' && (header || meta))
+      throw new Error(
+        `production route / sent noindex in its ${header ? 'X-Robots-Tag header' : 'robots meta'}.`
+      )
+  })
+  if (mode === 'staging') return
+  const sitemapIndex = routeUrl(baseUrl, '/sitemap-index.xml')
+  await boundedFetch(sitemapIndex, timeoutMs, async response => {
+    await response.body?.cancel().catch(() => undefined)
+    if (xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag')))
+      throw new Error('production route /sitemap-index.xml sent X-Robots-Tag noindex.')
+  })
+  await boundedFetch(routeUrl(baseUrl, '/robots.txt'), timeoutMs, async response => {
+    if (response.status !== 200)
+      throw new Error(`production route /robots.txt returned ${response.status}.`)
+    if (xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag')))
+      throw new Error('production route /robots.txt sent X-Robots-Tag noindex.')
+    const robots = await readBoundedText(response, 'production route /robots.txt')
+    const listsSitemapIndex = robots
+      .split(/\r?\n/u)
+      .some(line => /^\s*sitemap\s*:\s*(\S+)\s*$/iu.exec(line)?.[1] === sitemapIndex.href)
+    if (!listsSitemapIndex)
+      throw new Error(`production robots.txt does not list "Sitemap: ${sitemapIndex.href}".`)
+    const blocked = robotsTxtBlockedPath(robots, ['/', contentPath])
+    if (blocked)
+      throw new Error(
+        `production robots.txt blocks ${blocked.path} for user-agent ${blocked.agent}.`
+      )
+  })
+}
+
 export async function runHttpGates(
   modeValue: string,
   baseUrlValue: string,
@@ -200,6 +275,7 @@ export async function runHttpGates(
     expectLegacyRedirect(mode, baseUrl, `/${listingSlug}/`, listingRoute(listingSlug), timeoutMs),
     expectRoute(mode, baseUrl, '/submit/', timeoutMs)
   ])
+  await expectCrawlPolicy(mode, baseUrl, timeoutMs, listingRoute(listingSlug))
 }
 
 export async function runStagingHttpGates(baseUrlValue: string): Promise<void> {

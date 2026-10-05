@@ -7,6 +7,7 @@
 | [Development](./DEVELOPMENT.md) | Local catalog, Worker preview, schema changes |
 | [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review |
 | [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, release flow, cutover checklist |
+| [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, staging before production |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees |
 | [Dependency security](./DEPENDENCY_SECURITY.md) | Production dependency audit |
 | [Issue tracker](./agents/issue-tracker.md) | Agent issue workflow configuration |
