@@ -16,9 +16,6 @@ on:
         description: 'Optional newline or comma separated stale sitemap URLs to delete before submit'
         required: false
         type: string
-  # Re-enable the daily schedule after the Worker cutover (serpcompany/best.serp.co#34):
-  # schedule:
-  #   - cron: '17 9 * * *'
 
 permissions:
   contents: read
