@@ -751,6 +751,65 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     ).not.toThrow()
   })
 
+  it('widens an active exact-host block when a later rejection covers subdomains', () => {
+    // Both queued at once: a pre-#62 row on the bare domain (no block key, so its block covers
+    // the exact host only) and a native row on a subdomain keyed on the same registrable domain.
+    function queued(): { db: DatabaseSync; legacy: string; native: string } {
+      const db = planDatabase()
+      const legacy = crypto.randomUUID()
+      const native = crypto.randomUUID()
+      db.prepare(
+        `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+          logo_url,status,plan)
+        VALUES (?,'casino3.example','Legacy','d','https://casino3.example/','c','tools','l',
+          'verified','free')`
+      ).run(legacy)
+      db.prepare(
+        `INSERT INTO listing_submissions (id,slug,block_key,block_covers_subdomains,name,
+          description,website,content,category_slug,logo_url,status,plan)
+        VALUES (?,'go.casino3.example','casino3.example',1,'Go','d','https://go.casino3.example/',
+          'c','tools','l','verified','free')`
+      ).run(native)
+      return { db, legacy, native }
+    }
+    const reject = (id: string) =>
+      buildRejectSubmissionPlans({
+        category: 'prohibited',
+        now: NOW,
+        reason: 'Prohibited.',
+        reviewer: 'reviewer',
+        submissionId: id
+      })
+    const scope = (db: DatabaseSync) =>
+      db.prepare('SELECT url_key, covers_subdomains FROM listing_submission_url_blocks').all()
+    const submit = (db: DatabaseSync, host: string) => () =>
+      db
+        .prepare(
+          `INSERT INTO listing_submissions (id,slug,block_key,block_covers_subdomains,name,
+            description,website,content,category_slug,logo_url,plan)
+          VALUES (?,?,'casino3.example',1,'Again','d','https://example.com/','c','tools','l',
+            'free')`
+        )
+        .run(crypto.randomUUID(), host)
+
+    // The reviewer's case: the legacy row is rejected first, then the native one.
+    const first = queued()
+    execute(first.db, reject(first.legacy))
+    expect(scope(first.db)).toEqual([{ covers_subdomains: 0, url_key: 'casino3.example' }])
+    expect(submit(first.db, 'shop.casino3.example')).not.toThrow()
+    execute(first.db, reject(first.native))
+    expect(scope(first.db)).toEqual([{ covers_subdomains: 1, url_key: 'casino3.example' }])
+    expect(submit(first.db, 'www2.casino3.example')).toThrow(
+      /blocked until an admin lifts the block/u
+    )
+
+    // The other order: an exact-host rejection never narrows a subdomain-covering block.
+    const second = queued()
+    execute(second.db, reject(second.native))
+    execute(second.db, reject(second.legacy))
+    expect(scope(second.db)).toEqual([{ covers_subdomains: 1, url_key: 'casino3.example' }])
+  })
+
   it('lets an other-category rejection be resubmitted as a new submission', () => {
     const db = database('verified')
     execute(

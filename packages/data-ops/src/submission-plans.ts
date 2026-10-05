@@ -613,13 +613,16 @@ export function buildRejectSubmissionPlans(input: {
     )
   )
   if (input.category === 'prohibited') {
+    // An active block on the same key is kept, and widened to cover subdomains when this one
+    // does (a pre-#62 row blocks only its exact host; a later native row covers the domain).
     plans.push(
       {
         sql: `INSERT INTO listing_submission_url_blocks
           (url_key,covers_subdomains,submission_id,reason,blocked_by,blocked_at)
           SELECT COALESCE(block_key,slug),COALESCE(block_covers_subdomains,0),id,?,?,?
           FROM listing_submissions WHERE id=? AND status='rejected'
-          ON CONFLICT(url_key) WHERE lifted_at IS NULL DO NOTHING`,
+          ON CONFLICT(url_key) WHERE lifted_at IS NULL
+          DO UPDATE SET covers_subdomains=MAX(covers_subdomains,excluded.covers_subdomains)`,
         params: [input.reason, input.reviewer, input.now, input.submissionId]
       },
       assertGuard('prohibited_url_blocked', {
