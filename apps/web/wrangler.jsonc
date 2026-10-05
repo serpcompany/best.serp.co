@@ -60,7 +60,7 @@
       },
       "vars": {
         "AUTH_TRUST_HOST": "true",
-        "CANONICAL_HOST_REDIRECT": "off",
+        "CANONICAL_HOST_REDIRECT": "on",
         "D1_RUNTIME_ENV": "production",
         "SITE_ENVIRONMENT": "production"
       },

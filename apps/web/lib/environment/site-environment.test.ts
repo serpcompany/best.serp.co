@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parseRobotsTxt, robotsTxtAllows } from '../../../../scripts/crawl-policy'
+import { canonicalHostRedirectEnabled } from '../routing/canonical-host'
 import {
   CANONICAL_HOST,
   isPublicProduction,
@@ -135,9 +136,13 @@ describe('apps/web/wrangler.jsonc environment flags', () => {
       expect(config.env[name].workers_dev, name).toBe(true)
       expect(config.env[name].preview_urls, name).toBe(false)
     }
-    // `off` until the cutover; the owner flips it to `on` in a reviewed change.
-    expect(['on', 'off']).toContain(config.env.production.vars?.CANONICAL_HOST_REDIRECT)
+    // On since the cutover (deploy runbook, cutover step 5): the production workers.dev host
+    // 308s to best.serp.co. Staging and local never set it, so they never redirect.
+    expect(config.env.production.vars?.CANONICAL_HOST_REDIRECT).toBe('on')
     expect(config.vars?.CANONICAL_HOST_REDIRECT).toBeUndefined()
     expect(config.env.staging.vars?.CANONICAL_HOST_REDIRECT).toBeUndefined()
+    expect(canonicalHostRedirectEnabled(config.env.production.vars ?? {})).toBe(true)
+    expect(canonicalHostRedirectEnabled(config.env.staging.vars ?? {})).toBe(false)
+    expect(canonicalHostRedirectEnabled(config.vars ?? {})).toBe(false)
   })
 })

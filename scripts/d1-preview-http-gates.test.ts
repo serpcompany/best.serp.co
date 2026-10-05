@@ -39,6 +39,13 @@ writeFileSync(
     target: { checksum: 'a'.repeat(64) }
   })
 )
+// Production gates read CANONICAL_HOST_REDIRECT from wrangler.jsonc. These tests pin it to `off`
+// unless they pass their own config, so they don't depend on the checked-in value.
+const switchOffConfigPath = join(fixtureDirectory, 'wrangler-switch-off.jsonc')
+writeFileSync(
+  switchOffConfigPath,
+  JSON.stringify({ env: { production: { vars: { CANONICAL_HOST_REDIRECT: 'off' } } } })
+)
 
 afterAll(() => rmSync(fixtureDirectory, { force: true, recursive: true }))
 
@@ -48,7 +55,12 @@ function gates(
   timeoutMs?: number,
   options: HttpGateOptions = {}
 ): Promise<void> {
-  return runHttpGates(mode, baseUrl, { parityReportPath, timeoutMs, ...options })
+  return runHttpGates(mode, baseUrl, {
+    parityReportPath,
+    timeoutMs,
+    wranglerConfigPath: switchOffConfigPath,
+    ...options
+  })
 }
 
 /** Requests the trailing-slash gates make, and the canonical redirects they require. */
