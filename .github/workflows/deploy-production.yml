@@ -1,41 +1,36 @@
 name: Deploy Production
 
-# Manual production release from main with a typed confirmation. Only a commit that Deploy Staging
-# migrated, deployed, and smoke-tested on staging can be released (staging before production).
-# database-and-worker exports a D1 backup (kept 30 days) and applies migrations before the Worker
-# deploy; worker-only refuses to deploy onto a database with pending migrations.
-# See docs/DEPLOY_RUNBOOK.md.
+# main is production. Every push to main (a staging -> main promotion) releases it, and a
+# manual dispatch from main re-runs a release with a typed confirmation. Only source that
+# Deploy Staging verified on the staging branch is released: the same commit (fast-forward) or
+# the same tree (a promotion merge commit). The production environment's required reviewers
+# approve every release job. The release backs up and migrates production D1 only when
+# migrations are pending, and otherwise deploys the Worker only. A hotfix merged straight into
+# main stops at the staging check; dispatching with the hotfix confirmation skips that check
+# for a Worker-only release. See docs/DEPLOY_RUNBOOK.md and docs/RELEASE_GUARDS.md.
 on:
+  push:
+    branches: ['main']
   workflow_dispatch:
     inputs:
       confirmation:
-        description: 'Type deploy-best.serp.co-production to deploy production'
+        description: 'Type deploy-best.serp.co-production (or hotfix-best.serp.co-production for an owner-approved hotfix that staging never verified)'
         required: true
         type: string
-      release_mode:
-        description: 'worker-only, or back up and migrate production D1 before the Worker deploy'
-        required: true
-        default: worker-only
-        type: choice
-        options:
-          - worker-only
-          - database-and-worker
 
 permissions:
-  # actions: read lets the staging verification read this commit's Deploy Staging run.
+  # Staging verification reads Deploy Staging runs (actions: read) and this commit's tree
+  # (contents: read).
   actions: read
   contents: read
-
-concurrency:
-  group: best-serp-co-production
-  cancel-in-progress: false
 
 jobs:
   authorize:
     name: Check ref, confirmation & staging verification
     runs-on: ubuntu-latest
     steps:
-      - name: Require main and the typed confirmation
+      - name: Require main and, on a dispatch, the typed confirmation
+        id: ref
         env:
           CONFIRMATION: ${{ inputs.confirmation }}
         run: |
@@ -43,18 +38,29 @@ jobs:
             echo "::error::Production deploys run only from main, not $GITHUB_REF."
             exit 1
           fi
-          if [ "$CONFIRMATION" != "deploy-best.serp.co-production" ]; then
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$CONFIRMATION" = "hotfix-best.serp.co-production" ]; then
+            message="Hotfix release of $GITHUB_SHA: the staging check is skipped and only the Worker may deploy. Merge main into staging next (docs/RELEASE_GUARDS.md#hotfixes)."
+            echo "::warning title=Hotfix release::$message"
+            echo "$message" >> "$GITHUB_STEP_SUMMARY"
+            echo "verify_staging=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$CONFIRMATION" != "deploy-best.serp.co-production" ]; then
             echo "::error::Type deploy-best.serp.co-production to deploy production."
             exit 1
           fi
+          echo "verify_staging=true" >> "$GITHUB_OUTPUT"
 
       - name: Checkout reviewed source
+        if: steps.ref.outputs.verify_staging == 'true'
         uses: actions/checkout@v7
 
       - name: Install
+        if: steps.ref.outputs.verify_staging == 'true'
         uses: ./.github/actions/install
 
-      - name: Require a verified staging deploy of this commit
+      - name: Require a verified staging deploy of this commit's tree
+        if: steps.ref.outputs.verify_staging == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: pnpm tsx scripts/staging-verification.ts
@@ -62,6 +68,11 @@ jobs:
   release:
     name: Validate, back up, migrate & deploy production
     needs: [authorize]
+    # Job-level, so a run refused by authorize never joins the group and never replaces a
+    # valid queued production job. Shared with every production D1 workflow.
+    concurrency:
+      group: deploy-best-serp-co-production
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment:
@@ -90,8 +101,27 @@ jobs:
       - name: Build OpenNext Worker
         run: pnpm worker:build
 
+      - name: Plan the release from the production migration ledger
+        id: plan
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          plan="$(pnpm tsx scripts/cloudflare-release.ts plan-release production)"
+          echo "$plan"
+          mode="$(jq -r .mode <<<"$plan")"
+          case "$mode" in
+            database-and-worker | worker-only) ;;
+            *)
+              echo "::error::plan-release returned no release mode."
+              exit 1
+              ;;
+          esac
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "Release mode: $mode (pending migrations: $(jq -r '.pendingMigrations | join(", ")' <<<"$plan"))" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Back up production D1
-        if: inputs.release_mode == 'database-and-worker'
+        if: steps.plan.outputs.mode == 'database-and-worker'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -99,7 +129,7 @@ jobs:
         run: pnpm tsx scripts/cloudflare-release.ts backup production --output "$RUNNER_TEMP/d1-backup/best-serp-co-production-$GITHUB_SHA-$GITHUB_RUN_ID.sql"
 
       - name: Retain production D1 backup
-        if: inputs.release_mode == 'database-and-worker'
+        if: steps.plan.outputs.mode == 'database-and-worker'
         uses: actions/upload-artifact@v7
         with:
           name: best-serp-co-production-d1-pre-deploy-${{ github.run_id }}
@@ -108,7 +138,7 @@ jobs:
           retention-days: 30
 
       - name: Apply production D1 migrations
-        if: inputs.release_mode == 'database-and-worker'
+        if: steps.plan.outputs.mode == 'database-and-worker'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

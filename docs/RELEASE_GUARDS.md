@@ -1,8 +1,8 @@
 # Database commands and release guards
 
-How database commands name their targets, and how a production release proves that staging
-verified the same commit first. Environments, workflows, and the release procedure itself are
-in the [deploy runbook](./DEPLOY_RUNBOOK.md).
+How database commands name their targets, how changes move from `staging` to `main`, and how a
+production release proves that staging verified the same source first. Environments,
+workflows, and the release procedure itself are in the [deploy runbook](./DEPLOY_RUNBOOK.md).
 
 ## Database commands
 
@@ -17,9 +17,9 @@ ambiguous `db:migrate`.
 | `pnpm db:import:local`, `pnpm db:verify:local` | local D1 | Seed the reviewed initial catalog and prove exact parity |
 | `pnpm db:publish:local -- <manifest>` | local D1 | Apply a `d1/publications/` manifest |
 | `pnpm db:migrations:list:staging` | staging D1 | Read-only: applied, pending, and unknown migrations |
-| `pnpm db:migrate:staging` | staging D1 | `cloudflare-release.ts migrate staging`; runs only in `deploy-staging.yml` |
+| `pnpm db:migrate:staging` | staging D1 | `cloudflare-release.ts migrate staging`; runs only in `deploy-staging.yml` on `staging` |
 | `pnpm db:migrations:list:production` | production D1 | Read-only: applied, pending, and unknown migrations |
-| `pnpm db:migrate:production` | production D1 | `cloudflare-release.ts migrate production`; runs only in `deploy-production.yml` with the typed confirmation, after Deploy Staging verified the commit |
+| `pnpm db:migrate:production` | production D1 | `cloudflare-release.ts migrate production`; runs only in `deploy-production.yml` on `main` when `plan-release` finds pending migrations, after Deploy Staging verified the commit's tree |
 | `pnpm db:publish:production`, `pnpm db:approve:production`, `pnpm db:notify:production` | production D1 | Data operations; each runs only in its own workflow |
 
 The remote `migrations:list` commands run `cloudflare-release.ts list-migrations <env>`, which
@@ -32,11 +32,29 @@ Every D1 binding in `apps/web/wrangler.jsonc` declares `migrations_dir: "../../d
 and `migrations_table: "d1_migrations"`. `pnpm worker:config:validate` and every
 `cloudflare-release.ts` command refuse a binding that drifts.
 
+## Promotion
+
+The repository follows the serp git-workflow standard for repositories with Staging
+(serpcompany/best.serp.co#42, decision d):
+
+- **`staging` is the base branch.** Branch from it as `issue-<n>-<slug>` and open pull
+  requests into it. The owner squash-merges them, and each push to `staging` runs Deploy
+  Staging. Agents never merge.
+- **`main` is production.** Changes reach it only by promotion: the owner opens a `staging` →
+  `main` pull request and merges it with a **merge commit**, never a squash. Each push to
+  `main` runs Deploy Production, whose release job waits for the `production` reviewers.
+- **PR Review enforces the sources of `main`.** Once `staging` exists, `Validate Site &
+  Policy` fails a pull request into `main` unless its head is this repository's `staging` or a
+  `hotfix-*` branch. Rulesets cannot restrict a pull request's head branch.
+
+Promote only a `staging` head that Deploy Staging has verified; otherwise Deploy Production
+refuses the merge commit (see below) until it is.
+
 ## Staging before production
 
-Deploy Production and Bootstrap Production D1 release only a commit that Deploy Staging has
-verified. A commit is verified when **any attempt** of a `deploy-staging.yml` run on `main`
-for that exact commit completed all four steps successfully:
+Deploy Production and Bootstrap Production D1 release only source that Deploy Staging has
+verified on `staging`. Deploy Staging verified a commit when **any attempt** of a push or
+dispatch run of `deploy-staging.yml` on `staging` completed all four steps successfully:
 
 - **Apply staging D1 migrations**
 - **Deploy staging Worker**
@@ -44,31 +62,42 @@ for that exact commit completed all four steps successfully:
 - **Run Playwright smoke against staging**
 
 A green attempt that skipped those steps (for example, without staging credentials) does not
-count.
+count, and neither do runs on other branches or `pull_request` runs.
+
+**The released commit must have the tree of a verified staging commit.**
+`scripts/staging-verification.ts` reads the released commit's tree and accepts either:
+
+- the commit itself, verified on `staging` (a fast-forward, or a dispatch of that commit); or
+- a commit among the newest 100 Deploy Staging runs on `staging` whose head has the same tree
+  as the released commit.
+
+The tree is everything the release ships: source, migrations, configuration, and workflows. A
+promotion merge commit is a new commit, but its tree equals the merged `staging` head's tree
+whenever `main` had nothing that `staging` lacked. If `main` had diverged (a hotfix not yet
+merged back), the merged tree was never on staging, and the release is refused. Merge `main`
+into `staging`, let Deploy Staging verify the result, then promote again.
 
 Verification is permanent once earned. A later attempt or run of the same commit cannot
 withdraw it, whether that attempt is a re-run still in progress, a flaky smoke test, a broken
 staging token, or an older commit replayed over a newer staging schema. Those failures
-describe the staging environment, not the commit. A rule that let them withdraw verification
+describe the staging environment, not the source. A rule that let them withdraw verification
 could let `migrate production` pass and `deploy production` refuse within one release.
 
-The check runs twice, and both use the workflow's `GITHUB_TOKEN` with `actions: read`:
+The check runs twice, and both use the workflow's `GITHUB_TOKEN` with `actions: read` and
+`contents: read`:
 
 1. The `authorize` job runs `scripts/staging-verification.ts` before the `production`
    environment asks for reviewer approval.
 2. `cloudflare-release.ts` repeats it immediately before `migrate production`,
    `deploy production`, and `import production`, and before any Wrangler call.
 
-A dispatch always releases the head of `main`. Only a pushed head gets its own Deploy Staging
-run, so when several commits land in one push, only the last one is verified. If Deploy
-Staging is still running, wait for it.
-
-If the head has no verified attempt (the run failed, a push skipped CI, or Actions had an
-outage), start a new run on the head of `main`, wait for it to pass, then dispatch the
-production workflow again:
+Only a pushed head gets its own Deploy Staging run, so when several commits land in one push,
+only the last one is verified. If Deploy Staging is still running, wait for it. If the
+`staging` head has no verified attempt (the run failed, a push skipped CI, or Actions had an
+outage), start a new run on it, wait for it to pass, then re-run the production run:
 
 ```bash
-gh workflow run deploy-staging.yml --ref main
+gh workflow run deploy-staging.yml --ref staging
 ```
 
 Re-running the commit's own failed run also works. Don't re-run an older commit's run: it
@@ -85,15 +114,31 @@ applies every migration at its commit to an empty production database, for examp
 re-created one. The publication and submission workflows change production data, not schema
 or code, so they are not gated on staging.
 
+## Hotfixes
+
+A hotfix that cannot wait for staging is a `hotfix-<n>-<slug>` branch from `main`, squash-merged
+into `main` through a pull request. Its push runs Deploy Production, which stops at the
+staging check because staging never verified that tree. To release it anyway:
+
+1. The owner dispatches Deploy Production from `main` with `hotfix-best.serp.co-production`.
+   The `authorize` job records the skipped check in the run summary, and the `production`
+   reviewers still approve the release job.
+2. `cloudflare-release.ts` lets that dispatch run `deploy production` without the staging
+   check, and refuses `migrate production`. A hotfix that needs a migration goes through
+   staging.
+3. Merge `main` into `staging` immediately (a pull request into `staging`), so the next
+   promotion's merge commit carries a tree that staging verified.
+
+## Security boundary
+
 Until the token split, this is a process control, not a security boundary.
 
-- **Narrowed:** the `staging` environment allows deployments only from `main`, so only
-  workflows running from `main` can use the staging secrets.
+- **Narrowed:** the `staging` environment allows deployments only from the `staging` branch,
+  and `production` only from `main`, so only workflows on those branches can use their
+  secrets.
 - **Still open:** both environments still hold the account-wide Cloudflare token, so a
-  workflow merged to `main` that uses `staging` could still reach production directly. That
-  path requires a pull request and the five required checks of ruleset `main`, but no
-  approving review.
+  workflow merged to `staging` that uses the `staging` environment could still reach
+  production directly. That path requires a pull request and the five required checks, but
+  no approving review.
 
-Decision b (the per-environment token split, right after cutover) closes that path. Under
-decision d, the `staging` environment's restriction moves from `main` to the `staging`
-branch.
+Decision b (the per-environment token split, right after cutover) closes that path.

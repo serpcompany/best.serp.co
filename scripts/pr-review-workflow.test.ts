@@ -4,7 +4,9 @@ import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 
 interface WorkflowStep {
+  env?: Record<string, string>
   id?: string
+  if?: string
   uses?: string
   name?: string
   run?: string
@@ -12,6 +14,8 @@ interface WorkflowStep {
 }
 
 interface WorkflowJob {
+  if?: string
+  name?: string
   needs?: string | string[]
   'runs-on'?: string
   steps?: WorkflowStep[]
@@ -19,6 +23,7 @@ interface WorkflowJob {
 
 interface WorkflowDefinition {
   jobs: Record<string, WorkflowJob>
+  on: { pull_request?: { branches?: string[]; paths?: string[]; 'paths-ignore'?: string[] } }
   permissions?: Record<string, string>
 }
 
@@ -29,30 +34,57 @@ function loadWorkflow(): WorkflowDefinition {
   return yaml.load(raw) as WorkflowDefinition
 }
 
-function loadE2eRelevantFilters(): string[] {
-  const workflow = loadWorkflow()
-  const changesJob = workflow.jobs.changes
-  const filterStep = changesJob.steps?.find(step => step.id === 'filter')
-  const filters = yaml.load(String(filterStep?.with?.filters ?? '')) as {
-    e2e_relevant?: string[]
-  }
-
-  return filters.e2e_relevant ?? []
-}
-
-function pathMatchesFilter(path: string, filter: string): boolean {
-  if (!filter.endsWith('/**')) {
-    return path === filter
-  }
-
-  return path.startsWith(filter.slice(0, -3))
-}
-
-function isE2eRelevant(path: string): boolean {
-  return loadE2eRelevantFilters().some(filter => pathMatchesFilter(path, filter))
-}
+/** The five checks ruleset `main` (and the `staging` ruleset) require. */
+const requiredChecks = [
+  'Validate Site & Policy',
+  'Type Check',
+  'Unit Tests',
+  'OpenNext Worker Build',
+  'E2E Tests'
+]
 
 describe('pr-review workflow', () => {
+  it('reviews pull requests into staging (the base branch) and main (promotions, hotfixes)', () => {
+    const workflow = loadWorkflow()
+
+    expect(workflow.on.pull_request).toEqual({ branches: ['staging', 'main'] })
+  })
+
+  it('runs every required check on every pull request, unfiltered', () => {
+    const workflow = loadWorkflow()
+    const source = readFileSync(resolve(process.cwd(), '.github/workflows/pr-review.yml'), 'utf8')
+
+    // A skipped job satisfies a required check, so no required job may be conditional.
+    expect(Object.values(workflow.jobs).map(job => job.name)).toEqual(requiredChecks)
+    for (const job of Object.values(workflow.jobs)) {
+      expect(job.if, job.name).toBeUndefined()
+      expect(job.needs, job.name).toBeUndefined()
+    }
+    expect(source).not.toContain('paths-filter')
+    expect(workflow.jobs.changes).toBeUndefined()
+  })
+
+  it('accepts pull requests into main only from staging or a hotfix branch of this repository', () => {
+    const workflow = loadWorkflow()
+    const steps = workflow.jobs.validate.steps ?? []
+    const guard = steps.find(step => step.run?.includes('accepts only a promotion from staging'))
+
+    expect(steps.indexOf(guard as WorkflowStep)).toBe(1)
+    expect(guard?.if).toBe("github.base_ref == 'main'")
+    // The head ref is attacker-controlled, so it reaches the shell only through env.
+    const expression = (value: string) => `\${{ ${value} }}`
+    expect(guard?.env).toEqual({
+      HEAD_REF: expression('github.head_ref'),
+      HEAD_REPOSITORY: expression('github.event.pull_request.head.repo.full_name')
+    })
+    expect(guard?.run).toContain(
+      '[ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] && { [ "$HEAD_REF" = "staging" ] || [[ "$HEAD_REF" == hotfix-* ]]; }'
+    )
+    // Inactive only until the staging branch exists (the switch to the promotion flow).
+    expect(guard?.run).toContain('git ls-remote --exit-code --heads origin staging')
+    expect(guard?.run).toContain('exit 1')
+  })
+
   it('grants explicit permissions for PR change detection', () => {
     const workflow = loadWorkflow()
 
@@ -75,7 +107,10 @@ describe('pr-review workflow', () => {
     expect(stepRuns).toContain('pnpm test:d1')
     expect(stepRuns).toContain('pnpm lint:forbidden-links')
     const biomeStep = stepRuns?.find(run => run?.includes('pnpm exec biome check'))
-    expect(biomeStep).toContain('git diff --name-only --diff-filter=ACMR -z origin/main...HEAD')
+    // Against the pull request's own base: staging for changes, main for promotions.
+    expect(biomeStep).toContain(
+      'git diff --name-only --diff-filter=ACMR -z "origin/$GITHUB_BASE_REF...HEAD"'
+    )
     expect(biomeStep).toContain(
       `pnpm exec biome check --no-errors-on-unmatched "\${changed_files[@]}"`
     )
@@ -106,9 +141,7 @@ describe('pr-review workflow', () => {
     expect(workflow.jobs.validate['runs-on']).toBe('ubuntu-latest')
     expect(workflow.jobs.typecheck['runs-on']).toBe('ubuntu-latest')
     expect(workflow.jobs.test['runs-on']).toBe('ubuntu-latest')
-    expect(workflow.jobs.changes['runs-on']).toBe('ubuntu-latest')
     expect(workflow.jobs.e2e['runs-on']).toBe('ubuntu-latest')
-    expect(workflow.jobs.e2e.needs).toEqual(['changes'])
   })
 
   it('installs Playwright browsers without sudo-only system dependency escalation', () => {
@@ -117,37 +150,7 @@ describe('pr-review workflow', () => {
     const stepRuns = e2eJob.steps?.map(step => step.run).filter(Boolean)
 
     expect(stepRuns).toContain('pnpm --filter e2e test:install')
+    expect(stepRuns).toContain('pnpm test:e2e')
     expect(stepRuns).not.toContain('npx playwright install --with-deps')
-  })
-
-  it('uses the Node 24-compatible paths-filter action for E2E gating', () => {
-    const workflow = loadWorkflow()
-    const changesJob = workflow.jobs.changes
-    const filterStep = changesJob.steps?.find(step => step.id === 'filter')
-
-    expect(filterStep?.uses).toBe('dorny/paths-filter@v4')
-  })
-
-  it('keeps E2E path filtering behavior scoped to relevant app and test paths', () => {
-    const filters = loadE2eRelevantFilters()
-
-    expect(filters).toEqual([
-      'apps/web/**',
-      'apps/e2e/**',
-      'd1/**',
-      'packages/data-ops/**',
-      'packages/web-core/**',
-      'packages/design-system/**',
-      'packages/site-config/**'
-    ])
-    expect(isE2eRelevant('apps/e2e/tests/home.spec.ts')).toBe(true)
-    expect(isE2eRelevant('apps/web/app/page.tsx')).toBe(true)
-    expect(isE2eRelevant('d1/publications/release.yaml')).toBe(true)
-    expect(isE2eRelevant('packages/data-ops/src/catalog.ts')).toBe(true)
-    expect(isE2eRelevant('packages/web-core/src/root-shell.tsx')).toBe(true)
-    expect(isE2eRelevant('packages/design-system/components/button.tsx')).toBe(true)
-    expect(isE2eRelevant('packages/site-config/src/site.ts')).toBe(true)
-    expect(isE2eRelevant('docs/BUILD_PIPELINE.md')).toBe(false)
-    expect(isE2eRelevant('.github/workflows/pr-review.yml')).toBe(false)
   })
 })

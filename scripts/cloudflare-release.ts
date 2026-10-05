@@ -7,6 +7,8 @@
  * Commands:
  *   list-migrations read-only: applied, pending, and unknown migrations in the D1 ledger
  *                   (`pnpm db:migrations:list:<env>`)
+ *   plan-release    read-only: `database-and-worker` when migrations are pending, otherwise
+ *                   `worker-only`; refuses a database with migrations this commit lacks
  *   check-database  read-only: every d1/drizzle migration is applied and a publication exists
  *   verify-import   read-only: exact 16-table parity with the reviewed import and parity report
  *   backup          `wrangler d1 export` to --output <file>
@@ -16,14 +18,16 @@
  *   deploy          check-database, then `opennextjs-cloudflare deploy` of the built Worker
  *
  * Mutating commands run only inside the protected workflow that owns them
- * (`releaseAuthorizations`), from a clean checkout of main at GITHUB_SHA, with that workflow's
- * typed confirmation in RELEASE_CONFIRM. Production migrations, the bootstrap import, and Worker
- * deploys also require Deploy Staging to have verified that same commit
- * (`staging-verification.ts`, GITHUB_TOKEN with actions: read). Wrangler authenticates with
- * CLOUDFLARE_API_TOKEN and
- * CLOUDFLARE_ACCOUNT_ID. `--rehearse <directory>` runs migrate, import, verify-import, and
- * check-database with `--local --persist-to <directory>` instead of `--remote`; it never
- * contacts Cloudflare.
+ * (`releaseAuthorizations`): from that workflow file on its own branch (`staging` for staging,
+ * `main` for production), for one of its events, from a clean checkout at GITHUB_SHA, and, on
+ * a manual dispatch, with its typed confirmation in RELEASE_CONFIRM. A push carries no
+ * confirmation; the production environment's required reviewers approve it. Production
+ * migrations, the bootstrap import, and Worker deploys also require Deploy Staging to have
+ * verified the same source tree on `staging` (`staging-verification.ts`, GITHUB_TOKEN with
+ * actions: read and contents: read), except for an owner-approved hotfix dispatch, which may
+ * deploy the Worker but never migrate. Wrangler authenticates with CLOUDFLARE_API_TOKEN and
+ * CLOUDFLARE_ACCOUNT_ID. `--rehearse <directory>` runs the D1 commands except backup with
+ * `--local --persist-to <directory>` instead of `--remote`; it never contacts Cloudflare.
  *
  * `list-migrations` reads the ledger with a SELECT instead of `wrangler d1 migrations list`,
  * because Wrangler's list first runs `CREATE TABLE IF NOT EXISTS` on the ledger table.
@@ -59,6 +63,7 @@ export const releaseCommands = [
   'import',
   'list-migrations',
   'migrate',
+  'plan-release',
   'verify-import'
 ] as const
 export type ReleaseCommand = (typeof releaseCommands)[number]
@@ -66,17 +71,33 @@ export type ReleaseCommand = (typeof releaseCommands)[number]
 export const readOnlyCommands: ReadonlySet<ReleaseCommand> = new Set([
   'check-database',
   'list-migrations',
+  'plan-release',
   'verify-import'
 ])
 
+/** Workflow events that may run remote release commands. */
+export type ReleaseEvent = 'push' | 'workflow_dispatch'
+
 export interface ReleaseAuthorization {
+  /** The branch the workflow file and GITHUB_REF must both come from. */
+  branch: 'main' | 'staging'
   commands: readonly ReleaseCommand[]
-  /** Typed confirmation required in RELEASE_CONFIRM; staging deploys on reviewed pushes. */
+  /** Typed confirmation a manual dispatch must carry in RELEASE_CONFIRM; null for none. */
   confirmation: string | null
   environment: RemoteEnvironment
   /**
+   * Events that may run the commands. A push carries no typed confirmation: it is a reviewed
+   * merge or promotion, and production's environment reviewers approve the job.
+   */
+  events: readonly ReleaseEvent[]
+  /**
+   * A second dispatch confirmation for an owner-approved hotfix already on `main`: it skips the
+   * staging check for `deploy`, and refuses every other staging-gated command.
+   */
+  hotfixConfirmation?: string
+  /**
    * Commands that ship schema or code and therefore also require Deploy Staging to have verified
-   * the same commit (staging before production).
+   * the same source tree (staging before production).
    */
   requireVerifiedStaging: readonly ReleaseCommand[]
 }
@@ -84,36 +105,47 @@ export interface ReleaseAuthorization {
 /** The only workflows that may mutate a remote environment, and what each may do. */
 export const releaseAuthorizations: Readonly<Record<string, ReleaseAuthorization>> = {
   'deploy-staging.yml': {
+    branch: 'staging',
     commands: ['migrate', 'deploy'],
     confirmation: null,
     environment: 'staging',
+    events: ['push', 'workflow_dispatch'],
     requireVerifiedStaging: []
   },
   'deploy-production.yml': {
+    branch: 'main',
     commands: ['backup', 'migrate', 'deploy'],
     confirmation: project.confirmation.deploy,
     environment: 'production',
+    events: ['push', 'workflow_dispatch'],
+    hotfixConfirmation: project.confirmation.hotfix,
     requireVerifiedStaging: ['migrate', 'deploy']
   },
   'bootstrap-production-d1.yml': {
     // `import` applies migrations itself, and only after proving the database is empty. It
     // applies every migration at this commit, so it needs the same staging proof as `migrate`.
+    branch: 'main',
     commands: ['import'],
     confirmation: project.confirmation.bootstrap,
     environment: 'production',
+    events: ['workflow_dispatch'],
     requireVerifiedStaging: ['import']
   },
   'publish-d1.yml': {
     // A reviewed data change to production, not a schema or code release.
+    branch: 'main',
     commands: ['backup'],
     confirmation: project.confirmation.publish,
     environment: 'production',
+    events: ['workflow_dispatch'],
     requireVerifiedStaging: []
   },
   'approve-d1-submission.yml': {
+    branch: 'main',
     commands: ['backup'],
     confirmation: project.confirmation.submission,
     environment: 'production',
+    events: ['workflow_dispatch'],
     requireVerifiedStaging: []
   }
 }
@@ -207,29 +239,61 @@ export function validateRemoteConfig(
   }
 }
 
-function protectedWorkflowFile(workflowRef: string | undefined): string | undefined {
+/**
+ * The protected workflow running this process: its file must be one of
+ * `releaseAuthorizations`, loaded from that authorization's own branch of this repository.
+ */
+function protectedWorkflow(
+  workflowRef: string | undefined
+): { authorization: ReleaseAuthorization; file: string } | undefined {
   const prefix = `${project.repository}/.github/workflows/`
-  const suffix = '@refs/heads/main'
-  if (!workflowRef?.startsWith(prefix) || !workflowRef.endsWith(suffix)) return undefined
-  return workflowRef.slice(prefix.length, -suffix.length)
+  if (!workflowRef?.startsWith(prefix)) return undefined
+  const separator = workflowRef.indexOf('@', prefix.length)
+  if (separator < 0) return undefined
+  const file = workflowRef.slice(prefix.length, separator)
+  const authorization = Object.hasOwn(releaseAuthorizations, file)
+    ? releaseAuthorizations[file]
+    : undefined
+  if (!authorization || workflowRef.slice(separator + 1) !== `refs/heads/${authorization.branch}`)
+    return undefined
+  return { authorization, file }
+}
+
+/** An owner-approved hotfix: a dispatch carrying the workflow's hotfix confirmation. */
+export function isHotfixRelease(
+  authorization: ReleaseAuthorization,
+  env: NodeJS.ProcessEnv
+): boolean {
+  return (
+    authorization.hotfixConfirmation !== undefined &&
+    env.GITHUB_EVENT_NAME === 'workflow_dispatch' &&
+    env.RELEASE_CONFIRM === authorization.hotfixConfirmation
+  )
 }
 
 /**
  * Staging before production: when the owning workflow requires it for this command, resolves
- * only if Deploy Staging verified GITHUB_SHA. Call after `authorizeRelease`.
+ * only if Deploy Staging verified the tree of GITHUB_SHA on `staging`. An owner-approved hotfix
+ * resolves `'hotfix'` for `deploy` and is refused for anything else. Call after
+ * `authorizeRelease`.
  */
 export async function requireVerifiedStaging(
   command: ReleaseCommand,
   env: NodeJS.ProcessEnv,
   fetch?: FetchLike
-): Promise<StagingVerification | null> {
+): Promise<StagingVerification | 'hotfix' | null> {
   if (readOnlyCommands.has(command)) return null
-  const workflow = protectedWorkflowFile(env.GITHUB_WORKFLOW_REF)
-  const authorization = workflow ? releaseAuthorizations[workflow] : undefined
+  const authorization = protectedWorkflow(env.GITHUB_WORKFLOW_REF)?.authorization
   if (!authorization) {
     throw new Error(`Remote ${command} runs only inside a protected release workflow.`)
   }
   if (!authorization.requireVerifiedStaging.includes(command)) return null
+  if (isHotfixRelease(authorization, env)) {
+    if (command === 'deploy') return 'hotfix'
+    throw new Error(
+      `A hotfix release skips staging, so it may only deploy the Worker, never ${command}. Land the change through staging and promote it (docs/RELEASE_GUARDS.md#hotfixes).`
+    )
+  }
   return assertStagingVerified({
     apiUrl: env.GITHUB_API_URL,
     fetch,
@@ -238,7 +302,10 @@ export async function requireVerifiedStaging(
   })
 }
 
-/** Throws unless a mutating command runs from its owning protected workflow on reviewed main. */
+/**
+ * Throws unless a mutating command runs from its owning protected workflow, on that workflow's
+ * branch and events, with its confirmation on a dispatch, at a clean GITHUB_SHA.
+ */
 export function authorizeRelease(
   command: ReleaseCommand,
   environment: RemoteEnvironment,
@@ -251,25 +318,42 @@ export function authorizeRelease(
       `Remote ${command} runs only inside a protected GitHub Actions workflow. Use --rehearse <directory> to exercise it against an isolated local D1.`
     )
   }
-  const workflow = protectedWorkflowFile(env.GITHUB_WORKFLOW_REF)
-  const authorization = workflow ? releaseAuthorizations[workflow] : undefined
-  if (!workflow || !authorization) {
+  const running = protectedWorkflow(env.GITHUB_WORKFLOW_REF)
+  if (!running) {
     throw new Error(
-      `${env.GITHUB_WORKFLOW_REF || 'This workflow'} is not a protected ${project.repository} release workflow on main.`
+      `${env.GITHUB_WORKFLOW_REF || 'This workflow'} is not a protected ${project.repository} release workflow on its release branch.`
     )
   }
+  const { authorization, file: workflow } = running
   if (authorization.environment !== environment) {
     throw new Error(`${workflow} may not change ${environment}.`)
   }
   if (!authorization.commands.includes(command)) {
     throw new Error(`${workflow} may not run ${command}.`)
   }
-  if (env.GITHUB_REF !== 'refs/heads/main' || !env.GITHUB_SHA) {
-    throw new Error('Remote release commands require reviewed main.')
-  }
-  if (authorization.confirmation && env.RELEASE_CONFIRM !== authorization.confirmation) {
+  if (env.GITHUB_REF !== `refs/heads/${authorization.branch}` || !env.GITHUB_SHA) {
     throw new Error(
-      `Explicit ${environment} confirmation ${authorization.confirmation} is required in RELEASE_CONFIRM.`
+      `Remote release commands from ${workflow} require reviewed ${authorization.branch}.`
+    )
+  }
+  const event = authorization.events.find(candidate => candidate === env.GITHUB_EVENT_NAME)
+  if (!event) {
+    throw new Error(
+      `${workflow} runs remote commands only on ${authorization.events.join(' or ')}, not ${env.GITHUB_EVENT_NAME || 'an unknown event'}.`
+    )
+  }
+  if (
+    event === 'workflow_dispatch' &&
+    authorization.confirmation &&
+    env.RELEASE_CONFIRM !== authorization.confirmation &&
+    !isHotfixRelease(authorization, env)
+  ) {
+    throw new Error(
+      `Explicit ${environment} confirmation ${authorization.confirmation}${
+        authorization.hotfixConfirmation
+          ? ` (or ${authorization.hotfixConfirmation} for an owner-approved hotfix)`
+          : ''
+      } is required in RELEASE_CONFIRM.`
     )
   }
   if (git(['status', '--porcelain', '--untracked-files=normal']).trim()) {
@@ -423,7 +507,7 @@ export function assertDatabaseReady(
     throw new Error(
       `${environment} D1 is missing migrations ${readiness.missingMigrations.join(', ')}. ${
         environment === 'production'
-          ? 'Rerun the production deploy with release_mode database-and-worker.'
+          ? 'Re-run Deploy Production: plan-release then chooses database-and-worker and applies them first.'
           : 'Apply migrations before deploying.'
       }`
     )
@@ -436,6 +520,28 @@ export function assertDatabaseReady(
           : 'Import the reviewed catalog first.'
       }`
     )
+  }
+}
+
+export interface ReleasePlan {
+  mode: 'database-and-worker' | 'worker-only'
+  pendingMigrations: string[]
+}
+
+/**
+ * How a release ships: back up and migrate first when migrations are pending, otherwise deploy
+ * the Worker only. Refuses a database that carries migrations this commit lacks, which `deploy`
+ * would refuse anyway, before any backup or migration starts.
+ */
+export function planRelease(ledger: MigrationLedger, environment: RemoteEnvironment): ReleasePlan {
+  if (ledger.unknownMigrations.length > 0) {
+    throw new Error(
+      `${environment} D1 has migrations this commit does not contain (${ledger.unknownMigrations.join(', ')}); refusing to release older code over a newer schema.`
+    )
+  }
+  return {
+    mode: ledger.missingMigrations.length > 0 ? 'database-and-worker' : 'worker-only',
+    pendingMigrations: ledger.missingMigrations
   }
 }
 
@@ -740,9 +846,17 @@ export async function runRelease(
   if (args.rehearse === undefined) {
     authorizeRelease(args.command, args.environment, env, dependencies.git ?? git)
     const staging = await requireVerifiedStaging(args.command, env, dependencies.fetch)
-    if (staging) {
+    if (staging === 'hotfix') {
       console.error(
-        `Deploy Staging verified ${staging.sha}: ${staging.runUrl} (attempt ${staging.runAttempt})`
+        `::warning title=Hotfix release::${args.command} ${args.environment} skips the staging check for ${env.GITHUB_SHA} (owner-approved hotfix). Merge main into staging next (docs/RELEASE_GUARDS.md#hotfixes).`
+      )
+    } else if (staging) {
+      console.error(
+        `Deploy Staging verified ${
+          staging.match === 'commit'
+            ? staging.sha
+            : `tree ${staging.tree} of ${staging.sha} at staging commit ${staging.stagingSha}`
+        }: ${staging.runUrl} (attempt ${staging.runAttempt})`
       )
     }
   }
@@ -759,6 +873,11 @@ export async function runRelease(
         environment: args.environment,
         ledger: project.migrationsTable,
         ...(await readMigrationLedger(d1))
+      }
+    case 'plan-release':
+      return {
+        environment: args.environment,
+        ...planRelease(await readMigrationLedger(d1), args.environment)
       }
     case 'check-database': {
       const readiness = await checkDatabase(d1)

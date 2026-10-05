@@ -1,6 +1,8 @@
 Closes #
 
 <!--
+Base: `staging`. Only the owner's staging -> main promotion (merge commit) and `hotfix-*`
+branches target `main` (docs/RELEASE_GUARDS.md#promotion).
 Title: a Conventional Commit describing the outcome a visitor or maintainer notices
 (`fix: legal pages name working contact addresses`). The PR is squash-merged with this
 title, so it is the changelog line. See serpcompany/serp docs/engineering/standards/git-workflow.md.

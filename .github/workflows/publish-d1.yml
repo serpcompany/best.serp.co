@@ -18,10 +18,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: best-serp-co-production
-  cancel-in-progress: false
-
 jobs:
   authorize:
     name: Check ref, manifest, and confirmation
@@ -48,6 +44,10 @@ jobs:
   publish:
     name: Back up and publish to production D1
     needs: [authorize]
+    # Job-level, so a run refused by authorize never replaces a valid queued production job.
+    concurrency:
+      group: deploy-best-serp-co-production
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:

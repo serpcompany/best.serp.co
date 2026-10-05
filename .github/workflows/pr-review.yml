@@ -1,8 +1,11 @@
 name: PR Review
 
+# Required checks for every pull request into staging (the base branch) and main (promotions
+# from staging and hotfixes). Every job runs on every PR: a skipped job satisfies a required
+# check, so nothing here is path-filtered.
 on:
   pull_request:
-    branches: ['main']
+    branches: ['staging', 'main']
 
 permissions:
   contents: read
@@ -22,6 +25,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Require a promotion or hotfix branch for pull requests into main
+        if: github.base_ref == 'main'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if ! git ls-remote --exit-code --heads origin staging > /dev/null; then
+            echo "No staging branch exists yet, so main still accepts every pull request."
+            exit 0
+          fi
+          if [ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] && { [ "$HEAD_REF" = "staging" ] || [[ "$HEAD_REF" == hotfix-* ]]; }; then
+            exit 0
+          fi
+          echo "::error::main is production and accepts only a promotion from staging or a hotfix-* branch. Retarget this pull request to staging (docs/RELEASE_GUARDS.md#promotion)."
+          exit 1
+
       - name: Install
         uses: ./.github/actions/install
 
@@ -34,7 +53,7 @@ jobs:
       - name: Run Biome Check
         run: |
           mapfile -d '' changed_files < <(
-            git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- \
+            git diff --name-only --diff-filter=ACMR -z "origin/$GITHUB_BASE_REF...HEAD" -- \
               '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.jsonc' '*.css'
           )
           if ((${#changed_files[@]} == 0)); then
@@ -104,33 +123,8 @@ jobs:
   #         args: --config ./lychee.toml --verbose --no-progress .
   #         fail: true
 
-  changes:
-    name: Detect changes
-    runs-on: ubuntu-latest
-    outputs:
-      e2e_relevant: ${{ steps.filter.outputs.e2e_relevant }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Check for e2e-relevant changes
-        id: filter
-        uses: dorny/paths-filter@v4
-        with:
-          filters: |
-            e2e_relevant:
-              - 'apps/web/**'
-              - 'apps/e2e/**'
-              - 'd1/**'
-              - 'packages/data-ops/**'
-              - 'packages/web-core/**'
-              - 'packages/design-system/**'
-              - 'packages/site-config/**'
-
   e2e:
     name: E2E Tests
-    needs: [changes]
-    if: needs.changes.outputs.e2e_relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

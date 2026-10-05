@@ -2,14 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { project } from './project'
 import { assertStagingVerified, type FetchLike, stagingWorkflow } from './staging-verification'
 
+/** The released commit, and the tree it carries. */
 const sha = '0123456789abcdef0123456789abcdef01234567'
+const tree = 'a'.repeat(40)
+/** A staging commit with the same tree (the second parent of a promotion merge commit). */
+const stagingSha = '1'.repeat(40)
 const otherSha = 'f'.repeat(40)
+const otherTree = 'e'.repeat(40)
 const token = 'ghs_test'
-const rerun = 'gh workflow run deploy-staging.yml --ref main'
+const rerun = 'gh workflow run deploy-staging.yml --ref staging'
 
 interface Run {
   conclusion: string | null
+  event: string
   head_branch: string
+  head_commit: { id: string; tree_id: string }
   head_sha: string
   html_url: string
   id: number
@@ -19,10 +26,13 @@ interface Run {
 }
 
 function run(id: number, overrides: Partial<Run> = {}): Run {
+  const head = overrides.head_sha ?? sha
   return {
     conclusion: 'success',
-    head_branch: 'main',
-    head_sha: sha,
+    event: 'push',
+    head_branch: 'staging',
+    head_commit: { id: head, tree_id: head === sha ? tree : otherTree },
+    head_sha: head,
     html_url: `https://github.com/${project.repository}/actions/runs/${id}`,
     id,
     path: '.github/workflows/deploy-staging.yml',
@@ -30,6 +40,15 @@ function run(id: number, overrides: Partial<Run> = {}): Run {
     status: 'completed',
     ...overrides
   }
+}
+
+/** A run of a different staging commit whose head carries `tree` (what a promotion merges). */
+function promotedRun(id: number, overrides: Partial<Run> = {}): Run {
+  return run(id, {
+    head_commit: { id: stagingSha, tree_id: tree },
+    head_sha: stagingSha,
+    ...overrides
+  })
 }
 
 /** The staging job as the Actions API reports it; `skipped` marks steps that did not run. */
@@ -49,7 +68,8 @@ function stagingJob(skipped: readonly string[] = [], conclusion: string | null =
 
 /**
  * A fake GitHub API that records every request. `attempts[runId][n - 1]` holds the jobs of
- * attempt n of that run.
+ * attempt n of that run. Like the real API, the runs listing honours `head_sha`, and
+ * `git/commits/<sha>` reports the released commit's tree.
  */
 function github(
   runs: Run[],
@@ -61,44 +81,93 @@ function github(
     const parsed = new URL(url)
     requests.push({ headers: init.headers, url: parsed })
     const attempt = parsed.pathname.match(/\/actions\/runs\/(\d+)\/attempts\/(\d+)\/jobs$/u)
+    const commit = parsed.pathname.match(/\/git\/commits\/([0-9a-f]+)$/u)
+    const headSha = parsed.searchParams.get('head_sha')
     const body = attempt
       ? { jobs: attempts[Number(attempt[1])]?.[Number(attempt[2]) - 1] ?? [] }
-      : { total_count: runs.length, workflow_runs: runs }
+      : commit
+        ? { sha: commit[1], tree: { sha: commit[1] === sha ? tree : otherTree } }
+        : {
+            workflow_runs: runs.filter(candidate => !headSha || candidate.head_sha === headSha)
+          }
     return { json: async () => body, ok: status >= 200 && status < 300, status }
   }
   return { fetch, requests }
 }
 
 const paths = (api: ReturnType<typeof github>) => api.requests.map(request => request.url.pathname)
+const runsPath = `/repos/${project.repository}/actions/workflows/deploy-staging.yml/runs`
+const jobsPath = (id: number, attempt = 1) =>
+  `/repos/${project.repository}/actions/runs/${id}/attempts/${attempt}/jobs`
 
 describe('staging before production', () => {
-  it('accepts a commit whose Deploy Staging run migrated, deployed, gated, and smoke-tested it', async () => {
+  it('accepts a commit whose own Deploy Staging run on staging verified it (fast-forward)', async () => {
     const api = github([run(7)], { 7: [[stagingJob()]] })
     await expect(assertStagingVerified({ fetch: api.fetch, sha, token })).resolves.toEqual({
+      match: 'commit',
       runAttempt: 1,
       runId: 7,
       runUrl: `https://github.com/${project.repository}/actions/runs/7`,
-      sha
+      sha,
+      stagingSha: sha,
+      tree
     })
-    const [runsRequest, jobsRequest] = api.requests
-    expect(runsRequest?.url.origin).toBe('https://api.github.com')
-    expect(runsRequest?.url.pathname).toBe(
-      `/repos/${project.repository}/actions/workflows/deploy-staging.yml/runs`
-    )
+    const [commitRequest, runsRequest, jobsRequest] = api.requests
+    expect(commitRequest?.url.origin).toBe('https://api.github.com')
+    expect(commitRequest?.url.pathname).toBe(`/repos/${project.repository}/git/commits/${sha}`)
+    expect(runsRequest?.url.pathname).toBe(runsPath)
     // No status filter: a run whose latest attempt is still running or failed may hold an
     // earlier attempt that verified the commit.
     expect(Object.fromEntries(runsRequest?.url.searchParams ?? [])).toEqual({
-      branch: 'main',
+      branch: 'staging',
       head_sha: sha,
       per_page: '100'
     })
     expect(runsRequest?.headers.Authorization).toBe(`Bearer ${token}`)
-    expect(jobsRequest?.url.pathname).toBe(
-      `/repos/${project.repository}/actions/runs/7/attempts/1/jobs`
-    )
+    expect(jobsRequest?.url.pathname).toBe(jobsPath(7))
+    expect(api.requests).toHaveLength(3)
   })
 
-  it('keeps a verified commit verified while a later re-run is in progress or after it fails', async () => {
+  it('accepts a promotion merge commit whose tree a verified staging commit carries', async () => {
+    const api = github([promotedRun(40), run(41, { head_sha: otherSha })], {
+      40: [[stagingJob()]],
+      41: [[stagingJob()]]
+    })
+    await expect(assertStagingVerified({ fetch: api.fetch, sha, token })).resolves.toEqual({
+      match: 'tree',
+      runAttempt: 1,
+      runId: 40,
+      runUrl: `https://github.com/${project.repository}/actions/runs/40`,
+      sha,
+      stagingSha,
+      tree
+    })
+    // The commit's own runs first, then the newest staging runs, then only the tree match.
+    expect(paths(api)).toEqual([
+      `/repos/${project.repository}/git/commits/${sha}`,
+      runsPath,
+      runsPath,
+      jobsPath(40)
+    ])
+    expect(Object.fromEntries(api.requests[2]?.url.searchParams ?? [])).toEqual({
+      branch: 'staging',
+      per_page: String(stagingWorkflow.treeSearchRuns)
+    })
+  })
+
+  it('refuses a merge commit whose tree staging never verified (main had diverged)', async () => {
+    // Staging verified its own head, but main held a hotfix the merge brought in.
+    const api = github([run(50, { head_sha: otherSha })], { 50: [[stagingJob()]] })
+    const result = assertStagingVerified({ fetch: api.fetch, sha, token })
+    await expect(result).rejects.toThrow(
+      `Deploy Staging has no run on staging for ${sha} or for any commit with its tree ${tree}`
+    )
+    await expect(result).rejects.toThrow('merge main into staging first')
+    await expect(result).rejects.toThrow(rerun)
+    expect(paths(api).some(path => path.includes('/attempts/'))).toBe(false)
+  })
+
+  it('keeps a verified tree verified while a later re-run is in progress or after it fails', async () => {
     const verifiedFirst = [stagingJob()]
     const laterAttempts: Array<[string, Partial<Run>, unknown[]]> = [
       ['in progress', { conclusion: null, status: 'in_progress' }, [stagingJob([], null)]],
@@ -120,17 +189,16 @@ describe('staging before production', () => {
       ['cancelled', { conclusion: 'cancelled' }, [stagingJob([], 'cancelled')]]
     ]
     for (const [label, overrides, latestJobs] of laterAttempts) {
-      const api = github([run(21, { run_attempt: 2, ...overrides })], {
-        21: [verifiedFirst, latestJobs]
-      })
-      await expect(
-        assertStagingVerified({ fetch: api.fetch, sha, token }),
-        label
-      ).resolves.toMatchObject({ runAttempt: 1, runId: 21 })
-      expect(paths(api).slice(1), label).toEqual([
-        `/repos/${project.repository}/actions/runs/21/attempts/2/jobs`,
-        `/repos/${project.repository}/actions/runs/21/attempts/1/jobs`
-      ])
+      for (const candidate of [run, promotedRun]) {
+        const api = github([candidate(21, { run_attempt: 2, ...overrides })], {
+          21: [verifiedFirst, latestJobs]
+        })
+        await expect(
+          assertStagingVerified({ fetch: api.fetch, sha, token }),
+          label
+        ).resolves.toMatchObject({ runAttempt: 1, runId: 21 })
+        expect(paths(api).slice(-2), label).toEqual([jobsPath(21, 2), jobsPath(21, 1)])
+      }
     }
   })
 
@@ -139,18 +207,24 @@ describe('staging before production', () => {
       36: [[stagingJob([], 'failure')], [stagingJob()]]
     })
     await expect(assertStagingVerified({ fetch: api.fetch, sha, token })).resolves.toMatchObject({
+      match: 'commit',
       runAttempt: 2,
       runId: 36
     })
-    expect(api.requests).toHaveLength(2)
+    expect(paths(api).at(-1)).toBe(jobsPath(36, 2))
+    expect(api.requests).toHaveLength(3)
   })
 
   it('refuses a commit that Deploy Staging has not run for, naming how to start a run', async () => {
     const api = github([])
     const result = assertStagingVerified({ fetch: api.fetch, sha, token })
-    await expect(result).rejects.toThrow(`Deploy Staging has no run for ${sha} on main`)
+    await expect(result).rejects.toThrow(`Deploy Staging has no run on staging for ${sha}`)
     await expect(result).rejects.toThrow(rerun)
-    expect(api.requests).toHaveLength(1)
+    expect(paths(api)).toEqual([
+      `/repos/${project.repository}/git/commits/${sha}`,
+      runsPath,
+      runsPath
+    ])
   })
 
   it('refuses a commit whose only run is still in progress', async () => {
@@ -162,29 +236,41 @@ describe('staging before production', () => {
     await expect(result).rejects.toThrow(rerun)
   })
 
-  it('ignores runs for another commit, branch, or workflow', async () => {
+  it('ignores runs of another branch (including main), workflow, event, or tree', async () => {
+    const elsewhere: Array<Partial<Run>> = [
+      { head_branch: 'main' },
+      { head_branch: 'feature' },
+      { path: '.github/workflows/main-validation.yml' },
+      // A pull_request run of a fork branch named staging never deploys staging.
+      { event: 'pull_request' },
+      { event: 'schedule' }
+    ]
+    const runs = elsewhere.flatMap((overrides, index) => [
+      run(index + 1, overrides),
+      promotedRun(index + 11, overrides)
+    ])
+    runs.push(run(30, { head_sha: otherSha }))
     const api = github(
-      [
-        run(1, { head_sha: otherSha }),
-        run(2, { head_branch: 'feature' }),
-        run(3, { path: '.github/workflows/main-validation.yml' })
-      ],
-      Object.fromEntries([1, 2, 3].map(id => [id, [[stagingJob()]]]))
+      runs,
+      Object.fromEntries(runs.map(candidate => [candidate.id, [[stagingJob()]]]))
     )
     await expect(assertStagingVerified({ fetch: api.fetch, sha, token })).rejects.toThrow(
-      'has no run'
+      'has no run on staging'
     )
-    expect(api.requests).toHaveLength(1)
+    expect(api.requests).toHaveLength(3)
   })
 
   it('refuses green attempts that skipped any staging step, and failed jobs', async () => {
     for (const step of stagingWorkflow.requiredSteps) {
-      const api = github([run(9, { run_attempt: 2 })], {
-        9: [[stagingJob([step])], [stagingJob([step])]]
-      })
-      const result = assertStagingVerified({ fetch: api.fetch, sha, token })
-      await expect(result, step).rejects.toThrow('has completed every staging step')
-      await expect(result, step).rejects.toThrow(rerun)
+      for (const candidate of [run, promotedRun]) {
+        const api = github([candidate(9, { run_attempt: 2 })], {
+          9: [[stagingJob([step])], [stagingJob([step])]]
+        })
+        const result = assertStagingVerified({ fetch: api.fetch, sha, token })
+        await expect(result, step).rejects.toThrow('has completed every staging step')
+        await expect(result, step).rejects.toThrow(`(tree ${tree})`)
+        await expect(result, step).rejects.toThrow(rerun)
+      }
     }
     const failedJob = github([run(9, { conclusion: 'failure' })], {
       9: [[stagingJob([], 'failure')]]
@@ -194,21 +280,23 @@ describe('staging before production', () => {
     )
   })
 
-  it('accepts the newest verified run when a newer run never verified the commit', async () => {
-    const api = github([run(10), run(12, { conclusion: 'failure' })], {
-      10: [[stagingJob()]],
-      12: [[stagingJob(['Deploy staging Worker'], 'failure')]]
-    })
+  it('accepts the newest verified run when a newer run never verified the tree', async () => {
+    const api = github(
+      [run(10), run(12, { conclusion: 'failure' }), promotedRun(14, { conclusion: 'failure' })],
+      {
+        10: [[stagingJob()]],
+        12: [[stagingJob(['Deploy staging Worker'], 'failure')]],
+        14: [[stagingJob(['Deploy staging Worker'], 'failure')]]
+      }
+    )
     await expect(assertStagingVerified({ fetch: api.fetch, sha, token })).resolves.toMatchObject({
+      match: 'commit',
       runId: 10
     })
-    expect(paths(api).slice(1)).toEqual([
-      `/repos/${project.repository}/actions/runs/12/attempts/1/jobs`,
-      `/repos/${project.repository}/actions/runs/10/attempts/1/jobs`
-    ])
+    expect(paths(api).slice(2)).toEqual([jobsPath(12), jobsPath(10)])
   })
 
-  it('needs a full commit SHA and a token, and reports API failures', async () => {
+  it('needs a full commit SHA, a token, and a tree, and reports API failures', async () => {
     const api = github([run(7)], { 7: [[stagingJob()]] })
     await expect(assertStagingVerified({ fetch: api.fetch, sha: 'abc123', token })).rejects.toThrow(
       '40-character commit SHA'
@@ -218,11 +306,15 @@ describe('staging before production', () => {
     ).rejects.toThrow('40-character commit SHA')
     await expect(
       assertStagingVerified({ fetch: api.fetch, sha, token: undefined })
-    ).rejects.toThrow('GITHUB_TOKEN (with actions: read)')
+    ).rejects.toThrow('GITHUB_TOKEN (with actions: read and contents: read)')
     expect(api.requests).toEqual([])
     const forbidden = github([], {}, 403)
     await expect(assertStagingVerified({ fetch: forbidden.fetch, sha, token })).rejects.toThrow(
-      'HTTP 403; the token needs actions: read'
+      'HTTP 403; the token needs actions: read and contents: read'
+    )
+    const treeless: FetchLike = async () => ({ json: async () => ({}), ok: true, status: 200 })
+    await expect(assertStagingVerified({ fetch: treeless, sha, token })).rejects.toThrow(
+      `no tree for ${sha}`
     )
   })
 

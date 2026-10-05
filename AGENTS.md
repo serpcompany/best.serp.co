@@ -43,7 +43,7 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 - `pnpm db:generate`: generate a reviewed migration from the Drizzle schema.
 - `pnpm db:migrations:list:{local,staging,production}`: read-only migration status.
   `pnpm db:migrate:{staging,production}` runs only inside the protected deploy workflows,
-  and production only after Deploy Staging verified the same commit
+  and production only after Deploy Staging verified the same source tree
   (see [Release guards](./docs/RELEASE_GUARDS.md)).
 - `pnpm harness:fast` / `pnpm harness:check`: fast and full validation loops.
 - `pnpm test:e2e`: Playwright against a local Worker.
@@ -56,10 +56,13 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 ## Planning and implementation
 
 GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning.
-Use short-lived branches and pull requests into `main`. Ruleset `main` requires a PR and
-the five PR Review checks, and blocks force pushes and deletion. Agents never merge; the owner
-approves every merge. Issues and labels never grant production, database, or deployment
-authority.
+`staging` is the base branch: branch from `origin/staging` as `issue-<n>-<slug>` and open
+pull requests into `staging` (`gh pr create --base staging`); each merge deploys staging.
+`main` is production and changes only by the owner's `staging` → `main` promotion (a merge
+commit) or a `hotfix-*` pull request ([Release guards](./docs/RELEASE_GUARDS.md#promotion)).
+Rulesets require a PR and the five PR Review checks, and block force pushes and deletion.
+Agents never merge; the owner approves every merge. Issues and labels never grant production,
+database, or deployment authority.
 
 ## Non-negotiable architecture
 
