@@ -2,7 +2,7 @@
  * Draft emails (#70 screen 15, revision 4): "Finish your submission" reminders at +12h, +48h,
  * +7d, +14d, and +21d (the last), in two variants, and "Your draft expired" at day 30.
  */
-import { defineEmailTemplate, EmailTemplateError } from '../templates'
+import { clip, defineEmailTemplate, EmailTemplateError } from '../templates'
 import {
   bold,
   composeEmail,
@@ -12,6 +12,7 @@ import {
   type Inline,
   paragraph,
   required,
+  SUBJECT_NAME_MAX,
   sitePath
 } from './layout'
 
@@ -80,8 +81,8 @@ export const draftReminderEmail = defineEmailTemplate<DraftReminderInput>({
         heading: 'Finish your submission',
         preheader: `Your draft for ${name} expires in ${remaining}.`,
         subject: input.lastReminder
-          ? `Last reminder: your ${name} draft expires in ${remaining}`
-          : `Finish your submission: ${name}`
+          ? `Last reminder: your ${clip(name, SUBJECT_NAME_MAX)} draft expires in ${remaining}`
+          : `Finish your submission: ${clip(name, SUBJECT_NAME_MAX)}`
       },
       context
     )
@@ -102,10 +103,12 @@ export const draftExpiredEmail = defineEmailTemplate<DraftExpiredInput>({
     return composeEmail(
       {
         body: [
+          // Neutral for both draft kinds (no plan chosen, or checkout not finished); awaiting
+          // owner approval in #70.
           paragraph(
             'Your draft for ',
             bold(name),
-            ` was saved ${DRAFT_LIFETIME_DAYS} days ago without a plan, so it has expired and been removed.`
+            ` expired ${DRAFT_LIFETIME_DAYS} days after it was saved, so it has been removed.`
           ),
           paragraph(
             `The URL ${domain} is released, so it can be submitted again. If you still want it listed, start a new submission. It takes a couple of minutes, and we’ll read your site again to fill in the details.`
@@ -117,7 +120,7 @@ export const draftExpiredEmail = defineEmailTemplate<DraftExpiredInput>({
         },
         heading: 'Your draft expired',
         preheader: `${domain} is available to submit again.`,
-        subject: `Your ${name} draft expired`
+        subject: `Your ${clip(name, SUBJECT_NAME_MAX)} draft expired`
       },
       context
     )

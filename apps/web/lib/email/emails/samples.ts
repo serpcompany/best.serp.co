@@ -53,6 +53,32 @@ export const EMAIL_SAMPLES: SampleInputs = {
       },
       mockup: 'admin',
       to: 'devin@serp.co'
+    },
+    {
+      input: {
+        category: 'AI Tutor',
+        plan: { kind: 'paid', live: false },
+        source: 'submission',
+        submissionId: 's_7tq20z',
+        submissionName: 'Kiddo Tutor',
+        submittedBy: 'team@kiddotutor.com',
+        website: 'https://kiddotutor.com/'
+      },
+      mockup: 'adminpaidwait',
+      to: 'devin@serp.co'
+    },
+    {
+      input: {
+        category: 'AI Text to Speech',
+        plan: { kind: 'paid', live: true },
+        source: 'submission',
+        submissionId: 's_8m2q1d',
+        submissionName: 'Voxbloom',
+        submittedBy: 'hello@voxbloom.fm',
+        website: 'https://voxbloom.fm/'
+      },
+      mockup: 'adminpaidlive',
+      to: 'devin@serp.co'
     }
   ],
   'badge-missing': [
@@ -67,6 +93,32 @@ export const EMAIL_SAMPLES: SampleInputs = {
         website: 'https://ledgerly.app/'
       },
       mockup: 'badge',
+      to: 'maya@quillmate.app'
+    },
+    {
+      input: {
+        checkedAt: '2026-10-05T09:14:00Z',
+        listingName: 'Ledgerly',
+        listingSlug: 'ledgerly.app',
+        priceCents: 4900,
+        problem: 'missing',
+        recheckAt: '2026-10-06T09:14:00Z',
+        website: 'https://ledgerly.app/'
+      },
+      mockup: 'badgenone',
+      to: 'maya@quillmate.app'
+    },
+    {
+      input: {
+        checkedAt: '2026-10-05T09:14:00Z',
+        listingName: 'Ledgerly',
+        listingSlug: 'ledgerly.app',
+        priceCents: 4900,
+        problem: 'wrong_destination',
+        recheckAt: '2026-10-06T09:14:00Z',
+        website: 'https://ledgerly.app/'
+      },
+      mockup: 'badgewrong',
       to: 'maya@quillmate.app'
     }
   ],
@@ -134,6 +186,19 @@ export const EMAIL_SAMPLES: SampleInputs = {
       },
       mockup: 'draftpaid',
       to: 'maya@quillmate.app'
+    },
+    {
+      input: {
+        expiresInDays: 9,
+        lastReminder: true,
+        priceCents: 4900,
+        productName: 'Tablesmith',
+        submissionId: 's_6tb4ws',
+        variant: 'complete_checkout',
+        website: 'https://tablesmith.io'
+      },
+      mockup: 'draftpaidlast',
+      to: 'maya@quillmate.app'
     }
   ],
   'listing-approved': [
@@ -175,6 +240,19 @@ export const EMAIL_SAMPLES: SampleInputs = {
       to: 'maya@quillmate.app'
     }
   ],
+  'payment-received-in-review': [
+    {
+      input: {
+        checkProblem: 'the connection timed out',
+        paidCents: 4900,
+        submissionId: 's_7tq20z',
+        submissionName: 'Kiddo Tutor',
+        website: 'https://kiddotutor.com/'
+      },
+      mockup: 'paymentreview',
+      to: 'team@kiddotutor.com'
+    }
+  ],
   'ownership-removed': [
     {
       input: {
@@ -188,7 +266,9 @@ export const EMAIL_SAMPLES: SampleInputs = {
       to: 'jordan@brieflow.ai'
     }
   ],
-  'sign-in-code': [{ input: { code: '481902' }, mockup: 'signin', to: 'maya@quillmate.app' }],
+  'sign-in-code': [
+    { input: { code: '481902', type: 'sign-in' }, mockup: 'signin', to: 'maya@quillmate.app' }
+  ],
   'submission-received': [
     {
       input: {
@@ -210,6 +290,19 @@ export const EMAIL_SAMPLES: SampleInputs = {
       },
       mockup: 'rejected',
       to: 'maya@quillmate.app'
+    }
+  ],
+  'submission-rejected-prohibited': [
+    {
+      input: {
+        reason:
+          'keybazaar.shop sells software license keys that the publishers haven’t authorized. Our Terms of Service prohibit this (IP infringement).',
+        submissionId: 's_5hh3m0',
+        submissionName: 'KeyBazaar',
+        website: 'https://keybazaar.shop/'
+      },
+      mockup: 'rejectedprohibited',
+      to: 'admin@keybazaar.shop'
     }
   ],
   'submission-rejected-refunded': [
@@ -238,5 +331,5 @@ export function renderAppEmail<K extends keyof AppEmailTemplates>(
     D1_RUNTIME_ENV: options.environment,
     SITE_ENVIRONMENT: options.environment
   })
-  return renderEmail(template, input, emailRenderContext(policy, template, options.to))
+  return renderEmail(template, input, emailRenderContext(policy, template, options.to, input))
 }

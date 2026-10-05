@@ -41,4 +41,7 @@ export async function enqueueEmail<K extends keyof AppEmailTemplates & string>(
   }
 }
 
+export { EMAIL_ADMIN_RECIPIENT } from './config'
+export { SIGN_IN_CODE_LENGTH, SIGN_IN_CODE_TTL_SECONDS } from './emails/codes'
+export { SIGN_IN_CODE_TEMPLATE } from './registry'
 export { emailEventKey } from './service'

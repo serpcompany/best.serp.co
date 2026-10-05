@@ -1,9 +1,9 @@
 # Email templates
 
-The emails best.serp.co sends, built to the mockups the owner approved in
-serpcompany/best.serp.co#70 (screen 15). Sending, environments, and the template contract are
-in [Email](./EMAIL.md). Each template lives in `apps/web/lib/email/emails/` and is registered
-in `apps/web/lib/email/registry.ts` under the id below.
+The emails best.serp.co sends, built to the mockups in serpcompany/best.serp.co#70 (screen
+15, revisions 3–5). Sending, environments, and the template contract are in
+[Email](./EMAIL.md). Each template lives in `apps/web/lib/email/emails/` and is registered in
+`apps/web/lib/email/registry.ts` under the id below.
 
 Template ids are stable: each one is part of every delivery's ledger key and provider
 idempotency key, so renaming a template would let an event send again.
@@ -12,12 +12,14 @@ idempotency key, so renaming a template would let an event send again.
 
 | Id | Sent when | To | Button |
 |---|---|---|---|
-| `sign-in-code` | Better Auth sends a sign-in code; the code is in the subject | the user | none (code) |
-| `claim-code` | A claim needs a domain-email code; the code is in the subject | the work address | none (code) |
+| `sign-in-code` | Better Auth sends a sign-in code (`type: 'sign-in'` only); code in the subject | the user | none (code) |
+| `claim-code` | A claim needs a domain-email code; code in the subject | the work address | none (code) |
 | `submission-received` | A free submission's badge is verified and it enters review | submitter | `/account/` |
+| `payment-received-in-review` | A paid submission's automatic checks failed; it waits for review | submitter | `/account/submissions/<id>/` |
 | `changes-requested` | A reviewer requests changes (the note is quoted) | submitter | `/account/submissions/<id>/` |
 | `submission-rejected` | A reviewer rejects a submission that may be resubmitted | submitter | `/account/submissions/<id>/` |
 | `submission-rejected-refunded` | A paid submission is rejected and refunded | submitter | `/account/submissions/<id>/` |
+| `submission-rejected-prohibited` | A submission is rejected as prohibited: no resubmission, no refund | submitter | `/account/messages/new/?about=submission:<id>` |
 | `listing-approved` | A free listing is approved and live | submitter | `/products/<slug>/` |
 | `listing-live-paid` | A paid listing passes the automatic checks and goes live | submitter | `/products/<slug>/` |
 | `badge-missing` | The weekly check misses the badge (24h warning) | owner | `/account/listings/<slug>/` |
@@ -29,12 +31,27 @@ idempotency key, so renaming a template would let an event send again.
 | `admin-review-ready` | A submission or revision is ready for review | admin | `/admin/submissions/<id>/` |
 | `admin-new-message` | A submitter sent a message (no message body) | admin | `/admin/inbox/<thread>/` |
 
-`draft-reminder` has two variants: `choose_plan` ("Choose a plan") and `complete_checkout`
-("Complete checkout", the paid listing chosen but not paid). The +21d reminder sets
-`lastReminder`, which changes the subject and adds "This is the last reminder".
+- `draft-reminder` has two variants. `choose_plan` shows "Choose a plan". `complete_checkout`
+  shows "Complete checkout", for a draft where the paid listing was chosen but not paid. The
+  +21d reminder sets `lastReminder`, which changes the subject and adds "This is the last
+  reminder".
+- `badge-missing` names one of three findings: `nofollow`, `missing`, or `wrong_destination`.
+- `admin-review-ready` covers the free plan and both paid states: "(paid, live now)" and
+  "(paid, waiting for review)".
+- Prices (`priceCents`, `paidCents`, `refundedCents`) and times (`checkedAt`, `recheckAt`,
+  `warnedAt`, `badgeVerifiedAt`) are inputs. Times render in UTC
+  (`Mon, Oct 5 at 09:14 UTC`).
+- Submitter-supplied names in subjects are cut to 80 characters with an ellipsis, and whole
+  subjects to 200, so a long name shortens an email instead of stopping it. The admin message
+  subject never carries the sender's address: it shows `fromName`, or else their domain.
 
-Prices (`priceCents`, `paidCents`, `refundedCents`) and times (`checkedAt`, `recheckAt`,
-`warnedAt`, `badgeVerifiedAt`) are inputs. Times render in UTC (`Mon, Oct 5 at 09:14 UTC`).
+## Routes the buttons need
+
+The buttons link to routes other issues build: `/account/` and `/account/submissions/<id>/`
+(#65), `/admin/submissions/<id>/` (#64), and `/account/messages/...` with
+`/admin/inbox/<thread>/` (#73). **#65 must also create `/account/listings/<slug>/`**: the
+badge-missing and unlisted emails link there for "Check my badge" and "Relist". Screen 7 only
+defines `/account/listings/<slug>/edit`.
 
 ## Recipients and footers
 
@@ -44,26 +61,48 @@ Prices (`priceCents`, `paidCents`, `refundedCents`) and times (`checkedAt`, `rec
   admin should not silently add a mail recipient. Callers pass it as `to`; no template holds
   an address.
 - **Footers** say "This address isn't monitored. Reply from your dashboard: <link>". There
-  is no Reply-To. User emails link to `email.dashboardPath` (`/account/`) and admin emails
-  (`audience: 'admin'`) to `email.adminDashboardPath` (`/admin/`). When #73 adds the inboxes,
-  switch them to `/account/messages/` and `/admin/inbox/`; the TODOs in `site-config` mark
-  this. Until then the footer must not point at a page that doesn't exist yet.
+  is no Reply-To.
+  - User emails link to `email.dashboardPath` (`/account/`).
+  - Admin emails (`audience: 'admin'`) link to `email.adminDashboardPath`, the review queue
+    `/admin/submissions/` (#64).
+  - When #73 adds the inboxes, switch these to `/account/messages/` and `/admin/inbox/`. The
+    TODOs in `site-config` mark this. Until then a footer must not point at a page that
+    doesn't exist.
+  - `new-message` is sent only once #73 exists. Its footer links to the conversation itself
+    (`footerPath`), as the mockup shows.
 
 ## Sign-in code wiring (#72)
 
-Better Auth's `sendVerificationOTP` receives only `{ email, otp, type }`, so the OTP sender
-enqueues:
+Import from `@/lib/email/server`:
 
 ```ts
-await enqueueEmail(SIGN_IN_CODE_TEMPLATE /* 'sign-in-code' */, {
-  eventKey: emailEventKey('sign-in-code', crypto.randomUUID()),
-  input: { code: otp, expiresInMinutes: 10 }, // the configured OTP lifetime
-  to: email
-})
+import {
+  emailEventKey,
+  enqueueEmail,
+  SIGN_IN_CODE_LENGTH, // 6
+  SIGN_IN_CODE_TEMPLATE, // 'sign-in-code'
+  SIGN_IN_CODE_TTL_SECONDS // 600
+} from '@/lib/email/server'
+
+// Better Auth emailOTP: { otpLength: SIGN_IN_CODE_LENGTH, expiresIn: SIGN_IN_CODE_TTL_SECONDS }
+async sendVerificationOTP({ email, otp, type }) {
+  if (type !== 'sign-in') return // no other OTP flow is used; this email is for sign-in only
+  await enqueueEmail(SIGN_IN_CODE_TEMPLATE, {
+    eventKey: emailEventKey('sign-in-code', crypto.randomUUID()),
+    input: { code: otp, type },
+    to: email
+  })
+}
 ```
 
-The template accepts exactly six digits and refuses anything else (logged as
-`email_render_failed`).
+- **Lifetime:** the email states the lifetime from `SIGN_IN_CODE_TTL_SECONDS`, so configuring
+  Better Auth with the same constants keeps the two in step. A test pins both values.
+- **Refused input:** the template refuses a code that isn't `SIGN_IN_CODE_LENGTH` digits, or
+  any OTP type other than `sign-in`. `enqueueEmail` never throws, so a refused code is only
+  logged (`email_render_failed`) while Better Auth reports success. Pass only sign-in codes.
+- **Staging:** codes for addresses outside `EMAIL_STAGING_ALLOWLIST` are not sent; they are
+  logged as `email_skipped` while Better Auth reports success. Add testers to the allowlist
+  (`env.staging.vars` in `apps/web/wrangler.jsonc`) to receive codes.
 
 ## Previews
 
@@ -71,21 +110,20 @@ The template accepts exactly six digits and refuses anything else (logged as
 HTML and text with the mockups' sample data (`apps/web/lib/email/emails/samples.ts`), plus an
 index. It never sends anything.
 
-## Not covered by the mockups
+## Waiting for owner approval in #70
 
-These cases have no approved mockup. They use the closest approved wording; changing them
-needs approval in #70.
+These differ from the approved mockups and need the owner's approval:
 
-- `submission-rejected` ends with "You can edit the submission and send it again." (the
-  mockup's sentence was specific to its example). Prohibited rejections, which can't be
-  resubmitted, have no mockup and must not use this template.
-- `badge-missing` names three findings: `nofollow` (mocked), `missing` ("We couldn't find
-  the badge on the page."), and `wrong_destination` ("The badge is there, but its link
-  doesn't point to your listing.").
-- `admin-review-ready` for paid submissions uses "(paid, live now)" (named in the mockup
-  notes) and "(paid, waiting for review)", with Plan rows "Paid. Live now" and "Paid. Waiting
-  for review".
-- The last `complete_checkout` reminder joins the last-reminder sentence and the checkout
-  paragraph.
-- `submission-received` covers the free (badge) path only. A paid submission that waits for
-  review has no mocked "received" email.
+- **Footer links:** the dashboard (`/account/`) and the review queue
+  (`/admin/submissions/`) rather than the inboxes, until #73.
+- **`admin-review-ready`:** drops the mockup's line about paid subjects. It was a reviewer
+  note, and the R5 paid variants leave it out too.
+- **`submission-rejected`:** ends with "You can edit the submission and send it again." The
+  mockup's sentence was specific to its example.
+- **`admin-new-message`:** names the sender or their domain in the subject, not their
+  address ("New message from brieflow.ai: …").
+- **`draft-expired`:** reads "Your draft for <product> expired 30 days after it was saved, so
+  it has been removed." The mockup said "was saved 30 days ago without a plan", which is wrong
+  for a `complete_checkout` draft.
+- **`payment-received-in-review`:** takes the check problem as input. Only the
+  "couldn't load … (the connection timed out)" case is mocked.

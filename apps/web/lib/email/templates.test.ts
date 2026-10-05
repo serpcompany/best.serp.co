@@ -352,6 +352,13 @@ describe('template contract', () => {
         context('https://best.serp.co')
       ).subject
     ).toBe('Line one Bcc: x@y.co')
+    // An overlong subject is shortened with an ellipsis instead of dropping the email.
+    const long = renderEmail(
+      template({ ...ok, subject: 'x'.repeat(250) }),
+      null,
+      context('https://best.serp.co')
+    ).subject
+    expect(long).toBe(`${'x'.repeat(199)}…`)
     // An exact link passes with either quote and other attributes, and the text URL may end a
     // sentence.
     for (const content of [
@@ -368,7 +375,6 @@ describe('template contract', () => {
     }
     for (const content of [
       { ...ok, subject: ' \n ' },
-      { ...ok, subject: 'x'.repeat(201) },
       { ...ok, subject: 's', text: '  ' },
       { html: html``, subject: 's', text: 'x' },
       { html: '<p>raw</p>', subject: 's', text: 'x' },

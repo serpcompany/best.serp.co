@@ -3,37 +3,52 @@
  * subject (owner decision, #70). Key each send per call, for example
  * `emailEventKey('sign-in-code', crypto.randomUUID())`: every code is a new event, and keys
  * must never be derived from the code.
+ *
+ * The code length and lifetime are shared constants: Better Auth's email OTP config (#72)
+ * imports `SIGN_IN_CODE_LENGTH` and `SIGN_IN_CODE_TTL_SECONDS` from `../server`, so the email
+ * always states the lifetime the auth layer enforces.
  */
-import { defineEmailTemplate, EmailTemplateError } from '../templates'
-import { composeEmail, paragraph, required } from './layout'
+import { clip, defineEmailTemplate, EmailTemplateError } from '../templates'
+import { composeEmail, paragraph, required, SUBJECT_NAME_MAX } from './layout'
 
-const CODE = /^\d{6}$/u
+/** Digits in a sign-in code. */
+export const SIGN_IN_CODE_LENGTH = 6
+/** How long a sign-in code works: 10 minutes. */
+export const SIGN_IN_CODE_TTL_SECONDS = 600
+/** Digits in a claim domain-email code. */
+export const CLAIM_CODE_LENGTH = 6
+/** How long a claim code works: 10 minutes. */
+export const CLAIM_CODE_TTL_SECONDS = 600
 
-function sixDigits(code: string): string {
-  if (typeof code !== 'string' || !CODE.test(code)) {
-    throw new EmailTemplateError('A code email needs a six-digit code.')
+function digits(code: string, length: number): string {
+  if (typeof code !== 'string' || !new RegExp(`^\\d{${length}}$`, 'u').test(code)) {
+    throw new EmailTemplateError(`A code email needs a ${length}-digit code.`)
   }
   return code
 }
 
-function minutes(value: number | undefined): number {
-  const count = value ?? 10
-  if (!Number.isInteger(count) || count < 1) throw new EmailTemplateError('Expected minutes.')
-  return count
+function minutes(seconds: number): number {
+  return Math.ceil(seconds / 60)
 }
 
 export interface SignInCodeInput {
-  /** The six-digit code Better Auth generated (`sendVerificationOTP`'s `otp`). */
+  /** The code Better Auth generated (`sendVerificationOTP`'s `otp`). */
   code: string
-  /** How long the code lasts; 10 minutes unless the auth config says otherwise. */
-  expiresInMinutes?: number
+  /**
+   * Better Auth's OTP type. This email is for `sign-in` only; any other type is refused
+   * (logged as `email_render_failed`), so the caller must not send it for those flows.
+   */
+  type: 'sign-in'
 }
 
 export const signInCodeEmail = defineEmailTemplate<SignInCodeInput>({
   id: 'sign-in-code',
   render(input, context) {
-    const code = sixDigits(input.code)
-    const expires = minutes(input.expiresInMinutes)
+    if (input.type !== 'sign-in') {
+      throw new EmailTemplateError('The sign-in code email is only for sign-in codes.')
+    }
+    const code = digits(input.code, SIGN_IN_CODE_LENGTH)
+    const expires = minutes(SIGN_IN_CODE_TTL_SECONDS)
     const host = new URL(context.links.origin).host
     return composeEmail(
       {
@@ -56,7 +71,6 @@ export const signInCodeEmail = defineEmailTemplate<SignInCodeInput>({
 
 export interface ClaimCodeInput {
   code: string
-  expiresInMinutes?: number
   /** The listing being claimed. */
   listingName: string
 }
@@ -64,8 +78,8 @@ export interface ClaimCodeInput {
 export const claimCodeEmail = defineEmailTemplate<ClaimCodeInput>({
   id: 'claim-code',
   render(input, context) {
-    const code = sixDigits(input.code)
-    const expires = minutes(input.expiresInMinutes)
+    const code = digits(input.code, CLAIM_CODE_LENGTH)
+    const expires = minutes(CLAIM_CODE_TTL_SECONDS)
     const name = required(input.listingName, 'a listing name')
     const host = new URL(context.links.origin).host
     return composeEmail(
@@ -84,7 +98,7 @@ export const claimCodeEmail = defineEmailTemplate<ClaimCodeInput>({
         heading: `Confirm your email to claim ${name}`,
         preheader: `Confirm you work at ${name}.`,
         reason: `You’re getting this because this address was entered to claim a listing on ${host}.`,
-        subject: `${code} is your SERP code to claim ${name}`
+        subject: `${code} is your SERP code to claim ${clip(name, SUBJECT_NAME_MAX)}`
       },
       context
     )

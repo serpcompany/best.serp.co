@@ -1,10 +1,19 @@
 /**
  * Admin alerts (#70 screen 15): a submission is ready for review, and a submitter sent a
- * message. They go to `EMAIL_ADMIN_RECIPIENT` (site-config); the footer links to
- * the admin dashboard (`audience: 'admin'`).
+ * message. They go to `EMAIL_ADMIN_RECIPIENT` (site-config); the footer links to the review
+ * queue (`audience: 'admin'`). Subjects never carry a submitter's full address: the
+ * new-message alert names the sender or their domain.
  */
-import { defineEmailTemplate, EmailTemplateError } from '../templates'
-import { composeEmail, formatStamp, paragraph, required, rows, sitePath } from './layout'
+import { clip, defineEmailTemplate, EmailTemplateError } from '../templates'
+import {
+  composeEmail,
+  formatStamp,
+  paragraph,
+  required,
+  rows,
+  SUBJECT_NAME_MAX,
+  sitePath
+} from './layout'
 
 export type ReviewPlan =
   | { badgeVerifiedAt: Date | string; kind: 'free' }
@@ -65,7 +74,7 @@ export const adminReviewReadyEmail = defineEmailTemplate<AdminReviewReadyInput>(
         heading: `${name} is ready for review`,
         preheader: `${category} · submitted by ${submittedBy}`,
         reason: `You’re getting this because ${context.recipient} receives review alerts for ${host}.`,
-        subject: `Ready for review: ${name} (${plan.subject})`
+        subject: `Ready for review: ${clip(name, SUBJECT_NAME_MAX)} (${plan.subject})`
       },
       context
     )
@@ -75,8 +84,10 @@ export const adminReviewReadyEmail = defineEmailTemplate<AdminReviewReadyInput>(
 export interface AdminNewMessageInput {
   /** What the thread is about, e.g. `Claim: Brieflow (brieflow.ai)`. */
   about: string
-  /** The submitter's address. */
+  /** The submitter's address, shown in the body only. */
   from: string
+  /** The submitter's name for the subject; without one the subject names their domain. */
+  fromName?: string
   /** The thread kind for the preview line: Claim, Submission, Listing, or General. */
   kind: string
   threadId: string
@@ -90,6 +101,7 @@ export const adminNewMessageEmail = defineEmailTemplate<AdminNewMessageInput>({
   id: 'admin-new-message',
   render(input, context) {
     const from = required(input.from, 'the sender')
+    const sender = input.fromName?.trim() || from.slice(from.lastIndexOf('@') + 1)
     if (!Number.isInteger(input.unread) || input.unread < 1) {
       throw new EmailTemplateError('Expected an unread count.')
     }
@@ -116,7 +128,7 @@ export const adminNewMessageEmail = defineEmailTemplate<AdminNewMessageInput>({
         heading: 'New message from a submitter',
         preheader: `${required(input.kind, 'a thread kind')} · ${input.unread} unread ${input.unread === 1 ? 'message' : 'messages'}`,
         reason: `You’re getting this because ${context.recipient} receives inbox alerts for ${host}.`,
-        subject: `New message from ${from}: ${required(input.topic, 'a topic')}`
+        subject: `New message from ${clip(sender, SUBJECT_NAME_MAX)}: ${clip(required(input.topic, 'a topic'), SUBJECT_NAME_MAX)}`
       },
       context
     )

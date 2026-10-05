@@ -84,7 +84,10 @@ export function resolveUseSendConfig(env: {
  */
 export const EMAIL_DASHBOARD_PATH = site.email.dashboardPath
 
-/** The dashboard admin email footers link to (`/admin/`; `/admin/inbox/` once #73 lands). */
+/**
+ * The page admin email footers link to: the review queue (`/admin/submissions/`, #64), and
+ * `/admin/inbox/` once #73 lands.
+ */
 export const EMAIL_ADMIN_DASHBOARD_PATH = site.email.adminDashboardPath
 
 /**

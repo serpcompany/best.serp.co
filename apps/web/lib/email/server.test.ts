@@ -55,7 +55,7 @@ describe('enqueueEmail', () => {
     await expect(
       enqueue('sign-in-code', {
         eventKey: 'sign-in-code:0b7c2d9e-1f4a-4c3b-9a8e-123456789abc',
-        input: { code: '481902' },
+        input: { code: '481902', type: 'sign-in' },
         to: 'owner@serp.co'
       })
     ).resolves.toBeUndefined()

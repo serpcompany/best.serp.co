@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { EMAIL_ADMIN_RECIPIENT, EMAIL_LINK_ORIGINS } from '../config'
 import { type AppEmailTemplates, appEmailTemplates, SIGN_IN_CODE_TEMPLATE } from '../registry'
 import { EmailTemplateError } from '../templates'
+import { SIGN_IN_CODE_LENGTH, SIGN_IN_CODE_TTL_SECONDS } from './codes'
+import { hostOf } from './layout'
 import { EMAIL_SAMPLES, renderAppEmail } from './samples'
 
 type TemplateId = keyof AppEmailTemplates
@@ -41,9 +43,11 @@ describe('email registry', () => {
       'listing-unlisted',
       'new-message',
       'ownership-removed',
+      'payment-received-in-review',
       'sign-in-code',
       'submission-received',
       'submission-rejected',
+      'submission-rejected-prohibited',
       'submission-rejected-refunded'
     ])
     // Better Auth's OTP sender (#72) enqueues this id; renaming it would break that wiring.
@@ -68,7 +72,13 @@ describe('every email in every environment', () => {
           expect(urls.length, label).toBeGreaterThan(1)
           for (const url of urls)
             expect(url.startsWith(`${origin}/`), `${label}: ${url}`).toBe(true)
-          const dashboard = `${origin}${id.startsWith('admin-') ? '/admin/' : '/account/'}`
+          const dashboard = `${origin}${
+            id.startsWith('admin-')
+              ? '/admin/submissions/'
+              : id === 'new-message'
+                ? '/account/messages/t_8k2p/'
+                : '/account/'
+          }`
           expect(email.text, label).toContain(
             `This address isn't monitored. Reply from your dashboard: ${dashboard}`
           )
@@ -94,7 +104,7 @@ describe('submitter text is escaped', () => {
     'checkedAt',
     'code',
     'expiresInDays',
-    'expiresInMinutes',
+    'type',
     'lastReminder',
     'paidCents',
     'plan',
@@ -161,17 +171,30 @@ You're getting this because this address was entered at best.serp.co/login.`)
     )
   })
 
-  it('takes the configured lifetime and refuses anything but six digits', () => {
-    const email = renderAppEmail(
-      'sign-in-code',
-      { code: '000123', expiresInMinutes: 5 },
-      { environment: 'production', to: 'a@b.co' }
-    )
-    expect(email.text).toContain('It expires in 5 minutes and works once.')
+  it('shares its code length and lifetime with Better Auth, and refuses other codes', () => {
+    // #72 configures Better Auth's email OTP with these, so the email states the real lifetime.
+    expect(SIGN_IN_CODE_LENGTH).toBe(6)
+    expect(SIGN_IN_CODE_TTL_SECONDS).toBe(600)
+    expect(render('sign-in-code').text).toContain('It expires in 10 minutes and works once.')
     for (const code of ['12345', '1234567', 'abcdef', ' 123456', '']) {
       expect(() =>
-        renderAppEmail('sign-in-code', { code }, { environment: 'production', to: 'a@b.co' })
+        renderAppEmail(
+          'sign-in-code',
+          { code, type: 'sign-in' },
+          { environment: 'production', to: 'a@b.co' }
+        )
       ).toThrow(EmailTemplateError)
+    }
+  })
+
+  it('is only for sign-in codes', () => {
+    for (const type of ['email-verification', 'forget-password', 'change-email']) {
+      expect(() =>
+        renderAppEmail('sign-in-code', { code: '123456', type } as never, {
+          environment: 'production',
+          to: 'a@b.co'
+        })
+      ).toThrow(/only for sign-in/u)
     }
   })
 })
@@ -361,7 +384,7 @@ Review submission: https://best.serp.co/admin/submissions/s_4f9k2c/
 
 --
 SERP Directory · https://best.serp.co
-This address isn't monitored. Reply from your dashboard: https://best.serp.co/admin/
+This address isn't monitored. Reply from your dashboard: https://best.serp.co/admin/submissions/
 You're getting this because devin@serp.co receives review alerts for best.serp.co.`)
     expect(linksTo(email.html, 'https://best.serp.co/admin/submissions/s_4f9k2c/')).toBe(true)
   })
@@ -414,7 +437,7 @@ describe('new message', () => {
 describe('admin: new message', () => {
   it('names the sender and links to the inbox thread, without the message', () => {
     const email = render('admin-new-message')
-    expect(email.subject).toBe('New message from priya@brieflow.ai: Brieflow claim')
+    expect(email.subject).toBe('New message from brieflow.ai: Brieflow claim')
     expect(email.text).toContain(
       'From: priya@brieflow.ai\nAbout: Claim: Brieflow (brieflow.ai)\nUnread: 1 message'
     )
@@ -482,10 +505,153 @@ describe('draft expired', () => {
     const email = render('draft-expired')
     expect(email.subject).toBe('Your Tablesmith draft expired')
     expect(email.text).toContain(
-      'Your draft for Tablesmith was saved 30 days ago without a plan, so it has expired and been removed.\nThe URL tablesmith.io is released, so it can be submitted again.'
+      'Your draft for Tablesmith expired 30 days after it was saved, so it has been removed.\nThe URL tablesmith.io is released, so it can be submitted again.'
     )
     expect(
       linksTo(email.html, 'https://best.serp.co/submit/?url=https%3A%2F%2Ftablesmith.io')
     ).toBe(true)
+  })
+})
+
+describe('revision 5 emails', () => {
+  it('rejected as prohibited: no resubmission, no refund, Message us', () => {
+    const email = render('submission-rejected-prohibited')
+    expect(email.subject).toBe('KeyBazaar wasn’t approved')
+    expect(email.text).toBe(`KeyBazaar wasn’t approved
+
+A reviewer looked at KeyBazaar and couldn't approve it.
+Reason: keybazaar.shop sells software license keys that the publishers haven't authorized. Our Terms of Service prohibit this (IP infringement).
+Because the content is prohibited, keybazaar.shop can't be submitted or claimed again. If you think this is a mistake, message us from your dashboard.
+
+Message us: https://best.serp.co/account/messages/new/?about=submission:s_5hh3m0
+
+--
+SERP Directory · https://best.serp.co
+This address isn't monitored. Reply from your dashboard: https://best.serp.co/account/
+You're getting this because you have an account on best.serp.co.`)
+    expect(email.html).toContain('keybazaar.shop can’t be submitted again.')
+    expect(email.text).not.toMatch(/refund|send it again/iu)
+    expect(
+      linksTo(email.html, 'https://best.serp.co/account/messages/new/?about=submission:s_5hh3m0')
+    ).toBe(true)
+  })
+
+  it('payment received while the checks failed: not live yet, in review', () => {
+    const email = render('payment-received-in-review')
+    expect(email.subject).toBe('Payment received: Kiddo Tutor is in review')
+    expect(email.text).toBe(`Kiddo Tutor goes live after review
+
+Thanks for your payment of $49.00.
+Our automatic checks couldn't load https://kiddotutor.com/ (the connection timed out), so Kiddo Tutor isn't live yet. A reviewer will look at it before it's published. You don't need to do anything.
+If it's rejected for anything other than prohibited content, you get a full refund automatically.
+
+View submission: https://best.serp.co/account/submissions/s_7tq20z/
+
+--
+SERP Directory · https://best.serp.co
+This address isn't monitored. Reply from your dashboard: https://best.serp.co/account/
+You're getting this because you have an account on best.serp.co.`)
+    expect(email.html).toContain('Kiddo Tutor goes live after a reviewer looks at it.')
+  })
+
+  it('badge missing: the not-on-page and wrong-destination findings', () => {
+    expect(render('badge-missing', 1).text).toContain(
+      "Our weekly check loaded https://ledgerly.app/ on Mon, Oct 5 at 09:14 UTC. We couldn't find the badge on the page."
+    )
+    expect(render('badge-missing', 2).text).toContain(
+      "Our weekly check loaded https://ledgerly.app/ on Mon, Oct 5 at 09:14 UTC. The badge is there, but its link doesn't point to your listing."
+    )
+  })
+
+  it('admin review alert: the paid variants', () => {
+    const waiting = render('admin-review-ready', 1)
+    expect(waiting.subject).toBe('Ready for review: Kiddo Tutor (paid, waiting for review)')
+    expect(waiting.text).toContain(
+      'Source: New submission\nPlan: Paid. Waiting for review\nSubmitted by: team@kiddotutor.com'
+    )
+    expect(waiting.html).toContain('AI Tutor · submitted by team@kiddotutor.com')
+    const live = render('admin-review-ready', 2)
+    expect(live.subject).toBe('Ready for review: Voxbloom (paid, live now)')
+    expect(live.text).toContain('Plan: Paid. Live now')
+    expect(linksTo(live.html, 'https://best.serp.co/admin/submissions/s_8m2q1d/')).toBe(true)
+  })
+
+  it('the last complete-checkout reminder', () => {
+    const email = render('draft-reminder', 3)
+    expect(email.subject).toBe('Last reminder: your Tablesmith draft expires in 9 days')
+    expect(email.text).toContain(
+      "Your draft for Tablesmith expires in 9 days.\nThis is the last reminder. After that the draft is deleted and tablesmith.io can be submitted by anyone. You picked the paid listing but didn't finish checkout, so you haven't been charged. Complete the $49 one-off payment and Tablesmith goes live as soon as our automatic checks pass. A reviewer still looks at it."
+    )
+    expect(linksTo(email.html, 'https://best.serp.co/submit/s_6tb4ws/checkout/')).toBe(true)
+  })
+})
+
+describe('robustness', () => {
+  const longName = `${'Very long product name '.repeat(12)}end`
+
+  it('shortens long names in subjects instead of dropping the email', () => {
+    for (const id of Object.keys(EMAIL_SAMPLES) as TemplateId[]) {
+      const sample = EMAIL_SAMPLES[id][0]
+      if (!sample) continue
+      const input = Object.fromEntries(
+        Object.entries(sample.input).map(([key, value]) => [
+          key,
+          /name$|^about$|^topic$/iu.test(key) && typeof value === 'string' ? longName : value
+        ])
+      )
+      const email = renderAppEmail(id, input as never, { environment: 'production', to: sample.to })
+      expect(email.subject.length, id).toBeLessThanOrEqual(200)
+      if (id !== 'sign-in-code' && id !== 'badge-missing') expect(email.subject, id).toContain('…')
+    }
+    const admin = renderAppEmail(
+      'admin-review-ready',
+      { ...(EMAIL_SAMPLES['admin-review-ready'][1]?.input as never), submissionName: longName },
+      { environment: 'production', to: 'devin@serp.co' }
+    )
+    // The plan stays readable after a shortened name.
+    expect(admin.subject).toMatch(/…\s?\(paid, waiting for review\)$/u)
+  })
+
+  it('never puts a submitter address in the admin message subject', () => {
+    const sample = EMAIL_SAMPLES['admin-new-message'][0]
+    if (!sample) throw new Error('sample')
+    expect(render('admin-new-message').subject).toBe('New message from brieflow.ai: Brieflow claim')
+    const named = renderAppEmail(
+      'admin-new-message',
+      { ...sample.input, fromName: 'Priya Shah' },
+      { environment: 'production', to: 'devin@serp.co' }
+    )
+    expect(named.subject).toBe('New message from Priya Shah: Brieflow claim')
+    expect(named.subject).not.toContain('@')
+    expect(named.text).toContain('From: priya@brieflow.ai')
+  })
+
+  it('accepts only http(s) websites', () => {
+    expect(hostOf('https://ledgerly.app/')).toBe('ledgerly.app')
+    expect(hostOf('http://ledgerly.app:8080/x')).toBe('ledgerly.app:8080')
+    for (const url of [
+      'javascript:alert(1)',
+      'mailto:a@b.co',
+      'ftp://x.example/',
+      'ledgerly.app',
+      ''
+    ]) {
+      expect(() => hostOf(url), url).toThrow(EmailTemplateError)
+    }
+  })
+})
+
+describe('Outlook', () => {
+  it('pads the button cell and fixes the column width', () => {
+    const email = render('submission-received')
+    // Outlook ignores padding on links and max-width on tables.
+    expect(email.html).toContain(
+      '<td bgcolor="#09090b" style="background-color:#09090b;padding:12px 24px"><a href="https://best.serp.co/account/"'
+    )
+    expect(email.html).not.toMatch(/<a href="[^"]+" style="[^"]*padding/u)
+    expect(email.html).toContain(
+      '<!--[if mso]><table role="presentation" width="640" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->'
+    )
+    expect(email.html).toContain('<!--[if mso]></td></tr></table><![endif]-->')
   })
 })

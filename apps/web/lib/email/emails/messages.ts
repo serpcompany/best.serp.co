@@ -3,8 +3,8 @@
  * the message itself, only a link to the conversation. Bursts are throttled by the caller (one
  * email per few minutes), which the copy says.
  */
-import { defineEmailTemplate } from '../templates'
-import { bold, composeEmail, paragraph, required, sitePath } from './layout'
+import { clip, defineEmailTemplate } from '../templates'
+import { bold, composeEmail, paragraph, required, SUBJECT_NAME_MAX, sitePath } from './layout'
 
 export interface NewMessageInput {
   /** What the conversation is about, e.g. the product name. */
@@ -13,6 +13,9 @@ export interface NewMessageInput {
 }
 
 export const newMessageEmail = defineEmailTemplate<NewMessageInput>({
+  // The footer links to the conversation itself, as the mockup shows (sent only once #73's
+  // inbox exists).
+  footerPath: input => sitePath('account', 'messages', input.threadId),
   id: 'new-message',
   render(input, context) {
     const about = required(input.about, 'a conversation topic')
@@ -36,7 +39,7 @@ export const newMessageEmail = defineEmailTemplate<NewMessageInput>({
         },
         heading: 'You have a new message',
         preheader: 'The SERP team replied. Read it in your dashboard.',
-        subject: `You have a new message about ${about}`
+        subject: `You have a new message about ${clip(about, SUBJECT_NAME_MAX)}`
       },
       context
     )

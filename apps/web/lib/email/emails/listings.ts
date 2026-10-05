@@ -2,7 +2,7 @@
  * Emails about a live listing: approved, live after payment, badge missing (24h warning),
  * unlisted, and ownership removed (#70 screen 15).
  */
-import { defineEmailTemplate, EmailTemplateError } from '../templates'
+import { clip, defineEmailTemplate, EmailTemplateError } from '../templates'
 import {
   bold,
   box,
@@ -13,6 +13,7 @@ import {
   hostOf,
   paragraph,
   required,
+  SUBJECT_NAME_MAX,
   sitePath
 } from './layout'
 
@@ -47,7 +48,7 @@ export const listingApprovedEmail = defineEmailTemplate<ListingApprovedInput>({
         cta: { label: 'View your listing', url },
         heading: `${name} is live`,
         preheader: `Your listing is published at ${url.replace(/^https?:\/\//u, '')}`,
-        subject: `${name} is live on SERP`
+        subject: `${clip(name, SUBJECT_NAME_MAX)} is live on SERP`
       },
       context
     )
@@ -79,7 +80,7 @@ export const listingLivePaidEmail = defineEmailTemplate<ListingLivePaidInput>({
         cta: { label: 'View your listing', url },
         heading: `${name} is live`,
         preheader: 'Payment received. Your listing is published and in review.',
-        subject: `${name} is live on SERP`
+        subject: `${clip(name, SUBJECT_NAME_MAX)} is live on SERP`
       },
       context
     )
@@ -176,7 +177,7 @@ export const listingUnlistedEmail = defineEmailTemplate<ListingUnlistedInput>({
         },
         heading: `${name} is no longer listed`,
         preheader: 'The badge was still missing on our recheck.',
-        subject: `${name} has been removed from SERP`
+        subject: `${clip(name, SUBJECT_NAME_MAX)} has been removed from SERP`
       },
       context
     )
@@ -206,7 +207,7 @@ export const ownershipRemovedEmail = defineEmailTemplate<OwnershipRemovedInput>(
         cta: { label: `Claim ${name} again`, url: listingUrl(context, input.listingSlug) },
         heading: `Your ownership of ${name} was removed`,
         preheader: 'The badge was still missing on our recheck.',
-        subject: `You no longer manage ${name} on SERP`
+        subject: `You no longer manage ${clip(name, SUBJECT_NAME_MAX)} on SERP`
       },
       context
     )

@@ -11,8 +11,10 @@ import {
 import { newMessageEmail } from './emails/messages'
 import {
   changesRequestedEmail,
+  paymentReceivedInReviewEmail,
   submissionReceivedEmail,
   submissionRejectedEmail,
+  submissionRejectedProhibitedEmail,
   submissionRejectedRefundedEmail
 } from './emails/submissions'
 import { createEmailTemplateRegistry } from './templates'
@@ -24,7 +26,9 @@ import { createEmailTemplateRegistry } from './templates'
  *
  * Callers: `enqueueEmail('<id>', { eventKey, input, to })` from `./server.ts`. Admin alerts go
  * to `EMAIL_ADMIN_RECIPIENT`. The sign-in code (`sign-in-code`) is enqueued by Better Auth's
- * `sendVerificationOTP` (#60/#72) with `emailEventKey('sign-in-code', crypto.randomUUID())`.
+ * `sendVerificationOTP` (#60/#72) with `emailEventKey('sign-in-code', crypto.randomUUID())`,
+ * for OTP type `sign-in` only; its length and lifetime are `SIGN_IN_CODE_LENGTH` and
+ * `SIGN_IN_CODE_TTL_SECONDS`.
  */
 export const appEmailTemplates = createEmailTemplateRegistry({
   'admin-new-message': adminNewMessageEmail,
@@ -39,9 +43,11 @@ export const appEmailTemplates = createEmailTemplateRegistry({
   'listing-unlisted': listingUnlistedEmail,
   'new-message': newMessageEmail,
   'ownership-removed': ownershipRemovedEmail,
+  'payment-received-in-review': paymentReceivedInReviewEmail,
   'sign-in-code': signInCodeEmail,
   'submission-received': submissionReceivedEmail,
   'submission-rejected': submissionRejectedEmail,
+  'submission-rejected-prohibited': submissionRejectedProhibitedEmail,
   'submission-rejected-refunded': submissionRejectedRefundedEmail
 })
 

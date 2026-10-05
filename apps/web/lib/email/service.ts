@@ -121,18 +121,23 @@ export function emailEventKey(event: string, ...ids: string[]): string {
 
 /**
  * The context a template renders with: this environment's links, the recipient, and the
- * footer's dashboard link for the template's audience (the user dashboard, or the admin one).
+ * footer's dashboard link: the template's own `footerPath` for this input, else its audience's
+ * dashboard (the user dashboard, or the admin one).
  */
-export function emailRenderContext(
+export function emailRenderContext<Input>(
   policy: EmailPolicy,
-  template: Pick<EmailTemplate<never>, 'audience'>,
-  recipient: string
+  template: Pick<EmailTemplate<Input>, 'audience' | 'footerPath'>,
+  recipient: string,
+  input: Input
 ): EmailRenderContext {
   const links = createEmailLinks(policy.linkOrigin)
+  const footerPath = template.footerPath
+    ? template.footerPath(input)
+    : template.audience === 'admin'
+      ? EMAIL_ADMIN_DASHBOARD_PATH
+      : EMAIL_DASHBOARD_PATH
   return {
-    dashboardUrl: links.url(
-      template.audience === 'admin' ? EMAIL_ADMIN_DASHBOARD_PATH : EMAIL_DASHBOARD_PATH
-    ),
+    dashboardUrl: links.url(footerPath),
     environment: policy.environment,
     links,
     recipient
@@ -227,7 +232,11 @@ export function createEmailService<R extends EmailTemplateRegistry>(
 
     let rendered: RenderedEmail
     try {
-      rendered = renderEmail(template, request.input, emailRenderContext(policy, template, to))
+      rendered = renderEmail(
+        template,
+        request.input,
+        emailRenderContext(policy, template, to, request.input)
+      )
     } catch (error) {
       log({
         ...recipient,
