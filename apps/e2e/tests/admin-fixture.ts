@@ -1,6 +1,7 @@
-import { execFileSync } from 'node:child_process'
+import { readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { type APIRequestContext, expect } from '@playwright/test'
 
 /**
@@ -11,8 +12,6 @@ import { type APIRequestContext, expect } from '@playwright/test'
  * used against a deployed Worker.
  */
 
-const repositoryRoot = resolve(__dirname, '../../..')
-const DATABASE = 'best-serp-co-local'
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 
 /** Only when Playwright starts its own servers (not against an external or deployed Worker). */
@@ -55,35 +54,39 @@ export function seedAdminCatalog(): void {
   `)
 }
 
-/** Runs SQL on local D1 and returns the rows of the last statement. */
-export function localD1<T = Record<string, unknown>>(sql: string): T[] {
-  const output = execFileSync(
-    'pnpm',
-    [
-      'exec',
-      'wrangler',
-      'd1',
-      'execute',
-      DATABASE,
-      '--local',
-      '--persist-to',
-      stateRoot(),
-      '--config',
-      'apps/web/wrangler.jsonc',
-      '--json',
-      '--command',
-      sql
-    ],
-    {
-      cwd: repositoryRoot,
-      encoding: 'utf8',
-      env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
-      maxBuffer: 16 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'pipe']
-    }
+/**
+ * The admin Worker's D1 file. Miniflare keeps each local D1 database as one SQLite file in WAL
+ * mode, which this process can share with workerd.
+ */
+function databaseFile(): string {
+  const directory = resolve(stateRoot(), 'v3', 'd1', 'miniflare-D1DatabaseObject')
+  const files = readdirSync(directory).filter(
+    name => name.endsWith('.sqlite') && name !== 'metadata.sqlite'
   )
-  const parsed = JSON.parse(output) as Array<{ results?: T[] }>
-  return parsed.at(-1)?.results ?? []
+  if (files.length !== 1) {
+    throw new Error(`Expected one local D1 database in ${directory}; found ${files.length}.`)
+  }
+  return resolve(directory, files[0] as string)
+}
+
+/**
+ * Runs SQL on the admin Worker's local D1 and returns the rows of a single query. It opens the
+ * SQLite file directly: `wrangler d1 execute` would start a second Miniflare per call, which
+ * takes seconds each.
+ */
+export function localD1<T = Record<string, unknown>>(sql: string): T[] {
+  const database = new DatabaseSync(databaseFile())
+  try {
+    database.exec('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = ON;')
+    const trimmed = sql.trim()
+    if (/^(?:SELECT|WITH)\b/iu.test(trimmed) && !trimmed.replace(/;\s*$/u, '').includes(';')) {
+      return database.prepare(trimmed).all() as T[]
+    }
+    database.exec(trimmed)
+    return []
+  } finally {
+    database.close()
+  }
 }
 
 /** SQL string literal. */
