@@ -46,6 +46,14 @@ async function expectServedAsRequested(request: APIRequestContext, path: string)
   expect(response.status(), path).toBe(200)
 }
 
+/**
+ * Only best.serp.co (the production Worker on its canonical host) may be indexed or load
+ * analytics; local and staging hosts must not (serp standards/environment-configuration.md).
+ */
+function isPublicProductionOrigin(baseURL: string | undefined): boolean {
+  return baseURL !== undefined && new URL(baseURL).host === new URL(site.publicUrl).host
+}
+
 function structuredDataUrls(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(structuredDataUrls)
   if (!value || typeof value !== 'object') return []
@@ -295,6 +303,67 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     expect(search.headers()['x-edge-cache']).toBe('BYPASS')
   })
 
+  test('never lets a request header reach a page the edge cache serves to others', async ({
+    request
+  }) => {
+    // serpcompany/best.serp.co#41 review: a client's `x-nonce` was rendered into the stored
+    // page and served to every later visitor for 24 hours.
+    const probe = `e2e-cache-probe-${Date.now()}`
+    const path = `/products/?cache-poisoning-check=${Date.now()}`
+    const first = await request.get(path, {
+      headers: {
+        cookie: `theme=${probe}`,
+        'x-forwarded-host': `${probe}.example`,
+        'x-nonce': probe
+      }
+    })
+    expect(first.status()).toBe(200)
+    expect(first.headers()['x-edge-cache']).toBe('MISS')
+    expect(await first.text()).not.toContain(probe)
+    await expect(async () => {
+      const later = await request.get(path)
+      expect(later.headers()['x-edge-cache']).toBe('HIT')
+      const html = await later.text()
+      expect(html).not.toContain(probe)
+      expect(html).not.toMatch(/\snonce="/u)
+    }).toPass({ timeout: 10_000 })
+  })
+
+  test('keeps local and staging hosts out of search indexes and analytics', async ({
+    baseURL,
+    page,
+    request
+  }) => {
+    test.skip(isPublicProductionOrigin(baseURL), 'best.serp.co is indexable and loads analytics')
+    for (const path of [
+      '/',
+      '/about/',
+      '/about',
+      '/robots.txt',
+      '/sitemap-index.xml',
+      '/rss.xml',
+      '/api/search?q=video',
+      '/not-a-page/'
+    ]) {
+      const response = await request.get(path, { maxRedirects: 0 })
+      expect(response.headers()['x-robots-tag'], path).toMatch(/\bnoindex\b/u)
+      expect(response.headers()['x-worker-version'], path).toMatch(/^[\w-]+$/u)
+      expect(response.headers()['x-site-environment'], path).toMatch(/^(?:local|staging)$/u)
+    }
+    const robots = await request.get('/robots.txt')
+    expect(await robots.text()).toBe('User-agent: *\nDisallow: /\n')
+
+    const tagManagerRequests: string[] = []
+    page.on('request', sent => {
+      if (sent.url().includes('googletagmanager.com')) tagManagerRequests.push(sent.url())
+    })
+    const home = await page.goto('/', { waitUntil: 'networkidle' })
+    expect(home?.status()).toBe(200)
+    expect(await home?.text()).not.toContain('googletagmanager.com')
+    await expect(page.locator('script#google-tag-manager')).toHaveCount(0)
+    expect(tagManagerRequests).toEqual([])
+  })
+
   test('renders static, commercial, and legal pages', async ({ page }) => {
     const pages: Array<{ path: string; heading: RegExp }> = [
       { path: '/about/', heading: /^about serp$/i },
@@ -319,10 +388,13 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     }
   })
 
-  test('serves D1-derived sitemap contracts', async ({ request }) => {
+  test('serves D1-derived sitemap contracts', async ({ baseURL, request }) => {
     const robots = await request.get('/robots.txt')
     expect(robots.status()).toBe(200)
-    expect(await robots.text()).toContain(`Sitemap: ${absoluteUrl('/sitemap-index.xml')}`)
+    // Only best.serp.co advertises its sitemaps; every other host disallows crawling.
+    if (isPublicProductionOrigin(baseURL))
+      expect(await robots.text()).toContain(`Sitemap: ${absoluteUrl('/sitemap-index.xml')}`)
+    else expect(await robots.text()).toBe('User-agent: *\nDisallow: /\n')
 
     expect(await getSitemap(request, '/sitemap-index.xml')).toEqual([
       absoluteUrl('/sitemaps/pages/1.xml'),

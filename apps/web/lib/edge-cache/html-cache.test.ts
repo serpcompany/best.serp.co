@@ -6,6 +6,7 @@ import {
   EpochMemo,
   isCacheableRequest,
   loadSharedEpoch,
+  renderRequestFor,
   withEdgeCache
 } from './html-cache'
 
@@ -189,6 +190,85 @@ describe('edge HTML cache', () => {
     expect(head.status).toBe(404)
     expect(head.headers.get(EDGE_CACHE_HEADER)).toBe('HIT')
     expect(head.body).toBeNull()
+  })
+
+  it('renders a cacheable request with allowlisted headers only', () => {
+    const forwarded = renderRequestFor(
+      page('/products/?page=2', {
+        headers: {
+          accept: 'text/html',
+          'content-security-policy': "script-src 'nonce-attacker'",
+          cookie: 'theme=dark',
+          host: 'best.serp.co',
+          'next-router-state-tree': '%5B%22%22%5D',
+          rsc: '1',
+          'user-agent': 'Googlebot/2.1',
+          'x-forwarded-host': 'attacker.example',
+          'x-middleware-subrequest': 'middleware',
+          'x-nonce': 'attacker',
+          'x-opennext-initial-url': '/admin/'
+        },
+        method: 'HEAD'
+      })
+    )
+    expect(forwarded.url).toBe('https://best.serp.co/products/?page=2')
+    expect(forwarded.method).toBe('HEAD')
+    expect(Object.fromEntries(forwarded.headers)).toEqual({
+      accept: 'text/html',
+      host: 'best.serp.co',
+      'next-router-state-tree': '%5B%22%22%5D',
+      rsc: '1',
+      'user-agent': 'Googlebot/2.1'
+    })
+  })
+
+  // PR #47 review: the root layout loads analytics only for the `best.serp.co` Host, so a
+  // render that saw another spelling of the keyed host would store an analytics-free page.
+  it('renders with the host the cache key uses, whatever Host the client sent', async () => {
+    for (const host of ['best.serp.co:443', 'BEST.SERP.CO', 'attacker.example', undefined]) {
+      const request = page('/products/', host ? { headers: { host } } : undefined)
+      const forwarded = renderRequestFor(request)
+      expect(forwarded.headers.get('host'), String(host)).toBe('best.serp.co')
+      const key = new URL((await cacheKeyFor(request, 'v', 'e')).url)
+      expect(key.pathname.split('/')[4], String(host)).toBe(forwarded.headers.get('host'))
+    }
+    const port = renderRequestFor(new Request('http://127.0.0.1:8787/about/'))
+    expect(port.headers.get('host')).toBe('127.0.0.1:8787')
+  })
+
+  // serpcompany/best.serp.co#41 review: a client-sent `x-nonce` was rendered into a page that
+  // the cache then served to every visitor for 24 hours.
+  it('stores nothing a request header put into the page', async () => {
+    const edge = harness()
+    const reflect = (request: Request) =>
+      new Response(`<script nonce="${request.headers.get('x-nonce') ?? ''}"></script>`)
+    const poisoned = await withEdgeCache(
+      page('/products/', { headers: { 'x-nonce': 'ATTACKER' } }),
+      { waitUntil: promise => void promise },
+      { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => 'e' },
+      async request => reflect(request)
+    )
+    expect(poisoned.headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
+    expect(await poisoned.text()).toBe('<script nonce=""></script>')
+    await vi.waitFor(() => expect(edge.cache.entries.size).toBe(1))
+    const [stored] = [...edge.cache.entries.values()]
+    expect(new TextDecoder().decode(stored?.body)).toBe('<script nonce=""></script>')
+  })
+
+  it('renders a bypassed request as sent; its response is never stored', async () => {
+    const seen: Request[] = []
+    const edge = harness()
+    await withEdgeCache(
+      page('/search/?q=x', { headers: { 'x-nonce': 'n', cookie: 'authjs.session-token=a' } }),
+      { waitUntil: () => {} },
+      { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => 'e' },
+      async request => {
+        seen.push(request)
+        return new Response('results')
+      }
+    )
+    expect(seen[0]?.headers.get('x-nonce')).toBe('n')
+    expect(edge.cache.entries.size).toBe(0)
   })
 
   it('bypasses the cache when the catalog epoch is unavailable', async () => {

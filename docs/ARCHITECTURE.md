@@ -11,8 +11,8 @@ and detail DTOs. There is no filesystem fallback.
 
 ```text
 Browser
-  -> Cloudflare Worker entry (apps/web/worker.ts): trailing-slash redirects,
-     then the epoch-keyed edge HTML cache
+  -> Cloudflare Worker entry (apps/web/worker.ts): canonical-host and trailing-slash
+     redirects, the environment's crawl policy, then the epoch-keyed edge HTML cache
   -> OpenNext / Next.js routes (apps/web), on a cache miss
      -> server-only catalog adapter (apps/web/lib/catalog)
         -> catalog operations (packages/data-ops) -> D1 (DB) public catalog tables
@@ -31,8 +31,10 @@ Browser
   permanently through `apps/web/next.config.ts` (rules in `apps/web/lib/routing/redirects.ts`).
   "Featured" is a listing flag used for placements (the homepage section), not a public
   category page.
-- `apps/web/worker.ts` is the Worker entry: it redirects non-canonical page and file URLs
-  (`apps/web/lib/routing/`), serves anonymous pages from the edge HTML cache
+- `apps/web/worker.ts` is the Worker entry. It wires the build output into the request
+  pipeline (`apps/web/lib/worker/handle-request.ts`), which redirects non-canonical hosts
+  and URLs (`apps/web/lib/routing/`), applies the environment's crawl policy
+  (`apps/web/lib/environment/`), serves anonymous pages from the edge HTML cache
   (`apps/web/lib/edge-cache/`), and otherwise delegates to the generated
   `.open-next/worker.js`. It reads only the catalog epoch, through `packages/data-ops/`.
 - `apps/web/lib/catalog/` acquires the binding, validates the runtime environment,
@@ -54,6 +56,64 @@ Browser
   are the only layer that acquires credentials or calls remote APIs.
 - `scripts/migration/` holds the one-time JSON import and page comparison tooling. It
   is never imported by runtime or build code.
+
+## Environments and hosts
+
+Each environment is marked explicitly in the `vars` of `apps/web/wrangler.jsonc` and read
+per request (serp `standards/environment-configuration.md`); nothing is inferred from the
+host alone. A test (`apps/web/lib/environment/site-environment.test.ts`) pins the values.
+
+| Var | local | staging | production |
+| --- | --- | --- | --- |
+| `SITE_ENVIRONMENT` | `local` | `staging` | `production` |
+| `CANONICAL_HOST_REDIRECT` | unset | unset | `off` until the cutover, then `on` |
+
+- **Public production** is `SITE_ENVIRONMENT=production` on the canonical host
+  `best.serp.co`: indexable, `robots.txt` lists the sitemap index, and Google Tag Manager
+  loads. Everything else is non-production: local, staging, the production Worker's
+  `*.workers.dev` host, and a missing or misspelled var. There the Worker entry sends
+  `X-Robots-Tag: noindex, nofollow` on every response it answers and answers `/robots.txt`
+  with `Disallow: /` for every crawler, and the root layout leaves Google Tag Manager out
+  (`apps/web/lib/environment/`). Static files are served before the Worker runs, so
+  `apps/web/public/_headers` keeps them `noindex` on every `*.workers.dev` host, and
+  `next.config.ts` keeps its `*.workers.dev` `noindex` rule as defense in depth.
+- **Canonical host** (#42 decision e). With `CANONICAL_HOST_REDIRECT=on`, the production
+  Worker answers every `*.workers.dev` request (the workers.dev URL and preview URLs) with one
+  308 to `https://best.serp.co`, in canonical form and with the query kept byte for byte:
+  `/about?x=1` -> `https://best.serp.co/about/?x=1`. It runs before the trailing-slash rule
+  and the edge cache (`apps/web/lib/routing/canonical-host.ts`), so a stored response never
+  answers the wrong client. Requests that carry the `x-best-serp-co-smoke-test` header (any
+  value; not a secret) are served normally, so CI can test through the platform host. A
+  moved URL keeps its path and gets its own redirect on best.serp.co. Static files on
+  `*.workers.dev` are not redirected (they never reach the Worker; they stay `noindex`).
+  Staging never redirects. Both deployed environments set `workers_dev: true` and
+  `preview_urls: false`.
+- **Worker version and gates.** Every Worker response carries `x-worker-version`
+  (`CF_VERSION_METADATA.id`) and `x-site-environment` (the configured `SITE_ENVIRONMENT`, or
+  `unset`). Given the deployed version (`EXPECTED_WORKER_VERSION`, or the `deploy` entry
+  Wrangler writes to `WRANGLER_OUTPUT_FILE_PATH`), the HTTP gates
+  (`scripts/d1-preview-http-gates.ts`) wait until it answers three probes in a row (logging
+  `Worker version <id> answered N probe(s)`), then require it on every response, retrying an
+  answer from the previous version within the same 60-second budget; they assume
+  `wrangler deploy` to 100% of traffic. Production is gated on its platform host with the
+  smoke-test header (non-production policy, `x-site-environment: production`, and the 308 once
+  the switch is `on`), then on best.serp.co itself without it: no noindex, robots.txt lists the
+  sitemap index, Google Tag Manager loads. Every answer from the Worker is enforced. Only
+  these are skipped, with a `best.serp.co check skipped` warning: a `cf-mitigated` challenge,
+  a 403 or 429 without Worker headers (zone protection), and GitHub Pages before the cutover
+  (which fails while the switch is `on`). A 503 without Worker headers (for example, a Worker
+  over its limits), no answer, or any other answer fails. The workers.dev pass also rejects a
+  robots-meta noindex on `/` and a listing page, which is the same on every host. In
+  `apps/web/lib/environment/`, `public-policy.test.tsx` runs the policy through the Worker
+  pipeline and the root layout's analytics decision, and `noindex-sources.test.ts` checks the
+  real `next.config.ts` headers and the layout's and pages' robots metadata.
+- **Manual check of best.serp.co** (deploy runbook, cutover step 4, and after any gate run
+  that logged `best.serp.co check skipped`). `pnpm tsx scripts/d1-preview-http-gates.ts public
+  https://best.serp.co` runs the same best.serp.co checks without skipping anything. Then
+  `curl -sI https://best.serp.co/` must show `x-site-environment: production` and an
+  `x-worker-version` equal to the version Deploy Production deployed: the id its gate log
+  prints (`Worker version <id> answered N probe(s)`), or the active deployment under Workers &
+  Pages → `best-serp-co-production` → Deployments in the Cloudflare dashboard.
 
 ## URL canonicalization
 
@@ -110,7 +170,9 @@ extensions (`chart.js`), and a test checks the committed import.
   noindex `*.workers.dev` hosts. This is deliberate: the e2e suite and the HTTP gates then
   verify on staging exactly the URLs production publishes, and those hosts are never
   indexed.
-- **Sitemaps.** `/robots.txt` advertises `/sitemap-index.xml`, which lists the URL-set files
+- **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other
+  host serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)).
+  The index lists the URL-set files
   `/sitemaps/pages/1.xml`, `/sitemaps/directory/1.xml`, and `/sitemaps/categories/1.xml`
   directly (no nested index). `/sitemap.xml` is a compatibility redirect to the index.
   Listing entries carry `published_at` as `lastmod`; the static page and category sets carry
@@ -147,7 +209,10 @@ reads it with one statement (two index seeks). Four layers, from the edge inward
    epoch, host, path and query (and, for React Server Components requests, the router
    headers Next.js varies on). A hit loads neither Next.js nor D1. Misses render normally
    and 200/301/308/404 responses without `Set-Cookie` are stored for 24 hours; visitors
-   still receive the origin `Cache-Control`. Bypassed: `/api`, `/admin`, `/account`,
+   still receive the origin `Cache-Control`. A cacheable request reaches OpenNext with only
+   `accept`, `host`, `user-agent`, and the router headers; every other request header
+   (cookies, `x-nonce`, forwarded and framework-internal headers) is dropped, so nothing a
+   client sends can be stored and served to others (`renderRequestFor`). Bypassed: `/api`, `/admin`, `/account`,
    `/login`, `/search`, `/_next`, requests with `Authorization`, and Auth.js or preview
    cookies. Responses carry `x-edge-cache: HIT | MISS | BYPASS`.
 2. **Epoch memo.** Each isolate reuses its epoch for 30 seconds and revalidates it in the
