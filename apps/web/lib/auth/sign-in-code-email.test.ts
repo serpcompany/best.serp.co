@@ -9,12 +9,11 @@ vi.mock('../email/server', async () => ({
 }))
 
 describe('the sign-in code email bridge', () => {
-  it('stays unregistered until the sign-in-code template is in the email registry', async () => {
+  it('is registered, because the sign-in-code template is in the email registry', async () => {
     const { appEmailTemplates } = await import('../email/registry')
     const { signInCodeEmail } = await import('./sign-in-code-email')
-    expect(signInCodeEmail.templateRegistered).toBe(
-      Object.hasOwn(appEmailTemplates, 'sign-in-code')
-    )
+    expect(Object.hasOwn(appEmailTemplates, 'sign-in-code')).toBe(true)
+    expect(signInCodeEmail.templateRegistered).toBe(true)
   })
 
   it('keys every code email by a fresh UUID and enqueues it as sign-in-code', async () => {

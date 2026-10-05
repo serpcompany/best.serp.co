@@ -54,6 +54,7 @@ describe('email module boundary', () => {
       'runtime.ts',
       'senders.ts',
       'service.ts',
+      'sign-in-code.ts',
       'templates.ts',
       'test-fixture.ts'
     ])
@@ -65,6 +66,25 @@ describe('email module boundary', () => {
         /import 'server-only'|from '(?:@opennextjs\/[^']+|next(?:\/[^']+)?)'|process\.env/u
       )
     }
+  })
+
+  it('never depends on the auth module, which depends on it', () => {
+    const emailFiles = appFiles().filter(file => file.startsWith('lib/email/'))
+    expect(emailFiles.length).toBeGreaterThan(10)
+    const authImports = emailFiles.filter(file =>
+      importSpecifiers(readFileSync(resolve(appDirectory, file), 'utf8')).some(specifier => {
+        const target = specifier.startsWith('@/')
+          ? resolve(appDirectory, specifier.slice(2))
+          : specifier.startsWith('.')
+            ? resolve(appDirectory, dirname(file), specifier)
+            : null
+        const fromApp = target ? relative(appDirectory, target) : ''
+        return fromApp === 'lib/auth' || fromApp.startsWith('lib/auth/')
+      })
+    )
+    expect(authImports).toEqual([])
+    // The sign-in code contract imports nothing, so Better Auth's config can load it anywhere.
+    expect(importSpecifiers(source('sign-in-code.ts'))).toEqual([])
   })
 
   it('reads D1 only after resolving the environment policy, and holds no SQL', () => {

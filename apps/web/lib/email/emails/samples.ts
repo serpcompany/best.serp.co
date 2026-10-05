@@ -267,7 +267,7 @@ export const EMAIL_SAMPLES: SampleInputs = {
     }
   ],
   'sign-in-code': [
-    { input: { code: '481902', type: 'sign-in' }, mockup: 'signin', to: 'maya@quillmate.app' }
+    { input: { code: '481902', expiresInMinutes: 10 }, mockup: 'signin', to: 'maya@quillmate.app' }
   ],
   'submission-received': [
     {

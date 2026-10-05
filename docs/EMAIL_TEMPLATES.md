@@ -12,7 +12,7 @@ idempotency key, so renaming a template would let an event send again.
 
 | Id | Sent when | To | Button |
 |---|---|---|---|
-| `sign-in-code` | Better Auth sends a sign-in code (`type: 'sign-in'` only); code in the subject | the user | none (code) |
+| `sign-in-code` | Better Auth sends a sign-in code (sign-in codes only); code in the subject | the user | none (code) |
 | `claim-code` | A claim needs a domain-email code; code in the subject | the work address | none (code) |
 | `submission-received` | A free submission's badge is verified and it enters review | submitter | `/account/` |
 | `payment-received-in-review` | A paid submission's automatic checks failed; it waits for review | submitter | `/account/submissions/<id>/` |
@@ -71,38 +71,34 @@ defines `/account/listings/<slug>/edit`.
   - `new-message` is sent only once #73 exists. Its footer links to the conversation itself
     (`footerPath`), as the mockup shows.
 
-## Sign-in code wiring (#72)
+## Sign-in code wiring
 
-Import from `@/lib/email/server`:
+Better Auth (#60) sends sign-in codes through `apps/web/lib/auth/sign-in-code-email.ts`:
 
 ```ts
-import {
-  emailEventKey,
-  enqueueEmail,
-  SIGN_IN_CODE_LENGTH, // 6
-  SIGN_IN_CODE_TEMPLATE, // 'sign-in-code'
-  SIGN_IN_CODE_TTL_SECONDS // 600
-} from '@/lib/email/server'
-
-// Better Auth emailOTP: { otpLength: SIGN_IN_CODE_LENGTH, expiresIn: SIGN_IN_CODE_TTL_SECONDS }
-async sendVerificationOTP({ email, otp, type }) {
-  if (type !== 'sign-in') return // no other OTP flow is used; this email is for sign-in only
-  await enqueueEmail(SIGN_IN_CODE_TEMPLATE, {
-    eventKey: emailEventKey('sign-in-code', crypto.randomUUID()),
-    input: { code: otp, type },
-    to: email
-  })
-}
+enqueueEmail(SIGN_IN_CODE_TEMPLATE_ID, {
+  eventKey: emailEventKey('sign-in-code', crypto.randomUUID()),
+  input: { code, expiresInMinutes }, // SignInCodeInput
+  to
+})
 ```
 
-- **Lifetime:** the email states the lifetime from `SIGN_IN_CODE_TTL_SECONDS`, so configuring
-  Better Auth with the same constants keeps the two in step. A test pins both values.
-- **Refused input:** the template refuses a code that isn't `SIGN_IN_CODE_LENGTH` digits, or
-  any OTP type other than `sign-in`. `enqueueEmail` never throws, so a refused code is only
-  logged (`email_render_failed`) while Better Auth reports success. Pass only sign-in codes.
+- **One definition:** the template id, the code length (6), and the lifetime (600 seconds) live
+  in `apps/web/lib/email/sign-in-code.ts`, which imports nothing. `lib/auth/rate-limits.ts`
+  configures Better Auth's email OTP plugin with them, and `lib/auth` imports from `lib/email`,
+  never the reverse (`boundary.test.ts`). `rate-limits.test.ts` pins the values.
+- **Lifetime:** the email states `expiresInMinutes`, which Better Auth's sender derives from the
+  lifetime it enforces.
+- **Refused input:** the template refuses a code that isn't `SIGN_IN_CODE_LENGTH` digits, or a
+  lifetime that isn't 1 to 60 whole minutes. `enqueueEmail` never throws, so a refused code is
+  only logged (`email_render_failed`). Better Auth's sender sends `sign-in` codes only; any
+  other OTP purpose is refused before it reaches the email module.
 - **Staging:** codes for addresses outside `EMAIL_STAGING_ALLOWLIST` are not sent; they are
-  logged as `email_skipped` while Better Auth reports success. Add testers to the allowlist
-  (`env.staging.vars` in `apps/web/wrangler.jsonc`) to receive codes.
+  logged as `email_skipped` while Better Auth answers 200 as usual. Add testers to the
+  allowlist (`env.staging.vars` in `apps/web/wrangler.jsonc`) to receive codes.
+- **Evidence:** `lib/auth/sign-in-code-delivery.test.ts` requests a code on staging through
+  Better Auth, `enqueueEmail`, the D1 ledger, and the useSend sender with a fake `fetch`, then
+  signs in with the emailed code.
 
 ## Previews
 

@@ -7,20 +7,18 @@
  *   `wrangler dev` runs one isolate, so the outbox is shared by every request.
  * - `staging`, `production`: the email sender enqueues the `sign-in-code` email through the
  *   email module (`lib/email`, #61), keyed `emailEventKey('sign-in-code', crypto.randomUUID())`
- *   because every code is a new event and a key must never derive from the code. Until that
- *   template is registered, no sender is configured: requesting a code fails with 503
+ *   because every code is a new event and a key must never derive from the code. Without a
+ *   registered template, no sender is configured: requesting a code fails with 503
  *   `OTP_DELIVERY_UNAVAILABLE` and no code is created, logged, or exposed.
  */
+import { SIGN_IN_CODE_TEMPLATE, type SignInCodeInput } from '../email/sign-in-code'
 import type { SiteEnvironment } from '../environment/site-environment'
 
-/** The email template that carries a sign-in code (`lib/email/registry.ts`, #61). */
-export const SIGN_IN_CODE_TEMPLATE_ID = 'sign-in-code'
+/** The email template that carries a sign-in code (`lib/email/sign-in-code.ts`, #61). */
+export const SIGN_IN_CODE_TEMPLATE_ID = SIGN_IN_CODE_TEMPLATE
 
 /** What the `sign-in-code` template renders: the code and how long it lasts. */
-export interface SignInCodeEmailInput {
-  code: string
-  expiresInMinutes: number
-}
+export type SignInCodeEmailInput = SignInCodeInput
 
 /** Enqueues one `sign-in-code` email (`enqueueEmail`, which never throws). */
 export type SignInCodeEnqueue = (request: {

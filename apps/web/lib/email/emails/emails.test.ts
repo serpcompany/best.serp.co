@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { EMAIL_ADMIN_RECIPIENT, EMAIL_LINK_ORIGINS } from '../config'
-import { type AppEmailTemplates, appEmailTemplates, SIGN_IN_CODE_TEMPLATE } from '../registry'
+import { type AppEmailTemplates, appEmailTemplates } from '../registry'
+import {
+  SIGN_IN_CODE_LENGTH,
+  SIGN_IN_CODE_TEMPLATE,
+  SIGN_IN_CODE_TTL_SECONDS
+} from '../sign-in-code'
 import { EmailTemplateError } from '../templates'
-import { SIGN_IN_CODE_LENGTH, SIGN_IN_CODE_TTL_SECONDS } from './codes'
 import { hostOf } from './layout'
 import { EMAIL_SAMPLES, renderAppEmail } from './samples'
 
@@ -50,8 +54,9 @@ describe('email registry', () => {
       'submission-rejected-prohibited',
       'submission-rejected-refunded'
     ])
-    // Better Auth's OTP sender (#72) enqueues this id; renaming it would break that wiring.
+    // Better Auth's OTP sender (lib/auth) enqueues this id; renaming it would resend codes.
     expect(SIGN_IN_CODE_TEMPLATE).toBe('sign-in-code')
+    expect(appEmailTemplates[SIGN_IN_CODE_TEMPLATE].id).toBe(SIGN_IN_CODE_TEMPLATE)
     expect(Object.keys(EMAIL_SAMPLES).sort()).toEqual(Object.keys(appEmailTemplates).sort())
     for (const [id, template] of Object.entries(appEmailTemplates)) {
       expect(template.audience === 'admin', id).toBe(id.startsWith('admin-'))
@@ -171,30 +176,39 @@ You're getting this because this address was entered at best.serp.co/login.`)
     )
   })
 
-  it('shares its code length and lifetime with Better Auth, and refuses other codes', () => {
-    // #72 configures Better Auth's email OTP with these, so the email states the real lifetime.
+  it('states the lifetime Better Auth gives it, and refuses codes of another length', () => {
+    // lib/auth/rate-limits.ts configures Better Auth's email OTP with these (one definition).
     expect(SIGN_IN_CODE_LENGTH).toBe(6)
     expect(SIGN_IN_CODE_TTL_SECONDS).toBe(600)
+    expect(EMAIL_SAMPLES['sign-in-code'][0]?.input).toEqual({
+      code: '481902',
+      expiresInMinutes: SIGN_IN_CODE_TTL_SECONDS / 60
+    })
     expect(render('sign-in-code').text).toContain('It expires in 10 minutes and works once.')
+    const fiveMinutes = renderAppEmail(
+      'sign-in-code',
+      { code: '481902', expiresInMinutes: 5 },
+      { environment: 'production', to: 'a@b.co' }
+    )
+    expect(fiveMinutes.text).toContain('It expires in 5 minutes and works once.')
+    expect(fiveMinutes.html).toContain('It expires in 5 minutes.')
     for (const code of ['12345', '1234567', 'abcdef', ' 123456', '']) {
       expect(() =>
         renderAppEmail(
           'sign-in-code',
-          { code, type: 'sign-in' },
+          { code, expiresInMinutes: 10 },
           { environment: 'production', to: 'a@b.co' }
         )
       ).toThrow(EmailTemplateError)
     }
-  })
-
-  it('is only for sign-in codes', () => {
-    for (const type of ['email-verification', 'forget-password', 'change-email']) {
+    for (const expiresInMinutes of [0, -1, 1.5, 61, Number.NaN]) {
       expect(() =>
-        renderAppEmail('sign-in-code', { code: '123456', type } as never, {
-          environment: 'production',
-          to: 'a@b.co'
-        })
-      ).toThrow(/only for sign-in/u)
+        renderAppEmail(
+          'sign-in-code',
+          { code: '481902', expiresInMinutes },
+          { environment: 'production', to: 'a@b.co' }
+        )
+      ).toThrow(EmailTemplateError)
     }
   })
 })

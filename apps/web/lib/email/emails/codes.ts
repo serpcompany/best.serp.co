@@ -4,17 +4,15 @@
  * `emailEventKey('sign-in-code', crypto.randomUUID())`: every code is a new event, and keys
  * must never be derived from the code.
  *
- * The code length and lifetime are shared constants: Better Auth's email OTP config (#72)
- * imports `SIGN_IN_CODE_LENGTH` and `SIGN_IN_CODE_TTL_SECONDS` from `../server`, so the email
- * always states the lifetime the auth layer enforces.
+ * The sign-in code's length and lifetime live in `../sign-in-code.ts`, which Better Auth's
+ * email OTP config (`lib/auth/rate-limits.ts`) imports. Better Auth's OTP sender
+ * (`lib/auth/otp-sender.ts`) enqueues this email for sign-in codes only, with the lifetime it
+ * enforces.
  */
+import { SIGN_IN_CODE_LENGTH, SIGN_IN_CODE_TEMPLATE, type SignInCodeInput } from '../sign-in-code'
 import { clip, defineEmailTemplate, EmailTemplateError } from '../templates'
 import { composeEmail, paragraph, required, SUBJECT_NAME_MAX } from './layout'
 
-/** Digits in a sign-in code. */
-export const SIGN_IN_CODE_LENGTH = 6
-/** How long a sign-in code works: 10 minutes. */
-export const SIGN_IN_CODE_TTL_SECONDS = 600
 /** Digits in a claim domain-email code. */
 export const CLAIM_CODE_LENGTH = 6
 /** How long a claim code works: 10 minutes. */
@@ -31,24 +29,21 @@ function minutes(seconds: number): number {
   return Math.ceil(seconds / 60)
 }
 
-export interface SignInCodeInput {
-  /** The code Better Auth generated (`sendVerificationOTP`'s `otp`). */
-  code: string
-  /**
-   * Better Auth's OTP type. This email is for `sign-in` only; any other type is refused
-   * (logged as `email_render_failed`), so the caller must not send it for those flows.
-   */
-  type: 'sign-in'
+/** A code's lifetime in minutes: a whole number from 1 to 60. */
+function lifetime(expiresInMinutes: number): number {
+  if (!Number.isInteger(expiresInMinutes) || expiresInMinutes < 1 || expiresInMinutes > 60) {
+    throw new EmailTemplateError('A code email needs a lifetime of 1 to 60 whole minutes.')
+  }
+  return expiresInMinutes
 }
 
+export type { SignInCodeInput } from '../sign-in-code'
+
 export const signInCodeEmail = defineEmailTemplate<SignInCodeInput>({
-  id: 'sign-in-code',
+  id: SIGN_IN_CODE_TEMPLATE,
   render(input, context) {
-    if (input.type !== 'sign-in') {
-      throw new EmailTemplateError('The sign-in code email is only for sign-in codes.')
-    }
     const code = digits(input.code, SIGN_IN_CODE_LENGTH)
-    const expires = minutes(SIGN_IN_CODE_TTL_SECONDS)
+    const expires = lifetime(input.expiresInMinutes)
     const host = new URL(context.links.origin).host
     return composeEmail(
       {

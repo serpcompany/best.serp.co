@@ -6,7 +6,7 @@ const { getCloudflareContext } = vi.hoisted(() => ({ getCloudflareContext: vi.fn
 vi.mock('server-only', () => ({}))
 vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext }))
 
-// The registry is empty until the #70 templates land, so calls go through an untyped view.
+// An untyped view, so tests can also pass ids that are not registered.
 async function enqueue(templateId: string, request: unknown): Promise<unknown> {
   const { enqueueEmail } = await import('./server')
   return (enqueueEmail as (id: string, request: unknown) => Promise<unknown>)(templateId, request)
@@ -55,7 +55,7 @@ describe('enqueueEmail', () => {
     await expect(
       enqueue('sign-in-code', {
         eventKey: 'sign-in-code:0b7c2d9e-1f4a-4c3b-9a8e-123456789abc',
-        input: { code: '481902', type: 'sign-in' },
+        input: { code: '481902', expiresInMinutes: 10 },
         to: 'owner@serp.co'
       })
     ).resolves.toBeUndefined()
