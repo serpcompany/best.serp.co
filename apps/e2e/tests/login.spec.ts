@@ -41,12 +41,17 @@ async function requestCodeInPage(page: Page, email: string): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
 }
 
+/** Types a code into the slots, replacing whatever the last guess left there. */
 async function typeCode(page: Page, code: string): Promise<void> {
-  await page.locator('#code').fill(code)
+  const input = page.locator('#code')
+  await input.fill('')
+  await input.fill(code)
 }
 
-function wrongCode(code: string): string {
-  return code === '000000' ? '111111' : '000000'
+/** The `index`th wrong code: a different one each time, since the slots keep the last guess. */
+function wrongCode(code: string, index = 0): string {
+  const candidates = ['000000', '111111', '222222', '333333'].filter(value => value !== code)
+  return candidates[index] ?? '444444'
 }
 
 test.describe('sign-in screens', () => {
@@ -63,7 +68,8 @@ test.describe('sign-in screens', () => {
     await requestCodeInPage(page, email)
     // The answer is the same whether or not an email went out (docs/ACCOUNTS.md).
     await expect(page.getByText(`If ${email} is a valid address`)).toBeVisible()
-    await expect(page.getByText(/Resend in \d:\d\d/u)).toBeVisible()
+    // The 60-second resend countdown starts at 1:00, never above it.
+    await expect(page.getByText(/Resend in (?:1:00|0:[0-5]\d)/u)).toBeVisible()
 
     await typeCode(page, await outboxCode(page, email))
     await expect(page.getByRole('heading', { name: 'You’re signed in' })).toBeVisible()
@@ -87,6 +93,25 @@ test.describe('sign-in screens', () => {
     await page.waitForURL(/\/login\/\?callbackUrl=%2Faccount%2F$/u)
   })
 
+  // PR #76 review, finding 1: a callback that normalizes to `//host` never leaves the site.
+  test('keeps the post-login redirect on this site', async ({ baseURL, page }) => {
+    await asClient(page)
+    const email = uniqueEmail('redirect')
+    const origin = new URL(baseURL ?? '').origin
+    await page.goto('/login/?callbackUrl=%2F.%2F%2Fevil.example%2Fphish')
+    await requestCodeInPage(page, email)
+    await typeCode(page, await outboxCode(page, email))
+    await expect(page.getByRole('link', { name: 'Continue to your account' })).toHaveAttribute(
+      'href',
+      '/account/'
+    )
+    await page.waitForURL(`${origin}/account/`)
+    // Signed in already, the same trick on /login redirects to the account page too.
+    await page.goto('/login/?callbackUrl=%2Fx%2F..%2F%2Fevil.example%2F')
+    await page.waitForURL(`${origin}/account/`)
+    expect(new URL(page.url()).origin).toBe(origin)
+  })
+
   test('signs out from the account menu', async ({ page }) => {
     await asClient(page)
     const email = uniqueEmail('menu')
@@ -106,20 +131,48 @@ test.describe('sign-in screens', () => {
     await page.goto('/login/')
     await requestCodeInPage(page, email)
     const code = await outboxCode(page, email)
+    const input = page.locator('#code')
 
-    await typeCode(page, wrongCode(code))
+    await typeCode(page, wrongCode(code, 0))
     await expect(
       page.getByText(
         'That code isn’t right. Check the most recent email and try again. 2 attempts left.'
       )
     ).toBeVisible()
-    await typeCode(page, wrongCode(code))
+    // The six digits stay in the slots, and the real input is marked invalid and described.
+    await expect(input).toHaveValue(wrongCode(code, 0))
+    await expect(input).toHaveAttribute('aria-invalid', 'true')
+    await expect(input).toHaveAttribute('aria-describedby', 'code-error')
+    await typeCode(page, wrongCode(code, 1))
     await expect(page.getByText(/1 attempt left\.$/u)).toBeVisible()
-    await typeCode(page, wrongCode(code))
+    await typeCode(page, wrongCode(code, 2))
     await expect(
       page.getByText('Too many incorrect codes. Request a new code to try again.')
     ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Send a new code' }).first()).toBeVisible()
+  })
+
+  // PR #76 review, finding 3: a resend a per-email limit drops still leaves the old code.
+  test('keeps counting the old code’s attempts after a resend within the minute', async ({
+    page
+  }) => {
+    await asClient(page)
+    const email = uniqueEmail('resend')
+    await page.goto('/login/')
+    await requestCodeInPage(page, email)
+    const code = await outboxCode(page, email)
+    await typeCode(page, wrongCode(code, 0))
+    await expect(page.getByText(/2 attempts left\.$/u)).toBeVisible()
+    await typeCode(page, wrongCode(code, 1))
+    await expect(page.getByText(/1 attempt left\.$/u)).toBeVisible()
+    // Within the minute the per-email cooldown answers like a sent code but sends nothing.
+    await page.getByRole('button', { name: 'Send a new code' }).click()
+    await expect(page.getByText(/Resend in (?:1:00|0:[0-5]\d)/u)).toBeVisible()
+    expect(await outboxCode(page, email)).toBe(code)
+    await typeCode(page, wrongCode(code, 2))
+    await expect(
+      page.getByText('Too many incorrect codes. Request a new code to try again.')
+    ).toBeVisible()
   })
 
   test('explains an expired code', async ({ page }) => {

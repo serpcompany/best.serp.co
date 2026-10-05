@@ -28,7 +28,7 @@ import { getRoute } from '@serpdirectory/web-core/routes'
 import { ArrowRight, CircleX, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { callbackDestination } from '@/lib/auth/callback-url'
 import {
   CODE_ATTEMPTS,
@@ -87,6 +87,7 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
   const [otp, setOtp] = useState('')
   const [codeError, setCodeError] = useState<CodeError>(null)
   const [pending, setPending] = useState(false)
+  const codeInput = useRef<HTMLInputElement>(null)
   const now = useNow(step.kind !== 'done')
 
   const destination = callbackDestination(callbackPath)
@@ -143,9 +144,14 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
     const sent = await sendCode(email)
     setPending(false)
     if (!sent) return
+    // A per-email limit answers like a sent code, so the code in the inbox may still be the
+    // old one: keep counting its wrong guesses unless it is already used up or expired
+    // (PR #76 review, finding 3).
+    const codeDead = codeError?.kind === 'expired' || codeError?.kind === 'attempts'
+    const wrongGuesses = step.kind === 'code' && !codeDead ? step.wrongGuesses : 0
     setOtp('')
     setCodeError(null)
-    setStep({ kind: 'code', sentAt: Date.now(), wrongGuesses: 0 })
+    setStep({ kind: 'code', sentAt: Date.now(), wrongGuesses })
   }
 
   async function onVerify(code: string) {
@@ -160,7 +166,14 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
       router.refresh()
       return
     }
-    setOtp('')
+    // The digits stay in the (red) slots, as in the mockup, selected so the next code typed
+    // replaces them; editing them clears the error.
+    window.requestAnimationFrame(() => {
+      const input = codeInput.current
+      if (!input || input.disabled) return
+      input.focus()
+      input.setSelectionRange(0, input.value.length)
+    })
     if (outcome.kind === 'wrong') {
       const wrongGuesses = step.wrongGuesses + 1
       setStep({ ...step, wrongGuesses })
@@ -237,7 +250,11 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
   }
 
   if (step.kind === 'code') {
-    const resendIn = RESEND_COOLDOWN_SECONDS - (now - step.sentAt) / 1000
+    // `now` ticks once a second and can trail `sentAt`; clamp so the countdown starts at 1:00.
+    const resendIn = Math.min(
+      RESEND_COOLDOWN_SECONDS,
+      RESEND_COOLDOWN_SECONDS - Math.max(0, now - step.sentAt) / 1000
+    )
     const codeDead = codeError?.kind === 'expired' || codeError?.kind === 'attempts'
     const guessLimitSeconds = codeError?.kind === 'limited' ? (codeError.until - now) / 1000 : 0
     const message = codeErrorMessage(codeError, guessLimitSeconds)
@@ -263,12 +280,15 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
               <Field data-invalid={message ? true : undefined}>
                 <FieldLabel htmlFor="code">Code</FieldLabel>
                 <InputOTP
+                  ref={codeInput}
                   id="code"
                   autoFocus
                   autoComplete="one-time-code"
                   disabled={pending || codeDead}
                   inputMode="numeric"
                   maxLength={CODE_LENGTH}
+                  aria-invalid={message ? true : undefined}
+                  aria-describedby={message ? 'code-error' : 'code-description'}
                   pattern={DIGITS_ONLY}
                   value={otp}
                   onChange={value => {
@@ -287,7 +307,7 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                       />
                     ))}
                   </InputOTPGroup>
-                  <InputOTPSeparator className="text-muted-foreground" />
+                  <InputOTPSeparator className="text-muted-foreground [&>svg]:size-4" />
                   <InputOTPGroup>
                     {[3, 4, 5].map(index => (
                       <InputOTPSlot
@@ -300,9 +320,9 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                   </InputOTPGroup>
                 </InputOTP>
                 {message ? (
-                  <FieldError>{message}</FieldError>
+                  <FieldError id="code-error">{message}</FieldError>
                 ) : (
-                  <FieldDescription>
+                  <FieldDescription id="code-description">
                     From SERP Directory &lt;noreply@mail.serp.co&gt;. Check spam if it isn’t there
                     in a minute.
                   </FieldDescription>
@@ -393,12 +413,13 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                 required
                 value={email}
                 aria-invalid={emailError ? true : undefined}
+                aria-describedby={emailError ? 'email-error' : undefined}
                 onChange={event => {
                   setEmail(event.target.value)
                   setEmailError(null)
                 }}
               />
-              {emailError ? <FieldError>{emailError}</FieldError> : null}
+              {emailError ? <FieldError id="email-error">{emailError}</FieldError> : null}
             </Field>
             <LoginNotice notice={notice} seconds={limitedSeconds} />
             <Field>
