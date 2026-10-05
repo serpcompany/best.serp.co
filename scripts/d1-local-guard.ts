@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { captureApplicationSnapshot } from './d1-application-snapshot'
@@ -94,7 +94,14 @@ function importArtifact(): void {
   console.log(`Imported the reviewed initial catalog into local ${project.domain}.`)
 }
 
-function localSqlitePath(directory: string): string {
+/** Miniflare's D1 storage directory; its Cache API, KV, and R2 SQLite files live elsewhere. */
+const D1_OBJECT_DIRECTORY = 'miniflare-D1DatabaseObject'
+
+/**
+ * The one D1 database file below `directory`. Only D1's own storage counts: a Worker preview also
+ * persists Cache API (and other) SQLite files under the same state directory (#81).
+ */
+export function localSqlitePath(directory: string): string {
   const matches: string[] = []
   const visit = (current: string) => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
@@ -103,7 +110,8 @@ function localSqlitePath(directory: string): string {
       else if (
         entry.isFile() &&
         entry.name.endsWith('.sqlite') &&
-        entry.name !== 'metadata.sqlite'
+        entry.name !== 'metadata.sqlite' &&
+        basename(current) === D1_OBJECT_DIRECTORY
       ) {
         matches.push(path)
       }

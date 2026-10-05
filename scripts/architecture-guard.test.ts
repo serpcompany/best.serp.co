@@ -1,8 +1,121 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import {
+  D1_MAX_FUNCTION_ARGUMENTS,
+  d1StatementLimitViolations,
+  maxFunctionArguments,
+  oversizedPatternLiterals,
+  stripSqlLiteralsAndComments
+} from '@serpdirectory/data-ops/sql-limits'
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { project } from './project'
+
+/** Drizzle's pattern helpers: they build a LIKE from a bound value without SQL text. */
+const DRIZZLE_PATTERN_HELPERS = new Set(['like', 'notLike', 'ilike', 'notIlike'])
+/**
+ * Reviewed uses of those helpers, as `file:helper` -> why its pattern is bounded to 50 bytes.
+ * Empty: search matches with `instr()` (#77).
+ */
+const ALLOWED_DRIZZLE_PATTERN_HELPERS: Readonly<Record<string, string>> = {}
+/** What ends the right operand of LIKE/GLOB at the top level of an expression. */
+const PATTERN_OPERAND_END =
+  /^(?:AND|OR|ESCAPE|THEN|WHEN|ELSE|END|WHERE|ORDER|GROUP|HAVING|LIMIT|UNION|FROM|AS)\b/iu
+
+/**
+ * True when a LIKE or GLOB in `text` (any case; operator form `x LIKE …` or function form
+ * `like(…)`) takes a bound value (`?`, which also stands for any `${…}`) anywhere in its
+ * pattern operand: `LIKE ?`, `LIKE (?)`, `LIKE '%' || ? || '%'`, `like(?, x)`.
+ */
+function likeTakesBoundValue(text: string): boolean {
+  const code = stripSqlLiteralsAndComments(text)
+  for (const match of code.matchAll(/\b(?:LIKE|GLOB)\b/giu)) {
+    const start = match.index ?? 0
+    // Operator form follows an operand (`name LIKE`, `) NOT GLOB`); function form opens a call.
+    const operatorForm = /[\w)'"?\]]\s+$/u.test(code.slice(0, start))
+    const functionForm = /^\s*\(/u.test(code.slice(start + match[0].length))
+    if (!operatorForm && !functionForm) continue
+    let depth = 0
+    let operand = ''
+    for (let index = start + match[0].length; index < code.length; index++) {
+      const character = code[index] ?? ''
+      if (depth === 0 && operand.trim() && PATTERN_OPERAND_END.test(code.slice(index))) break
+      if (character === '(') depth++
+      else if (character === ')') {
+        if (depth === 0) break
+        depth--
+      } else if (character === ',' && depth === 0) break
+      operand += character
+    }
+    if (operand.includes('?')) return true
+  }
+  return false
+}
+
+/**
+ * LIKE/GLOB and function-argument violations in one TypeScript source: every string and
+ * template literal is checked for a bound or concatenated pattern (any case, no keyword gate),
+ * literal patterns over 50 bytes, and SQL functions over 32 arguments; Drizzle's pattern
+ * helpers are refused unless reviewed (`ALLOWED_DRIZZLE_PATTERN_HELPERS`).
+ */
+function sqlSourceViolations(file: string, sourceText: string): string[] {
+  const source = ts.createSourceFile(file, sourceText, ts.ScriptTarget.Latest, true)
+  const violations: string[] = []
+  const lineOf = (node: ts.Node) => source.getLineAndCharacterOfPosition(node.getStart()).line + 1
+  const drizzleNamespaces = new Set<string>()
+  const refuseHelper = (node: ts.Node, helper: string) => {
+    if (!DRIZZLE_PATTERN_HELPERS.has(helper)) return
+    if (ALLOWED_DRIZZLE_PATTERN_HELPERS[`${file}:${helper}`]) return
+    violations.push(`${file}:${lineOf(node)}: Drizzle ${helper}() builds an unbounded LIKE pattern`)
+  }
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isImportDeclaration(node) &&
+      ts.isStringLiteral(node.moduleSpecifier) &&
+      /^drizzle-orm(?:\/|$)/u.test(node.moduleSpecifier.text)
+    ) {
+      const bindings = node.importClause?.namedBindings
+      if (bindings && ts.isNamedImports(bindings)) {
+        for (const element of bindings.elements) {
+          refuseHelper(element, (element.propertyName ?? element.name).text)
+        }
+      } else if (bindings && ts.isNamespaceImport(bindings)) {
+        drizzleNamespaces.add(bindings.name.text)
+      }
+    }
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      drizzleNamespaces.has(node.expression.text)
+    ) {
+      refuseHelper(node, node.name.text)
+    }
+    let text: string | null = null
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) text = node.text
+    else if (ts.isTemplateExpression(node)) {
+      text = node.head.text + node.templateSpans.map(span => `?${span.literal.text}`).join('')
+    }
+    if (text) {
+      const where = `${file}:${lineOf(node)}`
+      if (likeTakesBoundValue(text)) {
+        violations.push(`${where}: LIKE/GLOB takes a bound or concatenated pattern`)
+      }
+      for (const pattern of oversizedPatternLiterals(text)) {
+        violations.push(`${where}: LIKE/GLOB pattern over 50 bytes: ${pattern}`)
+      }
+      if (/\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE|WITH)\b/iu.test(text)) {
+        const widest = maxFunctionArguments(text)
+        if (widest && widest.count > D1_MAX_FUNCTION_ARGUMENTS) {
+          violations.push(`${where}: ${widest.name}() has ${widest.count} arguments`)
+        }
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return violations
+}
 
 function trackedFiles(): string[] {
   return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
@@ -384,6 +497,64 @@ describe('single-site D1-only repository architecture', () => {
         )
       )
     expect(violations).toEqual([])
+  })
+
+  // #77: node:sqlite applies none of D1's statement limits and workerd does not enforce the
+  // 32-argument function limit, so these are checked on the SQL text itself.
+  it('keeps user input out of LIKE/GLOB patterns and every SQL function within 32 arguments', () => {
+    const sqlSources = trackedFiles().filter(
+      file =>
+        (file.startsWith('packages/data-ops/src/') || /^scripts\/[^/]+\.ts$/u.test(file)) &&
+        file.endsWith('.ts') &&
+        !file.endsWith('.test.ts') &&
+        existsSync(resolve(file))
+    )
+    const violations = sqlSources.flatMap(file =>
+      sqlSourceViolations(file, readFileSync(resolve(file), 'utf8'))
+    )
+    for (const migration of readdirSync(resolve('d1/drizzle')).filter(name =>
+      name.endsWith('.sql')
+    )) {
+      const statements = readFileSync(resolve('d1/drizzle', migration), 'utf8').split(
+        '--> statement-breakpoint'
+      )
+      for (const statement of statements) {
+        for (const violation of d1StatementLimitViolations(statement)) {
+          violations.push(`d1/drizzle/${migration}: ${violation}`)
+        }
+      }
+    }
+    expect(violations).toEqual([])
+  })
+
+  // #81 review: the first version of the check missed each of these.
+  it('catches every way a bound value can reach a LIKE/GLOB pattern', () => {
+    const bypasses: Record<string, string> = {
+      'Drizzle like() helper': `import { like } from 'drizzle-orm'
+        export const f = (q: string) => like(listings.name, \`%\${q}%\`)`,
+      'Drizzle namespace ilike()': `import * as orm from 'drizzle-orm'
+        export const f = (q: string) => orm.ilike(listings.name, q)`,
+      'sql fragment without a statement keyword': `import { sql } from 'drizzle-orm'
+        export const f = (q: string) => sql\`\${listings.name} LIKE \${\`%\${q}%\`}\``,
+      'lowercase statement': `export const f = 'select id from listings where name like ?'`,
+      'concatenated pattern in parentheses': `export const f = \`SELECT id FROM listings WHERE name LIKE ('%' || ? || '%')\``,
+      'function form': `export const f = 'SELECT id FROM listings WHERE like(?, name)'`,
+      'wrapped pattern': `export const f = 'SELECT id FROM t WHERE name NOT GLOB lower(?) AND x = 1'`,
+      'literal function-form pattern over 50 bytes': `export const f = "SELECT like('${'%'.repeat(60)}', name)"`,
+      'function with 33 arguments': `export const f = 'SELECT max(${Array(33).fill('1').join(',')})'`
+    }
+    for (const [name, source] of Object.entries(bypasses)) {
+      expect(sqlSourceViolations(`fixture.ts`, source), name).not.toEqual([])
+    }
+    for (const safe of [
+      `export const f = "SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND type = ?"`,
+      `export const f = 'SELECT id FROM t WHERE instr(lower(name), ?) > 0 AND slug LIKE \\'a%\\''`,
+      `import { eq, sql } from 'drizzle-orm'
+        export const f = (q: string) => sql\`\${listings.name} = \${q}\``,
+      `export const message = 'Looks like a good choice.'`
+    ]) {
+      expect(sqlSourceViolations('fixture.ts', safe), safe).toEqual([])
+    }
   })
 
   it('keeps retired public static repositories out of live application links', () => {

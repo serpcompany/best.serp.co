@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
+import { assertD1StatementLimits } from '@serpdirectory/data-ops/sql-limits'
 import { hasFileExtension } from '@serpdirectory/web-core/canonical-url'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
@@ -62,8 +63,11 @@ function d1Binding(value: unknown): SQLInputValue {
 function executeInTestTransaction(db: DatabaseSync, publication: PublicationPlan): void {
   db.exec('DROP TABLE IF EXISTS publication_guard; BEGIN IMMEDIATE;')
   try {
-    for (const item of publication.statements)
+    for (const item of publication.statements) {
+      // The production publisher's SQL gets the same D1 limit and self-comparison checks (#77).
+      assertD1StatementLimits(item.query, item.bindings)
       db.prepare(item.query).run(...item.bindings.map(d1Binding))
+    }
     db.exec('COMMIT')
   } catch (error) {
     db.exec('ROLLBACK')

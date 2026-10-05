@@ -51,6 +51,11 @@ export type UserRole = (typeof userRoles)[number]
 /** Rate-limit log rows older than this are pruned; no rule window may exceed it. */
 export const AUTH_RATE_LIMIT_RETENTION_MS = 24 * 60 * 60 * 1000
 const PRUNE_BATCH_SIZE = 200
+/**
+ * Rules per decision. The check binds three values per rule plus two, so this keeps the
+ * statement far below D1's 100 bound parameters (#77); callers pass at most three.
+ */
+export const MAX_AUTH_RATE_LIMIT_RULES = 16
 
 export interface AuthRateLimitRule {
   /** Normalized key the rule counts, for example an email address or an IP address. */
@@ -197,6 +202,9 @@ export function createAuthOperations({
   return {
     async consumeRateLimit(rules) {
       if (rules.length === 0) return { allowed: true, retryAfterSeconds: 0 }
+      if (rules.length > MAX_AUTH_RATE_LIMIT_RULES) {
+        throw new Error(`Auth rate limits take at most ${MAX_AUTH_RATE_LIMIT_RULES} rules.`)
+      }
       for (const rule of rules) validRule(rule)
       const now = clock().getTime()
       if (!Number.isFinite(now)) throw new Error('Auth rate limit clock is invalid.')
@@ -204,11 +212,8 @@ export function createAuthOperations({
       const buckets = await Promise.all(
         rules.map(rule => hmacHex(key, `${rule.scope}\0${rule.key}`))
       )
-      const distinctBuckets = [...new Set(buckets)]
-      const candidates = sql.join(
-        distinctBuckets.map(bucket => sql`SELECT ${bucket} AS bucket`),
-        sql` UNION `
-      )
+      // One JSON binding instead of a UNION per bucket: D1 allows five compound SELECT terms.
+      const candidates = sql`SELECT DISTINCT value AS bucket FROM json_each(${JSON.stringify(buckets)})`
       const underEveryLimit = sql.join(
         rules.map(
           (rule, index) =>

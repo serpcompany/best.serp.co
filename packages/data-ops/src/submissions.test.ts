@@ -132,6 +132,25 @@ describe('shared submission data operations', () => {
     ).resolves.toMatchObject({ slug: 'autoenhance.ai' })
   })
 
+  // #77: the batch size follows the input, so data-ops caps it like the form does.
+  it('refuses more than five resource links or FAQs before touching D1', async () => {
+    const link = { label: 'Docs', url: 'https://example.com/docs' }
+    const faq = { answer: 'Yes.', question: 'Free?' }
+    for (const overflow of [{ resourceLinks: Array(6).fill(link) }, { faqs: Array(6).fill(faq) }]) {
+      await expect(
+        operations().createSubmission({ ...input, ...overflow, website: 'https://capped.example/' })
+      ).rejects.toMatchObject({ code: 'too_many_items', status: 400 })
+    }
+    await expect(
+      operations().createSubmission({
+        ...input,
+        faqs: Array(5).fill(faq),
+        resourceLinks: Array(5).fill(link),
+        website: 'https://capped.example/'
+      })
+    ).resolves.toMatchObject({ slug: 'capped.example' })
+  })
+
   it('blocks every variant and subdomain of a prohibited registrable domain', async () => {
     sqlite.database.exec(`INSERT INTO listing_submission_url_blocks
       (url_key,covers_subdomains,reason,blocked_by,blocked_at) VALUES

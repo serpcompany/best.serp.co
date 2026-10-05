@@ -224,6 +224,26 @@ export function revisionContentSource(id: string): StagedContentSource {
 }
 
 /**
+ * Resource links and FAQs per submission or revision: the submission form's caps
+ * (`packages/web-core/src/forms/submission-contract.ts`), enforced here as well so a batch's
+ * statement count stays bounded whatever the caller (#77).
+ */
+export const MAX_STAGED_RESOURCE_LINKS = 5
+export const MAX_STAGED_FAQS = 5
+
+/** Throws when staged content has more resource links or FAQs than a listing may carry. */
+export function assertStagedChildLimits(
+  content: Pick<StagedListingContent, 'faqs' | 'resourceLinks'>
+): void {
+  if (content.resourceLinks.length > MAX_STAGED_RESOURCE_LINKS) {
+    throw new Error(`A listing has at most ${MAX_STAGED_RESOURCE_LINKS} resource links.`)
+  }
+  if (content.faqs.length > MAX_STAGED_FAQS) {
+    throw new Error(`A listing has at most ${MAX_STAGED_FAQS} FAQs.`)
+  }
+}
+
+/**
  * Replaces the resource links and FAQs of a staged submission or revision. The caller's
  * preceding compare-and-swap decides whether the row may be edited.
  */
@@ -231,6 +251,7 @@ export function replaceStagedChildrenPlans(
   source: StagedContentSource,
   content: Pick<StagedListingContent, 'faqs' | 'resourceLinks'>
 ): StatementPlan[] {
+  assertStagedChildLimits(content)
   return [
     {
       sql: `DELETE FROM ${source.resourceTable} WHERE ${source.parentColumn}=?`,
