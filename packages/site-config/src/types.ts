@@ -99,8 +99,12 @@ export type SiteDefinition = {
   copy: SiteCopyConfig
   /** Transactional email identity (`apps/web/lib/email/`). */
   email: {
+    /** Root-relative path of the admin dashboard that admin email footers link to. */
+    adminDashboardPath: string
+    /** Who receives admin alerts (submission ready for review, new message). */
+    adminRecipient: string
     /**
-     * Root-relative path of the dashboard every email footer links to. The sender is not
+     * Root-relative path of the dashboard every user email footer links to. The sender is not
      * monitored, so replies happen there (serpcompany/best.serp.co#73).
      */
     dashboardPath: string

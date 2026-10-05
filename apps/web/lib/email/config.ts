@@ -78,10 +78,20 @@ export function resolveUseSendConfig(env: {
 }
 
 /**
- * The dashboard every email footer links to (`/account/`). The sender is not monitored and
- * emails carry no Reply-To; replies happen in the dashboard (serpcompany/best.serp.co#73).
+ * The dashboard every user email footer links to (`/account/`; `/account/messages/` once #73
+ * adds the inbox). The sender is not monitored and emails carry no Reply-To; replies happen in
+ * the dashboard (serpcompany/best.serp.co#73).
  */
 export const EMAIL_DASHBOARD_PATH = site.email.dashboardPath
+
+/** The dashboard admin email footers link to (`/admin/`; `/admin/inbox/` once #73 lands). */
+export const EMAIL_ADMIN_DASHBOARD_PATH = site.email.adminDashboardPath
+
+/**
+ * The address admin alerts go to (`devin@serp.co`, serpcompany/best.serp.co#59). Callers pass
+ * it as the recipient; templates never hold an address.
+ */
+export const EMAIL_ADMIN_RECIPIENT = site.email.adminRecipient
 
 export const STAGING_SUBJECT_PREFIX = '[staging]'
 

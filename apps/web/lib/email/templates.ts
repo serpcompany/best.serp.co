@@ -119,9 +119,13 @@ const CSS_PROPERTIES = new Set([
   'margin-left',
   'margin-right',
   'margin-top',
+  'max-height',
   'max-width',
   'min-width',
+  'mso-hide',
   'mso-line-height-rule',
+  'opacity',
+  'overflow',
   'padding',
   'padding-bottom',
   'padding-left',
@@ -138,7 +142,7 @@ const CSS_PROPERTIES = new Set([
 // Colours as hex, lengths, numbers, keywords, and font stacks. No `(`, `)`, `\`, `:`, `;`,
 // `/`, `@`, `<`, or `>`, so no `url()`, `expression()`, escapes, or a second declaration.
 const CSS_VALUE =
-  /^(?:#[0-9a-f]{3,8}|-?\d*\.?\d+(?:px|em|rem|%)?|[a-z][a-z-]*|'[a-z0-9 -]+'|"[a-z0-9 -]+")(?:\s*,?\s+|\s*,\s*)?/iu
+  /^(?:#[0-9a-f]{3,8}|-?\d*\.?\d+(?:px|em|rem|%)?|-?[a-z][a-z-]*|'[a-z0-9 -]+'|"[a-z0-9 -]+")(?:\s*,?\s+|\s*,\s*)?/iu
 
 function isCssValue(value: string): boolean {
   let rest = value.trim()
@@ -520,11 +524,14 @@ export function createEmailLinks(origin: string): EmailLinks {
 export interface EmailRenderContext {
   /**
    * The absolute dashboard URL every footer must link to, in both bodies: the sender is not
-   * monitored, so the footer says so and points here (serpcompany/best.serp.co#73).
+   * monitored, so the footer says so and points here (serpcompany/best.serp.co#73). Users get
+   * their dashboard, admins (`audience: 'admin'`) the admin one.
    */
   dashboardUrl: string
   environment: SiteEnvironment
   links: EmailLinks
+  /** The normalized address this email goes to, for "you're getting this because" lines. */
+  recipient: string
 }
 
 export interface EmailContent {
@@ -534,6 +541,8 @@ export interface EmailContent {
 }
 
 export interface EmailTemplate<Input> {
+  /** Who reads it, which picks the footer's dashboard link. Defaults to `user`. */
+  readonly audience?: 'admin' | 'user'
   /** Stable id, recorded with each delivery: lower-case letters, digits, and dashes. */
   readonly id: string
   render(input: Input, context: EmailRenderContext): EmailContent

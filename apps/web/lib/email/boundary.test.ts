@@ -57,7 +57,10 @@ describe('email module boundary', () => {
       'templates.ts',
       'test-fixture.ts'
     ])
-    for (const file of modules) {
+    const emails = readdirSync(resolve(emailDirectory, 'emails'))
+      .filter(file => file.endsWith('.ts'))
+      .map(file => `emails/${file}`)
+    for (const file of [...modules, ...emails]) {
       expect(source(file), file).not.toMatch(
         /import 'server-only'|from '(?:@opennextjs\/[^']+|next(?:\/[^']+)?)'|process\.env/u
       )
@@ -90,10 +93,15 @@ describe('email module boundary', () => {
       file =>
         !/\.test\.tsx?$/u.test(file) &&
         importSpecifiers(readFileSync(resolve(appDirectory, file), 'utf8')).some(specifier =>
-          /(?:^|\/)test-fixture$/u.test(specifier)
+          /(?:^|\/)(?:test-fixture|samples)$/u.test(specifier)
         )
     )
     expect(fixtureImports).toEqual([])
+    // Templates take every address as input or from config; none holds one.
+    for (const file of readdirSync(resolve(emailDirectory, 'emails'))) {
+      if (!file.endsWith('.ts') || file.endsWith('.test.ts') || file === 'samples.ts') continue
+      expect(source(`emails/${file}`), file).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/u)
+    }
   })
 
   it('is never imported by a Client Component, by any path', () => {

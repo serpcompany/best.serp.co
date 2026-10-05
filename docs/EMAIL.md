@@ -28,7 +28,7 @@ Worker handler outside Next.js.
 | `config.ts` | Environment policy, senders, link origins, the staging allowlist, useSend settings |
 | `senders.ts` | Providers behind one interface: useSend (API), log (local), capture (tests) |
 | `templates.ts` | Template contract: `defineEmailTemplate`, the escaping `html` tag, `css`, absolute links |
-| `registry.ts` | The site's templates, empty until #70 is approved |
+| `registry.ts` | The site's 16 emails, built to #70; catalog in [Email templates](./EMAIL_TEMPLATES.md) |
 
 The idempotency ledger lives in `packages/data-ops/src/email-deliveries.ts` (table
 `email_deliveries`), like every other SQL statement. Senders and the dashboard path come from
@@ -159,9 +159,11 @@ them in Workers Logs:
 
 ## Templates
 
-A template is `defineEmailTemplate<Input>({ id, render(input, context) })` returning
-`{ subject, text, html }`; `context` holds `environment`, `links`, and `dashboardUrl` (the
-absolute `/account/` URL for the sending environment).
+A template is `defineEmailTemplate<Input>({ id, audience?, render(input, context) })`
+returning `{ subject, text, html }`. `context` holds `environment`, `links`, `recipient`, and
+`dashboardUrl`: the absolute `/account/` URL, or `/admin/` for `audience: 'admin'`. Every
+registered email and its inputs are listed in [Email templates](./EMAIL_TEMPLATES.md); they
+share the layout in `apps/web/lib/email/emails/layout.ts`.
 
 - **Footer.** Every email says the address isn't monitored and links to `dashboardUrl`;
   `renderEmail` refuses a template whose text or HTML body lacks that link.

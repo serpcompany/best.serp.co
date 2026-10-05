@@ -30,6 +30,11 @@ export const site: SiteDefinition = {
   // serp.co (serpcompany/best.serp.co#59). Nothing receives mail for them: emails carry no
   // Reply-To, and their footer sends people to the dashboard (#73 adds its inbox).
   email: {
+    // TODO(#73): '/admin/inbox/' once the admin inbox exists; the admin dashboard until then.
+    adminDashboardPath: '/admin/',
+    // One alert recipient (serpcompany/best.serp.co#59), not every admin on the allowlist.
+    adminRecipient: 'devin@serp.co',
+    // TODO(#73): '/account/messages/' once the dashboard inbox exists; the dashboard until then.
     dashboardPath: '/account/',
     from: {
       name: 'SERP Directory',

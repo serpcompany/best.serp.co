@@ -51,19 +51,36 @@ describe('enqueueEmail', () => {
       ctx: { waitUntil },
       env: { D1_RUNTIME_ENV: 'local', DB: new SqliteD1().asD1Database(), SITE_ENVIRONMENT: 'local' }
     })
+    const infos = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     await expect(
-      enqueue('test-fixture', { eventKey: 'fixture:server', input: {}, to: 'owner@serp.co' })
+      enqueue('sign-in-code', {
+        eventKey: 'sign-in-code:0b7c2d9e-1f4a-4c3b-9a8e-123456789abc',
+        input: { code: '481902' },
+        to: 'owner@serp.co'
+      })
     ).resolves.toBeUndefined()
     expect(getCloudflareContext).toHaveBeenCalledWith({ async: true })
     expect(waitUntil).toHaveBeenCalledTimes(1)
     await waitUntil.mock.calls[0]?.[0]
-    // No template is registered yet, so the scheduled delivery rejects it and logs why.
+    // Locally the registered sign-in code is written to the log, never sent.
+    const lines = loggedLines(infos)
+    expect(lines[0]).toMatchObject({
+      event: 'email_logged',
+      subject: '481902 is your SERP sign-in code',
+      to: 'owner@serp.co'
+    })
+    expect(lines[1]).toMatchObject({
+      event: 'email_sent',
+      provider: 'log',
+      templateId: 'sign-in-code'
+    })
+    expect(loggedLines(errors)).toEqual([])
+
+    // An unregistered id is rejected in the background, never thrown.
+    await enqueue('test-fixture', { eventKey: 'fixture:server', input: {}, to: 'owner@serp.co' })
+    await waitUntil.mock.calls[1]?.[0]
     expect(loggedLines(errors)).toEqual([
-      expect.objectContaining({
-        event: 'email_rejected',
-        eventKey: 'fixture:server',
-        reason: 'unknown_template'
-      })
+      expect.objectContaining({ event: 'email_rejected', reason: 'unknown_template' })
     ])
   })
 
