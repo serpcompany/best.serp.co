@@ -4,11 +4,21 @@ import { join } from 'node:path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { stringify } from 'yaml'
 import {
+  SMOKE_TEST_HEADER,
+  WORKER_VERSION_HEADER
+} from '../apps/web/lib/environment/site-environment'
+import {
   metaRobotsBlocksIndexing,
   robotsTxtBlockedPath,
   xRobotsTagBlocksIndexing
 } from './crawl-policy.ts'
-import { runHttpGates } from './d1-preview-http-gates.ts'
+import {
+  deployedWorkerVersion,
+  expectedWorkerVersionFromEnvironment,
+  type HttpGateOptions,
+  runHttpGates,
+  waitForWorkerVersion
+} from './d1-preview-http-gates.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -28,8 +38,13 @@ writeFileSync(
 
 afterAll(() => rmSync(fixtureDirectory, { force: true, recursive: true }))
 
-function gates(mode: string, baseUrl: string, timeoutMs?: number): Promise<void> {
-  return runHttpGates(mode, baseUrl, { parityReportPath, timeoutMs })
+function gates(
+  mode: string,
+  baseUrl: string,
+  timeoutMs?: number,
+  options: HttpGateOptions = {}
+): Promise<void> {
+  return runHttpGates(mode, baseUrl, { parityReportPath, timeoutMs, ...options })
 }
 
 /** Requests the trailing-slash gates make, and the canonical redirects they require. */
@@ -206,16 +221,23 @@ describe('environment-specific HTTP gates', () => {
   })
 })
 
-// Crawl policy (serp standards/environment-configuration.md). Kept apart from the route
-// contracts above: after them, Production fetches /, /sitemap-index.xml and /robots.txt again,
-// and Staging fetches / again.
-const CRAWL_POLICY_REQUESTS = { production: 3, staging: 1 } as const
+// Crawl and analytics policy (serp standards/environment-configuration.md). Kept apart from the
+// route contracts above: after them, Production fetches /, /sitemap-index.xml and /robots.txt
+// again, and Staging fetches /, /sitemap-index.xml, /robots.txt, and / without the smoke header.
+const CRAWL_POLICY_REQUESTS = { production: 3, staging: 4 } as const
 
 function correctRobotsTxt(robotsOrigin: string): string {
+  if (robotsOrigin !== origin) return 'User-agent: *\nDisallow: /\n'
   return `User-Agent: *\nAllow: /\nDisallow: /search\nSitemap: ${robotsOrigin}/sitemap-index.xml\n`
 }
 
-/** What a correct deployment serves: Staging is noindex, Production lists its sitemap. */
+const googleTagManager =
+  '<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TEST"></iframe></noscript>'
+
+/**
+ * What a correct deployment serves: Staging is noindex everywhere, disallows crawling, and
+ * loads no Google Tag Manager; Production lists its sitemap and loads Google Tag Manager.
+ */
 function withCrawlPolicy(url: URL, response: Response): Response {
   const headers = new Headers(response.headers)
   if (url.origin !== origin) headers.set('x-robots-tag', 'noindex, nofollow')
@@ -223,7 +245,7 @@ function withCrawlPolicy(url: URL, response: Response): Response {
     return new Response(correctRobotsTxt(url.origin), { status: 200, headers })
   if (url.pathname === '/')
     return new Response(
-      '<html><head><title>SERP</title><meta name="robots" content="index, follow"/></head><body>ok</body></html>',
+      `<html><head><title>SERP</title><meta name="robots" content="index, follow"/></head><body>${url.origin === origin ? googleTagManager : ''}ok</body></html>`,
       { status: response.status, headers }
     )
   return new Response(response.body, { status: response.status, headers })
@@ -261,19 +283,88 @@ describe('environment-specific crawl policy gates', () => {
     ])
     const staging = stubCrawlPolicy((_url, response) => response)
     await expect(gates('staging', stagingOrigin)).resolves.toBeUndefined()
-    expect(staging.slice(-CRAWL_POLICY_REQUESTS.staging).map(url => url.pathname)).toEqual(['/'])
+    expect(staging.slice(-CRAWL_POLICY_REQUESTS.staging).map(url => url.pathname)).toEqual([
+      '/',
+      '/sitemap-index.xml',
+      '/robots.txt',
+      '/'
+    ])
   })
 
-  it('requires Staging to send noindex in the header or the robots meta', async () => {
-    stubCrawlPolicy((url, response) => {
-      if (url.pathname !== '/') return response
-      return new Response('<html><head><meta name="robots" content="noindex"></head></html>')
-    })
-    await expect(gates('staging', stagingOrigin)).resolves.toBeUndefined()
+  it.each(['/', '/sitemap-index.xml', '/robots.txt'])(
+    'requires Staging to send an X-Robots-Tag noindex on %s',
+    async path => {
+      stubCrawlPolicy((url, response) => {
+        if (url.pathname !== path) return response
+        const headers = new Headers(response.headers)
+        headers.delete('x-robots-tag')
+        // A robots meta alone is not enough: every response carries the header.
+        return new Response(
+          path === '/' ? '<html><head><meta name="robots" content="noindex"></head></html>' : 'x',
+          { headers }
+        )
+      })
+      await expect(gates('staging', stagingOrigin)).rejects.toThrow(
+        `staging route ${path} sent no noindex in its X-Robots-Tag header`
+      )
+    }
+  )
+
+  it.each([
+    [
+      'the production rules',
+      `User-Agent: *\nAllow: /\nSitemap: ${origin}/sitemap-index.xml\n`,
+      '*'
+    ],
+    [
+      'Googlebot allowed',
+      'User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nAllow: /\n',
+      'googlebot'
+    ],
+    ['no rules', '', '*']
+  ])('rejects a Staging robots.txt with %s', async (_label, robots, agent) => {
     stubCrawlPolicy((url, response) =>
-      url.pathname === '/' ? new Response('<html><head></head></html>') : response
+      url.pathname === '/robots.txt'
+        ? new Response(robots, { headers: { 'x-robots-tag': 'noindex' } })
+        : response
     )
-    await expect(gates('staging', stagingOrigin)).rejects.toThrow('sent no noindex')
+    await expect(gates('staging', stagingOrigin)).rejects.toThrow(
+      `staging robots.txt lets user-agent ${agent} crawl /`
+    )
+  })
+
+  it('rejects Google Tag Manager outside Production and requires it on Production', async () => {
+    stubCrawlPolicy((url, response) =>
+      url.pathname === '/'
+        ? new Response(`<html><head></head><body>${googleTagManager}</body></html>`, {
+            headers: response.headers
+          })
+        : response
+    )
+    await expect(gates('staging', stagingOrigin)).rejects.toThrow(
+      'staging route / loads Google Tag Manager'
+    )
+    stubCrawlPolicy((url, response) =>
+      url.pathname === '/' ? new Response('<html><head></head><body>ok</body></html>') : response
+    )
+    await expect(gates('production', origin)).rejects.toThrow(
+      'production route / does not load Google Tag Manager'
+    )
+  })
+
+  it('rejects a Staging origin that redirects requests without the smoke-test header', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input))
+        if (!new Headers(init?.headers).has(SMOKE_TEST_HEADER))
+          return new Response(null, { status: 308, headers: { location: `${origin}/` } })
+        return withCrawlPolicy(url, successfulResponse(url))
+      })
+    )
+    await expect(gates('staging', stagingOrigin)).rejects.toThrow(
+      `without the smoke-test header returned 308 ${origin}/; this origin must not redirect`
+    )
   })
 
   it.each([
@@ -409,5 +500,179 @@ describe('crawl policy readers', () => {
     expect(
       robotsTxtBlockedPath('User-agent: *\nDisallow: /pro*$\nAllow: /products/\n', ['/products/a/'])
     ).toBeNull()
+  })
+})
+
+describe('smoke-test header and deployed Worker version', () => {
+  const deployed = '0a1b2c3d-0000-4000-8000-00000000d0d0'
+  const previous = '0a1b2c3d-0000-4000-8000-0000000000aa'
+
+  /** A correct deployment whose responses report `answering()` as their Worker version. */
+  function stubVersioned(answering: (url: URL) => string | null) {
+    const requests: Array<{ smoke: boolean; url: URL }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input))
+        requests.push({ smoke: new Headers(init?.headers).has(SMOKE_TEST_HEADER), url })
+        const response = withCrawlPolicy(url, successfulResponse(url))
+        const version = answering(url)
+        return version ? withHeader(response, WORKER_VERSION_HEADER, version) : response
+      })
+    )
+    return requests
+  }
+
+  const noWait = { sleep: async () => {}, versionPollIntervalMs: 1_000 }
+
+  it('sends the smoke-test header on every gate request but the no-redirect check', async () => {
+    const requests = stubVersioned(() => null)
+    await expect(gates('staging', stagingOrigin)).resolves.toBeUndefined()
+    expect(requests.filter(request => !request.smoke).map(request => request.url.pathname)).toEqual(
+      ['/']
+    )
+    const production = stubVersioned(() => null)
+    await expect(gates('production', origin)).resolves.toBeUndefined()
+    expect(production.every(request => request.smoke)).toBe(true)
+  })
+
+  it('waits until the deployed version answers, then requires it on every response', async () => {
+    let probes = 0
+    const requests = stubVersioned(url => {
+      if (url.pathname !== '/robots.txt' || probes >= 5) return deployed
+      probes += 1
+      return probes <= 2 ? previous : deployed
+    })
+    await expect(
+      gates('staging', stagingOrigin, undefined, { expectedVersion: deployed, ...noWait })
+    ).resolves.toBeUndefined()
+    // Two answers from the previous version, then three in a row from the deployed one.
+    expect(requests.slice(0, 5).map(request => request.url.pathname)).toEqual(
+      Array(5).fill('/robots.txt')
+    )
+    expect(requests[5]?.url.pathname).not.toBe('/robots.txt')
+  })
+
+  it('fails when the deployed version never answers within the bound', async () => {
+    const requests = stubVersioned(() => previous)
+    await expect(
+      gates('staging', stagingOrigin, undefined, {
+        expectedVersion: deployed,
+        ...noWait,
+        versionWaitMs: 10_000
+      })
+    ).rejects.toThrow(
+      `Worker version ${deployed} did not answer ${stagingOrigin} within 10 s (last answer: ${previous})`
+    )
+    expect(requests.length).toBeLessThanOrEqual(11)
+    await expect(
+      waitForWorkerVersion(new URL(stagingOrigin), deployed, { waitMs: 60_001 })
+    ).rejects.toThrow('at most 60 seconds')
+  })
+
+  it('fails a gate answered by another version after the wait', async () => {
+    let answered = 0
+    stubVersioned(url => {
+      answered += 1
+      return url.pathname === '/rss.xml' && answered > 3 ? previous : deployed
+    })
+    await expect(
+      gates('production', origin, undefined, { expectedVersion: deployed, ...noWait })
+    ).rejects.toThrow(
+      `production route /rss.xml was answered by Worker version ${previous}, not the deployed ${deployed}`
+    )
+  })
+
+  it('reads the deployed version from Wrangler output', () => {
+    const output = [
+      JSON.stringify({ type: 'wrangler-session', version: 1 }),
+      JSON.stringify({ type: 'deploy', version: 1, version_id: previous }),
+      '',
+      JSON.stringify({ type: 'deploy', version: 1, version_id: deployed, worker_name: 'w' })
+    ].join('\n')
+    expect(deployedWorkerVersion(output)).toBe(deployed)
+    expect(() => deployedWorkerVersion('{"type":"version-upload"}')).toThrow('no Wrangler deploy')
+    expect(() => deployedWorkerVersion('not json')).toThrow('not JSON')
+    expect(() =>
+      deployedWorkerVersion(JSON.stringify({ type: 'deploy', version_id: 'bad id;' }))
+    ).toThrow('invalid Worker version')
+
+    const outputPath = join(fixtureDirectory, 'wrangler-output.ndjson')
+    writeFileSync(outputPath, output)
+    expect(expectedWorkerVersionFromEnvironment({ WRANGLER_OUTPUT_FILE_PATH: outputPath })).toBe(
+      deployed
+    )
+    expect(
+      expectedWorkerVersionFromEnvironment({
+        EXPECTED_WORKER_VERSION: previous,
+        WRANGLER_OUTPUT_FILE_PATH: outputPath
+      })
+    ).toBe(previous)
+    expect(expectedWorkerVersionFromEnvironment({})).toBeUndefined()
+    expect(() =>
+      expectedWorkerVersionFromEnvironment({
+        WRANGLER_OUTPUT_FILE_PATH: join(fixtureDirectory, 'missing.ndjson')
+      })
+    ).toThrow('is unreadable')
+  })
+})
+
+describe('production canonical-host redirect gate', () => {
+  const platform = 'https://best-serp-co-production.serpcompany.workers.dev'
+
+  function wranglerConfig(value: string): string {
+    const path = join(fixtureDirectory, `wrangler-${value}.jsonc`)
+    writeFileSync(
+      path,
+      JSON.stringify({ env: { production: { vars: { CANONICAL_HOST_REDIRECT: value } } } })
+    )
+    return path
+  }
+
+  /** The production Worker with the switch on: workers.dev redirects unless the smoke header is sent. */
+  function stubRedirecting(location = (url: URL) => `${origin}${url.pathname}/${url.search}`) {
+    const requests: URL[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input))
+        requests.push(url)
+        if (url.origin === platform && !new Headers(init?.headers).has(SMOKE_TEST_HEADER))
+          return new Response(null, { status: 308, headers: { location: location(url) } })
+        return withCrawlPolicy(url, successfulResponse(url))
+      })
+    )
+    return requests
+  }
+
+  it('checks the platform host only when the checked-in switch is on', async () => {
+    const off = stubRedirecting()
+    await expect(
+      gates('production', origin, undefined, { wranglerConfigPath: wranglerConfig('off') })
+    ).resolves.toBeUndefined()
+    expect(off.some(url => url.origin === platform)).toBe(false)
+
+    const on = stubRedirecting()
+    await expect(
+      gates('production', origin, undefined, { wranglerConfigPath: wranglerConfig('on') })
+    ).resolves.toBeUndefined()
+    expect(on.filter(url => url.origin === platform).map(url => url.pathname)).toEqual([
+      '/about',
+      '/'
+    ])
+  })
+
+  it('requires one 308 to the same canonical URL on best.serp.co', async () => {
+    stubRedirecting(() => '/about/?gate=canonical-host')
+    await expect(
+      gates('production', origin, undefined, { wranglerConfigPath: wranglerConfig('on') })
+    ).rejects.toThrow(`not a 308 to ${origin}/about/?gate=canonical-host`)
+  })
+
+  it('refuses a switch that is neither on nor off', async () => {
+    stubRedirecting()
+    await expect(
+      gates('production', origin, undefined, { wranglerConfigPath: wranglerConfig('yes') })
+    ).rejects.toThrow('CANONICAL_HOST_REDIRECT must be on or off')
   })
 })

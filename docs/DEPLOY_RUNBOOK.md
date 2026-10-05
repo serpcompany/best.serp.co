@@ -19,7 +19,7 @@ Status (serpcompany/best.serp.co#34):
 | Worker | `best-serp-co-staging` (workers.dev) | `best-serp-co-production` (workers.dev review URL until cutover) |
 | D1 | `best-serp-co-staging` `8e6b67e5-9c58-4fa9-aca1-25b0020c0833` | `best-serp-co-production` `404ec437-53a2-4fbc-8b5f-b5e69065708e` |
 | Origin | https://best-serp-co-staging.serpcompany.workers.dev | https://best.serp.co (Worker Custom Domain on `serp.co`, at cutover) |
-| Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`; `*.workers.dev` responses are `noindex`). Production HTTP gates run here until best.serp.co stops returning `server: GitHub.com`. After cutover, set `workers_dev: false` (and `project.remote.production.workersDev`) to retire it. |
+| Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`; `*.workers.dev` responses are `noindex`). Production HTTP gates run here until best.serp.co stops returning `server: GitHub.com`. At cutover it does not go away: `CANONICAL_HOST_REDIRECT` flips to `on` and it 308s to best.serp.co except for requests with the smoke-test header (#42 decision e; see [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)). |
 | GitHub environment | `staging` (`main` only, no reviewers) | `production` (required reviewers, `main` only) |
 
 The identities live in `env.staging` / `env.production` of `apps/web/wrangler.jsonc` and in
@@ -230,9 +230,17 @@ permission beyond the deploy token above.
    GitHub Pages CNAME), confirm `curl -I https://best.serp.co` no longer shows
    `server: GitHub.com`, re-run **Deploy Production** (`worker-only`) for the HTTP gates,
    and submit `sitemap-index.xml` in Search Console.
-5. Set up the submission notifier and re-enable the `submit-gsc-sitemaps.yml` schedule.
-6. Disable GitHub Pages and delete the `legacy-static` branch.
-7. Remove `apps/serp.co` and `sites/serp.co` from `json-directory-template`.
+5. Switch the platform host to the canonical host: merge a reviewed change setting
+   `env.production.vars.CANONICAL_HOST_REDIRECT` to `"on"` in `apps/web/wrangler.jsonc`,
+   then release it with **Deploy Production** (`worker-only`). The production HTTP gates then
+   also require `https://best-serp-co-production.serpcompany.workers.dev/about` to answer
+   one 308 to `https://best.serp.co/about/`. Never flip it before step 4: the review URL
+   would redirect to GitHub Pages, and the pre-cutover gates refuse that. Keep
+   `workers_dev: true`; CI reaches the Worker there with the `x-best-serp-co-smoke-test`
+   header.
+6. Set up the submission notifier and re-enable the `submit-gsc-sitemaps.yml` schedule.
+7. Disable GitHub Pages and delete the `legacy-static` branch.
+8. Remove `apps/serp.co` and `sites/serp.co` from `json-directory-template`.
 
 Production database or Worker operations require explicit maintainer confirmation;
 a passing local harness never grants deployment authority.

@@ -10,7 +10,8 @@
   },
   "vars": {
     "AUTH_TRUST_HOST": "true",
-    "D1_RUNTIME_ENV": "local"
+    "D1_RUNTIME_ENV": "local",
+    "SITE_ENVIRONMENT": "local"
   },
   "version_metadata": {
     "binding": "CF_VERSION_METADATA"
@@ -28,12 +29,14 @@
     "staging": {
       "name": "best-serp-co-staging",
       "workers_dev": true,
+      "preview_urls": false,
       "observability": {
         "enabled": true
       },
       "vars": {
         "AUTH_TRUST_HOST": "true",
-        "D1_RUNTIME_ENV": "staging"
+        "D1_RUNTIME_ENV": "staging",
+        "SITE_ENVIRONMENT": "staging"
       },
       "version_metadata": {
         "binding": "CF_VERSION_METADATA"
@@ -51,12 +54,15 @@
     "production": {
       "name": "best-serp-co-production",
       "workers_dev": true,
+      "preview_urls": false,
       "observability": {
         "enabled": true
       },
       "vars": {
         "AUTH_TRUST_HOST": "true",
-        "D1_RUNTIME_ENV": "production"
+        "CANONICAL_HOST_REDIRECT": "off",
+        "D1_RUNTIME_ENV": "production",
+        "SITE_ENVIRONMENT": "production"
       },
       "version_metadata": {
         "binding": "CF_VERSION_METADATA"

@@ -25,6 +25,10 @@ interface D1Database {
 interface CloudflareEnv {
   AUTH_TRUST_HOST: 'true'
   ASSETS: { fetch(request: Request): Promise<Response> }
+  /** `on` 308s the production Worker's workers.dev host to best.serp.co (production only). */
+  CANONICAL_HOST_REDIRECT?: 'on' | 'off'
   DB: D1Database
   D1_RUNTIME_ENV: 'local' | 'staging' | 'production'
+  /** Crawl and analytics policy; anything but `production` is non-production. */
+  SITE_ENVIRONMENT?: 'local' | 'staging' | 'production'
 }

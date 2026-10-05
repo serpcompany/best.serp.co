@@ -98,7 +98,9 @@ let nextConfig: NextConfig = {
 
   headers: async () => [
     {
-      // Staging runs on a public *.workers.dev hostname; keep it out of search indexes.
+      // Defense in depth: the Worker entry sends noindex on every response outside public
+      // production (SITE_ENVIRONMENT, docs/ARCHITECTURE.md#environments-and-hosts). This host
+      // rule keeps the *.workers.dev hosts out of search indexes even if that config is wrong.
       source: '/:path*',
       has: [{ type: 'host', value: '.*\\.workers\\.dev' }],
       headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }]

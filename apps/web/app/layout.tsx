@@ -10,6 +10,7 @@ import { siteCopy } from '@serpdirectory/web-core/site-copy'
 import { SignOutButton } from '@/components/auth/sign-out-button'
 import { getHeaderAuthState } from '@/lib/auth'
 import { getActiveCategories } from '@/lib/catalog/repository'
+import { isPublicProductionRequest } from '@/lib/environment/request-environment'
 
 export const metadata = rootLayoutMetadata
 export const dynamic = 'force-dynamic'
@@ -19,11 +20,14 @@ type RootLayoutProps = {
 }
 
 export default async function RootLayout({ children }: RootLayoutProps): Promise<ReactElement> {
-  const gtmId = resolveGoogleTagManagerId(siteConfig)
-  const [authState, activeCategories] = await Promise.all([
+  const [authState, activeCategories, publicProduction] = await Promise.all([
     getHeaderAuthState(),
-    getActiveCategories()
+    getActiveCategories(),
+    isPublicProductionRequest()
   ])
+  // Analytics load only on the public production site, never on local, staging, or the
+  // production Worker's workers.dev host (docs/ARCHITECTURE.md#environments-and-hosts).
+  const gtmId = publicProduction ? resolveGoogleTagManagerId(siteConfig) : undefined
   const activeCategorySlugs = activeCategories.map(category => category.slug)
 
   return (

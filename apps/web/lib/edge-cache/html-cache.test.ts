@@ -6,6 +6,7 @@ import {
   EpochMemo,
   isCacheableRequest,
   loadSharedEpoch,
+  renderRequestFor,
   withEdgeCache
 } from './html-cache'
 
@@ -189,6 +190,68 @@ describe('edge HTML cache', () => {
     expect(head.status).toBe(404)
     expect(head.headers.get(EDGE_CACHE_HEADER)).toBe('HIT')
     expect(head.body).toBeNull()
+  })
+
+  it('renders a cacheable request with allowlisted headers only', () => {
+    const forwarded = renderRequestFor(
+      page('/products/?page=2', {
+        headers: {
+          accept: 'text/html',
+          cookie: 'theme=dark',
+          'next-router-state-tree': '%5B%22%22%5D',
+          rsc: '1',
+          'user-agent': 'Googlebot/2.1',
+          'x-forwarded-host': 'attacker.example',
+          'x-middleware-subrequest': 'middleware',
+          'x-nonce': 'attacker',
+          'x-opennext-initial-url': '/admin/'
+        },
+        method: 'HEAD'
+      })
+    )
+    expect(forwarded.url).toBe('https://best.serp.co/products/?page=2')
+    expect(forwarded.method).toBe('HEAD')
+    expect(Object.fromEntries(forwarded.headers)).toEqual({
+      accept: 'text/html',
+      'next-router-state-tree': '%5B%22%22%5D',
+      rsc: '1',
+      'user-agent': 'Googlebot/2.1'
+    })
+  })
+
+  // serpcompany/best.serp.co#41 review: a client-sent `x-nonce` was rendered into a page that
+  // the cache then served to every visitor for 24 hours.
+  it('stores nothing a request header put into the page', async () => {
+    const edge = harness()
+    const reflect = (request: Request) =>
+      new Response(`<script nonce="${request.headers.get('x-nonce') ?? ''}"></script>`)
+    const poisoned = await withEdgeCache(
+      page('/products/', { headers: { 'x-nonce': 'ATTACKER' } }),
+      { waitUntil: promise => void promise },
+      { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => 'e' },
+      async request => reflect(request)
+    )
+    expect(poisoned.headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
+    expect(await poisoned.text()).toBe('<script nonce=""></script>')
+    await vi.waitFor(() => expect(edge.cache.entries.size).toBe(1))
+    const [stored] = [...edge.cache.entries.values()]
+    expect(new TextDecoder().decode(stored?.body)).toBe('<script nonce=""></script>')
+  })
+
+  it('renders a bypassed request as sent; its response is never stored', async () => {
+    const seen: Request[] = []
+    const edge = harness()
+    await withEdgeCache(
+      page('/search/?q=x', { headers: { 'x-nonce': 'n', cookie: 'authjs.session-token=a' } }),
+      { waitUntil: () => {} },
+      { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => 'e' },
+      async request => {
+        seen.push(request)
+        return new Response('results')
+      }
+    )
+    expect(seen[0]?.headers.get('x-nonce')).toBe('n')
+    expect(edge.cache.entries.size).toBe(0)
   })
 
   it('bypasses the cache when the catalog epoch is unavailable', async () => {
