@@ -268,9 +268,9 @@ permission beyond the deploy token above.
    [Backups and recovery](#backups-and-recovery)), then set the switch back to `"off"` with a
    `hotfix-*` PR into `main` ([Release guards](./RELEASE_GUARDS.md#hotfixes)) or a change
    merged into `staging` and promoted.
-6. Set up the submission notifier and re-enable the `submit-gsc-sitemaps.yml` schedule.
-7. Disable GitHub Pages and delete the `legacy-static` branch.
-8. Remove `apps/serp.co` and `sites/serp.co` from `json-directory-template`.
+6. Submission review moves in-app (#52); `submit-gsc-sitemaps.yml` stays manual-only.
+7. Disable GitHub Pages and delete the `legacy-static` branch (done 2026-10-05).
+8. Remove only serp.co pieces from `json-directory-template`; it still serves other sites.
 
 Production database or Worker operations require explicit maintainer confirmation;
 a passing local harness never grants deployment authority.
