@@ -24,8 +24,10 @@
  * confirmation; the production environment's required reviewers approve it. Production
  * migrations, the bootstrap import, and Worker deploys also require Deploy Staging to have
  * verified the same source tree on `staging` (`staging-verification.ts`, GITHUB_TOKEN with
- * actions: read and contents: read), except for an owner-approved hotfix dispatch, which may
- * deploy the Worker but never migrate. Wrangler authenticates with CLOUDFLARE_API_TOKEN and
+ * actions: read and contents: read), except for an owner-approved hotfix dispatch of a merged
+ * `hotfix-*` pull request, which may deploy the Worker but never migrate. They also refuse a
+ * stale release: `main` must still point at GITHUB_SHA or a commit with its tree.
+ * Wrangler authenticates with CLOUDFLARE_API_TOKEN and
  * CLOUDFLARE_ACCOUNT_ID. `--rehearse <directory>` runs the D1 commands except backup with
  * `--local --persist-to <directory>` instead of `--remote`; it never contacts Cloudflare.
  *
@@ -51,6 +53,8 @@ import {
 import { applicationTableNames } from './d1-table-inventory'
 import { project, type RemoteEnvironment } from './project'
 import {
+  assertCurrentRelease,
+  assertHotfixMerge,
   assertStagingVerified,
   type FetchLike,
   type StagingVerification
@@ -273,9 +277,11 @@ export function isHotfixRelease(
 
 /**
  * Staging before production: when the owning workflow requires it for this command, resolves
- * only if Deploy Staging verified the tree of GITHUB_SHA on `staging`. An owner-approved hotfix
- * resolves `'hotfix'` for `deploy` and is refused for anything else. Call after
- * `authorizeRelease`.
+ * only if Deploy Staging verified the tree of GITHUB_SHA on `staging`, or, for an owner-approved
+ * hotfix `deploy`, only if GITHUB_SHA is the merge commit of a `hotfix-*` pull request into
+ * main (`'hotfix'`; anything else under the hotfix confirmation is refused). Either way the
+ * release must still be current: the workflow's branch points at GITHUB_SHA or its tree. Call
+ * after `authorizeRelease`.
  */
 export async function requireVerifiedStaging(
   command: ReleaseCommand,
@@ -288,18 +294,26 @@ export async function requireVerifiedStaging(
     throw new Error(`Remote ${command} runs only inside a protected release workflow.`)
   }
   if (!authorization.requireVerifiedStaging.includes(command)) return null
-  if (isHotfixRelease(authorization, env)) {
-    if (command === 'deploy') return 'hotfix'
-    throw new Error(
-      `A hotfix release skips staging, so it may only deploy the Worker, never ${command}. Land the change through staging and promote it (docs/RELEASE_GUARDS.md#hotfixes).`
-    )
-  }
-  return assertStagingVerified({
+  const github = {
     apiUrl: env.GITHUB_API_URL,
     fetch,
     sha: env.GITHUB_SHA,
     token: env.GITHUB_TOKEN
-  })
+  }
+  let proof: StagingVerification | 'hotfix'
+  if (isHotfixRelease(authorization, env)) {
+    if (command !== 'deploy') {
+      throw new Error(
+        `A hotfix release skips staging, so it may only deploy the Worker, never ${command}. Land the change through staging and promote it (docs/RELEASE_GUARDS.md#hotfixes).`
+      )
+    }
+    await assertHotfixMerge(github)
+    proof = 'hotfix'
+  } else {
+    proof = await assertStagingVerified(github)
+  }
+  await assertCurrentRelease({ ...github, branch: authorization.branch })
+  return proof
 }
 
 /**
@@ -530,13 +544,23 @@ export interface ReleasePlan {
 
 /**
  * How a release ships: back up and migrate first when migrations are pending, otherwise deploy
- * the Worker only. Refuses a database that carries migrations this commit lacks, which `deploy`
- * would refuse anyway, before any backup or migration starts.
+ * the Worker only. Refuses, before any backup or migration starts, a database that carries
+ * migrations this commit lacks (which `deploy` would refuse anyway) and a hotfix with pending
+ * migrations (which `migrate` would refuse after the backup).
  */
-export function planRelease(ledger: MigrationLedger, environment: RemoteEnvironment): ReleasePlan {
+export function planRelease(
+  ledger: MigrationLedger,
+  environment: RemoteEnvironment,
+  options: { hotfix?: boolean } = {}
+): ReleasePlan {
   if (ledger.unknownMigrations.length > 0) {
     throw new Error(
       `${environment} D1 has migrations this commit does not contain (${ledger.unknownMigrations.join(', ')}); refusing to release older code over a newer schema.`
+    )
+  }
+  if (options.hotfix && ledger.missingMigrations.length > 0) {
+    throw new Error(
+      `A hotfix release may not migrate, and ${environment} D1 is missing ${ledger.missingMigrations.join(', ')}. Land the migration through staging and promote it (docs/RELEASE_GUARDS.md#hotfixes).`
     )
   }
   return {
@@ -874,11 +898,16 @@ export async function runRelease(
         ledger: project.migrationsTable,
         ...(await readMigrationLedger(d1))
       }
-    case 'plan-release':
+    case 'plan-release': {
+      // Read-only and unauthorized, so the hotfix flag can only make the plan stricter.
+      const running = protectedWorkflow(env.GITHUB_WORKFLOW_REF)
       return {
         environment: args.environment,
-        ...planRelease(await readMigrationLedger(d1), args.environment)
+        ...planRelease(await readMigrationLedger(d1), args.environment, {
+          hotfix: running ? isHotfixRelease(running.authorization, env) : false
+        })
       }
+    }
     case 'check-database': {
       const readiness = await checkDatabase(d1)
       assertDatabaseReady(readiness, args.environment)

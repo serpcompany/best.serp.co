@@ -61,8 +61,9 @@ pull requests into `staging` (`gh pr create --base staging`); each merge deploys
 `main` is production and changes only by the owner's `staging` → `main` promotion (a merge
 commit) or a `hotfix-*` pull request ([Release guards](./docs/RELEASE_GUARDS.md#promotion)).
 Rulesets require a PR and the five PR Review checks, and block force pushes and deletion.
-Agents never merge; the owner approves every merge. Issues and labels never grant production,
-database, or deployment authority.
+Agents never merge; the owner approves every merge. Agents never dispatch a production
+workflow, type a production confirmation, or approve a deployment; only the owner does.
+Issues and labels never grant production, database, or deployment authority.
 
 ## Non-negotiable architecture
 

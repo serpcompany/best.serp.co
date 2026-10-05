@@ -1,7 +1,12 @@
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
+import { project } from './project'
+import { hotfixBranch } from './staging-verification'
+
+const repository = project.repository
 
 interface WorkflowStep {
   env?: Record<string, string>
@@ -77,21 +82,53 @@ describe('pr-review workflow', () => {
       HEAD_REF: expression('github.head_ref'),
       HEAD_REPOSITORY: expression('github.event.pull_request.head.repo.full_name')
     })
-    expect(guard?.run).toContain(
-      '[ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] && { [ "$HEAD_REF" = "staging" ] || [[ "$HEAD_REF" == hotfix-* ]]; }'
-    )
-    // Inactive only until the staging branch exists (the switch to the promotion flow).
-    expect(guard?.run).toContain('git ls-remote --exit-code --heads origin staging')
-    expect(guard?.run).toContain('exit 1')
+    // The same hotfix branch names the release script's hotfix check accepts.
+    expect(guard?.run).toContain(`[[ "$HEAD_REF" =~ ${hotfixBranch.source} ]]`)
+    expect(guard?.run).toContain('git ls-remote --exit-code origin refs/heads/staging')
   })
 
-  it('grants explicit permissions for PR change detection', () => {
-    const workflow = loadWorkflow()
+  it('runs the head-branch guard exactly, failing closed when the branch list is unavailable', () => {
+    const steps = loadWorkflow().jobs.validate.steps ?? []
+    const guard = String(steps.find(step => step.name?.startsWith('Require a promotion'))?.run)
+    const exact = 'abc123\trefs/heads/staging\n'
+    // [ls-remote exit status, ls-remote output, head ref, head repository, expected exit]
+    const cases: Array<[number, string, string, string, number]> = [
+      // Inactive only until the staging branch exists (the switch to the promotion flow).
+      [2, '', 'issue-46-x', repository, 0],
+      // A network or auth failure never reads as "no staging branch".
+      [128, '', 'staging', repository, 1],
+      // ls-remote tail-matches patterns; only refs/heads/staging itself counts.
+      [0, 'abc123\trefs/heads/x/staging\n', 'issue-46-x', repository, 0],
+      [0, exact, 'staging', repository, 0],
+      [0, exact, 'hotfix-12-search', repository, 0],
+      [0, exact, 'issue-46-x', repository, 1],
+      [0, exact, 'x/staging', repository, 1],
+      [0, exact, 'staging-2', repository, 1],
+      [0, exact, 'hotfix-a/b', repository, 1],
+      [0, exact, 'staging', 'someone/best.serp.co', 1]
+    ]
+    for (const [status, output, headRef, headRepository, expected] of cases) {
+      // A shell function stands in for the git binary, so nothing reaches the network.
+      const stub = `git() { printf '%s' "$LS_OUTPUT"; return "$LS_STATUS"; }\n`
+      const result = spawnSync('bash', ['-eo', 'pipefail', '-c', stub + guard], {
+        encoding: 'utf8',
+        env: {
+          GITHUB_REPOSITORY: repository,
+          HEAD_REF: headRef,
+          HEAD_REPOSITORY: headRepository,
+          LS_OUTPUT: output,
+          LS_STATUS: String(status),
+          PATH: process.env.PATH
+        }
+      })
+      expect(result.status, `${status} ${headRef} ${headRepository}: ${result.stdout}`).toBe(
+        expected
+      )
+    }
+  })
 
-    expect(workflow.permissions).toMatchObject({
-      contents: 'read',
-      'pull-requests': 'read'
-    })
+  it('grants only read access to repository contents', () => {
+    expect(loadWorkflow().permissions).toEqual({ contents: 'read' })
   })
 
   it('validates the active Worker and D1 contracts without touching a database', () => {

@@ -208,19 +208,32 @@ describe('production deploy workflow', () => {
     expect(release.concurrency).toEqual(productionGroup)
   })
 
-  it('skips the staging check only for a hotfix dispatch, which then never migrates', () => {
+  it('replaces the staging check only for a hotfix dispatch, with proof of a hotfix-* merge', () => {
     const [ref, ...rest] = authorize.steps ?? []
     expect(ref?.id).toBe('ref')
     expect(ref?.run).toContain(
       `[ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$CONFIRMATION" = "${project.confirmation.hotfix}" ]`
     )
-    expect(ref?.run?.match(/verify_staging=false/gu)).toHaveLength(1)
-    expect(ref?.run).toContain('echo "verify_staging=true" >> "$GITHUB_OUTPUT"')
-    for (const step of rest) {
-      expect(step.if, step.name).toBe("steps.ref.outputs.verify_staging == 'true'")
-    }
+    expect(ref?.run?.match(/proof=hotfix/gu)).toHaveLength(1)
+    expect(ref?.run).toContain('echo "proof=staging" >> "$GITHUB_OUTPUT"')
+    // Exactly one proof runs: staging verification, or the merged hotfix-* pull request.
+    expect(rest.map(step => [step.if, step.run ?? step.uses])).toEqual([
+      [undefined, 'actions/checkout@v7'],
+      [undefined, './.github/actions/install'],
+      ["steps.ref.outputs.proof == 'staging'", 'pnpm tsx scripts/staging-verification.ts'],
+      ["steps.ref.outputs.proof == 'hotfix'", 'pnpm tsx scripts/staging-verification.ts --hotfix']
+    ])
+    expect(workflow.permissions).toEqual({
+      actions: 'read',
+      contents: 'read',
+      'pull-requests': 'read'
+    })
     expect(releaseAuthorizations['deploy-production.yml']?.hotfixConfirmation).toBe(
       project.confirmation.hotfix
+    )
+    // The plan sees the confirmation, so a hotfix with pending migrations stops before backup.
+    expect(stepRunning(release, 'plan-release production').env?.RELEASE_CONFIRM).toBe(
+      expression('inputs.confirmation')
     )
   })
 
@@ -308,7 +321,12 @@ describe('staging before production in the workflows', () => {
   it('verifies staging before reviewer approval and again in every gated release step', () => {
     for (const [file, authorization] of gated) {
       const workflow = loadWorkflow(file)
-      expect(workflow.permissions, file).toEqual({ actions: 'read', contents: 'read' })
+      // The hotfix check also reads merged pull requests.
+      expect(workflow.permissions, file).toEqual(
+        authorization.hotfixConfirmation
+          ? { actions: 'read', contents: 'read', 'pull-requests': 'read' }
+          : { actions: 'read', contents: 'read' }
+      )
       const authorize = workflow.jobs.authorize as WorkflowJob
       expect(authorize.environment, file).toBeUndefined()
       const verify = stepRunning(authorize, 'pnpm tsx scripts/staging-verification.ts')
@@ -629,12 +647,13 @@ describe('protected deployment boundaries', () => {
     }
     for (const file of newWorkflows) {
       const workflow = loadWorkflow(file)
-      // Only the staging-gated workflows read Actions runs (staging before production).
-      expect(workflow.permissions, file).toEqual(
-        releaseAuthorizations[file]?.requireVerifiedStaging.length
-          ? { actions: 'read', contents: 'read' }
-          : { contents: 'read' }
-      )
+      // Only the staging-gated workflows read Actions runs (staging before production), and
+      // only the one with a hotfix confirmation reads pull requests.
+      expect(workflow.permissions, file).toEqual({
+        contents: 'read',
+        ...(releaseAuthorizations[file]?.requireVerifiedStaging.length ? { actions: 'read' } : {}),
+        ...(releaseAuthorizations[file]?.hotfixConfirmation ? { 'pull-requests': 'read' } : {})
+      })
       for (const job of Object.values(workflow.jobs)) {
         expect(JSON.stringify(job.env ?? {}), file).not.toContain('secrets.')
         for (const step of job.steps ?? []) {

@@ -17,6 +17,7 @@ import {
   type ProcessRunner,
   parseReleaseArguments,
   parseWranglerRows,
+  type ReleaseCommand,
   readMigrationLedger,
   readOnlyCommands,
   releaseAuthorizations,
@@ -137,12 +138,34 @@ function workflowEnv(
 const cleanGit = (args: string[]): string => (args[0] === 'status' ? '' : `${sha}\n`)
 const mutatingCommands = releaseCommands.filter(command => !readOnlyCommands.has(command))
 
+/** A newer commit with different source, for a `main` that has moved on. */
+const newerSha = '2'.repeat(40)
+const newerTree = 'b'.repeat(40)
+
+/** A merged pull request into main, as the closed-pulls listing reports it. */
+function mergedPull(headRef: string, mergeCommit = sha) {
+  return {
+    base: { ref: 'main' },
+    head: { ref: headRef, repo: { full_name: project.repository } },
+    html_url: 'https://github.com/pull/9',
+    merge_commit_sha: mergeCommit,
+    merged_at: '2026-10-05T00:00:00Z',
+    number: 9
+  }
+}
+
 /**
- * A fake GitHub API for the staging check, recording every request path. When `verified`, a
+ * A fake GitHub API for the release checks, recording every request path. When `verified`, a
  * push run of Deploy Staging on `staging` verified `stagingSha` (the released commit itself by
  * default, or a staging commit with the same tree, as a promotion merge commit would carry).
+ * `main` points at `mainHead` (the released commit by default), and `pulls` are the closed
+ * pull requests into main.
  */
-function stagingApi(verified: boolean, stagingSha = sha) {
+function stagingApi(
+  verified: boolean,
+  options: { mainHead?: string; pulls?: unknown[]; stagingSha?: string } = {}
+) {
+  const { mainHead = sha, pulls = [], stagingSha = sha } = options
   const requests: string[] = []
   const fetch: FetchLike = async url => {
     const { pathname, searchParams } = new URL(url)
@@ -165,17 +188,24 @@ function stagingApi(verified: boolean, stagingSha = sha) {
         ]
       : []
     const body = pathname.includes('/git/commits/')
-      ? { tree: { sha: tree } }
-      : pathname.includes('/workflows/')
-        ? { workflow_runs: runs.filter(run => !headSha || run.head_sha === headSha) }
-        : {
-            jobs: [
-              {
-                conclusion: 'success',
-                steps: stagingWorkflow.requiredSteps.map(name => ({ conclusion: 'success', name }))
+      ? { tree: { sha: pathname.endsWith(newerSha) ? newerTree : tree } }
+      : pathname.endsWith('/git/ref/heads/main')
+        ? { object: { sha: mainHead, type: 'commit' } }
+        : pathname.endsWith('/pulls')
+          ? pulls
+          : pathname.includes('/workflows/')
+            ? { workflow_runs: runs.filter(run => !headSha || run.head_sha === headSha) }
+            : {
+                jobs: [
+                  {
+                    conclusion: 'success',
+                    steps: stagingWorkflow.requiredSteps.map(name => ({
+                      conclusion: 'success',
+                      name
+                    }))
+                  }
+                ]
               }
-            ]
-          }
     return { json: async () => body, ok: true, status: 200 }
   }
   return { fetch, requests }
@@ -461,7 +491,7 @@ describe('staging before production', () => {
         ).resolves.toMatchObject({ match: 'commit', runId: 1, sha, stagingSha: sha, tree })
         // A merge-commit promotion releases a new commit with a verified staging commit's tree.
         await expect(
-          requireVerifiedStaging(command, env, stagingApi(true, stagingSha).fetch)
+          requireVerifiedStaging(command, env, stagingApi(true, { stagingSha }).fetch)
         ).resolves.toMatchObject({ match: 'tree', runId: 1, sha, stagingSha, tree })
       }
     }
@@ -469,7 +499,7 @@ describe('staging before production', () => {
       requireVerifiedStaging(
         'import',
         withToken(workflowEnv('bootstrap-production-d1.yml', project.confirmation.bootstrap)),
-        stagingApi(true, stagingSha).fetch
+        stagingApi(true, { stagingSha }).fetch
       )
     ).resolves.toMatchObject({ match: 'tree', runId: 1, sha })
     await expect(
@@ -481,15 +511,29 @@ describe('staging before production', () => {
     ).rejects.toThrow('GITHUB_TOKEN')
   })
 
-  it('lets only a hotfix dispatch skip staging, and only to deploy the Worker', async () => {
-    const api = stagingApi(false)
+  it('lets only a hotfix dispatch of a merged hotfix-* pull request skip staging, to deploy', async () => {
     const hotfix = withToken(workflowEnv('deploy-production.yml', project.confirmation.hotfix))
+    const api = stagingApi(false, { pulls: [mergedPull('hotfix-12-search')] })
     await expect(requireVerifiedStaging('deploy', hotfix, api.fetch)).resolves.toBe('hotfix')
+    // The hotfix proof replaces staging verification; no Actions run is consulted.
+    expect(api.requests.some(path => path.includes('/actions/'))).toBe(false)
+    expect(api.requests.some(path => path.endsWith('/pulls'))).toBe(true)
     await expect(requireVerifiedStaging('migrate', hotfix, api.fetch)).rejects.toThrow(
       'may only deploy the Worker, never migrate'
     )
     await expect(requireVerifiedStaging('backup', hotfix, api.fetch)).resolves.toBeNull()
-    expect(api.requests).toEqual([])
+    // The confirmation alone is not enough: main's head must be a hotfix-* merge.
+    for (const pulls of [
+      [],
+      [mergedPull('issue-12-search')],
+      [mergedPull('staging')],
+      [mergedPull('hotfix-12-search', newerSha)]
+    ]) {
+      await expect(
+        requireVerifiedStaging('deploy', hotfix, stagingApi(false, { pulls }).fetch),
+        JSON.stringify(pulls)
+      ).rejects.toThrow('not the merge commit of a merged hotfix-* pull request')
+    }
     // A push never carries a confirmation, so a stray RELEASE_CONFIRM cannot make it a hotfix.
     await expect(
       requireVerifiedStaging(
@@ -503,9 +547,43 @@ describe('staging before production', () => {
       requireVerifiedStaging(
         'import',
         withToken(workflowEnv('bootstrap-production-d1.yml', project.confirmation.hotfix)),
-        stagingApi(false).fetch
+        stagingApi(false, { pulls: [mergedPull('hotfix-12-search')] }).fetch
       )
     ).rejects.toThrow('has no run on staging')
+  })
+
+  it('refuses a stale release once main has moved on to different source', async () => {
+    const releases: Array<[string, NodeJS.ProcessEnv, ReleaseCommand]> = [
+      ['deploy', withToken(workflowEnv('deploy-production.yml', null, 'push')), 'deploy'],
+      ['migrate', withToken(workflowEnv('deploy-production.yml', null, 'push')), 'migrate'],
+      [
+        'hotfix deploy',
+        withToken(workflowEnv('deploy-production.yml', project.confirmation.hotfix)),
+        'deploy'
+      ],
+      [
+        'bootstrap import',
+        withToken(workflowEnv('bootstrap-production-d1.yml', project.confirmation.bootstrap)),
+        'import'
+      ]
+    ]
+    const pulls = [mergedPull('hotfix-12-search')]
+    for (const [label, env, command] of releases) {
+      // main moved to a commit with other source: an older release must not overwrite it.
+      await expect(
+        requireVerifiedStaging(command, env, stagingApi(true, { mainHead: newerSha, pulls }).fetch),
+        label
+      ).rejects.toThrow(`main now points at ${newerSha}, not ${sha}, so this release is stale`)
+      // main moved to a commit with the same tree (an empty promotion): the source is current.
+      await expect(
+        requireVerifiedStaging(
+          command,
+          env,
+          stagingApi(true, { mainHead: '3'.repeat(40), pulls }).fetch
+        ),
+        label
+      ).resolves.toBeTruthy()
+    }
   })
 
   it('never consults GitHub for read-only checks and refuses unknown workflows', async () => {
@@ -531,10 +609,16 @@ describe('release entry point', () => {
    */
   function harness(
     verified: boolean,
-    options: { pending?: string[]; stagingSha?: string; unknown?: string[] } = {}
+    options: {
+      mainHead?: string
+      pending?: string[]
+      pulls?: unknown[]
+      stagingSha?: string
+      unknown?: string[]
+    } = {}
   ) {
     const events: string[] = []
-    const api = stagingApi(verified, options.stagingSha)
+    const api = stagingApi(verified, options)
     const fetch: FetchLike = async (url, init) => {
       events.push(`fetch ${new URL(url).pathname}`)
       return api.fetch(url, init)
@@ -710,13 +794,34 @@ describe('release entry point', () => {
     }
   })
 
-  it('deploys a hotfix without the staging check but never migrates one', async () => {
+  it('refuses a stale production release before any Wrangler or D1 call', async () => {
+    for (const command of ['migrate', 'deploy']) {
+      const run = harness(true, { mainHead: newerSha })
+      await expect(
+        runRelease(
+          [command, 'production'],
+          productionEnv('deploy-production.yml', null, 'push'),
+          dependencies(run)
+        ),
+        command
+      ).rejects.toThrow('this release is stale')
+      expect(run.runs, command).toEqual([])
+    }
+  })
+
+  it('deploys a hotfix-* merge without the staging check but never migrates one', async () => {
     const hotfix = productionEnv('deploy-production.yml', project.confirmation.hotfix)
-    const deploy = harness(false)
+    const pulls = [mergedPull('hotfix-12-search')]
+    const deploy = harness(false, { pulls })
     await expect(
       runRelease(['deploy', 'production'], hotfix, dependencies(deploy))
     ).resolves.toMatchObject({ deployed: 'best-serp-co-production' })
-    expect(deploy.events.filter(entry => entry.startsWith('fetch '))).toEqual([])
+    expect(deploy.events.filter(entry => entry.includes('/actions/'))).toEqual([])
+    const notHotfix = harness(false, { pulls: [mergedPull('issue-12-search')] })
+    await expect(
+      runRelease(['deploy', 'production'], hotfix, dependencies(notHotfix))
+    ).rejects.toThrow('not the merge commit of a merged hotfix-* pull request')
+    expect(notHotfix.runs).toEqual([])
     expect(deploy.runs.at(-1)?.slice(0, 6)).toEqual([
       'pnpm',
       '--filter',
@@ -752,6 +857,29 @@ describe('release entry point', () => {
         dependencies(harness(false, { unknown: ['9999_future.sql'] }))
       )
     ).rejects.toThrow('does not contain (9999_future.sql)')
+  })
+
+  it('refuses a hotfix with pending migrations at the plan, before any backup', async () => {
+    const pending = freshMigrationNames().slice(-1)
+    const hotfix = productionEnv('deploy-production.yml', project.confirmation.hotfix)
+    const run = harness(false, { pending })
+    await expect(
+      runRelease(['plan-release', 'production'], hotfix, dependencies(run))
+    ).rejects.toThrow(
+      `A hotfix release may not migrate, and production D1 is missing ${pending[0]}`
+    )
+    for (const call of run.runs) expect(call[call.indexOf('--command') + 1]).toMatch(/^SELECT\b/u)
+    // Without pending migrations a hotfix plans worker-only; a promotion still migrates.
+    await expect(
+      runRelease(['plan-release', 'production'], hotfix, dependencies(harness(false)))
+    ).resolves.toMatchObject({ mode: 'worker-only' })
+    await expect(
+      runRelease(
+        ['plan-release', 'production'],
+        productionEnv('deploy-production.yml', null, 'push'),
+        dependencies(harness(false, { pending }))
+      )
+    ).resolves.toMatchObject({ mode: 'database-and-worker' })
   })
 
   it('never consults GitHub for staging releases or read-only listings', async () => {

@@ -38,14 +38,18 @@ The repository follows the serp git-workflow standard for repositories with Stag
 (serpcompany/best.serp.co#42, decision d):
 
 - **`staging` is the base branch.** Branch from it as `issue-<n>-<slug>` and open pull
-  requests into it. The owner squash-merges them, and each push to `staging` runs Deploy
-  Staging. Agents never merge.
+  requests into it. The owner squash-merges them (the hotfix merge-back below is the one
+  merge commit), and each push to `staging` runs Deploy Staging. Agents never merge.
 - **`main` is production.** Changes reach it only by promotion: the owner opens a `staging` →
   `main` pull request and merges it with a **merge commit**, never a squash. Each push to
   `main` runs Deploy Production, whose release job waits for the `production` reviewers.
-- **PR Review enforces the sources of `main`.** Once `staging` exists, `Validate Site &
+- **Only the owner releases.** Agents never dispatch a production workflow, never type a
+  production confirmation, and never approve a deployment.
+- **PR Review catches mis-targeted pull requests.** Once `staging` exists, `Validate Site &
   Policy` fails a pull request into `main` unless its head is this repository's `staging` or a
-  `hotfix-*` branch. Rulesets cannot restrict a pull request's head branch.
+  `hotfix-*` branch (rulesets cannot restrict a head branch). It is an accident guard, not the
+  control: a pull request runs its own copy of the check and could edit it. The control is
+  the release-time tree check below.
 
 Promote only a `staging` head that Deploy Staging has verified; otherwise Deploy Production
 refuses the merge commit (see below) until it is.
@@ -91,6 +95,13 @@ The check runs twice, and both use the workflow's `GITHUB_TOKEN` with `actions: 
 2. `cloudflare-release.ts` repeats it immediately before `migrate production`,
    `deploy production`, and `import production`, and before any Wrangler call.
 
+**A release must still be current.** Every push to `main` queues its own release, so before
+those commands `cloudflare-release.ts` also refuses a release once `main` points at a commit
+with a different tree: an older run approved late, or re-run, never overwrites a newer
+Worker. Reject a release you don't intend to ship rather than leaving it waiting; a job
+waiting for review stays queued for up to 30 days. Roll back with Cloudflare, not by
+re-running an older release.
+
 Only a pushed head gets its own Deploy Staging run, so when several commits land in one push,
 only the last one is verified. If Deploy Staging is still running, wait for it. If the
 `staging` head has no verified attempt (the run failed, a push skipped CI, or Actions had an
@@ -121,13 +132,18 @@ into `main` through a pull request. Its push runs Deploy Production, which stops
 staging check because staging never verified that tree. To release it anyway:
 
 1. The owner dispatches Deploy Production from `main` with `hotfix-best.serp.co-production`.
-   The `authorize` job records the skipped check in the run summary, and the `production`
-   reviewers still approve the release job.
-2. `cloudflare-release.ts` lets that dispatch run `deploy production` without the staging
-   check, and refuses `migrate production`. A hotfix that needs a migration goes through
-   staging.
-3. Merge `main` into `staging` immediately (a pull request into `staging`), so the next
-   promotion's merge commit carries a tree that staging verified.
+   `authorize` accepts it only when `main`'s head is the merge commit of a merged `hotfix-*`
+   pull request from this repository (`staging-verification.ts --hotfix`), and records the
+   skipped staging check in the run summary. The `production` reviewers still approve.
+2. `cloudflare-release.ts` repeats that proof, then lets the dispatch run `deploy production`
+   without the staging check. `plan-release` refuses a hotfix with pending migrations before
+   any backup; a hotfix that needs a migration goes through staging.
+3. Merge `main` into `staging` immediately: a pull request from `main` into `staging`, merged
+   with **Create a merge commit**, the only merge commit `staging` takes. A squash would leave
+   the hotfix out of `staging`'s history, so the promotion's merge base stays before it, and
+   any later `staging` change to the same lines makes every `staging` → `main` promotion
+   conflict, with no way to resolve it through a pull request. With a merge commit, Deploy
+   Staging verifies the merged tree and the next promotion carries it.
 
 ## Security boundary
 

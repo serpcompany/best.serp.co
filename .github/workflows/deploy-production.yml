@@ -5,9 +5,10 @@ name: Deploy Production
 # Deploy Staging verified on the staging branch is released: the same commit (fast-forward) or
 # the same tree (a promotion merge commit). The production environment's required reviewers
 # approve every release job. The release backs up and migrates production D1 only when
-# migrations are pending, and otherwise deploys the Worker only. A hotfix merged straight into
-# main stops at the staging check; dispatching with the hotfix confirmation skips that check
-# for a Worker-only release. See docs/DEPLOY_RUNBOOK.md and docs/RELEASE_GUARDS.md.
+# migrations are pending, and otherwise deploys the Worker only. A hotfix-* pull request merged
+# into main stops at the staging check; dispatching with the hotfix confirmation replaces that
+# check with proof that main's head is that merge, for a Worker-only release. Every release is
+# refused once main has moved on. See docs/DEPLOY_RUNBOOK.md and docs/RELEASE_GUARDS.md.
 on:
   push:
     branches: ['main']
@@ -20,9 +21,10 @@ on:
 
 permissions:
   # Staging verification reads Deploy Staging runs (actions: read) and this commit's tree
-  # (contents: read).
+  # (contents: read); the hotfix check reads merged pull requests (pull-requests: read).
   actions: read
   contents: read
+  pull-requests: read
 
 jobs:
   authorize:
@@ -39,31 +41,35 @@ jobs:
             exit 1
           fi
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$CONFIRMATION" = "hotfix-best.serp.co-production" ]; then
-            message="Hotfix release of $GITHUB_SHA: the staging check is skipped and only the Worker may deploy. Merge main into staging next (docs/RELEASE_GUARDS.md#hotfixes)."
+            message="Hotfix release of $GITHUB_SHA: the staging check is skipped and only the Worker may deploy. Merge main into staging next, with a merge commit (docs/RELEASE_GUARDS.md#hotfixes)."
             echo "::warning title=Hotfix release::$message"
             echo "$message" >> "$GITHUB_STEP_SUMMARY"
-            echo "verify_staging=false" >> "$GITHUB_OUTPUT"
+            echo "proof=hotfix" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$CONFIRMATION" != "deploy-best.serp.co-production" ]; then
             echo "::error::Type deploy-best.serp.co-production to deploy production."
             exit 1
           fi
-          echo "verify_staging=true" >> "$GITHUB_OUTPUT"
+          echo "proof=staging" >> "$GITHUB_OUTPUT"
 
       - name: Checkout reviewed source
-        if: steps.ref.outputs.verify_staging == 'true'
         uses: actions/checkout@v7
 
       - name: Install
-        if: steps.ref.outputs.verify_staging == 'true'
         uses: ./.github/actions/install
 
       - name: Require a verified staging deploy of this commit's tree
-        if: steps.ref.outputs.verify_staging == 'true'
+        if: steps.ref.outputs.proof == 'staging'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: pnpm tsx scripts/staging-verification.ts
+
+      - name: Require a merged hotfix-* pull request for this commit
+        if: steps.ref.outputs.proof == 'hotfix'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm tsx scripts/staging-verification.ts --hotfix
 
   release:
     name: Validate, back up, migrate & deploy production
@@ -106,6 +112,8 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # A hotfix dispatch with pending migrations is refused here, before any backup.
+          RELEASE_CONFIRM: ${{ inputs.confirmation }}
         run: |
           plan="$(pnpm tsx scripts/cloudflare-release.ts plan-release production)"
           echo "$plan"

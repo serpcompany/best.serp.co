@@ -60,8 +60,9 @@ Pull requests into `staging` (the base branch) and `main` (promotions from `stag
 `hotfix-*` branches) run `pr-review.yml`. The repository rulesets `staging` and `main` (id
 24391799) apply these rules:
 
-- Every change needs a pull request: squash-merged into `staging`; into `main`, a merge
-  commit for promotions and a squash for hotfixes.
+- Every change needs a pull request: squash-merged into `staging` (except the merge commit
+  that brings a hotfix back from `main`); into `main`, a merge commit for promotions and a
+  squash for hotfixes.
 - Five checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
   `OpenNext Worker Build`, and `E2E Tests`. Every job runs on every pull request, because a
   skipped job satisfies a required check.
@@ -70,7 +71,8 @@ Pull requests into `staging` (the base branch) and `main` (promotions from `stag
 The rulesets require no approving review, no up-to-date branch, and no resolved
 conversations. Repository admins can bypass them only through a pull request, never with a
 direct push. Rulesets cannot restrict a pull request's head branch, so `Validate Site &
-Policy` fails a pull request into `main` whose head is not `staging` or `hotfix-*`. Agents
+Policy` fails a pull request into `main` whose head is not `staging` or `hotfix-*`. That only
+catches mis-targeted pull requests; Deploy Production's tree check is the control. Agents
 never merge: the owner approves every merge
 ([Release guards](./RELEASE_GUARDS.md#promotion)).
 

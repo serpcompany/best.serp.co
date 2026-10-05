@@ -20,7 +20,7 @@ Status (serpcompany/best.serp.co#34):
 | D1 | `best-serp-co-staging` `8e6b67e5-9c58-4fa9-aca1-25b0020c0833` | `best-serp-co-production` `404ec437-53a2-4fbc-8b5f-b5e69065708e` |
 | Origin | https://best-serp-co-staging.serpcompany.workers.dev | https://best.serp.co (Worker Custom Domain on `serp.co`, at cutover) |
 | Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`; `*.workers.dev` responses are `noindex`). Production HTTP gates run here until best.serp.co stops returning `server: GitHub.com`. After cutover, set `workers_dev: false` (and `project.remote.production.workersDev`) to retire it. |
-| Branch | `staging` (the base branch; PRs squash-merge here) | `main` (promotions from `staging` only) |
+| Branch | `staging` (the base branch; PRs squash-merge here, hotfix merge-backs use a merge commit) | `main` (promotions from `staging`, and `hotfix-*` PRs) |
 | GitHub environment | `staging` (`staging` branch only, no reviewers) | `production` (required reviewers, `main` only) |
 
 The identities live in `env.staging` / `env.production` of `apps/web/wrangler.jsonc` and in
@@ -121,8 +121,9 @@ Guards, in order:
    `import`, `deploy`) unless it runs in the workflow file that owns it, on that workflow's
    branch (`staging` or `main`) and events, against its environment, at a clean `GITHUB_SHA`,
    with the confirmation in `RELEASE_CONFIRM` on a dispatch. Production `migrate`, `deploy`,
-   and `import` also require the verified Deploy Staging run (a hotfix dispatch may only
-   `deploy` without it). The publisher, approver, and notifier scripts apply their own guards.
+   and `import` also require the verified Deploy Staging run (a hotfix dispatch of a merged
+   `hotfix-*` PR may only `deploy` without it) and a `main` that still points at the release.
+   The publisher, approver, and notifier scripts apply their own guards.
 4. `plan-release` refuses a database with migrations this commit lacks. `deploy` first proves
    that every `d1/drizzle` migration is applied and that a catalog publication exists.
 
@@ -168,7 +169,9 @@ PR Review already gates every merge, and Main Validation re-runs the full loop o
 
 Migrations are forward-only and applied before the new Worker deploys, so each must stay
 compatible with the live Worker while it applies. A `deploy-best.serp.co-production` dispatch
-re-runs a release; hotfixes follow [Release guards](./RELEASE_GUARDS.md#hotfixes).
+re-runs a release of the `main` head; a release is refused once `main` has moved on, so reject
+one you won't ship instead of leaving it waiting. Hotfixes follow
+[Release guards](./RELEASE_GUARDS.md#hotfixes).
 
 ### Backups and recovery
 

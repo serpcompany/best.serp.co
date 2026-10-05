@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { project } from './project'
-import { assertStagingVerified, type FetchLike, stagingWorkflow } from './staging-verification'
+import {
+  assertCurrentRelease,
+  assertHotfixMerge,
+  assertStagingVerified,
+  type FetchLike,
+  stagingWorkflow
+} from './staging-verification'
 
 /** The released commit, and the tree it carries. */
 const sha = '0123456789abcdef0123456789abcdef01234567'
@@ -329,5 +335,97 @@ describe('staging before production', () => {
     expect(api.requests[0]?.url.toString()).toMatch(
       /^https:\/\/github\.example\.com\/api\/v3\/repos\//u
     )
+  })
+})
+
+/** A fake GitHub API answering one fixed body per path suffix, recording each request. */
+function routes(table: Record<string, unknown>, status = 200) {
+  const requests: URL[] = []
+  const fetch: FetchLike = async url => {
+    const parsed = new URL(url)
+    requests.push(parsed)
+    const key = Object.keys(table).find(suffix => parsed.pathname.endsWith(suffix))
+    return { json: async () => (key ? table[key] : {}), ok: status === 200, status }
+  }
+  return { fetch, requests }
+}
+
+describe('hotfix and current-release checks', () => {
+  const pull = (overrides: Record<string, unknown> = {}) => ({
+    base: { ref: 'main' },
+    head: { ref: 'hotfix-12-search', repo: { full_name: project.repository } },
+    html_url: 'https://github.com/pull/12',
+    merge_commit_sha: sha,
+    merged_at: '2026-10-05T00:00:00Z',
+    number: 12,
+    ...overrides
+  })
+  const headOf = (ref: string, repo: unknown = { full_name: project.repository }) => ({
+    head: { ref, repo }
+  })
+
+  it('accepts only the merge commit of a merged hotfix-* pull request into main', async () => {
+    const api = routes({ '/pulls': [pull({ merge_commit_sha: otherSha, number: 11 }), pull()] })
+    await expect(assertHotfixMerge({ fetch: api.fetch, sha, token })).resolves.toEqual({
+      number: 12,
+      url: 'https://github.com/pull/12'
+    })
+    // Closed pull requests into main, newest first. commits/<sha>/pulls would list merged pull
+    // requests only for commits on the default branch, which is staging.
+    expect(api.requests[0]?.pathname).toBe(`/repos/${project.repository}/pulls`)
+    expect(Object.fromEntries(api.requests[0]?.searchParams ?? [])).toEqual({
+      base: 'main',
+      direction: 'desc',
+      per_page: '100',
+      sort: 'updated',
+      state: 'closed'
+    })
+    const refused: Array<[string, Record<string, unknown>]> = [
+      ['another commit', { merge_commit_sha: otherSha }],
+      ['closed unmerged', { merged_at: null }],
+      ['into staging', { base: { ref: 'staging' } }],
+      ['a feature branch', headOf('issue-12-search')],
+      ['a nested name', headOf('x/hotfix-12')],
+      ['a fork', headOf('hotfix-12-search', { full_name: 'someone/best.serp.co' })],
+      ['a deleted fork', headOf('hotfix-12-search', null)]
+    ]
+    for (const [label, overrides] of refused) {
+      await expect(
+        assertHotfixMerge({ fetch: routes({ '/pulls': [pull(overrides)] }).fetch, sha, token }),
+        label
+      ).rejects.toThrow('not the merge commit of a merged hotfix-* pull request')
+    }
+    await expect(assertHotfixMerge({ fetch: routes({}, 403).fetch, sha, token })).rejects.toThrow(
+      'pull-requests: read'
+    )
+    await expect(assertHotfixMerge({ fetch: api.fetch, sha, token: undefined })).rejects.toThrow(
+      'is required for the hotfix check'
+    )
+  })
+
+  it('accepts a release only while its branch points at it or at the same tree', async () => {
+    const commits = {
+      [`/git/commits/${sha}`]: { tree: { sha: tree } },
+      [`/git/commits/${otherSha}`]: { tree: { sha: otherTree } },
+      [`/git/commits/${stagingSha}`]: { tree: { sha: tree } }
+    }
+    const current = routes({ '/git/ref/heads/main': { object: { sha } }, ...commits })
+    await expect(
+      assertCurrentRelease({ branch: 'main', fetch: current.fetch, sha, token })
+    ).resolves.toEqual({ head: sha })
+    expect(current.requests.map(request => request.pathname)).toEqual([
+      `/repos/${project.repository}/git/ref/heads/main`
+    ])
+    const sameTree = routes({ '/git/ref/heads/main': { object: { sha: stagingSha } }, ...commits })
+    await expect(
+      assertCurrentRelease({ branch: 'main', fetch: sameTree.fetch, sha, token })
+    ).resolves.toEqual({ head: stagingSha })
+    const moved = routes({ '/git/ref/heads/main': { object: { sha: otherSha } }, ...commits })
+    await expect(
+      assertCurrentRelease({ branch: 'main', fetch: moved.fetch, sha, token })
+    ).rejects.toThrow(`main now points at ${otherSha}, not ${sha}, so this release is stale`)
+    await expect(
+      assertCurrentRelease({ branch: 'main', fetch: routes({}).fetch, sha, token })
+    ).rejects.toThrow('no commit for main')
   })
 })

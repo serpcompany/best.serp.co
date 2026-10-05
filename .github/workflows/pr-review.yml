@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -25,17 +24,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Catches a pull request opened against the wrong base. It is an accident guard, not the
+      # control: a pull request runs its own copy of this file. The control is Deploy
+      # Production's release-time tree check (docs/RELEASE_GUARDS.md#promotion).
       - name: Require a promotion or hotfix branch for pull requests into main
         if: github.base_ref == 'main'
         env:
           HEAD_REF: ${{ github.head_ref }}
           HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          if ! git ls-remote --exit-code --heads origin staging > /dev/null; then
+          # Exit code 2 means no matching ref; any other failure fails closed.
+          if refs="$(git ls-remote --exit-code origin refs/heads/staging)"; then status=0; else status=$?; fi
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            echo "::error::Could not list the staging branch (git ls-remote exited $status); failing closed."
+            exit 1
+          fi
+          if ! awk '$2 == "refs/heads/staging" { found = 1 } END { exit !found }' <<<"$refs"; then
             echo "No staging branch exists yet, so main still accepts every pull request."
             exit 0
           fi
-          if [ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] && { [ "$HEAD_REF" = "staging" ] || [[ "$HEAD_REF" == hotfix-* ]]; }; then
+          if [ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] && { [ "$HEAD_REF" = "staging" ] || [[ "$HEAD_REF" =~ ^hotfix-[A-Za-z0-9._-]+$ ]]; }; then
             exit 0
           fi
           echo "::error::main is production and accepts only a promotion from staging or a hotfix-* branch. Retarget this pull request to staging (docs/RELEASE_GUARDS.md#promotion)."
