@@ -39,6 +39,7 @@ import {
   formatCountdown,
   formatWait,
   RESEND_COOLDOWN_SECONDS,
+  readCodeText,
   requestCode,
   signOut,
   verifyCode
@@ -204,25 +205,25 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
   }
 
   /**
-   * Text headed for the code field with something besides digits in it, such as a code copied
-   * as "482 913" or "482-913": only its digits count (`codeDigits`). A whole code replaces
-   * whatever the slots hold; fewer digits go where the text was inserted.
+   * Pasted or inserted text, read by `readCodeText`: one standalone code ("Code: 719208",
+   * "482 913") replaces whatever the slots hold and is sent at once; a fragment (" 482 ") goes in
+   * at the caret; anything ambiguous (two codes, seven digits) changes nothing and sends nothing.
    */
   function onCodeText(text: string, input: HTMLInputElement) {
-    const digits = codeDigits(text)
-    if (!digits) return
-    if (digits.length >= CODE_LENGTH) {
-      onCodeChange(digits.slice(0, CODE_LENGTH))
+    const read = readCodeText(text)
+    if (read.kind === 'code') {
+      onCodeChange(read.code)
       return
     }
+    if (read.kind === 'ignore' || !read.digits) return
     const start = input.selectionStart ?? otp.length
     const end = input.selectionEnd ?? start
-    onCodeChange((otp.slice(0, start) + digits + otp.slice(end)).slice(0, CODE_LENGTH))
+    onCodeChange((otp.slice(0, start) + read.digits + otp.slice(end)).slice(0, CODE_LENGTH))
   }
 
-  // Typed or keyboard-inserted text with separators (a keyboard's clipboard suggestion, drag and
-  // drop) never reaches input-otp, whose digits-only pattern and six-character limit would
-  // drop or cut it; its digits are applied instead. Native `beforeinput`: React's
+  // Text typed or inserted in one go (a keyboard's clipboard suggestion, drag and drop) is read
+  // like a paste. input-otp would drop it for its separators, or keep its first six digits.
+  // A single typed character stays with input-otp. Native `beforeinput`: React's
   // `onBeforeInput` is not that event and cannot be cancelled.
   useEffect(() => {
     const input = codeInput.current
@@ -230,7 +231,7 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
     function onBeforeInput(event: InputEvent) {
       if (!input || !event.cancelable || event.inputType === 'insertFromPaste') return
       const text = event.data ?? event.dataTransfer?.getData('text/plain') ?? ''
-      if (!text || codeDigits(text) === text) return
+      if (!text || (text.length === 1 && codeDigits(text) === text)) return
       event.preventDefault()
       onCodeText(text, input)
     }
@@ -389,26 +390,29 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                   aria-invalid={message ? true : undefined}
                   aria-describedby={message ? 'code-error' : 'code-description'}
                   pattern={DIGITS_ONLY}
-                  // A partial paste keeps only its digits, merged where the caret is.
-                  pasteTransformer={codeDigits}
+                  // Never reached while onPasteCapture reads every paste; if it were, it keeps
+                  // only a fragment's digits, never the first six digits of a sentence.
+                  pasteTransformer={text => {
+                    const read = readCodeText(text)
+                    return read.kind === 'digits' ? read.digits : ''
+                  }}
                   value={otp}
                   onChange={onCodeChange}
                   onPasteCapture={event => {
-                    // A whole code pasted in any format ("482 913", "482-913", " 482913\n")
-                    // replaces whatever the slots hold and is sent at once.
-                    const digits = codeDigits(event.clipboardData.getData('text/plain'))
-                    if (digits.length !== CODE_LENGTH) return
+                    // Every paste is read here, before input-otp's own paste handling.
                     event.preventDefault()
                     event.stopPropagation()
-                    onCodeChange(digits)
+                    onCodeText(event.clipboardData.getData('text/plain'), event.currentTarget)
                   }}
                   onInput={event => {
                     // Autofill and password managers set the whole value at once, past the
-                    // digits-only pattern: keep its digits.
+                    // digits-only pattern: read it like pasted text. Anything ambiguous is
+                    // dropped, and React restores the previous value.
                     const value = event.currentTarget.value
-                    if (codeDigits(value) !== value) {
-                      onCodeChange(codeDigits(value).slice(0, CODE_LENGTH))
-                    }
+                    if (codeDigits(value) === value) return
+                    const read = readCodeText(value)
+                    if (read.kind === 'code') onCodeChange(read.code)
+                    else if (read.kind === 'digits') onCodeChange(read.digits)
                   }}
                 >
                   <InputOTPGroup>

@@ -121,10 +121,16 @@ request, before any limit is counted (`emailDeliveryConfigured`: matching enviro
 stops sign-in visibly instead of issuing codes that never arrive.
 
 **Copied codes.** The email shows the code as one unbroken run of digits, so copying it yields
-`482913`. People still paste codes as `482 913`, `482-913`, or with a line break, so only the
-digits count (`signInCodeDigits` in `lib/email/sign-in-code.ts`). The `/login` field applies
-this to pastes, typed or keyboard-inserted text, and autofill, and a full code is sent at once.
-The sign-in hook in `config.ts` applies it again before Better Auth checks the code.
+`482913`. The `/login` field reads pasted, inserted, and autofilled text with `readCodeText`
+(`components/auth/sign-in-api.ts`):
+- **One standalone code:** six digits, optionally split 3+3 by one space, NBSP or dash, with no
+  digit next to them ("Code: 719208", `482 913`). It replaces the slots and is sent at once.
+- **A fragment of digits and separators** (` 482 `): its digits go in at the caret.
+- **Anything ambiguous** (two different codes, seven digits, digits in another shape): nothing
+  changes and nothing is sent, so stray digits can never spend one of the three attempts.
+
+The sign-in hook in `config.ts` keeps only the digits of `otp` (`signInCodeDigits`) before Better
+Auth checks it. A formatted wrong code still counts as a guess.
 
 Every code adds an `email_deliveries` row, so each send also deletes up to 20 `sign-in-code`
 rows older than 24 hours (the provider's idempotency window), oldest first, with one prepared

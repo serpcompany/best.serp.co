@@ -25,6 +25,43 @@ export const CODE_ATTEMPTS = SIGN_IN_CODE_ATTEMPTS
  * normalization Better Auth's sign-in hook applies.
  */
 export const codeDigits = signInCodeDigits
+
+/** What pasted, inserted, or autofilled text means for the code field (`readCodeText`). */
+export type CodeText =
+  /** Exactly one code: it replaces the slots and is sent at once. */
+  | { code: string; kind: 'code' }
+  /** A fragment of digits and separators only (" 482 "): its digits go in at the caret. */
+  | { digits: string; kind: 'digits' }
+  /** Ambiguous (two different codes, or six or more digits with no code): nothing changes. */
+  | { kind: 'ignore' }
+
+/**
+ * A standalone code in text: six digits, optionally split 3+3 by one space, NBSP, thin space,
+ * or dash, with no digit right before or after ("Code: 719208", "482 913", "482-913").
+ */
+const CODE_IN_TEXT = /(?<!\d)\d{3}[ \u00a0\u2009\u202f\-\u2013]?\d{3}(?!\d)/gu
+/** Text that is only a fragment of a code: digits, whitespace, and dashes. */
+const CODE_FRAGMENT = /^[\d\s\-\u2013]*$/u
+
+/**
+ * Reads text headed for the code field. Text such as "It expires in 10 minutes. Code: 719208"
+ * yields its one standalone code (719208), never its first six digits (107192), so pasting
+ * from elsewhere cannot spend an attempt on a wrong guess. Two different codes, seven digits,
+ * or six digits in another shape ("48 29 13") are ambiguous and change nothing: the safer
+ * choice, since a guess the visitor did not mean costs one of three attempts. Invisible format
+ * characters (zero-width spaces, BOM, soft hyphen) are dropped first.
+ */
+export function readCodeText(text: string): CodeText {
+  const visible = text.replace(/\p{Cf}/gu, '')
+  const codes = new Set([...visible.matchAll(CODE_IN_TEXT)].map(match => codeDigits(match[0])))
+  if (codes.size === 1) return { code: [...codes][0] as string, kind: 'code' }
+  if (codes.size > 1) return { kind: 'ignore' }
+  const digits = codeDigits(visible)
+  return digits.length < CODE_LENGTH && CODE_FRAGMENT.test(visible)
+    ? { digits, kind: 'digits' }
+    : { kind: 'ignore' }
+}
+
 /** One code a minute per email and client; the resend link waits this long. */
 export const RESEND_COOLDOWN_SECONDS = 60
 

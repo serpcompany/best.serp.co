@@ -55,6 +55,25 @@ async function pasteIntoCode(page: Page, text: string): Promise<void> {
   await page.keyboard.press('ControlOrMeta+V')
 }
 
+/** Counts the page's code guesses (`/api/auth/sign-in/email-otp` requests). */
+function countGuesses(page: Page): { readonly count: number } {
+  const guesses = { count: 0 }
+  page.on('request', request => {
+    if (request.url().includes('/api/auth/sign-in/email-otp')) guesses.count += 1
+  })
+  return guesses
+}
+
+/** Requests a code on a fresh client and returns it, with the page on the code step. */
+async function codeStep(page: Page, label: string): Promise<string> {
+  await page.context().clearCookies()
+  await asClient(page)
+  const email = uniqueEmail(label)
+  await page.goto('/login/')
+  await requestCodeInPage(page, email)
+  return outboxCode(page, email)
+}
+
 /** A code as people copy it from an email or a phone: spaced, dashed, or padded. */
 const COPIED_CODE_FORMATS: ReadonlyArray<[string, (code: string) => string]> = [
   ['"482 913"', code => `${code.slice(0, 3)} ${code.slice(3)}`],
@@ -274,6 +293,43 @@ test.describe('sign-in screens', () => {
       await expect(page.getByRole('heading', { name: 'You’re signed in' }), label).toBeVisible()
     }
   })
+
+  // PR #82 review, finding 1: text with other digits before the code sent its first six digits.
+  test('signs in with the one code in a pasted sentence, with a single guess', async ({
+    context,
+    page
+  }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    const code = await codeStep(page, 'sentence')
+    const guesses = countGuesses(page)
+    await pasteIntoCode(page, `It expires in 10 minutes. Code: ${code}`)
+    await expect(page.getByRole('heading', { name: 'You’re signed in' })).toBeVisible()
+    expect(guesses.count).toBe(1)
+  })
+
+  for (const [label, ambiguous] of [
+    [
+      'two different codes',
+      (code: string) => `Old code ${code === '111111' ? '222 222' : '111 111'}, new code ${code}`
+    ],
+    ['seven digits', (code: string) => `${code}1`]
+  ] as const) {
+    test(`sends nothing for a paste with ${label}`, async ({ context, page }) => {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+      const code = await codeStep(page, 'ambiguous')
+      const guesses = countGuesses(page)
+      await pasteIntoCode(page, ambiguous(code))
+      // Give a submit time to start: none may.
+      await page.waitForTimeout(750)
+      expect(guesses.count).toBe(0)
+      await expect(page.locator('#code')).toHaveValue('')
+      await expect(page.getByText(/attempts? left/u)).toHaveCount(0)
+      // The visitor can still paste the code itself.
+      await pasteIntoCode(page, code)
+      await expect(page.getByRole('heading', { name: 'You’re signed in' })).toBeVisible()
+      expect(guesses.count).toBe(1)
+    })
+  }
 
   test('keeps only the digits of a code typed or autofilled with separators', async ({
     context,
