@@ -7,6 +7,7 @@
 
 export const RATE_LIMIT_KEY_LABEL = 'best.serp.co/auth-rate-limit/v1'
 export const KNOWN_DEVICE_KEY_LABEL = 'best.serp.co/known-device/v1'
+export const CODE_BINDING_KEY_LABEL = 'best.serp.co/code-binding/v1'
 
 const encoder = new TextEncoder()
 

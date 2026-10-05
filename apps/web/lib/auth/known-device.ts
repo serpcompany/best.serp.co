@@ -1,7 +1,7 @@
 /**
  * The known-device cookie (serpcompany/best.serp.co#60, review round 2): set after a successful
- * sign-in, it lets that browser request its account's next code without the per-email ceiling,
- * so an attacker who floods an email from many addresses cannot lock its owner out.
+ * sign-in, it lets that browser request its account's next code under its own per-email
+ * ceiling, so an attacker who floods an email from many addresses cannot lock its owner out.
  *
  * The value is `<payload>.<mac>`: a base64url JSON payload `{ u, iat, exp }` (user id, issued
  * and expiry times in seconds) and its HMAC-SHA256 under the key derived with
@@ -10,10 +10,14 @@
  * changes which code limits apply, and only for the account whose id it carries.
  */
 
+import { readCookieValues } from './cookies'
+
 export const KNOWN_DEVICE_COOKIE = 'bsc_known_device'
 export const KNOWN_DEVICE_MAX_AGE_SECONDS = 180 * 24 * 60 * 60
 const COOKIE_PATH = '/api/auth'
 const CLOCK_SKEW_SECONDS = 300
+/** More same-named cookies than a browser plausibly holds are ignored past this many. */
+const MAX_TOKENS_CHECKED = 8
 
 const encoder = new TextEncoder()
 
@@ -99,19 +103,28 @@ export async function verifyKnownDevice(
   )
 }
 
-/** The token from a `Cookie` header, or undefined. */
-export function readKnownDeviceToken(
+/**
+ * Every known-device token in a `Cookie` header. A sibling `*.serp.co` site can plant a
+ * same-named cookie that the browser sends first, so callers accept any token that verifies.
+ */
+export function readKnownDeviceTokens(
   cookieHeader: string | null | undefined,
   secure: boolean
-): string | undefined {
-  const name = knownDeviceCookieName(secure)
-  for (const part of (cookieHeader ?? '').split(';')) {
-    const separator = part.indexOf('=')
-    if (separator > 0 && part.slice(0, separator).trim() === name) {
-      return part.slice(separator + 1).trim() || undefined
-    }
+): string[] {
+  return readCookieValues(cookieHeader, knownDeviceCookieName(secure))
+}
+
+/** True when any of `tokens` verifies for `userId` (`verifyKnownDevice`). */
+export async function anyKnownDevice(
+  key: string,
+  tokens: readonly string[],
+  userId: string,
+  now: Date
+): Promise<boolean> {
+  for (const token of tokens.slice(0, MAX_TOKENS_CHECKED)) {
+    if (await verifyKnownDevice(key, token, userId, now)) return true
   }
-  return undefined
+  return false
 }
 
 /** The `Set-Cookie` value that stores `token` for 180 days. */

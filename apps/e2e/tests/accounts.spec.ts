@@ -46,10 +46,19 @@ async function requestCode({ headers, request }: Client, email: string) {
   })
 }
 
-async function devOtp({ request }: Client, email: string): Promise<string> {
-  const outbox = await request.get(`/api/auth/dev/otp-outbox?email=${encodeURIComponent(email)}`)
-  expect(outbox.status()).toBe(200)
-  const { otp } = (await outbox.json()) as { otp: string | null }
+interface OutboxEntry {
+  otp: string | null
+  sentAt: number | null
+}
+
+async function outbox({ request }: Client, email: string): Promise<OutboxEntry> {
+  const response = await request.get(`/api/auth/dev/otp-outbox?email=${encodeURIComponent(email)}`)
+  expect(response.status()).toBe(200)
+  return (await response.json()) as OutboxEntry
+}
+
+async function devOtp(account: Client, email: string): Promise<string> {
+  const { otp } = await outbox(account, email)
   expect(otp).toMatch(/^\d{6}$/u)
   return otp as string
 }
@@ -77,6 +86,10 @@ test.describe('accounts', () => {
     expect(requested.status()).toBe(200)
     expect(requested.headers()['x-edge-cache']).toBe('BYPASS')
     expect(requested.headers()['cache-control']).toContain('no-store')
+    // Only this client, holding the code's binding cookie, may guess the code.
+    expect(requested.headers()['set-cookie']).toMatch(
+      /bsc_code_binding=[^;]+; Max-Age=900; Path=\/api\/auth; HttpOnly; SameSite=Strict/u
+    )
     const otp = await devOtp(account, email)
 
     const signedIn = await request.post('/api/auth/sign-in/email-otp', {
@@ -107,13 +120,64 @@ test.describe('accounts', () => {
     expect(reused.status()).toBe(400)
   })
 
-  test('limits code requests per email', async ({ baseURL, request }) => {
+  test('answers a per-email limit like a sent code and keeps the code already sent', async ({
+    baseURL,
+    request
+  }) => {
     const account = client(request, baseURL)
     const email = uniqueEmail('limit')
     expect((await requestCode(account, email)).status()).toBe(200)
+    const first = await outbox(account, email)
+    // A second code within the minute is not sent, but the answer does not say so.
     const again = await requestCode(account, email)
-    expect(again.status()).toBe(429)
-    expect(Number(again.headers()['retry-after'])).toBeGreaterThan(0)
+    expect(again.status()).toBe(200)
+    expect(await again.json()).toEqual({ success: true })
+    expect(await outbox(account, email)).toEqual(first)
+    // The code the client already has still signs in.
+    const signedIn = await request.post('/api/auth/sign-in/email-otp', {
+      data: { email, otp: first.otp },
+      headers: account.headers
+    })
+    expect(signedIn.status()).toBe(200)
+  })
+
+  test('limits each client with 429, whatever the email', async ({ baseURL, request }) => {
+    const account = client(request, baseURL)
+    for (let index = 0; index < 5; index += 1) {
+      expect((await requestCode(account, uniqueEmail(`burst-${index}`))).status()).toBe(200)
+    }
+    const burst = await requestCode(account, uniqueEmail('burst-more'))
+    expect(burst.status()).toBe(429)
+    expect(Number(burst.headers()['retry-after'])).toBeGreaterThan(0)
+  })
+
+  test('refuses guesses from a client that did not request the code', async ({
+    baseURL,
+    request
+  }) => {
+    const owner = client(request, baseURL)
+    const email = uniqueEmail('bound')
+    expect((await requestCode(owner, email)).status()).toBe(200)
+    const otp = await devOtp(owner, email)
+    const stranger = await playwrightRequest.newContext({ baseURL })
+    try {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const guess = await stranger.post('/api/auth/sign-in/email-otp', {
+          data: { email, otp: otp === '000000' ? '111111' : '000000' },
+          headers: { 'cf-connecting-ip': uniqueIp(), origin: owner.headers.origin }
+        })
+        expect(guess.status()).toBe(400)
+        expect(await guess.json()).toMatchObject({ code: 'INVALID_OTP' })
+      }
+    } finally {
+      await stranger.dispose()
+    }
+    // The stranger's guesses never counted against the owner's code.
+    const signedIn = await request.post('/api/auth/sign-in/email-otp', {
+      data: { email, otp },
+      headers: owner.headers
+    })
+    expect(signedIn.status()).toBe(200)
   })
 
   test('never serves a signed-in request from the edge cache or stores its response', async ({
@@ -175,16 +239,17 @@ test.describe('admin gate', () => {
     test.setTimeout(120_000)
     const account = client(request, baseURL)
     const email = 'devin@serp.co'
-    let requested = await requestCode(account, email)
-    if (requested.status() === 429) {
-      // An admin's code limits count per client address (fresh per test), under an email-wide
-      // hourly ceiling every run shares: skip rather than wait if a busy hour reached it.
-      const retryAfter = Number(requested.headers()['retry-after'])
-      test.skip(retryAfter > 65, `devin@serp.co hourly code limit reached; retry in ${retryAfter}s`)
-      await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
-      requested = await requestCode(account, email)
-    }
+    const before = await outbox(account, email)
+    const requested = await requestCode(account, email)
     expect(requested.status(), await requested.text()).toBe(200)
+    // An admin's code limits count per client address (fresh per test), under an email-wide
+    // hourly ceiling every run shares. A denied request answers 200 like a sent one, so the
+    // outbox tells whether a code went out: skip rather than wait if a busy hour reached it.
+    const after = await outbox(account, email)
+    test.skip(
+      after.sentAt === null || after.sentAt === before.sentAt,
+      'devin@serp.co hourly code limit reached; retry within the hour'
+    )
     const otp = await devOtp(account, email)
     const signedIn = await request.post('/api/auth/sign-in/email-otp', {
       data: { email, otp },

@@ -31,6 +31,7 @@ These cookies are only relevant when optional authentication is enabled:
 | Cookie Name | Purpose | Duration | Type |
 | ----------- | ------- | -------- | ---- |
 | `better-auth.*` (`__Secure-better-auth.*` over HTTPS) | Sign-in session state after signing in with an emailed code | Up to 7 days, renewed while you stay signed in | Essential |
+| `bsc_code_binding` (`__Secure-bsc_code_binding` over HTTPS) | Ties a sign-in code to the browser that asked for it, so only that browser can enter it | 15 minutes | Essential |
 | `bsc_known_device` (`__Secure-bsc_known_device` over HTTPS) | Remembers that this browser has signed in to your account, so it can always request your next sign-in code | 180 days | Essential |
 
 ### 2.2 Analytics Cookies

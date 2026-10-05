@@ -46,11 +46,18 @@ function outbox(): Map<string, OutboxEntry> {
   return scope[OUTBOX_KEY]
 }
 
-/** The latest code the dev sender delivered to `email` within its lifetime, or null. */
-export function readDevOtpOutbox(email: string, now = Date.now()): string | null {
+/**
+ * The latest code the dev sender delivered to `email` within its lifetime and when (epoch
+ * milliseconds), or null. `sentAt` tells a test whether its request sent a code at all: a
+ * request a per-email limit denies answers like a sent one.
+ */
+export function readDevOtpOutbox(
+  email: string,
+  now = Date.now()
+): { otp: string; sentAt: number } | null {
   const entry = outbox().get(email.trim().toLowerCase())
   if (!entry) return null
-  return now - entry.sentAt <= 15 * 60 * 1000 ? entry.otp : null
+  return now - entry.sentAt <= 15 * 60 * 1000 ? { otp: entry.otp, sentAt: entry.sentAt } : null
 }
 
 export function clearDevOtpOutbox(): void {

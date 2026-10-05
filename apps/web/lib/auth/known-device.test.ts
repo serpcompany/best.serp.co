@@ -2,11 +2,12 @@ import { createHmac } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { deriveKey, KNOWN_DEVICE_KEY_LABEL, RATE_LIMIT_KEY_LABEL } from './keys'
 import {
+  anyKnownDevice,
   issueKnownDevice,
   KNOWN_DEVICE_MAX_AGE_SECONDS,
   knownDeviceCookieName,
   knownDeviceSetCookie,
-  readKnownDeviceToken,
+  readKnownDeviceTokens,
   verifyKnownDevice
 } from './known-device'
 
@@ -80,11 +81,26 @@ describe('known-device tokens', () => {
       expect(header).toContain('SameSite=Strict')
       expect(header.includes('Secure')).toBe(secure)
       const cookie = `theme=dark; ${header.split(';')[0]}; other=1`
-      expect(readKnownDeviceToken(cookie, secure)).toBe(token)
+      expect(readKnownDeviceTokens(cookie, secure)).toEqual([token])
       // The secure and local names never read each other.
-      expect(readKnownDeviceToken(cookie, !secure)).toBeUndefined()
+      expect(readKnownDeviceTokens(cookie, !secure)).toEqual([])
     }
     expect(knownDeviceCookieName(true)).toBe('__Secure-bsc_known_device')
-    expect(readKnownDeviceToken(null, false)).toBeUndefined()
+    expect(readKnownDeviceTokens(null, false)).toEqual([])
+  })
+
+  // Review round 3, finding 5: a sibling *.serp.co site can plant a same-named cookie for a
+  // longer path, which the browser sends first; the real cookie must still count.
+  it('accepts any same-named cookie that verifies, not only the first', async () => {
+    const key = await deriveKey(SECRET, KNOWN_DEVICE_KEY_LABEL)
+    const token = await issueKnownDevice(key, 'user-1', now)
+    const name = knownDeviceCookieName(true)
+    const header = `${name}=planted.value; theme=dark; ${name}=; ${name}=${token}`
+    const tokens = readKnownDeviceTokens(header, true)
+    expect(tokens).toEqual(['planted.value', token])
+    expect(await anyKnownDevice(key, tokens, 'user-1', now)).toBe(true)
+    expect(await anyKnownDevice(key, tokens, 'user-2', now)).toBe(false)
+    expect(await anyKnownDevice(key, ['planted.value'], 'user-1', now)).toBe(false)
+    expect(await anyKnownDevice(key, [], 'user-1', now)).toBe(false)
   })
 })

@@ -2,18 +2,26 @@
  * Abuse limits for sign-in codes (serpcompany/best.serp.co#60), enforced in D1 by
  * `consumeRateLimit` in `@serpdirectory/data-ops/auth`: isolates share no memory, so nothing is
  * counted in memory. Each code also allows at most `OTP_ALLOWED_ATTEMPTS` guesses (Better Auth
- * stores the attempt count with the code and deletes the code after the last one).
+ * stores the attempt count with the code and deletes the code after the last one), and only
+ * from the browser that requested it (`code-binding.ts`).
  *
- * A client is an IPv4 address or an IPv6 /64 (one host's usual allocation). Every request is
- * limited per client. What else applies depends on the email's standing:
+ * A client is an IPv4 address or an IPv6 /64 (one host's usual allocation). Two kinds of limit
+ * apply to every code request:
  *
- * - `new` (no verified account): one budget per email, and the site-wide hourly ceiling,
- *   which bounds mail to arbitrary addresses (cost and sender reputation).
- * - `member` (a verified account, from a browser that has not signed in to it): the cooldown
- *   and hourly limit count per email and client, under an email-wide ceiling that bounds how
- *   many codes reach the inbox. Never the site-wide ceiling.
- * - `known-device` (the request carries this account's known-device cookie, `known-device.ts`):
- *   per email and client only, so no amount of requests from other clients can stop it.
+ * - Per client (`otpClientRules`): the same for every email, so a 429 reveals nothing about
+ *   the email. These are the only code-request limits that answer 429.
+ * - Per email (`otpEmailRules`), chosen by the email's standing. A denial here answers the
+ *   same 200 as a sent code and sends nothing, so the limits never reveal whether an email
+ *   has an account (review round 3, finding 3):
+ *   - `new` (no verified account): one budget per email, and the site-wide hourly ceiling,
+ *     which bounds mail to arbitrary addresses (cost and sender reputation).
+ *   - `member` (a verified account, from a browser without its known-device cookie): the
+ *     cooldown and hourly limit count per email and client, under an email-wide ceiling that
+ *     bounds how many codes reach the inbox. Never the site-wide ceiling.
+ *   - `known-device` (the request carries this account's known-device cookie,
+ *     `known-device.ts`): per email and client, under a separate email-wide ceiling that no
+ *     request without the cookie can spend, so other clients cannot stop it and a stolen
+ *     cookie cannot remove the inbox cap.
  */
 import type { AuthRateLimitRule } from '@serpdirectory/data-ops/auth'
 
@@ -32,6 +40,8 @@ export const OTP_REQUEST_LIMITS = {
   emailHourly: { max: 5, windowMs: HOUR },
   /** A member's inbox, across every client without its known-device cookie. */
   memberEmailHourly: { max: 20, windowMs: HOUR },
+  /** A member's inbox, across every client with its known-device cookie. */
+  knownDeviceEmailHourly: { max: 10, windowMs: HOUR },
   /** Several people can share an IP address, so its limits are looser. */
   ipBurst: { max: 5, windowMs: MINUTE },
   ipHourly: { max: 20, windowMs: HOUR },
@@ -56,17 +66,22 @@ export interface OtpRequestContext {
   standing: EmailStanding
 }
 
-export function otpRequestRules({ email, ip, standing }: OtpRequestContext): AuthRateLimitRule[] {
+/** Limits on the requesting client, the same for every email. A denial answers 429. */
+export function otpClientRules(ip: string): AuthRateLimitRule[] {
   const limits = OTP_REQUEST_LIMITS
-  const perClient = [
+  return [
     { scope: 'otp-ip', key: ip, ...limits.ipBurst },
     { scope: 'otp-ip', key: ip, ...limits.ipHourly }
   ]
+}
+
+/** Limits on the email, by its standing. A denial answers 200 and sends nothing. */
+export function otpEmailRules({ email, ip, standing }: OtpRequestContext): AuthRateLimitRule[] {
+  const limits = OTP_REQUEST_LIMITS
   if (standing === 'new') {
     return [
       { scope: 'otp-email', key: email, ...limits.emailCooldown },
       { scope: 'otp-email', key: email, ...limits.emailHourly },
-      ...perClient,
       { scope: 'otp-site', key: 'all', ...limits.siteHourly }
     ]
   }
@@ -75,12 +90,11 @@ export function otpRequestRules({ email, ip, standing }: OtpRequestContext): Aut
     { scope: 'otp-email-client', key: `${email}\0${ip}`, ...limits.emailHourly }
   ]
   return standing === 'member'
-    ? [
+    ? [...perEmailAndClient, { scope: 'otp-email', key: email, ...limits.memberEmailHourly }]
+    : [
         ...perEmailAndClient,
-        { scope: 'otp-email', key: email, ...limits.memberEmailHourly },
-        ...perClient
+        { scope: 'otp-email-known-device', key: email, ...limits.knownDeviceEmailHourly }
       ]
-    : [...perEmailAndClient, ...perClient]
 }
 
 export function signInAttemptRules(ip: string): AuthRateLimitRule[] {
@@ -139,17 +153,22 @@ export function rateLimitAddress(value: string | null | undefined): string {
     .join(':')}::/64`
 }
 
+/** True for 240.0.0.0/4 (Class E), the range Cloudflare's Pseudo IPv4 addresses come from. */
+function isPseudoIpv4(address: string): boolean {
+  return IPV4_PATTERN.test(address) && Number(address.split('.')[0]) >= 240
+}
+
 /**
- * Cloudflare sets `cf-connecting-ip` on every request that reaches the Worker. If the zone's
- * Pseudo IPv4 is set to overwrite headers, that header holds a per-address Class E IPv4 hashed
- * from the IPv6 address and `cf-connecting-ipv6` holds the real one, so the IPv6 header wins
- * whenever it is present: its /64 is the client either way.
+ * The client of a request. Cloudflare sets `cf-connecting-ip` on every request that reaches
+ * the Worker. Only when the zone's Pseudo IPv4 overwrites headers does that header hold a
+ * Class E address hashed from the client's IPv6 address, with the real address in
+ * `cf-connecting-ipv6`; then the IPv6 /64 is the client. Otherwise `cf-connecting-ipv6` may
+ * come from the client itself, so it is ignored (review round 3, finding 2): trusting it would
+ * let any client choose its own rate-limit key.
  */
 export function clientIp(headers: Headers | undefined): string {
-  const ipv6 = headers?.get('cf-connecting-ipv6')
-  if (ipv6?.trim()) {
-    const address = rateLimitAddress(ipv6)
-    if (address !== UNKNOWN_IP) return address
-  }
-  return rateLimitAddress(headers?.get('cf-connecting-ip'))
+  const address = rateLimitAddress(headers?.get('cf-connecting-ip'))
+  if (!isPseudoIpv4(address)) return address
+  const ipv6 = rateLimitAddress(headers?.get('cf-connecting-ipv6'))
+  return ipv6.endsWith('::/64') ? ipv6 : address
 }
