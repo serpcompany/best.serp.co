@@ -19,7 +19,7 @@ Status (serpcompany/best.serp.co#34):
 | Worker | `best-serp-co-staging` (workers.dev) | `best-serp-co-production` (workers.dev review URL until cutover) |
 | D1 | `best-serp-co-staging` `8e6b67e5-9c58-4fa9-aca1-25b0020c0833` | `best-serp-co-production` `404ec437-53a2-4fbc-8b5f-b5e69065708e` |
 | Origin | https://best-serp-co-staging.serpcompany.workers.dev | https://best.serp.co (Worker Custom Domain on `serp.co`, at cutover) |
-| Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`; `*.workers.dev` responses are `noindex`). The production HTTP gates always run here, with the smoke-test header, before and after cutover: they never request best.serp.co, whose `serp.co` zone protection (Bot Fight Mode, WAF rules) may challenge CI runners. At cutover it does not go away: `CANONICAL_HOST_REDIRECT` flips to `on` and it 308s to best.serp.co except for requests with the smoke-test header (#42 decision e; see [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)). |
+| Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`; `*.workers.dev` responses are `noindex`). The production HTTP gates run their route, version, and policy checks here, with the smoke-test header, before and after cutover. After cutover they also check best.serp.co's crawl and analytics policy, but the gates never fail on best.serp.co's zone protection (Bot Fight Mode, WAF rules that may challenge CI runners): a challenge or block is skipped with a warning, and any answer from the Worker is enforced. At cutover it does not go away: `CANONICAL_HOST_REDIRECT` flips to `on` and it 308s to best.serp.co except for requests with the smoke-test header (#42 decision e; see [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)). |
 | GitHub environment | `staging` (`main` only, no reviewers) | `production` (required reviewers, `main` only) |
 
 The identities live in `env.staging` / `env.production` of `apps/web/wrangler.jsonc` and in
@@ -147,11 +147,12 @@ commit in parallel.
    same SQL and checks the publication checksum (`669f264f…0af5a`), version, and every count
    in the report.
 2. Run **Deploy Production** with `deploy-best.serp.co-production` and `worker-only` (the
-   bootstrap already applied the migrations). The HTTP gates are skipped with a notice while
-   GitHub Pages still serves best.serp.co.
+   bootstrap already applied the migrations). While GitHub Pages still serves best.serp.co,
+   the HTTP gates run in staging mode against the workers.dev review URL (noindex, no Google
+   Tag Manager, no redirect without the smoke-test header).
 3. Continue with the cutover checklist below, then re-run **Deploy Production**
-   (`worker-only`) so the HTTP gates run in production mode (still through the workers.dev
-   host).
+   (`worker-only`) so the HTTP gates run in production mode: through the workers.dev host,
+   then best.serp.co's crawl and analytics policy.
 
 ### Routine releases
 
@@ -198,13 +199,9 @@ passed against the staging Worker.
 
 ## HTTP gates after a deploy
 
-`scripts/d1-preview-http-gates.ts` gates staging on its workers.dev origin and production on
-https://best-serp-co-production.serpcompany.workers.dev, always with the
-`x-best-serp-co-smoke-test` header. With the deployed version (`EXPECTED_WORKER_VERSION`, or
-`WRANGLER_OUTPUT_FILE_PATH` set on both the deploy and the gates step), they wait up to 60 s
-for it and retry any answer from the previous version within that budget, then fail closed.
-They assume `wrangler deploy` (100% of traffic), not a gradual `wrangler versions deploy`
-split. Every Worker response carries `x-worker-version` and `x-site-environment`.
+[Environments and hosts](./ARCHITECTURE.md#environments-and-hosts) describes what the HTTP
+gates check per environment, how they wait for the deployed version, and when they skip a
+best.serp.co check with a `best.serp.co check skipped` warning.
 
 ## Caching after a deploy
 
@@ -240,8 +237,10 @@ permission beyond the deploy token above.
 4. Attach the Custom Domain `best.serp.co` to the production Worker (replaces the
    GitHub Pages CNAME), confirm `curl -I https://best.serp.co` no longer shows
    `server: GitHub.com`, and re-run **Deploy Production** (`worker-only`) for the HTTP
-   gates. Then check the custom domain **by hand**; this is a manual cutover step, because CI
-   never requests best.serp.co. From a maintainer machine:
+   gates; they now check best.serp.co too, but skip with a warning if zone protection
+   challenges the runner. Then check the custom domain **by hand** as a manual cutover step
+   (and after any run whose log shows `best.serp.co check skipped`). From a maintainer
+   machine:
 
    ```bash
    pnpm tsx scripts/d1-preview-http-gates.ts public https://best.serp.co
@@ -249,9 +248,13 @@ permission beyond the deploy token above.
    ```
 
    The first command requires no `noindex`, a robots.txt that lists the sitemap index, and
-   Google Tag Manager on `/`; the second shows the deployed version and `production`. If
-   either fails, roll the Custom Domain back to GitHub Pages before investigating. Then
-   submit `sitemap-index.xml` in Search Console.
+   Google Tag Manager on `/`. The second must show `x-site-environment: production` and an
+   `x-worker-version` equal to the version Deploy Production deployed: the id in its gate log
+   (`Worker version <id> answered N probe(s)`, once the workflows pass
+   `WRANGLER_OUTPUT_FILE_PATH`), or the active deployment's version under Workers & Pages →
+   `best-serp-co-production` → Deployments in the Cloudflare dashboard. If either fails, roll
+   the Custom Domain back to GitHub Pages before investigating. Then submit
+   `sitemap-index.xml` in Search Console.
 5. Switch the platform host to the canonical host: merge a reviewed change setting
    `env.production.vars.CANONICAL_HOST_REDIRECT` to `"on"` in `apps/web/wrangler.jsonc`,
    then release it with **Deploy Production** (`worker-only`). The production HTTP gates then
