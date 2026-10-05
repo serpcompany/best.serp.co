@@ -4,7 +4,8 @@ import {
   EmailProviderError,
   emailErrorCode,
   type OutgoingEmail,
-  redactedErrorMessage
+  redactedErrorMessage,
+  scrubSecrets
 } from './senders'
 
 const message: OutgoingEmail = {
@@ -105,6 +106,28 @@ describe('useSend sender', () => {
       expect(result.logged).toMatch(/^useSend answered \d{3}/u)
       expect(result.logged).not.toMatch(/@|person|us_secret/u)
     }
+  })
+
+  it('scrubs the API key and any bearer or us_ token from error messages', async () => {
+    const leaky = [
+      `Invalid API token ${apiKey}`,
+      'Rejected header Authorization: Bearer us_live_abcdef123456',
+      'Token us_live_abcdef123456 revoked',
+      `proxy said: bearer ${apiKey.toUpperCase()}`
+    ]
+    for (const detail of leaky) {
+      const { useSend } = sender(() =>
+        Response.json({ error: { code: 'UNAUTHORIZED', message: detail } }, { status: 401 })
+      )
+      const result = await failure(useSend.send(message))
+      expect(result.code).toBe('UNAUTHORIZED')
+      expect(result.logged, detail).toContain('[redacted]')
+      expect(result.logged, detail).not.toMatch(/us_|secret|abcdef/iu)
+    }
+    expect(scrubSecrets('key k-123 here', 'k-123')).toBe('key [redacted] here')
+    expect(redactedErrorMessage(new Error('Bearer xyz.abc for a@b.co'))).toBe(
+      '[redacted] for [redacted]'
+    )
   })
 
   it('reports network failures and timeouts without detail', async () => {

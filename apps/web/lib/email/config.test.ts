@@ -164,7 +164,11 @@ describe('email senders and useSend settings', () => {
       { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'http://app.usesend.com' },
       { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'https://app.usesend.com/api' },
       { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'https://app.usesend.com?x=1' },
-      { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'app.usesend.com' }
+      { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'app.usesend.com' },
+      // Only hosted useSend may receive the key.
+      { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'https://usesend.example.com' },
+      { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'https://app.usesend.com.evil.example' },
+      { USESEND_API_KEY: 'us_key', USESEND_BASE_URL: 'https://APP.usesend.com:8443' }
     ]
     for (const env of invalid) {
       expect(() => resolveUseSendConfig(env), JSON.stringify(env)).toThrow(EmailConfigError)

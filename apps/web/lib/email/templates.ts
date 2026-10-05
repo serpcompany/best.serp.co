@@ -571,10 +571,26 @@ export interface RenderedEmail {
 
 const MAX_SUBJECT_LENGTH = 200
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+}
+
+/** True when the HTML has an `<a>` whose `href` is exactly the (escaped) URL. */
+function linksExactly(markup: string, url: string): boolean {
+  const href = escapeRegExp(escapeHtml(url))
+  return new RegExp(`<a\\s(?:[^>]*\\s)?href\\s*=\\s*(["'])${href}\\1`, 'iu').test(markup)
+}
+
+/** True when the text has the URL as a whole token, not inside a longer URL or word. */
+function containsToken(text: string, url: string): boolean {
+  return new RegExp(`(?:^|[\\s(<])${escapeRegExp(url)}(?=$|[\\s)>.,;:!?])`, 'u').test(text)
+}
+
 /**
  * Renders a template and checks the result: a non-empty single-line subject (line breaks
  * and runs of whitespace collapse to one space) of at most 200 characters, non-empty text
- * and HTML bodies, and the dashboard link in both bodies (the footer every email carries).
+ * and HTML bodies, and the dashboard link in both: an `<a href>` of exactly `dashboardUrl` in
+ * the HTML and the URL as a whole token in the text (the footer every email carries).
  */
 export function renderEmail<Input>(
   template: EmailTemplate<Input>,
@@ -594,7 +610,7 @@ export function renderEmail<Input>(
   if (!text || !markup) {
     throw new EmailTemplateError(`Template ${template.id} rendered an empty body.`)
   }
-  if (!text.includes(context.dashboardUrl) || !markup.includes(escapeHtml(context.dashboardUrl))) {
+  if (!containsToken(text, context.dashboardUrl) || !linksExactly(markup, context.dashboardUrl)) {
     throw new EmailTemplateError(
       `Template ${template.id} must link to the dashboard (${context.dashboardUrl}) in both bodies.`
     )

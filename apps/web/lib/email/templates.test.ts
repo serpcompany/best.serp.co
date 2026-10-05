@@ -352,6 +352,20 @@ describe('template contract', () => {
         context('https://best.serp.co')
       ).subject
     ).toBe('Line one Bcc: x@y.co')
+    // An exact link passes with either quote and other attributes, and the text URL may end a
+    // sentence.
+    for (const content of [
+      {
+        html: html`<a class="f" href='${footer}' title="x">x</a>`,
+        subject: 's',
+        text: `(${footer}).`
+      },
+      { html: html`<p><a href="${footer}">x</a></p>`, subject: 's', text: `Reply: ${footer}` }
+    ]) {
+      expect(() =>
+        renderEmail(template(content), null, context('https://best.serp.co'))
+      ).not.toThrow()
+    }
     for (const content of [
       { ...ok, subject: ' \n ' },
       { ...ok, subject: 'x'.repeat(201) },
@@ -361,7 +375,25 @@ describe('template contract', () => {
       { html: Object.create(SafeHtml.prototype), subject: 's', text: 'x' },
       // Every footer links to the dashboard, in both bodies.
       { html: html`<p>x</p>`, subject: 's', text: `x ${footer}` },
-      { ...ok, subject: 's', text: 'x' }
+      { ...ok, subject: 's', text: 'x' },
+      // A link to a page under the dashboard is not the dashboard link.
+      {
+        html: html`<a href="${`${footer}settings/`}">x</a>`,
+        subject: 's',
+        text: `x ${footer}settings/`
+      },
+      // The URL in an alt attribute, with no link.
+      {
+        html: html`<img alt="${footer}" src="${footer}logo.png">`,
+        subject: 's',
+        text: `x ${footer}`
+      },
+      // The URL inside another link's query.
+      {
+        html: html`<a href="${`https://evil.example/?${footer}`}">x</a>`,
+        subject: 's',
+        text: `see https://evil.example/?${footer}`
+      }
     ]) {
       expect(() => renderEmail(template(content), null, context('https://best.serp.co'))).toThrow(
         EmailTemplateError

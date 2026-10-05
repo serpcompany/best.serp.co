@@ -40,6 +40,11 @@ export function emailSender(environment: SiteEnvironment): Readonly<EmailSenderI
 export const USESEND_API_KEY_SECRET = 'USESEND_API_KEY'
 /** The Worker var holding the useSend instance origin (`https://app.usesend.com`). */
 export const USESEND_BASE_URL_VAR = 'USESEND_BASE_URL'
+/**
+ * The only origins the API key may be sent to: hosted useSend (owner decision). Anything else
+ * disables email instead of sending the key as a Bearer token to an unknown host.
+ */
+export const USESEND_ORIGINS: ReadonlySet<string> = new Set(['https://app.usesend.com'])
 
 export interface UseSendConfig {
   apiKey: string
@@ -49,24 +54,18 @@ export interface UseSendConfig {
 
 /**
  * The useSend settings from Worker bindings. Throws `EmailConfigError` (email is then disabled)
- * unless `USESEND_BASE_URL` is an `https:` origin and `USESEND_API_KEY` is set.
+ * unless `USESEND_BASE_URL` is an allowed origin (`USESEND_ORIGINS`) and `USESEND_API_KEY` is
+ * set.
  */
 export function resolveUseSendConfig(env: {
   USESEND_API_KEY?: unknown
   USESEND_BASE_URL?: unknown
 }): UseSendConfig {
   const rawBase = typeof env.USESEND_BASE_URL === 'string' ? env.USESEND_BASE_URL.trim() : ''
-  let baseUrl: string | null = null
-  try {
-    const url = new URL(rawBase)
-    const origin = rawBase.replace(/\/+$/u, '')
-    if (url.protocol === 'https:' && url.origin === origin) baseUrl = origin
-  } catch {
-    baseUrl = null
-  }
-  if (!baseUrl) {
+  const baseUrl = rawBase.replace(/\/$/u, '')
+  if (!USESEND_ORIGINS.has(baseUrl)) {
     throw new EmailConfigError(
-      `Email is disabled: ${USESEND_BASE_URL_VAR} must be an https origin such as https://app.usesend.com.`
+      `Email is disabled: ${USESEND_BASE_URL_VAR} must be ${[...USESEND_ORIGINS].join(' or ')}.`
     )
   }
   const apiKey = typeof env.USESEND_API_KEY === 'string' ? env.USESEND_API_KEY.trim() : ''

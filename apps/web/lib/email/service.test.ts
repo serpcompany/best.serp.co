@@ -82,7 +82,7 @@ describe('email delivery', () => {
         from: { email: 'noreply@mail.serp.co', name: 'SERP Directory' },
         headers: { 'Auto-Submitted': 'auto-generated' },
         html: '<p>Secret body text</p><p><a href="https://best.serp.co/products/autoenhance.ai/">https://best.serp.co/products/autoenhance.ai/</a></p><p><a href="https://best.serp.co/account/">https://best.serp.co/account/</a></p>',
-        idempotencyKey: 'test-fixture:fixture:delivery',
+        idempotencyKey: 'production:test-fixture:fixture:delivery',
         subject: 'Fixture: Secret body text',
         text: 'Secret body text\n\nhttps://best.serp.co/products/autoenhance.ai/\n\nhttps://best.serp.co/account/',
         to: 'owner@serp.co'
@@ -467,7 +467,9 @@ describe('Worker email service', () => {
       expect(calls).toHaveLength(1)
       expect(calls[0]?.url).toBe('https://app.usesend.com/api/v1/emails')
       expect(calls[0]?.headers.get('authorization')).toBe('Bearer us_test_key')
-      expect(calls[0]?.headers.get('idempotency-key')).toBe('test-fixture:fixture:worker')
+      expect(calls[0]?.headers.get('idempotency-key')).toBe(
+        `${String(vars.SITE_ENVIRONMENT)}:test-fixture:fixture:worker`
+      )
       expect(calls[0]?.body).toEqual({
         from,
         headers: { 'Auto-Submitted': 'auto-generated' },
@@ -527,12 +529,39 @@ describe('Worker email service', () => {
 
 describe('email event keys', () => {
   it('derives a stable provider idempotency key of at most 256 characters', async () => {
-    expect(await emailIdempotencyKey('test-fixture', 'fixture:a')).toBe('test-fixture:fixture:a')
+    expect(await emailIdempotencyKey('production', 'test-fixture', 'fixture:a')).toBe(
+      'production:test-fixture:fixture:a'
+    )
     const long = `fixture:${'x'.repeat(192)}`
-    const hashed = await emailIdempotencyKey('t'.repeat(64), long)
+    const hashed = await emailIdempotencyKey('production', 't'.repeat(64), long)
     expect(hashed).toMatch(/^sha256:[0-9a-f]{64}$/u)
-    expect(await emailIdempotencyKey('t'.repeat(64), long)).toBe(hashed)
-    expect(await emailIdempotencyKey('u'.repeat(64), long)).not.toBe(hashed)
+    expect(await emailIdempotencyKey('production', 't'.repeat(64), long)).toBe(hashed)
+    expect(await emailIdempotencyKey('production', 'u'.repeat(64), long)).not.toBe(hashed)
+    expect(await emailIdempotencyKey('staging', 't'.repeat(64), long)).not.toBe(hashed)
+  })
+
+  it('gives staging and production different provider keys for the same event', async () => {
+    // useSend keeps idempotency keys per team, and both environments share the team while
+    // their ids overlap (an imported listing id, an autoincrement row).
+    const eventKey = emailEventKey('review-decision', '1')
+    const keys = await Promise.all(
+      (['local', 'staging', 'production'] as const).map(environment =>
+        emailIdempotencyKey(environment, 'test-fixture', eventKey)
+      )
+    )
+    expect(new Set(keys).size).toBe(3)
+    const sent = await Promise.all(
+      [staging, production].map(async vars => {
+        const { send, sender, settle } = harness(vars)
+        send(eventKey)
+        await settle()
+        return sender.sent[0]?.idempotencyKey
+      })
+    )
+    expect(sent).toEqual([
+      'staging:test-fixture:review-decision:1',
+      'production:test-fixture:review-decision:1'
+    ])
   })
 
   it('accepts a per-call random UUID for code emails', () => {

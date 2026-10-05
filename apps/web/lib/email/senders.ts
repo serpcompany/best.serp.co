@@ -73,6 +73,14 @@ function useSendErrorCode(body: unknown, status: number): string {
   return typeof code === 'string' && ERROR_CODE_PATTERN.test(code) ? code : `HTTP_${status}`
 }
 
+const TOKEN_IN_TEXT = /\bBearer\s+\S+|\bus_[A-Za-z0-9_-]+/giu
+
+/** Text with the API key, any `Bearer …` credential, and `us_…` tokens replaced. */
+export function scrubSecrets(text: string, apiKey?: string): string {
+  const withoutKey = apiKey ? text.split(apiKey).join('[redacted]') : text
+  return withoutKey.replace(TOKEN_IN_TEXT, '[redacted]')
+}
+
 function useSendErrorMessage(body: unknown): string {
   const message =
     typeof body === 'object' &&
@@ -143,7 +151,7 @@ export function createUseSendSender(options: {
       }
       const body = await jsonBody(response)
       if (!response.ok) {
-        const detail = useSendErrorMessage(body)
+        const detail = scrubSecrets(useSendErrorMessage(body), options.apiKey)
         throw new EmailProviderError(
           useSendErrorCode(body, response.status),
           `useSend answered ${response.status}${detail ? `: ${detail}` : ''}`
@@ -214,8 +222,8 @@ export function emailErrorCode(error: unknown): string {
 
 const ADDRESS_IN_TEXT = /[^\s@<>"'(),;:]+@[^\s@<>"'(),;:]+/gu
 
-/** An error message fit for logs: addresses redacted, at most 300 characters. */
+/** An error message fit for logs: addresses and tokens redacted, at most 300 characters. */
 export function redactedErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
-  return message.replace(ADDRESS_IN_TEXT, '[redacted]').slice(0, 300)
+  return scrubSecrets(message).replace(ADDRESS_IN_TEXT, '[redacted]').slice(0, 300)
 }

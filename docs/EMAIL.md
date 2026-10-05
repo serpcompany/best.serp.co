@@ -47,7 +47,9 @@ The idempotency ledger lives in `packages/data-ops/src/email-deliveries.ts` (tab
 Configuration, per deployed environment:
 
 - `USESEND_BASE_URL`: a non-secret var in `env.staging.vars` and `env.production.vars` of
-  `apps/web/wrangler.jsonc`, set to `https://app.usesend.com`. It must be an `https:` origin.
+  `apps/web/wrangler.jsonc`, set to `https://app.usesend.com`. It is pinned to that origin
+  (`USESEND_ORIGINS` in `config.ts`): any other value disables email rather than sending the
+  key as a Bearer token to an unknown host.
 - `USESEND_API_KEY`: a **Worker secret** (name only in `apps/web/.dev.vars.example`; never
   commit a value). Local development does not need one.
 - `EMAIL_STAGING_ALLOWLIST`: a non-secret var in `env.staging.vars`. Comma-separated plain
@@ -59,7 +61,7 @@ Email fails closed. In each of these cases every enqueue sends nothing and logs
 
 - `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` don't name the same known environment;
 - the `DB` binding is missing;
-- (staging, production) `USESEND_BASE_URL` is missing or not an `https:` origin;
+- (staging, production) `USESEND_BASE_URL` is missing or not `https://app.usesend.com`;
 - (staging, production) `USESEND_API_KEY` is missing.
 
 So deploying without the secret is safe.
@@ -70,12 +72,20 @@ So deploying without the secret is safe.
 ([send email](https://docs.usesend.com/api-reference/emails/send-email),
 [authentication](https://docs.usesend.com/api-reference/introduction)).
 
-- **Idempotency.** Each request carries `Idempotency-Key: <template id>:<event key>` (hashed
-  if over 256 characters). useSend returns the original `emailId` for a repeated key and body
-  for 24 hours, so a retry after a lost response never sends twice. This is on top of the
-  ledger.
+- **Idempotency.** Each request carries
+  `Idempotency-Key: <environment>:<template id>:<event key>`, SHA-256 hashed if over 256
+  characters. useSend returns the original `emailId` for a repeated key and body for 24
+  hours, so a retry after a lost response never sends twice. This is on top of the ledger.
+  - **Why the environment prefix.** useSend's idempotency keys are **team-wide**, and staging
+    and production use two keys in one team. Event ids overlap across environments (imported
+    listing ids, autoincrement rows), and a staging body never matches production's (From,
+    `[staging]` subject, links). Without the prefix, a staging send would make every
+    production attempt with the same key fail with 409 `NOT_UNIQUE` for 24 hours.
+  - **The ledger needs no prefix.** Each environment has its own D1 database, so its
+    `(template_id, event_key)` rows never meet another environment's.
 - **Errors.** useSend errors (`{ error: { code, message } }`) are logged as
-  `email_send_failed` with that code: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`,
+  `email_send_failed`, with the API key and any `Bearer …` or `us_…` token scrubbed from the
+  message, and with this code: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`,
   `NOT_UNIQUE`, `RATE_LIMITED`, `INTERNAL_SERVER_ERROR`. An unreadable error body is logged
   as `HTTP_<status>`, an unreachable API as `NETWORK_ERROR`, and a request that takes over 10
   seconds as `TIMEOUT`.
@@ -210,6 +220,10 @@ before they are done is safe: email is then disabled and logged.
    `best-serp-co-staging` and `best-serp-co-production`
    (`wrangler secret put USESEND_API_KEY --env staging` and `--env production`, from
    `apps/web`). Rotate a key the same way.
+   - **To do: restrict each key to its own sending domain** in useSend (API keys can be limited
+     to one domain): the staging key to `mail-staging.serp.co`, the production key to
+     `mail.serp.co`. Then a misconfigured staging Worker can never send as `mail.serp.co`. This
+     is the platform-level guard behind the staging allowlist.
 2. **Done: `USESEND_BASE_URL`.** The owner chose the hosted instance; `apps/web/wrangler.jsonc`
    sets it to `https://app.usesend.com` for both environments.
 3. **Confirm both sending domains are verified** in app.usesend.com → Domains:

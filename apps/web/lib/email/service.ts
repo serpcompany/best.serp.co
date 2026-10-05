@@ -121,12 +121,19 @@ const INVALID = '[invalid]'
 const MAX_IDEMPOTENCY_KEY_LENGTH = 256
 
 /**
- * The provider idempotency key for one template and event key: the same for every attempt, so
- * a retry after a lost response is answered with the original message instead of a second one.
- * `<template id>:<event key>`, or its SHA-256 when that would exceed 256 characters.
+ * The provider idempotency key for one environment, template, and event key: the same for every
+ * attempt, so a retry after a lost response is answered with the original message instead of a
+ * second one. `<environment>:<template id>:<event key>`, or its SHA-256 when that would exceed
+ * 256 characters. useSend keeps idempotency keys per team, and staging and production share a
+ * team while their ids overlap (imported listings, autoincrement rows), so the environment is
+ * part of the key; without it a staging send would make production's 409 for 24 hours.
  */
-export async function emailIdempotencyKey(templateId: string, eventKey: string): Promise<string> {
-  const key = `${templateId}:${eventKey}`
+export async function emailIdempotencyKey(
+  environment: string,
+  templateId: string,
+  eventKey: string
+): Promise<string> {
+  const key = `${environment}:${templateId}:${eventKey}`
   if (key.length <= MAX_IDEMPOTENCY_KEY_LENGTH) return key
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key))
   const hex = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
@@ -214,7 +221,7 @@ export function createEmailService<R extends EmailTemplateRegistry>(
       return
     }
 
-    const idempotencyKey = await emailIdempotencyKey(templateId, eventKey)
+    const idempotencyKey = await emailIdempotencyKey(policy.environment, templateId, eventKey)
     let claim: EmailDeliveryClaim
     try {
       claim = await ledger.claim({ eventKey, provider, templateId })
