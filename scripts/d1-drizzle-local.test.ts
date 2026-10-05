@@ -383,7 +383,7 @@ describe('fresh Drizzle D1 history', () => {
       mutateCanonicalState(stateDirectory)
       // The tampered table, and nothing else, must fail parity (not a crash or a missing report).
       expect(failingLocalStderr('verify', stateDirectory)).toContain(
-        'Local D1 exact 17-table bootstrap parity failed: listing_resource_links.'
+        'Local D1 exact 24-table bootstrap parity failed: listing_resource_links.'
       )
     },
     240_000
