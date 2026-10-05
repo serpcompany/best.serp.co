@@ -8,8 +8,10 @@
  * - `staging`, `production`: the email sender enqueues the `sign-in-code` email through the
  *   email module (`lib/email`, #61), keyed `emailEventKey('sign-in-code', crypto.randomUUID())`
  *   because every code is a new event and a key must never derive from the code. Without a
- *   registered template, no sender is configured: requesting a code fails with 503
- *   `OTP_DELIVERY_UNAVAILABLE` and no code is created, logged, or exposed.
+ *   registered template, no sender is configured; and before each code, the sender checks
+ *   that the Worker can deliver email at all (`emailDeliveryConfigured`: the environment, the
+ *   `DB` binding, and the useSend key and base URL). Either way, requesting a code fails with
+ *   503 `OTP_DELIVERY_UNAVAILABLE` and no code is created, logged, or exposed.
  */
 import { SIGN_IN_CODE_TEMPLATE, type SignInCodeInput } from '../email/sign-in-code'
 import type { SiteEnvironment } from '../environment/site-environment'
@@ -29,6 +31,11 @@ export type SignInCodeEnqueue = (request: {
 
 /** How staging and production deliver codes, from `lib/auth/sign-in-code-email.ts`. */
 export interface SignInCodeEmail {
+  /**
+   * Whether this request's Worker can deliver email (`emailDeliveryConfigured` in
+   * `lib/email/server.ts`); checked before every code is created. Resolves false on any doubt.
+   */
+  deliveryConfigured(): Promise<boolean>
   enqueue: SignInCodeEnqueue
   /** A new event key per code: `emailEventKey('sign-in-code', crypto.randomUUID())`. */
   eventKey(): string
@@ -46,6 +53,11 @@ export interface OtpMessage {
 }
 
 export interface OtpSender {
+  /**
+   * Checked at request time, before a code exists: false refuses the request with 503
+   * `OTP_DELIVERY_UNAVAILABLE`. A sender without it is always ready.
+   */
+  deliveryConfigured?(): Promise<boolean>
   /** `dev-console` exposes codes to local tests; it must never run outside local. */
   readonly kind: 'dev-console' | 'unavailable' | (string & {})
   send(message: OtpMessage): Promise<void>
@@ -114,12 +126,28 @@ export const unavailableOtpSender: OtpSender = {
   }
 }
 
-/** Sends sign-in codes as the `sign-in-code` email. */
+/**
+ * True when `sender` can deliver a code now. The `unavailable` sender never can, and a failed
+ * check counts as no (fail closed).
+ */
+export async function otpDeliveryReady(sender: OtpSender): Promise<boolean> {
+  if (sender.kind === 'unavailable') return false
+  if (!sender.deliveryConfigured) return true
+  try {
+    return (await sender.deliveryConfigured()) === true
+  } catch {
+    return false
+  }
+}
+
+/** Sends sign-in codes as the `sign-in-code` email, once the Worker can deliver email. */
 export function createEmailOtpSender({
+  deliveryConfigured,
   enqueue,
   eventKey
-}: Pick<SignInCodeEmail, 'enqueue' | 'eventKey'>): OtpSender {
+}: Pick<SignInCodeEmail, 'deliveryConfigured' | 'enqueue' | 'eventKey'>): OtpSender {
   return {
+    deliveryConfigured,
     kind: 'email',
     async send(message) {
       if (message.purpose !== 'sign-in') throw new OtpDeliveryUnavailableError()

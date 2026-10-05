@@ -91,10 +91,13 @@ describe('email module boundary', () => {
     const runtime = source('runtime.ts')
     const policy = runtime.indexOf('resolveEmailPolicy(env)')
     const binding = runtime.indexOf('if (!env.DB)')
-    const database = runtime.indexOf('createDatabase(env.DB)')
+    const resolved = runtime.indexOf('= resolveWorkerDelivery(env)')
+    const database = runtime.indexOf('createDatabase(database)')
     expect(policy).toBeGreaterThan(-1)
     expect(binding).toBeGreaterThan(policy)
-    expect(database).toBeGreaterThan(binding)
+    expect(resolved).toBeGreaterThan(binding)
+    expect(database).toBeGreaterThan(resolved)
+    expect(runtime.match(/createDatabase\(/gu)).toHaveLength(1)
     expect(runtime).toContain('@serpdirectory/data-ops/email-deliveries')
 
     for (const file of readdirSync(emailDirectory).filter(name => name.endsWith('.ts'))) {

@@ -24,7 +24,7 @@ Worker handler outside Next.js.
 | File | Owns |
 |---|---|
 | `server.ts` | `enqueueEmail(templateId, { eventKey, to, input })` for route handlers and actions (`server-only`) |
-| `runtime.ts` | `createWorkerEmailService({ env, context, templates })` from Worker bindings |
+| `runtime.ts` | `createWorkerEmailService({ env, context, templates })` from Worker bindings; `isEmailDeliveryConfigured(env)` |
 | `service.ts` | Validation, environment policy, rendering, the ledger claim, one send, logs; `emailEventKey` |
 | `config.ts` | Environment policy, senders, link origins, the staging allowlist, useSend settings |
 | `senders.ts` | Providers behind one interface: useSend (API), log (local), capture (tests) |

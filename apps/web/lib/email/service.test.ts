@@ -7,7 +7,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SqliteD1 } from '../../../../packages/data-ops/src/test-support'
 import { type EmailEnvironmentVars, resolveEmailPolicy } from './config'
-import { createWorkerEmailService } from './runtime'
+import { createWorkerEmailService, isEmailDeliveryConfigured } from './runtime'
 import { createCapturingEmailSender } from './senders'
 import {
   createDisabledEmailService,
@@ -516,7 +516,30 @@ describe('Worker email service', () => {
       ])
       expect(JSON.stringify(logs)).not.toContain(useSend.USESEND_API_KEY)
       expect(calls).toEqual([])
+      // The no-send check agrees, so Better Auth refuses a code it could not deliver.
+      expect(isEmailDeliveryConfigured(env), JSON.stringify({ ...env, DB: undefined })).toBe(false)
     }
+  })
+
+  it('reports delivery as configured exactly when the service would deliver', async () => {
+    const DB = new SqliteD1().asD1Database()
+    for (const env of [
+      { ...local, DB },
+      { ...local, DB, USESEND_API_KEY: '' },
+      { ...staging, ...useSend, DB },
+      { ...staging, ...useSend, DB, EMAIL_STAGING_ALLOWLIST: '' },
+      { ...production, ...useSend, DB }
+    ]) {
+      expect(isEmailDeliveryConfigured(env), String(env.SITE_ENVIRONMENT)).toBe(true)
+      const logs = await run(env, fakeFetch().fetcher)
+      expect(logs.map(entry => entry.event)).not.toContain('email_disabled')
+    }
+    // It never sends or touches D1.
+    const statements = new SqliteD1()
+    expect(
+      isEmailDeliveryConfigured({ ...production, ...useSend, DB: statements.asD1Database() })
+    ).toBe(true)
+    expect(statements.statements).toEqual([])
   })
 })
 

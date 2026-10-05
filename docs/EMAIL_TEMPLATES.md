@@ -89,6 +89,10 @@ enqueueEmail(SIGN_IN_CODE_TEMPLATE_ID, {
   never the reverse (`boundary.test.ts`). `rate-limits.test.ts` pins the values.
 - **Lifetime:** the email states `expiresInMinutes`, which Better Auth's sender derives from the
   lifetime it enforces.
+- **Delivery check:** before creating each code, Better Auth calls `emailDeliveryConfigured()`
+  (`lib/email/server.ts`, built on `isEmailDeliveryConfigured(env)` in `runtime.ts`). It sends
+  nothing and is false whenever `enqueueEmail` would log `email_disabled`. Then the request
+  answers 503 `OTP_DELIVERY_UNAVAILABLE` and no code exists.
 - **Refused input:** the template refuses a code that isn't `SIGN_IN_CODE_LENGTH` digits, or a
   lifetime that isn't 1 to 60 whole minutes. `enqueueEmail` never throws, so a refused code is
   only logged (`email_render_failed`). Better Auth's sender sends `sign-in` codes only; any

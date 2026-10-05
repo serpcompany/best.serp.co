@@ -84,6 +84,32 @@ describe('enqueueEmail', () => {
     ])
   })
 
+  it("reports whether this request's Worker can deliver, false on any doubt", async () => {
+    const { emailDeliveryConfigured } = await import('./server')
+    const DB = new SqliteD1().asD1Database()
+    const deployed = {
+      D1_RUNTIME_ENV: 'staging',
+      DB,
+      SITE_ENVIRONMENT: 'staging',
+      USESEND_API_KEY: 'us_test_key',
+      USESEND_BASE_URL: 'https://app.usesend.com'
+    }
+    const cases: Array<[unknown, boolean]> = [
+      [deployed, true],
+      [{ ...deployed, USESEND_API_KEY: undefined }, false],
+      [{ ...deployed, USESEND_BASE_URL: 'https://example.com' }, false],
+      [{ ...deployed, DB: undefined }, false],
+      [{}, false]
+    ]
+    for (const [env, expected] of cases) {
+      getCloudflareContext.mockResolvedValueOnce({ ctx: { waitUntil: vi.fn() }, env })
+      expect(await emailDeliveryConfigured()).toBe(expected)
+    }
+    getCloudflareContext.mockRejectedValueOnce(new Error('no context'))
+    expect(await emailDeliveryConfigured()).toBe(false)
+    expect(loggedLines(errors)).toEqual([])
+  })
+
   it('fails closed with a logged line when the environment is not configured', async () => {
     const waitUntil = vi.fn()
     getCloudflareContext.mockResolvedValue({ ctx: { waitUntil }, env: {} })

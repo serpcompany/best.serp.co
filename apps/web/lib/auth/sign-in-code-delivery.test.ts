@@ -33,7 +33,10 @@ interface Staging {
   sqlite: SqliteD1
 }
 
-function staging(allowlist: string): Staging {
+/** Worker vars that differ from a fully configured staging Worker. */
+type EmailOverrides = Partial<Record<'DB' | 'USESEND_API_KEY' | 'USESEND_BASE_URL', unknown>>
+
+function staging(allowlist: string, overrides: EmailOverrides = {}): Staging {
   const sqlite = new SqliteD1()
   const client = createDatabase(sqlite.asD1Database())
   const settings = resolveAuthSettings({
@@ -52,7 +55,8 @@ function staging(allowlist: string): Staging {
       EMAIL_STAGING_ALLOWLIST: allowlist,
       SITE_ENVIRONMENT: 'staging',
       USESEND_API_KEY: FAKE_USESEND_KEY,
-      USESEND_BASE_URL: 'https://app.usesend.com'
+      USESEND_BASE_URL: 'https://app.usesend.com',
+      ...overrides
     }
   })
   const fakeFetch = vi.fn<typeof fetch>(async () => Response.json({ emailId: 'email_fake_1' }))
@@ -110,6 +114,9 @@ describe('sign-in codes on staging', () => {
     )
     expect(requested.status).toBe(200)
     await h.settled()
+    expect(h.sqlite.database.prepare('SELECT count(*) AS n FROM verification').get()).toEqual({
+      n: 1
+    })
 
     expect(h.fetch).toHaveBeenCalledTimes(1)
     const [url, init] = h.fetch.mock.calls[0] ?? []
@@ -145,6 +152,32 @@ describe('sign-in codes on staging', () => {
       post('/sign-in/email-otp', { email: 'devin@serp.co', otp: code }, binding)
     )
     expect(signedIn.status).toBe(200)
+  })
+
+  it('answers 503 and creates no code when staging cannot deliver email', async () => {
+    const misconfigured: Array<[string, EmailOverrides]> = [
+      ['no useSend key', { USESEND_API_KEY: undefined }],
+      ['an empty useSend key', { USESEND_API_KEY: '' }],
+      ['an unknown useSend origin', { USESEND_BASE_URL: 'https://usesend.example.com' }],
+      ['no useSend origin', { USESEND_BASE_URL: undefined }],
+      ['no DB binding for email', { DB: undefined }]
+    ]
+    for (const [label, overrides] of misconfigured) {
+      const h = staging('devin@serp.co', overrides)
+      const requested = await h.auth.handler(
+        post('/email-otp/send-verification-otp', { email: 'devin@serp.co', type: 'sign-in' })
+      )
+      expect(requested.status, label).toBe(503)
+      expect(((await requested.json()) as { code: string }).code, label).toBe(
+        'OTP_DELIVERY_UNAVAILABLE'
+      )
+      await h.settled()
+      expect(h.fetch, label).not.toHaveBeenCalled()
+      expect(
+        h.sqlite.database.prepare('SELECT count(*) AS n FROM verification').get(),
+        label
+      ).toEqual({ n: 0 })
+    }
   })
 
   it('answers the same for an address outside the staging allowlist, and sends nothing', async () => {

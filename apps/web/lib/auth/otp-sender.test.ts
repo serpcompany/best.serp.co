@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  createDevOtpSender,
   createEmailOtpSender,
   OtpDeliveryUnavailableError,
+  otpDeliveryReady,
   type SignInCodeEmail,
   selectOtpSender,
   unavailableOtpSender
@@ -15,10 +17,12 @@ const message = {
 }
 
 function email(
-  templateRegistered: boolean
+  templateRegistered: boolean,
+  configured = true
 ): SignInCodeEmail & { enqueue: ReturnType<typeof vi.fn> } {
   let calls = 0
   return {
+    deliveryConfigured: async () => configured,
     enqueue: vi.fn(async () => undefined),
     eventKey: () => {
       calls += 1
@@ -67,6 +71,21 @@ describe('sign-in code senders', () => {
     expect(JSON.stringify(delivery.enqueue.mock.calls.map(call => call[0].eventKey))).not.toMatch(
       /482913|000111/u
     )
+  })
+
+  it('is ready only while the Worker can deliver email, and fails closed', async () => {
+    expect(await otpDeliveryReady(unavailableOtpSender)).toBe(false)
+    expect(await otpDeliveryReady(createDevOtpSender(() => {}))).toBe(true)
+    expect(await otpDeliveryReady(selectOtpSender('staging', email(true, true)))).toBe(true)
+    expect(await otpDeliveryReady(selectOtpSender('staging', email(true, false)))).toBe(false)
+    expect(await otpDeliveryReady(selectOtpSender('production', email(true, false)))).toBe(false)
+    const throwing = createEmailOtpSender({
+      ...email(true),
+      deliveryConfigured: async () => {
+        throw new Error('no context')
+      }
+    })
+    expect(await otpDeliveryReady(throwing)).toBe(false)
   })
 
   it('sends nothing but sign-in codes', async () => {

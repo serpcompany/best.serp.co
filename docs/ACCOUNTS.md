@@ -107,9 +107,12 @@ runs, which is refused outside `local`). Staging and production send the code as
 derives from a code. Only `sign-in` codes are sent. The code's length and lifetime are
 defined once, in `apps/web/lib/email/sign-in-code.ts`; `rate-limits.ts` configures Better Auth
 with them, and the email states the lifetime it is given. The `enqueueEmail` call is typed
-against the registered template, so the build fails if its input changes shape. Without a
-registered template, a code request answers 503 `OTP_DELIVERY_UNAVAILABLE` and no code is
-created or logged.
+against the registered template, so the build fails if its input changes shape. A code
+request answers 503 `OTP_DELIVERY_UNAVAILABLE`, and no code is created or logged, when no
+template is registered or when this Worker cannot deliver email. The second is checked on every
+request, before any limit is counted (`emailDeliveryConfigured`: matching environment vars, the
+`DB` binding, a valid `USESEND_BASE_URL` and `USESEND_API_KEY`). So a rotated or missing key
+stops sign-in visibly instead of issuing codes that never arrive.
 
 On staging, a code for an address outside `EMAIL_STAGING_ALLOWLIST` is skipped
 (`email_skipped`) while the request answers 200 like any other, so testers must be on the

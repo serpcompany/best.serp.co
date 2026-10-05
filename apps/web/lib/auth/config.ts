@@ -48,7 +48,12 @@ import {
   knownDeviceSetCookie,
   readKnownDeviceTokens
 } from './known-device'
-import { OtpDeliveryUnavailableError, type OtpSender, readDevOtpOutbox } from './otp-sender'
+import {
+  OtpDeliveryUnavailableError,
+  type OtpSender,
+  otpDeliveryReady,
+  readDevOtpOutbox
+} from './otp-sender'
 import {
   clientIp,
   type EmailStanding,
@@ -307,8 +312,9 @@ export function createAuth({ client, operations, sender, settings }: CreateAuthO
       before: createAuthMiddleware(async ctx => {
         if (ctx.path === SEND_OTP_PATH) {
           // Better Auth swallows delivery errors (the endpoint still answers success), so an
-          // environment without a sender refuses before a code exists.
-          if (sender.kind === 'unavailable') {
+          // environment without a sender, or whose email is not configured (a missing useSend
+          // key, a bad base URL, no DB), refuses before a code exists.
+          if (!(await otpDeliveryReady(sender))) {
             throw new APIError('SERVICE_UNAVAILABLE', {
               code: 'OTP_DELIVERY_UNAVAILABLE',
               message: new OtpDeliveryUnavailableError().message
