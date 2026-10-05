@@ -419,7 +419,11 @@ export const listingSubmissions = sqliteTable(
      * keeps inserting valid rows between migrate and deploy. Native intake (#63) writes `draft`.
      */
     status: text('status', { enum: submissionStatuses }).notNull().default('pending_badge'),
-    /** Digest of the legacy anonymous capability; signed-in submissions (#63) carry none. */
+    /**
+     * Retired with the anonymous capability flow (#63): nothing reads or writes it. It stays
+     * until a Worker without that flow is live, because a migration must keep the live Worker
+     * working while it applies (DEPLOY_RUNBOOK.md); a follow-up migration then drops it.
+     */
     accessTokenHash: text('access_token_hash'),
     verificationAttempts: integer('verification_attempts').notNull().default(0),
     lastVerificationAt: text('last_verification_at'),

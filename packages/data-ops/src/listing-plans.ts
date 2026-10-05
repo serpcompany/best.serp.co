@@ -53,32 +53,62 @@ function listingEvent(
   }
 }
 
-/**
- * Whether a listing already has `website` (#64 review): the one rule submission intake
- * (`createSubmission`) and the admin website edit (`listingWebsiteConflicts`) share. A listing
- * matches when its slug is the website's host (`urlKey`), or its stored website (kept as
- * entered) is the URL as given or one of its spellings (`websiteSpellings`), with or without a
- * query or fragment after it. So `https://x.example/?ref=abc`, `https://x.example/#top` and
- * `https://x.example/` collide whichever is stored. Both halves use `listings_website_idx`: an IN
- * list, and one range per spelling (`spelling#` up to `spelling@`, then `?` or `#` next).
- */
-export function listingWebsiteMatch(input: {
-  exceptListingId?: string
-  website: string
-}): PlanGuard {
+/** The two halves of `listingWebsiteMatch`, each selecting the ids of matching listings. */
+function listingWebsiteMatchHalves(input: { exceptListingId?: string; website: string }): {
+  byKey: PlanGuard
+  bySuffix: PlanGuard
+} {
   const website = input.website.trim()
   const host = urlKey(website).hostKey
   const spellings = websiteSpellings(website)
   const exact = [...new Set([website, ...spellings])]
   const except = input.exceptListingId === undefined ? [] : [input.exceptListingId]
   return {
-    sql: `(EXISTS (SELECT 1 FROM listings WHERE ${except.length ? 'id<>? AND ' : ''}(slug=?
-        OR website IN (${exact.map(() => '?').join(',')})))
-      OR EXISTS (SELECT 1 FROM json_each(?) spelling JOIN listings suffixed
+    byKey: {
+      sql: `SELECT id FROM listings WHERE ${except.length ? 'id<>? AND ' : ''}(slug=?
+        OR website IN (${exact.map(() => '?').join(',')}))`,
+      params: [...except, host, ...exact]
+    },
+    bySuffix: {
+      sql: `SELECT suffixed.id FROM json_each(?) spelling JOIN listings suffixed
         ON suffixed.website >= spelling.value || '#' AND suffixed.website < spelling.value || '@'
         AND substr(suffixed.website, length(spelling.value) + 1, 1) IN ('?', '#')
-        ${except.length ? 'WHERE suffixed.id<>?' : ''}))`,
-    params: [...except, host, ...exact, JSON.stringify(spellings), ...except]
+        ${except.length ? 'WHERE suffixed.id<>?' : ''}`,
+      params: [JSON.stringify(spellings), ...except]
+    }
+  }
+}
+
+/**
+ * Whether a listing already has `website` (#64 review): the one rule submission intake
+ * (`checkUrl`, `createDraft`, through `listingIdsWithWebsite`) and the admin website edit
+ * (`listingWebsiteConflicts`) share. A listing matches when its slug is the website's host
+ * (`urlKey`), or its stored website (kept as entered) is the URL as given or one of its
+ * spellings (`websiteSpellings`), with or without a query or fragment after it. So
+ * `https://x.example/?ref=abc`, `https://x.example/#top` and `https://x.example/` collide
+ * whichever is stored. Both halves use `listings_website_idx`: an IN list, and one range per
+ * spelling (`spelling#` up to `spelling@`, then `?` or `#` next).
+ */
+export function listingWebsiteMatch(input: {
+  exceptListingId?: string
+  website: string
+}): PlanGuard {
+  const { byKey, bySuffix } = listingWebsiteMatchHalves(input)
+  return {
+    sql: `(EXISTS (${byKey.sql}) OR EXISTS (${bySuffix.sql}))`,
+    params: [...byKey.params, ...bySuffix.params]
+  }
+}
+
+/**
+ * The ids of the listings that already have `website` by `listingWebsiteMatch`'s rule, for
+ * submission intake, which shows the listing ("Claim this listing").
+ */
+export function listingIdsWithWebsite(website: string): PlanGuard {
+  const { byKey, bySuffix } = listingWebsiteMatchHalves({ website })
+  return {
+    sql: `${byKey.sql} UNION ALL ${bySuffix.sql}`,
+    params: [...byKey.params, ...bySuffix.params]
   }
 }
 
