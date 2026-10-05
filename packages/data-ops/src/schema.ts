@@ -203,7 +203,10 @@ export const listings = sqliteTable(
       sql`${table.publishedAt} DESC`,
       table.displayOrder
     ),
-    index('listings_name_idx').on(sql`${table.name} COLLATE NOCASE`),
+    // #77: `MAX(display_order)` for a new listing (approval, payment, publisher) and the
+    // submission duplicate check on `website` were full scans of `listings`.
+    index('listings_display_order_idx').on(table.displayOrder),
+    index('listings_website_lookup_idx').on(table.website),
     index('listings_related_name_idx')
       .on(table.name, table.slug)
       .where(
@@ -252,8 +255,7 @@ export const listingMedia = sqliteTable(
       table.listingId,
       table.kind,
       table.sortOrder
-    ),
-    index('listing_media_listing_idx').on(table.listingId, table.sortOrder)
+    )
   ]
 )
 
@@ -269,8 +271,7 @@ export const listingResourceLinks = sqliteTable(
     sortOrder: integer('sort_order').notNull().default(0)
   },
   table => [
-    unique('listing_resource_links_listing_order_unique').on(table.listingId, table.sortOrder),
-    index('listing_resource_links_listing_idx').on(table.listingId, table.sortOrder)
+    unique('listing_resource_links_listing_order_unique').on(table.listingId, table.sortOrder)
   ]
 )
 
@@ -285,10 +286,7 @@ export const listingFaqs = sqliteTable(
     answer: text('answer').notNull(),
     sortOrder: integer('sort_order').notNull().default(0)
   },
-  table => [
-    unique('listing_faqs_listing_order_unique').on(table.listingId, table.sortOrder),
-    index('listing_faqs_listing_idx').on(table.listingId, table.sortOrder)
-  ]
+  table => [unique('listing_faqs_listing_order_unique').on(table.listingId, table.sortOrder)]
 )
 
 export const publicationState = sqliteTable(
@@ -878,7 +876,9 @@ export const listingSubmissionUrlBlocks = sqliteTable(
     ),
     uniqueIndex('listing_submission_url_blocks_active_idx')
       .on(table.urlKey)
-      .where(sql`${table.liftedAt} IS NULL`)
+      .where(sql`${table.liftedAt} IS NULL`),
+    // Full (not partial) indexes on foreign keys, so deleting the parent row is a seek (#77).
+    index('listing_submission_url_blocks_submission_idx').on(table.submissionId)
   ]
 )
 
@@ -921,9 +921,10 @@ export const listingOwners = sqliteTable(
     uniqueIndex('listing_owners_current_member_idx')
       .on(table.listingId, table.userId)
       .where(sql`${table.revokedAt} IS NULL`),
-    index('listing_owners_user_idx')
-      .on(table.userId, table.listingId)
-      .where(sql`${table.revokedAt} IS NULL`)
+    // Full (not partial) indexes on both foreign keys, so deleting a listing or a user is a
+    // seek; the partial unique indexes above cannot serve SQLite's foreign-key checks (#77).
+    index('listing_owners_listing_idx').on(table.listingId),
+    index('listing_owners_user_idx').on(table.userId, table.listingId)
   ]
 )
 
@@ -970,7 +971,9 @@ export const listingRevisions = sqliteTable(
       .on(table.listingId)
       .where(sql`${table.status} IN (${sqlList(openRevisionStatuses)})`),
     index('listing_revisions_review_queue_idx').on(table.status, table.createdAt),
-    index('listing_revisions_author_idx').on(table.authorUserId, table.createdAt)
+    index('listing_revisions_author_idx').on(table.authorUserId, table.createdAt),
+    // Full index on the listing foreign key (`listing_revisions_open_idx` is partial) (#77).
+    index('listing_revisions_listing_idx').on(table.listingId)
   ]
 )
 

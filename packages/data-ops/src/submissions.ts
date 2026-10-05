@@ -4,6 +4,7 @@ import { type UrlKey, urlKey } from '@serpdirectory/utils/url-key'
 import { and, eq, or, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
+import { assertStagedChildLimits } from './plan-support'
 import { validatePublicHttpUrl } from './public-url'
 import {
   categories,
@@ -292,6 +293,11 @@ export function createSubmissionOperations(config: {
 
   return {
     async createSubmission(input) {
+      try {
+        assertStagedChildLimits(input)
+      } catch (error) {
+        throw new SubmissionError('too_many_items', (error as Error).message)
+      }
       for (const value of [
         input.website,
         input.logoUrl,

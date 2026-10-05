@@ -177,6 +177,28 @@ describe('auth data operations', () => {
     expect(await operations.consumeRateLimit([])).toEqual({ allowed: true, retryAfterSeconds: 0 })
   })
 
+  // #77: candidates came from a UNION per bucket, which D1 caps at five terms.
+  it('records one hit per distinct bucket for many rules and caps the rule count', async () => {
+    const { hitCount, operations } = setup()
+    const rules = Array.from({ length: 16 }, (_, index) => ({
+      key: `key-${index % 10}`,
+      max: 5,
+      scope: `scope-${index % 10}`,
+      windowMs: MINUTE + index
+    }))
+    expect(await operations.consumeRateLimit(rules)).toEqual({
+      allowed: true,
+      retryAfterSeconds: 0
+    })
+    expect(hitCount()).toBe(10)
+    await expect(
+      operations.consumeRateLimit([
+        ...rules,
+        { key: 'k', max: 1, scope: 'extra', windowMs: MINUTE }
+      ])
+    ).rejects.toThrow(/at most 16 rules/u)
+  })
+
   it('stores keyed digests of rate-limited emails and IP addresses, never the values', async () => {
     const { operations, sqlite } = setup()
     await operations.consumeRateLimit(otpRules('secret@example.com', '203.0.113.9'))

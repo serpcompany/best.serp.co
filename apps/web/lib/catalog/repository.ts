@@ -2,20 +2,21 @@ import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { createCacheApiDataCache, noCatalogDataCache } from '@serpdirectory/data-ops/cache'
-import { createCatalogOperations } from '@serpdirectory/data-ops/catalog'
+import { createCatalogOperations, MAX_SEARCH_LIMIT } from '@serpdirectory/data-ops/catalog'
+import { sharedCatalogEpoch } from '@serpdirectory/data-ops/catalog-epoch'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import type {
   CatalogObserver,
   ListingNamePage,
   ListingNamePageQuery,
-  ListingPage,
   PublishedCategory
 } from '@serpdirectory/data-ops/contracts'
 import type { WebsiteDetailMetadata, WebsiteMetadata } from '@serpdirectory/web-core/content-query'
 import { cache } from 'react'
 
-export type PublishedListingPage = ListingPage
 export type { ListingNamePage, PublishedCategory }
+/** Largest `limit` search and autocomplete honor (`/api/search` clamps to it). */
+export { MAX_SEARCH_LIMIT }
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
@@ -42,7 +43,9 @@ const getOperations = cache(async () => {
     cache: dataCache,
     client: createDatabase(assertCatalogBinding(cloudflareEnv)),
     clock: () => new Date(),
-    observe
+    observe,
+    // The Worker entry just read the epoch for the edge cache key; reuse it (#77).
+    reuseEpoch: () => sharedCatalogEpoch()
   })
 })
 
@@ -58,13 +61,6 @@ const readListingBySlug = cache(
 )
 
 export const getPublishedListings = readPublishedListings
-
-export async function getPublishedListingPage(
-  page = 1,
-  pageSize = 48
-): Promise<PublishedListingPage> {
-  return (await getOperations()).getPublishedListingPage(page, pageSize)
-}
 
 /**
  * One page of the directory (or of one category) in directory name order. This is how

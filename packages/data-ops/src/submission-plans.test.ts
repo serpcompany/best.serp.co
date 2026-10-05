@@ -225,6 +225,23 @@ describe('submission transition map', () => {
     expect(submissionTransitions.ownerEdit.from).not.toContain('verified')
     expect(submissionTransitions.ownerEdit.from).not.toContain('paid_pending_review')
   })
+
+  // #77: a plan's statement count follows the staged children, so builders cap them.
+  it('refuses staged content with more than five resource links or FAQs', () => {
+    const plans = (overrides: Partial<typeof content>) =>
+      buildReplaceSubmissionContentPlans({
+        actor: 'reviewer',
+        content: { ...content, ...overrides },
+        expectedStatuses: ['verified'],
+        now: NOW,
+        submissionId
+      })
+    const link = { label: 'Docs', url: 'https://example.com/docs' }
+    const faq = { answer: 'Yes.', question: 'Free?' }
+    expect(() => plans({ resourceLinks: Array(6).fill(link) })).toThrow(/at most 5 resource links/u)
+    expect(() => plans({ faqs: Array(6).fill(faq) })).toThrow(/at most 5 FAQs/u)
+    expect(plans({ faqs: Array(5).fill(faq), resourceLinks: Array(5).fill(link) })).toHaveLength(15)
+  })
 })
 
 describe('submission status transitions (compare-and-swap with changes() assertions)', () => {

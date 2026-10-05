@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import type { CatalogDataCache } from './contracts'
+import { assertD1StatementLimits } from './sql-limits'
 
 const MIGRATIONS_DIRECTORY = resolve(import.meta.dirname, '../../../d1/drizzle')
 
@@ -42,41 +43,7 @@ export interface RecordedStatement {
   sql: string
 }
 
-const IDENTIFIER = String.raw`(?:"(?:[^"]|"")+"|[A-Za-z_][\w$]*)`
-/**
- * A column (optionally table-qualified) compared with the identical column text:
- * `"email" = "email"`, `"t"."c" IS "t"."c"`. The right side may not continue into a larger
- * expression, so increments such as `"attempts" = "attempts" + 1` are not matches.
- */
-const SELF_COMPARISON = new RegExp(
-  String.raw`(?<![\w$."]|[-+*/%&|]\s*)(${IDENTIFIER}(?:\.${IDENTIFIER})?)\s*(?:==|=|!=|<>|\bIS(?:\s+NOT)?\b)\s*\1(?![\w$."(]|\s*(?:[-+*/%&|<>=!]|\bCOLLATE\b))`,
-  'iu'
-)
-
-/**
- * The first place where `sql` compares a column with itself, or null. String literals and
- * comments are ignored. Such a predicate is always true (or NULL) and usually means a column
- * meant for an outer query resolved to the inner table instead: Drizzle writes columns
- * unqualified in single-table queries, which turned `admin_allowlist.email = users.email`
- * into `"email" = "email"` (#78).
- */
-export function findSelfComparison(sql: string): string | null {
-  const code = sql
-    .replace(/'(?:[^']|'')*'/gu, "''")
-    .replace(/\/\*[\s\S]*?\*\//gu, ' ')
-    .replace(/--[^\n]*/gu, ' ')
-  return SELF_COMPARISON.exec(code)?.[0] ?? null
-}
-
-/** Throws when `sql` compares a column with itself; the SQLite test helpers call it (#77). */
-export function assertNoSelfComparison(sql: string): void {
-  const selfComparison = findSelfComparison(sql)
-  if (selfComparison) {
-    throw new Error(
-      `Test SQL compares a column with itself (${selfComparison}); qualify the column or bind the value (#78): ${sql}`
-    )
-  }
-}
+export { findSelfComparison } from './sql-limits'
 
 export class SqliteD1 {
   readonly database: DatabaseSync
@@ -91,8 +58,9 @@ export class SqliteD1 {
     const owner = this
     const binding = {
       prepare(sql: string) {
-        // Every data-ops and app test that runs SQL through this binding gets the guard.
-        assertNoSelfComparison(sql)
+        // Every data-ops and app test that runs SQL through this binding gets the D1 limit
+        // and self-comparison checks (`sql-limits.ts`, #77 and #78).
+        assertD1StatementLimits(sql)
         let bindings: unknown[] = []
         const execute = <T>() => {
           owner.statements.push({ bindings, sql })
@@ -119,6 +87,7 @@ export class SqliteD1 {
         }
         return {
           bind(...values: unknown[]) {
+            assertD1StatementLimits(sql, values)
             bindings = values
             return this
           },

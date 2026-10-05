@@ -8,6 +8,7 @@ import * as draftPlansModule from '@serpdirectory/data-ops/draft-plans'
 import * as listingPlansModule from '@serpdirectory/data-ops/listing-plans'
 import { prepareCatalogPublication, type StatementPlan } from '@serpdirectory/data-ops/plan-support'
 import * as revisionPlansModule from '@serpdirectory/data-ops/revision-plans'
+import { assertD1StatementLimits } from '@serpdirectory/data-ops/sql-limits'
 import * as submissionPlansModule from '@serpdirectory/data-ops/submission-plans'
 import type { UrlKey } from '@serpdirectory/utils/url-key'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -58,11 +59,18 @@ let proxyDispose: (() => Promise<void>) | undefined
 let keyWorker: Unstable_DevWorker | undefined
 let db: D1Database
 
+/** Every plan statement gets the D1 limit and self-comparison checks before it runs (#77). */
+function checked(sql: string, params: readonly unknown[]): string {
+  assertD1StatementLimits(sql, params)
+  return sql
+}
+
 async function run(plans: StatementPlan[]): Promise<void> {
-  await db.batch(plans.map(plan => db.prepare(plan.sql).bind(...plan.params)))
+  await db.batch(plans.map(plan => db.prepare(checked(plan.sql, plan.params)).bind(...plan.params)))
 }
 
 async function all<T>(plan: StatementPlan): Promise<T[]> {
+  checked(plan.sql, plan.params)
   return (
     await db
       .prepare(plan.sql)
@@ -73,7 +81,7 @@ async function all<T>(plan: StatementPlan): Promise<T[]> {
 
 async function first<T = Record<string, unknown>>(sql: string, ...params: unknown[]) {
   return db
-    .prepare(sql)
+    .prepare(checked(sql, params))
     .bind(...params)
     .first<T>()
 }

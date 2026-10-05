@@ -43,10 +43,30 @@ enforced (`scripts/d1-drizzle-local.test.ts`). After `pnpm db:generate`, replace
 SQL with the hand-finished form and check that a second `pnpm db:generate` reports no changes.
 
 D1 has limits that `node:sqlite` does not apply: LIKE and GLOB patterns of at most 50 bytes, at
-most 100 bound parameters per statement, and at most 32 arguments per function. So no CHECK or
-trigger uses LIKE or GLOB (ISO instants are checked with `x IS strftime('%Y-%m-%dT%H:%M:%fZ', x)`),
-and `scripts/d1-workerd-plans.test.ts` (harness step "D1 contracts") runs the #62 plans, draft
-writes, badge checks, and URL blocks on Wrangler-local D1 (workerd).
+most 100 bound parameters and 100,000 bytes per statement, and at most 32 arguments per
+function; Wrangler-local D1 (workerd) also allows only 5 terms per compound SELECT and an
+expression depth of 100, but does not enforce the function limit. So (serpcompany/best.serp.co#77):
+
+- No CHECK or trigger uses LIKE or GLOB (ISO instants are checked with
+  `x IS strftime('%Y-%m-%dT%H:%M:%fZ', x)`), and no statement binds user input into a pattern.
+  The architecture guard fails on a bound or concatenated LIKE/GLOB pattern, a literal pattern
+  over 50 bytes, or a function with more than 32 arguments, in data-ops, scripts, and migrations.
+- `packages/data-ops/src/sql-limits.ts` checks every statement the SQLite and workerd test
+  helpers run against those limits, and against a column compared with itself (#78).
+- `scripts/d1-workerd-plans.test.ts` runs the #62 plans on workerd, and
+  `scripts/d1-workerd-queries.test.ts` runs every catalog, search, account, email, and
+  submission operation on workerd with the full import and worst-case inputs, with a
+  rows-read budget per catalog query shape (both in harness step "D1 contracts").
+- Search matches a listing's name, short description, and active category slugs and names,
+  never its long content. The query is normalized and cut to 100 characters and 8 distinct
+  terms (truncated, never rejected); the terms are one JSON binding read with `json_extract`,
+  matched with `instr()`, so a search binds four values whatever its length. Results are
+  cached per epoch, and `limit` is at most 100.
+- `0004_query_indexes.sql` adds `listings(display_order)` (the next display order of a new
+  listing), `listings(website)` (the submission duplicate check), and full indexes on the
+  foreign keys of `listing_owners`, `listing_revisions`, and `listing_submission_url_blocks`
+  (their partial indexes cannot serve SQLite's foreign-key checks). It drops two indexes that
+  duplicated a unique index and two no query used.
 
 - `categories` stores taxonomy rows and display order (unique `slug`).
 - `listings` stores public product fields, status, publication time, and stable IDs

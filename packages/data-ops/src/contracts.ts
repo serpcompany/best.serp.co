@@ -1,3 +1,4 @@
+import type { CatalogEpoch } from './catalog-epoch'
 import type { Database } from './client'
 
 export type CatalogOperation =
@@ -9,7 +10,6 @@ export type CatalogOperation =
   | 'listing-detail'
   | 'listing-name-order'
   | 'listing-name-page'
-  | 'listing-page'
   | 'published-summaries'
   | 'publication-version'
   | 'search-summaries'
@@ -24,8 +24,6 @@ export type CatalogQueryShape =
   | 'listing-detail'
   | 'listing-name-order'
   | 'listing-name-page-items'
-  | 'listing-page-count'
-  | 'listing-page-items'
   | 'navigation-next'
   | 'navigation-previous'
   | 'publication-version'
@@ -39,6 +37,12 @@ export type CatalogQueryShape =
 
 export interface CatalogQueryEvent {
   d1DurationMs: number | null
+  /**
+   * For a failed query: the SQLite result code and a stable reason, such as
+   * `SQLITE_ERROR:too_many_variables`. Never the SQL text or bound values (they can hold user
+   * input such as search terms).
+   */
+  errorCode?: string
   event: 'd1_query'
   operation: CatalogOperation
   queryShape: CatalogQueryShape
@@ -58,6 +62,7 @@ export interface CatalogCacheEvent {
     | 'listing-name-order'
     | 'listing-name-page'
     | 'published-summaries'
+    | 'search-summaries'
     | 'shell-stats'
   state: 'corrupt' | 'error' | 'hit' | 'miss' | 'write-error' | 'written'
 }
@@ -142,13 +147,6 @@ export interface UnpublishedListing {
   slug: string
 }
 
-export interface ListingPage {
-  items: ListingSummary[]
-  page: number
-  pageSize: number
-  total: number
-}
-
 /**
  * One page of listings in directory (name) order, optionally within one category.
  * `firstPublishedAt` / `lastPublishedAt` span the whole collection, not just the page.
@@ -197,14 +195,17 @@ export interface CatalogOperations {
   getLatestListings(limit?: number): Promise<ListingSummary[]>
   getListingBySlug(slug: string): Promise<ListingDetail | null>
   getListingNamePage(query?: ListingNamePageQuery): Promise<ListingNamePage>
-  getListingsByCategory(slug: string): Promise<ListingSummary[]>
   getPublicationVersion(): Promise<number>
-  getPublishedListingPage(page?: number, pageSize?: number): Promise<ListingPage>
   getPublishedListings(): Promise<ListingSummary[]>
   getShellStats(): Promise<CatalogShellStats>
   getSitemapListings(): Promise<ListingSummary[]>
   /** The unpublished listing at `slug`, or null when the slug is live or never existed. */
   getUnpublishedListing(slug: string): Promise<UnpublishedListing | null>
+  /**
+   * Public listings whose name, short description, or an active category (slug or name)
+   * contains every term of the normalized query (`normalizeSearchQuery`), at most
+   * `MAX_SEARCH_LIMIT`.
+   */
   searchListings(query: string, limit?: number): Promise<ListingSummary[]>
 }
 
@@ -213,4 +214,9 @@ export interface CatalogOperationsConfig {
   client: Database
   clock: () => Date
   observe: CatalogObserver
+  /**
+   * An epoch this isolate read moments ago (the Worker entry's, `sharedCatalogEpoch()`), so a
+   * render reuses it instead of reading the epoch again; null falls back to D1.
+   */
+  reuseEpoch?: () => CatalogEpoch | null
 }

@@ -233,11 +233,13 @@ reads it with one statement (two index seeks). Four layers, from the edge inward
    background for up to 5 minutes; isolates in one data center share it through the Cache
    API for 30 seconds. D1 therefore sees about one one-row epoch read per data center per
    30 seconds, and a publication reaches cached pages within about a minute. Nothing is
-   purged: old keys stop matching and expire.
+   purged: old keys stop matching and expire. The entry shares the epoch with the renders in
+   its isolate (`shareCatalogEpochToken`, a global, never a request header), so a render
+   reuses it for up to 30 seconds instead of reading it again.
 3. **Data cache** (Workers Cache API, `packages/data-ops/src/cache.ts`). Shell counts,
-   name order, name pages, featured/latest heads, details, and the full summary list (for
-   sitemaps and the feed) are cached under epoch-scoped keys for 24 hours, with live D1
-   fallback when the cache fails.
+   name order, name pages, featured/latest heads, details, search results (per normalized
+   query and limit), and the full summary list (for sitemaps and the feed) are cached under
+   epoch-scoped keys for 24 hours, with live D1 fallback when the cache fails.
 4. React `cache()` deduplicates reads within a request.
 
 Both Cache API layers are per data center and populate on demand. A deployment gets a new

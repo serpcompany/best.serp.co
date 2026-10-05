@@ -172,7 +172,8 @@ describe('fresh Drizzle D1 history', () => {
       '0000_baseline.sql',
       '0001_email_deliveries.sql',
       '0002_better_auth.sql',
-      '0003_submissions_data_model.sql'
+      '0003_submissions_data_model.sql',
+      '0004_query_indexes.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
@@ -274,9 +275,10 @@ describe('fresh Drizzle D1 history', () => {
     // a parent still referenced by a child would cascade-delete the child rows.
     const database = new DatabaseSync(':memory:')
     const names = freshMigrationNames()
-    const dataModel = names.at(-1)
-    expect(dataModel).toBe('0003_submissions_data_model.sql')
-    for (const migration of names.slice(0, -1)) {
+    const dataModelIndex = names.indexOf('0003_submissions_data_model.sql')
+    const dataModel = names[dataModelIndex]
+    expect(dataModelIndex).toBeGreaterThan(0)
+    for (const migration of names.slice(0, dataModelIndex)) {
       database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
     }
     database.exec(`
@@ -339,6 +341,14 @@ describe('fresh Drizzle D1 history', () => {
     expect(
       database.prepare("SELECT sql FROM sqlite_master WHERE name='listing_submission_faqs'").get()
     ).toMatchObject({ sql: expect.stringContaining('REFERENCES "listing_submissions"') })
+    // Every later migration (0004: query indexes, #77) applies to the populated database too.
+    for (const migration of names.slice(dataModelIndex + 1)) {
+      database.exec('BEGIN')
+      database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
+      database.exec('COMMIT')
+    }
+    expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect(database.prepare('SELECT COUNT(*) AS count FROM listings').get()).toEqual({ count: 2 })
     database.exec("DELETE FROM listing_submissions WHERE id = 'sub'")
     expect(database.prepare('SELECT COUNT(*) AS count FROM listing_submission_faqs').get()).toEqual(
       {

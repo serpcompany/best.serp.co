@@ -1,8 +1,43 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import {
+  D1_MAX_FUNCTION_ARGUMENTS,
+  d1StatementLimitViolations,
+  maxFunctionArguments,
+  oversizedPatternLiterals,
+  stripSqlLiteralsAndComments
+} from '@serpdirectory/data-ops/sql-limits'
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { project } from './project'
+
+/**
+ * String and template literals in a TypeScript file that read as SQL, with each `${…}` as `?`
+ * (an interpolation is one value or fragment the static check cannot expand).
+ */
+function sqlStringsIn(file: string): Array<{ line: number; text: string }> {
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(resolve(file), 'utf8'),
+    ts.ScriptTarget.Latest,
+    true
+  )
+  const found: Array<{ line: number; text: string }> = []
+  const visit = (node: ts.Node): void => {
+    let text: string | null = null
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) text = node.text
+    else if (ts.isTemplateExpression(node)) {
+      text = node.head.text + node.templateSpans.map(span => `?${span.literal.text}`).join('')
+    }
+    if (text && /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE|WITH)\b/u.test(text)) {
+      found.push({ line: source.getLineAndCharacterOfPosition(node.getStart()).line + 1, text })
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return found
+}
 
 function trackedFiles(): string[] {
   return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
@@ -384,6 +419,49 @@ describe('single-site D1-only repository architecture', () => {
         )
       )
     expect(violations).toEqual([])
+  })
+
+  // #77: node:sqlite applies none of D1's statement limits and workerd does not enforce the
+  // 32-argument function limit, so these are checked on the SQL text itself.
+  it('keeps user input out of LIKE/GLOB patterns and every SQL function within 32 arguments', () => {
+    const sqlSources = trackedFiles().filter(
+      file =>
+        (file.startsWith('packages/data-ops/src/') || /^scripts\/[^/]+\.ts$/u.test(file)) &&
+        file.endsWith('.ts') &&
+        !file.endsWith('.test.ts') &&
+        existsSync(resolve(file))
+    )
+    const violations: string[] = []
+    for (const file of sqlSources) {
+      for (const { line, text } of sqlStringsIn(file)) {
+        if (/\b(?:LIKE|GLOB)\s+(?:\?|'[^']*'\s*\|\|)/iu.test(stripSqlLiteralsAndComments(text))) {
+          violations.push(`${file}:${line}: LIKE/GLOB takes a bound or concatenated pattern`)
+        }
+        for (const pattern of oversizedPatternLiterals(text)) {
+          violations.push(`${file}:${line}: LIKE/GLOB pattern over 50 bytes: ${pattern}`)
+        }
+        const widest = maxFunctionArguments(text)
+        if (widest && widest.count > D1_MAX_FUNCTION_ARGUMENTS) {
+          violations.push(`${file}:${line}: ${widest.name}() has ${widest.count} arguments`)
+        }
+      }
+    }
+    for (const migration of readdirSync(resolve('d1/drizzle')).filter(name =>
+      name.endsWith('.sql')
+    )) {
+      const statements = readFileSync(resolve('d1/drizzle', migration), 'utf8').split(
+        '--> statement-breakpoint'
+      )
+      for (const statement of statements) {
+        for (const violation of d1StatementLimitViolations(statement)) {
+          violations.push(`d1/drizzle/${migration}: ${violation}`)
+        }
+      }
+    }
+    expect(violations).toEqual([])
+    // The checks themselves catch what they are meant to.
+    expect(maxFunctionArguments(`SELECT max(${Array(33).fill('1').join(',')})`)?.count).toBe(33)
+    expect(/\b(?:LIKE|GLOB)\s+\?/iu.test('WHERE name LIKE ? ESCAPE')).toBe(true)
   })
 
   it('keeps retired public static repositories out of live application links', () => {

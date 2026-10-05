@@ -17,6 +17,7 @@
     "./public-url": "./src/public-url.ts",
     "./revision-plans": "./src/revision-plans.ts",
     "./schema": "./src/schema.ts",
+    "./sql-limits": "./src/sql-limits.ts",
     "./submissions": "./src/submissions.ts",
     "./submission-plans": "./src/submission-plans.ts",
     "./test-support": "./src/test-support.ts"
