@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { createAuthOperations } from '@serpdirectory/data-ops/auth'
+import { createDatabase } from '@serpdirectory/data-ops/client'
 import * as draftPlansModule from '@serpdirectory/data-ops/draft-plans'
 import * as listingPlansModule from '@serpdirectory/data-ops/listing-plans'
 import { prepareCatalogPublication, type StatementPlan } from '@serpdirectory/data-ops/plan-support'
@@ -686,5 +688,37 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
   it('ran every exported plan builder on D1', () => {
     expect(builderNames.length).toBeGreaterThan(30)
     expect(builderNames.filter(name => !called.has(name))).toEqual([])
+  })
+})
+
+describe('admin allowlist on Wrangler-local D1 (workerd, #78)', () => {
+  it('checks each user against their own email and revokes one admin while another stays', async () => {
+    const operations = createAuthOperations({
+      client: createDatabase(db),
+      rateLimitKey: 'workerd-rate-limit-key-'.repeat(2)
+    })
+    await db.batch([
+      db.prepare(
+        "INSERT INTO admin_allowlist (email, added_by) VALUES ('second-admin@example.com', 'test')"
+      ),
+      db.prepare(
+        `INSERT INTO users (id, name, email, email_verified) VALUES
+          ('auth_owner', 'Owner', 'devin@serp.co', 1),
+          ('auth_second', 'Second', 'second-admin@example.com', 1),
+          ('auth_visitor', 'Visitor', 'visitor@example.com', 1)`
+      )
+    ])
+    expect((await operations.getAdminStatus('auth_visitor'))?.allowlisted).toBe(false)
+    expect(await operations.syncUserRole('auth_visitor')).toBe('user')
+    expect(await operations.syncUserRole('auth_owner')).toBe('admin')
+    expect((await operations.getAdminStatus('auth_owner'))?.allowlisted).toBe(true)
+
+    await db.prepare("DELETE FROM admin_allowlist WHERE email = 'devin@serp.co'").run()
+    expect(await operations.getAdminStatus('auth_owner')).toMatchObject({
+      allowlisted: false,
+      role: 'admin'
+    })
+    expect((await operations.getAdminStatus('auth_second'))?.allowlisted).toBe(true)
+    expect(await operations.syncUserRole('auth_owner')).toBe('user')
   })
 })
