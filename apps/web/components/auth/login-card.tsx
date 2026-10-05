@@ -35,6 +35,7 @@ import {
   CODE_LENGTH,
   CODE_LIFETIME_MINUTES,
   CODE_LIFETIME_SECONDS,
+  codeDigits,
   formatCountdown,
   formatWait,
   RESEND_COOLDOWN_SECONDS,
@@ -193,6 +194,50 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
     })
   }
 
+  /** Every change to the code field ends here, already reduced to at most six digits. */
+  function onCodeChange(value: string) {
+    setOtp(value)
+    if (value !== rejectedCode && codeError?.kind === 'wrong') setCodeError(null)
+    // A full code that differs from the rejected one is sent at once, whether it was typed,
+    // pasted, or autofilled (onComplete misses a replaced value).
+    if (value.length === CODE_LENGTH && value !== rejectedCode) void onVerify(value)
+  }
+
+  /**
+   * Text headed for the code field with something besides digits in it, such as a code copied
+   * as "482 913" or "482-913": only its digits count (`codeDigits`). A whole code replaces
+   * whatever the slots hold; fewer digits go where the text was inserted.
+   */
+  function onCodeText(text: string, input: HTMLInputElement) {
+    const digits = codeDigits(text)
+    if (!digits) return
+    if (digits.length >= CODE_LENGTH) {
+      onCodeChange(digits.slice(0, CODE_LENGTH))
+      return
+    }
+    const start = input.selectionStart ?? otp.length
+    const end = input.selectionEnd ?? start
+    onCodeChange((otp.slice(0, start) + digits + otp.slice(end)).slice(0, CODE_LENGTH))
+  }
+
+  // Typed or keyboard-inserted text with separators (a keyboard's clipboard suggestion, drag and
+  // drop) never reaches input-otp, whose digits-only pattern and six-character limit would
+  // drop or cut it; its digits are applied instead. Native `beforeinput`: React's
+  // `onBeforeInput` is not that event and cannot be cancelled.
+  useEffect(() => {
+    const input = codeInput.current
+    if (!input) return undefined
+    function onBeforeInput(event: InputEvent) {
+      if (!input || !event.cancelable || event.inputType === 'insertFromPaste') return
+      const text = event.data ?? event.dataTransfer?.getData('text/plain') ?? ''
+      if (!text || codeDigits(text) === text) return
+      event.preventDefault()
+      onCodeText(text, input)
+    }
+    input.addEventListener('beforeinput', onBeforeInput)
+    return () => input.removeEventListener('beforeinput', onBeforeInput)
+  })
+
   async function onVerify(code: string) {
     if (step.kind !== 'code' || verifying.current || code.length !== CODE_LENGTH) return
     if (code === rejectedCode) return
@@ -344,13 +389,26 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                   aria-invalid={message ? true : undefined}
                   aria-describedby={message ? 'code-error' : 'code-description'}
                   pattern={DIGITS_ONLY}
+                  // A partial paste keeps only its digits, merged where the caret is.
+                  pasteTransformer={codeDigits}
                   value={otp}
-                  onChange={value => {
-                    setOtp(value)
-                    if (value !== rejectedCode && codeError?.kind === 'wrong') setCodeError(null)
-                    // A full code that differs from the rejected one is sent at once, whether
-                    // it was typed, pasted, or autofilled (onComplete misses a replaced value).
-                    if (value.length === CODE_LENGTH && value !== rejectedCode) void onVerify(value)
+                  onChange={onCodeChange}
+                  onPasteCapture={event => {
+                    // A whole code pasted in any format ("482 913", "482-913", " 482913\n")
+                    // replaces whatever the slots hold and is sent at once.
+                    const digits = codeDigits(event.clipboardData.getData('text/plain'))
+                    if (digits.length !== CODE_LENGTH) return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    onCodeChange(digits)
+                  }}
+                  onInput={event => {
+                    // Autofill and password managers set the whole value at once, past the
+                    // digits-only pattern: keep its digits.
+                    const value = event.currentTarget.value
+                    if (codeDigits(value) !== value) {
+                      onCodeChange(codeDigits(value).slice(0, CODE_LENGTH))
+                    }
                   }}
                 >
                   <InputOTPGroup>

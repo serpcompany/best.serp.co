@@ -7,6 +7,8 @@
  *   `SIGN_IN_CODE_LENGTH`, `SIGN_IN_CODE_TTL_SECONDS`, and `SIGN_IN_CODE_ATTEMPTS`.
  * - `components/auth/` (the `/login` screen) sizes the code input, words its copy, and counts
  *   attempts from the same values, so the screen cannot drift from Better Auth.
+ * - `signInCodeDigits` normalizes a pasted or typed code the same way on the screen and in the
+ *   sign-in hook.
  * - `lib/auth/otp-sender.ts` hands each code to `enqueueEmail('sign-in-code', ...)` with the
  *   lifetime in minutes, and the `sign-in-code` template (`emails/codes.ts`) refuses a code of
  *   any other length.
@@ -26,6 +28,17 @@ export const SIGN_IN_CODE_TTL_SECONDS = 10 * 60
 
 /** Guesses one code allows before Better Auth deletes it. */
 export const SIGN_IN_CODE_ATTEMPTS = 3
+
+/**
+ * The digits of a code as someone pasted, typed, or autofilled it: every character that is not
+ * 0-9 (spaces, NBSP, dashes, newlines, zero-width characters) is dropped, so "482 913",
+ * "482-913", and " 482913\n" all become "482913". The `/login` code field applies it to every
+ * input, and Better Auth's sign-in hook (`lib/auth/config.ts`) applies it again before
+ * checking the code.
+ */
+export function signInCodeDigits(text: string): string {
+  return text.replace(/[^0-9]/gu, '')
+}
 
 /** What the `sign-in-code` template renders. */
 export interface SignInCodeInput {

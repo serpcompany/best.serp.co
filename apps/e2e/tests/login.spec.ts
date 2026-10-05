@@ -48,6 +48,21 @@ async function typeCode(page: Page, code: string): Promise<void> {
   await input.fill(code)
 }
 
+/** Puts `text` on the clipboard and pastes it into the code field with the keyboard. */
+async function pasteIntoCode(page: Page, text: string): Promise<void> {
+  await page.evaluate(value => navigator.clipboard.writeText(value), text)
+  await page.locator('#code').focus()
+  await page.keyboard.press('ControlOrMeta+V')
+}
+
+/** A code as people copy it from an email or a phone: spaced, dashed, or padded. */
+const COPIED_CODE_FORMATS: ReadonlyArray<[string, (code: string) => string]> = [
+  ['"482 913"', code => `${code.slice(0, 3)} ${code.slice(3)}`],
+  ['"482-913"', code => `${code.slice(0, 3)}-${code.slice(3)}`],
+  ['" 482913\\n"', code => ` ${code}\n`],
+  ['"482 913" with a no-break space', code => `${code.slice(0, 3)}\u00a0${code.slice(3)}`]
+]
+
 /** The `index`th wrong code: a different one each time, since the slots keep the last guess. */
 function wrongCode(code: string, index = 0): string {
   const candidates = ['000000', '111111', '222222', '333333'].filter(value => value !== code)
@@ -241,6 +256,56 @@ test.describe('sign-in screens', () => {
     // One value set over the six kept digits, as a paste or one-time-code autofill writes it.
     await page.locator('#code').fill(code)
     await page.waitForURL('**/about/')
+  })
+
+  // Owner bug: the code copied from the email as "482 913" did not paste into /login.
+  test('signs in with a code pasted as "482 913", "482-913", " 482913\\n", or with a no-break space', async ({
+    context,
+    page
+  }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    for (const [label, format] of COPIED_CODE_FORMATS) {
+      await context.clearCookies()
+      await asClient(page)
+      const email = uniqueEmail('pasted')
+      await page.goto('/login/')
+      await requestCodeInPage(page, email)
+      await pasteIntoCode(page, format(await outboxCode(page, email)))
+      await expect(page.getByRole('heading', { name: 'You’re signed in' }), label).toBeVisible()
+    }
+  })
+
+  test('keeps only the digits of a code typed or autofilled with separators', async ({
+    context,
+    page
+  }) => {
+    for (const [label, format] of COPIED_CODE_FORMATS) {
+      await context.clearCookies()
+      await asClient(page)
+      const email = uniqueEmail('typed')
+      await page.goto('/login/')
+      await requestCodeInPage(page, email)
+      const code = await outboxCode(page, email)
+      // Inserted as text, as a keyboard's clipboard suggestion does: one beforeinput event.
+      await page.locator('#code').focus()
+      await page.keyboard.insertText(format(code))
+      await expect(page.getByRole('heading', { name: 'You’re signed in' }), label).toBeVisible()
+    }
+    // Set as one value, as autofill and password managers do.
+    await context.clearCookies()
+    await asClient(page)
+    const email = uniqueEmail('autofill')
+    await page.goto('/login/')
+    await requestCodeInPage(page, email)
+    const code = await outboxCode(page, email)
+    await page.locator('#code').evaluate(
+      (input: HTMLInputElement, value) => {
+        input.value = value
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      },
+      `${code.slice(0, 3)} ${code.slice(3)}`
+    )
+    await expect(page.getByRole('heading', { name: 'You’re signed in' })).toBeVisible()
   })
 
   test('explains an expired code', async ({ page }) => {

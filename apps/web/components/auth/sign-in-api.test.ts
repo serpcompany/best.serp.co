@@ -5,11 +5,13 @@ import {
   OTP_LENGTH,
   OTP_REQUEST_LIMITS
 } from '../../lib/auth/rate-limits'
+import { signInCodeDigits } from '../../lib/email/sign-in-code'
 import {
   CODE_ATTEMPTS,
   CODE_LENGTH,
   CODE_LIFETIME_MINUTES,
   CODE_LIFETIME_SECONDS,
+  codeDigits,
   formatCountdown,
   formatWait,
   RESEND_COOLDOWN_SECONDS,
@@ -17,6 +19,29 @@ import {
   signOut,
   verifyCode
 } from './sign-in-api'
+
+// Owner bug: a code copied from the email as "482 913" did not paste into /login.
+describe('signInCodeDigits', () => {
+  it('keeps only the digits of a pasted, typed, or autofilled code', () => {
+    for (const pasted of [
+      '482913',
+      '482 913',
+      '482-913',
+      ' 482913\n',
+      '482\u00a0913',
+      '482\u2009913',
+      '\u200b482\u200c913\u200d\ufeff',
+      '482\r\n913\t',
+      '48–29—13'
+    ]) {
+      expect(signInCodeDigits(pasted), JSON.stringify(pasted)).toBe('482913')
+    }
+    expect(signInCodeDigits('')).toBe('')
+    expect(signInCodeDigits('code: 12')).toBe('12')
+    // The /login field uses exactly the normalization the server applies.
+    expect(codeDigits).toBe(signInCodeDigits)
+  })
+})
 
 // PR #76 review, finding 6: the screen reads the code contract Better Auth is configured with.
 describe('the code contract', () => {

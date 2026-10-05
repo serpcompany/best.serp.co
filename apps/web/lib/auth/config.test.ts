@@ -263,6 +263,34 @@ describe('email OTP sign-in', () => {
     expect((await guess(h, email, otp, browser)).status).toBe(400)
   })
 
+  // Owner bug: a code copied from the email as "482 913" did not sign in.
+  it('accepts a code copied with spaces, dashes, line breaks, or invisible characters', async () => {
+    const h = harness()
+    const formats: Array<(code: string) => string> = [
+      code => `${code.slice(0, 3)} ${code.slice(3)}`,
+      code => `${code.slice(0, 3)}-${code.slice(3)}`,
+      code => ` ${code}\n`,
+      code => `${code.slice(0, 3)}\u00a0${code.slice(3)}`,
+      code => `\u200b${code.slice(0, 3)}\u200b${code.slice(3)}\ufeff`
+    ]
+    for (const [index, format] of formats.entries()) {
+      const browser = new Browser(`192.0.2.${70 + index}`)
+      const email = `pasted-${index}@example.com`
+      const otp = await requestCode(h, email, browser)
+      const response = await guess(h, email, format(otp), browser)
+      expect(response.status, JSON.stringify(format(otp))).toBe(200)
+    }
+    // Normalizing never makes a wrong code right, and a formatted wrong code counts as a guess.
+    const browser = new Browser('192.0.2.79')
+    const email = 'pasted-wrong@example.com'
+    const otp = await requestCode(h, email, browser)
+    const wrong = otp === '000000' ? '111 111' : '000 000'
+    const refused = await guess(h, email, wrong, browser)
+    expect(refused.status).toBe(400)
+    expect(((await refused.json()) as { code: string }).code).toBe('INVALID_OTP')
+    expect((await guess(h, email, `${otp.slice(0, 3)} ${otp.slice(3)}`, browser)).status).toBe(200)
+  })
+
   it('limits each client to a few code requests, with 429 whatever the email', async () => {
     const h = harness()
     const browser = new Browser('198.51.100.3')

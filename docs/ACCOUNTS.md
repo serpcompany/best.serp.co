@@ -120,6 +120,12 @@ request, before any limit is counted (`emailDeliveryConfigured`: matching enviro
 `DB` binding, a valid `USESEND_BASE_URL` and `USESEND_API_KEY`). So a rotated or missing key
 stops sign-in visibly instead of issuing codes that never arrive.
 
+**Copied codes.** The email shows the code as one unbroken run of digits, so copying it yields
+`482913`. People still paste codes as `482 913`, `482-913`, or with a line break, so only the
+digits count (`signInCodeDigits` in `lib/email/sign-in-code.ts`). The `/login` field applies
+this to pastes, typed or keyboard-inserted text, and autofill, and a full code is sent at once.
+The sign-in hook in `config.ts` applies it again before Better Auth checks the code.
+
 Every code adds an `email_deliveries` row, so each send also deletes up to 20 `sign-in-code`
 rows older than 24 hours (the provider's idempotency window), oldest first, with one prepared
 statement (`pruneEmailDeliveries`), until #66 adds a scheduled job. Like the email, the prune

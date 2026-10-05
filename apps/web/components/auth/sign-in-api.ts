@@ -11,7 +11,8 @@
 import {
   SIGN_IN_CODE_ATTEMPTS,
   SIGN_IN_CODE_LENGTH,
-  SIGN_IN_CODE_TTL_SECONDS
+  SIGN_IN_CODE_TTL_SECONDS,
+  signInCodeDigits
 } from '../../lib/email/sign-in-code'
 
 /** The code contract Better Auth enforces (`lib/email/sign-in-code.ts`). */
@@ -19,6 +20,11 @@ export const CODE_LENGTH = SIGN_IN_CODE_LENGTH
 export const CODE_LIFETIME_SECONDS = SIGN_IN_CODE_TTL_SECONDS
 export const CODE_LIFETIME_MINUTES = Math.ceil(SIGN_IN_CODE_TTL_SECONDS / 60)
 export const CODE_ATTEMPTS = SIGN_IN_CODE_ATTEMPTS
+/**
+ * The digits of a pasted, typed, or autofilled code ("482 913" → "482913"), the same
+ * normalization Better Auth's sign-in hook applies.
+ */
+export const codeDigits = signInCodeDigits
 /** One code a minute per email and client; the resend link waits this long. */
 export const RESEND_COOLDOWN_SECONDS = 60
 

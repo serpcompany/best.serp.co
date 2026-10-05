@@ -93,6 +93,10 @@ enqueueEmail(SIGN_IN_CODE_TEMPLATE_ID, {
   (`lib/email/server.ts`, built on `isEmailDeliveryConfigured(env)` in `runtime.ts`). It sends
   nothing and is false whenever `enqueueEmail` would log `email_disabled`. Then the request
   answers 503 `OTP_DELIVERY_UNAVAILABLE` and no code exists.
+- **Copyable code:** the sign-in and claim emails show the code as one text node of bare
+  digits, spaced only by CSS `letter-spacing`. There's no space, separator, per-digit element or
+  zero-width character, so selecting or double-clicking it in Gmail, Apple Mail or Outlook copies
+  exactly the code. The text part and the subject carry it unspaced too.
 - **Refused input:** the template refuses a code that isn't `SIGN_IN_CODE_LENGTH` digits, or a
   lifetime that isn't 1 to 60 whole minutes. `enqueueEmail` never throws, so a refused code is
   only logged (`email_render_failed`). Better Auth's sender sends `sign-in` codes only; any
