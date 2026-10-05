@@ -1,8 +1,9 @@
 name: Main Validation
 
+# The full harness on every pushed revision of staging (the base branch) and main (production).
 on:
   push:
-    branches: ['main']
+    branches: ['staging', 'main']
 
 permissions:
   contents: read
@@ -12,7 +13,9 @@ jobs:
     name: Full non-deployment harness
     runs-on: ubuntu-latest
     env:
-      HARNESS_DIFF_BASE: ${{ github.event.before }}
+      # A push that creates the branch has no `before`; its head is a commit that was already
+      # validated where it came from, so the changed-file check compares it with itself.
+      HARNESS_DIFF_BASE: ${{ github.event.created && github.sha || github.event.before }}
       HARNESS_DIFF_HEAD: ${{ github.sha }}
     steps:
       - name: Checkout

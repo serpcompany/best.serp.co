@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
-import { releaseAuthorizations } from './cloudflare-release'
+import { type ReleaseCommand, readOnlyCommands, releaseAuthorizations } from './cloudflare-release'
 import { buildReviewIssue } from './d1-submission-notifier'
 import { project } from './project'
 import { stagingWorkflow } from './staging-verification'
@@ -103,20 +103,26 @@ const newWorkflows = [
   'notify-d1-submissions.yml'
 ]
 
+const productionGroup = { group: 'deploy-best-serp-co-production', 'cancel-in-progress': false }
+
 describe('staging deploy workflow', () => {
   const workflow = loadWorkflow('deploy-staging.yml')
   const job = workflow.jobs.deploy as WorkflowJob
 
-  it('deploys every reviewed main push (and on demand) to staging only, one run at a time', () => {
+  it('deploys every reviewed staging push (and on demand) to staging only, one run at a time', () => {
     expect(Object.keys(workflow.on).sort()).toEqual(['push', 'workflow_dispatch'])
-    expect(workflow.on.push).toEqual({ branches: ['main'] })
+    expect(workflow.on.push).toEqual({ branches: ['staging'] })
+    expect(stagingWorkflow.branch).toBe('staging')
+    expect(releaseAuthorizations['deploy-staging.yml']?.branch).toBe('staging')
     expect(workflow.permissions).toEqual({ contents: 'read' })
-    expect(workflow.concurrency).toEqual({
-      group: 'best-serp-co-staging',
+    // Job-level: a dispatch from another branch is skipped by `if` and never joins the group.
+    expect(workflow.concurrency).toBeUndefined()
+    expect(job.concurrency).toEqual({
+      group: 'deploy-best-serp-co-staging',
       'cancel-in-progress': false
     })
     expect(Object.keys(workflow.jobs)).toEqual(['deploy'])
-    expect(job.if).toBe("github.ref == 'refs/heads/main'")
+    expect(job.if).toBe("github.ref == 'refs/heads/staging'")
     expect(job.environment).toEqual({ name: 'staging', url: project.remote.staging.origin })
     expect(job.env).toEqual({ STAGING_ORIGIN: project.remote.staging.origin })
     expect(JSON.stringify(workflow)).not.toMatch(/production/u)
@@ -180,23 +186,57 @@ describe('staging deploy workflow', () => {
 
 describe('production deploy workflow', () => {
   const workflow = loadWorkflow('deploy-production.yml')
+  const authorize = workflow.jobs.authorize as WorkflowJob
   const release = workflow.jobs.release as WorkflowJob
-  const databaseStep = "inputs.release_mode == 'database-and-worker'"
+  const databaseStep = "steps.plan.outputs.mode == 'database-and-worker'"
 
-  it('is a typed-confirmation dispatch from main with an explicit release mode', () => {
-    expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch'])
+  it('releases every push to main, and typed-confirmation dispatches from main', () => {
+    expect(Object.keys(workflow.on).sort()).toEqual(['push', 'workflow_dispatch'])
+    expect(workflow.on.push).toEqual({ branches: ['main'] })
+    expect(releaseAuthorizations['deploy-production.yml']?.branch).toBe('main')
     const inputs = workflow.on.workflow_dispatch?.inputs ?? {}
-    expect(Object.keys(inputs).sort()).toEqual(['confirmation', 'release_mode'])
-    expect(inputs.release_mode).toMatchObject({
-      default: 'worker-only',
-      options: ['worker-only', 'database-and-worker'],
-      type: 'choice'
-    })
-    const authorize = runs(workflow.jobs.authorize as WorkflowJob).join('\n')
-    expect(authorize).toContain('"$GITHUB_REF" != "refs/heads/main"')
-    expect(authorize).toContain(`"$CONFIRMATION" != "${project.confirmation.deploy}"`)
+    expect(Object.keys(inputs)).toEqual(['confirmation'])
+    const check = runs(authorize).join('\n')
+    expect(check).toContain('"$GITHUB_REF" != "refs/heads/main"')
+    // The typed confirmation applies to dispatches; a push is approved by the environment.
+    expect(check).toContain(
+      `[ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$CONFIRMATION" != "${project.confirmation.deploy}" ]`
+    )
     expect(release.needs).toEqual(['authorize'])
     expect(release.environment).toEqual({ name: 'production', url: project.publicUrl })
+    expect(workflow.concurrency).toBeUndefined()
+    expect(release.concurrency).toEqual(productionGroup)
+  })
+
+  it('replaces the staging check only for a hotfix dispatch, with proof of a hotfix-* merge', () => {
+    const [ref, ...rest] = authorize.steps ?? []
+    expect(ref?.id).toBe('ref')
+    expect(ref?.run).toContain(
+      `[ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$CONFIRMATION" = "${project.confirmation.hotfix}" ]`
+    )
+    expect(ref?.run?.match(/proof=hotfix/gu)).toHaveLength(1)
+    expect(ref?.run).toContain('echo "proof=staging" >> "$GITHUB_OUTPUT"')
+    // Exactly one proof runs: staging verification, or the merged hotfix-* pull request.
+    expect(rest.map(step => [step.if, step.run ?? step.uses])).toEqual([
+      [undefined, 'actions/checkout@v7'],
+      [undefined, './.github/actions/install'],
+      ["steps.ref.outputs.proof == 'staging'", 'pnpm tsx scripts/staging-verification.ts'],
+      ["steps.ref.outputs.proof == 'hotfix'", 'pnpm tsx scripts/staging-verification.ts --hotfix']
+    ])
+    expect(workflow.permissions).toEqual({
+      actions: 'read',
+      contents: 'read',
+      'pull-requests': 'read'
+    })
+    expect(releaseAuthorizations['deploy-production.yml']?.hotfixConfirmation).toBe(
+      project.confirmation.hotfix
+    )
+    // The plan sees the confirmation and a token, so a hotfix with pending migrations and a
+    // stale release both stop before the backup.
+    expect(stepRunning(release, 'plan-release production').env).toMatchObject({
+      GITHUB_TOKEN: expression('github.token'),
+      RELEASE_CONFIRM: expression('inputs.confirmation')
+    })
   })
 
   it('runs the same production migration as pnpm db:migrate:production', () => {
@@ -205,10 +245,11 @@ describe('production deploy workflow', () => {
     )
   })
 
-  it('backs up and migrates D1 only in database-and-worker mode, then deploys and gates', () => {
+  it('plans from the ledger, backs up and migrates only when migrations are pending', () => {
     const order = [
       'pnpm harness:fast',
       'pnpm worker:build',
+      'cloudflare-release.ts plan-release production',
       'cloudflare-release.ts backup production',
       'cloudflare-release.ts migrate production',
       'cloudflare-release.ts deploy production',
@@ -217,6 +258,11 @@ describe('production deploy workflow', () => {
     expect(order.every(index => index >= 0)).toBe(true)
     expect([...order].sort((left, right) => left - right)).toEqual(order)
 
+    const plan = stepRunning(release, 'plan-release production')
+    expect(plan.id).toBe('plan')
+    expect(plan.if).toBeUndefined()
+    expect(plan.run).toContain('echo "mode=$mode" >> "$GITHUB_OUTPUT"')
+    expect(plan.run).toContain('database-and-worker | worker-only) ;;')
     expect(stepRunning(release, 'backup production').if).toBe(databaseStep)
     expect(stepRunning(release, 'migrate production').if).toBe(databaseStep)
     expect(stepRunning(release, 'deploy production').if).toBeUndefined()
@@ -277,7 +323,12 @@ describe('staging before production in the workflows', () => {
   it('verifies staging before reviewer approval and again in every gated release step', () => {
     for (const [file, authorization] of gated) {
       const workflow = loadWorkflow(file)
-      expect(workflow.permissions, file).toEqual({ actions: 'read', contents: 'read' })
+      // The hotfix check also reads merged pull requests.
+      expect(workflow.permissions, file).toEqual(
+        authorization.hotfixConfirmation
+          ? { actions: 'read', contents: 'read', 'pull-requests': 'read' }
+          : { actions: 'read', contents: 'read' }
+      )
       const authorize = workflow.jobs.authorize as WorkflowJob
       expect(authorize.environment, file).toBeUndefined()
       const verify = stepRunning(authorize, 'pnpm tsx scripts/staging-verification.ts')
@@ -297,6 +348,33 @@ describe('staging before production in the workflows', () => {
       for (const step of gatedSteps) {
         expect(step.env?.GITHUB_TOKEN, `${file}: ${step.name}`).toBe(expression('github.token'))
       }
+    }
+  })
+})
+
+describe('version-pinned HTTP gates', () => {
+  it('hands the version Wrangler deployed to the gates in both deploy workflows', () => {
+    // Outside the checkout (runner.temp), because the release script refuses an unclean tree.
+    const wranglerOutput = `${expression('runner.temp')}/wrangler-output.ndjson`
+    const cases: Array<[string, string, string]> = [
+      ['deploy-staging.yml', 'deploy', 'staging'],
+      ['deploy-production.yml', 'release', 'production']
+    ]
+    for (const [file, jobName, environment] of cases) {
+      const job = loadWorkflow(file).jobs[jobName] as WorkflowJob
+      const deploy = stepRunning(job, `cloudflare-release.ts deploy ${environment}`)
+      const gates = stepRunning(job, 'd1-preview-http-gates.ts')
+      expect(deploy.env?.WRANGLER_OUTPUT_FILE_PATH, file).toBe(wranglerOutput)
+      expect(gates.env?.WRANGLER_OUTPUT_FILE_PATH, file).toBe(wranglerOutput)
+      expect(
+        (job.steps ?? [])
+          .filter(step => step.env?.WRANGLER_OUTPUT_FILE_PATH !== undefined)
+          .map(step => step.name),
+        file
+      ).toEqual([deploy.name, gates.name])
+      expect(stepIndex(job, 'd1-preview-http-gates.ts'), file).toBeGreaterThan(
+        stepIndex(job, `cloudflare-release.ts deploy ${environment}`)
+      )
     }
   })
 })
@@ -436,7 +514,11 @@ describe('recreated D1 operation workflows', () => {
     )
     // The production environment requires reviewer approval, which a schedule cannot give.
     expect(environmentName(notify)).toBe('production-notifier')
-    expect(workflow.concurrency?.group).toBe('best-serp-co-production-notifier')
+    expect(workflow.concurrency).toBeUndefined()
+    expect(notify.concurrency).toEqual({
+      group: 'best-serp-co-production-notifier',
+      'cancel-in-progress': false
+    })
     expect(notify.permissions).toEqual({ contents: 'read', issues: 'write' })
     const [check, ...rest] = notify.steps ?? []
     expect(check?.id).toBe('credentials')
@@ -447,19 +529,35 @@ describe('recreated D1 operation workflows', () => {
       SUBMISSION_REVIEWER_GITHUB_LOGIN: expression('vars.SUBMISSION_REVIEWER_GITHUB_LOGIN')
     })
   })
+
+  it('relays a schedule on another default branch to main, so only main touches production', () => {
+    const workflow = loadWorkflow('notify-d1-submissions.yml')
+    const relay = workflow.jobs.relay as WorkflowJob
+    expect(Object.keys(workflow.jobs)).toEqual(['relay', 'notify'])
+    expect(relay.if).toBe(
+      "github.event_name == 'schedule' && github.ref != 'refs/heads/main' && vars.SUBMISSION_REVIEWER_GITHUB_LOGIN != ''"
+    )
+    expect(relay.environment).toBeUndefined()
+    expect(relay.permissions).toEqual({ actions: 'write' })
+    expect(relay.steps).toHaveLength(1)
+    expect(runs(relay)).toEqual([
+      'gh workflow run notify-d1-submissions.yml --ref main --repo "$GITHUB_REPOSITORY"'
+    ])
+    expect(relay.steps?.[0]?.env).toEqual({ GH_TOKEN: expression('github.token') })
+  })
 })
 
 describe('protected deployment boundaries', () => {
   it('gates every production job behind an unprivileged ref and confirmation check', () => {
     for (const file of productionDispatchWorkflows) {
       const workflow = loadWorkflow(file)
-      expect(Object.keys(workflow.on), file).toEqual(['workflow_dispatch'])
-      expect(workflow.concurrency, file).toEqual({
-        group: 'best-serp-co-production',
-        'cancel-in-progress': false
-      })
+      expect(Object.keys(workflow.on).sort(), file).toEqual(
+        file === 'deploy-production.yml' ? ['push', 'workflow_dispatch'] : ['workflow_dispatch']
+      )
+      expect(releaseAuthorizations[file]?.branch, file).toBe('main')
       const authorize = workflow.jobs.authorize as WorkflowJob
       expect(authorize.environment, file).toBeUndefined()
+      expect(authorize.concurrency, file).toBeUndefined()
       expect(JSON.stringify(authorize), file).not.toContain('secrets.')
       expect(runs(authorize).join('\n'), file).toContain('"$GITHUB_REF" != "refs/heads/main"')
       const privileged = Object.entries(workflow.jobs).filter(([name]) => name !== 'authorize')
@@ -474,18 +572,72 @@ describe('protected deployment boundaries', () => {
     }
   })
 
-  it('never mutates production outside a manual dispatch', () => {
-    const productionMutation =
-      /cloudflare-release\.ts (?:backup|migrate|import|deploy) production|db:(?:migrate|approve|publish):production|opennextjs-cloudflare deploy/u
-    for (const [file, workflow] of allWorkflows()) {
-      const triggers = Object.keys(workflow.on)
-      const automatic = triggers.some(trigger => trigger !== 'workflow_dispatch')
-      for (const [name, job] of Object.entries(workflow.jobs)) {
-        if (!automatic) continue
-        expect(environmentName(job), `${file}:${name}`).not.toBe('production')
-        expect(runs(job).join('\n'), `${file}:${name}`).not.toMatch(productionMutation)
+  it('serializes privileged jobs only after their guards, so a refused run evicts nothing', () => {
+    // GitHub keeps one pending run per concurrency group and cancels the older one. A group on
+    // the whole workflow let a mistyped dispatch replace a valid queued run before `authorize`
+    // refused it. A job skipped by a failed `needs` or a false `if` never joins its group.
+    const expected: Record<string, Record<string, unknown>> = {
+      'approve-d1-submission.yml': { review: productionGroup },
+      'bootstrap-production-d1.yml': { bootstrap: productionGroup },
+      'deploy-production.yml': { release: productionGroup },
+      'deploy-staging.yml': {
+        deploy: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
+      },
+      'notify-d1-submissions.yml': {
+        notify: { group: 'best-serp-co-production-notifier', 'cancel-in-progress': false }
+      },
+      'publish-d1.yml': { publish: productionGroup }
+    }
+    expect(Object.keys(expected).sort()).toEqual([...newWorkflows].sort())
+    for (const file of newWorkflows) {
+      const workflow = loadWorkflow(file)
+      expect(workflow.concurrency, file).toBeUndefined()
+      const grouped = Object.fromEntries(
+        Object.entries(workflow.jobs)
+          .filter(([, job]) => job.concurrency)
+          .map(([name, job]) => [name, job.concurrency])
+      )
+      expect(grouped, file).toEqual(expected[file])
+      for (const name of Object.keys(grouped)) {
+        const job = workflow.jobs[name] as WorkflowJob
+        // Each grouped job is guarded: it runs after `authorize`, or behind a branch `if`.
+        expect(job.needs ?? job.if, `${file}:${name}`).toBeTruthy()
+        expect(environmentName(job), `${file}:${name}`).toBeDefined()
       }
     }
+  })
+
+  it('mutates production automatically only on a push to main, behind the production reviewers', () => {
+    const productionMutation =
+      /cloudflare-release\.ts (?:backup|migrate|import|deploy) production|db:(?:migrate|approve|publish|notify):production|opennextjs-cloudflare deploy/u
+    const automaticMutations: string[] = []
+    for (const [file, workflow] of allWorkflows()) {
+      const triggers = Object.keys(workflow.on)
+      if (!triggers.some(trigger => trigger !== 'workflow_dispatch')) continue
+      for (const [name, job] of Object.entries(workflow.jobs)) {
+        const mutation = runs(job).join('\n').match(productionMutation)
+        if (!mutation && !environmentName(job)?.startsWith('production')) continue
+        automaticMutations.push(`${file}:${name}`)
+        if (file === 'deploy-production.yml') {
+          // A promotion or hotfix push to main: staging verification, then reviewer approval.
+          expect(workflow.on.push).toEqual({ branches: ['main'] })
+          expect(triggers.sort()).toEqual(['push', 'workflow_dispatch'])
+          expect(job.needs).toEqual(['authorize'])
+          expect(environmentName(job)).toBe('production')
+        } else {
+          // The scheduled notifier only records review notifications, in its own environment.
+          expect(`${file}:${name}`).toBe('notify-d1-submissions.yml:notify')
+          expect(environmentName(job)).toBe('production-notifier')
+          expect(runs(job).join('\n').match(new RegExp(productionMutation, 'gu'))).toEqual([
+            'db:notify:production'
+          ])
+        }
+      }
+    }
+    expect(automaticMutations.sort()).toEqual([
+      'deploy-production.yml:release',
+      'notify-d1-submissions.yml:notify'
+    ])
   })
 
   it('keeps Cloudflare credentials out of pull-request workflows and third-party actions', () => {
@@ -497,12 +649,13 @@ describe('protected deployment boundaries', () => {
     }
     for (const file of newWorkflows) {
       const workflow = loadWorkflow(file)
-      // Only the staging-gated workflows read Actions runs (staging before production).
-      expect(workflow.permissions, file).toEqual(
-        releaseAuthorizations[file]?.requireVerifiedStaging.length
-          ? { actions: 'read', contents: 'read' }
-          : { contents: 'read' }
-      )
+      // Only the staging-gated workflows read Actions runs (staging before production), and
+      // only the one with a hotfix confirmation reads pull requests.
+      expect(workflow.permissions, file).toEqual({
+        contents: 'read',
+        ...(releaseAuthorizations[file]?.requireVerifiedStaging.length ? { actions: 'read' } : {}),
+        ...(releaseAuthorizations[file]?.hotfixConfirmation ? { 'pull-requests': 'read' } : {})
+      })
       for (const job of Object.values(workflow.jobs)) {
         expect(JSON.stringify(job.env ?? {}), file).not.toContain('secrets.')
         for (const step of job.steps ?? []) {
@@ -562,7 +715,7 @@ describe('protected deployment boundaries', () => {
           if (!match) continue
           const [, command, environment] = match
           expect(environment, `${file}: ${step.name}`).toBe(authorization.environment)
-          if (command === 'check-database' || command === 'verify-import') continue
+          if (readOnlyCommands.has(command as ReleaseCommand)) continue
           expect(authorization.commands, `${file}: ${step.name}`).toContain(command)
           if (authorization.confirmation) {
             expect(step.env?.RELEASE_CONFIRM, `${file}: ${step.name}`).toBe(

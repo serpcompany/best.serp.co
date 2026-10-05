@@ -39,21 +39,25 @@ function githubExpression(value: string): string {
 }
 
 describe('main validation workflow', () => {
-  it('validates every pushed main revision without deployment authority', () => {
+  it('validates every pushed staging and main revision without deployment authority', () => {
     const workflow = loadWorkflow()
     const job = workflow.jobs.validate
     const checkout = job.steps?.find(step => step.uses === 'actions/checkout@v7')
     const commands = job.steps?.map(step => step.run).filter(Boolean)
 
-    expect(workflow.on.push?.branches).toEqual(['main'])
+    expect(workflow.on.push?.branches).toEqual(['staging', 'main'])
     expect(workflow.on.push?.paths).toBeUndefined()
     expect(workflow.permissions).toEqual({ contents: 'read' })
     expect(workflow.concurrency?.['cancel-in-progress']).not.toBe(true)
 
     expect(job['runs-on']).toBe('ubuntu-latest')
     expect(job.environment).toBeUndefined()
+    // A push that creates the branch (staging, once) has an all-zero `before`; it compares the
+    // already validated head with itself instead of linting the whole repository.
     expect(job.env).toEqual({
-      HARNESS_DIFF_BASE: githubExpression('github.event.before'),
+      HARNESS_DIFF_BASE: githubExpression(
+        'github.event.created && github.sha || github.event.before'
+      ),
       HARNESS_DIFF_HEAD: githubExpression('github.sha')
     })
     expect(checkout?.with?.['fetch-depth']).toBe(0)

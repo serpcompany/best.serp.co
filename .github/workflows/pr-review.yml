@@ -1,12 +1,14 @@
 name: PR Review
 
+# Required checks for every pull request into staging (the base branch) and main (promotions
+# from staging and hotfixes). Every job runs on every PR: a skipped job satisfies a required
+# check, so nothing here is path-filtered.
 on:
   pull_request:
-    branches: ['main']
+    branches: ['staging', 'main']
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -22,6 +24,31 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Catches a pull request opened against the wrong base. It is an accident guard, not the
+      # control: a pull request runs its own copy of this file. The control is Deploy
+      # Production's release-time tree check (docs/RELEASE_GUARDS.md#promotion).
+      - name: Require a promotion or hotfix branch for pull requests into main
+        if: github.base_ref == 'main'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          # Exit code 2 means no matching ref; any other failure fails closed.
+          if refs="$(git ls-remote --exit-code origin refs/heads/staging)"; then status=0; else status=$?; fi
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            echo "::error::Could not list the staging branch (git ls-remote exited $status); failing closed."
+            exit 1
+          fi
+          if ! awk '$2 == "refs/heads/staging" { found = 1 } END { exit !found }' <<<"$refs"; then
+            echo "No staging branch exists yet, so main still accepts every pull request."
+            exit 0
+          fi
+          if [ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] && { [ "$HEAD_REF" = "staging" ] || [[ "$HEAD_REF" =~ ^hotfix-[A-Za-z0-9._-]+$ ]]; }; then
+            exit 0
+          fi
+          echo "::error::main is production and accepts only a promotion from staging or a hotfix-* branch. Retarget this pull request to staging (docs/RELEASE_GUARDS.md#promotion)."
+          exit 1
+
       - name: Install
         uses: ./.github/actions/install
 
@@ -34,7 +61,7 @@ jobs:
       - name: Run Biome Check
         run: |
           mapfile -d '' changed_files < <(
-            git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- \
+            git diff --name-only --diff-filter=ACMR -z "origin/$GITHUB_BASE_REF...HEAD" -- \
               '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.jsonc' '*.css'
           )
           if ((${#changed_files[@]} == 0)); then
@@ -104,33 +131,8 @@ jobs:
   #         args: --config ./lychee.toml --verbose --no-progress .
   #         fail: true
 
-  changes:
-    name: Detect changes
-    runs-on: ubuntu-latest
-    outputs:
-      e2e_relevant: ${{ steps.filter.outputs.e2e_relevant }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Check for e2e-relevant changes
-        id: filter
-        uses: dorny/paths-filter@v4
-        with:
-          filters: |
-            e2e_relevant:
-              - 'apps/web/**'
-              - 'apps/e2e/**'
-              - 'd1/**'
-              - 'packages/data-ops/**'
-              - 'packages/web-core/**'
-              - 'packages/design-system/**'
-              - 'packages/site-config/**'
-
   e2e:
     name: E2E Tests
-    needs: [changes]
-    if: needs.changes.outputs.e2e_relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

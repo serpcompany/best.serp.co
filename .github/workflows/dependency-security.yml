@@ -2,7 +2,7 @@ name: Production Dependency Audit
 
 on:
   pull_request:
-    branches: ['main']
+    branches: ['staging', 'main']
   workflow_dispatch:
   schedule:
     - cron: '23 7 * * 1'

@@ -1,24 +1,27 @@
 name: Deploy Staging
 
-# Every reviewed push to main: fast harness, staging D1 migrations, Worker deploy, HTTP gates,
-# and the Playwright smoke suite against the deployed staging Worker. Skips (green) until the
-# `staging` environment holds Cloudflare credentials; see docs/DEPLOY_RUNBOOK.md.
+# Every reviewed push to staging (the base branch PRs squash into): fast harness, staging D1
+# migrations, Worker deploy, HTTP gates, and the Playwright smoke suite against the deployed
+# staging Worker. Deploy Production releases only a tree one of these runs verified. Skips
+# (green) until the `staging` environment holds Cloudflare credentials; see
+# docs/DEPLOY_RUNBOOK.md.
 on:
   push:
-    branches: ['main']
+    branches: ['staging']
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: best-serp-co-staging
-  cancel-in-progress: false
-
 jobs:
   deploy:
     name: Validate, migrate, deploy & smoke-test staging
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/staging'
+    # Job-level, so a dispatch from another branch (skipped above) never joins the group and
+    # never replaces a queued push run. A queued run is replaced only by a newer staging run.
+    concurrency:
+      group: deploy-best-serp-co-staging
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:
@@ -70,10 +73,15 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Wrangler records the new version here; the gates wait for it. Outside the checkout,
+          # because the release script refuses an unclean tree.
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
         run: pnpm tsx scripts/cloudflare-release.ts deploy staging
 
       - name: Run staging HTTP gates
         if: steps.credentials.outputs.configured == 'true'
+        env:
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
         run: pnpm tsx scripts/d1-preview-http-gates.ts staging "$STAGING_ORIGIN"
 
       - name: Install Chromium

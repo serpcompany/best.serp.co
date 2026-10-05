@@ -4,8 +4,8 @@ name: Bootstrap Production D1
 # any existing publication or catalog rows before changing anything, applies the d1/drizzle
 # migrations, imports d1/artifacts/best-serp-co-v1.sql.br only if its sha256 matches the parity
 # report, then proves exact parity with the report. Because it applies every migration at this
-# commit, it runs only for a commit that Deploy Staging verified (staging before production).
-# See docs/DEPLOY_RUNBOOK.md.
+# commit, it runs only for a commit whose tree Deploy Staging verified on the staging branch
+# (staging before production). See docs/DEPLOY_RUNBOOK.md.
 on:
   workflow_dispatch:
     inputs:
@@ -15,13 +15,10 @@ on:
         type: string
 
 permissions:
-  # actions: read lets the staging verification read this commit's Deploy Staging run.
+  # Staging verification reads Deploy Staging runs (actions: read) and this commit's tree
+  # (contents: read).
   actions: read
   contents: read
-
-concurrency:
-  group: best-serp-co-production
-  cancel-in-progress: false
 
 jobs:
   authorize:
@@ -47,7 +44,7 @@ jobs:
       - name: Install
         uses: ./.github/actions/install
 
-      - name: Require a verified staging deploy of this commit
+      - name: Require a verified staging deploy of this commit's tree
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: pnpm tsx scripts/staging-verification.ts
@@ -55,6 +52,10 @@ jobs:
   bootstrap:
     name: Import and verify the reviewed catalog
     needs: [authorize]
+    # Job-level, so a run refused by authorize never replaces a valid queued production job.
+    concurrency:
+      group: deploy-best-serp-co-production
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:

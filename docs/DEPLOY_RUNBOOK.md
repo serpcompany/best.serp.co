@@ -5,10 +5,10 @@ Status (serpcompany/best.serp.co#34):
 - **Staging** is live at https://best-serp-co-staging.serpcompany.workers.dev (D1
   `best-serp-co-staging`, catalog imported and verified against the parity report). Every
   `*.workers.dev` response carries `X-Robots-Tag: noindex, nofollow`. It was first deployed
-  by hand with `wrangler login`; from now on `deploy-staging.yml` deploys every push to `main`.
+  by hand with `wrangler login`; `deploy-staging.yml` now deploys every push to `staging`.
 - **Production** D1 `best-serp-co-production` is bootstrapped and verified (run
   36800330629), and the production Worker is deployed (run 36802748585) at its noindex
-  review URL. DNS has not moved.
+  review URL. DNS has not moved. `deploy-production.yml` releases every promotion to `main`.
 - **best.serp.co** is still served by GitHub Pages from the `legacy-static` branch, whose
   deploy workflow runs on pushes to that branch.
 
@@ -19,19 +19,21 @@ Status (serpcompany/best.serp.co#34):
 | Worker | `best-serp-co-staging` (workers.dev) | `best-serp-co-production` (workers.dev review URL until cutover) |
 | D1 | `best-serp-co-staging` `8e6b67e5-9c58-4fa9-aca1-25b0020c0833` | `best-serp-co-production` `404ec437-53a2-4fbc-8b5f-b5e69065708e` |
 | Origin | https://best-serp-co-staging.serpcompany.workers.dev | https://best.serp.co (Worker Custom Domain on `serp.co`, at cutover) |
-| Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`; `*.workers.dev` responses are `noindex`). The production HTTP gates run their route, version, and policy checks here, with the smoke-test header, before and after cutover. After cutover they also enforce best.serp.co's crawl and analytics policy on every Worker answer. Only zone protection (a `cf-mitigated` challenge, or a 403 or 429 without Worker headers) and GitHub Pages before the cutover are skipped, with a warning; a 503 without Worker headers or no answer fails. At cutover it does not go away: `CANONICAL_HOST_REDIRECT` flips to `on` and it 308s to best.serp.co except for requests with the smoke-test header (#42 decision e; see [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)). |
-| GitHub environment | `staging` (`main` only, no reviewers) | `production` (required reviewers, `main` only) |
+| Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`, noindex). The production HTTP gates run here with the smoke-test header and, after cutover, on best.serp.co, where they skip only zone protection (`cf-mitigated`, or a 403 or 429 without Worker headers) and GitHub Pages ([Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)). It stays after cutover: `CANONICAL_HOST_REDIRECT` flips to `on` and it 308s to best.serp.co except for smoke-test requests (#42 decision e). |
+| Branch | `staging` (the base branch; PRs squash-merge here, hotfix merge-backs use a merge commit) | `main` (promotions from `staging`, and `hotfix-*` PRs) |
+| GitHub environment | `staging` (`staging` branch only, no reviewers) | `production` (required reviewers, `main` only) |
 
 The identities live in `env.staging` / `env.production` of `apps/web/wrangler.jsonc` and in
 `scripts/project.ts` (IDs are not secrets). `scripts/cloudflare-release.ts` refuses to run
 when the two disagree. Cloudflare account: `SERP`, `cec5f04e1d18bcc65f2be0aefb04f059`.
 
-## Database commands and staging before production
+## Database commands, promotion, and staging before production
 
-[Release guards](./RELEASE_GUARDS.md) lists every `db:*` command with its target and
-explains the staging-before-production check that gates production migrations, imports, and
-Worker deploys. It also covers how to re-verify a commit with
-`gh workflow run deploy-staging.yml --ref main`.
+[Release guards](./RELEASE_GUARDS.md) lists every `db:*` command with its target, defines
+the `staging` → `main` promotion and the hotfix path, and explains the staging-before-production
+check (the released commit must carry a tree Deploy Staging verified) that gates production
+migrations, imports, and Worker deploys. Re-verify the `staging` head with
+`gh workflow run deploy-staging.yml --ref staging`.
 
 ## Setup
 
@@ -65,7 +67,7 @@ decision b; see [GitHub environments](#github-environments)).
 The `staging` and `production` environments exist:
 
 - `production` requires reviewer approval and allows deployments only from `main`.
-- `staging` allows deployments only from `main` and has no reviewers.
+- `staging` allows deployments only from the `staging` branch and has no reviewers.
 
 Each holds two environment secrets:
 
@@ -80,12 +82,13 @@ its own token, scoped to that environment's Worker and D1 database, plus a D1-on
 token is revoked. Until then, separate secrets do not limit the blast radius.
 
 Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "Staging deploy
-skipped" notice. After they exist, the next push to `main` deploys staging.
+skipped" notice. After they exist, the next push to `staging` deploys staging.
 
 ### Submission notifier (after the production bootstrap)
 
 The scheduled notifier cannot use `production`, because a schedule cannot pass reviewer
-approval. When production accepts submissions:
+approval. GitHub runs schedules on the default branch; while that is `staging`, a relay job
+re-dispatches the notifier on `main`. When production accepts submissions:
 
 1. Create the environment `production-notifier`: deployment branches `main` only, no
    required reviewers. Add `CLOUDFLARE_ACCOUNT_ID` and a `CLOUDFLARE_API_TOKEN` that has only
@@ -99,8 +102,8 @@ approval. When production accepts submissions:
 
 | Workflow | Trigger | Environment | Typed confirmation | Does |
 |---|---|---|---|---|
-| `deploy-staging.yml` | push to `main`, manual | `staging` | none | `pnpm harness:fast` → Worker build → staging D1 migrations → deploy → HTTP gates → Playwright smoke |
-| `deploy-production.yml` | manual, `main` | `production` | `deploy-best.serp.co-production` | Staging verification → `pnpm harness:fast` → Worker build → (database-and-worker: D1 backup → migrations) → deploy → HTTP gates |
+| `deploy-staging.yml` | push to `staging`, manual from `staging` | `staging` | none | `pnpm harness:fast` → Worker build → staging D1 migrations → deploy → HTTP gates → Playwright smoke |
+| `deploy-production.yml` | push to `main`, manual | `production` | dispatch: `deploy-best.serp.co-production` (or `hotfix-…`) | Staging verification → `pnpm harness:fast` → build → `plan-release` → (pending migrations: backup → migrate) → deploy → HTTP gates |
 | `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → initial catalog import into an empty production D1 → parity verification |
 | `publish-d1.yml` | manual, `main` | `production` | `publish-best.serp.co-production` | D1 backup → apply one `d1/publications/*.yaml` manifest |
 | `approve-d1-submission.yml` | manual, `main` | `production` | `approve-best.serp.co-submission-production` | D1 backup → approve or reject one submission → close its review issue |
@@ -108,30 +111,33 @@ approval. When production accepts submissions:
 
 Guards, in order:
 
-1. An `authorize` job with no secrets checks `main` and the typed confirmation (and the
-   manifest path or submission UUID), so a mistyped dispatch never requests reviewer approval.
-   Deploy Production and Bootstrap Production D1 also require Deploy Staging to have verified
-   the commit (see [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
-2. The GitHub `production` environment requires reviewer approval.
+1. An `authorize` job with no secrets checks `main` and, on a dispatch, the typed
+   confirmation (and the manifest path or submission UUID), so a mistyped dispatch never
+   requests reviewer approval. Deploy Production and Bootstrap Production D1 also require
+   Deploy Staging to have verified the commit's tree (see
+   [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
+2. The GitHub `production` environment requires reviewer approval, for pushes and dispatches.
 3. `scripts/cloudflare-release.ts` refuses every mutating command (`backup`, `migrate`,
-   `import`, `deploy`) unless it runs in the workflow file that owns it, against that
-   workflow's environment, on `main` at a clean `GITHUB_SHA`, with the confirmation in
-   `RELEASE_CONFIRM`. Production `migrate`, `deploy`, and `import` also require the
-   verified Deploy Staging run. `d1-remote-publisher.ts`, `d1-submission-approver.ts`, and
-   `d1-submission-notifier.ts` apply their own workflow and confirmation guards.
-4. `deploy` first proves that every `d1/drizzle` migration is applied, that no unknown
-   migration is present, and that a catalog publication exists.
+   `import`, `deploy`) unless it runs in the workflow file that owns it, on that workflow's
+   branch (`staging` or `main`) and events, against its environment, at a clean `GITHUB_SHA`,
+   with the confirmation in `RELEASE_CONFIRM` on a dispatch. Production `migrate`, `deploy`,
+   and `import` also require the verified Deploy Staging run (a hotfix dispatch of a merged
+   `hotfix-*` PR may only `deploy` without it) and a `main` that still points at the release.
+   The publisher, approver, and notifier scripts apply their own guards.
+4. `plan-release` refuses a database with migrations this commit lacks. `deploy` first proves
+   that every `d1/drizzle` migration is applied and that a catalog publication exists.
 
-The production workflows share the concurrency group `best-serp-co-production` and never
-cancel a running job. GitHub keeps only the newest pending run in a group, so re-dispatch a
-queued run that shows as cancelled. The notifier has its own group.
+Concurrency sits on the privileged job, after its guards: production jobs share
+`deploy-best-serp-co-production`, staging uses `deploy-best-serp-co-staging`, the notifier its
+own group, and none cancels a running job. A run refused by `authorize` or skipped by a branch
+`if` never joins a group, so it cannot replace a valid queued run.
 
-Staging runs `pnpm harness:fast` in its own job rather than waiting on Main Validation
+Each deploy runs `pnpm harness:fast` in its own job rather than waiting on Main Validation
 through `workflow_run`. A `workflow_run` job receives the default branch head as
 `GITHUB_SHA`, not the validated commit. That would break the release guard's `HEAD ==
 GITHUB_SHA` check, and a slow validation of an older commit could deploy after a newer one.
 PR Review already gates every merge, and Main Validation re-runs the full loop on the same
-commit in parallel.
+`staging` or `main` commit in parallel.
 
 ## Production release
 
@@ -146,22 +152,26 @@ commit in parallel.
    `verify-import` then compares all 16 application tables with an in-memory bootstrap of the
    same SQL and checks the publication checksum (`669f264f…0af5a`), version, and every count
    in the report.
-2. Run **Deploy Production** with `deploy-best.serp.co-production` and `worker-only` (the
-   bootstrap already applied the migrations). While GitHub Pages still serves best.serp.co,
-   the HTTP gates run in staging mode against the workers.dev review URL (noindex, no Google
-   Tag Manager, no redirect without the smoke-test header).
-3. Continue with the cutover checklist below, then re-run **Deploy Production**
-   (`worker-only`) so the HTTP gates run in production mode: through the workers.dev host,
-   then best.serp.co's crawl and analytics policy.
+2. Run **Deploy Production** (the bootstrap already applied the migrations, so it plans
+   `worker-only`). While GitHub Pages still serves best.serp.co, the HTTP gates run against
+   the noindex review origin instead.
+3. Continue with the cutover checklist below, then re-run **Deploy Production** so the HTTP
+   gates run in production mode: through the workers.dev host, then on best.serp.co.
 
-### Routine releases
+### Routine releases (promotion)
 
-- Merging to `main` deploys staging. Deploy Production refuses the commit until that
-  Deploy Staging run has succeeded.
-- Use `database-and-worker` when the release adds a `d1/drizzle` migration. `worker-only`
-  refuses a database with pending migrations and says so.
-- Migrations are forward-only and applied before the new Worker deploys, so each migration
-  must stay compatible with the Worker that is live while it applies.
+1. Wait until Deploy Staging is green for the `staging` head.
+2. The owner opens a `staging` → `main` pull request (`gh pr create --base main --head
+   staging`) and, after PR Review, merges it with **Create a merge commit**, never a squash.
+3. The push to `main` runs Deploy Production: the staging check matches the merge commit's
+   tree, the `production` reviewers approve, and `plan-release` backs up and migrates D1
+   first only when `d1/drizzle` migrations are pending.
+
+Migrations are forward-only and applied before the new Worker deploys, so each must stay
+compatible with the live Worker while it applies. A `deploy-best.serp.co-production` dispatch
+re-runs a release of the `main` head; a release is refused once `main` has moved on, so reject
+one you won't ship instead of leaving it waiting. Hotfixes follow
+[Release guards](./RELEASE_GUARDS.md#hotfixes).
 
 ### Backups and recovery
 
@@ -197,11 +207,10 @@ against staging both produced the exact 16-table snapshot `69a7bae9…e477` (3,4
 141 categories, 18,096 rows). The staging HTTP gates and the 17-test Playwright smoke suite
 passed against the staging Worker.
 
-## HTTP gates after a deploy
+## After a deploy
 
-[Environments and hosts](./ARCHITECTURE.md#environments-and-hosts) describes what the HTTP
-gates check per environment, how they wait for the deployed version, and when they skip a
-best.serp.co check with a `best.serp.co check skipped` warning.
+What the HTTP gates check per environment, how they wait for the deployed version, and when
+they skip a best.serp.co check: [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts).
 
 ## Caching after a deploy
 
@@ -236,33 +245,24 @@ permission beyond the deploy token above.
 3. Bootstrap and deploy production as described in [First release](#first-release-phase-4b).
 4. Attach the Custom Domain `best.serp.co` to the production Worker (replaces the
    GitHub Pages CNAME), confirm `curl -I https://best.serp.co` no longer shows
-   `server: GitHub.com`, and re-run **Deploy Production** (`worker-only`) for the HTTP
-   gates; they now check best.serp.co too, but skip with a warning if zone protection
-   challenges the runner. Then check the custom domain **by hand** as a manual cutover step
-   (and after any run whose log shows `best.serp.co check skipped`). From a maintainer
-   machine:
+   `server: GitHub.com`, and re-run **Deploy Production** for the HTTP gates. Then check
+   the custom domain **by hand** from a maintainer machine, a manual cutover step (and after
+   any run that logged `best.serp.co check skipped`; what each check compares is in
+   [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)):
 
    ```bash
    pnpm tsx scripts/d1-preview-http-gates.ts public https://best.serp.co
    curl -sI https://best.serp.co/ | grep -i -e x-worker-version -e x-site-environment
    ```
 
-   The first command requires no `noindex`, a robots.txt that lists the sitemap index, and
-   Google Tag Manager on `/`. The second must show `x-site-environment: production` and an
-   `x-worker-version` equal to the version Deploy Production deployed: the id in its gate log
-   (`Worker version <id> answered N probe(s)`, once the workflows pass
-   `WRANGLER_OUTPUT_FILE_PATH`), or the active deployment's version under Workers & Pages →
-   `best-serp-co-production` → Deployments in the Cloudflare dashboard. If either fails, roll
-   the Custom Domain back to GitHub Pages before investigating. Then submit
-   `sitemap-index.xml` in Search Console.
+   If either fails, roll the Custom Domain back to GitHub Pages before investigating. Then
+   submit `sitemap-index.xml` in Search Console.
 5. Switch the platform host to the canonical host: merge a reviewed change setting
-   `env.production.vars.CANONICAL_HOST_REDIRECT` to `"on"` in `apps/web/wrangler.jsonc`,
-   then release it with **Deploy Production** (`worker-only`). The production HTTP gates then
-   also require `https://best-serp-co-production.serpcompany.workers.dev/about` to answer
-   one 308 to `https://best.serp.co/about/`. Never flip it before step 4: the review URL
-   would redirect to GitHub Pages, and the pre-cutover gates refuse that. Keep
-   `workers_dev: true`; CI reaches the Worker there with the `x-best-serp-co-smoke-test`
-   header.
+   `env.production.vars.CANONICAL_HOST_REDIRECT` to `"on"` in `apps/web/wrangler.jsonc` and
+   release it with **Deploy Production**; the gates then also require the workers.dev host
+   to answer one 308 to best.serp.co. Never flip it before step 4: the review URL would
+   redirect to GitHub Pages, and the pre-cutover gates refuse that. Keep `workers_dev: true`;
+   CI reaches the Worker there with the `x-best-serp-co-smoke-test` header.
 6. Set up the submission notifier and re-enable the `submit-gsc-sitemaps.yml` schedule.
 7. Disable GitHub Pages and delete the `legacy-static` branch.
 8. Remove `apps/serp.co` and `sites/serp.co` from `json-directory-template`.

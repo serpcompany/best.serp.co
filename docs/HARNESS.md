@@ -56,28 +56,34 @@ database.
 Run a focused test while implementing, the fast loop at milestone boundaries, and the
 full loop before a substantial completion claim.
 
-Pull requests targeting `main` run `pr-review.yml`. The repository ruleset `main` (id
-24391799) applies these rules:
+Pull requests into `staging` (the base branch) and `main` (promotions from `staging`, and
+`hotfix-*` branches) run `pr-review.yml`. The repository rulesets `staging` and `main` (id
+24391799) apply these rules:
 
-- Every change needs a pull request, merged by squash, or by merge commit for promotions.
+- Every change needs a pull request: squash-merged into `staging` (except the merge commit
+  that brings a hotfix back from `main`); into `main`, a merge commit for promotions and a
+  squash for hotfixes.
 - Five checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
-  `OpenNext Worker Build`, and `E2E Tests`.
+  `OpenNext Worker Build`, and `E2E Tests`. Every job runs on every pull request, because a
+  skipped job satisfies a required check.
 - Force pushes and branch deletion are blocked.
 
-The ruleset requires no approving review, no up-to-date branch, and no resolved
-conversations. Repository admins can bypass it only through a pull request, never with a
-direct push. `E2E Tests` still runs only when browser-relevant paths change, and a skipped
-job satisfies the required check; #42 decision c drops that filter. Agents never merge: the
-owner approves every merge.
+The rulesets require no approving review, no up-to-date branch, and no resolved
+conversations. Repository admins can bypass them only through a pull request, never with a
+direct push. Rulesets cannot restrict a pull request's head branch, so `Validate Site &
+Policy` fails a pull request into `main` whose head is not `staging` or `hotfix-*`. That only
+catches mis-targeted pull requests; Deploy Production's tree check is the control. Agents
+never merge: the owner approves every merge
+([Release guards](./RELEASE_GUARDS.md#promotion)).
 
 After a reviewed pull request merges, `main-validation.yml` runs the full loop again
-on the exact resulting `main` revision. It supplies the before/after push revisions
-to the changed-file policy and has read-only repository permission. It does not
+on the exact resulting `staging` or `main` revision. It supplies the before/after push
+revisions to the changed-file policy and has read-only repository permission. It does not
 deploy, use a protected environment, or access a remote D1 database. This post-merge
 result proves the integrated revision independently; it does not replace the required
 pre-merge checks. Deployment is separate: `deploy-staging.yml` runs the fast loop and
-deploys the same push to staging, and production releases are manual protected workflows
-(see the [deploy runbook](./DEPLOY_RUNBOOK.md#workflows)).
+deploys each `staging` push to staging, and `deploy-production.yml` releases each `main`
+push after reviewer approval (see the [deploy runbook](./DEPLOY_RUNBOOK.md#workflows)).
 
 ## Documentation health
 
