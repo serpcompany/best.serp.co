@@ -4,6 +4,7 @@ import {
   createEmailDeliveryLedger,
   EMAIL_DELIVERY_MAX_ATTEMPTS,
   isEmailEventKey,
+  pruneEmailDeliveries,
   sqliteTimestamp
 } from './email-deliveries'
 import { SqliteD1 } from './test-support'
@@ -214,6 +215,65 @@ describe('email delivery ledger', () => {
     for (const statement of d1.statements) {
       expect(statement.sql).not.toContain(claim.eventKey)
       expect(statement.bindings).toContain(claim.eventKey)
+    }
+  })
+})
+
+describe('pruning stale deliveries', () => {
+  it('deletes a small batch of one template’s oldest stale rows with one prepared statement', async () => {
+    const d1 = new SqliteD1()
+    const client = createDatabase(d1.asD1Database())
+    const insert = d1.database.prepare(
+      "INSERT INTO email_deliveries (template_id, event_key, provider, status, created_at, updated_at) VALUES (?, ?, 'p', 'sent', ?, ?)"
+    )
+    const add = (templateId: string, eventKey: string, createdAt: string) =>
+      insert.run(templateId, eventKey, createdAt, createdAt)
+    add('sign-in-code', 'sign-in-code:old-1', '2026-10-04 09:00:00')
+    add('sign-in-code', 'sign-in-code:old-2', '2026-10-04 10:00:00')
+    add('sign-in-code', 'sign-in-code:old-3', '2026-10-04 11:00:00')
+    add('sign-in-code', 'sign-in-code:fresh', '2026-10-06 11:00:00')
+    add('submission-received', 'submission-created:old', '2026-10-01 09:00:00')
+    const before = new Date(Date.UTC(2026, 9, 5, 12, 0, 0))
+    const remaining = () =>
+      d1.database
+        .prepare('SELECT event_key FROM email_deliveries ORDER BY template_id, event_key')
+        .all()
+        .map(row => String(row.event_key))
+
+    d1.statements.length = 0
+    expect(
+      await pruneEmailDeliveries(client, { before, limit: 2, templateId: 'sign-in-code' })
+    ).toBe(2)
+    // The oldest two went; the newest stale row waits for the next call.
+    expect(remaining()).toEqual([
+      'sign-in-code:fresh',
+      'sign-in-code:old-3',
+      'submission-created:old'
+    ])
+    expect(d1.statements).toHaveLength(1)
+    expect(d1.statements[0]?.bindings).toContain('sign-in-code')
+    expect(d1.statements[0]?.sql).not.toContain('sign-in-code')
+
+    expect(
+      await pruneEmailDeliveries(client, { before, limit: 20, templateId: 'sign-in-code' })
+    ).toBe(1)
+    expect(
+      await pruneEmailDeliveries(client, { before, limit: 20, templateId: 'sign-in-code' })
+    ).toBe(0)
+    // Other templates and fresh rows are untouched.
+    expect(remaining()).toEqual(['sign-in-code:fresh', 'submission-created:old'])
+  })
+
+  it('refuses an invalid template id or batch size', async () => {
+    const client = createDatabase(new SqliteD1().asD1Database())
+    const before = new Date()
+    await expect(
+      pruneEmailDeliveries(client, { before, limit: 5, templateId: 'Bad Id' })
+    ).rejects.toThrow(/template id/u)
+    for (const limit of [0, 101, 1.5]) {
+      await expect(
+        pruneEmailDeliveries(client, { before, limit, templateId: 'sign-in-code' })
+      ).rejects.toThrow(/limit/u)
     }
   })
 })

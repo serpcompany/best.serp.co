@@ -1,4 +1,4 @@
-import { and, eq, lt, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import { emailDeliveries } from './schema'
 
@@ -62,6 +62,14 @@ export interface EmailDeliveryLedger {
    * attempt (it was never claimed, or a later attempt replaced it); nothing is changed then.
    */
   complete(input: EmailDeliveryCompletion): Promise<boolean>
+}
+
+export interface EmailDeliveryPruneInput {
+  /** Rows created before this instant are stale. */
+  before: Date
+  /** The most rows one call deletes, oldest first, so a call stays small. */
+  limit: number
+  templateId: string
 }
 
 export function isEmailEventKey(value: unknown): value is string {
@@ -194,4 +202,42 @@ export function createEmailDeliveryLedger(config: {
       return updated.results.length === 1
     }
   }
+}
+
+/**
+ * Deletes up to `limit` of a template's rows created before `before`, oldest first, and
+ * returns how many went. For templates whose events never repeat once they are stale (a
+ * sign-in code is keyed per send and is useless after its provider's 24-hour idempotency
+ * window), so nothing a retry could need is lost. Called opportunistically from the send path
+ * until a scheduled job exists (serpcompany/best.serp.co#66).
+ */
+export async function pruneEmailDeliveries(
+  client: Database,
+  input: EmailDeliveryPruneInput
+): Promise<number> {
+  const templateId = requirePattern(input.templateId, EMAIL_TEMPLATE_ID_PATTERN, 'template id')
+  if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 100) {
+    throw new Error('Email delivery prune limit must be an integer from 1 to 100.')
+  }
+  const stale = client.database
+    .select({ eventKey: emailDeliveries.eventKey })
+    .from(emailDeliveries)
+    .where(
+      and(
+        eq(emailDeliveries.templateId, templateId),
+        lt(emailDeliveries.createdAt, sqliteTimestamp(input.before))
+      )
+    )
+    .orderBy(asc(emailDeliveries.createdAt))
+    .limit(input.limit)
+  const deleted = await prepare(
+    client,
+    client.database
+      .delete(emailDeliveries)
+      .where(
+        and(eq(emailDeliveries.templateId, templateId), inArray(emailDeliveries.eventKey, stale))
+      )
+      .returning({ eventKey: emailDeliveries.eventKey })
+  ).all<{ eventKey: string }>()
+  return deleted.results.length
 }

@@ -63,7 +63,8 @@ writes, badge checks, and URL blocks on Wrangler-local D1 (workerd).
   `badge_checks` hold ownership, owner edits, and badge program history (#62, below).
 - `email_deliveries` is the transactional email ledger: one row per template and event key
   (status, attempts, provider message id, error code), never a recipient or content
-  (see [Email](./EMAIL.md)).
+  (see [Email](./EMAIL.md)). Each sign-in code send prunes `sign-in-code` rows older than 24
+  hours ([Accounts](./ACCOUNTS.md)).
 - `users`, `sessions`, `accounts`, and `verification` are Better Auth's tables (epoch
   millisecond timestamps; sign-in codes stored hashed). `users.role` is `user` or `admin`.
   These, `auth_rate_limit_hits`, and `email_deliveries` hold runtime data, so bootstrap

@@ -94,6 +94,11 @@ site can plant one that the browser sends first), and any that verifies counts.
   per email). Flooding past 300 codes an hour for new addresses pauses new sign-ups for up to
   an hour. That ceiling bounds the mail (cost and sender reputation) and never applies to
   existing accounts. Neither limit tells the requester that it applied.
+- **Timing (accepted).** A request a per-email limit denies skips Better Auth's code insert
+  and user lookup, so it can answer measurably faster than a sent one, and two requests from
+  two clients might still tell a member from a new email by latency. This is accepted: every
+  probe spends the email's own budget (1 a minute, 5 an hour for a new email), which rations
+  the probes, and the answer itself never differs.
 
 Rate-limit rows hold HMAC-SHA256 digests under a key derived from `BETTER_AUTH_SECRET`
 (`HMAC(secret, "best.serp.co/auth-rate-limit/v1")`, `keys.ts`), never an email or address.
@@ -113,6 +118,12 @@ template is registered or when this Worker cannot deliver email. The second is c
 request, before any limit is counted (`emailDeliveryConfigured`: matching environment vars, the
 `DB` binding, a valid `USESEND_BASE_URL` and `USESEND_API_KEY`). So a rotated or missing key
 stops sign-in visibly instead of issuing codes that never arrive.
+
+Every code adds an `email_deliveries` row, so each send also deletes up to 20 `sign-in-code`
+rows older than 24 hours (the provider's idempotency window), oldest first, with one prepared
+statement (`pruneEmailDeliveries`), until #66 adds a scheduled job. Like the email, the prune
+runs after the response (`waitUntil`), so it never delays a code request or widens the timing
+gap above.
 
 On staging, a code for an address outside `EMAIL_STAGING_ALLOWLIST` is skipped
 (`email_skipped`) while the request answers 200 like any other, so testers must be on the
