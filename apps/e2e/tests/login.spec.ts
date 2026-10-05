@@ -152,8 +152,10 @@ test.describe('sign-in screens', () => {
     await expect(page.getByRole('button', { name: 'Send a new code' }).first()).toBeVisible()
   })
 
-  // PR #76 review, finding 3: a resend a per-email limit drops still leaves the old code.
-  test('keeps counting the old code’s attempts after a resend within the minute', async ({
+  // PR #76 review 1, finding 3, and review 2, finding 2: a resend a per-email limit drops
+  // leaves the old code. The screen keeps its misses, gives no count it cannot know, and lets
+  // the server say when the code is spent.
+  test('keeps the old code after a resend within the minute, until the server says it is spent', async ({
     page
   }) => {
     await asClient(page)
@@ -169,10 +171,76 @@ test.describe('sign-in screens', () => {
     await page.getByRole('button', { name: 'Send a new code' }).click()
     await expect(page.getByText(/Resend in (?:1:00|0:[0-5]\d)/u)).toBeVisible()
     expect(await outboxCode(page, email)).toBe(code)
+    // The old code's third miss: the server still answers "wrong", and the screen claims no count.
     await typeCode(page, wrongCode(code, 2))
+    await expect(
+      page.getByText('That code isn’t right. Check the most recent email and try again.', {
+        exact: true
+      })
+    ).toBeVisible()
+    await expect(page.locator('#code')).toBeEnabled()
+    // The next guess is refused by the server as spent.
+    await typeCode(page, wrongCode(code, 3))
     await expect(
       page.getByText('Too many incorrect codes. Request a new code to try again.')
     ).toBeVisible()
+  })
+
+  // PR #76 review 2, finding 2: a resend that did send a new code gets the new code's attempts.
+  test('lets a resent new code be used after the old code’s misses', async ({ page }) => {
+    await asClient(page)
+    const email = uniqueEmail('fresh')
+    // A member's code limits count per email and client, so a second client address can send a
+    // new code within the minute.
+    await page.goto('/login/?callbackUrl=%2Fabout%2F')
+    await requestCodeInPage(page, email)
+    await typeCode(page, await outboxCode(page, email))
+    await page.waitForURL('**/about/')
+    await page.locator('header').first().getByRole('button', { name: 'Sign out' }).click()
+    await expect(page.getByRole('link', { name: 'Sign up / Sign in' }).first()).toBeVisible()
+
+    await page.goto('/login/?callbackUrl=%2Fabout%2F')
+    await requestCodeInPage(page, email)
+    const oldCode = await outboxCode(page, email)
+    await typeCode(page, wrongCode(oldCode, 0))
+    await typeCode(page, wrongCode(oldCode, 1))
+    await expect(page.getByText(/1 attempt left\.$/u)).toBeVisible()
+
+    await asClient(page)
+    await page.getByRole('button', { name: 'Send a new code' }).click()
+    await expect.poll(() => outboxCode(page, email)).not.toBe(oldCode)
+    const newCode = await outboxCode(page, email)
+    // One miss on the new code: the old count would say it is spent, but it is not.
+    await typeCode(
+      page,
+      wrongCode(newCode, 0) === oldCode ? wrongCode(newCode, 1) : wrongCode(newCode, 0)
+    )
+    await expect(
+      page.getByText('That code isn’t right. Check the most recent email and try again.', {
+        exact: true
+      })
+    ).toBeVisible()
+    await expect(page.getByText('Too many incorrect codes')).toHaveCount(0)
+    await typeCode(page, newCode)
+    await page.waitForURL('**/about/')
+  })
+
+  // PR #76 review 2, finding 1: pasting or autofilling over a rejected code submits it.
+  test('submits a pasted or autofilled code over the rejected one, never the rejected one again', async ({
+    page
+  }) => {
+    await asClient(page)
+    const email = uniqueEmail('paste')
+    await page.goto('/login/?callbackUrl=%2Fabout%2F')
+    await requestCodeInPage(page, email)
+    const code = await outboxCode(page, email)
+    await typeCode(page, wrongCode(code, 0))
+    await expect(page.getByText(/2 attempts left\.$/u)).toBeVisible()
+    // The rejected digits stay, and Verify will not send them again.
+    await expect(page.getByRole('button', { name: 'Verify' })).toBeDisabled()
+    // One value set over the six kept digits, as a paste or one-time-code autofill writes it.
+    await page.locator('#code').fill(code)
+    await page.waitForURL('**/about/')
   })
 
   test('explains an expired code', async ({ page }) => {

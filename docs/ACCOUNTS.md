@@ -142,8 +142,10 @@ the request carries a session cookie, so anonymous pages never load Better Auth 
   (InputOTP), then "You're signed in" and a redirect to `?callbackUrl=` (a path on this site,
   else `/account/`; `lib/auth/callback-url.ts`, which checks the path after normalization). The code step says a code is on its way *if*
   the address is valid, because a per-email limit answers like a sent code. It counts wrong
-  guesses locally (only this browser can guess its code, and a resend within the minute keeps
-  the old code's count) and shows the expired, too-many-codes, per-client 429 (with
+  guesses locally (only this browser can guess its code). After a resend that a per-email limit
+  may have dropped, it shows no count and lets the server's `TOO_MANY_ATTEMPTS` end the code. A
+  full code is sent as soon as it is typed, pasted, or autofilled, but never the one just
+  rejected. It shows the expired, too-many-codes, per-client 429 (with
   `Retry-After`), and 503 `OTP_DELIVERY_UNAVAILABLE` (email delivery not configured) states. Its
   code length, lifetime, and attempts come from `lib/email/sign-in-code.ts`, like Better Auth's.
 - **`/account`** (`components/account/account-shell.tsx`, shadcn dashboard-01): the sidebar

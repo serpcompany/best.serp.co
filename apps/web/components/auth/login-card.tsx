@@ -59,17 +59,40 @@ type Notice =
   | null
 
 type CodeError =
-  | { kind: 'wrong'; attemptsLeft: number }
+  /** `attemptsLeft` is null when a resend may have replaced the code, so the count is unknown. */
+  | { kind: 'wrong'; attemptsLeft: number | null }
   | { kind: 'expired' }
   | { kind: 'attempts' }
   | { kind: 'limited'; until: number }
   | { kind: 'failed' }
   | null
 
+/**
+ * The code step. `wrongGuesses` counts misses against the code the browser surely holds. After a
+ * resend that may or may not have sent a new code (a per-email limit answers like a sent one),
+ * `uncertain` is set: `wrongGuesses` still counts the old code's misses and `guessesSinceResend`
+ * the new code's, and only the server's TOO_MANY_ATTEMPTS ends the code (PR #76 review 2).
+ */
 type Step =
   | { kind: 'email' }
-  | { kind: 'code'; sentAt: number; wrongGuesses: number }
+  | {
+      guessesSinceResend: number
+      kind: 'code'
+      sentAt: number
+      uncertain: boolean
+      wrongGuesses: number
+    }
   | { kind: 'done'; email: string }
+
+function freshCode(): Step {
+  return {
+    guessesSinceResend: 0,
+    kind: 'code',
+    sentAt: Date.now(),
+    uncertain: false,
+    wrongGuesses: 0
+  }
+}
 
 export interface LoginCardProps {
   callbackPath: string
@@ -88,7 +111,11 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
   const [otp, setOtp] = useState('')
   const [codeError, setCodeError] = useState<CodeError>(null)
   const [pending, setPending] = useState(false)
+  /** The last code the server rejected; it is never sent again (PR #76 review 2). */
+  const [rejectedCode, setRejectedCode] = useState<string | null>(null)
   const codeInput = useRef<HTMLInputElement>(null)
+  /** Set synchronously, so a paste and a keystroke in the same tick cannot both submit. */
+  const verifying = useRef(false)
   const now = useNow(step.kind !== 'done')
 
   const destination = callbackDestination(callbackPath)
@@ -135,8 +162,9 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
     if (!sent) return
     setEmail(address)
     setOtp('')
+    setRejectedCode(null)
     setCodeError(null)
-    setStep({ kind: 'code', sentAt: Date.now(), wrongGuesses: 0 })
+    setStep(freshCode())
   }
 
   async function onResend() {
@@ -145,21 +173,34 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
     const sent = await sendCode(email)
     setPending(false)
     if (!sent) return
-    // A per-email limit answers like a sent code, so the code in the inbox may still be the
-    // old one: keep counting its wrong guesses unless it is already used up or expired
-    // (PR #76 review, finding 3).
-    const codeDead = codeError?.kind === 'expired' || codeError?.kind === 'attempts'
-    const wrongGuesses = step.kind === 'code' && !codeDead ? step.wrongGuesses : 0
     setOtp('')
+    setRejectedCode(null)
     setCodeError(null)
-    setStep({ kind: 'code', sentAt: Date.now(), wrongGuesses })
+    const codeDead = codeError?.kind === 'expired' || codeError?.kind === 'attempts'
+    if (step.kind !== 'code' || codeDead) {
+      setStep(freshCode())
+      return
+    }
+    // A per-email limit answers like a sent code, so the inbox may hold the old code or a new
+    // one: keep the old code's misses (PR #76 review 1, finding 3) and count the new code's
+    // separately, and let the server decide when the code is spent (review 2, finding 2).
+    setStep({
+      guessesSinceResend: 0,
+      kind: 'code',
+      sentAt: Date.now(),
+      uncertain: true,
+      wrongGuesses: step.wrongGuesses
+    })
   }
 
   async function onVerify(code: string) {
-    if (step.kind !== 'code' || pending || code.length !== CODE_LENGTH) return
+    if (step.kind !== 'code' || verifying.current || code.length !== CODE_LENGTH) return
+    if (code === rejectedCode) return
+    verifying.current = true
     setPending(true)
     setCodeError(null)
     const outcome = await verifyCode(email, code)
+    verifying.current = false
     setPending(false)
     if (outcome.kind === 'signed-in') {
       setStep({ email: outcome.email, kind: 'done' })
@@ -176,14 +217,26 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
       input.setSelectionRange(0, input.value.length)
     })
     if (outcome.kind === 'wrong') {
+      setRejectedCode(code)
       const wrongGuesses = step.wrongGuesses + 1
-      setStep({ ...step, wrongGuesses })
+      const guessesSinceResend = step.guessesSinceResend + 1
+      setStep({ ...step, guessesSinceResend, wrongGuesses })
       if (Date.now() - step.sentAt >= CODE_LIFETIME_SECONDS * 1000) {
         setCodeError({ kind: 'expired' })
-      } else if (wrongGuesses >= CODE_ATTEMPTS) {
+      } else if (!step.uncertain) {
+        // The browser surely holds this code, so the count is exact.
+        setCodeError(
+          wrongGuesses >= CODE_ATTEMPTS
+            ? { kind: 'attempts' }
+            : { attemptsLeft: CODE_ATTEMPTS - wrongGuesses, kind: 'wrong' }
+        )
+      } else if (guessesSinceResend >= CODE_ATTEMPTS) {
+        // Spent whichever code the inbox holds.
         setCodeError({ kind: 'attempts' })
       } else {
-        setCodeError({ attemptsLeft: CODE_ATTEMPTS - wrongGuesses, kind: 'wrong' })
+        // Either code may be in the inbox: the server's TOO_MANY_ATTEMPTS decides when it is
+        // spent, and the copy gives no count it cannot know.
+        setCodeError({ attemptsLeft: null, kind: 'wrong' })
       }
       return
     }
@@ -294,9 +347,11 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                   value={otp}
                   onChange={value => {
                     setOtp(value)
-                    if (codeError?.kind === 'wrong') setCodeError(null)
+                    if (value !== rejectedCode && codeError?.kind === 'wrong') setCodeError(null)
+                    // A full code that differs from the rejected one is sent at once, whether
+                    // it was typed, pasted, or autofilled (onComplete misses a replaced value).
+                    if (value.length === CODE_LENGTH && value !== rejectedCode) void onVerify(value)
                   }}
-                  onComplete={value => void onVerify(value)}
                 >
                   <InputOTPGroup>
                     {[0, 1, 2].map(index => (
@@ -345,7 +400,12 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={pending || otp.length !== CODE_LENGTH || guessLimitSeconds > 0}
+                    disabled={
+                      pending ||
+                      otp.length !== CODE_LENGTH ||
+                      otp === rejectedCode ||
+                      guessLimitSeconds > 0
+                    }
                   >
                     {pending ? <Spinner /> : null}
                     Verify
@@ -498,7 +558,9 @@ function LoginNotice({ notice, seconds }: { notice: Notice; seconds: number }) {
 function codeErrorMessage(error: CodeError, limitSeconds: number): string | null {
   switch (error?.kind) {
     case 'wrong':
-      return `That code isn’t right. Check the most recent email and try again. ${error.attemptsLeft} ${error.attemptsLeft === 1 ? 'attempt' : 'attempts'} left.`
+      return error.attemptsLeft === null
+        ? 'That code isn’t right. Check the most recent email and try again.'
+        : `That code isn’t right. Check the most recent email and try again. ${error.attemptsLeft} ${error.attemptsLeft === 1 ? 'attempt' : 'attempts'} left.`
     case 'expired':
       return `This code has expired. Codes work for ${CODE_LIFETIME_MINUTES} minutes.`
     case 'attempts':
