@@ -10,12 +10,13 @@ import {
   composeEmail,
   formatUsd,
   hostOf,
+  MESSAGE_US_PATH,
   paragraph,
   quote,
   required,
   rows,
   SUBJECT_NAME_MAX,
-  sitePath
+  submissionPath
 } from './layout'
 
 export interface SubmissionReceivedInput {
@@ -82,7 +83,7 @@ export const paymentReceivedInReviewEmail = defineEmailTemplate<PaymentReceivedI
         ],
         cta: {
           label: 'View submission',
-          url: context.links.url(sitePath('account', 'submissions', input.submissionId))
+          url: context.links.url(submissionPath(input.submissionId))
         },
         heading: `${name} goes live after review`,
         preheader: `${name} goes live after a reviewer looks at it.`,
@@ -114,7 +115,7 @@ export const changesRequestedEmail = defineEmailTemplate<ChangesRequestedInput>(
         ],
         cta: {
           label: 'Edit and resubmit',
-          url: context.links.url(sitePath('account', 'submissions', input.submissionId))
+          url: context.links.url(submissionPath(input.submissionId))
         },
         heading: 'A reviewer asked for changes',
         preheader: 'A reviewer left a note. Edit and resubmit when you’re ready.',
@@ -145,7 +146,7 @@ export const submissionRejectedEmail = defineEmailTemplate<SubmissionRejectedInp
         ],
         cta: {
           label: 'Open submission',
-          url: context.links.url(sitePath('account', 'submissions', input.submissionId))
+          url: context.links.url(submissionPath(input.submissionId))
         },
         heading: `${name} wasn’t approved`,
         preheader: 'Here’s why, and what you can do next.',
@@ -181,7 +182,7 @@ export const submissionRejectedRefundedEmail = defineEmailTemplate<SubmissionRej
           ],
           cta: {
             label: 'Open submission',
-            url: context.links.url(sitePath('account', 'submissions', input.submissionId))
+            url: context.links.url(submissionPath(input.submissionId))
           },
           heading: `${name} wasn’t approved`,
           preheader: `Your ${amount} payment has been refunded.`,
@@ -204,21 +205,19 @@ export const submissionRejectedProhibitedEmail =
     render(input, context) {
       const name = required(input.submissionName, 'a product name')
       const domain = hostOf(required(input.website, 'a website'))
-      const id = required(input.submissionId, 'a submission id')
+      required(input.submissionId, 'a submission id')
       return composeEmail(
         {
           body: [
             paragraph(`A reviewer looked at ${name} and couldn’t approve it.`),
             box(bold('Reason:'), ` ${required(input.reason, 'a reason')}`),
             paragraph(
-              `Because the content is prohibited, ${domain} can’t be submitted or claimed again. If you think this is a mistake, message us from your dashboard.`
+              `Because the content is prohibited, ${domain} can’t be submitted or claimed again. If you think this is a mistake, message us.`
             )
           ],
           cta: {
             label: 'Message us',
-            url: context.links.url(
-              `/account/messages/new/?about=submission:${encodeURIComponent(id)}`
-            )
+            url: context.links.url(MESSAGE_US_PATH)
           },
           heading: `${name} wasn’t approved`,
           preheader: `${domain} can’t be submitted again.`,

@@ -206,6 +206,18 @@ export function required(value: string, label: string): string {
 }
 
 /** A root-relative path with each segment encoded: `sitePath('submit', id, 'choose')`. */
+/**
+ * Pages an email would link to that don't exist yet go to a page that does (#64 link audit,
+ * checked by `links.test.ts`): a submission's own page (`/account/submissions/<id>/`, #65) is
+ * the account dashboard until #65 builds it.
+ */
+export function submissionPath(_submissionId: string): string {
+  return '/account/'
+}
+
+/** "Message us": the contact page until the account inbox (`/account/messages/new/`, #73). */
+export const MESSAGE_US_PATH = '/contact/'
+
 export function sitePath(...segments: string[]): string {
   return `/${segments.map(segment => encodeURIComponent(required(segment, 'a link segment'))).join('/')}/`
 }

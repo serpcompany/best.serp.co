@@ -266,9 +266,10 @@ describe('changes requested', () => {
       "Pagecraft isn't live yet. Our reviewer left this note:\n> The short description reads like an ad (“#1 best”, “10x faster”)."
     )
     expect(email.text).toContain(
-      'Edit and resubmit: https://best.serp.co/account/submissions/s_9pd31x/\nQuestions about the note? Reply to the reviewer in your dashboard.'
+      'Edit and resubmit: https://best.serp.co/account/\nQuestions about the note? Reply to the reviewer in your dashboard.'
     )
-    expect(linksTo(email.html, 'https://best.serp.co/account/submissions/s_9pd31x/')).toBe(true)
+    // The submission's own page arrives with #65; until then the button opens the dashboard.
+    expect(linksTo(email.html, 'https://best.serp.co/account/')).toBe(true)
     expect(email.html).toContain('font-style:italic')
   })
 
@@ -327,7 +328,7 @@ describe('rejected', () => {
       "A reviewer looked at Promptdeck and couldn't approve it this time.\nReason: promptdeck.io shows a domain-parking page with no product, so there's nothing to list yet.\nYou can edit the submission and send it again."
     )
     expect(email.html).toContain('<b>Reason:</b> promptdeck.io shows')
-    expect(linksTo(email.html, 'https://best.serp.co/account/submissions/s_2kd81p/')).toBe(true)
+    expect(linksTo(email.html, 'https://best.serp.co/account/')).toBe(true)
   })
 
   it('says how much was refunded', () => {
@@ -338,7 +339,7 @@ describe('rejected', () => {
     )
     expect(email.html).toContain('We’ve refunded <b>$49.00</b> to your original payment method.')
     expect(email.html).toContain('Your $49.00 payment has been refunded.')
-    expect(linksTo(email.html, 'https://best.serp.co/account/submissions/s_7tq20z/')).toBe(true)
+    expect(linksTo(email.html, 'https://best.serp.co/account/')).toBe(true)
   })
 })
 
@@ -557,9 +558,9 @@ describe('revision 5 emails', () => {
 
 A reviewer looked at KeyBazaar and couldn't approve it.
 Reason: keybazaar.shop sells software license keys that the publishers haven't authorized. Our Terms of Service prohibit this (IP infringement).
-Because the content is prohibited, keybazaar.shop can't be submitted or claimed again. If you think this is a mistake, message us from your dashboard.
+Because the content is prohibited, keybazaar.shop can't be submitted or claimed again. If you think this is a mistake, message us.
 
-Message us: https://best.serp.co/account/messages/new/?about=submission:s_5hh3m0
+Message us: https://best.serp.co/contact/
 
 --
 SERP Directory · https://best.serp.co
@@ -567,9 +568,8 @@ This address isn't monitored. Reply from your dashboard: https://best.serp.co/ac
 You're getting this because you have an account on best.serp.co.`)
     expect(email.html).toContain('keybazaar.shop can’t be submitted again.')
     expect(email.text).not.toMatch(/refund|send it again/iu)
-    expect(
-      linksTo(email.html, 'https://best.serp.co/account/messages/new/?about=submission:s_5hh3m0')
-    ).toBe(true)
+    // The account inbox arrives with #73; until then "Message us" opens the contact page.
+    expect(linksTo(email.html, 'https://best.serp.co/contact/')).toBe(true)
   })
 
   it('payment received while the checks failed: not live yet, in review', () => {
@@ -581,7 +581,7 @@ Thanks for your payment of $49.00.
 Our automatic checks couldn't load https://kiddotutor.com/ (the connection timed out), so Kiddo Tutor isn't live yet. A reviewer will look at it before it's published. You don't need to do anything.
 If it's rejected for anything other than prohibited content, you get a full refund automatically.
 
-View submission: https://best.serp.co/account/submissions/s_7tq20z/
+View submission: https://best.serp.co/account/
 
 --
 SERP Directory · https://best.serp.co

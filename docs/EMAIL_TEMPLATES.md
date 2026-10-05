@@ -15,11 +15,11 @@ idempotency key, so renaming a template would let an event send again.
 | `sign-in-code` | Better Auth sends a sign-in code (sign-in codes only); code in the subject | the user | none (code) |
 | `claim-code` | A claim needs a domain-email code; code in the subject | the work address | none (code) |
 | `submission-received` | A free submission's badge is verified and it enters review | submitter | `/account/` |
-| `payment-received-in-review` | A paid submission's automatic checks failed; it waits for review | submitter | `/account/submissions/<id>/` |
-| `changes-requested` | A reviewer requests changes (the note is quoted) | submitter | `/account/submissions/<id>/` |
-| `submission-rejected` | A reviewer rejects a submission that may be resubmitted | submitter | `/account/submissions/<id>/` |
-| `submission-rejected-refunded` | A paid submission is rejected and refunded | submitter | `/account/submissions/<id>/` |
-| `submission-rejected-prohibited` | A submission is rejected as prohibited: no resubmission, no refund | submitter | `/account/messages/new/?about=submission:<id>` |
+| `payment-received-in-review` | A paid submission's automatic checks failed; it waits for review | submitter | `/account/` (`/account/submissions/<id>/` after #65) |
+| `changes-requested` | A reviewer requests changes (the note is quoted) | submitter | `/account/` (`/account/submissions/<id>/` after #65) |
+| `submission-rejected` | A reviewer rejects a submission that may be resubmitted | submitter | `/account/` (`/account/submissions/<id>/` after #65) |
+| `submission-rejected-refunded` | A paid submission is rejected and refunded | submitter | `/account/` (`/account/submissions/<id>/` after #65) |
+| `submission-rejected-prohibited` | A submission is rejected as prohibited: no resubmission, no refund | submitter | `/contact/` (the account inbox after #73) |
 | `listing-approved` | A free listing is approved and live | submitter | `/products/<slug>/` |
 | `listing-live-paid` | A paid listing passes the automatic checks and goes live | submitter | `/products/<slug>/` |
 | `badge-missing` | The weekly check misses the badge (24h warning) | owner | `/account/listings/<slug>/` |
@@ -47,11 +47,14 @@ idempotency key, so renaming a template would let an event send again.
 
 ## Routes the buttons need
 
-The buttons link to routes other issues build: `/account/` and `/account/submissions/<id>/`
-(#65), `/admin/submissions/<id>/` (#64), and `/account/messages/...` with
-`/admin/inbox/<thread>/` (#73). **#65 must also create `/account/listings/<slug>/`**: the
-badge-missing and unlisted emails link there for "Check my badge" and "Relist". Screen 7 only
-defines `/account/listings/<slug>/edit`.
+Every button opens a page that exists; `apps/web/lib/email/emails/links.test.ts` renders every
+sample and fails on a link to a missing page. Until #65 builds `/account/submissions/<id>/`,
+submission buttons open `/account/` (`submissionPath`), and until #73 builds the account inbox,
+"Message us" opens `/contact/` (`MESSAGE_US_PATH`). The test lists the links still waiting for
+their page, all in emails nothing sends yet: `/account/listings/<slug>/` (badge-missing and
+unlisted, #65; screen 7 only defines `/account/listings/<slug>/edit`), `/account/messages/...`
+and `/admin/inbox/<thread>/` (#73), and the draft reminder's `/submit/<id>/choose/` (#63) and
+`/submit/<id>/checkout/` (#68).
 
 ## Recipients and footers
 
