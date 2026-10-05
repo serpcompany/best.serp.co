@@ -1,4 +1,6 @@
+import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose'
 import { describe, expect, it, vi } from 'vitest'
+import { ACCESS_JWT_HEADER } from '../auth/cloudflare-access'
 import { EDGE_CACHE_HEADER, withEdgeCache } from '../edge-cache/html-cache'
 import {
   NON_PRODUCTION_ROBOTS_TXT,
@@ -177,5 +179,111 @@ describe('Worker request pipeline and the edge cache', () => {
       '<script nonce-probe="x-nonce=;x-forwarded-host=;cookie=;x-middleware-subrequest="></script>'
     )
     expect(rendered).toHaveLength(1)
+  })
+})
+
+// serpcompany/best.serp.co#60: /admin and /api/admin need Cloudflare Access (production) and a
+// Better Auth session; the pages and handlers then require an admin.
+describe('admin gate', () => {
+  const team = 'serpcompany.cloudflareaccess.com'
+  const aud = 'c'.repeat(64)
+  const accessEnv: WorkerRequestEnv = {
+    ...productionEnv,
+    CF_ACCESS_AUD: aud,
+    CF_ACCESS_TEAM_DOMAIN: team
+  }
+  const session = { cookie: '__Secure-better-auth.session_token=token.signature' }
+
+  async function accessFixture() {
+    const pair = await generateKeyPair('RS256')
+    const jwks = { keys: [{ ...(await exportJWK(pair.publicKey)), alg: 'RS256', kid: 'k' }] }
+    const jwt = await new SignJWT({ email: 'devin@serp.co' })
+      .setProtectedHeader({ alg: 'RS256', kid: 'k' })
+      .setIssuer(`https://${team}`)
+      .setAudience(aud)
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(pair.privateKey)
+    return { getKey: () => createLocalJWKSet(jwks), jwt }
+  }
+
+  async function gate(url: string, env: WorkerRequestEnv, headers: Record<string, string> = {}) {
+    const { getKey, jwt } = await accessFixture()
+    const handler = pipeline()
+    const resolved = Object.fromEntries(
+      Object.entries(headers).map(([name, value]) => [name, value === 'VALID_JWT' ? jwt : value])
+    )
+    const response = await handleWorkerRequest(new Request(url, { headers: resolved }), env, {
+      ...handler,
+      access: { getKey }
+    })
+    return { response, serve: handler.serve }
+  }
+
+  it('answers 503 in production until the Access vars are configured', async () => {
+    for (const path of ['/admin/', '/api/admin/listings', '/admin/submissions/1/preview/x/']) {
+      const { response, serve } = await gate(`${production}${path}`, productionEnv, {
+        ...session,
+        [ACCESS_JWT_HEADER]: 'VALID_JWT'
+      })
+      expect(response.status, path).toBe(503)
+      expect(await response.text()).toBe('Access not configured\n')
+      expect(response.headers.get('cache-control')).toBe('private, no-store')
+      expect(serve).not.toHaveBeenCalled()
+    }
+  })
+
+  it('answers 403 in production without a valid Access JWT, even with a session', async () => {
+    for (const headers of [session, { ...session, [ACCESS_JWT_HEADER]: 'forged.token.value' }]) {
+      const { response, serve } = await gate(`${production}/admin/`, accessEnv, headers)
+      expect(response.status).toBe(403)
+      expect(serve).not.toHaveBeenCalled()
+    }
+  })
+
+  it('answers 401 to an Access-verified request without a session cookie', async () => {
+    const { response, serve } = await gate(`${production}/api/admin/anything`, accessEnv, {
+      [ACCESS_JWT_HEADER]: 'VALID_JWT',
+      cookie: 'theme=dark'
+    })
+    expect(response.status).toBe(401)
+    expect(serve).not.toHaveBeenCalled()
+  })
+
+  it('passes Access plus a session cookie on to the admin pages, which check the role', async () => {
+    const { response, serve } = await gate(`${production}/admin/`, accessEnv, {
+      ...session,
+      [ACCESS_JWT_HEADER]: 'VALID_JWT'
+    })
+    expect(response.status).toBe(200)
+    expect(serve).toHaveBeenCalledOnce()
+  })
+
+  it('needs only the session cookie on staging and locally unless Access is switched on', async () => {
+    const stagingEnv: WorkerRequestEnv = { SITE_ENVIRONMENT: 'staging' }
+    expect((await gate(`${staging}/admin/`, stagingEnv)).response.status).toBe(401)
+    expect((await gate(`${staging}/ADMIN/`, stagingEnv)).response.status).toBe(401)
+    expect((await gate(`${staging}/admin/`, stagingEnv, session)).serve).toHaveBeenCalledOnce()
+    const flagged = await gate(
+      `${staging}/admin/`,
+      { CF_ACCESS_REQUIRED: 'on', SITE_ENVIRONMENT: 'staging' },
+      session
+    )
+    expect(flagged.response.status).toBe(503)
+    const local = await gate('http://localhost:8787/api/admin/x', { SITE_ENVIRONMENT: 'local' })
+    expect(local.response.status).toBe(401)
+  })
+
+  it('treats a Worker without SITE_ENVIRONMENT as production', async () => {
+    const { response } = await gate(`${production}/admin/`, {}, session)
+    expect(response.status).toBe(503)
+  })
+
+  it('leaves every other path alone', async () => {
+    for (const path of ['/', '/about/', '/api/auth/get-session', '/administrator/']) {
+      const { response, serve } = await gate(`${production}${path}`, productionEnv)
+      expect(response.status, path).toBe(200)
+      expect(serve, path).toHaveBeenCalledOnce()
+    }
   })
 })

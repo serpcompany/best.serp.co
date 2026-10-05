@@ -15,6 +15,13 @@
       "when": 1791219171639,
       "tag": "0001_email_deliveries",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791226100994,
+      "tag": "0002_better_auth",
+      "breakpoints": true
     }
   ]
 }

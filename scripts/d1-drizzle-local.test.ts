@@ -13,7 +13,7 @@ import {
   requiredIndexNames
 } from './d1-drizzle-local'
 import { validateCanonicalLocalConfig } from './d1-local-config'
-import { canonicalPreviewCommand } from './d1-local-preview'
+import { canonicalPreviewCommand, localPreviewVarArgs } from './d1-local-preview'
 import { resolveFreshD1StateRoot } from './d1-local-state'
 import { applicationColumnInventory, importOrder } from './d1-table-inventory'
 import { project } from './project'
@@ -51,6 +51,27 @@ function runDrizzle(command: string, stateDirectory: string): string {
       WRANGLER_SEND_METRICS: 'false'
     }
   })
+}
+
+function executeLocal(stateDirectory: string, command: string): void {
+  execFileSync(
+    'pnpm',
+    [
+      'exec',
+      'wrangler',
+      'd1',
+      'execute',
+      project.local.databaseName,
+      '--command',
+      command,
+      '--local',
+      '--persist-to',
+      resolve(stateDirectory, 'drizzle', 'best-serp-co'),
+      '--config',
+      project.wranglerConfigPath
+    ],
+    { stdio: 'ignore' }
+  )
 }
 
 function mutateCanonicalState(stateDirectory: string): void {
@@ -125,9 +146,12 @@ describe('fresh Drizzle D1 history', () => {
     expect(config).toContain("out: './d1/drizzle'")
     expect(config).toContain("schema: './packages/data-ops/src/schema.ts'")
     expect(config).not.toMatch(/accountId|databaseId|token|process\.env/u)
-    expect(freshMigrationNames()).toEqual(['0000_baseline.sql', '0001_email_deliveries.sql'])
+    expect(freshMigrationNames()).toEqual([
+      '0000_baseline.sql',
+      '0001_email_deliveries.sql',
+      '0002_better_auth.sql'
+    ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
-
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
     const journal = JSON.parse(
       readFileSync(resolve(freshMigrationsDirectory, 'meta/_journal.json'), 'utf8')
@@ -141,18 +165,35 @@ describe('fresh Drizzle D1 history', () => {
       expect(existsSync(resolve(freshMigrationsDirectory, snapshot)), snapshot).toBe(true)
     }
 
-    // Every table any migration creates is hand-finished as STRICT.
+    const baseline = readFileSync(resolve(freshMigrationsDirectory, '0000_baseline.sql'), 'utf8')
+    for (const trigger of d1TriggerNames) expect(baseline).toContain(`CREATE TRIGGER ${trigger}`)
+    expect(baseline).toContain('COLLATE NOCASE')
+
+    // Every table of every migration is STRICT (Drizzle cannot express it; see DATA_MODEL.md).
     const history = freshMigrationNames()
       .map(name => readFileSync(resolve(freshMigrationsDirectory, name), 'utf8'))
       .join('\n')
     expect(history.match(/^CREATE TABLE/gmu)).toHaveLength(applicationTableNames.length)
     expect(history.match(/^\) STRICT;/gmu)).toHaveLength(applicationTableNames.length)
+    for (const index of requiredIndexNames) expect(history).toContain(`\`${index}\``)
+    expect(history).not.toMatch(/site_id|`sites`/u)
+  })
 
-    const migration = readFileSync(resolve(freshMigrationsDirectory, '0000_baseline.sql'), 'utf8')
-    for (const trigger of d1TriggerNames) expect(migration).toContain(`CREATE TRIGGER ${trigger}`)
-    for (const index of requiredIndexNames) expect(migration).toContain(`\`${index}\``)
-    expect(migration).toContain('COLLATE NOCASE')
-    expect(migration).not.toMatch(/site_id|`sites`/u)
+  it('seeds the admin allowlist with the owner only, deterministically', () => {
+    const database = freshDatabase()
+    const rows = database
+      .prepare('SELECT email, created_at FROM admin_allowlist ORDER BY email')
+      .all()
+    // A fixed created_at keeps the bootstrap snapshot (verify-import, db:verify:local) exact.
+    expect(rows.map(row => [String(row.email), String(row.created_at)])).toEqual([
+      ['devin@serp.co', '2026-10-06 00:00:00']
+    ])
+    expect(() =>
+      database.exec(
+        "INSERT INTO admin_allowlist (email, added_by) VALUES ('Owner@Example.com', 'x')"
+      )
+    ).toThrow(/CHECK constraint/u)
+    database.close()
   })
 
   it('keeps the exact table and column inventory in sync with the applied schema', () => {
@@ -215,6 +256,12 @@ describe('fresh Drizzle D1 history', () => {
       expect(runLocal('verify', stateDirectory)).toContain('Verified local D1 publication')
       expect(runLocal('import', stateDirectory)).toContain('import is a no-op')
       expect(runLocal('verify', stateDirectory)).toContain('Verified local D1 publication')
+      // Accounts created at runtime (sign-ins, code limits) are outside bootstrap parity.
+      executeLocal(
+        stateDirectory,
+        "INSERT INTO users (id, name, email, email_verified) VALUES ('u1', '', 'a@example.com', 1); INSERT INTO auth_rate_limit_hits (bucket, hit_at) VALUES ('b', 1)"
+      )
+      expect(runLocal('verify', stateDirectory)).toContain('exact 17-table snapshot')
       mutateCanonicalState(stateDirectory)
       expect(() => runLocal('verify', stateDirectory)).toThrow()
     },
@@ -375,6 +422,23 @@ describe('fresh Drizzle D1 history', () => {
       expect(appPackage.name).toBe(project.appPackageName)
       expect(appPackage.scripts['preview:worker']).toContain('scripts/d1-local-preview.ts')
       expect(appPackage.scripts['preview:worker']).not.toContain('--site')
+
+      expect(localPreviewVarArgs(undefined)).toEqual([])
+      expect(localPreviewVarArgs('CF_ACCESS_REQUIRED=on,CF_ACCESS_AUD=abc123')).toEqual([
+        '--var',
+        'CF_ACCESS_REQUIRED:on',
+        '--var',
+        'CF_ACCESS_AUD:abc123'
+      ])
+      for (const refused of [
+        'SITE_ENVIRONMENT=production',
+        'D1_RUNTIME_ENV=production',
+        'CF_ACCESS_REQUIRED',
+        'CF_ACCESS_AUD=a b',
+        'CF_ACCESS_AUD=a;rm -rf /'
+      ]) {
+        expect(() => localPreviewVarArgs(refused), refused).toThrow(/LOCAL_PREVIEW_VARS/u)
+      }
 
       const playwright = readFileSync(resolve('apps/e2e/playwright.config.ts'), 'utf8')
       expect(playwright).toContain('pnpm db:migrate:local')

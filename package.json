@@ -90,6 +90,7 @@
     "tsx": "catalog:",
     "turbo": "^2.8.7",
     "typescript": "catalog:",
+    "vite": "7.3.6",
     "vitest": "4.1.11",
     "yaml": "^2.9.0"
   },

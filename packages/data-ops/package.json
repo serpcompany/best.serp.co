@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./auth": "./src/auth.ts",
     "./cache": "./src/cache.ts",
     "./catalog": "./src/catalog.ts",
     "./catalog-epoch": "./src/catalog-epoch.ts",
@@ -13,15 +14,17 @@
     "./public-url": "./src/public-url.ts",
     "./schema": "./src/schema.ts",
     "./submissions": "./src/submissions.ts",
-    "./submission-plans": "./src/submission-plans.ts"
+    "./submission-plans": "./src/submission-plans.ts",
+    "./test-support": "./src/test-support.ts"
   },
   "scripts": {
     "benchmark": "vitest run src/benchmark.test.ts",
-    "test": "vitest run src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/benchmark.test.ts",
+    "test": "vitest run src/auth.test.ts src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/benchmark.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
     "@serpdirectory/utils": "workspace:*",
+    "better-auth": "1.7.7",
     "drizzle-orm": "0.45.3",
     "server-only": "catalog:"
   },

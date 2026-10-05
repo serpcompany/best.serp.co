@@ -11,6 +11,7 @@ import { WebsiteResourcesSectionRoute as WebsiteResourcesSection } from '@serpdi
 import { WebsiteDetailRoutePage } from '@serpdirectory/web-core/website-routes/detail-page'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { requireAdmin } from '@/lib/auth/server'
 import { reviewPreviewAccessSchema } from '@/lib/submissions/review-preview'
 import { getSubmissionReviewPreview } from '@/lib/submissions/review-preview-repository'
 
@@ -42,6 +43,9 @@ function PrivatePreviewWebsiteHero(props: WebsiteHeroRouteProps) {
 }
 
 export default async function ReviewPreviewPage({ params }: ReviewPreviewPageProps) {
+  // Every /admin page needs an admin session (and Cloudflare Access in production, checked
+  // by the Worker entry); the capability token alone no longer opens the preview (#60).
+  await requireAdmin()
   const access = reviewPreviewAccessSchema.safeParse(await params)
   if (!access.success) notFound()
 

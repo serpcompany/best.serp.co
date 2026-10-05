@@ -5,10 +5,7 @@
   "exports": {
     "./asset-reference": "./src/asset-reference.ts",
     "./canonical-url": "./src/canonical-url.ts",
-    "./account-page": "./src/account-page.tsx",
     "./analytics": "./src/analytics.ts",
-    "./auth/github-sign-in-button": "./src/auth/github-sign-in-button.tsx",
-    "./auth/sign-out-button": "./src/auth/sign-out-button.tsx",
     "./categories": "./src/categories.ts",
     "./category-websites-list-route": "./src/category-websites-list-route.tsx",
     "./category-websites-list": "./src/category-websites-list.tsx",

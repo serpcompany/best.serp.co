@@ -9,7 +9,6 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "AUTH_TRUST_HOST": "true",
     "D1_RUNTIME_ENV": "local",
     "SITE_ENVIRONMENT": "local"
   },
@@ -34,7 +33,11 @@
         "enabled": true
       },
       "vars": {
-        "AUTH_TRUST_HOST": "true",
+        "BETTER_AUTH_TRUSTED_ORIGINS": "https://best-serp-co-staging.serpcompany.workers.dev",
+        "BETTER_AUTH_URL": "https://best-serp-co-staging.serpcompany.workers.dev",
+        "CF_ACCESS_AUD": "",
+        "CF_ACCESS_REQUIRED": "off",
+        "CF_ACCESS_TEAM_DOMAIN": "",
         "D1_RUNTIME_ENV": "staging",
         "EMAIL_STAGING_ALLOWLIST": "devin@serp.co",
         "SITE_ENVIRONMENT": "staging",
@@ -61,8 +64,11 @@
         "enabled": true
       },
       "vars": {
-        "AUTH_TRUST_HOST": "true",
+        "BETTER_AUTH_TRUSTED_ORIGINS": "https://best.serp.co",
+        "BETTER_AUTH_URL": "https://best.serp.co",
         "CANONICAL_HOST_REDIRECT": "on",
+        "CF_ACCESS_AUD": "a30cbc5f875dd674644be917d50cce67c69747eccc127b8bb1a02d226c8b2491",
+        "CF_ACCESS_TEAM_DOMAIN": "serpcompany.cloudflareaccess.com",
         "D1_RUNTIME_ENV": "production",
         "SITE_ENVIRONMENT": "production",
         "USESEND_BASE_URL": "https://app.usesend.com"

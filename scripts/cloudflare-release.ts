@@ -10,7 +10,7 @@
  *   plan-release    read-only: `database-and-worker` when migrations are pending, otherwise
  *                   `worker-only`; refuses a database with migrations this commit lacks
  *   check-database  read-only: every d1/drizzle migration is applied and a publication exists
- *   verify-import   read-only: exact 16-table parity with the reviewed import and parity report
+ *   verify-import   read-only: exact catalog-table parity with the reviewed import and parity report
  *   backup          `wrangler d1 export` to --output <file>
  *   migrate         `wrangler d1 migrations apply` (`pnpm db:migrate:<env>`)
  *   import          one-time bootstrap of an empty D1: refuse existing data, migrate, then
@@ -51,7 +51,7 @@ import {
   reviewedArtifactPaths,
   sha256
 } from './d1-import-artifact'
-import { applicationTableNames } from './d1-table-inventory'
+import { parityTableNames, runtimeTableNames } from './d1-table-inventory'
 import { project, type RemoteEnvironment } from './project'
 import {
   assertCurrentRelease,
@@ -706,6 +706,11 @@ export function parityCountMismatches(row: D1Row | undefined, report: ParityRepo
     .map(([key, expected]) => `${key} is ${String(row?.[key])}, expected ${String(expected)}`)
 }
 
+/** One row with the row count of every runtime table (identifiers are constants). */
+const runtimeRowsQuery = `SELECT ${runtimeTableNames
+  .map(table => `(SELECT count(*) FROM "${table}") AS "${table}"`)
+  .join(', ')}`
+
 /**
  * Proves the database holds exactly the reviewed initial catalog: every application table
  * matches the in-memory bootstrap of the checksum-verified SQL, and the publication checksum
@@ -723,11 +728,17 @@ export async function verifyImportedCatalog(
   }
   const [counts] = await d1.query(parityCountsQuery)
   const countMismatches = parityCountMismatches(counts, report)
+  // Bootstrap parity skips the rows of the runtime tables, but at bootstrap they must hold
+  // none: an import that planted a user, session, code, or delivery would otherwise go unnoticed.
+  const [runtimeRows] = await d1.query(runtimeRowsQuery)
+  const nonEmptyRuntimeTables = runtimeTableNames.filter(
+    table => Number(runtimeRows?.[table]) !== 0
+  )
   const expected = await expectedBootstrapSnapshot(sql)
   const actual = await captureApplicationSnapshot(snapshotTransport(d1), {
     pageSize: options.pageSize ?? 250
   })
-  const tableMismatches = applicationTableNames.filter(
+  const tableMismatches = parityTableNames.filter(
     table =>
       actual.tables[table].count !== expected.tables[table].count ||
       actual.tables[table].checksum !== expected.tables[table].checksum
@@ -735,12 +746,17 @@ export async function verifyImportedCatalog(
   if (
     countMismatches.length > 0 ||
     tableMismatches.length > 0 ||
+    nonEmptyRuntimeTables.length > 0 ||
     actual.checksum !== expected.checksum
   ) {
     throw new Error(
       `${environment} D1 does not match the reviewed ${project.artifact.name} import.${
         countMismatches.length > 0 ? ` Parity report: ${countMismatches.join('; ')}.` : ''
-      }${tableMismatches.length > 0 ? ` Tables: ${tableMismatches.join(', ')}.` : ''}`
+      }${tableMismatches.length > 0 ? ` Tables: ${tableMismatches.join(', ')}.` : ''}${
+        nonEmptyRuntimeTables.length > 0
+          ? ` Runtime tables must be empty at bootstrap: ${nonEmptyRuntimeTables.join(', ')}.`
+          : ''
+      }`
     )
   }
   return {
@@ -749,7 +765,7 @@ export async function verifyImportedCatalog(
     listings: counts?.listing_count,
     categories: counts?.category_count,
     snapshot: actual.checksum,
-    tables: applicationTableNames.length,
+    tables: parityTableNames.length,
     totalRows: actual.totalRows,
     version: counts?.version
   }

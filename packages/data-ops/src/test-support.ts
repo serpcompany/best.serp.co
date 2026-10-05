@@ -20,16 +20,16 @@ export class MemoryCatalogCache implements CatalogDataCache {
 }
 
 /**
- * Apply every checked-in D1 migration in order, statement by statement, exactly as
- * Drizzle/Wrangler do, so tests exercise the real STRICT tables, indexes, and
+ * Apply the checked-in D1 migrations in order, statement by statement, exactly as
+ * Drizzle/Wrangler do, so tests exercise the real STRICT tables, indexes, seeds, and
  * primary-category triggers instead of a hand-maintained copy.
  */
 export function applyMigrations(database: DatabaseSync): void {
-  const migrations = readdirSync(MIGRATIONS_DIRECTORY)
+  const names = readdirSync(MIGRATIONS_DIRECTORY)
     .filter(name => name.endsWith('.sql'))
     .sort()
-  for (const migration of migrations) {
-    const statements = readFileSync(resolve(MIGRATIONS_DIRECTORY, migration), 'utf8')
+  for (const name of names) {
+    const statements = readFileSync(resolve(MIGRATIONS_DIRECTORY, name), 'utf8')
       .split('--> statement-breakpoint')
       .map(statement => statement.trim())
       .filter(Boolean)
@@ -61,12 +61,18 @@ export class SqliteD1 {
           const statement = owner.database.prepare(sql)
           const values = bindings as SQLInputValue[]
           let results: T[] = []
-          if (statement.columns().length > 0) results = statement.all(...values) as T[]
-          else statement.run(...values)
+          let changes = 0
+          if (statement.columns().length > 0) {
+            results = statement.all(...values) as T[]
+            changes = Number(owner.database.prepare('SELECT changes() AS changes').get()?.changes)
+          } else {
+            changes = Number(statement.run(...values).changes)
+          }
           return {
             results,
             success: true as const,
             meta: {
+              changes,
               duration: 0,
               rows_read: results.length,
               rows_written: 0
@@ -83,6 +89,13 @@ export class SqliteD1 {
           },
           async first<T>() {
             return execute<T>().results[0] ?? null
+          },
+          /** Rows as value arrays in column order, as D1's `raw()` returns them to Drizzle. */
+          async raw<T>() {
+            owner.statements.push({ bindings, sql })
+            const statement = owner.database.prepare(sql)
+            statement.setReturnArrays(true)
+            return statement.all(...(bindings as SQLInputValue[])) as T[]
           },
           async run<T>() {
             return execute<T>()

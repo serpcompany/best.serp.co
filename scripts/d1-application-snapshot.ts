@@ -6,7 +6,9 @@ import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-loca
 import {
   type ApplicationTableName,
   applicationColumnInventory,
-  applicationTableNames
+  applicationTableNames,
+  type ParityTableName,
+  parityTableNames
 } from './d1-table-inventory'
 
 export interface SqlStatement {
@@ -32,9 +34,10 @@ export interface CanonicalTableSnapshot {
   rows: CanonicalValue[][]
 }
 
+/** Rows of every parity table (`parityTableNames`); runtime tables are left out. */
 export interface CanonicalApplicationSnapshot {
   checksum: string
-  tables: Record<ApplicationTableName, CanonicalTableSnapshot>
+  tables: Record<ParityTableName, CanonicalTableSnapshot>
   totalRows: number
   version: 1
 }
@@ -167,8 +170,8 @@ export async function captureApplicationSnapshot(
   transport: SnapshotTransport,
   options: SnapshotOptions = {}
 ): Promise<CanonicalApplicationSnapshot> {
-  const entries = [] as Array<[ApplicationTableName, CanonicalTableSnapshot]>
-  for (const table of applicationTableNames) {
+  const entries = [] as Array<[ParityTableName, CanonicalTableSnapshot]>
+  for (const table of parityTableNames) {
     entries.push([table, await captureCanonicalTable(transport, table, options)])
   }
   return applicationSnapshotFromTables(
@@ -177,9 +180,9 @@ export async function captureApplicationSnapshot(
 }
 
 export function applicationSnapshotFromTables(
-  tables: Record<ApplicationTableName, CanonicalTableSnapshot>
+  tables: Record<ParityTableName, CanonicalTableSnapshot>
 ): CanonicalApplicationSnapshot {
-  const entries = applicationTableNames.map(table => [table, tables[table]] as const)
+  const entries = parityTableNames.map(table => [table, tables[table]] as const)
   return {
     checksum: applicationChecksumFromTableSummaries(tables),
     tables,
@@ -203,7 +206,7 @@ export function applicationChecksumFromTableSummaries(
 export function assertCanonicalSnapshotIntegrity(snapshot: CanonicalApplicationSnapshot): void {
   if (snapshot.version !== 1) throw new Error('Unsupported canonical snapshot version.')
   let totalRows = 0
-  for (const table of applicationTableNames) {
+  for (const table of parityTableNames) {
     const tableSnapshot = snapshot.tables[table]
     if (!tableSnapshot) throw new Error(`Canonical snapshot is missing ${table}.`)
     if (tableSnapshot.columns.join('\0') !== applicationColumnInventory[table].join('\0')) {
@@ -348,7 +351,7 @@ export function emptyTableSnapshot(table: ApplicationTableName): CanonicalTableS
 }
 
 export function emptyApplicationSnapshot(): CanonicalApplicationSnapshot {
-  const entries = applicationTableNames.map(table => [table, emptyTableSnapshot(table)] as const)
+  const entries = parityTableNames.map(table => [table, emptyTableSnapshot(table)] as const)
   return {
     checksum: sha256(
       JSON.stringify(
@@ -365,11 +368,11 @@ export function emptyApplicationSnapshot(): CanonicalApplicationSnapshot {
 
 export function snapshotSummary(
   snapshot: CanonicalApplicationSnapshot
-): Record<ApplicationTableName, { checksum: string; count: number }> {
+): Record<ParityTableName, { checksum: string; count: number }> {
   return Object.fromEntries(
-    applicationTableNames.map(table => [
+    parityTableNames.map(table => [
       table,
       { checksum: snapshot.tables[table].checksum, count: snapshot.tables[table].count }
     ])
-  ) as Record<ApplicationTableName, { checksum: string; count: number }>
+  ) as Record<ParityTableName, { checksum: string; count: number }>
 }

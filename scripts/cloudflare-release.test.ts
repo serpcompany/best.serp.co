@@ -1242,6 +1242,26 @@ describe('one-time catalog bootstrap', () => {
     ).rejects.toThrow('Tables: listings.')
   })
 
+  it('requires the runtime tables to be empty at bootstrap', async () => {
+    const { database, target } = sqliteD1()
+    target.applyMigrations()
+    await importReviewedCatalog(target, 'production', { paths, report: fixtureReport() })
+    database.exec(
+      "INSERT INTO users (id, name, email, email_verified) VALUES ('planted', '', 'x@example.com', 1)"
+    )
+    database.exec(
+      "INSERT INTO sessions (id, expires_at, token, user_id) VALUES ('s', 1, 't', 'planted')"
+    )
+    database.exec(
+      "INSERT INTO email_deliveries (template_id, event_key, provider, status) VALUES ('t', 'evt', 'p', 'sent')"
+    )
+    await expect(
+      verifyImportedCatalog(target, 'production', { paths, report: fixtureReport() })
+    ).rejects.toThrow(
+      'Runtime tables must be empty at bootstrap: users, sessions, email_deliveries.'
+    )
+  })
+
   it('lists applied, pending, and unknown migrations with SELECTs only', async () => {
     const { database, target } = sqliteD1()
     const statements: string[] = []

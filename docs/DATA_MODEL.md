@@ -23,7 +23,8 @@ future user data are seeded from fixtures only, never copied from staging or pro
 `STRICT`, `PRAGMA foreign_keys = ON` leads the file, and four triggers enforce that a
 published listing always has exactly one primary category. Keep those properties when
 adding migrations (later migrations end each `CREATE TABLE` with `STRICT` by hand too);
-Drizzle cannot express them.
+Drizzle cannot express them. `0002_better_auth.sql` also seeds the admin allowlist with a
+fixed `created_at`, so bootstrap parity stays exact.
 
 - `categories` stores taxonomy rows and display order (unique `slug`).
 - `listings` stores public product fields, status, publication time, and stable IDs
@@ -38,6 +39,16 @@ Drizzle cannot express them.
 - `email_deliveries` is the transactional email ledger: one row per template and event key
   (status, attempts, provider message id, error code), never a recipient or content
   (see [Email](./EMAIL.md)).
+- `users`, `sessions`, `accounts`, and `verification` are Better Auth's tables (epoch
+  millisecond timestamps; sign-in codes stored hashed). `users.role` is `user` or `admin`.
+  These, `auth_rate_limit_hits`, and `email_deliveries` hold runtime data, so bootstrap
+  parity (`db:verify:local`, `verify-import`) skips their rows (`runtimeTableNames`), and
+  `verify-import` requires them to be empty.
+- `admin_allowlist` lists admin emails (lowercase); `auth_rate_limit_hits` is the sliding
+  window behind the sign-in code limits. Its rows are pseudonymous: HMAC-SHA256 digests under
+  a key derived from `BETTER_AUTH_SECRET`, never an email or IP address. `sessions` stores
+  the client's raw `ip_address` and `user_agent` (Better Auth's default)
+  ([Accounts](./ACCOUNTS.md)).
 
 ## Public eligibility
 

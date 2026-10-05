@@ -252,6 +252,79 @@ describe('single-site D1-only repository architecture', () => {
     expect(publicUrl).not.toMatch(/getCloudflareContext|process\.env|node:net/u)
   })
 
+  it('keeps accounts on Better Auth with their SQL in the shared data package', () => {
+    const sources = trackedFiles().filter(
+      file =>
+        file !== 'scripts/architecture-guard.test.ts' &&
+        /\.(?:jsonc?|m?[jt]sx?)$/u.test(file) &&
+        existsSync(resolve(file))
+    )
+    const retiredAuth = [
+      ['next', 'auth'].join('-'),
+      ['@auth', 'core'].join('/'),
+      'NEXTAUTH_',
+      'AUTH_TRUST_HOST',
+      ['GITHUB', 'CLIENT', 'ID'].join('_'),
+      ['GITHUB', 'CLIENT', 'SECRET'].join('_')
+    ]
+    const authJs = sources.filter(file => {
+      const source = readFileSync(resolve(file), 'utf8')
+      return retiredAuth.some(token => source.includes(token))
+    })
+    expect(authJs).toEqual([])
+
+    const authDirectory = resolve(project.appDirectory, 'lib/auth')
+    for (const file of readdirSync(authDirectory).filter(name => !name.includes('.test.'))) {
+      const source = readFileSync(resolve(authDirectory, file), 'utf8')
+      expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
+    }
+    const server = readFileSync(resolve(authDirectory, 'server.ts'), 'utf8')
+    expect(server).toContain("import 'server-only'")
+    expect(server).toContain('getCloudflareContext')
+    expect(server).toContain('createDatabase(binding)')
+    const operations = readFileSync(resolve('packages/data-ops/src/auth.ts'), 'utf8')
+    expect(operations).not.toMatch(/getCloudflareContext|process\.env/u)
+  })
+
+  it('makes every admin page and admin API route require an admin', () => {
+    const adminRoutes = trackedFiles().filter(
+      file =>
+        (file.startsWith(`${project.appDirectory}/app/admin/`) ||
+          file.startsWith(`${project.appDirectory}/app/api/admin/`)) &&
+        /(?:^|\/)(?:page|route|layout)\.tsx?$/u.test(file) &&
+        existsSync(resolve(file))
+    )
+    expect(adminRoutes).toEqual(
+      expect.arrayContaining([
+        `${project.appDirectory}/app/admin/route.ts`,
+        `${project.appDirectory}/app/admin/[...path]/page.tsx`,
+        `${project.appDirectory}/app/api/admin/[[...path]]/route.ts`
+      ])
+    )
+    for (const file of adminRoutes) {
+      const source = readFileSync(resolve(file), 'utf8')
+      expect(source, `${file} must call requireAdmin() or authorizeAdminRequest()`).toMatch(
+        /await (?:requireAdmin|authorizeAdminRequest)\(/u
+      )
+    }
+  })
+
+  // A Server Action is reachable by its action id from any page path, so no path-based gate
+  // (the Worker's /admin lock included) ever sees it, and each action must authorize itself.
+  // Until the admin panel (#64) settles how, no module the app bundles may declare one.
+  it('keeps Server Actions out of the app until #64 decides how they authorize', () => {
+    const violations = trackedFiles().filter(file => {
+      if (
+        !(file.startsWith(`${project.appDirectory}/`) || file.startsWith('packages/')) ||
+        !/\.(?:m?[jt]sx?)$/u.test(file) ||
+        !existsSync(resolve(file))
+      )
+        return false
+      return /^\s*['"]use server['"]/mu.test(readFileSync(resolve(file), 'utf8'))
+    })
+    expect(violations).toEqual([])
+  })
+
   it('keeps one fresh Drizzle migration history and forbids push-based schema mutation', () => {
     const config = readFileSync(resolve('drizzle.config.ts'), 'utf8')
     expect(config).toContain("out: './d1/drizzle'")

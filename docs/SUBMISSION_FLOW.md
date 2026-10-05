@@ -22,8 +22,9 @@ A notifier (`scripts/d1-submission-notifier.ts`) reads verified rows with no
 notification entry, opens an assigned issue in this private repository, and stores its
 number, URL, and a digest of a one-time draft-preview capability. The reviewer opens
 the private preview link (`/admin/submissions/<id>/preview/<token>/`, uncached and
-noindex) and then approves or rejects with `scripts/d1-submission-approver.ts` from a
-protected workflow. Approval atomically promotes the staged data into the catalog and
+noindex; like every `/admin` page it also needs an admin session and, in production,
+Cloudflare Access: [Accounts](./ACCOUNTS.md)) and then approves or rejects with
+`scripts/d1-submission-approver.ts` from a protected workflow. Approval atomically promotes the staged data into the catalog and
 advances the publication version; either decision revokes the preview link.
 
 Both steps run against production D1 only:

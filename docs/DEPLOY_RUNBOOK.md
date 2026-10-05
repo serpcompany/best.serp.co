@@ -74,8 +74,8 @@ Each holds two environment secrets:
 
 - `CLOUDFLARE_ACCOUNT_ID`: `cec5f04e1d18bcc65f2be0aefb04f059`
 - `CLOUDFLARE_API_TOKEN`: today, **both environments hold the account-wide token**
-  described above (#34), with Edit on every Worker and D1 database in the SERP account. A leak from
-  either environment therefore reaches staging and production alike.
+  described above (#34), with Edit on every Worker and D1 database in the SERP account.
+  A leak from either environment therefore reaches staging and production alike.
 
 The planned fix is #42 decision b, scheduled right after cutover. It gives each environment
 its own token, scoped to that environment's Worker and D1 database, plus a D1-only token for
@@ -83,7 +83,8 @@ its own token, scoped to that environment's Worker and D1 database, plus a D1-on
 token is revoked. Until then, separate secrets do not limit the blast radius.
 
 Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "Staging deploy
-skipped" notice. After they exist, the next push to `staging` deploys staging.
+skipped" notice. After they exist, the next push to `staging` deploys staging. The
+`BETTER_AUTH_SECRET` secret and the `/admin` Access app: [Accounts](./ACCOUNTS.md).
 
 ### Submission notifier (after the production bootstrap)
 
@@ -152,9 +153,9 @@ PR Review already gates every merge, and Main Validation re-runs the full loop o
    `d1/artifacts/best-serp-co-v1.sql.br`, refuses it unless its sha256 equals the parity
    report's `artifact.sqlChecksum`, and imports it in one D1 execution. If the execution
    fails, D1 rolls it back and the run can be repeated. A repeat after success is a no-op.
-   `verify-import` then compares all 16 application tables with an in-memory bootstrap of the
-   same SQL and checks the publication checksum (`669f264f…0af5a`), version, and every count
-   in the report.
+   `verify-import` then requires the six runtime tables (accounts, limits, email ledger) to be
+   empty, compares the 17 others with an in-memory bootstrap of the same SQL, and checks the
+   publication checksum (`669f264f…0af5a`), version, and every count in the report.
 2. Run **Deploy Production** (the bootstrap already applied the migrations, so it plans
    `worker-only`). While GitHub Pages still serves best.serp.co, the HTTP gates run against
    the noindex review origin instead.
@@ -201,9 +202,9 @@ pnpm tsx scripts/cloudflare-release.ts check-database production --rehearse "$di
 ```
 
 `list-migrations <env>`, `check-database <env>`, and `verify-import <env>` are read-only and
-may run against a remote database from a maintainer machine after `wrangler login`. `verify-import` issues about 90
-paged reads and takes about a minute and a half. Every other command refuses to run outside
-its protected workflow.
+may run against a remote database from a maintainer machine after `wrangler login`.
+`verify-import` issues about 90 paged reads and takes about a minute and a half. Every other
+command refuses to run outside its protected workflow.
 
 Evidence from 2026-09-30: the local production rehearsal and a read-only `verify-import`
 against staging both produced the exact 16-table snapshot `69a7bae9…e477` (3,422 listings,

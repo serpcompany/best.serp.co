@@ -452,6 +452,162 @@ export const emailDeliveries = sqliteTable(
   ]
 )
 
+/**
+ * Better Auth tables (serpcompany/best.serp.co#60). Property names are Better Auth's field
+ * names, which its Drizzle adapter reads; columns are snake_case like the rest of the schema.
+ * Timestamps are epoch milliseconds (`timestamp_ms`), as Better Auth's own SQLite schema
+ * generator writes them. `packages/data-ops/src/auth.ts` passes exactly these tables to the
+ * adapter and `auth.test.ts` checks them against Better Auth's expected schema.
+ */
+const epochMillisecondsNow = sql`(cast(unixepoch('subsecond') * 1000 as integer))`
+
+export const userRoles = ['user', 'admin'] as const
+
+export const users = sqliteTable(
+  'users',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    email: text('email').notNull(),
+    emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
+    image: text('image'),
+    role: text('role', { enum: userRoles }).notNull().default('user'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(epochMillisecondsNow),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(epochMillisecondsNow)
+      .$onUpdate(() => new Date())
+  },
+  table => [
+    unique('users_email_unique').on(table.email),
+    check('users_email_verified_boolean', booleanCheck(table.emailVerified)),
+    check('users_role_valid', sql`${table.role} IN ('user', 'admin')`)
+  ]
+)
+
+export const sessions = sqliteTable(
+  'sessions',
+  {
+    id: text('id').primaryKey(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    token: text('token').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(epochMillisecondsNow),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(epochMillisecondsNow)
+      .$onUpdate(() => new Date()),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' })
+  },
+  table => [
+    unique('sessions_token_unique').on(table.token),
+    index('sessions_user_idx').on(table.userId)
+  ]
+)
+
+export const accounts = sqliteTable(
+  'accounts',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('account_id').notNull(),
+    providerId: text('provider_id').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    accessToken: text('access_token'),
+    refreshToken: text('refresh_token'),
+    idToken: text('id_token'),
+    accessTokenExpiresAt: integer('access_token_expires_at', { mode: 'timestamp_ms' }),
+    refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp_ms' }),
+    scope: text('scope'),
+    password: text('password'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(epochMillisecondsNow),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(epochMillisecondsNow)
+      .$onUpdate(() => new Date())
+  },
+  table => [index('accounts_user_idx').on(table.userId)]
+)
+
+export const verification = sqliteTable(
+  'verification',
+  {
+    id: text('id').primaryKey(),
+    identifier: text('identifier').notNull(),
+    value: text('value').notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(epochMillisecondsNow),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .default(epochMillisecondsNow)
+      .$onUpdate(() => new Date())
+  },
+  table => [index('verification_identifier_idx').on(table.identifier)]
+)
+
+/**
+ * Admins are signed-in users whose verified email is listed here (#59). The first row,
+ * devin@serp.co, is seeded by the migration that creates the table. Emails are stored
+ * lowercase, the form Better Auth stores user emails in.
+ */
+export const adminAllowlist = sqliteTable(
+  'admin_allowlist',
+  {
+    email: text('email').primaryKey(),
+    note: text('note').notNull().default(''),
+    addedBy: text('added_by').notNull(),
+    createdAt: text('created_at').notNull().default(currentTimestamp)
+  },
+  table => [
+    check('admin_allowlist_email_normalized', sql`${table.email} = lower(trim(${table.email}))`)
+  ]
+)
+
+/**
+ * Sliding-window log behind the sign-in code limits (`packages/data-ops/src/auth.ts`). A row
+ * records one allowed request for a bucket: an HMAC-SHA256 digest, under a key the app derives
+ * from `BETTER_AUTH_SECRET`, of a scope and a normalized key (an email, an IP address or IPv6 /64,
+ * or both), never the key itself. Rows are pseudonymous: without the secret they cannot be
+ * reversed by enumerating addresses. Rows older than 24 hours are pruned as requests arrive.
+ */
+export const authRateLimitHits = sqliteTable(
+  'auth_rate_limit_hits',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    bucket: text('bucket').notNull(),
+    hitAt: integer('hit_at').notNull()
+  },
+  table => [
+    index('auth_rate_limit_hits_bucket_idx').on(table.bucket, table.hitAt),
+    index('auth_rate_limit_hits_time_idx').on(table.hitAt)
+  ]
+)
+
+export const usersRelations = relations(users, ({ many }) => ({
+  accounts: many(accounts),
+  sessions: many(sessions)
+}))
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] })
+}))
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  user: one(users, { fields: [accounts.userId], references: [users.id] })
+}))
+
 export const categoriesRelations = relations(categories, ({ many }) => ({
   listings: many(listingCategories)
 }))
