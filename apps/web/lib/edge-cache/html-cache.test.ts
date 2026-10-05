@@ -197,7 +197,9 @@ describe('edge HTML cache', () => {
       page('/products/?page=2', {
         headers: {
           accept: 'text/html',
+          'content-security-policy': "script-src 'nonce-attacker'",
           cookie: 'theme=dark',
+          host: 'best.serp.co',
           'next-router-state-tree': '%5B%22%22%5D',
           rsc: '1',
           'user-agent': 'Googlebot/2.1',
@@ -213,10 +215,25 @@ describe('edge HTML cache', () => {
     expect(forwarded.method).toBe('HEAD')
     expect(Object.fromEntries(forwarded.headers)).toEqual({
       accept: 'text/html',
+      host: 'best.serp.co',
       'next-router-state-tree': '%5B%22%22%5D',
       rsc: '1',
       'user-agent': 'Googlebot/2.1'
     })
+  })
+
+  // PR #47 review: the root layout loads analytics only for the `best.serp.co` Host, so a
+  // render that saw another spelling of the keyed host would store an analytics-free page.
+  it('renders with the host the cache key uses, whatever Host the client sent', async () => {
+    for (const host of ['best.serp.co:443', 'BEST.SERP.CO', 'attacker.example', undefined]) {
+      const request = page('/products/', host ? { headers: { host } } : undefined)
+      const forwarded = renderRequestFor(request)
+      expect(forwarded.headers.get('host'), String(host)).toBe('best.serp.co')
+      const key = new URL((await cacheKeyFor(request, 'v', 'e')).url)
+      expect(key.pathname.split('/')[4], String(host)).toBe(forwarded.headers.get('host'))
+    }
+    const port = renderRequestFor(new Request('http://127.0.0.1:8787/about/'))
+    expect(port.headers.get('host')).toBe('127.0.0.1:8787')
   })
 
   // serpcompany/best.serp.co#41 review: a client-sent `x-nonce` was rendered into a page that

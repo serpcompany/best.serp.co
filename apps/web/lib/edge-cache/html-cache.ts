@@ -48,14 +48,15 @@ const RSC_VARIANT_HEADERS = [
 ] as const
 
 /**
- * The only request headers a cacheable request is rendered with. Every other header a client
- * sends is dropped before OpenNext sees it, so no request-controlled value (an `x-nonce`, a
- * forwarded host, a framework-internal `x-middleware-*` or `x-opennext-*` header, a cookie)
- * can reach a response that the cache then serves to everyone. `host` and the RSC router
- * headers are part of the cache key; `accept` and `user-agent` only choose between framework
- * behaviors (for example, blocking metadata for crawlers) and are never copied into a page.
+ * The only client request headers a cacheable request is rendered with. Every other header a
+ * client sends is dropped before OpenNext sees it, so no request-controlled value (an
+ * `x-nonce`, a forwarded host, a framework-internal `x-middleware-*` or `x-opennext-*`
+ * header, a cookie) can reach a response that the cache then serves to everyone. The RSC
+ * router headers are part of the cache key; `accept` and `user-agent` only choose between
+ * framework behaviors (for example, blocking metadata for crawlers) and are never copied into
+ * a page. `host` is not copied either: `renderRequestFor` sets it from the request URL.
  */
-const RENDER_REQUEST_HEADERS = ['accept', 'host', 'user-agent', ...RSC_VARIANT_HEADERS] as const
+const RENDER_REQUEST_HEADERS = ['accept', 'user-agent', ...RSC_VARIANT_HEADERS] as const
 
 const CACHEABLE_STATUSES = new Set([200, 301, 308, 404])
 
@@ -91,8 +92,11 @@ export function isCacheableRequest(request: Request): boolean {
 }
 
 /**
- * The request a cacheable request is rendered from: same URL, method, and signal, but only the
- * allowlisted headers (`RENDER_REQUEST_HEADERS`).
+ * The request a cacheable request is rendered from: same URL, method, and signal, only the
+ * allowlisted headers (`RENDER_REQUEST_HEADERS`), and a `Host` equal to the normalized URL host
+ * the cache key uses (lowercase, no default port). The page (for example, whether the root
+ * layout loads analytics on best.serp.co) then always matches the key it is stored under, even
+ * if the client spelled the host differently (`BEST.SERP.CO:443`).
  */
 export function renderRequestFor(request: Request): Request {
   const headers = new Headers()
@@ -100,6 +104,7 @@ export function renderRequestFor(request: Request): Request {
     const value = request.headers.get(name)
     if (value !== null) headers.set(name, value)
   }
+  headers.set('host', new URL(request.url).host)
   return new Request(request, { headers })
 }
 
