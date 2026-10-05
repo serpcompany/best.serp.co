@@ -1,7 +1,14 @@
+'use client'
+
 import { FaviconWithFallback } from '@serpdirectory/web-core/ui/favicon-with-fallback'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 
-/** A product's logo, with the site's checked-in fallback for a missing or broken image. */
+/**
+ * A product's logo, with the site's checked-in fallback for a missing or broken image. The
+ * image renders after hydration: an `<img>` that fails before React attaches its error handler
+ * would otherwise stay a broken image instead of falling back.
+ */
 export function ProductLogo({
   className = 'rounded-sm',
   logoUrl,
@@ -15,6 +22,19 @@ export function ProductLogo({
   size?: number
   website: string
 }) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  if (!mounted) {
+    return (
+      <span
+        aria-hidden="true"
+        className={`${className} inline-block shrink-0 bg-muted`}
+        style={{ height: size, width: size }}
+      />
+    )
+  }
   return (
     <FaviconWithFallback
       className={className}
