@@ -155,7 +155,9 @@ the request carries a session cookie, so anonymous pages never load Better Auth 
   "Soon" badge and do not link. The shell is composed from the shared dashboard pieces in
   `packages/web-core/src/dashboard/` (`AppShell`, `SidebarBrand`, `NavMain`, `NavSecondary`,
   `NavUser`, `SiteHeader`, `DashboardPageHeader`), which the admin panel (#64, shadcn
-  sidebar-07) reuses with `collapsible="icon"` and `rail`.
+  sidebar-07) reuses with `collapsible="icon"` and `rail`. `NavMain` marks the current page
+  from the path; the collapsed off-canvas sidebar is `inert`; and the mobile Sheet returns
+  focus to the sidebar trigger when it closes (a local addition to the design-system Sidebar).
 
 Both pages are noindex and bypass the edge cache. `apps/e2e/tests/login.spec.ts` covers them
 in a browser.

@@ -9,7 +9,7 @@ import {
 } from '@serpdirectory/design-system/sidebar'
 import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
-import type { ComponentProps } from 'react'
+import React, { type ComponentProps } from 'react'
 import { useCloseMobileSidebar } from './nav-main'
 
 export interface DashboardLink {

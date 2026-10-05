@@ -32,7 +32,7 @@ import { signOut } from '@/components/auth/sign-in-api'
 export type AccountUser = DashboardUser
 
 const NAV: readonly DashboardNavItem[] = [
-  { href: getRoute('account'), icon: LayoutDashboard, isActive: true, title: 'Overview' },
+  { exact: true, href: getRoute('account'), icon: LayoutDashboard, title: 'Overview' },
   { icon: FileText, title: 'Submissions' },
   { icon: Box, title: 'Listings' },
   { icon: MessageSquare, title: 'Messages' },

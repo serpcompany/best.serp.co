@@ -6,7 +6,8 @@ import {
   SidebarMenuItem
 } from '@serpdirectory/design-system/sidebar'
 import Link from 'next/link'
-import type { ReactNode } from 'react'
+import React, { type ReactNode } from 'react'
+import { useCloseMobileSidebar } from './nav-main'
 
 const SERP_MARK =
   'M 127.62 540.68 C 255.64 429.97 383.70 319.31 511.76 208.65 C 639.74 319.23 767.70 429.86 895.69 540.45 C 895.70 631.71 895.73 722.97 895.64 814.23 C 719.72 662.17 543.76 510.14 367.81 358.10 C 398.86 414.80 429.83 471.54 460.92 528.22 C 349.85 623.79 238.69 719.27 127.67 814.91 C 127.66 723.50 127.67 632.09 127.62 540.68 Z'
@@ -35,12 +36,13 @@ export function SidebarBrand({
   subtitle?: string
   logo?: ReactNode
 }) {
+  const close = useCloseMobileSidebar()
   return (
     <SidebarMenu>
       <SidebarMenuItem>
         {subtitle ? (
           <SidebarMenuButton size="lg" asChild>
-            <Link href={href}>
+            <Link href={href} onClick={close}>
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 {logo ?? <SerpMark className="size-4" />}
               </div>
@@ -52,7 +54,7 @@ export function SidebarBrand({
           </SidebarMenuButton>
         ) : (
           <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
-            <Link href={href}>
+            <Link href={href} onClick={close}>
               {logo ?? <SerpMark className="!size-5" />}
               <span className="text-base font-semibold">{title}</span>
             </Link>

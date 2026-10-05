@@ -18,6 +18,7 @@ import {
 } from '@serpdirectory/design-system/sidebar'
 import { EllipsisVertical, LogOut, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
+import React from 'react'
 
 export interface DashboardUser {
   email: string

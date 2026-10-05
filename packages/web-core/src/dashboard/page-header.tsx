@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import React, { type ReactNode } from 'react'
 
 /** A dashboard page's heading row: the page `<h1>`, a one-line description, and actions. */
 export function DashboardPageHeader({
