@@ -216,7 +216,7 @@ describe('fresh Drizzle D1 history', () => {
     expect(history).not.toMatch(/PRAGMA foreign_keys\s*=\s*OFF/iu)
     for (const index of requiredIndexNames) expect(history).toContain(`\`${index}\``)
     for (const trigger of d1TriggerNames) expect(history).toContain(`CREATE TRIGGER ${trigger}`)
-    expect(history).not.toMatch(/site_id|`sites`/u)
+    expect(history).not.toMatch(/\bsite_id\b|`sites`/u)
   })
 
   it('seeds the admin allowlist with the owner only, deterministically', () => {

@@ -224,10 +224,6 @@ export function revisionContentSource(id: string): StagedContentSource {
 }
 
 /**
- * Replaces the resource links and FAQs of a staged submission or revision. The caller's
- * preceding compare-and-swap decides whether the row may be edited.
- */
-/**
  * Resource links and FAQs per submission or revision: the submission form's caps
  * (`packages/web-core/src/forms/submission-contract.ts`), enforced here as well so a batch's
  * statement count stays bounded whatever the caller (#77).
@@ -247,6 +243,10 @@ export function assertStagedChildLimits(
   }
 }
 
+/**
+ * Replaces the resource links and FAQs of a staged submission or revision. The caller's
+ * preceding compare-and-swap decides whether the row may be edited.
+ */
 export function replaceStagedChildrenPlans(
   source: StagedContentSource,
   content: Pick<StagedListingContent, 'faqs' | 'resourceLinks'>

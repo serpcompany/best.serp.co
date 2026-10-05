@@ -68,7 +68,7 @@ export const requiredIndexNames = [
   'listings_publication_idx',
   'listings_related_name_idx',
   'listings_slug_unique',
-  'listings_website_lookup_idx',
+  'listings_website_idx',
   'migration_runs_manifest_unique',
   'migration_runs_time_idx',
   'publication_runs_manifest_unique',

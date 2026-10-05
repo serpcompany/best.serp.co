@@ -206,7 +206,7 @@ export const listings = sqliteTable(
     // #77: `MAX(display_order)` for a new listing (approval, payment, publisher) and the
     // submission duplicate check on `website` were full scans of `listings`.
     index('listings_display_order_idx').on(table.displayOrder),
-    index('listings_website_lookup_idx').on(table.website),
+    index('listings_website_idx').on(table.website),
     index('listings_related_name_idx')
       .on(table.name, table.slug)
       .where(

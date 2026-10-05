@@ -71,6 +71,20 @@ describe('the shared SQLite test binding', () => {
     }
   })
 
+  // #81 review notes: these were false positives or a false negative.
+  it('ignores CTE column lists, parameters in literals, and quoted identifiers', () => {
+    const columns = Array.from({ length: 40 }, (_, index) => `c${index}`).join(', ')
+    expect(d1StatementLimitViolations(`WITH x(${columns}) AS (SELECT 1) SELECT * FROM x`)).toEqual(
+      []
+    )
+    expect(d1StatementLimitViolations("SELECT '?101' AS note, ?", [1])).toEqual([])
+    const quoted = Array.from({ length: 6 }, (_, index) => `"union${index}"`).join(', ')
+    expect(d1StatementLimitViolations(`SELECT ${quoted}, "union" FROM t`)).toEqual([])
+    expect(d1StatementLimitViolations(`SELECT like('${'%'.repeat(60)}', name) FROM t`)).toEqual([
+      'LIKE/GLOB pattern of 60 bytes'
+    ])
+  })
+
   it('reports every D1 statement limit a statement would exceed', () => {
     expect(d1StatementLimitViolations('SELECT ?', Array(100).fill(1))).toEqual([])
     expect(d1StatementLimitViolations('SELECT ?', Array(101).fill(1))).toEqual([

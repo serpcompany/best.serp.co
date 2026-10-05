@@ -106,7 +106,8 @@ export function maxFunctionArguments(sql: string): { count: number; name: string
     let depth = 0
     let commas = 0
     let empty = true
-    for (let index = match.index + match[0].length; index < code.length; index++) {
+    let index = match.index + match[0].length
+    for (; index < code.length; index++) {
       const character = code[index]
       if (character === '(') depth++
       else if (character === ')') {
@@ -115,6 +116,8 @@ export function maxFunctionArguments(sql: string): { count: number; name: string
       } else if (character === ',' && depth === 0) commas++
       else if (!/\s/u.test(character ?? '')) empty = false
     }
+    // `name(c0, c1, …) AS (…)` names a common table expression's columns, not a call.
+    if (/^\)\s*AS\s*(?:NOT\s+)?(?:MATERIALIZED\s*)?\(/iu.test(code.slice(index))) continue
     const count = empty && commas === 0 ? 0 : commas + 1
     if (!widest || count > widest.count) widest = { count, name }
   }
@@ -123,14 +126,22 @@ export function maxFunctionArguments(sql: string): { count: number; name: string
 
 /** Terms of the widest compound SELECT, counted conservatively over the whole statement. */
 export function compoundSelectTerms(sql: string): number {
-  const operators = stripSqlLiteralsAndComments(sql).match(/\b(?:UNION|INTERSECT|EXCEPT)\b/giu)
+  const operators = withoutQuotedIdentifiers(stripSqlLiteralsAndComments(sql)).match(
+    /\b(?:UNION|INTERSECT|EXCEPT)\b/giu
+  )
   return (operators?.length ?? 0) + 1
+}
+
+/** `code` (already stripped of literals and comments) without double-quoted identifiers. */
+function withoutQuotedIdentifiers(code: string): string {
+  return code.replace(/"(?:[^"]|"")*"/gu, '""')
 }
 
 /** Literal LIKE/GLOB patterns longer than D1's 50 bytes. */
 export function oversizedPatternLiterals(sql: string): string[] {
   const withoutComments = sql.replace(/--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/gu, ' ')
-  const patterns = withoutComments.matchAll(/\b(?:LIKE|GLOB)\s+'((?:[^']|'')*)'/giu)
+  // The operator form (`x LIKE 'p'`) and the function form (`like('p', x)`).
+  const patterns = withoutComments.matchAll(/\b(?:LIKE|GLOB)\s*\(?\s*'((?:[^']|'')*)'/giu)
   return [...patterns]
     .map(match => (match[1] ?? '').replaceAll("''", "'"))
     .filter(pattern => encoder.encode(pattern).length > D1_MAX_PATTERN_BYTES)
@@ -141,7 +152,8 @@ export function d1StatementLimitViolations(sql: string, params: readonly unknown
   const violations: string[] = []
   const bytes = encoder.encode(sql).length
   if (bytes > D1_MAX_STATEMENT_BYTES) violations.push(`statement is ${bytes} bytes`)
-  const numbered = [...sql.matchAll(/\?(\d+)/gu)].map(match => Number(match[1]))
+  const code = withoutQuotedIdentifiers(stripSqlLiteralsAndComments(sql))
+  const numbered = [...code.matchAll(/\?(\d+)/gu)].map(match => Number(match[1]))
   const parameters = Math.max(params.length, ...numbered, 0)
   if (parameters > D1_MAX_BOUND_PARAMETERS) violations.push(`${parameters} bound parameters`)
   const widest = maxFunctionArguments(sql)

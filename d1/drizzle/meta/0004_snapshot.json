@@ -2429,8 +2429,8 @@
           "columns": ["display_order"],
           "isUnique": false
         },
-        "listings_website_lookup_idx": {
-          "name": "listings_website_lookup_idx",
+        "listings_website_idx": {
+          "name": "listings_website_idx",
           "columns": ["website"],
           "isUnique": false
         },
