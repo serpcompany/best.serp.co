@@ -18,6 +18,6 @@
     "typescript": "catalog:"
   },
   "optionalDependencies": {
-    "@sentry/nextjs": "^10.38.0"
+    "@sentry/nextjs": "^10.76.0"
   }
 }
