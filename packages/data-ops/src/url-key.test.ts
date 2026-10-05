@@ -1,4 +1,4 @@
-import { isHostWithin, urlKey } from '@serpdirectory/utils/url-key'
+import { isHostBlocked, urlKey } from '@serpdirectory/utils/url-key'
 import { describe, expect, it } from 'vitest'
 
 describe('urlKey (shared website normalization, #62 review finding 4)', () => {
@@ -15,10 +15,15 @@ describe('urlKey (shared website normalization, #62 review finding 4)', () => {
       'https://ｃａｓｉｎｏ.com/',
       'http://casino.com:8080/path?query#hash'
     ]) {
-      expect(urlKey(website), website).toEqual({ blockKey: 'casino.com', hostKey: 'casino.com' })
+      expect(urlKey(website), website).toEqual({
+        blockKey: 'casino.com',
+        coversSubdomains: true,
+        hostKey: 'casino.com'
+      })
     }
     expect(urlKey('https://bücher.de/')).toEqual({
       blockKey: 'xn--bcher-kva.de',
+      coversSubdomains: true,
       hostKey: 'xn--bcher-kva.de'
     })
     expect(urlKey('https://xn--bcher-kva.de/').hostKey).toBe('xn--bcher-kva.de')
@@ -27,14 +32,17 @@ describe('urlKey (shared website normalization, #62 review finding 4)', () => {
   it('keeps subdomains as their own host but blocks them with their registrable domain', () => {
     expect(urlKey('https://go.casino.com/')).toEqual({
       blockKey: 'casino.com',
+      coversSubdomains: true,
       hostKey: 'go.casino.com'
     })
     expect(urlKey('https://www2.casino.com/')).toEqual({
       blockKey: 'casino.com',
+      coversSubdomains: true,
       hostKey: 'www2.casino.com'
     })
     expect(urlKey('https://shop.bbc.co.uk/')).toEqual({
       blockKey: 'bbc.co.uk',
+      coversSubdomains: true,
       hostKey: 'shop.bbc.co.uk'
     })
   })
@@ -43,9 +51,17 @@ describe('urlKey (shared website normalization, #62 review finding 4)', () => {
     expect(urlKey('https://user.github.io/').blockKey).toBe('user.github.io')
     expect(urlKey('https://docs.user.github.io/').blockKey).toBe('user.github.io')
     expect(urlKey('https://my-app.vercel.app/').blockKey).toBe('my-app.vercel.app')
-    // A public suffix itself, or an IP address, is its own block key.
-    expect(urlKey('https://github.io/')).toEqual({ blockKey: 'github.io', hostKey: 'github.io' })
-    expect(urlKey('https://1.1.1.1/')).toEqual({ blockKey: '1.1.1.1', hostKey: '1.1.1.1' })
+    // A public suffix itself, or an IP address, is its own block key, for that exact host only.
+    expect(urlKey('https://github.io/')).toEqual({
+      blockKey: 'github.io',
+      coversSubdomains: false,
+      hostKey: 'github.io'
+    })
+    expect(urlKey('https://1.1.1.1/')).toEqual({
+      blockKey: '1.1.1.1',
+      coversSubdomains: false,
+      hostKey: '1.1.1.1'
+    })
   })
 
   it('removes www. only when the rest is still a registrable host', () => {
@@ -59,10 +75,13 @@ describe('urlKey (shared website normalization, #62 review finding 4)', () => {
     expect(() => urlKey('https://./')).toThrow()
   })
 
-  it('matches a host against a block key and its subdomains only', () => {
-    expect(isHostWithin('casino.com', 'casino.com')).toBe(true)
-    expect(isHostWithin('go.casino.com', 'casino.com')).toBe(true)
-    expect(isHostWithin('notcasino.com', 'casino.com')).toBe(false)
-    expect(isHostWithin('other.github.io', 'user.github.io')).toBe(false)
+  it('matches a host against a block by its scope', () => {
+    const domain = { coversSubdomains: true, key: 'casino.com' }
+    expect(isHostBlocked('casino.com', domain)).toBe(true)
+    expect(isHostBlocked('go.casino.com', domain)).toBe(true)
+    expect(isHostBlocked('notcasino.com', domain)).toBe(false)
+    const suffix = { coversSubdomains: false, key: 'github.io' }
+    expect(isHostBlocked('github.io', suffix)).toBe(true)
+    expect(isHostBlocked('unrelated-user.github.io', suffix)).toBe(false)
   })
 })

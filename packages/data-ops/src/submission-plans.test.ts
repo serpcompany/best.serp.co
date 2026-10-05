@@ -77,10 +77,10 @@ function seedSubmission(
   }
   db.prepare(
     `INSERT INTO listing_submissions
-      (id,slug,block_key,name,description,website,content,category_slug,logo_url,status,
+      (id,slug,block_key,block_covers_subdomains,name,description,website,content,category_slug,logo_url,status,
        access_token_hash,badge_verified_at,listing_id,owner_user_id,plan,paid_at,
        rejection_reason,rejection_category,draft_saved_at,withdrawal_reason,published_checksum)
-    VALUES (?,'example.com','example.com','Example','Description','https://example.com/','Content',
+    VALUES (?,'example.com','example.com',1,'Example','Description','https://example.com/','Content',
       'tools','https://example.com/logo.png',?,'hash','2026-08-01T00:00:00.000Z',?,?,?,?,?,?,?,?,?)`
   ).run(
     submissionId,
@@ -664,16 +664,22 @@ describe('submission status transitions (compare-and-swap with changes() asserti
       })
     )
     expect(
-      db.prepare('SELECT url_key,submission_id,lifted_at FROM listing_submission_url_blocks').all()
-    ).toEqual([{ lifted_at: null, submission_id: submissionId, url_key: 'example.com' }])
+      db
+        .prepare(
+          'SELECT url_key,covers_subdomains,submission_id,lifted_at FROM listing_submission_url_blocks'
+        )
+        .all()
+    ).toEqual([
+      { covers_subdomains: 1, lifted_at: null, submission_id: submissionId, url_key: 'example.com' }
+    ])
     const submit = (slug: string, blockKey: string | null) => () =>
       db
         .prepare(
-          `INSERT INTO listing_submissions (id,slug,block_key,name,description,website,content,
-            category_slug,logo_url) VALUES (?,?,?,'Again','d','https://example.com/','c','tools',
-            'https://example.com/logo.png')`
+          `INSERT INTO listing_submissions (id,slug,block_key,block_covers_subdomains,name,
+            description,website,content,category_slug,logo_url)
+          VALUES (?,?,?,?,'Again','d','https://example.com/','c','tools','https://example.com/logo.png')`
         )
-        .run(crypto.randomUUID(), slug, blockKey)
+        .run(crypto.randomUUID(), slug, blockKey, blockKey === null ? null : 1)
     const blocked = /blocked until an admin lifts the block/u
     expect(submit('example.com', 'example.com')).toThrow(blocked)
     expect(submit('go.example.com', 'example.com')).toThrow(blocked)
@@ -702,6 +708,47 @@ describe('submission status transitions (compare-and-swap with changes() asserti
       )
     ).toThrow(/malformed JSON/u)
     expect(submit('go.example.com', 'example.com')).not.toThrow()
+  })
+
+  it('blocks only the exact host for a public suffix, an IP, or a pre-#62 row', () => {
+    for (const [slug, blockKey, covers] of [
+      ['github.io', 'github.io', 0],
+      ['go.legacy.example', null, null]
+    ] as const) {
+      const db = database('verified')
+      db.prepare(
+        'UPDATE listing_submissions SET slug=?, block_key=?, block_covers_subdomains=? WHERE id=?'
+      ).run(slug, blockKey, covers, submissionId)
+      execute(
+        db,
+        buildRejectSubmissionPlans({
+          category: 'prohibited',
+          now: NOW,
+          reason: 'Prohibited.',
+          reviewer: 'reviewer',
+          submissionId
+        })
+      )
+      expect(
+        db.prepare('SELECT url_key,covers_subdomains FROM listing_submission_url_blocks').get()
+      ).toEqual({ covers_subdomains: 0, url_key: slug })
+      const submit = (host: string) => () =>
+        db
+          .prepare(
+            `INSERT INTO listing_submissions (id,slug,name,description,website,content,
+              category_slug,logo_url) VALUES (?,?,'Again','d','https://example.com/','c','tools','l')`
+          )
+          .run(crypto.randomUUID(), host)
+      expect(submit(slug)).toThrow(/blocked until an admin lifts the block/u)
+      // Separate sites under a public suffix stay open; for a pre-#62 row this is the documented
+      // limitation (staging only: production had no submissions before #62).
+      expect(submit(`unrelated.${slug}`)).not.toThrow()
+    }
+    expect(() =>
+      database('verified')
+        .prepare('UPDATE listing_submissions SET block_covers_subdomains=0 WHERE id=?')
+        .run(submissionId)
+    ).not.toThrow()
   })
 
   it('lets an other-category rejection be resubmitted as a new submission', () => {
@@ -957,6 +1004,7 @@ describe('protected submission statement plans', () => {
     const db = database('verified')
     expect(query(db, selectSubmissionForDecisionPlan(submissionId))).toEqual([
       {
+        block_covers_subdomains: 1,
         block_key: 'example.com',
         checksum: 'before',
         content_version: 1,

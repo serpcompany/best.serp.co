@@ -42,6 +42,12 @@ A test applies the migration to a populated database inside a transaction with f
 enforced (`scripts/d1-drizzle-local.test.ts`). After `pnpm db:generate`, replace the generated
 SQL with the hand-finished form and check that a second `pnpm db:generate` reports no changes.
 
+D1 has limits that `node:sqlite` does not apply: LIKE and GLOB patterns of at most 50 bytes, at
+most 100 bound parameters per statement, and at most 32 arguments per function. So no CHECK or
+trigger uses LIKE or GLOB (ISO instants are checked with `x IS strftime('%Y-%m-%dT%H:%M:%fZ', x)`),
+and `scripts/d1-workerd-plans.test.ts` (harness step "D1 contracts") runs the #62 plans, draft
+writes, badge checks, and URL blocks on Wrangler-local D1 (workerd).
+
 - `categories` stores taxonomy rows and display order (unique `slug`).
 - `listings` stores public product fields, status, publication time, and stable IDs
   (unique `slug`), plus `source` and `link_rel` (see [Listings](#listings-source-link-and-unpublishing)).
@@ -107,9 +113,13 @@ SQL with the hand-finished form and check that a second `pnpm db:generate` repor
   the listing to still have it, so an admin edit made meanwhile is never overwritten.
 - **Deploy window.** The column defaults stay `status = 'pending_badge'` and `plan = 'free'`,
   as before #62, so a Worker deployed before this migration keeps writing valid legacy rows
-  between migrate and deploy. Native intake (#63) writes `draft` explicitly.
+  between migrate and deploy. **Contract for #63:** native intake writes a draft explicitly:
+  `status = 'draft'`, `plan = NULL` (the column default `free` is refused for a draft),
+  `owner_user_id`, `draft_saved_at` (`Date#toISOString()`), and `block_key` with
+  `block_covers_subdomains` from `urlKey()`.
 - **Draft clock** (#59 amendment): `draft_saved_at` (an ISO instant, required for a draft)
-  starts when the draft is first saved, and edits never reset it, so editing cannot extend a
+  starts when the draft is first saved. Edits never reset it or the reminders (the owner
+  confirmed on 2026-10-06: the 30 days run from the first save), so editing cannot extend a
   hold on a URL. `draft_reminders_sent` (0 to 5) and `draft_last_reminder_at` record the claimed
   reminders; `withdrawal_reason` (`owner` | `expired` | `admin`) is set exactly when the status
   is `withdrawn`. `listing_submissions_draft_clock_idx` (drafts only) serves the reminder and
@@ -121,13 +131,25 @@ SQL with the hand-finished form and check that a second `pnpm db:generate` repor
   `www.` are removed. The host is the slug and the duplicate key. `block_key` is its registrable
   domain per the Public Suffix List, private section included (`tldts` 7.4.16, 128 KB minified,
   46 KB gzipped, no Node APIs), so `user.github.io` is its own site. The app computes it at
-  intake and stores it, because SQLite cannot evaluate the PSL; a CHECK keeps it equal to the
-  slug or a parent domain of it. Rows written before #62 have none and fall back to their slug.
-  A `prohibited` rejection inserts an active block for the block key; the trigger
+  intake and stores it with its scope (`block_covers_subdomains`), because SQLite cannot evaluate
+  the PSL; CHECKs keep it equal to the slug or a parent domain of it. A host with no registrable
+  domain (a public suffix such as `github.io`, or an IP address) is its own block key with an
+  exact-host scope, so a block on it never covers the separate sites under it.
+  A `prohibited` rejection inserts an active block for the block key with that scope; the trigger
   `listing_submissions_refuse_blocked_url` then refuses any new submission, free or paid, whose
-  block key is blocked or whose slug is that domain or a subdomain of it (so it also holds for a
-  row without a block key, or after a PSL update), until an admin lifts the block (`lifted_at`).
-  `other` rejections block nothing.
+  slug is the blocked key, or a subdomain of it when the block covers subdomains, until an admin
+  lifts the block (`lifted_at`). `other` rejections block nothing. **Limitation:** a row written
+  before #62 has no block key, so a prohibited rejection of it blocks its exact host only. Such
+  rows exist only on staging (production had no submissions before #62), so there is no backfill.
+- **Charges are recorded in #68's `orders`.** `paid_at` and `refunded_at` describe a payment
+  applied to this submission, nothing more. **Contract for #68:** `orders` is the ledger of record
+  for every charge and refund, including the ones a submission row cannot represent: a checkout
+  that completes after a reviewer requested changes or rejected the submission, a duplicate
+  checkout session, an upgrade of a listing unpublished during checkout, or a charge after a
+  `prohibited` rejection (the row refuses `refunded_at` there). The webhook records the charge in
+  `orders` first, applies it with `buildRecordSubmissionPaymentPlans` (or
+  `buildRecordUnappliedPaymentPlans` for a withdrawn row) when the submission accepts it, and
+  otherwise refunds it from `orders` alone.
 - `listing_revisions` stage an owner's edit of a live listing (name, description, content,
   primary category, logo, video, resource links, FAQs; never website or slug) against the
   listing's `checksum` at the time (`base_checksum`). A listing has at most one open revision,
@@ -135,7 +157,8 @@ SQL with the hand-finished form and check that a second `pnpm db:generate` repor
   submission's.
 - `badge_checks` (listing, `checked_at`, `outcome` `pass` | `fail`, `reason`, `conclusive`) is
   the badge program history. A network error or timeout is an inconclusive `fail` and never
-  counts as a miss; `checked_at` is an ISO instant (a CHECK), compared as text. It is outside the catalog: writing it never changes the catalog epoch.
+  counts as a miss; `checked_at` is an ISO instant (a CHECK), compared as text. It is outside
+  the catalog: writing it never changes the catalog epoch.
 
 These tables are empty in the initial import, so bootstrap parity compares them like the
 submission tables (`scripts/d1-table-inventory.ts`).

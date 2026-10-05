@@ -287,7 +287,7 @@
         },
         "badge_checks_checked_at_iso": {
           "name": "badge_checks_checked_at_iso",
-          "value": "\"badge_checks\".\"checked_at\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z'"
+          "value": "\"checked_at\" IS strftime('%Y-%m-%dT%H:%M:%fZ', \"checked_at\")"
         },
         "badge_checks_pass_conclusive": {
           "name": "badge_checks_pass_conclusive",
@@ -1681,6 +1681,13 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "covers_subdomains": {
+          "name": "covers_subdomains",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -1708,6 +1715,10 @@
         "listing_submission_url_blocks_lift_complete": {
           "name": "listing_submission_url_blocks_lift_complete",
           "value": "(\"listing_submission_url_blocks\".\"lifted_at\" IS NULL) = (\"listing_submission_url_blocks\".\"lifted_by\" IS NULL)"
+        },
+        "listing_submission_url_blocks_covers_subdomains_boolean": {
+          "name": "listing_submission_url_blocks_covers_subdomains_boolean",
+          "value": "\"covers_subdomains\" IN (0, 1)"
         }
       }
     },
@@ -1944,6 +1955,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "block_covers_subdomains": {
+          "name": "block_covers_subdomains",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "published_checksum": {
           "name": "published_checksum",
           "type": "text",
@@ -2083,6 +2101,14 @@
           "name": "listing_submissions_block_key_matches",
           "value": "\"listing_submissions\".\"block_key\" IS NULL OR \"listing_submissions\".\"slug\" = \"listing_submissions\".\"block_key\" OR substr(\"listing_submissions\".\"slug\", -1 - length(\"listing_submissions\".\"block_key\")) = '.' || \"listing_submissions\".\"block_key\""
         },
+        "listing_submissions_block_scope": {
+          "name": "listing_submissions_block_scope",
+          "value": "(\"listing_submissions\".\"block_key\" IS NULL) = (\"listing_submissions\".\"block_covers_subdomains\" IS NULL) AND (\"listing_submissions\".\"block_covers_subdomains\" IS NOT 0 OR \"listing_submissions\".\"block_key\" = \"listing_submissions\".\"slug\")"
+        },
+        "listing_submissions_block_covers_subdomains_boolean": {
+          "name": "listing_submissions_block_covers_subdomains_boolean",
+          "value": "\"listing_submissions\".\"block_covers_subdomains\" IS NULL OR \"listing_submissions\".\"block_covers_subdomains\" IN (0, 1)"
+        },
         "listing_submissions_withdrawn_unpaid": {
           "name": "listing_submissions_withdrawn_unpaid",
           "value": "\"listing_submissions\".\"status\" != 'withdrawn' OR \"listing_submissions\".\"paid_at\" IS NULL OR \"listing_submissions\".\"refunded_at\" IS NOT NULL"
@@ -2101,7 +2127,7 @@
         },
         "listing_submissions_draft_saved_at_iso": {
           "name": "listing_submissions_draft_saved_at_iso",
-          "value": "\"listing_submissions\".\"draft_saved_at\" IS NULL OR \"listing_submissions\".\"draft_saved_at\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z'"
+          "value": "\"draft_saved_at\" IS strftime('%Y-%m-%dT%H:%M:%fZ', \"draft_saved_at\")"
         },
         "listing_submissions_draft_reminders_range": {
           "name": "listing_submissions_draft_reminders_range",

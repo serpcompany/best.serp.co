@@ -115,6 +115,7 @@ export const applicationColumnInventory = {
     'draft_last_reminder_at',
     'withdrawal_reason',
     'block_key',
+    'block_covers_subdomains',
     'published_checksum',
     'content_version'
   ],
@@ -181,7 +182,8 @@ export const applicationColumnInventory = {
     'blocked_at',
     'lifted_at',
     'lifted_by',
-    'lift_note'
+    'lift_note',
+    'covers_subdomains'
   ],
   listing_owners: [
     'id',

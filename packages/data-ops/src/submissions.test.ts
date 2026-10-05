@@ -134,9 +134,10 @@ describe('shared submission data operations', () => {
 
   it('blocks every variant and subdomain of a prohibited registrable domain', async () => {
     sqlite.database.exec(`INSERT INTO listing_submission_url_blocks
-      (url_key,reason,blocked_by,blocked_at) VALUES
-      ('casino.com','Prohibited','admin','2026-08-01T00:00:00.000Z'),
-      ('xn--bcher-kva.de','Prohibited','admin','2026-08-01T00:00:00.000Z')`)
+      (url_key,covers_subdomains,reason,blocked_by,blocked_at) VALUES
+      ('casino.com',1,'Prohibited','admin','2026-08-01T00:00:00.000Z'),
+      ('xn--bcher-kva.de',1,'Prohibited','admin','2026-08-01T00:00:00.000Z'),
+      ('github.io',0,'Prohibited','admin','2026-08-01T00:00:00.000Z')`)
     for (const website of [
       'https://casino.com/',
       'https://casino.com./',
@@ -157,8 +158,15 @@ describe('shared submission data operations', () => {
       sqlite.database.prepare('SELECT COUNT(*) AS count FROM listing_submissions').get()
     ).toEqual({ count: 0 })
     await expect(
-      operations().createSubmission({ ...input, website: 'https://notcasino.com/' })
-    ).resolves.toMatchObject({ slug: 'notcasino.com' })
+      operations().createSubmission({ ...input, website: 'https://github.io/' })
+    ).rejects.toMatchObject({ code: 'url_blocked' })
+    // An exact-host block on a public suffix never covers the separate sites under it.
+    for (const website of ['https://notcasino.com/', 'https://unrelated-user.github.io/']) {
+      await expect(
+        operations().createSubmission({ ...input, website }),
+        website
+      ).resolves.toMatchObject({ slug: new URL(website).hostname })
+    }
   })
 
   it('normalizes the slug and block key, so host variants count as duplicates', async () => {
@@ -338,12 +346,14 @@ describe('shared submission data operations', () => {
         corrupt: () =>
           sqlite.database
             // The block key must match the slug (a CHECK), so the corruption clears it too.
-            .prepare("UPDATE listing_submissions SET slug=' ', block_key=NULL WHERE id=?")
+            .prepare(
+              "UPDATE listing_submissions SET slug=' ', block_key=NULL, block_covers_subdomains=NULL WHERE id=?"
+            )
             .run(saved.id),
         restore: () =>
           sqlite.database
             .prepare(
-              "UPDATE listing_submissions SET slug='example.com', block_key='example.com' WHERE id=?"
+              "UPDATE listing_submissions SET slug='example.com', block_key='example.com', block_covers_subdomains=1 WHERE id=?"
             )
             .run(saved.id)
       },

@@ -84,9 +84,14 @@ export type SubmissionEventType = (typeof submissionEventTypes)[number]
 export const withdrawalReasons = ['owner', 'expired', 'admin'] as const
 export type WithdrawalReason = (typeof withdrawalReasons)[number]
 
-/** `strftime('%Y-%m-%dT%H:%M:%fZ')` / `Date#toISOString()`, so instants compare as text. */
-const isoInstantGlob =
-  '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z'
+/**
+ * An ISO instant exactly as `Date#toISOString()` writes it, so instants compare as text. A round
+ * trip through `strftime` rather than a GLOB: D1 limits LIKE and GLOB patterns to 50 bytes, and
+ * `IS` (not `=`) makes a value strftime cannot parse fail the CHECK instead of passing as NULL.
+ * A NULL value passes (NULL IS NULL).
+ */
+const isoInstantCheck = (column: { name: string }) =>
+  sql`${sql.identifier(column.name)} IS strftime('%Y-%m-%dT%H:%M:%fZ', ${sql.identifier(column.name)})`
 
 export const listingOwnerRoles = ['owner'] as const
 export const listingOwnerVerifications = ['submission', 'badge_claim', 'paid_claim'] as const
@@ -420,11 +425,14 @@ export const listingSubmissions = sqliteTable(
     draftLastReminderAt: text('draft_last_reminder_at'),
     withdrawalReason: text('withdrawal_reason', { enum: withdrawalReasons }),
     /**
-     * The registrable domain of `slug` (`urlKey()` in `@serpdirectory/utils/url-key`): what a
-     * prohibited rejection blocks. Null only on rows written before #62 (or by a pre-#62 Worker),
-     * which fall back to their slug.
+     * What a prohibited rejection blocks (`urlKey()` in `@serpdirectory/utils/url-key`): the
+     * registrable domain of `slug`, covering its subdomains, or the host itself when it has no
+     * registrable domain (a public suffix such as `github.io`, or an IP address). Null only on
+     * rows written before #62 (or by a pre-#62 Worker), which block their exact host.
      */
     blockKey: text('block_key'),
+    /** Whether a block on `block_key` covers its subdomains (false: the exact host only). */
+    blockCoversSubdomains: integer('block_covers_subdomains', { mode: 'boolean' }),
     /** The listing checksum written when a paid submission was published before review. */
     publishedChecksum: text('published_checksum'),
     /** Increments on every edit of the staged content; approval compares and swaps on it. */
@@ -497,6 +505,14 @@ export const listingSubmissions = sqliteTable(
       sql`${table.blockKey} IS NULL OR ${table.slug} = ${table.blockKey} OR substr(${table.slug}, -1 - length(${table.blockKey})) = '.' || ${table.blockKey}`
     ),
     check(
+      'listing_submissions_block_scope',
+      sql`(${table.blockKey} IS NULL) = (${table.blockCoversSubdomains} IS NULL) AND (${table.blockCoversSubdomains} IS NOT 0 OR ${table.blockKey} = ${table.slug})`
+    ),
+    check(
+      'listing_submissions_block_covers_subdomains_boolean',
+      sql`${table.blockCoversSubdomains} IS NULL OR ${table.blockCoversSubdomains} IN (0, 1)`
+    ),
+    check(
       'listing_submissions_withdrawn_unpaid',
       sql`${table.status} != 'withdrawn' OR ${table.paidAt} IS NULL OR ${table.refundedAt} IS NOT NULL`
     ),
@@ -509,10 +525,7 @@ export const listingSubmissions = sqliteTable(
       'listing_submissions_draft_clock',
       sql`${table.status} != 'draft' OR ${table.draftSavedAt} IS NOT NULL`
     ),
-    check(
-      'listing_submissions_draft_saved_at_iso',
-      sql`${table.draftSavedAt} IS NULL OR ${table.draftSavedAt} GLOB ${sql.raw(`'${isoInstantGlob}'`)}`
-    ),
+    check('listing_submissions_draft_saved_at_iso', isoInstantCheck(table.draftSavedAt)),
     check(
       'listing_submissions_draft_reminders_range',
       sql`${table.draftRemindersSent} BETWEEN 0 AND 5`
@@ -832,10 +845,11 @@ export const authRateLimitHits = sqliteTable(
 )
 
 /**
- * A prohibited rejection blocks its normalized URL key (today the submission slug: the
- * lowercase hostname without `www.`) from any new submission, free or paid, until an admin
- * lifts the block (#59 owner amendment, 2026-10-06). The trigger
- * `listing_submissions_refuse_blocked_url` enforces it. Lifting keeps the row as history.
+ * A prohibited rejection blocks the submission's block key from any new submission, free or
+ * paid, until an admin lifts the block (#59 owner amendments, 2026-10-06): a registrable domain
+ * with all its subdomains, or an exact host (`covers_subdomains = 0`) when the host has no
+ * registrable domain or the row predates #62. The trigger `listing_submissions_refuse_blocked_url`
+ * enforces it. Lifting keeps the row as history.
  */
 export const listingSubmissionUrlBlocks = sqliteTable(
   'listing_submission_url_blocks',
@@ -850,12 +864,17 @@ export const listingSubmissionUrlBlocks = sqliteTable(
     blockedAt: text('blocked_at').notNull(),
     liftedAt: text('lifted_at'),
     liftedBy: text('lifted_by'),
-    liftNote: text('lift_note')
+    liftNote: text('lift_note'),
+    coversSubdomains: integer('covers_subdomains', { mode: 'boolean' }).notNull()
   },
   table => [
     check(
       'listing_submission_url_blocks_lift_complete',
       sql`(${table.liftedAt} IS NULL) = (${table.liftedBy} IS NULL)`
+    ),
+    check(
+      'listing_submission_url_blocks_covers_subdomains_boolean',
+      booleanCheck(table.coversSubdomains)
     ),
     uniqueIndex('listing_submission_url_blocks_active_idx')
       .on(table.urlKey)
@@ -1032,10 +1051,7 @@ export const badgeChecks = sqliteTable(
     check('badge_checks_outcome_valid', sql`${table.outcome} IN (${sqlList(badgeCheckOutcomes)})`),
     check('badge_checks_conclusive_boolean', booleanCheck(table.conclusive)),
     // ISO instants compare as text: the keep-free refund window reads `checked_at`.
-    check(
-      'badge_checks_checked_at_iso',
-      sql`${table.checkedAt} GLOB ${sql.raw(`'${isoInstantGlob}'`)}`
-    ),
+    check('badge_checks_checked_at_iso', isoInstantCheck(table.checkedAt)),
     check(
       'badge_checks_pass_conclusive',
       sql`${table.outcome} = 'fail' OR (${table.conclusive} = 1 AND ${table.reason} IS NULL)`

@@ -7,11 +7,13 @@ import { getDomain } from 'tldts'
  * - `hostKey`: the normalized host. It is the submission slug and the duplicate key.
  * - `blockKey`: the registrable domain of `hostKey` (eTLD+1 per the Public Suffix List, private
  *   section included, so `user.github.io` and `app.vercel.app` are sites of their own). A
- *   prohibited rejection blocks it and every subdomain. An IP address or a host that is itself a
- *   public suffix has no registrable domain and is its own block key.
+ *   prohibited rejection blocks it and every subdomain (`coversSubdomains`).
+ * - A host with no registrable domain (a public suffix such as `github.io`, or an IP address) is
+ *   its own block key, and a block on it covers that exact host only, never the sites under it.
  */
 export interface UrlKey {
   blockKey: string
+  coversSubdomains: boolean
   hostKey: string
 }
 
@@ -36,10 +38,16 @@ export function urlKey(website: string): UrlKey {
     if (registrableDomain(rest) !== null) host = rest
   }
   if (!host || host.startsWith('.')) throw new Error('A website URL needs a host name.')
-  return { blockKey: registrableDomain(host) ?? host, hostKey: host }
+  const registrable = registrableDomain(host)
+  return registrable === null
+    ? { blockKey: host, coversSubdomains: false, hostKey: host }
+    : { blockKey: registrable, coversSubdomains: true, hostKey: host }
 }
 
-/** True when `host` is `domain` or one of its subdomains (the block-key match). */
-export function isHostWithin(host: string, domain: string): boolean {
-  return host === domain || host.endsWith(`.${domain}`)
+/** True when a block on `key` (with its scope) covers `host`: the trigger's match. */
+export function isHostBlocked(
+  host: string,
+  block: { coversSubdomains: boolean; key: string }
+): boolean {
+  return host === block.key || (block.coversSubdomains && host.endsWith(`.${block.key}`))
 }

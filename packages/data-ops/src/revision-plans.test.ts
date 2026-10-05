@@ -435,9 +435,9 @@ describe('one staged-edit channel per listing (#62 review, finding 1)', () => {
   function paidLiveListing(): DatabaseSync {
     const db = planDatabase()
     db.prepare(
-      `INSERT INTO listing_submissions (id,slug,block_key,name,description,website,content,
+      `INSERT INTO listing_submissions (id,slug,block_key,block_covers_subdomains,name,description,website,content,
         category_slug,logo_url,status,plan,owner_user_id,draft_saved_at)
-      VALUES (?,'paid.example','paid.example','Paid','Submitted description',
+      VALUES (?,'paid.example','paid.example',1,'Paid','Submitted description',
         'https://paid.example/','Submitted content','tools','https://paid.example/logo.png',
         'draft','paid','user_owner',?)`
     ).run(submissionId, NOW)

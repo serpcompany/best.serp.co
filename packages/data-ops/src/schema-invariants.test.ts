@@ -18,6 +18,7 @@ function insertSubmission(
   const row: Record<string, string | null> = { status: 'draft', ...values }
   if (row.status === 'draft') {
     for (const [column, value] of Object.entries({
+      block_covers_subdomains: '1',
       block_key: slug,
       draft_saved_at: NOW,
       owner_user_id: 'user_owner',
@@ -104,9 +105,17 @@ describe('submission status, plan, and decision invariants', () => {
     expect(() => insertSubmission(db, { draft_saved_at: null })).toThrow(
       /listing_submissions_draft_clock/u
     )
-    expect(() => insertSubmission(db, { draft_saved_at: '2026-10-06 12:00:00' })).toThrow(
-      /listing_submissions_draft_saved_at_iso/u
-    )
+    // Not toISOString() output: other formats, an impossible date, and unparseable text.
+    for (const value of [
+      '2026-10-06 12:00:00',
+      '2026-10-06T12:00:00Z',
+      '2026-13-06T12:00:00.000Z',
+      'yesterday'
+    ]) {
+      expect(() => insertSubmission(db, { draft_saved_at: value }), value).toThrow(
+        /listing_submissions_draft_saved_at_iso/u
+      )
+    }
     expect(() =>
       insertSubmission(db, { draft_last_reminder_at: NOW, draft_reminders_sent: '6' })
     ).toThrow(/listing_submissions_draft_reminders_range/u)
@@ -125,11 +134,54 @@ describe('submission status, plan, and decision invariants', () => {
     insertSubmission(db, { status: 'withdrawn', withdrawal_reason: 'expired' })
   })
 
+  it('keeps an exact-host block key equal to the slug, and the scope set with the key', () => {
+    const db = database()
+    expect(() =>
+      insertSubmission(
+        db,
+        {
+          block_covers_subdomains: '0',
+          block_key: 'example.com',
+          plan: 'free',
+          status: 'pending_badge'
+        },
+        'go.example.com'
+      )
+    ).toThrow(/listing_submissions_block_scope/u)
+    expect(() =>
+      insertSubmission(
+        db,
+        {
+          block_covers_subdomains: null,
+          block_key: 'example.com',
+          plan: 'free',
+          status: 'pending_badge'
+        },
+        'example.com'
+      )
+    ).toThrow(/listing_submissions_block_scope/u)
+    insertSubmission(
+      db,
+      {
+        block_covers_subdomains: '0',
+        block_key: 'github.io',
+        plan: 'free',
+        status: 'pending_badge'
+      },
+      'github.io'
+    )
+  })
+
   it('keeps the block key on the slug or a parent domain of it', () => {
     const db = database()
     insertSubmission(
       db,
-      { block_key: 'example.com', plan: 'free', status: 'pending_badge' },
+      {
+        block_covers_subdomains: '1',
+        block_key: 'example.com',
+        plan: 'free',
+        status: 'pending_badge'
+      },
       'go.example.com'
     )
     for (const [slug, blockKey] of [
@@ -137,7 +189,16 @@ describe('submission status, plan, and decision invariants', () => {
       ['notexample.com', 'example.com']
     ] as const) {
       expect(() =>
-        insertSubmission(db, { block_key: blockKey, plan: 'free', status: 'pending_badge' }, slug)
+        insertSubmission(
+          db,
+          {
+            block_covers_subdomains: '1',
+            block_key: blockKey,
+            plan: 'free',
+            status: 'pending_badge'
+          },
+          slug
+        )
       ).toThrow(/listing_submissions_block_key_matches/u)
     }
   })
@@ -260,8 +321,9 @@ describe('ownership, URL blocks, and badge checks', () => {
   it('blocks a URL key once at a time and refuses new submissions while blocked', () => {
     const db = database()
     const block = () =>
-      db.exec(`INSERT INTO listing_submission_url_blocks (url_key,reason,blocked_by,blocked_at)
-        VALUES ('example.com','Malware','admin','${NOW}')`)
+      db.exec(`INSERT INTO listing_submission_url_blocks
+        (url_key,covers_subdomains,reason,blocked_by,blocked_at)
+        VALUES ('example.com',1,'Malware','admin','${NOW}')`)
     block()
     expect(block).toThrow(/UNIQUE constraint failed/u)
     expect(() => insertSubmission(db, {})).toThrow(/blocked until an admin lifts the block/u)

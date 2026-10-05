@@ -61,13 +61,19 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
   other edit channel: revisions are refused and unpublishing is refused (reject it instead).
 - Payment races: a draft that switched to free while its checkout was open is upgraded by the
   payment from `pending_badge`; a payment that completes after withdrawal or expiry is recorded
-  with its refund (#68's webhook issues it). Once paid, the owner cannot withdraw; they message
-  the team (#73) and an admin decides.
+  with its refund (#68's webhook issues it). Any other charge the submission cannot accept lives
+  only in #68's `orders`, which is the ledger of record ([Data model](./DATA_MODEL.md)). Once
+  paid, the owner cannot withdraw; they message the team (#73) and an admin decides.
+- The protected publisher's `listing-unpublish` can still take a listing down while its
+  submission is queued (an emergency takedown is never blocked). The in-app plans refuse that,
+  but after such a takedown a `changes_requested` submission cannot be resubmitted and a
+  `paid_pending_review` one cannot be approved; the admin resolves it by rejecting with `live`,
+  which records no second unpublish.
 - Rejecting a submission with a listing (pass `live` whenever `listing_id` is set) unpublishes
   it (410) if it is still up and revokes the submitter's ownership in the same batch. A
-  `prohibited` rejection blocks the registrable domain and its subdomains from new free and
-  paid submissions until an admin lifts the block; an `other` rejection may be submitted again
-  as a new submission.
+  `prohibited` rejection blocks the registrable domain and its subdomains (or the exact host,
+  for a public suffix such as `github.io`) from new free and paid submissions until an admin lifts
+  the block; an `other` rejection may be submitted again as a new submission.
 - Refunds (`buildRefundSubmissionPlans`) record `refunded_at`: after an `other` rejection (never
   a `prohibited` one); for an approved paid listing whose latest conclusive badge check passed in
   the last 7 days, which stays live with `plan = 'free'` (the event records that check); by

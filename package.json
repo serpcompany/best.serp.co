@@ -58,7 +58,7 @@
     "shadcn": "cd packages/design-system && pnpm dlx shadcn@canary add",
     "start": "turbo run start",
     "test": "turbo test --cache-dir=.turbo",
-    "test:d1": "pnpm exec vitest run scripts/d1-drizzle-local.test.ts scripts/d1-local-state.test.ts scripts/d1-preview-http-gates.test.ts scripts/d1-publisher.sqlite.test.ts scripts/d1-remote-publisher.test.ts scripts/d1-submission-approver.test.ts scripts/d1-submission-notifier.test.ts scripts/cloudflare-release.test.ts scripts/staging-verification.test.ts",
+    "test:d1": "pnpm exec vitest run scripts/d1-drizzle-local.test.ts scripts/d1-workerd-plans.test.ts scripts/d1-local-state.test.ts scripts/d1-preview-http-gates.test.ts scripts/d1-publisher.sqlite.test.ts scripts/d1-remote-publisher.test.ts scripts/d1-submission-approver.test.ts scripts/d1-submission-notifier.test.ts scripts/cloudflare-release.test.ts scripts/staging-verification.test.ts",
     "test:e2e": "turbo test:e2e --filter=e2e",
     "test:e2e:smoke": "turbo test:e2e:smoke --filter=e2e",
     "test:e2e:ui": "turbo test:e2e:ui --filter=e2e",

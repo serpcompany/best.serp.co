@@ -51,10 +51,10 @@ function insert(
   }
   db.prepare(
     `INSERT INTO listing_submissions
-      (id,slug,block_key,name,description,website,content,category_slug,logo_url,status,
+      (id,slug,block_key,block_covers_subdomains,name,description,website,content,category_slug,logo_url,status,
        owner_user_id,plan,paid_at,listing_id,draft_saved_at,rejection_reason,rejection_category,
        withdrawal_reason,published_checksum)
-    VALUES (?,?,?,'Example','d','https://example.com/','c','tools','https://example.com/l.png',?,
+    VALUES (?,?,?,1,'Example','d','https://example.com/','c','tools','https://example.com/l.png',?,
       'user_owner',?,?,?,?,?,?,?,?)`
   ).run(
     submission,

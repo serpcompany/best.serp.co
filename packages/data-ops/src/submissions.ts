@@ -162,17 +162,17 @@ function submissionUrlKey(website: string): UrlKey {
 }
 
 /**
- * An active prohibited-URL block that covers the host: one on its block key (registrable
- * domain), on the host itself, or on any parent domain of the host. Mirrors the
+ * An active prohibited-URL block that covers the host: one on the host itself, or a
+ * subdomain-covering block on a parent domain of the host. Mirrors the
  * `listing_submissions_refuse_blocked_url` trigger, which enforces the same rule on insert.
  */
 export function selectActiveUrlBlockStatement(key: UrlKey): { params: unknown[]; sql: string } {
   return {
     sql: `SELECT id FROM listing_submission_url_blocks
       WHERE lifted_at IS NULL
-        AND (url_key=? OR url_key=? OR substr(?, -1 - length(url_key))='.' || url_key)
+        AND (url_key=? OR (covers_subdomains=1 AND substr(?, -1 - length(url_key))='.' || url_key))
       LIMIT 1`,
-    params: [key.blockKey, key.hostKey, key.hostKey]
+    params: [key.hostKey, key.hostKey]
   }
 }
 
@@ -365,6 +365,7 @@ export function createSubmissionOperations(config: {
             id,
             logoUrl: input.logoUrl,
             name: input.name,
+            blockCoversSubdomains: key.coversSubdomains,
             blockKey: key.blockKey,
             // The legacy capability flow is the free badge flow; it predates drafts (#63).
             plan: 'free',

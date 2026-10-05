@@ -34,6 +34,7 @@ CREATE TABLE `__new_listing_submissions` (
 	`draft_last_reminder_at` text,
 	`withdrawal_reason` text,
 	`block_key` text,
+	`block_covers_subdomains` integer,
 	`published_checksum` text,
 	`content_version` integer DEFAULT 1 NOT NULL,
 	FOREIGN KEY (`listing_id`) REFERENCES `listings`(`id`) ON UPDATE no action ON DELETE set null,
@@ -54,11 +55,13 @@ CREATE TABLE `__new_listing_submissions` (
 	CONSTRAINT "listing_submissions_draft_plan" CHECK("status" != 'draft' OR "plan" IS NULL OR "plan" = 'paid'),
 	CONSTRAINT "listing_submissions_draft_native" CHECK("status" != 'draft' OR ("owner_user_id" IS NOT NULL AND "block_key" IS NOT NULL)),
 	CONSTRAINT "listing_submissions_block_key_matches" CHECK("block_key" IS NULL OR "slug" = "block_key" OR substr("slug", -1 - length("block_key")) = '.' || "block_key"),
+	CONSTRAINT "listing_submissions_block_scope" CHECK(("block_key" IS NULL) = ("block_covers_subdomains" IS NULL) AND ("block_covers_subdomains" IS NOT 0 OR "block_key" = "slug")),
+	CONSTRAINT "listing_submissions_block_covers_subdomains_boolean" CHECK("block_covers_subdomains" IS NULL OR "block_covers_subdomains" IN (0, 1)),
 	CONSTRAINT "listing_submissions_withdrawn_unpaid" CHECK("status" != 'withdrawn' OR "paid_at" IS NULL OR "refunded_at" IS NOT NULL),
 	CONSTRAINT "listing_submissions_no_refund_when_prohibited" CHECK("refunded_at" IS NULL OR "rejection_category" IS NULL OR "rejection_category" != 'prohibited'),
 	CONSTRAINT "listing_submissions_content_version_positive" CHECK("content_version" >= 1),
 	CONSTRAINT "listing_submissions_draft_clock" CHECK("status" != 'draft' OR "draft_saved_at" IS NOT NULL),
-	CONSTRAINT "listing_submissions_draft_saved_at_iso" CHECK("draft_saved_at" IS NULL OR "draft_saved_at" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z'),
+	CONSTRAINT "listing_submissions_draft_saved_at_iso" CHECK("draft_saved_at" IS strftime('%Y-%m-%dT%H:%M:%fZ', "draft_saved_at")),
 	CONSTRAINT "listing_submissions_draft_reminders_range" CHECK("draft_reminders_sent" BETWEEN 0 AND 5),
 	CONSTRAINT "listing_submissions_draft_reminder_recorded" CHECK(("draft_reminders_sent" = 0) = ("draft_last_reminder_at" IS NULL)),
 	CONSTRAINT "listing_submissions_withdrawal_reason_valid" CHECK("withdrawal_reason" IS NULL OR "withdrawal_reason" IN ('owner', 'expired', 'admin')),
@@ -145,15 +148,17 @@ CREATE TABLE `listing_submission_url_blocks` (
 	`lifted_at` text,
 	`lifted_by` text,
 	`lift_note` text,
+	`covers_subdomains` integer NOT NULL,
 	FOREIGN KEY (`submission_id`) REFERENCES `listing_submissions`(`id`) ON UPDATE no action ON DELETE set null,
-	CONSTRAINT "listing_submission_url_blocks_lift_complete" CHECK(("listing_submission_url_blocks"."lifted_at" IS NULL) = ("listing_submission_url_blocks"."lifted_by" IS NULL))
+	CONSTRAINT "listing_submission_url_blocks_lift_complete" CHECK(("listing_submission_url_blocks"."lifted_at" IS NULL) = ("listing_submission_url_blocks"."lifted_by" IS NULL)),
+	CONSTRAINT "listing_submission_url_blocks_covers_subdomains_boolean" CHECK("covers_subdomains" IN (0, 1))
 ) STRICT;
 --> statement-breakpoint
 CREATE UNIQUE INDEX `listing_submission_url_blocks_active_idx` ON `listing_submission_url_blocks` (`url_key`) WHERE "listing_submission_url_blocks"."lifted_at" IS NULL;--> statement-breakpoint
 CREATE TRIGGER listing_submissions_refuse_blocked_url BEFORE INSERT ON listing_submissions
 WHEN EXISTS (SELECT 1 FROM listing_submission_url_blocks b WHERE b.lifted_at IS NULL
-  AND (b.url_key = new.block_key OR b.url_key = new.slug
-    OR substr(new.slug, -1 - length(b.url_key)) = '.' || b.url_key))
+  AND (b.url_key = new.slug
+    OR (b.covers_subdomains = 1 AND substr(new.slug, -1 - length(b.url_key)) = '.' || b.url_key)))
 BEGIN
   SELECT RAISE(ABORT, 'submission url is blocked until an admin lifts the block');
 END;
@@ -249,7 +254,7 @@ CREATE TABLE `badge_checks` (
 	FOREIGN KEY (`listing_id`) REFERENCES `listings`(`id`) ON UPDATE no action ON DELETE cascade,
 	CONSTRAINT "badge_checks_outcome_valid" CHECK("badge_checks"."outcome" IN ('pass', 'fail')),
 	CONSTRAINT "badge_checks_conclusive_boolean" CHECK("conclusive" IN (0, 1)),
-	CONSTRAINT "badge_checks_checked_at_iso" CHECK("badge_checks"."checked_at" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z'),
+	CONSTRAINT "badge_checks_checked_at_iso" CHECK("checked_at" IS strftime('%Y-%m-%dT%H:%M:%fZ', "checked_at")),
 	CONSTRAINT "badge_checks_pass_conclusive" CHECK("badge_checks"."outcome" = 'fail' OR ("badge_checks"."conclusive" = 1 AND "badge_checks"."reason" IS NULL)),
 	CONSTRAINT "badge_checks_fail_reason" CHECK("badge_checks"."outcome" = 'pass' OR "badge_checks"."reason" IS NOT NULL)
 ) STRICT;

@@ -114,7 +114,8 @@ export function selectSubmissionForDecisionPlan(submissionId: string): Statement
   return {
     sql: `SELECT s.id,s.slug,s.status,s.listing_id,s.plan,s.paid_at,s.refunded_at,
         s.owner_user_id,s.rejection_category,s.content_version,s.published_checksum,
-        COALESCE(s.block_key,s.slug) AS block_key,ps.version,ps.checksum,
+        COALESCE(s.block_key,s.slug) AS block_key,
+        COALESCE(s.block_covers_subdomains,0) AS block_covers_subdomains,ps.version,ps.checksum,
         CASE WHEN ${listingIsLiveGuard('s.listing_id')} THEN 1 ELSE 0 END AS listing_live
       FROM listing_submissions s JOIN publication_state ps ON ps.id=1
       WHERE s.id=?`,
@@ -537,9 +538,10 @@ export function buildClearDraftPlans(input: {
  * Rejection with a reason and its category. Pass `live` whenever the submission has a listing
  * (`listing_id` is set): the listing is unpublished in the same batch (or stays down if an admin
  * already unpublished it) and the submitter's ownership is revoked. A `prohibited` rejection
- * blocks the submission's block key (its registrable domain) and every subdomain from new
- * submissions until an admin lifts it; refunding an `other` rejection of a paid submission is
- * recorded by `buildRefundSubmissionPlans`.
+ * blocks the submission's block key from new submissions until an admin lifts it: its
+ * registrable domain with every subdomain, or the exact host when the host has no registrable
+ * domain (a public suffix or an IP) or the row predates #62 (no `block_key`). Refunding an
+ * `other` rejection of a paid submission is recorded by `buildRefundSubmissionPlans`.
  */
 export function buildRejectSubmissionPlans(input: {
   category: RejectionCategory
@@ -614,9 +616,9 @@ export function buildRejectSubmissionPlans(input: {
     plans.push(
       {
         sql: `INSERT INTO listing_submission_url_blocks
-          (url_key,submission_id,reason,blocked_by,blocked_at)
-          SELECT COALESCE(block_key,slug),id,?,?,? FROM listing_submissions
-          WHERE id=? AND status='rejected'
+          (url_key,covers_subdomains,submission_id,reason,blocked_by,blocked_at)
+          SELECT COALESCE(block_key,slug),COALESCE(block_covers_subdomains,0),id,?,?,?
+          FROM listing_submissions WHERE id=? AND status='rejected'
           ON CONFLICT(url_key) WHERE lifted_at IS NULL DO NOTHING`,
         params: [input.reason, input.reviewer, input.now, input.submissionId]
       },
