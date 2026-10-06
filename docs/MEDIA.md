@@ -24,8 +24,10 @@ best.serp.co/listings/<slug>/<logo|image>/<sha256-16>.<png|jpg|webp|gif|avif|ico
 best.serp.co/submissions/<submission-id>/<logo|image>/<sha256-16>.<ext>
 ```
 
-with `Cache-Control: public, max-age=31536000, immutable`, its `Content-Type`, and R2's own
-SHA-256 check. A changed image gets a new key, so nothing is purged.
+with its `Content-Type` and R2's own SHA-256 check. A listing image is stored with
+`Cache-Control: public, max-age=31536000, immutable`: a changed image gets a new key, so nothing
+is purged. A submission's image is stored with `public, max-age=300`, so deleting a rejected or
+withdrawn submission's image takes it off the media host within minutes, with no zone purge.
 
 - A submission's images live under its own `submissions/<id>/` prefix while it is reviewed, never
   under a live listing's path. Approval queues a copy into `listings/<slug>/` (the cron checks
@@ -85,26 +87,34 @@ stores the bytes under their key. `media-operations.ts` records the result with 
 (`media-plans.ts`).
 
 The Worker relies on Cloudflare's egress, which never reaches private addresses. A Node script
-(the legacy migration) passes `nodeFetch` (`safe-fetch-node.ts`), which resolves each hop's host
-and refuses private, loopback, link-local, ULA, IPv4-mapped, NAT64, and 6to4 addresses with the
-same `public-url.ts` policy, on the first request and on every redirect.
+(the migration, the upload) may run on a self-hosted runner (#55) or a laptop, so it passes
+`nodeFetch` (`safe-fetch-node.ts`): each hop's connection resolves its host once, refuses
+private, loopback, link-local, ULA, IPv4-mapped, NAT64, and 6to4 addresses with the same
+`public-url.ts` policy, and connects to exactly the checked address (an undici dispatcher's
+`lookup`), so DNS rebinding cannot swap it; `Host` and TLS SNI stay the host's.
 
 Where it runs:
 
-- **Submit v2** (#84): saving a submission hosts its logo, and the social image prefill found, under
-  `submissions/<id>/` after the response (`hostSubmissionImages` in
-  `apps/web/lib/media/server.ts`); a changed logo replaces the copy. Intake refuses SVG logos and
-  prefill skips SVG icons. Nothing here can fail the save.
+- **Submit v2** (#84): saving a submission hosts its logo under `submissions/<id>/` after the
+  response (`hostSubmissionImages` in `apps/web/lib/media/server.ts`), and its featured image:
+  the social image the server's own prefill finds on the submitted website, never a URL the
+  client sends. A changed logo replaces the copy. Intake refuses SVG logos and prefill skips SVG
+  icons. Nothing here can fail the save.
 - **Admin listing edit** (#64): `updateListingDetails` hosts a changed logo before its batch
   (`createMediaHost`). A logo that can never be hosted (SVG, not an image, 404, too large) is
   refused with a 422 that names the reason, and nothing is saved. A retryable failure saves, the
   screen warns with the reason instead of "Saved", the source is queued, and a hosted current logo
-  stays until the new one lands.
+  stays until the new one lands. While it waits, the form shows the queued source, the preview
+  the current logo, and the note says "New logo pending"; saving the current logo's URL again
+  cancels the queued replacement.
 - **Approvals** (`adoptStagedLogoPlans`, `adoptSubmissionImagePlans`): a listing logo row whose
   source is the staged logo is kept, hosted or not (so a revision or claim keeps an unchanged
-  imported logo, relative and repo paths too); otherwise the submission's hosted logo and social
-  image are queued for a copy into the listing's path, or the source is queued. The approval
-  then hosts the listing's queue after its response (`settle`, through `waitUntil`).
+  imported logo, relative and repo paths too); otherwise the submission's hosted logo is queued
+  for a copy into the listing's path, or its source is queued. The featured image is adopted
+  only as the reviewer saw it: the review screen and both previews show the hosted image (or why
+  there is none), the approval sends that key back, and the batch is refused if the image
+  changed since; a waiting or failed image, or a paid listing going live before review, adopts
+  none. The approval then hosts the listing's queue after its response (`settle`).
 - **Worker cron** (`*/15`, the `listing-media` job in `apps/web/lib/worker/scheduled.ts`): retries
   due slots, ten per run, each claimed with a ten-minute lease, then deletes finished
   submissions' images. Retryable failures (timeouts, unreachable hosts, 408, 429, 5xx, a failed

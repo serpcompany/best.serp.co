@@ -214,10 +214,11 @@ pasted image link, checked on save to be a PNG, JPEG, or WebP of at most 1 MB an
 128 px on its shorter side when its size can be read. SVG is refused, and prefill never
 proposes an SVG icon. A local Worker also accepts http, for its fixture sites.
 
-The saved logo, and the social image prefill found, are then copied to our media host under the
-submission (`best.serp.co/submissions/<id>/…`, after the response, so hosting never fails the
-save; see [Listing media](./MEDIA.md)). The review preview and the admin screens show that hosted
-copy, or the fallback tile with a link to the source; approval copies it into the listing's path.
+The saved logo, and the social image the server's own prefill finds on the website, are then
+copied to our media host under the submission (`best.serp.co/submissions/<id>/…`, after the
+response, so hosting never fails the save; see [Listing media](./MEDIA.md)). The review screen
+and previews show those hosted copies, or the fallback tile with a link to the source; approval
+copies the logo, and the featured image exactly as the reviewer saw it, into the listing's path.
 Only the submitter's own form previews the URL they typed, through
 `<img referrerpolicy="no-referrer" loading="lazy">`.
 
