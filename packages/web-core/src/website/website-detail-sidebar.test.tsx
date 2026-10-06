@@ -144,6 +144,6 @@ describe('WebsiteDetailSidebar', () => {
       dark: 'https://best.serp.co/badge/featured-on-serp.co-dark.svg',
       light: 'https://best.serp.co/badge/featured-on-serp.co-light.svg'
     })
-    expect(collectStringProp(sidebar, 'siteName')).toContain('SERP')
+    expect(collectStringProp(sidebar, 'siteName')).toContain('SERP Best')
   })
 })

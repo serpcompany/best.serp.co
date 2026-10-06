@@ -12,7 +12,7 @@ import { submissionBadgeTargets } from '@/lib/submissions/presentation'
 
 export const metadata: Metadata = generateBaseMetadata({
   title: 'Add the badge',
-  description: 'Add the Featured on SERP badge to your site and verify it.',
+  description: 'Add the Featured on SERP Best badge to your site and verify it.',
   path: '/submit/',
   noindex: true
 })
