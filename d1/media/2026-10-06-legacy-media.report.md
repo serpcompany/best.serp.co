@@ -1713,3 +1713,24 @@ checked: 1,795 read back from the staging media host, 1,952 from their sources. 
 Dry run after: 3,745 of 3,747 verified (SHA-256 and MD5); `lex.page`'s image (already uploaded)
 and `roblox.com`'s logo answered `site_unreachable` once and verified in the MD5 pass minutes
 earlier.
+
+## Refresh 2026-10-07, second pass (upload run 37495034303)
+
+That run found 1,795 objects present and uploaded 1,899; 53 objects on 38 listings failed. Every
+missing object is now a `repo:` seed under `apps/web/public/listing-media-seed/`, so the next
+staging upload reads only checked-in bytes. Each seed is checked against the plan's size, SHA-256,
+and MD5 (`scripts/catalog-media.test.ts`), and keys of uploaded objects are unchanged.
+
+- **46 objects** the runner saw re-encoded (`bytes X != Y`), plus `toonly.com`'s logo (403 to the
+  runner), `towardsdatascience.com`'s logo and image (`unexpected_type` on the runner), and
+  `yourcoverletter.com`'s logo (timeout): seeded from their sources here, every one matching.
+- **`kili.so`**: its #115 seeds were never committed, because a global `*.so` ignore matched the
+  directory. `.gitignore` now un-ignores `listing-media-seed/`, and the test requires every seed
+  to be tracked.
+- **`shopify.com`'s logo**: its source now serves only the other encoding (2,738 bytes) to both
+  machines. It was never uploaded, so it takes that object's key
+  (`1cd456a83d0130b4.avif`) instead.
+- **Already uploaded, source drifting**: `medarc.ai`, `onloop.com`, and `paypal.com` logos are
+  seeded from the staging bucket's copy, so a dry run no longer depends on their sources.
+
+None drops to the tile. Dry run after: 3,747 of 3,747 verified.
