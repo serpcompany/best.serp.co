@@ -8,7 +8,6 @@ import {
   draftExpiresInDays,
   hostOf,
   isConclusiveFailure,
-  VERIFICATION_ATTEMPT_LIMIT,
   VERIFICATION_COOLDOWN_SECONDS
 } from '../submissions/contract'
 
@@ -80,6 +79,9 @@ export interface AccountCards {
   review: { count: number; names: string[] }
 }
 
+/** The badge panel's checks per listing per 24 hours (`LISTING_BADGE_CHECKS_PER_DAY`). */
+export const LISTING_BADGE_CHECKS_PER_DAY = 10
+
 const SHORT_REASON_LENGTH = 40
 
 function shortReason(reason: string): string {
@@ -124,7 +126,7 @@ function badgePanel(listing: AccountListing, target: BadgeTarget): BadgePanel | 
   return {
     badgeUrl,
     cooldownEndsAt: Number.isNaN(lastClaim) ? 0 : lastClaim + VERIFICATION_COOLDOWN_SECONDS * 1000,
-    checksLeft: Math.max(0, VERIFICATION_ATTEMPT_LIMIT - listing.badge.verificationAttempts),
+    checksLeft: Math.max(0, LISTING_BADGE_CHECKS_PER_DAY - listing.badge.checksInWindow),
     failing: last !== null && last.outcome === 'fail' && last.conclusive,
     history,
     last,

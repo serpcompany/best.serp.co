@@ -1,5 +1,4 @@
-import type { ExtrasInput, RevisionRequest } from '@/lib/account/contract'
-import type { DraftContentInput } from '@/lib/submissions/contract'
+import type { ExtrasInput, ResubmitRequest, RevisionRequest } from '@/lib/account/contract'
 import { call } from '../submit/submit-api'
 
 /**
@@ -19,10 +18,7 @@ export function withdrawSubmission(id: string) {
   return post<{ ok: true }>(submission(id, 'withdraw'))
 }
 
-export function resubmitSubmission(
-  id: string,
-  input: DraftContentInput & { expectedContentVersion: number }
-) {
+export function resubmitSubmission(id: string, input: ResubmitRequest) {
   return post<{ ok: true; status: string }>(submission(id, 'resubmit'), input)
 }
 

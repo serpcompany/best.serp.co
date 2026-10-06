@@ -148,6 +148,7 @@ describe('account rows', () => {
                 at: '2026-10-05T09:14:00.000Z',
                 by: 'owner',
                 conclusive: true,
+                fromPanel: true,
                 outcome: 'fail',
                 reason: 'link_not_followed'
               }
@@ -155,7 +156,7 @@ describe('account rows', () => {
             lastCheckAt: '2026-10-05T09:14:00.000Z',
             lastError: 'link_not_followed',
             submissionId: 'sub-free',
-            verificationAttempts: 2
+            checksInWindow: 2
           },
           plan: 'free'
         }),

@@ -40,8 +40,15 @@ export const extrasSchema = z.object({
 
 export type ExtrasInput = z.infer<typeof extrasSchema>
 
-/** `POST /api/account/submissions/<id>/resubmit`: the fixed details, then back to review. */
-export const resubmitRequestSchema = draftContentSchema.extend({ expectedContentVersion: version })
+/**
+ * `POST /api/account/submissions/<id>/resubmit`: the fixed details, then back to review. FAQs
+ * and links may be fixed in the same pass (both, or neither to keep them).
+ */
+export const resubmitRequestSchema = draftContentSchema.extend({
+  expectedContentVersion: version,
+  faqs: extrasSchema.shape.faqs.optional(),
+  resourceLinks: extrasSchema.shape.resourceLinks.optional()
+})
 
 /** `POST /api/account/submissions/<id>/extras`: FAQs and links while it waits for review. */
 export const extrasRequestSchema = extrasSchema.extend({ expectedContentVersion: version })
@@ -52,6 +59,8 @@ export const extrasRequestSchema = extrasSchema.extend({ expectedContentVersion:
  * listing may keep a site-relative one), so it is checked on the server.
  */
 export const revisionRequestSchema = extrasSchema.extend({
+  /** The open revision's version the form loaded, or null when it loaded the live listing. */
+  expectedRevisionVersion: version.nullable(),
   categorySlug: z.string().trim().min(1, 'Choose a primary category.').max(100),
   content: z
     .string()
@@ -70,6 +79,7 @@ export const revisionRequestSchema = extrasSchema.extend({
 })
 
 export type RevisionRequest = z.input<typeof revisionRequestSchema>
+export type ResubmitRequest = z.input<typeof resubmitRequestSchema>
 
 /** A link's URL problem as the form shows it, or null. */
 export function linkUrlProblem(value: string): string | null {

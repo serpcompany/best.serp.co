@@ -31,6 +31,7 @@ import {
   buildResubmitSubmissionPlans,
   buildUpgradeListingToPaidPlans,
   buildWithdrawSubmissionPlans,
+  LISTING_BADGE_CHECK_ACTOR,
   type ListingBadgeCheckClaim,
   recordSubmissionNotificationPlan,
   selectRefundPendingSubmissionsPlan,
@@ -1032,12 +1033,21 @@ describe('the owner’s account actions (#65)', () => {
       claimedAt: '2026-10-06 12:00:00',
       conclusiveCodes: ['badge_missing', 'link_not_followed'],
       cooldownCutoff: '2026-10-06 11:59:30',
-      maxAttempts: 10,
+      maxChecks: 10,
       now: NOW,
       ownerUserId: 'user_owner',
       submissionId,
+      windowStart: '2026-10-05 12:00:00',
       ...options
     })
+
+  /** A panel check's event at `at` (`YYYY-MM-DD HH:MM:SS`). */
+  function panelCheck(db: DatabaseSync, at: string, eventType: string, detail: string | null) {
+    db.prepare(
+      `INSERT INTO listing_submission_events (submission_id,event_type,detail,actor,created_at)
+      VALUES (?,?,?,?,?)`
+    ).run(submissionId, eventType, detail, LISTING_BADGE_CHECK_ACTOR, at)
+  }
 
   it('claims a badge check only for the owner’s live, free, approved listing', () => {
     for (const status of submissionStatuses) {
@@ -1056,6 +1066,11 @@ describe('the owner’s account actions (#65)', () => {
       }
       db.close()
     }
+    const tenToday = (db: DatabaseSync) => {
+      for (let index = 0; index < 10; index += 1) {
+        panelCheck(db, `2026-10-06 0${index}:00:00`, 'badge_verified', null)
+      }
+    }
     const refusals: Array<[string, (db: DatabaseSync) => void]> = [
       ['paid', db => db.prepare("UPDATE listing_submissions SET plan='paid', paid_at=?").run(NOW)],
       ['down', db => db.prepare('UPDATE listings SET is_active=0').run()],
@@ -1070,15 +1085,7 @@ describe('the owner’s account actions (#65)', () => {
             .prepare("UPDATE listing_submissions SET last_verification_at='2026-10-06 11:59:50'")
             .run()
       ],
-      [
-        'at the cap',
-        db =>
-          db
-            .prepare(
-              "UPDATE listing_submissions SET verification_attempts=10, last_verification_error='badge_missing'"
-            )
-            .run()
-      ]
+      ['ten checks in the last 24 hours', tenToday]
     ]
     for (const [label, change] of refusals) {
       const db = database('approved')
@@ -1087,58 +1094,93 @@ describe('the owner’s account actions (#65)', () => {
       expect(() => execute(db, claim()), label).toThrow(/malformed JSON/u)
       db.close()
     }
-    // At the cap, a last check that was a connection problem leaves one more try.
-    const retry = database('approved')
-    ownedLiveListing(retry)
-    retry
-      .prepare(
-        "UPDATE listing_submissions SET verification_attempts=10, last_verification_error='timeout'"
-      )
-      .run()
-    expect(() => execute(retry, claim())).not.toThrow()
+    const allowed: Array<[string, (db: DatabaseSync) => void]> = [
+      // The badge step's own lifetime cap (#84) doesn't lock the panel.
+      [
+        'badge step used its ten',
+        db =>
+          db
+            .prepare(
+              "UPDATE listing_submissions SET verification_attempts=10, last_verification_error='badge_missing'"
+            )
+            .run()
+      ],
+      // Connection problems, and checks older than the window, don't count.
+      [
+        'nine results and a timeout',
+        db => {
+          for (let index = 0; index < 9; index += 1) {
+            panelCheck(db, `2026-10-06 0${index}:00:00`, 'verification_failed', 'badge_missing')
+          }
+          panelCheck(db, '2026-10-06 10:00:00', 'verification_failed', 'fetch_timeout')
+        }
+      ],
+      [
+        'ten yesterday',
+        db => {
+          for (let index = 0; index < 10; index += 1) {
+            panelCheck(db, `2026-10-05 0${index}:00:00`, 'badge_verified', null)
+          }
+        }
+      ]
+    ]
+    for (const [label, change] of allowed) {
+      const db = database('approved')
+      ownedLiveListing(db)
+      change(db)
+      expect(() => execute(db, claim()), label).not.toThrow()
+      db.close()
+    }
     expect(() => execute(database('approved'), claim({ ownerUserId: 'user_other' }))).toThrow(
       /malformed JSON/u
     )
   })
 
-  it('records a claimed check once: a pass or conclusive miss uses up a check', () => {
+  it('records a claimed check once, as a panel event, leaving the badge step’s counter alone', () => {
     const db = database('approved')
     ownedLiveListing(db)
     execute(db, claim())
     const finish = (
       result: { ok: true } | { code: string; ok: false },
-      conclusive: boolean,
       claimedAt = '2026-10-06 12:00:00'
     ) =>
       buildFinishListingBadgeCheckPlans({
         claimedAt,
-        conclusive,
         now: NOW,
         ownerUserId: 'user_owner',
         result,
         submissionId
       })
-    expect(() => execute(db, finish({ ok: true }, true, '2026-10-06 11:00:00'))).toThrow(
+    expect(() => execute(db, finish({ ok: true }, '2026-10-06 11:00:00'))).toThrow(
       /malformed JSON/u
     )
-    execute(db, finish({ code: 'timeout', ok: false }, false))
+    execute(db, finish({ code: 'link_not_followed', ok: false }))
+    execute(db, finish({ ok: true }))
     expect(submission(db)).toMatchObject({
-      last_verification_error: 'timeout',
+      last_verification_error: null,
       status: 'approved',
       verification_attempts: 0
     })
-    execute(db, finish({ code: 'link_not_followed', ok: false }, true))
-    expect(submission(db)).toMatchObject({
-      last_verification_error: 'link_not_followed',
-      verification_attempts: 1
-    })
-    execute(db, finish({ ok: true }, true))
-    expect(submission(db)).toMatchObject({
-      last_verification_error: null,
-      verification_attempts: 2
-    })
-    expect(events(db, 'verification_failed')).toBe(2)
-    expect(events(db, 'badge_verified')).toBe(1)
+    expect(
+      db
+        .prepare(
+          'SELECT event_type,detail,actor,created_at FROM listing_submission_events ORDER BY id'
+        )
+        .all()
+    ).toEqual([
+      {
+        actor: LISTING_BADGE_CHECK_ACTOR,
+        created_at: '2026-10-06 12:00:00',
+        detail: 'link_not_followed',
+        event_type: 'verification_failed'
+      },
+      {
+        actor: LISTING_BADGE_CHECK_ACTOR,
+        created_at: '2026-10-06 12:00:00',
+        detail: null,
+        event_type: 'badge_verified'
+      }
+    ])
     expect(count(db, 'SELECT COUNT(*) AS count FROM badge_checks')).toBe(0)
   })
 })

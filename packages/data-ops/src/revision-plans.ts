@@ -107,21 +107,30 @@ export function buildCreateRevisionPlans(input: {
 
 /**
  * Replaces an open revision's staged content and increments its `content_version`; only its
- * author edits it. Approval compares and swaps on the version the reviewer saw.
+ * author edits it. Approval compares and swaps on the version the reviewer saw. Pass
+ * `expectedContentVersion` (the version the author's form loaded) so a stale second tab is
+ * refused instead of overwriting newer edits (#102 review round 1).
  */
 export function buildReplaceRevisionContentPlans(input: {
   authorUserId: string
   content: StagedListingContent
+  expectedContentVersion?: number
   now: string
   revisionId: string
 }): StatementPlan[] {
   const { content } = input
+  const expected = input.expectedContentVersion
+  if (expected !== undefined && (!Number.isSafeInteger(expected) || expected < 1)) {
+    throw new Error('A content version is a positive integer read with the revision.')
+  }
   return [
     {
       sql: `UPDATE listing_revisions
         SET name=?,description=?,content=?,category_slug=?,logo_url=?,video_url=?,updated_at=?,
           content_version=content_version+1
-        WHERE id=? AND author_user_id=? AND status IN (${statusList(revisionTransitions.edit.from)})`,
+        WHERE id=? AND author_user_id=? AND status IN (${statusList(revisionTransitions.edit.from)})${
+          expected === undefined ? '' : ' AND content_version=?'
+        }`,
       params: [
         content.name,
         content.description,
@@ -131,7 +140,8 @@ export function buildReplaceRevisionContentPlans(input: {
         content.videoUrl ?? null,
         input.now,
         input.revisionId,
-        input.authorUserId
+        input.authorUserId,
+        ...(expected === undefined ? [] : [expected])
       ]
     },
     assertPreviousStatementChangedOne('revision_content_replaced'),

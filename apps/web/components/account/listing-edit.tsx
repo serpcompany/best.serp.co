@@ -75,6 +75,8 @@ export interface ListingEditView extends Extras {
         categoryName: string | null
         categorySlug: string
         content: string
+        /** The version the form loads: saving it back refuses a stale tab. */
+        contentVersion: number
         description: string
         logoUrl: string
         rejectionReason: string | null
@@ -274,6 +276,7 @@ export function ListingEdit({
       categorySlug: value.categorySlug,
       content: value.content,
       description: value.description,
+      expectedRevisionVersion: open?.contentVersion ?? null,
       logoUrl: value.logoUrl,
       ...extrasInput(extras)
     })

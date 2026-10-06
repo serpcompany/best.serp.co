@@ -225,7 +225,7 @@ test('a submission moves through its statuses, is resubmitted after a change req
   expect(submissionRow(id)?.content_version).toBe(2)
 
   // A reviewer asks for changes; the account shows the note and the edit form.
-  const note = 'Describe what it does in plain terms, without “#1”.'
+  const note = 'Describe what it does in plain terms, without “#1”, and link the plans page.'
   const changes = await adminPage.request.post(`/api/admin/submissions/${id}/request-changes`, {
     data: { note },
     headers: admin.headers
@@ -240,12 +240,18 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await expect(page.getByLabel('Website URL')).toBeDisabled()
   await page.getByLabel('Short description').fill('Sorts freelancer expenses into tax categories.')
   await expect(page.getByText('Edited', { exact: true })).toBeVisible()
+  // The note is about a link too: it's fixed in the same pass (#102 review round 1).
+  await expect(page.getByLabel('Link 1 URL')).toHaveValue('https://ledgerly.example/pricing')
+  await page.getByLabel('Link 1 URL').fill('https://ledgerly.example/plans')
   await capture(page, '06-changes-requested')
   await page.getByRole('button', { name: 'Resubmit for review' }).click()
   await expect(page.getByText(`${name} is back in the review queue.`)).toBeVisible()
   await expect(page.getByText('Waiting for a reviewer')).toBeVisible()
   await expect(page.getByText('Resubmitted')).toBeVisible()
   expect(submissionRow(id)).toMatchObject({ content_version: 3, status: 'verified' })
+  expect(
+    localD1(`SELECT url FROM listing_submission_resource_links WHERE submission_id = ${q(id)}`)
+  ).toEqual([{ url: 'https://ledgerly.example/plans' }])
   // The FAQs added in review are kept, and the admin hears it's back.
   await expect(page.getByText('Does it file my taxes?')).toBeVisible()
   await expect
@@ -272,7 +278,8 @@ test('a submission moves through its statuses, is resubmitted after a change req
   const panel = page.getByRole('dialog')
   await expect(panel.getByText(`${name} badge`)).toBeVisible()
   await expect(panel.getByText('Badge found, dofollow')).toBeVisible()
-  await expect(panel.getByText('9 of 10')).toBeVisible()
+  // The panel's own budget (10 a day); the badge step's check doesn't count.
+  await expect(panel.getByText('10 of 10')).toBeVisible()
   await capture(page, '05-badge-passing')
   fixture.update(label, { badge: 'nofollow' })
   // A check within the last 30 seconds (the submission's) keeps the button disabled.
@@ -283,7 +290,7 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await expect(panel.getByRole('button', { name: /Check again in 0:/u })).toBeDisabled()
   await expect(panel.getByText('Link is nofollow')).toBeVisible()
   await expect(panel.getByText('Fix the badge')).toBeVisible()
-  await expect(panel.getByText('8 of 10')).toBeVisible()
+  await expect(panel.getByText('9 of 10')).toBeVisible()
   // No weekly checks are promised while the badge program (#66) is off.
   await expect(panel.getByText(/weekly/iu)).toHaveCount(0)
   await capture(page, '05-badge-failing')
@@ -312,6 +319,40 @@ test('a submission moves through its statuses, is resubmitted after a change req
       WHERE listing_id = ${q(`submission_${id}`)} ORDER BY created_at DESC LIMIT 1`
   )
   expect(revision?.status).toBe('pending_review')
+  // Three tabs save the version they loaded at once: one wins, the others get 409.
+  const revisionBody = {
+    categorySlug: activeCategory(),
+    content: 'Turns rough product notes into landing pages.',
+    description: revised,
+    expectedRevisionVersion: revision?.content_version,
+    faqs: [
+      { answer: 'No. It prepares the worksheets; you file.', question: 'Does it file my taxes?' },
+      { answer: 'Most US banks and credit unions.', question: 'Which banks can I connect?' }
+    ],
+    logoUrl: `${website}icon.png`,
+    resourceLinks: [{ label: 'Pricing', url: 'https://ledgerly.example/plans' }]
+  }
+  const listingRowId = `submission_${id}`
+  const saves = await Promise.all(
+    [1, 2, 3].map(() =>
+      user.context.request.post(`/api/account/listings/${listingRowId}/revision`, {
+        data: revisionBody,
+        headers: user.headers
+      })
+    )
+  )
+  expect(saves.map(response => response.status()).sort()).toEqual([200, 409, 409])
+  expect(
+    localD1<{ content_version: number }>(
+      `SELECT content_version FROM listing_revisions WHERE id = ${q(revision?.id ?? '')}`
+    )[0]?.content_version
+  ).toBe((revision?.content_version ?? 0) + 1)
+  // The page still holds the old version: its save is refused, not applied.
+  await page.getByRole('button', { name: 'Change pending edits' }).click()
+  await page.getByRole('button', { name: 'Submit changes for review' }).click()
+  await expect(
+    page.getByText('This listing changed in another window. Reload and try again.')
+  ).toBeVisible()
   await page.goto('/account/')
   await expect(row(page, name).getByText('Edits in review')).toBeVisible()
   await expect
@@ -342,8 +383,8 @@ test('a submission moves through its statuses, is resubmitted after a change req
     await expect(async () => {
       const html = await (await visitor.get(`/products/${slug}/`)).text()
       expect(html).toContain(revised)
-      // The link added while the submission was in review is on the listing page.
-      expect(html).toContain('https://ledgerly.example/pricing')
+      // The link fixed in the resubmission is on the listing page.
+      expect(html).toContain('https://ledgerly.example/plans')
     }).toPass({ intervals: [1_000, 2_000, 5_000], timeout: 90_000 })
   } finally {
     await visitor.dispose()
@@ -459,6 +500,7 @@ test('shows and acts on the user’s own records only, never cached or indexed',
         categorySlug: activeCategory(),
         content: '',
         description: 'Taken over.',
+        expectedRevisionVersion: null,
         faqs: [],
         logoUrl: `https://${listingSlug}/logo.png`,
         resourceLinks: []

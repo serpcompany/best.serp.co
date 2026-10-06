@@ -11,6 +11,7 @@ import {
   CardTitle
 } from '@serpdirectory/design-system/card'
 import { FieldDescription, FieldGroup } from '@serpdirectory/design-system/field'
+import { Separator } from '@serpdirectory/design-system/separator'
 import { Spinner } from '@serpdirectory/design-system/spinner'
 import { MessageSquare, Pencil, Plus, Undo2 } from 'lucide-react'
 import Link from 'next/link'
@@ -241,9 +242,11 @@ function ExtrasCard({ faqsHint, view }: { faqsHint: string; view: SubmissionDeta
 
 function ResubmitCard({
   categories,
+  faqsHint,
   view
 }: {
   categories: readonly CategoryChoice[]
+  faqsHint: string
   view: SubmissionDetailView
 }) {
   const router = useRouter()
@@ -256,15 +259,24 @@ function ResubmitCard({
   }
   const [value, setValue] = useState<ContentValue>(original)
   const [errors, setErrors] = useState<ContentErrors>({})
+  // FAQs and links are fixed in the same pass when the note is about one (#102 round 1).
+  const [extras, setExtras] = useState<ExtrasValue>(() => extrasValue(view))
+  const [extrasProblems, setExtrasProblems] = useState<ExtrasErrors | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function resubmit() {
     const found = contentErrors(value, true)
+    const foundExtras = extrasErrors(extras)
     setErrors(found)
-    if (Object.keys(found).length > 0) return
+    setExtrasProblems(foundExtras)
+    if (Object.keys(found).length > 0 || hasExtrasErrors(foundExtras)) {
+      toast.error('Fix the highlighted fields.')
+      return
+    }
     setBusy(true)
     const response = await resubmitSubmission(view.id, {
       ...value,
+      ...extrasInput(extras),
       expectedContentVersion: view.contentVersion
     })
     setBusy(false)
@@ -296,6 +308,13 @@ function ResubmitCard({
               note: 'To change the URL, withdraw this submission and submit again.',
               url: view.website
             }}
+          />
+          <Separator />
+          <ExtrasEditor
+            errors={extrasProblems}
+            faqsHint={faqsHint}
+            onChange={setExtras}
+            value={extras}
           />
         </FieldGroup>
       </CardContent>
@@ -354,7 +373,7 @@ export function SubmissionDetail({
           <p>“{view.reviewerNote ?? 'A reviewer asked for changes.'}”</p>
           <p className="text-xs">From the SERP team · {formatDay(view.reviewedAt)}</p>
         </ToneAlert>
-        <ResubmitCard categories={categories} view={view} />
+        <ResubmitCard categories={categories} faqsHint={faqsHint} view={view} />
       </>
     )
   } else if (view.status === 'in_review' || view.status === 'live_paid') {

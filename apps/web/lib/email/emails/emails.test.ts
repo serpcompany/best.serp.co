@@ -551,6 +551,14 @@ You're getting this because devin@serp.co receives review alerts for best.serp.c
       'Review submission: https://best.serp.co/admin/revisions/s_4f9k2c/'
     )
     expect(linksTo(waiting.html, 'https://best.serp.co/admin/revisions/s_4f9k2c/')).toBe(true)
+    // A revision of a listing whose owner an admin assigned has no plan, and still alerts.
+    const unplanned = renderAppEmail(
+      'admin-review-ready',
+      { ...sample.input, plan: { kind: 'none' }, source: 'revision' },
+      { environment: 'production', to: sample.to }
+    )
+    expect(unplanned.subject).toBe('Ready for review: Quillmate (owner edit)')
+    expect(unplanned.text).toContain('Plan: None. An admin assigned the owner')
   })
 })
 

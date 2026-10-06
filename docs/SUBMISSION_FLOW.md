@@ -38,7 +38,7 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
 | edit (owner) | `draft`, `pending_badge`, `changes_requested` | unchanged (`edited`, `content_version` + 1) |
 | edit (reviewer) | any non-final status | unchanged (`edited`, `content_version` + 1) |
 | FAQs and links (owner, #65) | `verified`, `paid_pending_review` | unchanged (`edited`, `content_version` + 1) |
-| badge check of the live free listing (owner, #65) | `approved` | unchanged (check counters, an event) |
+| badge check of the live free listing (owner, #65) | `approved` | unchanged (`last_verification_at`, an event) |
 
 - Drafts never enter the review queue, are never badge-checked, and trigger no badge or review
   email. Like every non-final status, a draft holds its URL key against duplicates (the

@@ -14,7 +14,8 @@ import {
   buildReplaceSubmissionContentPlans,
   buildReplaceSubmissionExtrasPlans,
   buildResubmitSubmissionPlans,
-  buildWithdrawSubmissionPlans
+  buildWithdrawSubmissionPlans,
+  LISTING_BADGE_CHECK_ACTOR
 } from './submission-plans'
 import {
   CONCLUSIVE_VERIFICATION_FAILURES,
@@ -22,7 +23,6 @@ import {
   SUBMISSION_LIMITS,
   SubmissionError,
   VERIFICATION_COOLDOWN_SECONDS,
-  VERIFICATION_MAX_ATTEMPTS,
   validateDraftContent
 } from './submissions'
 
@@ -47,7 +47,15 @@ export const ACCOUNT_LIMITS = {
 /** Rows per list; a submitter has a handful. */
 const LIST_LIMIT = 200
 /** Badge history entries per listing. */
-const HISTORY_LIMIT = 10
+const HISTORY_LIMIT = 20
+
+/**
+ * The badge panel's own budget (#102 review round 1): checks that find a result, per listing,
+ * in the last 24 hours, on top of the 30-second cooldown. It resets over time, so a listing
+ * whose badge step used its ten checks can still be checked.
+ */
+export const LISTING_BADGE_CHECKS_PER_DAY = 10
+const BADGE_WINDOW_MS = 24 * 60 * 60 * 1000
 
 export interface AccountFaq {
   answer: string
@@ -111,17 +119,20 @@ export interface AccountBadgeCheck {
   at: string
   by: 'owner' | 'program'
   conclusive: boolean
+  /** A check from the account's badge panel (what its 24-hour budget counts). */
+  fromPanel: boolean
   outcome: 'fail' | 'pass'
   reason: string | null
 }
 
-/** A live free listing's badge, checked from its approved submission's counters. */
+/** A live free listing's badge, checked through its approved submission. */
 export interface AccountListingBadge {
+  /** Panel checks that found a result in the last 24 hours (`LISTING_BADGE_CHECKS_PER_DAY`). */
+  checksInWindow: number
   history: AccountBadgeCheck[]
   lastCheckAt: string | null
   lastError: string | null
   submissionId: string
-  verificationAttempts: number
 }
 
 export interface AccountRevision {
@@ -258,12 +269,13 @@ const LISTING_JOINS = `LEFT JOIN listing_submissions s ON s.id=(SELECT x.id FROM
 function badgeHistoryPlan(userId: string, slug: string | null): StatementPlan {
   const listingFilter = slug === null ? '' : ' AND l.slug=?2'
   return {
-    sql: `SELECT listing_id,at,by,outcome,reason,conclusive FROM (
+    sql: `SELECT listing_id,at,by,outcome,reason,conclusive,from_panel FROM (
         SELECT s.listing_id,strftime('%Y-%m-%dT%H:%M:%fZ',e.created_at) AS at,'owner' AS by,
           CASE WHEN e.event_type='badge_verified' THEN 'pass' ELSE 'fail' END AS outcome,
           e.detail AS reason,
           CASE WHEN e.event_type='badge_verified'
             OR e.detail IN (SELECT value FROM json_each(?3)) THEN 1 ELSE 0 END AS conclusive,
+          CASE WHEN e.actor='${LISTING_BADGE_CHECK_ACTOR}' THEN 1 ELSE 0 END AS from_panel,
           e.id AS sort_id
         FROM listing_submission_events e JOIN listing_submissions s ON s.id=e.submission_id
           JOIN listings l ON l.id=s.listing_id
@@ -271,7 +283,7 @@ function badgeHistoryPlan(userId: string, slug: string | null): StatementPlan {
           AND ${OWNED}${listingFilter}
         UNION ALL
         SELECT b.listing_id,b.checked_at AS at,'program' AS by,b.outcome,b.reason,b.conclusive,
-          b.id AS sort_id
+          0 AS from_panel,b.id AS sort_id
         FROM badge_checks b JOIN listings l ON l.id=b.listing_id
         WHERE ${OWNED}${listingFilter})
       ORDER BY at DESC,sort_id DESC LIMIT ${slug === null ? LIST_LIMIT : HISTORY_LIMIT}`,
@@ -412,12 +424,19 @@ function toBadgeCheck(row: Row): AccountBadgeCheck {
     at: accountInstant(row.at) ?? '',
     by: row.by === 'program' ? 'program' : 'owner',
     conclusive: Number(row.conclusive) === 1,
+    fromPanel: Number(row.from_panel) === 1,
     outcome: row.outcome === 'pass' ? 'pass' : 'fail',
     reason: optional(row.reason)
   }
 }
 
-function toListing(row: Row, history: AccountBadgeCheck[]): AccountListing {
+/** Panel checks that found a result since `windowStart` (an ISO instant). */
+function checksSince(history: readonly AccountBadgeCheck[], windowStart: string): number {
+  return history.filter(check => check.fromPanel && check.conclusive && check.at > windowStart)
+    .length
+}
+
+function toListing(row: Row, history: AccountBadgeCheck[], now: Date): AccountListing {
   const submissionId = optional(row.submission_id)
   const plan = (optional(row.plan) as SubmissionPlan | null) ?? null
   const revisionId = optional(row.revision_id)
@@ -429,11 +448,14 @@ function toListing(row: Row, history: AccountBadgeCheck[]): AccountListing {
   return {
     badge: free
       ? {
+          checksInWindow: checksSince(
+            history,
+            new Date(now.getTime() - BADGE_WINDOW_MS).toISOString()
+          ),
           history,
           lastCheckAt: accountInstant(row.last_verification_at),
           lastError: optional(row.last_verification_error),
-          submissionId,
-          verificationAttempts: Number(row.verification_attempts ?? 0)
+          submissionId
         }
       : null,
     categoryName: optional(row.category_name),
@@ -443,7 +465,14 @@ function toListing(row: Row, history: AccountBadgeCheck[]): AccountListing {
     live: Number(row.live) === 1,
     logoUrl: optional(row.logo_url),
     name: text(row.name),
-    plan: submissionId ? plan : row.verified_via === 'paid_claim' ? 'paid' : null,
+    // Without a submission, a claim decides the plan (#67): paid, or free by the badge.
+    plan: submissionId
+      ? plan
+      : row.verified_via === 'paid_claim'
+        ? 'paid'
+        : row.verified_via === 'badge_claim'
+          ? 'free'
+          : null,
     publishedAt: accountInstant(row.published_at),
     revision: revisionId
       ? {
@@ -535,7 +564,6 @@ export interface AccountOperations {
   /** Records a claimed check; `verification_superseded` (409) when a later claim overtook it. */
   finishListingBadgeCheck(input: {
     claimedAt: string
-    conclusive: boolean
     result: { ok: true } | { code: string; ok: false }
     submissionId: string
     userId: string
@@ -546,21 +574,26 @@ export interface AccountOperations {
   overview(userId: string): Promise<AccountOverview>
   /**
    * Saves the owner's edits of a changes-requested submission and sends it back to the review
-   * queue it left, in one batch (`stale_submission`, 409, when it changed meanwhile).
+   * queue it left, in one batch (`stale_submission`, 409, when it changed meanwhile). With
+   * `extras`, its FAQs and links are replaced too (a note may be about one); without, kept.
    */
   resubmitSubmission(input: {
     content: DraftContent
     expectedContentVersion: number
+    extras?: AccountExtras
     submissionId: string
     userId: string
   }): Promise<AccountSubmissionDetail>
   /**
    * Stages the owner's edits of a live listing: a new revision, or the open one replaced (and
    * sent back to review when changes were requested). Returns the revision and whether it
-   * (re)entered the review queue.
+   * (re)entered the review queue. `expectedRevisionVersion` is the open revision's
+   * `contentVersion` the form loaded, or null when it loaded none; anything else is a stale tab
+   * and is refused (`stale_revision`, 409) instead of overwriting newer edits.
    */
   saveRevision(input: {
     content: RevisionContent
+    expectedRevisionVersion: number | null
     listingId: string
     newRevisionId: string
     userId: string
@@ -639,7 +672,7 @@ export function createAccountOperations(config: {
       await read(selectAccountListingPlans(userId, slug))
     const row = rows?.[0]
     if (!row) return null
-    const base = toListing(row, (history ?? []).map(toBadgeCheck))
+    const base = toListing(row, (history ?? []).map(toBadgeCheck), now())
     const staged = revisionRows?.[0]
     return {
       ...base,
@@ -710,10 +743,11 @@ export function createAccountOperations(config: {
           cooldownCutoff: sqliteTimestamp(
             new Date(at.getTime() - VERIFICATION_COOLDOWN_SECONDS * 1000)
           ),
-          maxAttempts: VERIFICATION_MAX_ATTEMPTS,
+          maxChecks: LISTING_BADGE_CHECKS_PER_DAY,
           now: at.toISOString(),
           ownerUserId: userId,
-          submissionId: current.badge.submissionId
+          submissionId: current.badge.submissionId,
+          windowStart: sqliteTimestamp(new Date(at.getTime() - BADGE_WINDOW_MS))
         })
       )
       const fresh = await listingById(userId, listingId)
@@ -726,11 +760,12 @@ export function createAccountOperations(config: {
           409
         )
       }
-      const conclusiveLast =
-        badge.lastError === null ||
-        (CONCLUSIVE_VERIFICATION_FAILURES as readonly string[]).includes(badge.lastError)
-      if (badge.verificationAttempts >= VERIFICATION_MAX_ATTEMPTS && conclusiveLast) {
-        throw new SubmissionError('attempt_limit', 'Badge verification attempt limit reached.', 429)
+      if (badge.checksInWindow >= LISTING_BADGE_CHECKS_PER_DAY) {
+        throw new SubmissionError(
+          'attempt_limit',
+          'This badge was checked 10 times in the last 24 hours. Try again later.',
+          429
+        )
       }
       throw new SubmissionError('cooldown', 'Wait 30 seconds before checking again.', 429)
     },
@@ -760,11 +795,10 @@ export function createAccountOperations(config: {
       }
     },
 
-    async finishListingBadgeCheck({ claimedAt, conclusive, result, submissionId, userId }) {
+    async finishListingBadgeCheck({ claimedAt, result, submissionId, userId }) {
       const recorded = await write(
         buildFinishListingBadgeCheckPlans({
           claimedAt,
-          conclusive,
           now: now().toISOString(),
           ownerUserId: userId,
           result,
@@ -796,12 +830,14 @@ export function createAccountOperations(config: {
         history.set(id, entries)
       }
       return {
-        listings: (listingRows ?? []).map(row => toListing(row, history.get(text(row.id)) ?? [])),
+        listings: (listingRows ?? []).map(row =>
+          toListing(row, history.get(text(row.id)) ?? [], now())
+        ),
         submissions: (submissionRows ?? []).map(toSubmission)
       }
     },
 
-    async resubmitSubmission({ content, expectedContentVersion, submissionId, userId }) {
+    async resubmitSubmission({ content, expectedContentVersion, extras, submissionId, userId }) {
       const current = await requireSubmission(userId, submissionId)
       if (current.status !== 'changes_requested') {
         throw new SubmissionError(
@@ -814,17 +850,24 @@ export function createAccountOperations(config: {
       if (!(await activeCategory(checked.categorySlug))) {
         throw new SubmissionError('invalid_category', 'Choose a primary category.')
       }
+      const children = extras
+        ? validateExtras(extras)
+        : { faqs: current.faqs, resourceLinks: current.resourceLinks }
       const at = now().toISOString()
-      const edited = (
+      const edited: string[] = (
         ['name', 'description', 'content', 'categorySlug', 'logoUrl'] as const
       ).filter(field => checked[field] !== current[field])
+      if (JSON.stringify(children.faqs) !== JSON.stringify(current.faqs)) edited.push('faqs')
+      if (JSON.stringify(children.resourceLinks) !== JSON.stringify(current.resourceLinks)) {
+        edited.push('resourceLinks')
+      }
       const done = await write([
         ...buildReplaceSubmissionContentPlans({
           actor: userId,
           content: {
             ...checked,
-            faqs: current.faqs,
-            resourceLinks: current.resourceLinks,
+            faqs: children.faqs,
+            resourceLinks: children.resourceLinks,
             videoUrl: current.videoUrl
           },
           eventDetail: JSON.stringify({ fields: edited }),
@@ -856,7 +899,7 @@ export function createAccountOperations(config: {
       return requireSubmission(userId, submissionId)
     },
 
-    async saveRevision({ content, listingId, newRevisionId, userId }) {
+    async saveRevision({ content, expectedRevisionVersion, listingId, newRevisionId, userId }) {
       const current = await listingById(userId, listingId)
       if (!current.live) {
         throw new SubmissionError('not_editable', 'Only a live listing can be edited.', 409)
@@ -917,6 +960,13 @@ export function createAccountOperations(config: {
         resourceLinks: extras.resourceLinks,
         videoUrl: current.videoUrl
       }
+      const stale = new SubmissionError(
+        'stale_revision',
+        'This listing changed in another window. Reload and try again.',
+        409
+      )
+      // The form edits what it loaded: the open revision at that version, or the live listing.
+      if ((open?.contentVersion ?? null) !== expectedRevisionVersion) throw stale
       const at = now().toISOString()
       const revisionId = open?.id ?? newRevisionId
       const plans = open
@@ -924,6 +974,7 @@ export function createAccountOperations(config: {
             ...buildReplaceRevisionContentPlans({
               authorUserId: userId,
               content: staged,
+              expectedContentVersion: open.contentVersion,
               now: at,
               revisionId
             }),
@@ -938,13 +989,7 @@ export function createAccountOperations(config: {
             now: at,
             revisionId
           })
-      if (!(await write(plans))) {
-        throw new SubmissionError(
-          'stale_revision',
-          'This listing changed in another window. Reload and try again.',
-          409
-        )
-      }
+      if (!(await write(plans))) throw stale
       return { queued: !open || open.status === 'changes_requested', revisionId }
     },
 

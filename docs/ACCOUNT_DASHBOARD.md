@@ -37,20 +37,26 @@ architecture guard requires both calls and keeps SQL out of `lib/account/`.
 | Endpoint | Body | Does |
 |---|---|---|
 | `submissions/<id>/withdraw` | none | `draft`, `pending_badge`, `verified`, `changes_requested`, never once paid or live (#59) |
-| `submissions/<id>/resubmit` | details, `expectedContentVersion` | the owner's edit plus `resubmit`, one batch; FAQs and links are kept |
+| `submissions/<id>/resubmit` | details, optional `faqs` and `resourceLinks`, `expectedContentVersion` | the owner's edit plus `resubmit`, one batch; FAQs and links are replaced when sent, else kept |
 | `submissions/<id>/extras` | `faqs`, `resourceLinks`, `expectedContentVersion` | FAQs and links while `verified` or `paid_pending_review` |
-| `listings/<id>/revision` | details, `faqs`, `resourceLinks` | a new revision, or the open one replaced (and resubmitted after a change request) |
+| `listings/<id>/revision` | details, `faqs`, `resourceLinks`, `expectedRevisionVersion` | a new revision, or the open one replaced (and resubmitted after a change request) |
 | `listings/<id>/discard-revision` | none | withdraws the open revision |
 | `listings/<id>/verify-badge` | none | checks a live free listing's badge (below) |
 
 A changed logo is checked as on `/submit/` (https, then a fetch that confirms the image); an
 unchanged one is kept as stored, so an imported listing's site-relative logo survives an edit.
-Links must be https. At most five FAQs and five links (`ACCOUNT_LIMITS`). Edits count against
-the submit flow's 10 saves an hour per account. Name and website never change here.
+Links must be https. At most five FAQs and five links (`ACCOUNT_LIMITS`). Name and website never
+change here. Every save carries the version its form loaded (`expectedContentVersion`, or
+`expectedRevisionVersion`: the open revision's, or null for the live listing), and the plans
+compare and swap on it, so a stale tab gets 409 and never overwrites newer edits. Edits spend
+their own budget (`lib/account/limits.ts`: 10 a minute, 60 an hour per account), apart from the
+submit flow's draft saves, and only once the request is valid: a refused or stale save costs
+nothing.
 
 A resubmission and a revision entering the queue send `admin-review-ready` to the admin
-recipient (keyed by the item and its content version); its button opens
-`/admin/revisions/<id>/` for a revision. Revision decisions send nothing to the owner yet: there
+recipient (keyed by the item and its content version), whatever the listing's plan (an owner an
+admin assigned reads "None"); its button opens `/admin/revisions/<id>/` for a revision. Revision
+decisions send nothing to the owner yet: there
 is no approved template.
 
 ## FAQs and links in review
@@ -68,12 +74,14 @@ listing page soon." instead of the mockup's "Shown on your listing page." (owner
 
 For a live free listing (its approved, unpaid submission with `plan = 'free'`), the Drawer shows
 the last check, its result, the embed code, and the history, and "Re-verify now" runs the badge
-step's verifier (#84) with its rules: one compare-and-swap claim on the submission
-(`listingBadgeCheck`, 30-second cooldown, ten checks that find a result, connection problems
-never count), then the outbound budget per submission, account, and client address. The button
+step's verifier (#84): one compare-and-swap claim on the submission (`listingBadgeCheck`, the
+30-second cooldown, and the panel's own budget of ten checks that find a result per listing in
+the last 24 hours, so it refills and never depends on the badge step's lifetime ten; connection
+problems never count), then the outbound budget per submission, account, and client address.
+The checks are events with the actor `account-badge-check`, stamped with the check's time. The button
 is disabled while a check runs and through the cooldown (the owner decision for the badge step),
-with no "too many checks" copy. The owner's checks are recorded on the submission (its counters
-and `badge_verified` / `verification_failed` events), never in `badge_checks`, which stays the
+with no "too many checks" copy. The owner's checks are recorded on the submission
+(`last_verification_at` and `badge_verified` / `verification_failed` events), never in `badge_checks`, which stays the
 badge program's (#66) history, so a manual miss can't start #66's recheck or count toward the
 refund window. The history merges both, marked "You" or the program's label. Until
 `features.badgeProgram` is on, nothing promises weekly checks (`feature-copy.ts`), and the

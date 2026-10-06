@@ -889,17 +889,17 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       claimedAt: '2026-10-06 12:00:00',
       conclusiveCodes: ['badge_missing', 'link_not_followed'],
       cooldownCutoff: '2026-10-06 11:59:30',
-      maxAttempts: 10,
+      maxChecks: 10,
       now: NOW,
       ownerUserId: 'user_owner',
-      submissionId: 'sub-dash'
+      submissionId: 'sub-dash',
+      windowStart: '2026-10-05 12:00:00'
     }
     await run(S.buildClaimListingBadgeCheckPlans(claim))
     await expect(run(S.buildClaimListingBadgeCheckPlans(claim))).rejects.toThrow()
     await run(
       S.buildFinishListingBadgeCheckPlans({
         claimedAt: claim.claimedAt,
-        conclusive: true,
         now: NOW,
         ownerUserId: 'user_owner',
         result: { code: 'link_not_followed', ok: false },
@@ -942,6 +942,7 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       plan: 'free'
     })
     const saved = await account.saveRevision({
+      expectedRevisionVersion: null,
       content: {
         categorySlug: 'apps',
         content: 'Owner revision',

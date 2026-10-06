@@ -1,12 +1,20 @@
+import { validateExtras } from '@serpdirectory/data-ops/account'
 import { revisionRequestSchema } from '@/lib/account/contract'
 import { sendRevisionReadyAlert } from '@/lib/account/emails'
-import { ACCOUNT_ID, accountNotFound, changedLogoProblem, parseBody } from '@/lib/account/requests'
+import {
+  ACCOUNT_ID,
+  accountNotFound,
+  changedLogoProblem,
+  parseBody,
+  spendAccountEdit,
+  staleAnswer
+} from '@/lib/account/requests'
 import { accountOperations } from '@/lib/account/runtime'
 import { clientIp } from '@/lib/auth/rate-limits'
 import { authorizeUserRequest, consumeRequestRateLimit } from '@/lib/auth/server'
 import { verifyFeaturedBadge } from '@/lib/submissions/badge-verifier'
-import { isConclusiveFailure } from '@/lib/submissions/contract'
 import {
+  apiError,
   authorizationFailure,
   json,
   payloadTooLarge,
@@ -15,7 +23,6 @@ import {
 } from '@/lib/submissions/http'
 import { badgeCheckRateLimitRules } from '@/lib/submissions/limits'
 import { submissionBadgeVerificationTargets } from '@/lib/submissions/presentation'
-import { consumeSubmissionRateLimit } from '@/lib/submissions/repository'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,9 +34,9 @@ export const dynamic = 'force-dynamic'
  *   changed (and sent back to review when changes were requested). Nothing public changes until
  *   an admin approves it. A changed logo is checked as the submit flow checks one.
  * - `discard-revision`: withdraws the open revision.
- * - `verify-badge`: checks a live free listing's badge with the badge step's verifier and limits
- *   (#84): one claim in a compare-and-swap (30-second cooldown, ten checks), the outbound budget
- *   per submission, account, and client address, then the fetch.
+ * - `verify-badge`: checks a live free listing's badge with the badge step's verifier (#84): one
+ *   claim in a compare-and-swap (30-second cooldown, ten checks that find a result per 24
+ *   hours), the outbound budget per submission, account, and client address, then the fetch.
  *
  * Every read and write is scoped to the session's user in SQL, so someone else's id is a 404.
  */
@@ -53,14 +60,30 @@ export async function POST(
       if (!parsed.ok) return parsed.response
       const current = await operations.listingById(user.id, id)
       if (!current) return accountNotFound('listing')
-      await consumeSubmissionRateLimit(`user:${user.id}`)
+      if (!current.live) {
+        return apiError(409, 'not_editable', 'Only a live listing can be edited.')
+      }
+      const open =
+        current.revision?.status === 'pending_review' ||
+        current.revision?.status === 'changes_requested'
+          ? current.revision
+          : null
+      // The form saves what it loaded: a stale tab never overwrites newer edits.
+      if ((open?.contentVersion ?? null) !== parsed.data.expectedRevisionVersion) {
+        return staleAnswer('listing')
+      }
+      validateExtras(parsed.data)
+      const limited = await spendAccountEdit(user.id)
+      if (limited) return limited
       const unchanged = [current.logoUrl, current.revision?.logoUrl].includes(parsed.data.logoUrl)
       if (!unchanged) {
         const problem = await changedLogoProblem(parsed.data.logoUrl)
         if (problem) return problem
       }
+      const { expectedRevisionVersion, ...content } = parsed.data
       const saved = await operations.saveRevision({
-        content: parsed.data,
+        content,
+        expectedRevisionVersion,
         listingId: id,
         newRevisionId: crypto.randomUUID(),
         userId: user.id
@@ -107,7 +130,6 @@ export async function POST(
       )
       await operations.finishListingBadgeCheck({
         claimedAt,
-        conclusive: !result.ok && isConclusiveFailure(result.code),
         result: result.ok ? { ok: true } : { code: result.code, ok: false },
         submissionId,
         userId: user.id

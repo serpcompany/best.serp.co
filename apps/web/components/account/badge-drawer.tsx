@@ -283,8 +283,8 @@ export function BadgeDrawer({
                 : 'Re-verify now'}
           </Button>
           <p className="text-center text-xs text-muted-foreground">
-            <b className="tabular-nums text-foreground">{badge.checksLeft} of 10</b> checks left ·
-            one every 30 seconds
+            <b className="tabular-nums text-foreground">{badge.checksLeft} of 10</b> checks left
+            today · one every 30 seconds
           </p>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close

@@ -18,6 +18,8 @@ import {
 export type ReviewPlan =
   | { badgeVerifiedAt: Date | string; kind: 'free' }
   | { kind: 'paid'; live: boolean }
+  /** A listing with no plan: its owner was assigned by an admin (a revision, #65). */
+  | { kind: 'none' }
 
 export interface AdminReviewReadyInput {
   category: string
@@ -43,6 +45,9 @@ function planLabels(plan: ReviewPlan): { row: string; subject: string } {
     return plan.live
       ? { row: 'Paid. Live now', subject: 'paid, live now' }
       : { row: 'Paid. Waiting for review', subject: 'paid, waiting for review' }
+  }
+  if (plan.kind === 'none') {
+    return { row: 'None. An admin assigned the owner', subject: 'owner edit' }
   }
   throw new EmailTemplateError('Unknown review plan.')
 }

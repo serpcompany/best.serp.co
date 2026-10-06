@@ -38,9 +38,8 @@ export async function sendResubmittedAlert(input: {
 }
 
 /**
- * Sent when a revision enters the queue (new, or fixed after a change request). A listing with
- * no plan (an owner an admin assigned) has no plan line to show, so it sends nothing; the queue
- * still lists the revision.
+ * Sent for every revision that enters the queue (new, or fixed after a change request),
+ * whatever the listing's plan: one whose owner an admin assigned says so (#102 review round 1).
  */
 export async function sendRevisionReadyAlert(input: {
   listing: AccountListingDetail
@@ -49,7 +48,7 @@ export async function sendRevisionReadyAlert(input: {
 }): Promise<void> {
   const { listing } = input
   const revision = listing.revision
-  if (!listing.plan || !revision || revision.id !== input.revisionId) return
+  if (!revision || revision.id !== input.revisionId) return
   const verified = listing.badge?.history.find(check => check.outcome === 'pass')?.at
   await enqueueEmail('admin-review-ready', {
     eventKey: emailEventKey('revision-ready', revision.id, String(revision.contentVersion)),
@@ -58,7 +57,9 @@ export async function sendRevisionReadyAlert(input: {
       plan:
         listing.plan === 'paid'
           ? { kind: 'paid', live: listing.live }
-          : { badgeVerifiedAt: verified ?? listing.publishedAt ?? new Date(), kind: 'free' },
+          : listing.plan === 'free'
+            ? { badgeVerifiedAt: verified ?? listing.publishedAt ?? new Date(), kind: 'free' }
+            : { kind: 'none' },
       source: 'revision',
       submissionId: revision.id,
       submissionName: listing.name,

@@ -871,6 +871,9 @@ export function buildReplaceSubmissionExtrasPlans(input: {
   ]
 }
 
+/** The actor of an owner's listing badge check events (#65), apart from the badge step's. */
+export const LISTING_BADGE_CHECK_ACTOR = 'account-badge-check'
+
 /** What a listing badge check compares and swaps against (#65). */
 export interface ListingBadgeCheckClaim {
   /** `YYYY-MM-DD HH:MM:SS` (UTC), as the badge step's claim writes `last_verification_at`. */
@@ -879,21 +882,33 @@ export interface ListingBadgeCheckClaim {
   conclusiveCodes: readonly string[]
   /** `last_verification_at` at or before this is past the cooldown. */
   cooldownCutoff: string
-  maxAttempts: number
+  /** Checks that found a result in the window, at most (10 per listing per 24 hours). */
+  maxChecks: number
   now: string
   ownerUserId: string
   submissionId: string
+  /** `YYYY-MM-DD HH:MM:SS` (UTC): the start of the window the cap counts. */
+  windowStart: string
+}
+
+/** Events of the owner's listing checks that found a result, on the submission `s`. */
+function countedListingChecks(submissionSql: string): string {
+  return `(SELECT COUNT(*) FROM listing_submission_events e
+    WHERE e.submission_id=${submissionSql} AND e.actor='${LISTING_BADGE_CHECK_ACTOR}'
+      AND e.created_at>?
+      AND (e.event_type='badge_verified' OR e.detail IN (SELECT value FROM json_each(?))))`
 }
 
 /**
  * The owner claims one badge check of their live free listing (#65), before anything is
- * fetched, with the badge step's rules (`claimVerification`): the listing's approved free,
- * unpaid submission, its listing live and still theirs, past the cooldown, and under the cap of
- * conclusive checks. The claim and its result live on the submission (its check counters and
- * events), not in `badge_checks`, which holds the badge program's checks (#66) only.
+ * fetched: the listing's approved free, unpaid submission, its listing live and still theirs,
+ * past the 30-second cooldown, and under its own cap of checks that found a result in the last
+ * 24 hours (round-1 review of #102: the badge step's lifetime cap of ten could lock the panel
+ * forever). The claim and its result live on the submission (`last_verification_at`, an event),
+ * never in `badge_checks`, which holds the badge program's checks (#66) only.
  */
 export function buildClaimListingBadgeCheckPlans(input: ListingBadgeCheckClaim): StatementPlan[] {
-  if (!Number.isSafeInteger(input.maxAttempts) || input.maxAttempts < 1) {
+  if (!Number.isSafeInteger(input.maxChecks) || input.maxChecks < 1) {
     throw new Error('A badge check cap is a positive integer.')
   }
   return [
@@ -908,16 +923,16 @@ export function buildClaimListingBadgeCheckPlans(input: ListingBadgeCheckClaim):
               AND o.user_id=listing_submissions.owner_user_id
               AND o.role='owner' AND o.revoked_at IS NULL)
           AND (last_verification_at IS NULL OR last_verification_at<=?)
-          AND NOT (verification_attempts>=? AND (last_verification_error IS NULL
-            OR last_verification_error IN (SELECT value FROM json_each(?))))`,
+          AND ${countedListingChecks('listing_submissions.id')}<?`,
       params: [
         input.claimedAt,
         input.now,
         input.submissionId,
         input.ownerUserId,
         input.cooldownCutoff,
-        input.maxAttempts,
-        JSON.stringify(input.conclusiveCodes)
+        input.windowStart,
+        JSON.stringify(input.conclusiveCodes),
+        input.maxChecks
       ]
     },
     assertPreviousStatementChangedOne('listing_badge_check_claimed')
@@ -926,35 +941,40 @@ export function buildClaimListingBadgeCheckPlans(input: ListingBadgeCheckClaim):
 
 /**
  * Records a claimed listing badge check (#65), compare-and-swapping on the claim, so a check
- * overtaken by a later claim records nothing. A pass or a conclusive failure uses up one check;
- * a connection problem does not. The event is the owner-visible badge history.
+ * overtaken by a later claim records nothing. The event (actor `account-badge-check`, stamped
+ * with the check's time) is the owner-visible history and what the 24-hour cap counts: a pass or
+ * a conclusive failure counts, a connection problem doesn't. The badge step's own counters
+ * (`verification_attempts`) are left alone.
  */
 export function buildFinishListingBadgeCheckPlans(input: {
   claimedAt: string
-  /** Whether a failure is conclusive (the page loaded and the badge was missing or unfollowed). */
-  conclusive: boolean
   now: string
   ownerUserId: string
   result: { ok: true } | { code: string; ok: false }
   submissionId: string
 }): StatementPlan[] {
   const error = input.result.ok ? null : input.result.code
-  const increment = input.result.ok || input.conclusive ? 1 : 0
+  const stamp = input.now.slice(0, 19).replace('T', ' ')
   return [
     {
-      sql: `UPDATE listing_submissions
-        SET verification_attempts=verification_attempts+?,last_verification_error=?,updated_at=?
+      sql: `UPDATE listing_submissions SET last_verification_error=?,updated_at=?
         WHERE id=? AND owner_user_id=? AND last_verification_at=?
           AND status IN (${statusList(submissionTransitions.listingBadgeCheck.from)})`,
-      params: [increment, error, input.now, input.submissionId, input.ownerUserId, input.claimedAt]
+      params: [error, input.now, input.submissionId, input.ownerUserId, input.claimedAt]
     },
     assertPreviousStatementChangedOne('listing_badge_check_recorded'),
-    event(
-      input.submissionId,
-      input.result.ok ? 'badge_verified' : 'verification_failed',
-      'badge-verifier',
-      error
-    )
+    {
+      sql: `INSERT INTO listing_submission_events (submission_id,event_type,detail,actor,created_at)
+        VALUES (?,?,?,?,?)`,
+      params: [
+        input.submissionId,
+        input.result.ok ? 'badge_verified' : 'verification_failed',
+        // An inconclusive failure is recorded without counting: its code is not in the list.
+        error,
+        LISTING_BADGE_CHECK_ACTOR,
+        stamp
+      ]
+    }
   ]
 }
 

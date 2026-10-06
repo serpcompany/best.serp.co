@@ -133,7 +133,7 @@ describe('account operations', () => {
     ])
     expect(mine.listings.map(listing => listing.id)).toEqual(['lst_mine'])
     expect(mine.listings[0]).toMatchObject({
-      badge: { submissionId: 'sub_lst_mine', verificationAttempts: 1 },
+      badge: { checksInWindow: 0, submissionId: 'sub_lst_mine' },
       live: true,
       plan: 'free',
       submission: { id: 'sub_lst_mine', status: 'approved' }
@@ -306,6 +306,7 @@ describe('account operations', () => {
     await expect(
       operations().saveRevision({
         content: edit,
+        expectedRevisionVersion: null,
         listingId: 'lst_edit',
         newRevisionId: 'rev_x',
         userId: OTHER
@@ -315,6 +316,7 @@ describe('account operations', () => {
     expect(
       await operations().saveRevision({
         content: edit,
+        expectedRevisionVersion: null,
         listingId: 'lst_edit',
         newRevisionId: 'rev_1',
         userId: OWNER
@@ -324,6 +326,7 @@ describe('account operations', () => {
     expect(
       await operations().saveRevision({
         content: { ...edit, description: 'Changed again' },
+        expectedRevisionVersion: 1,
         listingId: 'lst_edit',
         newRevisionId: 'rev_2',
         userId: OWNER
@@ -341,6 +344,37 @@ describe('account operations', () => {
     // The live listing is untouched until a reviewer approves.
     expect(staged?.description).toBe('Live description')
 
+    // A stale tab (it loaded version 1, or no revision at all) is refused, never applied.
+    for (const expectedRevisionVersion of [1, null]) {
+      await expect(
+        operations().saveRevision({
+          content: { ...edit, description: 'From a stale tab' },
+          expectedRevisionVersion,
+          listingId: 'lst_edit',
+          newRevisionId: 'rev_stale',
+          userId: OWNER
+        })
+      ).rejects.toMatchObject({ code: 'stale_revision', status: 409 })
+    }
+    // Two tabs loaded version 2: the first save wins, the second gets 409 (the Playwright
+    // suite sends them in parallel to the Worker).
+    const save = (tab: string) =>
+      operations().saveRevision({
+        content: { ...edit, description: `Tab ${tab}` },
+        expectedRevisionVersion: 2,
+        listingId: 'lst_edit',
+        newRevisionId: `rev_${tab}`,
+        userId: OWNER
+      })
+    await save('A')
+    await expect(save('B')).rejects.toMatchObject({ code: 'stale_revision' })
+    expect(row("SELECT description FROM listing_revisions WHERE id='rev_1'")).toEqual({
+      description: 'Tab A'
+    })
+    expect(row("SELECT content_version FROM listing_revisions WHERE id='rev_1'")).toEqual({
+      content_version: 3
+    })
+
     // A reviewer asks for changes; saving fixes and resubmits it.
     sqlite.database.exec(
       "UPDATE listing_revisions SET status='changes_requested', reviewer_note='Shorter' WHERE id='rev_1'"
@@ -348,6 +382,7 @@ describe('account operations', () => {
     expect(
       await operations().saveRevision({
         content: edit,
+        expectedRevisionVersion: 3,
         listingId: 'lst_edit',
         newRevisionId: 'rev_3',
         userId: OWNER
@@ -360,6 +395,7 @@ describe('account operations', () => {
     await expect(
       operations().saveRevision({
         content: { ...edit, logoUrl: 'http://lst_edit.example/new.png' },
+        expectedRevisionVersion: 4,
         listingId: 'lst_edit',
         newRevisionId: 'rev_4',
         userId: OWNER
@@ -375,7 +411,7 @@ describe('account operations', () => {
     ).rejects.toMatchObject({ code: 'no_open_revision' })
   })
 
-  it('checks a live free listing’s badge with the badge step’s cooldown and cap', async () => {
+  it('checks a live free listing’s badge with its own cooldown and 24-hour budget', async () => {
     seedOwnedListing('lst_badge')
     seedOwnedListing('lst_paid', { paid: true })
     await expect(
@@ -384,7 +420,24 @@ describe('account operations', () => {
     await expect(
       operations().claimListingBadgeCheck({ listingId: 'lst_badge', userId: OTHER })
     ).rejects.toMatchObject({ code: 'not_found' })
+    // The badge step used all ten of its checks: the panel has its own budget anyway.
+    sqlite.database.exec(
+      "UPDATE listing_submissions SET verification_attempts=10, last_verification_error='badge_missing' WHERE id='sub_lst_badge'"
+    )
 
+    const check = async (result: { ok: true } | { code: string; ok: false }) => {
+      const { claimedAt } = await operations().claimListingBadgeCheck({
+        listingId: 'lst_badge',
+        userId: OWNER
+      })
+      await operations().finishListingBadgeCheck({
+        claimedAt,
+        result,
+        submissionId: 'sub_lst_badge',
+        userId: OWNER
+      })
+      now = new Date(now.getTime() + 31_000)
+    }
     const { claimedAt } = await operations().claimListingBadgeCheck({
       listingId: 'lst_badge',
       userId: OWNER
@@ -394,37 +447,55 @@ describe('account operations', () => {
     ).rejects.toMatchObject({ code: 'cooldown', status: 429 })
     await operations().finishListingBadgeCheck({
       claimedAt,
-      conclusive: true,
       result: { code: 'link_not_followed', ok: false },
       submissionId: 'sub_lst_badge',
       userId: OWNER
     })
-    // A second record of the same claim is refused: it was already counted.
+    now = new Date(now.getTime() + 31_000)
+    // A record of a claim that was overtaken is refused.
     await expect(
       operations().finishListingBadgeCheck({
         claimedAt: '2026-10-06 11:00:00',
-        conclusive: true,
         result: { ok: true },
         submissionId: 'sub_lst_badge',
         userId: OWNER
       })
     ).rejects.toMatchObject({ code: 'verification_superseded' })
 
-    const listing = await operations().listing(OWNER, 'lst_badge.example')
+    let listing = await operations().listing(OWNER, 'lst_badge.example')
     expect(listing?.badge).toMatchObject({
-      history: [{ by: 'owner', conclusive: true, outcome: 'fail', reason: 'link_not_followed' }],
-      lastError: 'link_not_followed',
-      verificationAttempts: 2
+      checksInWindow: 1,
+      history: [
+        {
+          by: 'owner',
+          conclusive: true,
+          fromPanel: true,
+          outcome: 'fail',
+          reason: 'link_not_followed'
+        }
+      ],
+      lastError: 'link_not_followed'
     })
-    // The badge program's own checks stay in badge_checks; the owner's never go there.
+    // The badge step's counter is left alone, and the program's table is never written.
+    expect(
+      row("SELECT verification_attempts FROM listing_submissions WHERE id='sub_lst_badge'")
+    ).toEqual({
+      verification_attempts: 10
+    })
     expect(row('SELECT COUNT(*) AS count FROM badge_checks')).toEqual({ count: 0 })
 
-    now = new Date(Date.parse(NOW) + 31_000)
-    sqlite.database.exec(
-      "UPDATE listing_submissions SET verification_attempts=10 WHERE id='sub_lst_badge'"
-    )
+    // A connection problem doesn't count; nine more results reach the budget of ten.
+    await check({ code: 'fetch_timeout', ok: false })
+    for (let index = 0; index < 9; index += 1) await check({ ok: true })
+    listing = await operations().listing(OWNER, 'lst_badge.example')
+    expect(listing?.badge?.checksInWindow).toBe(10)
     await expect(
       operations().claimListingBadgeCheck({ listingId: 'lst_badge', userId: OWNER })
     ).rejects.toMatchObject({ code: 'attempt_limit', status: 429 })
+    // The budget refills as checks leave the 24-hour window.
+    now = new Date(Date.parse(NOW) + 24 * 60 * 60 * 1000 + 40_000)
+    await expect(
+      operations().claimListingBadgeCheck({ listingId: 'lst_badge', userId: OWNER })
+    ).resolves.toMatchObject({ claimedAt: expect.any(String) })
   })
 })
