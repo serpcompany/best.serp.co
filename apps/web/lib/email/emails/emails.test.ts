@@ -544,6 +544,11 @@ You're getting this because devin@serp.co receives review alerts for best.serp.c
     const waiting = subject({ kind: 'paid', live: false }, 'revision')
     expect(waiting.subject).toBe('Ready for review: Quillmate (paid, waiting for review)')
     expect(waiting.text).toContain('Source: Revision')
+    // A revision opens its own review page (#65 sends these for owner edits of live listings).
+    expect(waiting.text).toContain(
+      'Review submission: https://best.serp.co/admin/revisions/s_4f9k2c/'
+    )
+    expect(linksTo(waiting.html, 'https://best.serp.co/admin/revisions/s_4f9k2c/')).toBe(true)
   })
 })
 

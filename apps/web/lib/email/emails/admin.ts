@@ -24,6 +24,7 @@ export interface AdminReviewReadyInput {
   plan: ReviewPlan
   /** A new submission, or a revision of a live listing. */
   source: 'revision' | 'submission'
+  /** The submission's id, or the revision's (the button opens its review page). */
   submissionId: string
   submissionName: string
   /** The submitter's address, shown to the admin. */
@@ -69,7 +70,14 @@ export const adminReviewReadyEmail = defineEmailTemplate<AdminReviewReadyInput>(
         ],
         cta: {
           label: 'Review submission',
-          url: context.links.url(sitePath('admin', 'submissions', input.submissionId))
+          // A revision is reviewed on its own page (#64); `submissionId` is then its id.
+          url: context.links.url(
+            sitePath(
+              'admin',
+              input.source === 'revision' ? 'revisions' : 'submissions',
+              input.submissionId
+            )
+          )
         },
         heading: `${name} is ready for review`,
         preheader: `${category} · submitted by ${submittedBy}`,
