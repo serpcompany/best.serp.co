@@ -598,7 +598,6 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         <p className="text-sm text-muted-foreground">
           {`Paste this into the HTML of ${site} and keep the link dofollow.`}
         </p>
-        {/* biome-ignore lint/performance/noImgElement: the badge preview, as on the badge step */}
         <img src={badge.previewUrl} alt="Featured on SERP" width={170} height={42} />
         <div className="w-full overflow-x-auto rounded-md border border-input px-3 py-2 font-mono text-[11px] leading-relaxed shadow-xs dark:bg-input/30">
           {/* A div, not a <pre>: the site's global <pre> style is a dark code block. */}
