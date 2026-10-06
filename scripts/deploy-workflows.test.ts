@@ -545,6 +545,33 @@ describe('D1 data stays in Cloudflare', () => {
   // fork pull requests can restore caches. A D1 export holds sessions, OAuth tokens, and emails,
   // so no workflow exports D1; recovery is a Time Travel bookmark (#99, docs/D1_RECOVERY.md).
   // These checks read workflow and script text, not data; RELEASE_GUARDS lists what they miss.
+  //
+  // Adding a job that gets CLOUDFLARE_API_TOKEN (RELEASE_GUARDS, "Adding a credentialed job"):
+  // 1. add `<file>:<job>` to `credentialedJobs`;
+  // 2. put `cloudflare-release.ts bookmark <env>` right before each step that can change D1 and
+  //    add `<file>:<job>:<env>` to `bookmarkedChanges` (once per change step);
+  // 3. only for a token step that cannot change D1 (an R2-only upload, say), add its exact `run`
+  //    to `tokenStepsWithoutChanges`, with a comment saying why;
+  // 4. add any new action to `credentialedJobActions`, and any artifact or cache to
+  //    `allowedUploads`.
+
+  /** Every job where some step gets the Cloudflare token: the upload checks cover each one. */
+  const credentialedJobs = [
+    'approve-d1-submission.yml:review',
+    'bootstrap-production-d1.yml:bootstrap',
+    'deploy-production.yml:release',
+    'deploy-staging.yml:deploy',
+    'notify-d1-submissions.yml:notify',
+    'publish-d1.yml:publish'
+  ]
+  /** Every step that can change D1, as `<file>:<job>:<environment>`; each follows a bookmark. */
+  const bookmarkedChanges = [
+    'approve-d1-submission.yml:review:production',
+    'bootstrap-production-d1.yml:bootstrap:production',
+    'deploy-production.yml:release:production',
+    'deploy-staging.yml:deploy:staging',
+    'publish-d1.yml:publish:production'
+  ]
   const databaseExport =
     /backup|dump|export|snapshot|\.sql\b|\.sqlite|\.db\b|(?:^|[^a-z0-9])d1(?:[^a-z0-9]|$)|database/iu
   const uploads = /upload-artifact|actions\/cache|upload-pages-artifact/u
@@ -569,8 +596,8 @@ describe('D1 data stays in Cloudflare', () => {
       name: /^$/u,
       paths: [
         '~/.pnpm',
-        '${{ github.workspace }}/.next/cache',
-        '${{ github.workspace }}/apps/*/.next/cache'
+        `${expression('github.workspace')}/.next/cache`,
+        `${expression('github.workspace')}/apps/*/.next/cache`
       ]
     }
   ]
@@ -807,7 +834,7 @@ describe('D1 data stays in Cloudflare', () => {
       // A neutral name and path is still refused: only reviewed artifacts are allowed.
       { uses: 'actions/upload-artifact@v7', with: { name: 'out', path: '/tmp/out/' } },
       { uses: 'actions/cache/save@v4', with: { key: 'k', path: 'db-export/' } },
-      { uses: 'actions/cache@v5', with: { key: 'k', path: '${{ runner.temp }}/out' } }
+      { uses: 'actions/cache@v5', with: { key: 'k', path: `${expression('runner.temp')}/out` } }
     ]
     for (const step of removed) expect(uploadViolations(step), JSON.stringify(step)).not.toEqual([])
     // The evidence the workflows do upload stays allowed.
@@ -849,14 +876,7 @@ describe('D1 data stays in Cloudflare', () => {
     const { jobs, violations } = credentialedJobViolations(allWorkflows())
     expect(violations).toEqual([])
     // The check runs on every credentialed job, wherever the token is passed (#101 round 2).
-    expect(jobs).toEqual([
-      'approve-d1-submission.yml:review',
-      'bootstrap-production-d1.yml:bootstrap',
-      'deploy-production.yml:release',
-      'deploy-staging.yml:deploy',
-      'notify-d1-submissions.yml:notify',
-      'publish-d1.yml:publish'
-    ])
+    expect(jobs).toEqual([...credentialedJobs].sort())
     // The reviewer's probe: a token-less step in a credentialed job.
     const publish = loadWorkflow('publish-d1.yml')
     const job = publish.jobs.publish as WorkflowJob
@@ -911,13 +931,7 @@ describe('D1 data stays in Cloudflare', () => {
   it('bookmarks D1 directly before every step that can change it, and only after success', () => {
     const { changes, violations } = d1ChangeAudit(allWorkflows())
     expect(violations).toEqual([])
-    expect(changes).toEqual([
-      'approve-d1-submission.yml:review:production',
-      'bootstrap-production-d1.yml:bootstrap:production',
-      'deploy-production.yml:release:production',
-      'deploy-staging.yml:deploy:staging',
-      'publish-d1.yml:publish:production'
-    ])
+    expect(changes).toEqual([...bookmarkedChanges].sort())
   })
 
   it('refuses a change that could run after a failed or missing bookmark (#101 review)', () => {

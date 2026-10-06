@@ -184,6 +184,14 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
   `--form`, `-d @`, `--data-binary @`), or `wget` upload. Commands are read one at a time, split
   at `|`, `;`, `&`, and newlines.
 
+**Adding a credentialed job.** A workflow change that gives a job `CLOUDFLARE_API_TOKEN` fails
+these tests until the lists at the top of the "D1 data stays in Cloudflare" tests say what it
+does: the job goes in `credentialedJobs`; each step that can change D1 follows its bookmark and
+goes in `bookmarkedChanges`; a token step that cannot change D1 (an R2-only upload, for
+example) gets its exact `run` in `tokenStepsWithoutChanges` with the reason; and new actions or
+artifacts go in `credentialedJobActions` or `allowedUploads`. Each entry is reviewed with the
+workflow.
+
 These checks read workflow and script text, not data. An allowlisted upload path, a log line or
 job summary, a remote reusable workflow, a program called by another name or from inside a
 script (a reviewed `pnpm` command that itself uploads), or a file written in one step and sent
