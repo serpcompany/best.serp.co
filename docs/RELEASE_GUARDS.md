@@ -130,16 +130,28 @@ or code, so they are not gated on staging by a check.
 
 ## Catalog data: staging first
 
-Every reviewed catalog change reaches staging before production (#95, owner decision). A manifest
-under `d1/publications/` is applied by **Publish D1 Catalog (staging)** (`publish-d1-staging.yml`,
-dispatched from `staging` with `publish-best.serp.co-staging`, `staging` environment, staging D1
-backup first), checked there, and then, after promotion, by **Publish D1 Catalog** from `main`.
-Listing media follows the same order: a plan under `d1/media/` is uploaded by **Upload Listing
+Every reviewed catalog change reaches staging before production (#95, owner decision). A
+manifest under `d1/publications/` is applied by **Publish D1 Catalog (staging)**
+(`publish-d1-staging.yml`, dispatched from `staging` with `publish-best.serp.co-staging`, in the
+`staging` environment, after recording a D1 Time Travel bookmark, never a database export),
+checked there, and then, after promotion, by **Publish D1 Catalog** from `main`.
+
+Listing media follows the same order. A plan under `d1/media/` is uploaded by **Upload Listing
 Media (staging)** (`upload-media-best.serp.co-staging`) and later by **Upload Listing Media**
-from `main` (`upload-media-best.serp.co-production`), which copies staging's verified objects,
-before the manifest that names its keys is published. `scripts/d1-remote-publisher.ts` and `scripts/media-upload.ts` each refuse to
-run outside their own workflow, branch, and confirmation; the uploader also refuses any key
-outside `best.serp.co/listings/`. Procedure: [Listing media](./MEDIA.md#uploading-and-publishing).
+from `main` (`upload-media-best.serp.co-production`), which copies staging's verified objects
+bucket to bucket through the R2 API, before the manifest that names its keys is published.
+
+- `d1-remote-publisher.ts` and `media-upload.ts` each refuse to run outside their own workflow,
+  branch, and confirmation; the publisher also refuses a database that is not its target's.
+- The uploader refuses any key outside `best.serp.co/listings/` and verifies, never
+  overwrites, an object the bucket already holds.
+- The publisher refuses a media manifest until the target's own bucket holds every object it
+  names, byte for byte.
+- A media manifest is row-level (`concurrency: rows`): it fits both environments whatever else
+  each published, and a listing that changed since generation refuses it with nothing written.
+  Any other manifest still names the base version both environments must share.
+
+Procedure: [Listing media](./MEDIA.md#uploading-and-publishing).
 
 ## Hotfixes
 
@@ -242,9 +254,12 @@ Until the token split, this is a process control, not a security boundary.
 - **Narrowed:** the `staging` environment allows deployments only from the `staging` branch,
   and `production` only from `main`, so only workflows on those branches can use their
   secrets.
-- **Still open:** both environments still hold the account-wide Cloudflare token, so a
-  workflow merged to `staging` that uses the `staging` environment could still reach
-  production directly. That path requires a pull request and the five required checks, but
-  no approving review.
+- **Still open:** both environments still hold the account-wide Cloudflare token (Edit on every
+  Worker, D1 database, and R2 bucket, including serp.co's `cdn`), so a workflow merged to
+  `staging` that uses the `staging` environment could still reach production directly. That
+  path requires a pull request and the five required checks, but no approving review.
+- **No human gate on staging data:** the `staging` environment has no reviewers, so anything
+  that can dispatch workflows can run the staging publication or upload. Agents never do
+  (AGENTS.md); an optional `staging-data` environment would enforce it (MEDIA.md).
 
 Decision b (the per-environment token split, right after cutover) closes that path.
