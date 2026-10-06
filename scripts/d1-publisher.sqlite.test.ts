@@ -141,6 +141,36 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
     expect(() => manifestSchema.parse(rename('chart.js', 'chart-js'))).not.toThrow()
   })
 
+  it('takes an ISO instant or the calendar date imported listings store as publishedAt', () => {
+    const create = (publishedAt: string) => ({
+      version: 1,
+      id: 'sqlite-release',
+      basePublicationVersion: 4,
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite', beforeChecksum },
+      operations: [
+        {
+          action: 'listing-create',
+          listing: {
+            id: 'lst_sqlite_test_create',
+            slug: 'new-listing',
+            name: 'New',
+            description: 'Description',
+            website: 'https://example.com/',
+            publishedAt,
+            categories: ['seo']
+          }
+        }
+      ]
+    })
+    // Listings sort by `published_at` text: a manifest must be able to keep `2026-05-16` (#89).
+    for (const value of [now, '2026-05-16']) {
+      expect(() => manifestSchema.parse(create(value)), value).not.toThrow()
+    }
+    for (const value of ['2026-5-16', '16/05/2026', '2026-05-16T00:00:00', '2026-13-01', '']) {
+      expect(() => manifestSchema.parse(create(value)), value).toThrow()
+    }
+  })
+
   it('keeps every slug in the reviewed initial import a page URL', () => {
     const report = parse(readFileSync(resolve(project.artifact.parityReportPath), 'utf8')) as {
       parity: { categories: Array<{ slug: string }>; exactSlugSet: string[] }
