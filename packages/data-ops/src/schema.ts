@@ -9,10 +9,13 @@ import {
   unique,
   uniqueIndex
 } from 'drizzle-orm/sqlite-core'
+import { IMAGE_CONTENT_TYPES, MAX_IMAGE_SIDE } from './media-format'
+import { MAX_MEDIA_BYTES, MEDIA_KINDS, MEDIA_SITE } from './media-keys'
 
 const currentTimestamp = sql`CURRENT_TIMESTAMP`
 const booleanCheck = (column: { name: string }) => sql`${sql.identifier(column.name)} IN (0, 1)`
 const sqlList = (values: readonly string[]) => sql.raw(values.map(value => `'${value}'`).join(', '))
+const MEDIA_KEY_PREFIX = `${MEDIA_SITE}/listings/`
 
 /**
  * Who added a listing (serpcompany/best.serp.co#62). `admin` covers the imported catalog and
@@ -272,6 +275,43 @@ export const listingCategories = sqliteTable(
   ]
 )
 
+/**
+ * A hosted image's key and metadata, all present or all absent (serpcompany/best.serp.co#95).
+ * The key is `best.serp.co/listings/<slug>/<logo|image>/<sha256-16>.<ext>` in the environment's
+ * media bucket; the CHECK keeps its prefix and kind honest without a LIKE pattern (#77). Every
+ * term is NOT NULL-checked, because a CHECK that evaluates to NULL passes.
+ */
+const hostedMediaCheck = (table: {
+  bytes: { name: string }
+  contentType: { name: string }
+  height: { name: string }
+  kind: { name: string }
+  mediaKey: { name: string }
+  sha256: { name: string }
+  width: { name: string }
+}) => {
+  const column = (value: { name: string }) => sql.identifier(value.name)
+  return sql`(${column(table.mediaKey)} IS NULL AND ${column(table.sha256)} IS NULL
+    AND ${column(table.contentType)} IS NULL AND ${column(table.bytes)} IS NULL
+    AND ${column(table.width)} IS NULL AND ${column(table.height)} IS NULL)
+    OR (${column(table.mediaKey)} IS NOT NULL AND ${column(table.sha256)} IS NOT NULL
+    AND ${column(table.contentType)} IS NOT NULL AND ${column(table.bytes)} IS NOT NULL
+    AND ${column(table.width)} IS NOT NULL AND ${column(table.height)} IS NOT NULL
+    AND substr(${column(table.mediaKey)}, 1, ${sql.raw(String(MEDIA_KEY_PREFIX.length))}) = ${sql.raw(`'${MEDIA_KEY_PREFIX}'`)}
+    AND instr(${column(table.mediaKey)}, '/' || ${column(table.kind)} || '/') > 0
+    AND length(${column(table.sha256)}) = 64
+    AND ${column(table.contentType)} IN (${sqlList(Object.values(IMAGE_CONTENT_TYPES))})
+    AND ${column(table.bytes)} BETWEEN 1 AND ${sql.raw(String(MAX_MEDIA_BYTES))}
+    AND ${column(table.width)} BETWEEN 1 AND ${sql.raw(String(MAX_IMAGE_SIDE))}
+    AND ${column(table.height)} BETWEEN 1 AND ${sql.raw(String(MAX_IMAGE_SIDE))})`
+}
+
+/**
+ * Listing logos, images, and videos. `url` is where the media came from; a row with a
+ * `media_key` is hosted in the environment's media bucket and renders from the media host
+ * (serpcompany/best.serp.co#95). A logo or image row without a key is an imported reference the
+ * legacy media migration has not repointed yet.
+ */
 export const listingMedia = sqliteTable(
   'listing_media',
   {
@@ -281,7 +321,13 @@ export const listingMedia = sqliteTable(
       .references(() => listings.id, { onDelete: 'cascade' }),
     kind: text('kind', { enum: ['logo', 'image', 'video'] }).notNull(),
     url: text('url').notNull(),
-    sortOrder: integer('sort_order').notNull().default(0)
+    sortOrder: integer('sort_order').notNull().default(0),
+    mediaKey: text('media_key'),
+    sha256: text('sha256'),
+    contentType: text('content_type'),
+    bytes: integer('bytes'),
+    width: integer('width'),
+    height: integer('height')
   },
   table => [
     check('listing_media_kind_valid', sql`${table.kind} IN ('logo', 'image', 'video')`),
@@ -289,7 +335,82 @@ export const listingMedia = sqliteTable(
       table.listingId,
       table.kind,
       table.sortOrder
-    )
+    ),
+    check('listing_media_hosted_complete', hostedMediaCheck(table))
+  ]
+)
+
+/**
+ * Media still to be hosted (serpcompany/best.serp.co#95): one row per listing or submission
+ * image slot whose source has not been copied into the media bucket yet. A Worker cron retries
+ * `pending` rows with backoff; `failed` rows stopped retrying and are shown to the admin. A
+ * submission's slot becomes `hosted` (with the result) so its approval can copy the hosted
+ * image; a listing's slot is deleted once its `listing_media` row is hosted.
+ */
+export const mediaIngestionStatuses = ['pending', 'hosted', 'failed'] as const
+export type MediaIngestionStatus = (typeof mediaIngestionStatuses)[number]
+
+export const mediaIngestions = sqliteTable(
+  'media_ingestions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    listingId: text('listing_id').references(() => listings.id, { onDelete: 'cascade' }),
+    submissionId: text('submission_id').references(() => listingSubmissions.id, {
+      onDelete: 'cascade'
+    }),
+    kind: text('kind', { enum: MEDIA_KINDS }).notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    sourceUrl: text('source_url').notNull(),
+    status: text('status', { enum: mediaIngestionStatuses }).notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: text('next_attempt_at'),
+    lastError: text('last_error'),
+    mediaKey: text('media_key'),
+    sha256: text('sha256'),
+    contentType: text('content_type'),
+    bytes: integer('bytes'),
+    width: integer('width'),
+    height: integer('height'),
+    createdAt: text('created_at').notNull().default(currentTimestamp),
+    updatedAt: text('updated_at').notNull().default(currentTimestamp)
+  },
+  table => [
+    check(
+      'media_ingestions_one_target',
+      sql`(${table.listingId} IS NULL) != (${table.submissionId} IS NULL)`
+    ),
+    check('media_ingestions_kind_valid', sql`${table.kind} IN (${sqlList(MEDIA_KINDS)})`),
+    check(
+      'media_ingestions_status_valid',
+      sql`${table.status} IN (${sqlList(mediaIngestionStatuses)})`
+    ),
+    check('media_ingestions_attempts_nonnegative', sql`${table.attempts} >= 0`),
+    check(
+      'media_ingestions_pending_scheduled',
+      sql`(${table.status} = 'pending') = (${table.nextAttemptAt} IS NOT NULL)`
+    ),
+    check(
+      'media_ingestions_next_attempt_iso',
+      sql`${table.nextAttemptAt} IS NULL OR ${isoInstantCheck(table.nextAttemptAt)}`
+    ),
+    check(
+      'media_ingestions_failed_explained',
+      sql`${table.status} != 'failed' OR ${table.lastError} IS NOT NULL`
+    ),
+    check(
+      'media_ingestions_hosted_result',
+      sql`(${table.status} = 'hosted') = (${table.mediaKey} IS NOT NULL)`
+    ),
+    check('media_ingestions_hosted_complete', hostedMediaCheck(table)),
+    uniqueIndex('media_ingestions_listing_slot_idx')
+      .on(table.listingId, table.kind, table.sortOrder)
+      .where(sql`${table.listingId} IS NOT NULL`),
+    uniqueIndex('media_ingestions_submission_slot_idx')
+      .on(table.submissionId, table.kind, table.sortOrder)
+      .where(sql`${table.submissionId} IS NOT NULL`),
+    index('media_ingestions_due_idx')
+      .on(table.nextAttemptAt)
+      .where(sql`${table.status} = 'pending'`)
   ]
 )
 

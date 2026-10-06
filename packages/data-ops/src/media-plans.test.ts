@@ -1,0 +1,434 @@
+import type { DatabaseSync } from 'node:sqlite'
+import { describe, expect, it } from 'vitest'
+import type { HostedMedia } from './media-keys'
+import {
+  buildClaimMediaPlans,
+  buildHostListingMediaPlans,
+  buildQueueMediaPlans,
+  buildRecordMediaFailurePlans,
+  buildRecordSubmissionMediaPlans,
+  MAX_MEDIA_ATTEMPTS,
+  MEDIA_RETRY_DELAYS_MINUTES,
+  nextMediaAttemptAt,
+  selectDueMediaPlan,
+  selectListingMediaContextPlan,
+  selectListingMediaQueuePlan,
+  selectSubmissionMediaPlan
+} from './media-plans'
+import {
+  count,
+  execute,
+  NOW,
+  planDatabase,
+  publication,
+  publicationState,
+  query,
+  seedLiveListing
+} from './plan-test-support'
+import { buildApproveSubmissionPlans } from './submission-plans'
+
+const listingId = 'lst_media'
+const slug = 'lst_media.example'
+const submissionId = 'sub_media'
+
+function hosted(kind: 'image' | 'logo', hash = 'a', sourceUrl = 'https://assets.example/new.png') {
+  const sha256 = hash.repeat(64)
+  return {
+    bytes: 2048,
+    contentType: 'image/png',
+    height: 256,
+    key: `best.serp.co/listings/${slug}/${kind}/${sha256.slice(0, 16)}.png`,
+    sha256,
+    sourceUrl,
+    width: 256
+  } satisfies HostedMedia
+}
+
+function seededDatabase(): DatabaseSync {
+  const db = planDatabase()
+  seedLiveListing(db, listingId)
+  return db
+}
+
+function seedSubmission(db: DatabaseSync, logoUrl = 'https://example.com/logo.png'): void {
+  db.prepare(
+    `INSERT INTO listing_submissions
+      (id,slug,block_key,block_covers_subdomains,name,description,website,content,category_slug,
+       logo_url,status,access_token_hash,badge_verified_at,owner_user_id,plan)
+     VALUES (?,'example.com','example.com',1,'Example','Description','https://example.com/',
+       'Content','tools',?,'verified','hash','2026-08-01T00:00:00.000Z','user_owner','free')`
+  ).run(submissionId, logoUrl)
+}
+
+function slots(db: DatabaseSync): unknown[] {
+  return db
+    .prepare(
+      `SELECT listing_id,submission_id,kind,sort_order,source_url,status,attempts,next_attempt_at,
+        last_error,media_key FROM media_ingestions ORDER BY id`
+    )
+    .all()
+}
+
+function approve(db: DatabaseSync): void {
+  execute(
+    db,
+    buildApproveSubmissionPlans({
+      afterChecksum: 'after',
+      affectedRoute: '/products/example.com/',
+      beforeChecksum: 'before',
+      expectedContentVersion: 1,
+      listingId: 'lst_approved',
+      manifestId: `verified-submission-${submissionId}`,
+      now: NOW,
+      reviewer: 'reviewer',
+      runId: `submission_publish_${submissionId}`,
+      submissionId,
+      version: 1
+    })
+  )
+}
+
+describe('media retry schedule', () => {
+  it('backs off after each failed attempt and stops after the last delay', () => {
+    expect(MAX_MEDIA_ATTEMPTS).toBe(MEDIA_RETRY_DELAYS_MINUTES.length + 1)
+    expect(nextMediaAttemptAt(NOW, 1)).toBe('2026-10-06T12:15:00.000Z')
+    expect(nextMediaAttemptAt(NOW, 2)).toBe('2026-10-06T13:00:00.000Z')
+    expect(nextMediaAttemptAt(NOW, MEDIA_RETRY_DELAYS_MINUTES.length)).toBe(
+      '2026-10-08T12:00:00.000Z'
+    )
+    expect(nextMediaAttemptAt(NOW, MAX_MEDIA_ATTEMPTS)).toBeNull()
+    expect(() => nextMediaAttemptAt(NOW, 0)).toThrow(/at least one/u)
+    expect(() => nextMediaAttemptAt('2026-10-06', 1)).toThrow(/ISO instant/u)
+  })
+})
+
+describe('hosting a listing slot', () => {
+  it('writes the key and metadata, clears the queue, and advances the catalog version', () => {
+    const db = seededDatabase()
+    execute(
+      db,
+      buildQueueMediaPlans({
+        kind: 'logo',
+        now: NOW,
+        sortOrder: 0,
+        sourceUrl: 'https://assets.example/new.png',
+        target: { listingId }
+      })
+    )
+    const pub = publication('listing-media')
+    execute(
+      db,
+      buildHostListingMediaPlans({
+        kind: 'logo',
+        listingId,
+        media: hosted('logo'),
+        publication: pub,
+        sortOrder: 0
+      })
+    )
+    expect(
+      db
+        .prepare(
+          `SELECT kind,url,media_key,sha256,content_type,bytes,width,height FROM listing_media
+           WHERE listing_id=? ORDER BY kind,sort_order`
+        )
+        .all(listingId)
+    ).toEqual([
+      {
+        bytes: null,
+        content_type: null,
+        height: null,
+        kind: 'image',
+        media_key: null,
+        sha256: null,
+        url: 'https://assets.example/image.png',
+        width: null
+      },
+      {
+        bytes: 2048,
+        content_type: 'image/png',
+        height: 256,
+        kind: 'logo',
+        media_key: hosted('logo').key,
+        sha256: 'a'.repeat(64),
+        url: 'https://assets.example/new.png',
+        width: 256
+      }
+    ])
+    expect(slots(db)).toEqual([])
+    expect(publicationState(db)).toEqual({ checksum: pub.afterChecksum, version: 2 })
+    expect(query(db, selectListingMediaContextPlan(listingId))).toEqual([
+      { checksum: pub.afterChecksum, id: listingId, slug, version: 2 }
+    ])
+  })
+
+  it('refuses a key of the wrong kind or site, and a listing that does not exist', () => {
+    const db = seededDatabase()
+    const plans = (media: HostedMedia, id = listingId) =>
+      buildHostListingMediaPlans({
+        kind: 'logo',
+        listingId: id,
+        media,
+        publication: publication('listing-media'),
+        sortOrder: 0
+      })
+    expect(() => plans(hosted('image'))).toThrow(/not a hosted logo key/u)
+    expect(() => plans({ ...hosted('logo'), key: 'serp.co/logo.png' })).toThrow(/not a hosted/u)
+    expect(() => execute(db, plans(hosted('logo'), 'lst_missing'))).toThrow(/malformed JSON/u)
+    expect(publicationState(db).version).toBe(1)
+  })
+})
+
+describe('the media queue', () => {
+  it('keeps retryable failures pending with backoff and fails the rest with a reason', () => {
+    const db = seededDatabase()
+    const fail = (attempts: number, retryable: boolean, code = 'site_unreachable') =>
+      execute(
+        db,
+        buildRecordMediaFailurePlans({
+          attempts,
+          code,
+          kind: 'image',
+          now: NOW,
+          retryable,
+          sortOrder: 1,
+          sourceUrl: 'https://assets.example/og.png',
+          target: { listingId }
+        })
+      )
+    fail(1, true)
+    expect(slots(db)).toEqual([
+      {
+        attempts: 1,
+        kind: 'image',
+        last_error: 'site_unreachable',
+        listing_id: listingId,
+        media_key: null,
+        next_attempt_at: '2026-10-06T12:15:00.000Z',
+        sort_order: 1,
+        source_url: 'https://assets.example/og.png',
+        status: 'pending',
+        submission_id: null
+      }
+    ])
+    fail(MAX_MEDIA_ATTEMPTS, true)
+    expect(slots(db)).toMatchObject([
+      { attempts: MAX_MEDIA_ATTEMPTS, next_attempt_at: null, status: 'failed' }
+    ])
+    fail(1, false, 'svg')
+    expect(slots(db)).toMatchObject([
+      { last_error: 'svg', next_attempt_at: null, status: 'failed' }
+    ])
+    expect(query(db, selectListingMediaQueuePlan(listingId))).toMatchObject([
+      { kind: 'image', last_error: 'svg', status: 'failed' }
+    ])
+    expect(() => fail(1, false, ' ')).toThrow(/reason/u)
+  })
+
+  it('lists due slots oldest first and lets exactly one run claim each', () => {
+    const db = seededDatabase()
+    seedSubmission(db)
+    execute(
+      db,
+      buildQueueMediaPlans({
+        kind: 'image',
+        now: '2026-10-06T11:00:00.000Z',
+        sortOrder: 0,
+        sourceUrl: 'https://example.com/og.png',
+        target: { submissionId }
+      })
+    )
+    execute(
+      db,
+      buildQueueMediaPlans({
+        kind: 'logo',
+        now: NOW,
+        sortOrder: 0,
+        sourceUrl: 'https://assets.example/new.png',
+        target: { listingId }
+      })
+    )
+    execute(
+      db,
+      buildQueueMediaPlans({
+        kind: 'image',
+        now: '2026-10-06T13:00:00.000Z',
+        sortOrder: 2,
+        sourceUrl: 'https://assets.example/later.png',
+        target: { listingId }
+      })
+    )
+    const due = query(db, selectDueMediaPlan(NOW)) as Array<{ id: number; next_attempt_at: string }>
+    expect(due).toMatchObject([
+      { kind: 'image', listing_id: null, slug: 'example.com', submission_id: submissionId },
+      { kind: 'logo', listing_id: listingId, slug, submission_id: null }
+    ])
+    const first = due[0]
+    if (!first) throw new Error('No due slot.')
+    const claim = buildClaimMediaPlans({
+      id: first.id,
+      now: NOW,
+      readNextAttemptAt: first.next_attempt_at
+    })
+    execute(db, claim)
+    expect(() => execute(db, claim)).toThrow(/malformed JSON/u)
+    expect(query(db, selectDueMediaPlan(NOW))).toHaveLength(1)
+    expect(() => selectDueMediaPlan(NOW, 0)).toThrow(/1 to 50/u)
+  })
+})
+
+describe('submission media and approval', () => {
+  it('records a hosted submission image and shows its slots to the reviewer', () => {
+    const db = seededDatabase()
+    seedSubmission(db)
+    const plans = (media: HostedMedia) =>
+      buildRecordSubmissionMediaPlans({
+        kind: 'logo',
+        media,
+        now: NOW,
+        sortOrder: 0,
+        submissionId
+      })
+    execute(db, plans(hosted('logo', 'b', 'https://example.com/logo.png')))
+    execute(db, plans(hosted('logo', 'c', 'https://example.com/logo.png')))
+    expect(query(db, selectSubmissionMediaPlan(submissionId))).toEqual([
+      {
+        attempts: 2,
+        kind: 'logo',
+        last_error: null,
+        media_key: hosted('logo', 'c').key,
+        next_attempt_at: null,
+        sort_order: 0,
+        source_url: 'https://example.com/logo.png',
+        status: 'hosted'
+      }
+    ])
+    expect(() =>
+      execute(
+        db,
+        buildRecordSubmissionMediaPlans({
+          kind: 'logo',
+          media: hosted('logo'),
+          now: NOW,
+          sortOrder: 0,
+          submissionId: 'sub_missing'
+        })
+      )
+    ).toThrow(/malformed JSON/u)
+  })
+
+  it("adopts the submission's hosted logo when it is still the submitted source", () => {
+    const db = planDatabase()
+    seedSubmission(db)
+    execute(
+      db,
+      buildRecordSubmissionMediaPlans({
+        kind: 'logo',
+        media: hosted('logo', 'd', 'https://example.com/logo.png'),
+        now: NOW,
+        sortOrder: 0,
+        submissionId
+      })
+    )
+    approve(db)
+    expect(
+      db.prepare("SELECT url,media_key FROM listing_media WHERE listing_id='lst_approved'").all()
+    ).toEqual([{ media_key: hosted('logo', 'd').key, url: 'https://example.com/logo.png' }])
+    expect(
+      count(db, 'SELECT COUNT(*) AS count FROM media_ingestions WHERE listing_id IS NOT NULL')
+    ).toBe(0)
+  })
+
+  it('queues the logo, never hotlinks it, when no hosted copy of that source exists', () => {
+    const db = planDatabase()
+    seedSubmission(db, 'https://example.com/new-logo.png')
+    execute(
+      db,
+      buildRecordSubmissionMediaPlans({
+        kind: 'logo',
+        media: hosted('logo', 'e', 'https://example.com/old-logo.png'),
+        now: NOW,
+        sortOrder: 0,
+        submissionId
+      })
+    )
+    approve(db)
+    expect(
+      count(db, "SELECT COUNT(*) AS count FROM listing_media WHERE listing_id='lst_approved'")
+    ).toBe(0)
+    expect(slots(db)).toEqual([
+      expect.objectContaining({ status: 'hosted', submission_id: submissionId }),
+      {
+        attempts: 0,
+        kind: 'logo',
+        last_error: null,
+        listing_id: 'lst_approved',
+        media_key: null,
+        next_attempt_at: NOW,
+        sort_order: 0,
+        source_url: 'https://example.com/new-logo.png',
+        status: 'pending',
+        submission_id: null
+      }
+    ])
+  })
+})
+
+describe('hosted media constraints', () => {
+  it('requires a complete, prefixed, kind-matching key and a single queue target', () => {
+    const db = seededDatabase()
+    seedSubmission(db)
+    const insertMedia = (columns: string, values: string) => () =>
+      db.exec(
+        `INSERT INTO listing_media (listing_id,kind,url,sort_order,${columns})
+         VALUES ('${listingId}','logo','https://x.example/a.png',5,${values})`
+      )
+    const sha = `'${'f'.repeat(64)}'`
+    const key = (path: string) => `'${path}'`
+    expect(insertMedia('media_key', key(`best.serp.co/listings/${slug}/logo/ffff.png`))).toThrow(
+      /CHECK constraint failed: listing_media_hosted_complete/u
+    )
+    expect(
+      insertMedia(
+        'media_key,sha256,content_type,bytes,width,height',
+        `${key(`serp.co/listings/${slug}/logo/ffff.png`)},${sha},'image/png',10,1,1`
+      )
+    ).toThrow(/listing_media_hosted_complete/u)
+    expect(
+      insertMedia(
+        'media_key,sha256,content_type,bytes,width,height',
+        `${key(`best.serp.co/listings/${slug}/image/ffff.png`)},${sha},'image/png',10,1,1`
+      )
+    ).toThrow(/listing_media_hosted_complete/u)
+    expect(
+      insertMedia(
+        'media_key,sha256,content_type,bytes,width,height',
+        `${key(`best.serp.co/listings/${slug}/logo/ffff.svg`)},${sha},'image/svg+xml',10,1,1`
+      )
+    ).toThrow(/listing_media_hosted_complete/u)
+    expect(
+      insertMedia(
+        'media_key,sha256,content_type,bytes,width,height',
+        `${key(`best.serp.co/listings/${slug}/logo/ffff.png`)},${sha},'image/png',10,1,1`
+      )
+    ).not.toThrow()
+    expect(() =>
+      db.exec(
+        `INSERT INTO media_ingestions (listing_id,submission_id,kind,source_url,next_attempt_at)
+         VALUES ('${listingId}','${submissionId}','logo','https://x.example/a.png','${NOW}')`
+      )
+    ).toThrow(/media_ingestions_one_target/u)
+    expect(() =>
+      db.exec(
+        `INSERT INTO media_ingestions (listing_id,kind,source_url)
+         VALUES ('${listingId}','logo','https://x.example/a.png')`
+      )
+    ).toThrow(/media_ingestions_pending_scheduled/u)
+    expect(() =>
+      db.exec(
+        `INSERT INTO media_ingestions (listing_id,kind,source_url,status)
+         VALUES ('${listingId}','logo','https://x.example/a.png','failed')`
+      )
+    ).toThrow(/media_ingestions_failed_explained/u)
+  })
+})

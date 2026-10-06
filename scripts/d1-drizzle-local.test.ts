@@ -175,7 +175,8 @@ describe('fresh Drizzle D1 history', () => {
       '0003_submissions_data_model.sql',
       '0004_query_indexes.sql',
       '0005_admin_panel.sql',
-      '0006_badge_program.sql'
+      '0006_badge_program.sql',
+      '0007_hosted_media.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
@@ -343,7 +344,8 @@ describe('fresh Drizzle D1 history', () => {
     expect(
       database.prepare("SELECT sql FROM sqlite_master WHERE name='listing_submission_faqs'").get()
     ).toMatchObject({ sql: expect.stringContaining('REFERENCES "listing_submissions"') })
-    // Every later migration (0004: query indexes, #77; 0005: admin panel, #64) applies to the populated database too.
+    // Every later migration (0004: query indexes, #77; 0005: admin panel, #64; 0006: hosted media,
+    // #95) applies to the populated database too.
     for (const migration of names.slice(dataModelIndex + 1)) {
       database.exec('BEGIN')
       database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))

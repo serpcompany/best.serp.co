@@ -182,6 +182,73 @@ export function finishCatalogPublicationPlans(publication: CatalogPublication): 
   ]
 }
 
+/** The hosted-image columns of `listing_media` and `media_ingestions` (#95). */
+export const HOSTED_MEDIA_COLUMNS = 'media_key,sha256,content_type,bytes,width,height'
+/** Clears a `media_ingestions` slot's hosted result. */
+export const CLEARED_MEDIA_RESULT = `media_key=NULL,sha256=NULL,content_type=NULL,bytes=NULL,
+  width=NULL,height=NULL`
+
+/**
+ * Gives a listing the logo staged on a submission or revision, never as a hotlink: the live
+ * hosted logo stays when it came from the same source; otherwise a submission's hosted copy of
+ * that source is adopted; otherwise the source is queued for the cron and the page shows the
+ * fallback tile until it is hosted. Runs inside an approval batch.
+ */
+export function adoptStagedLogoPlans(input: {
+  listingId: string
+  now: string
+  stagedId: string
+  stagedTable: 'listing_revisions' | 'listing_submissions'
+}): StatementPlan[] {
+  hoursBefore(input.now, 0)
+  const { listingId, stagedId, stagedTable } = input
+  const stagedLogo = `(SELECT logo_url FROM ${stagedTable} WHERE id=?)`
+  const logoRow = `EXISTS (SELECT 1 FROM listing_media WHERE listing_id=? AND kind='logo')`
+  const adoptHostedSubmissionLogo: StatementPlan[] =
+    stagedTable === 'listing_submissions'
+      ? [
+          {
+            sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order,${HOSTED_MEDIA_COLUMNS})
+              SELECT ?,'logo',j.source_url,0,j.media_key,j.sha256,j.content_type,j.bytes,
+                j.width,j.height
+              FROM listing_submissions s JOIN media_ingestions j ON j.submission_id=s.id
+                AND j.kind='logo' AND j.sort_order=0 AND j.status='hosted'
+                AND j.source_url=s.logo_url
+              WHERE s.id=? AND NOT ${logoRow}`,
+            params: [listingId, stagedId, listingId]
+          }
+        ]
+      : []
+  return [
+    {
+      sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'
+        AND NOT (media_key IS NOT NULL AND url IS ${stagedLogo})`,
+      params: [listingId, stagedId]
+    },
+    ...adoptHostedSubmissionLogo,
+    {
+      sql: `INSERT INTO media_ingestions
+        (listing_id,kind,sort_order,source_url,status,attempts,next_attempt_at,created_at,updated_at)
+        SELECT ?,'logo',0,logo_url,'pending',0,?,?,? FROM ${stagedTable}
+        WHERE id=? AND NOT ${logoRow}
+        ON CONFLICT(listing_id,kind,sort_order) WHERE listing_id IS NOT NULL DO UPDATE SET
+          source_url=excluded.source_url,status='pending',attempts=0,
+          next_attempt_at=excluded.next_attempt_at,last_error=NULL,${CLEARED_MEDIA_RESULT},
+          updated_at=excluded.updated_at`,
+      params: [listingId, input.now, input.now, input.now, stagedId, listingId]
+    },
+    {
+      sql: `DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo' AND ${logoRow}`,
+      params: [listingId, listingId]
+    },
+    assertGuard('staged_logo_hosted_or_queued', {
+      sql: `${logoRow} OR EXISTS (SELECT 1 FROM media_ingestions WHERE listing_id=?
+        AND kind='logo' AND sort_order=0 AND status='pending' AND source_url IS ${stagedLogo})`,
+      params: [listingId, listingId, stagedId]
+    })
+  ]
+}
+
 /** Staged listing content shared by submissions and revisions. */
 export interface StagedListingContent {
   categorySlug: string
@@ -316,16 +383,14 @@ export function applyStagedContentPlans(input: {
       params: [listingId, source.id]
     },
     assertPreviousStatementChangedOne('primary_category_replaced'),
-    {
-      sql: `DELETE FROM listing_media WHERE listing_id=? AND kind IN ('logo','video')`,
-      params: [listingId]
-    },
-    {
-      sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
-        SELECT ?,'logo',logo_url,0 FROM ${source.table} WHERE id=?`,
-      params: [listingId, source.id]
-    },
-    assertPreviousStatementChangedOne('staged_logo_applied'),
+    { sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='video'`, params: [listingId] },
+    // Never a hotlink (#95): keep the hosted logo, adopt a hosted copy, or queue the source.
+    ...adoptStagedLogoPlans({
+      listingId,
+      now: input.now,
+      stagedId: source.id,
+      stagedTable: source.table
+    }),
     {
       sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
         SELECT ?,'video',video_url,1 FROM ${source.table} WHERE id=? AND video_url IS NOT NULL`,

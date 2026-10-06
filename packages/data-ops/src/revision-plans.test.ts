@@ -280,8 +280,25 @@ describe('revision status transitions (compare-and-swap with changes() assertion
           db.prepare('SELECT kind,url FROM listing_media ORDER BY kind,sort_order').all()
         ).toEqual([
           { kind: 'image', url: 'https://assets.example/image.png' },
-          { kind: 'logo', url: 'https://assets.example/new-logo.png' },
           { kind: 'video', url: 'https://assets.example/demo.mp4' }
+        ])
+        // The new logo is never hotlinked: it waits for the media cron, behind the fallback tile.
+        expect(
+          db
+            .prepare(
+              'SELECT listing_id,kind,sort_order,source_url,status,attempts,next_attempt_at FROM media_ingestions'
+            )
+            .all()
+        ).toEqual([
+          {
+            attempts: 0,
+            kind: 'logo',
+            listing_id: listingId,
+            next_attempt_at: NOW,
+            sort_order: 0,
+            source_url: 'https://assets.example/new-logo.png',
+            status: 'pending'
+          }
         ])
         expect(db.prepare('SELECT label FROM listing_resource_links').all()).toEqual([
           { label: 'Pricing' }
