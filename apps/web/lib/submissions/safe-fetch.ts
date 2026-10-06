@@ -5,6 +5,10 @@ import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
  * logo checks): every hop, including each redirect, must be a public http(s) URL
  * (`validatePublicHttpUrl`); redirects are followed by hand, at most three; each request times
  * out after 8 seconds; and a body is read up to a byte cap, never past it.
+ *
+ * The policy reads the URL, not DNS: a public hostname that resolves to a private address
+ * passes it. Production relies on Cloudflare's egress, which never reaches private ranges,
+ * for that case (docs/SUBMISSION_FLOW.md#fetching-submitters-sites).
  */
 
 export const SUBMISSION_FETCH_USER_AGENT = 'SERPSoftwareBadgeVerifier/1.0'
@@ -24,7 +28,7 @@ export type SafeFetchFailure =
   | `http_${number}`
 
 export type SafeFetchResult =
-  | { body: Uint8Array; contentType: string; ok: true; url: string }
+  | { body: Uint8Array; contentType: string; headers: Headers; ok: true; url: string }
   | { code: SafeFetchFailure; ok: false }
 
 export interface SafeFetchOptions {
@@ -125,7 +129,7 @@ export async function safeFetch(url: string, options: SafeFetchOptions): Promise
       return { code: isTimeout(error) ? 'fetch_timeout' : 'read_failed', ok: false }
     }
     if (!body) return { code: 'response_too_large', ok: false }
-    return { body, contentType, ok: true, url: safe.url.toString() }
+    return { body, contentType, headers: response.headers, ok: true, url: safe.url.toString() }
   }
   return { code: 'too_many_redirects', ok: false }
 }

@@ -38,23 +38,56 @@ export function authorizationFailure(result: Exclude<Authorization, { ok: true }
   return apiError(503, 'auth_unavailable', 'Accounts are unavailable right now.')
 }
 
-/** 413 for a body declared larger than `maxBytes`, answered before any session or D1 work. */
-export function payloadTooLarge(request: Request, maxBytes = 32_000) {
-  return Number(request.headers.get('content-length') || '0') > maxBytes
-    ? apiError(413, 'payload_too_large', 'The submission is too large.')
-    : null
+/** The largest JSON body a submit-flow route reads; the prefill route reads at most 4 KB. */
+export const MAX_BODY_BYTES = 32_000
+
+function tooLargeResponse() {
+  return apiError(413, 'payload_too_large', 'The request is too large.')
 }
 
-/** Reads a JSON body of at most `maxBytes`, or null when it is missing, too large, or invalid. */
-export async function readJson(request: Request, maxBytes = 32_000): Promise<unknown | null> {
-  const declared = Number(request.headers.get('content-length') || '0')
-  if (declared > maxBytes) return null
-  const text = await request.text().catch(() => null)
-  if (text === null || text.length > maxBytes) return null
+/** 413 for a body declared larger than `maxBytes`, answered before any session or D1 work. */
+export function payloadTooLarge(request: Request, maxBytes = MAX_BODY_BYTES) {
+  return Number(request.headers.get('content-length') || '0') > maxBytes ? tooLargeResponse() : null
+}
+
+export type JsonBody = { response: NextResponse } | { response: null; value: unknown }
+
+/**
+ * Reads a JSON body of at most `maxBytes`, counting bytes as they stream in, so a body with no
+ * `Content-Length` (chunked) is cut off at the cap instead of buffered whole (PR #84 review
+ * round 1, finding 4). Too large: a 413 `response`. Missing or invalid JSON: `value` null.
+ */
+export async function readJsonBody(request: Request, maxBytes = MAX_BODY_BYTES): Promise<JsonBody> {
+  const declared = payloadTooLarge(request, maxBytes)
+  if (declared) return { response: declared }
+  if (!request.body) return { response: null, value: null }
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
   try {
-    return JSON.parse(text) as unknown
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined)
+        return { response: tooLargeResponse() }
+      }
+      chunks.push(value)
+    }
   } catch {
-    return null
+    return { response: null, value: null }
+  }
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  try {
+    return { response: null, value: JSON.parse(new TextDecoder().decode(bytes)) as unknown }
+  } catch {
+    return { response: null, value: null }
   }
 }
 

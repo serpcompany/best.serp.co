@@ -219,6 +219,7 @@ const CONCLUSIVE_FAILURES = new Set([
   'badge_missing',
   'link_not_followed',
   'nofollow',
+  'page_not_followed',
   'wrong_destination'
 ])
 
@@ -232,6 +233,27 @@ export function checksLeft(submission: {
   verificationAttempts: number
 }): number {
   return Math.max(0, VERIFICATION_ATTEMPT_LIMIT - submission.verificationAttempts)
+}
+
+export const LOGO_HTTPS_MESSAGE = 'Use an image address that starts with https://.'
+
+/**
+ * Logos are hotlinked on https pages, so their URL must be https (PR #84 review round 1,
+ * finding 6); a local Worker also accepts http for its fixture sites. Logos only ever render
+ * through `<img referrerpolicy="no-referrer" loading="lazy">`, never inline, `<object>`, or
+ * `<iframe>` (an SVG may hold a script). #64: re-check the logo URL (`checkLogoUrl`) when an
+ * admin approves, since the image can change after it was saved.
+ */
+export function logoUrlProblem(value: string, allowInsecure: boolean): string | null {
+  try {
+    const url = new URL(value.trim())
+    if (url.username || url.password) return LOGO_HTTPS_MESSAGE
+    if (url.protocol === 'https:') return null
+    if (url.protocol === 'http:' && allowInsecure) return null
+    return LOGO_HTTPS_MESSAGE
+  } catch {
+    return FIELD_MESSAGES.logoUrl
+  }
 }
 
 /** Why a logo URL was refused (`checkLogoUrl` in `./prefill.ts`). */

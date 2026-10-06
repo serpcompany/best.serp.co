@@ -63,15 +63,21 @@ export interface BadgeStepProps {
   submission: SubmissionSummary
 }
 
-type Outcome = { code: string; href?: string; rel?: string[] } | null
+type Outcome = { code: string; href?: string; rel?: string[]; source?: string } | null
 
-/** Every `rel` token that keeps a link from being followed (the verifier's list). */
-const UNFOLLOWED_REL = ['nofollow', 'sponsored', 'ugc']
-
-/** "nofollow", "nofollow and ugc", "nofollow, sponsored, or ugc" */
-function joinTokens(tokens: string[], last: 'and' | 'or'): string {
+/** "nofollow", "nofollow and ugc", "nofollow, sponsored and ugc" */
+function joinTokens(tokens: string[]): string {
   if (tokens.length <= 1) return tokens[0] ?? ''
-  return `${tokens.slice(0, -1).join(', ')}${tokens.length > 2 ? ',' : ''} ${last} ${tokens.at(-1)}`
+  return `${tokens.slice(0, -1).join(', ')} and ${tokens.at(-1)}`
+}
+
+/** `nofollow`, `sponsored`, or `ugc`, as inline code. */
+function UnfollowedTokens() {
+  return (
+    <>
+      <code>nofollow</code>, <code>sponsored</code>, or <code>ugc</code>
+    </>
+  )
 }
 
 const UNREACHABLE: Record<string, string> = {
@@ -321,17 +327,16 @@ export function BadgeStep({
       </ToneAlert>
     )
   } else if (code === 'link_not_followed' || code === 'nofollow') {
-    // The tokens the check found; after a reload only the code is known, so name all three.
+    // The tokens the check just found. After a reload only the result is stored, so the alert
+    // gives the general rule, with no sample of tokens the site may not have.
     const found = outcome?.rel?.length ? outcome.rel : code === 'nofollow' ? ['nofollow'] : null
-    const tokens = found ?? UNFOLLOWED_REL
-    const marked = joinTokens(tokens, found ? 'and' : 'or')
-    result = (
-      <ToneAlert tone="warning" title={`Badge found, but the link is marked ${marked}`}>
+    result = found ? (
+      <ToneAlert tone="warning" title={`Badge found, but the link is marked ${joinTokens(found)}`}>
         <p>
           The badge has to be a plain link that search engines follow. Remove{' '}
-          {tokens.map((token, index) => (
+          {found.map((token, index) => (
             <span key={token}>
-              {index > 0 ? (index === tokens.length - 1 ? (found ? ' and ' : ' or ') : ', ') : ''}
+              {index > 0 ? (index === found.length - 1 ? ' and ' : ', ') : ''}
               <code>{token}</code>
             </span>
           ))}{' '}
@@ -339,7 +344,7 @@ export function BadgeStep({
         </p>
         <div className="mt-2 w-full overflow-x-auto rounded-md border bg-muted/50 px-3 py-2 font-mono text-[11px] text-foreground">
           &lt;a href="{listingUrl}" rel="
-          {tokens.map(token => (
+          {found.map(token => (
             <span key={token}>
               <span className="rounded bg-red-500/15 px-0.5 text-red-700 line-through dark:text-red-400">
                 {token}
@@ -348,6 +353,42 @@ export function BadgeStep({
           ))}
           noopener"&gt;
         </div>
+      </ToneAlert>
+    ) : (
+      <ToneAlert tone="warning" title="Badge found, but the link isn’t followed">
+        <p>
+          The badge has to be a plain link that search engines follow. Remove <UnfollowedTokens />{' '}
+          from its <code>rel</code>, publish the change, then check again.
+        </p>
+      </ToneAlert>
+    )
+  } else if (code === 'page_not_followed') {
+    const source = outcome?.source
+    result = (
+      <ToneAlert
+        tone="warning"
+        title="Badge found, but the page tells search engines not to follow links"
+      >
+        <p>
+          {source === 'header' ? (
+            <>
+              {site} is served with an <code>X-Robots-Tag</code> header that includes{' '}
+              <code>nofollow</code> or <code>none</code>.
+            </>
+          ) : source === 'meta' ? (
+            <>
+              {site} has a <code>&lt;meta name="robots"&gt;</code> tag that includes{' '}
+              <code>nofollow</code> or <code>none</code>.
+            </>
+          ) : (
+            <>
+              {site} has a robots meta tag or an <code>X-Robots-Tag</code> header that includes{' '}
+              <code>nofollow</code> or <code>none</code>.
+            </>
+          )}{' '}
+          Search engines then follow no link on the page, the badge included. Remove it, publish the
+          change, then check again.
+        </p>
       </ToneAlert>
     )
   } else if (code === 'wrong_destination') {
@@ -385,8 +426,8 @@ export function BadgeStep({
             <h1 className="font-semibold text-2xl tracking-tight">Add the badge to {domain}</h1>
             <p className="mt-1 text-muted-foreground text-sm">
               Paste a snippet into the HTML of <b className="font-medium text-foreground">{site}</b>
-              . The footer works well. Keep the link dofollow: don’t add{' '}
-              <code className="rounded bg-muted px-1 font-mono text-xs">rel="nofollow"</code>.
+              . The footer works well. Keep it a plain link: don’t add <UnfollowedTokens /> to its{' '}
+              <code className="rounded bg-muted px-1 font-mono text-xs">rel</code>.
             </p>
           </div>
         </div>

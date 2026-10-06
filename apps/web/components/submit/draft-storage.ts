@@ -4,9 +4,19 @@
  * It holds only what the visitor entered (never a token, a session, or a submission id), and is
  * cleared once the draft is saved to their account. Storage that is unavailable or full is
  * ignored: the form still works, it just won't remember.
+ *
+ * Shared computers (PR #84 review round 1, finding 8): signed out, the draft lives under one
+ * anonymous key; signed in, under a key for that account, which adopts the anonymous draft on
+ * the way back from sign-in. Signing out clears every draft key, so the next person to sign in
+ * never sees someone else's draft.
  */
 
 export const SUBMIT_DRAFT_STORAGE_KEY = 'bsc_submit_draft_v1'
+
+/** The storage key for a signed-in account's draft, or the anonymous one. */
+export function draftStorageKey(userId: string | null): string {
+  return userId ? `${SUBMIT_DRAFT_STORAGE_KEY}:u:${userId}` : SUBMIT_DRAFT_STORAGE_KEY
+}
 /** A local draft older than this is ignored (drafts in an account last 30 days). */
 const LOCAL_DRAFT_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -74,18 +84,34 @@ export function parseLocalDraft(raw: string | null, now = Date.now()): LocalSubm
   return draft.website || draft.name || draft.description || draft.content ? draft : null
 }
 
-export function readLocalDraft(): LocalSubmitDraft | null {
+/**
+ * The draft for `userId` (or the anonymous one). A signed-in account without its own draft
+ * adopts the anonymous one: the visitor who filled in the form and then signed in.
+ */
+export function readLocalDraft(userId: string | null): LocalSubmitDraft | null {
   try {
-    return parseLocalDraft(window.localStorage.getItem(SUBMIT_DRAFT_STORAGE_KEY))
+    const storage = window.localStorage
+    const own = parseLocalDraft(storage.getItem(draftStorageKey(userId)))
+    if (own || !userId) return own
+    const anonymous = storage.getItem(SUBMIT_DRAFT_STORAGE_KEY)
+    const adopted = parseLocalDraft(anonymous)
+    if (adopted && anonymous) {
+      storage.setItem(draftStorageKey(userId), anonymous)
+      storage.removeItem(SUBMIT_DRAFT_STORAGE_KEY)
+    }
+    return adopted
   } catch {
     return null
   }
 }
 
-export function writeLocalDraft(draft: Omit<LocalSubmitDraft, 'savedAt'>): void {
+export function writeLocalDraft(
+  draft: Omit<LocalSubmitDraft, 'savedAt'>,
+  userId: string | null
+): void {
   try {
     window.localStorage.setItem(
-      SUBMIT_DRAFT_STORAGE_KEY,
+      draftStorageKey(userId),
       JSON.stringify({ ...draft, savedAt: Date.now() })
     )
   } catch {
@@ -93,10 +119,28 @@ export function writeLocalDraft(draft: Omit<LocalSubmitDraft, 'savedAt'>): void 
   }
 }
 
-export function clearLocalDraft(): void {
+export function clearLocalDraft(userId: string | null): void {
   try {
+    window.localStorage.removeItem(draftStorageKey(userId))
     window.localStorage.removeItem(SUBMIT_DRAFT_STORAGE_KEY)
   } catch {
     // Nothing to clear.
+  }
+}
+
+/** Removes every draft this browser keeps, anonymous or per account: on sign-out. */
+export function clearAllLocalDrafts(): void {
+  try {
+    const storage = window.localStorage
+    const keys: string[] = []
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index)
+      if (key === SUBMIT_DRAFT_STORAGE_KEY || key?.startsWith(`${SUBMIT_DRAFT_STORAGE_KEY}:`)) {
+        keys.push(key)
+      }
+    }
+    for (const key of keys) storage.removeItem(key)
+  } catch {
+    // Storage unavailable (or no window): nothing is kept.
   }
 }

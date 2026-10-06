@@ -4,7 +4,8 @@ import {
   apiError,
   authorizationFailure,
   json,
-  readJson,
+  payloadTooLarge,
+  readJsonBody,
   submissionFailure,
   toSummary
 } from '@/lib/submissions/http'
@@ -20,11 +21,15 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
  * badge step (3) comes next.
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const tooLarge = payloadTooLarge(request)
+  if (tooLarge) return tooLarge
   const authorization = await authorizeUserRequest(request)
   if (!authorization.ok) return authorizationFailure(authorization)
   const { id } = await context.params
   if (!UUID.test(id)) return apiError(404, 'not_found', 'Submission not found.')
-  const parsed = planRequestSchema.safeParse((await readJson(request)) ?? {})
+  const body = await readJsonBody(request)
+  if (body.response) return body.response
+  const parsed = planRequestSchema.safeParse(body.value ?? {})
   if (!parsed.success) return apiError(400, 'invalid_plan', 'Choose the free listing.')
   try {
     const submission = await chooseFreePlan(id, authorization.user.id)

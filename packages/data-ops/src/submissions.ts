@@ -45,13 +45,19 @@ export const SUBMISSION_LIMITS = {
 } as const
 
 const REVIEW_CHANNEL = 'github_issue'
-/** Conclusive check results; `nofollow` is the code stored before `link_not_followed` (#84). */
-const CONTENT_VERIFICATION_FAILURES = new Set([
+/**
+ * Check results that read the page and found a problem; each uses up one of the ten checks.
+ * `nofollow` is the code stored before `link_not_followed` (#84).
+ */
+export const CONCLUSIVE_VERIFICATION_FAILURES = [
   'badge_missing',
   'link_not_followed',
   'nofollow',
+  'page_not_followed',
   'wrong_destination'
-])
+] as const
+const CONTENT_VERIFICATION_FAILURES = new Set<string>(CONCLUSIVE_VERIFICATION_FAILURES)
+const CONCLUSIVE_SQL_LIST = CONCLUSIVE_VERIFICATION_FAILURES.map(code => `'${code}'`).join(',')
 const PUBLISHED_AT_PATTERN = /^\d{4}-\d{2}-\d{2}$/u
 
 export class SubmissionError extends Error {
@@ -138,16 +144,29 @@ export interface OwnSubmission {
 export type SubmissionVerificationResult = { ok: true } | { code: string; ok: false }
 
 export interface SubmissionOperations {
-  /** The submission if the badge may be checked now; throws on the attempt limit or cooldown. */
-  beginVerification(id: string, ownerUserId: string): Promise<OwnSubmission>
+  /**
+   * Claims one badge check in a single compare-and-swap, before anything is fetched: the
+   * submission must be the owner's, waiting for its badge, past the 30-second cooldown, and
+   * under the ten-check cap. Throws `not_found` (404), `not_pending_badge` (409),
+   * `attempt_limit` (429), or `cooldown` (429). Pass `claimedAt` to `finishVerification`.
+   */
+  claimVerification(
+    id: string,
+    ownerUserId: string
+  ): Promise<{ claimedAt: string; submission: OwnSubmission }>
   checkUrl(website: string, ownerUserId?: string | null): Promise<UrlAvailability>
   /** `draft` → `pending_badge` with the free plan (`buildChooseSubmissionPlanPlans`). */
   chooseFreePlan(id: string, ownerUserId: string): Promise<OwnSubmission>
   consumeRateLimit(fingerprint: string): Promise<void>
   createDraft(input: { ownerUserId: string; submission: NewDraftInput }): Promise<OwnSubmission>
+  /**
+   * Records the claimed check's result, compare-and-swapping on `claimedAt`. A check whose claim
+   * was overtaken (a later claim after the cooldown) throws `verification_superseded` (409).
+   */
   finishVerification(
     id: string,
     ownerUserId: string,
+    claimedAt: string,
     result: SubmissionVerificationResult
   ): Promise<OwnSubmission>
   getOwnSubmission(id: string, ownerUserId: string): Promise<OwnSubmission | null>
@@ -347,14 +366,23 @@ export function buildSubmissionReviewPreview(
   }
 }
 
+/** `YYYY-MM-DD HH:MM:SS` (UTC), the `CURRENT_TIMESTAMP` format of the verification columns. */
+function sqliteTimestamp(value: Date): string {
+  return value.toISOString().slice(0, 19).replace('T', ' ')
+}
+
 function validClock(clock: () => Date): Date {
   const value = clock()
   if (Number.isNaN(value.getTime())) throw new Error('Submission clock returned an invalid date.')
   return value
 }
 
-/** Checks a draft's content before it is written; the form contract checks the same rules. */
-function validateContent(content: DraftContent): DraftContent {
+/**
+ * Checks a draft's content before it is written; the form contract checks the same rules.
+ * Logos must be https (PR #84 review round 1, finding 6): they are hotlinked on https pages.
+ * A local Worker also accepts http, for the fixture websites of the end-to-end tests.
+ */
+function validateContent(content: DraftContent, allowInsecureLogos: boolean): DraftContent {
   const name = content.name.trim()
   const description = content.description.trim()
   const body = content.content.trim()
@@ -373,8 +401,12 @@ function validateContent(content: DraftContent): DraftContent {
     throw new SubmissionError('invalid_content', 'The long description is too long.')
   }
   if (!categorySlug) throw new SubmissionError('invalid_category', 'Choose a primary category.')
-  if (!logoUrl || !validatePublicHttpUrl(logoUrl).ok) {
+  const logo = logoUrl ? validatePublicHttpUrl(logoUrl) : null
+  if (!logo?.ok) {
     throw new SubmissionError('invalid_logo', 'Add a logo with a public image address.')
+  }
+  if (logo.url.protocol !== 'https:' && !allowInsecureLogos) {
+    throw new SubmissionError('invalid_logo', 'Use an image address that starts with https://.')
   }
   return { categorySlug, content: body, description, logoUrl, name }
 }
@@ -391,10 +423,13 @@ async function runPlans(client: Database, plans: SubmissionStatementPlan[]): Pro
 }
 
 export function createSubmissionOperations(config: {
+  /** Accept http logo URLs (a local Worker only); every other environment requires https. */
+  allowInsecureLogos?: boolean
   client: Database
   clock?: () => Date
 }): SubmissionOperations {
   const { client } = config
+  const allowInsecureLogos = config.allowInsecureLogos === true
   const clock = config.clock ?? (() => new Date())
 
   async function queryFirst<T>(query: CompiledQuery): Promise<T | null> {
@@ -523,7 +558,7 @@ export function createSubmissionOperations(config: {
       if (!('hostKey' in key)) {
         throw unavailableError({ kind: 'invalid', message: key.message })
       }
-      const content = validateContent(submission)
+      const content = validateContent(submission, allowInsecureLogos)
       const [category, availability] = await Promise.all([
         queryFirst(
           client.database
@@ -580,7 +615,7 @@ export function createSubmissionOperations(config: {
     },
 
     async updateDraft({ content, expectedContentVersion, ownerUserId, submissionId }) {
-      const checked = validateContent(content)
+      const checked = validateContent(content, allowInsecureLogos)
       const current = await requireOwnSubmission(submissionId, ownerUserId)
       if (current.status !== 'draft' && current.status !== 'pending_badge') {
         throw new SubmissionError(
@@ -708,65 +743,86 @@ export function createSubmissionOperations(config: {
       }
     },
 
-    async beginVerification(id, ownerUserId) {
-      const row = await requireOwnSubmission(id, ownerUserId)
-      if (row.status !== 'pending_badge') return row
+    async claimVerification(id, ownerUserId) {
+      const now = validClock(clock)
+      const claimedAt = sqliteTimestamp(now)
+      const cooldownCutoff = sqliteTimestamp(
+        new Date(now.getTime() - VERIFICATION_COOLDOWN_SECONDS * 1000)
+      )
+      let changes = 0
+      try {
+        const result = await prepareRaw(
+          client,
+          `UPDATE listing_submissions SET last_verification_at=?,updated_at=?
+            WHERE id=? AND owner_user_id=? AND status='pending_badge'
+              AND (last_verification_at IS NULL OR last_verification_at<=?)
+              AND NOT (verification_attempts>=? AND (last_verification_error IS NULL
+                OR last_verification_error IN (${CONCLUSIVE_SQL_LIST})))`,
+          [claimedAt, now.toISOString(), id, ownerUserId, cooldownCutoff, VERIFICATION_MAX_ATTEMPTS]
+        ).run()
+        changes = Number(result.meta?.changes ?? 0)
+      } catch {
+        throw new Error('D1 verification claim failed.')
+      }
+      const submission = await requireOwnSubmission(id, ownerUserId)
+      if (changes === 1) return { claimedAt, submission }
+      if (submission.status !== 'pending_badge') {
+        throw new SubmissionError(
+          'not_pending_badge',
+          'This submission isn’t waiting for its badge.',
+          409
+        )
+      }
       const lastFailureWasConclusive =
-        !row.lastVerificationError || CONTENT_VERIFICATION_FAILURES.has(row.lastVerificationError)
-      if (row.verificationAttempts >= VERIFICATION_MAX_ATTEMPTS && lastFailureWasConclusive) {
+        !submission.lastVerificationError ||
+        CONTENT_VERIFICATION_FAILURES.has(submission.lastVerificationError)
+      if (
+        submission.verificationAttempts >= VERIFICATION_MAX_ATTEMPTS &&
+        lastFailureWasConclusive
+      ) {
         throw new SubmissionError('attempt_limit', 'Badge verification attempt limit reached.', 429)
       }
-      if (
-        row.lastVerificationAt &&
-        validClock(clock).getTime() - Date.parse(`${row.lastVerificationAt.replace(' ', 'T')}Z`) <
-          VERIFICATION_COOLDOWN_SECONDS * 1000
-      ) {
-        throw new SubmissionError('cooldown', 'Wait 30 seconds before checking again.', 429)
-      }
-      return row
+      throw new SubmissionError('cooldown', 'Wait 30 seconds before checking again.', 429)
     },
 
-    async finishVerification(id, ownerUserId, result) {
-      const row = await requireOwnSubmission(id, ownerUserId)
-      if (row.status !== 'pending_badge') return row
+    async finishVerification(id, ownerUserId, claimedAt, result) {
       const status = result.ok ? 'verified' : 'pending_badge'
       const error = result.ok ? null : result.code
       const attemptIncrement = result.ok || CONTENT_VERIFICATION_FAILURES.has(result.code) ? 1 : 0
-      const statements = [
-        prepareRaw(
-          client,
-          `UPDATE listing_submissions SET status=?, verification_attempts=verification_attempts+?,
-            last_verification_at=CURRENT_TIMESTAMP,last_verification_error=?,
-            badge_verified_at=CASE WHEN ?='verified' THEN CURRENT_TIMESTAMP ELSE badge_verified_at END,
-            updated_at=CURRENT_TIMESTAMP
-          WHERE id=? AND owner_user_id=? AND status='pending_badge'
-            AND verification_attempts=? AND last_verification_at IS ?`,
-          [
+      const now = validClock(clock)
+      const recorded = await runPlans(client, [
+        {
+          sql: `UPDATE listing_submissions SET status=?,verification_attempts=verification_attempts+?,
+              last_verification_error=?,
+              badge_verified_at=CASE WHEN ?='verified' THEN ? ELSE badge_verified_at END,
+              updated_at=?
+            WHERE id=? AND owner_user_id=? AND status='pending_badge' AND last_verification_at=?`,
+          params: [
             status,
             attemptIncrement,
             error,
             status,
+            sqliteTimestamp(now),
+            now.toISOString(),
             id,
             ownerUserId,
-            row.verificationAttempts,
-            row.lastVerificationAt
+            claimedAt
           ]
-        ),
-        prepareRaw(client, assertPreviousStatementChangedOne('verification_state_changed').sql, []),
-        prepareRaw(
-          client,
-          `INSERT INTO listing_submission_events (submission_id,event_type,detail,actor)
-          VALUES (?,?,?,'badge-verifier')`,
-          [id, result.ok ? 'badge_verified' : 'verification_failed', error]
+        },
+        assertPreviousStatementChangedOne('verification_recorded'),
+        {
+          sql: `INSERT INTO listing_submission_events (submission_id,event_type,detail,actor)
+            VALUES (?,?,?,'badge-verifier')`,
+          params: [id, result.ok ? 'badge_verified' : 'verification_failed', error]
+        }
+      ])
+      if (!recorded) {
+        throw new SubmissionError(
+          'verification_superseded',
+          'Another check of this badge finished first. Reload to see its result.',
+          409
         )
-      ]
-      let results: D1Result<unknown>[]
-      try {
-        results = await client.binding.batch(statements)
-      } catch {
-        throw new Error('D1 verification update failed.')
       }
-      if (results.some(item => !item.success)) throw new Error('D1 verification update failed.')
       return requireOwnSubmission(id, ownerUserId)
     },
 

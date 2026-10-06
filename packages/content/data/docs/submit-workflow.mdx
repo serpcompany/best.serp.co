@@ -18,9 +18,12 @@ form stays in their browser meanwhile and comes back filled in after sign-in. Co
 saves a draft to their account. Nothing is reviewed or published yet.
 
 Next, the submitter chooses how to get listed. The free listing asks them to add the "Featured
-on SERP" badge to their site with a dofollow link to their future listing page. They copy a
-snippet, publish it, and ask us to check. A check loads the website and reports exactly what it
-found: the badge missing, a nofollow link, a link to the wrong page, or a site that could not be
+on SERP" badge to their site as a plain, followed link to their future listing page: its `rel`
+must not include `nofollow`, `sponsored`, or `ugc`, and the page must not tell search engines
+to skip its links with a robots `nofollow`. They copy a snippet, publish it, and ask us to
+check. A check reads the page as a browser would (comments, scripts, and templates don't count)
+and reports exactly what it found: the badge missing, a link that isn't followed, a page that
+asks search engines not to follow links, a link to the wrong page, or a site that could not be
 reached. Connection problems never use up one of the ten checks, and checks are limited to one
 every 30 seconds. When the badge checks out, the submission enters the review queue, the
 submitter gets a confirmation email, and the SERP team is alerted.

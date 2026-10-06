@@ -60,12 +60,29 @@ function database(env: ScheduledEnv): D1Database {
 export const draftJobs: ScheduledJob = {
   name: 'draft-reminders-and-expiry',
   async run({ context, env, now }) {
+    const jobs = createDraftJobOperations({ client: createDatabase(database(env)) })
+    // The email service delivers through `waitUntil`; collecting each delivery lets the job
+    // await it, so the run sends one email at a time instead of firing a whole batch.
+    const deliveries: Promise<unknown>[] = []
+    const email = createWorkerEmailService({
+      context: {
+        waitUntil(promise) {
+          deliveries.push(promise)
+          context.waitUntil(promise)
+        }
+      },
+      env,
+      templates: appEmailTemplates
+    })
     const result = await runDraftJobs({
-      email: createWorkerEmailService({ context, env, templates: appEmailTemplates }),
-      jobs: createDraftJobOperations({ client: createDatabase(database(env)) }),
+      jobs,
       now,
       paidListings: site.features.showPaidListings,
-      priceCents: site.submissions.paidListingPriceCents
+      priceCents: site.submissions.paidListingPriceCents,
+      async send(templateId, request) {
+        email.enqueue(templateId, request)
+        await Promise.allSettled(deliveries.splice(0))
+      }
     })
     return { ...result }
   }

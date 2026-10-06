@@ -1,9 +1,11 @@
-import type { Database } from './client'
+import { type Database, d1ErrorCode } from './client'
 import {
   buildExpireDraftPlans,
   buildMarkDraftReminderSentPlans,
+  DRAFT_REMINDER_COUNT,
   type DraftReminderNumber,
   type DraftReminderVariant,
+  draftClockCutoffs,
   draftReminderVariants,
   selectDraftRemindersDuePlan,
   selectExpiredDraftsPlan
@@ -39,6 +41,15 @@ export interface ExpiredDraft {
   website: string
 }
 
+/**
+ * A draft email whose last send failed and may be sent again (PR #84 review round 1,
+ * finding 7): the ledger row is `failed` with attempts left, and the draft is still in the
+ * state the email describes (the same reminder still the latest claimed, or expired).
+ */
+export type RetryableDraftEmail =
+  | { eventKey: string; kind: 'expired'; draft: ExpiredDraft }
+  | { eventKey: string; kind: 'reminder'; draft: DueDraftReminder }
+
 export interface DraftJobOperations {
   /** Claims reminder `reminder`; false when another run claimed it or the draft moved on. */
   claimReminder(input: {
@@ -51,7 +62,32 @@ export interface DraftJobOperations {
   expireDraft(input: { now: string; submissionId: string }): Promise<boolean>
   expiredDrafts(input: { limit: number; now: string }): Promise<ExpiredDraft[]>
   remindersDue(input: { limit: number; now: string }): Promise<DueDraftReminder[]>
+  /** Draft emails to send again: failed in the email ledger with attempts left. */
+  retryableEmails(input: {
+    limit: number
+    maxAttempts: number
+    now: string
+  }): Promise<RetryableDraftEmail[]>
 }
+
+interface RetryRow {
+  draft_reminders_sent: number
+  draft_saved_at: string | null
+  event_key: string
+  id: string
+  name: string
+  owner_email: string | null
+  paid_at: string | null
+  plan: string | null
+  slug: string
+  status: string
+  template_id: string
+  website: string
+  withdrawal_reason: string | null
+}
+
+const REMINDER_KEY = /^submission-draft-reminder:([0-9a-f-]{36}):([1-5])$/u
+const EXPIRED_KEY = /^submission-draft-expired:([0-9a-f-]{36})$/u
 
 interface DueRow {
   draft_saved_at: string
@@ -99,16 +135,23 @@ export function createDraftJobOperations(config: { client: Database }): DraftJob
     return result.results
   }
 
-  /** True when the plan's batch committed; a failed compare-and-swap rolls it back. */
+  /**
+   * True when the plan's batch committed, false when its compare-and-swap lost (another run, or
+   * the draft moved on). Any other D1 failure is rethrown, so an outage fails the run instead
+   * of looking like nothing was due (PR #84 review round 1, finding 7).
+   */
   async function claim(plans: StatementPlan[]): Promise<boolean> {
+    let results: D1Result<unknown>[]
     try {
-      const results = await binding.batch(
+      results = await binding.batch(
         plans.map(plan => binding.prepare(plan.sql).bind(...plan.params))
       )
-      return results.every(result => result.success)
-    } catch {
-      return false
+    } catch (error) {
+      if (d1ErrorCode(error).endsWith(':plan_assertion_failed')) return false
+      throw new Error(`D1 draft job claim failed (${d1ErrorCode(error)}).`)
     }
+    if (!results.every(result => result.success)) throw new Error('D1 draft job claim failed.')
+    return true
   }
 
   return {
@@ -142,6 +185,78 @@ export function createDraftJobOperations(config: { client: Database }): DraftJob
 
     async expireDraft(input) {
       return claim(buildExpireDraftPlans(input))
+    },
+
+    async retryableEmails({ limit, maxAttempts, now }) {
+      const { expiryCutoff } = draftClockCutoffs(now)
+      // The submission id is the event key's middle part: `submission-draft-reminder:<id>:<n>`
+      // (26-character prefix) or `submission-draft-expired:<id>` (25 characters).
+      const failed = await rows<RetryRow>({
+        sql: `SELECT d.template_id,d.event_key,s.id,s.slug,s.name,s.website,s.status,s.plan,s.paid_at,
+            s.draft_saved_at,s.draft_reminders_sent,s.withdrawal_reason,u.email AS owner_email
+          FROM email_deliveries d
+          JOIN listing_submissions s ON s.id=CASE d.template_id
+            WHEN 'draft-reminder' THEN substr(d.event_key,27,36)
+            ELSE substr(d.event_key,26,36) END
+          LEFT JOIN users u ON u.id=s.owner_user_id
+          WHERE d.template_id IN ('draft-reminder','draft-expired') AND d.status='failed'
+            AND d.attempts<?
+          ORDER BY d.updated_at,d.event_key
+          LIMIT ?`,
+        params: [maxAttempts, limit]
+      })
+      const retryable: RetryableDraftEmail[] = []
+      for (const row of failed) {
+        if (!row.owner_email) continue
+        const expired = EXPIRED_KEY.exec(row.event_key)
+        if (row.template_id === 'draft-expired' && expired?.[1] === row.id) {
+          if (row.status !== 'withdrawn' || row.withdrawal_reason !== 'expired') continue
+          retryable.push({
+            draft: {
+              draftSavedAt: row.draft_saved_at ?? '',
+              id: row.id,
+              name: row.name,
+              ownerEmail: row.owner_email,
+              slug: row.slug,
+              website: row.website
+            },
+            eventKey: row.event_key,
+            kind: 'expired'
+          })
+          continue
+        }
+        const reminder = REMINDER_KEY.exec(row.event_key)
+        if (row.template_id !== 'draft-reminder' || reminder?.[1] !== row.id) continue
+        const number = Number(reminder[2])
+        const stillLatest =
+          row.status === 'draft' &&
+          Number(row.draft_reminders_sent) === number &&
+          row.draft_saved_at !== null &&
+          row.draft_saved_at > expiryCutoff &&
+          number <= DRAFT_REMINDER_COUNT
+        const variant: DraftReminderVariant | null =
+          row.plan === null
+            ? 'choose_plan'
+            : row.plan === 'paid' && row.paid_at === null
+              ? 'complete_checkout'
+              : null
+        if (!stillLatest || !variant || row.draft_saved_at === null) continue
+        retryable.push({
+          draft: {
+            draftSavedAt: row.draft_saved_at,
+            id: row.id,
+            name: row.name,
+            ownerEmail: row.owner_email,
+            reminder: reminderOf(number),
+            slug: row.slug,
+            variant,
+            website: row.website
+          },
+          eventKey: row.event_key,
+          kind: 'reminder'
+        })
+      }
+      return retryable
     }
   }
 }

@@ -1,10 +1,17 @@
-import { decodeEntities } from './prefill'
+import { htmlTags } from './html-tokens'
 import { safeFetch } from './safe-fetch'
 
 /**
  * Badge verification (serpcompany/best.serp.co#59): load the submitted website through the
- * safe fetcher (`./safe-fetch.ts`, which applies the shared public-URL policy to every
- * hop) and look for the Featured badge inside a plain, followed link to the listing.
+ * safe fetcher (`./safe-fetch.ts`, which applies the shared public-URL policy to every hop)
+ * and look, in the tags a browser would render (`./html-tokens.ts`), for the Featured badge:
+ * a real `<img>` of one of the badge URLs inside an `<a>` whose own `href` is the listing and
+ * whose own `rel` has no `nofollow`, `sponsored`, or `ugc` (owner decision on #84), on a page
+ * that does not tell crawlers to skip its links (`<meta name="robots" content="nofollow">` or
+ * an `X-Robots-Tag: nofollow` header).
+ *
+ * Only the static HTML is read: a badge added by JavaScript fails, and a badge hidden with CSS
+ * (`display:none`) passes, because detecting it would need rendering. That is accepted.
  */
 const MAX_HTML_BYTES = 1_000_000
 
@@ -15,11 +22,18 @@ const MAX_HTML_BYTES = 1_000_000
 export const UNFOLLOWED_REL_TOKENS = ['nofollow', 'sponsored', 'ugc'] as const
 export type UnfollowedRelToken = (typeof UNFOLLOWED_REL_TOKENS)[number]
 
+/** Robots directives that stop crawlers following every link on a page. */
+const UNFOLLOWED_ROBOTS_DIRECTIVES = new Set(['nofollow', 'none'])
+/** `<meta name>` values whose robots directives major crawlers obey. */
+const ROBOTS_META_NAMES = new Set(['robots', 'googlebot', 'bingbot'])
+
 type ScanResult =
   | { ok: true }
   | { ok: false; code: 'badge_missing' }
   /** `rel`: the tokens that stop the badge link from being followed, in the order found. */
   | { code: 'link_not_followed'; ok: false; rel: UnfollowedRelToken[] }
+  /** The whole page asks crawlers not to follow its links: by a robots meta tag or header. */
+  | { code: 'page_not_followed'; ok: false; source: 'header' | 'meta' }
   /** `href`: where the first misdirected badge links, when it is an absolute URL. */
   | { href?: string; ok: false; code: 'wrong_destination' }
 
@@ -39,26 +53,22 @@ export type BadgeVerificationResult =
         | `http_${number}`
     }
 
-/**
- * The first value of attribute `name` in `tag`, entities decoded, as a browser reads it. The
- * name must stand alone, so `data-rel` is never read as `rel`.
- */
-function attribute(tag: string, name: string): string | null {
-  const match = tag.match(
-    new RegExp(`(?<![\\w-])${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i')
-  )
-  const value = match?.[1] ?? match?.[2] ?? match?.[3]
-  return value === undefined ? null : decodeEntities(value)
-}
-
 /** The unfollowed tokens in a `rel` value: split on whitespace, compared case-insensitively. */
-export function unfollowedRelTokens(rel: string | null): UnfollowedRelToken[] {
-  const tokens = (rel ?? '').toLowerCase().split(/\s+/u)
+export function unfollowedRelTokens(rel: string | null | undefined): UnfollowedRelToken[] {
+  const tokens = (rel ?? '').toLowerCase().split(/[\t\n\f\r ]+/u)
   return UNFOLLOWED_REL_TOKENS.filter(token => tokens.includes(token))
 }
 
-function canonical(value: string): string {
-  const url = new URL(value)
+/** True when a robots directive list (`noindex, nofollow`, `googlebot: none`) skips links. */
+export function robotsSkipLinks(value: string | null | undefined): boolean {
+  return (value ?? '')
+    .toLowerCase()
+    .split(/[\s,:]+/u)
+    .some(directive => UNFOLLOWED_ROBOTS_DIRECTIVES.has(directive))
+}
+
+function canonical(value: string, base: string | undefined): string {
+  const url = new URL(value.trim(), base)
   url.hash = ''
   return url.toString().replace(/\/$/, '')
 }
@@ -72,46 +82,94 @@ export interface BadgeTargets {
 
 /**
  * Passes when any expected badge image sits inside a link to the listing with no unfollowed
- * `rel` token. Otherwise reports, in this order: a badge linking to the listing but not
- * followed (`link_not_followed`), a badge linking elsewhere (`wrong_destination`), or no badge.
+ * `rel` token on a page that does not skip links. Otherwise reports, in this order: the page
+ * skips links (`page_not_followed`, only when a badge links to the listing), a badge linking to
+ * the listing but not followed (`link_not_followed`), a badge linking elsewhere
+ * (`wrong_destination`), or no badge. `pageUrl` resolves relative URLs (with `<base href>`).
  */
-export function scanFeaturedBadge(html: string, expected: BadgeTargets): ScanResult {
-  const expectedBadges = new Set(expected.badgeUrls.map(canonical))
+export function scanFeaturedBadge(
+  html: string,
+  expected: BadgeTargets,
+  pageUrl?: string
+): ScanResult {
+  const expectedBadges = new Set(expected.badgeUrls.map(url => canonical(url, undefined)))
   const expectedListings = new Set(
-    [expected.listingUrl, ...(expected.legacyListingUrls ?? [])].map(canonical)
+    [expected.listingUrl, ...(expected.legacyListingUrls ?? [])].map(url =>
+      canonical(url, undefined)
+    )
   )
+  let base = pageUrl
+  let sawBase = false
+  let anchor: ReadonlyMap<string, string> | null = null
   let sawBadge = false
+  let followed = false
   let wrongHref: string | null = null
   let unfollowed: UnfollowedRelToken[] | null = null
+  let pageSkipsLinks = false
 
-  for (const match of html.matchAll(/<a\b[^>]*>([\s\S]*?)<\/a\s*>/gi)) {
-    const anchor = match[0]
-    const opening = anchor.match(/^<a\b[^>]*>/i)?.[0] ?? anchor
-    const inner = match[1] ?? ''
-    const href = attribute(opening, 'href')
-    const hasBadge = [...inner.matchAll(/<img\b[^>]*>/gi)].some(image => {
-      const src = attribute(image[0], 'src')
-      if (!src) return false
-      try {
-        return expectedBadges.has(canonical(src))
-      } catch {
-        return false
-      }
-    })
-    if (!hasBadge) continue
-    sawBadge = true
-    let toListing = false
+  const resolve = (value: string | undefined): string | null => {
+    if (value === undefined) return null
     try {
-      toListing = href !== null && expectedListings.has(canonical(href))
-      if (!toListing && href !== null) wrongHref ??= new URL(href).toString()
+      return canonical(value, base)
     } catch {
-      toListing = false
+      return null
     }
-    if (!toListing) continue
-    const tokens = unfollowedRelTokens(attribute(opening, 'rel'))
-    if (tokens.length === 0) return { ok: true }
-    unfollowed ??= tokens
   }
+
+  const absolute = (value: string | undefined): string | null => {
+    try {
+      return value === undefined ? null : new URL(value.trim(), base).toString()
+    } catch {
+      return null
+    }
+  }
+
+  for (const tag of htmlTags(html)) {
+    if (tag.kind === 'end') {
+      if (tag.name === 'a' && !tag.inForeignContent) anchor = null
+      continue
+    }
+    if (tag.name === 'base' && !sawBase && tag.attributes.has('href')) {
+      sawBase = true
+      try {
+        base = new URL(tag.attributes.get('href') ?? '', pageUrl).toString()
+      } catch {
+        // An unusable base leaves relative URLs resolving against the page.
+      }
+      continue
+    }
+    if (tag.name === 'meta') {
+      const name = tag.attributes.get('name')?.trim().toLowerCase()
+      if (name && ROBOTS_META_NAMES.has(name) && robotsSkipLinks(tag.attributes.get('content'))) {
+        pageSkipsLinks = true
+      }
+      continue
+    }
+    if (tag.name === 'a') {
+      // An `<a>` inside `<svg>` or `<math>` is not an HTML link; a new `<a>` closes the last.
+      anchor = tag.inForeignContent ? null : tag.attributes
+      continue
+    }
+    // The parser reads `<image>` as `<img>`.
+    if ((tag.name !== 'img' && tag.name !== 'image') || tag.inForeignContent || !anchor) continue
+    const src = resolve(tag.attributes.get('src'))
+    if (!src || !expectedBadges.has(src)) continue
+    sawBadge = true
+    const href = resolve(anchor.get('href'))
+    if (!href || !expectedListings.has(href)) {
+      if (href) wrongHref ??= absolute(anchor.get('href'))
+      continue
+    }
+    const tokens = unfollowedRelTokens(anchor.get('rel'))
+    if (tokens.length === 0) followed = true
+    else unfollowed ??= tokens
+  }
+
+  const linksToListing = followed || unfollowed !== null
+  if (linksToListing && pageSkipsLinks) {
+    return { code: 'page_not_followed', ok: false, source: 'meta' }
+  }
+  if (followed) return { ok: true }
   if (unfollowed) return { code: 'link_not_followed', ok: false, rel: unfollowed }
   if (sawBadge) {
     return { ok: false, code: 'wrong_destination', ...(wrongHref ? { href: wrongHref } : {}) }
@@ -135,9 +193,15 @@ export async function verifyFeaturedBadge(
     if (page.code === 'read_failed') return { ok: false, code: 'verification_service_error' }
     return { ok: false, code: page.code }
   }
+  let result: ScanResult
   try {
-    return scanFeaturedBadge(new TextDecoder().decode(page.body), expected)
+    result = scanFeaturedBadge(new TextDecoder().decode(page.body), expected, page.url)
   } catch {
     return { ok: false, code: 'verification_service_error' }
   }
+  const headerSkipsLinks = robotsSkipLinks(page.headers.get('x-robots-tag'))
+  if (headerSkipsLinks && (result.ok || result.code === 'link_not_followed')) {
+    return { code: 'page_not_followed', ok: false, source: 'header' }
+  }
+  return result
 }

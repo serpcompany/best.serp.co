@@ -359,8 +359,14 @@ export function displayHost(website: string): string {
 /** Reads the page at `website` and proposes the form's fields (see the module comment). */
 export async function readSitePrefill(
   website: string,
-  fetcher: typeof fetch = fetch
+  fetcher: typeof fetch = fetch,
+  options: {
+    /** Propose http images too (a local Worker only); otherwise only https images. */
+    allowInsecureLogos?: boolean
+  } = {}
 ): Promise<SitePrefillResult> {
+  const usableImage = (url: string) =>
+    url.startsWith('https:') || (options.allowInsecureLogos === true && url.startsWith('http:'))
   const host = displayHost(website)
   const page = await safeFetch(website, {
     accept: type => type === 'text/html' || type === 'application/xhtml+xml',
@@ -372,14 +378,17 @@ export async function readSitePrefill(
   const metadata = parseSiteMetadata(new TextDecoder().decode(page.body), page.url)
 
   let siteIcon: string | null = null
-  for (const candidate of iconCandidates(metadata, page.url).slice(0, MAX_ICON_ATTEMPTS)) {
+  const candidates = iconCandidates(metadata, page.url).filter(usableImage)
+  for (const candidate of candidates.slice(0, MAX_ICON_ATTEMPTS)) {
     const checked = await checkLogoUrl(candidate, fetcher)
     if (checked.ok) {
       siteIcon = candidate
       break
     }
   }
-  const social = metadata.socialImage ? await checkLogoUrl(metadata.socialImage, fetcher) : null
+  const socialImage =
+    metadata.socialImage && usableImage(metadata.socialImage) ? metadata.socialImage : null
+  const social = socialImage ? await checkLogoUrl(socialImage, fetcher) : null
 
   return {
     description: metadata.description
@@ -389,6 +398,6 @@ export async function readSitePrefill(
     name: proposeName(metadata),
     ok: true,
     siteIcon,
-    socialImage: social?.ok && metadata.socialImage ? metadata.socialImage : null
+    socialImage: social?.ok && socialImage ? socialImage : null
   }
 }

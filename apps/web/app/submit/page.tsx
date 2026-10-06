@@ -4,7 +4,7 @@ import { SubmitForm } from '@/components/submit/submit-form'
 import { getSessionUser } from '@/lib/auth/server'
 import { getActiveCategories } from '@/lib/catalog/repository'
 import { toSummary } from '@/lib/submissions/http'
-import { getOwnSubmission } from '@/lib/submissions/repository'
+import { getOwnSubmission, insecureLogosAllowed } from '@/lib/submissions/repository'
 
 export const metadata: Metadata = {
   title: 'Submit to SERP',
@@ -45,7 +45,9 @@ export default async function SubmitPage({ searchParams }: SubmitPageProps) {
       categories={categories.map(category => ({ label: category.name, slug: category.slug }))}
       editing={editing}
       initialUrl={first(params.url)}
+      allowInsecureLogos={await insecureLogosAllowed()}
       signedInEmail={user?.email ?? null}
+      signedInUserId={user?.id ?? null}
     />
   )
 }

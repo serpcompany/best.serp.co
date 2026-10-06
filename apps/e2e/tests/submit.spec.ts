@@ -399,6 +399,18 @@ test.describe('submit v2', () => {
       name: 'Down'
     })
     fixture.update(`down-${id}`, { status: 503 })
+    const metaRobots = await pendingBadge(`robots-${id}`, {
+      badge: 'valid',
+      description: 'Robots meta.',
+      name: 'Robots',
+      robots: 'meta'
+    })
+    const headerRobots = await pendingBadge(`header-${id}`, {
+      badge: 'valid',
+      description: 'Robots header.',
+      name: 'Header',
+      robots: 'header'
+    })
 
     expect(await verify(nofollow)).toMatchObject({
       body: {
@@ -417,8 +429,34 @@ test.describe('submit v2', () => {
     expect(await verify(down)).toMatchObject({
       body: { result: { code: 'http_503', ok: false }, submission: { verificationAttempts: 0 } }
     })
+    // A page that tells crawlers to skip its links fails, however good the badge link is.
+    expect(await verify(metaRobots)).toMatchObject({
+      body: {
+        result: { code: 'page_not_followed', ok: false, source: 'meta' },
+        submission: { verificationAttempts: 1 }
+      }
+    })
+    expect(await verify(headerRobots)).toMatchObject({
+      body: { result: { code: 'page_not_followed', ok: false, source: 'header' } }
+    })
     // One check every 30 seconds.
     expect(await verify(nofollow)).toMatchObject({ body: { code: 'cooldown' }, status: 429 })
+
+    // PR #84 review round 1, finding 2: parallel checks claim one check; the rest get 429.
+    const racing = await pendingBadge(`race-${id}`, {
+      badge: 'missing',
+      description: 'Parallel checks.',
+      name: 'Race'
+    })
+    const answers = await Promise.all(Array.from({ length: 6 }, () => verify(racing)))
+    expect(answers.map(answer => answer.status).sort()).toEqual([200, 429, 429, 429, 429, 429])
+    for (const answer of answers.filter(item => item.status === 429)) {
+      expect(answer.body).toMatchObject({ code: 'cooldown' })
+    }
+    expect(answers.find(answer => answer.status === 200)?.body).toMatchObject({
+      result: { code: 'badge_missing' },
+      submission: { verificationAttempts: 1 }
+    })
     // Nobody else can check, choose a plan for, or edit the submission.
     const stranger = await newClient(browser)
     await signInContext(stranger, baseURL ?? '', `e2e-submit-stranger-${id}@example.com`)

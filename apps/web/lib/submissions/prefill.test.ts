@@ -207,6 +207,34 @@ describe('site prefill', () => {
     expect(calls).not.toContain('/favicon.ico')
   })
 
+  it('proposes only https images, unless the Worker is local', async () => {
+    const { calls, fetcher } = site({
+      '/': {
+        body: PAGE.replace(
+          'href="/icon-192.png"',
+          'href="http://cdn.quillmate.app/icon-192.png"'
+        ).replace('content="/og.png"', 'content="http://cdn.quillmate.app/og.png"'),
+        type: 'text/html'
+      },
+      '/icon-192.png': { body: png(192, 192), type: 'image/png' },
+      '/og.png': { body: png(1200, 630), type: 'image/png' },
+      '/apple-touch-icon.png': { body: png(180, 180), type: 'image/png' }
+    })
+    const https = await readSitePrefill('https://quillmate.app/', fetcher)
+    expect(https).toMatchObject({
+      siteIcon: 'https://quillmate.app/apple-touch-icon.png',
+      socialImage: null
+    })
+    expect(calls).not.toContain('/og.png')
+    const local = await readSitePrefill('https://quillmate.app/', fetcher, {
+      allowInsecureLogos: true
+    })
+    expect(local).toMatchObject({
+      siteIcon: 'http://cdn.quillmate.app/icon-192.png',
+      socialImage: 'http://cdn.quillmate.app/og.png'
+    })
+  })
+
   it('reports a page it could not read, so the form can say so', async () => {
     const { fetcher } = site({ '/': { body: 'nope', status: 503, type: 'text/html' } })
     await expect(readSitePrefill('https://down.example/', fetcher)).resolves.toEqual({

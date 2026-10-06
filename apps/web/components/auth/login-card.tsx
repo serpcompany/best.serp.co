@@ -603,7 +603,7 @@ function useSubmitDraftName(callbackPath: string): string | null {
   const [name, setName] = useState<string | null>(null)
   useEffect(() => {
     if (!/^\/submit(?:\/|\?|$)/u.test(callbackPath)) return
-    const draft = readLocalDraft()
+    const draft = readLocalDraft(null)
     const label = draft?.name.trim() || (draft?.website ? hostOf(draft.website) : '')
     setName(label || null)
   }, [callbackPath])

@@ -320,9 +320,12 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
     expect(await submissions.chooseFreePlan(draft.id, owner)).toMatchObject({
       status: 'pending_badge'
     })
-    await submissions.beginVerification(draft.id, owner)
+    const { claimedAt } = await submissions.claimVerification(draft.id, owner)
     expect(
-      await submissions.finishVerification(draft.id, owner, { code: 'badge_missing', ok: false })
+      await submissions.finishVerification(draft.id, owner, claimedAt, {
+        code: 'badge_missing',
+        ok: false
+      })
     ).toMatchObject({ verificationAttempts: 1 })
     expect(await submissions.getReviewPreview({ id: draft.id, token: 't'.repeat(43) })).toBeNull()
 
@@ -348,6 +351,9 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
       (await jobs.expiredDrafts({ limit: 100, now: later(31 * 24) })).map(item => item.id)
     ).toEqual([waiting.id])
     expect(await jobs.expireDraft({ now: later(31 * 24), submissionId: waiting.id })).toBe(true)
+    expect(await jobs.retryableEmails({ limit: 100, maxAttempts: 5, now: later(31 * 24) })).toEqual(
+      []
+    )
   }, 120_000)
 
   it('kept every catalog query successful and within its budget, and ran every operation', () => {

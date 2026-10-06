@@ -24,6 +24,11 @@ export type { DraftContent, NewDraftInput, OwnSubmission, UrlAvailability }
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
+/** True only for a Worker configured as local by both vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`). */
+function isLocalWorker(env: CloudflareEnv): boolean {
+  return env.D1_RUNTIME_ENV === 'local' && env.SITE_ENVIRONMENT === 'local'
+}
+
 async function operations() {
   const { env } = await getCloudflareContext({ async: true })
   const workerEnv = env as CloudflareEnv
@@ -32,8 +37,20 @@ async function operations() {
     throw new Error('A valid D1_RUNTIME_ENV is required for submissions.')
   }
   return createSubmissionOperations({
+    // Logos must be https, except on a local Worker, whose e2e fixture sites are http.
+    allowInsecureLogos: isLocalWorker(workerEnv),
     client: createDatabase(workerEnv.DB)
   })
+}
+
+/** Whether http logo URLs are accepted: only on a local Worker (see `operations`). */
+export async function insecureLogosAllowed(): Promise<boolean> {
+  try {
+    const { env } = await getCloudflareContext({ async: true })
+    return isLocalWorker(env as CloudflareEnv)
+  } catch {
+    return false
+  }
 }
 
 export async function checkSubmissionUrl(
@@ -78,14 +95,18 @@ export async function chooseFreePlan(id: string, ownerUserId: string): Promise<O
   return (await operations()).chooseFreePlan(id, ownerUserId)
 }
 
-export async function beginVerification(id: string, ownerUserId: string): Promise<OwnSubmission> {
-  return (await operations()).beginVerification(id, ownerUserId)
+export async function claimVerification(
+  id: string,
+  ownerUserId: string
+): Promise<{ claimedAt: string; submission: OwnSubmission }> {
+  return (await operations()).claimVerification(id, ownerUserId)
 }
 
 export async function finishVerification(
   id: string,
   ownerUserId: string,
+  claimedAt: string,
   result: SubmissionVerificationResult
 ): Promise<OwnSubmission> {
-  return (await operations()).finishVerification(id, ownerUserId, result)
+  return (await operations()).finishVerification(id, ownerUserId, claimedAt, result)
 }

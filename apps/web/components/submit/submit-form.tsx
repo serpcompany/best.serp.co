@@ -61,6 +61,7 @@ import {
   descriptionLengthMessage,
   fieldErrors,
   hostOf,
+  logoUrlProblem,
   newDraftSchema,
   normalizeWebsiteInput,
   type PrefillResponse,
@@ -97,7 +98,11 @@ export interface SubmitFormProps {
   editing: SubmissionSummary | null
   /** `?url=`: the website to start from (the "draft expired" email's "Start again"). */
   initialUrl: string | null
+  /** Accept http logo URLs (a local Worker only, for its http fixture sites). */
+  allowInsecureLogos: boolean
   signedInEmail: string | null
+  /** Keys this browser's draft to the account (`draft-storage.ts`); null signed out. */
+  signedInUserId: string | null
 }
 
 type FilledField = 'description' | 'logo' | 'name'
@@ -176,7 +181,14 @@ function readableWebsite(value: string): string | null {
   }
 }
 
-export function SubmitForm({ categories, editing, initialUrl, signedInEmail }: SubmitFormProps) {
+export function SubmitForm({
+  allowInsecureLogos,
+  categories,
+  editing,
+  initialUrl,
+  signedInEmail,
+  signedInUserId
+}: SubmitFormProps) {
   const router = useRouter()
   const signedIn = signedInEmail !== null
   const [website, setWebsite] = useState(editing?.website ?? '')
@@ -278,7 +290,7 @@ export function SubmitForm({ categories, editing, initialUrl, signedInEmail }: S
   // Restore this browser's draft, or start from `?url=`.
   useEffect(() => {
     if (editing) return
-    const local = readLocalDraft()
+    const local = readLocalDraft(signedInUserId)
     const fromUrl = initialUrl ? normalizeWebsiteInput(initialUrl) : null
     if (local && (!fromUrl || local.website === fromUrl)) {
       setWebsite(local.website)
@@ -316,7 +328,7 @@ export function SubmitForm({ categories, editing, initialUrl, signedInEmail }: S
         socialImage,
         website
       }
-      if (website || name || description || content) writeLocalDraft(draft)
+      if (website || name || description || content) writeLocalDraft(draft, signedInUserId)
     }, 250)
     return () => window.clearTimeout(timer)
   }, [
@@ -372,8 +384,11 @@ export function SubmitForm({ categories, editing, initialUrl, signedInEmail }: S
       name,
       website: normalizeWebsiteInput(website)
     })
-    if (parsed.success) return null
-    return fieldErrors(parsed.error)
+    const found = parsed.success ? {} : fieldErrors(parsed.error)
+    // Logos are hotlinked on https pages, so the address must be https (PR #84 review 1).
+    const logoProblem = logoUrl ? logoUrlProblem(logoUrl, allowInsecureLogos) : null
+    if (logoProblem && !found.logoUrl) found.logoUrl = logoProblem
+    return Object.keys(found).length > 0 ? found : null
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -389,18 +404,21 @@ export function SubmitForm({ categories, editing, initialUrl, signedInEmail }: S
     setShowSummary(false)
     if (blocking) return
     if (!signedIn) {
-      writeLocalDraft({
-        categorySlug,
-        content,
-        description,
-        filled,
-        logoChoice,
-        logoUrl,
-        name,
-        siteIcon,
-        socialImage,
-        website: normalizeWebsiteInput(website)
-      })
+      writeLocalDraft(
+        {
+          categorySlug,
+          content,
+          description,
+          filled,
+          logoChoice,
+          logoUrl,
+          name,
+          siteIcon,
+          socialImage,
+          website: normalizeWebsiteInput(website)
+        },
+        null
+      )
       window.location.assign(SIGN_IN_PATH)
       return
     }
@@ -414,7 +432,7 @@ export function SubmitForm({ categories, editing, initialUrl, signedInEmail }: S
       : await createDraft({ ...fields, website: normalizeWebsiteInput(website) })
     if (response.ok) {
       saved.current = true
-      if (!editing) clearLocalDraft()
+      if (!editing) clearLocalDraft(signedInUserId)
       router.push(response.data.next)
       return
     }

@@ -3,6 +3,7 @@ import {
   draftUpdateSchema,
   fieldErrors,
   LOGO_MESSAGES,
+  logoUrlProblem,
   nextStepPath
 } from '@/lib/submissions/contract'
 import {
@@ -10,7 +11,7 @@ import {
   authorizationFailure,
   json,
   payloadTooLarge,
-  readJson,
+  readJsonBody,
   submissionFailure,
   toSummary
 } from '@/lib/submissions/http'
@@ -18,6 +19,7 @@ import { checkLogoUrl } from '@/lib/submissions/prefill'
 import {
   consumeSubmissionRateLimit,
   getOwnSubmission,
+  insecureLogosAllowed,
   updateDraft
 } from '@/lib/submissions/repository'
 
@@ -40,7 +42,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!authorization.ok) return authorizationFailure(authorization)
   const { id } = await context.params
   if (!UUID.test(id)) return notFound()
-  const parsed = draftUpdateSchema.safeParse((await readJson(request)) ?? {})
+  const body = await readJsonBody(request)
+  if (body.response) return body.response
+  const parsed = draftUpdateSchema.safeParse(body.value ?? {})
   if (!parsed.success) {
     return apiError(400, 'invalid_submission', 'Check the highlighted fields.', {
       fields: fieldErrors(parsed.error)
@@ -53,6 +57,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     await consumeSubmissionRateLimit(`user:${owner}`)
     const { expectedContentVersion, ...content } = parsed.data
     if (content.logoUrl !== current.logoUrl) {
+      const httpsProblem = logoUrlProblem(content.logoUrl, await insecureLogosAllowed())
+      if (httpsProblem) {
+        return apiError(400, 'invalid_logo', httpsProblem, { fields: { logoUrl: httpsProblem } })
+      }
       const logo = await checkLogoUrl(content.logoUrl)
       if (!logo.ok) {
         return apiError(400, logo.code, LOGO_MESSAGES[logo.code], {

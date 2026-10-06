@@ -63,6 +63,8 @@ export interface FixtureProduct {
   delayMs?: number
   description: string
   name: string
+  /** Tells crawlers to skip the page's links: a robots meta tag or an X-Robots-Tag header. */
+  robots?: 'header' | 'meta'
   /** The home page's HTTP status (default 200). */
   status?: number
 }
@@ -85,7 +87,7 @@ function page(product: FixtureProduct, slug: string): string {
       ? ''
       : `<a href="${listingUrl}" target="_blank" rel="${product.badge === 'nofollow' ? 'nofollow noopener' : 'noopener noreferrer'}" title="Featured on SERP"><img src="${featuredBadgeUrls.light}" alt="Featured on SERP" width="200" height="50" /></a>`
   return `<!doctype html><html><head>
-<title>${product.name} — the fixture product</title>
+<title>${product.name} — the fixture product</title>${product.robots === 'meta' ? '\n<meta name="robots" content="index, nofollow">' : ''}
 <meta name="description" content="${product.description}">
 <meta property="og:site_name" content="${product.name}">
 <meta property="og:image" content="/og.png">
@@ -110,7 +112,10 @@ export async function startFixtureSite(): Promise<FixtureSite> {
     if (path === '/') {
       const respond = () =>
         response
-          .writeHead(product.status ?? 200, { 'content-type': 'text/html; charset=utf-8' })
+          .writeHead(product.status ?? 200, {
+            'content-type': 'text/html; charset=utf-8',
+            ...(product.robots === 'header' ? { 'x-robots-tag': 'nofollow' } : {})
+          })
           .end(page(product, host))
       if (product.delayMs) setTimeout(respond, product.delayMs)
       else respond()

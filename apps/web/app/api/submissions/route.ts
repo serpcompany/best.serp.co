@@ -1,11 +1,16 @@
 import { authorizeUserRequest } from '@/lib/auth/server'
-import { fieldErrors, LOGO_MESSAGES, newDraftSchema } from '@/lib/submissions/contract'
+import {
+  fieldErrors,
+  LOGO_MESSAGES,
+  logoUrlProblem,
+  newDraftSchema
+} from '@/lib/submissions/contract'
 import {
   apiError,
   authorizationFailure,
   json,
   payloadTooLarge,
-  readJson,
+  readJsonBody,
   submissionFailure,
   toAvailability,
   toSummary,
@@ -15,7 +20,8 @@ import { checkLogoUrl } from '@/lib/submissions/prefill'
 import {
   checkSubmissionUrl,
   consumeSubmissionRateLimit,
-  createDraft
+  createDraft,
+  insecureLogosAllowed
 } from '@/lib/submissions/repository'
 
 export const dynamic = 'force-dynamic'
@@ -29,7 +35,9 @@ export async function POST(request: Request) {
   if (tooLarge) return tooLarge
   const authorization = await authorizeUserRequest(request)
   if (!authorization.ok) return authorizationFailure(authorization)
-  const parsed = newDraftSchema.safeParse((await readJson(request)) ?? {})
+  const body = await readJsonBody(request)
+  if (body.response) return body.response
+  const parsed = newDraftSchema.safeParse(body.value ?? {})
   if (!parsed.success) {
     return apiError(400, 'invalid_submission', 'Check the highlighted fields.', {
       fields: fieldErrors(parsed.error)
@@ -41,6 +49,10 @@ export async function POST(request: Request) {
     // Answer duplicates and blocks before fetching the logo.
     const availability = toAvailability(await checkSubmissionUrl(parsed.data.website, owner))
     if (availability.kind !== 'available') return unavailableResponse(availability)
+    const httpsProblem = logoUrlProblem(parsed.data.logoUrl, await insecureLogosAllowed())
+    if (httpsProblem) {
+      return apiError(400, 'invalid_logo', httpsProblem, { fields: { logoUrl: httpsProblem } })
+    }
     const logo = await checkLogoUrl(parsed.data.logoUrl)
     if (!logo.ok) {
       return apiError(400, logo.code, LOGO_MESSAGES[logo.code], {

@@ -172,7 +172,10 @@ export function ProductLogo({
         width={size}
         height={size}
         className="size-full object-contain"
+        // Logos are hotlinked from the submitter's site: no referrer, loaded when in view.
         referrerPolicy="no-referrer"
+        loading="lazy"
+        decoding="async"
         onError={() => setFailed(true)}
       />
     </span>

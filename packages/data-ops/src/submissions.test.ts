@@ -107,6 +107,8 @@ describe('native submission intake', () => {
       [{ categorySlug: 'missing' }, 'invalid_category'],
       [{ categorySlug: 'retired' }, 'invalid_category'],
       [{ logoUrl: 'http://10.0.0.1/logo.png' }, 'invalid_logo'],
+      [{ logoUrl: 'http://assets.example.com/logo.png' }, 'invalid_logo'],
+      [{ logoUrl: 'https://user:pass@assets.example.com/logo.png' }, 'invalid_logo'],
       [{ logoUrl: '' }, 'invalid_logo']
     ]
     for (const [overrides, code] of cases) {
@@ -116,6 +118,22 @@ describe('native submission intake', () => {
     await expect(draft({ description: 'x'.repeat(160) })).resolves.toMatchObject({
       status: 'draft'
     })
+    // A local Worker accepts http logos, for its http fixture sites.
+    const local = createSubmissionOperations({
+      allowInsecureLogos: true,
+      client: createDatabase(sqlite.asD1Database()),
+      clock: () => now
+    })
+    await expect(
+      local.createDraft({
+        ownerUserId: OWNER,
+        submission: {
+          ...input,
+          logoUrl: 'http://assets.example.com/logo.png',
+          website: 'https://local.example.org/'
+        }
+      })
+    ).resolves.toMatchObject({ logoUrl: 'http://assets.example.com/logo.png' })
   })
 
   it('refuses a website whose slug would end in a file extension', async () => {
@@ -307,7 +325,7 @@ describe('native submission intake', () => {
     await expect(operations().chooseFreePlan(saved.id, OTHER)).rejects.toMatchObject({
       code: 'not_found'
     })
-    await expect(operations().beginVerification(saved.id, OTHER)).rejects.toMatchObject({
+    await expect(operations().claimVerification(saved.id, OTHER)).rejects.toMatchObject({
       code: 'not_found'
     })
     expect(sqlite.database.prepare('SELECT name,status FROM listing_submissions').get()).toEqual({
@@ -376,25 +394,42 @@ describe('native submission intake', () => {
     return operations().chooseFreePlan(saved.id, OWNER)
   }
 
-  it('rolls back one of two concurrent verification transitions from the same snapshot', async () => {
-    const saved = await pendingBadge()
-    const attempts = await Promise.allSettled([
-      operations().finishVerification(saved.id, OWNER, { code: 'badge_missing', ok: false }),
-      operations().finishVerification(saved.id, OWNER, { code: 'wrong_destination', ok: false })
-    ])
+  /** Claims a check and records `result` for it. */
+  async function check(id: string, result: { ok: true } | { code: string; ok: false }) {
+    const { claimedAt } = await operations().claimVerification(id, OWNER)
+    return operations().finishVerification(id, OWNER, claimedAt, result)
+  }
 
-    expect(attempts.filter(attempt => attempt.status === 'fulfilled')).toHaveLength(1)
-    expect(attempts.filter(attempt => attempt.status === 'rejected')).toHaveLength(1)
-    expect(
-      sqlite.database
-        .prepare('SELECT verification_attempts FROM listing_submissions WHERE id=?')
-        .get(saved.id)
-    ).toEqual({ verification_attempts: 1 })
+  // PR #84 review round 1, finding 2: the cooldown and the cap are claimed before any fetch.
+  it('lets exactly one of several parallel checks claim the badge check', async () => {
+    const saved = await pendingBadge()
+    const claims = await Promise.allSettled(
+      Array.from({ length: 8 }, () => operations().claimVerification(saved.id, OWNER))
+    )
+    const won = claims.filter(claim => claim.status === 'fulfilled')
+    expect(won).toHaveLength(1)
+    for (const claim of claims) {
+      if (claim.status === 'rejected') {
+        expect(claim.reason).toMatchObject({ code: 'cooldown', status: 429 })
+      }
+    }
+    const [winner] = won as Array<PromiseFulfilledResult<{ claimedAt: string }>>
+    expect(winner?.value.claimedAt).toBe('2026-08-01 00:00:00')
+    await expect(
+      operations().finishVerification(saved.id, OWNER, winner?.value.claimedAt ?? '', {
+        code: 'badge_missing',
+        ok: false
+      })
+    ).resolves.toMatchObject({ verificationAttempts: 1 })
+    // A result for a stale claim is refused with 409, never a 500.
+    await expect(
+      operations().finishVerification(saved.id, OWNER, '2026-07-31 23:59:00', { ok: true })
+    ).rejects.toMatchObject({ code: 'verification_superseded', status: 409 })
     expect(
       sqlite.database
         .prepare(
           `SELECT COUNT(*) AS count FROM listing_submission_events
-          WHERE submission_id=? AND event_type='verification_failed'`
+          WHERE submission_id=? AND event_type IN ('verification_failed','badge_verified')`
         )
         .get(saved.id)
     ).toEqual({ count: 1 })
@@ -402,68 +437,88 @@ describe('native submission intake', () => {
 
   it('verifies the badge only for the owner of a pending-badge submission', async () => {
     const saved = await draft()
-    // A draft has no badge step yet; verification leaves it untouched.
-    await expect(
-      operations().finishVerification(saved.id, OWNER, { ok: true })
-    ).resolves.toMatchObject({ status: 'draft' })
+    // A draft has no badge step yet.
+    await expect(operations().claimVerification(saved.id, OWNER)).rejects.toMatchObject({
+      code: 'not_pending_badge',
+      status: 409
+    })
     await operations().chooseFreePlan(saved.id, OWNER)
+    await expect(operations().claimVerification(saved.id, OTHER)).rejects.toMatchObject({
+      code: 'not_found',
+      status: 404
+    })
+    const { claimedAt } = await operations().claimVerification(saved.id, OWNER)
     await expect(
-      operations().finishVerification(saved.id, OTHER, { ok: true })
-    ).rejects.toMatchObject({ code: 'not_found' })
-    const verified = await operations().finishVerification(saved.id, OWNER, { ok: true })
+      operations().finishVerification(saved.id, OTHER, claimedAt, { ok: true })
+    ).rejects.toMatchObject({ code: 'verification_superseded' })
+    const verified = await operations().finishVerification(saved.id, OWNER, claimedAt, {
+      ok: true
+    })
     expect(verified).toMatchObject({ plan: 'free', status: 'verified', verificationAttempts: 1 })
-    expect(verified.badgeVerifiedAt).not.toBeNull()
+    expect(verified.badgeVerifiedAt).toBe('2026-08-01 00:00:00')
+    now = new Date(now.getTime() + 60_000)
+    await expect(operations().claimVerification(saved.id, OWNER)).rejects.toMatchObject({
+      code: 'not_pending_badge'
+    })
   })
 
   it('enforces the cooldown and attempt limit, and keeps transient failures free', async () => {
     const saved = await pendingBadge()
-    await expect(operations().beginVerification(saved.id, OWNER)).resolves.toMatchObject({
-      status: 'pending_badge'
-    })
-    const transient = await operations().finishVerification(saved.id, OWNER, {
-      code: 'site_unreachable',
-      ok: false
-    })
+    const transient = await check(saved.id, { code: 'site_unreachable', ok: false })
     expect(sqlite.statements.some(statement => /\bTEMP\b/iu.test(statement.sql))).toBe(false)
     expect(transient).toMatchObject({
+      lastVerificationAt: '2026-08-01 00:00:00',
       lastVerificationError: 'site_unreachable',
       verificationAttempts: 0
     })
-
-    // `last_verification_at` is the database clock; check the cooldown against it.
-    const lastAt = sqlite.database
-      .prepare('SELECT last_verification_at AS at FROM listing_submissions WHERE id=?')
-      .get(saved.id) as { at: string }
-    now = new Date(`${lastAt.at.replace(' ', 'T')}Z`)
-    await expect(operations().beginVerification(saved.id, OWNER)).rejects.toMatchObject({
+    // A transient failure still starts the cooldown: every fetch is claimed.
+    now = new Date(now.getTime() + 29_000)
+    await expect(operations().claimVerification(saved.id, OWNER)).rejects.toMatchObject({
       code: 'cooldown',
       status: 429
     })
-    now = new Date(now.getTime() + 30_000)
-    await expect(operations().beginVerification(saved.id, OWNER)).resolves.toBeTruthy()
+    now = new Date(now.getTime() + 1_000)
+    await expect(check(saved.id, { code: 'nofollow', ok: false })).resolves.toMatchObject({
+      verificationAttempts: 1
+    })
 
     // Every conclusive result counts toward the limit, including the code stored before #84.
-    for (const code of ['link_not_followed', 'nofollow', 'badge_missing', 'wrong_destination']) {
+    for (const code of [
+      'link_not_followed',
+      'page_not_followed',
+      'nofollow',
+      'badge_missing',
+      'wrong_destination'
+    ]) {
       sqlite.database
         .prepare(
           'UPDATE listing_submissions SET verification_attempts=10,last_verification_error=?,last_verification_at=NULL WHERE id=?'
         )
         .run(code, saved.id)
-      await expect(operations().beginVerification(saved.id, OWNER), code).rejects.toMatchObject({
+      await expect(operations().claimVerification(saved.id, OWNER), code).rejects.toMatchObject({
         code: 'attempt_limit',
         status: 429
       })
     }
+    // After the tenth miss, a connection problem does not pause checks.
+    sqlite.database
+      .prepare("UPDATE listing_submissions SET last_verification_error='fetch_timeout' WHERE id=?")
+      .run(saved.id)
+    await expect(operations().claimVerification(saved.id, OWNER)).resolves.toMatchObject({
+      submission: { verificationAttempts: 10 }
+    })
   })
 
-  it('counts an unfollowed badge link as a conclusive check', async () => {
+  it('counts unfollowed badge links and pages as conclusive checks', async () => {
     const saved = await pendingBadge()
-    await expect(
-      operations().finishVerification(saved.id, OWNER, { code: 'link_not_followed', ok: false })
-    ).resolves.toMatchObject({
+    await expect(check(saved.id, { code: 'link_not_followed', ok: false })).resolves.toMatchObject({
       lastVerificationError: 'link_not_followed',
       status: 'pending_badge',
       verificationAttempts: 1
+    })
+    now = new Date(now.getTime() + 30_000)
+    await expect(check(saved.id, { code: 'page_not_followed', ok: false })).resolves.toMatchObject({
+      verificationAttempts: 2
     })
   })
 
@@ -492,7 +547,7 @@ describe('native submission intake', () => {
 
   async function verifiedWithPreview(token: string) {
     const saved = await pendingBadge()
-    await operations().finishVerification(saved.id, OWNER, { ok: true })
+    await check(saved.id, { ok: true })
     sqlite.database
       .prepare(
         `INSERT INTO listing_submission_resource_links (submission_id,label,url,sort_order)

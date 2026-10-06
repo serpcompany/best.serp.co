@@ -50,6 +50,7 @@ describe('email module boundary', () => {
     )
     expect(modules.sort()).toEqual([
       'config.ts',
+      'dev-outbox.ts',
       'registry.ts',
       'runtime.ts',
       'senders.ts',
