@@ -79,10 +79,10 @@ function seedSubmission(
   db.prepare(
     `INSERT INTO listing_submissions
       (id,slug,block_key,block_covers_subdomains,name,description,website,content,category_slug,logo_url,status,
-       access_token_hash,badge_verified_at,listing_id,owner_user_id,plan,paid_at,
+       badge_verified_at,listing_id,owner_user_id,plan,paid_at,
        rejection_reason,rejection_category,draft_saved_at,withdrawal_reason,published_checksum)
     VALUES (?,'example.com','example.com',1,'Example','Description','https://example.com/','Content',
-      'tools','https://example.com/logo.png',?,'hash','2026-08-01T00:00:00.000Z',?,?,?,?,?,?,?,?,?)`
+      'tools','https://example.com/logo.png',?,'2026-08-01T00:00:00.000Z',?,?,?,?,?,?,?,?,?)`
   ).run(
     submissionId,
     status,
@@ -1190,7 +1190,7 @@ describe('protected submission statement plans', () => {
     expect(events(db, 'approved')).toBe(1)
   })
 
-  it('approves a legacy capability submission without creating an owner', () => {
+  it('approves an ownerless pre-#63 submission without creating an owner', () => {
     const db = database('verified', { owner: null })
     execute(db, approvalPlans())
     expect(count(db, 'SELECT COUNT(*) AS count FROM listing_owners')).toBe(0)

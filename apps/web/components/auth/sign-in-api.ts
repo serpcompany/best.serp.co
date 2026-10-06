@@ -14,6 +14,7 @@ import {
   SIGN_IN_CODE_TTL_SECONDS,
   signInCodeDigits
 } from '../../lib/email/sign-in-code'
+import { clearAllLocalDrafts } from '../submit/draft-storage'
 
 /** The code contract Better Auth enforces (`lib/email/sign-in-code.ts`). */
 export const CODE_LENGTH = SIGN_IN_CODE_LENGTH
@@ -156,7 +157,12 @@ export async function verifyCode(
 }
 
 /** Ends the session. Resolves true when the server confirmed it. */
+/**
+ * Signs out, and forgets every `/submit` draft this browser keeps, so the next person to use
+ * it never sees one (PR #84 review round 1, finding 8).
+ */
 export async function signOut(fetcher: Fetch = fetch): Promise<boolean> {
+  clearAllLocalDrafts()
   try {
     return (await post(fetcher, '/sign-out', {})).ok
   } catch {

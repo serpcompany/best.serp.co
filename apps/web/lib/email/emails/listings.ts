@@ -7,6 +7,7 @@ import {
   bold,
   box,
   composeEmail,
+  featuresOf,
   formatCheckTime,
   formatDay,
   formatUsd,
@@ -41,8 +42,12 @@ export const listingApprovedEmail = defineEmailTemplate<ListingApprovedInput>({
         body: [
           paragraph(`${name} passed review and is now listed on SERP:`),
           box(bold(url)),
+          // Weekly checks, and removal when the badge goes missing, are #66's badge program:
+          // until `features.badgeProgram` is on, the email only asks to keep the badge.
           paragraph(
-            `Keep the badge on ${required(input.website, 'a website')}. We check it every week, and a free listing whose badge goes missing is removed.`
+            featuresOf(context).badgeProgram
+              ? `Keep the badge on ${required(input.website, 'a website')}. We check it every week, and a free listing whose badge goes missing is removed.`
+              : `Keep the badge on ${required(input.website, 'a website')}.`
           )
         ],
         cta: { label: 'View your listing', url },

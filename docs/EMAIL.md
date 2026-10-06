@@ -211,6 +211,9 @@ listed in [Email templates](./EMAIL_TEMPLATES.md); they share the layout in
 Apply migrations (`pnpm db:migrate:local`) so `email_deliveries` exists, then run
 `pnpm dev`. Each email appears in the Worker output as an `email_logged` line with the
 sender, recipient, subject, and text body. Nothing is sent locally, even with a useSend key.
+The local Worker also keeps the last 30 minutes of messages in memory for end-to-end tests:
+`GET /api/dev/email-outbox?to=<address>` returns their subjects and text, and answers 404
+anywhere but local.
 Local links always use `http://localhost:8787`; a `pnpm worktree:init` worktree serves on
 its own port (`pnpm agent:manifest` → `webUrl`), so swap the port when following one.
 

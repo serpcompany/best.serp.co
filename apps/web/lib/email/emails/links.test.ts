@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { site } from '@serpdirectory/site-config'
 import { describe, expect, it } from 'vitest'
 import { features, type SiteFeatures } from '../../features'
 import { type AppEmailTemplates, appEmailTemplates } from '../registry'
@@ -12,7 +13,8 @@ import { EMAIL_SAMPLES, renderAppEmail } from './samples'
  *   allowed only while it is listed in `DEFERRED` with that issue, and only in emails nothing
  *   sends yet. When a deferred page lands, its entry fails here until it is removed.
  * - an email the app sends never asks for a dashboard action whose area is still off in
- *   `lib/features.ts` (editing a submission before #65, replying before #73). Flagged copy
+ *   `lib/features.ts` (editing a submission before #65, replying before #73), or promises
+ *   weekly badge checks before #66's badge program. Flagged copy
  *   switches back to the approved wording when the issue turns its flag on, and the links that
  *   come back with it must then exist.
  */
@@ -27,10 +29,6 @@ const APP_DIRECTORY = join(WEB_DIRECTORY, 'app')
 const DEFERRED: Partial<Record<TemplateId, Array<{ issue: string; path: RegExp }>>> = {
   'admin-new-message': [{ issue: '#73', path: /^\/admin\/inbox\/[^/]+\/$/u }],
   'badge-missing': [{ issue: '#65', path: /^\/account\/listings\/[^/]+\/$/u }],
-  'draft-reminder': [
-    { issue: '#63', path: /^\/submit\/[^/]+\/choose\/$/u },
-    { issue: '#68', path: /^\/submit\/[^/]+\/checkout\/$/u }
-  ],
   'listing-unlisted': [{ issue: '#65', path: /^\/account\/listings\/[^/]+\/$/u }],
   'new-message': [{ issue: '#73', path: /^\/account\/messages\/[^/]+\/$/u }]
 }
@@ -46,6 +44,11 @@ const DASHBOARD_PROMISES: ReadonlyArray<{
     issue: '#65',
     pattern:
       /\bresubmit\b|\bedit the submission\b|\b(?:open|view) submission\b|(?<!\bmessage us )\bfrom your dashboard\b/iu
+  },
+  {
+    feature: 'badgeProgram',
+    issue: '#66',
+    pattern: /\bevery week\b|\bweekly\b|\bcheck again about 24 hours\b/iu
   },
   {
     feature: 'messages',
@@ -136,13 +139,23 @@ function siteLinks(html: string): string[] {
 
 type Rendered = { html: string; subject: string; text: string }
 
+/**
+ * A sample's input as the app sends it. The draft reminder's paid copy and its checkout link
+ * (#68) follow `site.features.showPaidListings`, which the draft job passes as `paidListings`
+ * (#63), so it renders here with the site's flag rather than the mockups' `true`.
+ */
+function sentInput(id: TemplateId, input: unknown): unknown {
+  if (id !== 'draft-reminder') return input
+  return { ...(input as object), paidListings: site.features.showPaidListings }
+}
+
 /** Every sample of every template, rendered in production with the given site areas. */
 function renderAll(siteFeatures: SiteFeatures): Array<{ email: Rendered; id: TemplateId }> {
   return (
     Object.entries(EMAIL_SAMPLES) as Array<[TemplateId, Array<{ input: unknown; to: string }>]>
   ).flatMap(([id, samples]) =>
     samples.map(sample => ({
-      email: renderAppEmail(id, sample.input as never, {
+      email: renderAppEmail(id, sentInput(id, sample.input) as never, {
         environment: 'production',
         features: siteFeatures,
         to: sample.to
@@ -172,8 +185,18 @@ function promisesIn(email: Rendered, id: TemplateId): Array<keyof SiteFeatures> 
   )
 }
 
-const ALL_OFF: SiteFeatures = { accountDashboard: false, messages: false, orders: false }
-const ALL_ON: SiteFeatures = { accountDashboard: true, messages: true, orders: true }
+const ALL_OFF: SiteFeatures = {
+  accountDashboard: false,
+  badgeProgram: false,
+  messages: false,
+  orders: false
+}
+const ALL_ON: SiteFeatures = {
+  accountDashboard: true,
+  badgeProgram: true,
+  messages: true,
+  orders: true
+}
 
 describe('email links', () => {
   const routes = appRoutes()
@@ -247,6 +270,7 @@ describe('email copy', () => {
   it('switches the flagged copy with its flags: interim wording off, approved wording on', () => {
     const flagged: Partial<Record<TemplateId, Array<keyof SiteFeatures>>> = {
       'changes-requested': ['accountDashboard', 'messages'],
+      'listing-approved': ['badgeProgram'],
       'submission-rejected': ['accountDashboard'],
       'submission-rejected-prohibited': ['messages']
     }

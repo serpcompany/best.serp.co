@@ -153,6 +153,7 @@ export const EMAIL_SAMPLES: SampleInputs = {
       input: {
         expiresInDays: 29,
         lastReminder: false,
+        paidListings: true,
         priceCents: 4900,
         productName: 'Tablesmith',
         submissionId: 's_6tb4ws',
@@ -166,6 +167,7 @@ export const EMAIL_SAMPLES: SampleInputs = {
       input: {
         expiresInDays: 9,
         lastReminder: true,
+        paidListings: true,
         priceCents: 4900,
         productName: 'Tablesmith',
         submissionId: 's_6tb4ws',
@@ -179,6 +181,7 @@ export const EMAIL_SAMPLES: SampleInputs = {
       input: {
         expiresInDays: 23,
         lastReminder: false,
+        paidListings: true,
         priceCents: 4900,
         productName: 'Tablesmith',
         submissionId: 's_6tb4ws',
@@ -192,6 +195,7 @@ export const EMAIL_SAMPLES: SampleInputs = {
       input: {
         expiresInDays: 9,
         lastReminder: true,
+        paidListings: true,
         priceCents: 4900,
         productName: 'Tablesmith',
         submissionId: 's_6tb4ws',

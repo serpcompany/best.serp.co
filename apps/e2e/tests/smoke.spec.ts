@@ -371,7 +371,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       { path: '/contact/', heading: /^contact serp$/i },
       { path: '/pricing/', heading: /^serp pricing$/i },
       { path: '/sponsor/', heading: /^sponsor serp$/i },
-      { path: '/submit/', heading: /^submit$/i },
+      { path: '/submit/', heading: /^submit a product$/i },
       { path: '/legal/privacy-policy/', heading: /^privacy policy$/i },
       { path: '/legal/privacy/', heading: /^privacy policy$/i },
       { path: '/legal/terms-conditions/', heading: /^terms of service$/i },

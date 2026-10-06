@@ -5,6 +5,8 @@
  * - `createUseSendSender`: useSend's send-email API (SES-backed), staging and production.
  *   https://docs.usesend.com/api-reference/emails/send-email
  * - `createLogEmailSender`: writes each message to the Worker log; local development only.
+ *   With `devOutbox`, it also keeps recent messages in memory for the local-only
+ *   `/api/dev/email-outbox` endpoint that end-to-end tests read (`readDevEmailOutbox`).
  * - `createCapturingEmailSender`: records messages in memory for tests.
  */
 
@@ -168,12 +170,56 @@ export function createUseSendSender(options: {
  * Writes the whole message (recipient, subject, and text body) to the log instead of sending
  * it. Only the local environment uses it: deployed logs must never hold message bodies.
  */
+export interface DevOutboxEmail {
+  sentAt: number
+  subject: string
+  text: string
+  to: string
+}
+
+const DEV_OUTBOX_KEY = Symbol.for('best.serp.co/dev-email-outbox')
+const DEV_OUTBOX_LIMIT = 100
+const DEV_OUTBOX_LIFETIME_MS = 30 * 60 * 1000
+
+function devOutbox(): DevOutboxEmail[] {
+  const scope = globalThis as typeof globalThis & { [DEV_OUTBOX_KEY]?: DevOutboxEmail[] }
+  scope[DEV_OUTBOX_KEY] ||= []
+  return scope[DEV_OUTBOX_KEY]
+}
+
+/**
+ * The messages the local log sender delivered to `to` in the last 30 minutes, newest first.
+ * Local `wrangler dev` runs one isolate, so every request sees the same outbox (like the dev
+ * sign-in code outbox in `lib/auth/otp-sender.ts`).
+ */
+export function readDevEmailOutbox(to: string, now = Date.now()): DevOutboxEmail[] {
+  const recipient = to.trim().toLowerCase()
+  return devOutbox()
+    .filter(entry => entry.to === recipient && now - entry.sentAt <= DEV_OUTBOX_LIFETIME_MS)
+    .reverse()
+}
+
+export function clearDevEmailOutbox(): void {
+  devOutbox().length = 0
+}
+
 export function createLogEmailSender(
-  write: (line: string) => void = line => console.info(line)
+  write: (line: string) => void = line => console.info(line),
+  options: { devOutbox?: boolean } = {}
 ): EmailSender {
   return {
     provider: 'log',
     async send(message) {
+      if (options.devOutbox) {
+        const outbox = devOutbox()
+        outbox.push({
+          sentAt: Date.now(),
+          subject: message.subject,
+          text: message.text,
+          to: message.to.toLowerCase()
+        })
+        if (outbox.length > DEV_OUTBOX_LIMIT) outbox.splice(0, outbox.length - DEV_OUTBOX_LIMIT)
+      }
       write(
         JSON.stringify({
           event: 'email_logged',

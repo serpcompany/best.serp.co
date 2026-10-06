@@ -8,10 +8,11 @@ import { assertPreviousStatementChangedOne, hoursBefore, type StatementPlan } fr
  * choosing free (the row leaves `draft`), withdrawal, or expiry. The clock is
  * `listing_submissions.draft_saved_at`; edits never reset it.
  *
- * The scheduled job (#63) reads the due drafts, claims each reminder with
- * `buildMarkDraftReminderSentPlans` (a compare-and-swap, so two runs cannot both claim it), and
- * only then sends the email through the email ledger with the idempotency key
- * `draftReminderEmailKey`, which absorbs a retried send.
+ * The scheduled job (#63, `draft-jobs.ts` and `apps/web/lib/submissions/draft-jobs.ts`) reads
+ * the due drafts, claims each reminder with `buildMarkDraftReminderSentPlans` (a
+ * compare-and-swap, so two runs cannot both claim it), and only then sends the email through
+ * the email ledger with the idempotency key `draftReminderEmailKey`, which absorbs a retried
+ * send.
  */
 export const DRAFT_REMINDER_OFFSETS_HOURS = [12, 48, 7 * 24, 14 * 24, 21 * 24] as const
 export const DRAFT_EXPIRY_HOURS = 30 * 24
@@ -72,7 +73,7 @@ export function draftExpiredEmailKey(submissionId: string): string {
  * job that missed a run sends only that one (earlier ones are skipped, not sent late). Pass
  * `reminder` to read only the drafts due for that reminder. `variant` picks the email:
  * `choose_plan` (no plan chosen) or `complete_checkout` (paid chosen, not paid). Expired drafts
- * are left to `selectExpiredDraftsPlan`. Rows: `id`, `slug`, `name`, `owner_user_id`,
+ * are left to `selectExpiredDraftsPlan`. Rows: `id`, `slug`, `name`, `website`, `owner_user_id`,
  * `owner_email`, `draft_saved_at`, `draft_reminders_sent`, `reminder`, `variant`.
  */
 export function selectDraftRemindersDuePlan(input: {
@@ -89,10 +90,10 @@ export function selectDraftRemindersDuePlan(input: {
     .map(index => `WHEN s.draft_saved_at <= ? THEN ${index + 1}`)
     .join(' ')
   return {
-    sql: `SELECT id,slug,name,owner_user_id,owner_email,draft_saved_at,draft_reminders_sent,reminder,
-        variant
+    sql: `SELECT id,slug,name,website,owner_user_id,owner_email,draft_saved_at,draft_reminders_sent,
+        reminder,variant
       FROM (
-        SELECT s.id,s.slug,s.name,s.owner_user_id,u.email AS owner_email,s.draft_saved_at,
+        SELECT s.id,s.slug,s.name,s.website,s.owner_user_id,u.email AS owner_email,s.draft_saved_at,
           s.draft_reminders_sent,CASE ${latestDue} ELSE 0 END AS reminder,
           CASE WHEN ${variantCondition('choose_plan', 's')} THEN 'choose_plan'
             ELSE 'complete_checkout' END AS variant
@@ -116,13 +117,13 @@ export function selectDraftRemindersDuePlan(input: {
 
 /**
  * Drafts saved 30 days or more before `now`, plan chosen or not: a paid draft that never
- * completed checkout also holds its URL key. Rows: `id`, `slug`, `name`, `owner_user_id`,
- * `owner_email` (null without an owner), `draft_saved_at`.
+ * completed checkout also holds its URL key. Rows: `id`, `slug`, `name`, `website`,
+ * `owner_user_id`, `owner_email` (null without an owner), `draft_saved_at`.
  */
 export function selectExpiredDraftsPlan(input: { limit: number; now: string }): StatementPlan {
   const { expiryCutoff } = draftClockCutoffs(input.now)
   return {
-    sql: `SELECT s.id,s.slug,s.name,s.owner_user_id,u.email AS owner_email,s.draft_saved_at
+    sql: `SELECT s.id,s.slug,s.name,s.website,s.owner_user_id,u.email AS owner_email,s.draft_saved_at
       FROM listing_submissions s INDEXED BY listing_submissions_draft_clock_idx
       LEFT JOIN users u ON u.id=s.owner_user_id
       WHERE s.status='draft' AND s.draft_saved_at <= ?

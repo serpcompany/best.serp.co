@@ -368,11 +368,19 @@ describe('single-site D1-only repository architecture', () => {
     expect(notifier).toContain('validateNotificationContext')
 
     expect(existsSync(resolve(project.appDirectory, 'lib/url-safety.ts'))).toBe(false)
-    const verifier = readFileSync(
-      resolve(project.appDirectory, 'lib/submissions/badge-verifier.ts'),
+    // Every fetch of a submitter's URL (badge checks, prefill, logos) goes through the safe
+    // fetcher, which validates each hop with the shared public-URL policy.
+    const safeFetch = readFileSync(
+      resolve(project.appDirectory, 'lib/submissions/safe-fetch.ts'),
       'utf8'
     )
-    expect(verifier).toContain('@serpdirectory/data-ops/public-url')
+    expect(safeFetch).toContain("from '@serpdirectory/data-ops/public-url'")
+    expect(safeFetch).toContain("redirect: 'manual'")
+    for (const file of ['badge-verifier.ts', 'prefill.ts']) {
+      const source = readFileSync(resolve(project.appDirectory, 'lib/submissions', file), 'utf8')
+      expect(source, file).toContain("from './safe-fetch'")
+      expect(source, file).not.toMatch(/\bfetcher\(|\bawait fetch\(/u)
+    }
     const publicUrl = readFileSync(resolve('packages/data-ops/src/public-url.ts'), 'utf8')
     expect(publicUrl).toContain('validatePublicHttpUrl')
     expect(publicUrl).not.toMatch(/getCloudflareContext|process\.env|node:net/u)

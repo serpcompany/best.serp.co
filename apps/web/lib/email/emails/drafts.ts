@@ -24,7 +24,13 @@ export interface DraftReminderInput {
   expiresInDays: number
   /** The +21d reminder says it is the last one. */
   lastReminder: boolean
-  /** The current paid listing price, in cents. */
+  /**
+   * Whether the site offers the paid listing (`features.showPaidListings`, #68). Off, the email
+   * offers the free badge listing only: no price, and a draft left in `complete_checkout`
+   * gets the "choose a plan" email.
+   */
+  paidListings: boolean
+  /** The current paid listing price, in cents (used only while `paidListings` is on). */
   priceCents: number
   productName: string
   submissionId: string
@@ -43,18 +49,20 @@ export const draftReminderEmail = defineEmailTemplate<DraftReminderInput>({
     if (input.variant !== 'choose_plan' && input.variant !== 'complete_checkout') {
       throw new EmailTemplateError('Unknown draft reminder variant.')
     }
-    const checkout = input.variant === 'complete_checkout'
+    const paid = input.paidListings === true
+    const checkout = paid && input.variant === 'complete_checkout'
     const lastLine = `This is the last reminder. After that the draft is deleted and ${domain} can be submitted by anyone. `
+    const options = paid
+      ? `Pick how to get listed: free with our badge, or ${price} one-off without it.`
+      : 'Pick how to get listed: free with our badge.'
     const detail: Inline[] = checkout
       ? [
           `${input.lastReminder ? lastLine : ''}You picked the paid listing but didn’t finish checkout, so you haven’t been charged. Complete the ${price} one-off payment and ${name} goes live as soon as our automatic checks pass. A reviewer still looks at it.`
         ]
       : input.lastReminder
-        ? [
-            `${lastLine}Pick how to get listed: free with our badge, or ${price} one-off without it.`
-          ]
+        ? [`${lastLine}${options}`]
         : [
-            `It’s saved with everything you entered. Pick how to get listed: free with our badge, or ${price} one-off without it. Nothing is reviewed until you choose.`
+            `It’s saved with everything you entered. ${options} Nothing is reviewed until you choose.`
           ]
     return composeEmail(
       {

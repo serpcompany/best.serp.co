@@ -2,7 +2,8 @@
  * Site areas that later steps of #59 ship. Whatever depends on one of them (email copy and
  * links, admin navigation) reads its flag here instead of promising it early. The issue that
  * builds the area turns the flag on, and the approved wording and links come back on their own:
- * `apps/web/lib/email/emails/links.test.ts` then requires the pages they link to.
+ * `apps/web/lib/email/emails/links.test.ts` then requires the pages they link to, and
+ * `apps/web/lib/feature-copy.test.ts` keeps page copy from promising an area that is off.
  */
 export interface SiteFeatures {
   /**
@@ -10,6 +11,12 @@ export interface SiteFeatures {
    * where a submitter edits and resubmits. Off: emails send people to `/submit/` instead.
    */
   readonly accountDashboard: boolean
+  /**
+   * #66: the badge program, which checks every verified badge each week and emails the owner
+   * when it goes missing. Off: the submit pages don't promise weekly checks
+   * (`lib/feature-copy.ts`).
+   */
+  readonly badgeProgram: boolean
   /**
    * #73: conversations with the SERP team (`/account/messages/`, `/admin/inbox/`). Off: emails
    * point to `/contact/` instead.
@@ -24,6 +31,7 @@ export interface SiteFeatures {
 
 export const features: SiteFeatures = {
   accountDashboard: false,
+  badgeProgram: false,
   messages: false,
   orders: false
 }

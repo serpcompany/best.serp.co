@@ -25,11 +25,13 @@ import {
 } from '@serpdirectory/design-system/input-otp'
 import { Spinner } from '@serpdirectory/design-system/spinner'
 import { getRoute } from '@serpdirectory/web-core/routes'
-import { ArrowRight, CircleX, Clock } from 'lucide-react'
+import { ArrowRight, CircleX, Clock, Info } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
+import { readLocalDraft } from '@/components/submit/draft-storage'
 import { callbackDestination } from '@/lib/auth/callback-url'
+import { hostOf } from '@/lib/submissions/contract'
 import {
   CODE_ATTEMPTS,
   CODE_LENGTH,
@@ -127,6 +129,7 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
   const now = useNow(step.kind !== 'done')
 
   const destination = callbackDestination(callbackPath)
+  const draftName = useSubmitDraftName(callbackPath)
 
   useEffect(() => {
     if (step.kind !== 'done') return undefined
@@ -321,7 +324,9 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
           </CardTitle>
           <CardDescription>
             Signed in as <b className="font-medium text-foreground">{step.email}</b>.{' '}
-            {destination.sentence}
+            {draftName
+              ? 'Taking you back to Submit, where your draft is waiting.'
+              : destination.sentence}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -538,6 +543,13 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
       <CardContent>
         <form noValidate onSubmit={onEmailSubmit}>
           <FieldGroup>
+            {draftName ? (
+              <Alert className="bg-card text-card-foreground">
+                <Info aria-hidden="true" />
+                <AlertTitle>Your {draftName} draft is saved</AlertTitle>
+                <AlertDescription>Sign in to finish submitting it.</AlertDescription>
+              </Alert>
+            ) : null}
             <Field data-invalid={emailError ? true : undefined}>
               <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
@@ -580,6 +592,22 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
       </CardContent>
     </LoginLayout>
   )
+}
+
+/**
+ * The product name of the `/submit` draft kept in this browser (#63), when the visitor is
+ * signing in on the way back to Submit: the card then says the draft is saved and waiting.
+ * Read after mount, since the server cannot see browser storage.
+ */
+function useSubmitDraftName(callbackPath: string): string | null {
+  const [name, setName] = useState<string | null>(null)
+  useEffect(() => {
+    if (!/^\/submit(?:\/|\?|$)/u.test(callbackPath)) return
+    const draft = readLocalDraft(null)
+    const label = draft?.name.trim() || (draft?.website ? hostOf(draft.website) : '')
+    setName(label || null)
+  }, [callbackPath])
+  return name
 }
 
 /** login-01's page layout: a centred column, max-w-sm, holding the card. */

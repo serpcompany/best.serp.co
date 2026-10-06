@@ -79,7 +79,9 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 - `migration_runs` and `publication_runs` record imports and applied manifests.
 - `listing_slug_redirects` maps retired slugs to their listing.
 - `listing_submissions` and its resource, FAQ, event, rate-limit, and notification
-  tables hold private intake. Only a digest of each legacy access capability is stored.
+  tables hold private intake, owned by the signed-in submitter (#63). `access_token_hash` is
+  retired: nothing reads or writes it, and a follow-up migration drops it once no live Worker
+  uses it.
   `listing_submission_url_blocks` holds prohibited-URL blocks.
 - `listing_owners`, `listing_revisions` (with resource, FAQ, and event tables), and
   `badge_checks` hold ownership, owner edits, and badge program history (#62, below).

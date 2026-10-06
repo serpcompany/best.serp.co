@@ -62,8 +62,12 @@ export const submissionReceivedEmail = defineEmailTemplate<SubmissionReceivedInp
             ['Category', required(input.category, 'a category')],
             ['Plan', 'Free (badge)']
           ]),
+          // Adding FAQs and links is #65's dashboard: until `features.accountDashboard` is on,
+          // the email doesn't promise it (the #64 email audit, `links.test.ts`).
           paragraph(
-            'We’ll email you when it’s been reviewed. Meanwhile, you can add FAQs and links from your dashboard.'
+            featuresOf(context).accountDashboard
+              ? 'We’ll email you when it’s been reviewed. Meanwhile, you can add FAQs and links from your dashboard.'
+              : 'We’ll email you when it’s been reviewed.'
           )
         ],
         cta: { label: 'Open your dashboard', url: context.links.url('/account/') },

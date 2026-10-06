@@ -48,10 +48,13 @@ change runs in a protected workflow.
   `.open-next/worker.js`. It reads only the catalog epoch and, after a listing page
   rendered 404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is
   rendered again as the 410 gone page), both through `packages/data-ops/`.
+  Its `scheduled()` handler runs `lib/worker/scheduled.ts`, which maps each Cron Trigger to
+  its jobs ([draft reminders](./SUBMISSION_FLOW.md#draft-reminders-and-expiry), hourly).
 - `apps/web/lib/catalog/` acquires the binding, validates the runtime environment,
   and deduplicates reads per request. It contains no SQL.
-- `apps/web/lib/submissions/` validates the binding, performs bounded badge HTTP
-  verification, and delegates every submission write to `packages/data-ops/`.
+- `apps/web/lib/submissions/` validates the binding, fetches submitters' pages and images
+  only through its bounded safe fetcher (badge checks, URL prefill, logo checks), and
+  delegates every submission read and write to `packages/data-ops/`, scoped to the owner.
 - `apps/web/lib/email/` sends transactional email through the useSend API after the
   response, claims each template and event key in the `email_deliveries` ledger
   (`packages/data-ops/`) so it never sends twice, and only logs locally

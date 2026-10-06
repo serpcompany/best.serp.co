@@ -88,7 +88,8 @@ export function createWorkerEmailService<R extends EmailTemplateRegistry>(option
     const { database, policy, useSend } = resolveWorkerDelivery(env)
     const sender = useSend
       ? createUseSendSender({ ...useSend, fetch: options.fetch })
-      : createLogEmailSender()
+      : // Local only (`useSend` is null): log, and keep messages for the dev outbox endpoint.
+        createLogEmailSender(undefined, { devOutbox: policy.environment === 'local' })
     return createEmailService({
       ledger: createEmailDeliveryLedger({ client: createDatabase(database), clock: options.clock }),
       log,

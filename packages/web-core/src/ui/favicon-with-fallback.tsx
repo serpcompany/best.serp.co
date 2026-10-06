@@ -73,6 +73,11 @@ export function FaviconWithFallback({
       alt={currentImage.alt}
       width={size}
       height={size}
+      // Listing logos can be hotlinked from the product's own site (#63): never send our URL as
+      // the referrer, and load them only when they come into view.
+      referrerPolicy="no-referrer"
+      loading="lazy"
+      decoding="async"
       className={`${className} flex-shrink-0 object-contain`}
       style={{ width: `${size}px`, height: 'auto', aspectRatio: '1/1' }}
       onError={() => {

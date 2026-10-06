@@ -25,9 +25,19 @@ function render(
 }
 
 /** Today's site: no account dashboard pages (#65), no conversations (#73). */
-const BEFORE: SiteFeatures = { accountDashboard: false, messages: false, orders: false }
+const BEFORE: SiteFeatures = {
+  accountDashboard: false,
+  badgeProgram: false,
+  messages: false,
+  orders: false
+}
 /** Once #65 and #73 ship. */
-const AFTER: SiteFeatures = { accountDashboard: true, messages: true, orders: false }
+const AFTER: SiteFeatures = {
+  accountDashboard: true,
+  badgeProgram: true,
+  messages: true,
+  orders: false
+}
 
 /** A sample rendered in production with the given site areas. */
 function renderWith(id: TemplateId, features: SiteFeatures) {
@@ -258,7 +268,7 @@ You're getting this because this address was entered at best.serp.co/login.`)
 
 describe('submission received', () => {
   it('lists the submission and links to the dashboard', () => {
-    const email = render('submission-received')
+    const email = renderWith('submission-received', AFTER)
     expect(email.subject).toBe('We received Quillmate')
     expect(email.text).toBe(`Quillmate is in the review queue
 
@@ -277,6 +287,14 @@ This address isn't monitored. Reply from your dashboard: https://best.serp.co/ac
 You're getting this because you have an account on best.serp.co.`)
     expect(linksTo(email.html, 'https://best.serp.co/account/')).toBe(true)
     expect(email.html).toContain('>Free (badge)</td>')
+  })
+
+  it('until #65, promises nothing the dashboard cannot do yet', () => {
+    const email = renderWith('submission-received', BEFORE)
+    expect(bodyText(email)).toContain(
+      "Plan: Free (badge)\nWe'll email you when it's been reviewed.\n\nOpen your dashboard: https://best.serp.co/account/"
+    )
+    expect(bodyText(email)).not.toMatch(/FAQs and links/u)
   })
 })
 
@@ -342,7 +360,7 @@ describe('changes requested', () => {
 
 describe('listing approved', () => {
   it('shows the listing URL and links to it', () => {
-    const email = render('listing-approved')
+    const email = renderWith('listing-approved', AFTER)
     expect(email.subject).toBe('Quillmate is live on SERP')
     expect(email.text).toBe(`Quillmate is live
 
@@ -361,6 +379,14 @@ You're getting this because you have an account on best.serp.co.`)
     expect(render('listing-approved', 0, 'staging').html).toContain(
       'Your listing is published at best-serp-co-staging.serpcompany.workers.dev/products/quillmate.app/'
     )
+  })
+
+  it('until #66, asks to keep the badge without promising weekly checks', () => {
+    const email = renderWith('listing-approved', BEFORE)
+    expect(bodyText(email)).toContain(
+      'https://best.serp.co/products/quillmate.app/\nKeep the badge on https://quillmate.app/.\n\nView your listing'
+    )
+    expect(bodyText(email)).not.toMatch(/week|removed/iu)
   })
 })
 
@@ -608,6 +634,46 @@ describe('draft reminder', () => {
     expect(last.text).toContain(
       'This is the last reminder. After that the draft is deleted and tablesmith.io can be submitted by anyone. You picked the paid listing'
     )
+  })
+})
+
+describe('draft reminder while the paid listing is off', () => {
+  function reminder(index: number, change: Record<string, unknown> = {}) {
+    return renderAppEmail(
+      'draft-reminder',
+      {
+        ...(EMAIL_SAMPLES['draft-reminder'][index]?.input as never),
+        paidListings: false,
+        ...change
+      },
+      { environment: 'production', to: 'a@b.co' }
+    )
+  }
+
+  it('offers the free badge listing only, with no price', () => {
+    const first = reminder(0)
+    expect(first.subject).toBe('Finish your submission: Tablesmith')
+    expect(first.text).toContain(
+      "It's saved with everything you entered. Pick how to get listed: free with our badge. Nothing is reviewed until you choose."
+    )
+    const last = reminder(1)
+    expect(last.text).toContain(
+      'This is the last reminder. After that the draft is deleted and tablesmith.io can be submitted by anyone. Pick how to get listed: free with our badge.'
+    )
+    for (const email of [first, last]) {
+      expect(`${email.subject}\n${email.text}\n${email.html}`).not.toMatch(/\$49|one-off|paid/u)
+      expect(linksTo(email.html, 'https://best.serp.co/submit/s_6tb4ws/choose/')).toBe(true)
+    }
+  })
+
+  it('sends a draft left in checkout to the plan choice, with no paid copy', () => {
+    for (const index of [2, 3]) {
+      const email = reminder(index)
+      expect(email.text).not.toMatch(/\$49|one-off|paid listing|checkout|Rather add our badge/u)
+      expect(email.text).toContain('Pick how to get listed: free with our badge.')
+      expect(linksTo(email.html, 'https://best.serp.co/submit/s_6tb4ws/choose/')).toBe(true)
+      expect(email.html).not.toContain('/checkout/')
+    }
   })
 })
 

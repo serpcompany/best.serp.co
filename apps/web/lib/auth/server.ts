@@ -13,7 +13,11 @@ import 'server-only'
  * route answers 503 and the guards never grant access.
  */
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { createAuthOperations } from '@serpdirectory/data-ops/auth'
+import {
+  type AuthRateLimitDecision,
+  type AuthRateLimitRule,
+  createAuthOperations
+} from '@serpdirectory/data-ops/auth'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import { pruneEmailDeliveries } from '@serpdirectory/data-ops/email-deliveries'
 import { headers } from 'next/headers'
@@ -22,6 +26,7 @@ import { cache } from 'react'
 import { type Auth, createAuth } from './config'
 import {
   type Authorization,
+  type AuthorizationFailure,
   authorizeAdmin,
   authorizeUser,
   checkAdminRequestOrigin,
@@ -184,7 +189,6 @@ export async function requireAdmin(): Promise<SessionUser> {
   return interrupt(await authorizeCurrentAdmin())
 }
 
-/** The admin decision for a route handler that answers its own JSON errors. */
 /**
  * The admin decision for a route handler that answers its own JSON errors. A request that can
  * change state (anything but GET, HEAD, OPTIONS) must also carry a trusted `Origin`.
@@ -210,4 +214,60 @@ export async function authorizeAdminRequest(request: Request): Promise<Authoriza
     getAdminStatus: userId => runtime.operations.getAdminStatus(userId),
     getSession: async () => readSession(request.headers)
   })
+}
+
+function logUnavailable(error: unknown): void {
+  console.error(
+    JSON.stringify({
+      event: 'auth_unavailable',
+      message: error instanceof Error ? error.message : String(error)
+    })
+  )
+}
+
+/**
+ * Null when `request` may proceed: it cannot change state (GET, HEAD, OPTIONS), or it carries
+ * one of this Worker's trusted `Origin`s. The same rule as admin writes (`guards.ts`).
+ */
+export async function checkRequestOrigin(request: Request): Promise<AuthorizationFailure | null> {
+  let runtime: AccountRuntime
+  try {
+    runtime = await getAccountRuntime()
+  } catch (error) {
+    logUnavailable(error)
+    return { ok: false, reason: 'auth_unavailable', status: 503 }
+  }
+  return checkAdminRequestOrigin(request, value =>
+    isTrustedOrigin(value, runtime.settings.trustedOrigins)
+  )
+}
+
+/**
+ * The signed-in user for a route handler that answers its own JSON errors (the submit flow,
+ * #63): 401 without a session, and a state-changing request must carry a trusted `Origin`.
+ */
+export async function authorizeUserRequest(request: Request): Promise<Authorization> {
+  const origin = await checkRequestOrigin(request)
+  if (origin) return origin
+  return authorizeUser({ getSession: async () => readSession(request.headers) })
+}
+
+/** The request's signed-in user, or null (never throws; misconfigured accounts read as null). */
+export async function getRequestUser(request: Request): Promise<SessionUser | null> {
+  try {
+    const result = await authorizeUser({ getSession: async () => readSession(request.headers) })
+    return result.ok ? result.user : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Counts one request against `rules` in D1 (the sliding-window limits sign-in uses,
+ * `consumeRateLimit` in `@serpdirectory/data-ops/auth`), keyed with the Worker's rate-limit key.
+ */
+export async function consumeRequestRateLimit(
+  rules: readonly AuthRateLimitRule[]
+): Promise<AuthRateLimitDecision> {
+  return (await getAccountRuntime()).operations.consumeRateLimit(rules)
 }

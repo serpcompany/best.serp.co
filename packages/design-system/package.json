@@ -24,6 +24,7 @@
     "./field": "./components/shadcn/field.tsx",
     "./form": "./components/shadcn/form.tsx",
     "./input": "./components/shadcn/input.tsx",
+    "./input-group": "./components/shadcn/input-group.tsx",
     "./input-otp": "./components/shadcn/input-otp.tsx",
     "./item": "./components/shadcn/item.tsx",
     "./label": "./components/shadcn/label.tsx",
