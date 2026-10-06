@@ -43,7 +43,7 @@ async function emailsTo(request: APIRequestContext, to: string): Promise<string[
     .sort()
 }
 
-type Kind = 'claim' | 'curated' | 'down' | 'fixed' | 'free' | 'paid'
+type Kind = 'claim' | 'curated' | 'down' | 'fixed' | 'free' | 'gone' | 'paid'
 
 interface Seeded {
   email: string
@@ -142,6 +142,7 @@ test.beforeAll(async () => {
   seed('fixed', product('Fixed product', 'missing'))
   seed('claim', product('Claimed product', 'nofollow'))
   seed('down', { ...product('Down product', 'missing'), status: 503 })
+  seed('gone', { ...product('Gone product', 'valid'), status: 404 })
   seed('curated', product('Curated product', 'missing'))
   seed('paid', product('Paid product', 'missing'))
 })
@@ -161,8 +162,12 @@ test('the weekly pass warns on conclusive misses only, and checks no curated or 
   expect(checks('claim')).toEqual([
     { conclusive: 1, kind: 'weekly', outcome: 'fail', reason: 'link_not_followed' }
   ])
+  // A 5xx can't tell; a 4xx is a miss right away (owner decision on #106).
   expect(checks('down')).toEqual([
     { conclusive: 0, kind: 'weekly', outcome: 'fail', reason: 'http_503' }
+  ])
+  expect(checks('gone')).toEqual([
+    { conclusive: 1, kind: 'weekly', outcome: 'fail', reason: 'http_404' }
   ])
   for (const kind of ['curated', 'paid'] as const) {
     expect(checks(kind), kind).toEqual([])
@@ -176,6 +181,9 @@ test('the weekly pass warns on conclusive misses only, and checks no curated or 
     `Action needed: the SERP badge is missing on ${host('claim')}`
   ])
   expect(await emailsTo(request, get('down').email)).toEqual([])
+  expect(await emailsTo(request, get('gone').email)).toEqual([
+    `Action needed: the SERP badge is missing on ${host('gone')}`
+  ])
 
   // Replayed, and continued by the hourly trigger: nothing is checked or sent again.
   const fetched = fixture.requests(get('free').label)
@@ -229,7 +237,17 @@ test('the daily pass rechecks each warning and unpublishes or revokes on a confi
   expect(
     badgeD1(`SELECT revoked_reason FROM listing_owners WHERE listing_id = ${q(get('claim').id)}`)
   ).toEqual([{ revoked_reason: 'badge_removed' }])
-  expect(version()).toBe(2)
+  // The 404 site, still 404 on the recheck, is unpublished too.
+  expect(checks('gone').at(-1)).toEqual({
+    conclusive: 1,
+    kind: 'confirmation',
+    outcome: 'fail',
+    reason: 'http_404'
+  })
+  expect(badgeD1(`SELECT is_active FROM listings WHERE id = ${q(get('gone').id)}`)).toEqual([
+    { is_active: 0 }
+  ])
+  expect(version()).toBe(3)
   // The fixed listing and the unreachable one stay as they were.
   expect(
     badgeD1(
@@ -250,7 +268,7 @@ test('the daily pass rechecks each warning and unpublishes or revokes on a confi
   // Replayed: no second unpublish, revocation, or email.
   await trigger(request, DAILY)
   await trigger(request, HOURLY)
-  expect(version()).toBe(2)
+  expect(version()).toBe(3)
   expect(await emailsTo(request, get('free').email)).toHaveLength(2)
   expect(await emailsTo(request, get('claim').email)).toHaveLength(2)
   for (const kind of ['curated', 'paid'] as const) {

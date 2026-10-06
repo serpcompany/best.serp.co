@@ -34,9 +34,10 @@ import {
  *
  * **Conclusive** means the page loaded and the badge is missing, not followed (`rel`
  * `nofollow`, `sponsored`, or `ugc`, or a page that tells Googlebot or all crawlers not to
- * follow links), or links elsewhere: `CONCLUSIVE_VERIFICATION_FAILURES`, as at submit (#63).
- * Anything else (a timeout, an unreachable site, any HTTP error status, a non-HTML or unreadable
- * page, a page past the parser's limits) is inconclusive: recorded, never a miss.
+ * follow links), or links elsewhere: `CONCLUSIVE_VERIFICATION_FAILURES`, as at submit (#63);
+ * and any 4xx answer, such as a 403 to our checker or a dead 404 or 410 (owner decision on
+ * #106, 2026-10-06). Anything else (a timeout, an unreachable site, a 5xx, a non-HTML or
+ * unreadable page, a page past the parser's limits) is inconclusive: recorded, never a miss.
  *
  * **Limits.** A run checks at most `BADGE_CHECK_LIMIT` sites, `BADGE_CHECK_CONCURRENCY` at a
  * time: each check is at most four fetches (three redirects) of 8 seconds and one bounded parse,
@@ -54,20 +55,39 @@ export const BADGE_CHECK_CONCURRENCY = 4
 export const BADGE_EMAIL_RETRY_LIMIT = 20
 
 const CONCLUSIVE = new Set<string>(CONCLUSIVE_VERIFICATION_FAILURES)
+const CLIENT_ERROR = /^http_(4\d\d)$/u
+
+/** True for a conclusive miss: a page that loaded without a working badge, or any 4xx. */
+export function isConclusiveBadgeFailure(code: string): boolean {
+  return CONCLUSIVE.has(code) || CLIENT_ERROR.test(code)
+}
 
 /** How a verifier result is recorded: a pass, a conclusive miss, or an inconclusive failure. */
 export function badgeCheckRecord(result: BadgeVerificationResult): BadgeCheckRecord {
   if (result.ok) return { outcome: 'pass' }
-  return { conclusive: CONCLUSIVE.has(result.code), outcome: 'fail', reason: result.code }
+  return { conclusive: isConclusiveBadgeFailure(result.code), outcome: 'fail', reason: result.code }
 }
 
-/** The "badge missing" email's finding for a conclusive miss's reason. */
-export function badgeProblem(reason: string): BadgeProblem {
-  if (reason === 'wrong_destination') return 'wrong_destination'
-  if (reason === 'link_not_followed' || reason === 'page_not_followed' || reason === 'nofollow') {
-    return 'nofollow'
+/**
+ * The "badge missing" email's finding for a conclusive miss. "Marked nofollow" only when the
+ * link's `rel` has `nofollow` (the verifier's tokens, known for a check made in this run); a
+ * `sponsored` or `ugc` link, or one whose tokens are not known (an email sent again later), is
+ * "isn't followed", which is true of every unfollowed link.
+ */
+export function badgeProblem(
+  reason: string,
+  result?: BadgeVerificationResult
+): { httpStatus?: number; problem: BadgeProblem } {
+  const status = CLIENT_ERROR.exec(reason)?.[1]
+  if (status) return { httpStatus: Number(status), problem: 'http_status' }
+  if (reason === 'wrong_destination') return { problem: 'wrong_destination' }
+  if (reason === 'page_not_followed') return { problem: 'page_not_followed' }
+  if (reason === 'nofollow') return { problem: 'nofollow' }
+  if (reason === 'link_not_followed') {
+    const rel = result && !result.ok && result.code === 'link_not_followed' ? result.rel : []
+    return { problem: rel.includes('nofollow') ? 'nofollow' : 'not_followed' }
   }
-  return 'missing'
+  return { problem: 'missing' }
 }
 
 export interface BadgeProgramResult {
@@ -97,7 +117,9 @@ export type SendBadgeEmail = <K extends ProgramTemplate>(
 ) => Promise<void>
 
 /** Checks one listing's badge; it never throws (a thrown error counts as inconclusive). */
-export type VerifyListingBadge = (listing: BadgeProgramListing) => Promise<BadgeVerificationResult>
+export type VerifyListingBadge = (
+  listing: Pick<BadgeProgramListing, 'id' | 'slug' | 'website'>
+) => Promise<BadgeVerificationResult>
 
 async function eachLimited<T>(
   items: readonly T[],
@@ -146,6 +168,8 @@ export async function runBadgeProgram(input: {
 
   // Emails go out one at a time, after every check of a step has been recorded.
   const outbox: BadgeProgramEmail[] = []
+  /** This run's verifier results, by listing, for the email's exact finding. */
+  const results = new Map<string, BadgeVerificationResult>()
   const flush = async () => {
     for (const email of outbox.splice(0)) await sendEmail(email)
   }
@@ -160,7 +184,7 @@ export async function runBadgeProgram(input: {
           ...listing,
           checkedAt: email.checkedAt,
           priceCents,
-          problem: badgeProblem(email.reason),
+          ...badgeProblem(email.reason, results.get(email.listing.id)),
           recheckAt: badgeRecheckAt(email.checkedAt).toISOString(),
           website
         },
@@ -189,7 +213,9 @@ export async function runBadgeProgram(input: {
 
   const verify = async (listing: BadgeProgramListing): Promise<BadgeCheckRecord> => {
     try {
-      return badgeCheckRecord(await input.verify(listing))
+      const checked = await input.verify(listing)
+      results.set(listing.id, checked)
+      return badgeCheckRecord(checked)
     } catch {
       return { conclusive: false, outcome: 'fail', reason: 'verification_service_error' }
     }

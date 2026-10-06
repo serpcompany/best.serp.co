@@ -1119,6 +1119,15 @@ describe('badge program on Wrangler-local D1 (workerd, #66)', () => {
           )
       )
     )
+    // The refund check (#68) records on D1 under its own kind.
+    const { id: refundCheck } = await operations.recordRefundCheck({
+      listingId: 'lst-badge-claim',
+      now: window,
+      result: { outcome: 'pass' }
+    })
+    expect(await first('SELECT kind, outcome FROM badge_checks WHERE id = ?', refundCheck)).toEqual(
+      { kind: 'refund', outcome: 'pass' }
+    )
     const retries = await operations.retryableEmails({ limit: 10, maxAttempts: 5, now: window })
     expect(retries.map(email => [email.template, email.to])).toEqual([
       ['listing-unlisted', 'free@badge.example'],

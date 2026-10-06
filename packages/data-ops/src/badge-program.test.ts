@@ -190,6 +190,7 @@ describe('badge program operations', () => {
         checkId: warned.id,
         checkedAt: at(1),
         listing: {
+          id: 'lst_free',
           name: 'Live lst_free',
           slug: 'lst_free.example',
           website: 'https://lst_free.example/'
@@ -509,6 +510,7 @@ describe('badge program operations', () => {
         checkId: revoked.id,
         checkedAt: at(0.25, DAILY),
         listing: {
+          id: 'lst_claim',
           name: 'Live lst_claim',
           slug: 'lst_claim.example',
           website: 'https://lst_claim.example/'
@@ -521,6 +523,62 @@ describe('badge program operations', () => {
     await expect(
       ops.retryableEmails({ limit: 10, maxAttempts: 5, now: at(8 * 24, DAILY) })
     ).resolves.toEqual([])
+  })
+
+  it('defers a free listing while its own submission is in review, instead of refetching it', async () => {
+    await warnFree()
+    // An upgrade to paid is waiting for review: unpublishing would be refused meanwhile.
+    db().exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,
+        category_slug,logo_url,status,plan,paid_at,listing_id,owner_user_id,published_checksum)
+      VALUES ('sub_upgrade','lst_free.example','Free','d','https://lst_free.example/','c','tools',
+        'l','paid_pending_review','paid','2026-10-05T12:00:00.000Z','lst_free','user_free',
+        'checksum-lst_free')`)
+    expect(await due()).toEqual([])
+    const next = at(7 * 24)
+    expect(
+      (await ops.weeklyDue({ cycleStart: next, limit: 10, now: at(1, next) })).map(i => i.id)
+    ).toEqual(['lst_claim'])
+    // Once that submission is resolved, the recheck is due again.
+    db().exec(
+      "UPDATE listing_submissions SET status='rejected',rejection_reason='No',rejection_category='prohibited',paid_at=NULL WHERE id='sub_upgrade'"
+    )
+    expect((await due()).map(item => item.id)).toEqual(['lst_free'])
+  })
+
+  it('leaves out a free listing whose submitter an admin removed as owner', async () => {
+    db().exec(`UPDATE listing_owners SET revoked_at='2026-10-01T00:00:00.000Z',
+      revoked_reason='admin_removed' WHERE listing_id='lst_free'`)
+    expect((await weekly()).map(item => item.id)).toEqual(['lst_claim'])
+    // A listing approved before ownership rows existed still reaches its submitter.
+    db().exec("DELETE FROM listing_owners WHERE listing_id='lst_free'")
+    expect(await listing('lst_free')).toMatchObject({ ownerEmail: 'free@example.com' })
+    // And a new owner an admin moved it to gets the emails.
+    db().exec(`INSERT INTO listing_owners (listing_id,user_id,verified_via,verified_at)
+      VALUES ('lst_free','user_paid','admin','2026-10-02T00:00:00.000Z')`)
+    expect(await listing('lst_free')).toMatchObject({ ownerEmail: 'paid@example.com' })
+  })
+
+  it('records the one-off refund check of a paid listing (#68)', async () => {
+    await expect(ops.refundCheckTarget('lst_paid')).resolves.toEqual({
+      id: 'lst_paid',
+      slug: 'lst_paid.example',
+      website: 'https://lst_paid.example/'
+    })
+    await expect(ops.refundCheckTarget('lst_missing')).resolves.toBeNull()
+    const { id } = await ops.recordRefundCheck({ listingId: 'lst_paid', now: at(1), result: PASS })
+    expect(
+      one('SELECT listing_id,kind,outcome,conclusive FROM badge_checks WHERE id=?', id)
+    ).toEqual({
+      conclusive: 1,
+      kind: 'refund',
+      listing_id: 'lst_paid',
+      outcome: 'pass'
+    })
+    await expect(
+      ops.recordRefundCheck({ listingId: 'lst_missing', now: at(1), result: MISSING })
+    ).rejects.toThrow(/not an approved listing/u)
+    // The pass is what the refund's keep-free path reads; the catalog never moved.
+    expect(version()).toBe(1)
   })
 
   it('keys each email by template and check', () => {

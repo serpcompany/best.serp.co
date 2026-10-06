@@ -7,6 +7,7 @@ import {
 import {
   assertPreviousStatementChangedOne,
   hoursBefore,
+  listingHasQueuedSubmission,
   prepareCatalogPublication,
   type StatementPlan
 } from './plan-support'
@@ -81,6 +82,12 @@ export interface BadgeWarning {
   reason: string
 }
 
+export interface RefundCheckTarget {
+  id: string
+  slug: string
+  website: string
+}
+
 export interface PendingConfirmation extends BadgeProgramListing {
   warning: BadgeWarning
 }
@@ -91,6 +98,7 @@ export type BadgeCheckRecord =
   | { conclusive: boolean; outcome: 'fail'; reason: string }
 
 interface EmailListing {
+  id: string
   name: string
   slug: string
   website: string
@@ -156,6 +164,16 @@ export interface BadgeProgramOperations {
     now: string
     result: BadgeCheckRecord
   }): Promise<RecordedBadgeCheck>
+  /**
+   * Records the one-off badge check of a listing being refunded (#68): `kind = 'refund'`. A
+   * conclusive pass is what `buildRefundSubmissionPlans` (`keep_free`) reads to keep the listing
+   * as a free one. Throws when the listing is gone or was never approved.
+   */
+  recordRefundCheck(input: { listingId: string; now: string; result: BadgeCheckRecord }): Promise<{
+    id: number
+  }>
+  /** The website and slug a refund check (#68) reads, or null for an unknown listing. */
+  refundCheckTarget(listingId: string): Promise<RefundCheckTarget | null>
   /** Program emails whose last send failed and that still apply, to send again. */
   retryableEmails(input: {
     limit: number
@@ -179,8 +197,24 @@ const FREE_SUBMISSION = `(SELECT s.id FROM listing_submissions s
   WHERE s.listing_id=l.id AND s.status='approved' AND s.plan='free' ORDER BY s.id LIMIT 1)`
 
 /**
+ * The owner a free submitted listing's emails go to: its current owner, or for a listing approved
+ * before ownership rows existed, its submitter, unless that submitter's ownership of this listing
+ * was revoked (an admin removed it; PR #106 review round 1, suggestion 5): such a listing has
+ * nobody to warn, so it stays out of the program.
+ */
+const SUBMISSION_OWNER = (listingSql: string, submitterSql: string) => `COALESCE(
+    (SELECT co.user_id FROM listing_owners co WHERE co.listing_id=${listingSql} AND co.role='owner'
+      AND co.revoked_at IS NULL),
+    (SELECT ${submitterSql} WHERE NOT EXISTS (SELECT 1 FROM listing_owners ro
+      WHERE ro.listing_id=${listingSql} AND ro.user_id=${submitterSql}
+        AND ro.revoked_at IS NOT NULL)))`
+
+/**
  * The live listings the program checks, with their branch, owner, and warning (columns
  * `warning_*` are null unless the listing is in warning). Binds the warning cutoff, then now.
+ * A free listing whose own submission is in review (`paid_pending_review`: an upgrade, or
+ * `changes_requested`) waits until that decision: unpublishing is refused meanwhile, so checking
+ * it would only fetch the site again every hour (round 1, suggestion 4).
  */
 const PROGRAM_LISTINGS = `SELECT l.id,l.slug,l.name,l.website,
     CASE WHEN fs.id IS NULL THEN 'revoke' ELSE 'unpublish' END AS branch,
@@ -190,11 +224,12 @@ const PROGRAM_LISTINGS = `SELECT l.id,l.slug,l.name,l.website,
   LEFT JOIN listing_submissions fs ON l.source='submission' AND fs.id=${FREE_SUBMISSION}
   LEFT JOIN listing_owners o ON o.listing_id=l.id AND o.role='owner' AND o.revoked_at IS NULL
   JOIN users u ON u.id=CASE WHEN fs.id IS NULL THEN o.user_id
-    ELSE COALESCE(o.user_id,fs.owner_user_id) END
+    ELSE ${SUBMISSION_OWNER('l.id', 'fs.owner_user_id')} END
   LEFT JOIN badge_checks w ON w.id=${LATEST_CONCLUSIVE}
     AND w.kind='weekly' AND w.outcome='fail' AND w.checked_at>=?
   WHERE l.status='approved' AND l.is_active=1 AND l.published_at IS NOT NULL
-    AND l.published_at<=? AND (fs.id IS NOT NULL OR o.verified_via='badge_claim')`
+    AND l.published_at<=? AND (fs.id IS NOT NULL OR o.verified_via='badge_claim')
+    AND (fs.id IS NULL OR NOT ${listingHasQueuedSubmission('l.id')})`
 
 const NO_CHECK_SINCE = `NOT EXISTS (SELECT 1 FROM badge_checks c
   WHERE c.listing_id=l.id AND c.checked_at>=?)`
@@ -305,6 +340,36 @@ export function buildRecordConfirmationPlans(input: {
   ]
 }
 
+/**
+ * Records the refund check (#68) of an approved listing, live or not, whatever its plan: the
+ * refund decides from it, and the badge program's own states ignore `refund` rows except as a
+ * check of this cycle.
+ */
+export function buildRecordRefundCheckPlans(input: {
+  listingId: string
+  now: string
+  result: BadgeCheckRecord
+}): StatementPlan[] {
+  return [
+    {
+      sql: `INSERT INTO badge_checks (listing_id,checked_at,outcome,reason,conclusive,kind)
+        SELECT ?,?,?,?,?,'refund' WHERE EXISTS (SELECT 1 FROM listings
+          WHERE id=? AND status='approved' AND published_at IS NOT NULL)
+        RETURNING id`,
+      params: [input.listingId, input.now, ...checkValues(input.result), input.listingId]
+    },
+    assertPreviousStatementChangedOne('badge_refund_check_recorded')
+  ]
+}
+
+export function selectRefundCheckTargetPlan(listingId: string): StatementPlan {
+  return {
+    sql: `SELECT id,slug,website FROM listings
+      WHERE id=? AND status='approved' AND published_at IS NOT NULL`,
+    params: [listingId]
+  }
+}
+
 interface ProgramRow {
   branch: string
   id: string
@@ -338,7 +403,7 @@ function listingOf(row: ProgramRow): BadgeProgramListing {
 }
 
 function emailListing(listing: EmailListing): EmailListing {
-  return { name: listing.name, slug: listing.slug, website: listing.website }
+  return { id: listing.id, name: listing.name, slug: listing.slug, website: listing.website }
 }
 
 interface PublicationRow {
@@ -349,6 +414,7 @@ interface PublicationRow {
 
 interface RetryRow {
   check_id: number
+  id: string
   checked_at: string
   event_key: string
   name: string
@@ -520,13 +586,24 @@ export function createBadgeProgramOperations(config: { client: Database }): Badg
           }
     },
 
+    async refundCheckTarget(listingId) {
+      const [row] = await rows<RefundCheckTarget>(selectRefundCheckTargetPlan(listingId))
+      return row ? { id: row.id, slug: row.slug, website: row.website } : null
+    },
+
+    async recordRefundCheck(input) {
+      const id = await insert(buildRecordRefundCheckPlans(input))
+      if (id === null) throw new Error('The refunded listing is not an approved listing.')
+      return { id }
+    },
+
     async retryableEmails({ limit, maxAttempts, now }) {
       const cutoff = warningCutoff(now)
       const failed = `d.status='failed' AND d.attempts<?`
       // A warning still applies while it is the listing's warning (`PROGRAM_LISTINGS`).
       const warnings = await rows<RetryRow>({
         sql: `SELECT d.event_key,p.warning_id AS check_id,p.warning_checked_at AS checked_at,
-            p.warning_reason AS reason,p.name,p.slug,p.website,p.owner_email,NULL AS warned_at
+            p.warning_reason AS reason,p.id,p.name,p.slug,p.website,p.owner_email,NULL AS warned_at
           FROM (${PROGRAM_LISTINGS} AND w.id IS NOT NULL) p
           JOIN email_deliveries d ON d.template_id='badge-missing'
             AND d.event_key='badge-missing:'||p.warning_id
@@ -536,7 +613,7 @@ export function createBadgeProgramOperations(config: { client: Database }): Badg
       // "Unlisted" still applies while the listing stays unpublished, to its owner.
       const unlisted = await rows<RetryRow>({
         sql: `SELECT d.event_key,c.id AS check_id,c.checked_at,NULL AS reason,
-            l.name,l.slug,l.website,u.email AS owner_email,
+            l.id,l.name,l.slug,l.website,u.email AS owner_email,
             (SELECT wc.checked_at FROM badge_checks wc WHERE wc.listing_id=l.id
               AND wc.kind='weekly' AND wc.conclusive=1 AND wc.outcome='fail' AND wc.id<c.id
               ORDER BY wc.checked_at DESC,wc.id DESC LIMIT 1) AS warned_at
@@ -544,12 +621,8 @@ export function createBadgeProgramOperations(config: { client: Database }): Badg
           JOIN badge_checks c ON c.id=CAST(substr(d.event_key,18) AS INTEGER)
             AND d.event_key='listing-unlisted:'||c.id
           JOIN listings l ON l.id=c.listing_id
-          JOIN users u ON u.id=COALESCE(
-            (SELECT o.user_id FROM listing_owners o
-              WHERE o.listing_id=l.id AND o.role='owner' AND o.revoked_at IS NULL),
-            (SELECT s.owner_user_id FROM listing_submissions s
-              WHERE s.listing_id=l.id AND s.status='approved' AND s.plan='free'
-              ORDER BY s.id LIMIT 1))
+          JOIN listing_submissions fs ON fs.id=${FREE_SUBMISSION}
+          JOIN users u ON u.id=${SUBMISSION_OWNER('l.id', 'fs.owner_user_id')}
           WHERE d.template_id='listing-unlisted' AND ${failed}
             AND c.kind='confirmation' AND c.outcome='fail' AND c.conclusive=1 AND c.checked_at>=?
             AND l.status='approved' AND l.is_active=0
@@ -559,7 +632,7 @@ export function createBadgeProgramOperations(config: { client: Database }): Badg
       // "Ownership removed" goes to the owner this check revoked, within the week.
       const revoked = await rows<RetryRow>({
         sql: `SELECT d.event_key,c.id AS check_id,c.checked_at,NULL AS reason,
-            l.name,l.slug,l.website,u.email AS owner_email,NULL AS warned_at
+            l.id,l.name,l.slug,l.website,u.email AS owner_email,NULL AS warned_at
           FROM email_deliveries d
           JOIN badge_checks c ON c.id=CAST(substr(d.event_key,19) AS INTEGER)
             AND d.event_key='ownership-removed:'||c.id
@@ -572,7 +645,12 @@ export function createBadgeProgramOperations(config: { client: Database }): Badg
           ORDER BY d.updated_at,d.event_key LIMIT ?`,
         params: [BADGE_REVOKE_REASON, maxAttempts, cutoff, limit]
       })
-      const listing = (row: RetryRow) => ({ name: row.name, slug: row.slug, website: row.website })
+      const listing = (row: RetryRow) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        website: row.website
+      })
       const common = (row: RetryRow) => ({
         checkId: Number(row.check_id),
         checkedAt: row.checked_at,

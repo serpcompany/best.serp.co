@@ -291,7 +291,7 @@
         },
         "badge_checks_kind_valid": {
           "name": "badge_checks_kind_valid",
-          "value": "\"badge_checks\".\"kind\" IN ('weekly', 'confirmation')"
+          "value": "\"badge_checks\".\"kind\" IN ('weekly', 'confirmation', 'refund')"
         },
         "badge_checks_conclusive_boolean": {
           "name": "badge_checks_conclusive_boolean",

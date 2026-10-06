@@ -303,6 +303,8 @@ describe('scheduled badge program', () => {
     const off: SiteFeatures = {
       accountDashboard: false,
       badgeProgram: false,
+      claims: false,
+      listingFaqs: false,
       messages: false,
       orders: false
     }

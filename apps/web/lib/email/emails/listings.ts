@@ -92,18 +92,52 @@ export const listingLivePaidEmail = defineEmailTemplate<ListingLivePaidInput>({
   }
 })
 
-/** What the badge check found. */
-export type BadgeProblem = 'missing' | 'nofollow' | 'wrong_destination'
+/**
+ * What the badge check found. `nofollow` is used only when the link's `rel` really has
+ * `nofollow`; a `sponsored` or `ugc` link is `not_followed`, a page whose robots rules stop
+ * crawlers following links is `page_not_followed`, and a 4xx answer to our checker is
+ * `http_status` (owner decision on #106, 2026-10-06). Those three reuse the submit page's
+ * approved lines for the same results (#70 screen 3), word for word.
+ */
+export type BadgeProblem =
+  | 'http_status'
+  | 'missing'
+  | 'nofollow'
+  | 'not_followed'
+  | 'page_not_followed'
+  | 'wrong_destination'
 
-const BADGE_FINDINGS: Readonly<Record<BadgeProblem, readonly (string | { bold: string })[]>> = {
+const BADGE_FINDINGS: Readonly<
+  Record<Exclude<BadgeProblem, 'http_status'>, readonly (string | { bold: string })[]>
+> = {
   missing: ['We couldn’t find the badge on the page.'],
   nofollow: ['The badge is there, but its link is marked ', { bold: 'nofollow' }, '.'],
+  not_followed: ['Badge found, but the link isn’t followed.'],
+  page_not_followed: ['Badge found, but the page tells search engines not to follow links.'],
   wrong_destination: ['The badge is there, but its link doesn’t point to your listing.']
+}
+
+function badgeFinding(input: {
+  httpStatus?: number
+  problem: BadgeProblem
+}): readonly (string | { bold: string })[] {
+  if (input.problem === 'http_status') {
+    const status = input.httpStatus
+    if (!Number.isInteger(status) || (status as number) < 400 || (status as number) > 499) {
+      throw new EmailTemplateError('An HTTP status finding needs a 4xx status.')
+    }
+    return [`The site answered with HTTP ${status}.`]
+  }
+  const finding = BADGE_FINDINGS[input.problem]
+  if (!finding) throw new EmailTemplateError('Unknown badge problem.')
+  return finding
 }
 
 export interface BadgeMissingInput extends ListingRef {
   checkedAt: Date | string
-  /** The current paid listing price, in cents (the upgrade line). */
+  /** The 4xx status our checker got, for the `http_status` finding. */
+  httpStatus?: number
+  /** The current paid listing price, in cents (the upgrade line, shown while #68 is on). */
   priceCents: number
   problem: BadgeProblem
   /** When the confirmation recheck runs, about 24 hours later. */
@@ -116,15 +150,17 @@ export const badgeMissingEmail = defineEmailTemplate<BadgeMissingInput>({
   render(input, context) {
     const name = required(input.listingName, 'a listing name')
     const website = required(input.website, 'a website')
-    const finding = BADGE_FINDINGS[input.problem]
-    if (!finding) throw new EmailTemplateError('Unknown badge problem.')
+    const finding = badgeFinding(input)
     return composeEmail(
       {
-        after: [
-          paragraph(
-            `Rather not keep the badge? Upgrade to a paid listing for ${formatUsd(input.priceCents, { cents: false })} one-off and the badge becomes optional.`
-          )
-        ],
+        // The paid upgrade is #68's: offered only while `features.orders` is on.
+        after: featuresOf(context).orders
+          ? [
+              paragraph(
+                `Rather not keep the badge? Upgrade to a paid listing for ${formatUsd(input.priceCents, { cents: false })} one-off and the badge becomes optional.`
+              )
+            ]
+          : [],
         body: [
           paragraph(
             `Our weekly check loaded ${website} on ${formatCheckTime(input.checkedAt)}. `,
@@ -166,20 +202,30 @@ export const listingUnlistedEmail = defineEmailTemplate<ListingUnlistedInput>({
   render(input, context) {
     const name = required(input.listingName, 'a listing name')
     const price = formatUsd(input.priceCents, { cents: false })
+    // Relisting is a paid listing (#68): offered only while `features.orders` is on.
+    const relist = featuresOf(context).orders
     return composeEmail(
       {
         body: [
           paragraph(
             `We rechecked ${required(input.website, 'a website')} on ${formatCheckTime(input.checkedAt)} and the badge was still missing, so ${name} has been removed from SERP, as we warned on ${formatDay(input.warnedAt)}.`
           ),
-          paragraph(
-            `To bring it back, relist it as a paid listing. It’s ${price} one-off, and the badge becomes optional.`
-          )
+          ...(relist
+            ? [
+                paragraph(
+                  `To bring it back, relist it as a paid listing. It’s ${price} one-off, and the badge becomes optional.`
+                )
+              ]
+            : [])
         ],
-        cta: {
-          label: `Relist for ${price}`,
-          url: context.links.url(sitePath('account', 'listings', input.listingSlug))
-        },
+        ...(relist
+          ? {
+              cta: {
+                label: `Relist for ${price}`,
+                url: context.links.url(sitePath('account', 'listings', input.listingSlug))
+              }
+            }
+          : {}),
         heading: `${name} is no longer listed`,
         preheader: 'The badge was still missing on our recheck.',
         subject: `${clip(name, SUBJECT_NAME_MAX)} has been removed from SERP`
@@ -199,6 +245,8 @@ export const ownershipRemovedEmail = defineEmailTemplate<OwnershipRemovedInput>(
   id: 'ownership-removed',
   render(input, context) {
     const name = required(input.listingName, 'a listing name')
+    // Claiming again is #67, by the badge or by a payment (#68): offered only while both are on.
+    const claimAgain = featuresOf(context).claims && featuresOf(context).orders
     return composeEmail(
       {
         body: [
@@ -206,10 +254,14 @@ export const ownershipRemovedEmail = defineEmailTemplate<OwnershipRemovedInput>(
             `We rechecked ${required(input.website, 'a website')} on ${formatCheckTime(input.checkedAt)} and the badge was still missing. Ownership came from the badge, so you no longer manage the ${name} listing.`
           ),
           paragraph(
-            `The listing stays on SERP. To manage it again, claim it again with the badge or a ${formatUsd(input.priceCents, { cents: false })} one-off payment.`
+            claimAgain
+              ? `The listing stays on SERP. To manage it again, claim it again with the badge or a ${formatUsd(input.priceCents, { cents: false })} one-off payment.`
+              : 'The listing stays on SERP.'
           )
         ],
-        cta: { label: `Claim ${name} again`, url: listingUrl(context, input.listingSlug) },
+        ...(claimAgain
+          ? { cta: { label: `Claim ${name} again`, url: listingUrl(context, input.listingSlug) } }
+          : {}),
         heading: `Your ownership of ${name} was removed`,
         preheader: 'The badge was still missing on our recheck.',
         subject: `You no longer manage ${clip(name, SUBJECT_NAME_MAX)} on SERP`

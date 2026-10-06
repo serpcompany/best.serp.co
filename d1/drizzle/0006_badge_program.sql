@@ -8,7 +8,7 @@ CREATE TABLE `__new_badge_checks` (
 	`kind` text DEFAULT 'weekly' NOT NULL,
 	FOREIGN KEY (`listing_id`) REFERENCES `listings`(`id`) ON UPDATE no action ON DELETE cascade,
 	CONSTRAINT "badge_checks_outcome_valid" CHECK("outcome" IN ('pass', 'fail')),
-	CONSTRAINT "badge_checks_kind_valid" CHECK("kind" IN ('weekly', 'confirmation')),
+	CONSTRAINT "badge_checks_kind_valid" CHECK("kind" IN ('weekly', 'confirmation', 'refund')),
 	CONSTRAINT "badge_checks_conclusive_boolean" CHECK("conclusive" IN (0, 1)),
 	CONSTRAINT "badge_checks_checked_at_iso" CHECK("checked_at" IS strftime('%Y-%m-%dT%H:%M:%fZ', "checked_at")),
 	CONSTRAINT "badge_checks_pass_conclusive" CHECK("outcome" = 'fail' OR ("conclusive" = 1 AND "reason" IS NULL)),

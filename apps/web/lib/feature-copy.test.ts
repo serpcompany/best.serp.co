@@ -61,6 +61,7 @@ const APPROVED_INTERIM_COPY: Record<string, RegExp[]> = {}
 const ALL_OFF: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
+  claims: false,
   listingFaqs: false,
   messages: false,
   orders: false
@@ -68,6 +69,7 @@ const ALL_OFF: SiteFeatures = {
 const ALL_ON: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: true,
+  claims: true,
   listingFaqs: true,
   messages: true,
   orders: true

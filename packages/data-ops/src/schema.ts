@@ -151,11 +151,13 @@ export type ListingEventType = (typeof listingEventTypes)[number]
 export const badgeCheckOutcomes = ['pass', 'fail'] as const
 export type BadgeCheckOutcome = (typeof badgeCheckOutcomes)[number]
 /**
- * Which pass of the badge program (#66) made a check: the `weekly` check, or the `confirmation`
- * recheck about 24 hours after a weekly conclusive miss. Only a weekly conclusive miss opens a
- * warning; a confirmation miss is recorded in the same batch as its unpublish or revocation.
+ * Which pass of the badge program (#66) made a check: the `weekly` check, the `confirmation`
+ * recheck about 24 hours after a weekly conclusive miss, or the one-off `refund` check of a paid
+ * listing being refunded (#68, owner decision 2026-10-06: a pass keeps it as a free listing).
+ * Only a weekly conclusive miss opens a warning; a confirmation miss is recorded in the same
+ * batch as its unpublish or revocation.
  */
-export const badgeCheckKinds = ['weekly', 'confirmation'] as const
+export const badgeCheckKinds = ['weekly', 'confirmation', 'refund'] as const
 export type BadgeCheckKind = (typeof badgeCheckKinds)[number]
 
 export const categories = sqliteTable(

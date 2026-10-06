@@ -123,13 +123,19 @@ const pass: BadgeVerificationResult = { ok: true }
 const missing: BadgeVerificationResult = { code: 'badge_missing', ok: false }
 
 describe('badge check outcomes', () => {
-  it('counts only a loaded page with a missing, unfollowed, or misdirected badge as a miss', () => {
+  it('counts a loaded page without a working badge, or any 4xx, as a miss', () => {
     expect(badgeCheckRecord({ ok: true })).toEqual({ outcome: 'pass' })
     const conclusive: BadgeVerificationResult[] = [
       { code: 'badge_missing', ok: false },
       { code: 'link_not_followed', ok: false, rel: ['sponsored'] },
       { code: 'page_not_followed', ok: false, source: 'meta' },
-      { code: 'wrong_destination', ok: false }
+      { code: 'wrong_destination', ok: false },
+      // Owner decision on #106: a 4xx is a miss right away (a 403 to our checker, a dead page).
+      { code: 'http_400', ok: false },
+      { code: 'http_403', ok: false },
+      { code: 'http_404', ok: false },
+      { code: 'http_410', ok: false },
+      { code: 'http_451', ok: false }
     ]
     for (const result of conclusive) {
       expect(badgeCheckRecord(result), JSON.stringify(result)).toMatchObject({
@@ -137,15 +143,13 @@ describe('badge check outcomes', () => {
         outcome: 'fail'
       })
     }
-    // Network errors, timeouts, HTTP errors (4xx and 5xx), non-HTML and unreadable pages, and
-    // the checker's own limits never count as a miss.
+    // Network errors, timeouts, 5xx, non-HTML and unreadable pages, and the checker's own
+    // limits never count as a miss.
     for (const code of [
       'fetch_timeout',
       'site_unreachable',
       'http_500',
       'http_503',
-      'http_404',
-      'http_403',
       'not_html',
       'page_unreadable',
       'response_too_large',
@@ -162,11 +166,26 @@ describe('badge check outcomes', () => {
     }
   })
 
-  it('names the email finding for each miss', () => {
-    expect(badgeProblem('badge_missing')).toBe('missing')
-    expect(badgeProblem('link_not_followed')).toBe('nofollow')
-    expect(badgeProblem('page_not_followed')).toBe('nofollow')
-    expect(badgeProblem('wrong_destination')).toBe('wrong_destination')
+  it('names the email finding only in words that are true of it', () => {
+    expect(badgeProblem('badge_missing')).toEqual({ problem: 'missing' })
+    expect(badgeProblem('wrong_destination')).toEqual({ problem: 'wrong_destination' })
+    expect(badgeProblem('page_not_followed')).toEqual({ problem: 'page_not_followed' })
+    expect(badgeProblem('http_404')).toEqual({ httpStatus: 404, problem: 'http_status' })
+    // "Marked nofollow" only when the link's rel has nofollow.
+    const rel = (tokens: Array<'nofollow' | 'sponsored' | 'ugc'>): BadgeVerificationResult => ({
+      code: 'link_not_followed',
+      ok: false,
+      rel: tokens
+    })
+    expect(badgeProblem('link_not_followed', rel(['nofollow', 'ugc']))).toEqual({
+      problem: 'nofollow'
+    })
+    expect(badgeProblem('link_not_followed', rel(['sponsored']))).toEqual({
+      problem: 'not_followed'
+    })
+    expect(badgeProblem('link_not_followed', rel(['ugc']))).toEqual({ problem: 'not_followed' })
+    // Sent again later, without the tokens: the line that is true of every unfollowed link.
+    expect(badgeProblem('link_not_followed')).toEqual({ problem: 'not_followed' })
   })
 })
 
@@ -211,6 +230,36 @@ describe('badge program run', () => {
       }
     ])
     expect(result).toMatchObject({ inconclusive: 1, more: false, passed: 1, warned: 1, weekly: 3 })
+  })
+
+  it('names the exact finding in the warning: nofollow, sponsored, or a 4xx', async () => {
+    const { operations } = fakeOperations({
+      weekly: [listing('n'), listing('s'), listing('g')]
+    })
+    const { send, sent } = sender()
+    const verdicts: Record<string, BadgeVerificationResult> = {
+      g: { code: 'http_410', ok: false },
+      n: { code: 'link_not_followed', ok: false, rel: ['nofollow'] },
+      s: { code: 'link_not_followed', ok: false, rel: ['sponsored'] }
+    }
+    await runBadgeProgram({
+      now: NOW,
+      operations,
+      priceCents: 4900,
+      send,
+      verify: async item => verdicts[item.id] ?? pass
+    })
+    const findings = Object.fromEntries(
+      sent.map(email => {
+        const input = email.input as { httpStatus?: number; problem: string }
+        return [email.to, [input.problem, input.httpStatus]]
+      })
+    )
+    expect(findings).toEqual({
+      'g@example.com': ['http_status', 410],
+      'n@example.com': ['nofollow', undefined],
+      's@example.com': ['not_followed', undefined]
+    })
   })
 
   it('unpublishes or revokes on a confirmed miss and emails the owner', async () => {

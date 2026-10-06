@@ -49,6 +49,18 @@ const DASHBOARD_PROMISES: ReadonlyArray<{
     pattern: /\bevery week\b|\bweekly\b|\bcheck again about 24 hours\b/iu
   },
   {
+    // Paid listings, upgrades, and relisting are #68's.
+    feature: 'orders',
+    issue: '#68',
+    pattern: /\$\d+|\bpaid listing\b|\brelist\b/iu
+  },
+  {
+    // Claiming a listing (again) is #67's.
+    feature: 'claims',
+    issue: '#67',
+    pattern: /\bclaim it again\b|\bclaim [^.\n]{1,80} again\b/iu
+  },
+  {
     feature: 'messages',
     issue: '#73',
     pattern:
@@ -207,6 +219,7 @@ function promisesIn(email: Rendered, id: TemplateId): Array<keyof SiteFeatures> 
 const ALL_OFF: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
+  claims: false,
   listingFaqs: false,
   messages: false,
   orders: false
@@ -214,6 +227,7 @@ const ALL_OFF: SiteFeatures = {
 const ALL_ON: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: true,
+  claims: true,
   listingFaqs: true,
   messages: true,
   orders: true
@@ -319,6 +333,25 @@ describe('email copy', () => {
       expect(before && promisesIn(before.email, id), id).toEqual([])
       expect(after && promisesIn(after.email, id), id).toEqual(expected)
     }
+  })
+
+  it('keeps the badge emails from offering paid listings (#68) or claims (#67) while they are off', () => {
+    const badgeEmails: TemplateId[] = ['badge-missing', 'listing-unlisted', 'ownership-removed']
+    const promised = (siteFeatures: SiteFeatures) =>
+      renderAll(siteFeatures)
+        .filter(({ id }) => badgeEmails.includes(id))
+        .map(({ email, id }) => [id, promisesIn(email, id)] as const)
+    const launching = { ...ALL_ON, claims: false, orders: false }
+    for (const [id, features] of promised(launching)) {
+      expect(features, id).not.toContain('orders')
+      expect(features, id).not.toContain('claims')
+    }
+    // The approved offers come back with their flags, and the audit sees them.
+    expect(Object.fromEntries(promised(ALL_ON))).toMatchObject({
+      'badge-missing': expect.arrayContaining(['orders']),
+      'listing-unlisted': expect.arrayContaining(['orders']),
+      'ownership-removed': expect.arrayContaining(['claims', 'orders'])
+    })
   })
 
   it('exempts only the owner-approved interim copy, and only where it is used', () => {
