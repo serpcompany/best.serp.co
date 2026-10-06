@@ -228,7 +228,9 @@ describe('edge HTML cache', () => {
     await edge.serve(page('/moved/'), () =>
       Response.redirect('https://best.serp.co/products/', 308)
     )
-    expect(edge.cache.entries.size).toBe(2)
+    // An unpublished listing's 410 gone page is public and epoch-keyed like any page (#64).
+    await edge.serve(page('/products/gone.example/'), () => new Response('gone', { status: 410 }))
+    expect(edge.cache.entries.size).toBe(3)
     const head = await edge.serve(page('/missing/', { method: 'HEAD' }))
     expect(head.status).toBe(404)
     expect(head.headers.get(EDGE_CACHE_HEADER)).toBe('HIT')

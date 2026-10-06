@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createDatabase } from './client'
 import { createSubmissionOperations, type SubmissionInput } from './submissions'
-import { SqliteD1 } from './test-support'
+import { insertPublishedListing, SqliteD1 } from './test-support'
 
 const input: SubmissionInput = {
   category: 'tools',
@@ -211,6 +211,54 @@ describe('shared submission data operations', () => {
         .prepare('SELECT block_key FROM listing_submissions WHERE slug=?')
         .get('go.example.com')
     ).toEqual({ block_key: 'example.com' })
+  })
+
+  it('refuses a website another listing stores in another spelling (#64 review)', async () => {
+    // Imported listings mostly have a slug that isn't their host.
+    insertPublishedListing(sqlite.database, {
+      categoryIds: [
+        (
+          sqlite.database.prepare("SELECT id FROM categories WHERE slug='tools'").get() as {
+            id: number
+          }
+        ).id
+      ],
+      content: 'Content',
+      description: 'Description',
+      displayOrder: 0,
+      id: 'lst_beta',
+      isFeatured: false,
+      name: 'Beta Tool',
+      publishedAt: '2026-05-16',
+      slug: 'beta-tool',
+      website: 'https://www.new.example'
+    })
+    for (const website of [
+      'https://new.example/',
+      'http://new.example',
+      'https://www.new.example/',
+      'https://new.example/?ref=producthunt',
+      'https://new.example/#top'
+    ]) {
+      await expect(
+        operations().createSubmission({ ...input, website }),
+        website
+      ).rejects.toMatchObject({ code: 'listing_exists', status: 409 })
+    }
+    // The other direction: a stored website with a query or fragment.
+    sqlite.database
+      .prepare("UPDATE listings SET website='https://new.example/?ref=abc#top' WHERE id='lst_beta'")
+      .run()
+    for (const website of ['https://new.example/', 'https://www.new.example#pricing']) {
+      await expect(
+        operations().createSubmission({ ...input, website }),
+        website
+      ).rejects.toMatchObject({ code: 'listing_exists', status: 409 })
+    }
+    // Another page on that host isn't matched: comparing stored websites by host is #94.
+    await expect(
+      operations().createSubmission({ ...input, website: 'https://new.example/other' })
+    ).resolves.toMatchObject({ slug: 'new.example' })
   })
 
   it('rolls back one of two concurrent verification transitions from the same snapshot', async () => {

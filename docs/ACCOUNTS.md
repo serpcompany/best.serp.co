@@ -14,8 +14,8 @@ email is #61.
 - **Admins** are signed-in users whose verified email is on the D1 `admin_allowlist`
   (seeded with `devin@serp.co` by migration `0002_better_auth`). Each new session sets
   `users.role` (`user` | `admin`) from the allowlist, and every admin request checks the
-  allowlist again, so removing an email revokes access on the next request. Until the admin
-  panel (#64) manages the allowlist, add or remove admins with a reviewed migration.
+  allowlist again, so removing an email revokes access on the next request. Admins add and
+  remove each other on `/admin/admins/` (#64); the last admin cannot be removed.
 - **`/admin` and `/api/admin`** need Cloudflare Access (production) **and** an admin session.
 
 | Piece | Where |
@@ -190,11 +190,12 @@ path (any case, decoded) before the edge cache and Next.js:
 Requests that pass reach pages and handlers, which call `requireAdmin()` (Next.js
 `unauthorized()` 401 / `forbidden()` 403, with `experimental.authInterrupts`) or
 `authorizeAdminRequest()` (JSON; a state-changing method also needs an `Origin` among the
-trusted origins, since every `*.serp.co` site is same-site). `/admin/` itself is a 204 for
-admins until #70 approves a screen. Unknown admin paths are caught by `app/admin/[...path]`
+trusted origins, since every `*.serp.co` site is same-site). `/admin/` redirects admins to
+the review queue ([Admin panel](./ADMIN_PANEL.md)). Unknown admin paths are caught by `app/admin/[...path]`
 and `app/api/admin/[[...path]]`. `scripts/architecture-guard.test.ts` fails any admin page or
 route that does not call the guard, and any Server Action anywhere in `apps/web` or `packages/`
-(actions are reachable by id from any path, so no path gate sees them) until #64 decides. Access is required in
+(actions are reachable by id from any path, so no path gate sees them; #64 decided that admin
+writes are `/api/admin` route handlers). Access is required in
 production (and whenever `SITE_ENVIRONMENT` is not exactly `local` or `staging`); locally and
 on staging only with `CF_ACCESS_REQUIRED=on`.
 
@@ -256,4 +257,6 @@ fails closed: the Worker answers 403 without a valid Access JWT.
 - Without `.dev.vars`, local runs (and the CI E2E job) use a random per-isolate secret, so
   sessions end when the Worker restarts.
 - The session cookie keeps Better Auth's `__Secure-` name rather than `__Host-` (Better Auth
-  adds the prefix itself); admin writes rely on the `Origin` check instead. Revisit in #64.
+  adds the prefix itself); admin writes rely on the `Origin` check instead. #64 kept this:
+  every admin write needs a trusted `Origin` and a JSON body, and a session cookie that a
+  sibling `*.serp.co` site plants is the planter's own session, which the allowlist refuses.

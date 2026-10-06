@@ -173,7 +173,8 @@ describe('fresh Drizzle D1 history', () => {
       '0001_email_deliveries.sql',
       '0002_better_auth.sql',
       '0003_submissions_data_model.sql',
-      '0004_query_indexes.sql'
+      '0004_query_indexes.sql',
+      '0005_admin_panel.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
@@ -341,7 +342,7 @@ describe('fresh Drizzle D1 history', () => {
     expect(
       database.prepare("SELECT sql FROM sqlite_master WHERE name='listing_submission_faqs'").get()
     ).toMatchObject({ sql: expect.stringContaining('REFERENCES "listing_submissions"') })
-    // Every later migration (0004: query indexes, #77) applies to the populated database too.
+    // Every later migration (0004: query indexes, #77; 0005: admin panel, #64) applies to the populated database too.
     for (const migration of names.slice(dataModelIndex + 1)) {
       database.exec('BEGIN')
       database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
@@ -355,6 +356,69 @@ describe('fresh Drizzle D1 history', () => {
         count: 0
       }
     )
+    database.close()
+  })
+
+  it('upgrades a populated database to the #64 listing log and admin ownership', () => {
+    // `listing_owners` is rebuilt to accept `verified_via = 'admin'`; nothing references it, so
+    // the rebuild keeps every row, including revoked history, under enforced foreign keys.
+    const database = new DatabaseSync(':memory:')
+    const names = freshMigrationNames()
+    const adminPanel = '0005_admin_panel.sql'
+    for (const migration of names.slice(0, names.indexOf(adminPanel))) {
+      database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
+    }
+    database.exec(`
+      INSERT INTO categories (slug, name) VALUES ('tools', 'Tools');
+      INSERT INTO listings (id, slug, name, description, website, status, source_kind,
+        source_identity, checksum)
+      VALUES ('lst_owned', 'owned.example', 'Owned', 'd', 'https://owned.example/', 'draft',
+        'legacy-json-migration-v1', 'owned', 'c');
+      INSERT INTO listing_categories VALUES ('lst_owned', 1, 0, 1);
+      UPDATE listings SET status = 'approved', published_at = '2026-05-16';
+      INSERT INTO users (id, name, email, email_verified)
+        VALUES ('user_a', 'A', 'a@example.com', 1), ('user_b', 'B', 'b@example.com', 1);
+      INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at, revoked_at,
+        revoked_reason)
+      VALUES ('lst_owned', 'user_a', 'badge_claim', '2026-09-03T00:00:00.000Z',
+        '2026-09-20T00:00:00.000Z', 'badge_removed'),
+        ('lst_owned', 'user_b', 'paid_claim', '2026-09-21T00:00:00.000Z', NULL, NULL);
+    `)
+    database.exec('BEGIN')
+    database.exec(readFileSync(resolve(freshMigrationsDirectory, adminPanel), 'utf8'))
+    database.exec('COMMIT')
+
+    expect(
+      database
+        .prepare('SELECT user_id, verified_via, revoked_reason FROM listing_owners ORDER BY id')
+        .all()
+    ).toEqual([
+      { revoked_reason: 'badge_removed', user_id: 'user_a', verified_via: 'badge_claim' },
+      { revoked_reason: null, user_id: 'user_b', verified_via: 'paid_claim' }
+    ])
+    expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    database.exec(`
+      UPDATE listing_owners SET revoked_at = '2026-10-06T00:00:00.000Z',
+        revoked_reason = 'transferred' WHERE user_id = 'user_b';
+      INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+        VALUES ('lst_owned', 'user_a', 'admin', '2026-10-06T00:00:00.000Z');
+      INSERT INTO listing_events (listing_id, event_type, actor)
+        VALUES ('lst_owned', 'owner_transferred', 'admin@example.com');
+    `)
+    // One current owner per listing still holds after the rebuild.
+    expect(() =>
+      database.exec(`INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+        VALUES ('lst_owned', 'user_b', 'admin', '2026-10-06T00:00:00.000Z')`)
+    ).toThrow(/UNIQUE constraint/u)
+    expect(() =>
+      database.exec(`INSERT INTO listing_events (listing_id, event_type, actor)
+        VALUES ('lst_owned', 'deleted', 'admin@example.com')`)
+    ).toThrow(/CHECK constraint/u)
+    database.exec("UPDATE listings SET is_active = 0 WHERE id = 'lst_owned'")
+    database.exec("DELETE FROM listings WHERE id = 'lst_owned'")
+    expect(database.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({
+      count: 0
+    })
     database.close()
   })
 

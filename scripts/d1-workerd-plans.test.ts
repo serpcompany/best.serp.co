@@ -2,6 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import * as adminPlansModule from '@serpdirectory/data-ops/admin-plans'
+import * as adminQueriesModule from '@serpdirectory/data-ops/admin-queries'
+import { createAdminReadOperations } from '@serpdirectory/data-ops/admin-queries'
 import { createAuthOperations } from '@serpdirectory/data-ops/auth'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import * as draftPlansModule from '@serpdirectory/data-ops/draft-plans'
@@ -49,7 +52,9 @@ function tracked<T extends object>(module: T): T {
     })
   ) as T
 }
+const A = tracked(adminPlansModule)
 const D = tracked(draftPlansModule)
+const Q = tracked(adminQueriesModule)
 const L = tracked(listingPlansModule)
 const R = tracked(revisionPlansModule)
 const S = tracked(submissionPlansModule)
@@ -602,6 +607,10 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       })
     )
     expect(await listing('lst-rejected')).toMatchObject({ is_active: 0 })
+    // The rejection is the refund-pending marker until the refund is recorded.
+    const refundPending = async () =>
+      (await all<{ id: string }>(S.selectRefundPendingSubmissionsPlan(50))).map(row => row.id)
+    expect(await refundPending()).toContain('sub-rejected')
     await run(
       S.buildRefundSubmissionPlans({
         actor: 'admin',
@@ -611,6 +620,7 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       })
     )
     expect(await submission('sub-rejected')).toMatchObject({ refunded_at: NOW, status: 'rejected' })
+    expect(await refundPending()).not.toContain('sub-rejected')
 
     // A payment held for review, and one that arrives after the owner withdrew.
     await insertDraft('sub-held', 'https://held.example/')
@@ -691,6 +701,148 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       })
     )
     await insertDraft('sub-after-lift', 'https://shop.casino.example/')
+  })
+
+  it('runs the admin panel plans and reads (#64)', async () => {
+    // Reads: every queue view, the counts, one submission and revision, the listing search with
+    // its JSON facet filters and numbered parameters, one listing, and the categories.
+    for (const view of ['waiting', 'changes', 'all'] as const) {
+      await all(Q.selectReviewQueuePlan(view))
+    }
+    const [counts] = await all<{ waiting: number }>(Q.selectReviewQueueCountsPlan())
+    expect(typeof counts?.waiting).toBe('number')
+    const reviewResults = await db.batch(
+      Q.selectSubmissionReviewPlans('sub-free').map(plan =>
+        db.prepare(plan.sql).bind(...plan.params)
+      )
+    )
+    expect(reviewResults[0]?.results).toMatchObject([{ id: 'sub-free', status: 'approved' }])
+    await db.batch(
+      Q.selectRevisionReviewPlans('rev-1').map(plan => db.prepare(plan.sql).bind(...plan.params))
+    )
+    const [page, totals, facets] = await db.batch<Record<string, unknown>>(
+      Q.selectAdminListingsPlans(
+        { linkRels: ['sponsored'], query: 'FREE', sources: ['submission'], statuses: ['unlisted'] },
+        { limit: 10, offset: 0 }
+      ).map(plan => db.prepare(plan.sql).bind(...plan.params))
+    )
+    expect(page?.results).toMatchObject([{ admin_status: 'unlisted', slug: 'free-tool.example' }])
+    expect(totals?.results).toMatchObject([{ matches: 1 }])
+    expect(facets?.results.length).toBeGreaterThan(0)
+    await db.batch(
+      Q.selectAdminListingPlans('free-tool.example').map(plan =>
+        db.prepare(plan.sql).bind(...plan.params)
+      )
+    )
+    expect(await all(Q.selectActiveCategoriesPlan())).toHaveLength(2)
+    expect(await all(Q.selectActiveUrlBlockPlan('casino.example'))).toEqual([])
+    // "Allow resubmission" targets: a submission's own key, a listing's latest submission's key.
+    expect(await all(Q.selectResubmissionTargetPlan({ submissionId: 'sub-free' }))).toEqual([
+      { block_key: expect.any(String), id: 'sub-free' }
+    ])
+    expect(await all(Q.selectResubmissionTargetPlan({ listingId: 'lst-missing' }))).toEqual([])
+    // A website move collides with another listing's host; a free host does not.
+    expect(
+      await all(
+        Q.selectListingWebsiteConflictPlan({
+          listingId: 'lst-free',
+          website: 'https://www.keep.example/'
+        })
+      )
+    ).toEqual([{ blocked: 0, listing: 1, submission: 0 }])
+    expect(
+      await all(
+        Q.selectListingWebsiteConflictPlan({
+          listingId: 'lst-free',
+          website: 'https://new.example/'
+        })
+      )
+    ).toEqual([{ blocked: 0, listing: 0, submission: 0 }])
+    // Stored websites match with a query or fragment on either side (json_each and the
+    // `listings_website_idx` ranges run on D1 too). The slug isn't the host here.
+    await db
+      .prepare("UPDATE listings SET website='https://moved.example/?ref=abc' WHERE id='lst-keep'")
+      .run()
+    for (const website of ['https://moved.example/', 'https://www.moved.example/#top']) {
+      expect(
+        await all(Q.selectListingWebsiteConflictPlan({ listingId: 'lst-free', website })),
+        website
+      ).toEqual([{ blocked: 0, listing: 1, submission: 0 }])
+    }
+    await db
+      .prepare("UPDATE listings SET website='https://moved.example' WHERE id='lst-keep'")
+      .run()
+    expect(
+      await all(
+        Q.selectListingWebsiteConflictPlan({
+          listingId: 'lst-free',
+          website: 'https://moved.example/?ref=producthunt'
+        })
+      )
+    ).toEqual([{ blocked: 0, listing: 1, submission: 0 }])
+    await db
+      .prepare("UPDATE listings SET website='https://keep.example/' WHERE id='lst-keep'")
+      .run()
+    const reads = createAdminReadOperations({ client: createDatabase(db) })
+    expect(await reads.getAdminListing('free-tool.example')).toMatchObject({
+      adminStatus: 'unlisted',
+      owner: { userId: 'user_owner', verifiedVia: 'paid_claim' }
+    })
+
+    // Writes: an admin edit of the live listing, then a transfer to another verified account.
+    const [current] = await all<{ checksum: string }>(L.selectListingForPublicationPlan('lst-free'))
+    await run(
+      L.buildUpdateListingDetailsPlans({
+        details: {
+          categorySlug: 'tools',
+          description: 'Edited by an admin',
+          logoUrl: 'https://example.com/admin-logo.png',
+          name: 'Free Tool (edited)',
+          website: 'https://free-tool.example/'
+        },
+        expectedChecksum: String(current?.checksum),
+        fields: ['name', 'description', 'category', 'logo'],
+        listingId: 'lst-free',
+        publication: await publication('listing-edit', 'lst-free')
+      })
+    )
+    expect(await listing('lst-free')).toMatchObject({
+      is_active: 0,
+      name: 'Free Tool (edited)',
+      status: 'approved'
+    })
+    await db.prepare("UPDATE users SET email_verified=1 WHERE id='user_other'").run()
+    const [target] = await all<{ id: string }>(A.selectVerifiedUserByEmailPlan('Other@example.com'))
+    expect(target?.id).toBe('user_other')
+    await run(
+      L.buildTransferListingOwnerPlans({
+        fromUserId: 'user_owner',
+        listingId: 'lst-free',
+        publication: await publication('owner-transfer', 'lst-free'),
+        toUserId: 'user_other'
+      })
+    )
+    expect(
+      (
+        await all<{ event_type: string }>({
+          params: ['lst-free'],
+          sql: 'SELECT event_type FROM listing_events WHERE listing_id=? ORDER BY id'
+        })
+      ).map(row => row.event_type)
+    ).toEqual(
+      expect.arrayContaining(['edited', 'owner_transferred', 'link_rel_changed', 'unpublished'])
+    )
+
+    // The allowlist: add once, remove, and never remove the last admin.
+    await run(A.buildAddAdminPlans({ addedBy: 'devin@serp.co', email: 'Workerd@Example.com' }))
+    await expect(
+      run(A.buildAddAdminPlans({ addedBy: 'devin@serp.co', email: 'workerd@example.com' }))
+    ).rejects.toThrow()
+    expect(
+      (await all<{ email: string }>(A.selectAdminAllowlistPlan())).map(row => row.email)
+    ).toContain('workerd@example.com')
+    await run(A.buildRemoveAdminPlans({ email: 'workerd@example.com' }))
+    await expect(run(A.buildRemoveAdminPlans({ email: 'devin@serp.co' }))).rejects.toThrow()
   })
 
   it('ran every exported plan builder on D1', () => {

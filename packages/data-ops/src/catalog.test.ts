@@ -625,6 +625,7 @@ describe('listing link rel, verified owner, and unpublished state (#62)', () => 
     expect(await catalog.getListingBySlug('echo')).toBeNull()
     expect(await catalog.getUnpublishedListing('echo')).toEqual({
       category: 'primary',
+      categoryName: 'primary category',
       name: 'echo listing',
       slug: 'echo'
     })

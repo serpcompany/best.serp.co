@@ -9,7 +9,9 @@
 | [Email](./EMAIL.md) | Transactional email, environments, owner prerequisites |
 | [Email templates](./EMAIL_TEMPLATES.md) | Every email, its trigger, recipient, and link |
 | [Accounts](./ACCOUNTS.md) | Better Auth sign-in codes, admins, Cloudflare Access |
+| [Admin panel](./ADMIN_PANEL.md) | `/admin` screens, decisions, the production-write exception |
 | [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, release flow, cutover checklist |
+| [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel |
 | [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, staging before production |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees |
 | [Dependency security](./DEPENDENCY_SECURITY.md) | Production dependency audit |

@@ -15,6 +15,7 @@ export type CatalogOperation =
   | 'search-summaries'
   | 'shell-stats'
   | 'unpublished-listing'
+  | 'unpublished-listing-status'
 
 export type CatalogQueryShape =
   | 'canonical-redirect'
@@ -34,6 +35,7 @@ export type CatalogQueryShape =
   | 'search-summaries'
   | 'shell-stats'
   | 'unpublished-listing'
+  | 'unpublished-listing-status'
 
 export interface CatalogQueryEvent {
   d1DurationMs: number | null
@@ -143,6 +145,8 @@ export interface ListingDetail extends ListingSummary {
 export interface UnpublishedListing {
   /** Primary category slug when that category is still active. */
   category: string | null
+  /** That category's display name, for the 410 page's link (#64). */
+  categoryName: string | null
   name: string
   slug: string
 }

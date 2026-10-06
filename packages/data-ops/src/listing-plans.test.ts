@@ -5,7 +5,11 @@ import {
   buildRepublishListingPlans,
   buildRevokeListingOwnerPlans,
   buildSetListingLinkRelPlans,
+  buildTransferListingOwnerPlans,
   buildUnpublishListingPlans,
+  buildUpdateListingDetailsPlans,
+  type ListingDetailsField,
+  listingWebsiteMatch,
   selectListingForPublicationPlan
 } from './listing-plans'
 import { prepareCatalogPublication } from './plan-support'
@@ -299,5 +303,460 @@ describe('listing ownership transitions', () => {
     const db = database()
     execute(db, buildUnpublishListingPlans({ listingId, publication: prepared, reason: 'admin' }))
     expect(publicationState(db)).toEqual({ checksum: prepared.afterChecksum, version: 2 })
+  })
+})
+
+describe('listing activity log and admin edits (#64)', () => {
+  const at = (db: DatabaseSync, version: number, action: string) =>
+    publication(action, { checksum: publicationState(db).checksum, version })
+
+  function listingEvents(db: DatabaseSync): Array<Record<string, unknown>> {
+    return db
+      .prepare('SELECT event_type,detail,actor FROM listing_events WHERE listing_id=? ORDER BY id')
+      .all(listingId) as Array<Record<string, unknown>>
+  }
+
+  it('records every listing change in listing_events with its actor and detail', () => {
+    const db = database()
+    execute(
+      db,
+      buildUnpublishListingPlans({
+        listingId,
+        note: '  Owner asked to take it down.  ',
+        publication: publication('listing-unpublish'),
+        reason: 'admin'
+      })
+    )
+    execute(db, buildRepublishListingPlans({ listingId, publication: at(db, 2, 'republish') }))
+    execute(
+      db,
+      buildSetListingLinkRelPlans({
+        linkRel: 'nofollow',
+        listingId,
+        publication: at(db, 3, 'link')
+      })
+    )
+    execute(
+      db,
+      buildGrantListingOwnerPlans({
+        listingId,
+        publication: at(db, 4, 'grant'),
+        userId: 'user_owner',
+        verifiedVia: 'badge_claim'
+      })
+    )
+    execute(
+      db,
+      buildRevokeListingOwnerPlans({
+        listingId,
+        publication: at(db, 5, 'revoke'),
+        reason: 'badge_removed',
+        userId: 'user_owner'
+      })
+    )
+    expect(listingEvents(db)).toEqual([
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({ note: 'Owner asked to take it down.', reason: 'admin' }),
+        event_type: 'unpublished'
+      },
+      { actor: 'reviewer', detail: null, event_type: 'republished' },
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({ from: 'follow', to: 'nofollow' }),
+        event_type: 'link_rel_changed'
+      },
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({ userId: 'user_owner', verifiedVia: 'badge_claim' }),
+        event_type: 'owner_granted'
+      },
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({ reason: 'badge_removed', userId: 'user_owner' }),
+        event_type: 'owner_revoked'
+      }
+    ])
+  })
+
+  it('keeps a listing whose submission was rejected down', () => {
+    const db = database()
+    db.exec(`
+      INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+        logo_url,status,plan,listing_id,rejection_reason,rejection_category)
+      VALUES ('sub','lst_live.example','Live','d','https://lst_live.example/','c','tools','l',
+        'rejected','free','lst_live','Spam','other')`)
+    db.prepare('UPDATE listings SET is_active=0 WHERE id=?').run(listingId)
+    expectRefused(
+      db,
+      buildRepublishListingPlans({ listingId, publication: publication('listing-republish') })
+    )
+  })
+
+  it('transfers ownership to another verified account and compares the current owner', () => {
+    const db = database()
+    // An ownerless listing: the admin assigns its first owner.
+    execute(
+      db,
+      buildTransferListingOwnerPlans({
+        fromUserId: null,
+        listingId,
+        publication: publication('transfer'),
+        toUserId: 'user_owner'
+      })
+    )
+    expect(query(db, selectListingForPublicationPlan(listingId))).toMatchObject([
+      { owner_user_id: 'user_owner', version: 2 }
+    ])
+    // A stale view of the owner (the admin saw none) is refused.
+    expectRefused(
+      db,
+      buildTransferListingOwnerPlans({
+        fromUserId: null,
+        listingId,
+        publication: at(db, 2, 'transfer-stale'),
+        toUserId: 'user_other'
+      })
+    )
+    execute(
+      db,
+      buildTransferListingOwnerPlans({
+        fromUserId: 'user_owner',
+        listingId,
+        publication: at(db, 2, 'transfer-again'),
+        toUserId: 'user_other'
+      })
+    )
+    expect(
+      db.prepare('SELECT user_id,verified_via,revoked_reason FROM listing_owners ORDER BY id').all()
+    ).toEqual([
+      { revoked_reason: 'transferred', user_id: 'user_owner', verified_via: 'admin' },
+      { revoked_reason: null, user_id: 'user_other', verified_via: 'admin' }
+    ])
+    expect(listingEvents(db).map(event => event.event_type)).toEqual([
+      'owner_transferred',
+      'owner_transferred'
+    ])
+    // The new owner needs a verified account.
+    db.exec(`INSERT INTO users (id,name,email,email_verified)
+      VALUES ('user_unverified','U','u@example.com',0)`)
+    expectRefused(
+      db,
+      buildTransferListingOwnerPlans({
+        fromUserId: 'user_other',
+        listingId,
+        publication: at(db, 3, 'transfer-unverified'),
+        toUserId: 'user_unverified'
+      })
+    )
+    expect(() =>
+      buildTransferListingOwnerPlans({
+        fromUserId: 'user_other',
+        listingId,
+        publication: at(db, 3, 'transfer-same'),
+        toUserId: 'user_other'
+      })
+    ).toThrow(/already belongs/u)
+  })
+
+  const edit = {
+    categorySlug: 'apps',
+    description: 'A new short description.',
+    logoUrl: 'https://assets.example/new-logo.png',
+    name: 'Renamed',
+    website: 'https://lst_live.example/home'
+  }
+
+  it("edits a live listing's details, keeps it live, and logs the fields", () => {
+    const db = database()
+    execute(
+      db,
+      buildUpdateListingDetailsPlans({
+        details: edit,
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['name', 'description', 'category', 'logo', 'website'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    )
+    const prepared = publication('listing-edit')
+    expect(listing(db)).toMatchObject({
+      checksum: prepared.afterChecksum,
+      description: edit.description,
+      is_active: 1,
+      name: 'Renamed',
+      status: 'approved',
+      website: edit.website
+    })
+    expect(
+      db
+        .prepare(
+          `SELECT c.slug,lc.is_primary FROM listing_categories lc JOIN categories c
+          ON c.id=lc.category_id WHERE lc.listing_id=? ORDER BY c.slug`
+        )
+        .all(listingId)
+    ).toEqual([{ is_primary: 1, slug: 'apps' }])
+    expect(
+      db.prepare("SELECT url FROM listing_media WHERE listing_id=? AND kind='logo'").all(listingId)
+    ).toEqual([{ url: edit.logoUrl }])
+    // Other media stay.
+    expect(
+      count(
+        db,
+        "SELECT COUNT(*) AS count FROM listing_media WHERE kind='image' AND listing_id=?",
+        listingId
+      )
+    ).toBe(1)
+    expect(listingEvents(db)).toEqual([
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({ fields: ['name', 'description', 'category', 'logo', 'website'] }),
+        event_type: 'edited'
+      }
+    ])
+    expectPublished(db, 2)
+    // The checksum the admin saw is now stale.
+    expectRefused(
+      db,
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, name: 'Again' },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['name'],
+        listingId,
+        publication: at(db, 2, 'listing-edit-stale')
+      })
+    )
+  })
+
+  it('edits an unpublished listing and leaves it unpublished', () => {
+    const db = database()
+    db.prepare('UPDATE listings SET is_active=0 WHERE id=?').run(listingId)
+    execute(
+      db,
+      buildUpdateListingDetailsPlans({
+        details: edit,
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['name'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    )
+    expect(listing(db)).toMatchObject({ is_active: 0, name: 'Renamed', status: 'approved' })
+  })
+
+  it('refuses an edit while a submission is queued, after a rejection, or to an unknown category', () => {
+    for (const status of ['paid_pending_review', 'changes_requested', 'rejected'] as const) {
+      const db = database()
+      db.prepare(
+        `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+          logo_url,status,plan,paid_at,listing_id,published_checksum,rejection_reason,
+          rejection_category)
+        VALUES ('sub','lst_live.example','Live','d','https://lst_live.example/','c','tools','l',
+          ?,'paid',?,'lst_live',?,?,?)`
+      ).run(
+        status,
+        NOW,
+        status === 'rejected' ? null : 'checksum-lst_live',
+        status === 'rejected' ? 'Spam' : null,
+        status === 'rejected' ? 'other' : null
+      )
+      expectRefused(
+        db,
+        buildUpdateListingDetailsPlans({
+          details: edit,
+          expectedChecksum: 'checksum-lst_live',
+          fields: ['name'],
+          listingId,
+          publication: publication('listing-edit')
+        })
+      )
+    }
+    const db = database()
+    expectRefused(
+      db,
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, categorySlug: 'missing' },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['category'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    )
+    expect(() =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, name: ' ' },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['name'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    ).toThrow(/name cannot be empty/u)
+  })
+
+  it('refuses a website that collides, inside the batch, with the submission intake rules', () => {
+    const move = (db: DatabaseSync, website: string, fields: ListingDetailsField[] = ['website']) =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, website },
+        expectedChecksum: 'checksum-lst_live',
+        fields,
+        listingId,
+        publication: publication('listing-edit')
+      })
+    // Another listing's host (www. and the path don't matter) or URL.
+    const listed = database()
+    seedLiveListing(listed, 'lst_other', { slug: 'other.example' })
+    expectRefused(listed, move(listed, 'https://www.other.example/pricing'))
+    // Another listing's stored website in another spelling (scheme, www., trailing slash), or
+    // with a query or fragment on either side.
+    for (const [stored, website] of [
+      ['https://www.new.example', 'http://new.example/'],
+      ['https://www.new.example', 'https://new.example/?ref=abc'],
+      ['https://new.example/?ref=abc', 'https://new.example/'],
+      ['https://new.example/#top', 'https://www.new.example']
+    ] as const) {
+      const spelled = database()
+      seedLiveListing(spelled, 'lst_beta', { slug: 'beta-tool' })
+      spelled.prepare("UPDATE listings SET website=? WHERE id='lst_beta'").run(stored)
+      expectRefused(spelled, move(spelled, website))
+    }
+    // A submission in flight for the host.
+    const inFlight = database()
+    inFlight
+      .prepare(
+        `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+          logo_url,status,plan) VALUES ('sub','flight.example','Flight','d',
+          'https://flight.example/','c','tools','https://flight.example/l.png','verified','free')`
+      )
+      .run()
+    expectRefused(inFlight, move(inFlight, 'https://flight.example/'))
+    // An active block on a parent domain.
+    const blocked = database()
+    blocked
+      .prepare(
+        `INSERT INTO listing_submission_url_blocks (url_key,covers_subdomains,reason,blocked_by,
+          blocked_at) VALUES ('casino.example',1,'Gambling','admin',?)`
+      )
+      .run(NOW)
+    expectRefused(blocked, move(blocked, 'https://app.casino.example/'))
+    // The intake's URL rule, for the website and the logo.
+    expect(() => move(database(), 'http://127.0.0.1/')).toThrow(/public HTTP\(S\)/u)
+    expect(() =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, logoUrl: 'http://localhost/logo.png' },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['logo'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    ).toThrow(/public HTTP\(S\)/u)
+    // An edit that keeps the website isn't checked against legacy duplicates.
+    const legacy = database()
+    seedLiveListing(legacy, 'lst_twin', { slug: 'twin.example' })
+    legacy
+      .prepare("UPDATE listings SET website='https://lst_live.example/home' WHERE id='lst_twin'")
+      .run()
+    execute(legacy, move(legacy, 'https://lst_live.example/home', ['name']))
+    expect(listing(legacy)).toMatchObject({ name: 'Renamed' })
+  })
+
+  it('matches another listing by host slug, or by stored website with its query or fragment ignored', () => {
+    const db = database()
+    seedLiveListing(db, 'lst_beta', { slug: 'beta-tool' })
+    const listed = (website: string, exceptListingId = listingId) => {
+      const match = listingWebsiteMatch({ exceptListingId, website })
+      return (
+        db.prepare(`SELECT ${match.sql} AS listed`).get(...(match.params as string[])) as {
+          listed: number
+        }
+      ).listed
+    }
+    const matches = (stored: string, website: string) => {
+      db.prepare("UPDATE listings SET website=? WHERE id='lst_beta'").run(stored)
+      return listed(website)
+    }
+    // Both directions: a query or fragment on the stored or the new URL doesn't matter.
+    for (const [stored, website] of [
+      ['https://x.example/', 'https://x.example/?ref=abc'],
+      ['https://x.example/', 'https://x.example/#top'],
+      ['https://x.example/?ref=abc', 'https://x.example/'],
+      ['https://x.example/#top', 'https://x.example/'],
+      ['https://www.x.example?ref=abc', 'http://x.example/#top'],
+      ['https://x.example/tool?ref=abc', 'https://www.x.example/tool/'],
+      ['https://x.example/?ref=abc', 'https://x.example/?ref=other']
+    ] as const) {
+      expect(matches(stored, website), `${stored} ${website}`).toBe(1)
+    }
+    // Another page on the host, or a path that only starts the same, is another website.
+    for (const [stored, website] of [
+      ['https://x.example/tool?ref=abc', 'https://x.example/'],
+      ['https://x.example/tool-pro?ref=abc', 'https://x.example/tool'],
+      ['https://x.example/?ref=abc', 'https://x.example/tool']
+    ] as const) {
+      expect(matches(stored, website), `${stored} ${website}`).toBe(0)
+    }
+    // A listing never matches itself; another listing's slug that is the host does.
+    expect(listed('https://lst_live.example/?ref=abc')).toBe(0)
+    expect(listed('https://lst_live.example/?ref=abc', 'lst_beta')).toBe(1)
+  })
+
+  it('validates and writes the website and logo only when the edit changes them', () => {
+    const logos = (db: DatabaseSync) =>
+      db.prepare("SELECT url FROM listing_media WHERE listing_id=? AND kind='logo'").all(listingId)
+    const rename = (db: DatabaseSync, details: Partial<typeof edit>) =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, ...details },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['name'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    // Imported listings (#64 review): no logo (the fallback tile), or a site-relative one.
+    const noLogo = database()
+    noLogo.prepare("DELETE FROM listing_media WHERE listing_id=? AND kind='logo'").run(listingId)
+    execute(noLogo, rename(noLogo, { logoUrl: '' }))
+    expect(listing(noLogo)).toMatchObject({ name: 'Renamed', website: 'https://lst_live.example/' })
+    expect(logos(noLogo)).toEqual([])
+    const relative = database()
+    relative
+      .prepare("UPDATE listing_media SET url=? WHERE listing_id=? AND kind='logo'")
+      .run('/listing-logos/lst_live.example/logo.png', listingId)
+    execute(relative, rename(relative, { logoUrl: '/listing-logos/lst_live.example/logo.png' }))
+    expect(listing(relative)).toMatchObject({ name: 'Renamed' })
+    expect(logos(relative)).toEqual([{ url: '/listing-logos/lst_live.example/logo.png' }])
+    // An unchanged website is neither checked nor written, even when the edit carries another.
+    const keeps = database()
+    execute(keeps, rename(keeps, { website: 'http://127.0.0.1/' }))
+    expect(listing(keeps)).toMatchObject({ website: 'https://lst_live.example/' })
+
+    // A changed logo is checked; an emptied one removes the logo row.
+    const changeLogo = (db: DatabaseSync, logoUrl: string) =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, logoUrl },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['logo'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    expect(() => changeLogo(database(), '/listing-logos/other.png')).toThrow(/public HTTP\(S\)/u)
+    const cleared = database()
+    execute(cleared, changeLogo(cleared, ' '))
+    expect(logos(cleared)).toEqual([])
+    expect(
+      count(
+        cleared,
+        "SELECT COUNT(*) AS count FROM listing_media WHERE kind='image' AND listing_id=?",
+        listingId
+      )
+    ).toBe(1)
+    // A changed website must be a public URL.
+    expect(() =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, website: '' },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['website'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    ).toThrow(/public HTTP\(S\)/u)
   })
 })

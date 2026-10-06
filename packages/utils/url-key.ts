@@ -44,6 +44,29 @@ export function urlKey(website: string): UrlKey {
     : { blockKey: registrable, coversSubdomains: true, hostKey: host }
 }
 
+/**
+ * The spellings of a website URL that the "already listed" check treats as the same website
+ * (#64 review): http or https, the host with and without a leading `www.` (the host is
+ * `urlKey`'s), and the path with and without a trailing slash, all without the query and
+ * fragment. `listings.website` stores a URL as it was entered, so `listingWebsiteMatch` in
+ * data-ops compares the stored value with the URL as given, with each spelling, and with each
+ * spelling followed by any query or fragment. Shared by submission intake and the admin website
+ * edit, so both match the same listings.
+ */
+export function websiteSpellings(website: string): string[] {
+  const url = new URL(website)
+  const { hostKey } = urlKey(website)
+  const port = url.port ? `:${url.port}` : ''
+  const path = url.pathname.replace(/\/+$/u, '')
+  const spellings: string[] = []
+  for (const scheme of ['https', 'http']) {
+    for (const host of [hostKey, `www.${hostKey}`]) {
+      for (const tail of [path, `${path}/`]) spellings.push(`${scheme}://${host}${port}${tail}`)
+    }
+  }
+  return spellings
+}
+
 /** True when a block on `key` (with its scope) covers `host`: the trigger's match. */
 export function isHostBlocked(
   host: string,

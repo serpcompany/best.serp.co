@@ -257,10 +257,11 @@ test.describe('admin gate', () => {
     })
     expect(signedIn.status()).toBe(200)
 
-    // The admin stub renders nothing: 204 for an admin (#70 approves every screen first).
-    const stub = await request.get('/admin/')
-    expect(stub.status()).toBe(204)
-    expect(await stub.text()).toBe('')
+    // /admin/ opens the review queue (#64).
+    const home = await request.get('/admin/', { maxRedirects: 0 })
+    expect(home.status()).toBe(307)
+    expect(home.headers().location).toMatch(/\/admin\/submissions\/$/u)
+    expect((await request.get('/admin/submissions/')).status()).toBe(200)
     expect((await request.get('/api/admin/listings')).status()).toBe(404)
     expect((await request.get('/admin/not-a-page/')).status()).toBe(404)
 

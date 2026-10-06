@@ -422,7 +422,8 @@ describe('single-site D1-only repository architecture', () => {
     )
     expect(adminRoutes).toEqual(
       expect.arrayContaining([
-        `${project.appDirectory}/app/admin/route.ts`,
+        `${project.appDirectory}/app/admin/layout.tsx`,
+        `${project.appDirectory}/app/admin/page.tsx`,
         `${project.appDirectory}/app/admin/[...path]/page.tsx`,
         `${project.appDirectory}/app/api/admin/[[...path]]/route.ts`
       ])
@@ -435,10 +436,25 @@ describe('single-site D1-only repository architecture', () => {
     }
   })
 
+  it('keeps admin panel SQL in the shared data package (#64)', () => {
+    const adminDirectory = resolve(project.appDirectory, 'lib/admin')
+    for (const file of readdirSync(adminDirectory).filter(name => !name.includes('.test.'))) {
+      const source = readFileSync(resolve(adminDirectory, file), 'utf8')
+      expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
+    }
+    const runtime = readFileSync(resolve(adminDirectory, 'runtime.ts'), 'utf8')
+    expect(runtime).toContain("import 'server-only'")
+    expect(runtime).toContain('createDatabase(workerEnv.DB)')
+    const requests = readFileSync(resolve(adminDirectory, 'requests.ts'), 'utf8')
+    expect(requests).toContain("import 'server-only'")
+  })
+
   // A Server Action is reachable by its action id from any page path, so no path-based gate
   // (the Worker's /admin lock included) ever sees it, and each action must authorize itself.
-  // Until the admin panel (#64) settles how, no module the app bundles may declare one.
-  it('keeps Server Actions out of the app until #64 decides how they authorize', () => {
+  // The admin panel (#64) decided: admin writes are route handlers under /api/admin, which the
+  // Worker gate and `authorizeAdminRequest()` (session, allowlist, trusted Origin) both see. No
+  // module the app bundles may declare a Server Action.
+  it('keeps Server Actions out of the app: admin writes are /api/admin route handlers (#64)', () => {
     const violations = trackedFiles().filter(file => {
       if (
         !(file.startsWith(`${project.appDirectory}/`) || file.startsWith('packages/')) ||

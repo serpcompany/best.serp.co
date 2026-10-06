@@ -9,12 +9,13 @@ import type {
   CatalogObserver,
   ListingNamePage,
   ListingNamePageQuery,
-  PublishedCategory
+  PublishedCategory,
+  UnpublishedListing
 } from '@serpdirectory/data-ops/contracts'
 import type { WebsiteDetailMetadata, WebsiteMetadata } from '@serpdirectory/web-core/content-query'
 import { cache } from 'react'
 
-export type { ListingNamePage, PublishedCategory }
+export type { ListingNamePage, PublishedCategory, UnpublishedListing }
 /** Largest `limit` search and autocomplete honor (`/api/search` clamps to it). */
 export { MAX_SEARCH_LIMIT }
 
@@ -106,6 +107,15 @@ export const getListingBySlug = readListingBySlug
 export async function getCanonicalSlugForRedirect(oldSlug: string): Promise<string | null> {
   return (await getOperations()).getCanonicalSlugForRedirect(oldSlug)
 }
+
+/**
+ * A listing that was published and is now unpublished, so its URL answers 410 Gone (#64);
+ * null for a slug that was never published.
+ */
+export const getUnpublishedListing = cache(
+  async (slug: string): Promise<UnpublishedListing | null> =>
+    (await getOperations()).getUnpublishedListing(slug)
+)
 
 export async function getActiveCategories(): Promise<PublishedCategory[]> {
   return (await readShellStats()).categories

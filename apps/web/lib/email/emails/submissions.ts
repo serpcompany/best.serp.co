@@ -3,20 +3,40 @@
  * changes requested, rejected, rejected with a refund, and rejected as prohibited (#70 screen
  * 15). Submitter text (names, notes, reasons) is escaped by `html`.
  */
-import { clip, defineEmailTemplate } from '../templates'
+import { clip, defineEmailTemplate, type EmailRenderContext } from '../templates'
 import {
+  ACCOUNT_PATH,
   bold,
   box,
+  CONTACT_PATH,
   composeEmail,
+  featuresOf,
   formatUsd,
   hostOf,
+  link,
+  messageUsPath,
   paragraph,
   quote,
   required,
   rows,
   SUBJECT_NAME_MAX,
-  sitePath
+  SUBMIT_PATH,
+  submissionPath
 } from './layout'
+
+/**
+ * Until #65's account dashboard can edit a submission (`features.accountDashboard`), the
+ * rejection email, which would send people there to edit and resubmit, points to `/submit/`
+ * instead (owner decision on #64). A rejected submission releases its URL key, so a new one
+ * can be made.
+ */
+function submitAgain(context: EmailRenderContext) {
+  const url = context.links.url(SUBMIT_PATH)
+  return {
+    cta: { label: 'Submit again', url },
+    sentence: paragraph('Update your details and submit again at ', link(url))
+  }
+}
 
 export interface SubmissionReceivedInput {
   category: string
@@ -82,7 +102,7 @@ export const paymentReceivedInReviewEmail = defineEmailTemplate<PaymentReceivedI
         ],
         cta: {
           label: 'View submission',
-          url: context.links.url(sitePath('account', 'submissions', input.submissionId))
+          url: context.links.url(submissionPath(input.submissionId, context))
         },
         heading: `${name} goes live after review`,
         preheader: `${name} goes live after a reviewer looks at it.`,
@@ -104,20 +124,44 @@ export const changesRequestedEmail = defineEmailTemplate<ChangesRequestedInput>(
   id: 'changes-requested',
   render(input, context) {
     const name = required(input.submissionName, 'a product name')
+    const { accountDashboard, messages } = featuresOf(context)
+    // Until #65, the interim copy sends the submitter to the account area, not `/submit/`: a
+    // changes-requested submission keeps its URL key, so it is resubmitted, not submitted anew
+    // (owner decision on #64, 2026-10-06).
+    const account = context.links.url(ACCOUNT_PATH)
+    const resubmit = accountDashboard
+      ? {
+          cta: {
+            label: 'Edit and resubmit',
+            url: context.links.url(submissionPath(input.submissionId, context))
+          },
+          preheader: 'A reviewer left a note. Edit and resubmit when you’re ready.',
+          sentence: paragraph('Make the changes and resubmit. It goes back into the review queue.')
+        }
+      : {
+          cta: { label: 'Open your account', url: account },
+          preheader:
+            'A reviewer left a note. Update your details and resubmit from your account when you’re ready.',
+          sentence: paragraph(
+            'Update your details and resubmit from your account at ',
+            link(account)
+          )
+        }
     return composeEmail(
       {
-        after: [paragraph('Questions about the note? Reply to the reviewer in your dashboard.')],
+        after: [
+          messages
+            ? paragraph('Questions about the note? Reply to the reviewer in your dashboard.')
+            : paragraph('Questions? Contact us at ', link(context.links.url(CONTACT_PATH)))
+        ],
         body: [
           paragraph(`${name} isn’t live yet. Our reviewer left this note:`),
           quote(required(input.note, 'a reviewer note')),
-          paragraph('Make the changes and resubmit. It goes back into the review queue.')
+          resubmit.sentence
         ],
-        cta: {
-          label: 'Edit and resubmit',
-          url: context.links.url(sitePath('account', 'submissions', input.submissionId))
-        },
+        cta: resubmit.cta,
         heading: 'A reviewer asked for changes',
-        preheader: 'A reviewer left a note. Edit and resubmit when you’re ready.',
+        preheader: resubmit.preheader,
         subject: `Changes requested for ${clip(name, SUBJECT_NAME_MAX)}`
       },
       context
@@ -136,17 +180,23 @@ export const submissionRejectedEmail = defineEmailTemplate<SubmissionRejectedInp
   id: 'submission-rejected',
   render(input, context) {
     const name = required(input.submissionName, 'a product name')
+    const resubmit = featuresOf(context).accountDashboard
+      ? {
+          cta: {
+            label: 'Open submission',
+            url: context.links.url(submissionPath(input.submissionId, context))
+          },
+          sentence: paragraph('You can edit the submission and send it again.')
+        }
+      : submitAgain(context)
     return composeEmail(
       {
         body: [
           paragraph(`A reviewer looked at ${name} and couldn’t approve it this time.`),
           box(bold('Reason:'), ` ${required(input.reason, 'a reason')}`),
-          paragraph('You can edit the submission and send it again.')
+          resubmit.sentence
         ],
-        cta: {
-          label: 'Open submission',
-          url: context.links.url(sitePath('account', 'submissions', input.submissionId))
-        },
+        cta: resubmit.cta,
         heading: `${name} wasn’t approved`,
         preheader: 'Here’s why, and what you can do next.',
         subject: `${clip(name, SUBJECT_NAME_MAX)} wasn’t approved`
@@ -181,7 +231,7 @@ export const submissionRejectedRefundedEmail = defineEmailTemplate<SubmissionRej
           ],
           cta: {
             label: 'Open submission',
-            url: context.links.url(sitePath('account', 'submissions', input.submissionId))
+            url: context.links.url(submissionPath(input.submissionId, context))
           },
           heading: `${name} wasn’t approved`,
           preheader: `Your ${amount} payment has been refunded.`,
@@ -205,20 +255,20 @@ export const submissionRejectedProhibitedEmail =
       const name = required(input.submissionName, 'a product name')
       const domain = hostOf(required(input.website, 'a website'))
       const id = required(input.submissionId, 'a submission id')
+      // "From your dashboard" needs #73's conversations; until then "Message us" is /contact/.
+      const where = featuresOf(context).messages ? ' from your dashboard' : ''
       return composeEmail(
         {
           body: [
             paragraph(`A reviewer looked at ${name} and couldn’t approve it.`),
             box(bold('Reason:'), ` ${required(input.reason, 'a reason')}`),
             paragraph(
-              `Because the content is prohibited, ${domain} can’t be submitted or claimed again. If you think this is a mistake, message us from your dashboard.`
+              `Because the content is prohibited, ${domain} can’t be submitted or claimed again. If you think this is a mistake, message us${where}.`
             )
           ],
           cta: {
             label: 'Message us',
-            url: context.links.url(
-              `/account/messages/new/?about=submission:${encodeURIComponent(id)}`
-            )
+            url: context.links.url(messageUsPath(id, context))
           },
           heading: `${name} wasn’t approved`,
           preheader: `${domain} can’t be submitted again.`,

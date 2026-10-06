@@ -38,6 +38,7 @@
     "@serpdirectory/utils": "workspace:*",
     "@serpdirectory/web-core": "workspace:*",
     "@tailwindcss/typography": "^0.5.19",
+    "@tanstack/react-table": "8.21.3",
     "@vercel/functions": "^3.4.3",
     "better-auth": "1.7.7",
     "clsx": "^2.1.1",

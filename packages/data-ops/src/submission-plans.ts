@@ -14,7 +14,12 @@ import {
   type StatementPlan,
   submissionContentSource
 } from './plan-support'
-import type { RejectionCategory, SubmissionStatus } from './schema'
+import {
+  type ListingLinkRel,
+  listingLinkRels,
+  type RejectionCategory,
+  type SubmissionStatus
+} from './schema'
 
 export { assertPreviousStatementChangedOne } from './plan-support'
 
@@ -131,12 +136,16 @@ export function selectSubmissionForDecisionPlan(submissionId: string): Statement
  */
 function createListingFromSubmissionPlans(input: {
   checksum: string
+  linkRel: ListingLinkRel
   listingId: string
   now: string
   sourceCondition: PlanGuard
   submissionId: string
 }): StatementPlan[] {
   const { listingId, submissionId } = input
+  if (!(listingLinkRels as readonly string[]).includes(input.linkRel)) {
+    throw new Error('Link rel must be follow, nofollow, or sponsored.')
+  }
   return [
     {
       sql: `INSERT INTO listings
@@ -144,9 +153,15 @@ function createListingFromSubmissionPlans(input: {
          source_kind,source_identity,checksum,display_order,source,link_rel)
         SELECT ?,slug,name,description,website,content,0,0,1,'draft',
           'verified-submission',id,?,COALESCE((SELECT MAX(display_order)+1 FROM listings),0),
-          'submission','nofollow'
+          'submission',?
         FROM listing_submissions WHERE id=? AND listing_id IS NULL AND (${input.sourceCondition.sql})`,
-      params: [listingId, input.checksum, submissionId, ...input.sourceCondition.params]
+      params: [
+        listingId,
+        input.checksum,
+        input.linkRel,
+        submissionId,
+        ...input.sourceCondition.params
+      ]
     },
     assertPreviousStatementChangedOne('draft_listing_created'),
     {
@@ -199,13 +214,15 @@ function createListingFromSubmissionPlans(input: {
 
 /**
  * `verified` → `approved`: the staged submission becomes a published listing. Refused unless
- * the staged content is still the version the reviewer saw (`expectedContentVersion`).
+ * the staged content is still the version the reviewer saw (`expectedContentVersion`). The
+ * outbound link is `nofollow` (#59) unless the reviewer chose another `linkRel` (#64).
  */
 export function buildApproveSubmissionPlans(input: {
   afterChecksum: string
   affectedRoute: string
   beforeChecksum: string
   expectedContentVersion: number
+  linkRel?: ListingLinkRel
   listingId: string
   manifestId: string
   now: string
@@ -240,6 +257,7 @@ export function buildApproveSubmissionPlans(input: {
     ),
     ...createListingFromSubmissionPlans({
       checksum: input.afterChecksum,
+      linkRel: input.linkRel ?? 'nofollow',
       listingId: input.listingId,
       now: input.now,
       sourceCondition: current,
@@ -333,6 +351,7 @@ export function buildRecordSubmissionPaymentPlans(
     }),
     ...createListingFromSubmissionPlans({
       checksum: input.publication.afterChecksum,
+      linkRel: 'nofollow',
       listingId: input.listingId,
       now: input.now,
       sourceCondition: payable,
@@ -754,6 +773,8 @@ export function buildRefundSubmissionPlans(
 export function buildReplaceSubmissionContentPlans(input: {
   actor: string
   content: StagedListingContent & { content: string }
+  /** Recorded on the `edited` event, for example the fields a reviewer changed (JSON). */
+  eventDetail?: string
   expectedContentVersion?: number
   expectedStatuses: readonly SubmissionStatus[]
   now: string
@@ -799,7 +820,7 @@ export function buildReplaceSubmissionContentPlans(input: {
     },
     assertPreviousStatementChangedOne('submission_content_replaced'),
     ...replaceStagedChildrenPlans(submissionContentSource(input.submissionId), input.content),
-    event(input.submissionId, 'edited', input.actor)
+    event(input.submissionId, 'edited', input.actor, input.eventDetail ?? null)
   ]
 }
 
@@ -818,6 +839,23 @@ export function buildLiftSubmissionUrlBlockPlans(input: {
     },
     assertPreviousStatementChangedOne('url_block_lifted')
   ]
+}
+
+/**
+ * Paid submissions rejected as `other` whose refund isn't recorded yet, oldest rejection first
+ * (#64 review). The rejection batch is the refund-pending marker: it sets `status='rejected'`
+ * and `rejection_category='other'` on a row with `paid_at` set and `refunded_at` null, and
+ * `buildRefundSubmissionPlans` (`after_rejection`) clears it by recording `refunded_at`. A
+ * replayed rejection and #68's refund sweep retry the rows this returns.
+ */
+export function selectRefundPendingSubmissionsPlan(limit: number): StatementPlan {
+  return {
+    sql: `SELECT id,slug,paid_at,reviewed_at FROM listing_submissions
+      WHERE status='rejected' AND rejection_category='other'
+        AND paid_at IS NOT NULL AND refunded_at IS NULL
+      ORDER BY reviewed_at,id LIMIT ?`,
+    params: [limit]
+  }
 }
 
 export function selectVerifiedSubmissionNotificationPlans(limit: number): StatementPlan[] {

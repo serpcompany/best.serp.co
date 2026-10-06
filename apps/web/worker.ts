@@ -14,6 +14,7 @@
  */
 import {
   catalogEpochToken,
+  isUnpublishedListingSlug,
   readCatalogEpoch,
   shareCatalogEpochToken
 } from '@serpdirectory/data-ops/catalog-epoch'
@@ -28,6 +29,7 @@ import {
   loadSharedEpoch,
   withEdgeCache
 } from './lib/edge-cache/html-cache'
+import { goneListingRenderer } from './lib/routing/gone-listing'
 import { configRedirectPatterns } from './lib/routing/trailing-slash'
 import { handleWorkerRequest } from './lib/worker/handle-request'
 
@@ -100,8 +102,29 @@ function catalogEpoch(
   return context => memo.current(context)
 }
 
+/**
+ * Renders through OpenNext; a listing page's 404 for an unpublished slug becomes the 410 gone
+ * page, and no incoming request carries the internal gone-render header
+ * (`lib/routing/gone-listing.ts`, #64). Without a valid binding the 404 stands.
+ */
+function renderer(
+  env: WorkerEnv,
+  context: ExecutionContext
+): (request: Request) => Promise<Response> {
+  const render = (request: Request): Promise<Response> =>
+    openNextWorker.fetch(request, env, context)
+  const database = env.DB
+  if (!database || !runtimeEnvironments.has(env.D1_RUNTIME_ENV ?? '')) {
+    return goneListingRenderer(render)
+  }
+  return goneListingRenderer(render, slug =>
+    isUnpublishedListingSlug({ client: createDatabase(database), observe: log, slug })
+  )
+}
+
 export default {
   fetch(request: Request, env: WorkerEnv, context: ExecutionContext): Promise<Response> {
+    const render = renderer(env, context)
     return handleWorkerRequest(request, env, {
       configRedirects,
       // Redirects and the non-production robots.txt are answered before this, so they are
@@ -118,7 +141,7 @@ export default {
             epoch: catalogEpoch(env, cache),
             observe: log
           },
-          rendered => openNextWorker.fetch(rendered, env, context)
+          render
         )
       }
     })

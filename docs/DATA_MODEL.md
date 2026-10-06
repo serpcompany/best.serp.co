@@ -83,6 +83,9 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   `listing_submission_url_blocks` holds prohibited-URL blocks.
 - `listing_owners`, `listing_revisions` (with resource, FAQ, and event tables), and
   `badge_checks` hold ownership, owner edits, and badge program history (#62, below).
+- `listing_events` is the listing activity log (#64): admin edits, unpublish (with the note),
+  republish, link changes, and ownership grants, revocations, and transfers, each with its
+  actor, written by the plan that makes the change (`listing-plans.ts`).
 - `email_deliveries` is the transactional email ledger: one row per template and event key
   (status, attempts, provider message id, error code), never a recipient or content
   (see [Email](./EMAIL.md)). Each sign-in code send prunes `sign-in-code` rows older than 24
@@ -117,7 +120,8 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 ## Ownership, plans, revisions, and badge checks (#62)
 
 - `listing_owners`: listing, user, `role` (`owner`; more roles can be added for teams),
-  `verified_via` (`submission` | `badge_claim` | `paid_claim`), `verified_at`, and
+  `verified_via` (`submission` | `badge_claim` | `paid_claim` | `admin`, a transfer in the
+  admin panel; added by `0005_admin_panel`, which rebuilds the table), `verified_at`, and
   `revoked_at`/`revoked_reason`. A partial unique index allows one current owner per listing;
   revoking keeps the row, so the table is the ownership history. User references are
   `ON DELETE RESTRICT`: account deletion must resolve ownership first.
@@ -151,13 +155,19 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 - **URL keys and prohibited URLs** (#59 amendments). `urlKey()`
   (`packages/utils/url-key.ts`) normalizes every website once: the WHATWG URL parser (as in
   workerd) percent-decodes, punycodes, and lowercases the host; trailing dots and a leading
-  `www.` are removed. The host is the slug and the duplicate key. `block_key` is its registrable
-  domain per the Public Suffix List, private section included (`tldts` 7.4.16, 128 KB minified,
-  46 KB gzipped, no Node APIs), so `user.github.io` is its own site. The app computes it at
-  intake and stores it with its scope (`block_covers_subdomains`), because SQLite cannot evaluate
-  the PSL; CHECKs keep it equal to the slug or a parent domain of it. A host with no registrable
-  domain (a public suffix such as `github.io`, or an IP address) is its own block key with an
-  exact-host scope, so a block on it never covers the separate sites under it.
+  `www.` are removed. The host is the slug and the duplicate key: a website is already listed
+  when a listing's slug is its host, or a listing's stored website is one of its spellings
+  (`websiteSpellings()`: http or https, with or without `www.`, with or without a trailing
+  slash, any query or fragment ignored on either side). Intake and the admin website edit share
+  that rule (`listingWebsiteMatch`), and the stored website stays as entered. Comparing stored
+  websites by host needs a stored key (#94), because most imported slugs aren't hosts.
+  `block_key` is the host's
+  registrable domain per the Public Suffix List, private section included (`tldts` 7.4.16,
+  128 KB minified, 46 KB gzipped, no Node APIs), so `user.github.io` is its own site. The app
+  computes it at intake and stores it with its scope (`block_covers_subdomains`), because SQLite
+  cannot evaluate the PSL; CHECKs keep it equal to the slug or a parent domain of it. A host with
+  no registrable domain (a public suffix such as `github.io`, or an IP address) is its own block
+  key with an exact-host scope, so a block on it never covers the separate sites under it.
   A `prohibited` rejection inserts an active block for the block key with that scope; the trigger
   `listing_submissions_refuse_blocked_url` then refuses any new submission, free or paid, whose
   slug is the blocked key, or a subdomain of it when the block covers subdomains, until an admin
@@ -173,6 +183,12 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   `orders` first, applies it with `buildRecordSubmissionPaymentPlans` (or
   `buildRecordUnappliedPaymentPlans` for a withdrawn row) when the submission accepts it, and
   otherwise refunds it from `orders` alone.
+- **Refund pending.** A paid submission rejected as `other` owes its refund from the rejection
+  batch on: `status = 'rejected'`, `rejection_category = 'other'`, `paid_at` set, `refunded_at`
+  null (`selectRefundPendingSubmissionsPlan`). The batch writes that marker atomically, so no
+  extra column is needed; `buildRefundSubmissionPlans` (`after_rejection`) clears it. #68's
+  refund hook is idempotent and is retried by a replayed rejection and by its sweep
+  ([Admin panel](./ADMIN_PANEL.md#refunds)).
 - `listing_revisions` stage an owner's edit of a live listing (name, description, content,
   primary category, logo, video, resource links, FAQs; never website or slug) against the
   listing's `checksum` at the time (`base_checksum`). A listing has at most one open revision,
@@ -190,7 +206,7 @@ submission tables (`scripts/d1-table-inventory.ts`).
 
 Every transition is a credential-free statement plan in `packages/data-ops`
 (`submission-plans.ts`, `draft-plans.ts`, `listing-plans.ts`, `revision-plans.ts`,
-`plan-support.ts`) sent as
+`admin-plans.ts`, `plan-support.ts`; the admin panel's reads are `admin-queries.ts`) sent as
 one D1 batch. Each mutation repeats its expected state in the `WHERE` and is followed by a
 `changes() = 1` assertion, so a stale or concurrent decision fails the whole batch. A plan that
 changes public output (publishing, unpublishing, content, `link_rel`, ownership) also records
