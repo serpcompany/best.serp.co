@@ -69,7 +69,8 @@ it on (owner decision on #64):
 Submitter-facing pages follow the same rule: copy that needs a later area comes from
 `apps/web/lib/feature-copy.ts` behind its flag (the badge step's "Add FAQs and links" and
 "Keep the badge up" cards, the form's FAQs hint, the free plan's weekly check), and
-`feature-copy.test.ts` fails when another page or component says it while the flag is off.
+`feature-copy.test.ts` fails when another page, component, `lib/submissions` message, or
+`packages/site-config` copy says it while the flag is off.
 
 `links.test.ts` also fails when an email the app sends (any template whose id app code names) asks
 for a dashboard action whose flag is off, apart from the owner-approved interim copy it lists

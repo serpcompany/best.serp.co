@@ -8,11 +8,21 @@ import { features, type SiteFeatures } from './features'
  * Pages promise only what the site can do (PR #84 review round 4), as the email audit
  * (`email/emails/links.test.ts`) does for emails: submitter-facing copy that needs a later site
  * area lives in `feature-copy.ts` behind that area's flag, and no page or component says it
- * anywhere else while the flag is off. The admin panel is left out: its copy describes listing
- * states to the team, not what a submitter can do.
+ * anywhere else while the flag is off. Scanned: `app/`, `components/`, `lib/submissions/` (its
+ * messages reach the submitter), and `packages/site-config` (site copy, including the About
+ * page). The admin panel is left out: its copy describes listing states to the team, not what
+ * a submitter can do.
  */
 
 const WEB_DIRECTORY = resolve(__dirname, '..')
+const SITE_CONFIG_DIRECTORY = resolve(WEB_DIRECTORY, '../../packages/site-config')
+const SCANNED = [
+  join(WEB_DIRECTORY, 'app'),
+  join(WEB_DIRECTORY, 'components'),
+  join(WEB_DIRECTORY, 'lib', 'submissions'),
+  join(SITE_CONFIG_DIRECTORY, 'src'),
+  join(SITE_CONFIG_DIRECTORY, 'content')
+]
 
 const PAGE_PROMISES: ReadonlyArray<{
   feature: keyof SiteFeatures
@@ -54,7 +64,7 @@ const ALL_ON: SiteFeatures = {
   orders: true
 }
 
-/** Pages and components outside the admin panel, without tests or code comments. */
+/** The scanned sources outside the admin panel, without tests or code comments. */
 function pageSources(): Array<{ code: string; path: string }> {
   const sources: Array<{ code: string; path: string }> = []
   const visit = (directory: string) => {
@@ -64,7 +74,7 @@ function pageSources(): Array<{ code: string; path: string }> {
         if (name !== 'admin' && name !== 'node_modules') visit(path)
         continue
       }
-      if (!/\.tsx?$/u.test(name) || /\.test\.tsx?$/u.test(name)) continue
+      if (!/\.(?:tsx?|mdx?)$/u.test(name) || /\.test\.tsx?$/u.test(name)) continue
       const file = relative(WEB_DIRECTORY, path)
       const code = (APPROVED_INTERIM_COPY[file] ?? []).reduce(
         (text, approved) => text.replace(approved, ''),
@@ -75,7 +85,7 @@ function pageSources(): Array<{ code: string; path: string }> {
       sources.push({ code, path: file })
     }
   }
-  for (const directory of ['app', 'components']) visit(join(WEB_DIRECTORY, directory))
+  for (const directory of SCANNED) visit(directory)
   return sources
 }
 
@@ -91,6 +101,9 @@ describe('page copy', () => {
     const paths = pageSources().map(source => source.path)
     expect(paths).toContain('components/submit/badge-step.tsx')
     expect(paths).toContain('components/submit/submit-form.tsx')
+    expect(paths).toContain('lib/submissions/contract.ts')
+    expect(paths).toContain('../../packages/site-config/src/site.ts')
+    expect(paths).toContain('../../packages/site-config/content/about/about.mdx')
     expect(paths.some(path => path.includes('admin'))).toBe(false)
   })
 
