@@ -155,13 +155,17 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 - **URL keys and prohibited URLs** (#59 amendments). `urlKey()`
   (`packages/utils/url-key.ts`) normalizes every website once: the WHATWG URL parser (as in
   workerd) percent-decodes, punycodes, and lowercases the host; trailing dots and a leading
-  `www.` are removed. The host is the slug and the duplicate key. `block_key` is its registrable
-  domain per the Public Suffix List, private section included (`tldts` 7.4.16, 128 KB minified,
-  46 KB gzipped, no Node APIs), so `user.github.io` is its own site. The app computes it at
-  intake and stores it with its scope (`block_covers_subdomains`), because SQLite cannot evaluate
-  the PSL; CHECKs keep it equal to the slug or a parent domain of it. A host with no registrable
-  domain (a public suffix such as `github.io`, or an IP address) is its own block key with an
-  exact-host scope, so a block on it never covers the separate sites under it.
+  `www.` are removed. The host is the slug and the duplicate key: a website is already listed
+  when a listing's slug is its host, or a listing's stored website is one of its spellings
+  (`websiteSpellings()`: http or https, with or without `www.`, with or without a trailing
+  slash). Intake and the admin website edit share that rule; comparing stored websites by host
+  needs a stored key (#94), because most imported slugs aren't hosts. `block_key` is the host's
+  registrable domain per the Public Suffix List, private section included (`tldts` 7.4.16,
+  128 KB minified, 46 KB gzipped, no Node APIs), so `user.github.io` is its own site. The app
+  computes it at intake and stores it with its scope (`block_covers_subdomains`), because SQLite
+  cannot evaluate the PSL; CHECKs keep it equal to the slug or a parent domain of it. A host with
+  no registrable domain (a public suffix such as `github.io`, or an IP address) is its own block
+  key with an exact-host scope, so a block on it never covers the separate sites under it.
   A `prohibited` rejection inserts an active block for the block key with that scope; the trigger
   `listing_submissions_refuse_blocked_url` then refuses any new submission, free or paid, whose
   slug is the blocked key, or a subdomain of it when the block covers subdomains, until an admin

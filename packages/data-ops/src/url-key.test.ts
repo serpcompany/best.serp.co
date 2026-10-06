@@ -1,4 +1,4 @@
-import { isHostBlocked, urlKey } from '@serpdirectory/utils/url-key'
+import { isHostBlocked, urlKey, websiteSpellings } from '@serpdirectory/utils/url-key'
 import { describe, expect, it } from 'vitest'
 
 describe('urlKey (shared website normalization, #62 review finding 4)', () => {
@@ -83,5 +83,36 @@ describe('urlKey (shared website normalization, #62 review finding 4)', () => {
     const suffix = { coversSubdomains: false, key: 'github.io' }
     expect(isHostBlocked('github.io', suffix)).toBe(true)
     expect(isHostBlocked('unrelated-user.github.io', suffix)).toBe(false)
+  })
+
+  it('spells one website the ways the already-listed check matches (#64 review)', () => {
+    const root = websiteSpellings('https://new.example/')
+    expect(root).toEqual(
+      expect.arrayContaining([
+        'https://new.example',
+        'https://new.example/',
+        'https://www.new.example',
+        'https://www.new.example/',
+        'http://new.example',
+        'http://www.new.example/'
+      ])
+    )
+    expect(root).toHaveLength(8)
+    // Every spelling of the same website gives the same set.
+    for (const website of [
+      'https://new.example',
+      'http://WWW.New.Example/',
+      'https://new.example./'
+    ]) {
+      expect(new Set(websiteSpellings(website)), website).toEqual(new Set([...root, website]))
+    }
+    // A path keeps its own spellings, with its query; another path is another website.
+    const path = websiteSpellings('https://www.serp.ly/tool/?ref=1')
+    expect(path).toEqual(
+      expect.arrayContaining(['https://serp.ly/tool?ref=1', 'http://www.serp.ly/tool/?ref=1'])
+    )
+    expect(path).not.toContain('https://serp.ly/?ref=1')
+    expect(websiteSpellings('https://serp.ly/other')).not.toContain('https://serp.ly/tool')
+    expect(websiteSpellings('https://example.com:8443/')).toContain('https://www.example.com:8443')
   })
 })

@@ -1,4 +1,4 @@
-import { urlKey } from '@serpdirectory/utils/url-key'
+import { urlKey, websiteSpellings } from '@serpdirectory/utils/url-key'
 import {
   assertPreviousStatementChangedOne,
   beginCatalogPublicationPlans,
@@ -53,12 +53,12 @@ function listingEvent(
   }
 }
 
-/** True while the listing's originating submission stands rejected (either category). */
 /**
  * What stops a listing from moving to another website (#64 review), with the submission
- * intake's rules (`createSubmission`): the website must pass `validatePublicHttpUrl`, and its
- * host (`urlKey`) must not be another listing's slug or website, the slug of a submission in
- * flight (other than this listing's own), or covered by an active prohibited-URL block (the
+ * intake's rules (`createSubmission`): the website must pass `validatePublicHttpUrl`; no other
+ * listing may have its host (`urlKey`) as its slug or one of its spellings (`websiteSpellings`)
+ * as its website; its host must not be the slug of a submission in flight (other than this
+ * listing's own); and no active prohibited-URL block may cover it (the
  * `listing_submissions_refuse_blocked_url` trigger's rule). Throws for an invalid website.
  */
 export function listingWebsiteConflicts(input: { listingId: string; website: string }): {
@@ -69,6 +69,7 @@ export function listingWebsiteConflicts(input: { listingId: string; website: str
   const website = input.website.trim()
   if (!validatePublicHttpUrl(website).ok) throw new Error('A website must be a public HTTP(S) URL.')
   const host = urlKey(website).hostKey
+  const spellings = websiteSpellings(website)
   const statuses = activeSubmissionStatuses.map(() => '?').join(',')
   return {
     block: {
@@ -77,8 +78,9 @@ export function listingWebsiteConflicts(input: { listingId: string; website: str
       params: [host, host]
     },
     listing: {
-      sql: `EXISTS (SELECT 1 FROM listings WHERE id<>? AND (slug=? OR website=?))`,
-      params: [input.listingId, host, website]
+      sql: `EXISTS (SELECT 1 FROM listings WHERE id<>? AND (slug=?
+        OR website IN (${spellings.map(() => '?').join(',')})))`,
+      params: [input.listingId, host, ...spellings]
     },
     submission: {
       sql: `EXISTS (SELECT 1 FROM listing_submissions WHERE slug=? AND status IN (${statuses})
@@ -88,6 +90,7 @@ export function listingWebsiteConflicts(input: { listingId: string; website: str
   }
 }
 
+/** True while the listing's originating submission stands rejected (either category). */
 function listingSubmissionRejected(listingIdSql: string): string {
   return `EXISTS (SELECT 1 FROM listing_submissions rejected
     WHERE rejected.listing_id=${listingIdSql} AND rejected.status='rejected')`

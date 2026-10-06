@@ -1,7 +1,7 @@
 import { isValidAssetReference } from '@serpdirectory/utils/asset-reference'
 import { hasFileExtension } from '@serpdirectory/utils/file-extensions'
-import { type UrlKey, urlKey } from '@serpdirectory/utils/url-key'
-import { and, eq, or, sql } from 'drizzle-orm'
+import { type UrlKey, urlKey, websiteSpellings } from '@serpdirectory/utils/url-key'
+import { and, eq, inArray, or, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
 import { assertStagedChildLimits } from './plan-support'
@@ -334,7 +334,13 @@ export function createSubmissionOperations(config: {
           client.database
             .select({ id: listings.id })
             .from(listings)
-            .where(or(eq(listings.slug, slug), eq(listings.website, input.website)))
+            // The admin website edit matches listings the same way (`listingWebsiteConflicts`).
+            .where(
+              or(
+                eq(listings.slug, slug),
+                inArray(listings.website, websiteSpellings(input.website))
+              )
+            )
             .limit(1)
         ),
         // A prohibited rejection blocks the registrable domain and its subdomains until an admin

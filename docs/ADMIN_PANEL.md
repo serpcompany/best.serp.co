@@ -77,10 +77,16 @@ below), and otherwise sends the reviewed statement plans as one D1 batch:
   `validatePublicHttpUrl` (public HTTP(S) only). One the edit leaves alone is neither checked
   nor rewritten, so an imported listing keeps its legacy website, site-relative logo
   (`/listing-logos/…`), or missing logo through any other edit. Clearing a listing's logo
-  removes it, and its page shows the fallback tile. A new website must not collide, by its host (`urlKey`), with another
-  listing, a submission in flight, or an active prohibited-URL block
-  (`listingWebsiteConflicts`). The decision answers 409 with which one, and the edit's batch
-  refuses the same collisions. The slug never changes.
+  removes it, and its page shows the fallback tile.
+- **A new website must not collide** (`listingWebsiteConflicts`, the intake's rule). It is
+  refused when another listing's slug is its host (`urlKey`), when another listing's stored
+  website is one of its spellings (`websiteSpellings`: http or https, with or without `www.`,
+  with or without a trailing slash), when its host is a submission in flight, or when an active
+  prohibited-URL block covers its host. The decision answers 409 with which one, and the edit's
+  batch refuses the same collisions. The slug never changes. Other listings' websites are
+  compared as URLs, not hosts: most imported slugs aren't their host, so a listing at
+  `https://new.example/pricing` doesn't stop a move to `https://new.example/`. A stored website
+  key is #94.
 - **"Allow resubmission" acts on the record in the path.** It lifts the block on that
   submission's block key, or on the key of the listing's latest submission. An unknown id is
   404. A body `urlKey`, the key the admin confirmed, is only compared with it (409 when they

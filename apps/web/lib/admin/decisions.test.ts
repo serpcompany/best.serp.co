@@ -604,6 +604,55 @@ describe('listing decisions', () => {
     })
   })
 
+  it('refuses a website another listing stores in another spelling, as intake does', async () => {
+    const { context, db, row } = fixture()
+    // Imported listings mostly have a slug that isn't their host (#64 review probes).
+    for (const [id, slug, website] of [
+      ['lst_beta', 'beta-tool', 'https://www.new.example/'],
+      ['lst_gamma', 'gamma-tool', 'https://gamma.example/']
+    ] as const) {
+      insertPublishedListing(db, {
+        categoryIds: [1],
+        content: 'Content',
+        description: `${slug} description`,
+        displayOrder: 1,
+        id,
+        isFeatured: false,
+        name: slug,
+        publishedAt: '2026-05-16',
+        slug,
+        website
+      })
+    }
+    const moveTo = (id: string, website: string) =>
+      updateListingDetails(context(), {
+        details: {
+          categorySlug: 'tools',
+          description: id === 'lst_brief' ? 'Brieflow description' : 'gamma-tool description',
+          logoUrl: id === 'lst_brief' ? 'https://assets.example/brief.png' : '',
+          name: id === 'lst_brief' ? 'Brieflow' : 'gamma-tool',
+          website
+        },
+        expectedChecksum: String(row('SELECT checksum FROM listings WHERE id=?', id)?.checksum),
+        listingId: id
+      })
+    for (const website of ['https://new.example/', 'https://new.example', 'http://new.example']) {
+      expect(await moveTo('lst_brief', website), website).toMatchObject({
+        error: 'website_listed',
+        status: 409
+      })
+    }
+    // Two moves to one website, spelled with and without the trailing slash: the second collides.
+    expect(await moveTo('lst_brief', 'https://brieflow.com/')).toMatchObject({ ok: true })
+    expect(await moveTo('lst_gamma', 'https://brieflow.com')).toMatchObject({
+      error: 'website_listed',
+      status: 409
+    })
+    expect(row("SELECT website FROM listings WHERE id='lst_gamma'")).toEqual({
+      website: 'https://gamma.example/'
+    })
+  })
+
   it('edits an imported listing with no logo or a site-relative logo; new URLs are checked', async () => {
     const { context, db, row } = fixture()
     // 257 imported listings have no logo (the fallback tile) and 80 a site-relative one.

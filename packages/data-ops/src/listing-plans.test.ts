@@ -605,6 +605,13 @@ describe('listing activity log and admin edits (#64)', () => {
     const listed = database()
     seedLiveListing(listed, 'lst_other', { slug: 'other.example' })
     expectRefused(listed, move(listed, 'https://www.other.example/pricing'))
+    // Another listing's stored website in another spelling (scheme, www., trailing slash).
+    const spelled = database()
+    seedLiveListing(spelled, 'lst_beta', { slug: 'beta-tool' })
+    spelled
+      .prepare("UPDATE listings SET website='https://www.new.example' WHERE id='lst_beta'")
+      .run()
+    expectRefused(spelled, move(spelled, 'http://new.example/'))
     // A submission in flight for the host.
     const inFlight = database()
     inFlight
