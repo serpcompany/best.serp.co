@@ -197,10 +197,18 @@ A source that changed between the plan and the staging upload fails that object
 
 A publication that reports "listings changed since this manifest was generated" wrote nothing.
 Some listing's logo or images changed on that environment after generation (an admin edit, an
-approval, or the cron hosting a queued slot). Regenerate the plan and manifests from the
-current catalog (the migration script reads `expected` from it), review the diff, upload the
-new plan, and publish the new manifests. Manifests that published stay published: each is
-idempotent by its content, and the regenerated ones simply leave those listings out.
+approval, or the cron hosting a queued slot). A row-level manifest fits only the rows it was
+generated from, so recovery keeps staging first:
+
+1. Regenerate the plan and manifests from **staging's** current rows (the migration script reads
+   `expected` from them), with **new manifest ids**: an id that already succeeded is refused as
+   "already used by different content". Review the diff.
+2. Upload the new plan to staging and publish the new manifests on staging, then, after the
+   promotion, upload and publish them on production.
+
+Manifests that published stay published, and regenerated ones leave their listings out. A
+listing that changed only on production stays refused there; it keeps its production media
+until its rows match staging's again, and is never repointed without the staging check.
 
 Agents prepare and review these files; they never run the uploads or publications
 ([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)).

@@ -78,9 +78,9 @@ Each holds two environment secrets:
   too). A leak from either environment therefore reaches staging and production alike.
 
 The planned fix is #42 decision b, scheduled right after cutover. It gives each environment
-its own token, scoped to that environment's Worker, D1 database, and R2 bucket, plus a D1-only
-token for `production-notifier`. Each new token is proven in its workflow before the
-account-wide token is revoked. Until then, separate secrets do not limit the blast radius.
+its own token, scoped to its Worker, D1 database, and R2 bucket (production's also reads
+`cdn-staging`, the upload's copy source), plus a D1-only token for `production-notifier`,
+each proven in its workflow before the account-wide token goes. Until then, a leak reaches both.
 
 Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "Staging deploy
 skipped" notice. After they exist, the next push to `staging` deploys staging. The
