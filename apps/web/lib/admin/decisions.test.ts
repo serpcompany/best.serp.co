@@ -604,6 +604,82 @@ describe('listing decisions', () => {
     })
   })
 
+  it('edits an imported listing with no logo or a site-relative logo; new URLs are checked', async () => {
+    const { context, db, row } = fixture()
+    // 257 imported listings have no logo (the fallback tile) and 80 a site-relative one.
+    for (const [id, slug, logo] of [
+      ['lst_bare', 'bare.example', null],
+      ['lst_local', 'local.example', '/listing-logos/local.example/logo.png']
+    ] as const) {
+      insertPublishedListing(db, {
+        categoryIds: [1],
+        content: 'Content',
+        description: `${slug} description`,
+        displayOrder: 1,
+        id,
+        isFeatured: false,
+        name: slug,
+        publishedAt: '2026-05-16',
+        slug,
+        website: `https://${slug}/`
+      })
+      if (logo) {
+        db.prepare(
+          "INSERT INTO listing_media (listing_id, kind, url, sort_order) VALUES (?, 'logo', ?, 0)"
+        ).run(id, logo)
+      }
+    }
+    const logos = (id: string) =>
+      db.prepare("SELECT url FROM listing_media WHERE listing_id=? AND kind='logo'").all(id)
+    const edit = (id: string, slug: string, changes: { logoUrl?: string; name?: string }) =>
+      updateListingDetails(context(), {
+        // What the details form sends: the stored values, with the logo as '' when there is none.
+        details: {
+          categorySlug: 'tools',
+          description: `${slug} description`,
+          logoUrl: id === 'lst_local' ? '/listing-logos/local.example/logo.png' : '',
+          name: slug,
+          website: `https://${slug}/`,
+          ...changes
+        },
+        expectedChecksum: String(row('SELECT checksum FROM listings WHERE id=?', id)?.checksum),
+        listingId: id
+      })
+    // A name-only edit succeeds and leaves the logo as it was.
+    expect(await edit('lst_bare', 'bare.example', { name: 'Bare' })).toEqual({
+      fields: ['name'],
+      ok: true,
+      replayed: false
+    })
+    expect(logos('lst_bare')).toEqual([])
+    expect(await edit('lst_local', 'local.example', { name: 'Local' })).toEqual({
+      fields: ['name'],
+      ok: true,
+      replayed: false
+    })
+    expect(logos('lst_local')).toEqual([{ url: '/listing-logos/local.example/logo.png' }])
+    // A changed logo must be a public URL, as at intake; an emptied one removes the logo.
+    for (const logoUrl of ['/listing-logos/other.png', 'http://10.0.0.1/logo.png']) {
+      expect(await edit('lst_local', 'local.example', { logoUrl, name: 'Local' })).toMatchObject({
+        error: 'invalid_logo',
+        status: 422
+      })
+    }
+    expect(
+      await edit('lst_bare', 'bare.example', {
+        logoUrl: 'https://assets.example/bare.png',
+        name: 'Bare'
+      })
+    ).toEqual({ fields: ['logo'], ok: true, replayed: false })
+    expect(logos('lst_bare')).toEqual([{ url: 'https://assets.example/bare.png' }])
+    expect(await edit('lst_local', 'local.example', { logoUrl: '', name: 'Local' })).toEqual({
+      fields: ['logo'],
+      ok: true,
+      replayed: false
+    })
+    expect(logos('lst_local')).toEqual([])
+  })
+
   it('transfers to an account that exists, then removes the owner', async () => {
     const { context, row } = fixture()
     expect(

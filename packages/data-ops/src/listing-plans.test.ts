@@ -8,6 +8,7 @@ import {
   buildTransferListingOwnerPlans,
   buildUnpublishListingPlans,
   buildUpdateListingDetailsPlans,
+  type ListingDetailsField,
   selectListingForPublicationPlan
 } from './listing-plans'
 import { prepareCatalogPublication } from './plan-support'
@@ -592,7 +593,7 @@ describe('listing activity log and admin edits (#64)', () => {
   })
 
   it('refuses a website that collides, inside the batch, with the submission intake rules', () => {
-    const move = (db: DatabaseSync, website: string, fields = ['website']) =>
+    const move = (db: DatabaseSync, website: string, fields: ListingDetailsField[] = ['website']) =>
       buildUpdateListingDetailsPlans({
         details: { ...edit, website },
         expectedChecksum: 'checksum-lst_live',
@@ -642,5 +643,66 @@ describe('listing activity log and admin edits (#64)', () => {
       .run()
     execute(legacy, move(legacy, 'https://lst_live.example/home', ['name']))
     expect(listing(legacy)).toMatchObject({ name: 'Renamed' })
+  })
+
+  it('validates and writes the website and logo only when the edit changes them', () => {
+    const logos = (db: DatabaseSync) =>
+      db.prepare("SELECT url FROM listing_media WHERE listing_id=? AND kind='logo'").all(listingId)
+    const rename = (db: DatabaseSync, details: Partial<typeof edit>) =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, ...details },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['name'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    // Imported listings (#64 review): no logo (the fallback tile), or a site-relative one.
+    const noLogo = database()
+    noLogo.prepare("DELETE FROM listing_media WHERE listing_id=? AND kind='logo'").run(listingId)
+    execute(noLogo, rename(noLogo, { logoUrl: '' }))
+    expect(listing(noLogo)).toMatchObject({ name: 'Renamed', website: 'https://lst_live.example/' })
+    expect(logos(noLogo)).toEqual([])
+    const relative = database()
+    relative
+      .prepare("UPDATE listing_media SET url=? WHERE listing_id=? AND kind='logo'")
+      .run('/listing-logos/lst_live.example/logo.png', listingId)
+    execute(relative, rename(relative, { logoUrl: '/listing-logos/lst_live.example/logo.png' }))
+    expect(listing(relative)).toMatchObject({ name: 'Renamed' })
+    expect(logos(relative)).toEqual([{ url: '/listing-logos/lst_live.example/logo.png' }])
+    // An unchanged website is neither checked nor written, even when the edit carries another.
+    const keeps = database()
+    execute(keeps, rename(keeps, { website: 'http://127.0.0.1/' }))
+    expect(listing(keeps)).toMatchObject({ website: 'https://lst_live.example/' })
+
+    // A changed logo is checked; an emptied one removes the logo row.
+    const changeLogo = (db: DatabaseSync, logoUrl: string) =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, logoUrl },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['logo'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    expect(() => changeLogo(database(), '/listing-logos/other.png')).toThrow(/public HTTP\(S\)/u)
+    const cleared = database()
+    execute(cleared, changeLogo(cleared, ' '))
+    expect(logos(cleared)).toEqual([])
+    expect(
+      count(
+        cleared,
+        "SELECT COUNT(*) AS count FROM listing_media WHERE kind='image' AND listing_id=?",
+        listingId
+      )
+    ).toBe(1)
+    // A changed website must be a public URL.
+    expect(() =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, website: '' },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['website'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    ).toThrow(/public HTTP\(S\)/u)
   })
 })

@@ -73,8 +73,11 @@ below), and otherwise sends the reviewed statement plans as one D1 batch:
   unpublished (edit or reject the submission instead); a rejected listing stays down and
   read-only; a transfer needs a verified account; the last admin cannot be removed (the plan
   refuses it inside the batch, so two admins cannot remove each other at once).
-- **URLs follow the submission intake.** Website and logo URLs pass `validatePublicHttpUrl`
-  (public HTTP(S) only). A new website must not collide, by its host (`urlKey`), with another
+- **URLs follow the submission intake.** A website or logo URL that an edit changes must pass
+  `validatePublicHttpUrl` (public HTTP(S) only). One the edit leaves alone is neither checked
+  nor rewritten, so an imported listing keeps its legacy website, site-relative logo
+  (`/listing-logos/…`), or missing logo through any other edit. Clearing a listing's logo
+  removes it, and its page shows the fallback tile. A new website must not collide, by its host (`urlKey`), with another
   listing, a submission in flight, or an active prohibited-URL block
   (`listingWebsiteConflicts`). The decision answers 409 with which one, and the edit's batch
   refuses the same collisions. The slug never changes.

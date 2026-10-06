@@ -10,6 +10,7 @@ import {
   q,
   removeAdmin,
   seedAdminCatalog,
+  seedImportedListing,
   seedVerifiedSubmission,
   signIn,
   signInAsNewAdmin,
@@ -325,6 +326,44 @@ test.describe('listings', () => {
       }).toPass({ intervals: [1_000, 2_000, 5_000], timeout: 90_000 })
     } finally {
       await visitor.dispose()
+    }
+  })
+
+  test('edits imported listings with no logo or a site-relative logo; a new logo is checked', async ({
+    baseURL,
+    page
+  }) => {
+    const admin = client(page.request, baseURL)
+    admins.push(await signInAsNewAdmin(admin))
+    const logos = (id: string) =>
+      localD1<{ url: string }>(
+        `SELECT url FROM listing_media WHERE listing_id = ${q(id)} AND kind = 'logo'`
+      )
+    const relativeLogo = '/listing-logos/serpdownloaders.com/logo.png'
+    for (const [label, logo] of [
+      ['no-logo', null],
+      ['relative-logo', relativeLogo]
+    ] as const) {
+      const listing = seedImportedListing(label, activeCategory(), logo)
+      await page.goto(`/admin/listings/${listing.slug}/`)
+      await expect(page.getByRole('heading', { name: listing.name, level: 1 })).toBeVisible()
+      await page.getByLabel('Name', { exact: true }).fill(`${listing.name} renamed`)
+      await page.getByRole('button', { name: 'Save changes' }).click()
+      await expect(page.getByText('Saved.')).toBeVisible()
+      expect(localD1(`SELECT name FROM listings WHERE id = ${q(listing.id)}`)).toEqual([
+        { name: `${listing.name} renamed` }
+      ])
+      expect(logos(listing.id)).toEqual(logo ? [{ url: logo }] : [])
+      if (logo) {
+        // A changed logo still follows the intake's rule: a public http(s) URL.
+        await page.reload()
+        await page.getByLabel('Logo', { exact: true }).fill('/listing-logos/other.png')
+        await page.getByRole('button', { name: 'Save changes' }).click()
+        await expect(
+          page.getByText('The logo needs a public http or https image URL.').first()
+        ).toBeVisible()
+        expect(logos(listing.id)).toEqual([{ url: logo }])
+      }
     }
   })
 

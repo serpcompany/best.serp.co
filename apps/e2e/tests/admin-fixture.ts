@@ -137,6 +137,37 @@ export function seedVerifiedSubmission(label: string, category: string): Fixture
   return submission
 }
 
+/**
+ * A live listing as the one-time import left it (`legacy-json-migration-v1`): no submission, and
+ * either no logo (the fallback tile) or a site-relative one (`/listing-logos/…`).
+ */
+export function seedImportedListing(
+  label: string,
+  category: string,
+  logoUrl: string | null
+): FixtureSubmission {
+  const key = `${label}-${unique()}`
+  const listing = { id: `e2e-import-${key}`, name: `E2E ${label} ${key.slice(-5)}`, slug: key }
+  localD1(`
+    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
+      source_kind, source_identity, checksum)
+    VALUES (${q(listing.id)}, ${q(listing.slug)}, ${q(listing.name)},
+      'An imported listing for the admin panel suite.', ${q(`https://www.${key}.example`)},
+      'It came from the one-time JSON import.', 'draft', '2026-05-16',
+      'legacy-json-migration-v1', ${q(listing.slug)}, ${q(`e2e-${key}`)});
+    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+      SELECT ${q(listing.id)}, id, 0, 1 FROM categories WHERE slug = ${q(category)};
+    ${
+      logoUrl
+        ? `INSERT INTO listing_media (listing_id, kind, url, sort_order)
+            VALUES (${q(listing.id)}, 'logo', ${q(logoUrl)}, 0);`
+        : ''
+    }
+    UPDATE listings SET status = 'approved' WHERE id = ${q(listing.id)};
+  `)
+  return listing
+}
+
 /** The category `seedAdminCatalog` adds. */
 export function activeCategory(): string {
   return 'e2e-tools'

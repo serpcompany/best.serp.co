@@ -39,6 +39,7 @@ import {
   buildUnpublishListingPlans,
   buildUpdateListingDetailsPlans,
   type ListingDetailsEdit,
+  type ListingDetailsField,
   selectListingForPublicationPlan
 } from '@serpdirectory/data-ops/listing-plans'
 import { executePlans, isPlanConflict, queryPlan } from '@serpdirectory/data-ops/plan-runner'
@@ -419,7 +420,7 @@ async function approveSubmissionOnce(
       resourceLinks: review.resourceLinks,
       videoUrl: review.videoUrl
     }
-    const invalid = validateListingFields(content, categories)
+    const invalid = validateListingFields(content, categories, { logoUrl: review.logoUrl })
     if (invalid) return invalid
     plans.push(
       ...buildReplaceSubmissionContentPlans({
@@ -855,7 +856,13 @@ function isPublicUrl(value: string): boolean {
   return validatePublicHttpUrl(value).ok
 }
 
-/** Field rules shared by the reviewer's inline edit and the listing details form. */
+/**
+ * Field rules shared by the reviewer's inline edit and the listing details form. The website and
+ * logo follow the submission intake's URL rule, but only when the edit changes them (`current`
+ * holds the stored values): an imported listing keeps the website, site-relative logo, or missing
+ * logo it was imported with through any other edit (#64 review). A submission always has a logo;
+ * the listing form may clear one (`logo: 'optional'`), and the page then shows the fallback tile.
+ */
 export function validateListingFields(
   fields: {
     categorySlug: string
@@ -864,7 +871,9 @@ export function validateListingFields(
     name: string
     website?: string
   },
-  categories: ReadonlyArray<{ slug: string }>
+  categories: ReadonlyArray<{ slug: string }>,
+  current: { logoUrl: string | null; website?: string },
+  logo: 'optional' | 'required' = 'required'
 ): DecisionFailure | null {
   const name = fields.name.trim()
   if (!name || name.length > NAME_MAX) {
@@ -881,10 +890,19 @@ export function validateListingFields(
   if (!categories.some(category => category.slug === fields.categorySlug)) {
     return failure(422, 'invalid_category', 'Choose an active category.')
   }
-  if (!isPublicUrl(fields.logoUrl.trim())) {
+  const logoUrl = fields.logoUrl.trim()
+  if (
+    logoUrl !== (current.logoUrl ?? '').trim() &&
+    (logoUrl ? !isPublicUrl(logoUrl) : logo === 'required')
+  ) {
     return failure(422, 'invalid_logo', 'The logo needs a public http or https image URL.')
   }
-  if (fields.website !== undefined && !isPublicUrl(fields.website.trim())) {
+  const website = fields.website?.trim()
+  if (
+    website !== undefined &&
+    website !== (current.website ?? '').trim() &&
+    !isPublicUrl(website)
+  ) {
     return failure(422, 'invalid_website', 'The website needs a public http or https URL.')
   }
   return null
@@ -942,7 +960,12 @@ async function updateListingDetailsOnce(
   const reads = createAdminReadOperations({ client: context.client })
   const current = await reads.getAdminListing(snapshot.slug)
   if (!current) return notFound('listing')
-  const invalid = validateListingFields(input.details, await reads.listActiveCategories())
+  const invalid = validateListingFields(
+    input.details,
+    await reads.listActiveCategories(),
+    { logoUrl: current.logoUrl, website: current.website },
+    'optional'
+  )
   if (invalid) return invalid
   const details = {
     categorySlug: input.details.categorySlug.trim(),
@@ -951,13 +974,14 @@ async function updateListingDetailsOnce(
     name: input.details.name.trim(),
     website: input.details.website.trim()
   }
+  // Only these are written: an unchanged website or logo is neither validated nor rewritten.
   const fields = [
     details.name !== current.name ? 'name' : null,
     details.categorySlug !== current.categorySlug ? 'category' : null,
-    details.website !== current.website ? 'website' : null,
+    details.website !== current.website.trim() ? 'website' : null,
     details.description !== current.description ? 'description' : null,
-    details.logoUrl !== (current.logoUrl ?? '') ? 'logo' : null
-  ].filter((field): field is string => field !== null)
+    details.logoUrl !== (current.logoUrl ?? '').trim() ? 'logo' : null
+  ].filter((field): field is ListingDetailsField => field !== null)
   if (snapshot.checksum !== input.expectedChecksum) {
     return fields.length === 0 ? { fields, ok: true, replayed: true } : changed
   }

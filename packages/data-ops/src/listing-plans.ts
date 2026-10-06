@@ -335,10 +335,14 @@ export function buildTransferListingOwnerPlans(input: {
 export interface ListingDetailsEdit {
   categorySlug: string
   description: string
+  /** Empty when the edit removes the logo (the page then shows the fallback tile). */
   logoUrl: string
   name: string
   website: string
 }
+
+/** What a listing details edit changed, as the activity log names it. */
+export type ListingDetailsField = 'category' | 'description' | 'logo' | 'name' | 'website'
 
 /**
  * An admin's edit of a listing's details: name, short description, website, primary category,
@@ -348,27 +352,38 @@ export interface ListingDetailsEdit {
  * while its submission stands rejected. The listing moves to `draft` inside the batch so the
  * primary-category triggers allow the change, then back to `approved`. `fields` names what
  * changed, for the activity log.
+ *
+ * The website and logo are validated and written only when `fields` names them (#64 review):
+ * an imported listing keeps the website, site-relative logo, or missing logo it was imported
+ * with through any other edit. A changed website or logo follows the submission intake's URL
+ * rule, and an emptied logo removes the logo row.
  */
 export function buildUpdateListingDetailsPlans(input: {
   details: ListingDetailsEdit
   expectedChecksum: string
-  fields: readonly string[]
+  fields: readonly ListingDetailsField[]
   listingId: string
   publication: CatalogPublication
 }): StatementPlan[] {
   const { details, listingId } = input
-  for (const [field, value] of Object.entries(details)) {
-    if (!value.trim()) throw new Error(`A listing's ${field} cannot be empty.`)
+  const changesWebsite = input.fields.includes('website')
+  const changesLogo = input.fields.includes('logo')
+  for (const field of ['name', 'description', 'categorySlug'] as const) {
+    if (!details[field].trim()) throw new Error(`A listing's ${field} cannot be empty.`)
   }
   if (input.fields.length === 0) throw new Error('A listing edit must change something.')
-  for (const url of [details.website, details.logoUrl]) {
-    if (!validatePublicHttpUrl(url.trim()).ok)
-      throw new Error('Listing URLs must be public HTTP(S) URLs.')
+  const website = details.website.trim()
+  const logoUrl = details.logoUrl.trim()
+  if (changesWebsite && !validatePublicHttpUrl(website).ok) {
+    throw new Error('Listing URLs must be public HTTP(S) URLs.')
+  }
+  if (changesLogo && logoUrl && !validatePublicHttpUrl(logoUrl).ok) {
+    throw new Error('Listing URLs must be public HTTP(S) URLs.')
   }
   const category = `(SELECT id FROM categories WHERE slug=? AND is_active=1)`
   // A new website must not collide with another listing, a submission, or a block.
-  const conflicts = input.fields.includes('website')
-    ? Object.values(listingWebsiteConflicts({ listingId, website: details.website }))
+  const conflicts = changesWebsite
+    ? Object.values(listingWebsiteConflicts({ listingId, website }))
     : []
   return [
     ...beginCatalogPublicationPlans(input.publication, {
@@ -391,12 +406,12 @@ export function buildUpdateListingDetailsPlans(input: {
     },
     assertPreviousStatementChangedOne('listing_opened_for_edit'),
     {
-      sql: `UPDATE listings SET name=?,description=?,website=?,checksum=?,updated_at=?
-        WHERE id=? AND status='draft'`,
+      sql: `UPDATE listings SET name=?,description=?,${changesWebsite ? 'website=?,' : ''}
+        checksum=?,updated_at=? WHERE id=? AND status='draft'`,
       params: [
         details.name.trim(),
         details.description.trim(),
-        details.website.trim(),
+        ...(changesWebsite ? [website] : []),
         input.publication.afterChecksum,
         input.publication.now,
         listingId
@@ -415,11 +430,23 @@ export function buildUpdateListingDetailsPlans(input: {
       params: [listingId, details.categorySlug]
     },
     assertPreviousStatementChangedOne('listing_primary_category_set'),
-    { sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'`, params: [listingId] },
-    {
-      sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order) VALUES (?,'logo',?,0)`,
-      params: [listingId, details.logoUrl.trim()]
-    },
+    ...(changesLogo
+      ? [
+          {
+            sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'`,
+            params: [listingId]
+          },
+          ...(logoUrl
+            ? [
+                {
+                  sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
+                    VALUES (?,'logo',?,0)`,
+                  params: [listingId, logoUrl]
+                }
+              ]
+            : [])
+        ]
+      : []),
     {
       sql: `UPDATE listings SET status='approved' WHERE id=? AND status='draft'`,
       params: [listingId]
