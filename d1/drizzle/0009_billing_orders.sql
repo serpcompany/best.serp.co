@@ -57,7 +57,7 @@ CREATE TABLE `orders` (
 	CONSTRAINT "orders_outcome_valid" CHECK("orders"."outcome" IS NULL OR "orders"."outcome" IN ('published', 'held', 'upgraded', 'relisted', 'claimed', 'unapplied')),
 	CONSTRAINT "orders_refund_listing_action_valid" CHECK("orders"."refund_listing_action" IS NULL
         OR "orders"."refund_listing_action" IN ('keep_free', 'unpublish', 'already_unpublished', 'none')),
-	CONSTRAINT "orders_attention_valid" CHECK("orders"."attention" IS NULL OR "orders"."attention" IN ('amount_mismatch', 'listing_update_failed')),
+	CONSTRAINT "orders_attention_valid" CHECK("orders"."attention" IS NULL OR "orders"."attention" IN ('amount_mismatch')),
 	CONSTRAINT "orders_refund_reason_valid" CHECK("orders"."refund_reason" IS NULL OR "orders"."refund_reason" IN ('rejected', 'admin', 'unapplied')),
 	CONSTRAINT "orders_target_matches_purpose" CHECK(("orders"."purpose" = 'claim' AND "orders"."kind" = 'paid_claim'
         AND "orders"."claim_id" IS NOT NULL AND "orders"."listing_id" IS NOT NULL

@@ -3,6 +3,7 @@ import {
   buildAttachCheckoutPlans,
   buildClaimRefundPlans,
   buildFinishRefundPlans,
+  buildMarkFailedReasonPlans,
   buildMarkOrderAppliedPlans,
   buildMarkOrderFailedPlans,
   buildMarkOrderPaidPlans,
@@ -17,7 +18,6 @@ import {
   type StatementPlan
 } from '@serpdirectory/data-ops/plan-support'
 import type {
-  OrderAttention,
   OrderOutcome,
   OrderRefundListingAction,
   OrderRefundReason
@@ -69,6 +69,8 @@ const CHECKOUT_REUSE_MARGIN_MS = 5 * 60 * 1000
 const RECONCILE_AFTER_MS = 10 * 60 * 1000
 /** A failed order's checkout is reconciled this long: the provider's webhook retry window. */
 const FAILED_RECONCILE_MS = 3 * 24 * 60 * 60 * 1000
+/** Provider calls the hourly sweep makes at most. */
+const SWEEP_PROVIDER_CALLS = 20
 /** How often a write that lost the catalog publication race tries again. */
 const PUBLICATION_ATTEMPTS = 3
 
@@ -164,13 +166,20 @@ interface CheckoutTarget {
   targetKey: string
 }
 
-/** Expires a checkout at the provider so it can't be paid any more (best effort). */
-async function expireCheckout(deps: BillingDependencies, checkoutId: string | null): Promise<void> {
-  if (!checkoutId) return
+/**
+ * Expires a checkout at the provider so it can't be paid any more (best effort). True only when
+ * the provider confirmed it; otherwise the sweep keeps asking about it (it may have been paid).
+ */
+async function expireCheckout(
+  deps: BillingDependencies,
+  checkoutId: string | null
+): Promise<boolean> {
+  if (!checkoutId) return true
   try {
-    await deps.provider.expireCheckout(checkoutId)
+    return await deps.provider.expireCheckout(checkoutId)
   } catch (error) {
     logError('billing_checkout_expire_failed', error, { checkout: checkoutId })
+    return false
   }
 }
 
@@ -197,9 +206,13 @@ async function openCheckout(
     ) {
       return { ok: true, url: open.checkoutUrl }
     }
-    await expireCheckout(deps, open.providerCheckoutId)
+    const expired = await expireCheckout(deps, open.providerCheckoutId)
     await deps.operations.apply(
-      buildMarkOrderFailedPlans({ now: now.toISOString(), orderId: open.id, reason: 'superseded' })
+      buildMarkOrderFailedPlans({
+        now: now.toISOString(),
+        orderId: open.id,
+        reason: expired ? 'superseded' : 'superseded_unconfirmed'
+      })
     )
   }
   const order = await deps.operations.createOrder({
@@ -252,8 +265,8 @@ async function openCheckout(
   )
   if (!attached) {
     // Never hand out a checkout the ledger doesn't know: expire it and fail the order.
-    await expireCheckout(deps, session.checkoutId)
-    return unavailable('checkout_not_recorded')
+    const expired = await expireCheckout(deps, session.checkoutId)
+    return unavailable(expired ? 'checkout_not_recorded' : 'checkout_not_recorded_unconfirmed')
   }
   log('billing_checkout_opened', { order: order.id, purpose: order.purpose })
   return { ok: true, url: session.url }
@@ -760,8 +773,8 @@ async function applyClaimPayment(deps: BillingDependencies, order: OrderRecord):
 // ---------------------------------------------------------------------------------------------
 // Refunds: claim, then the provider, then finalize
 
-/** What a finished refund did to the listing; `pending` when its listing change didn't apply. */
-export type RefundListing = 'kept_free' | 'pending' | 'unchanged' | 'unpublished'
+/** What a finished refund did to the listing. */
+export type RefundListing = 'kept_free' | 'unchanged' | 'unpublished'
 
 function listingResult(action: OrderRefundListingAction | null): RefundListing {
   if (action === 'keep_free') return 'kept_free'
@@ -817,37 +830,52 @@ async function providerRefund(
 function finishPlans(
   deps: BillingDependencies,
   order: OrderRecord,
-  refundId: string | null,
-  attention: OrderAttention | null = null
+  refundId: string | null
 ): StatementPlan[] {
-  return buildFinishRefundPlans({ attention, now: nowIso(deps), orderId: order.id, refundId })
+  return buildFinishRefundPlans({ now: nowIso(deps), orderId: order.id, refundId })
 }
 
-/** The listing change an admin's refund decided, built on the current publication state. */
+/**
+ * The listing change an admin's refund decided, built on the current publication state. The
+ * badge check recorded with the claim decides, at the claim's time (`decidedAt`): a refund
+ * finished later (the sweep, after the provider failed) applies the same decision, whatever
+ * checks came since. A listing that went down in the meantime is refunded as it is.
+ */
 async function adminListingPlans(
   deps: BillingDependencies,
   order: OrderRecord
-): Promise<StatementPlan[]> {
+): Promise<{ plans: StatementPlan[]; result: RefundListing }> {
   const submissionId = order.submissionId
   const actor = order.refundedBy ?? BILLING_ACTOR
   const now = nowIso(deps)
-  if (!submissionId || order.refundListingAction === 'none') return []
+  const decidedAt = order.refundRequestedAt ?? now
+  const unchanged = { plans: [], result: 'unchanged' as const }
+  if (!submissionId || order.refundListingAction === 'none') return unchanged
   const submission = await deps.operations.checkoutSubmission(submissionId)
   // Recorded already (another attempt finished the listing change): refund the order only.
-  if (!submission || submission.refundedAt !== null) return []
-  switch (order.refundListingAction) {
-    case 'keep_free':
-      return buildRefundSubmissionPlans({
+  if (!submission || submission.refundedAt !== null) {
+    return { plans: [], result: listingResult(order.refundListingAction) }
+  }
+  const live = await deps.operations.listingLive(submission.listingId)
+  if (order.refundListingAction === 'keep_free' && live) {
+    return {
+      plans: buildRefundSubmissionPlans({
         actor,
         badgeCheckId: order.refundBadgeCheckId ?? 0,
+        decidedAt,
         mode: 'keep_free',
         now,
         submissionId
-      })
-    case 'unpublish':
-      return buildRefundSubmissionPlans({
+      }),
+      result: 'kept_free'
+    }
+  }
+  if (order.refundListingAction === 'unpublish' && live) {
+    return {
+      plans: buildRefundSubmissionPlans({
         actor,
         badgeCheckId: order.refundBadgeCheckId ?? 0,
+        decidedAt,
         mode: 'unpublish',
         now,
         publication: await publicationFor(deps, {
@@ -858,33 +886,26 @@ async function adminListingPlans(
           slug: submission.slug
         }),
         submissionId
-      })
-    default:
-      return buildRefundSubmissionPlans({
-        actor,
-        mode: 'already_unpublished',
-        now,
-        submissionId
-      })
+      }),
+      result: 'unpublished'
+    }
+  }
+  return {
+    plans: buildRefundSubmissionPlans({ actor, mode: 'already_unpublished', now, submissionId }),
+    result: order.refundListingAction === 'unpublish' ? 'unpublished' : 'unchanged'
   }
 }
 
 /**
  * Finishes a claimed refund: the provider refunds (idempotently, so a retry is safe), then one
- * batch records it: the rejection's or the admin's listing change, and `refunded`. An admin's
- * listing change that keeps failing (the publication race, or the badge check at refund aged
- * out before a retry) still records the refund, flagged `listing_update_failed`: the money is
- * back, so the order must say so. Throws when the provider fails; the order stays `refunding`
- * and the sweep finishes it.
+ * batch records it: the rejection's or the admin's recorded listing change, and `refunded`.
+ * Throws when the provider fails or the batch keeps losing (the catalog publication race); the
+ * order stays `refunding` and the sweep finishes the same decision later.
  */
 async function finishRefund(deps: BillingDependencies, orderId: string): Promise<RefundListing> {
   const claimed = await deps.operations.order(orderId)
   if (!claimed) throw new Error(`Order ${orderId} not found.`)
-  if (claimed.status === 'refunded') {
-    return claimed.attention === 'listing_update_failed'
-      ? 'pending'
-      : listingResult(claimed.refundListingAction)
-  }
+  if (claimed.status === 'refunded') return listingResult(claimed.refundListingAction)
   if (claimed.status !== 'refunding') throw new Error(`Order ${orderId} has no claimed refund.`)
   const refundId = await providerRefund(deps, claimed)
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
@@ -892,6 +913,7 @@ async function finishRefund(deps: BillingDependencies, orderId: string): Promise
     if (!order) throw new Error(`Order ${orderId} not found.`)
     if (order.status === 'refunded') return listingResult(order.refundListingAction)
     let plans: StatementPlan[] = []
+    let result: RefundListing = 'unchanged'
     if (order.refundReason === 'rejected' && order.submissionId) {
       const submission = await deps.operations.checkoutSubmission(order.submissionId)
       plans =
@@ -904,24 +926,16 @@ async function finishRefund(deps: BillingDependencies, orderId: string): Promise
             })
           : []
     } else if (order.refundReason === 'admin') {
-      plans = await adminListingPlans(deps, order)
+      ;({ plans, result } = await adminListingPlans(deps, order))
     }
     if (await deps.operations.apply([...plans, ...finishPlans(deps, order, refundId)])) {
       log('billing_order_refunded', { order: order.id, reason: order.refundReason })
-      return listingResult(order.refundListingAction)
+      return result
     }
-    if (order.refundReason !== 'admin') break
   }
   const order = await deps.operations.order(orderId)
   if (order?.status === 'refunded') return listingResult(order.refundListingAction)
-  if (order?.refundReason !== 'admin') {
-    throw new Error(`The refund of order ${orderId} could not be recorded.`)
-  }
-  await deps.operations.apply(finishPlans(deps, order, refundId, 'listing_update_failed'))
-  logError('billing_refund_listing_failed', new Error('The listing change did not apply.'), {
-    order: orderId
-  })
-  return 'pending'
+  throw new Error(`The refund of order ${orderId} could not be recorded yet.`)
 }
 
 /**
@@ -1077,7 +1091,7 @@ async function decideRefund(
   if (badgeCheckId) {
     const shown = await deps.operations.refundBadgeCheck(badgeCheckId)
     if (
-      shown &&
+      shown?.latest &&
       shown.listingId === submission.listingId &&
       deps.now().getTime() - Date.parse(shown.checkedAt) < REFUND_CHECK_MAX_AGE_MS
     ) {
@@ -1178,25 +1192,24 @@ export async function refundOrder(
  */
 export async function runBillingSweep(
   deps: BillingDependencies,
-  input: { limit: number }
+  input: { limit: number; providerCalls?: number }
 ): Promise<Record<string, number>> {
-  const counts = { applied: 0, errors: 0, failed: 0, refunds: 0 }
-  for (const submissionId of await deps.operations.refundPendingSubmissions(input.limit)) {
-    try {
-      await refundRejectedSubmission(deps, { actor: BILLING_ACTOR, submissionId })
-      counts.refunds += 1
-    } catch (error) {
-      counts.errors += 1
-      logError('billing_sweep_refund_failed', error, { submission: submissionId })
-    }
-  }
+  const counts = { applied: 0, errors: 0, failed: 0, refunds: 0, skipped: 0 }
+  // Each item may call the provider once; the run stops calling it after this many.
+  let calls = input.providerCalls ?? SWEEP_PROVIDER_CALLS
   const now = deps.now().getTime()
   const orders = await deps.operations.ordersToReconcile({
     before: new Date(now - RECONCILE_AFTER_MS).toISOString(),
     failedSince: new Date(now - FAILED_RECONCILE_MS).toISOString(),
     limit: input.limit
   })
+  // Most urgent first: claimed refunds, then paid orders never applied, then checkouts.
   for (const order of orders) {
+    if (calls <= 0) {
+      counts.skipped += 1
+      continue
+    }
+    calls -= 1
     try {
       if (order.status === 'refunding') {
         await finishRefund(deps, order.id)
@@ -1221,10 +1234,39 @@ export async function runBillingSweep(
           })
         )
         counts.failed += 1
+      } else if (order.status === 'failed' && checkout.state === 'open') {
+        // A superseded checkout still open: expire it, so the sweep can stop asking.
+        if (await expireCheckout(deps, checkout.checkoutId)) {
+          await deps.operations.apply(
+            buildMarkFailedReasonPlans({
+              orderId: order.id,
+              now: nowIso(deps),
+              reason: 'superseded'
+            })
+          )
+        }
+      } else if (order.status === 'failed' && checkout.state === 'expired') {
+        await deps.operations.apply(
+          buildMarkFailedReasonPlans({ orderId: order.id, now: nowIso(deps), reason: 'expired' })
+        )
       }
     } catch (error) {
       counts.errors += 1
       logError('billing_sweep_order_failed', error, { order: order.id })
+    }
+  }
+  for (const submissionId of await deps.operations.refundPendingSubmissions(input.limit)) {
+    if (calls <= 0) {
+      counts.skipped += 1
+      continue
+    }
+    calls -= 1
+    try {
+      await refundRejectedSubmission(deps, { actor: BILLING_ACTOR, submissionId })
+      counts.refunds += 1
+    } catch (error) {
+      counts.errors += 1
+      logError('billing_sweep_refund_failed', error, { submission: submissionId })
     }
   }
   return counts

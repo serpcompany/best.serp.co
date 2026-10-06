@@ -18,8 +18,6 @@ export const metadata: Metadata = { title: 'Orders' }
 
 /** The line under an order's status (#70 screen 13's notes). */
 function note(order: AdminOrderRow): string | null {
-  if (order.attention === 'amount_mismatch') return 'Amount mismatch'
-  if (order.attention === 'listing_update_failed') return 'Listing not updated'
   if (order.status === 'refunded') {
     if (order.refundReason === 'rejected') return 'Auto refund on reject'
     if (order.refundListingAction === 'unpublish') return 'Listing unpublished (no badge)'
@@ -74,8 +72,9 @@ export default async function OrdersPage() {
         : null,
       note: note(order),
       number: order.number,
-      // A claimed refund a failure left can be finished from here too.
-      refundable: order.status === 'paid' || order.status === 'refunding',
+      // An admin's refund a failure left can be finished from here too; others, by the sweep.
+      refundable:
+        order.status === 'paid' || (order.status === 'refunding' && order.refundReason === 'admin'),
       status: order.status,
       stripeRef,
       stripeUrl: stripeRef && deps ? deps.provider.dashboardUrl(stripeRef) : null

@@ -252,12 +252,13 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
     },
 
     async expireCheckout(checkoutId) {
-      if (!/^cs_[A-Za-z0-9_]+$/u.test(checkoutId)) return
+      if (!/^cs_[A-Za-z0-9_]+$/u.test(checkoutId)) return false
       try {
         await call('POST', `/v1/checkout/sessions/${checkoutId}/expire`, form({}))
+        return true
       } catch (error) {
-        // Already complete or expired: nothing left to stop.
-        if (error instanceof BillingProviderError && error.status === 400) return
+        // Already complete or expired: nothing left to stop, but it may have been paid.
+        if (error instanceof BillingProviderError && error.status === 400) return false
         throw error
       }
     },

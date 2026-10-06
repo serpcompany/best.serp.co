@@ -19,12 +19,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@serpdirectory/design-system/dropdown-menu'
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle
-} from '@serpdirectory/design-system/empty'
 import { Field, FieldGroup, FieldLabel } from '@serpdirectory/design-system/field'
 import { Input } from '@serpdirectory/design-system/input'
 import {
@@ -121,14 +115,17 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
       failed: byStatus('failed'),
       paid: byStatus('paid'),
       pending: byStatus('pending'),
-      refunded: byStatus('refunded')
+      // A refund in progress counts with the refunds.
+      refunded: byStatus('refunded') + byStatus('refunding')
     }
   }, [orders])
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return orders.filter(
       order =>
-        (tab === 'all' || order.status === tab) &&
+        (tab === 'all' ||
+          order.status === tab ||
+          (tab === 'refunded' && order.status === 'refunding')) &&
         (!needle ||
           [orderLabel(order), order.customer ?? '', order.item?.name ?? ''].some(value =>
             value.toLowerCase().includes(needle)
@@ -170,11 +167,7 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
       description:
         result.listing === 'unpublished'
           ? `${name} was unpublished (no passing badge). ${logged}`
-          : result.listing === 'kept_free'
-            ? `${name} stays live as a free listing. ${logged}`
-            : result.listing === 'pending'
-              ? `The listing update is pending. ${logged}`
-              : logged
+          : logged
     })
     router.refresh()
   }
@@ -219,14 +212,7 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
           value={query}
         />
       </div>
-      {shown.length === 0 ? (
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyTitle>No orders</EmptyTitle>
-            <EmptyDescription>Paid listings and paid claims appear here.</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
+      {
         <div className="overflow-hidden rounded-lg border">
           <Table>
             <TableHeader className="bg-muted">
@@ -340,7 +326,7 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
             </TableBody>
           </Table>
         </div>
-      )}
+      }
       <PaginationFooter
         onPage={setPage}
         onPageSize={size => {

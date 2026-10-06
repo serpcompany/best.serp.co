@@ -29,8 +29,8 @@ the target (submission, listing, or claim), amount and currency, provider and it
 (checkout, payment, refund), what was actually charged, `status` (`pending` → `paid` →
 `refunding` → `refunded`, or `failed`), `outcome` once applied (`published`, `held`,
 `upgraded`, `relisted`, `claimed`, `unapplied`), the refund reason (`rejected`, `admin`,
-`unapplied`), actor, and an admin refund's listing decision and badge check, `attention`
-(`amount_mismatch`, `listing_update_failed`), and timestamps. A partial unique index allows
+`unapplied`), actor, note, and an admin refund's listing decision and badge check, `attention`
+(`amount_mismatch`), and timestamps. A partial unique index allows
 one `pending` order per target, so a double click or a second tab reuses the open checkout.
 `billing_events` records each provider event once by `(provider, event_id)`.
 
@@ -95,14 +95,16 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   a pass keeps it live as free, a miss or an inconclusive check unpublishes it (410). One already
   down is refunded as is. A submission still in review is rejected instead (409), a prohibited
   rejection is never refunded, and an unapplied or claim order is refunded from the order alone.
-  The badge check and the listing decision are recorded with the claim, so a retry (a lost
-  write, Stripe down) finishes that decision without checking again; a listing change that
-  keeps failing still records the refund, flagged `listing_update_failed`, and answers
-  "pending". No email: #70 has none for it.
-- **Sweep.** The hourly cron (`billing-sweep` in `lib/worker/scheduled.ts`) retries pending
-  rejection refunds, finishes claimed refunds, reconciles pending orders whose checkout closed
-  (paid → applied, otherwise `failed`) and failed orders for three days (a superseded session
-  paid late), and applies paid orders a crash left unapplied.
+  The badge check and the listing decision are recorded with the claim, and finishing applies
+  that decision whatever its age or any later check (`decidedAt`), so a retry (a lost write,
+  Stripe down, the sweep an hour later) never checks again and never leaves the listing live on
+  the paid plan. A dialog's check that a newer dialog replaced is refused and checked again. A
+  listing that went down meanwhile is refunded as it is. No email: #70 has none for it.
+- **Sweep.** The hourly cron (`billing-sweep` in `lib/worker/scheduled.ts`) works most urgent
+  first, with at most 20 Stripe calls a run: claimed refunds, paid orders a crash left
+  unapplied, pending orders whose checkout closed (paid → applied, otherwise `failed`), failed
+  orders whose superseded checkout couldn't be confirmed expired (for three days; it expires an
+  open one and drops one Stripe expired), then refunds still owed after an `other` rejection.
 
 No self-withdraw after payment (#59): the withdraw plans already refuse a paid submission.
 

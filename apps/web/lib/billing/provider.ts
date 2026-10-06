@@ -70,8 +70,11 @@ export interface BillingProvider {
   createCheckout(request: CheckoutRequest): Promise<CheckoutSession>
   /** The provider's dashboard page for a payment or checkout id, for the admin Orders menu. */
   dashboardUrl(reference: string): string | null
-  /** Stops a checkout from accepting payment (a superseded one). A closed one is a no-op. */
-  expireCheckout(checkoutId: string): Promise<void>
+  /**
+   * Stops a checkout from accepting payment (a superseded one). True when the provider expired
+   * it; false when it was already closed (it may have been paid).
+   */
+  expireCheckout(checkoutId: string): Promise<boolean>
   getCheckout(checkoutId: string): Promise<CheckoutState>
   /** The provider's refund id, or null when the payment had already been refunded. */
   refund(request: RefundRequest): Promise<{ refundId: string | null }>

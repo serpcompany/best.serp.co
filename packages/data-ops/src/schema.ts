@@ -1349,7 +1349,7 @@ export const orderRefundListingActions = [
 export type OrderRefundListingAction = (typeof orderRefundListingActions)[number]
 
 /** Why an order needs an admin's attention. */
-export const orderAttentions = ['amount_mismatch', 'listing_update_failed'] as const
+export const orderAttentions = ['amount_mismatch'] as const
 export type OrderAttention = (typeof orderAttentions)[number]
 
 export const orders = sqliteTable(

@@ -43,6 +43,8 @@ function fakeProvider() {
   const expired: string[] = []
   /** Throws on the next refund (the provider was down). */
   const failNextRefund = { value: false }
+  /** The provider can't confirm expiring a checkout (it may have been paid). */
+  const expireFails = { value: false }
   let created = 0
   const provider: BillingProvider & {
     pay(checkoutId: string, charged?: number): CheckoutState
@@ -68,7 +70,9 @@ function fakeProvider() {
     async expireCheckout(checkoutId) {
       expired.push(checkoutId)
       const session = sessions.get(checkoutId)
-      if (session?.state === 'open') sessions.set(checkoutId, { ...session, state: 'expired' })
+      if (expireFails.value || session?.state !== 'open') return false
+      sessions.set(checkoutId, { ...session, state: 'expired' })
+      return true
     },
     async getCheckout(checkoutId) {
       const session = sessions.get(checkoutId)
@@ -102,7 +106,7 @@ function fakeProvider() {
       return event
     }
   }
-  return { expired, failNextRefund, provider, refunds, sessions }
+  return { expired, expireFails, failNextRefund, provider, refunds, sessions }
 }
 
 function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'pass' } = {}) {
@@ -117,7 +121,8 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
   `)
   const client = createDatabase(sqlite.asD1Database())
   const operations = createBillingOperations({ client })
-  const { expired, failNextRefund, provider, refunds } = fakeProvider()
+  const { expired, expireFails, failNextRefund, provider, refunds } = fakeProvider()
+  const clock = { now: NOW }
   const badgeChecks = { count: 0 }
   const emails: Array<{ eventKey: string; template: string; to: string }> = []
   let ids = 0
@@ -127,7 +132,7 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
       badgeChecks.count += 1
       return checkBadgeAtRefund({
         listingId,
-        now: NOW,
+        now: clock.now,
         operations: createBadgeProgramOperations({ client }),
         verify: async () =>
           options.badge === 'missing' ? { code: 'badge_missing', ok: false } : { ok: true }
@@ -143,7 +148,7 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
     notify: async (template, request) => {
       emails.push({ eventKey: request.eventKey, template, to: request.to })
     },
-    now: () => NOW,
+    now: () => clock.now,
     operations,
     priceCents: 4900,
     provider
@@ -189,10 +194,12 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
   return {
     badgeChecks,
     client,
+    clock,
     db,
     deps,
     emails,
     expired,
+    expireFails,
     failNextRefund,
     listing,
     provider,
@@ -537,30 +544,63 @@ describe('races and mismatches (#111 review round 1)', () => {
     ).toEqual({ is_active: 0 })
   })
 
-  it('records the refund and flags the order when the listing change keeps failing', async () => {
-    const f = fixture({ badge: 'pass' })
-    f.submission('s1', 'draft', null)
-    await webhook(f, paidEvent(f, await checkout(f, 's1')))
-    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
-    const order = f.row<{ id: string }>('SELECT id FROM orders')
-    f.failNextRefund.value = true
-    await expect(
-      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
-    ).rejects.toThrow()
-    // The badge check at refund aged out before the retry: keep_free can't apply any more.
-    f.db.exec(`UPDATE badge_checks SET checked_at='2026-10-06T09:00:00.000Z'`)
-    await expect(
-      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
-    ).resolves.toEqual({
-      listing: 'pending',
-      ok: true,
-      replayed: false
+  for (const [badge, listing, live, plan] of [
+    ['pass', 'kept_free', 1, 'free'],
+    ['missing', 'unpublished', 0, 'paid']
+  ] as const) {
+    it(`applies the recorded decision (${listing}) when the sweep finishes it over an hour later`, async () => {
+      const f = fixture({ badge })
+      f.submission('s1', 'draft', null)
+      await webhook(f, paidEvent(f, await checkout(f, 's1')))
+      f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+      const order = f.row<{ id: string }>('SELECT id FROM orders')
+      f.failNextRefund.value = true
+      await expect(
+        refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+      ).rejects.toThrow()
+      // A newer refund check (another dialog) must not change the recorded decision either.
+      f.clock.now = new Date(NOW.getTime() + 65 * 60 * 1000)
+      await previewRefund(f.deps, { orderId: order.id })
+      await runBillingSweep(f.deps, { limit: 10 })
+      expect(f.row('SELECT status, refund_listing_action FROM orders')).toEqual({
+        refund_listing_action: badge === 'pass' ? 'keep_free' : 'unpublish',
+        status: 'refunded'
+      })
+      expect(
+        f.row(
+          `SELECT l.is_active AS live, s.plan, s.refunded_at IS NOT NULL AS refunded
+            FROM listing_submissions s JOIN listings l ON l.id=s.listing_id`
+        )
+      ).toEqual({ live, plan, refunded: 1 })
+      expect(f.badgeChecks.count).toBe(1)
+      expect(f.refunds).toHaveLength(1)
     })
-    expect(f.row('SELECT status, attention FROM orders')).toEqual({
-      attention: 'listing_update_failed',
-      status: 'refunded'
+
+    it(`refuses a dialog's check a newer dialog replaced, and checks again (badge ${badge})`, async () => {
+      const f = fixture({ badge })
+      f.submission('s1', 'draft', null)
+      await webhook(f, paidEvent(f, await checkout(f, 's1')))
+      f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+      const order = f.row<{ id: string }>('SELECT id FROM orders')
+      // Two tabs: the first dialog's check is no longer the listing's latest.
+      const first = await previewRefund(f.deps, { orderId: order.id })
+      await previewRefund(f.deps, { orderId: order.id })
+      const stale = 'badgeCheckId' in first ? first.badgeCheckId : null
+      await expect(
+        refundOrder(f.deps, { actor: 'devin@serp.co', badgeCheckId: stale, orderId: order.id })
+      ).resolves.toEqual({ listing, ok: true, replayed: false })
+      expect(f.badgeChecks.count).toBe(3)
+      expect(
+        f.row(
+          `SELECT l.is_active AS live, s.plan FROM listing_submissions s
+            JOIN listings l ON l.id=s.listing_id`
+        )
+      ).toEqual({ live, plan })
+      expect(
+        f.row<{ fresh: number }>(`SELECT refund_badge_check_id <> ${stale} AS fresh FROM orders`)
+      ).toEqual({ fresh: 1 })
     })
-  })
+  }
 })
 
 describe('refund dialog', () => {
@@ -755,12 +795,16 @@ describe('refunds', () => {
 })
 
 describe('sweep', () => {
-  it('records a payment that reached a superseded checkout and finishes claimed refunds', async () => {
+  it('records a payment that reached a superseded checkout it could not expire', async () => {
     const f = fixture()
     f.submission('s1', 'pending_badge', 'free')
     const first = await checkout(f, 's1')
     f.db.exec(`UPDATE orders SET checkout_expires_at='2026-10-06T12:01:00.000Z'`)
+    f.expireFails.value = true
     await checkout(f, 's1')
+    expect(
+      f.row(`SELECT failure_reason FROM orders WHERE provider_checkout_id='${first}'`)
+    ).toEqual({ failure_reason: 'superseded_unconfirmed' })
     // The superseded checkout was paid anyway and its webhook never arrived.
     f.provider.pay(first)
     f.db.exec(`UPDATE orders SET failed_at='2026-10-06T11:00:00.000Z' WHERE status='failed'`)
@@ -768,6 +812,34 @@ describe('sweep', () => {
     expect(
       f.rows(`SELECT status, outcome FROM orders WHERE provider_checkout_id='${first}'`)
     ).toEqual([{ outcome: 'published', status: 'paid' }])
+  })
+
+  it('leaves checkouts it expired alone, and puts paid orders before abandoned ones', async () => {
+    const f = fixture()
+    for (let index = 0; index < 30; index += 1) {
+      f.submission(`a${index}`, 'draft', null)
+      await checkout(f, `a${index}`)
+    }
+    // Every abandoned checkout failed a day ago without a confirmed expiry.
+    f.db.exec(`UPDATE orders SET status='failed', failure_reason='superseded_unconfirmed',
+      failed_at='2026-10-05T12:00:00.000Z', created_at='2026-10-05T11:00:00.000Z'`)
+    f.submission('s1', 'draft', null)
+    const paid = await checkout(f, 's1')
+    f.provider.pay(paid)
+    // Paid, recorded, never applied.
+    f.db.exec(`UPDATE orders SET status='paid', provider_payment_id='pi_x', charged_cents=4900,
+      charged_currency='usd', paid_at='2026-10-06T11:00:00.000Z' WHERE target_key='submission:s1'`)
+    const counts = await runBillingSweep(f.deps, { limit: 50, providerCalls: 5 })
+    expect(counts).toMatchObject({ applied: 1, skipped: 26 })
+    expect(f.row(`SELECT outcome FROM orders WHERE target_key='submission:s1'`)).toEqual({
+      outcome: 'published'
+    })
+    // Asked once, the abandoned (open) checkouts are expired and stop being reconciled.
+    expect(
+      f.row<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM orders WHERE failure_reason='superseded_unconfirmed'`
+      ).n
+    ).toBe(26)
   })
 
   it('fails pending orders whose checkout closed unpaid and applies paid ones', async () => {
@@ -782,7 +854,8 @@ describe('sweep', () => {
       applied: 1,
       errors: 0,
       failed: 1,
-      refunds: 0
+      refunds: 0,
+      skipped: 0
     })
     expect(f.rows(`SELECT target_key, status, outcome FROM orders ORDER BY target_key`)).toEqual([
       { outcome: null, status: 'failed', target_key: 'submission:s1' },

@@ -399,7 +399,7 @@ test('refund with a badge pass: the listing stays live as a free listing', async
         screenshot: '13c-refund-badge-pass',
         title: /^Refund \$49\.00 for .*\?$/u
       },
-      /stays live as a free listing\. Logged under e2e-billing-admin-/u
+      /^Logged under e2e-billing-admin-/u
     )
     expect(order(`id = ${q(paid.id)}`)).toMatchObject({
       refund_reason: 'admin',

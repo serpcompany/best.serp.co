@@ -1326,7 +1326,10 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         userId: 'user_owner'
       })
     )
-    await run(B.buildMarkOrderFailedPlans({ now: NOW, orderId: 'ord-2', reason: 'expired' }))
+    await run(
+      B.buildMarkOrderFailedPlans({ now: NOW, orderId: 'ord-2', reason: 'superseded_unconfirmed' })
+    )
+    await run(B.buildMarkFailedReasonPlans({ now: NOW, orderId: 'ord-2', reason: 'expired' }))
     expect(await order('ord-2')).toMatchObject({ failure_reason: 'expired', status: 'failed' })
     await run(
       B.buildMarkOrderPaidPlans({

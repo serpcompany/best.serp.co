@@ -771,9 +771,13 @@ export function buildRejectSubmissionPlans(input: {
  * that check alone, so an earlier weekly pass can neither keep a listing whose refund check
  * missed or couldn't tell, nor block its unpublish.
  */
-function refundBadgeCheck(passed: boolean): string {
-  return `EXISTS (SELECT 1 FROM badge_checks rc WHERE rc.id=? AND rc.listing_id=s.listing_id
-    AND rc.kind='refund' AND rc.checked_at>=? AND ${passed ? "rc.outcome='pass'" : "rc.outcome<>'pass'"}
+function refundBadgeCheck(passed: boolean, recorded: boolean): string {
+  const outcome = passed ? "rc.outcome='pass'" : "rc.outcome<>'pass'"
+  const check = `rc.id=? AND rc.listing_id=s.listing_id AND rc.kind='refund' AND rc.checked_at>=?
+    AND ${outcome}`
+  // A decision recorded with a claimed refund (#68) is final: newer checks don't undo it.
+  if (recorded) return `EXISTS (SELECT 1 FROM badge_checks rc WHERE ${check})`
+  return `EXISTS (SELECT 1 FROM badge_checks rc WHERE ${check}
     AND NOT EXISTS (SELECT 1 FROM badge_checks later WHERE later.listing_id=rc.listing_id
       AND later.kind='refund' AND (later.checked_at>rc.checked_at
         OR (later.checked_at=rc.checked_at AND later.id>rc.id))))`
@@ -793,7 +797,18 @@ function refundBadgeCheck(passed: boolean): string {
  *   admin, or deleted) is refunded without touching the catalog.
  */
 export function buildRefundSubmissionPlans(
-  input: { actor: string; now: string; submissionId: string } & (
+  input: {
+    actor: string
+    /**
+     * When the refund was decided and claimed (#68's `orders.refund_requested_at`): the badge
+     * check recorded with that claim then decides, whatever its age at `now` and whatever
+     * checks came after it. Without it, the check must be the listing's latest refund check
+     * and recent at `now`.
+     */
+    decidedAt?: string
+    now: string
+    submissionId: string
+  } & (
     | { mode: 'after_rejection' }
     | { mode: 'already_unpublished' }
     | { badgeCheckId: number; mode: 'keep_free' }
@@ -801,7 +816,8 @@ export function buildRefundSubmissionPlans(
   )
 ): StatementPlan[] {
   const paid = `s.id=? AND s.plan='paid' AND s.paid_at IS NOT NULL AND s.refunded_at IS NULL`
-  const checkWindow = hoursBefore(input.now, REFUND_BADGE_CHECK_MAX_AGE_HOURS)
+  const checkWindow = hoursBefore(input.decidedAt ?? input.now, REFUND_BADGE_CHECK_MAX_AGE_HOURS)
+  const recorded = input.decidedAt !== undefined
   const refund = (condition: PlanGuard, plan: 'free' | 'paid', label: string): StatementPlan[] => [
     {
       sql: `UPDATE listing_submissions SET plan=?,refunded_at=?,updated_at=?
@@ -835,7 +851,7 @@ export function buildRefundSubmissionPlans(
     return [
       ...refund(
         {
-          sql: `s.status='approved' AND ${live} AND ${refundBadgeCheck(true)}`,
+          sql: `s.status='approved' AND ${live} AND ${refundBadgeCheck(true, recorded)}`,
           params: [input.badgeCheckId, checkWindow]
         },
         'free',
@@ -852,7 +868,7 @@ export function buildRefundSubmissionPlans(
       assertPreviousStatementChangedOne('kept_free_badge_recorded')
     ]
   }
-  const condition = `s.status='approved' AND ${live} AND ${refundBadgeCheck(false)}`
+  const condition = `s.status='approved' AND ${live} AND ${refundBadgeCheck(false, recorded)}`
   return [
     ...beginCatalogPublicationPlans(input.publication, {
       sql: `EXISTS (SELECT 1 FROM listing_submissions s WHERE ${paid} AND ${condition})`,

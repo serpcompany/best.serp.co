@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e5cb94e3-9db0-4ed1-8c20-6744febba24b",
+  "id": "7d50882e-5f88-45bc-8fa8-ca42b22dbb7a",
   "prevId": "876f34c4-6293-4c68-be1b-a5b7bf95fb3f",
   "tables": {
     "accounts": {
@@ -3392,7 +3392,7 @@
         },
         "orders_attention_valid": {
           "name": "orders_attention_valid",
-          "value": "\"orders\".\"attention\" IS NULL OR \"orders\".\"attention\" IN ('amount_mismatch', 'listing_update_failed')"
+          "value": "\"orders\".\"attention\" IS NULL OR \"orders\".\"attention\" IN ('amount_mismatch')"
         },
         "orders_refund_reason_valid": {
           "name": "orders_refund_reason_valid",

@@ -282,6 +282,23 @@ export function buildMarkOrderFailedPlans(input: {
 }
 
 /**
+ * A failed order's reason, once the sweep learned its checkout can no longer be paid (expired
+ * at the provider), so it stops asking.
+ */
+export function buildMarkFailedReasonPlans(input: {
+  now: string
+  orderId: string
+  reason: string
+}): StatementPlan[] {
+  return [
+    {
+      sql: `UPDATE orders SET failure_reason=?,updated_at=? WHERE id=? AND status='failed'`,
+      params: [input.reason, input.now, input.orderId]
+    }
+  ]
+}
+
+/**
  * Claims a refund: `paid` → `refunding`, compared and swapped on the state the refund was
  * decided on, before the provider is asked. `unapplied` claims a payment nothing applied yet
  * (it is recorded as applied with the outcome `unapplied` in the same statement), so a racing
@@ -331,17 +348,15 @@ export function buildClaimRefundPlans(
 
 /** `refunding` → `refunded`, once the provider confirmed the refund. */
 export function buildFinishRefundPlans(input: {
-  attention?: OrderAttention | null
   now: string
   orderId: string
   refundId: string | null
 }): StatementPlan[] {
   return [
     {
-      sql: `UPDATE orders SET status='refunded',provider_refund_id=?,refunded_at=?,
-          attention=COALESCE(?,attention),updated_at=?
+      sql: `UPDATE orders SET status='refunded',provider_refund_id=?,refunded_at=?,updated_at=?
         WHERE id=? AND status='refunding'`,
-      params: [input.refundId, input.now, input.attention ?? null, input.now, input.orderId]
+      params: [input.refundId, input.now, input.now, input.orderId]
     },
     assertPreviousStatementChangedOne('order_refunded')
   ]
@@ -380,10 +395,18 @@ export function selectSubmissionPaymentOrderPlan(submissionId: string): Statemen
 }
 
 /**
- * Orders the hourly sweep looks at again: pending orders whose checkout should have finished
- * (`before`); failed orders whose checkout might still have been paid (since `failedSince`,
- * the provider's retry window); paid orders never applied (a crash between recording the
- * payment and applying it); and claimed refunds a failure left unfinished.
+ * Failure reasons of a checkout that may still have been paid: superseded, or never recorded,
+ * when expiring it at the provider wasn't confirmed. A checkout that expired, failed, or was
+ * expired by us can't be paid, so the sweep leaves it alone.
+ */
+export const RECONCILABLE_FAILURES = ['superseded_unconfirmed', 'checkout_not_recorded_unconfirmed']
+
+/**
+ * Orders the hourly sweep looks at again, most urgent first: claimed refunds a failure left
+ * unfinished, then paid orders never applied (a crash between recording the payment and
+ * applying it), then pending orders whose checkout should have finished (`before`), then failed
+ * orders whose checkout might still have been paid (`RECONCILABLE_FAILURES`, since
+ * `failedSince`, the provider's retry window).
  */
 export function selectOrdersToReconcilePlan(input: {
   before: string
@@ -392,14 +415,25 @@ export function selectOrdersToReconcilePlan(input: {
 }): StatementPlan {
   return {
     sql: `SELECT ${ORDER_COLUMNS} FROM orders o
-      WHERE (o.status='pending' AND o.provider_checkout_id IS NOT NULL
-          AND o.checkout_expires_at<?)
-        OR (o.status='failed' AND o.provider_checkout_id IS NOT NULL AND o.failed_at>=?
-          AND o.failed_at<?)
+      WHERE (o.status='refunding' AND o.refund_requested_at<?)
         OR (o.status='paid' AND o.applied_at IS NULL AND o.paid_at<?)
-        OR (o.status='refunding' AND o.refund_requested_at<?)
-      ORDER BY o.created_at,o.id LIMIT ?`,
-    params: [input.before, input.failedSince, input.before, input.before, input.before, input.limit]
+        OR (o.status='pending' AND o.provider_checkout_id IS NOT NULL
+          AND o.checkout_expires_at<?)
+        OR (o.status='failed' AND o.provider_checkout_id IS NOT NULL
+          AND o.failure_reason IN (${RECONCILABLE_FAILURES.map(() => '?').join(',')})
+          AND o.failed_at>=? AND o.failed_at<?)
+      ORDER BY CASE o.status WHEN 'refunding' THEN 0 WHEN 'paid' THEN 1 WHEN 'pending' THEN 2
+        ELSE 3 END,o.created_at,o.id
+      LIMIT ?`,
+    params: [
+      input.before,
+      input.before,
+      input.before,
+      ...RECONCILABLE_FAILURES,
+      input.failedSince,
+      input.before,
+      input.limit
+    ]
   }
 }
 
@@ -672,9 +706,14 @@ export interface BillingOperations {
     limit: number
   }): Promise<OrderRecord[]>
   /** A badge check at refund (`kind = 'refund'`), to confirm the one an admin's dialog showed. */
-  refundBadgeCheck(
-    checkId: number
-  ): Promise<{ checkedAt: string; id: number; listingId: string; outcome: 'fail' | 'pass' } | null>
+  refundBadgeCheck(checkId: number): Promise<{
+    checkedAt: string
+    id: number
+    /** The listing's latest refund check: a dialog left open behind a newer one isn't. */
+    latest: boolean
+    listingId: string
+    outcome: 'fail' | 'pass'
+  } | null>
   /** Paid submissions rejected as `other` whose refund isn't recorded yet, oldest first. */
   refundPendingSubmissions(limit: number): Promise<string[]>
   /** A rejected submission's category and reason. */
@@ -754,13 +793,18 @@ export function createBillingOperations(config: { client: Database }): BillingOp
     },
     async refundBadgeCheck(checkId) {
       const [row] = await queryPlan<Row>(client, {
-        sql: `SELECT id,listing_id,checked_at,outcome FROM badge_checks WHERE id=? AND kind='refund'`,
+        sql: `SELECT rc.id,rc.listing_id,rc.checked_at,rc.outcome,
+            NOT EXISTS (SELECT 1 FROM badge_checks later WHERE later.listing_id=rc.listing_id
+              AND later.kind='refund' AND (later.checked_at>rc.checked_at
+                OR (later.checked_at=rc.checked_at AND later.id>rc.id))) AS latest
+          FROM badge_checks rc WHERE rc.id=? AND rc.kind='refund'`,
         params: [checkId]
       })
       return row
         ? {
             checkedAt: String(row.checked_at),
             id: Number(row.id),
+            latest: Number(row.latest) === 1,
             listingId: String(row.listing_id),
             outcome: row.outcome === 'pass' ? 'pass' : 'fail'
           }

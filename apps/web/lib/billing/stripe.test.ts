@@ -239,8 +239,8 @@ describe('Stripe provider', () => {
       webhookSecret: SECRET
     })
     await expect(stripe.getCheckout('cs_test_1')).rejects.toMatchObject({ code: 'mode_mismatch' })
-    await expect(stripe.expireCheckout('cs_test_2')).resolves.toBeUndefined()
-    await expect(stripe.expireCheckout('cs_test_3')).resolves.toBeUndefined()
+    await expect(stripe.expireCheckout('cs_test_2')).resolves.toBe(true)
+    await expect(stripe.expireCheckout('cs_test_3')).resolves.toBe(false)
     expect(calls.slice(1).map(call => call.url)).toEqual([
       'https://api.stripe.com/v1/checkout/sessions/cs_test_2/expire',
       'https://api.stripe.com/v1/checkout/sessions/cs_test_3/expire'
