@@ -12,7 +12,8 @@ import { validatePublicHttpUrl } from './public-url'
  *
  * The policy reads the URL, not DNS: a public hostname that resolves to a private address passes
  * it. The Worker relies on Cloudflare's egress, which never reaches private ranges, for that
- * case; a script running elsewhere does not have that protection.
+ * case; a Node script passes `nodeFetch` (`safe-fetch-node.ts`), which resolves every hop and
+ * refuses restricted addresses. Only ports 80 and 443 are fetched.
  */
 
 export const SAFE_FETCH_USER_AGENT = 'SERPSoftwareBadgeVerifier/1.0'
@@ -94,6 +95,10 @@ export async function safeFetch(url: string, options: SafeFetchOptions): Promise
   for (let redirect = 0; redirect <= SAFE_FETCH_MAX_REDIRECTS; redirect += 1) {
     const safe = validatePublicHttpUrl(current)
     if (!safe.ok) return { code: 'invalid_target', ok: false }
+    // Web ports only: no internal service on another port of a public host.
+    if (safe.url.port !== '' && safe.url.port !== '80' && safe.url.port !== '443') {
+      return { code: 'invalid_target', ok: false }
+    }
 
     let response: Response
     try {
@@ -106,6 +111,9 @@ export async function safeFetch(url: string, options: SafeFetchOptions): Promise
         signal: AbortSignal.timeout(options.timeoutMs ?? SAFE_FETCH_TIMEOUT_MS)
       })
     } catch (error) {
+      if (error instanceof Error && error.name === 'RestrictedAddressError') {
+        return { code: 'invalid_target', ok: false }
+      }
       return { code: isTimeout(error) ? 'fetch_timeout' : 'site_unreachable', ok: false }
     }
 
