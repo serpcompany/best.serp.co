@@ -801,16 +801,25 @@ describe('D1 data stays in Cloudflare', () => {
   function tokenIn(value: unknown): boolean {
     const text = JSON.stringify(value ?? {})
     if (cloudflareCredentialName.test(text)) return true
-    for (const [, body = ''] of text.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)) {
-      for (const match of body.matchAll(/\bsecrets\b(?:\s*\.\s*([A-Za-z0-9_-]+))?/giu)) {
-        if (!match[1] || !nonCloudflareSecrets.has(match[1])) return true
-      }
+    // Any `secrets` in the text, inside an expression or not, unless it is exactly
+    // `secrets.<NAME>` for a reviewed name: no expression parsing to fool (#101 round 4).
+    for (const match of text.matchAll(
+      /(?<![A-Za-z0-9_])secrets(?![A-Za-z0-9_])(\.[A-Za-z0-9_]+)?/giu
+    )) {
+      const exact =
+        match[0].startsWith('secrets.') && nonCloudflareSecrets.has(match[1]?.slice(1) ?? '')
+      if (!exact) return true
     }
     return false
   }
+
   /** The step gets the token: from the workflow's or job's `env`, or its own `env` or `with`. */
   const stepHoldsToken = (workflow: WorkflowDefinition, job: WorkflowJob, step: WorkflowStep) =>
-    tokenIn((workflow as { env?: unknown }).env) || tokenIn(job.env) || tokenIn(step)
+    tokenIn((workflow as { env?: unknown }).env) ||
+    tokenIn(job.env) ||
+    tokenIn((job as { container?: unknown }).container) ||
+    tokenIn((job as { services?: unknown }).services) ||
+    tokenIn(step)
   /** Some step of the job gets the token, or the job or workflow passes it to every step. */
   const jobHoldsToken = (workflow: WorkflowDefinition, job: WorkflowJob) =>
     tokenIn((workflow as { env?: unknown }).env) || tokenIn(job)
@@ -823,7 +832,15 @@ describe('D1 data stays in Cloudflare', () => {
       for (const [name, job] of Object.entries(workflow.jobs)) {
         if (!jobHoldsToken(workflow, job)) continue
         jobs.push(`${file}:${name}`)
+        // Nothing in the job may change what its steps run (#101 round 4): no container or
+        // services, and no step writing GITHUB_ENV or GITHUB_PATH for the steps after it.
+        for (const key of ['container', 'services'])
+          if (key in job) violations.push(`${file}:${name}: a credentialed job may not set ${key}`)
         for (const step of stepsOf(job)) {
+          if (step.run && /\bGITHUB_(?:ENV|PATH)\b/u.test(step.run))
+            violations.push(
+              `${file}:${name}: ${step.name ?? step.run.slice(0, 40)} writes GITHUB_ENV or GITHUB_PATH in a credentialed job`
+            )
           if (step.uses && !credentialedJobActions.has(step.uses))
             violations.push(`${file}:${name}: ${step.uses} is not a reviewed action`)
           for (const upload of outboundUploads(step.run ?? ''))
@@ -1219,6 +1236,98 @@ describe('D1 data stays in Cloudflare', () => {
       { T: secret('GSC_QUOTA_PROJECT') }
     ]) {
       expect(d1ChangeAudit([['ok.yml', workflow({ env, run: 'node x.mjs' })]]).changes).toEqual([])
+    }
+  })
+
+  it('keeps earlier steps, containers, and services from changing a credentialed job (#101 round 4)', () => {
+    const publish = loadWorkflow('publish-d1.yml')
+    const job = publish.jobs.publish as WorkflowJob
+    const bookmarkAt = stepIndex(job, 'cloudflare-release.ts bookmark production')
+    const edited = (edit: (job: WorkflowJob & Record<string, unknown>) => void) => {
+      const copy = structuredClone(job) as WorkflowJob & Record<string, unknown>
+      edit(copy)
+      return credentialedJobViolations([
+        ['publish-d1.yml', { ...publish, jobs: { publish: copy } }]
+      ]).violations.join('\n')
+    }
+    // A token-less step before an exempt one sets NODE_OPTIONS, or puts a pnpm shim on PATH.
+    expect(
+      edited(copy =>
+        copy.steps?.splice(bookmarkAt, 0, {
+          run: 'echo "NODE_OPTIONS=--require ./evil.js" >> "$GITHUB_ENV"'
+        })
+      )
+    ).toContain('writes GITHUB_ENV or GITHUB_PATH')
+    expect(
+      edited(copy =>
+        copy.steps?.splice(bookmarkAt, 0, {
+          run: 'mkdir -p "$RUNNER_TEMP/bin" && printf "#!/bin/sh\\nevil" > "$RUNNER_TEMP/bin/pnpm" && echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"'
+        })
+      )
+    ).toContain('writes GITHUB_ENV or GITHUB_PATH')
+    // A job container or services change where and how every step runs.
+    expect(
+      edited(copy => {
+        copy.container = {
+          image: 'evil/image:latest',
+          env: { NODE_OPTIONS: '--require ./evil.js' }
+        }
+      })
+    ).toContain('may not set container')
+    expect(
+      edited(copy => {
+        copy.services = { db: { image: 'postgres', env: { X: '1' } } }
+      })
+    ).toContain('may not set services')
+    // container.env with the token reaches a step that has no env of its own.
+    const containerToken = structuredClone(job) as WorkflowJob & Record<string, unknown>
+    containerToken.container = {
+      image: 'node:24',
+      env: { CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN') }
+    }
+    containerToken.steps = [
+      ...stepsOf(containerToken),
+      {
+        run: 'pnpm exec wrangler d1 execute best-serp-co-production --remote --command "DELETE FROM listings"'
+      }
+    ]
+    expect(
+      d1ChangeAudit([
+        ['publish-d1.yml', { ...publish, jobs: { publish: containerToken } }]
+      ]).violations.join('\n')
+    ).toContain('must directly follow')
+  })
+
+  it('counts every `secrets` in the text, not only parsed expressions (#101 round 4)', () => {
+    const workflow = (step: WorkflowStep): WorkflowDefinition => ({
+      jobs: { cleanup: { environment: 'production', 'runs-on': 'ubuntu-latest', steps: [step] } },
+      on: { workflow_dispatch: null }
+    })
+    const destroy =
+      'pnpm exec wrangler d1 execute best-serp-co-production --remote --command "DELETE FROM listings"'
+    for (const [label, step] of [
+      [
+        '`}}` inside a string literal',
+        {
+          env: {
+            T: expression("format('}}{0}', secrets[format('CLOUDFLARE{0}API_TOKEN', '_')])")
+          },
+          run: `export "$(printf 'CLOUDFLARE_%s' API_TOKEN)=\${T:2}"; ${destroy}`
+        }
+      ],
+      [
+        'a mixed-case reference',
+        { env: { T: expression('secrets.CloudFlare_Api_Token') }, run: destroy }
+      ],
+      [
+        'an allowed secret OR another one',
+        { env: { T: expression('secrets.GITHUB_TOKEN || secrets.DEPLOY') }, run: destroy }
+      ],
+      ['SECRETS in capitals', { env: { T: expression('SECRETS.GITHUB_TOKEN') }, run: destroy }]
+    ] as Array<[string, WorkflowStep]>) {
+      const audit = d1ChangeAudit([['cleanup.yml', workflow(step)]])
+      expect(audit.changes, label).toEqual(['cleanup.yml:cleanup:production'])
+      expect(audit.violations.join('\n'), label).toContain('must directly follow')
     }
   })
 

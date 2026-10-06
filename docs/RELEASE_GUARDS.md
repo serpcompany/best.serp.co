@@ -162,9 +162,11 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
 - **Changes are found by credential, and the check fails closed.** A step holds a credential
   when its own `env` or `with`, or the job's or workflow's `env`, names a Wrangler credential
   variable in any case (`CLOUDFLARE_API_TOKEN`, the deprecated `CF_API_TOKEN`, the global
-  `*_API_KEY` and `*_EMAIL`), or uses any secret in an expression other than an exact
-  `secrets.<name>` from a reviewed list (`GITHUB_TOKEN` and the Search Console secrets), so
-  `secrets.cloudflare_api_token`, `secrets[...]` and `toJSON(secrets)` all count. Every such
+  `*_API_KEY` and `*_EMAIL`), or contains the word `secrets` anywhere, in any case, other than
+  an exact `secrets.<name>` from a reviewed list (`GITHUB_TOKEN` and the Search Console secrets).
+  The text is not parsed as expressions, so `secrets.cloudflare_api_token`, `secrets[...]`,
+  `toJSON(secrets)`, and a `}}` inside a string literal all count. The job's `container` and
+  `services` are read too. Every such
   step is a D1 change except a step whose whole `run` is one of a short reviewed list (the two
   credential checks, a read-only `cloudflare-release.ts` command, the Worker `deploy`, and Deploy
   Production's plan step) **and** that has nothing else to change what runs: only the keys
@@ -175,6 +177,9 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
   publish once it lands. A bookmark step must meet the same rules.
 - **No handoff.** A step holding the token, other than that list, may not write `GITHUB_ENV`,
   `GITHUB_PATH`, `GITHUB_OUTPUT`, or `GITHUB_STATE`, so it cannot pass the token to a later step.
+  In a job holding the token, no `run` step may write `GITHUB_ENV` or `GITHUB_PATH` (only the
+  reviewed install action, a `uses`, sets its own), and the job may not set `container` or
+  `services`, so nothing outside a step changes what an exempt command runs.
 - **A change runs only after a successful bookmark.** Its bookmark is the step right before it in
   the same job, for the job's environment, with the same `if:`. Neither step may use
   `continue-on-error` or a status function (`always()`, `failure()`, `cancelled()`,
