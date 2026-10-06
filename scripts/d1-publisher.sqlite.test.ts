@@ -310,3 +310,123 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
     expect(db.prepare('SELECT COUNT(*) AS count FROM publication_runs').get()).toEqual({ count: 0 })
   })
 })
+
+describe('listing-unpublish (the admin panel’s unpublished state, #64 and #100)', () => {
+  const unpublish = (extra: Record<string, unknown> = {}) =>
+    plan({
+      operations: [
+        {
+          action: 'listing-unpublish',
+          id: 'lst_sqlite_test',
+          slug: 'old-slug',
+          categories: ['seo'],
+          reason: 'hijacked domain: gambling',
+          expected: { website: 'https://example.com' },
+          ...extra
+        }
+      ]
+    })
+  const listingState = (db: DatabaseSync) =>
+    db.prepare("SELECT slug,status,is_active FROM listings WHERE id='lst_sqlite_test'").get()
+
+  it('keeps the row, sets is_active=0, logs the reason, and turns over the catalog', () => {
+    const db = database()
+    const publication = unpublish()
+    executeInTestTransaction(db, publication)
+    // The row stays: approved and inactive is what the 410 route and Republish look for.
+    expect(listingState(db)).toEqual({ slug: 'old-slug', status: 'approved', is_active: 0 })
+    expect(
+      db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM listing_categories WHERE listing_id='lst_sqlite_test'"
+        )
+        .get()
+    ).toEqual({ count: 1 })
+    expect(
+      db.prepare('SELECT listing_id,event_type,detail,actor FROM listing_events').all()
+    ).toEqual([
+      {
+        listing_id: 'lst_sqlite_test',
+        event_type: 'unpublished',
+        detail: JSON.stringify({ manifest: 'sqlite-release', reason: 'hijacked domain: gambling' }),
+        actor: 'test@example.com'
+      }
+    ])
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 5
+    })
+    expect(publication.affectedRoutes.split('\n')).toEqual(
+      expect.arrayContaining([
+        '/products/old-slug/',
+        '/products/categories/seo/',
+        '/search/',
+        '/rss.xml'
+      ])
+    )
+  })
+
+  it('records the unpublish on the listing’s approved submission, as the admin panel does', () => {
+    const db = database()
+    db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+        logo_url,status,plan,listing_id)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l','approved','free',
+        'lst_sqlite_test')`)
+    executeInTestTransaction(db, unpublish())
+    expect(
+      db.prepare('SELECT submission_id,event_type,detail FROM listing_submission_events').all()
+    ).toEqual([
+      { submission_id: 'sub', event_type: 'unpublished', detail: 'hijacked domain: gambling' }
+    ])
+  })
+
+  it.each([
+    [
+      'the website changed since the manifest was generated',
+      (db: DatabaseSync) => db.exec("UPDATE listings SET website='https://moved.example'")
+    ],
+    [
+      'the listing is already unpublished',
+      (db: DatabaseSync) => db.exec('UPDATE listings SET is_active=0')
+    ],
+    [
+      'the listing’s own submission is in review',
+      (db: DatabaseSync) =>
+        db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,
+            category_slug,logo_url,status,plan,paid_at,listing_id,published_checksum)
+          VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l',
+            'paid_pending_review','paid','${now}','lst_sqlite_test','checksum')`)
+    ],
+    [
+      'its categories changed',
+      (db: DatabaseSync) =>
+        db.exec(`INSERT INTO categories (id,slug,name) VALUES (2,'extra','Extra');
+          INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+            VALUES ('lst_sqlite_test',2,1,0);`)
+    ]
+  ])('refuses the whole batch when %s', (_name, change) => {
+    const db = database()
+    change(db)
+    const before = listingState(db)
+    expect(() => executeInTestTransaction(db, unpublish())).toThrow()
+    expect(listingState(db)).toEqual(before)
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({ count: 0 })
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 4
+    })
+  })
+
+  it('still accepts the original operation without a reason or expected row', () => {
+    const db = database()
+    executeInTestTransaction(db, unpublish({ reason: undefined, expected: undefined }))
+    expect(listingState(db)).toEqual({ slug: 'old-slug', status: 'approved', is_active: 0 })
+    expect(db.prepare('SELECT detail FROM listing_events').get()).toEqual({
+      detail: JSON.stringify({ manifest: 'sqlite-release', reason: null })
+    })
+  })
+
+  it('refuses an empty reason and an unknown expected field', () => {
+    expect(() => unpublish({ reason: '  ' })).toThrow()
+    expect(() => unpublish({ expected: { website: 'https://example.com', name: 'Old' } })).toThrow()
+    expect(() => unpublish({ expected: { website: 'not a url' } })).toThrow()
+  })
+})
