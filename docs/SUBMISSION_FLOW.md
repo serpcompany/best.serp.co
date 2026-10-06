@@ -259,7 +259,7 @@ Both steps run against production D1 only:
 - `approve-d1-submission.yml` ("Review D1 Submission") is dispatched from `main` with the
   submission UUID, `approve` or `reject`, and the confirmation
   `approve-best.serp.co-submission-production`. After reviewer approval of the `production`
-  environment, it exports a D1 backup (an Actions artifact kept 30 days), runs
+  environment, it records a D1 Time Travel bookmark in the run summary, runs
   `pnpm db:approve:production`, and comments on and closes the review issue.
 
 Setup and guards are in [the deploy runbook](./DEPLOY_RUNBOOK.md#workflows).

@@ -141,8 +141,8 @@ the gone page, and answers it with 410. The edge cache stores the 410 under the 
 
 The repository rule is that production data changes only through protected GitHub Actions. The
 admin panel is the one exception (#59, #64): on production, a decision made in `/admin` writes
-production D1 from the Worker, without a workflow, a reviewer approval, or a backup. Its guards
-instead:
+production D1 from the Worker, without a workflow, a reviewer approval, or a bookmark. Its
+guards instead:
 
 - the Cloudflare Access application on `/admin*` and `/api/admin*`, plus an admin session whose
   verified email is on the D1 allowlist, re-checked on every request;

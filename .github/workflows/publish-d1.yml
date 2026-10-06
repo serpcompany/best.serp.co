@@ -1,8 +1,9 @@
 name: Publish D1 Catalog
 
-# Applies one reviewed manifest from d1/publications to production D1 after exporting a backup
-# (kept 30 days). scripts/d1-remote-publisher.ts re-checks main, this workflow, the manifest
-# location, and the typed confirmation.
+# Applies one reviewed manifest from d1/publications to production D1 after recording a D1 Time
+# Travel bookmark and its restore command in the run summary; D1 data never leaves Cloudflare.
+# scripts/d1-remote-publisher.ts re-checks main, this workflow, the manifest location, and the
+# typed confirmation.
 on:
   workflow_dispatch:
     inputs:
@@ -42,7 +43,7 @@ jobs:
           fi
 
   publish:
-    name: Back up and publish to production D1
+    name: Bookmark and publish to production D1
     needs: [authorize]
     # Job-level, so a run refused by authorize never replaces a valid queued production job.
     concurrency:
@@ -72,20 +73,11 @@ jobs:
       - name: Run publisher contract tests
         run: pnpm test:d1
 
-      - name: Back up production D1
+      - name: Record production D1 Time Travel bookmark
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          RELEASE_CONFIRM: ${{ inputs.confirmation }}
-        run: pnpm tsx scripts/cloudflare-release.ts backup production --output "$RUNNER_TEMP/d1-backup/best-serp-co-production-$GITHUB_SHA-$GITHUB_RUN_ID.sql"
-
-      - name: Retain pre-publication backup
-        uses: actions/upload-artifact@v7
-        with:
-          name: best-serp-co-production-d1-pre-publication-${{ github.run_id }}
-          path: ${{ runner.temp }}/d1-backup/
-          if-no-files-found: error
-          retention-days: 30
+        run: pnpm tsx scripts/cloudflare-release.ts bookmark production
 
       - name: Publish reviewed manifest
         env:

@@ -97,7 +97,7 @@ The check runs twice, and both use the workflow's `GITHUB_TOKEN` with `actions: 
 
 **A release must still be current.** Every push to `main` queues its own release, so
 `cloudflare-release.ts` also refuses a release once `main` points at a commit with a
-different tree: first in `plan-release`, before any backup export, then again before those
+different tree: first in `plan-release`, before the D1 bookmark, then again before those
 commands. An older run approved late, or re-run, never overwrites a newer Worker. Reject a release you don't intend to ship rather than leaving it waiting; a job
 waiting for review stays queued for up to 30 days. Roll back with Cloudflare, not by
 re-running an older release.
@@ -137,7 +137,7 @@ staging check because staging never verified that tree. To release it anyway:
    skipped staging check in the run summary. The `production` reviewers still approve.
 2. `cloudflare-release.ts` repeats that proof, then lets the dispatch run `deploy production`
    without the staging check. `plan-release` refuses a hotfix with pending migrations before
-   any backup; a hotfix that needs a migration goes through staging.
+   the bookmark; a hotfix that needs a migration goes through staging.
 3. Merge `main` into `staging` immediately: a pull request from `main` into `staging`, merged
    with **Create a merge commit**, the only merge commit `staging` takes. A squash would leave
    the hotfix out of `staging`'s history, so the promotion's merge base stays before it, and
@@ -145,6 +145,25 @@ staging check because staging never verified that tree. To release it anyway:
    conflict, with no way to resolve it through a pull request. With a merge commit, Deploy
    Staging verifies the merged tree and the next promotion carries it. GitHub remembers the
    last merge method, so switch the button back to **Squash and merge** for the next PR.
+
+## D1 data stays in Cloudflare
+
+No workflow exports a D1 database (#99). The repository is public, so any signed-in GitHub user
+can download its workflow artifacts, and once accounts exist an export would hold session and
+OAuth tokens, verification values, and submitter emails. Instead, each workflow step that changes
+D1 (`cloudflare-release.ts migrate` or `import`, `db:publish:production`, `db:approve:production`)
+directly follows a step running `cloudflare-release.ts bookmark <env>`. That read-only command
+reads the Time Travel bookmark (`wrangler d1 time-travel info --json`), writes it and the exact
+`wrangler d1 time-travel restore … --bookmark` command to the run summary, and fails the job
+when it cannot, so no change runs without a restore point. The endpoint accepts D1 Read, which
+the deploy token's D1 → Edit includes. Only the owner restores
+([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
+
+`scripts/deploy-workflows.test.ts` enforces it: no workflow or composite action uploads or
+caches anything whose name, path, or key looks like a database export; no workflow runs
+`d1 export`; and every D1 mutation step follows a bookmark step for the same environment and
+condition, without `continue-on-error`. The scheduled notifier, which only records review
+notifications, is the one D1 writer without a bookmark.
 
 ## Security boundary
 

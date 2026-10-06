@@ -9,10 +9,10 @@
   `best-serp-co-v1.sql.br` are committed; never hand-edit generated SQL.
 - Ongoing catalog changes use reviewed manifests under `d1/publications/`.
 - Stable listing IDs survive slug changes; record old slugs in `listing_slug_redirects`.
-- Staging and production backup, migration, import, and publication run only through
-  protected workflows. Production migrates only a commit that Deploy Staging already
-  migrated and smoke-tested. `pnpm db:migrations:list:<local|staging|production>` is
-  read-only.
+- Staging and production migration, import, and publication run only through protected
+  workflows, each after a D1 Time Travel bookmark; no workflow exports D1. Production
+  migrates only a commit that Deploy Staging already migrated and smoke-tested.
+  `pnpm db:migrations:list:<local|staging|production>` is read-only.
 
 Read [the data model](../docs/DATA_MODEL.md) and
 [deploy runbook](../docs/DEPLOY_RUNBOOK.md) before changing this directory.

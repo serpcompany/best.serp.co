@@ -9,6 +9,7 @@ import { project } from './project'
 import { stagingWorkflow } from './staging-verification'
 
 interface WorkflowStep {
+  'continue-on-error'?: boolean | string
   env?: Record<string, string>
   id?: string
   if?: string
@@ -133,6 +134,7 @@ describe('staging deploy workflow', () => {
     const commands = [
       'pnpm harness:fast',
       'pnpm worker:build',
+      'pnpm tsx scripts/cloudflare-release.ts bookmark staging',
       'pnpm tsx scripts/cloudflare-release.ts migrate staging',
       'pnpm tsx scripts/cloudflare-release.ts deploy staging',
       'pnpm tsx scripts/d1-preview-http-gates.ts staging "$STAGING_ORIGIN"',
@@ -233,7 +235,7 @@ describe('production deploy workflow', () => {
       project.confirmation.hotfix
     )
     // The plan sees the confirmation and a token, so a hotfix with pending migrations and a
-    // stale release both stop before the backup.
+    // stale release both stop before the bookmark.
     expect(stepRunning(release, 'plan-release production').env).toMatchObject({
       GITHUB_TOKEN: expression('github.token'),
       RELEASE_CONFIRM: expression('inputs.confirmation')
@@ -246,12 +248,12 @@ describe('production deploy workflow', () => {
     )
   })
 
-  it('plans from the ledger, backs up and migrates only when migrations are pending', () => {
+  it('plans from the ledger, bookmarks and migrates only when migrations are pending', () => {
     const order = [
       'pnpm harness:fast',
       'pnpm worker:build',
       'cloudflare-release.ts plan-release production',
-      'cloudflare-release.ts backup production',
+      'cloudflare-release.ts bookmark production',
       'cloudflare-release.ts migrate production',
       'cloudflare-release.ts deploy production',
       'd1-preview-http-gates.ts production https://best.serp.co'
@@ -264,19 +266,13 @@ describe('production deploy workflow', () => {
     expect(plan.if).toBeUndefined()
     expect(plan.run).toContain('echo "mode=$mode" >> "$GITHUB_OUTPUT"')
     expect(plan.run).toContain('database-and-worker | worker-only) ;;')
-    expect(stepRunning(release, 'backup production').if).toBe(databaseStep)
+    expect(stepRunning(release, 'bookmark production').if).toBe(databaseStep)
     expect(stepRunning(release, 'migrate production').if).toBe(databaseStep)
     expect(stepRunning(release, 'deploy production').if).toBeUndefined()
-    const backup = release.steps?.find(step => step.uses === 'actions/upload-artifact@v7')
-    expect(backup?.if).toBe(databaseStep)
-    expect(backup?.with).toMatchObject({
-      'if-no-files-found': 'error',
-      path: `${expression('runner.temp')}/d1-backup/`,
-      'retention-days': 30
-    })
-    expect(stepRunning(release, 'backup production').run).toContain(
-      '--output "$RUNNER_TEMP/d1-backup/'
+    expect(stepIndex(release, 'migrate production')).toBe(
+      stepIndex(release, 'bookmark production') + 1
     )
+    expect(release.steps?.filter(step => step.uses?.includes('upload-artifact'))).toEqual([])
   })
 
   it('gates best.serp.co once the Worker serves it, and the workers.dev review origin before', () => {
@@ -302,6 +298,7 @@ describe('production D1 bootstrap workflow', () => {
     expect(environmentName(bootstrap)).toBe('production')
     expect(runs(bootstrap).slice(1)).toEqual([
       'pnpm test:d1',
+      'pnpm tsx scripts/cloudflare-release.ts bookmark production',
       'pnpm tsx scripts/cloudflare-release.ts import production',
       'pnpm tsx scripts/cloudflare-release.ts verify-import production'
     ])
@@ -439,7 +436,7 @@ describe('recreated D1 operation workflows', () => {
     )
   })
 
-  it('requires the script confirmations and backs up D1 before approval or publication', () => {
+  it('requires the script confirmations and bookmarks D1 before approval or publication', () => {
     const cases: Array<[string, string, string, string]> = [
       [
         'approve-d1-submission.yml',
@@ -456,15 +453,10 @@ describe('recreated D1 operation workflows', () => {
       expect(runs(workflow.jobs.authorize as WorkflowJob).join('\n')).toContain(
         `"$CONFIRMATION" != "${confirmation}"`
       )
-      const backup = stepIndex(job, 'cloudflare-release.ts backup production --output')
-      const upload = (job.steps ?? []).findIndex(step => step.uses === 'actions/upload-artifact@v7')
-      expect(backup).toBeGreaterThan(stepIndex(job, 'pnpm test:d1'))
-      expect(upload).toBe(backup + 1)
-      expect(stepIndex(job, command)).toBeGreaterThan(upload)
-      expect(job.steps?.[upload]?.with).toMatchObject({
-        'if-no-files-found': 'error',
-        'retention-days': 30
-      })
+      const bookmark = stepIndex(job, 'cloudflare-release.ts bookmark production')
+      expect(bookmark).toBeGreaterThan(stepIndex(job, 'pnpm test:d1'))
+      expect(stepIndex(job, command)).toBe(bookmark + 1)
+      expect(job.steps?.filter(step => step.uses?.includes('upload-artifact'))).toEqual([])
     }
     const publishAuthorize = runs(loadWorkflow('publish-d1.yml').jobs.authorize as WorkflowJob)
     expect(publishAuthorize.join('\n')).toContain('^d1/publications/[A-Za-z0-9._-]+\\.ya?ml$')
@@ -548,6 +540,132 @@ describe('recreated D1 operation workflows', () => {
   })
 })
 
+describe('D1 data stays in Cloudflare', () => {
+  // This repository is public: any signed-in GitHub user can download a workflow artifact, and
+  // fork pull requests can restore caches. A D1 export holds sessions, OAuth tokens, and emails,
+  // so no workflow exports D1; recovery is a Time Travel bookmark (#99, docs/D1_RECOVERY.md).
+  const databaseExport =
+    /backup|dump|export|snapshot|\.sql\b|\.sqlite|\.db\b|(?:^|[^a-z0-9])d1(?:[^a-z0-9]|$)|database/iu
+  const uploads = /upload-artifact|actions\/cache|upload-pages-artifact/u
+  const mutation =
+    /cloudflare-release\.ts (?:migrate|import) (staging|production)|db:(?:migrate|publish|approve):(staging|production)/u
+
+  /** Every step of every workflow and composite action under .github, wherever it is nested. */
+  function githubSteps(): Array<[string, WorkflowStep]> {
+    const files = [
+      ...readdirSync(workflowDirectory)
+        .filter(file => /\.ya?ml$/u.test(file))
+        .map(file => `.github/workflows/${file}`),
+      ...readdirSync(resolve('.github/actions'), { recursive: true, encoding: 'utf8' })
+        .filter(file => /(?:^|\/)action\.ya?ml$/u.test(file))
+        .map(file => `.github/actions/${file}`)
+    ]
+    const steps: Array<[string, WorkflowStep]> = []
+    const visit = (file: string, node: unknown): void => {
+      if (Array.isArray(node)) for (const item of node) visit(file, item)
+      else if (typeof node === 'object' && node !== null) {
+        if ('uses' in node || 'run' in node) steps.push([file, node as WorkflowStep])
+        for (const value of Object.values(node)) visit(file, value)
+      }
+    }
+    for (const file of files) visit(file, yaml.load(readFileSync(resolve(file), 'utf8')))
+    return steps
+  }
+
+  function exportedData(step: WorkflowStep): string[] {
+    if (!step.uses || !uploads.test(step.uses)) return []
+    return [step.with?.name, step.with?.path, step.with?.key]
+      .map(value => String(value ?? ''))
+      .filter(value => databaseExport.test(value))
+  }
+
+  it('recognises the D1 backup uploads this repository used to run', () => {
+    const removed: WorkflowStep[] = [
+      {
+        uses: 'actions/upload-artifact@v7',
+        with: {
+          name: `best-serp-co-production-d1-pre-deploy-${expression('github.run_id')}`,
+          path: `${expression('runner.temp')}/d1-backup/`
+        }
+      },
+      { uses: 'actions/upload-artifact@v4', with: { name: 'x', path: '/tmp/production.sql' } },
+      { uses: 'actions/cache/save@v4', with: { key: 'k', path: 'db-export/' } }
+    ]
+    for (const step of removed) expect(exportedData(step), JSON.stringify(step)).not.toEqual([])
+    // The evidence the workflows do upload stays allowed.
+    for (const path of ['apps/e2e/playwright-report/', 'apps/e2e/test-results/']) {
+      expect(exportedData({ uses: 'actions/upload-artifact@v7', with: { path } })).toEqual([])
+    }
+  })
+
+  it('uploads or caches nothing that looks like a database export', () => {
+    const steps = githubSteps()
+    expect(steps.some(([, step]) => step.uses?.includes('upload-artifact'))).toBe(true)
+    const offending = steps
+      .filter(([, step]) => exportedData(step).length > 0)
+      .map(
+        ([file, step]) => `${file}: ${step.name ?? step.uses} (${exportedData(step).join(', ')})`
+      )
+    expect(offending).toEqual([])
+  })
+
+  it('never exports a D1 database in a workflow', () => {
+    for (const [file, step] of githubSteps()) {
+      expect(step.run ?? '', `${file}: ${step.name}`).not.toMatch(
+        /\bd1 export\b|cloudflare-release\.ts backup\b/u
+      )
+    }
+    expect(Object.values(packageScripts).join('\n')).not.toMatch(/\bd1 export\b/u)
+  })
+
+  it('records a Time Travel bookmark immediately before every remote D1 mutation', () => {
+    const mutations: string[] = []
+    for (const [file, workflow] of allWorkflows()) {
+      for (const [name, job] of Object.entries(workflow.jobs)) {
+        const steps = job.steps ?? []
+        steps.forEach((step, index) => {
+          const match = step.run?.match(mutation)
+          if (!match) return
+          const environment = match[1] ?? match[2]
+          const label = `${file}:${name}: ${step.name}`
+          mutations.push(`${file}:${name}:${environment}`)
+          const bookmark = steps[index - 1]
+          // Same environment, same condition, and nothing that would let it fail open.
+          expect(bookmark?.run, label).toBe(
+            `pnpm tsx scripts/cloudflare-release.ts bookmark ${environment}`
+          )
+          expect(bookmark?.if, label).toBe(step.if)
+          expect(bookmark?.['continue-on-error'], label).toBeUndefined()
+          expect(step['continue-on-error'], label).toBeUndefined()
+          expect(bookmark?.env, label).toEqual({
+            CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
+            CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN')
+          })
+        })
+      }
+    }
+    expect(mutations.sort()).toEqual([
+      'approve-d1-submission.yml:review:production',
+      'bootstrap-production-d1.yml:bootstrap:production',
+      'deploy-production.yml:release:production',
+      'deploy-staging.yml:deploy:staging',
+      'publish-d1.yml:publish:production'
+    ])
+  })
+
+  it('lets only the scheduled notifier write production D1 without a bookmark', () => {
+    // It records notification state every 15 minutes with a D1-only token; a bookmark per run
+    // would bury the reviewed mutations' bookmarks, and Time Travel still covers it.
+    const unbookmarked = allWorkflows().flatMap(([file, workflow]) =>
+      Object.entries(workflow.jobs)
+        .filter(([, job]) => runs(job).some(run => /db:[a-z]+:production/u.test(run)))
+        .filter(([, job]) => !runs(job).some(run => run.includes('cloudflare-release.ts bookmark')))
+        .map(([name]) => `${file}:${name}`)
+    )
+    expect(unbookmarked).toEqual(['notify-d1-submissions.yml:notify'])
+  })
+})
+
 describe('protected deployment boundaries', () => {
   it('gates every production job behind an unprivileged ref and confirmation check', () => {
     for (const file of productionDispatchWorkflows) {
@@ -555,7 +673,9 @@ describe('protected deployment boundaries', () => {
       expect(Object.keys(workflow.on).sort(), file).toEqual(
         file === 'deploy-production.yml' ? ['push', 'workflow_dispatch'] : ['workflow_dispatch']
       )
-      expect(releaseAuthorizations[file]?.branch, file).toBe('main')
+      // Publication and review use no release command (their bookmark is read-only); their
+      // scripts and the authorize job below hold them to main.
+      expect(releaseAuthorizations[file]?.branch ?? 'main', file).toBe('main')
       const authorize = workflow.jobs.authorize as WorkflowJob
       expect(authorize.environment, file).toBeUndefined()
       expect(authorize.concurrency, file).toBeUndefined()
@@ -610,7 +730,7 @@ describe('protected deployment boundaries', () => {
 
   it('mutates production automatically only on a push to main, behind the production reviewers', () => {
     const productionMutation =
-      /cloudflare-release\.ts (?:backup|migrate|import|deploy) production|db:(?:migrate|approve|publish|notify):production|opennextjs-cloudflare deploy/u
+      /cloudflare-release\.ts (?:migrate|import|deploy) production|db:(?:migrate|approve|publish|notify):production|opennextjs-cloudflare deploy/u
     const automaticMutations: string[] = []
     for (const [file, workflow] of allWorkflows()) {
       const triggers = Object.keys(workflow.on)
@@ -668,8 +788,8 @@ describe('protected deployment boundaries', () => {
   })
 
   it('runs every credentialed or deploying job on an ephemeral GitHub-hosted runner', () => {
-    // CI_RUNNER_LABELS never moves these, so no secret, D1 backup, or Wrangler session lands on
-    // a persistent host (docs/HARNESS.md#ci-runners).
+    // CI_RUNNER_LABELS never moves these, so no secret, D1 data, or Wrangler session lands on a
+    // persistent host (docs/HARNESS.md#ci-runners).
     for (const file of [...newWorkflows, 'submit-gsc-sitemaps.yml']) {
       for (const [name, job] of Object.entries(loadWorkflow(file).jobs)) {
         expect(job['runs-on'], `${file}:${name}`).toBe(githubHostedRunner)
