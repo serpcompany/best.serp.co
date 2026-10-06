@@ -2,7 +2,10 @@
  * Recognizes a listing image by its bytes, never by a declared type or file name
  * (serpcompany/best.serp.co#95): PNG, JPEG, WebP, GIF, AVIF, and ICO are hosted; SVG is
  * recognized only to be refused, because a same-host SVG can carry script. Dimensions come from
- * the format's own header, so no image is decoded.
+ * the format's own header, and the file's structure is checked to the end (PNG chunks through
+ * IEND, a JPEG scan and EOI, a GIF image and trailer, a WebP RIFF size, AVIF image data, each ICO
+ * entry inside the file), so a header-only stub or a header glued to other bytes is refused. The
+ * pixel count is capped, so no declared size can blow up a renderer. No image is decoded.
  */
 
 export const HOSTED_IMAGE_FORMATS = ['png', 'jpeg', 'webp', 'gif', 'avif', 'ico'] as const
@@ -26,12 +29,21 @@ export const IMAGE_EXTENSIONS: Readonly<Record<HostedImageFormat, string>> = {
   webp: 'webp'
 }
 
-/** The largest side a header may declare; anything larger is a corrupt or hostile header. */
-export const MAX_IMAGE_SIDE = 65_535
+/** The largest side a hosted image may have. */
+export const MAX_IMAGE_SIDE = 16_384
+/** The most pixels a hosted image may have (width × height), about a 7,700 × 5,200 screenshot. */
+export const MAX_IMAGE_PIXELS = 40_000_000
+
+export type ImageSniffFailure =
+  | 'corrupt_image'
+  | 'svg'
+  | 'too_many_pixels'
+  | 'unknown_format'
+  | 'unreadable_dimensions'
 
 export type ImageSniff =
   | { format: HostedImageFormat; height: number; ok: true; width: number }
-  | { ok: false; reason: 'svg' | 'unknown_format' | 'unreadable_dimensions' }
+  | { ok: false; reason: ImageSniffFailure }
 
 function ascii(bytes: Uint8Array, start: number, length: number): string {
   let text = ''
@@ -76,20 +88,97 @@ function startsWith(bytes: Uint8Array, signature: readonly number[], offset = 0)
   return signature.every((value, index) => bytes[offset + index] === value)
 }
 
-function sized(format: HostedImageFormat, width: number | null, height: number | null): ImageSniff {
+function sized(
+  format: HostedImageFormat,
+  width: number | null,
+  height: number | null,
+  complete: boolean
+): ImageSniff {
   if (
     width === null ||
     height === null ||
     !Number.isInteger(width) ||
     !Number.isInteger(height) ||
     width < 1 ||
-    height < 1 ||
-    width > MAX_IMAGE_SIDE ||
-    height > MAX_IMAGE_SIDE
+    height < 1
   ) {
     return { ok: false, reason: 'unreadable_dimensions' }
   }
+  if (width > MAX_IMAGE_SIDE || height > MAX_IMAGE_SIDE || width * height > MAX_IMAGE_PIXELS) {
+    return { ok: false, reason: 'too_many_pixels' }
+  }
+  if (!complete) return { ok: false, reason: 'corrupt_image' }
   return { format, height, ok: true, width }
+}
+
+function indexOfBytes(bytes: Uint8Array, pattern: readonly number[], from = 0): number {
+  outer: for (let index = from; index + pattern.length <= bytes.length; index += 1) {
+    for (let offset = 0; offset < pattern.length; offset += 1) {
+      if (bytes[index + offset] !== pattern[offset]) continue outer
+    }
+    return index
+  }
+  return -1
+}
+
+/** Every chunk fits the file, the first is IHDR, image data follows, and IEND ends it. */
+function pngComplete(bytes: Uint8Array): boolean {
+  let offset = 8
+  let first = true
+  let imageData = false
+  while (offset + 12 <= bytes.length) {
+    const length = u32be(bytes, offset)
+    const type = ascii(bytes, offset + 4, 4)
+    if (first && type !== 'IHDR') return false
+    first = false
+    const next = offset + 12 + length
+    if (next > bytes.length) return false
+    if (type === 'IDAT' && length > 0) imageData = true
+    if (type === 'IEND') return imageData
+    offset = next
+  }
+  return false
+}
+
+/** A start of scan follows the frame header, and an end-of-image marker follows the scan. */
+function jpegComplete(bytes: Uint8Array): boolean {
+  const scan = indexOfBytes(bytes, [0xff, 0xda], 2)
+  return scan > 0 && indexOfBytes(bytes, [0xff, 0xd9], scan + 2) > scan
+}
+
+/** An image descriptor after the header, and the trailer near the end. */
+function gifComplete(bytes: Uint8Array): boolean {
+  const descriptor = indexOfBytes(bytes, [0x2c], 13)
+  const tail = bytes.subarray(Math.max(descriptor + 10, bytes.length - 32))
+  return descriptor > 0 && tail.includes(0x3b)
+}
+
+/** The RIFF size covers the file, and the first chunk's data fits inside it. */
+function webpComplete(bytes: Uint8Array): boolean {
+  const riffEnd = u32le(bytes, 4) + 8
+  const chunkEnd = 20 + u32le(bytes, 16)
+  return riffEnd >= 20 && riffEnd <= bytes.length + 1 && chunkEnd <= riffEnd + 1
+}
+
+/** Image data (`mdat`) follows the metadata. */
+function avifComplete(bytes: Uint8Array): boolean {
+  const mdat = indexOfBytes(bytes, [0x6d, 0x64, 0x61, 0x74])
+  return mdat > 0 && u32be(bytes, mdat - 4) > 8
+}
+
+/** Every entry's image lies inside the file and starts as a PNG or a bitmap header. */
+function icoComplete(bytes: Uint8Array): boolean {
+  const count = u16le(bytes, 4)
+  const directoryEnd = 6 + count * 16
+  for (let index = 0; index < count; index += 1) {
+    const entry = 6 + index * 16
+    const size = u32le(bytes, entry + 8)
+    const offset = u32le(bytes, entry + 12)
+    if (size < 40 || offset < directoryEnd || offset + size > bytes.length) return false
+    const png = startsWith(bytes, [0x89, 0x50, 0x4e, 0x47], offset)
+    if (!png && u32le(bytes, offset) !== 40) return false
+  }
+  return count > 0
 }
 
 function pngSize(bytes: Uint8Array): [number, number] | null {
@@ -195,26 +284,27 @@ function looksLikeSvg(bytes: Uint8Array): boolean {
 export function sniffImage(bytes: Uint8Array): ImageSniff {
   if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
     const size = pngSize(bytes)
-    return sized('png', size?.[0] ?? null, size?.[1] ?? null)
+    return sized('png', size?.[0] ?? null, size?.[1] ?? null, pngComplete(bytes))
   }
   if (startsWith(bytes, [0xff, 0xd8, 0xff])) {
     const size = jpegSize(bytes)
-    return sized('jpeg', size?.[0] ?? null, size?.[1] ?? null)
+    return sized('jpeg', size?.[0] ?? null, size?.[1] ?? null, jpegComplete(bytes))
   }
   if (ascii(bytes, 0, 4) === 'RIFF' && ascii(bytes, 8, 4) === 'WEBP') {
     const size = webpSize(bytes)
-    return sized('webp', size?.[0] ?? null, size?.[1] ?? null)
+    return sized('webp', size?.[0] ?? null, size?.[1] ?? null, webpComplete(bytes))
   }
   if (ascii(bytes, 0, 6) === 'GIF87a' || ascii(bytes, 0, 6) === 'GIF89a') {
-    return sized('gif', u16le(bytes, 6), u16le(bytes, 8))
+    const size = bytes.length >= 10 ? ([u16le(bytes, 6), u16le(bytes, 8)] as const) : null
+    return sized('gif', size?.[0] ?? null, size?.[1] ?? null, gifComplete(bytes))
   }
   if (isAvif(bytes)) {
     const size = avifSize(bytes)
-    return sized('avif', size?.[0] ?? null, size?.[1] ?? null)
+    return sized('avif', size?.[0] ?? null, size?.[1] ?? null, avifComplete(bytes))
   }
   if (startsWith(bytes, [0x00, 0x00, 0x01, 0x00])) {
     const size = icoSize(bytes)
-    return sized('ico', size?.[0] ?? null, size?.[1] ?? null)
+    return sized('ico', size?.[0] ?? null, size?.[1] ?? null, icoComplete(bytes))
   }
   if (looksLikeSvg(bytes)) return { ok: false, reason: 'svg' }
   return { ok: false, reason: 'unknown_format' }

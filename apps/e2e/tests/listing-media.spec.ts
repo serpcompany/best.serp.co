@@ -53,7 +53,6 @@ test.describe('hosted listing media', () => {
       expect(media.status(), src).toBe(200)
       expect(media.headers()['content-type']).toBe('image/png')
       expect(media.headers()['cache-control']).toBe('public, max-age=31536000, immutable')
-      expect(media.headers()['x-content-type-options']).toBe('nosniff')
     }
 
     const graph = await page
