@@ -575,7 +575,10 @@ describe('D1 data stays in Cloudflare', () => {
     'deploy-production.yml:release',
     'deploy-staging.yml:deploy',
     'notify-d1-submissions.yml:notify',
-    'publish-d1.yml:publish'
+    'publish-d1-staging.yml:publish',
+    'publish-d1.yml:publish',
+    'upload-media-staging.yml:upload',
+    'upload-media.yml:upload'
   ]
   /** Every step that can change D1, as `<file>:<job>:<environment>`; each follows a bookmark. */
   const bookmarkedChanges = [
@@ -583,6 +586,7 @@ describe('D1 data stays in Cloudflare', () => {
     'bootstrap-production-d1.yml:bootstrap:production',
     'deploy-production.yml:release:production',
     'deploy-staging.yml:deploy:staging',
+    'publish-d1-staging.yml:publish:staging',
     'publish-d1.yml:publish:production'
   ]
   const databaseExport =
@@ -650,6 +654,13 @@ describe('D1 data stays in Cloudflare', () => {
       run: /^pnpm tsx scripts\/cloudflare-release\.ts (?:bookmark|plan-release|list-migrations|check-database|verify-import|deploy) (?:staging|production)\n?$/u
     },
     {
+      // The listing media uploads (#95): `scripts/media-upload.ts` reads and writes R2 objects
+      // through the R2 API (`scripts/r2-objects.ts`) and never reaches D1, so this exact command
+      // is not a D1 change. Any other spelling still needs a bookmark (fail closed).
+      id: 'R2-only media upload',
+      run: /^pnpm media:upload:(?:staging|production) -- "\$PLAN_PATH"\n?$/u
+    },
+    {
       id: 'Deploy Production plan',
       run: new RegExp(
         `^${escapeRegExp(
@@ -682,6 +693,9 @@ describe('D1 data stays in Cloudflare', () => {
     CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
     CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN'),
     GITHUB_TOKEN: expression('github.token'),
+    // The media uploads' typed confirmation and reviewed plan path (#95), checked by the script.
+    MEDIA_UPLOAD_CONFIRM: expression('inputs.confirmation'),
+    PLAN_PATH: expression('inputs.plan_path'),
     RELEASE_CONFIRM: expression('inputs.confirmation'),
     // Deploy Staging's job env, and where the Worker deploy records its version.
     STAGING_ORIGIN: project.remote.staging.origin,
@@ -1132,6 +1146,94 @@ describe('D1 data stays in Cloudflare', () => {
       ]
     ])
     expect(reads).toEqual({ changes: [], violations: [] })
+  })
+
+  it('exempts exactly the R2-only media upload; any variant needs a bookmark (#97)', () => {
+    // The scripts the exemption names run the R2-only uploader and nothing else.
+    expect(packageScripts['media:upload:staging']).toBe(
+      'pnpm tsx scripts/media-upload.ts --target=staging'
+    )
+    expect(packageScripts['media:upload:production']).toBe(
+      'pnpm tsx scripts/media-upload.ts --target=production'
+    )
+    // The uploader reaches Cloudflare only through the R2 objects API: its imports are these,
+    // and its one Cloudflare URL is an R2 bucket object.
+    const imports = (file: string) =>
+      [...readFileSync(resolve(file), 'utf8').matchAll(/^import [^;]*?from '([^']+)'/gmsu)]
+        .map(match => match[1])
+        .sort()
+    expect(imports('scripts/media-upload.ts')).toEqual([
+      './project',
+      './r2-objects',
+      '@serpdirectory/data-ops/media-format',
+      '@serpdirectory/data-ops/media-keys',
+      '@serpdirectory/data-ops/safe-fetch',
+      '@serpdirectory/data-ops/safe-fetch-node',
+      'node:crypto',
+      'node:fs',
+      'node:path',
+      'node:url',
+      'zod'
+    ])
+    expect(imports('scripts/r2-objects.ts')).toEqual(['@serpdirectory/data-ops/media-keys'])
+    const r2 = readFileSync(resolve('scripts/r2-objects.ts'), 'utf8')
+    const placeholder = (name: string) => `\${${name}}`
+    expect(r2.match(/api\.cloudflare\.com[^`'"]*/gu)).toEqual([
+      `api.cloudflare.com/client/v4/accounts/${placeholder('accountId')}/r2/buckets/${placeholder('bucket')}/objects/${placeholder('key')}`
+    ])
+    expect(readFileSync(resolve('scripts/media-upload.ts'), 'utf8')).not.toMatch(
+      /api\.cloudflare\.com/u
+    )
+    const audit = d1ChangeAudit(allWorkflows())
+    expect(audit.violations).toEqual([])
+    expect(audit.changes.filter(change => change.startsWith('upload-media'))).toEqual([])
+    const upload = loadWorkflow('upload-media-staging.yml')
+    const job = upload.jobs.upload as WorkflowJob
+    const at = stepIndex(job, 'media:upload:staging')
+    const withUpload = (step: WorkflowStep, jobExtra: Partial<WorkflowJob> = {}) => {
+      const steps = [...stepsOf(job)]
+      steps[at] = step
+      return d1ChangeAudit([
+        [
+          'upload-media-staging.yml',
+          { ...upload, jobs: { upload: { ...job, ...jobExtra, steps } } }
+        ]
+      ])
+    }
+    const original = stepsOf(job)[at] as WorkflowStep
+    expect(withUpload(original).changes).toEqual([])
+    // Each variant is a change without a bookmark: refused.
+    const variants: Array<[string, WorkflowStep, Partial<WorkflowJob>]> = [
+      ['another target', { ...original, run: 'pnpm media:upload:dry-run -- "$PLAN_PATH"' }, {}],
+      [
+        'an appended command',
+        { ...original, run: `${original.run} && pnpm db:publish:staging` },
+        {}
+      ],
+      [
+        'a second argument',
+        { ...original, run: 'pnpm media:upload:staging -- "$PLAN_PATH" x' },
+        {}
+      ],
+      [
+        'the script by path',
+        { ...original, run: 'pnpm tsx scripts/media-upload.ts --target=staging' },
+        {}
+      ],
+      [
+        'an unreviewed env',
+        { ...original, env: { ...original.env, NODE_OPTIONS: '--require ./x.js' } },
+        {}
+      ],
+      ['a shell', { ...original, shell: 'bash -e {0}' } as WorkflowStep, {}],
+      ['job env', original, { env: { BASH_ENV: 'scripts/evil.sh' } }]
+    ]
+    for (const [label, step, jobExtra] of variants) {
+      const result = withUpload(step, jobExtra)
+      // A job-wide env reaches the credential check too, so it may count more than once.
+      expect(result.changes, label).toContain('upload-media-staging.yml:upload:staging')
+      expect(result.violations.join('\n'), label).toMatch(/must directly follow a plain/u)
+    }
   })
 
   it('exempts a reviewed command only when nothing else can change what it runs (#101 round 3)', () => {

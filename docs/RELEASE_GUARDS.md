@@ -196,13 +196,16 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
   `toJSON(secrets)`, and a `}}` inside a string literal all count. The job's `container` and
   `services` are read too. Every such
   step is a D1 change except a step whose whole `run` is one of a short reviewed list (the two
-  credential checks, a read-only `cloudflare-release.ts` command, the Worker `deploy`, and Deploy
-  Production's plan step) **and** that has nothing else to change what runs: only the keys
+  credential checks, a read-only `cloudflare-release.ts` command, the Worker `deploy`, Deploy
+  Production's plan step, and exactly `pnpm media:upload:<staging|production> -- "$PLAN_PATH"`,
+  #95's R2-only upload, whose script imports nothing that reaches D1) **and** that has nothing else to change what runs: only the keys
   `name`, `id`, `if`, `env`, and `run`; only reviewed `env` entries with their exact values (no
   `NODE_OPTIONS`, `BASH_ENV`, or `LD_PRELOAD`); no `shell` or `working-directory`; and no
   `defaults` or other `env` on the job or workflow. Any other launcher (`npm`, a path such as
-  `./node_modules/.bin/wrangler`, a script, an action) is a change, and so is #97's staging
-  publish once it lands. A bookmark step must meet the same rules.
+  `./node_modules/.bin/wrangler`, a script, an action) is a change, and so is the staging
+  publish (`publish-d1-staging.yml`, after its bookmark). Any variant of the upload command (an
+  extra argument or command, the script by path, an unreviewed `env`) is a change too. A
+  bookmark step must meet the same rules.
 - **No handoff.** A step holding the token, other than that list, may not write `GITHUB_ENV`,
   `GITHUB_PATH`, `GITHUB_OUTPUT`, or `GITHUB_STATE`, so it cannot pass the token to a later step.
   In a job holding the token, no `run` step may write `GITHUB_ENV` or `GITHUB_PATH` (only the
@@ -219,7 +222,7 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
   reports, the staging smoke evidence, and the install action's dependency caches), matched by
   action, name, and path. No workflow runs `d1 export` or `cloudflare-release.ts backup`, and no
   script under `scripts/` passes `export` to Wrangler. In every job where any step holds the
-  token (six today, all checked), each step uses only reviewed actions and runs no `gh gist`,
+  token (nine today, all checked), each step uses only reviewed actions and runs no `gh gist`,
   `gh release upload|create`, `gh api` file field, `curl` upload (`-T`, `--upload-file`, `-F`,
   `--form`, `-d @`, `--data-binary @`), or `wget` upload. Commands are read one at a time, split
   at `|`, `;`, `&`, and newlines.
