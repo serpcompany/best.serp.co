@@ -172,6 +172,11 @@ export interface AccountListing {
   slug: string
   /** The user's latest submission for the listing. */
   submission: { id: string; status: SubmissionStatus } | null
+  /**
+   * Unlisted by the badge program (#66) from the free plan: relisting it is a paid listing
+   * (#68, "Relist for $49").
+   */
+  unlistedForBadge: boolean
   verifiedVia: string
   website: string
 }
@@ -254,7 +259,10 @@ const LISTING_COLUMNS = `l.id,l.slug,l.name,l.description,l.website,l.is_active,
   r.id AS revision_id,r.status AS revision_status,r.created_at AS revision_created_at,
   r.updated_at AS revision_updated_at,r.reviewer_note AS revision_note,
   r.rejection_reason AS revision_rejection_reason,r.reviewed_at AS revision_reviewed_at,
-  r.content_version AS revision_content_version`
+  r.content_version AS revision_content_version,
+  (SELECT e.detail FROM listing_submission_events e
+    WHERE e.submission_id=s.id AND e.event_type='unpublished'
+    ORDER BY e.id DESC LIMIT 1) AS unpublished_reason`
 
 /** The user's latest submission (`s`) and latest revision (`r`) of each listing `l`. */
 const LISTING_JOINS = `LEFT JOIN listing_submissions s ON s.id=(SELECT x.id FROM listing_submissions x
@@ -490,6 +498,8 @@ function toListing(row: Row, history: AccountBadgeCheck[], now: Date): AccountLi
     submission: submissionId
       ? { id: submissionId, status: text(row.submission_status) as SubmissionStatus }
       : null,
+    unlistedForBadge:
+      Number(row.live) !== 1 && free && optional(row.unpublished_reason) === 'badge_missing',
     verifiedVia: text(row.verified_via),
     website: text(row.website)
   }

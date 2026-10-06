@@ -5,7 +5,8 @@
  *
  * Each cron expression maps to the jobs it runs. The hourly trigger runs the draft reminders
  * and expiry (#63), so the +12h reminder goes out within the hour it falls due, and continues
- * the badge program (#66) in batches; the badge program's weekly trigger opens its cycle and
+ * the badge program (#66) in batches, then the billing sweep (#68); the badge program's weekly
+ * trigger opens its cycle and
  * its daily trigger its confirmation rechecks (`lib/badge-program/schedule.ts`). A 15-minute
  * trigger hosts the queued listing media (#95). A trigger with no jobs here is logged and
  * ignored.
@@ -20,6 +21,9 @@ import { createDraftJobOperations } from '@serpdirectory/data-ops/draft-jobs'
 import { site } from '@serpdirectory/site-config'
 import { runBadgeProgram } from '../badge-program/program'
 import { BADGE_DAILY_CRON, BADGE_WEEKLY_CRON } from '../badge-program/schedule'
+import { ordersEnabledFor } from '../billing/flags'
+import { runBillingSweep } from '../billing/service'
+import { type BillingEnv, createBillingDependencies } from '../billing/worker-billing'
 import { appEmailTemplates } from '../email/registry'
 import { createWorkerEmailService, type EmailWorkerEnv } from '../email/runtime'
 import { type SiteFeatures, features as siteFeatures } from '../features'
@@ -36,9 +40,8 @@ export const MEDIA_CRON = '*/15 * * * *'
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
-export interface ScheduledEnv extends EmailWorkerEnv {
+export interface ScheduledEnv extends EmailWorkerEnv, BillingEnv {
   D1_RUNTIME_ENV?: string
-  DB?: D1Database
   /**
    * `on` runs the badge program on a local Worker while `features.badgeProgram` is off, for the
    * end-to-end suite (`LOCAL_PREVIEW_VARS`). Ignored unless `SITE_ENVIRONMENT` and
@@ -127,7 +130,7 @@ export const draftJobs: ScheduledJob = {
     const result = await runDraftJobs({
       jobs,
       now,
-      paidListings: site.features.showPaidListings,
+      paidListings: ordersEnabledFor(env),
       priceCents: site.submissions.paidListingPriceCents,
       send: (templateId, request) => email.send(templateId, request)
     })
@@ -161,6 +164,31 @@ export function createBadgeProgramJob(features: SiteFeatures = siteFeatures): Sc
 
 export const badgeProgramJob = createBadgeProgramJob()
 
+/** Orders and refunds the sweep looks at per run. */
+const BILLING_SWEEP_LIMIT = 50
+
+/**
+ * The billing sweep (#68, `runBillingSweep`): refunds still owed after an `other` rejection,
+ * pending orders whose checkout closed (reconciled with the provider), and paid orders a crash
+ * left unapplied. Off while orders are off.
+ */
+export function createBillingJob(features: SiteFeatures = siteFeatures): ScheduledJob {
+  return {
+    name: 'billing-sweep',
+    async run({ context, env }) {
+      if (!ordersEnabledFor(env, features)) return { enabled: false }
+      const email = sequentialEmail(context, env)
+      const deps = createBillingDependencies({
+        env,
+        notify: (templateId, request) => email.send(templateId, request)
+      })
+      return { enabled: true, ...(await runBillingSweep(deps, { limit: BILLING_SWEEP_LIMIT })) }
+    }
+  }
+}
+
+export const billingJob = createBillingJob()
+
 /**
  * Retries the due listing and submission media slots and deletes finished submissions' images
  * (`runMediaCron`). Without a `DB` or `MEDIA` binding it logs `media_cron_disabled` and skips.
@@ -174,7 +202,7 @@ export const mediaJobs: ScheduledJob = {
 }
 
 export const scheduledJobs: Readonly<Record<string, readonly ScheduledJob[]>> = {
-  [DRAFT_JOBS_CRON]: [draftJobs, badgeProgramJob],
+  [DRAFT_JOBS_CRON]: [draftJobs, badgeProgramJob, billingJob],
   [BADGE_WEEKLY_CRON]: [badgeProgramJob],
   [BADGE_DAILY_CRON]: [badgeProgramJob],
   [MEDIA_CRON]: [mediaJobs]

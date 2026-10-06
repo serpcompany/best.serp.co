@@ -254,6 +254,44 @@ export const applicationColumnInventory = {
     'height',
     'created_at',
     'updated_at'
+  ],
+  orders: [
+    'id',
+    'user_id',
+    'kind',
+    'purpose',
+    'target_key',
+    'submission_id',
+    'listing_id',
+    'claim_id',
+    'amount_cents',
+    'currency',
+    'provider',
+    'provider_checkout_id',
+    'checkout_url',
+    'checkout_expires_at',
+    'provider_payment_id',
+    'provider_refund_id',
+    'status',
+    'outcome',
+    'failure_reason',
+    'refund_reason',
+    'refunded_by',
+    'paid_at',
+    'applied_at',
+    'refunded_at',
+    'failed_at',
+    'created_at',
+    'updated_at'
+  ],
+  billing_events: [
+    'provider',
+    'event_id',
+    'event_type',
+    'order_id',
+    'outcome',
+    'received_at',
+    'processed_at'
   ]
 } as const
 
@@ -320,7 +358,9 @@ export const importOrder: ApplicationTableName[] = [
   'listing_revision_events',
   'badge_checks',
   'listing_events',
-  'media_ingestions'
+  'media_ingestions',
+  'orders',
+  'billing_events'
 ]
 
 export const toolOwnedTableNames = ['d1_migrations'] as const

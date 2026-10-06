@@ -85,7 +85,8 @@ with no "too many checks" copy. The owner's checks are recorded on the submissio
 badge program's (#66) history, so a manual miss can't start #66's recheck or count toward the
 refund window. The history merges both, marked "You" or the program's label. Until
 `features.badgeProgram` is on, nothing promises weekly checks (`feature-copy.ts`), and the
-"Upgrade: $49 one-off" entry point stays hidden with `showPaidListings` (#68).
+"Upgrade: $49 one-off" entry point (in the badge panel) and an unlisted listing's "Relist for
+$49" show only while orders are on ([Billing](./BILLING.md)).
 
 ## Logos
 

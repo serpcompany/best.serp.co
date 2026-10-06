@@ -178,15 +178,10 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   lifts the block (`lifted_at`). `other` rejections block nothing. **Limitation:** a row written
   before #62 has no block key, so a prohibited rejection of it blocks its exact host only. Such
   rows exist only on staging (production had no submissions before #62), so there is no backfill.
-- **Charges are recorded in #68's `orders`.** `paid_at` and `refunded_at` describe a payment
-  applied to this submission, nothing more. **Contract for #68:** `orders` is the ledger of record
-  for every charge and refund, including the ones a submission row cannot represent: a checkout
-  that completes after a reviewer requested changes or rejected the submission, a duplicate
-  checkout session, an upgrade of a listing unpublished during checkout, or a charge after a
-  `prohibited` rejection (the row refuses `refunded_at` there). The webhook records the charge in
-  `orders` first, applies it with `buildRecordSubmissionPaymentPlans` (or
-  `buildRecordUnappliedPaymentPlans` for a withdrawn row) when the submission accepts it, and
-  otherwise refunds it from `orders` alone.
+- **Charges are recorded in `orders`** ([Billing](./BILLING.md)), the ledger of record for every
+  charge and refund. `paid_at` and `refunded_at` describe a payment applied to this submission,
+  nothing more; a charge the submission can't accept (a duplicate checkout, a payment after a
+  withdrawal, rejection, or change request) is refunded from `orders` alone.
 - **Refund pending.** A paid submission rejected as `other` owes its refund from the rejection
   batch on: `status = 'rejected'`, `rejection_category = 'other'`, `paid_at` set, `refunded_at`
   null (`selectRefundPendingSubmissionsPlan`). The batch writes that marker atomically, so no
@@ -209,6 +204,9 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   from the one-off check at refund (#68). `0006_badge_program` rebuilds the table to add `kind`
   (existing rows become `weekly`; nothing references it). It is outside the catalog: writing it
   never changes the catalog epoch.
+
+- `orders` and `billing_events` (`0008_billing_orders`): the billing ledger and the provider's
+  webhook events, written only by `packages/data-ops/src/billing.ts`.
 
 These tables are empty in the initial import, so bootstrap parity compares them like the
 submission tables (`scripts/d1-table-inventory.ts`).

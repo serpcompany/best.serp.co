@@ -465,6 +465,58 @@ export function buildUpgradeListingToPaidPlans(input: {
 }
 
 /**
+ * A free listing the badge program unlisted (its latest `unpublished` event is `badge_missing`,
+ * #66) comes back as a paid listing (#68, "Relist for $49"): the listing is republished at the
+ * same URL and its approved submission moves to the paid plan, in one batch that advances the
+ * catalog version. A listing an admin unpublished, or one whose submission is not approved and
+ * free and unpaid, is refused.
+ */
+export function buildRelistListingToPaidPlans(input: {
+  actor: string
+  listingId: string
+  now: string
+  publication: CatalogPublication
+  submissionId: string
+}): StatementPlan[] {
+  const relistable = `EXISTS (SELECT 1 FROM listing_submissions s JOIN listings l ON l.id=s.listing_id
+      WHERE s.id=? AND s.listing_id=? AND s.status='approved' AND s.plan='free'
+        AND s.paid_at IS NULL AND s.refunded_at IS NULL
+        AND l.status='approved' AND l.is_active=0 AND l.published_at IS NOT NULL
+        AND (SELECT e.detail FROM listing_submission_events e
+          WHERE e.submission_id=s.id AND e.event_type='unpublished'
+          ORDER BY e.id DESC LIMIT 1)='badge_missing')`
+  return [
+    ...beginCatalogPublicationPlans(input.publication, {
+      sql: relistable,
+      params: [input.submissionId, input.listingId]
+    }),
+    {
+      sql: `UPDATE listings SET is_active=1,updated_at=?
+        WHERE id=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL`,
+      params: [input.now, input.listingId]
+    },
+    assertPreviousStatementChangedOne('listing_relisted'),
+    {
+      sql: `UPDATE listing_submissions SET plan='paid',paid_at=?,updated_at=?
+        WHERE id=? AND listing_id=? AND status='approved' AND plan='free' AND paid_at IS NULL`,
+      params: [input.now, input.now, input.submissionId, input.listingId]
+    },
+    assertPreviousStatementChangedOne('relisted_submission_paid'),
+    event(input.submissionId, 'paid', input.actor, 'relist'),
+    {
+      sql: `INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,?,?,?)`,
+      params: [
+        input.listingId,
+        'republished',
+        JSON.stringify({ reason: 'relisted_paid' }),
+        input.actor
+      ]
+    },
+    ...finishCatalogPublicationPlans(input.publication)
+  ]
+}
+
+/**
  * `paid_pending_review` → `approved`. The listing is already live; its content is replaced by
  * the submission's staged content (which a reviewer may have edited before approving). Refused
  * unless the staged content is the version the reviewer saw and the live listing is unchanged

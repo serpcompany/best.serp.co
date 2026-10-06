@@ -233,6 +233,7 @@ export async function signIn({ headers, request }: Client, email: string): Promi
 export const ADMIN_EMAIL_PREFIXES = {
   accountDashboard: 'e2e-account-admin',
   adminPanel: 'e2e-panel-admin',
+  billing: 'e2e-billing-admin',
   adminPanelAdded: 'e2e-panel-added'
 } as const
 

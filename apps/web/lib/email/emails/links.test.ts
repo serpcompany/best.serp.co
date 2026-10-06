@@ -1,6 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
-import { site } from '@serpdirectory/site-config'
 import { describe, expect, it } from 'vitest'
 import { features, type SiteFeatures } from '../../features'
 import { type AppEmailTemplates, appEmailTemplates } from '../registry'
@@ -91,8 +90,12 @@ const FLAGGED_SENDERS: Partial<
   Record<TemplateId, { directory: string; feature: keyof SiteFeatures }>
 > = {
   'badge-missing': { directory: 'lib/badge-program', feature: 'badgeProgram' },
+  // Billing (#68) sends these only while orders are on (`lib/billing/flags.ts`).
+  'listing-live-paid': { directory: 'lib/billing', feature: 'orders' },
   'listing-unlisted': { directory: 'lib/badge-program', feature: 'badgeProgram' },
-  'ownership-removed': { directory: 'lib/badge-program', feature: 'badgeProgram' }
+  'ownership-removed': { directory: 'lib/badge-program', feature: 'badgeProgram' },
+  'payment-received-in-review': { directory: 'lib/billing', feature: 'orders' },
+  'submission-rejected-refunded': { directory: 'lib/billing', feature: 'orders' }
 }
 
 /** App source outside the email module (tests excluded), by path from `apps/web`. */
@@ -172,12 +175,12 @@ type Rendered = { html: string; subject: string; text: string }
 
 /**
  * A sample's input as the app sends it. The draft reminder's paid copy and its checkout link
- * (#68) follow `site.features.showPaidListings`, which the draft job passes as `paidListings`
- * (#63), so it renders here with the site's flag rather than the mockups' `true`.
+ * (#68) follow `features.orders`, which the draft job passes as `paidListings` (#63), so it
+ * renders here with the site's flag rather than the mockups' `true`.
  */
 function sentInput(id: TemplateId, input: unknown): unknown {
   if (id !== 'draft-reminder') return input
-  return { ...(input as object), paidListings: site.features.showPaidListings }
+  return { ...(input as object), paidListings: features.orders }
 }
 
 /** Every sample of every template, rendered in production with the given site areas. */

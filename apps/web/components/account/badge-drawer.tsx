@@ -286,6 +286,12 @@ export function BadgeDrawer({
             <b className="tabular-nums text-foreground">{badge.checksLeft} of 10</b> checks left
             today · one every 30 seconds
           </p>
+          {row?.upgrade ? (
+            <Button asChild variant="outline">
+              {/* A plain link: the checkout route opens a provider checkout (#68). */}
+              <a href={row.upgrade.href}>{row.upgrade.label}</a>
+            </Button>
+          ) : null}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>

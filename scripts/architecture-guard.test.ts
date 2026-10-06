@@ -525,6 +525,40 @@ describe('single-site D1-only repository architecture', () => {
     expect(requests).toContain("import 'server-only'")
   })
 
+  // Billing (#68): the ledger's SQL lives in the shared data package, and everything specific to
+  // the payment provider stays behind the billing module's interface, so Lago can replace Stripe.
+  it('keeps billing SQL in the data package and the provider inside the billing module (#68)', () => {
+    const billingDirectory = resolve(project.appDirectory, 'lib/billing')
+    for (const file of readdirSync(billingDirectory).filter(name => !name.includes('.test.'))) {
+      const source = readFileSync(resolve(billingDirectory, file), 'utf8')
+      expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
+    }
+    const runtime = readFileSync(resolve(billingDirectory, 'runtime.ts'), 'utf8')
+    expect(runtime).toContain("import 'server-only'")
+    const providerSpecific =
+      /api\.stripe\.com|createStripeProvider|stripe-signature|checkout\.session/iu
+    const outside = trackedFiles().filter(
+      file =>
+        /\.(?:ts|tsx)$/u.test(file) &&
+        (file.startsWith(`${project.appDirectory}/`) || file.startsWith('packages/')) &&
+        !file.startsWith(`${project.appDirectory}/lib/billing/`) &&
+        existsSync(resolve(file)) &&
+        providerSpecific.test(readFileSync(resolve(file), 'utf8'))
+    )
+    expect(outside).toEqual([])
+    // Only the billing module's runtime reads the provider's secrets.
+    const secretReaders = trackedFiles().filter(
+      file =>
+        /\.(?:ts|tsx)$/u.test(file) &&
+        file.startsWith(`${project.appDirectory}/`) &&
+        !file.endsWith('.d.ts') &&
+        !file.startsWith(`${project.appDirectory}/lib/billing/`) &&
+        existsSync(resolve(file)) &&
+        /STRIPE_(?:SECRET_KEY|WEBHOOK_SECRET)/u.test(readFileSync(resolve(file), 'utf8'))
+    )
+    expect(secretReaders).toEqual([])
+  })
+
   it('catches every way code can write badge checks (#66 review round 1)', () => {
     for (const write of [
       'INSERT INTO badge_checks (listing_id) VALUES (?)',

@@ -50,8 +50,6 @@ export const site: SiteDefinition = {
     showFeaturedGuides: false,
     showGuides: false,
     showNewsletter: true,
-    // Paid listings ship with checkout (#68); until then /submit offers the free badge listing.
-    showPaidListings: false,
     showProjects: false
   },
   id: 'best.serp.co',
@@ -95,7 +93,9 @@ export const site: SiteDefinition = {
   },
   submissions: {
     // $49 USD, one-off and permanent (#59 owner decision, 2026-10-06).
-    paidListingPriceCents: 4900
+    paidListingPriceCents: 4900,
+    // Sales tax is deferred (#68): Stripe Tax stays off.
+    automaticTax: false
   },
   site: {
     description:

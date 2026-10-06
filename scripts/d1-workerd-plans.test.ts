@@ -12,6 +12,7 @@ import {
   badgeProgramEmailKey,
   createBadgeProgramOperations
 } from '@serpdirectory/data-ops/badge-program'
+import * as billingModule from '@serpdirectory/data-ops/billing'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import * as draftPlansModule from '@serpdirectory/data-ops/draft-plans'
 import * as listingPlansModule from '@serpdirectory/data-ops/listing-plans'
@@ -68,6 +69,7 @@ const L = tracked(listingPlansModule)
 const M = tracked(mediaPlansModule)
 const R = tracked(revisionPlansModule)
 const S = tracked(submissionPlansModule)
+const B = tracked(billingModule)
 
 let stateDirectory: string
 let proxyDispose: (() => Promise<void>) | undefined
@@ -1207,6 +1209,168 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         .bind(listingId, hosted('logo', 'c').key)
         .run()
     ).rejects.toThrow(/listing_media_hosted_complete/u)
+  })
+
+  it('records orders, webhook events, upgrades, relists, and refunds (#68)', async () => {
+    const order = async (id: string) =>
+      (await all<Record<string, unknown>>(B.selectOrderPlan(id)))[0] ?? null
+    // A paid submission: the order is opened, gets its checkout, is paid, and is applied in the
+    // same batch as the payment plans.
+    await insertDraft('sub-order', 'https://order.example/')
+    await choose('sub-order', 'paid')
+    await run(
+      B.buildCreateOrderPlans({
+        amountCents: 4900,
+        currency: 'usd',
+        id: 'ord-1',
+        now: NOW,
+        provider: 'stripe',
+        purpose: 'submission',
+        submissionId: 'sub-order',
+        userId: 'user_owner'
+      })
+    )
+    // One open order per target.
+    await expect(
+      run(
+        B.buildCreateOrderPlans({
+          amountCents: 4900,
+          currency: 'usd',
+          id: 'ord-dup',
+          now: NOW,
+          provider: 'stripe',
+          purpose: 'submission',
+          submissionId: 'sub-order',
+          userId: 'user_owner'
+        })
+      )
+    ).rejects.toThrow(/UNIQUE/u)
+    expect(await all(B.selectOpenOrderPlan('submission:sub-order'))).toHaveLength(1)
+    await run(
+      B.buildAttachCheckoutPlans({
+        checkoutId: 'cs_1',
+        expiresAt: '2026-10-06T13:00:00.000Z',
+        now: NOW,
+        orderId: 'ord-1',
+        url: 'https://checkout.example/cs_1'
+      })
+    )
+    expect(await all(B.selectOrderByCheckoutPlan('stripe', 'cs_1'))).toHaveLength(1)
+    await run(B.buildMarkOrderPaidPlans({ now: NOW, orderId: 'ord-1', paymentId: 'pi_1' }))
+    await run([
+      ...S.buildRecordSubmissionPaymentPlans({
+        actor: 'billing',
+        listingId: 'lst-order',
+        now: NOW,
+        outcome: 'publish',
+        publication: await publication('paid-listing', 'sub-order'),
+        submissionId: 'sub-order'
+      }),
+      ...B.buildMarkOrderAppliedPlans({ now: NOW, orderId: 'ord-1', outcome: 'published' })
+    ])
+    expect(await order('ord-1')).toMatchObject({ outcome: 'published', status: 'paid' })
+    // Applied once: a second application is refused.
+    await expect(
+      run(B.buildMarkOrderAppliedPlans({ now: NOW, orderId: 'ord-1', outcome: 'held' }))
+    ).rejects.toThrow()
+    expect(await all(B.selectSubmissionPaymentOrderPlan('sub-order'))).toHaveLength(1)
+    expect(await all(B.selectCheckoutSubmissionPlan('sub-order'))).toEqual([
+      expect.objectContaining({ status: 'paid_pending_review', owner_email: 'owner@example.com' })
+    ])
+    expect(
+      await all(B.selectOrdersToReconcilePlan({ before: '2026-10-07T00:00:00.000Z', limit: 10 }))
+    ).toEqual([])
+    expect(await all(B.selectAdminOrdersPlan())).toEqual([
+      expect.objectContaining({ buyer_email: 'owner@example.com', id: 'ord-1', listing_live: 1 })
+    ])
+
+    // Webhook events are recorded once.
+    const event = {
+      eventId: 'evt_1',
+      eventType: 'checkout.session.completed',
+      now: NOW,
+      provider: 'stripe'
+    }
+    await run(B.buildRecordBillingEventPlans(event))
+    await run(B.buildRecordBillingEventPlans(event))
+    await run(B.buildFinishBillingEventPlans({ ...event, orderId: 'ord-1', outcome: 'published' }))
+    expect(
+      await first('SELECT COUNT(*) AS n, MAX(outcome) AS outcome FROM billing_events')
+    ).toEqual({ n: 1, outcome: 'published' })
+
+    // An unpaid order fails; a refund records the reason and the actor.
+    await insertDraft('sub-failed', 'https://failed.example/')
+    await run(
+      B.buildCreateOrderPlans({
+        amountCents: 4900,
+        currency: 'usd',
+        id: 'ord-2',
+        now: NOW,
+        provider: 'stripe',
+        purpose: 'submission',
+        submissionId: 'sub-failed',
+        userId: 'user_owner'
+      })
+    )
+    await run(B.buildMarkOrderFailedPlans({ now: NOW, orderId: 'ord-2', reason: 'expired' }))
+    expect(await order('ord-2')).toMatchObject({ failure_reason: 'expired', status: 'failed' })
+    await run(B.buildMarkOrderPaidPlans({ now: NOW, orderId: 'ord-2', paymentId: 'pi_2' }))
+    await run(
+      B.buildMarkOrderRefundedPlans({
+        actor: 'billing',
+        now: NOW,
+        orderId: 'ord-2',
+        reason: 'unapplied',
+        refundId: 're_2'
+      })
+    )
+    expect(await order('ord-2')).toMatchObject({
+      outcome: 'unapplied',
+      refund_reason: 'unapplied',
+      status: 'refunded'
+    })
+
+    // Upgrade and relist of an owned free listing.
+    await insertDraft('sub-relist', 'https://relist.example/')
+    await choose('sub-relist', 'free')
+    await db.prepare(`UPDATE listing_submissions SET status='verified' WHERE id='sub-relist'`).run()
+    await run(
+      S.buildApproveSubmissionPlans({
+        ...(await publication('approve', 'sub-relist')),
+        affectedRoute: '/products/relist.example/',
+        expectedContentVersion: 1,
+        listingId: 'lst-relist',
+        reviewer: 'reviewer',
+        submissionId: 'sub-relist'
+      })
+    )
+    const [owned] = await all<Record<string, unknown>>(
+      B.selectCheckoutListingPlan({ slug: 'relist.example' }, 'user_owner')
+    )
+    expect(owned).toMatchObject({ live: 1, plan: 'free', submission_status: 'approved' })
+    await run(
+      L.buildUnpublishListingPlans({
+        listingId: 'lst-relist',
+        publication: await publication('badge-unpublish', 'lst-relist'),
+        reason: 'badge_missing'
+      })
+    )
+    await run(
+      S.buildRelistListingToPaidPlans({
+        actor: 'billing',
+        listingId: 'lst-relist',
+        now: NOW,
+        publication: await publication('paid-relist', 'lst-relist'),
+        submissionId: 'sub-relist'
+      })
+    )
+    expect(await listing('lst-relist')).toMatchObject({ is_active: 1 })
+    expect(await submission('sub-relist')).toMatchObject({ paid_at: NOW, plan: 'paid' })
+    expect(
+      await all(B.selectCheckoutListingPlan({ listingId: 'lst-relist' }, 'user_owner'))
+    ).toEqual([
+      expect.objectContaining({ live: 1, plan: 'paid', unpublished_reason: 'badge_missing' })
+    ])
   })
 
   it('ran every exported plan builder on D1', () => {

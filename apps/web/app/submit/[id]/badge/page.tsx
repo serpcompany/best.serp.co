@@ -1,10 +1,10 @@
-import { site } from '@serpdirectory/site-config'
 import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import { siteConfig } from '@serpdirectory/web-core/site-config'
 import { getFeaturedOnBadgePreviewPathFromKey } from '@serpdirectory/web-core/website/featured-on-badge-url'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { BadgeStep } from '@/components/submit/badge-step'
+import { ordersEnabled } from '@/lib/billing/runtime'
 import { nextStepPath } from '@/lib/submissions/contract'
 import { toSummary } from '@/lib/submissions/http'
 import { ownSubmissionForPage } from '@/lib/submissions/pages'
@@ -38,7 +38,7 @@ export default async function BadgePage({ params }: BadgePageProps) {
       }}
       badgeUrls={{ dark, light }}
       listingUrl={targets.listingUrl}
-      showPaid={site.features.showPaidListings}
+      showPaid={await ordersEnabled()}
       signedInEmail={user.email}
       siteName={siteConfig.badges.featuredOn.displayName}
       submission={toSummary(submission)}

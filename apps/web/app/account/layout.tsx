@@ -1,10 +1,10 @@
-import { site } from '@serpdirectory/site-config'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { AccountShell } from '@/components/account/account-shell'
 import { getAccountOverview } from '@/lib/account/overview'
 import { accountRows, type BadgeTarget } from '@/lib/account/view'
 import { getSessionUser } from '@/lib/auth/server'
+import { ordersEnabled } from '@/lib/billing/runtime'
 import { requireRouteFeature } from '@/lib/route-feature-gates'
 
 /**
@@ -29,7 +29,7 @@ export default async function AccountLayout({ children }: { children: ReactNode 
   const rows = accountRows(await getAccountOverview(user.id), {
     badgeTarget: noBadge,
     now: new Date(),
-    showPaid: site.features.showPaidListings
+    showPaid: await ordersEnabled()
   })
   return (
     <AccountShell

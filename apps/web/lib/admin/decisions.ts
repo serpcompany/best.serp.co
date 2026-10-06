@@ -80,8 +80,9 @@ export type AdminNotify = <K extends keyof AppEmailTemplates & string>(
 ) => Promise<void>
 
 /**
- * Refunds a paid submission's payment through the payment provider (#68). Absent until #68
- * ships, so a paid submission cannot be rejected as `other` (which promises a refund) yet.
+ * Refunds a paid submission's payment through the payment provider (#68's billing module,
+ * `lib/billing/service.ts`). Absent while orders are off, so a paid submission cannot be
+ * rejected as `other` (which promises a refund) then.
  *
  * The contract (docs/ADMIN_PANEL.md, "Refunds"): the rejection batch leaves the submission
  * refund-pending (`selectRefundPendingSubmissionsPlan`) until the refund is recorded, so
@@ -93,6 +94,20 @@ export type AdminNotify = <K extends keyof AppEmailTemplates & string>(
  */
 export interface AdminRefunds {
   refundRejectedSubmission(input: { actor: string; submissionId: string }): Promise<void>
+}
+
+/** What a refund from Orders did to the order's listing (#70 screen 13). */
+export type OrderRefundListing = 'kept_free' | 'unchanged' | 'unpublished'
+
+/**
+ * The admin Orders screen's refund (#68, `refundOrder` in `lib/billing/service.ts`): the badge
+ * check at refund, the provider refund, and the D1 batch. Absent while orders are off.
+ */
+export interface AdminBilling {
+  refundOrder(input: {
+    actor: string
+    orderId: string
+  }): Promise<{ listing: OrderRefundListing; ok: true; replayed: boolean } | DecisionFailure>
 }
 
 /**
@@ -117,6 +132,7 @@ export interface AdminMediaHost {
 export interface AdminContext {
   /** The admin's verified email: the actor recorded on every decision. */
   actor: string
+  billing?: AdminBilling
   client: Database
   media?: AdminMediaHost
   /** Builds an email event key (`emailEventKey` in production). */
@@ -1354,4 +1370,22 @@ export async function removeAdmin(
   )
   log(context, 'remove_admin', email, decision.ok ? 'removed' : decision.error)
   return decision.ok ? decision : lastAdmin
+}
+
+// ---------------------------------------------------------------------------------------------
+// Orders (#68)
+
+/**
+ * "Refund" on an order (#70 screen 13). The billing module decides what happens to the listing
+ * (the badge check at refund keeps a passing one live as free; otherwise it is unpublished) and
+ * is idempotent: a refunded order answers `replayed`. 404 while orders are off.
+ */
+export async function refundOrder(
+  context: AdminContext,
+  input: { orderId: string }
+): Promise<Decision<{ listing: OrderRefundListing }>> {
+  if (!context.billing) return notFound('order')
+  const result = await context.billing.refundOrder({ actor: context.actor, orderId: input.orderId })
+  log(context, 'refund_order', input.orderId, result.ok ? result.listing : result.error)
+  return result
 }

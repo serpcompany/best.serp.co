@@ -90,8 +90,10 @@ word for word (`APPROVED_INTERIM_COPY`: "resubmit from your account"). It lists 
 in emails nothing sends yet: `/account/messages/...` and `/admin/inbox/<thread>/` (#73).
 `/account/listings/<slug>/`, where badge-missing and unlisted point, opens the listing's badge
 panel (#65). The draft reminder, which the hourly job sends (#63), renders
-with the site's `showPaidListings` flag as the job passes it, so its "Complete checkout" link
-to `/submit/<id>/checkout/` must exist once #68 turns the flag on.
+with `features.orders` as the job passes it, and its "Complete checkout" link opens
+`/submit/<id>/checkout/` ([Billing](./BILLING.md)). The billing module alone sends
+`listing-live-paid`, `payment-received-in-review`, and `submission-rejected-refunded`, only
+while orders are on (`FLAGGED_SENDERS`).
 
 ## Recipients and footers
 
