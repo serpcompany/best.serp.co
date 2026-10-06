@@ -50,6 +50,7 @@ import { ArrowRight, BadgeCheck, Copy, MessageSquare, ShieldCheck } from 'lucide
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { formatWait } from '@/components/auth/sign-in-api'
 import { type BadgeOutcome, badgeCheckResultAlert } from '@/components/submit/badge-step'
 import { call } from '@/components/submit/submit-api'
 
@@ -69,6 +70,8 @@ interface ClaimView {
   attemptsLeft: number
   checksLeft: number
   codeExpiresAt: string
+  /** Until when the confirmed address can finish the claim. */
+  confirmedUntil: string | null
   email: string
   id: string
   lockedUntil: string | null
@@ -90,6 +93,8 @@ interface ApiFailure {
   code: string
   contactPath?: string
   retryAfterSeconds?: number
+  /** `already_owned` by the caller. */
+  self?: boolean
 }
 
 type Step =
@@ -99,6 +104,8 @@ type Step =
   | 'email'
   | 'loading'
   | 'method'
+  /** The caller already owns the listing. */
+  | 'mine'
   | 'owned'
   | 'payment'
   | 'unclaimable'
@@ -179,7 +186,13 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState<string | null>(null)
   const [code, setCode] = useState('')
-  const [codeError, setCodeError] = useState<'attempts' | 'expired' | 'invalid' | null>(null)
+  const [codeError, setCodeError] = useState<'attempts' | 'expired' | 'invalid' | 'rate' | null>(
+    null
+  )
+  /** "Try again in …" for a send the hourly caps refused. */
+  const [rateWait, setRateWait] = useState('')
+  /** The visitor owns the listing now: the claim link goes without waiting for the page. */
+  const [owner, setOwner] = useState(false)
   const [contactPath, setContactPath] = useState('/contact/')
   const [outcome, setOutcome] = useState<BadgeOutcome>(null)
   const [badgeWaitUntil, setBadgeWaitUntil] = useState(0)
@@ -215,6 +228,11 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         signIn()
         return true
       }
+      if (error.code === 'already_owned' && error.self) {
+        setOwner(true)
+        setStep('mine')
+        return true
+      }
       if (error.code === 'already_owned') {
         setContactPath(error.contactPath ?? '/contact/')
         setStep('owned')
@@ -241,6 +259,15 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         resumed.lockedUntil && Date.parse(resumed.lockedUntil) > Date.now() ? 'attempts' : null
       )
       setStep('code')
+    } else if (
+      resumed?.status === 'email_verified' &&
+      resumed.confirmedUntil &&
+      Date.parse(resumed.confirmedUntil) <= Date.now()
+    ) {
+      // A confirmation lasts 24 hours: past that, the address is confirmed again with a new code.
+      setEmail(resumed.email)
+      setCodeError('expired')
+      setStep('code')
     } else if (resumed?.status === 'email_verified') {
       setEmail(resumed.email)
       setStep(resumed.method === 'paid' ? 'payment' : 'badge')
@@ -266,7 +293,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
   // link, so refreshing while the success (or already-owned) answer shows would unmount it.
   const changeOpen = (next: boolean) => {
     setOpen(next)
-    if (!next && (step === 'done' || step === 'owned')) router.refresh()
+    if (!next && (step === 'done' || step === 'mine' || step === 'owned')) router.refresh()
   }
 
   const openDialog = useCallback(() => {
@@ -303,12 +330,30 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
       setEmailError(
         `${providerName(email)} addresses can’t confirm you work at ${name}. Use an address at ${domain}.`
       )
-    } else if (error.code === 'domain_mismatch' || error.code === 'invalid_email') {
+    } else if (error.code === 'invalid_email') {
+      setEmailError('Enter a valid email address, like you@company.com.')
+    } else if (error.code === 'domain_mismatch') {
       setEmailError(
         `That address is at ${domainOf(email) || email}. Use an email at ${domain} (subdomains like team.${domain} work too).`
       )
-    } else if (error.code === 'cooldown' || error.code === 'too_many_attempts') {
-      // A code is already out (or the claim is locked): back to the code step as it stands.
+    } else if (
+      error.code === 'cooldown' &&
+      step === 'email' &&
+      claim?.status === 'code_sent' &&
+      claim.email === email.trim().toLowerCase()
+    ) {
+      // The code sent a moment ago to this address still works.
+      setStep('code')
+    } else if (error.code === 'cooldown') {
+      const wait = formatWait(error.retryAfterSeconds ?? 60)
+      if (step === 'code') {
+        setRateWait(wait)
+        setCodeError('rate')
+      } else {
+        setEmailError(`Too many code requests. Try again in ${wait}.`)
+      }
+    } else if (error.code === 'too_many_attempts') {
+      // The claim is locked: back to the code step as it stands.
       await load()
     }
   }
@@ -353,6 +398,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     if (response.ok) {
       setClaim(response.data.claim)
       if (response.data.claim.status === 'completed') {
+        setOwner(true)
         setStep('done')
         return
       }
@@ -362,7 +408,13 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     }
     const error = response.error as ApiFailure
     if (elsewhere(response.status, error)) return
-    if (error.code === 'cooldown') {
+    if (error.code === 'confirmation_expired') {
+      // 24 hours after the address was confirmed: confirm it again with a new code.
+      setEmail(claim.email)
+      setCode('')
+      setCodeError('expired')
+      setStep('code')
+    } else if (error.code === 'cooldown') {
       setBadgeWaitUntil(Date.now() + (error.retryAfterSeconds ?? BADGE_COOLDOWN_SECONDS) * 1000)
     } else if (error.code === 'checks_used') {
       setClaim(current => (current ? { ...current, checksLeft: 0 } : current))
@@ -384,11 +436,13 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
   const title =
     step === 'done'
       ? `You now manage ${name}`
-      : step === 'owned'
-        ? `${name} already has an owner`
-        : `Claim ${name}`
+      : step === 'mine'
+        ? 'You manage this listing'
+        : step === 'owned'
+          ? `${name} already has an owner`
+          : `Claim ${name}`
   const description =
-    step === 'done'
+    step === 'done' || step === 'mine'
       ? 'It’s in your account. Edits you make are reviewed before they go live.'
       : step === 'owned'
         ? 'Someone has already verified that they own this listing.'
@@ -515,7 +569,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
             value={code}
             onChange={value => {
               setCode(value)
-              if (codeError === 'invalid') setCodeError(null)
+              if (codeError === 'invalid' || codeError === 'rate') setCodeError(null)
               if (value.length === CODE_LENGTH && codeError !== 'expired') void verifyCode(value)
             }}
           >
@@ -549,6 +603,10 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
             </FieldError>
           ) : codeError === 'invalid' ? (
             <FieldError>That code isn’t right.</FieldError>
+          ) : codeError === 'rate' ? (
+            <FieldError>
+              {`Too many code requests. Try again in ${rateWait}, or use the most recent code we sent.`}
+            </FieldError>
           ) : (
             <FieldDescription>
               It expires in 10 minutes. Didn’t get it?{' '}
@@ -674,14 +732,15 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         </Button>
       </>
     )
-  } else if (step === 'done') {
-    body = copy.keepTheBadge ? (
-      <Alert>
-        <ShieldCheck aria-hidden="true" />
-        <AlertTitle>{`Keep the badge on ${domain}`}</AlertTitle>
-        <AlertDescription>{copy.keepTheBadge}</AlertDescription>
-      </Alert>
-    ) : null
+  } else if (step === 'done' || step === 'mine') {
+    body =
+      step === 'done' && copy.keepTheBadge ? (
+        <Alert>
+          <ShieldCheck aria-hidden="true" />
+          <AlertTitle>{`Keep the badge on ${domain}`}</AlertTitle>
+          <AlertDescription>{copy.keepTheBadge}</AlertDescription>
+        </Alert>
+      ) : null
     footer = (
       <>
         <Button asChild variant="outline">
@@ -750,7 +809,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
   if (isMobile) {
     return (
       <>
-        {trigger}
+        {owner ? null : trigger}
         <Drawer open={open} onOpenChange={changeOpen}>
           <DrawerContent>
             <DrawerHeader className="text-left">
@@ -766,7 +825,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
   }
   return (
     <>
-      {trigger}
+      {owner ? null : trigger}
       <Dialog open={open} onOpenChange={changeOpen}>
         <DialogContent className="sm:max-w-lg [&>*]:min-w-0">
           <DialogHeader>

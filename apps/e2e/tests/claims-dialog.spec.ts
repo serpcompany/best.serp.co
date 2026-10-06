@@ -157,6 +157,12 @@ test('claims a listing with the badge through every step and its errors', async 
     )
   ).toBeVisible()
   await capture(page, '8h-mismatch')
+  // The browser takes it; the server needs a registrable domain.
+  await field.fill('jordan@localhost')
+  await dialog(page).getByRole('button', { name: 'Send code' }).click()
+  await expect(
+    dialog(page).getByText('Enter a valid email address, like you@company.com.')
+  ).toBeVisible()
   const address = `jordan@${listing.slug}`
   await field.fill(address)
   await dialog(page).getByRole('button', { name: 'Send code' }).click()
@@ -228,8 +234,10 @@ test('claims a listing with the badge through every step and its errors', async 
   expect(
     claimsD1(`SELECT verified_via FROM listing_owners WHERE listing_id = ${q(listing.id)}`)
   ).toEqual([{ verified_via: 'badge_claim' }])
-  // Closing the success answer refreshes the page, which no longer offers the claim.
+  // The claim link goes at once, whatever the cached page says, and stays gone after closing.
+  await expect(page.getByRole('button', { name: 'Claim this listing' })).toHaveCount(0)
   await dialog(page).getByRole('button', { name: 'Close' }).first().click()
+  await expect(dialog(page)).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Claim this listing' })).toHaveCount(0)
 })
 
@@ -306,6 +314,80 @@ test('shows the already-owned dialog with the contact path', async ({ context, p
     '/contact/'
   )
   await capture(page, '8i-owned')
+})
+
+test('tells the owner they manage the listing, never that someone else owns it', async ({
+  context,
+  page
+}) => {
+  const listing = seed('Mine product')
+  const email = `mine-${unique()}@example.com`
+  await signedIn(context, email)
+  // The page rendered before this visitor's ownership reached it (the catalog cache).
+  await page.goto(`/products/${listing.slug}/`)
+  await expect(page.getByRole('button', { name: 'Claim this listing' })).toBeVisible()
+  claimsD1(`
+    INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+      SELECT ${q(listing.id)}, id, 'badge_claim', ${q(new Date().toISOString())}
+      FROM users WHERE email = ${q(email)};
+  `)
+  await page.getByRole('button', { name: 'Claim this listing' }).click()
+  await expect(dialog(page).getByRole('heading', { name: 'You manage this listing' })).toBeVisible()
+  await expect(
+    dialog(page).getByText('It’s in your account. Edits you make are reviewed before they go live.')
+  ).toBeVisible()
+  await expect(dialog(page).getByText(/already has an owner/u)).toHaveCount(0)
+  await expect(dialog(page).getByRole('link', { name: 'Edit listing' })).toHaveAttribute(
+    'href',
+    `/account/listings/${listing.slug}/edit/`
+  )
+  await expect(page.getByRole('button', { name: 'Claim this listing' })).toHaveCount(0)
+  await capture(page, '8f-mine')
+})
+
+test('says when the hourly caps stop a send, and when a confirmation ran out', async ({
+  context,
+  page
+}) => {
+  const listing = seed('Capped product')
+  await signedIn(context, `capped-${unique()}@example.com`)
+  await page.clock.install()
+  await page.goto(`/products/${listing.slug}/`)
+  await page.getByRole('button', { name: 'Claim this listing' }).click()
+  await dialog(page).getByRole('button', { name: 'Continue' }).click()
+  const address = `team@${listing.slug}`
+  await dialog(page).getByLabel('Your email at localtest.me').fill(address)
+  await dialog(page).getByRole('button', { name: 'Send code' }).click()
+  await expect(dialog(page).getByText(`Code sent to ${address}`)).toBeVisible()
+  // Three codes an hour per address: the fourth send is refused, and the dialog says so.
+  for (let send = 2; send <= 4; send += 1) {
+    claimsD1(`UPDATE listing_claims SET code_sent_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes')
+      WHERE listing_id = ${q(listing.id)}`)
+    await page.clock.fastForward(61_000)
+    const answer = page.waitForResponse(
+      response =>
+        new URL(response.url()).pathname === '/api/claims' && response.request().method() === 'POST'
+    )
+    await dialog(page).getByRole('button', { name: 'Resend', exact: true }).click()
+    expect((await answer).status()).toBe(send < 4 ? 201 : 429)
+  }
+  await expect(
+    dialog(page).getByText(
+      /^Too many code requests\. Try again in \d+ (?:minutes?|hours?), or use the most recent code we sent\.$/u
+    )
+  ).toBeVisible()
+  await capture(page, '8l-capped')
+
+  // The most recent code still confirms; a day later the confirmation has run out.
+  await enterCode(page, await codeFor(page, address))
+  await expect(dialog(page).getByText('Step 4 of 4')).toBeVisible()
+  claimsD1(`UPDATE listing_claims SET email_verified_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-25 hours')
+    WHERE listing_id = ${q(listing.id)}`)
+  await dialog(page).getByRole('button', { name: 'Verify badge and claim' }).click()
+  await expect(dialog(page).getByText('Step 3 of 4')).toBeVisible()
+  await expect(dialog(page).getByText('This code has expired. Send a new one.')).toBeVisible()
+  await expect(dialog(page).getByRole('button', { name: 'Send a new code' })).toBeVisible()
+  await capture(page, '8m-confirmation-expired')
 })
 
 test.describe('on a phone', () => {

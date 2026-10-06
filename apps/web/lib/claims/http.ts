@@ -4,8 +4,8 @@ import { apiError, json } from '@/lib/submissions/http'
 import type { ClaimFailure, ClaimFailureCode } from './service'
 
 /**
- * The claim API's error answers (#67). The claim dialog (#70 screen 8) is not built yet, so
- * nothing shows these strings to visitors; the dialog will map each `code` to its approved copy.
+ * The claim API's error answers (#67). The claim dialog (#70 screen 8) never shows these
+ * strings: it maps each `code` to its approved copy.
  */
 const MESSAGES: Record<ClaimFailureCode, string> = {
   already_owned: 'This listing already has an owner.',
@@ -32,7 +32,8 @@ export function claimFailure(failure: ClaimFailure) {
   const extra = {
     ...(failure.attemptsLeft !== undefined ? { attemptsLeft: failure.attemptsLeft } : {}),
     ...(failure.contactPath ? { contactPath: failure.contactPath } : {}),
-    ...(failure.retryAfterSeconds ? { retryAfterSeconds: failure.retryAfterSeconds } : {})
+    ...(failure.retryAfterSeconds ? { retryAfterSeconds: failure.retryAfterSeconds } : {}),
+    ...(failure.self ? { self: true } : {})
   }
   const response = apiError(failure.status, failure.code, MESSAGES[failure.code], extra)
   if (failure.retryAfterSeconds) {

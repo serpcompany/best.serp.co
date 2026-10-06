@@ -37,7 +37,8 @@ proving the address.
    stored with the claim (`product_url`), and the badge is checked there.
 2. **Start** (`POST /api/claims`, `{ listing: <slug>, method, email }`). The listing must be live,
    have no current owner (else `409 already_owned` with `contactPath`: `/contact/`, or a claim
-   conversation once #73 ships), and not be under a prohibited-URL block on the product's
+   conversation once #73 ships; with `self: true` when the caller is the owner, so the dialog
+   says they manage it), and not be under a prohibited-URL block on the product's
    domain. The address must be well formed, not free webmail (`WEBMAIL_DOMAINS`), never on
    SERP's domains (`@serp.ly` proves nothing), and its domain's registrable domain (Public Suffix
    List, private section included) must be the product's: `www.` and subdomains normalize, and a

@@ -644,12 +644,13 @@ describe('claim flow', () => {
     ).resolves.toMatchObject({
       target: { openClaim: { checksLeft: 10, id: claim.id, status: 'code_sent' }, paid: true }
     })
+    const someoneElse = await claimTarget(deps(), { listingSlug: 'owned-tool', userId: 'user_a' })
+    expect(someoneElse).toMatchObject({ code: 'already_owned', contactPath: '/contact/' })
+    expect(someoneElse).not.toHaveProperty('self')
+    // The owner asking hears that they manage it, never that someone else does.
     await expect(
-      claimTarget(deps(), { listingSlug: 'owned-tool', userId: 'user_a' })
-    ).resolves.toMatchObject({
-      code: 'already_owned',
-      contactPath: '/contact/'
-    })
+      claimTarget(deps(), { listingSlug: 'owned-tool', userId: 'user_b' })
+    ).resolves.toMatchObject({ code: 'already_owned', self: true })
   })
 
   it('allows ten badge checks that find a result, as at submit, and none after', async () => {
@@ -681,7 +682,15 @@ describe('claim flow', () => {
 
   it('needs a fresh confirmation to finish', async () => {
     const claim = await startBadge()
-    await confirmClaimEmail(deps(), { claimId: claim.id, code: lastCode(), userId: 'user_a' })
+    const confirmed = await confirmClaimEmail(deps(), {
+      claimId: claim.id,
+      code: lastCode(),
+      userId: 'user_a'
+    })
+    // The dialog reads when the confirmation runs out, to resume at the code step after it.
+    expect(confirmed).toMatchObject({
+      claim: { confirmedUntil: new Date(clock + 24 * 60 * MINUTE).toISOString() }
+    })
     clock += 25 * 60 * MINUTE
     await expect(
       checkClaimBadge(badgeDeps(), { actor: 'a', claimId: claim.id, userId: 'user_a' })

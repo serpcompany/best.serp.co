@@ -69,6 +69,8 @@ export interface ClaimDependencies {
 export interface ClaimView {
   /** Wrong codes still allowed for the current code. */
   attemptsLeft: number
+  /** Until when the confirmed address can finish the claim (null before it's confirmed). */
+  confirmedUntil: string | null
   /** Badge checks that can still find a result (of `CLAIM_BADGE_MAX_ATTEMPTS`). */
   checksLeft: number
   codeExpiresAt: string
@@ -110,6 +112,8 @@ export interface ClaimFailure {
   contactPath?: string
   ok: false
   retryAfterSeconds?: number
+  /** `already_owned` by the caller: the dialog says they manage the listing, not that someone does. */
+  self?: true
   status: 404 | 409 | 410 | 422 | 429
 }
 
@@ -135,6 +139,11 @@ function view(claim: ListingClaim, listing: { name: string; slug: string }): Cla
   return {
     attemptsLeft: Math.max(0, CLAIM_CODE_MAX_ATTEMPTS - claim.attempts),
     checksLeft: Math.max(0, CLAIM_BADGE_MAX_ATTEMPTS - claim.badgeAttempts),
+    confirmedUntil: claim.emailVerifiedAt
+      ? new Date(
+          Date.parse(claim.emailVerifiedAt) + CLAIM_VERIFIED_TTL_HOURS * 60 * MINUTE
+        ).toISOString()
+      : null,
     codeExpiresAt: claim.codeExpiresAt,
     email: claim.email,
     id: claim.id,
@@ -173,8 +182,11 @@ export async function hashClaimCode(key: string, claimId: string, code: string):
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-function owned(deps: ClaimDependencies): ClaimFailure {
-  return fail(409, 'already_owned', { contactPath: deps.contactPath })
+function owned(deps: ClaimDependencies, self = false): ClaimFailure {
+  return fail(409, 'already_owned', {
+    contactPath: deps.contactPath,
+    ...(self ? { self: true as const } : {})
+  })
 }
 
 /** A listing whose ownership the owner decides: the claimer gets in touch instead. */
@@ -186,12 +198,14 @@ function review(deps: Pick<ClaimDependencies, 'contactPath'>): ClaimFailure {
 async function claimableListing(
   deps: ClaimDependencies,
   by: { id: string } | { slug: string },
+  /** Who asks: the listing's own owner hears that they manage it. */
+  userId: string,
   /** A refusal decided before anything is fetched (the address itself). */
   screen: () => ClaimFailure | null = () => null
 ): Promise<ClaimResult<{ listing: ClaimListing; site: ProductSite }>> {
   const listing = await deps.operations.listing(by)
   if (!listing?.live) return fail(404, 'not_found')
-  if (listing.ownerUserId) return owned(deps)
+  if (listing.ownerUserId) return owned(deps, listing.ownerUserId === userId)
   // #100's owner-review sets, and anything an admin holds: the owner decides, not a claim.
   if (await deps.operations.held(listing.id)) return review(deps)
   const screened = screen()
@@ -215,7 +229,7 @@ export async function startClaim(
   }
   // A malformed, webmail, or SERP address is refused before the listing's link is followed.
   const screened = screenClaimAddress(input.email)
-  const target = await claimableListing(deps, { slug: input.listingSlug }, () =>
+  const target = await claimableListing(deps, { slug: input.listingSlug }, input.userId, () =>
     screened ? fail(422, screened) : null
   )
   if (!target.ok) return target
@@ -266,7 +280,7 @@ export async function startClaim(
       })
   if (!written) {
     const current = await deps.operations.listing({ id: listing.id })
-    if (current?.ownerUserId) return owned(deps)
+    if (current?.ownerUserId) return owned(deps, current.ownerUserId === input.userId)
     return fail(409, 'changed')
   }
   const claim = await deps.operations.claim({ claimId, userId: input.userId })
@@ -291,7 +305,9 @@ async function ownClaim(
   const listing = await deps.operations.listing({ id: claim.listingId })
   if (!listing) return fail(404, 'not_found')
   if (claim.status === 'cancelled') {
-    return listing.ownerUserId ? owned(deps) : fail(409, 'changed')
+    return listing.ownerUserId
+      ? owned(deps, listing.ownerUserId === input.userId)
+      : fail(409, 'changed')
   }
   return { claim, listing, ok: true }
 }
@@ -305,7 +321,7 @@ export async function confirmClaimEmail(
   const { claim, listing } = found
   // Confirmed already (a repeated request): nothing to spend.
   if (claim.status !== 'code_sent') return { claim: view(claim, listing), ok: true }
-  if (listing.ownerUserId) return owned(deps)
+  if (listing.ownerUserId) return owned(deps, listing.ownerUserId === input.userId)
   const now = deps.now()
   if (claim.lockedUntil && Date.parse(claim.lockedUntil) > now.getTime()) {
     return fail(429, 'too_many_attempts', {
@@ -391,11 +407,13 @@ export async function checkClaimBadge(
     if (listing.ownerUserId === input.userId) {
       return { claim: view(claim, listing), ok: true, result: { ok: true } }
     }
-    return listing.ownerUserId ? owned(deps) : fail(409, 'not_owner')
+    return listing.ownerUserId
+      ? owned(deps, listing.ownerUserId === input.userId)
+      : fail(409, 'not_owner')
   }
   if (claim.method !== 'badge') return fail(422, 'invalid_method')
   if (claim.status !== 'email_verified') return fail(409, 'not_confirmed')
-  if (listing.ownerUserId) return owned(deps)
+  if (listing.ownerUserId) return owned(deps, listing.ownerUserId === input.userId)
   if (claim.badgeAttempts >= CLAIM_BADGE_MAX_ATTEMPTS) return fail(409, 'checks_used')
   const now = deps.now()
   if (confirmationExpired(claim, now)) return fail(410, 'confirmation_expired')
@@ -408,7 +426,7 @@ export async function checkClaimBadge(
   })
   if (!started) {
     const current = await deps.operations.listing({ id: listing.id })
-    if (current?.ownerUserId) return owned(deps)
+    if (current?.ownerUserId) return owned(deps, current.ownerUserId === input.userId)
     if (!current?.live) return fail(404, 'not_found')
     const checked = claim.badgeCheckedAt ? Date.parse(claim.badgeCheckedAt) : now.getTime()
     return fail(429, 'cooldown', {
@@ -441,7 +459,7 @@ export async function checkClaimBadge(
   const done = await deps.operations.complete({ actor: input.actor, claim, now: now.toISOString() })
   if (!done) {
     const current = await deps.operations.listing({ id: listing.id })
-    if (current?.ownerUserId) return owned(deps)
+    if (current?.ownerUserId) return owned(deps, current.ownerUserId === input.userId)
     return (await deps.operations.held(listing.id)) ? review(deps) : fail(409, 'changed')
   }
   const completed = await deps.operations.claim(input)
@@ -506,7 +524,7 @@ export async function claimTarget(
   deps: ClaimDependencies,
   input: { listingSlug: string; userId: string }
 ): Promise<ClaimResult<{ target: ClaimTarget }>> {
-  const target = await claimableListing(deps, { slug: input.listingSlug })
+  const target = await claimableListing(deps, { slug: input.listingSlug }, input.userId)
   if (!target.ok) return target
   const { listing, site } = target
   const open = await deps.operations.openClaim({ listingId: listing.id, userId: input.userId })
