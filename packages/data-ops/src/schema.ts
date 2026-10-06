@@ -17,6 +17,7 @@ const booleanCheck = (column: { name: string }) => sql`${sql.identifier(column.n
 const sqlList = (values: readonly string[]) => sql.raw(values.map(value => `'${value}'`).join(', '))
 const LISTING_MEDIA_PREFIX = `${MEDIA_SITE}/listings/`
 const SUBMISSION_MEDIA_PREFIX = `${MEDIA_SITE}/submissions/`
+const REVISION_MEDIA_PREFIX = `${MEDIA_SITE}/revisions/`
 /** `substr(column, 1, n) = 'prefix'` for one of the prefixes, without a LIKE pattern (#77). */
 const prefixCheck = (column: { name: string }, prefixes: readonly string[]) =>
   sql.raw(
@@ -352,11 +353,11 @@ export const listingMedia = sqliteTable(
 )
 
 /**
- * Media still to be hosted (serpcompany/best.serp.co#95): one row per listing or submission
- * image slot whose source has not been copied into the media bucket yet. A Worker cron retries
- * `pending` rows with backoff; `failed` rows stopped retrying and are shown to the admin. A
- * submission's slot becomes `hosted` (its key under `best.serp.co/submissions/<id>/`) so its
- * approval can queue a copy into the listing's path; a listing's slot is deleted once its
+ * Media still to be hosted (serpcompany/best.serp.co#95): one row per listing, submission, or
+ * revision image slot whose source has not been copied into the media bucket yet. A Worker cron
+ * retries `pending` rows with backoff; `failed` rows stopped retrying. A submission's or a
+ * revision's slot becomes `hosted` (its key under `best.serp.co/submissions/<id>/` or
+ * `best.serp.co/revisions/<id>/`) so its approval can queue a copy into the listing's path; a listing's slot is deleted once its
  * `listing_media` row is hosted. An admin edit, an approval, or a publication that changes a
  * slot's media replaces or deletes the row, and the cron writes only while its claim holds.
  */
@@ -371,12 +372,16 @@ export const mediaIngestions = sqliteTable(
     submissionId: text('submission_id').references(() => listingSubmissions.id, {
       onDelete: 'cascade'
     }),
+    /** A listing revision's new logo, hosted when the revision is saved (#96 round 4). */
+    revisionId: text('revision_id').references(() => listingRevisions.id, {
+      onDelete: 'cascade'
+    }),
     kind: text('kind', { enum: MEDIA_KINDS }).notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
     sourceUrl: text('source_url').notNull(),
     /**
-     * For a listing slot adopted from an approved submission: the submission's hosted key, which
-     * the cron copies into the listing's path instead of fetching the source again.
+     * For a listing slot adopted from an approved submission or revision: its reviewed hosted
+     * key, which the cron copies into the listing's path instead of fetching the source again.
      */
     copyFromKey: text('copy_from_key'),
     status: text('status', { enum: mediaIngestionStatuses }).notNull().default('pending'),
@@ -395,7 +400,7 @@ export const mediaIngestions = sqliteTable(
   table => [
     check(
       'media_ingestions_one_target',
-      sql`(${table.listingId} IS NULL) != (${table.submissionId} IS NULL)`
+      sql`(${table.listingId} IS NOT NULL) + (${table.submissionId} IS NOT NULL) + (${table.revisionId} IS NOT NULL) = 1`
     ),
     check('media_ingestions_kind_valid', sql`${table.kind} IN (${sqlList(MEDIA_KINDS)})`),
     check(
@@ -421,11 +426,15 @@ export const mediaIngestions = sqliteTable(
     ),
     check(
       'media_ingestions_hosted_complete',
-      hostedMediaCheck(table, [LISTING_MEDIA_PREFIX, SUBMISSION_MEDIA_PREFIX])
+      hostedMediaCheck(table, [
+        LISTING_MEDIA_PREFIX,
+        SUBMISSION_MEDIA_PREFIX,
+        REVISION_MEDIA_PREFIX
+      ])
     ),
     check(
-      'media_ingestions_copy_from_submission',
-      sql`${table.copyFromKey} IS NULL OR (${table.listingId} IS NOT NULL AND ${prefixCheck(table.copyFromKey, [SUBMISSION_MEDIA_PREFIX])})`
+      'media_ingestions_copy_from_pending',
+      sql`${table.copyFromKey} IS NULL OR (${table.listingId} IS NOT NULL AND ${prefixCheck(table.copyFromKey, [SUBMISSION_MEDIA_PREFIX, REVISION_MEDIA_PREFIX])})`
     ),
     uniqueIndex('media_ingestions_listing_slot_idx')
       .on(table.listingId, table.kind, table.sortOrder)
@@ -433,6 +442,9 @@ export const mediaIngestions = sqliteTable(
     uniqueIndex('media_ingestions_submission_slot_idx')
       .on(table.submissionId, table.kind, table.sortOrder)
       .where(sql`${table.submissionId} IS NOT NULL`),
+    uniqueIndex('media_ingestions_revision_slot_idx')
+      .on(table.revisionId, table.kind, table.sortOrder)
+      .where(sql`${table.revisionId} IS NOT NULL`),
     index('media_ingestions_due_idx')
       .on(table.nextAttemptAt)
       .where(sql`${table.status} = 'pending'`)

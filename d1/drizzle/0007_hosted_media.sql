@@ -2,6 +2,7 @@ CREATE TABLE `media_ingestions` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`listing_id` text,
 	`submission_id` text,
+	`revision_id` text,
 	`kind` text NOT NULL,
 	`sort_order` integer DEFAULT 0 NOT NULL,
 	`source_url` text NOT NULL,
@@ -20,7 +21,8 @@ CREATE TABLE `media_ingestions` (
 	`updated_at` text DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	FOREIGN KEY (`listing_id`) REFERENCES `listings`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`submission_id`) REFERENCES `listing_submissions`(`id`) ON UPDATE no action ON DELETE cascade,
-	CONSTRAINT "media_ingestions_one_target" CHECK(("media_ingestions"."listing_id" IS NULL) != ("media_ingestions"."submission_id" IS NULL)),
+	FOREIGN KEY (`revision_id`) REFERENCES `listing_revisions`(`id`) ON UPDATE no action ON DELETE cascade,
+	CONSTRAINT "media_ingestions_one_target" CHECK(("media_ingestions"."listing_id" IS NOT NULL) + ("media_ingestions"."submission_id" IS NOT NULL) + ("media_ingestions"."revision_id" IS NOT NULL) = 1),
 	CONSTRAINT "media_ingestions_kind_valid" CHECK("media_ingestions"."kind" IN ('logo', 'image')),
 	CONSTRAINT "media_ingestions_status_valid" CHECK("media_ingestions"."status" IN ('pending', 'hosted', 'failed')),
 	CONSTRAINT "media_ingestions_attempts_nonnegative" CHECK("media_ingestions"."attempts" >= 0),
@@ -34,18 +36,19 @@ CREATE TABLE `media_ingestions` (
     OR ("media_key" IS NOT NULL AND "sha256" IS NOT NULL
     AND "content_type" IS NOT NULL AND "bytes" IS NOT NULL
     AND "width" IS NOT NULL AND "height" IS NOT NULL
-    AND (substr("media_key", 1, 22) = 'best.serp.co/listings/' OR substr("media_key", 1, 25) = 'best.serp.co/submissions/')
+    AND (substr("media_key", 1, 22) = 'best.serp.co/listings/' OR substr("media_key", 1, 25) = 'best.serp.co/submissions/' OR substr("media_key", 1, 23) = 'best.serp.co/revisions/')
     AND instr("media_key", '/' || "kind" || '/') > 0
     AND length("sha256") = 64
     AND "content_type" IN ('image/avif', 'image/gif', 'image/x-icon', 'image/jpeg', 'image/png', 'image/webp')
     AND "bytes" BETWEEN 1 AND 5242880
     AND "width" BETWEEN 1 AND 16384
     AND "height" BETWEEN 1 AND 16384)),
-	CONSTRAINT "media_ingestions_copy_from_submission" CHECK("media_ingestions"."copy_from_key" IS NULL OR ("media_ingestions"."listing_id" IS NOT NULL AND (substr("copy_from_key", 1, 25) = 'best.serp.co/submissions/')))
+	CONSTRAINT "media_ingestions_copy_from_pending" CHECK("media_ingestions"."copy_from_key" IS NULL OR ("media_ingestions"."listing_id" IS NOT NULL AND (substr("copy_from_key", 1, 25) = 'best.serp.co/submissions/' OR substr("copy_from_key", 1, 23) = 'best.serp.co/revisions/')))
 ) STRICT;
 --> statement-breakpoint
 CREATE UNIQUE INDEX `media_ingestions_listing_slot_idx` ON `media_ingestions` (`listing_id`,`kind`,`sort_order`) WHERE "media_ingestions"."listing_id" IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX `media_ingestions_submission_slot_idx` ON `media_ingestions` (`submission_id`,`kind`,`sort_order`) WHERE "media_ingestions"."submission_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `media_ingestions_revision_slot_idx` ON `media_ingestions` (`revision_id`,`kind`,`sort_order`) WHERE "media_ingestions"."revision_id" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX `media_ingestions_due_idx` ON `media_ingestions` (`next_attempt_at`) WHERE "media_ingestions"."status" = 'pending';--> statement-breakpoint
 -- Hand-finished (docs/DATA_MODEL.md): listing_media only gains nullable columns. A rebuild would
 -- need foreign keys switched off, which D1 ignores inside a migration's transaction.

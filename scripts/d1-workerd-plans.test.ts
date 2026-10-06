@@ -1159,7 +1159,7 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     )
     await db.prepare("UPDATE listing_submissions SET status='rejected' WHERE id='sub-media'").run()
     const finished = () =>
-      all<{ id: number; media_key: string | null }>(M.selectFinishedSubmissionMediaPlan(50))
+      all<{ id: number; media_key: string | null }>(M.selectFinishedPendingMediaPlan(50))
     expect(await finished()).toEqual([])
     await db
       .prepare("DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo'")
@@ -1168,7 +1168,7 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     const [done] = await finished()
     expect(done).toMatchObject({ media_key: submissionLogo.key })
     if (!done) throw new Error('No finished submission media.')
-    await run(M.buildForgetSubmissionMediaPlans({ id: done.id, mediaKey: done.media_key }))
+    await run(M.buildForgetPendingMediaPlans({ id: done.id, mediaKey: done.media_key }))
     expect(await all(M.selectSubmissionMediaPlan('sub-media'))).toEqual([])
     await expect(
       db

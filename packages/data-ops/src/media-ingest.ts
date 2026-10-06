@@ -8,11 +8,11 @@ import {
   cacheControlForKey,
   type HostedMedia,
   isMediaKey,
+  isPendingMediaKey,
   MAX_MEDIA_BYTES,
   type MediaKind,
   type MediaOwner,
   mediaKey,
-  parseMediaKey,
   sha256Hex
 } from './media-keys'
 import { type SafeFetchFailure, safeFetch } from './safe-fetch'
@@ -42,15 +42,15 @@ export interface MediaBucket {
 
 /**
  * The production bucket is shared with serp.co (`cdn`), so every write is held to this site's
- * keys (`best.serp.co/listings/…` and `best.serp.co/submissions/…`): any other key is refused
- * before it reaches R2. `storeHostedMedia` checks the same, so an unwrapped bucket is safe too.
- * The runtime deletes only a submission's own images (`best.serp.co/submissions/…`); a listing's
- * hosted image is never deleted by the Worker.
+ * keys (`best.serp.co/listings/…`, `…/submissions/…`, `…/revisions/…`): any other key is
+ * refused before it reaches R2. `storeHostedMedia` checks the same, so an unwrapped bucket is
+ * safe too. The runtime deletes only pending images (a submission's or a revision's); a
+ * listing's hosted image is never deleted by the Worker.
  */
 export function scopedMediaBucket(bucket: MediaBucket): MediaBucket {
   return {
     delete(key) {
-      if (parseMediaKey(key)?.scope !== 'submissions' || !bucket.delete) {
+      if (!isPendingMediaKey(key) || !bucket.delete) {
         return Promise.reject(new Error(`Refusing to delete ${key}.`))
       }
       return bucket.delete(key)
@@ -155,7 +155,11 @@ export function hostedMediaFor(
   target: { kind: MediaKind; sourceUrl: string } & MediaOwner
 ): HostedMedia {
   const owner: MediaOwner =
-    'slug' in target ? { slug: target.slug } : { submissionId: target.submissionId }
+    'slug' in target
+      ? { slug: target.slug }
+      : 'submissionId' in target
+        ? { submissionId: target.submissionId }
+        : { revisionId: target.revisionId }
   return {
     bytes: image.body.byteLength,
     contentType: image.contentType,
@@ -169,7 +173,7 @@ export function hostedMediaFor(
 
 /**
  * The only write to the media bucket. It refuses any key outside this site's listing and
- * submission keys, so no caller can write elsewhere in the shared `cdn` bucket.
+ * pending keys, so no caller can write elsewhere in the shared `cdn` bucket.
  */
 export async function storeHostedMedia(
   bucket: MediaBucket,

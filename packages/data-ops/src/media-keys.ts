@@ -15,9 +15,10 @@ export const MAX_MEDIA_BYTES = 5 * 1024 * 1024
 /** A listing's hosted image: content-addressed, so it never changes and caches for a year. */
 export const MEDIA_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 /**
- * A pending submission's image (`best.serp.co/submissions/<id>/…`): cached five minutes, so
- * deleting a rejected or withdrawn submission's image takes it off the media host promptly,
- * without a zone purge (#96 review round 2, S1). Approval copies it to a listing key.
+ * A pending image, a submission's (`best.serp.co/submissions/<id>/…`) or a revision's
+ * (`best.serp.co/revisions/<id>/…`): cached five minutes, so deleting a rejected or withdrawn
+ * one takes it off the media host promptly, without a zone purge (#96 review round 2, S1).
+ * Approval copies it to a listing key.
  */
 export const SUBMISSION_MEDIA_CACHE_CONTROL = 'public, max-age=300'
 /** The local Worker serves its R2 binding here (never on staging or in production). */
@@ -40,16 +41,20 @@ export interface HostedMedia {
 const slugPattern = /^[a-z0-9][a-z0-9._-]*$/u
 const submissionIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u
 const keyPattern = new RegExp(
-  `^${MEDIA_SITE.replaceAll('.', '\\.')}/(listings|submissions)/([A-Za-z0-9][A-Za-z0-9._-]*)/(logo|image)/([0-9a-f]{${MEDIA_HASH_LENGTH}})\\.(png|jpg|webp|gif|avif|ico)$`,
+  `^${MEDIA_SITE.replaceAll('.', '\\.')}/(listings|submissions|revisions)/([A-Za-z0-9][A-Za-z0-9._-]*)/(logo|image)/([0-9a-f]{${MEDIA_HASH_LENGTH}})\\.(png|jpg|webp|gif|avif|ico)$`,
   'u'
 )
 
 /**
- * Where an image lives: a published listing (`listings/<slug>/…`), or a submission still in
- * review (`submissions/<id>/…`), which approval copies into the listing's path. A submission's
- * image never sits under a live listing's path.
+ * Where an image lives: a published listing (`listings/<slug>/…`), or a submission or a
+ * listing revision still in review (`submissions/<id>/…`, `revisions/<id>/…`, #96 round 4),
+ * which approval copies into the listing's path. A pending image never sits under a live
+ * listing's path.
  */
-export type MediaOwner = { slug: string } | { submissionId: string }
+export type MediaOwner = { slug: string } | { submissionId: string } | { revisionId: string }
+
+/** The scopes whose images wait for a review: short cache, deletable, copied on approval. */
+export const PENDING_MEDIA_SCOPES = ['submissions', 'revisions'] as const
 
 function digestPart(sha256: string, format: HostedImageFormat): string {
   if (!/^[0-9a-f]{64}$/u.test(sha256)) throw new Error('Invalid SHA-256 digest.')
@@ -63,20 +68,26 @@ export function mediaKey(
     if (!slugPattern.test(input.slug)) throw new Error('Invalid listing slug for a media key.')
     return `${MEDIA_SITE}/listings/${input.slug}/${input.kind}/${digestPart(input.sha256, input.format)}`
   }
-  if (!submissionIdPattern.test(input.submissionId)) {
-    throw new Error('Invalid submission id for a media key.')
+  const [scope, id] =
+    'submissionId' in input
+      ? (['submissions', input.submissionId] as const)
+      : (['revisions', input.revisionId] as const)
+  if (!submissionIdPattern.test(id)) {
+    throw new Error(
+      `Invalid ${scope === 'submissions' ? 'submission' : 'revision'} id for a media key.`
+    )
   }
-  return `${MEDIA_SITE}/submissions/${input.submissionId}/${input.kind}/${digestPart(input.sha256, input.format)}`
+  return `${MEDIA_SITE}/${scope}/${id}/${input.kind}/${digestPart(input.sha256, input.format)}`
 }
 
 export interface ParsedMediaKey {
   extension: string
   hash: string
   kind: MediaKind
-  /** The listing slug or the submission id. */
+  /** The listing slug, or the submission or revision id. */
   owner: string
-  scope: 'listings' | 'submissions'
-  /** The listing slug (an empty string for a submission key). */
+  scope: 'listings' | (typeof PENDING_MEDIA_SCOPES)[number]
+  /** The listing slug (an empty string for a pending key). */
   slug: string
 }
 
@@ -98,7 +109,7 @@ export function parseMediaKey(value: string): ParsedMediaKey | null {
   }
 }
 
-/** A key this site may write: a listing's or a submission's image. */
+/** A key this site may write: a listing's, a submission's or a revision's image. */
 export function isMediaKey(value: string): boolean {
   return parseMediaKey(value) !== null
 }
@@ -108,19 +119,23 @@ export function isListingMediaKey(value: string): boolean {
   return parseMediaKey(value)?.scope === 'listings'
 }
 
-/** The listing key a submission's hosted image is copied to on approval (same bytes). */
-export function listingKeyForSubmissionKey(key: string, slug: string): string {
+/** A submission's or a revision's image, waiting for its review. */
+export function isPendingMediaKey(value: string): boolean {
+  const scope = parseMediaKey(value)?.scope
+  return scope === 'submissions' || scope === 'revisions'
+}
+
+/** The listing key a pending image is copied to on approval (same bytes). */
+export function listingKeyForPendingKey(key: string, slug: string): string {
   const parsed = parseMediaKey(key)
-  if (parsed?.scope !== 'submissions') throw new Error(`${key} is not a submission media key.`)
+  if (!parsed || parsed.scope === 'listings') throw new Error(`${key} is not a pending media key.`)
   if (!slugPattern.test(slug)) throw new Error('Invalid listing slug for a media key.')
   return `${MEDIA_SITE}/listings/${slug}/${parsed.kind}/${parsed.hash}.${parsed.extension}`
 }
 
-/** The `Cache-Control` a key is stored with: immutable for listings, short for submissions. */
+/** The `Cache-Control` a key is stored with: immutable for listings, short while pending. */
 export function cacheControlForKey(key: string): string {
-  return parseMediaKey(key)?.scope === 'submissions'
-    ? SUBMISSION_MEDIA_CACHE_CONTROL
-    : MEDIA_CACHE_CONTROL
+  return isPendingMediaKey(key) ? SUBMISSION_MEDIA_CACHE_CONTROL : MEDIA_CACHE_CONTROL
 }
 
 /** The content type a key's extension stands for (keys are only ever written with their type). */

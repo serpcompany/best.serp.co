@@ -310,7 +310,7 @@ describe('media operations', () => {
     expect(rows('SELECT media_key FROM listing_media')).toEqual([{ media_key: listingKey }])
     expect(bucket.objects.get(listingKey)?.body).toEqual(png)
     // The submission is not finished yet, so its own copy stays.
-    expect(await operations.forgetFinishedSubmissionMedia()).toBe(0)
+    expect(await operations.forgetFinishedPendingMedia()).toBe(0)
     expect(bucket.objects.size).toBe(2)
   })
 
@@ -405,11 +405,11 @@ describe('media operations', () => {
       body: png,
       options: { httpMetadata: { cacheControl: '', contentType: 'image/png' } }
     })
-    expect(await operations.forgetFinishedSubmissionMedia()).toBe(0)
+    expect(await operations.forgetFinishedPendingMedia()).toBe(0)
     sqlite.database
       .prepare("UPDATE listing_submissions SET status='rejected' WHERE id=?")
       .run(submissionId)
-    expect(await operations.forgetFinishedSubmissionMedia()).toBe(2)
+    expect(await operations.forgetFinishedPendingMedia()).toBe(2)
     expect(rows('SELECT COUNT(*) AS count FROM media_ingestions')).toEqual([{ count: 0 }])
     // Only the submission's object went; a listing's hosted image is never deleted.
     expect([...bucket.objects.keys()]).toEqual([listingObject])

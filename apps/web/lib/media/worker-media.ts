@@ -111,7 +111,7 @@ export async function runMediaCron(env: MediaWorkerEnv): Promise<MediaRunSummary
   }
   const summary = await operations.processDueMedia()
   // Finished submissions' own images (rejected, withdrawn, or approved and copied): #96 S1.
-  await operations.forgetFinishedSubmissionMedia().catch(error => {
+  await operations.forgetFinishedPendingMedia().catch(error => {
     log({ event: 'media_forget_failed', message: error instanceof Error ? error.message : '' })
   })
   return summary

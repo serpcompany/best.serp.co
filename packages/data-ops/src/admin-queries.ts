@@ -54,12 +54,20 @@ const latestConclusiveBadge = (listingIdSql: string) => `(SELECT outcome FROM ba
 
 /**
  * Hosted copies the admin screens render instead of a source URL (#96 review S9): a
- * submission's hosted slot for its current source, or the listing's hosted logo when a revision
- * keeps it. A source with no hosted copy is shown as a link, never as an image.
+ * submission's or a revision's hosted slot for its current source, or the listing's hosted logo
+ * when a revision keeps it. A source with no hosted copy is shown as a link, never as an image.
+ * The revision form matches `stagedLogoKeySql`, which approval compares and swaps on.
  */
 function submissionHostedKey(submission: string, kind: 'image' | 'logo', source?: string): string {
   return `(SELECT j.media_key FROM media_ingestions j WHERE j.submission_id=${submission}.id
     AND j.kind='${kind}' AND j.sort_order=0 AND j.status='hosted'${source ? ` AND j.source_url=${source}` : ''})`
+}
+
+function revisionHostedLogoKey(revision: string): string {
+  return `COALESCE((SELECT j.media_key FROM media_ingestions j WHERE j.revision_id=${revision}.id
+      AND j.kind='logo' AND j.sort_order=0 AND j.status='hosted'
+      AND j.source_url=${revision}.logo_url),
+    ${listingHostedLogoKey(`${revision}.listing_id`, `${revision}.logo_url`)})`
 }
 
 function listingHostedLogoKey(listingId: string, source?: string): string {
@@ -93,7 +101,7 @@ export function selectReviewQueuePlan(view: ReviewQueueView): StatementPlan {
         WHERE s.status IN (${submissionStatusesByView[view]})
         UNION ALL
         SELECT 'revision',r.id,l.slug,r.name,l.website,r.logo_url,
-          ${listingHostedLogoKey('r.listing_id', 'r.logo_url')},r.status,
+          ${revisionHostedLogoKey('r')},r.status,
           ${listingPaidSql('r.listing_id')},NULL,NULL,r.listing_id,u.email,
           ${latestConclusiveBadge('r.listing_id')},
           CASE WHEN r.status='changes_requested' THEN COALESCE(r.reviewed_at,r.updated_at)
@@ -150,10 +158,6 @@ export function selectSubmissionReviewPlans(submissionId: string): StatementPlan
           c.name AS category_name,s.logo_url,s.video_url,s.status,s.plan,s.paid_at,s.refunded_at,
           ${submissionHostedKey('s', 'logo', 's.logo_url')} AS logo_key,
           ${submissionHostedKey('s', 'image')} AS image_key,
-          (SELECT json_object('attempts',j.attempts,'lastError',j.last_error,
-              'nextAttemptAt',j.next_attempt_at,'sourceUrl',j.source_url,'status',j.status)
-            FROM media_ingestions j WHERE j.submission_id=s.id AND j.kind='image'
-              AND j.sort_order=0) AS image_slot,
           s.verification_attempts,s.last_verification_at,s.last_verification_error,
           s.badge_verified_at,s.reviewed_at,s.reviewed_by,s.reviewer_note,s.rejection_reason,
           s.rejection_category,s.withdrawal_reason,s.created_at,s.updated_at,s.content_version,
@@ -208,7 +212,7 @@ export function selectRevisionReviewPlans(revisionId: string): StatementPlan[] {
     {
       sql: `SELECT r.id,r.listing_id,r.status,r.base_checksum,r.name,r.description,r.content,
           r.category_slug,c.name AS category_name,r.logo_url,r.video_url,r.reviewer_note,
-          ${listingHostedLogoKey('r.listing_id', 'r.logo_url')} AS logo_key,
+          ${revisionHostedLogoKey('r')} AS logo_key,
           r.rejection_reason,r.reviewed_at,r.reviewed_by,r.created_at,r.updated_at,
           r.content_version,l.slug,l.website,l.name AS listing_name,l.checksum AS listing_checksum,
           l.link_rel AS listing_link_rel,
@@ -374,10 +378,6 @@ export function selectAdminListingPlans(slug: string): StatementPlan[] {
               'nextAttemptAt',j.next_attempt_at,'sourceUrl',j.source_url,'status',j.status)
             FROM media_ingestions j WHERE j.listing_id=l.id AND j.kind='logo' AND j.sort_order=0)
             AS logo_queue,
-          (SELECT json_object('attempts',j.attempts,'lastError',j.last_error,
-              'nextAttemptAt',j.next_attempt_at,'sourceUrl',j.source_url,'status',j.status)
-            FROM media_ingestions j WHERE j.listing_id=l.id AND j.kind='image' AND j.sort_order=0)
-            AS image_queue,
           s.id AS submission_id,s.status AS submission_status,s.paid_at AS submission_paid_at,
           s.refunded_at AS submission_refunded_at,s.rejection_reason,s.rejection_category,
           s.reviewed_by AS submission_reviewed_by,s.reviewed_at AS submission_reviewed_at,
@@ -592,8 +592,6 @@ export interface SubmissionReview {
   } | null
   /** The hosted copy of the submission's social image, if any (#95). */
   imageKey: string | null
-  /** The featured image slot (hosted, waiting, or failed), for the reviewer (#96 round 2 B1). */
-  imageSlot: AdminListingDetail['logoQueue']
   /** The hosted copy of `logoUrl`, if any: render this, never `logoUrl` (#96 S9). */
   logoKey: string | null
   logoUrl: string
@@ -701,8 +699,6 @@ export interface AdminListingDetail extends AdminListingRow {
    */
   /** The logo row's source the page shows now; `logoUrl` is the form's (queued or current). */
   currentLogoUrl: string | null
-  /** The featured image slot waiting or failed (a reviewed copy that could not land, #96 r3). */
-  imageQueue: AdminListingDetail['logoQueue']
   logoQueue: {
     attempts: number
     lastError: string | null
@@ -869,7 +865,6 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         // A queued logo is the logo the admin set last: the form shows its source (#96 r2 S2).
         logoUrl: logoQueue?.sourceUrl ?? listing.logoUrl ?? null,
         logoQueue,
-        imageQueue: parseLogoQueue(row.image_queue),
         activity: events(activity ?? [], 'listing'),
         badgeChecks: badgeChecks(checks ?? []),
         block: block(row),
@@ -998,7 +993,6 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
               }
             : null,
         imageKey: optionalText(row.image_key),
-        imageSlot: parseLogoQueue(row.image_slot),
         logoKey: optionalText(row.logo_key),
         logoUrl: text(row.logo_url),
         name: text(row.name),

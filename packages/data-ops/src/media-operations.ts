@@ -11,7 +11,7 @@ import {
 } from './media-ingest'
 import {
   type HostedMedia,
-  listingKeyForSubmissionKey,
+  listingKeyForPendingKey,
   MEDIA_KINDS,
   type MediaKind,
   type MediaOwner,
@@ -19,19 +19,20 @@ import {
 } from './media-keys'
 import {
   buildClaimMediaPlans,
-  buildForgetSubmissionMediaPlans,
+  buildForgetPendingMediaPlans,
   buildHostListingMediaPlans,
   buildQueueMediaPlans,
   buildRecordClaimedFailurePlans,
   buildRecordMediaFailurePlans,
-  buildRecordSubmissionMediaPlans,
+  buildRecordPendingMediaPlans,
   MAX_MEDIA_ATTEMPTS,
   MEDIA_INGESTION_BATCH_LIMIT,
   type MediaClaim,
   type MediaTarget,
   mediaClaimLease,
+  type PendingMediaOwner,
   selectDueMediaPlan,
-  selectFinishedSubmissionMediaPlan,
+  selectFinishedPendingMediaPlan,
   selectListingMediaContextPlan,
   selectListingMediaQueuePlan,
   selectSubmissionMediaPlan
@@ -96,12 +97,27 @@ export interface MediaOperations {
     sourceUrl: string
     submissionId: string
   }): Promise<MediaOutcome>
+  /**
+   * A listing revision named its logo (#96 round 4, for #102's revision save): host it under
+   * `best.serp.co/revisions/<id>/` now or queue it, so the reviewer sees the hosted copy and
+   * approval adopts exactly that key. A logo the listing already hosts from the same source
+   * needs no copy: the review shows the listing's.
+   */
+  hostRevisionMedia(input: {
+    kind: MediaKind
+    revisionId: string
+    sortOrder: number
+    sourceUrl: string
+  }): Promise<MediaOutcome>
   /** The cron: retry due slots, oldest first. */
   processDueMedia(limit?: number): Promise<MediaRunSummary>
   /** One listing's due slots now (after an admin approval queued its copies). */
   processListingMedia(listingId: string): Promise<MediaRunSummary>
-  /** Deletes the images and slots of finished submissions (approved and copied, rejected, withdrawn). */
-  forgetFinishedSubmissionMedia(limit?: number): Promise<number>
+  /**
+   * Deletes the images and slots of finished submissions and revisions (approved and copied,
+   * rejected, withdrawn).
+   */
+  forgetFinishedPendingMedia(limit?: number): Promise<number>
   /** Queued or failed slots of a listing, for the admin (#85). */
   listingMediaQueue(listingId: string): Promise<MediaSlotStatus[]>
   /** A submission's media slots and their state, for the review screen (#85). */
@@ -127,6 +143,7 @@ interface DueRow {
   kind: string
   listing_id: string | null
   next_attempt_at: string
+  revision_id: string | null
   slug: string | null
   sort_order: number
   source_url: string
@@ -266,7 +283,41 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
     return { code: failure.code, status: pending ? 'pending' : 'failed' }
   }
 
-  /** Hosts one claimed slot: copy a submission's image, or fetch the source; never write it twice. */
+  /**
+   * Hosts a submission's or a revision's image under its own pending prefix, never a live
+   * listing's path (#95 review S1, #96 round 4), or records why it could not.
+   */
+  async function hostPending(
+    owner: PendingMediaOwner,
+    slot: { kind: MediaKind; sortOrder: number; sourceUrl: string }
+  ): Promise<MediaOutcome> {
+    const revision = 'revisionId' in owner
+    const [found] = await all<{ id: string }>({
+      sql: `SELECT id FROM ${revision ? 'listing_revisions' : 'listing_submissions'} WHERE id=?`,
+      params: [revision ? owner.revisionId : owner.submissionId]
+    })
+    if (!found) throw new Error(revision ? 'Revision not found.' : 'Submission not found.')
+    const result = await ingest({ kind: slot.kind, sourceUrl: slot.sourceUrl, ...owner })
+    observe({
+      event: 'media_ingest',
+      host: hostOf(slot.sourceUrl),
+      outcome: result.ok ? 'hosted' : result.code,
+      target: revision ? 'revision' : 'submission'
+    })
+    if (!result.ok) return recordFailure(owner, slot, result, 1)
+    await run(
+      buildRecordPendingMediaPlans({
+        kind: slot.kind,
+        media: result.media,
+        now: now(),
+        owner,
+        sortOrder: slot.sortOrder
+      })
+    )
+    return { key: result.media.key, status: 'hosted' }
+  }
+
+  /** Hosts one claimed slot: copy a reviewed image, or fetch the source; never write it twice. */
   async function processClaimed(
     row: DueRow,
     claim: MediaClaim,
@@ -306,7 +357,7 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
               bytes: source.bytes,
               contentType: source.content_type,
               height: source.height,
-              key: listingKeyForSubmissionKey(row.copy_from_key, row.slug),
+              key: listingKeyForPendingKey(row.copy_from_key, row.slug),
               sha256: source.sha256,
               sourceUrl: row.source_url,
               width: source.width
@@ -317,7 +368,7 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
           // by a refetch whose key, the content hash, is the reviewed one. Anything else leaves
           // the tile, with its reason for the admin, and is never published.
           if (!result.ok && !result.retryable) {
-            const expected = listingKeyForSubmissionKey(row.copy_from_key, row.slug)
+            const expected = listingKeyForPendingKey(row.copy_from_key, row.slug)
             const image = await fetchImage(row.source_url, {
               fetcher: config.fetcher,
               webPortsOnly: config.webPortsOnly ?? true
@@ -356,17 +407,19 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
           workflow: 'worker/media-cron'
         })
       } else {
-        const submissionId = row.submission_id ?? ''
-        const result = await ingest({ kind, sourceUrl: row.source_url, submissionId })
+        const owner: PendingMediaOwner = row.revision_id
+          ? { revisionId: row.revision_id }
+          : { submissionId: row.submission_id ?? '' }
+        const result = await ingest({ kind, sourceUrl: row.source_url, ...owner })
         if (!result.ok) return await fail(result)
         await run(
-          buildRecordSubmissionMediaPlans({
+          buildRecordPendingMediaPlans({
             claim,
             kind,
             media: result.media,
             now: now(),
-            sortOrder: row.sort_order,
-            submissionId
+            owner,
+            sortOrder: row.sort_order
           })
         )
       }
@@ -439,36 +492,31 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
     },
 
     async hostSubmissionMedia(input) {
-      const [submission] = await all<{ id: string }>({
-        sql: 'SELECT id FROM listing_submissions WHERE id=?',
-        params: [input.submissionId]
+      const { submissionId, ...slot } = input
+      return hostPending({ submissionId }, slot)
+    },
+
+    async hostRevisionMedia(input) {
+      const { revisionId, ...slot } = input
+      const [revision] = await all<{ current_key: string | null }>({
+        sql: `SELECT (SELECT m.media_key FROM listing_media m WHERE m.listing_id=r.listing_id
+            AND m.kind=? AND m.media_key IS NOT NULL AND m.url=? ORDER BY m.sort_order LIMIT 1)
+            AS current_key
+          FROM listing_revisions r WHERE r.id=?`,
+        params: [slot.kind, slot.sourceUrl, revisionId]
       })
-      if (!submission) throw new Error('Submission not found.')
-      // Under the submission's own prefix, never a live listing's path (#95 review S1).
-      const result = await ingest({
-        kind: input.kind,
-        sourceUrl: input.sourceUrl,
-        submissionId: input.submissionId
-      })
-      observe({
-        event: 'media_ingest',
-        host: hostOf(input.sourceUrl),
-        outcome: result.ok ? 'hosted' : result.code,
-        target: 'submission'
-      })
-      if (!result.ok) {
-        return recordFailure({ submissionId: input.submissionId }, input, result, 1)
+      if (!revision) throw new Error('Revision not found.')
+      // The listing already hosts this source: the review shows that copy, and no other.
+      if (revision.current_key) {
+        await run([
+          {
+            sql: `DELETE FROM media_ingestions WHERE revision_id=? AND kind=? AND sort_order=?`,
+            params: [revisionId, slot.kind, slot.sortOrder]
+          }
+        ])
+        return { key: revision.current_key, status: 'hosted' }
       }
-      await run(
-        buildRecordSubmissionMediaPlans({
-          kind: input.kind,
-          media: result.media,
-          now: now(),
-          sortOrder: input.sortOrder,
-          submissionId: input.submissionId
-        })
-      )
-      return { key: result.media.key, status: 'hosted' }
+      return hostPending({ revisionId }, slot)
     },
 
     processDueMedia(limit = MEDIA_INGESTION_BATCH_LIMIT) {
@@ -479,16 +527,16 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
       return processDue(MEDIA_INGESTION_BATCH_LIMIT, listingId)
     },
 
-    async forgetFinishedSubmissionMedia(limit = MEDIA_INGESTION_BATCH_LIMIT) {
+    async forgetFinishedPendingMedia(limit = MEDIA_INGESTION_BATCH_LIMIT) {
       let forgotten = 0
       const rows = await all<{ id: number; media_key: string | null }>(
-        selectFinishedSubmissionMediaPlan(limit)
+        selectFinishedPendingMediaPlan(limit)
       )
       for (const row of rows) {
         try {
           // The object first: a row is only forgotten once nothing is left behind in R2.
           if (row.media_key) await bucket.delete?.(row.media_key)
-          await run(buildForgetSubmissionMediaPlans({ id: row.id, mediaKey: row.media_key }))
+          await run(buildForgetPendingMediaPlans({ id: row.id, mediaKey: row.media_key }))
           forgotten += 1
         } catch {
           observe({ event: 'media_forget_error', id: row.id })

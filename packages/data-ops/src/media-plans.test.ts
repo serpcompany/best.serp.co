@@ -801,14 +801,14 @@ describe('hosted media constraints', () => {
         `INSERT INTO media_ingestions (submission_id,kind,source_url,next_attempt_at,copy_from_key)
          VALUES ('${submissionId}','logo','https://x.example/a.png','${NOW}','${submissionKey}')`
       )
-    ).toThrow(/media_ingestions_copy_from_submission/u)
+    ).toThrow(/media_ingestions_copy_from_pending/u)
     expect(() =>
       db.exec(
         `INSERT INTO media_ingestions (listing_id,kind,source_url,next_attempt_at,copy_from_key)
          VALUES ('${listingId}','logo','https://x.example/a.png','${NOW}',
            'best.serp.co/listings/${slug}/logo/${'f'.repeat(16)}.png')`
       )
-    ).toThrow(/media_ingestions_copy_from_submission/u)
+    ).toThrow(/media_ingestions_copy_from_pending/u)
     expect(() =>
       db.exec(
         `INSERT INTO media_ingestions (listing_id,kind,source_url,next_attempt_at,copy_from_key)

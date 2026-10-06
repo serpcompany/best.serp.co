@@ -237,6 +237,7 @@ export const applicationColumnInventory = {
     'id',
     'listing_id',
     'submission_id',
+    'revision_id',
     'kind',
     'sort_order',
     'source_url',

@@ -1,4 +1,10 @@
-import { type HostedMedia, MEDIA_KINDS, type MediaKind, parseMediaKey } from './media-keys'
+import {
+  type HostedMedia,
+  isPendingMediaKey,
+  MEDIA_KINDS,
+  type MediaKind,
+  parseMediaKey
+} from './media-keys'
 import {
   assertPreviousStatementChangedOne,
   beginCatalogPublicationPlans,
@@ -34,7 +40,18 @@ export const MEDIA_CLAIM_LEASE_MINUTES = 10
 /** Slots one cron run processes, which bounds its subrequests. */
 export const MEDIA_INGESTION_BATCH_LIMIT = 10
 
-export type MediaTarget = { listingId: string } | { submissionId: string }
+export type MediaTarget = { listingId: string } | { submissionId: string } | { revisionId: string }
+
+/** A submission or a revision whose images wait for its review (#96 round 4). */
+export type PendingMediaOwner = { submissionId: string } | { revisionId: string }
+
+function targetId(target: MediaTarget): string {
+  return 'listingId' in target
+    ? target.listingId
+    : 'submissionId' in target
+      ? target.submissionId
+      : target.revisionId
+}
 
 export interface MediaSlot {
   kind: MediaKind
@@ -72,14 +89,14 @@ function assertSlot(slot: MediaSlot): void {
   if (!Number.isSafeInteger(slot.sortOrder) || slot.sortOrder < 0) {
     throw new Error('A media slot needs a non-negative sort order.')
   }
-  const id = 'listingId' in slot.target ? slot.target.listingId : slot.target.submissionId
-  if (!id) throw new Error('A media slot needs its listing or submission.')
+  if (!targetId(slot.target))
+    throw new Error('A media slot needs its listing, submission or revision.')
 }
 
 function assertHosted(
   media: HostedMedia,
   kind: MediaKind,
-  scope: 'listings' | 'submissions'
+  scope: 'listings' | 'revisions' | 'submissions'
 ): void {
   const parsed = parseMediaKey(media.key)
   if (parsed?.scope !== scope || parsed.kind !== kind) {
@@ -89,17 +106,17 @@ function assertHosted(
 
 /** The target column, its value, and the partial unique index's conflict clause. */
 function targetColumns(target: MediaTarget): { column: string; conflict: string; id: string } {
-  return 'listingId' in target
-    ? {
-        column: 'listing_id',
-        conflict: 'ON CONFLICT(listing_id,kind,sort_order) WHERE listing_id IS NOT NULL',
-        id: target.listingId
-      }
-    : {
-        column: 'submission_id',
-        conflict: 'ON CONFLICT(submission_id,kind,sort_order) WHERE submission_id IS NOT NULL',
-        id: target.submissionId
-      }
+  const column =
+    'listingId' in target
+      ? 'listing_id'
+      : 'submissionId' in target
+        ? 'submission_id'
+        : 'revision_id'
+  return {
+    column,
+    conflict: `ON CONFLICT(${column},kind,sort_order) WHERE ${column} IS NOT NULL`,
+    id: targetId(target)
+  }
 }
 
 function hostedValues(media: HostedMedia): unknown[] {
@@ -205,9 +222,27 @@ export function buildRecordSubmissionMediaPlans(input: {
   sortOrder: number
   submissionId: string
 }): StatementPlan[] {
-  const target = { submissionId: input.submissionId }
+  const { submissionId, ...rest } = input
+  return buildRecordPendingMediaPlans({ ...rest, owner: { submissionId } })
+}
+
+/**
+ * Records a submission's or a revision's hosted image under its own pending prefix
+ * (`submissions/<id>/…`, `revisions/<id>/…`, #96 round 4): when it is saved, as an upsert, or
+ * from the cron while its claim holds. The review screen shows it; approval adopts that key.
+ */
+export function buildRecordPendingMediaPlans(input: {
+  claim?: MediaClaim
+  kind: MediaKind
+  media: HostedMedia
+  now: string
+  owner: PendingMediaOwner
+  sortOrder: number
+}): StatementPlan[] {
+  const target: MediaTarget = input.owner
+  const revision = 'revisionId' in target
   assertSlot({ kind: input.kind, sortOrder: input.sortOrder, target })
-  assertHosted(input.media, input.kind, 'submissions')
+  assertHosted(input.media, input.kind, revision ? 'revisions' : 'submissions')
   requireInstant(input.now)
   if (input.claim) {
     return [
@@ -227,46 +262,49 @@ export function buildRecordSubmissionMediaPlans(input: {
       assertPreviousStatementChangedOne('media_claim_current')
     ]
   }
-  const { conflict } = targetColumns(target)
+  const { column, conflict, id } = targetColumns(target)
   return [
     {
       sql: `INSERT INTO media_ingestions
-        (submission_id,kind,sort_order,source_url,status,attempts,next_attempt_at,last_error,
+        (${column},kind,sort_order,source_url,status,attempts,next_attempt_at,last_error,
          ${hostedColumns},created_at,updated_at)
         SELECT ?,?,?,?,'hosted',1,NULL,NULL,?,?,?,?,?,?,?,?
-        WHERE EXISTS (SELECT 1 FROM listing_submissions WHERE id=?)
+        WHERE EXISTS (SELECT 1 FROM ${revision ? 'listing_revisions' : 'listing_submissions'}
+          WHERE id=?)
         ${conflict} DO UPDATE SET source_url=excluded.source_url,status='hosted',
           attempts=media_ingestions.attempts+1,next_attempt_at=NULL,last_error=NULL,
           copy_from_key=NULL,media_key=excluded.media_key,sha256=excluded.sha256,
           content_type=excluded.content_type,bytes=excluded.bytes,width=excluded.width,
           height=excluded.height,updated_at=excluded.updated_at`,
       params: [
-        input.submissionId,
+        id,
         input.kind,
         input.sortOrder,
         input.media.sourceUrl,
         ...hostedValues(input.media),
         input.now,
         input.now,
-        input.submissionId
+        id
       ]
     },
-    assertPreviousStatementChangedOne('submission_media_hosted')
+    assertPreviousStatementChangedOne(
+      revision ? 'revision_media_hosted' : 'submission_media_hosted'
+    )
   ]
 }
 
 /**
  * Queues a slot for the cron without trying it first (attempts 0, due now), replacing whatever
- * the slot held before. `copyFromKey` names a submission's hosted copy to use instead of the
- * source (approval).
+ * the slot held before. `copyFromKey` names a submission's or a revision's hosted copy to use
+ * instead of the source (approval).
  */
 export function buildQueueMediaPlans(
   input: MediaSlot & { copyFromKey?: string; now: string; sourceUrl: string }
 ): StatementPlan[] {
   assertSlot(input)
   requireInstant(input.now)
-  if (input.copyFromKey && parseMediaKey(input.copyFromKey)?.scope !== 'submissions') {
-    throw new Error('Only a submission key is copied into a listing.')
+  if (input.copyFromKey && !isPendingMediaKey(input.copyFromKey)) {
+    throw new Error('Only a submission or revision key is copied into a listing.')
   }
   const { column, conflict, id } = targetColumns(input.target)
   return [
@@ -375,8 +413,8 @@ export function buildRecordClaimedFailurePlans(input: {
 }
 
 /**
- * Pending slots that are due (one listing's, or all), oldest first, with the slug or submission
- * id their key is built from, the submission copy to use, and what the listing's slot holds now.
+ * Pending slots that are due (one listing's, or all), oldest first, with the slug, submission
+ * id or revision id their key is built from, the submission copy to use, and what the listing's slot holds now.
  */
 export function selectDueMediaPlan(
   now: string,
@@ -388,7 +426,7 @@ export function selectDueMediaPlan(
     throw new Error('A media batch takes 1 to 50 slots.')
   }
   return {
-    sql: `SELECT j.id,j.listing_id,j.submission_id,j.kind,j.sort_order,j.source_url,
+    sql: `SELECT j.id,j.listing_id,j.submission_id,j.revision_id,j.kind,j.sort_order,j.source_url,
         j.copy_from_key,j.attempts,j.next_attempt_at,l.slug,
         (SELECT COALESCE(m.media_key,m.url) FROM listing_media m WHERE m.listing_id=j.listing_id
           AND m.kind=j.kind AND m.sort_order=j.sort_order) AS current_media
@@ -421,22 +459,23 @@ export function buildClaimMediaPlans(input: {
 }
 
 /**
- * Submission media slots whose submission is finished (#96 review S1): rejected or withdrawn
- * (which covers an expired draft), or approved with no listing slot still waiting to copy its
- * image. Their images under `best.serp.co/submissions/<id>/` are deleted, then the rows; the
- * cron stops retrying slots nobody will review. An R2 lifecycle rule on that prefix (an owner
- * action, docs/MEDIA.md) catches anything this misses.
+ * Pending media slots whose submission or revision is finished (#96 review S1, round 4):
+ * rejected or withdrawn (which covers an expired draft), or approved with no listing slot still
+ * waiting to copy its image. Their images under `best.serp.co/submissions/<id>/` or
+ * `best.serp.co/revisions/<id>/` are deleted, then the rows; the cron stops retrying slots
+ * nobody will review. An R2 lifecycle rule on those prefixes (an owner action, docs/MEDIA.md)
+ * catches anything this misses.
  */
-export function selectFinishedSubmissionMediaPlan(
-  limit = MEDIA_INGESTION_BATCH_LIMIT
-): StatementPlan {
+export function selectFinishedPendingMediaPlan(limit = MEDIA_INGESTION_BATCH_LIMIT): StatementPlan {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
     throw new Error('A media batch takes 1 to 50 slots.')
   }
   return {
     sql: `SELECT j.id,j.media_key FROM media_ingestions j
-      JOIN listing_submissions s ON s.id=j.submission_id
-      WHERE s.status IN ('approved','rejected','withdrawn')
+      LEFT JOIN listing_submissions s ON s.id=j.submission_id
+      LEFT JOIN listing_revisions r ON r.id=j.revision_id
+      WHERE (s.status IN ('approved','rejected','withdrawn')
+          OR r.status IN ('approved','rejected','withdrawn'))
         AND (j.media_key IS NULL OR NOT EXISTS (SELECT 1 FROM media_ingestions q
           WHERE q.copy_from_key=j.media_key AND q.status='pending'))
       ORDER BY j.id ASC
@@ -445,18 +484,18 @@ export function selectFinishedSubmissionMediaPlan(
   }
 }
 
-/** Removes a finished submission's slot once its image (if any) is deleted. */
-export function buildForgetSubmissionMediaPlans(input: {
+/** Removes a finished submission's or revision's slot once its image (if any) is deleted. */
+export function buildForgetPendingMediaPlans(input: {
   id: number
   mediaKey: string | null
 }): StatementPlan[] {
-  if (input.mediaKey !== null && parseMediaKey(input.mediaKey)?.scope !== 'submissions') {
-    throw new Error('Only a submission’s own media is forgotten.')
+  if (input.mediaKey !== null && !isPendingMediaKey(input.mediaKey)) {
+    throw new Error('Only a submission’s or revision’s own media is forgotten.')
   }
   return [
     {
-      sql: `DELETE FROM media_ingestions WHERE id=? AND submission_id IS NOT NULL
-        AND media_key IS ?`,
+      sql: `DELETE FROM media_ingestions WHERE id=?
+        AND (submission_id IS NOT NULL OR revision_id IS NOT NULL) AND media_key IS ?`,
       params: [input.id, input.mediaKey]
     }
   ]

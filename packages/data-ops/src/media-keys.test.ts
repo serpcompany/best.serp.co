@@ -4,7 +4,7 @@ import {
   isListingMediaKey,
   isMediaKey,
   LOCAL_MEDIA_PATH,
-  listingKeyForSubmissionKey,
+  listingKeyForPendingKey,
   mediaKey,
   mediaUrl,
   parseMediaKey,
@@ -49,9 +49,9 @@ describe('media keys', () => {
     // A submission's image never stands in a listing row; approval copies it to the listing path.
     expect(isListingMediaKey(pending)).toBe(false)
     expect(isListingMediaKey(logoKey)).toBe(true)
-    expect(listingKeyForSubmissionKey(pending, 'dr.serp.co')).toBe(logoKey)
-    expect(() => listingKeyForSubmissionKey(logoKey, 'dr.serp.co')).toThrow(/not a submission/u)
-    expect(() => listingKeyForSubmissionKey(pending, '../x')).toThrow(/slug/u)
+    expect(listingKeyForPendingKey(pending, 'dr.serp.co')).toBe(logoKey)
+    expect(() => listingKeyForPendingKey(logoKey, 'dr.serp.co')).toThrow(/not a pending/u)
+    expect(() => listingKeyForPendingKey(pending, '../x')).toThrow(/slug/u)
     expect(() =>
       mediaKey({ format: 'png', kind: 'logo', sha256: sha, submissionId: '../x' })
     ).toThrow(/submission id/u)

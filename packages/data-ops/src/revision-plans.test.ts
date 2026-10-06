@@ -280,10 +280,11 @@ describe('revision status transitions (compare-and-swap with changes() assertion
           db.prepare('SELECT kind,url FROM listing_media ORDER BY kind,sort_order').all()
         ).toEqual([
           { kind: 'image', url: 'https://assets.example/image.png' },
+          // The new logo was not hosted at review: never hotlinked, never fetched later
+          // unreviewed (#96 round 3 S1), and the listing keeps its current logo (round 4 S1).
+          { kind: 'logo', url: 'https://assets.example/old-logo.png' },
           { kind: 'video', url: 'https://assets.example/demo.mp4' }
         ])
-        // The new logo was not hosted at review: never hotlinked, and never fetched later
-        // unreviewed (#96 round 3 S1). The fallback tile shows until an admin sets a logo.
         expect(count(db, 'SELECT COUNT(*) AS count FROM media_ingestions')).toBe(0)
         expect(db.prepare('SELECT label FROM listing_resource_links').all()).toEqual([
           { label: 'Pricing' }
