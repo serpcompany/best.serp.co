@@ -147,9 +147,12 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    under the cap of 10 conclusive checks), so parallel requests get one check and 429
    `cooldown` for the rest, and a stale result is refused with 409, never a 500. It then counts
    the fetch against an outbound budget whatever its result (20 an hour per submission, 60 an
-   hour per account), fetches the website, and reads it as a browser would
-   (`html-tokens.ts`: comments, `script`, `style`, `template`, `noscript`, `textarea` and the
-   other raw-text elements never count, and only an element's own attributes do). It requires a
+   hour per account), fetches the website, and parses it as a browser would (`parse5`, the
+   WHATWG parser, scripting on: comments, raw text such as `script` or `noscript`, `template`
+   contents and SVG or MathML content never count, and only an element's own attributes do).
+   `bounded-html.ts` stops a page nested over 512 deep, with over 100,000 elements, or over
+   its parsing-work budget, as `verification_service_error`, so 1 MB of crafted HTML costs
+   tens of milliseconds, not minutes; real pages use a small part of each. It requires a
    real badge `<img>` inside an `<a>` whose own `href` is `/products/<slug>/` (badges linking to
    the old `/reviews/` URL still count) and whose own `rel` has no `nofollow`, `sponsored`, or
    `ugc`, in any case or order (`link_not_followed`, which names the tokens found; owner

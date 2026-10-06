@@ -190,8 +190,9 @@ describe('badge scanner tokenizer', () => {
   })
 
   it('closes a link at the next link or its end tag', () => {
+    // The badge is on the page but outside any link.
     expect(scan(`<a href="${L}"></a><img src="${B}">`)).toEqual({
-      code: 'badge_missing',
+      code: 'wrong_destination',
       ok: false
     })
     expect(scan(`<a href="${L}"><a href="https://evil.example/"><img src="${B}"></a>`)).toEqual({
