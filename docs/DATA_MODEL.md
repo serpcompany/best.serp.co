@@ -115,7 +115,8 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   memberships stay, every public query (pages, sitemap, search, RSS, category pages, counts)
   drops it, and `getUnpublishedListing(slug)` finds it so the route can answer 410 Gone
   instead of 404 (#64). Republishing sets `is_active = 1` and the URL works again. The
-  publisher's `listing-unpublish` reaches the same state.
+  publisher's `listing-unpublish` reaches the same state, with the same activity records
+  ([Catalog hygiene](./CATALOG_HYGIENE.md)).
 - A listing has a **verified owner** when `listing_owners` has a current `owner` row; detail
   DTOs carry `verifiedOwner: true` (one probe of `listing_owners_current_owner_idx`).
 

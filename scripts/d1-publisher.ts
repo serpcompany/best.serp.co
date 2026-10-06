@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { listingHasQueuedSubmission } from '@serpdirectory/data-ops/plan-support'
 import { hasFileExtension } from '@serpdirectory/web-core/canonical-url'
 import { parse } from 'yaml'
 import { z } from 'zod'
@@ -91,12 +92,20 @@ const operation = z.discriminatedUnion('action', [
   z
     .object({ action: z.literal('listing-update'), listing, previousCategories: categories })
     .strict(),
+  /**
+   * Live → unpublished, the admin panel's state (#64): `status` stays `approved`, `is_active`
+   * becomes 0, the row is kept, and the URL answers 410 Gone. `reason` goes to the activity log.
+   * `expected` is the row the manifest was generated against (#100): the batch refuses a listing
+   * whose website changed since, so the operation stays correct on any environment.
+   */
   z
     .object({
       action: z.literal('listing-unpublish'),
       id: listingId,
       slug: existingSlug,
-      categories
+      categories,
+      reason: z.string().trim().min(1).max(200).optional(),
+      expected: z.object({ website: z.string().url() }).strict().optional()
     })
     .strict(),
   z
@@ -427,15 +436,37 @@ export function buildPublicationPlan(
       addCategories(op.listing.categories)
     }
     if (op.action === 'listing-unpublish') {
+      const website = op.expected ? [op.expected.website] : []
       statements.push(
         membershipGuard(op.id, op.categories),
+        // As in the admin panel (#64): never while the listing's own submission is in review.
         statement(
-          "UPDATE listings SET is_active=0,updated_at=? WHERE id=? AND slug=? AND status='approved' AND is_active=1",
+          `INSERT INTO publication_guard SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN 0 ELSE 1 END`,
+          op.id
+        ),
+        statement(
+          `UPDATE listings SET is_active=0,updated_at=? WHERE id=? AND slug=? AND status='approved' AND is_active=1${
+            op.expected ? ' AND website=?' : ''
+          }`,
           now,
           op.id,
-          op.slug
+          op.slug,
+          ...website
         ),
-        statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)')
+        statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
+        // The admin panel's activity records for an unpublish (#64).
+        statement(
+          "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'unpublished',?,?)",
+          op.id,
+          JSON.stringify({ manifest: manifest.id, reason: op.reason ?? null }),
+          manifest.provenance.actor
+        ),
+        statement(
+          "INSERT INTO listing_submission_events (submission_id,event_type,detail,actor) SELECT id,'unpublished',?,? FROM listing_submissions WHERE listing_id=? AND status='approved'",
+          op.reason ?? `manifest ${manifest.id}`,
+          manifest.provenance.actor,
+          op.id
+        )
       )
       routes.add(listingRoute(op.slug))
       addCategories(op.categories)

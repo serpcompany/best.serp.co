@@ -7,7 +7,8 @@
   (`STRICT` tables, primary-category triggers).
 - `d1/artifacts/` holds the one-time import. Only the parity report and
   `best-serp-co-v1.sql.br` are committed; never hand-edit generated SQL.
-- Ongoing catalog changes use reviewed manifests under `d1/publications/`.
+- Ongoing catalog changes use reviewed manifests under `d1/publications/`. `d1/hygiene/` holds
+  the listing domain check's reports, the evidence behind its unpublish manifests.
 - Stable listing IDs survive slug changes; record old slugs in `listing_slug_redirects`.
 - Staging and production backup, migration, import, and publication run only through
   protected workflows. Production migrates only a commit that Deploy Staging already
