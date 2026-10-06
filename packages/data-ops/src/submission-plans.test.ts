@@ -17,17 +17,21 @@ import {
   buildApproveLiveSubmissionPlans,
   buildApproveSubmissionPlans,
   buildChooseSubmissionPlanPlans,
+  buildClaimListingBadgeCheckPlans,
   buildClearDraftPlans,
+  buildFinishListingBadgeCheckPlans,
   buildLiftSubmissionUrlBlockPlans,
   buildRecordSubmissionPaymentPlans,
   buildRecordUnappliedPaymentPlans,
   buildRefundSubmissionPlans,
   buildRejectSubmissionPlans,
   buildReplaceSubmissionContentPlans,
+  buildReplaceSubmissionExtrasPlans,
   buildRequestSubmissionChangesPlans,
   buildResubmitSubmissionPlans,
   buildUpgradeListingToPaidPlans,
   buildWithdrawSubmissionPlans,
+  type ListingBadgeCheckClaim,
   recordSubmissionNotificationPlan,
   selectRefundPendingSubmissionsPlan,
   selectSubmissionForDecisionPlan,
@@ -215,7 +219,8 @@ describe('submission transition map', () => {
     for (const [action, transition] of Object.entries(submissionTransitions)) {
       for (const from of transition.from) expect(submissionStatuses, action).toContain(from)
     }
-    const bookkeeping = ['refund', 'payUnapplied', 'upgradeListing']
+    // The owner's badge check of a live listing (#65) records counters and an event only.
+    const bookkeeping = ['listingBadgeCheck', 'refund', 'payUnapplied', 'upgradeListing']
     for (const terminal of ['approved', 'rejected', 'withdrawn'] as const) {
       const outgoing = Object.entries(submissionTransitions).filter(
         ([action, transition]) =>
@@ -225,6 +230,8 @@ describe('submission transition map', () => {
     }
     expect(submissionTransitions.ownerEdit.from).not.toContain('verified')
     expect(submissionTransitions.ownerEdit.from).not.toContain('paid_pending_review')
+    // In the queue, the owner may add FAQs and links (#65) but never edit the rest.
+    expect(submissionTransitions.ownerExtras.from).toEqual(['verified', 'paid_pending_review'])
   })
 
   // #77: a plan's statement count follows the staged children, so builders cap them.
@@ -979,6 +986,160 @@ describe('submission status transitions (compare-and-swap with changes() asserti
         submissionId
       })
     ).toThrow(/before a final decision/u)
+  })
+})
+
+describe('the owner’s account actions (#65)', () => {
+  it('replaces only FAQs and links while the submission waits for review, for its owner', () => {
+    const plans = (expectedContentVersion = 1, ownerUserId = 'user_owner') =>
+      buildReplaceSubmissionExtrasPlans({
+        content: { faqs: [{ answer: 'A2', question: 'Q2' }], resourceLinks: [] },
+        expectedContentVersion,
+        now: NOW,
+        ownerUserId,
+        submissionId
+      })
+    expectTransition({
+      after: (db, from) => {
+        expect(submission(db)).toMatchObject({
+          content_version: 2,
+          description: 'Description',
+          name: 'Example',
+          status: from
+        })
+        expect(db.prepare('SELECT question FROM listing_submission_faqs').all()).toEqual([
+          { question: 'Q2' }
+        ])
+        expect(count(db, 'SELECT COUNT(*) AS count FROM listing_submission_resource_links')).toBe(0)
+      },
+      event: 'edited',
+      plans: () => plans(),
+      succeeds: submissionTransitions.ownerExtras.from
+    })
+    expect(() => execute(database('verified'), plans(2))).toThrow(/malformed JSON/u)
+    expect(() => execute(database('verified'), plans(1, 'user_other'))).toThrow(/malformed JSON/u)
+  })
+
+  function ownedLiveListing(db: DatabaseSync, owner = 'user_owner'): void {
+    db.prepare(
+      `INSERT INTO listing_owners (listing_id,user_id,role,verified_via,verified_at)
+      VALUES (?,?,'owner','submission','2026-08-01T00:00:00.000Z')`
+    ).run(liveListingId, owner)
+  }
+
+  const claim = (options: Partial<ListingBadgeCheckClaim> = {}) =>
+    buildClaimListingBadgeCheckPlans({
+      claimedAt: '2026-10-06 12:00:00',
+      conclusiveCodes: ['badge_missing', 'link_not_followed'],
+      cooldownCutoff: '2026-10-06 11:59:30',
+      maxAttempts: 10,
+      now: NOW,
+      ownerUserId: 'user_owner',
+      submissionId,
+      ...options
+    })
+
+  it('claims a badge check only for the owner’s live, free, approved listing', () => {
+    for (const status of submissionStatuses) {
+      const db = database(status, { live: true })
+      if (listing(db)) ownedLiveListing(db)
+      const before = submission(db)
+      if ((submissionTransitions.listingBadgeCheck.from as readonly string[]).includes(status)) {
+        execute(db, claim())
+        expect(submission(db)).toMatchObject({
+          last_verification_at: '2026-10-06 12:00:00',
+          status
+        })
+      } else {
+        expect(() => execute(db, claim()), `${status} must be refused`).toThrow(/malformed JSON/u)
+        expect(submission(db)).toEqual(before)
+      }
+      db.close()
+    }
+    const refusals: Array<[string, (db: DatabaseSync) => void]> = [
+      ['paid', db => db.prepare("UPDATE listing_submissions SET plan='paid', paid_at=?").run(NOW)],
+      ['down', db => db.prepare('UPDATE listings SET is_active=0').run()],
+      [
+        'revoked',
+        db => db.prepare("UPDATE listing_owners SET revoked_at=?, revoked_reason='x'").run(NOW)
+      ],
+      [
+        'cooling down',
+        db =>
+          db
+            .prepare("UPDATE listing_submissions SET last_verification_at='2026-10-06 11:59:50'")
+            .run()
+      ],
+      [
+        'at the cap',
+        db =>
+          db
+            .prepare(
+              "UPDATE listing_submissions SET verification_attempts=10, last_verification_error='badge_missing'"
+            )
+            .run()
+      ]
+    ]
+    for (const [label, change] of refusals) {
+      const db = database('approved')
+      ownedLiveListing(db)
+      change(db)
+      expect(() => execute(db, claim()), label).toThrow(/malformed JSON/u)
+      db.close()
+    }
+    // At the cap, a last check that was a connection problem leaves one more try.
+    const retry = database('approved')
+    ownedLiveListing(retry)
+    retry
+      .prepare(
+        "UPDATE listing_submissions SET verification_attempts=10, last_verification_error='timeout'"
+      )
+      .run()
+    expect(() => execute(retry, claim())).not.toThrow()
+    expect(() => execute(database('approved'), claim({ ownerUserId: 'user_other' }))).toThrow(
+      /malformed JSON/u
+    )
+  })
+
+  it('records a claimed check once: a pass or conclusive miss uses up a check', () => {
+    const db = database('approved')
+    ownedLiveListing(db)
+    execute(db, claim())
+    const finish = (
+      result: { ok: true } | { code: string; ok: false },
+      conclusive: boolean,
+      claimedAt = '2026-10-06 12:00:00'
+    ) =>
+      buildFinishListingBadgeCheckPlans({
+        claimedAt,
+        conclusive,
+        now: NOW,
+        ownerUserId: 'user_owner',
+        result,
+        submissionId
+      })
+    expect(() => execute(db, finish({ ok: true }, true, '2026-10-06 11:00:00'))).toThrow(
+      /malformed JSON/u
+    )
+    execute(db, finish({ code: 'timeout', ok: false }, false))
+    expect(submission(db)).toMatchObject({
+      last_verification_error: 'timeout',
+      status: 'approved',
+      verification_attempts: 0
+    })
+    execute(db, finish({ code: 'link_not_followed', ok: false }, true))
+    expect(submission(db)).toMatchObject({
+      last_verification_error: 'link_not_followed',
+      verification_attempts: 1
+    })
+    execute(db, finish({ ok: true }, true))
+    expect(submission(db)).toMatchObject({
+      last_verification_error: null,
+      verification_attempts: 2
+    })
+    expect(events(db, 'verification_failed')).toBe(2)
+    expect(events(db, 'badge_verified')).toBe(1)
+    expect(count(db, 'SELECT COUNT(*) AS count FROM badge_checks')).toBe(0)
   })
 })
 

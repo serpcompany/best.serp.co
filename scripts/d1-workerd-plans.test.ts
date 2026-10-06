@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import * as accountModule from '@serpdirectory/data-ops/account'
+import { createAccountOperations } from '@serpdirectory/data-ops/account'
 import * as adminPlansModule from '@serpdirectory/data-ops/admin-plans'
 import * as adminQueriesModule from '@serpdirectory/data-ops/admin-queries'
 import { createAdminReadOperations } from '@serpdirectory/data-ops/admin-queries'
@@ -52,6 +54,7 @@ function tracked<T extends object>(module: T): T {
     })
   ) as T
 }
+const Acc = tracked(accountModule)
 const A = tracked(adminPlansModule)
 const D = tracked(draftPlansModule)
 const Q = tracked(adminQueriesModule)
@@ -843,6 +846,124 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     ).toContain('workerd@example.com')
     await run(A.buildRemoveAdminPlans({ email: 'workerd@example.com' }))
     await expect(run(A.buildRemoveAdminPlans({ email: 'devin@serp.co' }))).rejects.toThrow()
+  })
+
+  it('runs the submitter dashboard plans and reads (#65)', async () => {
+    await insertDraft('sub-dash', 'https://dash.example/')
+    await choose('sub-dash', 'free')
+    await db
+      .prepare(
+        "UPDATE listing_submissions SET status='verified', badge_verified_at=? WHERE id='sub-dash'"
+      )
+      .bind(NOW)
+      .run()
+    // The owner adds FAQs and links while it waits for review.
+    await run(
+      S.buildReplaceSubmissionExtrasPlans({
+        content: { faqs: stagedContent.faqs, resourceLinks: stagedContent.resourceLinks },
+        expectedContentVersion: 1,
+        now: NOW,
+        ownerUserId: 'user_owner',
+        submissionId: 'sub-dash'
+      })
+    )
+    const approval = await publication('verified-submission', 'sub-dash')
+    await run(
+      S.buildApproveSubmissionPlans({
+        afterChecksum: approval.afterChecksum,
+        affectedRoute: '/products/dash.example/',
+        beforeChecksum: approval.beforeChecksum,
+        expectedContentVersion: 2,
+        listingId: 'lst-dash',
+        manifestId: approval.manifestId,
+        now: NOW,
+        reviewer: 'reviewer',
+        runId: approval.runId,
+        submissionId: 'sub-dash',
+        version: approval.version,
+        workflow: 'test/workerd'
+      })
+    )
+    // The owner checks the live free listing's badge: a claim, then its result.
+    const claim = {
+      claimedAt: '2026-10-06 12:00:00',
+      conclusiveCodes: ['badge_missing', 'link_not_followed'],
+      cooldownCutoff: '2026-10-06 11:59:30',
+      maxAttempts: 10,
+      now: NOW,
+      ownerUserId: 'user_owner',
+      submissionId: 'sub-dash'
+    }
+    await run(S.buildClaimListingBadgeCheckPlans(claim))
+    await expect(run(S.buildClaimListingBadgeCheckPlans(claim))).rejects.toThrow()
+    await run(
+      S.buildFinishListingBadgeCheckPlans({
+        claimedAt: claim.claimedAt,
+        conclusive: true,
+        now: NOW,
+        ownerUserId: 'user_owner',
+        result: { code: 'link_not_followed', ok: false },
+        submissionId: 'sub-dash'
+      })
+    )
+
+    // The reads, as plans and through the operations, scoped to the user.
+    const batch = (plans: StatementPlan[]) =>
+      db.batch<Record<string, unknown>>(
+        plans.map(plan => db.prepare(checked(plan.sql, plan.params)).bind(...plan.params))
+      )
+    const [submissions, listings, history] = await batch(
+      Acc.selectAccountOverviewPlans('user_owner')
+    )
+    expect(submissions?.results.map(row => row.id)).toContain('sub-dash')
+    expect(listings?.results.map(row => row.id)).toContain('lst-dash')
+    expect(history?.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          by: 'owner',
+          listing_id: 'lst-dash',
+          outcome: 'fail',
+          reason: 'link_not_followed'
+        })
+      ])
+    )
+    await batch(Acc.selectAccountSubmissionPlans('user_owner', 'sub-dash'))
+    await batch(Acc.selectAccountListingPlans('user_owner', 'dash.example'))
+    const account = createAccountOperations({
+      client: createDatabase(db),
+      clock: () => new Date(NOW)
+    })
+    expect(await account.listing('user_other', 'dash.example')).toBeNull()
+    const owned = await account.listing('user_owner', 'dash.example')
+    expect(owned).toMatchObject({
+      badge: { lastError: 'link_not_followed', submissionId: 'sub-dash' },
+      faqs: stagedContent.faqs,
+      live: true,
+      plan: 'free'
+    })
+    const saved = await account.saveRevision({
+      content: {
+        categorySlug: 'apps',
+        content: 'Owner revision',
+        description: 'Edited from the account',
+        faqs: [],
+        logoUrl: owned?.logoUrl ?? '',
+        resourceLinks: []
+      },
+      listingId: 'lst-dash',
+      newRevisionId: 'rev-dash',
+      userId: 'user_owner'
+    })
+    expect(saved).toEqual({ queued: true, revisionId: 'rev-dash' })
+    expect((await account.overview('user_owner')).listings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'lst-dash',
+          revision: expect.objectContaining({ status: 'pending_review' })
+        })
+      ])
+    )
+    await account.discardRevision({ listingId: 'lst-dash', userId: 'user_owner' })
   })
 
   it('ran every exported plan builder on D1', () => {

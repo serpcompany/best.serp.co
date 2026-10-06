@@ -382,7 +382,10 @@ function validClock(clock: () => Date): Date {
  * Logos must be https (PR #84 review round 1, finding 6): they are hotlinked on https pages.
  * A local Worker also accepts http, for the fixture websites of the end-to-end tests.
  */
-function validateContent(content: DraftContent, allowInsecureLogos: boolean): DraftContent {
+export function validateDraftContent(
+  content: DraftContent,
+  allowInsecureLogos: boolean
+): DraftContent {
   const name = content.name.trim()
   const description = content.description.trim()
   const body = content.content.trim()
@@ -558,7 +561,7 @@ export function createSubmissionOperations(config: {
       if (!('hostKey' in key)) {
         throw unavailableError({ kind: 'invalid', message: key.message })
       }
-      const content = validateContent(submission, allowInsecureLogos)
+      const content = validateDraftContent(submission, allowInsecureLogos)
       const [category, availability] = await Promise.all([
         queryFirst(
           client.database
@@ -615,7 +618,7 @@ export function createSubmissionOperations(config: {
     },
 
     async updateDraft({ content, expectedContentVersion, ownerUserId, submissionId }) {
-      const checked = validateContent(content, allowInsecureLogos)
+      const checked = validateDraftContent(content, allowInsecureLogos)
       const current = await requireOwnSubmission(submissionId, ownerUserId)
       if (current.status !== 'draft' && current.status !== 'pending_badge') {
         throw new SubmissionError(
