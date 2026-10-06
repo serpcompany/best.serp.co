@@ -1,7 +1,7 @@
 import { parse, serialize } from 'parse5'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { B, DIFFERENTIAL_CASES, L } from './badge-differential.fixture'
-import { scanFeaturedBadge } from './badge-verifier'
+import { scanFeaturedBadge, verifyFeaturedBadge } from './badge-verifier'
 import { HTML_LIMITS, HtmlTooComplexError, parseBoundedHtml } from './bounded-html'
 
 const MB = 1_000_000
@@ -42,6 +42,17 @@ function noahsArkPage(): string {
   const round = () =>
     Array.from({ length: 500 }, () => `<b ${shared} z=${z++}>`).join('') + '</b>'.repeat(500)
   return Array.from({ length: 12 }, round).join('')
+}
+
+async function fastestOfThreeAsync(run: () => Promise<unknown>): Promise<number> {
+  await run() // warm up
+  let fastest = Number.POSITIVE_INFINITY
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const started = performance.now()
+    await run()
+    fastest = Math.min(fastest, performance.now() - started)
+  }
+  return fastest
 }
 
 function fastestOfThree(run: () => unknown): number {
@@ -181,7 +192,12 @@ describe('badge scanner on 1 MB of crafted HTML', () => {
       'repeated <body> attributes',
       Array.from({ length: MB / 12 }, (_, i) => `<body b${i}>`).join('')
     ],
-    ["nested formatting that fills Noah's Ark", noahsArkPage()]
+    ["nested formatting that fills Noah's Ark", noahsArkPage()],
+    // PR #84 review round 3: the duplicate check compares long, equal-length names.
+    [
+      'long equal-length attribute names',
+      `<p ${Array.from({ length: 4400 }, (_, i) => `${'a'.repeat(216)}${String(i).padStart(4, '0')}`).join(' ')}>`
+    ]
   ]
 
   it.each(pages)('%s', (_label, html) => {
@@ -195,5 +211,21 @@ describe('badge scanner on 1 MB of crafted HTML', () => {
     }
     expect(html.length).toBeGreaterThan(MB * 0.85)
     expect(fastestOfThree(scan)).toBeLessThan(budgetMs)
+  })
+
+  /**
+   * PR #84 review round 5: the whole check, where a late `<meta>` (after 1,100 bytes of
+   * `<style>`, with a non-ASCII byte) has the page decoded and parsed a second time. Both
+   * parses share one budget, so the check stays within the same time.
+   */
+  it.each(pages)('%s, checked with a late <meta>', async (_label, html) => {
+    const late = `<style>/* é ${'x'.repeat(1100)} */</style><meta charset="windows-1252">${html}`
+    const check = () =>
+      verifyFeaturedBadge(
+        'https://example.com/',
+        expected,
+        async () => new Response(late, { headers: { 'Content-Type': 'text/html' } })
+      )
+    expect(await fastestOfThreeAsync(check)).toBeLessThan(budgetMs)
   })
 })

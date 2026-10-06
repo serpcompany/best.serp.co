@@ -1,11 +1,13 @@
 import type { DefaultTreeAdapterMap } from 'parse5'
-import { parseBoundedHtml } from './bounded-html'
+import { HtmlBudget, parseBoundedHtml } from './bounded-html'
 import {
   declaredEncodings,
   decodeHtml,
   decodeWith,
   encodingForLabel,
   extractMimeType,
+  isAsciiCompatible,
+  isPureAscii,
   metaContentEncoding,
   metaEncoding,
   splitHeaderValue
@@ -30,12 +32,12 @@ import { safeFetch } from './safe-fetch'
  * parser placed in `<head>`.
  *
  * The page is decoded as a browser decodes it (`./html-encoding.ts`: byte order mark, then the
- * `Content-Type` charset, then a `<meta>` declaration, then UTF-8), and a page a browser
- * would download (`Content-Disposition` other than `inline`) or can't show (the
- * `replacement` encoding) fails as `not_html` (PR #84 review round 3, finding 1). Wherever
- * the page's type or encoding is ambiguous, it fails closed as `not_html` too (round 4):
- * `Content-Type` or `Content-Disposition` values that disagree, and `<meta>` declarations
- * that disagree or that no `<meta>` in `<head>` confirms (`settleMetaEncoding`).
+ * `Content-Type` charset, then a `<meta>` declaration, then UTF-8). A page a browser would
+ * download (`Content-Disposition` other than `inline`, or several values) or can't show (the
+ * `replacement` encoding), and one whose type or encoding is ambiguous (`Content-Type`
+ * values that disagree, `<meta>` declarations that disagree or that nothing confirms:
+ * `settleMetaEncoding`), fails closed as `page_unreadable` (PR #84 review rounds 3 to 5). A
+ * page whose only type isn't HTML is `not_html`.
  *
  * Only the static HTML is read: a badge added by JavaScript fails, and a badge hidden with CSS
  * (`display:none`) passes, because detecting it would need rendering. That is accepted.
@@ -90,6 +92,11 @@ export type BadgeVerificationResult =
         | 'site_unreachable'
         | 'too_many_redirects'
         | 'verification_service_error'
+        /**
+         * The page's type or encoding is unclear, so the checker can't tell what a browser
+         * shows (rounds 3 to 5): fails closed, without using up a check.
+         */
+        | 'page_unreadable'
         | `http_${number}`
     }
 
@@ -188,7 +195,8 @@ function metaElementEncoding(meta: Element): string | null {
     const encoding = encodingForLabel(charset)
     return encoding && metaEncoding(encoding)
   }
-  if (attribute(meta, 'http-equiv')?.trim().toLowerCase() !== 'content-type') return null
+  // Not trimmed: Chromium doesn't read `http-equiv=" content-type "` as one (round 5).
+  if (attribute(meta, 'http-equiv')?.toLowerCase() !== 'content-type') return null
   const encoding = metaContentEncoding((attribute(meta, 'content') ?? '').toLowerCase())
   return encoding && metaEncoding(encoding)
 }
@@ -220,31 +228,64 @@ function treeMetaEncodings(document: ParentNode): { all: Set<string>; head: stri
   return { all, head }
 }
 
+/** The first `<meta>` declaration in document order, `<template>` contents included. */
+function firstMetaEncoding(document: ParentNode): string | null {
+  const stack: ParentNode[] = [document]
+  while (stack.length > 0) {
+    const node = stack.pop() as ParentNode
+    if (node !== document && isHtml(node as Element, 'meta')) {
+      const encoding = metaElementEncoding(node as Element)
+      if (encoding) return encoding
+    }
+    const children = childElements(
+      'tagName' in node && isHtml(node as Element, 'template') ? (node as Template).content : node
+    )
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      stack.push(children[index] as Element)
+    }
+  }
+  return null
+}
+
 /**
  * For a page whose encoding came from a `<meta>` in its first 1024 bytes or the UTF-8 default
  * (not a BOM or the header), the parsed document to scan, or null to fail closed (PR #84
- * review round 4). Chromium keeps looking for a `<meta>` past 1024 bytes while it is in
+ * review rounds 4 and 5). Chromium keeps looking for a `<meta>` past 1024 bytes while it is in
  * `<head>`, and skips text in `<script>`, `<style>`, `<title>` or `<textarea>`. So every
  * declaration in the page (`declaredEncodings` over the bytes, and every `<meta>` element the
- * parser built) must name one encoding, and the first `<meta>` in `<head>` must name it too,
- * unless it is UTF-8, the default either way. If it isn't the one decoded with, the page is
- * decoded with it once and parsed again, and must then say the same.
+ * parser built) must name one encoding, confirmed by one of: it is UTF-8 (the default either
+ * way); it is the first `<meta>` in `<head>`; or it is what the page was decoded with and the
+ * first real `<meta>` in the first 1024 bytes (which Chromium always reads, even one the parser
+ * moved into `<body>` after a stray element in `<head>`). A pure-ASCII page decodes the same in
+ * every ASCII-compatible encoding, so declarations of those never disagree there. If the
+ * encoding isn't the one decoded with, the page is decoded with it once and parsed again, on
+ * the same budget, and must then say the same.
  */
 function settleMetaEncoding(
   bytes: Uint8Array,
   decodedWith: string,
-  document: ParentNode
+  document: ParentNode,
+  budget: HtmlBudget
 ): ParentNode | null {
   const tree = treeMetaEncodings(document)
   const declared = new Set([...declaredEncodings(bytes), ...tree.all])
+  if (isPureAscii(bytes) && [...declared].every(isAsciiCompatible)) return document
   if (declared.size === 0) return decodedWith === 'utf-8' ? document : null
   const [encoding] = declared
   if (declared.size > 1 || encoding === undefined) return null
-  if (tree.head !== encoding && encoding !== 'utf-8') return null
+  const prefix = () => {
+    const html = decodeWith(bytes.subarray(0, 1024), decodedWith)
+    return html === null ? null : firstMetaEncoding(parseBoundedHtml(html, budget).document)
+  }
+  const confirmed =
+    encoding === 'utf-8' ||
+    tree.head === encoding ||
+    (encoding === decodedWith && prefix() === encoding)
+  if (!confirmed) return null
   if (encoding === decodedWith) return document
   const html = decodeWith(bytes, encoding)
   if (html === null) return null
-  const again = parseBoundedHtml(html).document
+  const again = parseBoundedHtml(html, budget).document
   const check = treeMetaEncodings(again)
   if ((check.head ?? 'utf-8') !== encoding || [...check.all].some(item => item !== encoding)) {
     return null
@@ -390,18 +431,22 @@ export async function verifyFeaturedBadge(
     if (page.code === 'read_failed') return { ok: false, code: 'verification_service_error' }
     return { ok: false, code: page.code }
   }
-  if (isDownload(page.headers.get('content-disposition'))) return { ok: false, code: 'not_html' }
+  // A page a browser would download, or whose type or encoding is unclear, fails closed.
+  const unreadable = { code: 'page_unreadable', ok: false } as const
+  if (isDownload(page.headers.get('content-disposition'))) return unreadable
   const mime = extractMimeType(page.headers.get('content-type'))
-  if (mime?.essence !== 'text/html') return { ok: false, code: 'not_html' }
+  if (mime?.essence !== 'text/html') return unreadable
   const decoded = decodeHtml(page.body, mime.charset)
-  if (!decoded) return { ok: false, code: 'not_html' }
+  if (!decoded) return unreadable
   let result: ScanResult
   try {
-    let document: ParentNode | null = parseBoundedHtml(decoded.html).document
+    // One budget for every parse of the page (round 5).
+    const budget = new HtmlBudget()
+    let document: ParentNode | null = parseBoundedHtml(decoded.html, budget).document
     if (decoded.source === 'meta' || decoded.source === 'default') {
-      document = settleMetaEncoding(page.body, decoded.encoding, document)
+      document = settleMetaEncoding(page.body, decoded.encoding, document, budget)
     }
-    if (!document) return { ok: false, code: 'not_html' }
+    if (!document) return unreadable
     result = scanDocument(document, expected, page.url)
   } catch {
     return { ok: false, code: 'verification_service_error' }

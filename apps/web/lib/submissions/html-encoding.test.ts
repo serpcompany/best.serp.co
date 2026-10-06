@@ -4,6 +4,9 @@ import {
   decodeHtml,
   encodingForLabel,
   extractMimeType,
+  fetchMimeType,
+  isAsciiCompatible,
+  isPureAscii,
   parseMimeType,
   prescanEncoding,
   splitHeaderValue
@@ -67,6 +70,15 @@ describe('Content-Type, as Fetch reads it', () => {
     expect(extractMimeType('bogus')).toBeNull()
   })
 
+  it('reads the type as Fetch does for safeFetch, so identical headers are HTML (round 5)', () => {
+    expect(fetchMimeType('text/html, text/html')).toEqual({ charset: null, essence: 'text/html' })
+    expect(extractMimeType('text/html, text/html')).toEqual({ charset: null, essence: 'text/html' })
+    // The last type wins for the fetch; the checker then refuses the disagreement.
+    expect(fetchMimeType('text/plain, text/html')?.essence).toBe('text/html')
+    expect(fetchMimeType('text/html, text/plain')?.essence).toBe('text/plain')
+    expect(extractMimeType('text/plain, text/html')).toBeNull()
+  })
+
   it('fails closed when joined values disagree on the type or the charset (round 4)', () => {
     expect(extractMimeType('text/html; charset=utf-8, text/plain')).toBeNull()
     expect(extractMimeType('text/plain, text/html')).toBeNull()
@@ -115,6 +127,24 @@ describe('meta prescan', () => {
     const page = `<script>'<meta charset="utf-8">'</script>${'<link rel=a href=b>'.repeat(60)}<meta charset="iso-2022-kr"><!-- <meta charset="gbk"> --><p><meta charset=latin1>`
     expect([...declaredEncodings(bytes(page))]).toEqual(['utf-8', 'replacement', 'windows-1252'])
     expect(declaredEncodings(bytes('<p>No declaration</p>')).size).toBe(0)
+  })
+})
+
+describe('pure ASCII', () => {
+  it('needs every byte below 0x80 and no ISO-2022 shift', () => {
+    expect(isPureAscii(bytes('<a href="x">badge</a>'))).toBe(true)
+    expect(isPureAscii(bytes('café'))).toBe(false)
+    for (const shift of [0x1b, 0x0e, 0x0f])
+      expect(isPureAscii(new Uint8Array([0x41, shift]))).toBe(false)
+  })
+
+  it('counts every encoding but ISO-2022-JP, UTF-16 and replacement as ASCII-compatible', () => {
+    for (const encoding of ['utf-8', 'windows-1252', 'shift_jis', 'gb18030', 'x-user-defined']) {
+      expect(isAsciiCompatible(encoding), encoding).toBe(true)
+    }
+    for (const encoding of ['iso-2022-jp', 'utf-16le', 'utf-16be', 'replacement']) {
+      expect(isAsciiCompatible(encoding), encoding).toBe(false)
+    }
   })
 })
 

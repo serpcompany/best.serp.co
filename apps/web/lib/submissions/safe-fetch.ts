@@ -1,4 +1,5 @@
 import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
+import { fetchMimeType } from './html-encoding'
 
 /**
  * The one way submission code fetches a submitter's URLs (badge verification, URL prefill, and
@@ -79,8 +80,12 @@ async function readBounded(response: Response, maxBytes: number): Promise<Uint8A
   return body
 }
 
+/**
+ * The response's MIME type essence as Fetch extracts it (repeated headers arrive joined with
+ * commas, and the last valid type wins), or '' when there is none.
+ */
 export function mediaTypeOf(contentType: string | null): string {
-  return (contentType ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
+  return fetchMimeType(contentType)?.essence ?? ''
 }
 
 export async function safeFetch(url: string, options: SafeFetchOptions): Promise<SafeFetchResult> {

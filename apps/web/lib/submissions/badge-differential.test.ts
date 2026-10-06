@@ -109,12 +109,21 @@ describe('badge checker against Chromium on encodings', () => {
     )
 
   it.each(ENCODING_CASES.map(item => [item.name, item] as const))('%s', async (_name, item) => {
-    const verdict = await check([...item.prefix, ...ascii(ENCODED_SNIPPET)], item.headers)
+    const verdict = await check(
+      [...item.prefix, ...(item.snippet ?? ascii(ENCODED_SNIPPET))],
+      item.headers
+    )
     expect(verdict.ok).toBe(item.chromium.link)
     if (!item.chromium.link) {
-      // Text a browser shows has no badge; a page it can't show or downloads is not HTML.
+      // Text a browser shows has no badge; a page shown as plain text is not HTML; and a page
+      // a browser can't show, downloads, or might read in another encoding is unreadable.
       const shown = ['UTF-16LE', 'UTF-16BE', 'ISO-2022-JP'].includes(item.chromium.characterSet)
-      expect(verdict).toEqual({ code: shown ? 'badge_missing' : 'not_html', ok: false })
+      const code = shown
+        ? 'badge_missing'
+        : item.name === 'htmlThenPlainText'
+          ? 'not_html'
+          : 'page_unreadable'
+      expect(verdict).toEqual({ code, ok: false })
     }
   })
 
@@ -155,6 +164,67 @@ describe('badge checker against Chromium on encodings', () => {
         disposition
       ).resolves.toEqual({ ok: true })
     }
+  })
+
+  // PR #84 review round 5: the reviewer's honest pages, which Chromium shows with the badge.
+  it('reads honest pages whose declarations disagree only harmlessly', async () => {
+    const html = [['Content-Type', 'text/html']] as const
+    const pages: Array<[string, number[]]> = [
+      // A theme's UTF-8 and a plugin's ISO-8859-1, on a pure-ASCII page.
+      [
+        'theme and plugin',
+        ascii(
+          `<meta charset="utf-8"><meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">${ENCODED_SNIPPET}`
+        )
+      ],
+      // An editor's template string, on a pure-ASCII page.
+      [
+        'template string',
+        ascii(
+          `<meta charset="utf-8"><script>var t = '<meta charset="iso-8859-1">'</script>${ENCODED_SNIPPET}`
+        )
+      ],
+      // A tracking pixel in <head> moves the <meta> into <body>; it is still in the first
+      // 1024 bytes, which Chromium always reads. The page has Latin-1 text (é).
+      [
+        'meta after a stray element',
+        [
+          ...ascii('<head><img src="/pixel.gif"><meta charset="iso-8859-1"><p>Caf'),
+          0xe9,
+          ...ascii(`</p>${ENCODED_SNIPPET}`)
+        ]
+      ],
+      [
+        'utf-8 and us-ascii',
+        ascii(`<meta charset="utf-8"><meta charset="us-ascii">${ENCODED_SNIPPET}`)
+      ],
+      [
+        'meta text in xmp',
+        ascii(`<meta charset="utf-8"><xmp><meta charset="iso-8859-1"></xmp>${ENCODED_SNIPPET}`)
+      ],
+      // Chromium doesn't trim http-equiv, so the second <meta> declares nothing, even with é.
+      [
+        'spaced http-equiv',
+        [
+          ...ascii(
+            '<meta charset="utf-8"><meta http-equiv=" content-type " content="text/html; charset=iso-8859-1">'
+          ),
+          0xc3,
+          0xa9,
+          ...ascii(ENCODED_SNIPPET)
+        ]
+      ]
+    ]
+    for (const [name, bytes] of pages) {
+      await expect(check(bytes, html), name).resolves.toEqual({ ok: true })
+    }
+    // Two identical Content-Type headers, which safeFetch reads as Fetch does.
+    await expect(
+      check(ascii(ENCODED_SNIPPET), [
+        ['Content-Type', 'text/html'],
+        ['Content-Type', 'text/html']
+      ])
+    ).resolves.toEqual({ ok: true })
   })
 
   // PR #84 review round 4: honest pages whose declarations agree still pass.

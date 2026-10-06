@@ -23,7 +23,8 @@ import {
  * - `elements`: 100,000 elements created;
  * - `work`: 10 million units, charged close to each step's real cost: a token, and opening
  *   an element, cost the open-element depth (what their scans can walk) plus 1 for a token;
- *   an attribute is 1 plus the attributes already on its tag (the duplicate check);
+ *   an attribute is 1 plus the attributes already on its tag (the duplicate check), each
+ *   weighted by the name's length in 32-character steps;
  *   inserting before a sibling or detaching a node is the parent's child count; and each
  *   walk of the list of active formatting elements is its length, times the new element's
  *   attributes when one is added (the Noah's Ark check).
@@ -54,13 +55,18 @@ export class HtmlTooComplexError extends Error {
 
 type Document = DefaultTreeAdapterMap['document']
 
-class WorkMeter {
+/**
+ * The limits a parse runs within. One budget can span several parses of the same page (a
+ * page decoded again after a late `<meta>`, PR #84 review round 5), so together they cost no
+ * more than one: work and elements add up, and depth is each parse's own.
+ */
+export class HtmlBudget {
   depth = 0
   elements = 0
   maxDepth = 0
   spent = 0
 
-  constructor(private readonly limits: HtmlLimits) {}
+  constructor(private readonly limits: HtmlLimits = HTML_LIMITS) {}
 
   charge(units: number): void {
     this.spent += units
@@ -82,22 +88,36 @@ class WorkMeter {
 }
 
 class MeteredTokenizer extends Tokenizer {
-  private readonly meter: WorkMeter
+  private readonly meter: HtmlBudget
 
-  constructor(options: TokenizerOptions, handler: Parser<DefaultTreeAdapterMap>, meter: WorkMeter) {
+  constructor(
+    options: TokenizerOptions,
+    handler: Parser<DefaultTreeAdapterMap>,
+    meter: HtmlBudget
+  ) {
     super(options, handler)
     this.meter = meter
   }
 
-  /** parse5 compares each attribute's name with every attribute already on the tag. */
   protected override _createAttr(attrNameFirstCh: string): void {
-    const token = this.currentToken
-    this.meter.charge(1 + (token && 'attrs' in token ? token.attrs.length : 0))
+    this.meter.charge(1)
     super._createAttr(attrNameFirstCh)
+  }
+
+  /**
+   * parse5 compares each attribute's name with every attribute already on the tag, and names
+   * of equal length compare in full, so each comparison costs more for a long name (PR #84
+   * review round 5: 4,400 names of 220 characters).
+   */
+  protected override _leaveAttrName(): void {
+    const token = this.currentToken
+    const earlier = token && 'attrs' in token ? token.attrs.length : 0
+    this.meter.charge(earlier * (1 + (this.currentAttr.name.length >> 5)))
+    super._leaveAttrName()
   }
 }
 
-function meteredTreeAdapter(meter: WorkMeter): TreeAdapter<DefaultTreeAdapterMap> {
+function meteredTreeAdapter(meter: HtmlBudget): TreeAdapter<DefaultTreeAdapterMap> {
   return {
     ...defaultTreeAdapter,
     adoptAttributes() {},
@@ -145,7 +165,7 @@ const FORMATTING_LIST_SCANS = [
  * its attributes, since the Noah's Ark check compares them with every entry since the last
  * marker before the entry is put at the front.
  */
-function meterFormattingList(list: FormattingList, meter: WorkMeter): void {
+function meterFormattingList(list: FormattingList, meter: HtmlBudget): void {
   const methods = list as unknown as Record<string, (...args: unknown[]) => unknown>
   for (const name of FORMATTING_LIST_SCANS) {
     const original = methods[name] as (...args: unknown[]) => unknown
@@ -162,9 +182,9 @@ function meterFormattingList(list: FormattingList, meter: WorkMeter): void {
 }
 
 class MeteredParser extends Parser<DefaultTreeAdapterMap> {
-  private readonly meter: WorkMeter
+  private readonly meter: HtmlBudget
 
-  constructor(meter: WorkMeter) {
+  constructor(meter: HtmlBudget) {
     // Scripting on, as for Googlebot: `<noscript>` content is raw text.
     super({ scriptingEnabled: true, treeAdapter: meteredTreeAdapter(meter) })
     this.meter = meter
@@ -228,10 +248,15 @@ export interface BoundedParse {
 
 /**
  * Parses a whole HTML document as a browser would (scripting on), or throws
- * `HtmlTooComplexError` when the page goes past any of `limits`.
+ * `HtmlTooComplexError` when the page goes past any of `limits`, or past what is left of a
+ * shared `HtmlBudget`.
  */
-export function parseBoundedHtml(html: string, limits: HtmlLimits = HTML_LIMITS): BoundedParse {
-  const meter = new WorkMeter(limits)
+export function parseBoundedHtml(
+  html: string,
+  limits: HtmlBudget | HtmlLimits = HTML_LIMITS
+): BoundedParse {
+  const meter = limits instanceof HtmlBudget ? limits : new HtmlBudget(limits)
+  meter.depth = 0
   const parser = new MeteredParser(meter)
   parser.tokenizer.write(html, true)
   return {

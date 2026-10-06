@@ -211,22 +211,22 @@ export function parseMimeType(input: string): MimeType | null {
   return { essence: `${type}/${subtype}`.toLowerCase(), parameters }
 }
 
-/**
- * Fetch's "extract a MIME type" from a `Content-Type` value, as a fetch hands it over (repeated
- * headers joined with commas): the last valid MIME type, with the charset carried over from
- * earlier values of the same type. Null when there is none, and, failing closed (round 4),
- * when the values name different MIME types or different charsets, which honest sites don't.
- */
-export function extractMimeType(
-  value: string | null | undefined
-): { charset: string | null; essence: string } | null {
-  if (value === null || value === undefined) return null
-  let charset: string | null = null
-  let essence: string | null = null
-  let result: { charset: string | null; essence: string } | null = null
+interface ExtractedMimeType {
+  charset: string | null
+  essence: string
+}
+
+function extractMimeTypes(value: string | null | undefined): {
+  charsets: Set<string>
+  essences: Set<string>
+  result: ExtractedMimeType | null
+} {
   const charsets = new Set<string>()
   const essences = new Set<string>()
-  for (const part of splitHeaderValue(value)) {
+  let charset: string | null = null
+  let essence: string | null = null
+  let result: ExtractedMimeType | null = null
+  for (const part of value === null || value === undefined ? [] : splitHeaderValue(value)) {
     const mime = parseMimeType(part)
     if (!mime || mime.essence === '*/*') continue
     const own = mime.parameters.get('charset') ?? null
@@ -238,8 +238,26 @@ export function extractMimeType(
     }
     result = { charset: own ?? charset, essence: mime.essence }
   }
-  if (essences.size > 1 || charsets.size > 1) return null
-  return result
+  return { charsets, essences, result }
+}
+
+/**
+ * Fetch's "extract a MIME type" from a `Content-Type` value, as a fetch hands it over (repeated
+ * headers joined with commas): the last valid MIME type, with the charset carried over from
+ * earlier values of the same type. Null when there is none. `safeFetch` checks the type with it,
+ * so two identical `text/html` headers are HTML (PR #84 review round 5).
+ */
+export function fetchMimeType(value: string | null | undefined): ExtractedMimeType | null {
+  return extractMimeTypes(value).result
+}
+
+/**
+ * `fetchMimeType`, failing closed (round 4): also null when the values name different MIME
+ * types or different charsets, which honest sites don't send.
+ */
+export function extractMimeType(value: string | null | undefined): ExtractedMimeType | null {
+  const { charsets, essences, result } = extractMimeTypes(value)
+  return essences.size > 1 || charsets.size > 1 ? null : result
 }
 
 /** "The algorithm for extracting a character encoding from a meta element", on `content`. */
@@ -271,6 +289,23 @@ export function metaEncoding(encoding: string): string {
   if (encoding === 'utf-16be' || encoding === 'utf-16le') return 'utf-8'
   if (encoding === 'x-user-defined') return 'windows-1252'
   return encoding
+}
+
+/**
+ * True for bytes every ASCII-compatible encoding decodes the same: none at or above 0x80, and
+ * no ESC, SO or SI (ISO-2022 shifts). On such a page, disagreeing declarations can't change
+ * the text (PR #84 review round 5).
+ */
+export function isPureAscii(bytes: Uint8Array): boolean {
+  for (const byte of bytes) {
+    if (byte >= 0x80 || byte === 0x1b || byte === 0x0e || byte === 0x0f) return false
+  }
+  return true
+}
+
+/** True when the encoding decodes ASCII bytes as ASCII, whatever the bytes. */
+export function isAsciiCompatible(encoding: string): boolean {
+  return !['iso-2022-jp', 'replacement', 'utf-16be', 'utf-16le'].includes(encoding)
 }
 
 /**

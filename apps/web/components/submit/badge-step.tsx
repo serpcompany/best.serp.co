@@ -431,6 +431,14 @@ export function BadgeStep({
         </p>
       </ToneAlert>
     )
+  } else if (code === 'page_unreadable') {
+    // A type or encoding the checker can't be sure of (PR #84 review round 5): the approved
+    // checker-problem copy, not the unreachable-site one, since nothing about the site is down.
+    result = (
+      <ToneAlert title="Our checker had a problem reading the page">
+        <p>This didn’t use up a check.</p>
+      </ToneAlert>
+    )
   } else if (code === 'wrong_destination') {
     result = (
       <ToneAlert tone="warning" title="Badge found, but it links elsewhere">

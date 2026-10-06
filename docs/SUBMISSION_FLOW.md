@@ -153,13 +153,17 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    account, and 120 per client address, which accounts behind it share; 429 `check_budget`
    with `retryAfterSeconds`), fetches the website, decodes it as a browser would
    (`html-encoding.ts`: byte order mark, then the `Content-Type` charset as Fetch extracts it,
-   then a `<meta>` in the first 1024 bytes, else UTF-8), and parses it. It fails closed as
-   `not_html` wherever type or encoding is unclear: a `replacement` encoding; a download (a
-   `Content-Disposition` other than `inline`, or several values); joined `Content-Type` values
-   naming different types or charsets, or a type other than `text/html`; and, when no BOM or
-   header decided, `<meta>` declarations anywhere in the page (bytes or parsed elements) that
-   disagree, or a non-UTF-8 one no `<meta>` in `<head>` confirms. A confirmed late `<meta>`
-   gets one more decode and parse with its encoding (PR #84 review round 4). Parsing is
+   then a `<meta>` in the first 1024 bytes, else UTF-8), and parses it. A page whose type
+   isn't HTML is `not_html`. It fails closed as `page_unreadable` (shown with the approved
+   "Our checker had a problem reading the page", no check used) wherever type or encoding is
+   unclear: a `replacement` encoding; a download (a `Content-Disposition` other than `inline`,
+   or several values); joined `Content-Type` values naming different types or charsets; and,
+   when no BOM or header decided, `<meta>` declarations anywhere in the page (bytes or parsed
+   elements) that disagree, or a non-UTF-8 one confirmed neither by the first `<meta>` in
+   `<head>` nor, when it is what the page was decoded with, by the first real `<meta>` in the
+   first 1024 bytes. On a pure-ASCII page, ASCII-compatible declarations never disagree. A
+   confirmed late `<meta>` gets one more decode and parse on the same work budget (PR #84
+   review rounds 4 and 5). Parsing is
    `parse5`'s (the WHATWG parser, scripting on: comments, raw text such as `script` or
    `noscript`, `template` contents and SVG or MathML content never count, and only an
    element's own attributes do).

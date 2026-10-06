@@ -392,6 +392,8 @@ export const ENCODING_CASES: ReadonlyArray<{
   name: string
   /** Bytes before the ASCII snippet. */
   prefix: readonly number[]
+  /** Bytes instead of the snippet, when the case needs its own link. */
+  snippet?: readonly number[]
 }> = [
   {
     chromium: { characterSet: 'UTF-16LE', link: false },
@@ -544,5 +546,18 @@ export const ENCODING_CASES: ReadonlyArray<{
     ],
     name: 'inlineAndAttachment',
     prefix: []
+  },
+  {
+    // PR #84 review round 5, added with the "first 1024 bytes" rule (reasoned, not from the
+    // reviewer's harness): an ISO-2022-JP decoy in a script inside the first 1024 bytes, and a
+    // real <meta> only later, in <body>. Chromium reads neither and decodes UTF-8, where the
+    // escape inside `href` breaks the link; ISO-2022-JP would drop it and make the badge.
+    chromium: { characterSet: 'UTF-8', link: false },
+    headers: HTML,
+    name: 'scriptDecoyThenLateBodyMeta',
+    prefix: ascii(
+      `<script>var s = '<meta charset="iso-2022-jp">'</script><p>Hi</p>${LINKS_1100}<meta charset="iso-2022-jp">`
+    ),
+    snippet: ascii(`<a hr\u001b(Bef="${L}"><img src="${B}"></a>`)
   }
 ]
