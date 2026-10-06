@@ -43,9 +43,9 @@ const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 export interface ScheduledEnv extends EmailWorkerEnv, BillingEnv {
   D1_RUNTIME_ENV?: string
   /**
-   * `on` runs the badge program on a local Worker while `features.badgeProgram` is off, for the
-   * end-to-end suite (`LOCAL_PREVIEW_VARS`). Ignored unless `SITE_ENVIRONMENT` and
-   * `D1_RUNTIME_ENV` are both `local`.
+   * `on` runs the badge program on a local Worker while `features.badgeProgram` is off
+   * (`LOCAL_PREVIEW_VARS`; unused since #130 turned the flag on). Ignored unless
+   * `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` are both `local`.
    */
   LOCAL_BADGE_PROGRAM?: string
   MEDIA?: R2Bucket
@@ -74,8 +74,8 @@ export interface ScheduledJob {
 }
 
 /**
- * The badge program runs only while `features.badgeProgram` is on (the owner turns it on at
- * launch), or on a local Worker that asks for it.
+ * The badge program runs only while `features.badgeProgram` is on (on since #130, the owner's
+ * launch decision), or on a local Worker that asks for it.
  */
 export function badgeProgramEnabled(
   env: ScheduledEnv,

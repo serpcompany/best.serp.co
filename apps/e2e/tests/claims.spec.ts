@@ -19,12 +19,13 @@ import { type FixtureSite, startFixtureSite } from './submit-fixture'
 
 /**
  * Claims of existing listings (serpcompany/best.serp.co#67) end to end, through the claim API on
- * a local Worker with claims on (`LOCAL_CLAIMS=on`): the free claim (domain-email code, then the
- * badge on a fixture website), the refusals (webmail, another domain, a wrong, expired, or
- * over-attempt code, an existing owner, no session, a foreign origin), ownership in the account
+ * a local Worker with the site's flags (#130: claims and the badge program on, orders off): the
+ * free claim (domain-email code, then the badge on a fixture website), the refusals (webmail,
+ * another domain, the paid method while orders are off, a wrong, expired, or over-attempt code,
+ * an existing owner, a held listing, no session, a foreign origin), ownership in the account
  * dashboard and the admin panel, and the weekly badge program removing a badge claimer whose
- * badge is confirmed missing (#66). The claim dialog (#70 screen 8) is not built yet, so the
- * suite drives the API the dialog will call.
+ * badge is confirmed missing (#66). The dialog that calls this API is
+ * `claims-dialog.spec.ts`'s.
  */
 
 test.skip(!claimsSuiteEnabled, 'needs the local claims Worker from playwright.config.ts')

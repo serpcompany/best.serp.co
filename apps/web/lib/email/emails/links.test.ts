@@ -251,12 +251,26 @@ describe('email links', () => {
   it('finds the emails the app sends', () => {
     for (const id of [
       'changes-requested',
+      'claim-code',
       'listing-approved',
       SIGN_IN_CODE_TEMPLATE,
       'submission-rejected',
       'submission-rejected-prohibited'
     ] as const) {
       expect(sent.has(id), id).toBe(true)
+    }
+  })
+
+  it('counts the badge program’s emails as sent now that it is on, and billing’s as not (#130)', () => {
+    for (const id of ['badge-missing', 'listing-unlisted', 'ownership-removed'] as const) {
+      expect(sent.has(id), id).toBe(true)
+    }
+    for (const id of [
+      'listing-live-paid',
+      'payment-received-in-review',
+      'submission-rejected-refunded'
+    ] as const) {
+      expect(sent.has(id), id).toBe(false)
     }
   })
 
@@ -338,16 +352,23 @@ describe('email copy', () => {
     }
   })
 
-  it('keeps the badge emails from offering paid listings (#68) or claims (#67) while they are off', () => {
+  it('keeps the badge emails from offering paid listings (#68), or claims (#67) without them, while they are off', () => {
     const badgeEmails: TemplateId[] = ['badge-missing', 'listing-unlisted', 'ownership-removed']
     const promised = (siteFeatures: SiteFeatures) =>
       renderAll(siteFeatures)
         .filter(({ id }) => badgeEmails.includes(id))
         .map(({ email, id }) => [id, promisesIn(email, id)] as const)
-    const launching = { ...ALL_ON, claims: false, orders: false }
-    for (const [id, features] of promised(launching)) {
-      expect(features, id).not.toContain('orders')
-      expect(features, id).not.toContain('claims')
+    // Claiming again offers the badge or a payment, so it waits for orders even with claims on,
+    // as the site ships (#130).
+    for (const launching of [
+      features,
+      { ...ALL_ON, orders: false },
+      { ...ALL_ON, claims: false, orders: false }
+    ]) {
+      for (const [id, offered] of promised(launching)) {
+        expect(offered, id).not.toContain('orders')
+        expect(offered, id).not.toContain('claims')
+      }
     }
     // The approved offers come back with their flags, and the audit sees them.
     expect(Object.fromEntries(promised(ALL_ON))).toMatchObject({

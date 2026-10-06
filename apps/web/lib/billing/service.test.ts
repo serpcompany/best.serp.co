@@ -14,7 +14,7 @@ import { buildRejectSubmissionPlans } from '@serpdirectory/data-ops/submission-p
 import { insertPublishedListing, SqliteD1 } from '@serpdirectory/data-ops/test-support'
 import { describe, expect, it } from 'vitest'
 import { checkBadgeAtRefund } from '../badge-program/refund'
-import { features } from '../features'
+import { features, type SiteFeatures } from '../features'
 import type { GuardrailResult } from './guardrails'
 import { createPaidClaims } from './paid-claims'
 import {
@@ -698,7 +698,10 @@ describe('paid claims (#67)', () => {
     SITE_ENVIRONMENT: 'local'
   }
 
-  function claimFixture(env: Record<string, string> = localBoth) {
+  function claimFixture(
+    env: Record<string, string> = localBoth,
+    siteFeatures: SiteFeatures = features
+  ) {
     const f = fixture()
     insertPublishedListing(f.db, {
       categoryIds: [1],
@@ -723,7 +726,7 @@ describe('paid claims (#67)', () => {
     f.deps.paidClaims = createPaidClaims({
       client: f.client,
       env,
-      features,
+      features: siteFeatures,
       now: () => f.clock.now
     })
     return f
@@ -846,11 +849,19 @@ describe('paid claims (#67)', () => {
   })
 
   it('offers no paid claim unless claims are on as well as orders', async () => {
-    const f = claimFixture({ ...localBoth, LOCAL_CLAIMS: 'off' })
-    expect(f.deps.paidClaims).toBeUndefined()
-    await expect(
-      startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
-    ).resolves.toMatchObject({ ok: false, status: 404 })
+    // Claims are on (#130) and orders off, as the site ships: the badge is the only method.
+    const ordersOff = claimFixture({ ...localBoth, LOCAL_ORDERS: 'off' })
+    // Orders on (a local Worker) while claims are off.
+    const claimsOff = claimFixture(
+      { ...localBoth, LOCAL_CLAIMS: 'off' },
+      { ...features, claims: false }
+    )
+    for (const f of [ordersOff, claimsOff]) {
+      expect(f.deps.paidClaims).toBeUndefined()
+      await expect(
+        startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
+      ).resolves.toMatchObject({ ok: false, status: 404 })
+    }
   })
 })
 

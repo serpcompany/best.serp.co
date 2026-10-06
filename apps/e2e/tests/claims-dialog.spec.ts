@@ -7,10 +7,12 @@ import { type FixtureSite, startFixtureSite } from './submit-fixture'
 
 /**
  * The claim dialog (serpcompany/best.serp.co#67, #70 screens 8 and 9) in the browser, on the
- * claims suite's Worker (`LOCAL_CLAIMS=on`, `LOCAL_BADGE_PROGRAM=on`): the sidebar's claim link,
- * sign-in first for visitors, the four steps with their approved errors (webmail, another domain,
- * a wrong, expired, or over-attempt code), the badge check, success, the "Verified owner" badge,
- * and the already-owned dialog. Desktop uses the dialog; a phone gets the drawer.
+ * claims suite's Worker with the site's flags (#130: claims and the badge program on, orders
+ * off): the sidebar's claim link, sign-in first for visitors, the four steps with their approved
+ * errors (webmail, another domain, a wrong, expired, or over-attempt code), the badge check and
+ * the badge program's weekly-check copy, success, the "Verified owner" badge, the already-owned
+ * dialog, and the contact path for a held listing or one whose slug and website disagree.
+ * Desktop uses the dialog; a phone gets the drawer.
  *
  * Set CLAIM_SCREENSHOT_DIRECTORY to save each state (desktop and mobile, in the color scheme the
  * run emulates: CLAIM_SCREENSHOT_SCHEME=dark for dark).
@@ -40,10 +42,15 @@ interface Seeded {
   slug: string
 }
 
-function seed(name: string, badge: 'missing' | 'valid' = 'missing'): Seeded {
+function seed(
+  name: string,
+  badge: 'missing' | 'valid' = 'missing',
+  /** A slug other than the fixture site's host, for a listing whose slug and website disagree. */
+  slugOverride?: string
+): Seeded {
   const label = `dialog-${unique()}`
   fixture.set(label, { badge, description: `${name}, a fixture.`, name })
-  const slug = fixture.slug(label)
+  const slug = slugOverride ?? fixture.slug(label)
   const id = `e2e-dialog-${label}`
   claimsD1(`
     INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
@@ -130,6 +137,12 @@ test('claims a listing with the badge through every step and its errors', async 
   ).toBeVisible()
   await expect(dialog(page).getByText('Step 1 of 4')).toBeVisible()
   await expect(dialog(page).getByText('Install the badge (free)')).toBeVisible()
+  // The badge program (#66) is on: the badge card says it is checked weekly.
+  await expect(
+    dialog(page).getByText(
+      'We check it weekly. If it’s removed, you lose ownership and the listing stays up.'
+    )
+  ).toBeVisible()
   await expect(dialog(page).getByText(/Skip the badge/u)).toHaveCount(0)
   await expect(
     dialog(page).getByText('Either way, you’ll confirm an email address at')
@@ -222,6 +235,11 @@ test('claims a listing with the badge through every step and its errors', async 
     dialog(page).getByText('It’s in your account. Edits you make are reviewed before they go live.')
   ).toBeVisible()
   await expect(dialog(page).getByText('Keep the badge on localtest.me')).toBeVisible()
+  await expect(
+    dialog(page).getByText(
+      'We check it weekly. If it’s missing on two checks about 24 hours apart, ownership is removed. The listing stays up.'
+    )
+  ).toBeVisible()
   await expect(dialog(page).getByRole('link', { name: 'Edit listing' })).toHaveAttribute(
     'href',
     `/account/listings/${listing.slug}/edit/`
@@ -314,6 +332,45 @@ test('shows the already-owned dialog with the contact path', async ({ context, p
     '/contact/'
   )
   await capture(page, '8i-owned')
+})
+
+test('sends a held listing, and one whose slug and website disagree, to the contact path', async ({
+  context,
+  page
+}) => {
+  await signedIn(context, `review-${unique()}@example.com`)
+  // On #100's owner-review list (`listing_claim_holds`): the owner decides, not a claim.
+  const held = seed('Held product')
+  claimsD1(`INSERT INTO listing_claim_holds (listing_id, reason, source)
+    VALUES (${q(held.id)}, 'off_domain', 'd1/hygiene/2026-10-06-listing-domains.yaml')`)
+  // The slug names a domain the website doesn't land on.
+  const mismatched = seed('Mismatched product', 'missing', `mismatch-${unique()}.example`)
+  for (const listing of [held, mismatched]) {
+    await page.goto(`/products/${listing.slug}/`)
+    const answer = page.waitForResponse(
+      response =>
+        new URL(response.url()).pathname === '/api/claims' && response.request().method() === 'GET'
+    )
+    await page.getByRole('button', { name: 'Claim this listing' }).click()
+    const refused = await answer
+    expect(refused.status(), listing.name).toBe(409)
+    expect(await refused.json()).toMatchObject({
+      code: 'review_required',
+      contactPath: '/contact/'
+    })
+    await expect(dialog(page).getByText('This URL can’t be claimed.')).toBeVisible()
+    await expect(dialog(page).getByRole('link', { name: 'Message us' })).toHaveAttribute(
+      'href',
+      '/contact/'
+    )
+    await expect(dialog(page).getByText('Step 1 of 4')).toHaveCount(0)
+  }
+  await capture(page, '8n-review')
+  expect(
+    claimsD1(
+      `SELECT COUNT(*) AS claims FROM listing_claims WHERE listing_id IN (${q(held.id)}, ${q(mismatched.id)})`
+    )
+  ).toEqual([{ claims: 0 }])
 })
 
 test('tells the owner they manage the listing, never that someone else owns it', async ({
