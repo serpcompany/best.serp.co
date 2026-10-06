@@ -782,6 +782,19 @@ describe('hosted media constraints', () => {
          VALUES ('${listingId}','${submissionId}','logo','https://x.example/a.png','${NOW}')`
       )
     ).toThrow(/media_ingestions_one_target/u)
+    // A revision is a third target, never alongside another (#96 review round 4, S1).
+    expect(() =>
+      db.exec(
+        `INSERT INTO media_ingestions (listing_id,revision_id,kind,source_url,next_attempt_at)
+         VALUES ('${listingId}','rev_x','logo','https://x.example/a.png','${NOW}')`
+      )
+    ).toThrow(/media_ingestions_one_target/u)
+    expect(() =>
+      db.exec(
+        `INSERT INTO media_ingestions (kind,source_url,next_attempt_at)
+         VALUES ('logo','https://x.example/a.png','${NOW}')`
+      )
+    ).toThrow(/media_ingestions_one_target/u)
     expect(() =>
       db.exec(
         `INSERT INTO media_ingestions (listing_id,kind,source_url)

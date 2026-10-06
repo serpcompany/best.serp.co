@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cacheControlForKey,
   contentTypeForKey,
   isListingMediaKey,
   isMediaKey,
+  isPendingMediaKey,
   LOCAL_MEDIA_PATH,
   listingKeyForPendingKey,
+  MEDIA_CACHE_CONTROL,
   mediaKey,
   mediaUrl,
   parseMediaKey,
   resolveListingDetailMedia,
   resolveListingMedia,
+  SUBMISSION_MEDIA_CACHE_CONTROL,
   sha256Hex,
   validateMediaBaseUrl
 } from './media-keys'
@@ -18,6 +22,21 @@ const sha = 'ab'.repeat(32)
 const logoKey = `best.serp.co/listings/dr.serp.co/logo/${sha.slice(0, 16)}.png`
 
 describe('media keys', () => {
+  it("keeps a revision's pending logo under its own prefix (#96 review round 4, S1)", () => {
+    const pending = mediaKey({ format: 'png', kind: 'logo', revisionId: 'rev_1', sha256: sha })
+    expect(pending).toBe(`best.serp.co/revisions/rev_1/logo/${sha.slice(0, 16)}.png`)
+    expect(parseMediaKey(pending)).toMatchObject({ owner: 'rev_1', scope: 'revisions', slug: '' })
+    expect(isPendingMediaKey(pending)).toBe(true)
+    expect(isPendingMediaKey(logoKey)).toBe(false)
+    expect(isListingMediaKey(pending)).toBe(false)
+    expect(listingKeyForPendingKey(pending, 'dr.serp.co')).toBe(logoKey)
+    expect(cacheControlForKey(pending)).toBe(SUBMISSION_MEDIA_CACHE_CONTROL)
+    expect(cacheControlForKey(logoKey)).toBe(MEDIA_CACHE_CONTROL)
+    expect(() =>
+      mediaKey({ format: 'png', kind: 'logo', revisionId: '../x', sha256: sha })
+    ).toThrow(/revision id/u)
+  })
+
   it('names an image by site, listing, kind, content hash, and format', () => {
     expect(mediaKey({ format: 'png', kind: 'logo', sha256: sha, slug: 'dr.serp.co' })).toBe(logoKey)
     expect(mediaKey({ format: 'jpeg', kind: 'image', sha256: sha, slug: 'a-b' })).toMatch(

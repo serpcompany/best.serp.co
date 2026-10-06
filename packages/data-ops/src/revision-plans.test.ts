@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
+import { buildQueueMediaPlans, buildRecordPendingMediaPlans } from './media-plans'
 import type { StagedListingContent, StatementPlan } from './plan-support'
 import {
   categoryId,
@@ -549,5 +550,159 @@ describe('one staged-edit channel per listing (#62 review, finding 1)', () => {
     expect(db.prepare('SELECT name FROM listings WHERE id=?').get(paidListing)).toEqual({
       name: 'Admin edit'
     })
+  })
+})
+
+describe("a revision's or claim's logo at approval (#96 review round 4, S1)", () => {
+  const sha = (fill: string) => fill.repeat(64)
+  const hostedLogo = (scope: string, owner: string, fill: string, sourceUrl: string) => ({
+    bytes: 10,
+    contentType: 'image/png',
+    height: 64,
+    key: `best.serp.co/${scope}/${owner}/logo/${fill.repeat(16)}.png`,
+    sha256: sha(fill),
+    sourceUrl,
+    width: 64
+  })
+  const logoRows = (db: DatabaseSync, id = listingId) =>
+    db.prepare("SELECT url,media_key FROM listing_media WHERE listing_id=? AND kind='logo'").all(id)
+  const logoQueue = (db: DatabaseSync, id = listingId) =>
+    db
+      .prepare(
+        "SELECT source_url,copy_from_key FROM media_ingestions WHERE listing_id=? AND kind='logo'"
+      )
+      .all(id)
+  const approve = (db: DatabaseSync, expectedLogoKey: string | null) =>
+    execute(
+      db,
+      buildApproveRevisionPlans({
+        expectedContentVersion: 1,
+        expectedLogoKey,
+        listingId,
+        now: NOW,
+        publication: publication('revision-approval', publicationState(db)),
+        reviewer: 'reviewer',
+        revisionId
+      })
+    )
+
+  it('adopts exactly the copy hosted when the revision was saved', () => {
+    const db = database()
+    seedRevision(db, 'pending_review')
+    const saved = hostedLogo('revisions', revisionId, 'a', content.logoUrl)
+    execute(
+      db,
+      buildRecordPendingMediaPlans({
+        kind: 'logo',
+        media: saved,
+        now: NOW,
+        owner: { revisionId },
+        sortOrder: 0
+      })
+    )
+    // Another key than the one the reviewer saw (or none) refuses the approval.
+    expect(() => approve(db, null)).toThrow(/malformed JSON/u)
+    expect(() =>
+      approve(db, hostedLogo('revisions', revisionId, 'b', content.logoUrl).key)
+    ).toThrow(/malformed JSON/u)
+    approve(db, saved.key)
+    // The old logo gives way to a copy of the reviewed bytes into the listing's path.
+    expect(logoRows(db)).toEqual([])
+    expect(logoQueue(db)).toEqual([{ copy_from_key: saved.key, source_url: content.logoUrl }])
+  })
+
+  it("keeps the listing's hosted logo when the revision kept its source", () => {
+    const db = database()
+    const current = hostedLogo('listings', `${listingId}.example`, 'c', content.logoUrl)
+    db.prepare(
+      `UPDATE listing_media SET url=?,media_key=?,sha256=?,content_type=?,bytes=?,width=?,height=?
+       WHERE listing_id=? AND kind='logo'`
+    ).run(
+      content.logoUrl,
+      current.key,
+      current.sha256,
+      current.contentType,
+      current.bytes,
+      current.width,
+      current.height,
+      listingId
+    )
+    seedRevision(db, 'pending_review')
+    approve(db, current.key)
+    expect(logoRows(db)).toEqual([{ media_key: current.key, url: content.logoUrl }])
+    expect(logoQueue(db)).toEqual([])
+  })
+
+  it('keeps the current logo, and its queue, when nothing reviewed is adopted', () => {
+    const db = database()
+    seedRevision(db, 'pending_review')
+    // An admin's replacement already waits on the listing's slot.
+    execute(
+      db,
+      buildQueueMediaPlans({
+        kind: 'logo',
+        now: NOW,
+        sortOrder: 0,
+        sourceUrl: 'https://assets.example/admin-logo.png',
+        target: { listingId }
+      })
+    )
+    approve(db, null)
+    expect(logoRows(db)).toEqual([{ media_key: null, url: 'https://assets.example/old-logo.png' }])
+    expect(logoQueue(db)).toEqual([
+      { copy_from_key: null, source_url: 'https://assets.example/admin-logo.png' }
+    ])
+  })
+
+  it('keeps the current logo when a claim approval has no hosted logo', () => {
+    const submissionId = '55555555-5555-4555-8555-555555555555'
+    const claimed = `submission_${submissionId}`
+    const db = planDatabase()
+    db.prepare(
+      `INSERT INTO listing_submissions (id,slug,block_key,block_covers_subdomains,name,description,website,content,
+        category_slug,logo_url,status,plan,owner_user_id,draft_saved_at)
+      VALUES (?,'claim.example','claim.example',1,'Claim','Submitted description',
+        'https://claim.example/','Submitted content','tools','https://claim.example/new.png',
+        'draft','paid','user_owner',?)`
+    ).run(submissionId, NOW)
+    execute(
+      db,
+      buildRecordSubmissionPaymentPlans({
+        actor: 'stripe',
+        listingId: claimed,
+        now: NOW,
+        outcome: 'publish',
+        publication: publication('paid-listing'),
+        submissionId
+      })
+    )
+    const current = hostedLogo('listings', 'claim.example', 'd', 'https://claim.example/old.png')
+    db.prepare(
+      `INSERT INTO listing_media (listing_id,kind,url,sort_order,media_key,sha256,content_type,
+        bytes,width,height) VALUES (?,'logo',?,0,?,?,?,?,?,?)`
+    ).run(
+      claimed,
+      current.sourceUrl,
+      current.key,
+      current.sha256,
+      current.contentType,
+      current.bytes,
+      current.width,
+      current.height
+    )
+    execute(
+      db,
+      buildApproveLiveSubmissionPlans({
+        expectedContentVersion: 1,
+        expectedLogoKey: null,
+        listingId: claimed,
+        now: NOW,
+        publication: publication('live-approval', publicationState(db)),
+        reviewer: 'reviewer',
+        submissionId
+      })
+    )
+    expect(logoRows(db, claimed)).toEqual([{ media_key: current.key, url: current.sourceUrl }])
+    expect(logoQueue(db, claimed)).toEqual([])
   })
 })

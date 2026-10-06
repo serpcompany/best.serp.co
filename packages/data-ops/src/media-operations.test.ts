@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { MEDIA_CACHE_CONTROL, sha256Hex } from './media-keys'
-import { createMediaOperations } from './media-operations'
+import { MEDIA_CACHE_CONTROL, SUBMISSION_MEDIA_CACHE_CONTROL, sha256Hex } from './media-keys'
+import { createMediaOperations, queueMedia } from './media-operations'
 import { buildQueueMediaPlans } from './media-plans'
 import { imageResponse, memoryBucket, pngBytes, routedFetch } from './media-test-support'
 import type { StatementPlan } from './plan-support'
@@ -425,3 +425,105 @@ async function runPlans(sqlite: SqliteD1, plans: StatementPlan[]): Promise<void>
       .run()
   }
 }
+
+describe("a revision's logo (#96 review round 4, S1)", () => {
+  const revisionId = 'rev_ops'
+  const revised = 'https://ops.example/revised.png'
+
+  function withRevision(routes: Parameters<typeof routedFetch>[0]) {
+    const setup = fixture(routes)
+    setup.sqlite.database.exec(`
+      INSERT INTO users(id,name,email,email_verified) VALUES ('user_owner','','o@example.com',1);
+      INSERT INTO listing_revisions
+        (id,listing_id,author_user_id,status,base_checksum,name,description,category_slug,logo_url)
+      VALUES ('${revisionId}','${listingId}','user_owner','pending_review','c','Ops','d','tools',
+        '${revised}');
+    `)
+    return setup
+  }
+
+  it('is hosted under the revision, copied into the listing on approval, then forgotten', async () => {
+    const png = pngBytes(128, 128)
+    let calls = 0
+    const { advance, bucket, events, operations, rows, sqlite } = withRevision({
+      // Down at save time; the cron hosts it later, still under the revision.
+      [revised]: () => {
+        calls += 1
+        return calls === 1 ? new Response('busy', { status: 503 }) : imageResponse(png)
+      }
+    })
+    const hash = (await sha256Hex(png)).slice(0, 16)
+    const pending = `best.serp.co/revisions/${revisionId}/logo/${hash}.png`
+    expect(
+      await operations.hostRevisionMedia({
+        kind: 'logo',
+        revisionId,
+        sortOrder: 0,
+        sourceUrl: revised
+      })
+    ).toEqual({ code: 'http_503', status: 'pending' })
+    expect(events.at(-1)).toMatchObject({ outcome: 'http_503', target: 'revision' })
+    advance(15)
+    expect(await operations.processDueMedia()).toMatchObject({ hosted: 1 })
+    expect(rows('SELECT revision_id,status,media_key FROM media_ingestions')).toEqual([
+      { media_key: pending, revision_id: revisionId, status: 'hosted' }
+    ])
+    // Pending: a short cache, so a withdrawn revision's logo leaves the media host promptly.
+    expect(bucket.objects.get(pending)?.options.httpMetadata.cacheControl).toBe(
+      SUBMISSION_MEDIA_CACHE_CONTROL
+    )
+    // Approval queued a copy of exactly the reviewed key; the listing gets the same bytes.
+    await queueMedia(sqlite.asD1Database(), {
+      copyFromKey: pending,
+      kind: 'logo',
+      now: '2026-10-06T12:15:00.000Z',
+      sortOrder: 0,
+      sourceUrl: revised,
+      target: { listingId }
+    })
+    sqlite.database.exec(`UPDATE listing_revisions SET status='approved'`)
+    expect(await operations.forgetFinishedPendingMedia()).toBe(0)
+    expect(await operations.processListingMedia(listingId)).toMatchObject({ hosted: 1 })
+    const listingKey = `best.serp.co/listings/${slug}/logo/${hash}.png`
+    expect(rows("SELECT url,media_key FROM listing_media WHERE kind='logo'")).toEqual([
+      { media_key: listingKey, url: revised }
+    ])
+    expect(calls).toBe(2)
+    // Once copied, the revision's object and slot go.
+    expect(await operations.forgetFinishedPendingMedia()).toBe(1)
+    expect(bucket.objects.has(pending)).toBe(false)
+    expect(bucket.objects.has(listingKey)).toBe(true)
+    expect(rows('SELECT COUNT(*) AS count FROM media_ingestions')).toEqual([{ count: 0 }])
+  })
+
+  it('needs no copy when the listing already hosts that source', async () => {
+    const png = pngBytes(96, 96)
+    const { operations, rows } = withRevision({ [logo]: imageResponse(png) })
+    const hosted = await operations.hostListingMedia({
+      actor: 'admin@example.com',
+      kind: 'logo',
+      listingId,
+      sortOrder: 0,
+      sourceUrl: logo,
+      workflow: 'app/admin'
+    })
+    expect(hosted.status).toBe('hosted')
+    expect(
+      await operations.hostRevisionMedia({
+        kind: 'logo',
+        revisionId,
+        sortOrder: 0,
+        sourceUrl: logo
+      })
+    ).toEqual(hosted)
+    expect(rows('SELECT COUNT(*) AS count FROM media_ingestions')).toEqual([{ count: 0 }])
+    await expect(
+      operations.hostRevisionMedia({
+        kind: 'logo',
+        revisionId: 'rev_missing',
+        sortOrder: 0,
+        sourceUrl: revised
+      })
+    ).rejects.toThrow(/Revision not found/u)
+  })
+})

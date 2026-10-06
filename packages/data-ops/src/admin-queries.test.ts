@@ -8,7 +8,7 @@ import { insertPublishedListing, SqliteD1 } from './test-support'
  * submissions and revisions per tab, the review DTOs carry what the screens show, and the
  * listing search filters, pages, and counts by the derived admin state.
  */
-function fixture() {
+function fixture(extraSql = '') {
   const d1 = new SqliteD1()
   const db = d1.database
   db.exec(`
@@ -109,6 +109,13 @@ function fixture() {
       ('sub_old','logo',0,'https://pagecraft.io/old-logo.png','hosted',1,
         ${hosted(`best.serp.co/submissions/sub_old/logo/${'d'.repeat(16)}.png`)});
   `)
+  if (extraSql)
+    db.exec(
+      extraSql.replaceAll(
+        '$HOSTED',
+        hosted(`best.serp.co/revisions/rev_brief/logo/${'e'.repeat(16)}.png`)
+      )
+    )
   return createAdminReadOperations({ client: createDatabase(d1.asD1Database()) })
 }
 
@@ -328,5 +335,19 @@ describe('hosted copies on the admin screens (#96 review S9)', () => {
     })
     // A revision keeps the listing's hosted logo only when it keeps the same source.
     expect(await reads.getRevisionReview('rev_brief')).toMatchObject({ logoKey: null })
+  })
+
+  it("shows a revision's own hosted logo of its current source (#96 review round 4, S1)", async () => {
+    const slot = (source: string) => `INSERT INTO media_ingestions (revision_id,kind,sort_order,
+        source_url,status,attempts,media_key,sha256,content_type,bytes,width,height)
+      VALUES ('rev_brief','logo',0,'${source}','hosted',1,$HOSTED)`
+    const key = `best.serp.co/revisions/rev_brief/logo/${'e'.repeat(16)}.png`
+    const current = fixture(slot('https://assets.example/brief-2.png'))
+    expect(await current.getRevisionReview('rev_brief')).toMatchObject({ logoKey: key })
+    const queue = await current.listReviewQueue('all')
+    expect(queue.find(item => item.id === 'rev_brief')?.logoKey).toBe(key)
+    // A copy of an earlier source is never shown for the revision's current logo.
+    const stale = fixture(slot('https://assets.example/brief-1.png'))
+    expect(await stale.getRevisionReview('rev_brief')).toMatchObject({ logoKey: null })
   })
 })
