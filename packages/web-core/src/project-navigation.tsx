@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { getRoute } from './routes'
-import { FaviconWithFallback } from './ui/favicon-with-fallback'
+import { ListingImage } from './ui/listing-image'
 
 interface ProjectNavItem {
   media?: {
@@ -37,10 +37,9 @@ export function ProjectNavigation({ previousWebsite, nextWebsite }: ProjectNavig
                   aria-hidden
                 />
               </div>
-              <FaviconWithFallback
-                website={previousWebsite.website}
+              <ListingImage
                 name={previousWebsite.name}
-                logoUrl={previousWebsite.media?.logo}
+                src={previousWebsite.media?.logo}
                 size={40}
                 className="rounded-lg"
               />
@@ -75,10 +74,9 @@ export function ProjectNavigation({ previousWebsite, nextWebsite }: ProjectNavig
               </div>
             </div>
             <div className="flex-shrink-0 flex items-center gap-3">
-              <FaviconWithFallback
-                website={nextWebsite.website}
+              <ListingImage
                 name={nextWebsite.name}
-                logoUrl={nextWebsite.media?.logo}
+                src={nextWebsite.media?.logo}
                 size={40}
                 className="rounded-lg"
               />
