@@ -62,8 +62,9 @@ proving the address.
    [badge program](./BADGE_PROGRAM.md) then checks the claimer's product page, and removes the
    owner (the listing stays up, curated) if the badge is confirmed missing; a later replay of the
    claim then answers `409 not_owner`.
-5. **Payment** (paid method, #68). `completePaidClaim` makes the claimer the owner (`paid_claim`)
-   once #68's webhook records the payment, after the same product-domain re-check; the badge is
+5. **Payment** (paid method, #68). "Continue to payment" opens `/claims/<id>/checkout/`
+   ([Billing](./BILLING.md)); `completePaidClaim` makes the claimer the owner (`paid_claim`)
+   once billing records the payment, after the same product-domain re-check; the badge is
    then optional and never checked. An owned listing answers `already_owned` with the contact
    path.
 

@@ -66,6 +66,13 @@ export function formatDateTime(iso: string | null): string {
   return `${p.weekday}, ${p.month} ${p.day}, ${p.hour}:${p.minute}`
 }
 
+/** "Oct 6, 11:20" (UTC), the Orders table's date. */
+export function formatMonthDayTime(iso: string | null): string {
+  if (!iso) return '—'
+  const p = parts(iso)
+  return `${p.month} ${p.day}, ${p.hour}:${p.minute}`
+}
+
 /** "Oct 1" */
 export function formatShortDate(iso: string | null): string {
   if (!iso) return '—'

@@ -525,6 +525,133 @@ describe('single-site D1-only repository architecture', () => {
     expect(requests).toContain("import 'server-only'")
   })
 
+  // Billing (#68): the ledger's SQL lives in the shared data package, and everything specific to
+  // the payment provider stays behind the billing module's interface, so Lago can replace Stripe.
+  it('keeps billing SQL in the data package and the provider inside the billing module (#68)', () => {
+    const billingDirectory = resolve(project.appDirectory, 'lib/billing')
+    const billingFiles = [
+      ...readdirSync(billingDirectory).filter(name => name.endsWith('.ts')),
+      ...readdirSync(resolve(billingDirectory, 'providers')).map(name => `providers/${name}`)
+    ].filter(name => !name.includes('.test.'))
+    for (const file of billingFiles) {
+      const source = readFileSync(resolve(billingDirectory, file), 'utf8')
+      expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
+    }
+    const runtime = readFileSync(resolve(billingDirectory, 'runtime.ts'), 'utf8')
+    expect(runtime).toContain("import 'server-only'")
+    const providerSpecific =
+      /api\.stripe\.com|createStripeProvider|stripe-signature|checkout\.session/iu
+    const outside = trackedFiles().filter(
+      file =>
+        /\.(?:ts|tsx)$/u.test(file) &&
+        (file.startsWith(`${project.appDirectory}/`) || file.startsWith('packages/')) &&
+        !file.startsWith(`${project.appDirectory}/lib/billing/providers/`) &&
+        existsSync(resolve(file)) &&
+        providerSpecific.test(readFileSync(resolve(file), 'utf8'))
+    )
+    expect(outside).toEqual([])
+    // Only the configured provider (`lib/billing/providers/`) reads the provider's secrets.
+    const secretReaders = trackedFiles().filter(
+      file =>
+        /\.(?:ts|tsx)$/u.test(file) &&
+        file.startsWith(`${project.appDirectory}/`) &&
+        !file.endsWith('.d.ts') &&
+        !file.startsWith(`${project.appDirectory}/lib/billing/providers/`) &&
+        existsSync(resolve(file)) &&
+        /STRIPE_(?:SECRET_KEY|WEBHOOK_SECRET)/u.test(readFileSync(resolve(file), 'utf8'))
+    )
+    expect(secretReaders).toEqual([])
+  })
+
+  // Owner decision on #70 (#68): the payment provider changes soon, so its name is never shown to
+  // submitters or admins: not on pages, in emails, in the admin panel, in error lines, in the
+  // legal pages, or in the item names sent to the provider's own page. Only the provider's
+  // implementation (`lib/billing/providers/`), config and env names, and developer docs name it.
+  it("never shows the payment provider's name to people (#68, owner decision on #70)", () => {
+    const named = /stripe/iu
+    const textOf = (file: string, sourceText: string): Array<{ line: number; text: string }> => {
+      const source = ts.createSourceFile(
+        file,
+        sourceText,
+        ts.ScriptTarget.Latest,
+        true,
+        file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+      )
+      const texts: Array<{ line: number; text: string }> = []
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isStringLiteral(node) ||
+          ts.isNoSubstitutionTemplateLiteral(node) ||
+          ts.isTemplateHead(node) ||
+          ts.isTemplateMiddle(node) ||
+          ts.isTemplateTail(node) ||
+          ts.isJsxText(node)
+        ) {
+          texts.push({
+            line: source.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+            text: node.text
+          })
+        }
+        ts.forEachChild(node, visit)
+      }
+      visit(source)
+      return texts
+    }
+    // The check sees the name in a string, a template, and JSX text.
+    expect(
+      textOf(
+        'probe.tsx',
+        'const a = "Pay with Stripe"; const b = `$' + '{a} STRIPE`; <p>stripe</p>'
+      )
+        .filter(({ text }) => named.test(text))
+        .map(({ text }) => text.trim())
+    ).toEqual(['Pay with Stripe', 'STRIPE', 'stripe'])
+    const userFacing = trackedFiles().filter(
+      file =>
+        /\.(?:ts|tsx)$/u.test(file) &&
+        !/\.(?:test|spec)\.tsx?$/u.test(file) &&
+        !file.endsWith('.d.ts') &&
+        (['app/', 'components/', 'lib/'].some(dir =>
+          file.startsWith(`${project.appDirectory}/${dir}`)
+        ) ||
+          [
+            'packages/site-config/src/',
+            'packages/web-core/src/',
+            'packages/design-system/',
+            // Validation and error messages the data layer returns to pages (#111 round 4).
+            'packages/data-ops/src/'
+          ].some(dir => file.startsWith(dir))) &&
+        !file.startsWith(`${project.appDirectory}/lib/billing/providers/`) &&
+        existsSync(resolve(file))
+    )
+    expect(userFacing.length).toBeGreaterThan(100)
+    // Every string, template, and JSX text the code could put in front of someone, emails
+    // included (their templates are code in `lib/email/`).
+    const shown = userFacing.flatMap(file =>
+      textOf(file, readFileSync(resolve(file), 'utf8'))
+        .filter(({ text }) => named.test(text))
+        .map(({ line, text }) => `${file}:${line}: ${text.trim().slice(0, 80)}`)
+    )
+    // The provider's own folder names it in code, but what it shows on the provider's page comes
+    // only from the order's neutral description (#111 round 4), checked above where it is built.
+    const provider = readFileSync(
+      resolve(project.appDirectory, 'lib/billing/providers/stripe.ts'),
+      'utf8'
+    )
+    expect(provider).toMatch(
+      /'line_items\[0\]\[price_data\]\[product_data\]\[name\]': request\.description,/u
+    )
+    expect(provider).not.toMatch(/product_data\]\[(?!name\])/u)
+    expect(provider).not.toMatch(/custom_text|submit_type|statement_descriptor/u)
+    // The legal pages and the site's other written content.
+    for (const file of trackedFiles().filter(
+      name => name.startsWith('packages/content/data/') && existsSync(resolve(name))
+    )) {
+      if (named.test(readFileSync(resolve(file), 'utf8'))) shown.push(file)
+    }
+    expect(shown).toEqual([])
+  })
+
   it('keeps claim SQL in the shared data package (#67)', () => {
     const claimsDirectory = resolve(project.appDirectory, 'lib/claims')
     for (const file of readdirSync(claimsDirectory).filter(name => !name.includes('.test.'))) {

@@ -455,7 +455,7 @@ export function BadgeStep({
             </Button>
             {showPaid ? (
               <Button asChild size="sm" variant="outline">
-                <Link href={`/submit/${submission.id}/checkout/`}>Skip the badge: $49 one-off</Link>
+                <a href={`/submit/${submission.id}/checkout/`}>Skip the badge: $49 one-off</a>
               </Button>
             ) : null}
           </>
@@ -547,7 +547,7 @@ export function BadgeStep({
               {' '}
               Rather not add a badge?{' '}
               <Button asChild variant="link" className="h-auto p-0">
-                <Link href={`/submit/${submission.id}/checkout/`}>Skip the badge: $49 one-off</Link>
+                <a href={`/submit/${submission.id}/checkout/`}>Skip the badge: $49 one-off</a>
               </Button>
             </>
           ) : null}

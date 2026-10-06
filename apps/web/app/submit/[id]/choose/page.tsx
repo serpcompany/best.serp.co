@@ -3,6 +3,7 @@ import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { ChoosePlan } from '@/components/submit/choose-plan'
+import { ordersEnabled } from '@/lib/billing/runtime'
 import { nextStepPath } from '@/lib/submissions/contract'
 import { toSummary } from '@/lib/submissions/http'
 import { ownSubmissionForPage } from '@/lib/submissions/pages'
@@ -29,7 +30,7 @@ export default async function ChoosePage({ params, searchParams }: ChoosePagePro
     <ChoosePlan
       justSaved={(await searchParams).saved === '1'}
       priceCents={site.submissions.paidListingPriceCents}
-      showPaid={site.features.showPaidListings}
+      showPaid={await ordersEnabled()}
       signedInEmail={user.email}
       submission={toSummary(submission)}
     />

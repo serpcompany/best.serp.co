@@ -718,17 +718,20 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
           </ItemActions>
         </Item>
         <FieldDescription>
-          {`${claim?.email ?? email} is confirmed. You become the owner as soon as the payment goes through on Stripe.`}
+          {`${claim?.email ?? email} is confirmed. You become the owner as soon as the payment goes through.`}
         </FieldDescription>
       </div>
     )
     footer = (
       <>
         {back('method')}
-        {/* Checkout is #68's: the paid method only shows once orders are on. */}
-        <Button disabled>
-          {`Continue to payment: ${usd(priceCents, false)}`}
-          <ArrowRight />
+        {/* The paid method only shows once orders are on (#68). A plain link: the route opens
+            the payment provider's checkout and comes back to this dialog. */}
+        <Button asChild disabled={!claim}>
+          <a href={claim ? `/claims/${claim.id}/checkout/` : '#claim'}>
+            {`Continue to payment: ${usd(priceCents, false)}`}
+            <ArrowRight />
+          </a>
         </Button>
       </>
     )

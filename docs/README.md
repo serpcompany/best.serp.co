@@ -12,6 +12,7 @@
 | [Image safety and media health](./MEDIA_HEALTH.md) | The listing image fallback, its guards, the weekly media check |
 | [Email](./EMAIL.md) | Transactional email, environments, owner prerequisites |
 | [Email templates](./EMAIL_TEMPLATES.md) | Every email, its trigger, recipient, and link |
+| [Billing](./BILLING.md) | Paid listings: Stripe behind the billing module, orders, refunds |
 | [Submitter dashboard](./ACCOUNT_DASHBOARD.md) | `/account`: statuses, edits, revisions, the badge panel |
 | [Accounts](./ACCOUNTS.md) | Better Auth sign-in codes, admins, Cloudflare Access |
 | [Admin panel](./ADMIN_PANEL.md) | `/admin` screens, decisions, the production-write exception |

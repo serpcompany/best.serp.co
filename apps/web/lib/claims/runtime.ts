@@ -26,6 +26,7 @@ interface ClaimEnv {
   DB?: D1Database
   LOCAL_BADGE_PROGRAM?: string
   LOCAL_CLAIMS?: string
+  LOCAL_ORDERS?: string
   SITE_ENVIRONMENT?: string
 }
 

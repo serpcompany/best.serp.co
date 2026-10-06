@@ -9,6 +9,7 @@
     "./admin-queries": "./src/admin-queries.ts",
     "./auth": "./src/auth.ts",
     "./badge-program": "./src/badge-program.ts",
+    "./billing": "./src/billing.ts",
     "./cache": "./src/cache.ts",
     "./catalog": "./src/catalog.ts",
     "./claims": "./src/claims.ts",

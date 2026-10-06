@@ -182,7 +182,8 @@ describe('fresh Drizzle D1 history', () => {
       '0005_admin_panel.sql',
       '0006_badge_program.sql',
       '0007_hosted_media.sql',
-      '0008_listing_claims.sql'
+      '0008_listing_claims.sql',
+      '0009_billing_orders.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.

@@ -38,7 +38,7 @@ export interface SiteFeatures {
    */
   readonly messages: boolean
   /**
-   * #68: orders (admin screen 13), with Stripe. Off: the admin sidebar hides Orders and
+   * #68: orders (admin screen 13), through the billing provider. Off: the admin sidebar hides Orders and
    * `/admin/orders/` stays a 404 (the admin catch-all), and the badge program's emails leave out
    * the paid upgrade and "Relist" offers.
    */

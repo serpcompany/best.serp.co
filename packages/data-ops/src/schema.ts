@@ -1441,6 +1441,214 @@ export const listingClaimHolds = sqliteTable(
   ]
 )
 
+/**
+ * Billing (#68). `orders` is the ledger of record for every charge and refund, whatever the
+ * submission or listing it was for could accept (docs/DATA_MODEL.md, "Charges are recorded in
+ * #68's `orders`"). Provider-neutral: `provider` names the billing provider (`stripe` now, Lago
+ * later) and the `provider_*` columns hold its references. Amounts are integer minor units.
+ */
+export const orderKinds = ['paid_listing', 'paid_claim'] as const
+export type OrderKind = (typeof orderKinds)[number]
+
+/**
+ * What a paid listing order buys: a new paid submission (`submission`), the upgrade of a live
+ * free listing (`upgrade`), or bringing back a free listing the badge program unlisted
+ * (`relist`). A paid claim is `claim` (#67).
+ */
+export const orderPurposes = ['submission', 'upgrade', 'relist', 'claim'] as const
+export type OrderPurpose = (typeof orderPurposes)[number]
+
+/**
+ * `refunding`: the refund is claimed (a compare-and-swap from the status it was decided on)
+ * before the provider is asked, so nothing else can apply or refund the order meanwhile; the
+ * provider's answer then finalizes it as `refunded`. The sweep finishes one a failure left.
+ */
+export const orderStatuses = ['pending', 'paid', 'refunding', 'refunded', 'failed'] as const
+export type OrderStatus = (typeof orderStatuses)[number]
+
+/**
+ * What a paid order did once applied: the submission went live (`published`) or waits for
+ * review after a failed guardrail check (`held`), the listing was upgraded or relisted, the
+ * claim completed, or the payment could not be applied and is refunded (`unapplied`).
+ */
+export const orderOutcomes = [
+  'published',
+  'held',
+  'upgraded',
+  'relisted',
+  'claimed',
+  'unapplied'
+] as const
+export type OrderOutcome = (typeof orderOutcomes)[number]
+
+/** Why an order was refunded: an `other` rejection, an admin's refund, or an unapplied payment. */
+export const orderRefundReasons = ['rejected', 'admin', 'unapplied'] as const
+export type OrderRefundReason = (typeof orderRefundReasons)[number]
+
+/**
+ * What an admin's refund does to the listing, decided (with the badge check at refund) before
+ * the refund is claimed, so a retry never checks the badge again.
+ */
+export const orderRefundListingActions = [
+  'keep_free',
+  'unpublish',
+  'already_unpublished',
+  'none'
+] as const
+export type OrderRefundListingAction = (typeof orderRefundListingActions)[number]
+
+/**
+ * Why an order needs an admin: a charge that didn't match its order (refunded), or a refund
+ * the provider kept refusing (`refund_failed`, after `REFUND_MAX_ATTEMPTS`; the sweep stops).
+ */
+export const orderAttentions = ['amount_mismatch', 'refund_failed'] as const
+export type OrderAttention = (typeof orderAttentions)[number]
+
+export const orders = sqliteTable(
+  'orders',
+  {
+    id: text('id').primaryKey(),
+    /** The order number people see (`ORD-<number>`), assigned in order from 1001. */
+    number: integer('number').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    kind: text('kind', { enum: orderKinds }).notNull(),
+    purpose: text('purpose', { enum: orderPurposes }).notNull(),
+    /** One open (`pending`) order per target: `submission:<id>`, `listing:<id>`, `claim:<id>`. */
+    targetKey: text('target_key').notNull(),
+    submissionId: text('submission_id').references(() => listingSubmissions.id),
+    listingId: text('listing_id').references(() => listings.id),
+    /** The paid claim (#67's `listing_claims`), kept without a foreign key. */
+    claimId: text('claim_id'),
+    amountCents: integer('amount_cents').notNull(),
+    currency: text('currency').notNull(),
+    provider: text('provider').notNull(),
+    providerCheckoutId: text('provider_checkout_id'),
+    checkoutUrl: text('checkout_url'),
+    checkoutExpiresAt: text('checkout_expires_at'),
+    providerPaymentId: text('provider_payment_id'),
+    providerRefundId: text('provider_refund_id'),
+    /** What the provider actually charged (the refund returns exactly this). */
+    chargedCents: integer('charged_cents'),
+    chargedCurrency: text('charged_currency'),
+    attention: text('attention', { enum: orderAttentions }),
+    status: text('status', { enum: orderStatuses }).notNull().default('pending'),
+    outcome: text('outcome', { enum: orderOutcomes }),
+    failureReason: text('failure_reason'),
+    /** The guardrail check that held a paid submission for review (`held`), e.g. `fetch_timeout`. */
+    checkProblem: text('check_problem'),
+    refundReason: text('refund_reason', { enum: orderRefundReasons }),
+    refundedBy: text('refunded_by'),
+    refundListingAction: text('refund_listing_action', { enum: orderRefundListingActions }),
+    refundBadgeCheckId: integer('refund_badge_check_id'),
+    refundRequestedAt: text('refund_requested_at'),
+    /** Provider refund attempts that failed, and when the sweep may try again (backoff). */
+    refundAttempts: integer('refund_attempts').notNull().default(0),
+    refundRetryAt: text('refund_retry_at'),
+    /** The admin's reason for the activity log (#70 screen 13). */
+    refundNote: text('refund_note'),
+    paidAt: text('paid_at'),
+    appliedAt: text('applied_at'),
+    refundedAt: text('refunded_at'),
+    failedAt: text('failed_at'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull()
+  },
+  table => [
+    check('orders_kind_valid', sql`${table.kind} IN (${sqlList(orderKinds)})`),
+    check('orders_purpose_valid', sql`${table.purpose} IN (${sqlList(orderPurposes)})`),
+    check('orders_status_valid', sql`${table.status} IN (${sqlList(orderStatuses)})`),
+    check(
+      'orders_outcome_valid',
+      sql`${table.outcome} IS NULL OR ${table.outcome} IN (${sqlList(orderOutcomes)})`
+    ),
+    check(
+      'orders_refund_listing_action_valid',
+      sql`${table.refundListingAction} IS NULL
+        OR ${table.refundListingAction} IN (${sqlList(orderRefundListingActions)})`
+    ),
+    check(
+      'orders_attention_valid',
+      sql`${table.attention} IS NULL OR ${table.attention} IN (${sqlList(orderAttentions)})`
+    ),
+    check(
+      'orders_refund_reason_valid',
+      sql`${table.refundReason} IS NULL OR ${table.refundReason} IN (${sqlList(orderRefundReasons)})`
+    ),
+    check(
+      'orders_target_matches_purpose',
+      sql`(${table.purpose} = 'claim' AND ${table.kind} = 'paid_claim'
+        AND ${table.claimId} IS NOT NULL AND ${table.listingId} IS NOT NULL
+        AND ${table.targetKey} = 'claim:' || ${table.claimId})
+      OR (${table.purpose} = 'submission' AND ${table.kind} = 'paid_listing'
+        AND ${table.submissionId} IS NOT NULL AND ${table.claimId} IS NULL
+        AND ${table.targetKey} = 'submission:' || ${table.submissionId})
+      OR (${table.purpose} IN ('upgrade', 'relist') AND ${table.kind} = 'paid_listing'
+        AND ${table.submissionId} IS NOT NULL AND ${table.listingId} IS NOT NULL
+        AND ${table.claimId} IS NULL AND ${table.targetKey} = 'listing:' || ${table.listingId})`
+    ),
+    check('orders_amount_positive', sql`${table.amountCents} > 0`),
+    check('orders_refund_attempts_valid', sql`${table.refundAttempts} >= 0`),
+    check('orders_currency_valid', sql`${table.currency} GLOB '[a-z][a-z][a-z]'`),
+    check(
+      'orders_paid_recorded',
+      sql`${table.status} IN ('pending', 'failed')
+        OR (${table.paidAt} IS NOT NULL AND ${table.providerPaymentId} IS NOT NULL
+          AND ${table.chargedCents} IS NOT NULL AND ${table.chargedCurrency} IS NOT NULL)`
+    ),
+    check(
+      'orders_refund_recorded',
+      sql`(${table.status} = 'refunded') = (${table.refundedAt} IS NOT NULL)
+        AND (${table.status} IN ('refunding', 'refunded')) = (${table.refundReason} IS NOT NULL)
+        AND (${table.refundReason} IS NULL) = (${table.refundRequestedAt} IS NULL)
+        AND (${table.refundReason} = 'admin') = (${table.refundListingAction} IS NOT NULL)`
+    ),
+    check(
+      'orders_outcome_after_payment',
+      sql`(${table.outcome} IS NULL) = (${table.appliedAt} IS NULL)
+        AND (${table.appliedAt} IS NULL OR ${table.paidAt} IS NOT NULL)`
+    ),
+    check(
+      'orders_failed_recorded',
+      sql`(${table.status} = 'failed') = (${table.failedAt} IS NOT NULL)`
+    ),
+    uniqueIndex('orders_number_idx').on(table.number),
+    uniqueIndex('orders_open_target_idx')
+      .on(table.targetKey)
+      .where(sql`${table.status} = 'pending'`),
+    uniqueIndex('orders_provider_checkout_idx')
+      .on(table.provider, table.providerCheckoutId)
+      .where(sql`${table.providerCheckoutId} IS NOT NULL`),
+    index('orders_status_created_idx').on(table.status, table.createdAt),
+    index('orders_submission_idx').on(table.submissionId),
+    index('orders_listing_idx').on(table.listingId),
+    index('orders_user_idx').on(table.userId, table.createdAt)
+  ]
+)
+
+/**
+ * Provider webhook events, recorded once per provider event id (#68). A replay of an event
+ * whose processing finished (`processed_at`) is a no-op; one that failed midway runs again,
+ * and every step it takes is itself idempotent.
+ */
+export const billingEvents = sqliteTable(
+  'billing_events',
+  {
+    provider: text('provider').notNull(),
+    eventId: text('event_id').notNull(),
+    eventType: text('event_type').notNull(),
+    orderId: text('order_id').references(() => orders.id),
+    outcome: text('outcome'),
+    receivedAt: text('received_at').notNull(),
+    processedAt: text('processed_at')
+  },
+  table => [
+    primaryKey({ columns: [table.provider, table.eventId] }),
+    index('billing_events_order_idx').on(table.orderId)
+  ]
+)
+
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   listingOwnerships: many(listingOwners),
@@ -1603,6 +1811,20 @@ export const listingRevisionEventsRelations = relations(listingRevisionEvents, (
 
 export const badgeChecksRelations = relations(badgeChecks, ({ one }) => ({
   listing: one(listings, { fields: [badgeChecks.listingId], references: [listings.id] })
+}))
+
+export const ordersRelations = relations(orders, ({ many, one }) => ({
+  events: many(billingEvents),
+  listing: one(listings, { fields: [orders.listingId], references: [listings.id] }),
+  submission: one(listingSubmissions, {
+    fields: [orders.submissionId],
+    references: [listingSubmissions.id]
+  }),
+  user: one(users, { fields: [orders.userId], references: [users.id] })
+}))
+
+export const billingEventsRelations = relations(billingEvents, ({ one }) => ({
+  order: one(orders, { fields: [billingEvents.orderId], references: [orders.id] })
 }))
 
 export const listingClaimsRelations = relations(listingClaims, ({ one }) => ({

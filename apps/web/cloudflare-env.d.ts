@@ -70,6 +70,17 @@ interface CloudflareEnv {
   MEDIA?: R2Bucket
   /** The media host pages build image URLs on (`https://cdn.serp.co`, …; `/_media` locally). */
   MEDIA_BASE_URL?: string
+  /**
+   * `on` turns orders (#68) on for a local Worker while `features.orders` is off: the end-to-end
+   * suite's mocked Stripe (`lib/billing/flags.ts`). Ignored anywhere but local.
+   */
+  LOCAL_ORDERS?: string
+  /** A local Worker only: the port of the end-to-end suite's mocked Stripe API on 127.0.0.1. */
+  LOCAL_STRIPE_MOCK_PORT?: string
+  /** Worker secret (#68): Stripe's secret key, test mode on staging and live in production. */
+  STRIPE_SECRET_KEY?: string
+  /** Worker secret (#68): the signing secret of the `/api/billing/webhook/` endpoint. */
+  STRIPE_WEBHOOK_SECRET?: string
   /** Staging only: comma-separated recipients email may go to (`lib/email/config.ts`). */
   EMAIL_STAGING_ALLOWLIST?: string
   /** Crawl and analytics policy; anything but `production` is non-production. */

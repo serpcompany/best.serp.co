@@ -15,11 +15,12 @@ the account area shares (`@serpdirectory/web-core/dashboard/*`); pages set their
 | Listings | `/admin/listings/` (`?q=`, `status`, `source`, `link`, `page`, `size`) | `selectAdminListingsPlans` |
 | Listing | `/admin/listings/<slug>/` | `selectAdminListingPlans` |
 | Admins | `/admin/admins/` | `selectAdminAllowlistPlan` |
+| Orders (#68) | `/admin/orders/` | `selectAdminOrdersPlan` (`data-ops/billing.ts`) |
 
 The reads are statement plans in `packages/data-ops/src/admin-queries.ts`; `apps/web/lib/admin/`
-holds no SQL (the architecture guard checks it). Orders (screen 13) need #68's ledger: the entry
-is hidden behind `features.orders` (`apps/web/lib/features.ts`) and `/admin/orders/`
-is a 404 until #68. The Inbox and the conversation panels on screens 11 and 12 are #73's.
+holds no SQL (the architecture guard checks it). Orders (screen 13, [Billing](./BILLING.md)) are
+shown while orders are on (`features.orders`); otherwise the entry is hidden and `/admin/orders/`
+is a 404. The Inbox and the conversation panels on screens 11 and 12 are #73's.
 
 ## Requests
 
@@ -38,6 +39,7 @@ forbids `'use server'`): an action id is reachable from any path, so no path gat
 | `/api/admin/listings/<id>/link-rel` | `linkRel` | `setListingLinkRel` |
 | `/api/admin/listings/<id>/{transfer-owner,remove-owner}` | `email`, `expectedOwnerUserId` | `transferListingOwner`, `removeListingOwner` |
 | `/api/admin/admins` (`POST` adds, `DELETE` removes) | `email` | `addAdmin`, `removeAdmin` |
+| `/api/admin/orders/<id>/refund` | none | `refundOrder` ([Billing](./BILLING.md)) |
 
 Every request passes, in order: the Worker's Cloudflare Access and session-cookie gate
 ([Accounts](./ACCOUNTS.md#admin-gate)); `authorizeAdminRequest()`, which re-checks the session
@@ -112,17 +114,17 @@ templates exist.
 
 ### Refunds
 
-Rejecting a paid submission as `other` promises a refund. Until #68 provides the refund hook
-(`AdminRefunds`), that decision answers 409 `refund_unavailable` and changes nothing. The
-contract #68 implements:
+Rejecting a paid submission as `other` promises a refund. The billing module provides the refund
+hook (`AdminRefunds`, `refundRejectedSubmission` in `lib/billing/service.ts`) while orders are on
+and billing is configured; otherwise that decision answers 409 `refund_unavailable` and changes
+nothing. The contract:
 
 - The rejection batch is the refund-pending marker: `status = 'rejected'`,
   `rejection_category = 'other'`, `paid_at` set and `refunded_at` null
   (`selectRefundPendingSubmissionsPlan`). The refund is recorded with
   `buildRefundSubmissionPlans` (`after_rejection`), which sets `refunded_at` and clears it.
-- The hook runs after the batch, again on every replay of the rejection, and from #68's sweep
-  of pending rows, so it must be idempotent (a provider idempotency key such as
-  `refund:<submissionId>`). It records the refund and sends `submission-rejected-refunded`;
+- The hook runs after the batch, again on every replay of the rejection, and from the billing
+  sweep of pending rows, so it is idempotent (the provider idempotency key `refund:<order>`). It records the refund and sends `submission-rejected-refunded`;
   the rejection email is not sent for these.
 - When the hook throws, the rejection stands, the decision answers
   `{ok: true, refundPending: true}`, and the refund stays pending for the next replay or sweep.

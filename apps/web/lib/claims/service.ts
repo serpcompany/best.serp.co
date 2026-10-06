@@ -9,6 +9,7 @@ import {
   type ClaimOperations,
   type ListingClaim
 } from '@serpdirectory/data-ops/claims'
+import type { StatementPlan } from '@serpdirectory/data-ops/plan-support'
 import type { ListingClaimMethod } from '@serpdirectory/data-ops/schema'
 import { CONCLUSIVE_VERIFICATION_FAILURES } from '@serpdirectory/data-ops/submissions'
 import { CLAIM_CODE_LENGTH, CLAIM_CODE_TTL_SECONDS } from '../email/emails/codes'
@@ -475,12 +476,19 @@ export async function completePaidClaim(
     ClaimDependencies,
     'contactPath' | 'now' | 'operations' | 'paidClaims' | 'resolveLanding'
   >,
-  input: { actor: string; claimId: string; userId: string }
-): Promise<ClaimResult<{ completed: boolean }>> {
+  input: {
+    actor: string
+    claimId: string
+    /** Billing's own record of the payment, committed in the same batch as the completion. */
+    together?: StatementPlan[]
+    userId: string
+  }
+): Promise<ClaimResult<{ completed: boolean; completedNow: boolean }>> {
   if (!deps.paidClaims) return fail(404, 'not_found')
   const claim = await deps.operations.claim(input)
   if (!claim) return fail(404, 'not_found')
-  if (claim.status === 'completed') return { completed: true, ok: true }
+  // Completed already (by another payment, or a replay): not by this call.
+  if (claim.status === 'completed') return { completed: true, completedNow: false, ok: true }
   if (claim.status === 'cancelled') {
     const listing = await deps.operations.listing({ id: claim.listingId })
     return listing?.ownerUserId
@@ -495,8 +503,13 @@ export async function completePaidClaim(
   if (!current) return fail(404, 'not_found')
   if (current.ownerUserId) return fail(409, 'already_owned', { contactPath: deps.contactPath })
   if (!(await sameProductDomain(deps, claim, current))) return fail(409, 'changed')
-  const done = await deps.operations.complete({ actor: input.actor, claim, now: now.toISOString() })
-  if (done) return { completed: true, ok: true }
+  const done = await deps.operations.complete({
+    actor: input.actor,
+    claim,
+    now: now.toISOString(),
+    together: input.together
+  })
+  if (done) return { completed: true, completedNow: true, ok: true }
   const listing = await deps.operations.listing({ id: claim.listingId })
   return listing?.ownerUserId
     ? fail(409, 'already_owned', { contactPath: deps.contactPath })

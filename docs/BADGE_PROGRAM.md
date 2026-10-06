@@ -96,7 +96,7 @@ retried refund checks again):
   plan refuses unless that check did not pass, so an earlier weekly pass can neither keep the
   listing nor block the refund.
 
-Nothing calls it yet.
+The admin Orders refund calls it ([Billing](./BILLING.md)).
 
 ## Checking it on staging
 

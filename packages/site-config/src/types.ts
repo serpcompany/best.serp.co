@@ -72,11 +72,6 @@ export type SiteFeatureFlags = {
   showFeaturedGuides: boolean
   showGuides: boolean
   showNewsletter: boolean
-  /**
-   * The paid listing (serpcompany/best.serp.co#68). Off until checkout exists: the submit flow
-   * offers the free badge listing only and hides every paid option.
-   */
-  showPaidListings: boolean
   showProjects: boolean
 }
 
@@ -132,6 +127,11 @@ export type SiteDefinition = {
   submissions: {
     /** The paid listing's price: one-off and permanent, in US cents. */
     paidListingPriceCents: number
+    /**
+     * Stripe Tax on paid listing checkouts (#68). Tax is deferred: billing refuses to start
+     * while this is on, because a taxed charge wouldn't match its order.
+     */
+    automaticTax: boolean
   }
   site: {
     description: string

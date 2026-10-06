@@ -1,3 +1,4 @@
+import { ordersEnabledFor } from '../billing/flags'
 import type { SiteFeatures } from '../features'
 
 /**
@@ -5,7 +6,7 @@ import type { SiteFeatures } from '../features'
  * `LOCAL_CLAIMS=on` (`LOCAL_PREVIEW_VARS`, for the end-to-end suite; ignored unless
  * `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` are both `local`). While off, every claim endpoint
  * answers 404. Paid claims also need `features.orders` (#68): with it off, only the badge
- * method exists.
+ * method exists (a local Worker started with `LOCAL_ORDERS=on` counts, as billing does).
  */
 export interface ClaimFlags {
   /** Where an "already owned" answer sends someone: a claim conversation (#73) or /contact/. */
@@ -15,7 +16,12 @@ export interface ClaimFlags {
 }
 
 export function claimFlags(
-  env: { D1_RUNTIME_ENV?: string; LOCAL_CLAIMS?: string; SITE_ENVIRONMENT?: string },
+  env: {
+    D1_RUNTIME_ENV?: string
+    LOCAL_CLAIMS?: string
+    LOCAL_ORDERS?: string
+    SITE_ENVIRONMENT?: string
+  },
   features: SiteFeatures
 ): ClaimFlags {
   const local =
@@ -23,6 +29,6 @@ export function claimFlags(
   return {
     contactPath: features.messages ? '/account/messages/new/?type=claim' : '/contact/',
     enabled: features.claims || local,
-    paid: features.orders
+    paid: ordersEnabledFor(env, features)
   }
 }

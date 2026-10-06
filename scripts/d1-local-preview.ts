@@ -11,8 +11,13 @@ import { project } from './project'
  * with the production Access lock (apps/e2e/tests/access-lock.spec.ts), and
  * `LOCAL_BADGE_PROGRAM`, which runs the badge program on a local Worker while its flag is off
  * (apps/e2e/tests/badge-program.spec.ts; `lib/worker/scheduled.ts` ignores it anywhere but
- * local), and `LOCAL_CLAIMS`, which turns claims on with `features.claims` off
- * (apps/e2e/tests/claims.spec.ts; `lib/claims/flags.ts` ignores it anywhere but local). Identity and environment vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`) can never be
+ * local), `LOCAL_CLAIMS`, which turns claims on with `features.claims` off
+ * (apps/e2e/tests/claims.spec.ts; `lib/claims/flags.ts` ignores it anywhere but local), and the
+ * orders suite's switches (apps/e2e/tests/billing.spec.ts, #68): `LOCAL_ORDERS` turns orders on
+ * while `features.orders` is off, `LOCAL_STRIPE_MOCK_PORT` points billing at the suite's mocked
+ * Stripe API, and `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` take the suite's own test values
+ * (`lib/billing/` ignores the first two anywhere but local, and refuses a live key outside
+ * production). Identity and environment vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`) can never be
  * overridden here.
  */
 export const LOCAL_PREVIEW_OVERRIDABLE_VARS = [
@@ -20,7 +25,11 @@ export const LOCAL_PREVIEW_OVERRIDABLE_VARS = [
   'CF_ACCESS_REQUIRED',
   'CF_ACCESS_TEAM_DOMAIN',
   'LOCAL_BADGE_PROGRAM',
-  'LOCAL_CLAIMS'
+  'LOCAL_CLAIMS',
+  'LOCAL_ORDERS',
+  'LOCAL_STRIPE_MOCK_PORT',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET'
 ] as const
 
 export function localPreviewVarArgs(value: string | undefined): string[] {

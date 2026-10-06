@@ -26,7 +26,7 @@ export default async function AccountListingPage({
 }: ListingPageProps): Promise<ReactElement> {
   const { slug } = await params
   const user = await requireAccountUser(`/account/listings/${slug}/`)
-  const rows = accountTableRows(await getAccountOverview(user.id))
+  const rows = await accountTableRows(await getAccountOverview(user.id))
   const row = rows.find(item => item.kind === 'listing' && item.slug === slug)
   if (!row || !ACCOUNT_ID.test(row.id)) notFound()
   if (!row.badge) redirect(`/account/listings/${slug}/edit/`)

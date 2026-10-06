@@ -4,6 +4,7 @@ import type {
   AccountOverview,
   AccountSubmission
 } from '@serpdirectory/data-ops/account'
+import { site } from '@serpdirectory/site-config'
 import {
   draftExpiresInDays,
   hostOf,
@@ -47,7 +48,11 @@ export interface BadgePanel {
 }
 
 export interface AccountRow {
-  action: { href: string; label: string; variant: 'default' | 'outline' } | 'badge' | null
+  /** `checkout` opens a payment (#68): rendered as a plain link, never prefetched. */
+  action:
+    | { checkout?: boolean; href: string; label: string; variant: 'default' | 'outline' }
+    | 'badge'
+    | null
   badge: BadgePanel | null
   /** The day the row is dated by (submitted, or published for a listing). */
   date: string
@@ -69,6 +74,8 @@ export interface AccountRow {
   slug: string
   status: AccountStatus
   tab: AccountTab
+  /** "Upgrade: $49 one-off" for a live free listing while orders are on (#68). */
+  upgrade: { href: string; label: string } | null
   website: string
 }
 
@@ -151,6 +158,7 @@ function submissionRow(submission: AccountSubmission, now: Date, showPaid: boole
     plan: submission.plan,
     revision: null,
     slug: submission.slug,
+    upgrade: null,
     website: submission.website
   }
   switch (submission.status) {
@@ -236,7 +244,16 @@ function submissionRow(submission: AccountSubmission, now: Date, showPaid: boole
   }
 }
 
-function listingRow(listing: AccountListing, target: BadgeTarget): AccountRow {
+/** The paid listing's price in the account's CTAs (`site.submissions.paidListingPriceCents`). */
+function priceLabel(priceCents: number): string {
+  return `$${Math.round(priceCents / 100)}`
+}
+
+function listingRow(
+  listing: AccountListing,
+  target: BadgeTarget,
+  paid: { priceCents: number } | null
+): AccountRow {
   const badge = badgePanel(listing, target)
   const revision =
     listing.revision?.status === 'pending_review' ||
@@ -258,12 +275,23 @@ function listingRow(listing: AccountListing, target: BadgeTarget): AccountRow {
     plan: listing.plan,
     revision,
     slug: listing.slug,
+    upgrade: null,
     website: listing.website
   }
+  const checkoutHref = `/account/listings/${listing.slug}/checkout/`
   if (!listing.live) {
     return {
       ...base,
-      action: null,
+      // Relisting a listing the badge program unlisted is a paid listing (#68).
+      action:
+        paid && listing.checkoutPurpose === 'relist'
+          ? {
+              checkout: true,
+              href: checkoutHref,
+              label: `Relist for ${priceLabel(paid.priceCents)}`,
+              variant: 'default'
+            }
+          : null,
       badge: null,
       next: { text: 'Removed from best.serp.co', tone: 'muted' },
       revision: null,
@@ -299,7 +327,11 @@ function listingRow(listing: AccountListing, target: BadgeTarget): AccountRow {
     action: badge ? 'badge' : null,
     next,
     status: 'live',
-    tab: 'live'
+    tab: 'live',
+    upgrade:
+      paid && listing.checkoutPurpose === 'upgrade'
+        ? { href: checkoutHref, label: `Upgrade: ${priceLabel(paid.priceCents)} one-off` }
+        : null
   }
 }
 
@@ -312,6 +344,7 @@ export function accountRows(
   overview: AccountOverview,
   options: { badgeTarget: BadgeTarget; now: Date; showPaid: boolean }
 ): AccountRow[] {
+  const paid = options.showPaid ? { priceCents: site.submissions.paidListingPriceCents } : null
   const queuedListings = new Set(
     overview.submissions
       .filter(
@@ -327,7 +360,7 @@ export function accountRows(
       .map(submission => submissionRow(submission, options.now, options.showPaid)),
     ...overview.listings
       .filter(listing => !queuedListings.has(listing.slug))
-      .map(listing => listingRow(listing, options.badgeTarget))
+      .map(listing => listingRow(listing, options.badgeTarget, paid))
   ]
   return rows.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 }

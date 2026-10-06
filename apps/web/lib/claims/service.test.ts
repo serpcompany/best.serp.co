@@ -607,10 +607,18 @@ describe('claim flow', () => {
         claimId: started.claim.id,
         userId: 'user_a'
       })
-    ).resolves.toEqual({ completed: true, ok: true })
+    ).resolves.toEqual({ completed: true, completedNow: true, ok: true })
     expect(row(`SELECT verified_via FROM listing_owners WHERE listing_id='lst_brief'`)).toEqual({
       verified_via: 'paid_claim'
     })
+    // A second payment for the same claim did not complete it (billing refunds that one).
+    await expect(
+      completePaidClaim(deps(true), {
+        actor: 'stripe',
+        claimId: started.claim.id,
+        userId: 'user_a'
+      })
+    ).resolves.toEqual({ completed: true, completedNow: false, ok: true })
     await expect(
       completePaidClaim(deps(true), { actor: 'stripe', claimId: rival.claim.id, userId: 'user_b' })
     ).resolves.toMatchObject({ code: 'already_owned', contactPath: '/contact/' })

@@ -15,6 +15,6 @@ export const metadata: Metadata = generateBaseMetadata({
 /** `/account/submissions/` (#65): the screen-5 table with the user's submissions only. */
 export default async function AccountSubmissionsPage(): Promise<ReactElement> {
   const user = await requireAccountUser('/account/submissions/')
-  const rows = accountTableRows(await getAccountOverview(user.id))
+  const rows = await accountTableRows(await getAccountOverview(user.id))
   return <AccountTablePage rows={rows} scope="submissions" />
 }
