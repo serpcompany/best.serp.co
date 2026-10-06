@@ -11,7 +11,6 @@ import {
   adminSuiteEnabled
 } from './tests/admin-fixture'
 import { badgeOrigin, badgeServerCommand, badgeSuiteEnabled } from './tests/badge-program-fixture'
-import { billingOrigin, billingServerCommand, billingSuiteEnabled } from './tests/billing-fixture'
 import { claimsOrigin, claimsServerCommand, claimsSuiteEnabled } from './tests/claims-fixture'
 import { mediaOrigin, mediaServerCommand, mediaServerEnabled } from './tests/media-fixture'
 
@@ -149,18 +148,6 @@ export default defineConfig({
               {
                 command: badgeServerCommand(),
                 url: `${badgeOrigin()}/robots.txt`,
-                reuseExistingServer: !process.env.CI,
-                timeout: 180000,
-                env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
-              }
-            ]
-          : []),
-        // The orders suite's own Worker and D1, with orders on and a mocked Stripe (#68).
-        ...(billingSuiteEnabled
-          ? [
-              {
-                command: billingServerCommand(),
-                url: `${billingOrigin()}/robots.txt`,
                 reuseExistingServer: !process.env.CI,
                 timeout: 180000,
                 env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }

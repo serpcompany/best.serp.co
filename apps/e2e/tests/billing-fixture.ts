@@ -1,55 +1,25 @@
 import { createHmac } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
-import { tmpdir } from 'node:os'
-import { resolve } from 'node:path'
-import { adminSuiteEnabled, localD1, type SuiteServer } from './admin-fixture'
+import { adminOrigin, adminServer, adminSuiteEnabled, localD1 } from './admin-fixture'
+import { E2E_STRIPE_SECRET_KEY, E2E_STRIPE_WEBHOOK_SECRET, stripeMockPort } from './orders-worker'
 
 /**
- * The orders suite (serpcompany/best.serp.co#68) runs on its own local Worker and D1, started by
- * `playwright.config.ts` from the already-built Worker with orders and claims on (`LOCAL_ORDERS`,
- * `LOCAL_CLAIMS`, a local Worker only) and pointed at a mocked Stripe API on 127.0.0.1 (`LOCAL_STRIPE_MOCK_PORT`), with
- * the suite's own test-mode values for `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. Nothing
- * reaches Stripe: the mock answers the Checkout Session and refund calls the Worker makes, and
- * serves the "Stripe page" the buyer pays or cancels on. Never used against a deployed Worker.
+ * The orders suite (serpcompany/best.serp.co#68) runs on the admin panel suite's local Worker and
+ * D1 (`admin-fixture.ts`), which `playwright.config.ts` starts with orders and claims on
+ * (`orders-worker.ts`): a Worker of its own would be one too many for the CI runner's memory.
+ * The suite's seeds use their own keys, users, and category, so the two suites share the D1
+ * without counting each other's rows. Nothing reaches Stripe: the mock below answers the
+ * Checkout Session and refund calls the Worker makes, and serves the provider's page the buyer
+ * pays or cancels on. Never used against a deployed Worker.
  */
 
-const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
+export { E2E_STRIPE_SECRET_KEY, E2E_STRIPE_WEBHOOK_SECRET, stripeMockPort }
 
 export const billingSuiteEnabled = adminSuiteEnabled
-
-export const billingServer: SuiteServer = {
-  // +3 admin, +4 media, +5 account, +6 badge program, +7 claims (#67).
-  port: playwrightPort + 9,
-  stateDirectory: resolve(tmpdir(), `best-serp-co-e2e-billing-${playwrightPort + 9}`)
-}
-
-/** Where the mocked Stripe API listens (the Worker reads it from `LOCAL_STRIPE_MOCK_PORT`). */
-export const stripeMockPort = playwrightPort + 10
-
-/** Test-mode values for this suite's local Worker only; never real keys. */
-export const E2E_STRIPE_SECRET_KEY = 'sk_test_e2emock'
-export const E2E_STRIPE_WEBHOOK_SECRET = 'whsec_e2emock'
+export const billingServer = adminServer
 
 export function billingOrigin(): string {
-  return `http://127.0.0.1:${billingServer.port}`
-}
-
-export function billingServerCommand(): string {
-  const state = billingServer.stateDirectory
-  const vars = [
-    'LOCAL_CLAIMS=on',
-    'LOCAL_ORDERS=on',
-    `LOCAL_STRIPE_MOCK_PORT=${stripeMockPort}`,
-    `STRIPE_SECRET_KEY=${E2E_STRIPE_SECRET_KEY}`,
-    `STRIPE_WEBHOOK_SECRET=${E2E_STRIPE_WEBHOOK_SECRET}`
-  ].join(',')
-  return [
-    'cd ../..',
-    `rm -rf "${state}"`,
-    `mkdir -p "${state}"`,
-    `HARNESS_D1_STATE_DIRECTORY="${state}" pnpm db:migrate:local`,
-    `HARNESS_D1_STATE_DIRECTORY="${state}" LOCAL_PREVIEW_VARS=${vars} PORT=${billingServer.port} pnpm tsx scripts/d1-local-preview.ts`
-  ].join(' && ')
+  return adminOrigin(adminServer)
 }
 
 export function billingD1<T = Record<string, unknown>>(sql: string): T[] {

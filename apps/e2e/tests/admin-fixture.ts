@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { type APIRequestContext, expect } from '@playwright/test'
+import { ORDERS_PREVIEW_VARS } from './orders-worker'
 
 /**
  * The admin panel suite (serpcompany/best.serp.co#64) runs on its own local Worker with its own
@@ -45,15 +46,21 @@ export function adminOrigin(server: SuiteServer = adminServer): string {
   return `http://127.0.0.1:${server.port}`
 }
 
-/** Serves the built Worker on a fresh, migrated D1 of its own (seeded by the suite). */
+/**
+ * Serves the built Worker on a fresh, migrated D1 of its own (seeded by the suite). The admin
+ * Worker also has orders and claims on: the orders suite (`billing.spec.ts`, #68) shares it
+ * (`orders-worker.ts`) rather than starting another preview Worker on the CI runner.
+ */
 export function adminServerCommand(server: SuiteServer = adminServer): string {
   const state = server.stateDirectory
+  const vars = server === adminServer ? ['LOCAL_CLAIMS=on', ...ORDERS_PREVIEW_VARS] : []
+  const previewVars = vars.length > 0 ? `LOCAL_PREVIEW_VARS=${vars.join(',')} ` : ''
   return [
     'cd ../..',
     `rm -rf "${state}"`,
     `mkdir -p "${state}"`,
     `HARNESS_D1_STATE_DIRECTORY="${state}" pnpm db:migrate:local`,
-    `HARNESS_D1_STATE_DIRECTORY="${state}" PORT=${server.port} pnpm tsx scripts/d1-local-preview.ts`
+    `HARNESS_D1_STATE_DIRECTORY="${state}" ${previewVars}PORT=${server.port} pnpm tsx scripts/d1-local-preview.ts`
   ].join(' && ')
 }
 
