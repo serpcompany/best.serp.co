@@ -27,7 +27,8 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `packages/data-ops/`: Drizzle schema, catalog and submission queries, caching.
 - `packages/design-system/`: UI primitives.
 - `d1/drizzle/`: forward-only migration history applied by Wrangler.
-- `d1/publications/`: reviewed catalog mutation manifests.
+- `d1/publications/`: reviewed catalog mutation manifests (staging first, then production).
+- `d1/media/`: reviewed listing media upload plans (keys and sources; no image files).
 - `d1/artifacts/`: one-time JSON import; the parity report and the brotli-compressed
   SQL are committed, the uncompressed SQL and batches are generated.
 - `scripts/project.ts`: the single deployment target (app, local D1, artifacts).
@@ -65,7 +66,8 @@ pull requests into `staging` (`gh pr create --base staging`); each merge deploys
 commit) or a `hotfix-*` pull request ([Release guards](./docs/RELEASE_GUARDS.md#promotion)).
 Rulesets require a PR and the five PR Review checks, and block force pushes and deletion.
 Agents never merge; the owner approves every merge. Agents never dispatch a production
-workflow, type a production confirmation, or approve a deployment; only the owner does.
+workflow or a staging data workflow (catalog publication, media upload), type their
+confirmations, or approve a deployment; only the owner does.
 Issues and labels never grant production, database, or deployment authority.
 
 ## Non-negotiable architecture

@@ -1,0 +1,84 @@
+name: Upload Listing Media (staging)
+
+# Uploads one reviewed listing media plan from d1/media into the staging media bucket (#95). Every
+# object is fetched again from its recorded source and uploaded only when its bytes still match
+# the plan. An object the bucket already holds is read back through the R2 API and verified:
+# a match is skipped, a mismatch fails and is never overwritten. scripts/media-upload.ts
+# re-checks staging, this workflow, the plan location, and the typed confirmation, and refuses
+# any key outside best.serp.co/listings/.
+on:
+  workflow_dispatch:
+    inputs:
+      plan_path:
+        description: 'Reviewed media plan under d1/media (for example d1/media/2026-10-06-legacy-media.json)'
+        required: true
+        type: string
+      confirmation:
+        description: 'Type upload-media-best.serp.co-staging to upload'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    name: Check ref, plan, and confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require staging, a media plan, and the typed confirmation
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          PLAN_PATH: ${{ inputs.plan_path }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/staging" ]; then
+            echo "::error::This media upload runs only from staging, not $GITHUB_REF."
+            exit 1
+          fi
+          if ! [[ "$PLAN_PATH" =~ ^d1/media/[A-Za-z0-9._-]+\.json$ ]]; then
+            echo "::error::plan_path must be a JSON file directly under d1/media/."
+            exit 1
+          fi
+          if [ "$CONFIRMATION" != "upload-media-best.serp.co-staging" ]; then
+            echo "::error::Type upload-media-best.serp.co-staging to upload."
+            exit 1
+          fi
+
+  upload:
+    name: Upload to the staging media bucket
+    needs: [authorize]
+    # Its own group (#97 review S5): an hour-long upload never holds the deploy group, where a
+    # waiting publication or deploy could be replaced. Uploads add objects only; a publication
+    # refuses a manifest whose objects its bucket does not hold yet. Job-level, so a run refused
+    # by authorize never replaces a valid queued upload.
+    concurrency:
+      group: media-upload-best-serp-co-staging
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: staging
+    steps:
+      - name: Require Cloudflare credentials
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::The staging environment needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/DEPLOY_RUNBOOK.md)."
+            exit 1
+          fi
+
+      - name: Checkout reviewed source
+        uses: actions/checkout@v7
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Upload the reviewed media plan
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MEDIA_UPLOAD_CONFIRM: ${{ inputs.confirmation }}
+          PLAN_PATH: ${{ inputs.plan_path }}
+        run: pnpm media:upload:staging -- "$PLAN_PATH"

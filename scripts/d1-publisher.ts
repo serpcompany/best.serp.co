@@ -91,6 +91,18 @@ const media = z
     video: z.string().url().optional()
   })
   .strict()
+/**
+ * One logo or image row of a listing as a row-level manifest expects it: kind, source `url`, and
+ * hosted `key` (null for an imported row the migration has not repointed yet).
+ */
+const mediaRow = z
+  .object({
+    kind: z.enum(['logo', 'image']),
+    url: z.string().min(1),
+    key: z.string().min(1).nullable().default(null)
+  })
+  .strict()
+export type ExpectedMediaRow = z.input<typeof mediaRow>
 const listing = z
   .object({
     id: listingId,
@@ -172,6 +184,44 @@ const operation = z.discriminatedUnion('action', [
       reason: z.string().min(1)
     })
     .strict(),
+  /**
+   * Replaces a listing's logo and images with hosted copies (#95). `expected` is the listing's
+   * logo and image rows (kind, source url, and hosted key, ordered by kind then sort order) when
+   * the manifest was generated: the batch refuses a listing whose media changed since (a
+   * row-level compare-and-swap, so the operation fits any environment whose rows match). Keys
+   * belong to the slug. The listing's queued media slots are dropped: the manifest wins.
+   */
+  z
+    .object({
+      action: z.literal('listing-media-update'),
+      id: listingId,
+      slug: existingSlug,
+      expected: z.array(mediaRow),
+      media: z
+        .object({
+          logo: hostedImage.optional(),
+          images: z
+            .array(hostedImage)
+            .superRefine(unique('Duplicate listing image.', value => value.key))
+            .optional()
+        })
+        .strict()
+    })
+    .strict(),
+  /**
+   * Adds categories to a listing as secondary (never primary) memberships, compared and swapped
+   * on the listing's slug and its current categories (`expected`, slugs in sort order), so it is
+   * row-level like `listing-media-update` (#98: the Adult category for adult downloaders).
+   */
+  z
+    .object({
+      action: z.literal('listing-categories-add'),
+      id: listingId,
+      slug: existingSlug,
+      expected: z.array(categorySlug).min(1),
+      add: categories
+    })
+    .strict(),
   z.object({ action: z.literal('category-create'), category }).strict(),
   z.object({ action: z.literal('category-update'), category }).strict(),
   z.object({ action: z.literal('category-unpublish'), slug: categorySlug }).strict()
@@ -180,14 +230,25 @@ const provenance = z
   .object({
     actor: z.string().regex(/^[a-zA-Z0-9@._-]{2,128}$/),
     workflow: z.string().regex(/^[a-z0-9][a-z0-9._/-]{1,127}$/),
-    beforeChecksum: checksum
+    beforeChecksum: checksum.optional()
   })
   .strict()
+/**
+ * How a manifest guards against concurrent catalog writes (#97 review B3):
+ * - `publication` (the default): it applies only at `basePublicationVersion` and
+ *   `provenance.beforeChecksum`, the catalog it was written against.
+ * - `rows`: every operation carries its own row-level compare-and-swap
+ *   (`listing-media-update`'s `expected`), so one manifest fits staging and production whatever
+ *   else each environment published. It names no base; the publisher plans it against the
+ *   publication state it reads at publish time and still advances the version.
+ */
+export const manifestConcurrency = ['publication', 'rows'] as const
 export const manifestSchema = z
   .object({
     version: z.literal(1),
     id: z.string().regex(/^[a-z0-9][a-z0-9._-]+$/),
-    basePublicationVersion: z.number().int().nonnegative(),
+    concurrency: z.enum(manifestConcurrency).default('publication'),
+    basePublicationVersion: z.number().int().nonnegative().optional(),
     provenance,
     operations: z.array(operation).min(1)
   })
@@ -196,6 +257,35 @@ export const manifestSchema = z
     const ids = new Set<string>()
     const slugs = new Set<string>()
     const categoryTargets = new Set<string>()
+    if (value.concurrency === 'rows') {
+      if (value.basePublicationVersion !== undefined || value.provenance.beforeChecksum) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'A row-level manifest names no base version or checksum; it is planned at publish time.',
+          path: ['basePublicationVersion']
+        })
+      }
+      value.operations.forEach((op, index) => {
+        if (op.action !== 'listing-media-update' && op.action !== 'listing-categories-add') {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              'A row-level manifest holds only listing-media-update and listing-categories-add operations.',
+            path: ['operations', index, 'action']
+          })
+        }
+      })
+    } else if (
+      value.basePublicationVersion === undefined ||
+      value.provenance.beforeChecksum === undefined
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A manifest needs basePublicationVersion and provenance.beforeChecksum.',
+        path: ['basePublicationVersion']
+      })
+    }
     value.operations.forEach((op, index) => {
       if (
         op.action === 'listing-content-remove-suffix' &&
@@ -206,6 +296,33 @@ export const manifestSchema = z
           message: 'The suffix must be shorter than the description.',
           path: ['operations', index, 'suffix']
         })
+      if (op.action === 'listing-categories-add') {
+        for (const slug of op.add) {
+          if (op.expected.includes(slug)) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `The listing already has category ${slug}.`,
+              path: ['operations', index, 'add']
+            })
+          }
+        }
+      }
+      if (op.action === 'listing-media-update') {
+        const keyed = [
+          ...(op.media.logo ? [['logo', op.media.logo.key] as const] : []),
+          ...(op.media.images ?? []).map(image => ['image', image.key] as const)
+        ]
+        for (const [kind, key] of keyed) {
+          const parsed = parseMediaKey(key)
+          if (parsed && (parsed.slug !== op.slug || parsed.kind !== kind)) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Media key ${key} is not this listing's ${kind}.`,
+              path: ['operations', index, 'media']
+            })
+          }
+        }
+      }
       if (op.action === 'listing-slug-change' && op.from === op.to)
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -260,9 +377,15 @@ export interface PlannedStatement {
 export interface PublicationPlan {
   affectedRoutes: string
   afterChecksum: string
+  /** The publication state the plan applies at: the manifest's, or the live one for `rows`. */
+  base: PublicationBase
   inputChecksum: string
   manifest: PublicationManifest
   statements: PlannedStatement[]
+}
+export interface PublicationBase {
+  checksum: string
+  version: number
 }
 interface BatchStatement {
   bind(...values: unknown[]): BatchStatement
@@ -413,13 +536,45 @@ function listingStatements(
 }
 export const parseManifest = (source: string): PublicationManifest =>
   manifestSchema.parse(parse(source))
+
+/**
+ * A listing's logo and image rows as one JSON array of `[kind, url, media_key]`, ordered by kind
+ * then sort order: what a `listing-media-update` compares and swaps on (`?` is the listing id).
+ */
+export const CURRENT_MEDIA_JSON = `(SELECT json_group_array(json_array(kind,url,media_key)) FROM (SELECT kind,url,media_key FROM listing_media WHERE listing_id=? AND kind IN ('logo','image') ORDER BY kind,sort_order))`
+
+/** The JSON a listing's `expected` rows must equal (`CURRENT_MEDIA_JSON`). */
+export function expectedMediaJson(rows: ExpectedMediaRow[]): string {
+  return JSON.stringify(rows.map(row => [row.kind, row.url, row.key ?? null]))
+}
+/**
+ * The base a manifest applies at: its own, or for a row-level manifest the live publication state
+ * the publisher read (`live`), which it must supply.
+ */
+export function publicationBase(
+  manifest: PublicationManifest,
+  live?: PublicationBase
+): PublicationBase {
+  if (manifest.concurrency === 'rows') {
+    if (!live || !live.checksum || !Number.isSafeInteger(live.version) || live.version < 0) {
+      throw new Error('A row-level manifest is planned against the live publication state.')
+    }
+    return live
+  }
+  return {
+    checksum: manifest.provenance.beforeChecksum ?? '',
+    version: manifest.basePublicationVersion ?? -1
+  }
+}
 export function buildPublicationPlan(
   manifest: PublicationManifest,
   source: string,
-  now: string
+  now: string,
+  live?: PublicationBase
 ): PublicationPlan {
+  const base = publicationBase(manifest, live)
   const inputChecksum = hash(source)
-  const afterChecksum = hash(`${manifest.provenance.beforeChecksum}\0${inputChecksum}`)
+  const afterChecksum = hash(`${base.checksum}\0${inputChecksum}`)
   const routes = new Set<string>()
   const addCategories = (values: string[]) =>
     values.forEach(value => routes.add(categoryRoute(value)))
@@ -428,19 +583,19 @@ export function buildPublicationPlan(
     statement('CREATE TEMP TABLE publication_guard (valid INTEGER NOT NULL CHECK (valid=1))'),
     statement(
       'INSERT INTO publication_guard SELECT CASE WHEN COUNT(*)=1 AND MAX(version)=? AND MAX(checksum)=? THEN 1 ELSE 0 END FROM publication_state WHERE id=1',
-      manifest.basePublicationVersion,
-      manifest.provenance.beforeChecksum
+      base.version,
+      base.checksum
     ),
     statement(
       "INSERT INTO publication_runs (id,manifest_id,base_version,input_checksum,outcome,started_at,actor,workflow,before_checksum,after_checksum) VALUES (?,?,?,?,'started',?,?,?,?,?) ON CONFLICT(manifest_id) DO UPDATE SET base_version=excluded.base_version,input_checksum=excluded.input_checksum,outcome='started',error=NULL,started_at=excluded.started_at,completed_at=NULL,actor=excluded.actor,workflow=excluded.workflow,before_checksum=excluded.before_checksum,after_checksum=excluded.after_checksum WHERE publication_runs.outcome='failed'",
       `publish_${hash(manifest.id).slice(0, 24)}`,
       manifest.id,
-      manifest.basePublicationVersion,
+      base.version,
       inputChecksum,
       now,
       manifest.provenance.actor,
       manifest.provenance.workflow,
-      manifest.provenance.beforeChecksum,
+      base.checksum,
       afterChecksum
     )
   ]
@@ -565,6 +720,69 @@ export function buildPublicationPlan(
       )
       routes.add(listingRoute(op.slug))
     }
+    if (op.action === 'listing-categories-add') {
+      statements.push(
+        statement(
+          `INSERT INTO publication_guard SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND (SELECT json_group_array(slug) FROM (SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? ORDER BY lc.sort_order, c.slug))=? THEN 1 ELSE 0 END`,
+          op.id,
+          op.slug,
+          op.id,
+          JSON.stringify(op.expected)
+        ),
+        ...op.add.flatMap(categorySlugToAdd => [
+          statement(
+            'INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) SELECT ?,id,(SELECT COALESCE(MAX(sort_order),-1)+1 FROM listing_categories WHERE listing_id=?),0 FROM categories WHERE slug=? AND is_active=1',
+            op.id,
+            op.id,
+            categorySlugToAdd
+          ),
+          statement(
+            'INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'
+          )
+        ])
+      )
+      routes.add(listingRoute(op.slug))
+      addCategories([...op.expected, ...op.add])
+    }
+    if (op.action === 'listing-media-update') {
+      const expected = expectedMediaJson(op.expected)
+      statements.push(
+        statement(
+          `INSERT INTO publication_guard SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND ${CURRENT_MEDIA_JSON}=? THEN 1 ELSE 0 END`,
+          op.id,
+          op.slug,
+          op.id,
+          expected
+        ),
+        statement(
+          "DELETE FROM listing_media WHERE listing_id=? AND kind IN ('logo','image')",
+          op.id
+        ),
+        statement(
+          "DELETE FROM media_ingestions WHERE listing_id=? AND kind IN ('logo','image')",
+          op.id
+        ),
+        ...[
+          ...(op.media.logo ? [['logo', op.media.logo, 0] as const] : []),
+          ...(op.media.images ?? []).map((image, order) => ['image', image, order] as const)
+        ].map(([kind, image, order]) =>
+          statement(
+            'INSERT INTO listing_media (listing_id,kind,url,sort_order,media_key,sha256,content_type,bytes,width,height) VALUES (?,?,?,?,?,?,?,?,?,?)',
+            op.id,
+            kind,
+            image.source,
+            order,
+            image.key,
+            image.sha256,
+            image.contentType,
+            image.bytes,
+            image.width,
+            image.height
+          )
+        )
+      )
+      routes.add(listingRoute(op.slug))
+    }
     if (op.action === 'listing-slug-change') {
       statements.push(
         membershipGuard(op.id, op.categories),
@@ -607,26 +825,26 @@ export function buildPublicationPlan(
   statements.push(
     statement(
       'UPDATE publication_state SET version=?,manifest_id=?,checksum=?,published_at=? WHERE id=1 AND version=? AND checksum=?',
-      manifest.basePublicationVersion + 1,
+      base.version + 1,
       manifest.id,
       afterChecksum,
       now,
-      manifest.basePublicationVersion,
-      manifest.provenance.beforeChecksum
+      base.version,
+      base.checksum
     ),
     statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
     statement(
       "UPDATE publication_runs SET published_version=?,affected_records=?,affected_routes=?,outcome='succeeded',completed_at=? WHERE manifest_id=? AND before_checksum=? AND after_checksum=?",
-      manifest.basePublicationVersion + 1,
+      base.version + 1,
       manifest.operations.length,
       affectedRoutes,
       now,
       manifest.id,
-      manifest.provenance.beforeChecksum,
+      base.checksum,
       afterChecksum
     )
   )
-  return { affectedRoutes, afterChecksum, inputChecksum, manifest, statements }
+  return { affectedRoutes, afterChecksum, base, inputChecksum, manifest, statements }
 }
 export async function executePublicationPlan(
   database: PublicationDatabase,

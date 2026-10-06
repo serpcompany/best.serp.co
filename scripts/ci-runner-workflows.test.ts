@@ -42,8 +42,11 @@ const credentialedWorkflows = [
   'deploy-production.yml',
   'deploy-staging.yml',
   'notify-d1-submissions.yml',
+  'publish-d1-staging.yml',
   'publish-d1.yml',
-  'submit-gsc-sitemaps.yml'
+  'submit-gsc-sitemaps.yml',
+  'upload-media-staging.yml',
+  'upload-media.yml'
 ]
 
 type Context = Record<string, unknown>

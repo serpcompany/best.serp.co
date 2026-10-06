@@ -11,6 +11,7 @@ import {
 } from './media-ingest'
 import {
   type HostedMedia,
+  isPendingMediaKey,
   listingKeyForPendingKey,
   MEDIA_KINDS,
   type MediaKind,
@@ -283,6 +284,43 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
     return { code: failure.code, status: pending ? 'pending' : 'failed' }
   }
 
+  /** The pending key a submission's or revision's slot holds now, if any. */
+  async function pendingSlotKey(
+    owner: PendingMediaOwner,
+    slot: { kind: MediaKind; sortOrder: number }
+  ): Promise<string | null> {
+    const revision = 'revisionId' in owner
+    const [row] = await all<{ media_key: string | null }>({
+      sql: `SELECT media_key FROM media_ingestions
+        WHERE ${revision ? 'revision_id' : 'submission_id'}=? AND kind=? AND sort_order=?`,
+      params: [revision ? owner.revisionId : owner.submissionId, slot.kind, slot.sortOrder]
+    })
+    return row?.media_key ?? null
+  }
+
+  /**
+   * Deletes a pending object its slot no longer names (#96 review round 5, S1): a submission's
+   * or revision's logo or image replaced before review was never reviewed, so it leaves the
+   * media host once the new row is written. Kept while any slot still names it or a listing
+   * slot waits to copy it (the same bytes hosted again have the same key). A failure is logged
+   * and never fails the save; the lifecycle rule catches what is left.
+   */
+  async function releaseSuperseded(previous: string | null, current: string | null) {
+    if (!previous || previous === current || !isPendingMediaKey(previous)) return
+    try {
+      const [used] = await all<{ used: number }>({
+        sql: `SELECT EXISTS (SELECT 1 FROM media_ingestions WHERE media_key=?
+            OR (copy_from_key=? AND status='pending')) AS used`,
+        params: [previous, previous]
+      })
+      if (used?.used) return
+      await bucket.delete?.(previous)
+      observe({ event: 'media_superseded_deleted' })
+    } catch {
+      observe({ event: 'media_superseded_delete_error' })
+    }
+  }
+
   /**
    * Hosts a submission's or a revision's image under its own pending prefix, never a live
    * listing's path (#95 review S1, #96 round 4), or records why it could not.
@@ -297,6 +335,7 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
       params: [revision ? owner.revisionId : owner.submissionId]
     })
     if (!found) throw new Error(revision ? 'Revision not found.' : 'Submission not found.')
+    const previous = await pendingSlotKey(owner, slot)
     const result = await ingest({ kind: slot.kind, sourceUrl: slot.sourceUrl, ...owner })
     observe({
       event: 'media_ingest',
@@ -304,7 +343,11 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
       outcome: result.ok ? 'hosted' : result.code,
       target: revision ? 'revision' : 'submission'
     })
-    if (!result.ok) return recordFailure(owner, slot, result, 1)
+    if (!result.ok) {
+      const failed = await recordFailure(owner, slot, result, 1)
+      await releaseSuperseded(previous, null)
+      return failed
+    }
     await run(
       buildRecordPendingMediaPlans({
         kind: slot.kind,
@@ -314,6 +357,7 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
         sortOrder: slot.sortOrder
       })
     )
+    await releaseSuperseded(previous, result.media.key)
     return { key: result.media.key, status: 'hosted' }
   }
 
@@ -508,12 +552,14 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
       if (!revision) throw new Error('Revision not found.')
       // The listing already hosts this source: the review shows that copy, and no other.
       if (revision.current_key) {
+        const previous = await pendingSlotKey({ revisionId }, slot)
         await run([
           {
             sql: `DELETE FROM media_ingestions WHERE revision_id=? AND kind=? AND sort_order=?`,
             params: [revisionId, slot.kind, slot.sortOrder]
           }
         ])
+        await releaseSuperseded(previous, null)
         return { key: revision.current_key, status: 'hosted' }
       }
       return hostPending({ revisionId }, slot)

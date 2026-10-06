@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeEntities, iconCandidates, parseSiteMetadata } from './site-metadata'
+import { decodeEntities, iconCandidates, metaRefreshUrl, parseSiteMetadata } from './site-metadata'
 
 const page = 'https://www.example.com/en/'
 const html = `<!doctype html><html><head>
@@ -81,5 +81,20 @@ describe('iconCandidates', () => {
       'https://www.example.com/apple-touch-icon.png',
       'https://www.example.com/favicon.ico'
     ])
+  })
+})
+
+describe('metaRefreshUrl', () => {
+  it('follows a shortener’s meta refresh to the product page, public URLs only', () => {
+    const page = (content: string) =>
+      `<html><head><meta http-equiv="refresh" content="${content}"><title>x</title></head></html>`
+    expect(metaRefreshUrl(page('0; url=https://www.avoma.com/'), 'https://serp.ly/avoma')).toBe(
+      'https://www.avoma.com/'
+    )
+    expect(metaRefreshUrl(page("0;URL='/landing'"), 'https://serp.ly/x')).toBe(
+      'https://serp.ly/landing'
+    )
+    expect(metaRefreshUrl(page('0; url=http://127.0.0.1/'), 'https://serp.ly/x')).toBeNull()
+    expect(metaRefreshUrl('<head><title>none</title></head>', 'https://serp.ly/x')).toBeNull()
   })
 })
