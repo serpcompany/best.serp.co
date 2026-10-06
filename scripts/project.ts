@@ -12,13 +12,18 @@ export const project = {
     name: 'best-serp-co-v1',
     parityReportPath: 'd1/artifacts/best-serp-co-v1-parity.yaml'
   },
-  /** Typed confirmations the protected production workflows require. */
+  /** Typed confirmations the protected workflows require. */
   confirmation: {
     bootstrap: 'bootstrap-best.serp.co-production',
     deploy: 'deploy-best.serp.co-production',
     /** Owner-approved Worker hotfix from main that skips the staging check; see RELEASE_GUARDS. */
     hotfix: 'hotfix-best.serp.co-production',
+    /** Listing media uploads from a reviewed plan (#95), staging first, then production. */
+    mediaUpload: 'upload-media-best.serp.co-production',
+    mediaUploadStaging: 'upload-media-best.serp.co-staging',
     publish: 'publish-best.serp.co-production',
+    /** A reviewed manifest applied to staging first (#95): every catalog change is checked there. */
+    publishStaging: 'publish-best.serp.co-staging',
     submission: 'approve-best.serp.co-submission-production'
   },
   domain: 'best.serp.co',

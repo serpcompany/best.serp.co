@@ -102,10 +102,17 @@ const productionDispatchWorkflows = [
   'deploy-production.yml',
   'publish-d1.yml'
 ]
+/** Media uploads (#95) guard themselves in scripts/media-upload.ts, not cloudflare-release.ts. */
+const mediaUploadWorkflows = {
+  'upload-media-staging.yml': 'staging',
+  'upload-media.yml': 'production'
+} as const
 const newWorkflows = [
   ...productionDispatchWorkflows,
   'deploy-staging.yml',
-  'notify-d1-submissions.yml'
+  'notify-d1-submissions.yml',
+  'publish-d1-staging.yml',
+  ...Object.keys(mediaUploadWorkflows)
 ]
 
 const productionGroup = { group: 'deploy-best-serp-co-production', 'cancel-in-progress': false }
@@ -385,7 +392,10 @@ describe('recreated D1 operation workflows', () => {
     const guards: Array<[string, string]> = [
       ['scripts/d1-submission-approver.ts', 'approve-d1-submission.yml'],
       ['scripts/d1-submission-notifier.ts', 'notify-d1-submissions.yml'],
-      ['scripts/d1-remote-publisher.ts', 'publish-d1.yml']
+      ['scripts/d1-remote-publisher.ts', 'publish-d1.yml'],
+      ['scripts/d1-remote-publisher.ts', 'publish-d1-staging.yml'],
+      ['scripts/media-upload.ts', 'upload-media.yml'],
+      ['scripts/media-upload.ts', 'upload-media-staging.yml']
     ]
     for (const [script, workflow] of guards) {
       expect(readFileSync(resolve(script), 'utf8')).toContain(`/.github/workflows/${workflow}@`)
@@ -1388,6 +1398,92 @@ describe('D1 data stays in Cloudflare', () => {
   })
 })
 
+describe('staging catalog publication and media uploads (#95)', () => {
+  /** The unprivileged checks every dispatch-only data workflow runs before its environment. */
+  function expectAuthorizedDispatch(
+    file: string,
+    branch: 'main' | 'staging',
+    environment: 'production' | 'staging',
+    confirmation: string,
+    privilegedJob: string
+  ): WorkflowJob {
+    const workflow = loadWorkflow(file)
+    expect(Object.keys(workflow.on), file).toEqual(['workflow_dispatch'])
+    expect(workflow.permissions, file).toEqual({ contents: 'read' })
+    expect(Object.keys(workflow.jobs).sort(), file).toEqual(['authorize', privilegedJob].sort())
+    const authorize = workflow.jobs.authorize as WorkflowJob
+    expect(authorize.environment, file).toBeUndefined()
+    expect(JSON.stringify(authorize), file).not.toContain('secrets.')
+    const checks = runs(authorize).join('\n')
+    expect(checks, file).toContain(`"$GITHUB_REF" != "refs/heads/${branch}"`)
+    expect(checks, file).toContain(`"$CONFIRMATION" != "${confirmation}"`)
+    const job = workflow.jobs[privilegedJob] as WorkflowJob
+    expect(job.needs, file).toEqual(['authorize'])
+    expect(environmentName(job), file).toBe(environment)
+    const [gate] = job.steps ?? []
+    expect(gate?.run, file).toContain('exit 1')
+    expect(gate?.run, file).toContain('CLOUDFLARE_API_TOKEN')
+    if (environment === 'staging') expect(JSON.stringify(workflow), file).not.toMatch(/production/u)
+    return job
+  }
+
+  it('applies a reviewed manifest to staging D1 from staging only, after a staging backup', () => {
+    const job = expectAuthorizedDispatch(
+      'publish-d1-staging.yml',
+      'staging',
+      'staging',
+      project.confirmation.publishStaging,
+      'publish'
+    )
+    expect(releaseAuthorizations['publish-d1-staging.yml']).toMatchObject({
+      branch: 'staging',
+      commands: ['backup'],
+      confirmation: project.confirmation.publishStaging,
+      environment: 'staging',
+      events: ['workflow_dispatch']
+    })
+    expect(stepIndex(job, 'cloudflare-release.ts backup staging')).toBeLessThan(
+      stepIndex(job, 'db:publish:staging')
+    )
+    const publish = stepRunning(job, 'db:publish:staging')
+    expect(publish.run).toBe('pnpm db:publish:staging -- "$MANIFEST_PATH"')
+    expect(publish.env).toMatchObject({
+      CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
+      CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN'),
+      CLOUDFLARE_D1_DATABASE_ID: project.remote.staging.databaseId,
+      D1_PUBLICATION_CONFIRM: expression('inputs.confirmation')
+    })
+    expect(packageScripts['db:publish:staging']).toBe(
+      'pnpm tsx scripts/d1-remote-publisher.ts --staging'
+    )
+  })
+
+  it('uploads a reviewed media plan to each environment from its own branch', () => {
+    for (const [file, environment] of Object.entries(mediaUploadWorkflows)) {
+      const job = expectAuthorizedDispatch(
+        file,
+        environment === 'staging' ? 'staging' : 'main',
+        environment,
+        environment === 'staging'
+          ? project.confirmation.mediaUploadStaging
+          : project.confirmation.mediaUpload,
+        'upload'
+      )
+      const upload = stepRunning(job, `media:upload:${environment}`)
+      expect(upload.run, file).toBe(`pnpm media:upload:${environment} -- "$PLAN_PATH"`)
+      for (const name of requiredScriptEnvironment('scripts/media-upload.ts')) {
+        expect(Object.keys(upload.env ?? {}), `${file} ${name}`).toContain(name)
+      }
+      expect(upload.env?.MEDIA_UPLOAD_CONFIRM, file).toBe(expression('inputs.confirmation'))
+      expect(packageScripts[`media:upload:${environment}`], file).toBe(
+        `pnpm tsx scripts/media-upload.ts --target=${environment}`
+      )
+      // Uploads change objects, not D1: no release command and no D1 identity.
+      expect(JSON.stringify(job), file).not.toMatch(/cloudflare-release|D1_DATABASE_ID/u)
+    }
+  })
+})
+
 describe('protected deployment boundaries', () => {
   it('gates every production job behind an unprivileged ref and confirmation check', () => {
     for (const file of productionDispatchWorkflows) {
@@ -1429,7 +1525,14 @@ describe('protected deployment boundaries', () => {
       'notify-d1-submissions.yml': {
         notify: { group: 'best-serp-co-production-notifier', 'cancel-in-progress': false }
       },
-      'publish-d1.yml': { publish: productionGroup }
+      'publish-d1.yml': { publish: productionGroup },
+      'publish-d1-staging.yml': {
+        publish: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
+      },
+      'upload-media.yml': { upload: productionGroup },
+      'upload-media-staging.yml': {
+        upload: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
+      }
     }
     expect(Object.keys(expected).sort()).toEqual([...newWorkflows].sort())
     for (const file of newWorkflows) {

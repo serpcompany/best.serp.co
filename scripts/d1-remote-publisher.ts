@@ -23,17 +23,47 @@ function requireEnvironment(env: NodeJS.ProcessEnv, name: string): string {
   return value
 }
 
-function validatePublicationContext(manifestPath: string, env: NodeJS.ProcessEnv): string {
+export type PublicationTarget = 'production' | 'staging'
+
+/**
+ * Where each target may publish from (#95): staging from `staging` through
+ * `publish-d1-staging.yml`, production from `main` through `publish-d1.yml`, each with its own
+ * typed confirmation, so every reviewed manifest is applied to staging before production.
+ */
+export const publicationTargets: Readonly<
+  Record<
+    PublicationTarget,
+    { branch: string; confirmation: string; workflow: string; workflowRef: string }
+  >
+> = {
+  production: {
+    branch: 'main',
+    confirmation: project.confirmation.publish,
+    workflow: 'publish-d1.yml',
+    workflowRef: '/.github/workflows/publish-d1.yml@'
+  },
+  staging: {
+    branch: 'staging',
+    confirmation: project.confirmation.publishStaging,
+    workflow: 'publish-d1-staging.yml',
+    workflowRef: '/.github/workflows/publish-d1-staging.yml@'
+  }
+}
+
+function validatePublicationContext(
+  manifestPath: string,
+  env: NodeJS.ProcessEnv,
+  target: PublicationTarget
+): string {
+  const { branch, confirmation, workflow, workflowRef } = publicationTargets[target]
   if (env.CI !== 'true' || env.GITHUB_ACTIONS !== 'true')
     throw new Error('Remote publication requires GitHub Actions.')
-  if (!env.GITHUB_WORKFLOW_REF?.includes('/.github/workflows/publish-d1.yml@'))
-    throw new Error('Remote publication requires publish-d1.yml.')
-  if (env.GITHUB_REF !== 'refs/heads/main' || !env.GITHUB_SHA)
-    throw new Error('Remote publication requires reviewed main.')
-  if (env.D1_PUBLICATION_CONFIRM !== project.confirmation.publish)
-    throw new Error(
-      `Explicit production publication confirmation ${project.confirmation.publish} is required.`
-    )
+  if (!env.GITHUB_WORKFLOW_REF?.includes(workflowRef))
+    throw new Error(`Remote publication to ${target} requires ${workflow}.`)
+  if (env.GITHUB_REF !== `refs/heads/${branch}` || !env.GITHUB_SHA)
+    throw new Error(`Remote publication to ${target} requires reviewed ${branch}.`)
+  if (env.D1_PUBLICATION_CONFIRM !== confirmation)
+    throw new Error(`Explicit ${target} publication confirmation ${confirmation} is required.`)
   const resolvedPath = resolve(manifestPath)
   const publicationsDirectory = resolve('d1/publications')
   const pathWithinPublications = relative(publicationsDirectory, resolvedPath)
@@ -88,12 +118,13 @@ async function queryD1(
 export async function publishRemoteManifest(
   manifestPath: string,
   env: NodeJS.ProcessEnv = process.env,
-  fetchImplementation: FetchImplementation = fetch
+  fetchImplementation: FetchImplementation = fetch,
+  target: PublicationTarget = 'production'
 ): Promise<{ afterChecksum: string; idempotent: boolean }> {
   const unresolvedPath = resolve(manifestPath)
   const source = readFileSync(unresolvedPath, 'utf8')
   const manifest = parseManifest(source)
-  const resolvedPath = validatePublicationContext(manifestPath, env)
+  const resolvedPath = validatePublicationContext(manifestPath, env, target)
   if (resolvedPath !== unresolvedPath)
     throw new Error('Manifest path resolution changed unexpectedly.')
   const plan = buildPublicationPlan(manifest, source, new Date().toISOString())
@@ -153,10 +184,14 @@ export async function publishRemoteManifest(
 }
 
 async function main(): Promise<void> {
-  const [manifestPath] = process.argv.slice(2).filter(value => value !== '--')
+  const args = process.argv.slice(2).filter(value => value !== '--')
+  const target: PublicationTarget = args[0] === '--staging' ? 'staging' : 'production'
+  const [manifestPath] = args.filter(value => value !== '--staging')
   if (!manifestPath)
-    throw new Error('Usage: pnpm db:publish:production -- d1/publications/<manifest>.yaml')
-  console.log(JSON.stringify(await publishRemoteManifest(manifestPath)))
+    throw new Error(
+      'Usage: pnpm db:publish:<staging|production> -- d1/publications/<manifest>.yaml'
+    )
+  console.log(JSON.stringify(await publishRemoteManifest(manifestPath, process.env, fetch, target)))
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

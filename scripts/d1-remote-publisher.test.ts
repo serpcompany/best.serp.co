@@ -74,6 +74,47 @@ describe('remote D1 publisher', () => {
     expect(fetchImplementation).not.toHaveBeenCalled()
   })
 
+  it('publishes to staging only from staging, through its own workflow and confirmation (#95)', async () => {
+    const staging = {
+      ...environment,
+      D1_PUBLICATION_CONFIRM: 'publish-best.serp.co-staging',
+      GITHUB_REF: 'refs/heads/staging',
+      GITHUB_WORKFLOW_REF: 'owner/repo/.github/workflows/publish-d1-staging.yml@refs/heads/staging'
+    }
+    const refused = vi.fn()
+    for (const [overrides, message] of [
+      [
+        { D1_PUBLICATION_CONFIRM: 'publish-best.serp.co-production' },
+        'publish-best.serp.co-staging'
+      ],
+      [{ GITHUB_REF: 'refs/heads/main' }, 'reviewed staging'],
+      [
+        { GITHUB_WORKFLOW_REF: 'owner/repo/.github/workflows/publish-d1.yml@refs/heads/staging' },
+        'publish-d1-staging.yml'
+      ]
+    ] as const) {
+      await expect(
+        publishRemoteManifest(manifestPath, { ...staging, ...overrides }, refused, 'staging')
+      ).rejects.toThrow(message)
+    }
+    // A staging run can never publish to production, and the other way round.
+    await expect(publishRemoteManifest(manifestPath, staging, refused)).rejects.toThrow(
+      'publish-d1.yml'
+    )
+    await expect(
+      publishRemoteManifest(manifestPath, environment, refused, 'staging')
+    ).rejects.toThrow('publish-d1-staging.yml')
+    expect(refused).not.toHaveBeenCalled()
+    const fetchImplementation = vi
+      .fn()
+      .mockResolvedValueOnce(response([{ success: true, results: [] }]))
+      .mockResolvedValueOnce(response([{ success: true, results: [] }]))
+    await expect(
+      publishRemoteManifest(manifestPath, staging, fetchImplementation, 'staging')
+    ).resolves.toMatchObject({ idempotent: false })
+    expect(fetchImplementation).toHaveBeenCalledTimes(2)
+  })
+
   it('requires the explicit D1 database identity', async () => {
     const { CLOUDFLARE_D1_DATABASE_ID: _databaseId, ...withoutDatabase } = environment
     await expect(publishRemoteManifest(manifestPath, withoutDatabase, vi.fn())).rejects.toThrow(
