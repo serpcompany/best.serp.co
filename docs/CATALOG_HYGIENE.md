@@ -97,11 +97,21 @@ pnpm catalog:faqs -- manifest      # write the manifest from the reviewed import
   reviewed import and checks every description byte by byte.
 - **Order:** it is based on the state #100's manifest leaves (publication version 2). Publish
   #100's, then this one, then #98's media manifests (row-level, any version). Staging first
-  (#97's staging path), then production after promotion. If an environment has moved on,
-  regenerate with `--base-version` and `--base-checksum` (and a new `--manifest-id`); the row
-  guards hold on either environment.
+  (#97's staging path), then production after promotion.
+- **An environment that has moved on** (staging has: approvals and badge-program unpublishes
+  advance its version). Read its state with the read-only
+  `pnpm tsx scripts/cloudflare-release.ts check-database <staging|production>` (its
+  `publication.version` and `publication.checksum`; it needs the Cloudflare credentials, so the
+  owner or a workflow runs it), then regenerate under a new id:
+  `pnpm catalog:faqs -- manifest --base-version N --base-checksum <sha256> --manifest-id
+  2026-10-07-listing-faqs-staging`. The id names the file (`d1/publications/<id>.yaml`), so the
+  reviewed version-2 manifest stays, and the header records the base. A listing whose
+  description changed there (an approved revision, an admin edit) would make the publisher
+  refuse the whole batch; leave it out with `--skip <slug>` (repeatable or comma-separated) and
+  fix it by hand, as its FAQs already show in the section.
 - **Until it is published**, the FAQs section leaves out an FAQ whose exact `### <question>`
-  heading line the description still holds (`faqsToShow`), so imported FAQs never show twice.
+  heading line the description still holds after its last `## FAQ` line (`faqsToShow`), so
+  imported FAQs never show twice.
   It never matches text in prose, and is a no-op once the manifest is published; remove it
   then.
 

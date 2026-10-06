@@ -13,14 +13,20 @@ export interface WebsiteFaqsSectionProps {
 
 /**
  * The FAQs the section shows: all of them, except an FAQ whose exact heading line
- * (`### <question>`) the long description still holds. That is the one-time import's copy of the
+ * (`### <question>`) the long description still holds after its last `## FAQ` line. That is the one-time import's copy of the
  * FAQs (335 listings, every FAQ under such a heading), which the #105 manifest
  * (`d1/publications/2026-10-06-listing-faqs.yaml`) removes from the descriptions. Until it is
  * published on an environment, this keeps those FAQs from showing twice. It matches whole
- * heading lines only, never text inside prose, and does nothing once the manifest is published.
+ * heading lines in that closing block only, never prose or other headings, and does nothing once
+ * the manifest is published.
  */
 export function faqsToShow(faqs: readonly WebsiteFaq[] | undefined, content: string | undefined) {
-  const headings = new Set((content ?? '').split('\n').filter(line => line.startsWith('### ')))
+  // Only the import's block counts: the headings after the description's last `## FAQ` line.
+  const lines = (content ?? '').split('\n')
+  const start = lines.lastIndexOf('## FAQ')
+  const headings = new Set(
+    start < 0 ? [] : lines.slice(start + 1).filter(line => line.startsWith('### '))
+  )
   // The import escaped MDX braces in its headings (`\{`), so both spellings count.
   const escaped = (text: string) => text.replaceAll('{', '\\{').replaceAll('}', '\\}')
   return (faqs ?? []).filter(

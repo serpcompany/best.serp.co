@@ -12,6 +12,7 @@ import {
   FAQ_MANIFEST_PATH,
   type FaqListing,
   faqBlockSuffix,
+  manifestPath,
   PREVIOUS_MANIFEST_PATH,
   reviewedImportFaqListings,
   stateAfter
@@ -149,5 +150,44 @@ describe('the committed FAQ manifest', () => {
         .get()
     ).toEqual({ count: 335 })
     database.close()
+  })
+})
+
+describe('regenerating for an environment that has moved on', () => {
+  const listings: FaqListing[] = [
+    { ...listing(`Intro.\n\n${block}`), id: 'lst_aaaaaaaaaa', slug: 'a.example' },
+    { ...listing(`Other.\n\n${block}`), id: 'lst_bbbbbbbbbb', slug: 'b.example' }
+  ]
+  const options = {
+    baseChecksum: 'f'.repeat(64),
+    baseVersion: 9,
+    id: '2026-10-07-listing-faqs-staging'
+  }
+
+  it('writes each manifest id to its own file, keeping the reviewed one', () => {
+    expect(manifestPath(options.id)).toBe('d1/publications/2026-10-07-listing-faqs-staging.yaml')
+    expect(manifestPath(FAQ_MANIFEST_ID)).toBe(FAQ_MANIFEST_PATH)
+  })
+
+  it('states the base it was given, and leaves out skipped listings', () => {
+    const source = buildFaqMoveManifest(listings, {
+      ...options,
+      baseOverride: true,
+      skip: ['b.example']
+    })
+    const manifest = parseManifest(source)
+    expect(manifest).toMatchObject({ basePublicationVersion: 9, id: options.id })
+    expect(
+      manifest.operations.map(operation => ('slug' in operation ? operation.slug : ''))
+    ).toEqual(['a.example'])
+    expect(source).toContain('# publication version 9 (checksum ffffffffffff…)')
+    expect(source).toContain('# Left out (their description drifted there): b.example.')
+    expect(source).not.toContain("#100's\n# manifest")
+  })
+
+  it('refuses to skip a listing it doesn’t know', () => {
+    expect(() => buildFaqMoveManifest(listings, { ...options, skip: ['c.example'] })).toThrow(
+      /names no listing/u
+    )
   })
 })

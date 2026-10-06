@@ -46,6 +46,11 @@ describe('listing FAQs (#105)', () => {
     // The import's heading hides its copy; the same question in prose never hides an FAQ.
     expect(faqsToShow(faqs, content)).toEqual([faqs[1]])
     expect(faqsToShow(faqs, '#### How do I download a video?')).toEqual(faqs)
+    // A heading in the body, outside the closing FAQ block, never hides an FAQ.
+    expect(faqsToShow(faqs, 'Intro\n\n### Is it free?\n\nYes.')).toEqual(faqs)
+    expect(
+      faqsToShow(faqs, '### Is it free?\n\nYes.\n\n## FAQ\n\n### How do I download a video?')
+    ).toEqual([faqs[1]])
     expect(faqsToShow(faqs, '### How do I download a video? (2026)')).toEqual(faqs)
     expect(faqsToShow(faqs, undefined)).toEqual(faqs)
     expect(faqsToShow(undefined, content)).toEqual([])
