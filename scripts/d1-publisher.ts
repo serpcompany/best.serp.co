@@ -158,6 +158,22 @@ const operation = z.discriminatedUnion('action', [
       expected: z.object({ website: z.string().url() }).strict().optional()
     })
     .strict(),
+  /**
+   * Removes the end of a listing's long description, keeping every other character (#105: the
+   * import's FAQ blocks, which the FAQs section now shows). Row-level guarded: the description
+   * must still be `expected.contentLength` characters (SQLite characters, code points) and end
+   * with exactly `suffix`, so a description edited since is refused, never cut elsewhere.
+   */
+  z
+    .object({
+      action: z.literal('listing-content-remove-suffix'),
+      id: listingId,
+      slug: existingSlug,
+      reason: z.string().trim().min(1).max(200),
+      expected: z.object({ contentLength: z.number().int().positive() }).strict(),
+      suffix: z.string().min(1)
+    })
+    .strict(),
   z
     .object({
       action: z.literal('listing-slug-change'),
@@ -222,11 +238,20 @@ const provenance = z
  * - `publication` (the default): it applies only at `basePublicationVersion` and
  *   `provenance.beforeChecksum`, the catalog it was written against.
  * - `rows`: every operation carries its own row-level compare-and-swap
- *   (`listing-media-update`'s `expected`), so one manifest fits staging and production whatever
+ *   (`rowLevelActions`), so one manifest fits staging and production whatever
  *   else each environment published. It names no base; the publisher plans it against the
  *   publication state it reads at publish time and still advances the version.
  */
 export const manifestConcurrency = ['publication', 'rows'] as const
+/**
+ * Operations that carry their own row-level compare-and-swap, so a `rows` manifest may hold them:
+ * media rows (`expected`), categories (`expected`), and a description's length and ending (#105).
+ */
+const rowLevelActions = new Set<string>([
+  'listing-media-update',
+  'listing-categories-add',
+  'listing-content-remove-suffix'
+])
 export const manifestSchema = z
   .object({
     version: z.literal(1),
@@ -251,11 +276,11 @@ export const manifestSchema = z
         })
       }
       value.operations.forEach((op, index) => {
-        if (op.action !== 'listing-media-update' && op.action !== 'listing-categories-add') {
+        if (!rowLevelActions.has(op.action)) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update and listing-categories-add operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add, and listing-content-remove-suffix operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -271,6 +296,15 @@ export const manifestSchema = z
       })
     }
     value.operations.forEach((op, index) => {
+      if (
+        op.action === 'listing-content-remove-suffix' &&
+        [...op.suffix].length >= op.expected.contentLength
+      )
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'The suffix must be shorter than the description.',
+          path: ['operations', index, 'suffix']
+        })
       if (op.action === 'listing-categories-add') {
         for (const slug of op.add) {
           if (op.expected.includes(slug)) {
@@ -663,6 +697,37 @@ export function buildPublicationPlan(
       )
       routes.add(listingRoute(op.slug))
       addCategories(op.categories)
+    }
+    if (op.action === 'listing-content-remove-suffix') {
+      const keep = op.expected.contentLength - [...op.suffix].length
+      statements.push(
+        // As in the admin panel (#64): never while the listing's own submission is in review.
+        statement(
+          `INSERT INTO publication_guard SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN 0 ELSE 1 END`,
+          op.id
+        ),
+        // A new checksum, so a revision or admin edit read before this change is refused as stale.
+        statement(
+          "UPDATE listings SET content=substr(content,1,?),checksum=?,updated_at=? WHERE id=? AND slug=? AND status='approved' AND length(content)=? AND substr(content,?)=?",
+          keep,
+          hash(`${manifest.id}\0${op.id}\0content`),
+          now,
+          op.id,
+          op.slug,
+          op.expected.contentLength,
+          keep + 1,
+          op.suffix
+        ),
+        statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
+        // The admin panel's activity record for an edit (#64).
+        statement(
+          "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
+          op.id,
+          JSON.stringify({ fields: ['content'], manifest: manifest.id, reason: op.reason }),
+          manifest.provenance.actor
+        )
+      )
+      routes.add(listingRoute(op.slug))
     }
     if (op.action === 'listing-categories-add') {
       statements.push(

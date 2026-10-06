@@ -22,6 +22,7 @@
     "agent:evidence": "pnpm tsx scripts/harness/agent-runtime.ts evidence",
     "agent:ui:capture": "pnpm tsx scripts/harness/ui-capture.ts",
     "catalog:domains": "pnpm tsx scripts/listing-domain-check.ts",
+    "catalog:faqs": "pnpm tsx scripts/listing-faq-move.ts",
     "worktree:new": "pnpm tsx scripts/harness/worktree.ts new",
     "worktree:init": "pnpm tsx scripts/harness/worktree.ts init",
     "worktree:doctor": "pnpm tsx scripts/harness/worktree.ts doctor",

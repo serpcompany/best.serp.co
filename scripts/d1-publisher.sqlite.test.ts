@@ -808,3 +808,141 @@ describe('listing-unpublish (the admin panel’s unpublished state, #64 and #100
     expect(() => unpublish({ expected: { website: 'not a url' } })).toThrow()
   })
 })
+
+describe('listing-content-remove-suffix (#105: imported FAQ blocks move to the FAQs section)', () => {
+  const body = 'Intro with an emoji 🚀 and more.'
+  const suffix = '\n\n## FAQ\n\n### Is it free?\n\nYes.'
+  const content = `${body}${suffix}`
+  const seeded = () => {
+    const db = database()
+    db.prepare("UPDATE listings SET content=? WHERE id='lst_sqlite_test'").run(content)
+    return db
+  }
+  const remove = (extra: Record<string, unknown> = {}) =>
+    plan({
+      operations: [
+        {
+          action: 'listing-content-remove-suffix',
+          id: 'lst_sqlite_test',
+          slug: 'old-slug',
+          reason: '#105 FAQs show in the FAQs section',
+          // SQLite counts characters (code points), not UTF-16 units: the emoji is one.
+          expected: { contentLength: [...content].length },
+          suffix,
+          ...extra
+        }
+      ]
+    })
+  const row = (db: DatabaseSync) =>
+    db.prepare("SELECT content,checksum FROM listings WHERE id='lst_sqlite_test'").get() as {
+      checksum: string
+      content: string
+    }
+
+  it('removes exactly the suffix, keeps every other character, and turns over the catalog', () => {
+    const db = seeded()
+    const before = row(db)
+    const publication = remove()
+    executeInTestTransaction(db, publication)
+    const after = row(db)
+    expect(after.content).toBe(body)
+    // A new checksum: a revision or admin edit based on the old description is now stale.
+    expect(after.checksum).not.toBe(before.checksum)
+    expect(db.prepare('SELECT event_type,detail,actor FROM listing_events').all()).toEqual([
+      {
+        actor: 'test@example.com',
+        detail: JSON.stringify({
+          fields: ['content'],
+          manifest: 'sqlite-release',
+          reason: '#105 FAQs show in the FAQs section'
+        }),
+        event_type: 'edited'
+      }
+    ])
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 5
+    })
+    expect(publication.affectedRoutes.split('\n')).toContain('/products/old-slug/')
+  })
+
+  it.each([
+    [
+      'the description changed length',
+      (db: DatabaseSync) =>
+        db
+          .prepare("UPDATE listings SET content=? WHERE id='lst_sqlite_test'")
+          .run(`${body}!${suffix}`)
+    ],
+    [
+      'the description no longer ends with the block',
+      (db: DatabaseSync) =>
+        db
+          .prepare("UPDATE listings SET content=? WHERE id='lst_sqlite_test'")
+          .run(`${body}${suffix.replace('Yes.', 'No!')}`)
+    ],
+    [
+      'the listing’s own submission is in review',
+      (db: DatabaseSync) =>
+        db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,
+          category_slug,logo_url,status,plan,paid_at,listing_id,published_checksum)
+        VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l',
+          'paid_pending_review','paid','${now}','lst_sqlite_test','checksum')`)
+    ],
+    ['the slug changed', (db: DatabaseSync) => db.exec("UPDATE listings SET slug='renamed'")]
+  ])('refuses the whole batch when %s', (_name, change) => {
+    const db = seeded()
+    change(db)
+    const before = row(db)
+    expect(() => executeInTestTransaction(db, remove())).toThrow()
+    expect(row(db)).toEqual(before)
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({ count: 0 })
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 4
+    })
+  })
+
+  it('applies row-level at whatever version each environment is, still guarded by the row', () => {
+    const rows = manifestSchema.parse({
+      version: 1,
+      id: 'rows-faqs',
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations: [
+        {
+          action: 'listing-content-remove-suffix',
+          id: 'lst_sqlite_test',
+          slug: 'old-slug',
+          reason: '#105 FAQs show in the FAQs section',
+          expected: { contentLength: [...content].length },
+          suffix
+        }
+      ]
+    })
+    for (const version of [4, 17]) {
+      const db = seeded()
+      db.prepare('UPDATE publication_state SET version=?').run(version)
+      const live = { checksum: beforeChecksum, version }
+      executeInTestTransaction(db, buildPublicationPlan(rows, 'rows faqs', now, live))
+      expect(row(db).content).toBe(body)
+      expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({
+        version: version + 1
+      })
+    }
+    const edited = seeded()
+    edited
+      .prepare("UPDATE listings SET content=? WHERE id='lst_sqlite_test'")
+      .run(`${body}!${suffix}`)
+    const live = { checksum: beforeChecksum, version: 4 }
+    expect(() =>
+      executeInTestTransaction(edited, buildPublicationPlan(rows, 'rows faqs', now, live))
+    ).toThrow()
+    expect(row(edited).content).toBe(`${body}!${suffix}`)
+  })
+
+  it('refuses a suffix as long as the description, and a missing reason', () => {
+    expect(() => remove({ expected: { contentLength: [...suffix].length } })).toThrow(
+      /shorter than the description/u
+    )
+    expect(() => remove({ reason: ' ' })).toThrow()
+  })
+})

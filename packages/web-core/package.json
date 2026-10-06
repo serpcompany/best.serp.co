@@ -103,6 +103,7 @@
     "./ui/favorite-button": "./src/ui/favorite-button.tsx",
     "./ui/favicon-with-fallback": "./src/ui/favicon-with-fallback.tsx",
     "./ui/favorites-link": "./src/ui/favorites-link.tsx",
+    "./website/website-faqs-section": "./src/website/website-faqs-section.tsx",
     "./website/website-hero": "./src/website/website-hero.tsx",
     "./website/website-hero-route": "./src/website/website-hero-route.tsx",
     "./website/website-cli-section": "./src/website/website-cli-section.tsx",

@@ -29,8 +29,15 @@ export interface WebsiteMetadata {
   priority?: WebsitePriority
   media?: WebsiteMedia
   content?: string
+  /** Approved FAQs from D1 (#105), in order; absent when there are none. */
+  faqs?: WebsiteFaq[]
   resourceLinks?: WebsiteResourceLink[]
   _meta?: ContentMeta
+}
+
+export interface WebsiteFaq {
+  answer: string
+  question: string
 }
 
 export interface WebsiteRelatedCardMetadata {
