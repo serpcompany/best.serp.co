@@ -225,7 +225,8 @@ describe('page-level nofollow', () => {
     '<meta name="robots" content="noindex, nofollow">',
     '<META NAME="Robots" CONTENT="NoFollow">',
     '<meta name="googlebot" content="none">',
-    '<meta content="nofollow" name="bingbot">'
+    '<meta content="nofollow" name="googlebot">',
+    '<meta name="robots" content="noindex nofollow">'
   ])('fails a followed badge on a page with %s', meta => {
     expect(scanFeaturedBadge(`${meta}${validBadgeHtml}`, expected)).toEqual({
       code: 'page_not_followed',
@@ -238,6 +239,9 @@ describe('page-level nofollow', () => {
     for (const html of [
       '<meta name="robots" content="noindex">',
       '<meta name="description" content="nofollow">',
+      // Only the general rules and Googlebot's count.
+      '<meta name="bingbot" content="nofollow">',
+      '<meta name="otherbot" content="none">',
       '<!-- <meta name="robots" content="nofollow"> -->',
       '<template><meta name="robots" content="nofollow"></template>'
     ]) {
@@ -250,7 +254,16 @@ describe('page-level nofollow', () => {
   })
 
   it('fails on an X-Robots-Tag header that skips links', async () => {
-    for (const header of ['nofollow', 'noindex, nofollow', 'googlebot: none', 'NOFOLLOW']) {
+    for (const header of [
+      'nofollow',
+      'noindex, nofollow',
+      'googlebot: none',
+      'NOFOLLOW',
+      'max-snippet: 20, nofollow',
+      'otherbot: noindex, googlebot: nofollow',
+      'googlebot: noindex nofollow',
+      'GoogleBot: noarchive, nofollow'
+    ]) {
       const page = async () =>
         new Response(validBadgeHtml, {
           headers: { 'Content-Type': 'text/html', 'X-Robots-Tag': header },
@@ -260,6 +273,24 @@ describe('page-level nofollow', () => {
         verifyFeaturedBadge('https://example.com', expected, page),
         header
       ).resolves.toEqual({ code: 'page_not_followed', ok: false, source: 'header' })
+    }
+    // PR #84 review round 2, finding 6: a rule for another crawler does not apply.
+    for (const header of [
+      'otherbot: nofollow',
+      'bingbot: none',
+      'otherbot: noindex, nofollow',
+      'unavailable_after: 25 Jun 2030 15:00:00 PST',
+      'googlebot: noindex, otherbot: none'
+    ]) {
+      const page = async () =>
+        new Response(validBadgeHtml, {
+          headers: { 'Content-Type': 'text/html', 'X-Robots-Tag': header },
+          status: 200
+        })
+      await expect(
+        verifyFeaturedBadge('https://example.com', expected, page),
+        header
+      ).resolves.toEqual({ ok: true })
     }
     const indexOnly = async () =>
       new Response(validBadgeHtml, {

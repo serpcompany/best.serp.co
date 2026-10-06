@@ -156,9 +156,11 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    real badge `<img>` inside an `<a>` whose own `href` is `/products/<slug>/` (badges linking to
    the old `/reviews/` URL still count) and whose own `rel` has no `nofollow`, `sponsored`, or
    `ugc`, in any case or order (`link_not_followed`, which names the tokens found; owner
-   decision on #84). A page that tells crawlers to skip its links, with
-   `<meta name="robots" content="nofollow">` (or `none`, also for `googlebot` and `bingbot`) or
-   an `X-Robots-Tag: nofollow` header, fails as `page_not_followed`. One followed badge link
+   decision on #84). A page that tells search engines to skip its links fails as
+   `page_not_followed`: a `nofollow` or `none` directive in `<meta name="robots">` or
+   `<meta name="googlebot">`, or in an `X-Robots-Tag` header with no user-agent prefix or a
+   `googlebot:` one. A prefix covers the directives after it up to the next prefix, so
+   `otherbot: noindex, nofollow` (or a `bingbot` rule) does not count. One followed badge link
    anywhere on the page passes. Only static HTML is read: a badge added by JavaScript fails,
    and a badge hidden with CSS passes, since detecting it would need rendering (accepted).
    Conclusive results (`badge_missing`, `link_not_followed`, `page_not_followed`,

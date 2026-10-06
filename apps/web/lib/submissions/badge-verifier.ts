@@ -34,8 +34,20 @@ export type UnfollowedRelToken = (typeof UNFOLLOWED_REL_TOKENS)[number]
 
 /** Robots directives that stop crawlers following every link on a page. */
 const UNFOLLOWED_ROBOTS_DIRECTIVES = new Set(['nofollow', 'none'])
-/** `<meta name>` values whose robots directives major crawlers obey. */
-const ROBOTS_META_NAMES = new Set(['robots', 'googlebot', 'bingbot'])
+/**
+ * The crawlers whose robots rules count: the general rules (`<meta name="robots">`, or an
+ * `X-Robots-Tag` directive with no user-agent prefix) and Googlebot's. A rule for any other
+ * crawler (`otherbot: nofollow`) does not fail the check.
+ */
+const ROBOTS_META_NAMES = new Set(['robots', 'googlebot'])
+const ROBOTS_HEADER_AGENTS = new Set(['googlebot'])
+/** `X-Robots-Tag` directives whose own value follows a colon, so the colon is not an agent. */
+const VALUED_ROBOTS_DIRECTIVES = new Set([
+  'max-image-preview',
+  'max-snippet',
+  'max-video-preview',
+  'unavailable_after'
+])
 
 type ScanResult =
   | { ok: true }
@@ -73,12 +85,40 @@ export function unfollowedRelTokens(rel: string | null | undefined): UnfollowedR
   return UNFOLLOWED_REL_TOKENS.filter(token => tokens.includes(token))
 }
 
-/** True when a robots directive list (`noindex, nofollow`, `googlebot: none`) skips links. */
-export function robotsSkipLinks(value: string | null | undefined): boolean {
-  return (value ?? '')
+/** True when directives (`noindex, nofollow`, `noindex nofollow`, `none`) skip links. */
+function directivesSkipLinks(directives: string): boolean {
+  return directives
     .toLowerCase()
-    .split(/[\s,:]+/u)
-    .some(directive => UNFOLLOWED_ROBOTS_DIRECTIVES.has(directive))
+    .split(/[\s,]+/u)
+    .some(token => UNFOLLOWED_ROBOTS_DIRECTIVES.has(token))
+}
+
+/** True when a robots meta `content` skips links. */
+export function robotsMetaSkipsLinks(content: string | null | undefined): boolean {
+  return directivesSkipLinks(content ?? '')
+}
+
+/**
+ * True when an `X-Robots-Tag` value skips links for the crawlers that count: a `nofollow` or
+ * `none` directive with no user-agent prefix, or after a `googlebot:` prefix. A prefix applies
+ * to the directives after it (`otherbot: noindex, nofollow` applies only to otherbot), until the
+ * next prefix (a fetch joins repeated headers with commas, so a later unprefixed line reads as
+ * part of the last prefix). Directives with their own colon value (`max-snippet: 20`) are not
+ * prefixes.
+ */
+export function robotsHeaderSkipsLinks(value: string | null | undefined): boolean {
+  let agent: string | null = null
+  for (const part of (value ?? '').split(',')) {
+    let directive = part.trim()
+    const prefix = /^([a-z0-9_.-]+)\s*:\s*(.*)$/iu.exec(directive)
+    if (prefix?.[1] && !VALUED_ROBOTS_DIRECTIVES.has(prefix[1].toLowerCase())) {
+      agent = prefix[1].toLowerCase()
+      directive = prefix[2] ?? ''
+    }
+    const applies = agent === null || ROBOTS_HEADER_AGENTS.has(agent)
+    if (applies && directivesSkipLinks(directive)) return true
+  }
+  return false
 }
 
 function canonical(value: string, base: string | undefined): string {
@@ -173,7 +213,11 @@ export function scanFeaturedBadge(
       const nearestLink = element.tagName === 'a' ? element : link
       if (isHtml(element, 'meta')) {
         const name = attribute(element, 'name')?.trim().toLowerCase()
-        if (name && ROBOTS_META_NAMES.has(name) && robotsSkipLinks(attribute(element, 'content'))) {
+        if (
+          name &&
+          ROBOTS_META_NAMES.has(name) &&
+          robotsMetaSkipsLinks(attribute(element, 'content'))
+        ) {
           pageSkipsLinks = true
         }
       } else if (isHtml(element, 'img') && nearestLink) {
@@ -237,7 +281,7 @@ export async function verifyFeaturedBadge(
   } catch {
     return { ok: false, code: 'verification_service_error' }
   }
-  const headerSkipsLinks = robotsSkipLinks(page.headers.get('x-robots-tag'))
+  const headerSkipsLinks = robotsHeaderSkipsLinks(page.headers.get('x-robots-tag'))
   if (headerSkipsLinks && (result.ok || result.code === 'link_not_followed')) {
     return { code: 'page_not_followed', ok: false, source: 'header' }
   }
