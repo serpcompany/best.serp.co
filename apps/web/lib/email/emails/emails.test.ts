@@ -290,21 +290,22 @@ describe('changes requested', () => {
     expect(email.html).toContain('font-style:italic')
   })
 
-  it('until #65 and #73, asks to submit again at /submit/ and to contact us (owner decision)', () => {
+  it('until #65 and #73, asks to resubmit from the account area and to contact us (owner decisions)', () => {
     const email = renderWith('changes-requested', BEFORE)
     expect(bodyText(email)).toContain(
-      'homepage.\nUpdate your details and submit again at https://best.serp.co/submit/\n\nSubmit again: https://best.serp.co/submit/\nQuestions? Contact us at https://best.serp.co/contact/'
+      'homepage.\nUpdate your details and resubmit from your account at https://best.serp.co/account/\n\nOpen your account: https://best.serp.co/account/\nQuestions? Contact us at https://best.serp.co/contact/'
     )
-    expect(bodyText(email)).not.toMatch(/resubmit|dashboard|reply/iu)
-    expect(linksTo(email.html, 'https://best.serp.co/submit/')).toBe(true)
+    // A changes-requested submission keeps its URL key, so `/submit/` would refuse it.
+    expect(bodyText(email)).not.toMatch(/submit again|\/submit\/|dashboard|reply/iu)
+    expect(linksTo(email.html, 'https://best.serp.co/account/')).toBe(true)
     expect(email.html).toContain(
-      'Update your details and submit again at <a href="https://best.serp.co/submit/"'
+      'Update your details and resubmit from your account at <a href="https://best.serp.co/account/"'
     )
     expect(email.html).toContain('Questions? Contact us at <a href="https://best.serp.co/contact/"')
     expect(email.html).toContain(
-      'A reviewer left a note. Update your details and submit again when you’re ready.'
+      'A reviewer left a note. Update your details and resubmit from your account when you’re ready.'
     )
-    expect(email.html).not.toMatch(/resubmit|account\/submissions/iu)
+    expect(email.html).not.toMatch(/\/submit\/|account\/submissions/iu)
   })
 
   it('with the account dashboard and conversations, asks to edit, resubmit, and reply there', () => {
@@ -324,7 +325,7 @@ describe('changes requested', () => {
     expect(dashboardOnly).toContain('Edit and resubmit: ')
     expect(dashboardOnly).toContain('Questions? Contact us at https://best.serp.co/contact/')
     const messagesOnly = bodyText(renderWith('changes-requested', { ...BEFORE, messages: true }))
-    expect(messagesOnly).toContain('Submit again: https://best.serp.co/submit/')
+    expect(messagesOnly).toContain('Open your account: https://best.serp.co/account/')
     expect(messagesOnly).toContain('Reply to the reviewer in your dashboard.')
   })
 

@@ -238,6 +238,9 @@ export function featuresOf(context: EmailRenderContext): SiteFeatures {
   return context.features ?? siteFeatures
 }
 
+/** The account area: the dashboard overview today, its submission pages once #65 ships. */
+export const ACCOUNT_PATH = '/account/'
+
 /** Where to submit a product again while the account dashboard can't edit one (#65). */
 export const SUBMIT_PATH = '/submit/'
 
@@ -251,7 +254,7 @@ export const CONTACT_PATH = '/contact/'
 export function submissionPath(submissionId: string, context: EmailRenderContext): string {
   return featuresOf(context).accountDashboard
     ? sitePath('account', 'submissions', submissionId)
-    : '/account/'
+    : ACCOUNT_PATH
 }
 
 /**

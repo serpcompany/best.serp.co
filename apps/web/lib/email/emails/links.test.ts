@@ -55,6 +55,16 @@ const DASHBOARD_PROMISES: ReadonlyArray<{
   }
 ]
 
+/**
+ * Copy the owner approved while its area is still off, by template. It is exempt from
+ * `DASHBOARD_PROMISES` word for word; anything else in that email is still checked.
+ */
+const APPROVED_INTERIM_COPY: Partial<Record<TemplateId, RegExp[]>> = {
+  // Owner decision on #64 (2026-10-06): a changes-requested submission is fixed and resubmitted
+  // from the account area (`/account/`), whose editing #65 builds.
+  'changes-requested': [/\bresubmit from your account\b/giu]
+}
+
 /** Templates sent through a constant rather than a literal id. */
 const SENT_THROUGH_CONSTANTS: TemplateId[] = [SIGN_IN_CODE_TEMPLATE]
 
@@ -152,8 +162,11 @@ function copyOf(email: Rendered): string {
   return [email.subject, preheader, email.text.split('\n--\n')[0] ?? ''].join('\n')
 }
 
-function promisesIn(email: Rendered): Array<keyof SiteFeatures> {
-  const copy = copyOf(email)
+function promisesIn(email: Rendered, id: TemplateId): Array<keyof SiteFeatures> {
+  const copy = (APPROVED_INTERIM_COPY[id] ?? []).reduce(
+    (text, approved) => text.replace(approved, ''),
+    copyOf(email)
+  )
   return DASHBOARD_PROMISES.filter(promise => promise.pattern.test(copy)).map(
     promise => promise.feature
   )
@@ -221,7 +234,7 @@ describe('email copy', () => {
     const problems = renderAll(features)
       .filter(({ id }) => sent.has(id))
       .flatMap(({ email, id }) =>
-        promisesIn(email)
+        promisesIn(email, id)
           .filter(feature => !features[feature])
           .map(feature => {
             const issue = DASHBOARD_PROMISES.find(promise => promise.feature === feature)?.issue
@@ -244,8 +257,25 @@ describe('email copy', () => {
     >) {
       const before = off.find(entry => entry.id === id)
       const after = on.find(entry => entry.id === id)
-      expect(before && promisesIn(before.email), id).toEqual([])
-      expect(after && promisesIn(after.email), id).toEqual(expected)
+      expect(before && promisesIn(before.email, id), id).toEqual([])
+      expect(after && promisesIn(after.email, id), id).toEqual(expected)
+    }
+  })
+
+  it('exempts only the owner-approved interim copy, and only where it is used', () => {
+    const off = renderAll(ALL_OFF)
+    for (const [id, phrases] of Object.entries(APPROVED_INTERIM_COPY) as Array<
+      [TemplateId, RegExp[]]
+    >) {
+      const email = off.find(entry => entry.id === id)?.email
+      for (const phrase of phrases) {
+        // Still present (or the exemption is removed), and a promise without the exemption.
+        expect(email && copyOf(email).match(phrase), `${id} ${phrase}`).not.toBeNull()
+        expect(
+          DASHBOARD_PROMISES.some(promise => email && promise.pattern.test(copyOf(email))),
+          `${id} ${phrase}`
+        ).toBe(true)
+      }
     }
   })
 })

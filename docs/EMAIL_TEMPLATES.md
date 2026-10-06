@@ -52,16 +52,19 @@ sample and fails on a link to a missing page. Copy and links that need a later s
 its flag in `apps/web/lib/features.ts` and switch to the approved wording when that issue turns
 it on (owner decision on #64):
 
-- `features.accountDashboard` (#65). Off, `changes-requested` and `submission-rejected` say
-  "Update your details and submit again at <`/submit/` link>" with a "Submit again" button,
-  and other submission buttons open `/account/`. On, they ask to edit and resubmit and link to
-  `/account/submissions/<id>/` (`submissionPath`).
+- `features.accountDashboard` (#65). Off, `changes-requested` says "Update your details and
+  resubmit from your account at <`/account/` link>" with an "Open your account" button (owner
+  decision, 2026-10-06: the submission keeps its URL key, so `/submit/` would refuse it), and
+  `submission-rejected` says "Update your details and submit again at <`/submit/` link>" with
+  a "Submit again" button. Other submission buttons open `/account/`. On, they ask to edit and
+  resubmit and link to `/account/submissions/<id>/` (`submissionPath`).
 - `features.messages` (#73). Off, `changes-requested` ends "Questions? Contact us at
   <`/contact/` link>" and the prohibited rejection's "Message us" opens `/contact/`. On, they
   point to the dashboard conversation (`messageUsPath`).
 
 The same test fails when an email the app sends (any template whose id app code names) asks
-for a dashboard action whose flag is off. It lists the links still waiting for their page, all
+for a dashboard action whose flag is off, apart from the owner-approved interim copy it lists
+word for word (`APPROVED_INTERIM_COPY`: "resubmit from your account"). It lists the links still waiting for their page, all
 in emails nothing sends yet: `/account/listings/<slug>/` (badge-missing and unlisted, #65;
 screen 7 only defines `/account/listings/<slug>/edit`), `/account/messages/...` and
 `/admin/inbox/<thread>/` (#73), and the draft reminder's `/submit/<id>/choose/` (#63) and

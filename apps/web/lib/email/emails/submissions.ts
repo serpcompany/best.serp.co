@@ -5,6 +5,7 @@
  */
 import { clip, defineEmailTemplate, type EmailRenderContext } from '../templates'
 import {
+  ACCOUNT_PATH,
   bold,
   box,
   CONTACT_PATH,
@@ -24,9 +25,10 @@ import {
 } from './layout'
 
 /**
- * Until #65's account dashboard can edit a submission (`features.accountDashboard`), emails
- * that would send people there to edit and resubmit point to `/submit/` instead (owner
- * decision on #64).
+ * Until #65's account dashboard can edit a submission (`features.accountDashboard`), the
+ * rejection email, which would send people there to edit and resubmit, points to `/submit/`
+ * instead (owner decision on #64). A rejected submission releases its URL key, so a new one
+ * can be made.
  */
 function submitAgain(context: EmailRenderContext) {
   const url = context.links.url(SUBMIT_PATH)
@@ -123,6 +125,10 @@ export const changesRequestedEmail = defineEmailTemplate<ChangesRequestedInput>(
   render(input, context) {
     const name = required(input.submissionName, 'a product name')
     const { accountDashboard, messages } = featuresOf(context)
+    // Until #65, the interim copy sends the submitter to the account area, not `/submit/`: a
+    // changes-requested submission keeps its URL key, so it is resubmitted, not submitted anew
+    // (owner decision on #64, 2026-10-06).
+    const account = context.links.url(ACCOUNT_PATH)
     const resubmit = accountDashboard
       ? {
           cta: {
@@ -133,9 +139,13 @@ export const changesRequestedEmail = defineEmailTemplate<ChangesRequestedInput>(
           sentence: paragraph('Make the changes and resubmit. It goes back into the review queue.')
         }
       : {
-          ...submitAgain(context),
+          cta: { label: 'Open your account', url: account },
           preheader:
-            'A reviewer left a note. Update your details and submit again when you’re ready.'
+            'A reviewer left a note. Update your details and resubmit from your account when you’re ready.',
+          sentence: paragraph(
+            'Update your details and resubmit from your account at ',
+            link(account)
+          )
         }
     return composeEmail(
       {
