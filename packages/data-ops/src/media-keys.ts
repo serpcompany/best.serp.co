@@ -3,8 +3,7 @@ import { type HostedImageFormat, IMAGE_CONTENT_TYPES, IMAGE_EXTENSIONS } from '.
 /**
  * Hosted listing media (serpcompany/best.serp.co#95). Every listing image lives in the
  * environment's R2 bucket under a content-addressed, immutable key, and D1 stores that key, never
- * a URL. Pages build the URL from the environment's media host (`MEDIA_BASE_URL`), so one
- * publication manifest fits staging and production.
+ * a URL. Pages build the URL from the environment's media host (`MEDIA_BASE_URL`).
  */
 
 /** The prefix this site owns in the shared bucket; nothing outside it is ever written. */
@@ -32,42 +31,82 @@ export interface HostedMedia {
 }
 
 const slugPattern = /^[a-z0-9][a-z0-9._-]*$/u
+const submissionIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/u
 const keyPattern = new RegExp(
-  `^${MEDIA_SITE.replaceAll('.', '\\.')}/listings/([a-z0-9][a-z0-9._-]*)/(logo|image)/([0-9a-f]{${MEDIA_HASH_LENGTH}})\\.(png|jpg|webp|gif|avif|ico)$`,
+  `^${MEDIA_SITE.replaceAll('.', '\\.')}/(listings|submissions)/([A-Za-z0-9][A-Za-z0-9._-]*)/(logo|image)/([0-9a-f]{${MEDIA_HASH_LENGTH}})\\.(png|jpg|webp|gif|avif|ico)$`,
   'u'
 )
 
-export function mediaKey(input: {
-  format: HostedImageFormat
-  kind: MediaKind
-  sha256: string
-  slug: string
-}): string {
-  if (!slugPattern.test(input.slug)) throw new Error(`Invalid listing slug for a media key.`)
-  if (!/^[0-9a-f]{64}$/u.test(input.sha256)) throw new Error('Invalid SHA-256 digest.')
-  return `${MEDIA_SITE}/listings/${input.slug}/${input.kind}/${input.sha256.slice(0, MEDIA_HASH_LENGTH)}.${IMAGE_EXTENSIONS[input.format]}`
+/**
+ * Where an image lives: a published listing (`listings/<slug>/…`), or a submission still in
+ * review (`submissions/<id>/…`), which approval copies into the listing's path. A submission's
+ * image never sits under a live listing's path.
+ */
+export type MediaOwner = { slug: string } | { submissionId: string }
+
+function digestPart(sha256: string, format: HostedImageFormat): string {
+  if (!/^[0-9a-f]{64}$/u.test(sha256)) throw new Error('Invalid SHA-256 digest.')
+  return `${sha256.slice(0, MEDIA_HASH_LENGTH)}.${IMAGE_EXTENSIONS[format]}`
+}
+
+export function mediaKey(
+  input: { format: HostedImageFormat; kind: MediaKind; sha256: string } & MediaOwner
+): string {
+  if ('slug' in input) {
+    if (!slugPattern.test(input.slug)) throw new Error('Invalid listing slug for a media key.')
+    return `${MEDIA_SITE}/listings/${input.slug}/${input.kind}/${digestPart(input.sha256, input.format)}`
+  }
+  if (!submissionIdPattern.test(input.submissionId)) {
+    throw new Error('Invalid submission id for a media key.')
+  }
+  return `${MEDIA_SITE}/submissions/${input.submissionId}/${input.kind}/${digestPart(input.sha256, input.format)}`
 }
 
 export interface ParsedMediaKey {
   extension: string
   hash: string
   kind: MediaKind
+  /** The listing slug or the submission id. */
+  owner: string
+  scope: 'listings' | 'submissions'
+  /** The listing slug (an empty string for a submission key). */
   slug: string
 }
 
 export function parseMediaKey(value: string): ParsedMediaKey | null {
   const match = value.match(keyPattern)
   if (!match) return null
+  const scope = match[1] as ParsedMediaKey['scope']
+  const owner = match[2] ?? ''
+  if (scope === 'listings' ? !slugPattern.test(owner) : !submissionIdPattern.test(owner)) {
+    return null
+  }
   return {
-    extension: match[4] ?? '',
-    hash: match[3] ?? '',
-    kind: match[2] as MediaKind,
-    slug: match[1] ?? ''
+    extension: match[5] ?? '',
+    hash: match[4] ?? '',
+    kind: match[3] as MediaKind,
+    owner,
+    scope,
+    slug: scope === 'listings' ? owner : ''
   }
 }
 
+/** A key this site may write: a listing's or a submission's image. */
 export function isMediaKey(value: string): boolean {
-  return keyPattern.test(value)
+  return parseMediaKey(value) !== null
+}
+
+/** A key a published listing row may hold. */
+export function isListingMediaKey(value: string): boolean {
+  return parseMediaKey(value)?.scope === 'listings'
+}
+
+/** The listing key a submission's hosted image is copied to on approval (same bytes). */
+export function listingKeyForSubmissionKey(key: string, slug: string): string {
+  const parsed = parseMediaKey(key)
+  if (parsed?.scope !== 'submissions') throw new Error(`${key} is not a submission media key.`)
+  if (!slugPattern.test(slug)) throw new Error('Invalid listing slug for a media key.')
+  return `${MEDIA_SITE}/listings/${slug}/${parsed.kind}/${parsed.hash}.${parsed.extension}`
 }
 
 /** The content type a key's extension stands for (keys are only ever written with their type). */

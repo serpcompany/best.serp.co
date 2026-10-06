@@ -1,11 +1,18 @@
-import { type HostedImageFormat, IMAGE_CONTENT_TYPES, sniffImage } from './media-format'
+import {
+  type HostedImageFormat,
+  IMAGE_CONTENT_TYPES,
+  type ImageSniffFailure,
+  sniffImage
+} from './media-format'
 import {
   type HostedMedia,
   isMediaKey,
   MAX_MEDIA_BYTES,
   MEDIA_CACHE_CONTROL,
   type MediaKind,
+  type MediaOwner,
   mediaKey,
+  parseMediaKey,
   sha256Hex
 } from './media-keys'
 import { type SafeFetchFailure, safeFetch } from './safe-fetch'
@@ -18,8 +25,10 @@ import { type SafeFetchFailure, safeFetch } from './safe-fetch'
  * failure leaves the listing on the fallback tile, never on the source URL.
  */
 
-/** The subset of Workers' `R2Bucket` that ingestion writes through. */
+/** The subset of Workers' `R2Bucket` that ingestion reads and writes through. */
 export interface MediaBucket {
+  delete?(key: string): Promise<unknown>
+  get?(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>
   put(
     key: string,
     value: Uint8Array,
@@ -33,10 +42,20 @@ export interface MediaBucket {
 
 /**
  * The production bucket is shared with serp.co (`cdn`), so every write is held to this site's
- * listing keys: a key outside `best.serp.co/listings/` is refused before it reaches R2.
+ * keys (`best.serp.co/listings/…` and `best.serp.co/submissions/…`): any other key is refused
+ * before it reaches R2. `storeHostedMedia` checks the same, so an unwrapped bucket is safe too.
+ * The runtime deletes only a submission's own images (`best.serp.co/submissions/…`); a listing's
+ * hosted image is never deleted by the Worker.
  */
 export function scopedMediaBucket(bucket: MediaBucket): MediaBucket {
   return {
+    delete(key) {
+      if (parseMediaKey(key)?.scope !== 'submissions' || !bucket.delete) {
+        return Promise.reject(new Error(`Refusing to delete ${key}.`))
+      }
+      return bucket.delete(key)
+    },
+    get: bucket.get?.bind(bucket),
     put(key, value, options) {
       if (!isMediaKey(key)) return Promise.reject(new Error(`Refusing to write ${key}.`))
       return bucket.put(key, value, options)
@@ -46,11 +65,10 @@ export function scopedMediaBucket(bucket: MediaBucket): MediaBucket {
 
 export type MediaFetchFailure =
   | SafeFetchFailure
+  | ImageSniffFailure
+  | 'copy_mismatch'
   | 'image_too_small'
   | 'store_failed'
-  | 'svg'
-  | 'unknown_format'
-  | 'unreadable_dimensions'
 
 export type FetchedImage = {
   body: Uint8Array
@@ -124,32 +142,34 @@ export async function fetchImage(
   }
 }
 
-/** The hosted record for fetched bytes; the key depends only on the listing, kind, and bytes. */
+/** The hosted record for fetched bytes; the key depends only on its owner, kind, and bytes. */
 export function hostedMediaFor(
   image: Omit<FetchedImage, 'ok' | 'url'>,
-  target: { kind: MediaKind; slug: string; sourceUrl: string }
+  target: { kind: MediaKind; sourceUrl: string } & MediaOwner
 ): HostedMedia {
+  const owner: MediaOwner =
+    'slug' in target ? { slug: target.slug } : { submissionId: target.submissionId }
   return {
     bytes: image.body.byteLength,
     contentType: image.contentType,
     height: image.height,
-    key: mediaKey({
-      format: image.format,
-      kind: target.kind,
-      sha256: image.sha256,
-      slug: target.slug
-    }),
+    key: mediaKey({ format: image.format, kind: target.kind, sha256: image.sha256, ...owner }),
     sha256: image.sha256,
     sourceUrl: target.sourceUrl,
     width: image.width
   }
 }
 
+/**
+ * The only write to the media bucket. It refuses any key outside this site's listing and
+ * submission keys, so no caller can write elsewhere in the shared `cdn` bucket.
+ */
 export async function storeHostedMedia(
   bucket: MediaBucket,
   media: HostedMedia,
   body: Uint8Array
 ): Promise<boolean> {
+  if (!isMediaKey(media.key)) return false
   try {
     await bucket.put(media.key, body, {
       customMetadata: { sha256: media.sha256, source: media.sourceUrl.slice(0, 1024) },
@@ -162,12 +182,11 @@ export async function storeHostedMedia(
   }
 }
 
-export interface IngestImageInput extends FetchImageOptions {
+export type IngestImageInput = FetchImageOptions & {
   bucket: MediaBucket
   kind: MediaKind
-  slug: string
   sourceUrl: string
-}
+} & MediaOwner
 
 /** Fetches, validates, and stores one image; the result is what D1 records. */
 export async function ingestImage(
@@ -177,5 +196,30 @@ export async function ingestImage(
   if (!image.ok) return image
   const media = hostedMediaFor(image, input)
   if (!(await storeHostedMedia(input.bucket, media, image.body))) return failure('store_failed')
+  return { media, ok: true }
+}
+
+/**
+ * Copies a hosted image within the bucket (a submission's image into its approved listing's
+ * path), checking the stored bytes against the recorded digest and format first.
+ */
+export async function copyHostedMedia(
+  bucket: MediaBucket,
+  fromKey: string,
+  media: HostedMedia
+): Promise<{ media: HostedMedia; ok: true } | MediaFailure> {
+  const object = bucket.get ? await bucket.get(fromKey).catch(() => null) : null
+  if (!object) return failure('store_failed')
+  const body = new Uint8Array(await object.arrayBuffer())
+  const sniffed = sniffImage(body)
+  if (!sniffed.ok) return failure(sniffed.reason)
+  if (
+    (await sha256Hex(body)) !== media.sha256 ||
+    IMAGE_CONTENT_TYPES[sniffed.format] !== media.contentType ||
+    body.byteLength !== media.bytes
+  ) {
+    return failure('copy_mismatch')
+  }
+  if (!(await storeHostedMedia(bucket, media, body))) return failure('store_failed')
   return { media, ok: true }
 }

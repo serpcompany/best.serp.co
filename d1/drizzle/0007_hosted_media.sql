@@ -5,6 +5,7 @@ CREATE TABLE `media_ingestions` (
 	`kind` text NOT NULL,
 	`sort_order` integer DEFAULT 0 NOT NULL,
 	`source_url` text NOT NULL,
+	`copy_from_key` text,
 	`status` text DEFAULT 'pending' NOT NULL,
 	`attempts` integer DEFAULT 0 NOT NULL,
 	`next_attempt_at` text,
@@ -33,13 +34,14 @@ CREATE TABLE `media_ingestions` (
     OR ("media_key" IS NOT NULL AND "sha256" IS NOT NULL
     AND "content_type" IS NOT NULL AND "bytes" IS NOT NULL
     AND "width" IS NOT NULL AND "height" IS NOT NULL
-    AND substr("media_key", 1, 22) = 'best.serp.co/listings/'
+    AND (substr("media_key", 1, 22) = 'best.serp.co/listings/' OR substr("media_key", 1, 25) = 'best.serp.co/submissions/')
     AND instr("media_key", '/' || "kind" || '/') > 0
     AND length("sha256") = 64
     AND "content_type" IN ('image/avif', 'image/gif', 'image/x-icon', 'image/jpeg', 'image/png', 'image/webp')
     AND "bytes" BETWEEN 1 AND 5242880
-    AND "width" BETWEEN 1 AND 65535
-    AND "height" BETWEEN 1 AND 65535))
+    AND "width" BETWEEN 1 AND 16384
+    AND "height" BETWEEN 1 AND 16384)),
+	CONSTRAINT "media_ingestions_copy_from_submission" CHECK("media_ingestions"."copy_from_key" IS NULL OR ("media_ingestions"."listing_id" IS NOT NULL AND (substr("copy_from_key", 1, 25) = 'best.serp.co/submissions/')))
 ) STRICT;
 --> statement-breakpoint
 CREATE UNIQUE INDEX `media_ingestions_listing_slot_idx` ON `media_ingestions` (`listing_id`,`kind`,`sort_order`) WHERE "media_ingestions"."listing_id" IS NOT NULL;--> statement-breakpoint
@@ -58,10 +60,10 @@ ALTER TABLE `listing_media` ADD `height` integer CONSTRAINT "listing_media_hoste
     OR ("media_key" IS NOT NULL AND "sha256" IS NOT NULL
     AND "content_type" IS NOT NULL AND "bytes" IS NOT NULL
     AND "width" IS NOT NULL AND "height" IS NOT NULL
-    AND substr("media_key", 1, 22) = 'best.serp.co/listings/'
+    AND (substr("media_key", 1, 22) = 'best.serp.co/listings/')
     AND instr("media_key", '/' || "kind" || '/') > 0
     AND length("sha256") = 64
     AND "content_type" IN ('image/avif', 'image/gif', 'image/x-icon', 'image/jpeg', 'image/png', 'image/webp')
     AND "bytes" BETWEEN 1 AND 5242880
-    AND "width" BETWEEN 1 AND 65535
-    AND "height" BETWEEN 1 AND 65535));
+    AND "width" BETWEEN 1 AND 16384
+    AND "height" BETWEEN 1 AND 16384));

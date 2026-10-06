@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   contentTypeForKey,
+  isListingMediaKey,
   isMediaKey,
   LOCAL_MEDIA_PATH,
+  listingKeyForSubmissionKey,
   mediaKey,
   mediaUrl,
   parseMediaKey,
@@ -27,13 +29,32 @@ describe('media keys', () => {
     )
   })
 
-  it('parses only this site’s listing keys', () => {
+  it('parses only this site’s listing and submission keys', () => {
     expect(parseMediaKey(logoKey)).toEqual({
       extension: 'png',
       hash: sha.slice(0, 16),
       kind: 'logo',
+      owner: 'dr.serp.co',
+      scope: 'listings',
       slug: 'dr.serp.co'
     })
+    const pending = mediaKey({ format: 'png', kind: 'logo', sha256: sha, submissionId: 'sub_Ab-1' })
+    expect(pending).toBe(`best.serp.co/submissions/sub_Ab-1/logo/${sha.slice(0, 16)}.png`)
+    expect(parseMediaKey(pending)).toMatchObject({
+      owner: 'sub_Ab-1',
+      scope: 'submissions',
+      slug: ''
+    })
+    expect(isMediaKey(pending)).toBe(true)
+    // A submission's image never stands in a listing row; approval copies it to the listing path.
+    expect(isListingMediaKey(pending)).toBe(false)
+    expect(isListingMediaKey(logoKey)).toBe(true)
+    expect(listingKeyForSubmissionKey(pending, 'dr.serp.co')).toBe(logoKey)
+    expect(() => listingKeyForSubmissionKey(logoKey, 'dr.serp.co')).toThrow(/not a submission/u)
+    expect(() => listingKeyForSubmissionKey(pending, '../x')).toThrow(/slug/u)
+    expect(() =>
+      mediaKey({ format: 'png', kind: 'logo', sha256: sha, submissionId: '../x' })
+    ).toThrow(/submission id/u)
     expect(contentTypeForKey(logoKey)).toBe('image/png')
     for (const value of [
       'https://cdn.serp.co/best.serp.co/listings/x/logo/abababababababab.png',
@@ -41,7 +62,10 @@ describe('media keys', () => {
       'serp.co/listings/x/logo/abababababababab.png',
       'best.serp.co/listings/x/video/abababababababab.png',
       'best.serp.co/listings/x/logo/abababababababab.svg',
-      'best.serp.co/listings/x/logo/ABABABABABABABAB.png'
+      'best.serp.co/listings/x/logo/ABABABABABABABAB.png',
+      'best.serp.co/listings/X/logo/abababababababab.png',
+      'best.serp.co/uploads/x/logo/abababababababab.png',
+      'best.serp.co/submissions/_x/logo/abababababababab.png'
     ]) {
       expect(isMediaKey(value), value).toBe(false)
     }

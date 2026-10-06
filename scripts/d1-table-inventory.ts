@@ -240,6 +240,7 @@ export const applicationColumnInventory = {
     'kind',
     'sort_order',
     'source_url',
+    'copy_from_key',
     'status',
     'attempts',
     'next_attempt_at',

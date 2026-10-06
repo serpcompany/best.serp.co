@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  copyHostedMedia,
   fetchImage,
   ingestImage,
   isRetryableMediaFailure,
   type MediaBucket,
-  scopedMediaBucket
+  scopedMediaBucket,
+  storeHostedMedia
 } from './media-ingest'
 import { MAX_MEDIA_BYTES, MEDIA_CACHE_CONTROL, sha256Hex } from './media-keys'
 import { imageResponse, memoryBucket, pngBytes, routedFetch } from './media-test-support'
@@ -153,5 +155,96 @@ describe('ingestImage', () => {
       })
     ).rejects.toThrow(/Refusing/u)
     expect(bucket.objects.size).toBe(0)
+  })
+
+  it('refuses, inside the one write function, any key outside best.serp.co/ (#96 review S6)', async () => {
+    const png = pngBytes(64, 64)
+    const sha256 = await sha256Hex(png)
+    const puts: string[] = []
+    // An unwrapped bucket: only storeHostedMedia stands between a caller and the shared bucket.
+    const raw: MediaBucket = {
+      put: async key => {
+        puts.push(key)
+      }
+    }
+    const media = {
+      bytes: png.byteLength,
+      contentType: 'image/png',
+      height: 64,
+      key: '',
+      sha256,
+      sourceUrl: source,
+      width: 64
+    }
+    for (const key of [
+      'serp.co/index.html',
+      'apps.serp.co/logo.png',
+      `best.serp.co/${sha256.slice(0, 16)}.png`,
+      `best.serp.co/static/logo/${sha256.slice(0, 16)}.png`,
+      `best.serp.co/listings/../../serp.co/logo/${sha256.slice(0, 16)}.png`,
+      `/best.serp.co/listings/x/logo/${sha256.slice(0, 16)}.png`,
+      `best.serp.co.evil/listings/x/logo/${sha256.slice(0, 16)}.png`
+    ]) {
+      expect(await storeHostedMedia(raw, { ...media, key }, png), key).toBe(false)
+    }
+    expect(puts).toEqual([])
+    const listingKey = `best.serp.co/listings/x/logo/${sha256.slice(0, 16)}.png`
+    expect(await storeHostedMedia(raw, { ...media, key: listingKey }, png)).toBe(true)
+    expect(puts).toEqual([listingKey])
+  })
+
+  it('deletes only a submission’s own images', async () => {
+    const bucket = memoryBucket()
+    const scoped = scopedMediaBucket(bucket)
+    const hash = 'a'.repeat(16)
+    const listingKey = `best.serp.co/listings/x/logo/${hash}.png`
+    const submissionKey = `best.serp.co/submissions/sub_1/logo/${hash}.png`
+    for (const key of [listingKey, submissionKey, 'serp.co/index.html']) {
+      bucket.objects.set(key, {
+        body: new Uint8Array(),
+        options: { httpMetadata: { cacheControl: '', contentType: '' } }
+      })
+    }
+    await expect(scoped.delete?.(listingKey)).rejects.toThrow(/Refusing to delete/u)
+    await expect(scoped.delete?.('serp.co/index.html')).rejects.toThrow(/Refusing to delete/u)
+    await scoped.delete?.(submissionKey)
+    expect([...bucket.objects.keys()].sort()).toEqual([listingKey, 'serp.co/index.html'])
+  })
+})
+
+describe('copyHostedMedia', () => {
+  it('copies a submission’s image into the listing path only when its bytes match the record', async () => {
+    const png = pngBytes(128, 128)
+    const sha256 = await sha256Hex(png)
+    const hash = sha256.slice(0, 16)
+    const from = `best.serp.co/submissions/sub_1/logo/${hash}.png`
+    const to = `best.serp.co/listings/x/logo/${hash}.png`
+    const bucket = memoryBucket()
+    const media = {
+      bytes: png.byteLength,
+      contentType: 'image/png',
+      height: 128,
+      key: to,
+      sha256,
+      sourceUrl: source,
+      width: 128
+    }
+    expect(await copyHostedMedia(bucket, from, media)).toEqual({
+      code: 'store_failed',
+      ok: false,
+      retryable: true
+    })
+    bucket.objects.set(from, {
+      body: png,
+      options: { httpMetadata: { cacheControl: '', contentType: '' } }
+    })
+    expect(await copyHostedMedia(bucket, from, { ...media, sha256: 'b'.repeat(64) })).toEqual({
+      code: 'copy_mismatch',
+      ok: false,
+      retryable: false
+    })
+    expect(bucket.objects.has(to)).toBe(false)
+    expect(await copyHostedMedia(bucket, from, media)).toEqual({ media, ok: true })
+    expect(bucket.objects.get(to)?.body).toEqual(png)
   })
 })

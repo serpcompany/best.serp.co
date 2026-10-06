@@ -15,7 +15,15 @@ import { MAX_MEDIA_BYTES, MEDIA_KINDS, MEDIA_SITE } from './media-keys'
 const currentTimestamp = sql`CURRENT_TIMESTAMP`
 const booleanCheck = (column: { name: string }) => sql`${sql.identifier(column.name)} IN (0, 1)`
 const sqlList = (values: readonly string[]) => sql.raw(values.map(value => `'${value}'`).join(', '))
-const MEDIA_KEY_PREFIX = `${MEDIA_SITE}/listings/`
+const LISTING_MEDIA_PREFIX = `${MEDIA_SITE}/listings/`
+const SUBMISSION_MEDIA_PREFIX = `${MEDIA_SITE}/submissions/`
+/** `substr(column, 1, n) = 'prefix'` for one of the prefixes, without a LIKE pattern (#77). */
+const prefixCheck = (column: { name: string }, prefixes: readonly string[]) =>
+  sql.raw(
+    `(${prefixes
+      .map(prefix => `substr("${column.name}", 1, ${prefix.length}) = '${prefix}'`)
+      .join(' OR ')})`
+  )
 
 /**
  * Who added a listing (serpcompany/best.serp.co#62). `admin` covers the imported catalog and
@@ -281,15 +289,18 @@ export const listingCategories = sqliteTable(
  * media bucket; the CHECK keeps its prefix and kind honest without a LIKE pattern (#77). Every
  * term is NOT NULL-checked, because a CHECK that evaluates to NULL passes.
  */
-const hostedMediaCheck = (table: {
-  bytes: { name: string }
-  contentType: { name: string }
-  height: { name: string }
-  kind: { name: string }
-  mediaKey: { name: string }
-  sha256: { name: string }
-  width: { name: string }
-}) => {
+const hostedMediaCheck = (
+  table: {
+    bytes: { name: string }
+    contentType: { name: string }
+    height: { name: string }
+    kind: { name: string }
+    mediaKey: { name: string }
+    sha256: { name: string }
+    width: { name: string }
+  },
+  prefixes: readonly string[]
+) => {
   const column = (value: { name: string }) => sql.identifier(value.name)
   return sql`(${column(table.mediaKey)} IS NULL AND ${column(table.sha256)} IS NULL
     AND ${column(table.contentType)} IS NULL AND ${column(table.bytes)} IS NULL
@@ -297,7 +308,7 @@ const hostedMediaCheck = (table: {
     OR (${column(table.mediaKey)} IS NOT NULL AND ${column(table.sha256)} IS NOT NULL
     AND ${column(table.contentType)} IS NOT NULL AND ${column(table.bytes)} IS NOT NULL
     AND ${column(table.width)} IS NOT NULL AND ${column(table.height)} IS NOT NULL
-    AND substr(${column(table.mediaKey)}, 1, ${sql.raw(String(MEDIA_KEY_PREFIX.length))}) = ${sql.raw(`'${MEDIA_KEY_PREFIX}'`)}
+    AND ${prefixCheck(table.mediaKey, prefixes)}
     AND instr(${column(table.mediaKey)}, '/' || ${column(table.kind)} || '/') > 0
     AND length(${column(table.sha256)}) = 64
     AND ${column(table.contentType)} IN (${sqlList(Object.values(IMAGE_CONTENT_TYPES))})
@@ -336,7 +347,7 @@ export const listingMedia = sqliteTable(
       table.kind,
       table.sortOrder
     ),
-    check('listing_media_hosted_complete', hostedMediaCheck(table))
+    check('listing_media_hosted_complete', hostedMediaCheck(table, [LISTING_MEDIA_PREFIX]))
   ]
 )
 
@@ -344,8 +355,10 @@ export const listingMedia = sqliteTable(
  * Media still to be hosted (serpcompany/best.serp.co#95): one row per listing or submission
  * image slot whose source has not been copied into the media bucket yet. A Worker cron retries
  * `pending` rows with backoff; `failed` rows stopped retrying and are shown to the admin. A
- * submission's slot becomes `hosted` (with the result) so its approval can copy the hosted
- * image; a listing's slot is deleted once its `listing_media` row is hosted.
+ * submission's slot becomes `hosted` (its key under `best.serp.co/submissions/<id>/`) so its
+ * approval can queue a copy into the listing's path; a listing's slot is deleted once its
+ * `listing_media` row is hosted. An admin edit, an approval, or a publication that changes a
+ * slot's media replaces or deletes the row, and the cron writes only while its claim holds.
  */
 export const mediaIngestionStatuses = ['pending', 'hosted', 'failed'] as const
 export type MediaIngestionStatus = (typeof mediaIngestionStatuses)[number]
@@ -361,6 +374,11 @@ export const mediaIngestions = sqliteTable(
     kind: text('kind', { enum: MEDIA_KINDS }).notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
     sourceUrl: text('source_url').notNull(),
+    /**
+     * For a listing slot adopted from an approved submission: the submission's hosted key, which
+     * the cron copies into the listing's path instead of fetching the source again.
+     */
+    copyFromKey: text('copy_from_key'),
     status: text('status', { enum: mediaIngestionStatuses }).notNull().default('pending'),
     attempts: integer('attempts').notNull().default(0),
     nextAttemptAt: text('next_attempt_at'),
@@ -401,7 +419,14 @@ export const mediaIngestions = sqliteTable(
       'media_ingestions_hosted_result',
       sql`(${table.status} = 'hosted') = (${table.mediaKey} IS NOT NULL)`
     ),
-    check('media_ingestions_hosted_complete', hostedMediaCheck(table)),
+    check(
+      'media_ingestions_hosted_complete',
+      hostedMediaCheck(table, [LISTING_MEDIA_PREFIX, SUBMISSION_MEDIA_PREFIX])
+    ),
+    check(
+      'media_ingestions_copy_from_submission',
+      sql`${table.copyFromKey} IS NULL OR (${table.listingId} IS NOT NULL AND ${prefixCheck(table.copyFromKey, [SUBMISSION_MEDIA_PREFIX])})`
+    ),
     uniqueIndex('media_ingestions_listing_slot_idx')
       .on(table.listingId, table.kind, table.sortOrder)
       .where(sql`${table.listingId} IS NOT NULL`),
