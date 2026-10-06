@@ -71,6 +71,7 @@ import { adminRequest } from './api'
 import { formatDay, initials, listingPath } from './format'
 import { Kv } from './kv'
 import { ProductLogo } from './product-cell'
+import { RecordHeader } from './record-header'
 import { StatusBadge, type StatusKind } from './status-badge'
 
 /**
@@ -276,25 +277,14 @@ export function ListingDetail({
       )
     }
     return (
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex items-start gap-3">
-          <ProductLogo
-            className="rounded-lg"
-            logoUrl={view.logoUrl}
-            name={view.name}
-            size={48}
-            website={view.website}
-          />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{view.name}</h1>
-              <StatusBadge kind={statusKinds[view.adminStatus]} />
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">{view.meta}</p>
-          </div>
-        </div>
-        {actions.length ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
-      </div>
+      <RecordHeader
+        actions={actions.length ? actions : null}
+        chips={<StatusBadge kind={statusKinds[view.adminStatus]} />}
+        logoUrl={view.logoUrl}
+        meta={view.meta}
+        name={view.name}
+        website={view.website}
+      />
     )
   })()
 

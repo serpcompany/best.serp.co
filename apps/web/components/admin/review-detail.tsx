@@ -69,6 +69,7 @@ import { adminRequest } from './api'
 import { ageWords, formatDateTime, formatSince, formatUsd, initials, listingPath } from './format'
 import { Kv } from './kv'
 import { ProductLogo } from './product-cell'
+import { RecordHeader } from './record-header'
 import { PlanBadge, StatusBadge, type StatusKind } from './status-badge'
 
 /**
@@ -680,35 +681,22 @@ export function ReviewDetail({
 
   return (
     <>
-      {/* The actions stay on one row beside the title from lg up (#64 review); a long name
-          truncates instead of pushing a button onto a second row. */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 items-start gap-3 lg:flex-1">
-          <ProductLogo
-            className="rounded-lg"
-            logoUrl={view.logoUrl}
-            name={view.name}
-            size={48}
-            website={view.website}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="min-w-0 max-w-full truncate text-2xl font-semibold tracking-tight">
-                {view.name}
-              </h1>
-              <StatusBadge kind={chips.kind} label={chips.label} />
-              <PlanBadge paid={view.paid} />
-              {isSubmission && !view.paid && view.badge?.verifiedAt ? (
-                <StatusBadge kind="pass" label="Badge pass" />
-              ) : null}
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">{meta}</p>
-          </div>
-        </div>
-        {actions ? (
-          <div className="flex flex-wrap gap-2 lg:shrink-0 lg:flex-nowrap">{actions}</div>
-        ) : null}
-      </div>
+      <RecordHeader
+        actions={actions}
+        chips={
+          <>
+            <StatusBadge kind={chips.kind} label={chips.label} />
+            <PlanBadge paid={view.paid} />
+            {isSubmission && !view.paid && view.badge?.verifiedAt ? (
+              <StatusBadge kind="pass" label="Badge pass" />
+            ) : null}
+          </>
+        }
+        logoUrl={view.logoUrl}
+        meta={meta}
+        name={view.name}
+        website={view.website}
+      />
       {banner}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0">{left}</div>
