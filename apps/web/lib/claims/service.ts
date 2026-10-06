@@ -11,7 +11,7 @@ import {
 import type { ListingClaimMethod } from '@serpdirectory/data-ops/schema'
 import { CLAIM_CODE_LENGTH, CLAIM_CODE_TTL_SECONDS } from '../email/emails/codes'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'
-import { checkClaimAddress, claimBlockKeys } from './address'
+import { checkClaimAddress, claimBlockKeys, screenClaimAddress } from './address'
 import { type ProductSite, productSite, type ResolveLanding } from './product'
 
 /**
@@ -179,13 +179,17 @@ function review(deps: Pick<ClaimDependencies, 'contactPath'>): ClaimFailure {
 /** The listing a claim may target, or why not. */
 async function claimableListing(
   deps: ClaimDependencies,
-  by: { id: string } | { slug: string }
+  by: { id: string } | { slug: string },
+  /** A refusal decided before anything is fetched (the address itself). */
+  screen: () => ClaimFailure | null = () => null
 ): Promise<ClaimResult<{ listing: ClaimListing; site: ProductSite }>> {
   const listing = await deps.operations.listing(by)
   if (!listing?.live) return fail(404, 'not_found')
   if (listing.ownerUserId) return owned(deps)
   // #100's owner-review sets, and anything an admin holds: the owner decides, not a claim.
   if (await deps.operations.held(listing.id)) return review(deps)
+  const screened = screen()
+  if (screened) return screened
   const resolved = await productSite(listing, deps.resolveLanding)
   if (!resolved.ok) {
     return resolved.reason === 'review' ? review(deps) : fail(409, 'no_product_domain')
@@ -203,7 +207,11 @@ export async function startClaim(
   if (method !== 'badge' && !(method === 'paid' && deps.paidClaims)) {
     return fail(422, 'invalid_method')
   }
-  const target = await claimableListing(deps, { slug: input.listingSlug })
+  // A malformed, webmail, or SERP address is refused before the listing's link is followed.
+  const screened = screenClaimAddress(input.email)
+  const target = await claimableListing(deps, { slug: input.listingSlug }, () =>
+    screened ? fail(422, screened) : null
+  )
   if (!target.ok) return target
   const { listing, site } = target
   const address = checkClaimAddress(input.email, site.domain)

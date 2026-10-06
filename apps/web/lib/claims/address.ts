@@ -85,6 +85,16 @@ function registrable(host: string): string | null {
   }
 }
 
+/** The problem with an address whatever the listing (malformed, webmail, SERP's), or null. */
+export function screenClaimAddress(email: string): ClaimAddressProblem | null {
+  const address = email.trim().toLowerCase()
+  const host = address.length <= 254 ? ADDRESS.exec(address)?.[1] : undefined
+  const domain = host ? registrable(host) : null
+  if (!domain) return 'invalid_email'
+  if (WEBMAIL_DOMAINS.has(domain)) return 'webmail'
+  return isForeignDomain(domain) ? 'domain_mismatch' : null
+}
+
 /**
  * Checks `email` against the product's domain (`productSite`): a well-formed address, not
  * webmail, never SERP's own domains, whose domain's registrable domain is the product's.

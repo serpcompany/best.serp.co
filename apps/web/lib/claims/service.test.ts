@@ -438,6 +438,27 @@ describe('claim flow', () => {
     })
   })
 
+  it('refuses a SERP, webmail, or malformed address before following the listing’s link', async () => {
+    let followed = 0
+    const counting = {
+      ...deps(),
+      resolveLanding: async () => {
+        followed += 1
+        return null
+      }
+    }
+    for (const [email, code] of [
+      ['team@serp.ly', 'domain_mismatch'],
+      ['me@gmail.com', 'webmail'],
+      ['nope', 'invalid_email']
+    ] as const) {
+      await expect(
+        startClaim(counting, { email, listingSlug: 'notion', method: 'badge', userId: 'user_a' })
+      ).resolves.toMatchObject({ code, status: 422 })
+    }
+    expect(followed).toBe(0)
+  })
+
   it('sends #100’s owner-review listings and disagreeing links to the contact path', async () => {
     // codementorgpt.com is unregistered today (#108 review round 2): whoever registers it and
     // sets up mail would pass the email step, so an instant claim is refused.
