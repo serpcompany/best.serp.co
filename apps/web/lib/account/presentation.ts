@@ -9,7 +9,7 @@ export const accountBadgeTarget: BadgeTarget = slug => {
   return { badgeUrl: targets.badgeUrls[0] ?? '', listingUrl: targets.listingUrl }
 }
 
-/** The badge's display name in the embed code ("Featured on SERP"). */
+/** The badge's display name in the embed code ("Featured on SERP Best"). */
 export const badgeSiteName = siteConfig.badges.featuredOn.displayName
 
 /** The badge panel's flagged copy (`feature-copy.ts`). */

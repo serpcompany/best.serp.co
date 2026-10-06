@@ -152,7 +152,7 @@ function BadgeCard({
         <div className="flex flex-col gap-3">
           <img
             src={previewUrl}
-            alt={`Featured on SERP badge, ${theme}`}
+            alt={`Featured on SERP Best badge, ${theme}`}
             width={180}
             height={45}
             className="h-auto w-[180px]"

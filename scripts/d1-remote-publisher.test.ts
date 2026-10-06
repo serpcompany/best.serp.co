@@ -2,7 +2,12 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { publishRemoteManifest, verifyTargetDatabase } from './d1-remote-publisher.ts'
+import { parseManifest } from './d1-publisher.ts'
+import {
+  assertHostedMediaServed,
+  publishRemoteManifest,
+  verifyTargetDatabase
+} from './d1-remote-publisher.ts'
 import { solidPng } from './fixtures/solid-png'
 import { project } from './project'
 
@@ -108,6 +113,25 @@ function cloudflare(
   const batches: Batch[][] = []
   const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    const list = url.match(/\/r2\/buckets\/([^/]+)\/objects\?(.*)$/u)
+    if (list) {
+      const prefix = `${list[1]}/${new URLSearchParams(list[2]).get('prefix') ?? ''}`
+      return Response.json({
+        result: Object.entries(options.objects ?? {})
+          .filter(([id]) => id.startsWith(prefix))
+          .map(([id, body]) => ({
+            etag: createHash('md5').update(body).digest('hex'),
+            http_metadata: {
+              cacheControl: 'public, max-age=31536000, immutable',
+              contentType: 'image/png'
+            },
+            key: id.slice((list[1] ?? '').length + 1),
+            size: body.byteLength
+          })),
+        result_info: { cursor: '', is_truncated: false },
+        success: true
+      })
+    }
     const r2 = url.match(/\/r2\/buckets\/([^/]+)\/objects\/(.+)$/u)
     if (r2) {
       const body = options.objects?.[`${r2[1]}/${r2[2]}`]
@@ -370,6 +394,40 @@ describe('row-level media manifests (#97 review B3)', () => {
     for (const fake of [onStaging, onProduction, wrong]) {
       expect(fake.batches.every(batch => batch.length === 1)).toBe(true)
     }
+  })
+
+  it('checks a planned object by one bucket listing, its MD5 ETag, never a GET (#95 release blocker 3)', async () => {
+    const manifest = parseManifest(mediaSource)
+    const planned = new Map([
+      [
+        mediaKey,
+        {
+          bytes: png.byteLength,
+          contentType: 'image/png',
+          height: 4,
+          key: mediaKey,
+          md5: createHash('md5').update(png).digest('hex'),
+          sha256: pngSha,
+          source: 'https://testing.example/icon.png',
+          width: 4
+        }
+      ]
+    ])
+    const good = cloudflare({ objects: objects('cdn') })
+    await expect(
+      assertHostedMediaServed(manifest, 'production', production, good.fetcher, planned)
+    ).resolves.toBeUndefined()
+    const calls = (fake: typeof good) => fake.fetcher.mock.calls.map(([url]) => String(url))
+    expect(calls(good)).toHaveLength(1)
+    expect(calls(good)[0]).toMatch(/\/r2\/buckets\/cdn\/objects\?/u)
+    // Same size, other bytes: R2's ETag (their MD5) is not the plan's, with no read-back either.
+    const tampered = new Uint8Array(png)
+    tampered[tampered.length - 5] = 0
+    const wrong = cloudflare({ objects: objects('cdn', tampered) })
+    await expect(
+      assertHostedMediaServed(manifest, 'production', production, wrong.fetcher, planned)
+    ).rejects.toThrow('md5_mismatch')
+    expect(calls(wrong)).toHaveLength(1)
   })
 
   it('is idempotent by its input, whatever version each environment published it at', async () => {

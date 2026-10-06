@@ -7618,11 +7618,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 2939
+        bytes: 2738
         contentType: image/avif
         height: 120
-        key: best.serp.co/listings/shopify.com/logo/d1b518105cf96633.avif
-        sha256: d1b518105cf966336a65807a28c68190beef4be64d6a437fada498b17c655f8c
+        key: best.serp.co/listings/shopify.com/logo/1cd456a83d0130b4.avif
+        sha256: 1cd456a83d0130b4cd1486b7f752fe414900969baf4c8d14d44b6b1fa95aeae9
         source: https://www.shopify.com/apple-touch-icon.png
         width: 120
   - action: listing-media-update

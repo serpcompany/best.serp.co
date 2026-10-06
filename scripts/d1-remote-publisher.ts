@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { relative, resolve } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { MEDIA_CACHE_CONTROL, MEDIA_SITE } from '@serpdirectory/data-ops/media-keys'
 import { validateRemoteConfig } from './cloudflare-release'
 import { assertD1Compatible } from './d1-compat'
 import {
@@ -13,9 +14,9 @@ import {
   type PublicationManifest,
   parseManifest
 } from './d1-publisher.ts'
-import { verifyObject } from './media-upload'
+import { type MediaPlanObject, mediaPlanSchema, verifyObject } from './media-upload'
 import { project } from './project'
-import { describeFetchError, getR2Object } from './r2-objects'
+import { describeFetchError, getR2Object, listedMismatch, listR2Objects } from './r2-objects'
 
 interface D1ApiResult {
   results?: Array<Record<string, unknown>>
@@ -178,39 +179,68 @@ function mediaUpdates(manifest: PublicationManifest) {
   return manifest.operations.flatMap(op => (op.action === 'listing-media-update' ? [op] : []))
 }
 
+/** The reviewed upload plans' objects by key (`d1/media/*.json`), for their MD5. */
+export function reviewedPlanObjects(directory = resolve('d1/media')): Map<string, MediaPlanObject> {
+  const objects = new Map<string, MediaPlanObject>()
+  for (const file of readdirSync(directory)
+    .filter(name => name.endsWith('.json'))
+    .sort()) {
+    const parsed = mediaPlanSchema.safeParse(
+      JSON.parse(readFileSync(join(directory, file), 'utf8'))
+    )
+    if (!parsed.success) continue
+    for (const object of parsed.data.objects) objects.set(object.key, object)
+  }
+  return objects
+}
+
 /**
  * Refuses a manifest whose hosted media the target's bucket does not hold yet, byte for byte
  * (#95; #97 review S4): its upload plan must run first, so a page never names a key that
- * answers 404 or serves other bytes. Each object is read from the target's own bucket through
- * the R2 API (never a CDN) and verified like an upload (`verifyObject`).
+ * answers 404 or serves other bytes. The target's own bucket is listed through the R2 API (never
+ * a CDN), and each object is verified by size, type, cache policy, and its ETag, the MD5 R2
+ * computed from the stored bytes, against the reviewed plan that pins the same bytes' MD5 and
+ * SHA-256 (#95 release blocker 3: a GET per object spent the API rate limit). An image no plan
+ * describes is read back and verified like an upload (`verifyObject`).
  */
 export async function assertHostedMediaServed(
   manifest: PublicationManifest,
   target: PublicationTarget,
   env: NodeJS.ProcessEnv,
-  fetchImplementation: FetchImplementation
+  fetchImplementation: FetchImplementation,
+  plans: Map<string, MediaPlanObject> = reviewedPlanObjects()
 ): Promise<void> {
   const images = mediaUpdates(manifest).flatMap(op => [
     ...(op.media.logo ? [op.media.logo] : []),
     ...(op.media.images ?? [])
   ])
+  if (images.length === 0) return
   const { bucket } = project.remote[target].media
+  const listed = await listR2Objects(bucket, `${MEDIA_SITE}/listings/`, env, fetchImplementation)
   const problems: string[] = []
-  const queue = [...new Map(images.map(image => [image.key, image])).values()]
-  await Promise.all(
-    Array.from({ length: 8 }, async () => {
-      for (let image = queue.shift(); image; image = queue.shift()) {
-        let problem: string | null
-        try {
-          const body = await getR2Object(bucket, image.key, env, fetchImplementation)
-          problem = body ? verifyObject(image, body) : 'missing'
-        } catch (error) {
-          problem = describeFetchError(error)
-        }
-        if (problem) problems.push(`${image.key} (${problem})`)
+  for (const image of new Map(images.map(entry => [entry.key, entry])).values()) {
+    let problem: string | null
+    const stored = listed.get(image.key)
+    const planned = plans.get(image.key)
+    const samePlan =
+      planned &&
+      planned.sha256 === image.sha256 &&
+      planned.bytes === image.bytes &&
+      planned.contentType === image.contentType &&
+      planned.width === image.width &&
+      planned.height === image.height
+    if (!stored) problem = 'missing'
+    else if (samePlan) problem = listedMismatch(planned, stored, MEDIA_CACHE_CONTROL)
+    else {
+      try {
+        const body = await getR2Object(bucket, image.key, env, fetchImplementation)
+        problem = body ? verifyObject(image, body) : 'missing'
+      } catch (error) {
+        problem = describeFetchError(error)
       }
-    })
-  )
+    }
+    if (problem) problems.push(`${image.key} (${problem})`)
+  }
   if (problems.length > 0) {
     problems.sort()
     throw new Error(
