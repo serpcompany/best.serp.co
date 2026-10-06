@@ -15,10 +15,10 @@ idempotency key, so renaming a template would let an event send again.
 | `sign-in-code` | Better Auth sends a sign-in code (sign-in codes only); code in the subject | the user | none (code) |
 | `claim-code` | A claim needs a domain-email code; code in the subject | the work address | none (code) |
 | `submission-received` | A free submission's badge is verified and it enters review | submitter | `/account/` |
-| `payment-received-in-review` | A paid submission's automatic checks failed; it waits for review | submitter | `/account/` (`/account/submissions/<id>/` after #65) |
-| `changes-requested` | A reviewer requests changes (the note is quoted) | submitter | `/submit/` (`/account/submissions/<id>/` after #65) |
-| `submission-rejected` | A reviewer rejects a submission that may be resubmitted | submitter | `/submit/` (`/account/submissions/<id>/` after #65) |
-| `submission-rejected-refunded` | A paid submission is rejected and refunded | submitter | `/account/` (`/account/submissions/<id>/` after #65) |
+| `payment-received-in-review` | A paid submission's automatic checks failed; it waits for review | submitter | `/account/submissions/<id>/` |
+| `changes-requested` | A reviewer requests changes (the note is quoted) | submitter | `/account/submissions/<id>/` |
+| `submission-rejected` | A reviewer rejects a submission that may be resubmitted | submitter | `/account/submissions/<id>/` |
+| `submission-rejected-refunded` | A paid submission is rejected and refunded | submitter | `/account/submissions/<id>/` |
 | `submission-rejected-prohibited` | A submission is rejected as prohibited: no resubmission, no refund | submitter | `/contact/` (a new conversation after #73) |
 | `listing-approved` | A free listing is approved and live | submitter | `/products/<slug>/` |
 | `listing-live-paid` | A paid listing passes the automatic checks and goes live | submitter | `/products/<slug>/` |
@@ -52,7 +52,8 @@ sample and fails on a link to a missing page. Copy and links that need a later s
 its flag in `apps/web/lib/features.ts` and switch to the approved wording when that issue turns
 it on (owner decision on #64):
 
-- `features.accountDashboard` (#65). Off, `changes-requested` says "Update your details and
+- `features.accountDashboard` (#65, on: [Submitter dashboard](./ACCOUNT_DASHBOARD.md)). Off,
+  `changes-requested` says "Update your details and
   resubmit from your account at <`/account/` link>" with an "Open your account" button (owner
   decision, 2026-10-06: the submission keeps its URL key, so `/submit/` would refuse it), and
   `submission-rejected` says "Update your details and submit again at <`/submit/` link>" with
@@ -70,14 +71,14 @@ Submitter-facing pages follow the same rule: copy that needs a later area comes 
 `apps/web/lib/feature-copy.ts` behind its flag (the badge step's "Add FAQs and links" and
 "Keep the badge up" cards, the form's FAQs hint, the free plan's weekly check), and
 `feature-copy.test.ts` fails when another page, component, `lib/submissions` message, or
-`packages/site-config` copy says it while the flag is off.
+`packages/site-config` copy (or `lib/account`, the dashboard's) says it while the flag is off.
 
 `links.test.ts` also fails when an email the app sends (any template whose id app code names) asks
 for a dashboard action whose flag is off, apart from the owner-approved interim copy it lists
 word for word (`APPROVED_INTERIM_COPY`: "resubmit from your account"). It lists the links still waiting for their page, all
-in emails nothing sends yet: `/account/listings/<slug>/` (badge-missing and unlisted, #65;
-screen 7 only defines `/account/listings/<slug>/edit`), `/account/messages/...` and
-`/admin/inbox/<thread>/` (#73). The draft reminder, which the hourly job sends (#63), renders
+in emails nothing sends yet: `/account/messages/...` and `/admin/inbox/<thread>/` (#73).
+`/account/listings/<slug>/`, where badge-missing and unlisted point, opens the listing's badge
+panel (#65). The draft reminder, which the hourly job sends (#63), renders
 with the site's `showPaidListings` flag as the job passes it, so its "Complete checkout" link
 to `/submit/<id>/checkout/` must exist once #68 turns the flag on.
 

@@ -163,10 +163,10 @@ the request carries a session cookie, so anonymous pages never load Better Auth 
   `Retry-After`), and 503 `OTP_DELIVERY_UNAVAILABLE` (email delivery not configured) states. Its
   code length, lifetime, and attempts come from `lib/email/sign-in-code.ts`, like Better Auth's.
 - **`/account`** (`components/account/account-shell.tsx`, shadcn dashboard-01): the sidebar
-  shell without the public header and footer, the user's email and sign-out, and the overview
-  (its heading and an empty state in a card). Signed out, it redirects to
-  `/login?callbackUrl=/account/`. Its other pages are #65, so their sidebar entries show a
-  "Soon" badge and do not link. The shell is composed from the shared dashboard pieces in
+  shell without the public header and footer, the user's email and sign-out, and the
+  submitter dashboard ([Submitter dashboard](./ACCOUNT_DASHBOARD.md), #65). Signed out, it
+  redirects to `/login?callbackUrl=/account/`. Messages (#73) and Settings show a "Soon" badge
+  and do not link. The shell is composed from the shared dashboard pieces in
   `packages/web-core/src/dashboard/` (`AppShell`, `SidebarBrand`, `NavMain`, `NavSecondary`,
   `NavUser`, `SiteHeader`, `DashboardPageHeader`), which the admin panel (#64, shadcn
   sidebar-07) reuses with `collapsible="icon"` and `rail`. `NavMain` marks the current page

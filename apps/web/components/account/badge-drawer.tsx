@@ -199,7 +199,7 @@ export function BadgeDrawer({
           ) : null}
           {notice ? <ToneAlert title="We couldn’t check the badge">{notice}</ToneAlert> : null}
           <Separator />
-          <Collapsible className="flex flex-col gap-2">
+          <Collapsible defaultOpen className="flex flex-col gap-2">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="-mx-2 justify-between">
                 Badge code

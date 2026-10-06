@@ -10,7 +10,7 @@ import {
   isConclusiveFailure,
   VERIFICATION_ATTEMPT_LIMIT,
   VERIFICATION_COOLDOWN_SECONDS
-} from '@/lib/submissions/contract'
+} from '../submissions/contract'
 
 /**
  * The submitter dashboard's view model (#65, #70 screen 5): the user's submissions and owned
@@ -123,9 +123,7 @@ function badgePanel(listing: AccountListing, target: BadgeTarget): BadgePanel | 
   const lastClaim = listing.badge.lastCheckAt ? Date.parse(listing.badge.lastCheckAt) : Number.NaN
   return {
     badgeUrl,
-    cooldownEndsAt: Number.isNaN(lastClaim)
-      ? 0
-      : lastClaim + VERIFICATION_COOLDOWN_SECONDS * 1000,
+    cooldownEndsAt: Number.isNaN(lastClaim) ? 0 : lastClaim + VERIFICATION_COOLDOWN_SECONDS * 1000,
     checksLeft: Math.max(0, VERIFICATION_ATTEMPT_LIMIT - listing.badge.verificationAttempts),
     failing: last !== null && last.outcome === 'fail' && last.conclusive,
     history,

@@ -197,8 +197,9 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   and none while its own submission is still in review; the logo is required, like a
   submission's.
 - `badge_checks` (listing, `checked_at`, `outcome` `pass` | `fail`, `reason`, `conclusive`) is
-  the badge program history. A network error or timeout is an inconclusive `fail` and never
-  counts as a miss; `checked_at` is an ISO instant (a CHECK), compared as text. It is outside
+  the badge program history (an owner's own checks from the account are recorded on the
+  submission instead: [Submitter dashboard](./ACCOUNT_DASHBOARD.md#badge-panel)). A network error
+  or timeout is an inconclusive `fail` and never counts as a miss; `checked_at` is an ISO instant (a CHECK), compared as text. It is outside
   the catalog: writing it never changes the catalog epoch.
 
 These tables are empty in the initial import, so bootstrap parity compares them like the

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { draftContentSchema, SUBMISSION_FIELD_LIMITS } from '@/lib/submissions/contract'
+import { draftContentSchema, SUBMISSION_FIELD_LIMITS } from '../submissions/contract'
 
 /**
  * The submitter dashboard's HTTP contract (serpcompany/best.serp.co#65), shared by the route
