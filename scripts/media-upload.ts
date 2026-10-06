@@ -154,10 +154,13 @@ function requireEnvironment(env: NodeJS.ProcessEnv, name: string): string {
   return value
 }
 
-/** The plan file, refused unless it is a JSON file directly under d1/media. */
-export function resolvePlanPath(planPath: string): string {
+/**
+ * The plan file, refused unless it is a JSON file directly under d1/media. Only tests pass their
+ * own `planDirectory`, so a transient plan never sits beside the reviewed ones other suites read.
+ */
+export function resolvePlanPath(planPath: string, planDirectory = 'd1/media'): string {
   const resolvedPath = resolve(planPath)
-  const directory = resolve('d1/media')
+  const directory = resolve(planDirectory)
   if (
     relative(directory, resolvedPath).includes('/') ||
     !resolvedPath.startsWith(`${directory}/`)
@@ -243,6 +246,8 @@ export interface UploadOptions {
   dryRun?: boolean
   env?: NodeJS.ProcessEnv
   fetcher?: typeof fetch
+  /** The directory plans must sit directly under; d1/media unless a test passes its own. */
+  planDirectory?: string
   target: UploadTarget
 }
 
@@ -252,7 +257,7 @@ export async function uploadMediaPlan(
 ): Promise<UploadSummary> {
   const env = options.env ?? process.env
   const api = options.fetcher ?? fetch
-  const resolvedPath = resolvePlanPath(planPath)
+  const resolvedPath = resolvePlanPath(planPath, options.planDirectory)
   const plan = mediaPlanSchema.parse(JSON.parse(readFileSync(resolvedPath, 'utf8')))
   const target = uploadTargets[options.target]
   if (!options.dryRun) validateUploadContext(env, options.target)
