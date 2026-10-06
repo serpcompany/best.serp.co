@@ -9,9 +9,6 @@ const failureText: Record<string, string> = {
   invalid_redirect: 'it redirected to an address that is not a public HTTP(S) URL',
   invalid_target: 'the URL is not a public HTTP(S) address on port 80 or 443',
   read_failed: 'the download broke off',
-  reviewed_copy_changed:
-    'the reviewed copy is gone and the source now serves different bytes, which are never published',
-  reviewed_copy_missing: 'the reviewed copy is gone and the source no longer serves it',
   response_too_large: 'the file is larger than 5 MB',
   site_unreachable: "the site couldn't be reached",
   store_failed: "the copy couldn't be stored",
@@ -40,22 +37,8 @@ export function logoNote(
   hostedLogo = false
 ): { text: string; tone: 'err' | 'warn' } | null {
   if (!queue) return null
-  if (hostedLogo) {
-    if (queue.status === 'failed') {
-      return {
-        text: `Couldn't host the new logo: ${describeMediaFailure(queue.lastError ?? 'unknown error')}. The page keeps the current logo. Save another image URL, or the current logo's URL to cancel.`,
-        tone: 'err'
-      }
-    }
-    const tried = queue.attempts
-      ? ` after ${queue.attempts} failed attempt${queue.attempts === 1 ? '' : 's'}: ${describeMediaFailure(queue.lastError ?? 'unknown error')}`
-      : ''
-    const next = queue.nextAttemptAt ? ` Next attempt: ${formatDateTime(queue.nextAttemptAt)}.` : ''
-    return {
-      text: `New logo pending${tried}. The page keeps the current logo until the new one is hosted; save the current logo's URL to cancel.${next}`,
-      tone: 'warn'
-    }
-  }
+  // A hosted logo stays on the page while its replacement waits: the screen adds no note.
+  if (hostedLogo) return null
   if (queue.status === 'failed') {
     return {
       text: `Couldn't host this logo: ${describeMediaFailure(queue.lastError ?? 'unknown error')}. The page shows the fallback tile. Save another image URL to try again.`,

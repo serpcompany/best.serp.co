@@ -9,7 +9,7 @@ import {
 import type { ListingDetailView } from '@/components/admin/listing-detail'
 import { renderableImage } from '../media/renderable-image'
 import { verifiedViaLabel } from './listing-labels'
-import { describeMediaFailure, logoNote } from './logo-note'
+import { logoNote } from './logo-note'
 
 /**
  * Maps the admin listing read to what the listing screen renders (#64 screen 12), including the
@@ -161,15 +161,6 @@ export function listingDetailView(
     logoImage: renderableImage({ key: listing.logoKey, url: listing.currentLogoUrl }, mediaBaseUrl),
     logoUrl: listing.logoUrl,
     logoNote: logoNote(listing.logoQueue, listing.logoKey !== null),
-    imageNote: listing.imageQueue
-      ? {
-          text:
-            listing.imageQueue.status === 'failed'
-              ? `Featured image not published: ${describeMediaFailure(listing.imageQueue.lastError ?? 'unknown error')}.`
-              : `Featured image waiting to be copied${listing.imageQueue.lastError ? ` (${describeMediaFailure(listing.imageQueue.lastError)})` : ''}.`,
-          tone: listing.imageQueue.status === 'failed' ? ('err' as const) : ('warn' as const)
-        }
-      : null,
     meta,
     name: listing.name,
     owner: listing.owner

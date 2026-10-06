@@ -45,12 +45,11 @@ describe('logo hosting note (#95)', () => {
       'the image has more than 40 megapixels (too_many_pixels)'
     )
     expect(describeMediaFailure('something_new')).toBe('something_new')
-    expect(describeMediaFailure('reviewed_copy_changed')).toMatch(
-      /^the reviewed copy is gone and the source now serves different bytes/u
-    )
+    // Reviewed-copy failures stay in the data and logs; the screens add no wording for them.
+    expect(describeMediaFailure('reviewed_copy_changed')).toBe('reviewed_copy_changed')
   })
 
-  it('keeps the current logo in the note while a replacement waits (#96 round 2 S2)', () => {
+  it('adds no note while a hosted logo stays on the page (#96 round 2 S2)', () => {
     const queue = {
       attempts: 1,
       lastError: 'http_503',
@@ -58,13 +57,8 @@ describe('logo hosting note (#95)', () => {
       sourceUrl: 'https://example.com/new.png',
       status: 'pending' as const
     }
-    expect(logoNote(queue, true)).toEqual({
-      text: "New logo pending after 1 failed attempt: the server answered HTTP 503 (http_503). The page keeps the current logo until the new one is hosted; save the current logo's URL to cancel.",
-      tone: 'warn'
-    })
-    expect(logoNote({ ...queue, status: 'failed' }, true)?.text).toMatch(
-      /^Couldn't host the new logo: .*The page keeps the current logo\./u
-    )
+    expect(logoNote(queue, true)).toBeNull()
+    expect(logoNote({ ...queue, status: 'failed' }, true)).toBeNull()
     expect(logoNote(queue, false)?.text).toMatch(/fallback tile/u)
   })
 })
