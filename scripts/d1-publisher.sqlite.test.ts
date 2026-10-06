@@ -802,6 +802,48 @@ describe('listing-unpublish (the admin panel’s unpublished state, #64 and #100
     })
   })
 
+  it('applies row-level at whatever version the environment is at, guarded by its row (#100)', () => {
+    const operation = {
+      action: 'listing-unpublish',
+      id: 'lst_sqlite_test',
+      slug: 'old-slug',
+      categories: ['seo'],
+      reason: 'hijacked domain: gambling',
+      expected: { website: 'https://example.com' }
+    }
+    const rows = (extra: Record<string, unknown> = {}) =>
+      manifestSchema.parse({
+        version: 1,
+        id: 'hijacked-rows',
+        concurrency: 'rows',
+        provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+        operations: [{ ...operation, ...extra }]
+      })
+    const db = database()
+    // Another publication moved this environment past the version the manifest was written at.
+    db.prepare('UPDATE publication_state SET version=9, checksum=?').run('b'.repeat(64))
+    executeInTestTransaction(
+      db,
+      buildPublicationPlan(rows(), 'rows manifest', now, { checksum: 'b'.repeat(64), version: 9 })
+    )
+    expect(listingState(db)).toEqual({ slug: 'old-slug', status: 'approved', is_active: 0 })
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 10
+    })
+    // The row guards still hold: a moved website refuses the batch at any version.
+    const moved = database()
+    moved.exec("UPDATE listings SET website='https://moved.example'")
+    expect(() =>
+      executeInTestTransaction(
+        moved,
+        buildPublicationPlan(rows(), 'rows manifest', now, { checksum: beforeChecksum, version: 4 })
+      )
+    ).toThrow()
+    expect(listingState(moved)).toEqual({ slug: 'old-slug', status: 'approved', is_active: 1 })
+    // Row-level, the website guard is required.
+    expect(() => rows({ expected: undefined })).toThrow(/needs expected.website/u)
+  })
+
   it('refuses an empty reason and an unknown expected field', () => {
     expect(() => unpublish({ reason: '  ' })).toThrow()
     expect(() => unpublish({ expected: { website: 'https://example.com', name: 'Old' } })).toThrow()
