@@ -224,40 +224,6 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
           'resource links',
           categoryFormatted
         ].join(', ')
-      },
-      {
-        '@type': 'FAQPage',
-        '@id': `${pageUrl}#faq`,
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: `What is included in ${website.name}'s ${listingLabel}?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `${website.name}'s ${listingLabel} includes its summary, category details, primary link, and any supplemental resources included with the ${listingLabel}.`
-            }
-          },
-          {
-            '@type': 'Question',
-            name: `How do I access ${website.name}'s published links?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `You can visit ${website.name} directly at ${website.website}.${
-                website.resourceLinks && website.resourceLinks.length > 0
-                  ? ' This entry also includes supplemental resource links alongside the main destination.'
-                  : ''
-              }`
-            }
-          },
-          {
-            '@type': 'Question',
-            name: `What category does ${website.name} belong to?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `${website.name} is categorized under "${categoryFormatted}" in the ${SITE_NAME} directory. ${website.description}`
-            }
-          }
-        ]
       }
     ]
   }

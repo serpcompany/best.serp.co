@@ -324,8 +324,8 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await page.goto(`/account/listings/${slug}/edit/`)
   await expect(page.getByRole('heading', { name: `Edit ${name}` })).toBeVisible()
   await expect(page.getByLabel('Name')).toBeDisabled()
-  // Listing pages don't show FAQs until #105 (features.listingFaqs).
-  await expect(page.getByText('FAQs will appear on your listing page soon.')).toBeVisible()
+  // Listing pages show FAQs (#105, features.listingFaqs), and the hint says so.
+  await expect(page.getByText('Shown on your listing page.')).toBeVisible()
   await capture(page, '07-edit')
   const revised = 'Sorts expenses from your bank feed and prepares quarterly tax worksheets.'
   await page.getByLabel('Short description').fill(revised)
@@ -579,4 +579,154 @@ test('shows and acts on the user’s own records only, never cached or indexed',
   }
   await owner.context.close()
   await other.context.close()
+})
+
+/** A live listing owned by `ownerEmail`'s account, with these FAQs, as an approval leaves it. */
+function seedOwnedListing(
+  label: string,
+  ownerEmail: string,
+  faqs: Array<[string, string]>,
+  content = ''
+) {
+  const id = `e2e-faqs-${label}-${unique()}`
+  const slug = `${id}.example`
+  const [owner] = localD1<{ id: string }>(`SELECT id FROM users WHERE email = ${q(ownerEmail)}`)
+  localD1(`
+    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
+      source_kind, source_identity, checksum, source, link_rel)
+    VALUES (${q(id)}, ${q(slug)}, ${q(`FAQ ${label}`)}, 'A listing for the FAQ section.',
+      ${q(`https://${slug}/`)}, ${q(content)}, 'draft', '2026-09-01', 'verified-submission', ${q(id)},
+      ${q(`e2e-${id}`)}, 'submission', 'nofollow');
+    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+      SELECT ${q(id)}, id, 0, 1 FROM categories WHERE slug = ${q(activeCategory())};
+    INSERT INTO listing_media (listing_id, kind, url, sort_order)
+      VALUES (${q(id)}, 'logo', ${q(`https://${slug}/logo.png`)}, 0);
+    ${faqs
+      .map(
+        ([question, answer], index) =>
+          `INSERT INTO listing_faqs (listing_id, question, answer, sort_order)
+            VALUES (${q(id)}, ${q(question)}, ${q(answer)}, ${index});`
+      )
+      .join('\n')}
+    UPDATE listings SET status = 'approved' WHERE id = ${q(id)};
+    INSERT INTO listing_owners (listing_id, user_id, role, verified_via, verified_at)
+      VALUES (${q(id)}, ${q(owner?.id ?? '')}, 'owner', 'admin', '2026-09-01T00:00:00.000Z');
+  `)
+  return { id, slug }
+}
+
+test('listing pages show approved FAQs, none without, and an approved FAQ revision after the epoch turns (#105)', async ({
+  baseURL,
+  browser,
+  page: adminPage
+}) => {
+  test.setTimeout(180_000)
+  const owner = await signedIn(browser, 'faqs')
+  const withFaqs = seedOwnedListing('with', owner.email, [
+    ['Does it file my taxes?', 'No. It prepares the worksheets; you file.'],
+    ['Which banks can I connect?', 'Most US banks and credit unions.']
+  ])
+  const without = seedOwnedListing('without', owner.email, [])
+  // As the one-time import stored them: each FAQ also a heading in the long description.
+  const imported = seedOwnedListing(
+    'imported',
+    owner.email,
+    [['How do I export a report?', 'From the Reports page.']],
+    '## FAQ\n\n### How do I export a report?\n\nFrom the Reports page.'
+  )
+  const visitor = await playwrightRequest.newContext({ baseURL })
+  try {
+    // With FAQs: the section, every question, and the answers (in the HTML while closed).
+    const html = await (await visitor.get(`/products/${withFaqs.slug}/`)).text()
+    expect(html).toContain('id="faqs"')
+    for (const text of [
+      'Does it file my taxes?',
+      'No. It prepares the worksheets; you file.',
+      'Which banks can I connect?'
+    ]) {
+      expect(html).toContain(text)
+    }
+    // Edge-cached like the rest of the page.
+    expect((await visitor.get(`/products/${withFaqs.slug}/`)).headers()['x-edge-cache']).toBe('HIT')
+    // Without FAQs: no section at all.
+    expect(await (await visitor.get(`/products/${without.slug}/`)).text()).not.toContain(
+      'id="faqs"'
+    )
+    // FAQs the long description already shows aren't repeated in a section.
+    const importedHtml = await (await visitor.get(`/products/${imported.slug}/`)).text()
+    expect(importedHtml).toContain('How do I export a report?')
+    expect(importedHtml).not.toContain('id="faqs"')
+
+    // The page in a browser: questions as an Accordion, an answer shown when opened.
+    const page = await (await browser.newContext({ baseURL })).newPage()
+    await page.goto(`/products/${withFaqs.slug}/`)
+    const faqs = page.locator('section[aria-labelledby="faqs"]')
+    await expect(faqs.getByRole('heading', { name: 'FAQs' })).toBeVisible()
+    await expect(faqs.getByText('No. It prepares the worksheets; you file.')).toBeHidden()
+    await faqs.getByRole('button', { name: 'Does it file my taxes?' }).click()
+    await expect(faqs.getByText('No. It prepares the worksheets; you file.')).toBeVisible()
+    if (screenshots) {
+      mkdirSync(screenshots, { recursive: true })
+      // The section itself (and, on a phone, the page around it), at both widths and themes.
+      for (const [width, size] of Object.entries(SIZES)) {
+        await page.setViewportSize({ height: 900, width: size.width })
+        for (const colorScheme of ['light', 'dark'] as const) {
+          await page.emulateMedia({ colorScheme })
+          await faqs.scrollIntoViewIfNeeded()
+          await page.waitForTimeout(400)
+          await faqs.screenshot({
+            path: resolve(screenshots, `105-faqs-section-${width}-${colorScheme}.png`)
+          })
+          await page.screenshot({
+            path: resolve(screenshots, `105-faqs-page-${width}-${colorScheme}.png`)
+          })
+        }
+      }
+    }
+    await page.context().close()
+
+    // The owner changes the FAQs; nothing public changes until an admin approves.
+    const saved = await owner.context.request.post(
+      `/api/account/listings/${withFaqs.id}/revision`,
+      {
+        data: {
+          categorySlug: activeCategory(),
+          content: '',
+          description: 'A listing for the FAQ section.',
+          expectedRevisionVersion: null,
+          faqs: [
+            {
+              answer: 'No. It prepares the worksheets; you file.',
+              question: 'Does it file my taxes?'
+            },
+            { answer: 'Yes, as a CSV.', question: 'Can I export my data?' }
+          ],
+          logoUrl: `https://${withFaqs.slug}/logo.png`,
+          resourceLinks: []
+        },
+        headers: owner.headers
+      }
+    )
+    expect(saved.status(), await saved.text()).toBe(200)
+    const { revisionId } = (await saved.json()) as { revisionId: string }
+    expect(await (await visitor.get(`/products/${withFaqs.slug}/`)).text()).not.toContain(
+      'Can I export my data?'
+    )
+    const admin = client(adminPage.request, baseURL)
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.accountDashboard, accountServer))
+    const approved = await adminPage.request.post(`/api/admin/revisions/${revisionId}/approve`, {
+      data: { expectedContentVersion: 1 },
+      headers: admin.headers
+    })
+    expect(approved.status(), await approved.text()).toBe(200)
+    // The approval advances the catalog epoch, so the cached page turns over.
+    await expect(async () => {
+      const updated = await (await visitor.get(`/products/${withFaqs.slug}/`)).text()
+      expect(updated).toContain('Can I export my data?')
+      expect(updated).not.toContain('Which banks can I connect?')
+    }).toPass({ intervals: [1_000, 2_000, 5_000], timeout: 90_000 })
+  } finally {
+    await visitor.dispose()
+    await owner.context.close()
+  }
 })

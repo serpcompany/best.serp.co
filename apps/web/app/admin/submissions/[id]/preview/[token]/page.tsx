@@ -2,6 +2,7 @@ import { ProjectNavigation } from '@serpdirectory/web-core/project-navigation'
 import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@serpdirectory/web-core/sections/external-resources-section-route'
 import { WebsiteContentSectionRoute as WebsiteContentSection } from '@serpdirectory/web-core/website/website-content-section-route'
 import { WebsiteDetailSidebar } from '@serpdirectory/web-core/website/website-detail-sidebar'
+import { WebsiteFaqsSection } from '@serpdirectory/web-core/website/website-faqs-section'
 import {
   WebsiteHeroRoute as WebsiteHero,
   type WebsiteHeroRouteProps
@@ -71,6 +72,7 @@ export default async function ReviewPreviewPage({ params }: ReviewPreviewPagePro
           ProjectNavigation,
           WebsiteContentSection,
           WebsiteDetailSidebar,
+          WebsiteFaqsSection,
           WebsiteHero: PrivatePreviewWebsiteHero,
           WebsiteRelatedProjects,
           WebsiteResourcesSection

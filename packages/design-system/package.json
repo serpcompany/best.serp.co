@@ -5,6 +5,7 @@
   "description": "Design System for the Monorepo",
   "exports": {
     "./theme-provider": "./index.tsx",
+    "./accordion": "./components/shadcn/accordion.tsx",
     "./alert": "./components/shadcn/alert.tsx",
     "./alert-dialog": "./components/shadcn/alert-dialog.tsx",
     "./aspect-ratio": "./components/shadcn/aspect-ratio.tsx",
