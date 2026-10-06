@@ -24,7 +24,7 @@ function render(
   return renderAppEmail(id, sample.input as never, { environment, to: sample.to })
 }
 
-/** Today's site: no account dashboard pages (#65), no conversations (#73). */
+/** The site before #65 and #73: no account dashboard pages, no conversations. */
 const BEFORE: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
@@ -736,7 +736,7 @@ Thanks for your payment of $49.00.
 Our automatic checks couldn't load https://kiddotutor.com/ (the connection timed out), so Kiddo Tutor isn't live yet. A reviewer will look at it before it's published. You don't need to do anything.
 If it's rejected for anything other than prohibited content, you get a full refund automatically.
 
-View submission: https://best.serp.co/account/
+View submission: https://best.serp.co/account/submissions/s_7tq20z/
 
 --
 SERP Directory · https://best.serp.co

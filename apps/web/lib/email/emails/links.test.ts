@@ -28,8 +28,6 @@ const APP_DIRECTORY = join(WEB_DIRECTORY, 'app')
 /** Links to pages other issues build, by template (each email that links there). */
 const DEFERRED: Partial<Record<TemplateId, Array<{ issue: string; path: RegExp }>>> = {
   'admin-new-message': [{ issue: '#73', path: /^\/admin\/inbox\/[^/]+\/$/u }],
-  'badge-missing': [{ issue: '#65', path: /^\/account\/listings\/[^/]+\/$/u }],
-  'listing-unlisted': [{ issue: '#65', path: /^\/account\/listings\/[^/]+\/$/u }],
   'new-message': [{ issue: '#73', path: /^\/account\/messages\/[^/]+\/$/u }]
 }
 

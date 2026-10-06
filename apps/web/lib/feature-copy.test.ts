@@ -9,8 +9,8 @@ import { features, type SiteFeatures } from './features'
  * (`email/emails/links.test.ts`) does for emails: submitter-facing copy that needs a later site
  * area lives in `feature-copy.ts` behind that area's flag, and no page or component says it
  * anywhere else while the flag is off. Scanned: `app/`, `components/`, `lib/submissions/` (its
- * messages reach the submitter), and `packages/site-config` (site copy, including the About
- * page). The admin panel is left out: its copy describes listing states to the team, not what
+ * messages reach the submitter), `lib/account/` (the dashboard's, #65), and
+ * `packages/site-config` (site copy, including the About page). The admin panel is left out: its copy describes listing states to the team, not what
  * a submitter can do.
  */
 
@@ -20,6 +20,7 @@ const SCANNED = [
   join(WEB_DIRECTORY, 'app'),
   join(WEB_DIRECTORY, 'components'),
   join(WEB_DIRECTORY, 'lib', 'submissions'),
+  join(WEB_DIRECTORY, 'lib', 'account'),
   join(SITE_CONFIG_DIRECTORY, 'src'),
   join(SITE_CONFIG_DIRECTORY, 'content')
 ]
@@ -45,11 +46,7 @@ const PAGE_PROMISES: ReadonlyArray<{
  * Copy the owner approved while its area is still off, by file, exempt word for word (as
  * `APPROVED_INTERIM_COPY` in the email audit).
  */
-const APPROVED_INTERIM_COPY: Record<string, RegExp[]> = {
-  // Owner decision on #64 (2026-10-06): a changes-requested submission is fixed and resubmitted
-  // from the account area, whose editing #65 builds; the email says the same.
-  'components/account/submissions-table.tsx': [/'Fix and resubmit'/gu]
-}
+const APPROVED_INTERIM_COPY: Record<string, RegExp[]> = {}
 
 const ALL_OFF: SiteFeatures = {
   accountDashboard: false,
@@ -121,6 +118,14 @@ describe('page copy', () => {
     expect(PAGE_PROMISES.filter(promise => promise.pattern.test(off))).toEqual([])
     expect(featureCopy(ALL_OFF)).toEqual({
       addFaqsAndLinks: null,
+      badgePanel: {
+        cadence: null,
+        cardNote: 'Free listings keep the badge on their site',
+        description: 'Free listing',
+        failingNote: null,
+        failingTitle: 'Fix the badge',
+        programCheckBy: 'SERP'
+      },
       contentHint: 'Shown on your listing page.',
       freePlanBadgeCheck: null,
       keepTheBadgeUp: null
@@ -130,6 +135,15 @@ describe('page copy', () => {
       addFaqsAndLinks: {
         description: 'From your account while the listing is in review.',
         title: 'Add FAQs and links'
+      },
+      badgePanel: {
+        cadence: 'Weekly',
+        cardNote: 'Free listings are checked weekly',
+        description: 'Free listing · checked weekly',
+        failingNote:
+          'If it’s still failing at the recheck about 24 hours later, the listing is unlisted.',
+        failingTitle: 'Fix the badge before the recheck',
+        programCheckBy: 'Weekly'
       },
       contentHint:
         'Shown on your listing page. FAQs and links can be added from your account later.',

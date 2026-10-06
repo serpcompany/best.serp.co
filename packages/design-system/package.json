@@ -15,6 +15,7 @@
     "./button": "./components/shadcn/button.tsx",
     "./card": "./components/shadcn/card.tsx",
     "./checkbox": "./components/shadcn/checkbox.tsx",
+    "./collapsible": "./components/shadcn/collapsible.tsx",
     "./command": "./components/shadcn/command.tsx",
     "./dialog": "./components/shadcn/dialog.tsx",
     "./drawer": "./components/shadcn/drawer.tsx",

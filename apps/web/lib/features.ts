@@ -8,7 +8,7 @@
 export interface SiteFeatures {
   /**
    * #65: the account dashboard's submission and listing pages (`/account/submissions/<id>/`),
-   * where a submitter edits and resubmits. Off: emails send people to `/submit/` instead.
+   * where a submitter edits and resubmits, and adds FAQs and links. On since #65 built them.
    */
   readonly accountDashboard: boolean
   /**
@@ -30,7 +30,7 @@ export interface SiteFeatures {
 }
 
 export const features: SiteFeatures = {
-  accountDashboard: false,
+  accountDashboard: true,
   badgeProgram: false,
   messages: false,
   orders: false
