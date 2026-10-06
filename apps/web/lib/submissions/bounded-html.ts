@@ -23,8 +23,10 @@ import {
  * - `elements`: 100,000 elements created;
  * - `work`: 10 million units, charged close to each step's real cost: a token, and opening
  *   an element, cost the open-element depth (what their scans can walk) plus 1 for a token;
- *   an attribute is 1 plus the attributes already on its tag (the duplicate check); and
- *   inserting before a sibling or detaching a node is the parent's child count.
+ *   an attribute is 1 plus the attributes already on its tag (the duplicate check);
+ *   inserting before a sibling or detaching a node is the parent's child count; and each
+ *   walk of the list of active formatting elements is its length, times the new element's
+ *   attributes when one is added (the Noah's Ark check).
  * Large real pages stay far below them (`bounded-html.test.ts` records several), and crafted
  * 1 MB pages stop within tens of milliseconds.
  *
@@ -124,6 +126,41 @@ function meteredTreeAdapter(meter: WorkMeter): TreeAdapter<DefaultTreeAdapterMap
   }
 }
 
+type FormattingList = Parser<DefaultTreeAdapterMap>['activeFormattingElements']
+
+/** Methods of the active formatting elements list that walk the whole list. */
+const FORMATTING_LIST_SCANS = [
+  'clearToLastMarker',
+  'getElementEntry',
+  'getElementEntryInScopeWithTagName',
+  'insertElementAfterBookmark',
+  'insertMarker',
+  'removeEntry'
+] as const
+
+/**
+ * Charges the list of active formatting elements (PR #84 review round 3, finding 2), which can
+ * hold far more entries than the stack (entries outlive their elements until a marker clears
+ * them): each walk of the list costs its length, and adding an element costs the length times
+ * its attributes, since the Noah's Ark check compares them with every entry since the last
+ * marker before the entry is put at the front.
+ */
+function meterFormattingList(list: FormattingList, meter: WorkMeter): void {
+  const methods = list as unknown as Record<string, (...args: unknown[]) => unknown>
+  for (const name of FORMATTING_LIST_SCANS) {
+    const original = methods[name] as (...args: unknown[]) => unknown
+    methods[name] = (...args: unknown[]) => {
+      meter.charge(list.entries.length)
+      return original.apply(list, args)
+    }
+  }
+  const pushElement = list.pushElement
+  list.pushElement = (element, token) => {
+    meter.charge(list.entries.length * (2 + 2 * element.attrs.length))
+    pushElement.call(list, element, token)
+  }
+}
+
 class MeteredParser extends Parser<DefaultTreeAdapterMap> {
   private readonly meter: WorkMeter
 
@@ -133,6 +170,7 @@ class MeteredParser extends Parser<DefaultTreeAdapterMap> {
     this.meter = meter
     // A fresh tokenizer, in the same initial state as the one `super` made and has not used.
     this.tokenizer = new MeteredTokenizer(this.options, this, meter)
+    meterFormattingList(this.activeFormattingElements, meter)
   }
 
   private chargeToken(): void {

@@ -31,6 +31,19 @@ function ordinaryPage(): string {
   return page(fill(wrapper, article))
 }
 
+/**
+ * PR #84 review round 3, finding 2: 12 rounds of 500 nested `<b>`s with 41 attributes each
+ * (only the last differs), each round closed again. The Noah's Ark check compares every new
+ * `<b>` with the open ones: plain parse5 takes about 0.7 s, inside every other limit.
+ */
+function noahsArkPage(): string {
+  const shared = attributes(40)
+  let z = 0
+  const round = () =>
+    Array.from({ length: 500 }, () => `<b ${shared} z=${z++}>`).join('') + '</b>'.repeat(500)
+  return Array.from({ length: 12 }, round).join('')
+}
+
 function fastestOfThree(run: () => unknown): number {
   run() // warm up
   let fastest = Number.POSITIVE_INFINITY
@@ -85,6 +98,9 @@ describe('parseBoundedHtml', () => {
     expect(() => parseBoundedHtml('<p a b c>', { ...HTML_LIMITS, work: 10 })).toThrow(
       HtmlTooComplexError
     )
+    // The list of active formatting elements: without its charge, this page fits every limit
+    // (at about 9.7 million units of work).
+    tooComplex(noahsArkPage())
   })
 
   it('does not merge repeated <html> and <body> attributes', () => {
@@ -93,8 +109,8 @@ describe('parseBoundedHtml', () => {
   })
 
   /**
-   * Real pages, first 1 MB, measured on 2026-10-06: work per byte 0.08 to 1.14 (the most was
-   * a 35 KB news index; the WHATWG parsing spec, 788 KB, used 0.81 million of the 10
+   * Real pages, first 1 MB, measured on 2026-10-06: work per byte 0.09 to 1.55 (the most was
+   * a 35 KB news index; the WHATWG parsing spec, 788 KB, used 0.93 million of the 10
    * million), at most 13,652 elements, and depth at most 35. Sites: Wikipedia (two
    * articles), GitHub, MDN, BBC News, Hacker News, the WHATWG and W3C specs, WordPress.org,
    * best.serp.co, Product Hunt, Elementor, The Verge, CNN, ThemeForest and Shopify.
@@ -164,7 +180,8 @@ describe('badge scanner on 1 MB of crafted HTML', () => {
     [
       'repeated <body> attributes',
       Array.from({ length: MB / 12 }, (_, i) => `<body b${i}>`).join('')
-    ]
+    ],
+    ["nested formatting that fills Noah's Ark", noahsArkPage()]
   ]
 
   it.each(pages)('%s', (_label, html) => {
