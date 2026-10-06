@@ -160,6 +160,8 @@ function createListingFromSubmissionPlans(input: {
   featuredImageKey?: string | null
   linkRel: ListingLinkRel
   listingId: string
+  /** The hosted logo the reviewer saw (null for the tile); absent when nobody reviewed it. */
+  logoKey?: string | null
   now: string
   sourceCondition: PlanGuard
   submissionId: string
@@ -199,6 +201,7 @@ function createListingFromSubmissionPlans(input: {
     ...adoptStagedLogoPlans({
       listingId,
       now: input.now,
+      reviewedKey: input.logoKey,
       stagedId: submissionId,
       stagedTable: 'listing_submissions'
     }),
@@ -259,6 +262,8 @@ export function buildApproveSubmissionPlans(input: {
    * shows no images (the legacy approval workflow): then no featured image is adopted.
    */
   expectedImageKey?: string | null
+  /** The hosted logo key the reviewer saw (null for the tile), like `expectedImageKey`. */
+  expectedLogoKey?: string | null
   linkRel?: ListingLinkRel
   listingId: string
   manifestId: string
@@ -296,6 +301,7 @@ export function buildApproveSubmissionPlans(input: {
       checksum: input.afterChecksum,
       featuredImageKey: input.expectedImageKey,
       linkRel: input.linkRel ?? 'nofollow',
+      logoKey: input.expectedLogoKey,
       listingId: input.listingId,
       now: input.now,
       sourceCondition: current,
@@ -468,6 +474,8 @@ export function buildApproveLiveSubmissionPlans(input: {
   expectedContentVersion: number
   /** As in `buildApproveSubmissionPlans`: the paid listing went live without its image. */
   expectedImageKey?: string | null
+  /** The hosted logo key the reviewer saw (null for the tile). */
+  expectedLogoKey?: string | null
   listingId: string
   now: string
   publication: CatalogPublication
@@ -488,6 +496,7 @@ export function buildApproveLiveSubmissionPlans(input: {
       checksum: input.publication.afterChecksum,
       listingId: input.listingId,
       now: input.now,
+      reviewedLogoKey: input.expectedLogoKey,
       source: submissionContentSource(input.submissionId)
     }),
     ...(input.expectedImageKey === undefined

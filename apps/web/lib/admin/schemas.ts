@@ -28,6 +28,8 @@ export const approveSubmissionSchema = z.object({
    * that image, and is refused if the submission's image changed since (#96 round 2 B1).
    */
   expectedImageKey: text(300).nullable().default(null),
+  /** The hosted logo the review screen showed (null for the tile), as for the image. */
+  expectedLogoKey: text(300).nullable().default(null),
   linkRel: linkRel.optional()
 })
 
@@ -39,7 +41,8 @@ export const rejectSubmissionSchema = z.object({
 })
 
 export const approveRevisionSchema = z.object({
-  expectedContentVersion: z.number().int().positive()
+  expectedContentVersion: z.number().int().positive(),
+  expectedLogoKey: text(300).nullable().default(null)
 })
 
 export const rejectRevisionSchema = z.object({ reason: text(2_000) })

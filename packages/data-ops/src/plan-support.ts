@@ -227,16 +227,39 @@ function queueFromSubmissionSlot(input: {
 }
 
 /**
- * Gives a listing the logo staged on a submission or revision, never as a hotlink:
- * - the live logo row stays when its source is the staged logo, hosted or not (an imported logo
- *   keeps rendering until the legacy migration repoints it, #95 review S7);
- * - otherwise a submission's hosted copy of that source is queued to be copied into the
- *   listing's path, or the source itself is queued for the cron.
- * The page shows the fallback tile until the new logo is hosted. Runs inside an approval batch.
+ * The hosted logo a review screen shows for a staged logo (#96 round 2 S9): a submission's
+ * hosted copy of its `logo_url`, or for a revision the listing's hosted logo of that source.
+ * `?` binds the staged id; the revision form also binds nothing else.
+ */
+export function stagedLogoKeySql(stagedTable: 'listing_revisions' | 'listing_submissions'): string {
+  return stagedTable === 'listing_submissions'
+    ? `(SELECT j.media_key FROM media_ingestions j JOIN listing_submissions s ON s.id=j.submission_id
+        WHERE s.id=? AND j.kind='logo' AND j.sort_order=0 AND j.status='hosted'
+          AND j.source_url=s.logo_url)`
+    : `(SELECT m.media_key FROM listing_media m JOIN listing_revisions r ON r.listing_id=m.listing_id
+        WHERE r.id=? AND m.kind='logo' AND m.media_key IS NOT NULL AND m.url=r.logo_url
+        ORDER BY m.sort_order LIMIT 1)`
+}
+
+/** The `<hash>.<ext>` a logo key ends with: the same bytes under any owner's path. */
+const logoTail = (key: string) => `substr(${key}, instr(${key}, '/logo/') + 6)`
+
+/**
+ * Gives a listing the logo staged on a submission or revision, only as it was reviewed (#96
+ * review round 3, S1); never a hotlink, and never a later fetch of the staged URL:
+ * - `reviewedKey` is the hosted logo the review screen showed (null for the tile). The batch is
+ *   refused unless that is still the staged logo's hosted copy (a compare-and-swap). Without
+ *   it (a paid listing going live at payment, the legacy approval workflow) the staged logo's
+ *   current hosted copy is used, unreviewed but never refetched.
+ * - The listing's logo row stays when its source is the staged logo and it holds those bytes, or
+ *   is an imported row not hosted yet (#95 review S7: relative and repo paths survive).
+ * - Otherwise a submission's reviewed copy is queued to be copied into the listing's path; a
+ *   logo that was not hosted at review leaves the fallback tile until an admin sets one.
  */
 export function adoptStagedLogoPlans(input: {
   listingId: string
   now: string
+  reviewedKey?: string | null
   stagedId: string
   stagedTable: 'listing_revisions' | 'listing_submissions'
 }): StatementPlan[] {
@@ -244,60 +267,44 @@ export function adoptStagedLogoPlans(input: {
   const { listingId, stagedId, stagedTable } = input
   const stagedLogo = `(SELECT logo_url FROM ${stagedTable} WHERE id=?)`
   const logoRow = `EXISTS (SELECT 1 FROM listing_media WHERE listing_id=? AND kind='logo')`
-  const queueFromSubmission: StatementPlan[] =
-    stagedTable === 'listing_submissions'
+  const reviewed = input.reviewedKey !== undefined
+  // The key to adopt: the reviewed one, or (unreviewed) the staged logo's hosted copy now.
+  const adopt = reviewed
+    ? { sql: '?', params: [input.reviewedKey] }
+    : { sql: stagedLogoKeySql(stagedTable), params: [stagedId] }
+  return [
+    ...(reviewed
+      ? [
+          assertGuard('reviewed_logo_current', {
+            sql: `${stagedLogoKeySql(stagedTable)} IS ?`,
+            params: [stagedId, input.reviewedKey]
+          })
+        ]
+      : []),
+    {
+      sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'
+        AND NOT (url IS ${stagedLogo} AND (media_key IS NULL
+          OR ${logoTail('media_key')} IS ${logoTail(adopt.sql)}))`,
+      params: [listingId, stagedId, ...adopt.params, ...adopt.params]
+    },
+    {
+      sql: `DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo'`,
+      params: [listingId]
+    },
+    ...(stagedTable === 'listing_submissions'
       ? [
           queueFromSubmissionSlot({
             kind: 'logo',
             listingId,
             now: input.now,
             slotCondition: {
-              sql: `j.source_url=${stagedLogo} AND NOT ${logoRow}`,
-              params: [stagedId, listingId]
+              sql: `j.status='hosted' AND j.media_key=${adopt.sql} AND NOT ${logoRow}`,
+              params: [...adopt.params, listingId]
             },
             submissionId: stagedId
           })
         ]
-      : []
-  return [
-    {
-      sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'
-        AND url IS NOT ${stagedLogo}`,
-      params: [listingId, stagedId]
-    },
-    {
-      sql: `DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo' AND ${logoRow}`,
-      params: [listingId, listingId]
-    },
-    ...queueFromSubmission,
-    {
-      sql: `INSERT INTO media_ingestions
-        (listing_id,kind,sort_order,source_url,status,attempts,next_attempt_at,created_at,updated_at)
-        SELECT ?,'logo',0,logo_url,'pending',0,?,?,? FROM ${stagedTable}
-        WHERE id=? AND NOT ${logoRow} AND NOT EXISTS (SELECT 1 FROM media_ingestions
-          WHERE listing_id=? AND kind='logo' AND sort_order=0 AND source_url IS ${stagedLogo}
-          AND next_attempt_at=?)
-        ON CONFLICT(listing_id,kind,sort_order) WHERE listing_id IS NOT NULL DO UPDATE SET
-          source_url=excluded.source_url,copy_from_key=NULL,status='pending',attempts=0,
-          next_attempt_at=excluded.next_attempt_at,last_error=NULL,${CLEARED_MEDIA_RESULT},
-          updated_at=excluded.updated_at`,
-      params: [
-        listingId,
-        input.now,
-        input.now,
-        input.now,
-        stagedId,
-        listingId,
-        listingId,
-        stagedId,
-        input.now
-      ]
-    },
-    assertGuard('staged_logo_kept_or_queued', {
-      sql: `${logoRow} OR EXISTS (SELECT 1 FROM media_ingestions WHERE listing_id=?
-        AND kind='logo' AND sort_order=0 AND status='pending' AND source_url IS ${stagedLogo})`,
-      params: [listingId, listingId, stagedId]
-    })
+      : [])
   ]
 }
 
@@ -439,6 +446,8 @@ export function applyStagedContentPlans(input: {
   checksum: string
   listingId: string
   now: string
+  /** The hosted logo the reviewer saw (null for the tile); see `adoptStagedLogoPlans`. */
+  reviewedLogoKey?: string | null
   source: StagedContentSource
 }): StatementPlan[] {
   const { listingId, source } = input
@@ -474,10 +483,11 @@ export function applyStagedContentPlans(input: {
     },
     assertPreviousStatementChangedOne('primary_category_replaced'),
     { sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='video'`, params: [listingId] },
-    // Never a hotlink (#95): keep the hosted logo, adopt a hosted copy, or queue the source.
+    // Never a hotlink (#95), and only the reviewed logo (#96 round 3).
     ...adoptStagedLogoPlans({
       listingId,
       now: input.now,
+      reviewedKey: input.reviewedLogoKey,
       stagedId: source.id,
       stagedTable: source.table
     }),

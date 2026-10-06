@@ -396,11 +396,14 @@ async function approveSubmissionOnce(
     expectedContentVersion: number
     /** The hosted featured image the reviewer saw; missing means none (#96 round 2 B1). */
     expectedImageKey?: string | null
+    /** The hosted logo the reviewer saw; missing means the tile (#96 round 3 S1). */
+    expectedLogoKey?: string | null
     linkRel?: ListingLinkRel
     submissionId: string
   }
 ): Promise<Decision<{ listingSlug: string }>> {
   const expectedImageKey = input.expectedImageKey ?? null
+  const expectedLogoKey = input.expectedLogoKey ?? null
   const snapshot = await submissionSnapshot(context, input.submissionId)
   if (!snapshot) return notFound('submission')
   const result = { listingSlug: snapshot.slug }
@@ -477,6 +480,7 @@ async function approveSubmissionOnce(
         beforeChecksum: publication.beforeChecksum,
         expectedContentVersion: version,
         expectedImageKey,
+        expectedLogoKey,
         linkRel: input.linkRel,
         listingId: approvedListingId,
         manifestId: publication.manifestId,
@@ -505,6 +509,7 @@ async function approveSubmissionOnce(
       ...buildApproveLiveSubmissionPlans({
         expectedContentVersion: version,
         expectedImageKey,
+        expectedLogoKey,
         listingId,
         now,
         publication,
@@ -734,7 +739,7 @@ export function approveRevision(
 
 async function approveRevisionOnce(
   context: AdminContext,
-  input: { expectedContentVersion: number; revisionId: string }
+  input: { expectedContentVersion: number; expectedLogoKey?: string | null; revisionId: string }
 ): Promise<Decision<{ listingSlug: string }>> {
   const snapshot = await revisionSnapshot(context, input.revisionId)
   if (!snapshot) return notFound('revision')
@@ -749,6 +754,7 @@ async function approveRevisionOnce(
     context,
     buildApproveRevisionPlans({
       expectedContentVersion: input.expectedContentVersion,
+      expectedLogoKey: input.expectedLogoKey ?? null,
       listingId: snapshot.listing_id,
       now,
       publication: await publicationFor(

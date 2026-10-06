@@ -373,10 +373,7 @@ describe('submission status transitions (compare-and-swap with changes() asserti
         expect(publicationState(db).version).toBe(2)
         // Live before review: no featured image is adopted until a reviewer has seen it.
         expect(
-          count(
-            db,
-            "SELECT COUNT(*) AS count FROM media_ingestions WHERE kind='image' AND listing_id IS NOT NULL"
-          )
+          count(db, 'SELECT COUNT(*) AS count FROM media_ingestions WHERE listing_id IS NOT NULL')
         ).toBe(0)
         expect(
           JSON.stringify(

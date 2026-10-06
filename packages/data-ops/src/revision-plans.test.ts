@@ -282,24 +282,9 @@ describe('revision status transitions (compare-and-swap with changes() assertion
           { kind: 'image', url: 'https://assets.example/image.png' },
           { kind: 'video', url: 'https://assets.example/demo.mp4' }
         ])
-        // The new logo is never hotlinked: it waits for the media cron, behind the fallback tile.
-        expect(
-          db
-            .prepare(
-              'SELECT listing_id,kind,sort_order,source_url,status,attempts,next_attempt_at FROM media_ingestions'
-            )
-            .all()
-        ).toEqual([
-          {
-            attempts: 0,
-            kind: 'logo',
-            listing_id: listingId,
-            next_attempt_at: NOW,
-            sort_order: 0,
-            source_url: 'https://assets.example/new-logo.png',
-            status: 'pending'
-          }
-        ])
+        // The new logo was not hosted at review: never hotlinked, and never fetched later
+        // unreviewed (#96 round 3 S1). The fallback tile shows until an admin sets a logo.
+        expect(count(db, 'SELECT COUNT(*) AS count FROM media_ingestions')).toBe(0)
         expect(db.prepare('SELECT label FROM listing_resource_links').all()).toEqual([
           { label: 'Pricing' }
         ])

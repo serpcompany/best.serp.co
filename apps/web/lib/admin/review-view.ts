@@ -54,6 +54,7 @@ export function submissionView(review: SubmissionReview, mediaBaseUrl: string): 
     featuredImage: featuredImageView(review, mediaBaseUrl),
     // The hosted copy, never the submitted source (#96 review S9).
     logoImage: renderableImage({ key: review.logoKey }, mediaBaseUrl),
+    logoKey: review.logoKey,
     logoUrl: review.logoUrl,
     name: review.name,
     paid,
@@ -99,6 +100,7 @@ export function revisionView(review: RevisionReview, mediaBaseUrl: string): Revi
     listing: { live: review.listing.live, liveSince: null, slug: review.listing.slug },
     // The hosted copy, never the submitted source (#96 review S9).
     logoImage: renderableImage({ key: review.logoKey }, mediaBaseUrl),
+    logoKey: review.logoKey,
     logoUrl: review.logoUrl,
     name: review.name,
     paid: review.plan === 'paid',

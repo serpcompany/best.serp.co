@@ -454,41 +454,89 @@ describe('submission media and approval', () => {
     expect(imageSlots(waiting.db)).toBe(0)
   })
 
-  it('queues the logo, never hotlinks it, when no hosted copy of that source exists', () => {
-    const db = planDatabase()
-    seedSubmission(db, 'https://example.com/new-logo.png')
+  it('adopts only the reviewed logo, never a later fetch of its URL (#96 review round 3, S1)', () => {
+    const setup = (logoUrl: string, hosted: HostedMedia | null) => {
+      const db = planDatabase()
+      seedSubmission(db, logoUrl)
+      if (hosted) {
+        execute(
+          db,
+          buildRecordSubmissionMediaPlans({
+            kind: 'logo',
+            media: hosted,
+            now: NOW,
+            sortOrder: 0,
+            submissionId
+          })
+        )
+      }
+      return db
+    }
+    const listingSlots = (db: DatabaseSync) =>
+      db
+        .prepare(
+          "SELECT copy_from_key,source_url FROM media_ingestions WHERE listing_id='lst_approved'"
+        )
+        .all()
+    const logo = pendingCopy('logo', 'e', 'https://example.com/logo.png')
+    // Not hosted at review (only an older source was): the reviewer saw the tile, and the
+    // listing keeps the tile; the URL is never queued for a later fetch.
+    const stale = setup(
+      'https://example.com/new-logo.png',
+      pendingCopy('logo', 'e', 'https://example.com/old-logo.png')
+    )
     execute(
-      db,
-      buildRecordSubmissionMediaPlans({
-        kind: 'logo',
-        media: pendingCopy('logo', 'e', 'https://example.com/old-logo.png'),
+      stale,
+      buildApproveSubmissionPlans({
+        afterChecksum: 'after',
+        affectedRoute: '/products/example.com/',
+        beforeChecksum: 'before',
+        expectedContentVersion: 1,
+        expectedLogoKey: null,
+        listingId: 'lst_approved',
+        manifestId: `verified-submission-${submissionId}`,
         now: NOW,
-        sortOrder: 0,
-        submissionId
+        reviewer: 'reviewer',
+        runId: `submission_publish_${submissionId}`,
+        submissionId,
+        version: 1
       })
     )
-    approve(db)
-    expect(
-      count(db, "SELECT COUNT(*) AS count FROM listing_media WHERE listing_id='lst_approved'")
-    ).toBe(0)
-    expect(slots(db)).toEqual([
-      expect.objectContaining({ status: 'hosted', submission_id: submissionId }),
-      {
-        attempts: 0,
-        kind: 'logo',
-        last_error: null,
-        listing_id: 'lst_approved',
-        media_key: null,
-        next_attempt_at: NOW,
-        sort_order: 0,
-        source_url: 'https://example.com/new-logo.png',
-        status: 'pending',
-        submission_id: null
-      }
+    expect(listingSlots(stale)).toEqual([])
+    // The reviewed hosted logo is queued as a copy, never as its source.
+    const reviewed = setup('https://example.com/logo.png', logo)
+    const approveWith = (db: DatabaseSync, expectedLogoKey: string | null) =>
+      execute(
+        db,
+        buildApproveSubmissionPlans({
+          afterChecksum: 'after',
+          affectedRoute: '/products/example.com/',
+          beforeChecksum: 'before',
+          expectedContentVersion: 1,
+          expectedLogoKey,
+          listingId: 'lst_approved',
+          manifestId: `verified-submission-${submissionId}`,
+          now: NOW,
+          reviewer: 'reviewer',
+          runId: `submission_publish_${submissionId}`,
+          submissionId,
+          version: 1
+        })
+      )
+    approveWith(reviewed, logo.key)
+    expect(listingSlots(reviewed)).toEqual([
+      { copy_from_key: logo.key, source_url: 'https://example.com/logo.png' }
     ])
-    expect(
-      count(db, 'SELECT COUNT(*) AS count FROM media_ingestions WHERE copy_from_key IS NOT NULL')
-    ).toBe(0)
+    // A logo hosted after the reviewer looked (or another one) refuses the approval.
+    expect(() => approveWith(setup('https://example.com/logo.png', logo), null)).toThrow(
+      /malformed JSON/u
+    )
+    expect(() =>
+      approveWith(
+        setup('https://example.com/logo.png', logo),
+        pendingCopy('logo', 'f', 'https://example.com/logo.png').key
+      )
+    ).toThrow(/malformed JSON/u)
   })
 })
 

@@ -103,6 +103,8 @@ export interface ReviewView {
   featuredImage: { image: string | null; key: string | null; note: string } | null
   /** The hosted copy of `logoUrl`, or null for the fallback tile (#96 review S9). */
   logoImage: string | null
+  /** The hosted logo's key, which approval sends back (null: approval leaves the tile). */
+  logoKey: string | null
   /** The submitted logo source; never rendered as an image. */
   logoUrl: string
   name: string
@@ -243,11 +245,14 @@ export function ReviewDetail({
         ? {
             edits: editing && editedFields.length > 0 ? edits : undefined,
             expectedContentVersion: view.contentVersion,
-            // Approval adopts only the featured image shown here (#96 round 2 B1).
+            // Approval adopts only the images shown here (#96 rounds 2 and 3).
             expectedImageKey: view.featuredImage?.key ?? null,
+            // An edited logo URL has no hosted copy yet: the tile, until an admin sets one.
+            expectedLogoKey:
+              editing && editedFields.includes('logoUrl') ? null : (view.logoKey ?? null),
             linkRel
           }
-        : { expectedContentVersion: view.contentVersion },
+        : { expectedContentVersion: view.contentVersion, expectedLogoKey: view.logoKey ?? null },
       paidLive ? `Approved. ${view.name} stays live.` : `Approved. ${view.name} is published.`
     )
 
@@ -531,7 +536,7 @@ export function ReviewDetail({
               ['Plan', view.paid ? `Paid · ${amount}` : 'Free (badge)'],
               [
                 'Logo',
-                `From ${hostOf(view.logoUrl)}${view.logoImage ? ', hosted' : ', not hosted yet'}`
+                `From ${hostOf(view.logoUrl)}${view.logoImage ? ', hosted' : ', not hosted: approving publishes the fallback tile until an admin sets a hosted logo'}`
               ]
             ]}
           />
