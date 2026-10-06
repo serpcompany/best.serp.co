@@ -7,6 +7,7 @@ import { AccountCrumbs } from '@/components/account/account-shell'
 import { ListingEdit } from '@/components/account/listing-edit'
 import { requireAccountUser } from '@/lib/account/pages'
 import { accountOperations } from '@/lib/account/runtime'
+import { categoryChoices } from '@/lib/account/view'
 import { getActiveCategories } from '@/lib/catalog/repository'
 
 export const metadata: Metadata = generateBaseMetadata({
@@ -52,7 +53,10 @@ export default async function AccountListingEditPage({
       <ListingEdit
         // A new revision state (saved, discarded, decided) starts the form from it again.
         key={revision ? `${revision.id}:${revision.status}:${revision.contentVersion}` : 'live'}
-        categories={categories.map(category => ({ label: category.name, slug: category.slug }))}
+        categories={categoryChoices(categories, {
+          name: revision?.categoryName ?? listing.categoryName,
+          slug: revision?.categorySlug ?? listing.categorySlug
+        })}
         view={{
           categoryName: listing.categoryName,
           categorySlug: listing.categorySlug ?? '',

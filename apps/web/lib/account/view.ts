@@ -8,7 +8,8 @@ import {
   draftExpiresInDays,
   hostOf,
   isConclusiveFailure,
-  VERIFICATION_ATTEMPT_LIMIT
+  VERIFICATION_ATTEMPT_LIMIT,
+  VERIFICATION_COOLDOWN_SECONDS
 } from '@/lib/submissions/contract'
 
 /**
@@ -35,6 +36,8 @@ export interface BadgePanel {
   /** The light badge image the embed code shows. */
   badgeUrl: string
   checksLeft: number
+  /** When the 30-second wait after the latest check ends (epoch ms), or 0. */
+  cooldownEndsAt: number
   history: AccountBadgeCheck[]
   /** The latest check (the owner's or the program's), or null before any. */
   last: AccountBadgeCheck | null
@@ -117,8 +120,12 @@ function badgePanel(listing: AccountListing, target: BadgeTarget): BadgePanel | 
   const history = listing.badge.history
   const last = history[0] ?? null
   const { badgeUrl, listingUrl } = target(listing.slug)
+  const lastClaim = listing.badge.lastCheckAt ? Date.parse(listing.badge.lastCheckAt) : Number.NaN
   return {
     badgeUrl,
+    cooldownEndsAt: Number.isNaN(lastClaim)
+      ? 0
+      : lastClaim + VERIFICATION_COOLDOWN_SECONDS * 1000,
     checksLeft: Math.max(0, VERIFICATION_ATTEMPT_LIMIT - listing.badge.verificationAttempts),
     failing: last !== null && last.outcome === 'fail' && last.conclusive,
     history,
@@ -378,4 +385,19 @@ export function isWithdrawable(submission: AccountSubmission): boolean {
     submission.listing === null &&
     ['draft', 'pending_badge', 'verified', 'changes_requested'].includes(submission.status)
   )
+}
+
+/**
+ * The category choices of an edit form: the active categories, plus the record's own when it
+ * isn't among them (a category with no public listings yet), so the select always shows it.
+ */
+export function categoryChoices(
+  categories: ReadonlyArray<{ name: string; slug: string }>,
+  current: { name: string | null; slug: string | null }
+): Array<{ label: string; slug: string }> {
+  const choices = categories.map(category => ({ label: category.name, slug: category.slug }))
+  if (current.slug && !choices.some(choice => choice.slug === current.slug)) {
+    choices.unshift({ label: current.name ?? current.slug, slug: current.slug })
+  }
+  return choices
 }

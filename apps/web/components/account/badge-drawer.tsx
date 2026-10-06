@@ -87,21 +87,27 @@ export function BadgeDrawer({
   const badge = row?.badge ?? null
   const [checking, setChecking] = useState(false)
   const [coolUntil, setCoolUntil] = useState(0)
-  const [now, setNow] = useState(() => Date.now())
+  // 0 until mounted, so the server and the first client render agree.
+  const [now, setNow] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const inFlight = useRef(false)
   const listingId = badge?.listingId
+
+  useEffect(() => {
+    setNow(Date.now())
+  }, [])
 
   useEffect(() => {
     if (listingId === undefined) return
     setNotice(null)
   }, [listingId])
 
+  const cooldownEndsAt = badge?.cooldownEndsAt ?? 0
   useEffect(() => {
-    if (coolUntil <= now) return
+    if (Math.max(coolUntil, cooldownEndsAt) <= now) return
     const timer = window.setInterval(() => setNow(Date.now()), 500)
     return () => window.clearInterval(timer)
-  }, [coolUntil, now])
+  }, [coolUntil, cooldownEndsAt, now])
 
   if (!row || !badge) return null
   const embed = buildFeaturedOnBadgeEmbedHtml({
@@ -109,7 +115,12 @@ export function BadgeDrawer({
     listingUrl: badge.listingUrl,
     siteName
   })
-  const waiting = Math.max(0, Math.ceil((coolUntil - now) / 1000))
+  // The server's cooldown runs from the latest check, here or in another tab.
+  const until = Math.max(coolUntil, badge.cooldownEndsAt)
+  const waiting = Math.min(
+    VERIFICATION_COOLDOWN_SECONDS,
+    Math.max(0, Math.ceil((until - now) / 1000))
+  )
   const disabled = checking || waiting > 0 || badge.checksLeft === 0
 
   async function verify() {

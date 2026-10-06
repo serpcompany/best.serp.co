@@ -9,7 +9,7 @@ import { submissionHistory } from '@/lib/account/history'
 import { requireAccountUser } from '@/lib/account/pages'
 import { ACCOUNT_ID } from '@/lib/account/requests'
 import { accountOperations } from '@/lib/account/runtime'
-import { accountStatusOf, isWithdrawable } from '@/lib/account/view'
+import { accountStatusOf, categoryChoices, isWithdrawable } from '@/lib/account/view'
 import { getActiveCategories } from '@/lib/catalog/repository'
 import { features } from '@/lib/features'
 
@@ -53,7 +53,10 @@ export default async function AccountSubmissionPage({
         ]}
       />
       <SubmissionDetail
-        categories={categories.map(category => ({ label: category.name, slug: category.slug }))}
+        categories={categoryChoices(categories, {
+          name: submission.categoryName,
+          slug: submission.categorySlug
+        })}
         email={user.email}
         history={submissionHistory(submission)}
         messagesNote={features.messages}
