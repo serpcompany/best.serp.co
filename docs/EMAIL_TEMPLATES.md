@@ -16,10 +16,10 @@ idempotency key, so renaming a template would let an event send again.
 | `claim-code` | A claim needs a domain-email code; code in the subject | the work address | none (code) |
 | `submission-received` | A free submission's badge is verified and it enters review | submitter | `/account/` |
 | `payment-received-in-review` | A paid submission's automatic checks failed; it waits for review | submitter | `/account/` (`/account/submissions/<id>/` after #65) |
-| `changes-requested` | A reviewer requests changes (the note is quoted) | submitter | `/account/` (`/account/submissions/<id>/` after #65) |
-| `submission-rejected` | A reviewer rejects a submission that may be resubmitted | submitter | `/account/` (`/account/submissions/<id>/` after #65) |
+| `changes-requested` | A reviewer requests changes (the note is quoted) | submitter | `/submit/` (`/account/submissions/<id>/` after #65) |
+| `submission-rejected` | A reviewer rejects a submission that may be resubmitted | submitter | `/submit/` (`/account/submissions/<id>/` after #65) |
 | `submission-rejected-refunded` | A paid submission is rejected and refunded | submitter | `/account/` (`/account/submissions/<id>/` after #65) |
-| `submission-rejected-prohibited` | A submission is rejected as prohibited: no resubmission, no refund | submitter | `/contact/` (the account inbox after #73) |
+| `submission-rejected-prohibited` | A submission is rejected as prohibited: no resubmission, no refund | submitter | `/contact/` (a new conversation after #73) |
 | `listing-approved` | A free listing is approved and live | submitter | `/products/<slug>/` |
 | `listing-live-paid` | A paid listing passes the automatic checks and goes live | submitter | `/products/<slug>/` |
 | `badge-missing` | The weekly check misses the badge (24h warning) | owner | `/account/listings/<slug>/` |
@@ -48,12 +48,23 @@ idempotency key, so renaming a template would let an event send again.
 ## Routes the buttons need
 
 Every button opens a page that exists; `apps/web/lib/email/emails/links.test.ts` renders every
-sample and fails on a link to a missing page. Until #65 builds `/account/submissions/<id>/`,
-submission buttons open `/account/` (`submissionPath`), and until #73 builds the account inbox,
-"Message us" opens `/contact/` (`MESSAGE_US_PATH`). The test lists the links still waiting for
-their page, all in emails nothing sends yet: `/account/listings/<slug>/` (badge-missing and
-unlisted, #65; screen 7 only defines `/account/listings/<slug>/edit`), `/account/messages/...`
-and `/admin/inbox/<thread>/` (#73), and the draft reminder's `/submit/<id>/choose/` (#63) and
+sample and fails on a link to a missing page. Copy and links that need a later site area read
+its flag in `apps/web/lib/features.ts` and switch to the approved wording when that issue turns
+it on (owner decision on #64):
+
+- `features.accountDashboard` (#65). Off, `changes-requested` and `submission-rejected` say
+  "Update your details and submit again at <`/submit/` link>" with a "Submit again" button,
+  and other submission buttons open `/account/`. On, they ask to edit and resubmit and link to
+  `/account/submissions/<id>/` (`submissionPath`).
+- `features.messages` (#73). Off, `changes-requested` ends "Questions? Contact us at
+  <`/contact/` link>" and the prohibited rejection's "Message us" opens `/contact/`. On, they
+  point to the dashboard conversation (`messageUsPath`).
+
+The same test fails when an email the app sends (any template whose id app code names) asks
+for a dashboard action whose flag is off. It lists the links still waiting for their page, all
+in emails nothing sends yet: `/account/listings/<slug>/` (badge-missing and unlisted, #65;
+screen 7 only defines `/account/listings/<slug>/edit`), `/account/messages/...` and
+`/admin/inbox/<thread>/` (#73), and the draft reminder's `/submit/<id>/choose/` (#63) and
 `/submit/<id>/checkout/` (#68).
 
 ## Recipients and footers

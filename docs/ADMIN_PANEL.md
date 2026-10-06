@@ -18,7 +18,7 @@ the account area shares (`@serpdirectory/web-core/dashboard/*`); pages set their
 
 The reads are statement plans in `packages/data-ops/src/admin-queries.ts`; `apps/web/lib/admin/`
 holds no SQL (the architecture guard checks it). Orders (screen 13) need #68's ledger: the entry
-is hidden behind `ADMIN_ORDERS_ENABLED` (`apps/web/lib/admin/features.ts`) and `/admin/orders/`
+is hidden behind `features.orders` (`apps/web/lib/features.ts`) and `/admin/orders/`
 is a 404 until #68. The Inbox and the conversation panels on screens 11 and 12 are #73's.
 
 ## Requests

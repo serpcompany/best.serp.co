@@ -5,6 +5,7 @@
  * dashboard. It renders the HTML part (email-safe tables, inline styles through `css()`, a
  * table-based button) and the plain-text part from one description, so the two never drift.
  */
+import { type SiteFeatures, features as siteFeatures } from '../../features'
 import {
   css,
   type EmailContent,
@@ -32,11 +33,20 @@ export const EMAIL_TOKENS = {
 
 const T = EMAIL_TOKENS
 
-/** Inline text: plain strings and numbers, or a bold run. */
-export type Inline = string | number | { readonly bold: string | number }
+/** Inline text: plain strings and numbers, a bold run, or a link that shows its URL. */
+export type Inline =
+  | string
+  | number
+  | { readonly bold: string | number }
+  | { readonly link: string }
 
 export function bold(value: string | number): { readonly bold: string | number } {
   return { bold: value }
+}
+
+/** An absolute URL written out as a link (`links.url(...)`), the same in both bodies. */
+export function link(url: string): { readonly link: string } {
+  return { link: url }
 }
 
 export type Block =
@@ -78,14 +88,27 @@ function plain(text: string): string {
 
 function inlineText(content: readonly Inline[]): string {
   return plain(
-    content.map(part => (typeof part === 'object' ? String(part.bold) : String(part))).join('')
+    content
+      .map(part =>
+        typeof part !== 'object' ? String(part) : 'link' in part ? part.link : String(part.bold)
+      )
+      .join('')
   )
 }
 
+const inlineLinkStyle = css({
+  color: T.strong,
+  'text-decoration': 'underline',
+  'word-break': 'break-all'
+})
+
 function inlineHtml(content: readonly Inline[]): HtmlValue[] {
-  return content.map(part =>
-    typeof part === 'object' ? html`<b>${String(part.bold)}</b>` : String(part)
-  )
+  return content.map(part => {
+    if (typeof part !== 'object') return String(part)
+    return 'link' in part
+      ? html`<a href="${part.link}" style="${inlineLinkStyle}">${part.link}</a>`
+      : html`<b>${String(part.bold)}</b>`
+  })
 }
 
 function lines(text: string): HtmlValue[] {
@@ -206,20 +229,39 @@ export function required(value: string, label: string): string {
 }
 
 /** A root-relative path with each segment encoded: `sitePath('submit', id, 'choose')`. */
-/**
- * Pages an email would link to that don't exist yet go to a page that does (#64 link audit,
- * checked by `links.test.ts`): a submission's own page (`/account/submissions/<id>/`, #65) is
- * the account dashboard until #65 builds it.
- */
-export function submissionPath(_submissionId: string): string {
-  return '/account/'
-}
-
-/** "Message us": the contact page until the account inbox (`/account/messages/new/`, #73). */
-export const MESSAGE_US_PATH = '/contact/'
-
 export function sitePath(...segments: string[]): string {
   return `/${segments.map(segment => encodeURIComponent(required(segment, 'a link segment'))).join('/')}/`
+}
+
+/** The site areas this email renders for: the context's flags, else the site's. */
+export function featuresOf(context: EmailRenderContext): SiteFeatures {
+  return context.features ?? siteFeatures
+}
+
+/** Where to submit a product again while the account dashboard can't edit one (#65). */
+export const SUBMIT_PATH = '/submit/'
+
+/** Where to reach the team while there are no conversations (#73). */
+export const CONTACT_PATH = '/contact/'
+
+/**
+ * A submission's own page (`/account/submissions/<id>/`) once #65 ships it, and the account
+ * dashboard until then. Emails link only to pages that exist (`links.test.ts`).
+ */
+export function submissionPath(submissionId: string, context: EmailRenderContext): string {
+  return featuresOf(context).accountDashboard
+    ? sitePath('account', 'submissions', submissionId)
+    : '/account/'
+}
+
+/**
+ * "Message us" about a submission: a new conversation once #73 ships, and the contact page
+ * until then.
+ */
+export function messageUsPath(submissionId: string, context: EmailRenderContext): string {
+  return featuresOf(context).messages
+    ? `/account/messages/new/?about=submission:${encodeURIComponent(submissionId)}`
+    : CONTACT_PATH
 }
 
 /**

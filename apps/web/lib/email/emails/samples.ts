@@ -5,6 +5,7 @@
  */
 
 import type { SiteEnvironment } from '../../environment/site-environment'
+import type { SiteFeatures } from '../../features'
 import { resolveEmailPolicy } from '../config'
 import type { AppEmailTemplates } from '../registry'
 import { appEmailTemplates } from '../registry'
@@ -319,11 +320,14 @@ export const EMAIL_SAMPLES: SampleInputs = {
   ]
 }
 
-/** Renders a registered email exactly as the service would in an environment. */
+/**
+ * Renders a registered email exactly as the service would in an environment, with the site's
+ * feature flags unless `features` overrides them (to test both states of flagged copy).
+ */
 export function renderAppEmail<K extends keyof AppEmailTemplates>(
   templateId: K,
   input: TemplateInput<AppEmailTemplates[K]>,
-  options: { environment: SiteEnvironment; to: string }
+  options: { environment: SiteEnvironment; features?: SiteFeatures; to: string }
 ): RenderedEmail {
   // Templates declare `render` as a method, so each accepts its own input type here.
   const template: EmailTemplate<unknown> = appEmailTemplates[templateId]
@@ -331,5 +335,10 @@ export function renderAppEmail<K extends keyof AppEmailTemplates>(
     D1_RUNTIME_ENV: options.environment,
     SITE_ENVIRONMENT: options.environment
   })
-  return renderEmail(template, input, emailRenderContext(policy, template, options.to, input))
+  const context = emailRenderContext(policy, template, options.to, input)
+  return renderEmail(
+    template,
+    input,
+    options.features ? { ...context, features: options.features } : context
+  )
 }

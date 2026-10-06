@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { SiteFeatures } from '../../features'
 import { EMAIL_ADMIN_RECIPIENT, EMAIL_LINK_ORIGINS } from '../config'
 import { type AppEmailTemplates, appEmailTemplates } from '../registry'
 import {
@@ -21,6 +22,27 @@ function render(
   const sample = EMAIL_SAMPLES[id][index]
   if (!sample) throw new Error(`no sample ${id}[${index}]`)
   return renderAppEmail(id, sample.input as never, { environment, to: sample.to })
+}
+
+/** Today's site: no account dashboard pages (#65), no conversations (#73). */
+const BEFORE: SiteFeatures = { accountDashboard: false, messages: false, orders: false }
+/** Once #65 and #73 ship. */
+const AFTER: SiteFeatures = { accountDashboard: true, messages: true, orders: false }
+
+/** A sample rendered in production with the given site areas. */
+function renderWith(id: TemplateId, features: SiteFeatures) {
+  const sample = EMAIL_SAMPLES[id][0]
+  if (!sample) throw new Error(`no sample ${id}`)
+  return renderAppEmail(id, sample.input as never, {
+    environment: 'production',
+    features,
+    to: sample.to
+  })
+}
+
+/** The text body above the footer (the footer is the same in every email). */
+function bodyText(email: { text: string }): string {
+  return email.text.split('\n--\n')[0] ?? ''
 }
 
 function attributeUrls(html: string): string[] {
@@ -259,18 +281,51 @@ You're getting this because you have an account on best.serp.co.`)
 })
 
 describe('changes requested', () => {
-  it('quotes the reviewer note and links to the submission', () => {
+  it('quotes the reviewer note', () => {
     const email = render('changes-requested')
     expect(email.subject).toBe('Changes requested for Pagecraft')
     expect(email.text).toContain(
       "Pagecraft isn't live yet. Our reviewer left this note:\n> The short description reads like an ad (“#1 best”, “10x faster”)."
     )
-    expect(email.text).toContain(
-      'Edit and resubmit: https://best.serp.co/account/\nQuestions about the note? Reply to the reviewer in your dashboard.'
-    )
-    // The submission's own page arrives with #65; until then the button opens the dashboard.
-    expect(linksTo(email.html, 'https://best.serp.co/account/')).toBe(true)
     expect(email.html).toContain('font-style:italic')
+  })
+
+  it('until #65 and #73, asks to submit again at /submit/ and to contact us (owner decision)', () => {
+    const email = renderWith('changes-requested', BEFORE)
+    expect(bodyText(email)).toContain(
+      'homepage.\nUpdate your details and submit again at https://best.serp.co/submit/\n\nSubmit again: https://best.serp.co/submit/\nQuestions? Contact us at https://best.serp.co/contact/'
+    )
+    expect(bodyText(email)).not.toMatch(/resubmit|dashboard|reply/iu)
+    expect(linksTo(email.html, 'https://best.serp.co/submit/')).toBe(true)
+    expect(email.html).toContain(
+      'Update your details and submit again at <a href="https://best.serp.co/submit/"'
+    )
+    expect(email.html).toContain('Questions? Contact us at <a href="https://best.serp.co/contact/"')
+    expect(email.html).toContain(
+      'A reviewer left a note. Update your details and submit again when you’re ready.'
+    )
+    expect(email.html).not.toMatch(/resubmit|account\/submissions/iu)
+  })
+
+  it('with the account dashboard and conversations, asks to edit, resubmit, and reply there', () => {
+    const email = renderWith('changes-requested', AFTER)
+    expect(bodyText(email)).toContain(
+      'Make the changes and resubmit. It goes back into the review queue.\n\nEdit and resubmit: https://best.serp.co/account/submissions/s_9pd31x/\nQuestions about the note? Reply to the reviewer in your dashboard.'
+    )
+    expect(linksTo(email.html, 'https://best.serp.co/account/submissions/s_9pd31x/')).toBe(true)
+    expect(email.html).toContain('A reviewer left a note. Edit and resubmit when you’re ready.')
+    expect(email.html).not.toMatch(/submit again|contact/iu)
+  })
+
+  it('switches each sentence on its own flag', () => {
+    const dashboardOnly = bodyText(
+      renderWith('changes-requested', { ...BEFORE, accountDashboard: true })
+    )
+    expect(dashboardOnly).toContain('Edit and resubmit: ')
+    expect(dashboardOnly).toContain('Questions? Contact us at https://best.serp.co/contact/')
+    const messagesOnly = bodyText(renderWith('changes-requested', { ...BEFORE, messages: true }))
+    expect(messagesOnly).toContain('Submit again: https://best.serp.co/submit/')
+    expect(messagesOnly).toContain('Reply to the reviewer in your dashboard.')
   })
 
   it('keeps line breaks in a note', () => {
@@ -321,14 +376,32 @@ describe('live after payment', () => {
 })
 
 describe('rejected', () => {
-  it('gives the reason and links to the submission', () => {
+  it('gives the reason', () => {
     const email = render('submission-rejected')
     expect(email.subject).toBe('Promptdeck wasn’t approved')
     expect(email.text).toContain(
-      "A reviewer looked at Promptdeck and couldn't approve it this time.\nReason: promptdeck.io shows a domain-parking page with no product, so there's nothing to list yet.\nYou can edit the submission and send it again."
+      "A reviewer looked at Promptdeck and couldn't approve it this time.\nReason: promptdeck.io shows a domain-parking page with no product, so there's nothing to list yet."
     )
     expect(email.html).toContain('<b>Reason:</b> promptdeck.io shows')
-    expect(linksTo(email.html, 'https://best.serp.co/account/')).toBe(true)
+  })
+
+  it('until #65, asks to submit again at /submit/ (owner decision)', () => {
+    const email = renderWith('submission-rejected', BEFORE)
+    expect(bodyText(email)).toContain(
+      'nothing to list yet.\nUpdate your details and submit again at https://best.serp.co/submit/\n\nSubmit again: https://best.serp.co/submit/'
+    )
+    expect(bodyText(email)).not.toMatch(/edit the submission|open submission|dashboard/iu)
+    expect(linksTo(email.html, 'https://best.serp.co/submit/')).toBe(true)
+    expect(email.html).not.toContain('account/submissions')
+  })
+
+  it('with the account dashboard, asks to edit the submission and links to it', () => {
+    const email = renderWith('submission-rejected', AFTER)
+    expect(bodyText(email)).toContain(
+      'nothing to list yet.\nYou can edit the submission and send it again.\n\nOpen submission: https://best.serp.co/account/submissions/s_2kd81p/'
+    )
+    expect(linksTo(email.html, 'https://best.serp.co/account/submissions/s_2kd81p/')).toBe(true)
+    expect(email.html).not.toMatch(/submit again/iu)
   })
 
   it('says how much was refunded', () => {
@@ -552,7 +625,7 @@ describe('draft expired', () => {
 
 describe('revision 5 emails', () => {
   it('rejected as prohibited: no resubmission, no refund, Message us', () => {
-    const email = render('submission-rejected-prohibited')
+    const email = renderWith('submission-rejected-prohibited', BEFORE)
     expect(email.subject).toBe('KeyBazaar wasn’t approved')
     expect(email.text).toBe(`KeyBazaar wasn’t approved
 
@@ -570,6 +643,16 @@ You're getting this because you have an account on best.serp.co.`)
     expect(email.text).not.toMatch(/refund|send it again/iu)
     // The account inbox arrives with #73; until then "Message us" opens the contact page.
     expect(linksTo(email.html, 'https://best.serp.co/contact/')).toBe(true)
+  })
+
+  it('rejected as prohibited, with conversations: message us from the dashboard', () => {
+    const email = renderWith('submission-rejected-prohibited', AFTER)
+    expect(bodyText(email)).toContain(
+      "can't be submitted or claimed again. If you think this is a mistake, message us from your dashboard.\n\nMessage us: https://best.serp.co/account/messages/new/?about=submission:s_5hh3m0"
+    )
+    expect(
+      linksTo(email.html, 'https://best.serp.co/account/messages/new/?about=submission:s_5hh3m0')
+    ).toBe(true)
   })
 
   it('payment received while the checks failed: not live yet, in review', () => {

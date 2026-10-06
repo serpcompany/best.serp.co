@@ -16,6 +16,7 @@
 import { isEmailTemplateId } from '@serpdirectory/data-ops/email-deliveries'
 import { absoluteUrl } from '@serpdirectory/web-core/canonical-url'
 import type { SiteEnvironment } from '../environment/site-environment'
+import type { SiteFeatures } from '../features'
 
 export class EmailTemplateError extends Error {
   override name = 'EmailTemplateError'
@@ -529,6 +530,11 @@ export interface EmailRenderContext {
    */
   dashboardUrl: string
   environment: SiteEnvironment
+  /**
+   * Which later site areas exist (`lib/features.ts`). Copy and links that depend on one switch
+   * on its flag. Defaults to the site's flags; tests pass both states.
+   */
+  features?: SiteFeatures
   links: EmailLinks
   /** The normalized address this email goes to, for "you're getting this because" lines. */
   recipient: string
