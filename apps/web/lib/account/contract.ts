@@ -44,11 +44,17 @@ export type ExtrasInput = z.infer<typeof extrasSchema>
  * `POST /api/account/submissions/<id>/resubmit`: the fixed details, then back to review. FAQs
  * and links may be fixed in the same pass (both, or neither to keep them).
  */
-export const resubmitRequestSchema = draftContentSchema.extend({
-  expectedContentVersion: version,
-  faqs: extrasSchema.shape.faqs.optional(),
-  resourceLinks: extrasSchema.shape.resourceLinks.optional()
-})
+export const resubmitRequestSchema = draftContentSchema
+  .extend({
+    expectedContentVersion: version,
+    faqs: extrasSchema.shape.faqs.optional(),
+    resourceLinks: extrasSchema.shape.resourceLinks.optional()
+  })
+  // Half a set would replace one list and silently keep the other (#102 review round 2).
+  .refine(body => (body.faqs === undefined) === (body.resourceLinks === undefined), {
+    message: 'Send both FAQs and links, or neither.',
+    path: ['faqs']
+  })
 
 /** `POST /api/account/submissions/<id>/extras`: FAQs and links while it waits for review. */
 export const extrasRequestSchema = extrasSchema.extend({ expectedContentVersion: version })
