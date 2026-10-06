@@ -74,13 +74,13 @@ Each holds two environment secrets:
 
 - `CLOUDFLARE_ACCOUNT_ID`: `cec5f04e1d18bcc65f2be0aefb04f059`
 - `CLOUDFLARE_API_TOKEN`: today, **both environments hold the account-wide token**
-  described above (#34), with Edit on every Worker and D1 database in the SERP account.
-  A leak from either environment therefore reaches staging and production alike.
+  described above (#34), with Edit on every Worker, D1 database, and R2 bucket (serp.co's `cdn`
+  too). A leak from either environment therefore reaches staging and production alike.
 
 The planned fix is #42 decision b, scheduled right after cutover. It gives each environment
-its own token, scoped to that environment's Worker and D1 database, plus a D1-only token for
-`production-notifier`. Each new token is proven in its workflow before the account-wide
-token is revoked. Until then, separate secrets do not limit the blast radius.
+its own token, scoped to its Worker, D1 database, and R2 bucket (production's also reads
+`cdn-staging`, the upload's copy source), plus a D1-only token for `production-notifier`,
+each proven in its workflow before the account-wide token goes. Until then, a leak reaches both.
 
 Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "Staging deploy
 skipped" notice. After they exist, the next push to `staging` deploys staging. The
@@ -107,14 +107,15 @@ re-dispatches the notifier on `main`. When production accepts submissions:
 | `deploy-staging.yml` | push to `staging`, manual from `staging` | `staging` | none | `pnpm harness:fast` → build → D1 bookmark → migrations → deploy → HTTP gates → Playwright smoke |
 | `deploy-production.yml` | push to `main`, manual | `production` | dispatch: `deploy-best.serp.co-production` (or `hotfix-…`) | Staging verification → `pnpm harness:fast` → build → `plan-release` → (pending migrations: bookmark → migrate) → deploy → HTTP gates |
 | `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → D1 bookmark → initial catalog import into an empty production D1 → parity verification |
-| `publish-d1.yml` | manual, `main` | `production` | `publish-best.serp.co-production` | D1 bookmark → apply one `d1/publications/*.yaml` manifest |
+| `publish-d1.yml`, `publish-d1-staging.yml` (#95) | manual, `main` / `staging` | `production` / `staging` | `publish-best.serp.co-<env>` | D1 bookmark → apply one reviewed manifest, staging first |
+| `upload-media.yml`, `upload-media-staging.yml` | manual, `main` / `staging` | `production` / `staging` | `upload-media-best.serp.co-<env>` | Upload one reviewed `d1/media/` plan to R2, no D1 change ([media](./MEDIA.md)) |
 | `approve-d1-submission.yml` | manual, `main` | `production` | `approve-best.serp.co-submission-production` | D1 bookmark → approve or reject one submission → close its review issue |
 | `notify-d1-submissions.yml` | every 15 minutes, manual | `production-notifier` | none | Open an assigned review issue per badge-verified submission |
 
 Guards, in order:
 
-1. An `authorize` job with no secrets checks `main` and, on a dispatch, the typed
-   confirmation (and the manifest path or submission UUID), so a mistyped dispatch never
+1. An `authorize` job with no secrets checks the workflow's branch and, on a dispatch, the typed
+   confirmation (and the manifest or plan path, or submission UUID), so a mistyped dispatch never
    requests reviewer approval. Deploy Production and Bootstrap Production D1 also require
    Deploy Staging to have verified the commit's tree (see
    [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
@@ -125,16 +126,16 @@ Guards, in order:
    with the confirmation in `RELEASE_CONFIRM` on a dispatch. Production `migrate`, `deploy`,
    and `import` also require the verified Deploy Staging run (a hotfix dispatch of a merged
    `hotfix-*` PR may only `deploy` without it) and a `main` that still points at the release.
-   The publisher, approver, and notifier scripts apply their own guards.
+   The publisher, approver, notifier, and `media-upload.ts` apply their own guards.
 4. `plan-release` refuses a database with migrations this commit lacks. `deploy` first proves
    that every `d1/drizzle` migration is applied and that a catalog publication exists.
 
 The HTTP gates: [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts).
 
 Concurrency sits on the privileged job, after its guards: production jobs share
-`deploy-best-serp-co-production`, staging uses `deploy-best-serp-co-staging`, the notifier its
-own group, and none cancels a running job. A run refused by `authorize` or skipped by a branch
-`if` never joins a group, so it cannot replace a valid queued run.
+`deploy-best-serp-co-production`, staging uses `deploy-best-serp-co-staging`, the notifier and
+media uploads their own groups, and none cancels a running job. A run refused by `authorize`
+or skipped by a branch `if` never joins a group, so it cannot replace a valid queued run.
 
 Each deploy runs `pnpm harness:fast` in its own job rather than waiting on Main Validation
 through `workflow_run`. A `workflow_run` job receives the default branch head as
@@ -229,7 +230,7 @@ publication or approval reaches cached pages within about a minute; nothing is p
 | Resource | Staging | Production |
 |---|---|---|
 | Workers Cache API (edge HTML, data) | built in, nothing to create | built in, nothing to create |
-| `version_metadata` binding `CF_VERSION_METADATA` | declared in `wrangler.jsonc` | declared in `wrangler.jsonc` |
+| `version_metadata` binding `CF_VERSION_METADATA` | in `wrangler.jsonc` | in `wrangler.jsonc` |
 | R2 `MEDIA` (#95) | `cdn-staging` on `cdn-staging.serp.co` | `cdn` on `cdn.serp.co` |
 
 Caching needs no KV namespace, Durable Object, or queue. Media: [Listing media](./MEDIA.md).

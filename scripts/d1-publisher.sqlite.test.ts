@@ -436,6 +436,202 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
     })
     expect(db.prepare('SELECT COUNT(*) AS count FROM publication_runs').get()).toEqual({ count: 0 })
   })
+
+  describe('listing-media-update (#95)', () => {
+    const sha = (digit: string) => digit.repeat(64)
+    const hosted = (kind: 'image' | 'logo', digit: string, slug = 'old-slug') => ({
+      bytes: 2048,
+      contentType: 'image/png',
+      height: 128,
+      key: `best.serp.co/listings/${slug}/${kind}/${sha(digit).slice(0, 16)}.png`,
+      sha256: sha(digit),
+      source: `https://assets.example/${kind}-${digit}.png`,
+      width: 128
+    })
+    const mediaUpdate = (overrides: Record<string, unknown> = {}) => ({
+      action: 'listing-media-update',
+      id: 'lst_sqlite_test',
+      slug: 'old-slug',
+      expected: [
+        { kind: 'image', url: 'https://dead.example/shot.png' },
+        { kind: 'logo', url: 'https://imagedelivery.net/x/old-slug/public' }
+      ],
+      media: { logo: hosted('logo', 'a'), images: [hosted('image', 'b')] },
+      ...overrides
+    })
+    const mediaDatabase = () => {
+      const db = database()
+      db.exec(`
+        INSERT INTO listing_media (listing_id,kind,url,sort_order) VALUES
+          ('lst_sqlite_test','logo','https://imagedelivery.net/x/old-slug/public',0),
+          ('lst_sqlite_test','image','https://dead.example/shot.png',1),
+          ('lst_sqlite_test','video','https://www.youtube.com/watch?v=1',0);
+        INSERT INTO media_ingestions (listing_id,kind,sort_order,source_url,next_attempt_at)
+          VALUES ('lst_sqlite_test','logo',0,'https://queued.example/logo.png','${now}');
+      `)
+      return db
+    }
+
+    it('replaces the logo and images with hosted copies, keeping video and clearing the queue', () => {
+      const db = mediaDatabase()
+      const publication = plan({ operations: [mediaUpdate()] })
+      executeInTestTransaction(db, publication)
+      expect(
+        db
+          .prepare(
+            "SELECT kind,url,sort_order,media_key,content_type,width FROM listing_media WHERE listing_id='lst_sqlite_test' ORDER BY kind,sort_order"
+          )
+          .all()
+      ).toEqual([
+        {
+          content_type: 'image/png',
+          kind: 'image',
+          media_key: hosted('image', 'b').key,
+          sort_order: 0,
+          url: hosted('image', 'b').source,
+          width: 128
+        },
+        {
+          content_type: 'image/png',
+          kind: 'logo',
+          media_key: hosted('logo', 'a').key,
+          sort_order: 0,
+          url: hosted('logo', 'a').source,
+          width: 128
+        },
+        {
+          content_type: null,
+          kind: 'video',
+          media_key: null,
+          sort_order: 0,
+          url: 'https://www.youtube.com/watch?v=1',
+          width: null
+        }
+      ])
+      expect(db.prepare('SELECT COUNT(*) AS count FROM media_ingestions').get()).toEqual({
+        count: 0
+      })
+      expect(publication.affectedRoutes.split('\n')).toContain('/products/old-slug/')
+      expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 5 })
+    })
+
+    it('drops every image of a listing that has none left, and rolls back when media changed', () => {
+      const db = mediaDatabase()
+      executeInTestTransaction(db, plan({ operations: [mediaUpdate({ media: {} })] }))
+      expect(
+        db.prepare("SELECT kind FROM listing_media WHERE listing_id='lst_sqlite_test'").all()
+      ).toEqual([{ kind: 'video' }])
+      const changed = mediaDatabase()
+      changed.exec("UPDATE listing_media SET url='https://new.example/logo.png' WHERE kind='logo'")
+      expect(() =>
+        executeInTestTransaction(changed, plan({ operations: [mediaUpdate()] }))
+      ).toThrow()
+      expect(changed.prepare("SELECT url FROM listing_media WHERE kind='logo'").get()).toEqual({
+        url: 'https://new.example/logo.png'
+      })
+      expect(changed.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 4 })
+    })
+
+    it('applies a row-level manifest at whatever version each environment is (#97 review B3)', () => {
+      const rows = (overrides: Record<string, unknown> = {}) =>
+        manifestSchema.parse({
+          version: 1,
+          id: 'rows-release',
+          concurrency: 'rows',
+          provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+          operations: [mediaUpdate()],
+          ...overrides
+        })
+      // Two environments that published different things since the manifest was generated.
+      for (const version of [4, 17]) {
+        const db = mediaDatabase()
+        db.prepare('UPDATE publication_state SET version=?').run(version)
+        const live = { checksum: beforeChecksum, version }
+        const publication = buildPublicationPlan(rows(), 'rows manifest', now, live)
+        expect(publication.base).toEqual(live)
+        executeInTestTransaction(db, publication)
+        expect(db.prepare('SELECT version,manifest_id FROM publication_state').get()).toEqual({
+          manifest_id: 'rows-release',
+          version: version + 1
+        })
+        expect(db.prepare("SELECT media_key FROM listing_media WHERE kind='logo'").get()).toEqual({
+          media_key: hosted('logo', 'a').key
+        })
+      }
+      // The live state is required, and a stale one still rolls the batch back.
+      expect(() => buildPublicationPlan(rows(), 'rows manifest', now)).toThrow(/live publication/u)
+      const stale = mediaDatabase()
+      expect(() =>
+        executeInTestTransaction(
+          stale,
+          buildPublicationPlan(rows(), 'rows manifest', now, {
+            checksum: beforeChecksum,
+            version: 3
+          })
+        )
+      ).toThrow()
+      // The row-level guard compares the hosted key too: a row the cron hosted meanwhile wins.
+      const hostedMeanwhile = mediaDatabase()
+      hostedMeanwhile.exec(
+        `UPDATE listing_media SET media_key='${hosted('logo', 'f').key}',sha256='${sha('f')}',
+          content_type='image/png',bytes=1,width=1,height=1 WHERE kind='logo'`
+      )
+      expect(() =>
+        executeInTestTransaction(
+          hostedMeanwhile,
+          buildPublicationPlan(rows(), 'rows manifest', now, {
+            checksum: beforeChecksum,
+            version: 4
+          })
+        )
+      ).toThrow()
+      expect(
+        hostedMeanwhile.prepare("SELECT media_key FROM listing_media WHERE kind='logo'").get()
+      ).toEqual({ media_key: hosted('logo', 'f').key })
+      // A row-level manifest names no base and holds only media updates; others need their base.
+      expect(() => rows({ basePublicationVersion: 4 })).toThrow(/names no base/u)
+      expect(() =>
+        rows({ provenance: { actor: 'test@example.com', workflow: 'test/sqlite', beforeChecksum } })
+      ).toThrow(/names no base/u)
+      expect(() =>
+        rows({ operations: [mediaUpdate(), { action: 'category-unpublish', slug: 'seo' }] })
+      ).toThrow(/only listing-media-update/u)
+      expect(() =>
+        manifestSchema.parse({
+          version: 1,
+          id: 'no-base',
+          provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+          operations: [mediaUpdate()]
+        })
+      ).toThrow(/needs basePublicationVersion/u)
+    })
+
+    it("refuses another listing's key, a key of the wrong kind, and a forged digest", () => {
+      const refused = (operation: Record<string, unknown>) => () =>
+        manifestSchema.parse({
+          version: 1,
+          id: 'sqlite-release',
+          basePublicationVersion: 4,
+          provenance: { actor: 'test@example.com', workflow: 'test/sqlite', beforeChecksum },
+          operations: [operation]
+        })
+      expect(refused(mediaUpdate())).not.toThrow()
+      expect(refused(mediaUpdate({ media: { logo: hosted('logo', 'a', 'other-slug') } }))).toThrow(
+        /not this listing's logo/u
+      )
+      expect(refused(mediaUpdate({ media: { logo: hosted('image', 'a') } }))).toThrow(
+        /not this listing's logo/u
+      )
+      expect(
+        refused(mediaUpdate({ media: { logo: { ...hosted('logo', 'a'), sha256: sha('c') } } }))
+      ).toThrow(/Invalid hosted media key/u)
+      expect(
+        refused(
+          mediaUpdate({ media: { logo: { ...hosted('logo', 'a'), contentType: 'image/webp' } } })
+        )
+      ).toThrow(/extension must match/u)
+    })
+  })
 })
 
 describe('listing-unpublish (the admin panel’s unpublished state, #64 and #100)', () => {

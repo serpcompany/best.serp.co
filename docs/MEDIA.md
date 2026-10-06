@@ -153,6 +153,66 @@ on `*.localtest.me:<port>`. `curl localhost:8787/cdn-cgi/handler/scheduled` runs
 e2e media server (`apps/e2e/tests/media-fixture.ts`) does on throwaway state;
 `apps/e2e/tests/listing-media.spec.ts` checks the rendered media against local R2.
 
+## Uploading and publishing
+
+A catalog-wide change (the legacy migration) is two reviewed files: an upload plan under
+`d1/media/` (each object's key, SHA-256, size, type, dimensions, and source: a public https URL
+or a `repo:` file under `apps/web/public`) and row-level manifests under `d1/publications/` that
+name the keys. `pnpm media:upload:dry-run -- d1/media/<plan>.json` fetches and verifies every
+object locally and writes nothing. The owner then runs, in order:
+
+1. **Upload Listing Media (staging)** from `staging`, typing `upload-media-best.serp.co-staging`.
+   Every object is fetched again and uploaded only if its bytes still match the plan.
+2. **Publish D1 Catalog (staging)** from `staging` with `publish-best.serp.co-staging`, once per
+   manifest, and check staging.
+3. After the `staging` → `main` promotion: **Upload Listing Media** with
+   `upload-media-best.serp.co-production`, then **Publish D1 Catalog** with
+   `publish-best.serp.co-production` for the same manifests.
+
+How the steps protect each other:
+
+- **Bucket to bucket.** The production upload copies each object from the `cdn-staging` bucket
+  through the R2 API, never through a CDN, so it gets the bytes staging verified whatever the
+  source or an edge cache does since.
+- **Existing objects are verified, never trusted.** An object the target bucket already holds is
+  read back and checked like an upload: a match is skipped, so a rerun finishes what is
+  missing; a mismatch fails that key (`present_mismatch:…`) and is never overwritten, since
+  something else wrote it.
+- **Upload before publish is enforced.** The publisher reads every object a manifest names from
+  the target's own bucket (`cdn-staging` or `cdn`) and refuses the manifest unless each one
+  matches its SHA-256, type, size, and dimensions.
+- **Row-level manifests.** A media manifest says `concurrency: rows` and names no base version.
+  Each listing carries its `expected` logo and image rows (kind, source URL, hosted key), and
+  the batch applies only while they still match, so one manifest fits staging and production
+  whatever else each published (admin edits, approvals, the media cron). The publisher reads
+  the live publication state, checks every listing first, and still advances the version;
+  rerunning a published manifest is a no-op.
+- **Its own queue.** Uploads use `media-upload-best-serp-co-<env>`, never the deploy groups, so
+  an hour-long upload cannot make a waiting deploy or publication be replaced.
+
+A source that changed between the plan and the staging upload fails that object
+(`sha256_mismatch`); regenerate the plan for it, then rerun the upload, which skips the rest.
+
+### Recovering a refused media manifest
+
+A publication that reports "listings changed since this manifest was generated" wrote nothing.
+Some listing's logo or images changed on that environment after generation (an admin edit, an
+approval, or the cron hosting a queued slot). A row-level manifest fits only the rows it was
+generated from, so recovery keeps staging first:
+
+1. Regenerate the plan and manifests from **staging's** current rows (the migration script reads
+   `expected` from them), with **new manifest ids**: an id that already succeeded is refused as
+   "already used by different content". Review the diff.
+2. Upload the new plan to staging and publish the new manifests on staging, then, after the
+   promotion, upload and publish them on production.
+
+Manifests that published stay published, and regenerated ones leave their listings out. A
+listing that changed only on production stays refused there; it keeps its production media
+until its rows match staging's again, and is never repointed without the staging check.
+
+Agents prepare and review these files; they never run the uploads or publications
+([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)).
+
 ## Owner setup
 
 Done on 2026-10-06: the `cdn-staging` bucket and both custom domains exist, and the deploy token
@@ -160,6 +220,12 @@ Done on 2026-10-06: the `cdn-staging` bucket and both custom domains exist, and 
 [deploy runbook](./DEPLOY_RUNBOOK.md#cloudflare-api-token)).
 
 ### Optional owner actions
+
+- **A human gate on staging data.** The `staging` environment has no reviewers, so anything that
+  can dispatch workflows could run the staging publication or upload. A `staging-data`
+  environment (deployments from `staging` only, the owner as required reviewer, the same two
+  secrets) used by `publish-d1-staging.yml` and `upload-media-staging.yml` would enforce what
+  AGENTS.md states, as `production-notifier` does for the notifier. Not created here.
 
 - **Lifecycle rules for pending images.** The cron deletes finished submissions' and revisions'
   images, but a row deleted outright (its queue rows cascade) leaves its objects behind. R2
