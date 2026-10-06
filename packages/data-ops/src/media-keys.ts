@@ -12,7 +12,14 @@ export const MEDIA_KINDS = ['logo', 'image'] as const
 export type MediaKind = (typeof MEDIA_KINDS)[number]
 
 export const MAX_MEDIA_BYTES = 5 * 1024 * 1024
+/** A listing's hosted image: content-addressed, so it never changes and caches for a year. */
 export const MEDIA_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+/**
+ * A pending submission's image (`best.serp.co/submissions/<id>/…`): cached five minutes, so
+ * deleting a rejected or withdrawn submission's image takes it off the media host promptly,
+ * without a zone purge (#96 review round 2, S1). Approval copies it to a listing key.
+ */
+export const SUBMISSION_MEDIA_CACHE_CONTROL = 'public, max-age=300'
 /** The local Worker serves its R2 binding here (never on staging or in production). */
 export const LOCAL_MEDIA_PATH = '/_media'
 /** Hex characters of the SHA-256 digest kept in the key. */
@@ -107,6 +114,13 @@ export function listingKeyForSubmissionKey(key: string, slug: string): string {
   if (parsed?.scope !== 'submissions') throw new Error(`${key} is not a submission media key.`)
   if (!slugPattern.test(slug)) throw new Error('Invalid listing slug for a media key.')
   return `${MEDIA_SITE}/listings/${slug}/${parsed.kind}/${parsed.hash}.${parsed.extension}`
+}
+
+/** The `Cache-Control` a key is stored with: immutable for listings, short for submissions. */
+export function cacheControlForKey(key: string): string {
+  return parseMediaKey(key)?.scope === 'submissions'
+    ? SUBMISSION_MEDIA_CACHE_CONTROL
+    : MEDIA_CACHE_CONTROL
 }
 
 /** The content type a key's extension stands for (keys are only ever written with their type). */

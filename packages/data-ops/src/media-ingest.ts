@@ -5,10 +5,10 @@ import {
   sniffImage
 } from './media-format'
 import {
+  cacheControlForKey,
   type HostedMedia,
   isMediaKey,
   MAX_MEDIA_BYTES,
-  MEDIA_CACHE_CONTROL,
   type MediaKind,
   type MediaOwner,
   mediaKey,
@@ -176,7 +176,7 @@ export async function storeHostedMedia(
   try {
     await bucket.put(media.key, body, {
       customMetadata: { sha256: media.sha256, source: media.sourceUrl.slice(0, 1024) },
-      httpMetadata: { cacheControl: MEDIA_CACHE_CONTROL, contentType: media.contentType },
+      httpMetadata: { cacheControl: cacheControlForKey(media.key), contentType: media.contentType },
       sha256: media.sha256
     })
     return true

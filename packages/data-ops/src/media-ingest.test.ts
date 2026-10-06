@@ -193,6 +193,31 @@ describe('ingestImage', () => {
     expect(puts).toEqual([listingKey])
   })
 
+  it('caches a pending submission image briefly and a listing copy for a year (#96 round 2 S1)', async () => {
+    const png = pngBytes(64, 64)
+    const bucket = memoryBucket()
+    const submitted = await ingestImage({
+      bucket,
+      fetcher: routedFetch({ [source]: imageResponse(png) }),
+      kind: 'logo',
+      sourceUrl: source,
+      submissionId: 'sub_1'
+    })
+    if (!submitted.ok) throw new Error('Not hosted.')
+    expect(bucket.objects.get(submitted.media.key)?.options.httpMetadata.cacheControl).toBe(
+      'public, max-age=300'
+    )
+    const listingKey = submitted.media.key.replace('submissions/sub_1', 'listings/x')
+    const copied = await copyHostedMedia(bucket, submitted.media.key, {
+      ...submitted.media,
+      key: listingKey
+    })
+    expect(copied.ok).toBe(true)
+    expect(bucket.objects.get(listingKey)?.options.httpMetadata.cacheControl).toBe(
+      MEDIA_CACHE_CONTROL
+    )
+  })
+
   it('deletes only a submission’s own images', async () => {
     const bucket = memoryBucket()
     const scoped = scopedMediaBucket(bucket)
