@@ -147,9 +147,10 @@ bucket to bucket through the R2 API, before the manifest that names its keys is 
   overwrites, an object the bucket already holds.
 - The publisher refuses a media manifest until the target's own bucket holds every object it
   names, byte for byte.
-- A media manifest is row-level (`concurrency: rows`): it fits both environments whatever else
-  each published, and a listing that changed since generation refuses it with nothing written.
-  Any other manifest still names the base version both environments must share.
+- Media, category, FAQ, and unpublish manifests are row-level (`concurrency: rows`): each fits
+  both environments whatever else each published, and a listing that changed since generation
+  refuses it with nothing written. Any other manifest still names the base version both
+  environments must share.
 
 Procedure: [Listing media](./MEDIA.md#uploading-and-publishing).
 

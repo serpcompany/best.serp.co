@@ -1723,19 +1723,19 @@ operations:
         key: null
     media:
       logo:
-        bytes: 22816
-        contentType: image/png
+        bytes: 14088
+        contentType: image/webp
         height: 512
-        key: best.serp.co/listings/streamroutine.com/logo/6bc62bc3698a92b6.png
-        sha256: 6bc62bc3698a92b619ed4381c053d794b1576da8d74c3c43bad0615199292b86
+        key: best.serp.co/listings/streamroutine.com/logo/c4f27344622a7d9e.webp
+        sha256: c4f27344622a7d9e95a6c4bfa8cf420f4df01a788e01e9dce26c445b0d4635e0
         source: https://streamroutine.com/themes/streamroutine/assets/images/streamroutine-logo-color.png
         width: 512
       images:
-        - bytes: 789649
-          contentType: image/png
+        - bytes: 70080
+          contentType: image/webp
           height: 630
-          key: best.serp.co/listings/streamroutine.com/image/f14141d5d0edd4d5.png
-          sha256: f14141d5d0edd4d5952318cb49731ffe99cde600db4d694a2f3685575a7c1c4e
+          key: best.serp.co/listings/streamroutine.com/image/0901940f2d1539b4.webp
+          sha256: 0901940f2d1539b410835bdf3e1762b4acb64c44069f7bb5333f8b38ac55990a
           source: https://streamroutine.com/themes/streamroutine/assets/images/streamroutine-social-share-og-image.png
           width: 1200
   - action: listing-media-update
@@ -1915,11 +1915,11 @@ operations:
         source: https://stunning.so/_next/static/media/favicon.69bc838a.ico
         width: 256
       images:
-        - bytes: 59418
-          contentType: image/jpeg
+        - bytes: 30220
+          contentType: image/webp
           height: 630
-          key: best.serp.co/listings/stunning.so/image/0d206cd6cacd5449.jpg
-          sha256: 0d206cd6cacd5449f3a899be8185768917ec5f7fda003b0947c15b83b4a33fb6
+          key: best.serp.co/listings/stunning.so/image/f904b4c27e8c06b2.webp
+          sha256: f904b4c27e8c06b26a6d5c0dde2386186b80955bdbbba785e38bdb36a60104b3
           source: https://stunning.so/images/og/og-en.jpg?v=3
           width: 1200
   - action: listing-media-update
@@ -2895,11 +2895,11 @@ operations:
         source: https://www.synthace.com/hubfs/synthace-logo-favicon-1.png
         width: 200
       images:
-        - bytes: 35231
-          contentType: image/png
+        - bytes: 17788
+          contentType: image/webp
           height: 419
-          key: best.serp.co/listings/synthace.com/image/00b164e2873414ce.png
-          sha256: 00b164e2873414ce4925f9dc523a84be717ad68376e8bd530cbac85bb6fdb612
+          key: best.serp.co/listings/synthace.com/image/eea3b390fc103c3d.webp
+          sha256: eea3b390fc103c3d5bdfe44048a8954bf063e3fde8dd310ece088a85eed66292
           source: https://www.synthace.com/hubfs/Homepage%20feature%20image.png
           width: 722
   - action: listing-media-update
@@ -3335,11 +3335,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 5193
-        contentType: image/png
+        bytes: 1594
+        contentType: image/webp
         height: 144
-        key: best.serp.co/listings/tailwindapp.com/logo/70df523cfbd079b1.png
-        sha256: 70df523cfbd079b1c3c28318811d5fb8a99c66a5852efb68c4e1c8285596952e
+        key: best.serp.co/listings/tailwindapp.com/logo/f273b4a7f210581b.webp
+        sha256: f273b4a7f210581b866eeb92877973f359c76ee465f97e95939de872a0a998b9
         source: https://www.tailwindapp.com/apple-touch-icon.png
         width: 144
   - action: listing-media-update
@@ -6549,19 +6549,19 @@ operations:
         key: null
     media:
       logo:
-        bytes: 2290
-        contentType: image/webp
+        bytes: 1948
+        contentType: image/avif
         height: 192
-        key: best.serp.co/listings/tryvelos.com/logo/880dbfe9709ea793.webp
-        sha256: 880dbfe9709ea79331ee54ad8a23cf93b21e2dfbfc4f2e18f0a1ad5041fc3cb7
+        key: best.serp.co/listings/tryvelos.com/logo/16bc03a8a6c36c12.avif
+        sha256: 16bc03a8a6c36c12e27cd62931870062622a208cb52defaa3a81ffa54319b915
         source: https://framerusercontent.com/images/ZmpAnbZPhek6tsmZSFwae3RiQ.png
         width: 192
       images:
-        - bytes: 13186
-          contentType: image/webp
+        - bytes: 8905
+          contentType: image/avif
           height: 900
-          key: best.serp.co/listings/tryvelos.com/image/201340aa4540ff55.webp
-          sha256: 201340aa4540ff550b89a948a71b0cde1fe0718ecf30dfa32d3f6ce588f9d294
+          key: best.serp.co/listings/tryvelos.com/image/bd5740ac8fe8eb1f.avif
+          sha256: bd5740ac8fe8eb1fcb71739caa3d52cc7738bc833533869a7efa63da53787bb6
           source: https://framerusercontent.com/images/0eyuFy49JARfXwssMQSulkkEE.png
           width: 1644
   - action: listing-media-update
@@ -6723,23 +6723,7 @@ operations:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/turnitin/public
         key: null
-    media:
-      logo:
-        bytes: 1137
-        contentType: image/png
-        height: 192
-        key: best.serp.co/listings/turnitin.com/logo/cdeca91dfc3005a3.png
-        sha256: cdeca91dfc3005a39be87d374ab6399247446b60b75a2207cca672ba28e6cf30
-        source: https://www.turnitin.com/system/favicon/favicon.png
-        width: 192
-      images:
-        - bytes: 13756
-          contentType: image/png
-          height: 418
-          key: best.serp.co/listings/turnitin.com/image/4d44f4576c86a958.png
-          sha256: 4d44f4576c86a9581e9d9f7c303e505f3ad8b794ade9ac06d6101d010a15cff1
-          source: https://www.turnitin.com/assets/images/resources/open-graph-page-images/default-turnitin-image.png
-          width: 800
+    media: {}
   - action: listing-media-update
     id: lst_7b2f65f4841094fa2accdd7c
     slug: tutorly.ai
@@ -7747,11 +7731,11 @@ operations:
         source: https://undetectable.ai/apple-touch-icon.png
         width: 100
       images:
-        - bytes: 72971
-          contentType: image/png
+        - bytes: 48916
+          contentType: image/webp
           height: 1600
-          key: best.serp.co/listings/undetectable.ai/image/f40f965eb4e8a3b6.png
-          sha256: f40f965eb4e8a3b69cabb2d4ac9703e8f81ec5663de9fb3546ed2c4e3d243427
+          key: best.serp.co/listings/undetectable.ai/image/bdb562fe894dc46c.webp
+          sha256: bdb562fe894dc46c63b0f4952ef83d0313fe14a88f2cdea28b969967d498585a
           source: https://undetectable.ai/assets/homepage-og.png
           width: 2560
   - action: listing-media-update
@@ -9225,11 +9209,11 @@ operations:
         source: https://framerusercontent.com/images/l509Ct0rYPk2FneS7K9xFoyb4ds.png
         width: 64
       images:
-        - bytes: 158876
-          contentType: image/webp
+        - bytes: 106045
+          contentType: image/avif
           height: 1260
-          key: best.serp.co/listings/vid2txt.com/image/bc1f3bf9948e3497.webp
-          sha256: bc1f3bf9948e3497995092798418977436569a18e1eca17598dd9b04430b0751
+          key: best.serp.co/listings/vid2txt.com/image/71ba67567c5d7db8.avif
+          sha256: 71ba67567c5d7db8aeab1b6ed6f4042684e24eb89cac7fbf2bbb67c9cde42205
           source: https://framerusercontent.com/images/xq8F77lMf895mb2eAIWYmK5qNeA.png
           width: 2400
   - action: listing-media-update

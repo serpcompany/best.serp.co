@@ -744,11 +744,12 @@ describe('listing domain report and manifest', () => {
 
   it('writes a manifest the publisher accepts, guarded by each listing’s website', () => {
     const source = buildUnpublishManifest(report, catalog, {
-      baseChecksum: 'a'.repeat(64),
-      baseVersion: 1,
       id: '2026-10-06-hijacked-domains',
       reportPath: 'd1/hygiene/x.yaml'
     })
+    // Row-level: no base version, so it fits staging and production in any order.
+    expect(parseManifest(source)).toMatchObject({ concurrency: 'rows' })
+    expect(parseManifest(source).basePublicationVersion).toBeUndefined()
     expect(parseManifest(source).operations).toEqual([
       {
         action: 'listing-unpublish',
@@ -764,8 +765,6 @@ describe('listing domain report and manifest', () => {
     )
     expect(() =>
       buildUnpublishManifest(report, moved, {
-        baseChecksum: 'a'.repeat(64),
-        baseVersion: 1,
         id: 'x-hijacked-domains',
         reportPath: 'x'
       })
@@ -797,8 +796,6 @@ describe('listing domain report and manifest', () => {
       // The manifest is exactly what the generator writes from the report and the catalog.
       expect(source, file).toBe(
         buildUnpublishManifest(committed, listings, {
-          baseChecksum: manifest.provenance.beforeChecksum,
-          baseVersion: manifest.basePublicationVersion,
           id: manifest.id,
           reportPath: `d1/hygiene/${file}`
         })
@@ -808,7 +805,11 @@ describe('listing domain report and manifest', () => {
       for (const migration of freshMigrationNames())
         database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
       database.exec(readReviewedImportSql(readParityReport()))
-      const plan = buildPublicationPlan(manifest, source, '2026-10-06T00:00:00.000Z')
+      // Row-level: planned at the environment's live state, here the import's.
+      const live = database
+        .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
+        .get() as { checksum: string; version: number }
+      const plan = buildPublicationPlan(manifest, source, '2026-10-06T00:00:00.000Z', live)
       database.exec('BEGIN')
       for (const item of plan.statements) {
         assertD1StatementLimits(item.query, item.bindings)
@@ -830,7 +831,7 @@ describe('listing domain report and manifest', () => {
         count: committed.unpublish.length
       })
       expect(database.prepare('SELECT version FROM publication_state').get()).toEqual({
-        version: manifest.basePublicationVersion + 1
+        version: live.version + 1
       })
       database.close()
       expect(

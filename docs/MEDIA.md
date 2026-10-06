@@ -165,7 +165,7 @@ object locally and writes nothing. The owner then runs, in order:
 1. **Upload Listing Media (staging)** from `staging`, typing `upload-media-best.serp.co-staging`.
    Every object is fetched again and uploaded only if its bytes still match the plan.
 2. **Publish D1 Catalog (staging)** from `staging` with `publish-best.serp.co-staging`, once per
-   manifest (#100's `hijacked-domains` first: its base version is 1), and check staging.
+   manifest (all row-level, in any order), and check staging.
 3. After the `staging` → `main` promotion: **Upload Listing Media** with
    `upload-media-best.serp.co-production`, then **Publish D1 Catalog** with
    `publish-best.serp.co-production` for the same manifests.

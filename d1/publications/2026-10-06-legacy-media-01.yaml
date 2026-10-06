@@ -524,11 +524,11 @@ operations:
         source: https://framerusercontent.com/images/JkcuV8B8O3aqOpN5Tl6t220iZC8.png
         width: 3327
       images:
-        - bytes: 54210
-          contentType: image/webp
+        - bytes: 40385
+          contentType: image/avif
           height: 1200
-          key: best.serp.co/listings/ayfie.com/image/b5fcc2048921d27a.webp
-          sha256: b5fcc2048921d27a073f3553a89fef67999e4fe096e8751a95fee369f85aae49
+          key: best.serp.co/listings/ayfie.com/image/da66d7580756d691.avif
+          sha256: da66d7580756d691acbde16f14a9edcfaed10c6f61cb64123b8c5b44b65f2abe
           source: https://framerusercontent.com/images/UFM6xkZzwIGx0Zi35dL4teO1f0M.png
           width: 1200
   - action: listing-media-update
@@ -1455,11 +1455,11 @@ operations:
         source: https://www.benchmarkemail.com/wp-content/uploads/2025/12/android-chrome-192x192-1.png
         width: 192
       images:
-        - bytes: 603262
+        - bytes: 590730
           contentType: image/gif
           height: 700
-          key: best.serp.co/listings/benchmarkemail.com/image/544f84dafdd675c7.gif
-          sha256: 544f84dafdd675c764ef433765ef888688608b3c0d05e51a29374f411961f4e1
+          key: best.serp.co/listings/benchmarkemail.com/image/fa4c1d123d8fbd23.gif
+          sha256: fa4c1d123d8fbd2360cefa06738557e7f64d2706184dcb722aa67b0c23bb6f6e
           source: https://www.benchmarkemail.com/wp-content/uploads/2024/08/Header.gif
           width: 700
   - action: listing-media-update
@@ -2816,11 +2816,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 8972
-        contentType: image/png
+        bytes: 6346
+        contentType: image/webp
         height: 206
-        key: best.serp.co/listings/botsify.com/logo/c5c6c25f271ffc4d.png
-        sha256: c5c6c25f271ffc4dd016d455d9cb68f1a020475b09508f5077cc853ddfc4caa1
+        key: best.serp.co/listings/botsify.com/logo/2ff2f0b6f00fd2ca.webp
+        sha256: 2ff2f0b6f00fd2ca5d317e9a2f625fd55b90a5ac3460815688b763abc270006f
         source: https://botsify.com/assets/img/favicon.png
         width: 180
   - action: listing-media-update
@@ -4487,11 +4487,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 6666
-        contentType: image/png
+        bytes: 2530
+        contentType: image/webp
         height: 180
-        key: best.serp.co/listings/caspio.com/logo/929fd01c9de16012.png
-        sha256: 929fd01c9de160126273d42c7da84eab6678b1bc3443cc42dbda469de75111da
+        key: best.serp.co/listings/caspio.com/logo/c6b457f0fa72b242.webp
+        sha256: c6b457f0fa72b242f75a0a699a4b427b5d6810cf511decb373d22ea4172c5a5f
         source: https://www.caspio.com/wp-content/themes/caspio/img/favicon/apple-touch-icon.png
         width: 180
   - action: listing-media-update
@@ -5870,11 +5870,11 @@ operations:
         key: null
     media:
       images:
-        - bytes: 60495
-          contentType: image/png
+        - bytes: 20280
+          contentType: image/webp
           height: 1260
-          key: best.serp.co/listings/checklist.gg/image/c33ec188964f1f46.png
-          sha256: c33ec188964f1f46233b103075fa7df7c3bc1b709715bab6dcd64f375d5f4e66
+          key: best.serp.co/listings/checklist.gg/image/17317772de5be0c8.webp
+          sha256: 17317772de5be0c8e20b9eb66b6125f4741187c2e4aeee570665889af98d99b1
           source: https://images.blocksurvey.io/checklistgg-home-meta.png
           width: 2400
   - action: listing-media-update
@@ -6389,11 +6389,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 9323
+        bytes: 12005
         contentType: image/png
         height: 192
-        key: best.serp.co/listings/clevr.ai/logo/ddf65b745e49f477.png
-        sha256: ddf65b745e49f4772e81970a35dbfa3481989c2928304ea193123f1f9ab35840
+        key: best.serp.co/listings/clevr.ai/logo/d3e133cb7a6b9493.png
+        sha256: d3e133cb7a6b949381c434adcc26aef7808cab6681d5175ded43b5615c1062b0
         source: https://clevr.ai/wp-content/uploads/2023/01/cropped-ClevrAI_logo_reg-512-%C3%97-512-px-copy-3-1-192x192.png
         width: 192
   - action: listing-media-update

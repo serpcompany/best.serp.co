@@ -1617,11 +1617,11 @@ operations:
         source: https://hocoos.com/wp-content/uploads/2025/01/hocoos_favicon.png
         width: 64
       images:
-        - bytes: 267510
-          contentType: image/png
+        - bytes: 237874
+          contentType: image/webp
           height: 994
-          key: best.serp.co/listings/hocoos.com/image/2467ace6de1a9d8f.png
-          sha256: 2467ace6de1a9d8f21f275442bb1bacf32e9536d536d8c642b60fb05a0e157d4
+          key: best.serp.co/listings/hocoos.com/image/0203db96410010be.webp
+          sha256: 0203db96410010be8833df626a4f0bf45abacb11f1447dc4cc3e995c71b81edb
           source: https://hocoos.com/wp-content/uploads/2025/06/home-hero.png
           width: 1213
   - action: listing-media-update
@@ -3030,11 +3030,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 3131
-        contentType: image/png
+        bytes: 2886
+        contentType: image/webp
         height: 192
-        key: best.serp.co/listings/influencermarketing.ai/logo/c451bd7bcb3053d7.png
-        sha256: c451bd7bcb3053d707f4b79b87c42a0dd7c2c56471aae7de6945a3e8e8fd9873
+        key: best.serp.co/listings/influencermarketing.ai/logo/c5397aa8bd54f5d1.webp
+        sha256: c5397aa8bd54f5d1d10ffe500cdd8cfda966a5453693dca223a71bc2a094faa5
         source: https://influencermarketing.ai/wp-content/uploads/2022/12/cropped-imai_logo_icon-192x192.png
         width: 192
       images:
@@ -4035,15 +4035,7 @@ operations:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
         key: null
-    media:
-      logo:
-        bytes: 1137
-        contentType: image/png
-        height: 192
-        key: best.serp.co/listings/ithenticate.com/logo/cdeca91dfc3005a3.png
-        sha256: cdeca91dfc3005a39be87d374ab6399247446b60b75a2207cca672ba28e6cf30
-        source: https://www.turnitin.com/system/favicon/favicon.png
-        width: 192
+    media: {}
   - action: listing-media-update
     id: lst_b40d1965a9afbd5b5a9b6644
     slug: itraveledthere.io
@@ -4246,11 +4238,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 1479
-        contentType: image/png
+        bytes: 834
+        contentType: image/webp
         height: 85
-        key: best.serp.co/listings/jaeves.com/logo/16c5a8c56dbcf4db.png
-        sha256: 16c5a8c56dbcf4db17b50b6248c972cdc4faa91fac1cfe9b9b68e86e6a273139
+        key: best.serp.co/listings/jaeves.com/logo/8cc7dd79913e08f4.webp
+        sha256: 8cc7dd79913e08f4f46268a22d5f728100ffcea4852189fb560c4ae87ea8e7af
         source: https://139767802.fs1.hubspotusercontent-eu1.net/hubfs/139767802/jaeves_mini_logo.png
         width: 88
   - action: listing-media-update
@@ -4779,11 +4771,11 @@ operations:
         key: null
     media:
       images:
-        - bytes: 39960
-          contentType: image/webp
+        - bytes: 25766
+          contentType: image/avif
           height: 630
-          key: best.serp.co/listings/jochem.ai/image/133fb59f90a492c8.webp
-          sha256: 133fb59f90a492c8b7a1ad0d1df26ba111eaa2605b84a27cb465f64337bdb557
+          key: best.serp.co/listings/jochem.ai/image/11f159b2ead9a182.avif
+          sha256: 11f159b2ead9a18212a3c15c5a717699439f12a241fb84bd3b65c14ece2064d7
           source: https://framerusercontent.com/images/gSWnJSHK01Q49RlzeVK2QiFe0.png
           width: 1200
   - action: listing-media-update
@@ -4809,11 +4801,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 64148
-        contentType: image/webp
+        bytes: 20781
+        contentType: image/avif
         height: 511
-        key: best.serp.co/listings/joinrhubarb.com/logo/c552a91e7c97e265.webp
-        sha256: c552a91e7c97e265a641401b44b94a8b913aae5473aa9698089e5a4dd236c9fc
+        key: best.serp.co/listings/joinrhubarb.com/logo/0ddab141b040d7bf.avif
+        sha256: 0ddab141b040d7bf8346b7ea16093efb61133226a92ed761b74c26dc010a261c
         source: https://framerusercontent.com/images/Xq7MHsUkYfrDzM47HEhw24RKq0.png
         width: 511
       images:
@@ -7913,11 +7905,11 @@ operations:
         key: null
     media:
       images:
-        - bytes: 102728
-          contentType: image/webp
+        - bytes: 64854
+          contentType: image/avif
           height: 1198
-          key: best.serp.co/listings/libraria.ai/image/444dea3e718cc1b5.webp
-          sha256: 444dea3e718cc1b578c6d47578da44baff37103fcb3f3fb5b7e52df9b2f4d1d8
+          key: best.serp.co/listings/libraria.ai/image/7cc6c391d6d85dd9.avif
+          sha256: 7cc6c391d6d85dd9eb7e24dafad2c02dfb0515fe11d83858615772c509a9cad6
           source: https://framerusercontent.com/images/m5j3OX5sJJAWtsUrq4QNrILtI.png
           width: 2286
   - action: listing-media-update
