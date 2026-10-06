@@ -6,6 +6,7 @@ import {
   type SubmissionStatementPlan,
   selectVerifiedSubmissionNotificationPlans
 } from '@serpdirectory/data-ops/submission-plans'
+import { assertD1Compatible } from './d1-compat'
 import { project } from './project'
 
 export const EXPECTED_REPOSITORY = 'serpcompany/best.serp.co'
@@ -120,6 +121,7 @@ async function query(
   env: NodeJS.ProcessEnv,
   fetcher: typeof fetch
 ): Promise<D1Result[]> {
+  assertD1Compatible(statements.map(statement => ({ query: statement.sql })))
   const response = await fetcher(
     `https://api.cloudflare.com/client/v4/accounts/${required(env, 'CLOUDFLARE_ACCOUNT_ID')}/d1/database/${required(env, 'CLOUDFLARE_D1_DATABASE_ID')}/query`,
     {
