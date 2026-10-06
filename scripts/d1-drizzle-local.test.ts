@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, describe, expect, it } from 'vitest'
+import { claimHoldsManifest } from './claim-holds-manifest'
 import {
   applicationTableNames,
   canonicalLocalConfig,
@@ -15,6 +16,7 @@ import {
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { canonicalPreviewCommand, localPreviewVarArgs } from './d1-local-preview'
 import { resolveFreshD1StateRoot } from './d1-local-state'
+import { parseManifest } from './d1-publisher'
 import { applicationColumnInventory, importOrder, parityTableNames } from './d1-table-inventory'
 import { project } from './project'
 
@@ -179,7 +181,8 @@ describe('fresh Drizzle D1 history', () => {
       '0004_query_indexes.sql',
       '0005_admin_panel.sql',
       '0006_badge_program.sql',
-      '0007_hosted_media.sql'
+      '0007_hosted_media.sql',
+      '0008_listing_claims.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
@@ -478,6 +481,27 @@ describe('fresh Drizzle D1 history', () => {
     database.close()
   })
 
+  it("holds instant claims of #100's owner-review listings through a reviewed manifest (#67)", () => {
+    // The migration is schema only; the holds are the reviewed manifest generated from the report.
+    const migration = readFileSync(
+      resolve(freshMigrationsDirectory, '0008_listing_claims.sql'),
+      'utf8'
+    )
+    expect(migration).not.toMatch(/INSERT INTO/u)
+    const report = readFileSync(resolve('d1/hygiene/2026-10-06-listing-domains.yaml'), 'utf8')
+    const source = readFileSync(
+      resolve('d1/publications/2026-10-06-listing-claim-holds.yaml'),
+      'utf8'
+    )
+    expect(source).toBe(claimHoldsManifest(report, '2026-10-06-listing-claim-holds'))
+    const reasons = parseManifest(source).operations.map(op =>
+      op.action === 'listing-claim-hold-add' ? op.reason : op.action
+    )
+    expect(reasons.filter(reason => reason === 'off_domain')).toHaveLength(266)
+    expect(reasons.filter(reason => reason === 'unreachable')).toHaveLength(391)
+    expect(reasons).toHaveLength(657)
+  })
+
   it('migrates empty canonical local state and verifies the exact fresh schema', () => {
     const stateDirectory = temporaryDirectory('best-serp-co-drizzle-')
     // pnpm db:migrations:list:local lists what pnpm db:migrate:local will apply: every migration.
@@ -700,9 +724,11 @@ describe('fresh Drizzle D1 history', () => {
         '--var',
         'CF_ACCESS_AUD:abc123'
       ])
-      expect(localPreviewVarArgs('LOCAL_BADGE_PROGRAM=on')).toEqual([
+      expect(localPreviewVarArgs('LOCAL_BADGE_PROGRAM=on,LOCAL_CLAIMS=on')).toEqual([
         '--var',
-        'LOCAL_BADGE_PROGRAM:on'
+        'LOCAL_BADGE_PROGRAM:on',
+        '--var',
+        'LOCAL_CLAIMS:on'
       ])
       for (const refused of [
         'SITE_ENVIRONMENT=production',

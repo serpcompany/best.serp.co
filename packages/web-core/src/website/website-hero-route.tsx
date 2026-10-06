@@ -3,6 +3,7 @@ import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
 import type { ComponentProps } from 'react'
 import { FavoriteButton } from '../ui/favorite-button'
 import { ListingImage } from '../ui/listing-image'
+import { VerifiedOwnerBadge } from './verified-owner-badge'
 import {
   WebsiteHero as SharedWebsiteHero,
   type WebsiteHeroProps as SharedWebsiteHeroProps
@@ -27,7 +28,13 @@ export function WebsiteHeroRoute({
     <SharedWebsiteHero
       website={website}
       breadcrumbItems={breadcrumbItems}
-      slots={{ Badge, Breadcrumb: BreadcrumbSlot, FavoriteButton, ListingImage }}
+      slots={{
+        Badge,
+        Breadcrumb: BreadcrumbSlot,
+        FavoriteButton,
+        ListingImage,
+        VerifiedOwnerBadge
+      }}
     />
   )
 }

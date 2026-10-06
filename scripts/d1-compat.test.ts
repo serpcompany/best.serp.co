@@ -65,6 +65,7 @@ describe('D1 compatibility of generated statements (#95 release blocker, SQLITE_
     }
     expect([...actions].sort()).toEqual([
       'listing-categories-add',
+      'listing-claim-hold-add',
       'listing-content-remove-suffix',
       'listing-media-update',
       'listing-unpublish'

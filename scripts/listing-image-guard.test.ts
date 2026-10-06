@@ -24,6 +24,8 @@ const roots = [
 const LISTING_IMAGE = 'packages/web-core/src/ui/listing-image.tsx'
 /** Images that are not listing media, by file, with why. */
 const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
+  'apps/web/components/claims/claim-listing.tsx':
+    'the "Featured on" badge preview in the claim flow',
   'apps/web/components/submit/badge-step.tsx': 'the "Featured on" badge preview',
   'apps/web/lib/email/emails/layout.ts': 'the site logo in email HTML',
   'packages/design-system/components/shadcn/avatar.tsx':

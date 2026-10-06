@@ -11,6 +11,7 @@ import {
   adminSuiteEnabled
 } from './tests/admin-fixture'
 import { badgeOrigin, badgeServerCommand, badgeSuiteEnabled } from './tests/badge-program-fixture'
+import { claimsOrigin, claimsServerCommand, claimsSuiteEnabled } from './tests/claims-fixture'
 import { mediaOrigin, mediaServerCommand, mediaServerEnabled } from './tests/media-fixture'
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
@@ -161,6 +162,18 @@ export default defineConfig({
                 url: `${mediaOrigin}/robots.txt`,
                 reuseExistingServer: !process.env.CI,
                 timeout: 300000,
+                env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
+              }
+            ]
+          : []),
+        // The claims suite's own Worker and D1, with claims and the badge program on (#67).
+        ...(claimsSuiteEnabled
+          ? [
+              {
+                command: claimsServerCommand(),
+                url: `${claimsOrigin()}/robots.txt`,
+                reuseExistingServer: !process.env.CI,
+                timeout: 180000,
                 env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
               }
             ]

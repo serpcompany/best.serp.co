@@ -14,6 +14,8 @@ type WebsiteHeroWebsite = {
   }
   name: string
   slug: string
+  /** The public "Verified owner" badge next to the name (#70 screen 9b). */
+  verifiedOwner?: true
   website: string
 }
 
@@ -50,13 +52,14 @@ export type WebsiteHeroProps = {
     Breadcrumb: ComponentType<BreadcrumbProps>
     FavoriteButton: ComponentType<FavoriteButtonProps>
     ListingImage: ComponentType<ListingImageProps>
+    VerifiedOwnerBadge?: ComponentType
   }
 }
 
 export function WebsiteHero({
   breadcrumbItems,
   website,
-  slots: { Badge, Breadcrumb, FavoriteButton, ListingImage }
+  slots: { Badge, Breadcrumb, FavoriteButton, ListingImage, VerifiedOwnerBadge }
 }: WebsiteHeroProps) {
   return (
     <section className="relative overflow-hidden border-b border-border/50 bg-gradient-to-b from-muted/30 via-background to-background">
@@ -100,6 +103,7 @@ export function WebsiteHero({
                         Unofficial
                       </Badge>
                     )}
+                    {website.verifiedOwner && VerifiedOwnerBadge ? <VerifiedOwnerBadge /> : null}
                   </div>
                 </div>
 

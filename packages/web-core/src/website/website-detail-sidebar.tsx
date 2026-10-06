@@ -1,5 +1,6 @@
 import { Download, ExternalLink, Hash } from 'lucide-react'
 import Link from 'next/link'
+import type { ReactNode } from 'react'
 import { getCategoryDisplayName } from '../category-display'
 import type { WebsiteLinkRel } from '../content-query'
 import { getRoute } from '../routes'
@@ -14,6 +15,8 @@ import {
 
 type WebsiteSidebarMetadata = {
   category?: string
+  /** A listing with a current owner shows no claim link (#70 screen 9). */
+  verifiedOwner?: true
   categories?: string[]
   linkRel: WebsiteLinkRel
   name: string
@@ -28,6 +31,11 @@ type OutboundViaConfig = {
 }
 
 export type WebsiteDetailSidebarProps = {
+  /**
+   * The claim link (#67, #70 screen 9a: "Work at …? Claim this listing"), shown under the
+   * categories of a listing that has no owner. The app passes it while claims are on.
+   */
+  claim?: ReactNode
   website: WebsiteSidebarMetadata
 }
 
@@ -91,7 +99,7 @@ export function outboundWebsiteRel(linkRel: WebsiteLinkRel): string {
   return OUTBOUND_REL[linkRel] ?? OUTBOUND_REL.nofollow
 }
 
-export function WebsiteDetailSidebar({ website }: WebsiteDetailSidebarProps) {
+export function WebsiteDetailSidebar({ claim, website }: WebsiteDetailSidebarProps) {
   const outboundWebsiteUrl = getOutboundUrlWithVia(website.website, siteConfig)
   const listingUrl = getFeaturedOnBadgeListingUrl({
     listingBasePath: siteConfig.listingRouteBasePath,
@@ -156,6 +164,7 @@ export function WebsiteDetailSidebar({ website }: WebsiteDetailSidebarProps) {
             </div>
           </div>
         )}
+        {claim && !website.verifiedOwner ? claim : null}
       </div>
 
       <FeaturedOnBadgeEmbedPanel
