@@ -607,6 +607,10 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       })
     )
     expect(await listing('lst-rejected')).toMatchObject({ is_active: 0 })
+    // The rejection is the refund-pending marker until the refund is recorded.
+    const refundPending = async () =>
+      (await all<{ id: string }>(S.selectRefundPendingSubmissionsPlan(50))).map(row => row.id)
+    expect(await refundPending()).toContain('sub-rejected')
     await run(
       S.buildRefundSubmissionPlans({
         actor: 'admin',
@@ -616,6 +620,7 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       })
     )
     expect(await submission('sub-rejected')).toMatchObject({ refunded_at: NOW, status: 'rejected' })
+    expect(await refundPending()).not.toContain('sub-rejected')
 
     // A payment held for review, and one that arrives after the owner withdrew.
     await insertDraft('sub-held', 'https://held.example/')

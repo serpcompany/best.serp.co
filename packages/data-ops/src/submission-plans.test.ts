@@ -29,6 +29,7 @@ import {
   buildUpgradeListingToPaidPlans,
   buildWithdrawSubmissionPlans,
   recordSubmissionNotificationPlan,
+  selectRefundPendingSubmissionsPlan,
   selectSubmissionForDecisionPlan,
   selectVerifiedSubmissionNotificationPlans,
   submissionTransitions
@@ -1006,9 +1007,16 @@ describe('refunds keep the plan model consistent (paid → free)', () => {
         now: NOW,
         submissionId
       })
+    const pending = (target: DatabaseSync) =>
+      (query(target, selectRefundPendingSubmissionsPlan(10)) as Array<{ id: string }>).map(
+        row => row.id
+      )
+    // The rejection marks the refund pending until it is recorded (#64 review).
+    expect(pending(db)).toEqual([submissionId])
     execute(db, plans())
     expect(submission(db)).toMatchObject({ plan: 'paid', refunded_at: NOW, status: 'rejected' })
     expect(events(db, 'refunded')).toBe(1)
+    expect(pending(db)).toEqual([])
     expect(() => execute(db, plans())).toThrow(/malformed JSON/u)
     expect(events(db, 'refunded')).toBe(1)
 
@@ -1016,6 +1024,7 @@ describe('refunds keep the plan model consistent (paid → free)', () => {
     prohibited
       .prepare("UPDATE listing_submissions SET rejection_category='prohibited' WHERE id=?")
       .run(submissionId)
+    expect(pending(prohibited)).toEqual([])
     expect(() => execute(prohibited, plans())).toThrow(/malformed JSON/u)
     expect(submission(prohibited).refunded_at).toBeNull()
     expect(() =>
@@ -1025,6 +1034,8 @@ describe('refunds keep the plan model consistent (paid → free)', () => {
     ).toThrow(/listing_submissions_no_refund_when_prohibited/u)
 
     const queued = database('verified', { paid: true })
+    expect(pending(queued)).toEqual([])
+    expect(pending(database('rejected', { paid: false }))).toEqual([])
     expect(() => execute(queued, plans())).toThrow(/malformed JSON/u)
     expect(submission(queued)).toMatchObject({ plan: 'paid', refunded_at: null })
   })

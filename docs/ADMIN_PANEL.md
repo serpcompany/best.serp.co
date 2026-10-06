@@ -51,13 +51,16 @@ changed), 422 (invalid input), or 503.
 ## Decisions
 
 Each decision reads the current state, answers a replay of a decision that already happened as
-`{ok: true, replayed: true}` without writing or emailing, and otherwise sends the reviewed
-statement plans as one D1 batch:
+`{ok: true, replayed: true}` without writing (it only retries the decision's email or refund,
+below), and otherwise sends the reviewed statement plans as one D1 batch:
 
 - **Compare and swap.** Approvals send the `content_version` the admin saw (a reviewer's inline
   edit increments it in the same batch, then the approval swaps on the new value), listing edits
   the listing `checksum`, ownership changes the owner the admin saw. A stale page gets 409 and
-  reloads. A race between two identical requests ends with one write and one replay.
+  reloads. A race between two identical requests ends with one write and one replay. A catalog
+  decision whose batch lost only the race for the global publication version (another listing
+  published in between, while this item is as it was read) runs once more on fresh state, so
+  two admins on different listings don't see a false 409.
 - **Publication.** Anything that changes public output (approve, reject a live listing,
   unpublish, republish, link, details, ownership) goes through `prepareCatalogPublication` and
   records a `publication_runs` row (`actor` = the admin's email, `workflow = 'app/admin'`),
@@ -71,7 +74,10 @@ statement plans as one D1 batch:
   read-only; a transfer needs a verified account; the last admin cannot be removed (the plan
   refuses it inside the batch, so two admins cannot remove each other at once).
 
-Emails go through `enqueueEmail` ([Email](./EMAIL.md)), once per event key:
+Emails go through `enqueueEmail` ([Email](./EMAIL.md)), built from the stored state whenever
+the decision holds. A replay enqueues the same email under the same event key: the ledger sends
+it at most once, and resends one whose first send failed (a provider outage), so retrying the
+decision is the recovery path.
 
 | Decision | Template | Event key |
 |---|---|---|
@@ -82,9 +88,25 @@ Emails go through `enqueueEmail` ([Email](./EMAIL.md)), once per event key:
 
 Approving a paid submission sends nothing yet: `listing-approved` is the free listing's email
 (it asks to keep the badge), and #70 has no paid approval email; a paid listing that went live
-on payment was told so then (`listing-live-paid`). Revision decisions send nothing until their templates exist. Rejecting a paid
-submission as `other` promises a refund: until #68 provides the refund hook (`AdminRefunds`),
-that decision answers 409 `refund_unavailable` and changes nothing.
+on payment was told so then (`listing-live-paid`). Revision decisions send nothing until their
+templates exist.
+
+### Refunds
+
+Rejecting a paid submission as `other` promises a refund. Until #68 provides the refund hook
+(`AdminRefunds`), that decision answers 409 `refund_unavailable` and changes nothing. The
+contract #68 implements:
+
+- The rejection batch is the refund-pending marker: `status = 'rejected'`,
+  `rejection_category = 'other'`, `paid_at` set and `refunded_at` null
+  (`selectRefundPendingSubmissionsPlan`). The refund is recorded with
+  `buildRefundSubmissionPlans` (`after_rejection`), which sets `refunded_at` and clears it.
+- The hook runs after the batch, again on every replay of the rejection, and from #68's sweep
+  of pending rows, so it must be idempotent (a provider idempotency key such as
+  `refund:<submissionId>`). It records the refund and sends `submission-rejected-refunded`;
+  the rejection email is not sent for these.
+- When the hook throws, the rejection stands, the decision answers
+  `{ok: true, refundPending: true}`, and the refund stays pending for the next replay or sweep.
 
 ## Unpublished listings answer 410
 

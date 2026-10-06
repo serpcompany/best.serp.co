@@ -841,6 +841,23 @@ export function buildLiftSubmissionUrlBlockPlans(input: {
   ]
 }
 
+/**
+ * Paid submissions rejected as `other` whose refund isn't recorded yet, oldest rejection first
+ * (#64 review). The rejection batch is the refund-pending marker: it sets `status='rejected'`
+ * and `rejection_category='other'` on a row with `paid_at` set and `refunded_at` null, and
+ * `buildRefundSubmissionPlans` (`after_rejection`) clears it by recording `refunded_at`. A
+ * replayed rejection and #68's refund sweep retry the rows this returns.
+ */
+export function selectRefundPendingSubmissionsPlan(limit: number): StatementPlan {
+  return {
+    sql: `SELECT id,slug,paid_at,reviewed_at FROM listing_submissions
+      WHERE status='rejected' AND rejection_category='other'
+        AND paid_at IS NOT NULL AND refunded_at IS NULL
+      ORDER BY reviewed_at,id LIMIT ?`,
+    params: [limit]
+  }
+}
+
 export function selectVerifiedSubmissionNotificationPlans(limit: number): StatementPlan[] {
   const pending = `SELECT candidate.id FROM listing_submissions candidate
     LEFT JOIN listing_submission_notifications notification

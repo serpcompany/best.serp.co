@@ -233,7 +233,12 @@ export function ReviewDetail({
     }
     setDialog(null)
     setEditing(false)
-    toast.success(result.replayed ? 'Already done. Nothing changed.' : done)
+    if (result.refundPending === true) {
+      // The rejection stands; the refund (#68) is retried by rejecting again or by its sweep.
+      toast.warning('Rejected, but the refund didn’t go through yet. Reject again to retry it.')
+    } else {
+      toast.success(result.replayed ? 'Already done. Nothing changed.' : done)
+    }
     router.refresh()
   }
 

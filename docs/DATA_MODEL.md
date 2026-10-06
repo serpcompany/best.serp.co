@@ -177,6 +177,12 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   `orders` first, applies it with `buildRecordSubmissionPaymentPlans` (or
   `buildRecordUnappliedPaymentPlans` for a withdrawn row) when the submission accepts it, and
   otherwise refunds it from `orders` alone.
+- **Refund pending.** A paid submission rejected as `other` owes its refund from the rejection
+  batch on: `status = 'rejected'`, `rejection_category = 'other'`, `paid_at` set, `refunded_at`
+  null (`selectRefundPendingSubmissionsPlan`). The batch writes that marker atomically, so no
+  extra column is needed; `buildRefundSubmissionPlans` (`after_rejection`) clears it. #68's
+  refund hook is idempotent and is retried by a replayed rejection and by its sweep
+  ([Admin panel](./ADMIN_PANEL.md#refunds)).
 - `listing_revisions` stage an owner's edit of a live listing (name, description, content,
   primary category, logo, video, resource links, FAQs; never website or slug) against the
   listing's `checksum` at the time (`base_checksum`). A listing has at most one open revision,

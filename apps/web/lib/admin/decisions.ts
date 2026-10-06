@@ -9,8 +9,11 @@
  * These writes go to the environment's own D1 from the Worker: the documented production-write
  * exception (docs/ADMIN_PANEL.md). The actor is the admin's verified email; each decision is
  * recorded in the submission, revision, or listing events, and in `publication_runs` when it
- * changes the catalog. Emails go through the injected `notify` (the email ledger keys each one,
- * so a retried decision never sends twice).
+ * changes the catalog. Emails go through the injected `notify` whenever the decision holds,
+ * a replay included: the email ledger keys each one by its event, so a retried decision never
+ * sends twice, and an email whose first send failed goes out when the decision is retried.
+ * A decision that lost only the race for the global publication version is run once more on
+ * fresh state (`retryPublicationRace`).
  *
  * Dependencies are injected, so `decisions.test.ts` runs every action on node:sqlite.
  */
@@ -73,6 +76,14 @@ export type AdminNotify = <K extends keyof AppEmailTemplates & string>(
 /**
  * Refunds a paid submission's payment through the payment provider (#68). Absent until #68
  * ships, so a paid submission cannot be rejected as `other` (which promises a refund) yet.
+ *
+ * The contract (docs/ADMIN_PANEL.md, "Refunds"): the rejection batch leaves the submission
+ * refund-pending (`selectRefundPendingSubmissionsPlan`) until the refund is recorded, so
+ * `refundRejectedSubmission` may run more than once for a submission: after the rejection,
+ * on every replay of it, and from #68's sweep. It must be idempotent (a provider idempotency
+ * key such as `refund:<submissionId>`), record the refund with `buildRefundSubmissionPlans`
+ * (`after_rejection`), and send `submission-rejected-refunded`. When it throws, the
+ * rejection stands and the refund stays pending.
  */
 export interface AdminRefunds {
   refundRejectedSubmission(input: { actor: string; submissionId: string }): Promise<void>
@@ -117,6 +128,52 @@ const changed = failure(
   'This changed since you opened it. Reload the page and try again.'
 )
 
+/**
+ * Lost only the race for the global publication version: another publication (an admin on a
+ * different listing, a publisher run) advanced `publication_state` between this decision's
+ * read and its batch, while the item is still as it was read. `retryPublicationRace` decides
+ * once more on fresh state, so this never reaches a client.
+ */
+const PUBLICATION_RACE = failure(409, 'publication_race', changed.message)
+
+/** What a catalog decision read: its item's snapshot, with the publication state joined in. */
+interface PublicationRead<S extends { version: number }> {
+  /** The snapshot keys that belong to `publication_state` rather than to the item. */
+  global: ReadonlyArray<keyof S & string>
+  read: () => Promise<S | null>
+  snapshot: S
+}
+
+function itemState(snapshot: object, global: readonly string[]): string {
+  return JSON.stringify(
+    Object.entries(snapshot)
+      .filter(([key]) => !global.includes(key))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+  )
+}
+
+/** True when the publication version moved and nothing about the item did. */
+async function lostPublicationRace<S extends { version: number }>(
+  read: PublicationRead<S>
+): Promise<boolean> {
+  const fresh = await read.read()
+  return (
+    fresh !== null &&
+    fresh.version !== read.snapshot.version &&
+    itemState(fresh, read.global) === itemState(read.snapshot, read.global)
+  )
+}
+
+/** Runs a catalog decision, and once more when it lost only the publication race. */
+async function retryPublicationRace<T extends object>(
+  decide: () => Promise<Decision<T>>
+): Promise<Decision<T>> {
+  const first = await decide()
+  if (first !== PUBLICATION_RACE) return first
+  const second = await decide()
+  return second === PUBLICATION_RACE ? changed : second
+}
+
 function nowIso(context: AdminContext): string {
   return (context.now?.() ?? new Date()).toISOString()
 }
@@ -129,19 +186,22 @@ function log(context: AdminContext, action: string, target: string, outcome: str
 
 /**
  * Sends the plans; a refused compare-and-swap (or constraint) re-reads the state: if the
- * decision already holds (an identical request won the race) it is a replay, otherwise 409.
+ * decision already holds (an identical request won the race) it is a replay; if only the
+ * publication version moved (`publication`), it lost the publication race; otherwise 409.
  */
-async function commit<T extends object>(
+async function commit<T extends object, S extends { version: number }>(
   context: AdminContext,
   plans: StatementPlan[],
   settled: () => Promise<boolean>,
-  result: T
+  result: T,
+  publication?: PublicationRead<S>
 ): Promise<Decision<T>> {
   try {
     await executePlans(context.client, plans)
   } catch (error) {
     if (!isPlanConflict(error)) throw error
     if (await settled()) return { ok: true, replayed: true, ...result }
+    if (publication && (await lostPublicationRace(publication))) return PUBLICATION_RACE
     return changed
   }
   return { ok: true, replayed: false, ...result }
@@ -195,6 +255,96 @@ async function submissionSnapshot(
   return row ?? null
 }
 
+function submissionRead(
+  context: AdminContext,
+  snapshot: SubmissionSnapshot
+): PublicationRead<SubmissionSnapshot> {
+  return {
+    global: ['checksum', 'version'],
+    read: () => submissionSnapshot(context, snapshot.id),
+    snapshot
+  }
+}
+
+function storedReview(context: AdminContext, submissionId: string) {
+  return createAdminReadOperations({ client: context.client }).getSubmissionReview(submissionId)
+}
+
+// Decision emails are built from the stored state each time the decision holds, so a replay
+// sends the same email under the same event key (the ledger sends it at most once).
+
+/** "Approved", for a free listing; a paid one was told it went live when it was paid. */
+async function emailApproval(context: AdminContext, submissionId: string): Promise<void> {
+  const review = await storedReview(context, submissionId)
+  // The paid approval email waits for its template (#70).
+  if (review?.status !== 'approved' || review.plan !== 'free' || !review.submitter) return
+  await context.notify('listing-approved', {
+    eventKey: context.eventKey('submission-approved', submissionId),
+    input: { listingName: review.name, listingSlug: review.slug, website: review.website },
+    to: review.submitter.email
+  })
+}
+
+/** "Changes requested", once per request: a resubmitted submission can be sent back again. */
+async function emailChangesRequested(context: AdminContext, submissionId: string): Promise<void> {
+  const review = await storedReview(context, submissionId)
+  if (review?.status !== 'changes_requested' || !review.submitter || !review.reviewerNote) return
+  const occurrence = review.events.filter(event => event.eventType === 'changes_requested').length
+  await context.notify('changes-requested', {
+    eventKey: context.eventKey('submission-changes-requested', submissionId, String(occurrence)),
+    input: { note: review.reviewerNote, submissionId, submissionName: review.name },
+    to: review.submitter.email
+  })
+}
+
+/**
+ * What follows a rejection that holds. A paid submission rejected as `other` is refund-pending
+ * until its refund is recorded, so the refund hook (#68) runs again, and the refund sends
+ * "rejected and refunded". Any other rejection gets its rejection email.
+ */
+async function afterRejection(
+  context: AdminContext,
+  submissionId: string
+): Promise<{ refundPending: boolean; refunded: boolean }> {
+  const review = await storedReview(context, submissionId)
+  const none = { refundPending: false, refunded: false }
+  if (review?.status !== 'rejected') return none
+  if (review.rejectionCategory === 'other' && review.paidAt !== null) {
+    if (review.refundedAt !== null) return { refundPending: false, refunded: true }
+    if (!context.refunds) return { refundPending: true, refunded: false }
+    try {
+      await context.refunds.refundRejectedSubmission({ actor: context.actor, submissionId })
+      return { refundPending: false, refunded: true }
+    } catch (error) {
+      log(context, 'refund_rejected_submission', submissionId, 'refund_pending')
+      console.error(error)
+      return { refundPending: true, refunded: false }
+    }
+  }
+  if (!review.submitter || !review.rejectionReason) return none
+  const request = {
+    eventKey: context.eventKey('submission-rejected', submissionId),
+    to: review.submitter.email
+  }
+  if (review.rejectionCategory === 'prohibited') {
+    await context.notify('submission-rejected-prohibited', {
+      ...request,
+      input: {
+        reason: review.rejectionReason,
+        submissionId,
+        submissionName: review.name,
+        website: review.website
+      }
+    })
+  } else {
+    await context.notify('submission-rejected', {
+      ...request,
+      input: { reason: review.rejectionReason, submissionId, submissionName: review.name }
+    })
+  }
+  return none
+}
+
 /** The edits a reviewer may make before approving (screen 11, "Edit before approving"). */
 export interface SubmissionEdits {
   categorySlug?: string
@@ -206,7 +356,14 @@ export interface SubmissionEdits {
 
 const EDIT_FIELDS = ['name', 'categorySlug', 'description', 'logoUrl', 'content'] as const
 
-export async function approveSubmission(
+export function approveSubmission(
+  context: AdminContext,
+  input: Parameters<typeof approveSubmissionOnce>[1]
+): Promise<Decision<{ listingSlug: string }>> {
+  return retryPublicationRace(() => approveSubmissionOnce(context, input))
+}
+
+async function approveSubmissionOnce(
   context: AdminContext,
   input: {
     edits?: SubmissionEdits
@@ -218,7 +375,10 @@ export async function approveSubmission(
   const snapshot = await submissionSnapshot(context, input.submissionId)
   if (!snapshot) return notFound('submission')
   const result = { listingSlug: snapshot.slug }
-  if (snapshot.status === 'approved') return { ok: true, replayed: true, ...result }
+  if (snapshot.status === 'approved') {
+    await emailApproval(context, input.submissionId)
+    return { ok: true, replayed: true, ...result }
+  }
   if (snapshot.status !== 'verified' && snapshot.status !== 'paid_pending_review') {
     return failure(409, 'not_in_review', 'Only a submission in the review queue can be approved.')
   }
@@ -343,22 +503,11 @@ export async function approveSubmission(
     context,
     plans,
     async () => (await submissionSnapshot(context, input.submissionId))?.status === 'approved',
-    result
+    result,
+    submissionRead(context, snapshot)
   )
   log(context, 'approve_submission', input.submissionId, decision.ok ? 'approved' : decision.error)
-  // A free listing gets "approved"; a paid one was told it went live when it was paid, and the
-  // paid approval email waits for its template (#70).
-  if (decision.ok && !decision.replayed && review.submitter && snapshot.plan === 'free') {
-    await context.notify('listing-approved', {
-      eventKey: context.eventKey('submission-approved', input.submissionId),
-      input: {
-        listingName: input.edits?.name?.trim() || review.name,
-        listingSlug: snapshot.slug,
-        website: review.website
-      },
-      to: review.submitter.email
-    })
-  }
+  if (decision.ok) await emailApproval(context, input.submissionId)
   return decision
 }
 
@@ -370,7 +519,10 @@ export async function requestSubmissionChanges(
   if (!note) return failure(422, 'note_required', 'Write a note for the submitter.')
   const snapshot = await submissionSnapshot(context, input.submissionId)
   if (!snapshot) return notFound('submission')
-  if (snapshot.status === 'changes_requested') return { ok: true, replayed: true }
+  if (snapshot.status === 'changes_requested') {
+    await emailChangesRequested(context, input.submissionId)
+    return { ok: true, replayed: true }
+  }
   if (!(submissionTransitions.requestChanges.from as readonly string[]).includes(snapshot.status)) {
     return failure(409, 'not_in_review', 'Only a submission in the review queue can be sent back.')
   }
@@ -387,33 +539,23 @@ export async function requestSubmissionChanges(
     {}
   )
   log(context, 'request_changes', input.submissionId, decision.ok ? 'sent' : decision.error)
-  if (decision.ok && !decision.replayed) {
-    const review = await createAdminReadOperations({
-      client: context.client
-    }).getSubmissionReview(input.submissionId)
-    if (review?.submitter) {
-      // One email per change request: a resubmitted submission can be sent back again.
-      const occurrence = review.events.filter(
-        event => event.eventType === 'changes_requested'
-      ).length
-      await context.notify('changes-requested', {
-        eventKey: context.eventKey(
-          'submission-changes-requested',
-          input.submissionId,
-          String(occurrence)
-        ),
-        input: { note, submissionId: input.submissionId, submissionName: review.name },
-        to: review.submitter.email
-      })
-    }
-  }
+  if (decision.ok) await emailChangesRequested(context, input.submissionId)
   return decision
 }
 
-export async function rejectSubmission(
+type RejectionResult = { refundPending: boolean; refunded: boolean }
+
+export function rejectSubmission(
+  context: AdminContext,
+  input: Parameters<typeof rejectSubmissionOnce>[1]
+): Promise<Decision<RejectionResult>> {
+  return retryPublicationRace(() => rejectSubmissionOnce(context, input))
+}
+
+async function rejectSubmissionOnce(
   context: AdminContext,
   input: { category: RejectionCategory; reason: string; submissionId: string }
-): Promise<Decision<{ refunded: boolean }>> {
+): Promise<Decision<RejectionResult>> {
   const reason = input.reason.trim()
   if (!reason) return failure(422, 'reason_required', 'Write the reason for the rejection.')
   if (input.category !== 'prohibited' && input.category !== 'other') {
@@ -421,7 +563,10 @@ export async function rejectSubmission(
   }
   const snapshot = await submissionSnapshot(context, input.submissionId)
   if (!snapshot) return notFound('submission')
-  if (snapshot.status === 'rejected') return { ok: true, refunded: false, replayed: true }
+  if (snapshot.status === 'rejected') {
+    // A replay retries what may have failed after the rejection: its email, or its refund.
+    return { ok: true, replayed: true, ...(await afterRejection(context, input.submissionId)) }
+  }
   if (!(submissionTransitions.reject.from as readonly string[]).includes(snapshot.status)) {
     return failure(409, 'not_rejectable', 'This submission can no longer be rejected.')
   }
@@ -459,7 +604,8 @@ export async function rejectSubmission(
       submissionId: input.submissionId
     }),
     async () => (await submissionSnapshot(context, input.submissionId))?.status === 'rejected',
-    { refunded: false }
+    { refundPending: false, refunded: false },
+    submissionRead(context, snapshot)
   )
   log(
     context,
@@ -467,41 +613,10 @@ export async function rejectSubmission(
     input.submissionId,
     decision.ok ? input.category : decision.error
   )
-  if (!decision.ok || decision.replayed) return decision
-  if (refundDue && context.refunds) {
-    // #68 refunds through Stripe, records it, and sends "rejected and refunded".
-    await context.refunds.refundRejectedSubmission({
-      actor: context.actor,
-      submissionId: input.submissionId
-    })
-    return { ...decision, refunded: true }
-  }
-  const review = await createAdminReadOperations({
-    client: context.client
-  }).getSubmissionReview(input.submissionId)
-  if (review?.submitter) {
-    const request = {
-      eventKey: context.eventKey('submission-rejected', input.submissionId),
-      to: review.submitter.email
-    }
-    if (input.category === 'prohibited') {
-      await context.notify('submission-rejected-prohibited', {
-        ...request,
-        input: {
-          reason,
-          submissionId: input.submissionId,
-          submissionName: review.name,
-          website: review.website
-        }
-      })
-    } else {
-      await context.notify('submission-rejected', {
-        ...request,
-        input: { reason, submissionId: input.submissionId, submissionName: review.name }
-      })
-    }
-  }
-  return decision
+  if (!decision.ok) return decision
+  // The batch left a paid `other` rejection refund-pending; #68's hook refunds it, records it,
+  // and sends "rejected and refunded" (`AdminRefunds`).
+  return { ...decision, ...(await afterRejection(context, input.submissionId)) }
 }
 
 /** "Allow resubmission": lifts the active prohibited-URL block on a block key. */
@@ -552,7 +667,26 @@ async function revisionSnapshot(
   return row ?? null
 }
 
-export async function approveRevision(
+function revisionRead(
+  context: AdminContext,
+  revisionId: string,
+  snapshot: RevisionSnapshot
+): PublicationRead<RevisionSnapshot> {
+  return {
+    global: ['checksum', 'version'],
+    read: () => revisionSnapshot(context, revisionId),
+    snapshot
+  }
+}
+
+export function approveRevision(
+  context: AdminContext,
+  input: Parameters<typeof approveRevisionOnce>[1]
+): Promise<Decision<{ listingSlug: string }>> {
+  return retryPublicationRace(() => approveRevisionOnce(context, input))
+}
+
+async function approveRevisionOnce(
   context: AdminContext,
   input: { expectedContentVersion: number; revisionId: string }
 ): Promise<Decision<{ listingSlug: string }>> {
@@ -583,7 +717,8 @@ export async function approveRevision(
       revisionId: input.revisionId
     }),
     async () => (await revisionSnapshot(context, input.revisionId))?.status === 'approved',
-    result
+    result,
+    revisionRead(context, input.revisionId, snapshot)
   )
   log(context, 'approve_revision', input.revisionId, decision.ok ? 'approved' : decision.error)
   return decision
@@ -669,6 +804,17 @@ async function listingSnapshot(
   return row ?? null
 }
 
+function listingRead(
+  context: AdminContext,
+  snapshot: ListingSnapshot
+): PublicationRead<ListingSnapshot> {
+  return {
+    global: ['publication_checksum', 'version'],
+    read: () => listingSnapshot(context, snapshot.id),
+    snapshot
+  }
+}
+
 function listingPublication(
   context: AdminContext,
   snapshot: ListingSnapshot,
@@ -732,7 +878,14 @@ export function validateListingFields(
   return null
 }
 
-export async function updateListingDetails(
+export function updateListingDetails(
+  context: AdminContext,
+  input: Parameters<typeof updateListingDetailsOnce>[1]
+): Promise<Decision<{ fields: string[] }>> {
+  return retryPublicationRace(() => updateListingDetailsOnce(context, input))
+}
+
+async function updateListingDetailsOnce(
   context: AdminContext,
   input: { details: ListingDetailsEdit; expectedChecksum: string; listingId: string }
 ): Promise<Decision<{ fields: string[] }>> {
@@ -781,13 +934,21 @@ export async function updateListingDetails(
       publication: await listingPublication(context, snapshot, 'listing-edit', nowIso(context))
     }),
     async () => false,
-    { fields }
+    { fields },
+    listingRead(context, snapshot)
   )
   log(context, 'edit_listing', input.listingId, decision.ok ? fields.join(',') : decision.error)
   return decision
 }
 
-export async function unpublishListing(
+export function unpublishListing(
+  context: AdminContext,
+  input: Parameters<typeof unpublishListingOnce>[1]
+): Promise<Decision> {
+  return retryPublicationRace(() => unpublishListingOnce(context, input))
+}
+
+async function unpublishListingOnce(
   context: AdminContext,
   input: { listingId: string; note?: string }
 ): Promise<Decision> {
@@ -823,13 +984,21 @@ export async function unpublishListing(
       reason: 'admin'
     }),
     async () => (await listingSnapshot(context, input.listingId))?.is_active === 0,
-    {}
+    {},
+    listingRead(context, snapshot)
   )
   log(context, 'unpublish_listing', input.listingId, decision.ok ? 'unpublished' : decision.error)
   return decision
 }
 
-export async function republishListing(
+export function republishListing(
+  context: AdminContext,
+  input: Parameters<typeof republishListingOnce>[1]
+): Promise<Decision> {
+  return retryPublicationRace(() => republishListingOnce(context, input))
+}
+
+async function republishListingOnce(
   context: AdminContext,
   input: { listingId: string }
 ): Promise<Decision> {
@@ -855,13 +1024,21 @@ export async function republishListing(
       publication: await listingPublication(context, snapshot, 'listing-republish', nowIso(context))
     }),
     async () => (await listingSnapshot(context, input.listingId))?.is_active === 1,
-    {}
+    {},
+    listingRead(context, snapshot)
   )
   log(context, 'republish_listing', input.listingId, decision.ok ? 'republished' : decision.error)
   return decision
 }
 
-export async function setListingLinkRel(
+export function setListingLinkRel(
+  context: AdminContext,
+  input: Parameters<typeof setListingLinkRelOnce>[1]
+): Promise<Decision> {
+  return retryPublicationRace(() => setListingLinkRelOnce(context, input))
+}
+
+async function setListingLinkRelOnce(
   context: AdminContext,
   input: { linkRel: ListingLinkRel; listingId: string }
 ): Promise<Decision> {
@@ -879,13 +1056,21 @@ export async function setListingLinkRel(
       publication: await listingPublication(context, snapshot, 'listing-link-rel', nowIso(context))
     }),
     async () => (await listingSnapshot(context, input.listingId))?.link_rel === input.linkRel,
-    {}
+    {},
+    listingRead(context, snapshot)
   )
   log(context, 'set_link_rel', input.listingId, decision.ok ? input.linkRel : decision.error)
   return decision
 }
 
-export async function transferListingOwner(
+export function transferListingOwner(
+  context: AdminContext,
+  input: Parameters<typeof transferListingOwnerOnce>[1]
+): Promise<Decision<{ ownerEmail: string }>> {
+  return retryPublicationRace(() => transferListingOwnerOnce(context, input))
+}
+
+async function transferListingOwnerOnce(
   context: AdminContext,
   input: { email: string; expectedOwnerUserId: string | null; listingId: string }
 ): Promise<Decision<{ ownerEmail: string }>> {
@@ -916,13 +1101,21 @@ export async function transferListingOwner(
       toUserId: user.id
     }),
     async () => (await listingSnapshot(context, input.listingId))?.owner_user_id === user.id,
-    result
+    result,
+    listingRead(context, snapshot)
   )
   log(context, 'transfer_owner', input.listingId, decision.ok ? 'transferred' : decision.error)
   return decision
 }
 
-export async function removeListingOwner(
+export function removeListingOwner(
+  context: AdminContext,
+  input: Parameters<typeof removeListingOwnerOnce>[1]
+): Promise<Decision> {
+  return retryPublicationRace(() => removeListingOwnerOnce(context, input))
+}
+
+async function removeListingOwnerOnce(
   context: AdminContext,
   input: { expectedOwnerUserId: string; listingId: string }
 ): Promise<Decision> {
@@ -944,7 +1137,8 @@ export async function removeListingOwner(
       userId: snapshot.owner_user_id
     }),
     async () => (await listingSnapshot(context, input.listingId))?.owner_user_id === null,
-    {}
+    {},
+    listingRead(context, snapshot)
   )
   log(context, 'remove_owner', input.listingId, decision.ok ? 'removed' : decision.error)
   return decision
@@ -969,17 +1163,16 @@ export async function addAdmin(
   } catch {
     return failure(422, 'invalid_email', 'Enter a valid email address.')
   }
-  if ((await allowlist(context)).includes(email)) {
-    return failure(409, 'already_admin', `${email} is already an admin.`)
-  }
+  // Already on the list: a replay, like every other decision.
+  if ((await allowlist(context)).includes(email)) return { email, ok: true, replayed: true }
   const decision = await commit(
     context,
     buildAddAdminPlans({ addedBy: context.actor, email }),
-    async () => false,
+    async () => (await allowlist(context)).includes(email),
     { email }
   )
   log(context, 'add_admin', email, decision.ok ? 'added' : decision.error)
-  return decision.ok ? decision : failure(409, 'already_admin', `${email} is already an admin.`)
+  return decision
 }
 
 export async function removeAdmin(

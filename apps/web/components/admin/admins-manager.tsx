@@ -76,6 +76,10 @@ export function AdminsManager({
       setAddError(result.message)
       return
     }
+    if (result.replayed) {
+      setAddError(`${result.email} is already an admin.`)
+      return
+    }
     toast.success(`${result.email} can open /admin at their next sign-in.`)
     setEmail('')
     router.refresh()

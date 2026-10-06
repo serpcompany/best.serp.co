@@ -1,7 +1,9 @@
 /**
- * Every admin decision (#64) on node:sqlite with the checked-in migrations: approvals publish
- * and email once, replays are no-ops, stale views answer 409, rejections block or refuse as the
- * category requires, listing actions log, and the allowlist never loses its last admin.
+ * Every admin decision (#64) on node:sqlite with the checked-in migrations: approvals publish,
+ * replays write nothing and only retry their email (the ledger sends it once), stale views
+ * answer 409 while a lost publication race is retried, rejections block, refuse, or keep the
+ * refund pending as the category requires, listing actions log, and the allowlist never loses
+ * its last admin.
  */
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import { insertPublishedListing, SqliteD1 } from '@serpdirectory/data-ops/test-support'
@@ -83,7 +85,38 @@ function fixture() {
   })
   const row = (sql: string, ...params: unknown[]) =>
     db.prepare(sql).get(...(params as string[])) as Record<string, unknown> | undefined
-  return { context, db, emails, paidLive, row, submission }
+  /**
+   * A client whose next write batches each first publish something else (another admin's
+   * decision on a different listing), so the decision's batch loses the race for the
+   * publication version. Read batches pass through.
+   */
+  const racingClient = (races = 1, alsoChange = '') => {
+    const d1 = sqlite.asD1Database()
+    const sqlOf = new WeakMap<object, string>()
+    const prepare = d1.prepare.bind(d1)
+    d1.prepare = sql => {
+      const statement = prepare(sql)
+      sqlOf.set(statement, sql)
+      return statement
+    }
+    const batch = d1.batch.bind(d1)
+    let left = races
+    d1.batch = async statements => {
+      const writes = statements.some(statement =>
+        /^\s*(?:INSERT|UPDATE|DELETE)\b/iu.test(sqlOf.get(statement) ?? '')
+      )
+      if (writes && left > 0) {
+        left -= 1
+        db.exec(
+          "UPDATE publication_state SET version = version + 1, checksum = 'elsewhere-' || version"
+        )
+        if (alsoChange) db.exec(alsoChange)
+      }
+      return batch(statements)
+    }
+    return createDatabase(d1)
+  }
+  return { context, db, emails, paidLive, racingClient, row, submission }
 }
 
 describe('submission decisions', () => {
@@ -127,10 +160,59 @@ describe('submission decisions', () => {
         to: 'maya@example.com'
       }
     ])
-    // A replay (double click, retry) changes nothing and sends nothing.
+    // A replay (double click, retry) writes nothing. It hands the same email to the ledger
+    // under the same event key, which sends it only if the first send failed.
     expect(await approve()).toEqual({ listingSlug: 'quillmate.app', ok: true, replayed: true })
     expect(row('SELECT version FROM publication_state')).toEqual({ version: 2 })
-    expect(emails).toHaveLength(1)
+    expect(emails).toHaveLength(2)
+    expect(emails[1]).toEqual(emails[0])
+  })
+
+  it('retries once when another publication won the race, and refuses a real change', async () => {
+    const { context, racingClient, row, submission } = fixture()
+    submission('sub_quill', 'quillmate.app', 'verified')
+    // Another admin publishes a different listing between this read and this batch.
+    expect(
+      await approveSubmission(context({ client: racingClient() }), {
+        expectedContentVersion: 1,
+        submissionId: 'sub_quill'
+      })
+    ).toEqual({ listingSlug: 'quillmate.app', ok: true, replayed: false })
+    expect(row("SELECT status FROM listing_submissions WHERE id='sub_quill'")).toEqual({
+      status: 'approved'
+    })
+    expect(row('SELECT version FROM publication_state')).toEqual({ version: 3 })
+
+    // It retries once: losing the race twice answers 409.
+    submission('sub_brief', 'brief.example', 'verified')
+    expect(
+      await approveSubmission(context({ client: racingClient(2) }), {
+        expectedContentVersion: 1,
+        submissionId: 'sub_brief'
+      })
+    ).toMatchObject({ error: 'conflict', status: 409 })
+
+    // A listing decision retries the same way.
+    expect(
+      await setListingLinkRel(context({ client: racingClient() }), {
+        linkRel: 'sponsored',
+        listingId: 'lst_brief'
+      })
+    ).toEqual({ ok: true, replayed: false })
+    expect(row("SELECT link_rel FROM listings WHERE id='lst_brief'")).toEqual({
+      link_rel: 'sponsored'
+    })
+
+    // When the item itself changed in the meantime too, there is no retry: 409.
+    expect(
+      await unpublishListing(
+        context({
+          client: racingClient(1, "UPDATE listings SET checksum = 'edited' WHERE id = 'lst_brief'")
+        }),
+        { listingId: 'lst_brief' }
+      )
+    ).toMatchObject({ error: 'conflict', status: 409 })
+    expect(row("SELECT is_active FROM listings WHERE id='lst_brief'")).toEqual({ is_active: 1 })
   })
 
   it('refuses an approval of content that changed since the reviewer opened it', async () => {
@@ -161,22 +243,24 @@ describe('submission decisions', () => {
     const send = () =>
       requestSubmissionChanges(context(), { note: 'Logo is blurry.', submissionId: 'sub_quill' })
     expect(await send()).toEqual({ ok: true, replayed: false })
-    expect(await send()).toEqual({ ok: true, replayed: true })
+    // The replay retries the same email (same event key) with the stored note.
+    expect(
+      await requestSubmissionChanges(context(), { note: 'Other words.', submissionId: 'sub_quill' })
+    ).toEqual({ ok: true, replayed: true })
     expect(
       row("SELECT status, reviewer_note FROM listing_submissions WHERE id='sub_quill'")
     ).toEqual({ reviewer_note: 'Logo is blurry.', status: 'changes_requested' })
-    expect(emails).toEqual([
-      {
-        eventKey: 'submission-changes-requested:sub_quill:1',
-        input: {
-          note: 'Logo is blurry.',
-          submissionId: 'sub_quill',
-          submissionName: 'Name sub_quill'
-        },
-        template: 'changes-requested',
-        to: 'maya@example.com'
-      }
-    ])
+    const email = {
+      eventKey: 'submission-changes-requested:sub_quill:1',
+      input: {
+        note: 'Logo is blurry.',
+        submissionId: 'sub_quill',
+        submissionName: 'Name sub_quill'
+      },
+      template: 'changes-requested',
+      to: 'maya@example.com'
+    }
+    expect(emails).toEqual([email, email])
   })
 
   it('rejects as other or prohibited, blocking the domain only for prohibited', async () => {
@@ -189,28 +273,31 @@ describe('submission decisions', () => {
         reason: 'Waitlist only.',
         submissionId: 'sub_other'
       })
-    ).toEqual({ ok: true, refunded: false, replayed: false })
+    ).toEqual({ ok: true, refundPending: false, refunded: false, replayed: false })
     expect(
       await rejectSubmission(context(), {
         category: 'prohibited',
         reason: 'Gambling without a license.',
         submissionId: 'sub_bad'
       })
-    ).toEqual({ ok: true, refunded: false, replayed: false })
+    ).toEqual({ ok: true, refundPending: false, refunded: false, replayed: false })
     expect(
       await rejectSubmission(context(), {
         category: 'prohibited',
         reason: 'Again.',
         submissionId: 'sub_bad'
       })
-    ).toEqual({ ok: true, refunded: false, replayed: true })
+    ).toEqual({ ok: true, refundPending: false, refunded: false, replayed: true })
     expect(
       row('SELECT url_key FROM listing_submission_url_blocks WHERE lifted_at IS NULL')
     ).toEqual({ url_key: 'casino.example' })
+    // The replay retries the stored rejection's email under the same event key.
     expect(emails.map(email => [email.template, email.eventKey])).toEqual([
       ['submission-rejected', 'submission-rejected:sub_other'],
+      ['submission-rejected-prohibited', 'submission-rejected:sub_bad'],
       ['submission-rejected-prohibited', 'submission-rejected:sub_bad']
     ])
+    expect(emails[2]?.input).toMatchObject({ reason: 'Gambling without a license.' })
     // "Allow resubmission" lifts the block once; a second click is a no-op.
     expect(await allowResubmission(context(), { urlKey: 'casino.example' })).toEqual({
       ok: true,
@@ -226,7 +313,7 @@ describe('submission decisions', () => {
   })
 
   it('unpublishes a live paid submission on rejection, and refuses a refund it cannot make', async () => {
-    const { context, paidLive, row } = fixture()
+    const { context, db, paidLive, row } = fixture()
     paidLive('sub_paid')
     expect(
       await rejectSubmission(context(), {
@@ -236,19 +323,54 @@ describe('submission decisions', () => {
       })
     ).toMatchObject({ error: 'refund_unavailable', status: 409 })
     expect(row("SELECT is_active FROM listings WHERE id='lst_brief'")).toEqual({ is_active: 1 })
-    const refundRejectedSubmission = vi.fn(async () => {})
-    expect(
-      await rejectSubmission(context({ refunds: { refundRejectedSubmission } }), {
+    // #68's refund fails once (a provider outage): the rejection stands, the refund stays
+    // pending, and a replay of the rejection retries it.
+    const refundRejectedSubmission = vi
+      .fn<(input: { actor: string; submissionId: string }) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('stripe down'))
+      .mockResolvedValue(undefined)
+    const reject = () =>
+      rejectSubmission(context({ refunds: { refundRejectedSubmission } }), {
         category: 'other',
         reason: 'Duplicate of another listing.',
         submissionId: 'sub_paid'
       })
-    ).toEqual({ ok: true, refunded: true, replayed: false })
-    expect(refundRejectedSubmission).toHaveBeenCalledWith({
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await reject()).toEqual({
+      ok: true,
+      refundPending: true,
+      refunded: false,
+      replayed: false
+    })
+    error.mockRestore()
+    expect(row("SELECT is_active FROM listings WHERE id='lst_brief'")).toEqual({ is_active: 0 })
+    expect(
+      row(
+        "SELECT status, rejection_category, refunded_at FROM listing_submissions WHERE id='sub_paid'"
+      )
+    ).toEqual({ refunded_at: null, rejection_category: 'other', status: 'rejected' })
+    expect(await reject()).toEqual({
+      ok: true,
+      refundPending: false,
+      refunded: true,
+      replayed: true
+    })
+    expect(refundRejectedSubmission).toHaveBeenCalledTimes(2)
+    expect(refundRejectedSubmission).toHaveBeenLastCalledWith({
       actor: 'devin@serp.co',
       submissionId: 'sub_paid'
     })
-    expect(row("SELECT is_active FROM listings WHERE id='lst_brief'")).toEqual({ is_active: 0 })
+    // Once #68 records the refund, a replay leaves it alone.
+    db.exec(
+      "UPDATE listing_submissions SET refunded_at = '2026-10-06T12:01:00.000Z' WHERE id='sub_paid'"
+    )
+    expect(await reject()).toEqual({
+      ok: true,
+      refundPending: false,
+      refunded: true,
+      replayed: true
+    })
+    expect(refundRejectedSubmission).toHaveBeenCalledTimes(2)
   })
 
   it('approves a live paid submission and keeps it live', async () => {
@@ -412,10 +534,10 @@ describe('admin allowlist decisions', () => {
       ok: true,
       replayed: false
     })
-    expect(await addAdmin(context(), { email: 'alex@serp.co' })).toMatchObject({
-      error: 'already_admin',
-      message: 'alex@serp.co is already an admin.',
-      status: 409
+    expect(await addAdmin(context(), { email: 'alex@serp.co' })).toEqual({
+      email: 'alex@serp.co',
+      ok: true,
+      replayed: true
     })
     expect(await removeAdmin(context(), { email: 'devin@serp.co' })).toEqual({
       email: 'devin@serp.co',
