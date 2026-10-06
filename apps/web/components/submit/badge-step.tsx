@@ -186,7 +186,11 @@ export function BadgeStep({
   const lastAt = verificationInstant(submission.lastVerificationAt)
   const cooldownUntil = lastAt === null ? 0 : lastAt + VERIFICATION_COOLDOWN_SECONDS * 1000
   const now = useNow(cooldownUntil > Date.now())
-  const cooldownSeconds = Math.max(0, (cooldownUntil - now) / 1000)
+  // Clamped: the claim time is stored to the second, so clock skew could read 0:31.
+  const cooldownSeconds = Math.min(
+    VERIFICATION_COOLDOWN_SECONDS,
+    Math.max(0, (cooldownUntil - now) / 1000)
+  )
   const paused = checksPaused(submission)
   const left = checksLeft(submission)
   const site = submission.website
