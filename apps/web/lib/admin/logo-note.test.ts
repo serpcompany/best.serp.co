@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { logoNote } from './logo-note'
+import { describeMediaFailure, logoNote } from './logo-note'
 
 describe('logo hosting note (#95)', () => {
   it('says nothing for a hosted logo, and why the tile shows otherwise', () => {
@@ -24,7 +24,7 @@ describe('logo hosting note (#95)', () => {
         sourceUrl: 'https://example.com/logo.png',
         status: 'pending'
       })?.text
-    ).toContain('after 2 failed attempts (http_503)')
+    ).toContain('after 2 failed attempts: the server answered HTTP 503 (http_503)')
     expect(
       logoNote({
         attempts: 1,
@@ -34,8 +34,16 @@ describe('logo hosting note (#95)', () => {
         status: 'failed'
       })
     ).toEqual({
-      text: "Couldn't host this logo (svg), so the page shows the fallback tile. Save another image URL to try again.",
+      text: "Couldn't host this logo: it is an SVG, which can't be hosted (svg). The page shows the fallback tile. Save another image URL to try again.",
       tone: 'err'
     })
+  })
+
+  it('names a failure in words, with its code', () => {
+    expect(describeMediaFailure('http_404')).toBe('the server answered HTTP 404 (http_404)')
+    expect(describeMediaFailure('too_many_pixels')).toBe(
+      'the image has more than 40 megapixels (too_many_pixels)'
+    )
+    expect(describeMediaFailure('something_new')).toBe('something_new')
   })
 })

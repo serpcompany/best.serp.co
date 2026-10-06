@@ -734,7 +734,13 @@ describe('listing decisions', () => {
         logoUrl: 'https://assets.example/bare.png',
         name: 'Bare'
       })
-    ).toEqual({ fields: ['logo'], logo: 'pending', ok: true, replayed: false })
+    ).toEqual({
+      fields: ['logo'],
+      logo: 'pending',
+      notice: expect.stringMatching(/^Saved, but the new logo is queued to be copied\./u),
+      ok: true,
+      replayed: false
+    })
     expect(logos('lst_bare')).toEqual([])
     expect(
       row("SELECT source_url,status FROM media_ingestions WHERE listing_id='lst_bare'")
@@ -762,7 +768,9 @@ describe('listing decisions', () => {
     const host = vi.fn(async (input: { sourceUrl: string }) =>
       input.sourceUrl === hosted.sourceUrl
         ? { hosted }
-        : { failure: { code: 'svg', retryable: false } }
+        : input.sourceUrl.endsWith('.svg')
+          ? { failure: { code: 'svg', retryable: false } }
+          : { failure: { code: 'http_503', retryable: true } }
     )
     const editLogo = (logoUrl: string) =>
       updateListingDetails(context({ media: { host } }), {
@@ -802,25 +810,64 @@ describe('listing decisions', () => {
         )
         .all()
     ).toEqual([{ media_key: hosted.key, url: hosted.sourceUrl }])
+    // A logo that can never be hosted is refused with its reason; nothing is saved (#96 S4).
+    const before = row("SELECT checksum FROM listings WHERE id='lst_brief'")?.checksum
     expect(await editLogo('https://assets.example/vector.svg')).toEqual({
+      error: 'logo_unhostable',
+      message: expect.stringContaining('it is an SVG'),
+      ok: false,
+      status: 422
+    })
+    expect(row("SELECT checksum FROM listings WHERE id='lst_brief'")?.checksum).toBe(before)
+    expect(
+      db
+        .prepare(
+          "SELECT url,media_key FROM listing_media WHERE listing_id='lst_brief' AND kind='logo'"
+        )
+        .all()
+    ).toEqual([{ media_key: hosted.key, url: hosted.sourceUrl }])
+    // A retryable failure saves with a warning, keeps the hosted logo, and queues the new one.
+    expect(await editLogo('https://assets.example/busy.png')).toEqual({
       fields: ['logo'],
-      logo: 'failed',
+      logo: 'pending',
+      notice: expect.stringContaining('the server answered HTTP 503 (http_503)'),
       ok: true,
       replayed: false
     })
     expect(
       db
         .prepare(
-          "SELECT COUNT(*) AS count FROM listing_media WHERE listing_id='lst_brief' AND kind='logo'"
+          "SELECT url,media_key FROM listing_media WHERE listing_id='lst_brief' AND kind='logo'"
         )
-        .get()
-    ).toEqual({ count: 0 })
+        .all()
+    ).toEqual([{ media_key: hosted.key, url: hosted.sourceUrl }])
     expect(
-      row("SELECT status,last_error FROM media_ingestions WHERE listing_id='lst_brief'")
+      row("SELECT source_url,status,last_error FROM media_ingestions WHERE listing_id='lst_brief'")
     ).toEqual({
-      last_error: 'svg',
-      status: 'failed'
+      last_error: 'http_503',
+      source_url: 'https://assets.example/busy.png',
+      status: 'pending'
     })
+  })
+
+  it('settles the approved listing’s queued media after the response, once', async () => {
+    const { context, row, submission } = fixture()
+    submission('sub_quill', 'quillmate.app', 'verified')
+    const settle = vi.fn()
+    const media = { host: vi.fn(), settle }
+    const approve = () =>
+      approveSubmission(context({ media }), {
+        expectedContentVersion: 1,
+        submissionId: 'sub_quill'
+      })
+    expect(await approve()).toMatchObject({ ok: true, replayed: false })
+    const listingId = row(
+      "SELECT listing_id FROM listing_submissions WHERE id='sub_quill'"
+    )?.listing_id
+    expect(settle.mock.calls).toEqual([[listingId]])
+    // A replay changes nothing and settles nothing.
+    expect(await approve()).toMatchObject({ ok: true, replayed: true })
+    expect(settle).toHaveBeenCalledTimes(1)
   })
 
   it('transfers to an account that exists, then removes the owner', async () => {
