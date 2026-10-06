@@ -563,9 +563,16 @@ function readRepoImage(source: string): Resolution {
   }
 }
 
+/**
+ * The MD5 of each new entry's bytes, for the upload plan only (#95 release blocker 3): R2's ETag
+ * is the stored bytes' MD5, so the uploader and the publisher verify a listed object without
+ * reading it back. Manifests never carry it.
+ */
+const entryMd5 = new WeakMap<HostedEntry, string>()
+
 function hostedEntry(resolution: Resolved, kind: MediaKind, slug: string): HostedEntry {
   const { image } = resolution
-  return {
+  const entry: HostedEntry = {
     bytes: image.body.byteLength,
     contentType: image.contentType,
     height: image.height,
@@ -574,6 +581,8 @@ function hostedEntry(resolution: Resolved, kind: MediaKind, slug: string): Hoste
     source: resolution.source,
     width: image.width
   }
+  entryMd5.set(entry, createHash('md5').update(image.body).digest('hex'))
+  return entry
 }
 
 /** A row that is already hosted, as the manifest repeats it (its object is in the bucket). */
@@ -599,7 +608,7 @@ export interface MigrationResult {
   categoryManifest: { file: string; text: string } | null
   manifests: Array<{ file: string; text: string }>
   outcomes: ListingOutcome[]
-  plan: { id: string; objects: HostedEntry[]; site: string; version: 1 }
+  plan: { id: string; objects: Array<HostedEntry & { md5: string }>; site: string; version: 1 }
   report: string
 }
 
@@ -937,7 +946,14 @@ export async function migrateLegacyMedia(options: {
 
   const plan = {
     id: migrationId,
-    objects: [...objects.values()].sort((a, b) => codePointCompare(a.key, b.key)),
+    objects: [...objects.values()]
+      .sort((a, b) => codePointCompare(a.key, b.key))
+      .map(entry => {
+        const md5 = entryMd5.get(entry)
+        if (!md5) throw new Error(`No MD5 for ${entry.key}.`)
+        const { bytes, contentType, height, key, sha256, source, width } = entry
+        return { bytes, contentType, height, key, md5, sha256, source, width }
+      }),
     site: 'best.serp.co',
     version: 1 as const
   }

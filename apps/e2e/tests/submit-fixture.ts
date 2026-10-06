@@ -87,7 +87,7 @@ function page(product: FixtureProduct, slug: string): string {
   const badge =
     product.badge === 'missing'
       ? ''
-      : `<a href="${listingUrl}" target="_blank" rel="${product.badge === 'nofollow' ? 'nofollow noopener' : 'noopener noreferrer'}" title="Featured on SERP"><img src="${featuredBadgeUrls.light}" alt="Featured on SERP" width="200" height="50" /></a>`
+      : `<a href="${listingUrl}" target="_blank" rel="${product.badge === 'nofollow' ? 'nofollow noopener' : 'noopener noreferrer'}" title="Featured on SERP Best"><img src="${featuredBadgeUrls.light}" alt="Featured on SERP Best" width="200" height="50" /></a>`
   return `<!doctype html><html><head>
 <title>${product.name} — the fixture product</title>${product.robots === 'meta' ? '\n<meta name="robots" content="index, nofollow">' : ''}
 <meta name="description" content="${product.description}">

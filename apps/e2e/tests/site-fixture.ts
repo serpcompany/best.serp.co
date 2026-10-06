@@ -5,7 +5,17 @@
  */
 export const site = {
   categoryCount: 140,
+  /**
+   * Live listings in the reviewed import, which the local suite runs against. A deployed
+   * environment publishes reviewed manifests and admin decisions on top (#100 unpublished 95
+   * hijacked domains), so there the suite reads the live count instead (`liveListingCount`).
+   */
   listingCount: 3422,
+  /**
+   * The fewest live listings a deployed environment may show: the import less #100's 95
+   * unpublishes, less headroom for admin unpublishes. A lost catalog still fails.
+   */
+  minimumDeployedListingCount: 3200,
   name: 'SERP',
   publicUrl: 'https://best.serp.co',
   title: 'SERP Directory of Products and Resources'

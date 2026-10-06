@@ -2544,15 +2544,7 @@ operations:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
         key: null
-    media:
-      logo:
-        bytes: 33542
-        contentType: image/x-icon
-        height: 90
-        key: best.serp.co/listings/dubbingai.io/logo/1143307443da1591.ico
-        sha256: 1143307443da1591f458d622388d7160a17657df7801d602ddc1f80a24e50d07
-        source: https://dubbingai.io/favicon.ico
-        width: 90
+    media: {}
   - action: listing-media-update
     id: lst_cbf4dcf4fcc75f3a7fa6a440
     slug: dubverse.ai
@@ -2825,23 +2817,7 @@ operations:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/earkind/public
         key: null
-    media:
-      logo:
-        bytes: 145384
-        contentType: image/png
-        height: 482
-        key: best.serp.co/listings/earkind.com/logo/3fca568b313c9d78.png
-        sha256: 3fca568b313c9d781b05a2bb7fa670c589b8c3feef039468637acc1ee51c740c
-        source: https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72tPBBzADzDA62AGSFRmPqcYs2JTInjD5dN-wT1JGkzF4FYrjDnenROZME5N6u6jl6to0CoKcP4ps1y0i6WLIOQBIGMsezYZpg3aHvPtJRh_sy9KKTIzuBET8slX2_74ww0mNG3sRrwKZlIn0RiRm4VOU3Y9bahvE7n9ZTSDVPsxYSIaKoc6SajhKaIiTUSbRBZJJS-uqH3zEP68RHnw9OL9rQ
-        width: 482
-      images:
-        - bytes: 143867
-          contentType: image/png
-          height: 482
-          key: best.serp.co/listings/earkind.com/image/e0dd7a6e237248dc.png
-          sha256: e0dd7a6e237248dcf1310f1a44bc00d6d5db53f72f1261bcc13022ca2c71b7f2
-          source: https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72taFJ8nxriB2fCO2WiuWurNiiWul3v-uBsHunlHpWVwVFx6zgerRu0ocZJEfecB7IwkL1sGMijN4-7nfc5Nmtdlp5ADcVZ3wq3JH1hOI_Q-2jORT6yklozHWMq0IEY8JWb7jcIZhKxkO-vyBx6bMGYwM4qm_p_AR4ECD6ChGN_tQgUC99oE-IsAam4hKak=w16383
-          width: 263
+    media: {}
   - action: listing-media-update
     id: lst_e41fa6f53c3dbf173400bc25
     slug: earningscall.ai

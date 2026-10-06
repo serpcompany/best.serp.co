@@ -86,3 +86,8 @@ d1/artifacts/*
 
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# Listing media seeds (#95): reviewed bytes keyed by listing slug, which is often a domain
+# (`kili.so`). Never ignored, whatever a global ignore says (`*.so`, `*.io`, ...).
+!/apps/web/public/listing-media-seed/
+!/apps/web/public/listing-media-seed/**

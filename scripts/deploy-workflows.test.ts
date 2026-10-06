@@ -1175,11 +1175,15 @@ describe('D1 data stays in Cloudflare', () => {
       'node:url',
       'zod'
     ])
-    expect(imports('scripts/r2-objects.ts')).toEqual(['@serpdirectory/data-ops/media-keys'])
+    expect(imports('scripts/r2-objects.ts')).toEqual([
+      '@serpdirectory/data-ops/media-keys',
+      'node:crypto'
+    ])
     const r2 = readFileSync(resolve('scripts/r2-objects.ts'), 'utf8')
     const placeholder = (name: string) => `\${${name}}`
     expect(r2.match(/api\.cloudflare\.com[^`'"]*/gu)).toEqual([
-      `api.cloudflare.com/client/v4/accounts/${placeholder('accountId')}/r2/buckets/${placeholder('bucket')}/objects/${placeholder('key')}`
+      // A bucket's objects: listed, read, and written (#95 release blocker 3), nothing else.
+      `api.cloudflare.com/client/v4/accounts/${placeholder('accountId')}/r2/buckets/${placeholder('bucket')}/objects`
     ])
     expect(readFileSync(resolve('scripts/media-upload.ts'), 'utf8')).not.toMatch(
       /api\.cloudflare\.com/u

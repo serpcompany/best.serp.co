@@ -157,8 +157,8 @@ e2e media server (`apps/e2e/tests/media-fixture.ts`) does on throwaway state;
 ## Uploading and publishing
 
 A catalog-wide change (the legacy migration) is two reviewed files: an upload plan under
-`d1/media/` (each object's key, SHA-256, size, type, dimensions, and source: a public https URL
-or a `repo:` file under `apps/web/public`) and row-level manifests under `d1/publications/` that
+`d1/media/` (each object's key, SHA-256, MD5, size, type, dimensions, and source: a public https
+URL or a `repo:` file under `apps/web/public`) and row-level manifests under `d1/publications/` that
 name the keys. `pnpm media:upload:dry-run -- d1/media/<plan>.json` fetches and verifies every
 object locally and writes nothing. The owner then runs, in order:
 
@@ -175,21 +175,24 @@ How the steps protect each other:
 - **Bucket to bucket.** The production upload copies each object from the `cdn-staging` bucket
   through the R2 API, never through a CDN, so it gets the bytes staging verified whatever the
   source or an edge cache does since.
-- **Existing objects are verified, never trusted.** An object the target bucket already holds is
-  read back and checked like an upload: a match is skipped, so a rerun finishes what is
-  missing; a mismatch fails that key (`present_mismatch:…`) and is never overwritten, since
-  something else wrote it.
-- **Upload before publish is enforced.** The publisher reads every object a manifest names from
-  the target's own bucket (`cdn-staging` or `cdn`) and refuses the manifest unless each one
-  matches its SHA-256, type, size, and dimensions.
+- **Existing objects are verified, never trusted.** A plan pins each object's SHA-256 and MD5,
+  taken from the same reviewed bytes. The bucket is listed (1,000 objects per API call), and an
+  object counts as present only when its size, type, cache policy, and ETag, which R2 computes as
+  the stored bytes' MD5, match: a rerun finishes what is missing, and a mismatch fails that key
+  (`present_mismatch:…`) and is never overwritten. A PUT's returned ETag must be its bytes' MD5.
+- **Rate limited.** Every R2 call shares one limiter (900 per 5 minutes, under the API's 1,200)
+  and retries a 429 or 5xx after its `Retry-After` or a backoff (`scripts/r2-objects.ts`). A
+  staging run of the 3,747-object plan takes about 15 minutes; production copies each object
+  with two calls, about 45 minutes, inside its 120-minute job.
+- **Upload before publish is enforced.** The publisher lists the target's own bucket (`cdn-staging`
+  or `cdn`) and refuses the manifest unless each object matches its plan the same way.
 - **Row-level manifests.** A media manifest says `concurrency: rows` and names no base version.
   Each listing carries its `expected` logo and image rows (kind, source URL, hosted key), and
   the batch applies only while they still match, so one manifest fits staging and production
   whatever else each published (admin edits, approvals, the media cron). The publisher reads
   the live publication state, checks every listing first, and still advances the version;
   rerunning a published manifest is a no-op.
-- **Its own queue.** Uploads use `media-upload-best-serp-co-<env>`, never the deploy groups, so
-  an hour-long upload cannot make a waiting deploy or publication be replaced.
+- **Its own queue.** Uploads use `media-upload-best-serp-co-<env>`, never the deploy groups.
 
 A source that changed between the plan and the staging upload fails that object
 (`sha256_mismatch`); regenerate the plan for it, then rerun the upload, which skips the rest.
@@ -246,8 +249,8 @@ refused replacements, and each logo left on the tile are in `d1/media/2026-10-06
 - `scripts/catalog-media.test.ts` applies the manifests to the import and checks that every logo
   and image is then a hosted key with a matching object in the plan, and that nothing else
   changes.
-- After the production publish, delete `apps/web/public/listing-logos/serpdownloaders.com/` and
-  `media/products/launchbuzz.io/` (the fallback tile stays).
+- After the production publish, delete `apps/web/public/listing-logos/serpdownloaders.com/`,
+  `listing-media-seed/` (sources a GitHub runner sees re-encoded), and `media/products/launchbuzz.io/`.
 
 Fetches are cached under `.runtime/legacy-media-cache`, through the DNS-checked Node fetcher, so
 a rerun reproduces the outputs byte for byte. `--part-size <n>` sets the listings per manifest,
@@ -284,12 +287,8 @@ Done on 2026-10-06: the `cdn-staging` bucket and both custom domains exist, and 
 
 - **Lifecycle rules for pending images.** The cron deletes finished submissions' and revisions'
   images, but a row deleted outright (its queue rows cascade) leaves its objects behind. R2
-  lifecycle rules on each bucket, prefixes `best.serp.co/submissions/` and
-  `best.serp.co/revisions/`, deleting objects after 365 days, catch those; it must outlast any review, though approval copies within minutes. Never put a rule on `best.serp.co/listings/` or on the bucket root (the
-  `cdn` bucket is shared with serp.co).
-- **`nosniff` on the media hosts.** R2 custom domains do not send `X-Content-Type-Options`.
-  Every object is stored with its sniffed `Content-Type` and SVG is never stored, so this is
-  defense in depth: a Response Header Transform Rule on the `serp.co` zone, for requests whose
-  hostname is `cdn.serp.co` or `cdn-staging.serp.co` and whose path starts with
-  `/best.serp.co/`, that sets `X-Content-Type-Options: nosniff`. Nothing in this repository
-  expects the header.
+  lifecycle rules (prefixes `best.serp.co/submissions/` and `best.serp.co/revisions/`, 365 days)
+  catch those. Never put one on `best.serp.co/listings/` or the root (`cdn` is shared).
+- **`nosniff` on the media hosts** (defense in depth; objects carry their sniffed type and SVG is
+  never stored): a Response Header Transform Rule on `serp.co` for `cdn.serp.co` and
+  `cdn-staging.serp.co` paths under `/best.serp.co/` setting `X-Content-Type-Options: nosniff`.
