@@ -1,5 +1,5 @@
 import { parse, serialize } from 'parse5'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { B, DIFFERENTIAL_CASES, L } from './badge-differential.fixture'
 import { scanFeaturedBadge } from './badge-verifier'
 import { HTML_LIMITS, HtmlTooComplexError, parseBoundedHtml } from './bounded-html'
@@ -16,6 +16,30 @@ function fill(prefix: string, unit: string, size = MB): string {
 
 function attributes(count: number, name = 'a'): string {
   return Array.from({ length: count }, (_, index) => `${name}${index}=1`).join(' ')
+}
+
+/** 1 MB of typical layout, 30 deep, with text, links, lists, a table and scripts. */
+function ordinaryPage(): string {
+  const wrapper = '<div class="layout"><section><div class="row"><div class="col">'.repeat(6)
+  const article = [
+    '<article><h2>Heading</h2><p>Some text with a <a href="/x/">link</a>, <em>emphasis</em>',
+    ' and <strong>strong words</strong> in a sentence that runs on for a while.</p>',
+    '<ul><li><a href="/a/">One</a></li><li><a href="/b/">Two</a></li></ul>',
+    '<table><tr><td>1</td><td>2</td></tr></table>',
+    '<img src="/i.png" alt="An image" loading="lazy"><script>var x = "<p>"</script></article>'
+  ].join('')
+  return page(fill(wrapper, article))
+}
+
+function fastestOfThree(run: () => unknown): number {
+  run() // warm up
+  let fastest = Number.POSITIVE_INFINITY
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const started = performance.now()
+    run()
+    fastest = Math.min(fastest, performance.now() - started)
+  }
+  return fastest
 }
 
 describe('parseBoundedHtml', () => {
@@ -70,23 +94,14 @@ describe('parseBoundedHtml', () => {
 
   /**
    * Real pages, first 1 MB, measured on 2026-10-06: work per byte 0.08 to 1.14 (the most was
-   * a 35 KB news index; the WHATWG parsing spec, 788 KB, used 0.81 million of the 10 million),
-   * at most 13,652 elements, and depth at most 35. Sites: Wikipedia (two articles), GitHub, MDN, BBC News,
-   * Hacker News, the WHATWG and W3C specs, WordPress.org, best.serp.co, Product Hunt,
-   * Elementor, The Verge, CNN, ThemeForest and Shopify. This synthetic page stands in for
-   * them: 1 MB of typical layout, 30 deep, with text, links, lists, a table and scripts.
+   * a 35 KB news index; the WHATWG parsing spec, 788 KB, used 0.81 million of the 10
+   * million), at most 13,652 elements, and depth at most 35. Sites: Wikipedia (two
+   * articles), GitHub, MDN, BBC News, Hacker News, the WHATWG and W3C specs, WordPress.org,
+   * best.serp.co, Product Hunt, Elementor, The Verge, CNN, ThemeForest and Shopify.
+   * `ordinaryPage()` stands in for them, denser than any.
    */
   it('parses a dense 1 MB page nested 30 deep inside the limits', () => {
-    const wrapper = '<div class="layout"><section><div class="row"><div class="col">'.repeat(6)
-    const article = [
-      '<article><h2>Heading</h2><p>Some text with a <a href="/x/">link</a>, <em>emphasis</em>',
-      ' and <strong>strong words</strong> in a sentence that runs on for a while.</p>',
-      '<ul><li><a href="/a/">One</a></li><li><a href="/b/">Two</a></li></ul>',
-      '<table><tr><td>1</td><td>2</td></tr></table>',
-      '<img src="/i.png" alt="An image" loading="lazy"><script>var x = "<p>"</script></article>'
-    ].join('')
-    const html = page(fill(wrapper, article))
-    const used = parseBoundedHtml(html)
+    const used = parseBoundedHtml(ordinaryPage())
     expect(used.maxDepth).toBeLessThan(40)
     expect(used.elements).toBeLessThan(HTML_LIMITS.elements / 2)
     // Every byte here is markup 30 deep, which no measured page came close to: 0.8 of the
@@ -97,10 +112,21 @@ describe('parseBoundedHtml', () => {
 
 /**
  * PR #84 review round 2, finding 2: 1 MB (the fetch cap) of crafted HTML stays cheap. Each
- * page either parses or stops at a limit, well inside 200 ms. Before the limits, plain parse5
- * took about 4 minutes on the nested `<div>`s and seconds on several others.
+ * page either parses or stops at a limit within 200 ms on Node 24 on the Apple silicon Mac the
+ * limits were measured on (the slowest, 1 MB of `x x x …`, about 60 ms), where plain parse5
+ * reads `ordinaryPage()` in about 40 ms. A slower or busier runner gets the same budget
+ * scaled by its own time for that page (a CI runner measured about 3 times slower). Before
+ * the limits, plain parse5 took about 4.5 minutes on the nested `<div>`s and seconds on
+ * several others, which no scaling hides.
  */
 describe('badge scanner on 1 MB of crafted HTML', () => {
+  const REFERENCE_MS = 40
+  let budgetMs = 200
+  beforeAll(() => {
+    const html = ordinaryPage()
+    const referenceMs = fastestOfThree(() => parse(html, { scriptingEnabled: true }))
+    budgetMs = 200 * Math.max(1, referenceMs / REFERENCE_MS)
+  })
   const expected = {
     badgeUrls: [B],
     listingUrl: L
@@ -150,14 +176,7 @@ describe('badge scanner on 1 MB of crafted HTML', () => {
         throw error
       }
     }
-    scan() // warm up
-    let fastest = Number.POSITIVE_INFINITY
-    for (let run = 0; run < 3; run += 1) {
-      const started = performance.now()
-      scan()
-      fastest = Math.min(fastest, performance.now() - started)
-    }
     expect(html.length).toBeGreaterThan(MB * 0.85)
-    expect(fastest).toBeLessThan(200)
+    expect(fastestOfThree(scan)).toBeLessThan(budgetMs)
   })
 })
