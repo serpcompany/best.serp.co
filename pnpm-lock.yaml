@@ -419,6 +419,9 @@ importers:
       server-only:
         specifier: 'catalog:'
         version: 0.0.1
+      undici:
+        specifier: 7.29.1
+        version: 7.29.1
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20261001.1
