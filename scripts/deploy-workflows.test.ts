@@ -102,10 +102,17 @@ const productionDispatchWorkflows = [
   'deploy-production.yml',
   'publish-d1.yml'
 ]
+/** Media uploads (#95) guard themselves in scripts/media-upload.ts, not cloudflare-release.ts. */
+const mediaUploadWorkflows = {
+  'upload-media-staging.yml': 'staging',
+  'upload-media.yml': 'production'
+} as const
 const newWorkflows = [
   ...productionDispatchWorkflows,
   'deploy-staging.yml',
-  'notify-d1-submissions.yml'
+  'notify-d1-submissions.yml',
+  'publish-d1-staging.yml',
+  ...Object.keys(mediaUploadWorkflows)
 ]
 
 const productionGroup = { group: 'deploy-best-serp-co-production', 'cancel-in-progress': false }
@@ -385,7 +392,10 @@ describe('recreated D1 operation workflows', () => {
     const guards: Array<[string, string]> = [
       ['scripts/d1-submission-approver.ts', 'approve-d1-submission.yml'],
       ['scripts/d1-submission-notifier.ts', 'notify-d1-submissions.yml'],
-      ['scripts/d1-remote-publisher.ts', 'publish-d1.yml']
+      ['scripts/d1-remote-publisher.ts', 'publish-d1.yml'],
+      ['scripts/d1-remote-publisher.ts', 'publish-d1-staging.yml'],
+      ['scripts/media-upload.ts', 'upload-media.yml'],
+      ['scripts/media-upload.ts', 'upload-media-staging.yml']
     ]
     for (const [script, workflow] of guards) {
       expect(readFileSync(resolve(script), 'utf8')).toContain(`/.github/workflows/${workflow}@`)
@@ -565,7 +575,10 @@ describe('D1 data stays in Cloudflare', () => {
     'deploy-production.yml:release',
     'deploy-staging.yml:deploy',
     'notify-d1-submissions.yml:notify',
-    'publish-d1.yml:publish'
+    'publish-d1-staging.yml:publish',
+    'publish-d1.yml:publish',
+    'upload-media-staging.yml:upload',
+    'upload-media.yml:upload'
   ]
   /** Every step that can change D1, as `<file>:<job>:<environment>`; each follows a bookmark. */
   const bookmarkedChanges = [
@@ -573,6 +586,7 @@ describe('D1 data stays in Cloudflare', () => {
     'bootstrap-production-d1.yml:bootstrap:production',
     'deploy-production.yml:release:production',
     'deploy-staging.yml:deploy:staging',
+    'publish-d1-staging.yml:publish:staging',
     'publish-d1.yml:publish:production'
   ]
   const databaseExport =
@@ -640,6 +654,13 @@ describe('D1 data stays in Cloudflare', () => {
       run: /^pnpm tsx scripts\/cloudflare-release\.ts (?:bookmark|plan-release|list-migrations|check-database|verify-import|deploy) (?:staging|production)\n?$/u
     },
     {
+      // The listing media uploads (#95): `scripts/media-upload.ts` reads and writes R2 objects
+      // through the R2 API (`scripts/r2-objects.ts`) and never reaches D1, so this exact command
+      // is not a D1 change. Any other spelling still needs a bookmark (fail closed).
+      id: 'R2-only media upload',
+      run: /^pnpm media:upload:(?:staging|production) -- "\$PLAN_PATH"\n?$/u
+    },
+    {
       id: 'Deploy Production plan',
       run: new RegExp(
         `^${escapeRegExp(
@@ -672,6 +693,9 @@ describe('D1 data stays in Cloudflare', () => {
     CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
     CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN'),
     GITHUB_TOKEN: expression('github.token'),
+    // The media uploads' typed confirmation and reviewed plan path (#95), checked by the script.
+    MEDIA_UPLOAD_CONFIRM: expression('inputs.confirmation'),
+    PLAN_PATH: expression('inputs.plan_path'),
     RELEASE_CONFIRM: expression('inputs.confirmation'),
     // Deploy Staging's job env, and where the Worker deploy records its version.
     STAGING_ORIGIN: project.remote.staging.origin,
@@ -1124,6 +1148,94 @@ describe('D1 data stays in Cloudflare', () => {
     expect(reads).toEqual({ changes: [], violations: [] })
   })
 
+  it('exempts exactly the R2-only media upload; any variant needs a bookmark (#97)', () => {
+    // The scripts the exemption names run the R2-only uploader and nothing else.
+    expect(packageScripts['media:upload:staging']).toBe(
+      'pnpm tsx scripts/media-upload.ts --target=staging'
+    )
+    expect(packageScripts['media:upload:production']).toBe(
+      'pnpm tsx scripts/media-upload.ts --target=production'
+    )
+    // The uploader reaches Cloudflare only through the R2 objects API: its imports are these,
+    // and its one Cloudflare URL is an R2 bucket object.
+    const imports = (file: string) =>
+      [...readFileSync(resolve(file), 'utf8').matchAll(/^import [^;]*?from '([^']+)'/gmsu)]
+        .map(match => match[1])
+        .sort()
+    expect(imports('scripts/media-upload.ts')).toEqual([
+      './project',
+      './r2-objects',
+      '@serpdirectory/data-ops/media-format',
+      '@serpdirectory/data-ops/media-keys',
+      '@serpdirectory/data-ops/safe-fetch',
+      '@serpdirectory/data-ops/safe-fetch-node',
+      'node:crypto',
+      'node:fs',
+      'node:path',
+      'node:url',
+      'zod'
+    ])
+    expect(imports('scripts/r2-objects.ts')).toEqual(['@serpdirectory/data-ops/media-keys'])
+    const r2 = readFileSync(resolve('scripts/r2-objects.ts'), 'utf8')
+    const placeholder = (name: string) => `\${${name}}`
+    expect(r2.match(/api\.cloudflare\.com[^`'"]*/gu)).toEqual([
+      `api.cloudflare.com/client/v4/accounts/${placeholder('accountId')}/r2/buckets/${placeholder('bucket')}/objects/${placeholder('key')}`
+    ])
+    expect(readFileSync(resolve('scripts/media-upload.ts'), 'utf8')).not.toMatch(
+      /api\.cloudflare\.com/u
+    )
+    const audit = d1ChangeAudit(allWorkflows())
+    expect(audit.violations).toEqual([])
+    expect(audit.changes.filter(change => change.startsWith('upload-media'))).toEqual([])
+    const upload = loadWorkflow('upload-media-staging.yml')
+    const job = upload.jobs.upload as WorkflowJob
+    const at = stepIndex(job, 'media:upload:staging')
+    const withUpload = (step: WorkflowStep, jobExtra: Partial<WorkflowJob> = {}) => {
+      const steps = [...stepsOf(job)]
+      steps[at] = step
+      return d1ChangeAudit([
+        [
+          'upload-media-staging.yml',
+          { ...upload, jobs: { upload: { ...job, ...jobExtra, steps } } }
+        ]
+      ])
+    }
+    const original = stepsOf(job)[at] as WorkflowStep
+    expect(withUpload(original).changes).toEqual([])
+    // Each variant is a change without a bookmark: refused.
+    const variants: Array<[string, WorkflowStep, Partial<WorkflowJob>]> = [
+      ['another target', { ...original, run: 'pnpm media:upload:dry-run -- "$PLAN_PATH"' }, {}],
+      [
+        'an appended command',
+        { ...original, run: `${original.run} && pnpm db:publish:staging` },
+        {}
+      ],
+      [
+        'a second argument',
+        { ...original, run: 'pnpm media:upload:staging -- "$PLAN_PATH" x' },
+        {}
+      ],
+      [
+        'the script by path',
+        { ...original, run: 'pnpm tsx scripts/media-upload.ts --target=staging' },
+        {}
+      ],
+      [
+        'an unreviewed env',
+        { ...original, env: { ...original.env, NODE_OPTIONS: '--require ./x.js' } },
+        {}
+      ],
+      ['a shell', { ...original, shell: 'bash -e {0}' } as WorkflowStep, {}],
+      ['job env', original, { env: { BASH_ENV: 'scripts/evil.sh' } }]
+    ]
+    for (const [label, step, jobExtra] of variants) {
+      const result = withUpload(step, jobExtra)
+      // A job-wide env reaches the credential check too, so it may count more than once.
+      expect(result.changes, label).toContain('upload-media-staging.yml:upload:staging')
+      expect(result.violations.join('\n'), label).toMatch(/must directly follow a plain/u)
+    }
+  })
+
   it('exempts a reviewed command only when nothing else can change what it runs (#101 round 3)', () => {
     const publish = loadWorkflow('publish-d1.yml')
     const job = publish.jobs.publish as WorkflowJob
@@ -1388,6 +1500,91 @@ describe('D1 data stays in Cloudflare', () => {
   })
 })
 
+describe('staging catalog publication and media uploads (#95)', () => {
+  /** The unprivileged checks every dispatch-only data workflow runs before its environment. */
+  function expectAuthorizedDispatch(
+    file: string,
+    branch: 'main' | 'staging',
+    environment: 'production' | 'staging',
+    confirmation: string,
+    privilegedJob: string
+  ): WorkflowJob {
+    const workflow = loadWorkflow(file)
+    expect(Object.keys(workflow.on), file).toEqual(['workflow_dispatch'])
+    expect(workflow.permissions, file).toEqual({ contents: 'read' })
+    expect(Object.keys(workflow.jobs).sort(), file).toEqual(['authorize', privilegedJob].sort())
+    const authorize = workflow.jobs.authorize as WorkflowJob
+    expect(authorize.environment, file).toBeUndefined()
+    expect(JSON.stringify(authorize), file).not.toContain('secrets.')
+    const checks = runs(authorize).join('\n')
+    expect(checks, file).toContain(`"$GITHUB_REF" != "refs/heads/${branch}"`)
+    expect(checks, file).toContain(`"$CONFIRMATION" != "${confirmation}"`)
+    const job = workflow.jobs[privilegedJob] as WorkflowJob
+    expect(job.needs, file).toEqual(['authorize'])
+    expect(environmentName(job), file).toBe(environment)
+    const [gate] = job.steps ?? []
+    expect(gate?.run, file).toContain('exit 1')
+    expect(gate?.run, file).toContain('CLOUDFLARE_API_TOKEN')
+    if (environment === 'staging') expect(JSON.stringify(workflow), file).not.toMatch(/production/u)
+    return job
+  }
+
+  it('applies a reviewed manifest to staging D1 from staging only, after a Time Travel bookmark', () => {
+    const job = expectAuthorizedDispatch(
+      'publish-d1-staging.yml',
+      'staging',
+      'staging',
+      project.confirmation.publishStaging,
+      'publish'
+    )
+    // The bookmark is read-only, so the workflow needs no release authorization (#97 review B1).
+    expect(releaseAuthorizations['publish-d1-staging.yml']).toBeUndefined()
+    const bookmark = stepRunning(job, 'cloudflare-release.ts bookmark staging')
+    expect(bookmark.run).toBe('pnpm tsx scripts/cloudflare-release.ts bookmark staging')
+    expect(stepIndex(job, 'cloudflare-release.ts bookmark staging')).toBeLessThan(
+      stepIndex(job, 'db:publish:staging')
+    )
+    // No database export, and nothing uploaded as an artifact of this public repository.
+    expect(JSON.stringify(job)).not.toMatch(/upload-artifact|\bbackup\b|d1 export/u)
+    const publish = stepRunning(job, 'db:publish:staging')
+    expect(publish.run).toBe('pnpm db:publish:staging -- "$MANIFEST_PATH"')
+    expect(publish.env).toMatchObject({
+      CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
+      CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN'),
+      CLOUDFLARE_D1_DATABASE_ID: project.remote.staging.databaseId,
+      D1_PUBLICATION_CONFIRM: expression('inputs.confirmation')
+    })
+    expect(packageScripts['db:publish:staging']).toBe(
+      'pnpm tsx scripts/d1-remote-publisher.ts --staging'
+    )
+  })
+
+  it('uploads a reviewed media plan to each environment from its own branch', () => {
+    for (const [file, environment] of Object.entries(mediaUploadWorkflows)) {
+      const job = expectAuthorizedDispatch(
+        file,
+        environment === 'staging' ? 'staging' : 'main',
+        environment,
+        environment === 'staging'
+          ? project.confirmation.mediaUploadStaging
+          : project.confirmation.mediaUpload,
+        'upload'
+      )
+      const upload = stepRunning(job, `media:upload:${environment}`)
+      expect(upload.run, file).toBe(`pnpm media:upload:${environment} -- "$PLAN_PATH"`)
+      for (const name of requiredScriptEnvironment('scripts/media-upload.ts')) {
+        expect(Object.keys(upload.env ?? {}), `${file} ${name}`).toContain(name)
+      }
+      expect(upload.env?.MEDIA_UPLOAD_CONFIRM, file).toBe(expression('inputs.confirmation'))
+      expect(packageScripts[`media:upload:${environment}`], file).toBe(
+        `pnpm tsx scripts/media-upload.ts --target=${environment}`
+      )
+      // Uploads change objects, not D1: no release command and no D1 identity.
+      expect(JSON.stringify(job), file).not.toMatch(/cloudflare-release|D1_DATABASE_ID/u)
+    }
+  })
+})
+
 describe('protected deployment boundaries', () => {
   it('gates every production job behind an unprivileged ref and confirmation check', () => {
     for (const file of productionDispatchWorkflows) {
@@ -1429,7 +1626,17 @@ describe('protected deployment boundaries', () => {
       'notify-d1-submissions.yml': {
         notify: { group: 'best-serp-co-production-notifier', 'cancel-in-progress': false }
       },
-      'publish-d1.yml': { publish: productionGroup }
+      'publish-d1.yml': { publish: productionGroup },
+      'publish-d1-staging.yml': {
+        publish: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
+      },
+      // Uploads hold their own groups, never the deploy groups (#97 review S5).
+      'upload-media.yml': {
+        upload: { group: 'media-upload-best-serp-co-production', 'cancel-in-progress': false }
+      },
+      'upload-media-staging.yml': {
+        upload: { group: 'media-upload-best-serp-co-staging', 'cancel-in-progress': false }
+      }
     }
     expect(Object.keys(expected).sort()).toEqual([...newWorkflows].sort())
     for (const file of newWorkflows) {

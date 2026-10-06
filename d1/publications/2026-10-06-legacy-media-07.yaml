@@ -1,0 +1,4356 @@
+# serpcompany/best.serp.co#95, part 7 of 7: repoint listing logos and images to
+# hosted copies (scripts/migration/legacy-media.ts). Upload d1/media/2026-10-06-legacy-media.json to the
+# environment first: the publisher refuses keys its bucket does not hold. Each part checks its
+# listings' rows, not a base version, so the parts apply in any order, staging first.
+version: 1
+id: 2026-10-06-legacy-media-07
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-media-update
+    id: lst_f70f9db8e746ed4bda12c99f
+    slug: waiheke.ai
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 2486
+        contentType: image/png
+        height: 64
+        key: best.serp.co/listings/waiheke.ai/logo/e774a294706d9017.png
+        sha256: e774a294706d9017ec083a00db645bb00aee7357f48a433c8e3f1d3c4281e39b
+        source: https://waiheke.ai/favicon.png
+        width: 64
+  - action: listing-media-update
+    id: lst_d30e7f1d494c8763f2cd3e5d
+    slug: wallubot.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wallu/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wallu/public
+        key: null
+    media:
+      logo:
+        bytes: 14171
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/wallubot.com/logo/52b27b546ce4447e.png
+        sha256: 52b27b546ce4447e5d9a1a45cbda0b1923a0009dd6aa139aae9c8fd923bcde04
+        source: https://wallubot.com/favicon-192.png
+        width: 192
+      images:
+        - bytes: 760165
+          contentType: image/png
+          height: 736
+          key: best.serp.co/listings/wallubot.com/image/e82a73a823cb9bdf.png
+          sha256: e82a73a823cb9bdffa11eca85affcec3756ea058f9349076c350a0820ced8e2b
+          source: https://wallubot.com/og-image2.png
+          width: 1408
+  - action: listing-media-update
+    id: lst_1700b46cc76030cc4261a969
+    slug: wand.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wand-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wand-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 26968
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wand.ai/logo/b5323e26a6294f53.avif
+        sha256: b5323e26a6294f53718e13202217494d9177103ddc679814fd28d275e12a95d6
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wand-ai/public
+        width: 800
+      images:
+        - bytes: 26968
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wand.ai/image/b5323e26a6294f53.avif
+          sha256: b5323e26a6294f53718e13202217494d9177103ddc679814fd28d275e12a95d6
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wand-ai/public
+          width: 800
+  - action: listing-media-update
+    id: lst_5691d16cdc52112487ac504a
+    slug: wanywhere.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wanywhere/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wanywhere/public
+        key: null
+    media:
+      images:
+        - bytes: 329756
+          contentType: image/jpeg
+          height: 630
+          key: best.serp.co/listings/wanywhere.com/image/0f942bbea7533b6e.jpg
+          sha256: 0f942bbea7533b6eb620569e43271ab36915a50c9fb5b1e640883025f180b811
+          source: https://www.wanywhere.com/wp-content/uploads/2025/10/Employee-Productivity-Software.jpg
+          width: 1200
+  - action: listing-media-update
+    id: lst_abc433642700d93ab9639ab8
+    slug: warmer.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warmer-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warmer-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 23797
+        contentType: image/png
+        height: 512
+        key: best.serp.co/listings/warmer.ai/logo/f1fbdc2cf8b448d8.png
+        sha256: f1fbdc2cf8b448d84ac078939437f720c83eeee36b1718f4e39d87fc5190fb35
+        source: https://warmer.ai/img/favicon.png
+        width: 512
+      images:
+        - bytes: 1321307
+          contentType: image/png
+          height: 1260
+          key: best.serp.co/listings/warmer.ai/image/462af6e9927bcb06.png
+          sha256: 462af6e9927bcb06138625b525fa9d4d0bc89848279e6787c1e03500cfb3bc01
+          source: https://warmer.ai/warmer-og-image.png
+          width: 2400
+  - action: listing-media-update
+    id: lst_5def671957f327721d4f3256
+    slug: warmest.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warmest/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warmest/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_fef20e110470167e8b29b742
+    slug: warp.dev
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warp-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warp-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 2739
+        contentType: image/png
+        height: 196
+        key: best.serp.co/listings/warp.dev/logo/052f0aa0c1b45740.png
+        sha256: 052f0aa0c1b45740c49072743708a53c7a0e317582385fb61dd8b6c67f74d9e2
+        source: https://www.warp.dev/favicon-196x196.png
+        width: 196
+      images:
+        - bytes: 155544
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/warp.dev/image/c0c126c06198a228.png
+          sha256: c0c126c06198a228c8b0a426aa24e4618ad92bc53fb23b5e8e4ce111693b58aa
+          source: https://www.warp.dev/og/default.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_135b9cf2a6b439a08393dad4
+    slug: watercoolertrivia.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/gpt-3-vs-water-cooler-trivia-participants/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/gpt-3-vs-water-cooler-trivia-participants/public
+        key: null
+    media:
+      logo:
+        bytes: 9579
+        contentType: image/jpeg
+        height: 256
+        key: best.serp.co/listings/watercoolertrivia.com/logo/2afab1a238b11dc2.jpg
+        sha256: 2afab1a238b11dc2acbb12c5cb19c810757778167a9a0c5a30c007f02f9ab23e
+        source: https://cdn.prod.website-files.com/621efa0a4ba033ccbc7549d2/621efa0a4ba0330081754a68_Screen%20Shot%202020-05-24%20at%204.23.59%20PM.jpg
+        width: 256
+      images:
+        - bytes: 177747
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/watercoolertrivia.com/image/56767cae5ae6f785.png
+          sha256: 56767cae5ae6f7850955ee07816b8f346e8a660700d2c1257dddbfd654601fa7
+          source: https://i.imgur.com/cwOJxXM.png
+          width: 1199
+  - action: listing-media-update
+    id: lst_92fc03c70fa70d5fe9767402
+    slug: watermarkremover.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/watermarkremover-io/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/watermarkremover-io/public
+        key: null
+    media:
+      logo:
+        bytes: 78509
+        contentType: image/png
+        height: 512
+        key: best.serp.co/listings/watermarkremover.io/logo/62cfc5b8f8e9ea04.png
+        sha256: 62cfc5b8f8e9ea040238f1e40745b13a3af7cc8093c292ad536a0ea691ad3aae
+        source: https://www.watermarkremover.io/static/assets/images/favicon.6c26fd5605b2029091cf..ico
+        width: 512
+      images:
+        - bytes: 820302
+          contentType: image/jpeg
+          height: 1256
+          key: best.serp.co/listings/watermarkremover.io/image/e93dc605b8ba6583.jpg
+          sha256: e93dc605b8ba6583f004261f2a57128fc69a2dca2d037a6c9c77e649701a2688
+          source: https://www.watermarkremover.io/static/public/watermark_remover.jpg
+          width: 2400
+  - action: listing-media-update
+    id: lst_71b575d884c273d1ba805ad8
+    slug: watermelon.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/watermelon-pulse/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/watermelon-pulse/public
+        key: null
+    media:
+      logo:
+        bytes: 1725
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/watermelon.ai/logo/3a3cb06d82edadb1.png
+        sha256: 3a3cb06d82edadb119f423ce2a346844ee3e1043004ade5477e44697392ade64
+        source: https://framerusercontent.com/images/3D9TM5Ab4zFpRobItsSyGMsvJQA.png
+        width: 180
+      images:
+        - bytes: 48605
+          contentType: image/png
+          height: 1024
+          key: best.serp.co/listings/watermelon.ai/image/5578c0af947bc101.png
+          sha256: 5578c0af947bc1019805ee25eb923138a0959dafd82d10e9e9948d025a0fdc39
+          source: https://framerusercontent.com/assets/K0WpgkJSQETwOLVDpY1lVyp5qc.png
+          width: 2048
+  - action: listing-media-update
+    id: lst_490518aeab0ddadd095a74cb
+    slug: wavechat.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavechat/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavechat/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_44b278e879e4d1f8d12107fd
+    slug: wavel.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavel-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavel-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 3766
+        contentType: image/webp
+        height: 192
+        key: best.serp.co/listings/wavel.ai/logo/0b47763e352989c1.webp
+        sha256: 0b47763e352989c1853d1c87137ea5703d0057b97ef67edd4a5e74587d44e698
+        source: https://i0.wp.com/wavel.ai/wp-content/uploads/2025/06/cropped-wavel-logo-2-1-1.webp?fit=192%2C192&ssl=1
+        width: 192
+      images:
+        - bytes: 44838
+          contentType: image/webp
+          height: 1260
+          key: best.serp.co/listings/wavel.ai/image/24e102b912db7388.webp
+          sha256: 24e102b912db7388fa3797b0da66a0e42786e6ea1ae0749315d12c65afd30a9a
+          source: https://wavel.ai/wp-content/uploads/2025/05/homepage-mi-1.webp
+          width: 2400
+  - action: listing-media-update
+    id: lst_acbaa209c1e843278d910f9d
+    slug: wavtool.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavtool/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavtool/public
+        key: null
+    media:
+      images:
+        - bytes: 2374236
+          contentType: image/png
+          height: 1260
+          key: best.serp.co/listings/wavtool.com/image/cfa1a9e186abe2a2.png
+          sha256: cfa1a9e186abe2a2f43bc278cf2859bceb90d7d67eadef06e184ac058c7b4ff1
+          source: https://wavtool.com/images/social-sharing-image.png
+          width: 2400
+  - action: listing-media-update
+    id: lst_8ad16155d41a1c4206daf8c7
+    slug: waylay.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/waylay/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/waylay/public
+        key: null
+    media:
+      logo:
+        bytes: 3289
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/waylay.io/logo/20fe87e5c75fd607.png
+        sha256: 20fe87e5c75fd60799f2dd7907d31ba2d9a2c173337ea0a26d25e2efdb9693d9
+        source: https://cdn.prod.website-files.com/600af1353f91b9eff1de3e74/6127a0f8e9ea23bbf1bf5aea_w.png
+        width: 256
+      images:
+        - bytes: 411561
+          contentType: image/jpeg
+          height: 1742
+          key: best.serp.co/listings/waylay.io/image/142d1df936c00f1f.jpg
+          sha256: 142d1df936c00f1f28eabbb50dbfbddccac818783304961686b6a8a9c7770de5
+          source: https://cdn.prod.website-files.com/66681500627b2db0acfea95d/66681500627b2db0acfeb615_Control%20CO2%20blogpost%20image%20(2).jpg
+          width: 3334
+  - action: listing-media-update
+    id: lst_3a38d4afc4db59eb234e8189
+    slug: wealthfront.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_a336079ee76e7f15760a376a
+    slug: wearenova.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/nova-a-i/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/nova-a-i/public
+        key: null
+    media:
+      logo:
+        bytes: 7057
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/wearenova.ai/logo/4054dcfc5813256e.png
+        sha256: 4054dcfc5813256edb520b2fbc5bab3ec9d7b138afbc55463d26b1dca5e6d31e
+        source: https://wearenova.ai/wp-content/uploads/2022/02/cropped-website-logo-192x192.png
+        width: 192
+      images:
+        - bytes: 23959
+          contentType: image/png
+          height: 317
+          key: best.serp.co/listings/wearenova.ai/image/19aa1b2c8713ac55.png
+          sha256: 19aa1b2c8713ac55540ea081414818e013ebb77465745a8944d5f7d033158238
+          source: https://wearenova.ai/wp-content/uploads/2022/02/NOVA-PIONEERING.png
+          width: 852
+  - action: listing-media-update
+    id: lst_a97a5eeebeb843b4da3ffd32
+    slug: weaverse.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weaverse/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weaverse/public
+        key: null
+    media:
+      images:
+        - bytes: 249676
+          contentType: image/webp
+          height: 1944
+          key: best.serp.co/listings/weaverse.io/image/a515bdb61bbd5fe9.webp
+          sha256: a515bdb61bbd5fe96b98b6c69db000549a64bd97b19d5f4e6690cc3ecbc21300
+          source: https://cdn.shopify.com/s/files/1/0838/0052/3057/files/weaverse-shopify-hydrogen-theme-builder-and-cms.webp?v=1769398712
+          width: 3456
+  - action: listing-media-update
+    id: lst_7f37574909354dbef4ad771d
+    slug: weaviate.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weaviate/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weaviate/public
+        key: null
+    media:
+      images:
+        - bytes: 269796
+          contentType: image/jpeg
+          height: 600
+          key: best.serp.co/listings/weaviate.io/image/cdd7ec19567c13fa.jpg
+          sha256: cdd7ec19567c13fa6e1b4c9a2b1acc9845772ca77a15099967e273f53cf77be5
+          source: https://weaviate.io/og/website/home.jpg
+          width: 1200
+  - action: listing-media-update
+    id: lst_8ea2ca6b8649197bf41b40a8
+    slug: web3summary.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/web3-summary/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/web3-summary/public
+        key: null
+    media:
+      logo:
+        bytes: 30096
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/web3summary.com/logo/cf8737170c1d1cdf.avif
+        sha256: cf8737170c1d1cdf0cb6876689a1b713cc6c3c64995b9f47c599ec8b5ae86787
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/web3-summary/public
+        width: 800
+      images:
+        - bytes: 30096
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/web3summary.com/image/cf8737170c1d1cdf.avif
+          sha256: cf8737170c1d1cdf0cb6876689a1b713cc6c3c64995b9f47c599ec8b5ae86787
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/web3-summary/public
+          width: 800
+  - action: listing-media-update
+    id: lst_dd88c09c02f731adc35ba69d
+    slug: webapi.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webapi-ai-2-0/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webapi-ai-2-0/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_a4c336b0b43909134dd9751a
+    slug: webcopilot.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webcopilot/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webcopilot/public
+        key: null
+    media:
+      logo:
+        bytes: 45558
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/webcopilot.ai/logo/f148dd69d47518c9.avif
+        sha256: f148dd69d47518c95fa935e37e761d2db42646754727d97fe71a7d77b0551ace
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webcopilot/public
+        width: 800
+      images:
+        - bytes: 45558
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/webcopilot.ai/image/f148dd69d47518c9.avif
+          sha256: f148dd69d47518c95fa935e37e761d2db42646754727d97fe71a7d77b0551ace
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webcopilot/public
+          width: 800
+  - action: listing-media-update
+    id: lst_2a3253fb3d661d8914a2e770
+    slug: webflow.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/intellimize/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/intellimize/public
+        key: null
+    media:
+      logo:
+        bytes: 2661
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/webflow.com/logo/5530fa535b6f07cc.png
+        sha256: 5530fa535b6f07cc3d5f41a0bb035b617f24d90a02144d2a1a69644c19481367
+        source: https://cdn.prod.website-files.com/686294e263eb7e215bd232f7/686d53d0446d4237b2f38c5f_webclip.png
+        width: 256
+      images:
+        - bytes: 153054
+          contentType: image/jpeg
+          height: 1256
+          key: best.serp.co/listings/webflow.com/image/942ad50df88a572c.jpg
+          sha256: 942ad50df88a572c0f5e97d5ede43affd155f64205ba239d11c9e60edeadc00a
+          source: https://cdn.prod.website-files.com/686294e263eb7e215bd232f7/6a048234cec10a58c38e1758_webflow-og.jpg
+          width: 2400
+  - action: listing-media-update
+    id: lst_3c9e642b6034758699860304
+    slug: weblium.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weblium/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weblium/public
+        key: null
+    media:
+      logo:
+        bytes: 8664
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/weblium.com/logo/380d56c7a10dd61e.png
+        sha256: 380d56c7a10dd61ebefa2ce3331aa936786d3fc699aeab1458b0803c13db7cf6
+        source: https://weblium.com/res/5dfb93c95146de002284210b/5e1725d69717f10022b07ed0_optimized
+        width: 180
+      images:
+        - bytes: 913753
+          contentType: image/png
+          height: 1080
+          key: best.serp.co/listings/weblium.com/image/fd95b2484e3bd261.png
+          sha256: fd95b2484e3bd2618c5463b9212ea5a5f5be6844c98dd8e133ad8dd24158573e
+          source: https://weblium.com/res/658003a5904345000e73e890/6589d885b050de000e180cdd_optimized
+          width: 1920
+  - action: listing-media-update
+    id: lst_229c43892f3a6a4c84f4993d
+    slug: webondemand.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webondemand/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webondemand/public
+        key: null
+    media:
+      logo:
+        bytes: 14395
+        contentType: image/png
+        height: 240
+        key: best.serp.co/listings/webondemand.com/logo/3ce26fd3b9813955.png
+        sha256: 3ce26fd3b98139553d63d877fa620ad19704ca82d20ad36f78fad08e2b621121
+        source: https://dwp5n41rsfk7g.cloudfront.net//Sites/102623/Root/Web/Images/favicon.png?v=55045
+        width: 240
+      images:
+        - bytes: 130338
+          contentType: image/jpeg
+          height: 627
+          key: best.serp.co/listings/webondemand.com/image/fa9499d6d02901d9.jpg
+          sha256: fa9499d6d02901d90b3f5778a15aaa69eebf9a339f1cfb22c023f788226aba5d
+          source: https://webondemand.com/Sites/102623/Root/Web/Images/SitePreview.jpg
+          width: 1200
+  - action: listing-media-update
+    id: lst_bc082459984d538bc3b0080b
+    slug: webquery.net
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webquery/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webquery/public
+        key: null
+    media:
+      images:
+        - bytes: 110281
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/webquery.net/image/f15d8719dacbd114.png
+          sha256: f15d8719dacbd1149c68e4b7ee3a20a9805320aa07104c1d01e4950ed907685e
+          source: https://www.webquery.net/OGP.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_673563e9462001f45e3cc7a5
+    slug: webscrapeai.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webscrapeai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webscrapeai/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_33b6470b9a4da9d89946f1c8
+    slug: webscrapingapi.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webscrapingapi.com/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webscrapingapi.com/public
+        key: null
+    media:
+      logo:
+        bytes: 68620
+        contentType: image/png
+        height: 600
+        key: best.serp.co/listings/webscrapingapi.com/logo/f46de8d5be5898f2.png
+        sha256: f46de8d5be5898f2718ffb833e71958a0abe900edcb6c2066803a6d0940cd6d8
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webscrapingapi.com/public
+        width: 800
+      images:
+        - bytes: 68620
+          contentType: image/png
+          height: 600
+          key: best.serp.co/listings/webscrapingapi.com/image/f46de8d5be5898f2.png
+          sha256: f46de8d5be5898f2718ffb833e71958a0abe900edcb6c2066803a6d0940cd6d8
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webscrapingapi.com/public
+          width: 800
+  - action: listing-media-update
+    id: lst_e1d34b529f25aa6f6f36e330
+    slug: websitesummaryai.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/website-summary-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/website-summary-ai/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_0902f55715a154e9875ef775
+    slug: webwhiz.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webwhiz/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webwhiz/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_1618571bbdcdc43254ddf5d5
+    slug: webyn.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webyn/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webyn/public
+        key: null
+    media:
+      logo:
+        bytes: 3358
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/webyn.ai/logo/aee89ab87b0866aa.png
+        sha256: aee89ab87b0866aad671c25ea112cf3cb4ed9294145c852a49ca99ac32b4ef07
+        source: https://cdn.prod.website-files.com/67ceb0789a154a30fe5bd4b3/67cee12a1a73096a75b166c6_Favicon_256.png
+        width: 256
+  - action: listing-media-update
+    id: lst_6191cf4bc21b0e56c21023e3
+    slug: weet.co
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weet/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weet/public
+        key: null
+    media:
+      images:
+        - bytes: 6897
+          contentType: image/png
+          height: 128
+          key: best.serp.co/listings/weet.co/image/02df3710e13637a9.png
+          sha256: 02df3710e13637a9bd59aeea46d97e4bcb73a12cda126bbdc1c2218cc8bd8ea4
+          source: https://weet.co/lib_vQVzvuJZDDyoBAPh/eahhb50q67fqal3d.png?w=1200&h=630&fit=crop
+          width: 134
+  - action: listing-media-update
+    id: lst_4ec24597a46f88a386aa732a
+    slug: weld.app
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weld-5-01/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weld-5-01/public
+        key: null
+    media:
+      logo:
+        bytes: 4027
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/weld.app/logo/b31bd996e92a473e.png
+        sha256: b31bd996e92a473e823a44f63f55aa96bfda41c0d5835f8be00d4b0acd40bcfa
+        source: https://weld.app/apple-icon.png?f38db0a278ff49d7
+        width: 180
+      images:
+        - bytes: 366587
+          contentType: image/png
+          height: 1260
+          key: best.serp.co/listings/weld.app/image/0eeb4efc6b863f5e.png
+          sha256: 0eeb4efc6b863f5ea221346a152987d4d6ddd5b077f7bd6fb7fb3cad5cbff8a1
+          source: https://weld.app/opengraph-image.png?0f59001403379bbf
+          width: 2400
+  - action: listing-media-update
+    id: lst_d836059a52c3010671356eb3
+    slug: welling.ai
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 11756
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/welling.ai/logo/d2f65595b0ee84f0.png
+        sha256: d2f65595b0ee84f0b9a36ac937d24cc45fcdddd73914883ff05d5b9f73d52ffa
+        source: https://www.welling.ai/apple-touch-icon.png
+        width: 180
+  - action: listing-media-update
+    id: lst_4537e2f15efdc8f6b30aad2b
+    slug: wellsaid.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wellsaidlabs/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wellsaidlabs/public
+        key: null
+    media:
+      logo:
+        bytes: 67801
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wellsaid.io/logo/22175767c27bc0be.avif
+        sha256: 22175767c27bc0be62d8642604ba94a9c2e4e4903f45dce5593c506be6ce1ec3
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wellsaidlabs/public
+        width: 800
+      images:
+        - bytes: 67801
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wellsaid.io/image/22175767c27bc0be.avif
+          sha256: 22175767c27bc0be62d8642604ba94a9c2e4e4903f45dce5593c506be6ce1ec3
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wellsaidlabs/public
+          width: 800
+  - action: listing-media-update
+    id: lst_f1a90988d88aab1a21988bf6
+    slug: welltested.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/welltested/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/welltested/public
+        key: null
+    media:
+      logo:
+        bytes: 410598
+        contentType: image/x-icon
+        height: 256
+        key: best.serp.co/listings/welltested.ai/logo/5d11427714a78beb.ico
+        sha256: 5d11427714a78bebcbaed68102cf04ae1c7c95376610703b6bf26648532d1ab8
+        source: https://www.welltested.ai/favicon.ico
+        width: 256
+  - action: listing-media-update
+    id: lst_8b19b71618deacd40c2cee5e
+    slug: wemadeastory.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/we-made-a-story/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/we-made-a-story/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_0a1fc475d2ebe069d05208ab
+    slug: wepik.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wepik/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wepik/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_ac7d629671f07134ba9b6aae
+    slug: wesendcv.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 6045
+        contentType: image/jpeg
+        height: 192
+        key: best.serp.co/listings/wesendcv.com/logo/ba0323e07bd81cb2.jpg
+        sha256: ba0323e07bd81cb2b7f7e7a5077ea9aa2b122554b8db50368313bb7ec2afdeab
+        source: https://wesendcv.com/wp-content/uploads/2024/02/cropped-wesendcv-com-192x192.jpg
+        width: 192
+  - action: listing-media-update
+    id: lst_2e181c4008b54028a4e80024
+    slug: wevo.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wevo/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wevo/public
+        key: null
+    media:
+      images:
+        - bytes: 11578
+          contentType: image/webp
+          height: 125
+          key: best.serp.co/listings/wevo.ai/image/c4117a1163846a7b.webp
+          sha256: c4117a1163846a7bc7a96a5d8b74f7e943e8928960dca4184671332edb08ed78
+          source: https://wevo.ai/wp-content/uploads/2025/12/wevo-accenture.webp
+          width: 869
+  - action: listing-media-update
+    id: lst_77ae684cc2eadf6a913e6c0d
+    slug: wewritecards.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/we-write-cards/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/we-write-cards/public
+        key: null
+    media:
+      logo:
+        bytes: 20817
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wewritecards.com/logo/763b07c2a76acc38.avif
+        sha256: 763b07c2a76acc38f4ea05e1dd096df0dbfa41c5a35599754ebd248772928609
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/we-write-cards/public
+        width: 800
+      images:
+        - bytes: 20817
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wewritecards.com/image/763b07c2a76acc38.avif
+          sha256: 763b07c2a76acc38f4ea05e1dd096df0dbfa41c5a35599754ebd248772928609
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/we-write-cards/public
+          width: 800
+  - action: listing-media-update
+    id: lst_c5d360500e966d245acfdebd
+    slug: what-the-chef.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/what-the-chef/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/what-the-chef/public
+        key: null
+    media:
+      images:
+        - bytes: 229433
+          contentType: image/png
+          height: 4414
+          key: best.serp.co/listings/what-the-chef.com/image/69c2aec2005fa3e0.png
+          sha256: 69c2aec2005fa3e06714c1a5772841e29c2b7fde47093c94c14a23b8ede1ed52
+          source: https://what-the-chef.com/static/what-the-chef-social.png
+          width: 8434
+  - action: listing-media-update
+    id: lst_c737684f9d6293ae7e7ba679
+    slug: whatdoesthiscodedo.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatdoesthiscodedo/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatdoesthiscodedo/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_f83322ee35635a3ce3d19feb
+    slug: whatgpt.app
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatgpt/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatgpt/public
+        key: null
+    media:
+      logo:
+        bytes: 8718
+        contentType: image/png
+        height: 1024
+        key: best.serp.co/listings/whatgpt.app/logo/ca4d9165acb02a4a.png
+        sha256: ca4d9165acb02a4a110db64447223821eb2661cf07d441e88ca613f53be87827
+        source: https://whatgpt.app/images/favicon.png
+        width: 1024
+      images:
+        - bytes: 8718
+          contentType: image/png
+          height: 1024
+          key: best.serp.co/listings/whatgpt.app/image/ca4d9165acb02a4a.png
+          sha256: ca4d9165acb02a4a110db64447223821eb2661cf07d441e88ca613f53be87827
+          source: https://whatgpt.app/images/favicon.png
+          width: 1024
+  - action: listing-media-update
+    id: lst_0f1577338dacc584fe1456c8
+    slug: whatthediff.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatthediff/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatthediff/public
+        key: null
+    media:
+      logo:
+        bytes: 36589
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/whatthediff.ai/logo/fa560ff12cfdaa9b.avif
+        sha256: fa560ff12cfdaa9bf65f34ccfd5191c90cd36bcd06ee87f6947c8c466d3c419d
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatthediff/public
+        width: 800
+      images:
+        - bytes: 36589
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/whatthediff.ai/image/fa560ff12cfdaa9b.avif
+          sha256: fa560ff12cfdaa9bf65f34ccfd5191c90cd36bcd06ee87f6947c8c466d3c419d
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatthediff/public
+          width: 800
+  - action: listing-media-update
+    id: lst_082c0e78a25db3ed863a1390
+    slug: whelp.co
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whelp/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whelp/public
+        key: null
+    media:
+      logo:
+        bytes: 58542
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/whelp.co/logo/2f2178ffab610f74.avif
+        sha256: 2f2178ffab610f7464c2e4972f1df540c5601f9043f20c3421aa8ea4e25d7505
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whelp/public
+        width: 800
+      images:
+        - bytes: 58542
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/whelp.co/image/2f2178ffab610f74.avif
+          sha256: 2f2178ffab610f7464c2e4972f1df540c5601f9043f20c3421aa8ea4e25d7505
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whelp/public
+          width: 800
+  - action: listing-media-update
+    id: lst_d008ec887c8dda320c9cac44
+    slug: whimsical.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whimsical-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whimsical-ai/public
+        key: null
+    media:
+      images:
+        - bytes: 227232
+          contentType: image/png
+          height: 628
+          key: best.serp.co/listings/whimsical.com/image/7568daaa7ba548ce.png
+          sha256: 7568daaa7ba548cee8f062cd0097cde0d9cc38d8c7f687ef1dd4d2f2ac8fc76e
+          source: https://whimsical.com/_next_public/cards/default-260714.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_591cfd6e2cfa056f99941b8c
+    slug: whimsyapp.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whimsyworks/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whimsyworks/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_31fc8260d3de2ad7fde6c8a8
+    slug: whismer.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whismer/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whismer/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_9829df7eb3f3feb949ca8aee
+    slug: whisperapi.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisperapi/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisperapi/public
+        key: null
+    media:
+      logo:
+        bytes: 125061
+        contentType: image/x-icon
+        height: 256
+        key: best.serp.co/listings/whisperapi.com/logo/c3defa1802ea132e.ico
+        sha256: c3defa1802ea132e54feae1d6d881b976bd54cf12c6c01daa936fdf0f6fbc10c
+        source: https://whisperapi.com/favicon.ico
+        width: 256
+  - action: listing-media-update
+    id: lst_ad7dff75614092b30cd019ba
+    slug: whisperize.me
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisperbot/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisperbot/public
+        key: null
+    media:
+      logo:
+        bytes: 7875
+        contentType: image/png
+        height: 250
+        key: best.serp.co/listings/whisperize.me/logo/1fa7dd0e3e92a977.png
+        sha256: 1fa7dd0e3e92a97702cb0bd4bcd22723080bda93db5b8e2b7c9ea76831e0a1bd
+        source: https://whisperize.me/assets/whisper_favicon-c38d55d96f5435a0fd942fee9401c7d5675c5846a77026c288f8c6890f9cdabb.ico
+        width: 250
+      images:
+        - bytes: 422254
+          contentType: image/png
+          height: 1262
+          key: best.serp.co/listings/whisperize.me/image/982534bd2300bf99.png
+          sha256: 982534bd2300bf99a8809d5b25eb9fac791a118f41c3873e3810305862063389
+          source: https://whisperize.me/assets/bored_to_replay-9df3bb9f51b67d25fd74a10bd770a00faa61616e340a54118e66ffdb516cd25f.png
+          width: 2400
+  - action: listing-media-update
+    id: lst_96aa571ac29dc74330e63ee1
+    slug: whispermemos.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisper-memos/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisper-memos/public
+        key: null
+    media:
+      logo:
+        bytes: 53904
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/whispermemos.com/logo/ee420387daaaf05c.avif
+        sha256: ee420387daaaf05ce688d7ef52222769e0a7f608f4d7099b16eab4ae5eac330a
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisper-memos/public
+        width: 800
+      images:
+        - bytes: 53904
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/whispermemos.com/image/ee420387daaaf05c.avif
+          sha256: ee420387daaaf05ce688d7ef52222769e0a7f608f4d7099b16eab4ae5eac330a
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisper-memos/public
+          width: 800
+  - action: listing-media-update
+    id: lst_eb9f9e91aa46a4e661aeb2e4
+    slug: whop-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-1.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-2.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-3.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-4.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/whop-video-downloader.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/main/images/whop-video-downloader.gif
+        key: null
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/whop-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 9960
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/whop-downloader/logo/22b0423d7163a810.png
+        sha256: 22b0423d7163a810fb0c65fea5eb9a703d73825875d4a3de93b1afcc46a61131
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/whop-downloader.png
+        width: 256
+      images:
+        - bytes: 242196
+          contentType: image/jpeg
+          height: 1440
+          key: best.serp.co/listings/whop-downloader/image/9bdd6efd678a66f8.jpg
+          sha256: 9bdd6efd678a66f87c64ef589802a8c6545fdd18751fa78ea2be335915e929b0
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-1.jpg
+          width: 2560
+        - bytes: 128609
+          contentType: image/jpeg
+          height: 1362
+          key: best.serp.co/listings/whop-downloader/image/e8582bdde0933398.jpg
+          sha256: e8582bdde093339811ebd158f77ff90d988d4f6723aa88ce4e6c4c19a1137084
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-2.jpg
+          width: 1270
+        - bytes: 166314
+          contentType: image/jpeg
+          height: 1440
+          key: best.serp.co/listings/whop-downloader/image/90cbd319caed3d47.jpg
+          sha256: 90cbd319caed3d4742468d7a6f1435bed007a42e4005185d31ce46c1a4ed7dd7
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-3.jpg
+          width: 2560
+        - bytes: 301111
+          contentType: image/jpeg
+          height: 1440
+          key: best.serp.co/listings/whop-downloader/image/ea0809ad95913a15.jpg
+          sha256: ea0809ad95913a15616407cb91dcd5777d2842972dc034fc32630a39ec19339f
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-4.jpg
+          width: 2560
+        - bytes: 45139
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/whop-downloader/image/a5d19af6822899fa.jpg
+          sha256: a5d19af6822899fa415aceb1abd7d606e6e1cded450878a6e37731e3a1fa5fd2
+          source: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/whop-video-downloader.jpg
+          width: 1920
+        - bytes: 672241
+          contentType: image/gif
+          height: 1080
+          key: best.serp.co/listings/whop-downloader/image/61ce634f92faef05.gif
+          sha256: 61ce634f92faef055fd68ad5693effabe1de588276d66aa82cdaac66b89c73d7
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/main/images/whop-video-downloader.gif
+          width: 1920
+  - action: listing-media-update
+    id: lst_834a96e6f8c01222d90d0390
+    slug: whop-video-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/whop-video-downloader.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/main/images/whop-video-downloader.gif
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-1.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-2.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-3.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-4.jpg
+        key: null
+    media:
+      images:
+        - bytes: 45139
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/whop-video-downloader/image/a5d19af6822899fa.jpg
+          sha256: a5d19af6822899fa415aceb1abd7d606e6e1cded450878a6e37731e3a1fa5fd2
+          source: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/whop-video-downloader.jpg
+          width: 1920
+        - bytes: 672241
+          contentType: image/gif
+          height: 1080
+          key: best.serp.co/listings/whop-video-downloader/image/61ce634f92faef05.gif
+          sha256: 61ce634f92faef055fd68ad5693effabe1de588276d66aa82cdaac66b89c73d7
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/main/images/whop-video-downloader.gif
+          width: 1920
+        - bytes: 242196
+          contentType: image/jpeg
+          height: 1440
+          key: best.serp.co/listings/whop-video-downloader/image/9bdd6efd678a66f8.jpg
+          sha256: 9bdd6efd678a66f87c64ef589802a8c6545fdd18751fa78ea2be335915e929b0
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-1.jpg
+          width: 2560
+        - bytes: 128609
+          contentType: image/jpeg
+          height: 1362
+          key: best.serp.co/listings/whop-video-downloader/image/e8582bdde0933398.jpg
+          sha256: e8582bdde093339811ebd158f77ff90d988d4f6723aa88ce4e6c4c19a1137084
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-2.jpg
+          width: 1270
+        - bytes: 166314
+          contentType: image/jpeg
+          height: 1440
+          key: best.serp.co/listings/whop-video-downloader/image/90cbd319caed3d47.jpg
+          sha256: 90cbd319caed3d4742468d7a6f1435bed007a42e4005185d31ce46c1a4ed7dd7
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-3.jpg
+          width: 2560
+        - bytes: 301111
+          contentType: image/jpeg
+          height: 1440
+          key: best.serp.co/listings/whop-video-downloader/image/ea0809ad95913a15.jpg
+          sha256: ea0809ad95913a15616407cb91dcd5777d2842972dc034fc32630a39ec19339f
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-4.jpg
+          width: 2560
+  - action: listing-media-update
+    id: lst_ad2b29c63fc1d8b76fa1d030
+    slug: windowai.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/windowai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/windowai/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_8dfc2f075c5c449ff71f3cf8
+    slug: windsor.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/windsor/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/windsor/public
+        key: null
+    media:
+      logo:
+        bytes: 43415
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/windsor.io/logo/59f6b039abf401db.avif
+        sha256: 59f6b039abf401dbf3d5336893422be4b789355ac46e31a0947878e7cd4465f8
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/windsor/public
+        width: 800
+      images:
+        - bytes: 43415
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/windsor.io/image/59f6b039abf401db.avif
+          sha256: 59f6b039abf401dbf3d5336893422be4b789355ac46e31a0947878e7cd4465f8
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/windsor/public
+          width: 800
+  - action: listing-media-update
+    id: lst_d3948361da1b6c4553006ee6
+    slug: wisdomise.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wisdomise/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wisdomise/public
+        key: null
+    media:
+      logo:
+        bytes: 19827
+        contentType: image/png
+        height: 128
+        key: best.serp.co/listings/wisdomise.com/logo/5cd1186f84b001fd.png
+        sha256: 5cd1186f84b001fde77e6f58440d7413d1ddec4474717161863f538353f6c12a
+        source: https://wisdomise.com/wisdomise-mark-128.png
+        width: 128
+      images:
+        - bytes: 19827
+          contentType: image/png
+          height: 128
+          key: best.serp.co/listings/wisdomise.com/image/5cd1186f84b001fd.png
+          sha256: 5cd1186f84b001fde77e6f58440d7413d1ddec4474717161863f538353f6c12a
+          source: https://wisdomise.com/wisdomise-mark-128.png
+          width: 128
+  - action: listing-media-update
+    id: lst_c665a7f2447c68d5ca9d5dc2
+    slug: wisecut.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wisecut/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wisecut/public
+        key: null
+    media:
+      logo:
+        bytes: 36437
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wisecut.ai/logo/695d5bae33872d3d.avif
+        sha256: 695d5bae33872d3df02b522e94738f4b526aa8a9dfc32985cd51faedf411cfeb
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wisecut/public
+        width: 800
+      images:
+        - bytes: 36437
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wisecut.ai/image/695d5bae33872d3d.avif
+          sha256: 695d5bae33872d3df02b522e94738f4b526aa8a9dfc32985cd51faedf411cfeb
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wisecut/public
+          width: 800
+  - action: listing-media-update
+    id: lst_8239d45c25698bb1c685baf2
+    slug: wiseone.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wiseone/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wiseone/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_95546321da94053fbcce0d64
+    slug: wishesai.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wishes-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wishes-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 39703
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/wishesai.com/logo/336dc8f9e5afc8ae.png
+        sha256: 336dc8f9e5afc8aefb328deb9b9079a27f3b45d2c1d7f499f0030ae9d81d935c
+        source: https://wishesai.com/assets/apple-touch-icon.png
+        width: 180
+  - action: listing-media-update
+    id: lst_ed85160928f41a840b04aaed
+    slug: wishpond.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wishpond/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wishpond/public
+        key: null
+    media:
+      logo:
+        bytes: 4694
+        contentType: image/png
+        height: 250
+        key: best.serp.co/listings/wishpond.com/logo/2ba8c10342846011.png
+        sha256: 2ba8c103428460118661b5a53c044993ebd01168fbe157da20d030115db8e0eb
+        source: https://wishpond.com/wp-content/uploads/2017/11/jordanpanda.png
+        width: 250
+      images:
+        - bytes: 5027
+          contentType: image/png
+          height: 259
+          key: best.serp.co/listings/wishpond.com/image/0c9525f29dbf0276.png
+          sha256: 0c9525f29dbf02767858ae0432a75b6dad10e9d718e0dc01b3485af86da7eff9
+          source: https://wishpond.com/wp-content/uploads/2015/09/Wishpond-Logo-2015-panda.png
+          width: 300
+  - action: listing-media-update
+    id: lst_dd8fb0cfe5d5d2e3524ebf0f
+    slug: wistia-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/wistia-video-downloader.jpg
+        key: null
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/wistia-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 796
+        contentType: image/png
+        height: 16
+        key: best.serp.co/listings/wistia-downloader/logo/ce6447769007529f.png
+        sha256: ce6447769007529fa1ec082720029eb50378371e2bd3cb7fcd860e6e4ca113f3
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/wistia-downloader.png
+        width: 16
+      images:
+        - bytes: 160340
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/wistia-downloader/image/4799e913ac538d4d.jpg
+          sha256: 4799e913ac538d4d09e953018bd0a6fbf3fd338559ea67157e7ba7090db81fd1
+          source: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/wistia-video-downloader.jpg
+          width: 1920
+  - action: listing-media-update
+    id: lst_5fd233158f7997c59a6dac65
+    slug: wistia-video-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/wistia-video-downloader.jpg
+        key: null
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/wistia-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 796
+        contentType: image/png
+        height: 16
+        key: best.serp.co/listings/wistia-video-downloader/logo/ce6447769007529f.png
+        sha256: ce6447769007529fa1ec082720029eb50378371e2bd3cb7fcd860e6e4ca113f3
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/wistia-downloader.png
+        width: 16
+      images:
+        - bytes: 160340
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/wistia-video-downloader/image/4799e913ac538d4d.jpg
+          sha256: 4799e913ac538d4d09e953018bd0a6fbf3fd338559ea67157e7ba7090db81fd1
+          source: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/wistia-video-downloader.jpg
+          width: 1920
+  - action: listing-media-update
+    id: lst_9f6cd1aa338e9ad75daafcce
+    slug: withbroadcast.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/broadcast/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/broadcast/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_c284c0a1b8460c8abb24af5a
+    slug: withorb.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 24531
+        contentType: image/png
+        height: 800
+        key: best.serp.co/listings/withorb.com/logo/8b913b2647b46068.png
+        sha256: 8b913b2647b46068b980b6b48f377ed4908dd8e0a8bd808f640dc598ac2f628d
+        source: https://www.withorb.com/apple-touch-icon.png
+        width: 800
+  - action: listing-media-update
+    id: lst_361c73d9369d39c27c3c2adc
+    slug: withpoly.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/poly/public
+        key: null
+    media:
+      logo:
+        bytes: 41862
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/withpoly.com/logo/783cf955d31b4ead.avif
+        sha256: 783cf955d31b4ead56c0e41ab416d76ae21c5f6b6c8ef45ef3ba526ec5852cfd
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/poly/public
+        width: 800
+  - action: listing-media-update
+    id: lst_f0936ec25783068dcfe01117
+    slug: withsutro.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/sutro/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/sutro/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_b4d2f9f4314f39472ad55f00
+    slug: wix.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 3477
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/wix.com/logo/295a1f6f927fd11a.png
+        sha256: 295a1f6f927fd11a3842a4c9f508b4152eca150cb4c54d6cfb64736fad659b80
+        source: https://www.wix.com/favicon.ico
+        width: 192
+  - action: listing-media-update
+    id: lst_dd2e21700357ffbf55a374fb
+    slug: wiz.chat
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wiz-chat/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wiz-chat/public
+        key: null
+    media:
+      logo:
+        bytes: 24121
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/wiz.chat/logo/4f73d2e655956d8e.png
+        sha256: 4f73d2e655956d8e8a09870a4ff5a28a5e0bf322d612a9876ed47cb48328e077
+        source: https://wiz.chat/apple-touch-icon.png
+        width: 180
+  - action: listing-media-update
+    id: lst_217eaa52954b8a32eaae9ab0
+    slug: wizu.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 76515
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/wizu.com/logo/f495608fc4d6cf90.png
+        sha256: f495608fc4d6cf9078a48b2f770e804240a4250c08635692c76b053d3b77da11
+        source: https://cdn.prod.website-files.com/656d91bbb149e5acd87cbc9c/6595cc8cb7c8338d9537dcb4_wizu-master.png
+        width: 256
+  - action: listing-media-update
+    id: lst_e2679b55281eb985e69245b7
+    slug: wnr.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wnr/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wnr/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_d13334d5e93955f6d17f78d0
+    slug: woebothealth.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/woebot-health/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/woebot-health/public
+        key: null
+    media:
+      logo:
+        bytes: 45386
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/woebothealth.com/logo/e9ac2b9cf56f2f85.avif
+        sha256: e9ac2b9cf56f2f85f9ae0c82427a880804e6912191d1513612231a4d75afdfeb
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/woebot-health/public
+        width: 800
+      images:
+        - bytes: 45386
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/woebothealth.com/image/e9ac2b9cf56f2f85.avif
+          sha256: e9ac2b9cf56f2f85f9ae0c82427a880804e6912191d1513612231a4d75afdfeb
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/woebot-health/public
+          width: 800
+  - action: listing-media-update
+    id: lst_30282872b9e0804cc8f2dad2
+    slug: wolfia.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wolfia/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wolfia/public
+        key: null
+    media:
+      logo:
+        bytes: 5230
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/wolfia.com/logo/da732224c254c59a.png
+        sha256: da732224c254c59a01349191958ae0fb4db1f58256fba2864a068c139e0a52c6
+        source: https://wolfia.com/images/meta/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 1561764
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/wolfia.com/image/a1c7fcd172817aa5.png
+          sha256: a1c7fcd172817aa52e07562624169305c188ac429505e262317e2c820cbd2e43
+          source: https://wolfia.com/api/og
+          width: 1200
+  - action: listing-media-update
+    id: lst_aa8ec7db36fce25944a5c3e0
+    slug: wolframalpha.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wolframalpha/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wolframalpha/public
+        key: null
+    media:
+      logo:
+        bytes: 49961
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wolframalpha.com/logo/56aba02d6a8721f8.avif
+        sha256: 56aba02d6a8721f87c03cb3f054823c38b0e621b70411844cad584077d0a9c6a
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wolframalpha/public
+        width: 800
+      images:
+        - bytes: 49961
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wolframalpha.com/image/56aba02d6a8721f8.avif
+          sha256: 56aba02d6a8721f87c03cb3f054823c38b0e621b70411844cad584077d0a9c6a
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wolframalpha/public
+          width: 800
+  - action: listing-media-update
+    id: lst_55f4cd6f9ea9ed2e9f9b5e07
+    slug: wonderchat.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderchat/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderchat/public
+        key: null
+    media:
+      logo:
+        bytes: 1807
+        contentType: image/avif
+        height: 96
+        key: best.serp.co/listings/wonderchat.io/logo/cc62155f808e3730.avif
+        sha256: cc62155f808e3730b4ba09540ec513db52b07d9590478e2255f21869a58a6905
+        source: https://framerusercontent.com/images/0OUenhRWAuJaqwaKYfjdN6zlNs.png
+        width: 96
+      images:
+        - bytes: 290134
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/wonderchat.io/image/311f33bc951766f5.png
+          sha256: 311f33bc951766f558c9eee5d3e596e05d585fa47d449994c435ac24b455e898
+          source: https://framerusercontent.com/assets/e0p0tE7zYsudrVAjGRc9wGoebX0.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_181a49c2c679b84a72d6183f
+    slug: wondercraft.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wondercraft/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wondercraft/public
+        key: null
+    media:
+      logo:
+        bytes: 15540
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/wondercraft.ai/logo/cd19aff7ccd3de83.png
+        sha256: cd19aff7ccd3de83087106517c1ca267dd30696d673d92e370d8ffbb49d0bb93
+        source: https://cdn.prod.website-files.com/65b3cc40daa94fa5529af14b/65b3cc40daa94fa5529af1d8_webclip.png
+        width: 256
+      images:
+        - bytes: 146955
+          contentType: image/jpeg
+          height: 1260
+          key: best.serp.co/listings/wondercraft.ai/image/337373824a617814.jpg
+          sha256: 337373824a6178142c26fb63fd1ff4751109efc5efea79de6d7a5062ffa2ad9c
+          source: https://cdn.prod.website-files.com/65b3cc40daa94fa5529af14b/697898cc7816572a34b747d3_WC_opengraph2%20(1).jpg
+          width: 2400
+  - action: listing-media-update
+    id: lst_f0587b825ff7a0e7979bda3e
+    slug: wonderdynamics.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonder-dynamics/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonder-dynamics/public
+        key: null
+    media:
+      logo:
+        bytes: 29704
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wonderdynamics.com/logo/1728149f519deb4f.avif
+        sha256: 1728149f519deb4f2c0519271d44717c9fc394ae6598122ad2b26ffeb7b18ce8
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonder-dynamics/public
+        width: 800
+      images:
+        - bytes: 29704
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wonderdynamics.com/image/1728149f519deb4f.avif
+          sha256: 1728149f519deb4f2c0519271d44717c9fc394ae6598122ad2b26ffeb7b18ce8
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonder-dynamics/public
+          width: 800
+  - action: listing-media-update
+    id: lst_6176283ba2033646b3fbba64
+    slug: wonderplan.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderplan/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderplan/public
+        key: null
+    media:
+      logo:
+        bytes: 11155
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/wonderplan.ai/logo/a8dcc63db475b447.png
+        sha256: a8dcc63db475b44712a795900367cc48bf2c9e8ff9d51e98c24a8c1219c00954
+        source: https://wonderplan.ai/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 117414
+          contentType: image/webp
+          height: 1754
+          key: best.serp.co/listings/wonderplan.ai/image/d8fa1d9f2927e89a.webp
+          sha256: d8fa1d9f2927e89adc470a7ce0de5a6c236ecd232fd9a01c7205b3ef2fb62172
+          source: https://wonderplan.ai/cover-image.webp
+          width: 3190
+  - action: listing-media-update
+    id: lst_5dffa5282bc25f1491fdca3f
+    slug: wonderway.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderway-coach/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderway-coach/public
+        key: null
+    media:
+      logo:
+        bytes: 11426
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/wonderway.io/logo/e24e6086b32d5446.png
+        sha256: e24e6086b32d5446b2866f9c1232da3bf2c61bd3831858fc39ceb404e2d7d354
+        source: https://cdn.prod.website-files.com/6254572d464133242304db67/6254572d4641334efe04dcd4_5d78f03b5ffb30f246d73ef1_web-clip.png
+        width: 256
+      images:
+        - bytes: 316190
+          contentType: image/jpeg
+          height: 710
+          key: best.serp.co/listings/wonderway.io/image/cdb7e32ce81a9fe7.jpg
+          sha256: cdb7e32ce81a9fe744d270c598a73a68539fcc300e47b57d2224be75f7445cae
+          source: https://cdn.prod.website-files.com/6254572d464133242304db67/64e5b5050fa04160ecdf739f_Mask%20group.jpg
+          width: 1378
+  - action: listing-media-update
+    id: lst_8fb86648d698418493ec3a7f
+    slug: wonsulting.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/coverletterai-by-wonsulting/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/coverletterai-by-wonsulting/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_cb3ddeb489426957820620c0
+    slug: wonsulting.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/network-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/network-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 30723
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wonsulting.com/logo/cc9e7e0e296f34c7.avif
+        sha256: cc9e7e0e296f34c789196ba04cd98c2f72f96b31de7f697e5d1ef9ceca517671
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/network-ai/public
+        width: 800
+      images:
+        - bytes: 30723
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wonsulting.com/image/cc9e7e0e296f34c7.avif
+          sha256: cc9e7e0e296f34c789196ba04cd98c2f72f96b31de7f697e5d1ef9ceca517671
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/network-ai/public
+          width: 800
+  - action: listing-media-update
+    id: lst_f55c4b031c099c726c684e3c
+    slug: woocommerce.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 3350
+        contentType: image/webp
+        height: 192
+        key: best.serp.co/listings/woocommerce.com/logo/e39016874d5d792d.webp
+        sha256: e39016874d5d792d4c57b108a41e640e3dcc1be12000aef0402944bdbc5d197f
+        source: https://woocommerce.com/wp-content/uploads/2024/12/cropped-logo-w-favicon.png?w=192
+        width: 192
+  - action: listing-media-update
+    id: lst_71d3f22afac72ddd631c1674
+    slug: word-spinner.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/word-spinner/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/word-spinner/public
+        key: null
+    media:
+      logo:
+        bytes: 4089
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/word-spinner.com/logo/d1486a7881fce1c8.png
+        sha256: d1486a7881fce1c8e899be55e559775a0f106d4d8e80a8ba0c7296ffdfc84b79
+        source: https://word-spinner.com/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 138441
+          contentType: image/png
+          height: 640
+          key: best.serp.co/listings/word-spinner.com/image/6df45556ae608df5.png
+          sha256: 6df45556ae608df50625cf9dc6eee634bdcf7f8c8aae9560503bc39e4f193268
+          source: https://word-spinner.com/assets/static/og.png
+          width: 1280
+  - action: listing-media-update
+    id: lst_32a4a501b84975898164f3d1
+    slug: wordai.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordai/public
+        key: null
+    media:
+      logo:
+        bytes: 18750
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wordai.com/logo/95c2b8c836de7be9.avif
+        sha256: 95c2b8c836de7be94d662cb7550d9f8ba0e6dad787e1f2dd75b6ea5be0013731
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordai/public
+        width: 800
+      images:
+        - bytes: 18750
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wordai.com/image/95c2b8c836de7be9.avif
+          sha256: 95c2b8c836de7be94d662cb7550d9f8ba0e6dad787e1f2dd75b6ea5be0013731
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordai/public
+          width: 800
+  - action: listing-media-update
+    id: lst_7d624605a6044b02e1dd513c
+    slug: wordfixerbot.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordfixerbot/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordfixerbot/public
+        key: null
+    media:
+      logo:
+        bytes: 22030
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wordfixerbot.com/logo/a0e13734580a10dd.avif
+        sha256: a0e13734580a10dd7076bdbaf7f3218806f06ee139bae1fa58b8495ba2c0aa91
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordfixerbot/public
+        width: 800
+      images:
+        - bytes: 22030
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wordfixerbot.com/image/a0e13734580a10dd.avif
+          sha256: a0e13734580a10dd7076bdbaf7f3218806f06ee139bae1fa58b8495ba2c0aa91
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordfixerbot/public
+          width: 800
+  - action: listing-media-update
+    id: lst_8b2a79dbf4f1d5c7f49dd86f
+    slug: wordhero.co
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordhero/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordhero/public
+        key: null
+    media:
+      logo:
+        bytes: 28958
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wordhero.co/logo/bd5cb61aad5afb18.avif
+        sha256: bd5cb61aad5afb1866abff05a35e6975f4bd417b828b72b951d1638a2a6774af
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordhero/public
+        width: 800
+      images:
+        - bytes: 28958
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wordhero.co/image/bd5cb61aad5afb18.avif
+          sha256: bd5cb61aad5afb1866abff05a35e6975f4bd417b828b72b951d1638a2a6774af
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordhero/public
+          width: 800
+  - action: listing-media-update
+    id: lst_0fee16521aad24ef85c1358d
+    slug: wordkraft.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordkraft/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordkraft/public
+        key: null
+    media:
+      logo:
+        bytes: 6525
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/wordkraft.ai/logo/b5a6c11b48e98410.png
+        sha256: b5a6c11b48e98410b62bf150bf47f54c508a6f18fed3b474c6df0d1d1b5b1bcf
+        source: https://wordkraft.ai/wp-content/uploads/2022/05/cropped-android-chrome-512x512-1-192x192.png
+        width: 192
+  - action: listing-media-update
+    id: lst_99077d31ddd7ec11836404e6
+    slug: wordmax.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordmax/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordmax/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_44ec9e19d5571fa46e9f47af
+    slug: wordmetrics.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordmetrics/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordmetrics/public
+        key: null
+    media:
+      logo:
+        bytes: 9435
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/wordmetrics.com/logo/ea454c305f77340b.png
+        sha256: ea454c305f77340bc69c208fb46bb1eb356253aea7f48670fe6a747c7012785b
+        source: https://wordmetrics.com/images/android-icon-192x192.png
+        width: 192
+      images:
+        - bytes: 44324
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/wordmetrics.com/image/4022adab4e00a5c0.png
+          sha256: 4022adab4e00a5c0150286747a84480f4475aae5645e13b10934b54078673507
+          source: https://wordmetrics.com/wp-content/uploads/2020/01/wm-opengraph-image.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_88ed34b71d77756354a48925
+    slug: wordtune.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordtune/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordtune/public
+        key: null
+    media:
+      logo:
+        bytes: 42795
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wordtune.com/logo/16edf3134c39948d.avif
+        sha256: 16edf3134c39948dc15f0489fe595c0fff63bd5c962b6a1c53fac6ddb31cd5c3
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordtune/public
+        width: 800
+      images:
+        - bytes: 42795
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wordtune.com/image/16edf3134c39948d.avif
+          sha256: 16edf3134c39948dc15f0489fe595c0fff63bd5c962b6a1c53fac6ddb31cd5c3
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordtune/public
+          width: 800
+  - action: listing-media-update
+    id: lst_c27f8f835f9b56489c2ad2e5
+    slug: workflos.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/workflos/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/workflos/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_a77dd388ba2c907ff4283ae0
+    slug: workist.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/workist/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/workist/public
+        key: null
+    media:
+      logo:
+        bytes: 5357
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/workist.com/logo/6022e2fd0113858d.png
+        sha256: 6022e2fd0113858d3da12f114bc4fa6164d08a861c4009e93d34699fa57e0727
+        source: https://cdn.prod.website-files.com/664d86b19069e771ae4687a4/66746e8e45b804a858d0cc58_webclip.png
+        width: 256
+      images:
+        - bytes: 301426
+          contentType: image/jpeg
+          height: 630
+          key: best.serp.co/listings/workist.com/image/56cf4152be765c8f.jpg
+          sha256: 56cf4152be765c8f1c96a2b7e92f28c6d5bb9b87c864c58b8b031b0c2db88c07
+          source: https://cdn.prod.website-files.com/664d86b19069e771ae4687a4/6677ed893a1746007de26b75_workist-open-graph.jpg
+          width: 1200
+  - action: listing-media-update
+    id: lst_de02c374bd6c548662dc4f05
+    slug: workwithpod.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/pod/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/pod/public
+        key: null
+    media:
+      logo:
+        bytes: 6048
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/workwithpod.com/logo/5a3d75d0a8180d13.png
+        sha256: 5a3d75d0a8180d134d6d4a383c90e584c87b3066a03c87f9e7bd0bd2bb97c340
+        source: https://www.workwithpod.com/assets/f1f64364b9f5-666b2995f2c09b5bdd454209_FF_pod_LO-10_256x256.png
+        width: 256
+      images:
+        - bytes: 185887
+          contentType: image/png
+          height: 800
+          key: best.serp.co/listings/workwithpod.com/image/d1f0cee43df309ec.png
+          sha256: d1f0cee43df309ec2e2e273c9ad706145fb6cbedc4d582cc034b16fadf3531a3
+          source: https://www.workwithpod.com/assets/bd6b2846fe09-679ae2cafc68d214db291842_Asset_8_-_Website_social.png
+          width: 1280
+  - action: listing-media-update
+    id: lst_5c2675f29475bb295b31f043
+    slug: wowto.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wowto/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wowto/public
+        key: null
+    media:
+      logo:
+        bytes: 30212
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/wowto.ai/logo/960f0d6cc0c6ba0c.avif
+        sha256: 960f0d6cc0c6ba0cbb963a0852ab2ca767f2b7384fa036b35024f5fd0285227d
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wowto/public
+        width: 800
+      images:
+        - bytes: 30212
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/wowto.ai/image/960f0d6cc0c6ba0c.avif
+          sha256: 960f0d6cc0c6ba0cbb963a0852ab2ca767f2b7384fa036b35024f5fd0285227d
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wowto/public
+          width: 800
+  - action: listing-media-update
+    id: lst_e1b425212d2128109b289161
+    slug: wpaibot.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wpaibot/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wpaibot/public
+        key: null
+    media:
+      logo:
+        bytes: 358742
+        contentType: image/x-icon
+        height: 256
+        key: best.serp.co/listings/wpaibot.com/logo/e502e14e2ce706eb.ico
+        sha256: e502e14e2ce706ebf94955c735f8a14ec90260204276f3f62d5cfb719284a1b2
+        source: https://www.wpaibot.com/favicon.ico
+        width: 256
+      images:
+        - bytes: 1060109
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/wpaibot.com/image/88b5cd6d6f318f6d.png
+          sha256: 88b5cd6d6f318f6dd5c3cf6a4aa8e0ecaaaad2552f25ed1fc5b5a657ccb033e7
+          source: https://www.wpaibot.com/api/og
+          width: 1200
+  - action: listing-media-update
+    id: lst_fa45e29140c18c78e1c08dd3
+    slug: wpdocs.chat
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/chatwp/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/chatwp/public
+        key: null
+    media:
+      logo:
+        bytes: 9755
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/wpdocs.chat/logo/e76fe4176fd7ae6f.png
+        sha256: e76fe4176fd7ae6f25a722ff1c44bb6be727d55804117b33f9931882750353d7
+        source: https://wpdocs.chat/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 57096
+          contentType: image/png
+          height: 532
+          key: best.serp.co/listings/wpdocs.chat/image/75f0cbf6ede707d9.png
+          sha256: 75f0cbf6ede707d91f8fdd1b00a784a2b660ea6bd6c5392e57708f17fa5c6b4a
+          source: https://wpdocs.chat/social-card.png
+          width: 945
+  - action: listing-media-update
+    id: lst_b8d04b7dee69d2ced1521d13
+    slug: wpturbo.dev
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wpturbo/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wpturbo/public
+        key: null
+    media:
+      logo:
+        bytes: 2309
+        contentType: image/png
+        height: 210
+        key: best.serp.co/listings/wpturbo.dev/logo/a915a661818757a0.png
+        sha256: a915a661818757a08f5037b551d3dcefe0a37d6e90b424a0630948259fe7982f
+        source: https://wpturbo.dev/wp-content/uploads/2022/09/symbol_color_bgcolor_screen.png
+        width: 210
+      images:
+        - bytes: 11523
+          contentType: image/png
+          height: 438
+          key: best.serp.co/listings/wpturbo.dev/image/b279956e0965bf70.png
+          sha256: b279956e0965bf70d86e8268241c4f930cacd6d1aeec4196ffef8e34aa686191
+          source: https://wpturbo.dev/wp-content/uploads/2022/10/wpturbo-bg.png
+          width: 694
+  - action: listing-media-update
+    id: lst_7f2c21a098288494b2402448
+    slug: wpwand.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wp-wand/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wp-wand/public
+        key: null
+    media:
+      images:
+        - bytes: 99766
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/wpwand.com/image/c5efb76e46e6199e.png
+          sha256: c5efb76e46e6199ec6ae203cf3f435eacbd02c85a7006db5a6aea00b6e7ff7fd
+          source: https://wpwand.com/wp-content/uploads/2023/06/OG.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_b8db35e93561cddc19cf794e
+    slug: wraithscribe.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wraithscribe/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wraithscribe/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_42d06798f44bb70022037328
+    slug: write.homes
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/write-homes/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/write-homes/public
+        key: null
+    media:
+      images:
+        - bytes: 4316155
+          contentType: image/png
+          height: 9087
+          key: best.serp.co/listings/write.homes/image/41ef1777f13e421e.png
+          sha256: 41ef1777f13e421eb48d19a9ed3c50e9f2940900cc1ec2fc9c5f5203ddb39289
+          source: https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f07c00f6-74d1-4889-a7c7-9cc4b25743a1/id-preview-abf53e1d--30aa3572-7e3d-4654-85b5-4604b0c36f48.lovable.app-1772221017900.png
+          width: 1920
+  - action: listing-media-update
+    id: lst_d6b86b4e1ebfe8c67ae93a62
+    slug: writechamp.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writechamp/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writechamp/public
+        key: null
+    media:
+      images:
+        - bytes: 2952818
+          contentType: image/png
+          height: 1569
+          key: best.serp.co/listings/writechamp.io/image/a4d088e402f08bd1.png
+          sha256: a4d088e402f08bd1a284f2926e70876a135120b95eaf6844fc42ef0968b85d31
+          source: https://writechamp.io/public/front/assets/images/og-home.png
+          width: 2997
+  - action: listing-media-update
+    id: lst_8156803fd9826379deeb6e25
+    slug: writecream.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writecream/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writecream/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_3693dd8b899a1becb1103128
+    slug: writefull.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writefull/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writefull/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_4223e6f7ae54e5bb5b8da773
+    slug: writegpt.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writegpt/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writegpt/public
+        key: null
+    media:
+      logo:
+        bytes: 40937
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/writegpt.ai/logo/8951af737c2d04af.avif
+        sha256: 8951af737c2d04afcc4195bc39958652055dd9e2ba48d66a8bda6a27e2d0ced3
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writegpt/public
+        width: 800
+      images:
+        - bytes: 40937
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/writegpt.ai/image/8951af737c2d04af.avif
+          sha256: 8951af737c2d04afcc4195bc39958652055dd9e2ba48d66a8bda6a27e2d0ced3
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writegpt/public
+          width: 800
+  - action: listing-media-update
+    id: lst_b2c897bb36174af5dd4f579f
+    slug: writemage.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemage/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemage/public
+        key: null
+    media:
+      logo:
+        bytes: 1571
+        contentType: image/png
+        height: 128
+        key: best.serp.co/listings/writemage.com/logo/5146ed79b486cb9e.png
+        sha256: 5146ed79b486cb9e1cdcdd7814cd22ae78e70ceb30fa06b4cd9a16cf121bc9e6
+        source: https://writemage.com/favicon.png
+        width: 128
+      images:
+        - bytes: 418255
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/writemage.com/image/fb94d6ef88a607da.png
+          sha256: fb94d6ef88a607da21285dd216837a712888ae3b08d1aafb0a97918c0d953fc5
+          source: https://writemage.com/og-img.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_e332c0dd8bbd085ab9d6defd
+    slug: writemail.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemail/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemail/public
+        key: null
+    media:
+      logo:
+        bytes: 25549
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/writemail.ai/logo/f2f983f2494d2424.png
+        sha256: f2f983f2494d24247de103c16700d24c7aa270735087e8ab0925380cc4270656
+        source: https://writemail.ai/assets/img/favicons/apple-touch-icon.png?v1.14.0
+        width: 180
+      images:
+        - bytes: 99784
+          contentType: image/png
+          height: 627
+          key: best.serp.co/listings/writemail.ai/image/53643750bad62a2d.png
+          sha256: 53643750bad62a2db98a6c1b5a88283adf9fb41191f724365b1f1f895e46cc85
+          source: https://writemail.ai/assets/img/writemail-2.png?v1.14.0
+          width: 1200
+  - action: listing-media-update
+    id: lst_b9fa8b0d8b223ebfafd0fc62
+    slug: writemyessays.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemyessays/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemyessays/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_0e5cd99ce24dde040f38a543
+    slug: writenowai.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writenow-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writenow-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 11558
+        contentType: image/png
+        height: 300
+        key: best.serp.co/listings/writenowai.com/logo/8b724c12d05a0a3e.png
+        sha256: 8b724c12d05a0a3e48233dbe40e114a3959baff69dd3694c3292fb0a6473a18c
+        source: https://writenowai.com/wp-content/uploads/2022/12/favicon_512-01-300x300.png
+        width: 300
+      images:
+        - bytes: 15614
+          contentType: image/png
+          height: 512
+          key: best.serp.co/listings/writenowai.com/image/df88a7d1d78c6b90.png
+          sha256: df88a7d1d78c6b90d17c66db90aa49607e910e67e695d764ab06348ec31925cb
+          source: https://writenowai.com/wp-content/uploads/2022/12/favicon_512-01.png
+          width: 512
+  - action: listing-media-update
+    id: lst_7506e4284cf646247968a59c
+    slug: writepanda.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/write-panda/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/write-panda/public
+        key: null
+    media:
+      logo:
+        bytes: 4821
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/writepanda.ai/logo/0aa54dc3a32cdcaf.png
+        sha256: 0aa54dc3a32cdcafa360b5ec218b3e9dbcad33ac2a1551be6d3a2bcffdd7d136
+        source: https://www.writepanda.ai/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 100528
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/writepanda.ai/image/dec1cde3581670c4.png
+          sha256: dec1cde3581670c4b56ec62c7a2a30cd4e73362f45359fbbc19885a21aba5ceb
+          source: https://www.writepanda.ai/og/default.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_06b2871c098329279341b86c
+    slug: writepaw.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writepaw/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writepaw/public
+        key: null
+    media:
+      logo:
+        bytes: 3006
+        contentType: image/png
+        height: 64
+        key: best.serp.co/listings/writepaw.com/logo/d9c1406697b58e25.png
+        sha256: d9c1406697b58e2593ac29266e34874e357d2bde36d45b711250d8b2e3203e8a
+        source: https://writepaw.com/favicon.png
+        width: 64
+      images:
+        - bytes: 56747
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/writepaw.com/image/816426cb86f88a2d.png
+          sha256: 816426cb86f88a2d588145f01101bb01a4f9137f66c9187c1b7418f079658a23
+          source: https://writepaw.com/seo.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_a5d1e693a256c1aa5e69adaf
+    slug: writer.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writer/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writer/public
+        key: null
+    media:
+      logo:
+        bytes: 50537
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/writer.com/logo/71ff05bdf9b02af3.avif
+        sha256: 71ff05bdf9b02af3017e3c92f25a6a900d43b506e0affe962a19b629c024bdbf
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writer/public
+        width: 800
+      images:
+        - bytes: 50537
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/writer.com/image/71ff05bdf9b02af3.avif
+          sha256: 71ff05bdf9b02af3017e3c92f25a6a900d43b506e0affe962a19b629c024bdbf
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writer/public
+          width: 800
+  - action: listing-media-update
+    id: lst_473901aeb52f97d0432c65a7
+    slug: writer.hix.ai
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 1334
+        contentType: image/webp
+        height: 115
+        key: best.serp.co/listings/writer.hix.ai/logo/1d6dd7b38d91fadc.webp
+        sha256: 1d6dd7b38d91fadc1c1795bd25f865d314b2e191e2056adb9e57677235cda809
+        source: https://hix.ai/apple-touch-icon.png
+        width: 115
+  - action: listing-media-update
+    id: lst_50d6d9ff63e66dd82c859b51
+    slug: writerly.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writerly-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writerly-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 16726
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/writerly.ai/logo/41710230cd60aba9.png
+        sha256: 41710230cd60aba939cc7b6866b8ba65c52d069bd69961044cfeb0d449ba4bfd
+        source: https://cdn.prod.website-files.com/6421cb46e720564988b5e848/645c14c96adde3051e8917f6_writerly-web-clip.png
+        width: 256
+      images:
+        - bytes: 53976
+          contentType: image/jpeg
+          height: 1260
+          key: best.serp.co/listings/writerly.ai/image/91310d8a7968629a.jpg
+          sha256: 91310d8a7968629a7cbc9cc6518cf467ce928416cba30b54bcc0f3bbc6e8dece
+          source: https://cdn.prod.website-files.com/6421cb46e720564988b5e848/645c178e5e89047cd754dec0_Writerly-Open-Graph.jpg
+          width: 2400
+  - action: listing-media-update
+    id: lst_a5404b15e839aab1b2c5c6be
+    slug: writersbrew.app
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writers-brew/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writers-brew/public
+        key: null
+    media:
+      logo:
+        bytes: 38437
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/writersbrew.app/logo/6fd856e7cb6f3929.avif
+        sha256: 6fd856e7cb6f3929be85a065a072b252b22e8605fe517487ef5dcff686418179
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writers-brew/public
+        width: 800
+      images:
+        - bytes: 38437
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/writersbrew.app/image/6fd856e7cb6f3929.avif
+          sha256: 6fd856e7cb6f3929be85a065a072b252b22e8605fe517487ef5dcff686418179
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writers-brew/public
+          width: 800
+  - action: listing-media-update
+    id: lst_b6b940432e89ff44c95be99b
+    slug: writerzen.net
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writerzen/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writerzen/public
+        key: null
+    media:
+      images:
+        - bytes: 508811
+          contentType: image/png
+          height: 627
+          key: best.serp.co/listings/writerzen.net/image/f128b3083dc4e623.png
+          sha256: f128b3083dc4e62311fd67017e55069eb279ed67850db1c20e0440845cfcf49f
+          source: https://writerzen.net/themes/writerzen/img/opengraph.png?version=1.20
+          width: 1200
+  - action: listing-media-update
+    id: lst_729005a46d5cdc3d9020282e
+    slug: writeseed.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writeseed/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writeseed/public
+        key: null
+    media:
+      logo:
+        bytes: 24096
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/writeseed.com/logo/9cfefea314bec9d3.avif
+        sha256: 9cfefea314bec9d337c18af8d2f715030a00fa1a05d464bc998e6e5eeb34a3cb
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writeseed/public
+        width: 800
+      images:
+        - bytes: 24096
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/writeseed.com/image/9cfefea314bec9d3.avif
+          sha256: 9cfefea314bec9d337c18af8d2f715030a00fa1a05d464bc998e6e5eeb34a3cb
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writeseed/public
+          width: 800
+  - action: listing-media-update
+    id: lst_291cbbada8e8a8021ffb85fe
+    slug: writesmart.so
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writesmart/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writesmart/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_70c946c2551e22e26774ae44
+    slug: writesonic.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writesonic/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writesonic/public
+        key: null
+    media:
+      logo:
+        bytes: 40911
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/writesonic.com/logo/f88f4eb7d325e7db.avif
+        sha256: f88f4eb7d325e7db750e8b913809799c17a1182ca4ce2077dd308fabbf194e97
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writesonic/public
+        width: 800
+      images:
+        - bytes: 40911
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/writesonic.com/image/f88f4eb7d325e7db.avif
+          sha256: f88f4eb7d325e7db750e8b913809799c17a1182ca4ce2077dd308fabbf194e97
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writesonic/public
+          width: 800
+  - action: listing-media-update
+    id: lst_d1ae82761b5249172ad98b3d
+    slug: writewithlaika.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writewithlaika/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writewithlaika/public
+        key: null
+    media:
+      logo:
+        bytes: 42255
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/writewithlaika.com/logo/1f8663cdc34cb6e3.avif
+        sha256: 1f8663cdc34cb6e348225ac77f442ee028d93a9d9f66566d1b777f74b3208877
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writewithlaika/public
+        width: 800
+      images:
+        - bytes: 42255
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/writewithlaika.com/image/1f8663cdc34cb6e3.avif
+          sha256: 1f8663cdc34cb6e348225ac77f442ee028d93a9d9f66566d1b777f74b3208877
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writewithlaika/public
+          width: 800
+  - action: listing-media-update
+    id: lst_2e83beb6be47bc41b68bfa6e
+    slug: writier.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writier/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writier/public
+        key: null
+    media:
+      logo:
+        bytes: 1686
+        contentType: image/avif
+        height: 192
+        key: best.serp.co/listings/writier.io/logo/62ca517019963baf.avif
+        sha256: 62ca517019963baf6d34ebd3fa8b8e674b0e63c1e6d4a6cafe21201f9d8e12eb
+        source: https://072ee363bdab7fec3a445daffb75ddd5.cdn.bubble.io/cdn-cgi/image/w=192,h=,f=auto,dpr=1,fit=contain/f1627151015042x481098806136905300/Icon-Square.png
+        width: 192
+      images:
+        - bytes: 4256
+          contentType: image/avif
+          height: 630
+          key: best.serp.co/listings/writier.io/image/7b9a10e135e57a71.avif
+          sha256: 7b9a10e135e57a7195ba54fca30d8fbd2a203cb3fba12ffe71e7e9c716ea9391
+          source: https://072ee363bdab7fec3a445daffb75ddd5.cdn.bubble.io/cdn-cgi/image/w=,h=,f=auto,dpr=1,fit=contain/f1627385013346x389003090324578500/Writier-Banner.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_e5f1c8bcc2917c532d67fbc1
+    slug: writio.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writio/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writio/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_492a69de4c847750665f243f
+    slug: wudpecker.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wudpecker/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wudpecker/public
+        key: null
+    media:
+      logo:
+        bytes: 5283
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/wudpecker.io/logo/d4e4d05198356e96.png
+        sha256: d4e4d05198356e964557faae8abfaa32aa41cdccae1de092b562ab38685fc932
+        source: https://cdn.prod.website-files.com/654b8ee7bbe984ebdbd03f23/65fb0d91090e548af152d893_New%20Project%20(9).png
+        width: 256
+      images:
+        - bytes: 18110
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/wudpecker.io/image/78b1c5d8ae1d63dd.png
+          sha256: 78b1c5d8ae1d63ddd845319b7141e947e16e0a2c5c2efbcbdedeb652c371b164
+          source: https://cdn.prod.website-files.com/654b8ee7bbe984ebdbd03f23/656707da2b4fb9b4d40ba76a_Frame%204.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_f9133ca607a83393ee392734
+    slug: wurkzen.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wurkzen/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wurkzen/public
+        key: null
+    media:
+      images:
+        - bytes: 40743
+          contentType: image/png
+          height: 604
+          key: best.serp.co/listings/wurkzen.com/image/b5912ab881333c5e.png
+          sha256: b5912ab881333c5e98941d32b2bd0e5f3537906efe184fd2b669262556a069e8
+          source: https://wurkzen.com/wp-content/uploads/2026/03/2026-03-12-21_16_48-.png
+          width: 1259
+  - action: listing-media-update
+    id: lst_2abbc573c1d68462a3b73290
+    slug: wysa.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wysa/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wysa/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_9b367eb8315b889740e8b6d1
+    slug: wzrd.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wzrd-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wzrd-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 27564
+        contentType: image/png
+        height: 512
+        key: best.serp.co/listings/wzrd.ai/logo/3d7fbdb258800177.png
+        sha256: 3d7fbdb258800177d356e8c0a66883274dd83902164d21c821752490a3a82d28
+        source: https://wzrd.ai/icons/icon-512x512.png?v=3d4c5f65cbdcbed757347ae304f57472
+        width: 512
+      images:
+        - bytes: 29223
+          contentType: image/jpeg
+          height: 640
+          key: best.serp.co/listings/wzrd.ai/image/30bcac78742bb01a.jpg
+          sha256: 30bcac78742bb01af737d28da5ce834f119e361cd632660daab7f366fcfaf722
+          source: https://wzrd.ai/images/share.jpg
+          width: 1280
+  - action: listing-media-update
+    id: lst_315ed60646089aacc4011cd3
+    slug: xata.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xata/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xata/public
+        key: null
+    media:
+      logo:
+        bytes: 4513
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/xata.io/logo/06eec0515cb3fc00.png
+        sha256: 06eec0515cb3fc0076e947111846863e88e0ffb419f8fe8c51dfec3c6a37d193
+        source: https://xata.io/apple-icon.png?apple-icon.02u68ngkt6llv.png
+        width: 192
+      images:
+        - bytes: 86156
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/xata.io/image/92ca205340e4cc6c.png
+          sha256: 92ca205340e4cc6cd022afe1f1bae8df9bc05637760f3407ab7e0ec4be938c8e
+          source: https://xata.io/api/og?title=Xata%20%E2%80%93%20the%20branch%20native%20Postgres%20platform
+          width: 1200
+  - action: listing-media-update
+    id: lst_7f5ca4983e690056a88ddcf5
+    slug: xebra.in
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xebra-biztech/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xebra-biztech/public
+        key: null
+    media:
+      images:
+        - bytes: 110435
+          contentType: image/png
+          height: 832
+          key: best.serp.co/listings/xebra.in/image/fd449bdff80e0509.png
+          sha256: fd449bdff80e0509d108dcbd3af9d4a4e90ac68ec86eceb17af294db1dea8869
+          source: https://xebra.in/asset/css/img/home_images/Cash-Flow-Closed-Chart.png
+          width: 1310
+  - action: listing-media-update
+    id: lst_706862981112df7b508f0d59
+    slug: xenonstack.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xenonstack/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xenonstack/public
+        key: null
+    media:
+      images:
+        - bytes: 482244
+          contentType: image/png
+          height: 1280
+          key: best.serp.co/listings/xenonstack.com/image/f4d58efe26d94ca3.png
+          sha256: f4d58efe26d94ca34cfaafa494582cc5c875a37ffb1e1964497693d8577a4206
+          source: https://www.xenonstack.com/hubfs/Xenonstack-Feature-Image-Reasoning-Foundry.png
+          width: 2884
+  - action: listing-media-update
+    id: lst_7d328cf0ebf70a610c891325
+    slug: xfantazy-downloader
+    expected:
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/xfantazy-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 7983
+        contentType: image/png
+        height: 70
+        key: best.serp.co/listings/xfantazy-downloader/logo/ab0512794753635a.png
+        sha256: ab0512794753635ae30e0ba90412ce87c561d7f83e69c6a876fc77e7f2608ba4
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/xfantazy-downloader.png
+        width: 205
+  - action: listing-media-update
+    id: lst_d834dd88386322d7271f2536
+    slug: xhamster-downloader
+    expected:
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/xhamster-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 1675
+        contentType: image/png
+        height: 48
+        key: best.serp.co/listings/xhamster-downloader/logo/a9c4ab4a43024a40.png
+        sha256: a9c4ab4a43024a40da4b19e15c0b253aa12f637cfcb4e5943d8e78456f224af4
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/xhamster-downloader.png
+        width: 48
+  - action: listing-media-update
+    id: lst_0dececdb46fb39ebd84d0036
+    slug: xhamsterlive-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/xhamsterlive-downloader.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/xhamsterlive-downloader/main/images/featured.gif
+        key: null
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/xhamsterlive-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 1861
+        contentType: image/png
+        height: 32
+        key: best.serp.co/listings/xhamsterlive-downloader/logo/75a33ca0ad316b82.png
+        sha256: 75a33ca0ad316b824f3d6d59c84af2dbda3017d00204515fa7f9524f50279e65
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/xhamsterlive-downloader.png
+        width: 32
+  - action: listing-media-update
+    id: lst_0e0020681056269062112e64
+    slug: ximilar.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/ximilar/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/ximilar/public
+        key: null
+    media:
+      logo:
+        bytes: 2638
+        contentType: image/webp
+        height: 192
+        key: best.serp.co/listings/ximilar.com/logo/a6aa5651979d4277.webp
+        sha256: a6aa5651979d4277e848c682d7be32e0152bdd06ef267b972edafe40af272473
+        source: https://www.ximilar.com/wp-content/uploads/2024/08/cropped-favicon-ximilar-192x192.png
+        width: 192
+      images:
+        - bytes: 259900
+          contentType: image/webp
+          height: 1724
+          key: best.serp.co/listings/ximilar.com/image/859706222dea0f12.webp
+          sha256: 859706222dea0f12599587a049129075dded512a1ecba35b08260a3614ef534d
+          source: https://www.ximilar.com/wp-content/uploads/2024/10/header-image-1-new.webp
+          width: 2000
+  - action: listing-media-update
+    id: lst_98a44a1fc824a9ad9e480e3f
+    slug: xinva.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xinva/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xinva/public
+        key: null
+    media:
+      logo:
+        bytes: 10737
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/xinva.ai/logo/641941bcb0aadb54.png
+        sha256: 641941bcb0aadb5448f81a578a6e3ff45b34c72491bb3da637f47106d3eda225
+        source: https://xinva.ai/wp-content/uploads/2023/04/cropped-Favicon-For-Xinva-192x192.png
+        width: 192
+      images:
+        - bytes: 57250
+          contentType: image/jpeg
+          height: 600
+          key: best.serp.co/listings/xinva.ai/image/2beec88c41c2d63d.jpg
+          sha256: 2beec88c41c2d63d4319700b8813f7db5ddc68e45ec24ff3690bf5c36477f100
+          source: https://xinva.ai/wp-content/uploads/2023/04/Social-preview-image-1.jpg
+          width: 1000
+  - action: listing-media-update
+    id: lst_f86cbf40eae0a3de1f7a804f
+    slug: xlovecam-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/xlovecam-video-downloader.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/xlovecam-video-downloader/main/images/featured.gif
+        key: null
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/xlovecam-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 3416
+        contentType: image/png
+        height: 114
+        key: best.serp.co/listings/xlovecam-downloader/logo/8871547ff89fdb2a.png
+        sha256: 8871547ff89fdb2aedbcf305b0b80479490930ccbea5acef531a24b2857f00c9
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/xlovecam-downloader.png
+        width: 114
+  - action: listing-media-update
+    id: lst_ce347d01617088970080dbf4
+    slug: xnxx-downloader
+    expected:
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/xnxx-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 5358
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/xnxx-downloader/logo/2f4e005219826910.png
+        sha256: 2f4e005219826910510100c2dabd865dc7d17c2919b2bfee0244cdd50e6c0912
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/xnxx-downloader.png
+        width: 180
+  - action: listing-media-update
+    id: lst_118e9056c1dc6cef07bd6741
+    slug: xnxx-video-downloader
+    expected:
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/xnxx-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 5358
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/xnxx-video-downloader/logo/2f4e005219826910.png
+        sha256: 2f4e005219826910510100c2dabd865dc7d17c2919b2bfee0244cdd50e6c0912
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/xnxx-downloader.png
+        width: 180
+  - action: listing-media-update
+    id: lst_97dbeb9f9caa8a0e1e602172
+    slug: xpressioncamera.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xpression-camera/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xpression-camera/public
+        key: null
+    media:
+      logo:
+        bytes: 34519
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/xpressioncamera.com/logo/dbb528b6d84a6e8f.avif
+        sha256: dbb528b6d84a6e8f40b5d25777f9119344b517951f8df5043370d7614c1f2c94
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xpression-camera/public
+        width: 800
+      images:
+        - bytes: 34519
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/xpressioncamera.com/image/dbb528b6d84a6e8f.avif
+          sha256: dbb528b6d84a6e8f40b5d25777f9119344b517951f8df5043370d7614c1f2c94
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xpression-camera/public
+          width: 800
+  - action: listing-media-update
+    id: lst_9c561f47fa97d1e6ec8d83e2
+    slug: xprt.is
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xprt/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xprt/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_e20bed0f9f95ab363505ac89
+    slug: xvideos-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/xvideos-video-downloader/main/images/xvideos-video-downloader.gif
+        key: null
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/xvideos-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 14707
+        contentType: image/png
+        height: 400
+        key: best.serp.co/listings/xvideos-downloader/logo/9c5ae907219be114.png
+        sha256: 9c5ae907219be114af9ee68cac1352117889d60c5a03e0f3bbebf92e46b9922a
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/xvideos-downloader.png
+        width: 400
+      images:
+        - bytes: 1171607
+          contentType: image/gif
+          height: 1080
+          key: best.serp.co/listings/xvideos-downloader/image/92b56700014eba65.gif
+          sha256: 92b56700014eba6520c6ff62adba67de1c615e64c6de6ca3c2721838862d19e0
+          source: https://raw.githubusercontent.com/serpapps/xvideos-video-downloader/main/images/xvideos-video-downloader.gif
+          width: 1920
+  - action: listing-media-update
+    id: lst_2cb1966a273d98c0cd421ada
+    slug: yaara.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yaara/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yaara/public
+        key: null
+    media:
+      logo:
+        bytes: 30116
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/yaara.ai/logo/7cab18481519610a.avif
+        sha256: 7cab18481519610ad106de3618dc627e2cfcc7854ceb153b9372736d8df32b15
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yaara/public
+        width: 800
+      images:
+        - bytes: 30116
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/yaara.ai/image/7cab18481519610a.avif
+          sha256: 7cab18481519610ad106de3618dc627e2cfcc7854ceb153b9372736d8df32b15
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yaara/public
+          width: 800
+  - action: listing-media-update
+    id: lst_bf575d032abd5da5db64737c
+    slug: yack.fyi
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yack/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yack/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_7ab3ac3b9f6ac281166a386e
+    slug: ycombinator.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/usebracket/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/usebracket/public
+        key: null
+    media:
+      logo:
+        bytes: 40714
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/ycombinator.com/logo/3922e513912fd7ae.avif
+        sha256: 3922e513912fd7aef261f1276c3be4cab14a9173841546914b740907b437296d
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/usebracket/public
+        width: 800
+      images:
+        - bytes: 40714
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/ycombinator.com/image/3922e513912fd7ae.avif
+          sha256: 3922e513912fd7aef261f1276c3be4cab14a9173841546914b740907b437296d
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/usebracket/public
+          width: 800
+  - action: listing-media-update
+    id: lst_b77f74a2eb145541be9b4817
+    slug: yellow.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yellow-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yellow-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 4168
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/yellow.ai/logo/f3a6ef6721da2b8f.png
+        sha256: f3a6ef6721da2b8f08b2e93189144faf9c8d5ba3cbaee9ceffb5e60469aba3cf
+        source: https://yellow.ai/wp-content/themes/yellow.ai/favicon/android-icon-192x192.png?v=4
+        width: 192
+      images:
+        - bytes: 442354
+          contentType: image/png
+          height: 628
+          key: best.serp.co/listings/yellow.ai/image/683deba468647402.png
+          sha256: 683deba4686474023d6c6c4f09d215ed77049497d8f20d2d2c0fca3220f06c1c
+          source: https://yellow.ai/wp-content/uploads/2025/09/1200x628-Preview-Image-2025-V2.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_2d3a569e69a874d8b5dd6c33
+    slug: yepic.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yepic-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yepic-ai/public
+        key: null
+    media:
+      logo:
+        bytes: 4716
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/yepic.ai/logo/9e309374546c5e6d.png
+        sha256: 9e309374546c5e6d3048e8fb25fe0d8dde318a9b8c3c397c2d88056f39a94b2f
+        source: https://cdn.prod.website-files.com/612117669239223c914f3574/673380be9ed7bec5c2f5bb46_webclip.png
+        width: 256
+  - action: listing-media-update
+    id: lst_eecc7937b38e911c4bfe5e88
+    slug: yesilhealth.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yesil-health/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yesil-health/public
+        key: null
+    media:
+      logo:
+        bytes: 430608
+        contentType: image/png
+        height: 1254
+        key: best.serp.co/listings/yesilhealth.com/logo/3c5cc1b8ba5300e2.png
+        sha256: 3c5cc1b8ba5300e267eb1fc36ca684b202d84b07f0019cd4647c3ed8a566e359
+        source: https://yesilhealth.com/icon.png?icon.0yzzwrzqg9shr.png
+        width: 1254
+      images:
+        - bytes: 167967
+          contentType: image/png
+          height: 627
+          key: best.serp.co/listings/yesilhealth.com/image/cdefbee05b029689.png
+          sha256: cdefbee05b029689fe44a2559669580650c3450b7b193fe495f08b2c2c61cd54
+          source: https://yesilhealth.com/og/yesil-agent.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_8d7334296d4dd71bf17a222d
+    slug: yespornplease-downloader
+    expected:
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/yespornplease-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 13604
+        contentType: image/png
+        height: 281
+        key: best.serp.co/listings/yespornplease-downloader/logo/9621f5add9f8909c.png
+        sha256: 9621f5add9f8909c2ece9412c243961c874660b3887fb7101ea321f476a18f71
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/yespornplease-downloader.png
+        width: 500
+  - action: listing-media-update
+    id: lst_4f3b344b4a0c351b774ffdc6
+    slug: yext.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yext-chat/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yext-chat/public
+        key: null
+    media:
+      logo:
+        bytes: 12740
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/yext.com/logo/d6ace6d7c4550c28.png
+        sha256: d6ace6d7c4550c28603e65a8ec4469752f364bb31752f5bb5f611de5cf6c6edb
+        source: https://www.yext.com/wp-content/themes/yext/img/icons/favicon-seal.png
+        width: 192
+      images:
+        - bytes: 4900
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/yext.com/image/ebe2fb04e490a529.png
+          sha256: ebe2fb04e490a529ca14095e1c15a6cbd1f5a3962ef0344adb510263c168240d
+          source: https://a.storyblok.com/f/291040917547085/1200x630/a9ff3cc8bf/yext-website-og-image_1200x630.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_465658a2f4ec18411d5a8ca9
+    slug: yo-kart.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 8069
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/yo-kart.com/logo/ce592831a8a9a6dc.png
+        sha256: ce592831a8a9a6dc98f184f744d4740125403792365e55d000a7d0624761b8c2
+        source: https://www.yo-kart.com/images/apple-touch-icon-192.png
+        width: 192
+  - action: listing-media-update
+    id: lst_bd4610b61e9280e3788a61ca
+    slug: yobulk.dev
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_0ecec553c1cf538fef957e71
+    slug: yodlee.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/abe-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/abe-ai/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_ebb0f78d4057325bee01a84b
+    slug: yotpo.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 8942
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/yotpo.com/logo/c7f2dc540e72ec71.png
+        sha256: c7f2dc540e72ec71c9d71fec2dda402f9f534ac627ea6cf827fcaddbd2dbe778
+        source: https://www.yotpo.com/apple-touch-icon.png
+        width: 180
+  - action: listing-media-update
+    id: lst_1f75790010eb55831efd914b
+    slug: you-tldr.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/you-tldr/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/you-tldr/public
+        key: null
+    media:
+      images:
+        - bytes: 71406
+          contentType: image/png
+          height: 900
+          key: best.serp.co/listings/you-tldr.com/image/ad8b5cd2a7da6bec.png
+          sha256: ad8b5cd2a7da6bec5e2c2a228fa7c3dc4d041f5294cd3058ef55cda722ef5819
+          source: https://you-tldr.com/og.png
+          width: 1600
+  - action: listing-media-update
+    id: lst_f0f93b3746a8a0d24a036d12
+    slug: yougotcooking.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yougotcooking/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yougotcooking/public
+        key: null
+    media:
+      logo:
+        bytes: 32746
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/yougotcooking.com/logo/3afc159cc2f0c052.png
+        sha256: 3afc159cc2f0c0521ed7d3051c0c526e35b0da9e99474e362be48624ac64fe9c
+        source: https://yougotcooking.com/assets/img/apple-touch-icon.png
+        width: 180
+  - action: listing-media-update
+    id: lst_5ea52472653fad60937be007
+    slug: youjizz-downloader
+    expected:
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/youjizz-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 9232
+        contentType: image/png
+        height: 77
+        key: best.serp.co/listings/youjizz-downloader/logo/0a3375466906f642.png
+        sha256: 0a3375466906f642f2b324933f23841f015ee4cf7353edd9982e3e201106654a
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/youjizz-downloader.png
+        width: 213
+  - action: listing-media-update
+    id: lst_a4b6ffa8ebd33ff7a646db8d
+    slug: youlearn.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youlearn/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youlearn/public
+        key: null
+    media:
+      logo:
+        bytes: 4666
+        contentType: image/avif
+        height: 500
+        key: best.serp.co/listings/youlearn.ai/logo/75d6eb0d2a5ac57a.avif
+        sha256: 75d6eb0d2a5ac57a89983c8900f3bee1c3376ef5e01b645443b1c86d963211a3
+        source: https://framerusercontent.com/images/vjinvljxixvQwNmXPx4ytroFgCY.png
+        width: 500
+      images:
+        - bytes: 696990
+          contentType: image/png
+          height: 1328
+          key: best.serp.co/listings/youlearn.ai/image/e0f19b9e158ea352.png
+          sha256: e0f19b9e158ea3527381e4393dc892d7a1c836681a45415d3299432f070dc5ab
+          source: https://framerusercontent.com/assets/XivrxXuIUuSjflrSGDEo0UF5eg.png
+          width: 2217
+  - action: listing-media-update
+    id: lst_5791b63e205869357a498e51
+    slug: youporn-downloader
+    expected:
+      - kind: image
+        url: /media/products/youporn-video-downloader/youporn-downloader-screenshot1.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/youporn-downloader-screenshot2.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/youporn-downloader-screenshot3.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/youporn-downloader-screenshot4.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/youporn-downloader-screenshot5.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/featured.webp
+        key: null
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/youporn-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 1573
+        contentType: image/png
+        height: 152
+        key: best.serp.co/listings/youporn-downloader/logo/030bda060324f270.png
+        sha256: 030bda060324f270abd6812b98f59622b491a48184d49c49ff9f0931fa6c7d61
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/youporn-downloader.png
+        width: 152
+      images:
+        - bytes: 56468
+          contentType: image/webp
+          height: 776
+          key: best.serp.co/listings/youporn-downloader/image/22c4f10f1413a051.webp
+          sha256: 22c4f10f1413a05176155593d3de5ffc589446ff77eed5462cb32aee485aa61d
+          source: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot1.webp
+          width: 1200
+        - bytes: 60410
+          contentType: image/webp
+          height: 776
+          key: best.serp.co/listings/youporn-downloader/image/19441c02f118601f.webp
+          sha256: 19441c02f118601f64d5bf1901670b61013f0b52a8ba99e27985bb8376a1df87
+          source: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot2.webp
+          width: 1200
+        - bytes: 62384
+          contentType: image/webp
+          height: 776
+          key: best.serp.co/listings/youporn-downloader/image/38c9331143d33dea.webp
+          sha256: 38c9331143d33dea1f7ce12a49a11fba964c116505e7303cb199314ef2198b60
+          source: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot3.webp
+          width: 1200
+        - bytes: 74562
+          contentType: image/webp
+          height: 776
+          key: best.serp.co/listings/youporn-downloader/image/a8aa777c1e6e36b1.webp
+          sha256: a8aa777c1e6e36b1f9fa74e5bfb24122222ef8799745ec0dfbe777eb2f34ff59
+          source: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot4.webp
+          width: 1200
+        - bytes: 49766
+          contentType: image/webp
+          height: 776
+          key: best.serp.co/listings/youporn-downloader/image/14890eb305da89d9.webp
+          sha256: 14890eb305da89d95ba9fdaa1f396ae09bf8e0644780aa15b3630e0735316b6c
+          source: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot5.webp
+          width: 1200
+  - action: listing-media-update
+    id: lst_ea46e4e3f95904cf0fddfe1c
+    slug: youporn-video-downloader
+    expected:
+      - kind: image
+        url: https://apps.serp.co/media/products/youporn-video-downloader/featured.webp
+        key: null
+      - kind: image
+        url: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot1.webp
+        key: null
+      - kind: image
+        url: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot2.webp
+        key: null
+      - kind: image
+        url: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot3.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/youporn-downloader-screenshot1.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/youporn-downloader-screenshot2.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/youporn-downloader-screenshot3.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/youporn-downloader-screenshot4.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/youporn-downloader-screenshot5.webp
+        key: null
+      - kind: image
+        url: /media/products/youporn-video-downloader/featured.webp
+        key: null
+    media:
+      images:
+        - bytes: 56468
+          contentType: image/webp
+          height: 776
+          key: best.serp.co/listings/youporn-video-downloader/image/22c4f10f1413a051.webp
+          sha256: 22c4f10f1413a05176155593d3de5ffc589446ff77eed5462cb32aee485aa61d
+          source: https://apps.serp.co/media/products/youporn-video-downloader/featured.webp
+          width: 1200
+        - bytes: 60410
+          contentType: image/webp
+          height: 776
+          key: best.serp.co/listings/youporn-video-downloader/image/19441c02f118601f.webp
+          sha256: 19441c02f118601f64d5bf1901670b61013f0b52a8ba99e27985bb8376a1df87
+          source: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot2.webp
+          width: 1200
+        - bytes: 62384
+          contentType: image/webp
+          height: 776
+          key: best.serp.co/listings/youporn-video-downloader/image/38c9331143d33dea.webp
+          sha256: 38c9331143d33dea1f7ce12a49a11fba964c116505e7303cb199314ef2198b60
+          source: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot3.webp
+          width: 1200
+        - bytes: 74562
+          contentType: image/webp
+          height: 776
+          key: best.serp.co/listings/youporn-video-downloader/image/a8aa777c1e6e36b1.webp
+          sha256: a8aa777c1e6e36b1f9fa74e5bfb24122222ef8799745ec0dfbe777eb2f34ff59
+          source: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot4.webp
+          width: 1200
+        - bytes: 49766
+          contentType: image/webp
+          height: 776
+          key: best.serp.co/listings/youporn-video-downloader/image/14890eb305da89d9.webp
+          sha256: 14890eb305da89d95ba9fdaa1f396ae09bf8e0644780aa15b3630e0735316b6c
+          source: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot5.webp
+          width: 1200
+  - action: listing-media-update
+    id: lst_48a3ffbda57702daad265829
+    slug: yourcoverletter.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/your-cover-letter/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/your-cover-letter/public
+        key: null
+    media:
+      logo:
+        bytes: 3778
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/yourcoverletter.com/logo/5a92200bfdf571ec.png
+        sha256: 5a92200bfdf571ec41d76237d6ea5937e6a485882b21c153fdeb16719e133ee7
+        source: https://c4681b.claudeassets.com/20250427002016im_/https://i0.wp.com/yourcoverletter.com/wp-content/uploads/2022/10/cropped-Your-Cover-Letter-512-1.png?fit=192%2C192&ssl=1
+        width: 192
+      images:
+        - bytes: 67075
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/yourcoverletter.com/image/21aa0f0dc4b50817.jpg
+          sha256: 21aa0f0dc4b50817ef72763b4ea3b898da45112358e83e1fcbeb5280f3e6a568
+          source: https://yourcoverletter.com/assets/yourcoverletter.com/wp-content/uploads/2022/09/Add-a-heading.jpg
+          width: 1920
+  - action: listing-media-update
+    id: lst_b9c95a04491e8884940d361d
+    slug: yourgpt.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yourgpt/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yourgpt/public
+        key: null
+    media:
+      logo:
+        bytes: 10148
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/yourgpt.ai/logo/4c3f28d01483852a.png
+        sha256: 4c3f28d01483852af9dd667fd50bf2bbb577f0476c6d7d19b72dee4495ecfe4c
+        source: https://yourgpt.ai/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 43706
+          contentType: image/webp
+          height: 630
+          key: best.serp.co/listings/yourgpt.ai/image/4db3d9ae55fd703e.webp
+          sha256: 4db3d9ae55fd703ee49c8cb81291d2771a9fcb3dd25dc28562e30aa42f22dbc2
+          source: https://yourgpt.ai/images/yourgpt-snap-banner.webp
+          width: 1200
+  - action: listing-media-update
+    id: lst_aca109933b087053fb54059a
+    slug: yourownstorybook.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/your-own-story-book/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/your-own-story-book/public
+        key: null
+    media:
+      logo:
+        bytes: 15824
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/yourownstorybook.com/logo/ce6d0e2bff1e2e4e.png
+        sha256: ce6d0e2bff1e2e4eedf767e72041306ebf0265bdec34419e183e53729bbc5f3b
+        source: https://www.yourownstorybook.com/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 5194455
+          contentType: image/png
+          height: 2048
+          key: best.serp.co/listings/yourownstorybook.com/image/5adc2d630d1d3329.png
+          sha256: 5adc2d630d1d3329ecfdeb4c12ac41dde6956eec9a283e0958f7b208a1b000cd
+          source: https://www.yourownstorybook.com/landing/piperMountain.png
+          width: 2048
+  - action: listing-media-update
+    id: lst_96bcf8728b85ea63ab330be1
+    slug: yoursearch.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yoursearch/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yoursearch/public
+        key: null
+    media:
+      logo:
+        bytes: 14528
+        contentType: image/png
+        height: 72
+        key: best.serp.co/listings/yoursearch.ai/logo/916ef4e77d929457.png
+        sha256: 916ef4e77d929457df58fd18a0e216f8c3a26a20846022a5ed9d47ec96f439be
+        source: https://yoursearch.ai/favicon.ico
+        width: 72
+  - action: listing-media-update
+    id: lst_26e4f1e4a0c00db3f6a3b5d6
+    slug: yoursidekick.xyz
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/sidekick-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/sidekick-ai/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_f385a4fc8137a43e6c773b67
+    slug: yous.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yous/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yous/public
+        key: null
+    media:
+      logo:
+        bytes: 38135
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/yous.ai/logo/98a12c62cc8d17ac.avif
+        sha256: 98a12c62cc8d17ac4e9d40ed830ffd529a0a68e71e89ebb812b7d464164846f7
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yous/public
+        width: 800
+      images:
+        - bytes: 38135
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/yous.ai/image/98a12c62cc8d17ac.avif
+          sha256: 98a12c62cc8d17ac4e9d40ed830ffd529a0a68e71e89ebb812b7d464164846f7
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yous/public
+          width: 800
+  - action: listing-media-update
+    id: lst_b8840864975df45d3cda30fd
+    slug: youscan.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youscan/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youscan/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_5c78bbdb78f3fa13970399c1
+    slug: youtube-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-1.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-2.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-3.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-4.jpg
+        key: null
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-5.jpg
+        key: null
+      - kind: logo
+        url: /listing-logos/serpdownloaders.com/youtube-downloader.png
+        key: null
+    media:
+      logo:
+        bytes: 448
+        contentType: image/png
+        height: 16
+        key: best.serp.co/listings/youtube-downloader/logo/4c16df6df6960efb.png
+        sha256: 4c16df6df6960efb422b781974d9f6f998263de288f96b21f79b9b5e58313387
+        source: repo:apps/web/public/listing-logos/serpdownloaders.com/youtube-downloader.png
+        width: 16
+      images:
+        - bytes: 304412
+          contentType: image/jpeg
+          height: 2714
+          key: best.serp.co/listings/youtube-downloader/image/ad31e6a5fee5c5ce.jpg
+          sha256: ad31e6a5fee5c5ce22e095d3003a0f4f9500b3c59181d24a9ec5b8977b5b1cb1
+          source: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-1.jpg
+          width: 4128
+        - bytes: 421510
+          contentType: image/jpeg
+          height: 2714
+          key: best.serp.co/listings/youtube-downloader/image/4d57943a6e75a05e.jpg
+          sha256: 4d57943a6e75a05e39b2b438697ac89a33e991baef0c50122dffa47578188378
+          source: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-2.jpg
+          width: 4128
+        - bytes: 443344
+          contentType: image/jpeg
+          height: 2714
+          key: best.serp.co/listings/youtube-downloader/image/aaa01b82cd552d5c.jpg
+          sha256: aaa01b82cd552d5c19697c088351e1f0fc0448cefb5e381284911255ff94292a
+          source: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-3.jpg
+          width: 4128
+        - bytes: 436522
+          contentType: image/jpeg
+          height: 2714
+          key: best.serp.co/listings/youtube-downloader/image/7cd87893aebc3cb4.jpg
+          sha256: 7cd87893aebc3cb43325ca8a92c82aba4cc7edd4986d8cc927af15385da616d0
+          source: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-4.jpg
+          width: 4128
+        - bytes: 378178
+          contentType: image/jpeg
+          height: 2714
+          key: best.serp.co/listings/youtube-downloader/image/66cda7d38936ed6c.jpg
+          sha256: 66cda7d38936ed6cd0cc0705704a7926b3820076f9397fd26852be57c68a7dd2
+          source: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-5.jpg
+          width: 4128
+  - action: listing-media-update
+    id: lst_e435db5c9404e33cea8a07de
+    slug: youtubesummarized.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youtube-summarized/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youtube-summarized/public
+        key: null
+    media:
+      logo:
+        bytes: 24250
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/youtubesummarized.com/logo/2146392ce2ebea07.avif
+        sha256: 2146392ce2ebea073ea03e4a26eafa041dd5662ec81feeb63e8b365c3f127310
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youtube-summarized/public
+        width: 800
+      images:
+        - bytes: 24250
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/youtubesummarized.com/image/2146392ce2ebea07.avif
+          sha256: 2146392ce2ebea073ea03e4a26eafa041dd5662ec81feeb63e8b365c3f127310
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youtube-summarized/public
+          width: 800
+  - action: listing-media-update
+    id: lst_c903cf443c7a1a93a551a601
+    slug: yoya.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yoya/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yoya/public
+        key: null
+    media:
+      logo:
+        bytes: 7285
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/yoya.ai/logo/312e9b50cf6761cc.png
+        sha256: 312e9b50cf6761cc6dadb612d551d00f113c4b00a5ce8f368bc350e8e0d70cc0
+        source: https://yoya.ai/logo-180.png
+        width: 180
+      images:
+        - bytes: 364080
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/yoya.ai/image/dd8a3a2a51809966.png
+          sha256: dd8a3a2a5180996625a5796d86101432adbc2022554dac68938ad033cf823b61
+          source: https://yoya.ai/og.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_ec5358e9351cb9e6218c99a1
+    slug: ytcopycat.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yt-copycat/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yt-copycat/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_a93cc48ba00f495b001f2fee
+    slug: yuma.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yuma/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yuma/public
+        key: null
+    media:
+      logo:
+        bytes: 3701
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/yuma.ai/logo/a643bef6e99ba5c0.png
+        sha256: a643bef6e99ba5c0a5479b9f14395b2ee1b9751373f38a41ce505c07c5ffac79
+        source: https://yuma.ai/apple-icon.png?apple-icon.0ah.dap4e.-6g.png?dpl=dpl_6DpFZyCgtpjhoeCNcGTGYSSSUhmz
+        width: 256
+      images:
+        - bytes: 42831
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/yuma.ai/image/b25089629da13a95.png
+          sha256: b25089629da13a9544262a01231051542d73729691d9bad270d34bdf15214ef0
+          source: https://yuma.ai/home/og.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_f034a3a472139f1743d759d1
+    slug: zap-hire.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zaphire/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zaphire/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_0565f93eca3315cb1d8d4c04
+    slug: zapier.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zapier/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zapier/public
+        key: null
+    media:
+      logo:
+        bytes: 57638
+        contentType: image/x-icon
+        height: 192
+        key: best.serp.co/listings/zapier.com/logo/733fdd5c9e5b3020.ico
+        sha256: 733fdd5c9e5b3020cbae07b0f9f6b0e21653b4975b400f8fe230c2a4e10f931a
+        source: https://zapier.com/favicon.ico
+        width: 192
+      images:
+        - bytes: 8175
+          contentType: image/avif
+          height: 630
+          key: best.serp.co/listings/zapier.com/image/a9198283b3a60e4e.avif
+          sha256: a9198283b3a60e4e19254e0b5fb283b6a5f3c79e623527e677e4b76916199af9
+          source: https://res.cloudinary.com/zapier-media/image/upload/q_auto/f_auto/v1776210705/Governance/og-image-homepage_mskeaq.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_ec10fdd6092272db3d0bbd54
+    slug: zaplingo.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zaplingo/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zaplingo/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_c2dd242b3dd6aad4d568fbff
+    slug: zappr.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zappr/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zappr/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_e1313cf323208cde5dd0652a
+    slug: zazow.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zazow/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zazow/public
+        key: null
+    media:
+      logo:
+        bytes: 27933
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/zazow.com/logo/ba230c0834c73845.png
+        sha256: ba230c0834c73845cf7f995dc42e638493ebddeefcb5ed4ce8c20e36ae0e3a1d
+        source: https://www.zazow.com/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 336500
+          contentType: image/jpeg
+          height: 630
+          key: best.serp.co/listings/zazow.com/image/1826ee2d01babb66.jpg
+          sha256: 1826ee2d01babb66b0419e884fc20c46c5c72d897c0994ef829cfb54ef7407f8
+          source: https://www.zazow.com/img/social.jpg
+          width: 1200
+  - action: listing-media-update
+    id: lst_eb2f253d09d6b4298a44aad8
+    slug: zbrain.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zbrain/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zbrain/public
+        key: null
+    media:
+      logo:
+        bytes: 1429
+        contentType: image/png
+        height: 96
+        key: best.serp.co/listings/zbrain.ai/logo/bc04d1d3db0a35c3.png
+        sha256: bc04d1d3db0a35c37f7da8f5127868232c0286719b8766125ed8d3cc18150bab
+        source: https://cdn.zbrain.ai/wp-content/uploads/2025/05/28052132/favicon-96x96-1.png
+        width: 96
+      images:
+        - bytes: 63867
+          contentType: image/png
+          height: 284
+          key: best.serp.co/listings/zbrain.ai/image/5e91c97fc2acb6ce.png
+          sha256: 5e91c97fc2acb6cebe8cbd952c49d58a164e74adbb13c7995eeaf82969cae242
+          source: https://cdn.zbrain.ai/wp-content/uploads/2026/07/17080848/Banner-ZBrain-1-400x284-1.png
+          width: 400
+  - action: listing-media-update
+    id: lst_ecf00a4d870d8936abaa6894
+    slug: zeda.io
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeda/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeda/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_83115e11a2bed1031871cf61
+    slug: zeemo.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeemo/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeemo/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_e03306b36233640f6adeb0a0
+    slug: zeg.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeg-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeg-ai/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_65a5016a0d5290fe1058ac25
+    slug: zekai.co
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zekai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zekai/public
+        key: null
+    media:
+      images:
+        - bytes: 53790
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/zekai.co/image/0ded1dd2a7347bd5.png
+          sha256: 0ded1dd2a7347bd513a0c6b04a1a256d87e99ba0b6ebf71572ccd1bbf559366d
+          source: https://zekai.co/opengraph-image?92f2da8f4c7a2a40
+          width: 1200
+  - action: listing-media-update
+    id: lst_fe5557832c98281811e62c12
+    slug: zencall.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zencall/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zencall/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_3430b862ec915b0c2756ae7d
+    slug: zenen.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zenen-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zenen-ai/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_ce1b4968aa0304fd4916a0e3
+    slug: zenmate.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zenmate-vpn/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zenmate-vpn/public
+        key: null
+    media:
+      logo:
+        bytes: 40436
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/zenmate.com/logo/4d31d802e522fde1.avif
+        sha256: 4d31d802e522fde1c03ecb9e694841cfc333c36b6dd27c14f70ae59e364cc443
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zenmate-vpn/public
+        width: 800
+      images:
+        - bytes: 40436
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/zenmate.com/image/4d31d802e522fde1.avif
+          sha256: 4d31d802e522fde1c03ecb9e694841cfc333c36b6dd27c14f70ae59e364cc443
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zenmate-vpn/public
+          width: 800
+  - action: listing-media-update
+    id: lst_71f65bbfb05f7543472ac147
+    slug: zenrows.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_ff14ba1e657dbda08cc34ca9
+    slug: zerogpt.cc
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerogpt-cc/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerogpt-cc/public
+        key: null
+    media:
+      logo:
+        bytes: 102558
+        contentType: image/x-icon
+        height: 128
+        key: best.serp.co/listings/zerogpt.cc/logo/09f9573fc39b528b.ico
+        sha256: 09f9573fc39b528bcb41b5c64fffcf8ede6b4dd22ad59eb44f9f625c5e38871e
+        source: https://zerogpt.cc/favicon.ico
+        width: 128
+      images:
+        - bytes: 5390
+          contentType: image/png
+          height: 200
+          key: best.serp.co/listings/zerogpt.cc/image/09f419ee4f85b9aa.png
+          sha256: 09f419ee4f85b9aa47397f86e95e4a42409bdeaa4a3004437cb6d5151cad5144
+          source: https://zerogpt.cc/static/images/zerogptico.png
+          width: 200
+  - action: listing-media-update
+    id: lst_3ecb99567f8b456ccf970ccd
+    slug: zerogpt.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 11861
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/zerogpt.com/logo/33be3d6f020c5e32.png
+        sha256: 33be3d6f020c5e32e1fafc97f84af37a020bf4491b62234b4b8eb4aef1666351
+        source: https://www.zerogpt.com/favicon180.png
+        width: 180
+  - action: listing-media-update
+    id: lst_f9f73e086b1bd76e2ced88a1
+    slug: zerogptdetector.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerogpt-detector/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerogpt-detector/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_3e897e170ec6ffb6f430c78a
+    slug: zerotax.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerotax-al/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerotax-al/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_79f7acea3dc465d7d1bc0bf8
+    slug: zevbot.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zev/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zev/public
+        key: null
+    media:
+      logo:
+        bytes: 46745
+        contentType: image/png
+        height: 194
+        key: best.serp.co/listings/zevbot.com/logo/66b6150fe92cbe1c.png
+        sha256: 66b6150fe92cbe1ced04d72a97176068fc0d2a598437a75588a4d5aaf72c8714
+        source: https://zevbot.com/icon.png
+        width: 194
+      images:
+        - bytes: 116208
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/zevbot.com/image/ac9f9c9ac1eea79c.png
+          sha256: ac9f9c9ac1eea79c2a8fff495c9fa6c27c109d4c2671ace04dc39b2f4322931b
+          source: https://zevbot.com/card.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_851e3fa18c1e78bcd8040106
+    slug: zevi.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zevi-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zevi-ai/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_e47b130dc842c30d3d058130
+    slug: zigpoll.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zigpoll/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zigpoll/public
+        key: null
+    media:
+      logo:
+        bytes: 1562
+        contentType: image/webp
+        height: 192
+        key: best.serp.co/listings/zigpoll.com/logo/8568d8019f0d09fb.webp
+        sha256: 8568d8019f0d09fbaed10723e41d697535b3c7148fce7f66038cdab5a869536c
+        source: https://www.zigpoll.com/android-icon-192x192.png
+        width: 192
+      images:
+        - bytes: 11616
+          contentType: image/webp
+          height: 900
+          key: best.serp.co/listings/zigpoll.com/image/e53a73a6851bf8f7.webp
+          sha256: e53a73a6851bf8f7ff9a2a3e92b400a26d0b7ac9e183712a9edc5657c3c03fa3
+          source: https://www.zigpoll.com/img/zigpoll-fb-share.jpg
+          width: 1600
+  - action: listing-media-update
+    id: lst_08144b6d0b2d0298033781e1
+    slug: zipchat.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zipchat/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zipchat/public
+        key: null
+    media:
+      logo:
+        bytes: 514311
+        contentType: image/png
+        height: 1920
+        key: best.serp.co/listings/zipchat.ai/logo/0881c67214ea9723.png
+        sha256: 0881c67214ea97235e5b3f4ae65905861302907d9090d523f5d601bae37aafee
+        source: https://res.cloudinary.com/website-astro/image/upload/v1781263591/logo-square_2x_gthdtz.png
+        width: 1920
+      images:
+        - bytes: 108242
+          contentType: image/png
+          height: 1260
+          key: best.serp.co/listings/zipchat.ai/image/ff0cdb2e2a6df93c.png
+          sha256: ff0cdb2e2a6df93cbda7e066cf6fefa96885256d867b546155dfca9342b1e6fa
+          source: https://www.zipchat.ai/images/og/en/index.png
+          width: 2400
+  - action: listing-media-update
+    id: lst_b2b28043b71c907f5ad5c666
+    slug: zipwp.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zipwp/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zipwp/public
+        key: null
+    media:
+      logo:
+        bytes: 34434
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/zipwp.com/logo/c5e1002d9a8f0dfb.avif
+        sha256: c5e1002d9a8f0dfbb8904d68555145dbab654b48c68b24e99ccd7cb353d04065
+        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zipwp/public
+        width: 800
+      images:
+        - bytes: 34434
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/zipwp.com/image/c5e1002d9a8f0dfb.avif
+          sha256: c5e1002d9a8f0dfbb8904d68555145dbab654b48c68b24e99ccd7cb353d04065
+          source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zipwp/public
+          width: 800
+  - action: listing-media-update
+    id: lst_41eed49abdfa8a4ead78f0ae
+    slug: ziteai.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zite/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zite/public
+        key: null
+    media:
+      logo:
+        bytes: 2964
+        contentType: image/webp
+        height: 100
+        key: best.serp.co/listings/ziteai.com/logo/4808a3a00e3a0b89.webp
+        sha256: 4808a3a00e3a0b89d3563d769fb0c9e2bbf559910d2c7681b88c57c82cf2bae8
+        source: https://images.squarespace-cdn.com/content/v1/63adcd523579b57a9be5ffb0/48fd0042-6c2d-455e-ac5c-d04a747d6a39/favicon.ico?format=100w
+        width: 100
+  - action: listing-media-update
+    id: lst_3fa8fadd5f00694fa8480b01
+    slug: zizoto.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zizoto/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zizoto/public
+        key: null
+    media:
+      logo:
+        bytes: 33731
+        contentType: image/png
+        height: 1083
+        key: best.serp.co/listings/zizoto.com/logo/a300bbf522e18b2d.png
+        sha256: a300bbf522e18b2d27e5350f32b361d66fa1473667373a151aadc4905aa11972
+        source: https://zizoto.com/assets/icon.png
+        width: 1083
+  - action: listing-media-update
+    id: lst_064348ab26a2cea64f43daa1
+    slug: zoho.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/notes-for-chatgpt/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/notes-for-chatgpt/public
+        key: null
+    media:
+      images:
+        - bytes: 17431
+          contentType: image/png
+          height: 1024
+          key: best.serp.co/listings/zoho.com/image/b0cc66ee445d8c0f.png
+          sha256: b0cc66ee445d8c0f3f5aef5c9759ad7cfd609cb2dd73f4a068eb61692fa19441
+          source: https://www.zohowebstatic.com/sites/zweb/images/ogimage/zoho-logo.png
+          width: 1024
+  - action: listing-media-update
+    id: lst_76d610bebe80b2ff8d9d2777
+    slug: zoom.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zoom-iq/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zoom-iq/public
+        key: null
+    media:
+      logo:
+        bytes: 4380
+        contentType: image/png
+        height: 72
+        key: best.serp.co/listings/zoom.com/logo/9ebe81173b0722df.png
+        sha256: 9ebe81173b0722df0a6cab4b27bfb4784d72ee11dfa8ab33d8fcbed381631366
+        source: https://www.zoom.com/apple-touch-icon.png
+        width: 72
+      images:
+        - bytes: 16986
+          contentType: image/jpeg
+          height: 630
+          key: best.serp.co/listings/zoom.com/image/d5989bf5d3d11e60.jpg
+          sha256: d5989bf5d3d11e60a42194801417920c68b329ac2121470992b10376807b622a
+          source: https://st1.zoom.us/homepage/20260930-1234/primary/dist/assets/images/thumb.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_bb7370710688ea402e9968e0
+    slug: zuora.com
+    expected:
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
+    media:
+      logo:
+        bytes: 9491
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/zuora.com/logo/196a3213d3045e39.png
+        sha256: 196a3213d3045e392e97d11fc480ef0c0424038bd6b8d77e6ab743bcdd59cae6
+        source: https://www.zuora.com/wp-content/uploads/2022/08/cropped-z-fav-icon-192x192.png
+        width: 192
+  - action: listing-media-update
+    id: lst_35593f6c25b348eadfbf27f1
+    slug: zuva.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zuva-contracts-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zuva-contracts-ai/public
+        key: null
+    media:
+      images:
+        - bytes: 25214
+          contentType: image/png
+          height: 1160
+          key: best.serp.co/listings/zuva.ai/image/d405277c3a6c9e14.png
+          sha256: d405277c3a6c9e1493851f69986e4ed79ffc5ec2c8ff8b62643c284b87da2c08
+          source: https://zuva.ai/uploads/zuva_default_hero.png
+          width: 1920
+  - action: listing-media-update
+    id: lst_18bcad0e28b027df8f4463f1
+    slug: zyngai.com
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zyng-ai/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zyng-ai/public
+        key: null
+    media: {}
+  - action: listing-media-update
+    id: lst_d21e976439664fe1aaf00ac3
+    slug: zzzcode.ai
+    expected:
+      - kind: image
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zzzcode/public
+        key: null
+      - kind: logo
+        url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zzzcode/public
+        key: null
+    media: {}

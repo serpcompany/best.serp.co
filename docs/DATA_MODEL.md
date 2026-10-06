@@ -279,8 +279,11 @@ stops at the first branch that finds a row.
 
 Ongoing changes use reviewed YAML manifests under `d1/publications/`. The publisher
 validates the base version, prior checksum, IDs, slugs, URLs, and categories before
-sending one batch; `publish-d1.yml` applies a manifest to production after recording a D1 Time
-Travel bookmark (no export). Verification, rejection, and approval batches assert
+sending one batch. `publish-d1-staging.yml` applies a manifest to staging first, then
+`publish-d1.yml` to production ([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)),
+each after recording a D1 Time Travel bookmark (no export). A row-level manifest
+(`concurrency: rows`: `listing-media-update` repoints hosted media, `listing-categories-add`
+adds a secondary category) checks each listing's rows, not a base version ([media](./MEDIA.md)). Verification, rejection, and approval batches assert
 `changes() = 1` after every compare-and-swap step, so stale decisions roll back.
 
 ## Initial import
