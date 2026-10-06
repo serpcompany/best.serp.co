@@ -60,7 +60,8 @@ import { project } from '../project'
  * they are. Fetches are cached under `.runtime/legacy-media-cache` (ignored by Git), so a rerun
  * reproduces the same outputs. Usage:
  *   pnpm migration:legacy-media [-- --retry-errors] [--limit <n>] [--current <directory>]
- *     [--refresh <upload-summary.json>] [--snapshot-sql <listings|media>]
+ *     [--refresh <upload-summary.json>] [--snapshot-sql <listings|media>] [--part-size <n>]
+ *     [--manifest-id <id>] [--allow-domain <slug>=<domain>]
  * `--refresh` refetches the source of every object an upload reported as failed, so its key
  * follows the new bytes; everything else replays from the cache.
  */
@@ -97,7 +98,60 @@ export const DEFAULT_ASSETS: Readonly<Record<string, string>> = {
   '9998c60ab0994aed9006a441a9d16af2f554efecea71afdf309bc0f96b445401':
     'Spaceship for-sale page favicon',
   f8fef5fc814f7b9aa077aee362033a10e27197ef7aadefc29cecff49504b9e1a:
-    'Snagged domain marketplace icon'
+    'Snagged domain marketplace icon',
+  c28fdd2a4f31e2dc64f653962286da5c82a4cdfc518b242d32812c624e9a19a4:
+    'create-next-app default favicon (current template)',
+  '3d10f7da6c603178340081668c4ac5b3ae9743ca9a262ab0fcd312fbb9f48bdd':
+    'create-react-app default favicon',
+  c386396ec70db3608075b5fbfaac4ab1ccaa86ba05a68ab393ec551eb66c3e00:
+    'create-react-app default logo192.png (the React logo)',
+  '9ea4f4da7050c0cc408926f6a39c253624e9babb1d43c7977cd821445a60b461':
+    'create-react-app default logo512.png (the React logo)'
+}
+
+/**
+ * Adult listings by name (#98 review round 2, S2): the downloaders and sites of adult platforms,
+ * whatever their category (14 of them are not in the Adult category). An adult listing takes
+ * only SERP's curated apps.serp.co screenshot as its featured image.
+ */
+export const ADULT_TERMS =
+  /porn|onlyfans|fansly|xhamster|xnxx|xvideos|redtube|youporn|spankbang|eporner|tnaflix|stripchat|livejasmin|chaturbate|camsoda|bongacams|myfreecams|manyvids|clips4sale|upornia|coomer|sexchat|dreamcam|motherless|brazzers|bangbros|fapello|thisvid|(?<![a-z])(?:erome|beeg|cam4|xxx|nsfw|hentai|rule34|javhd)(?![a-z])/u
+
+/** Adult by category, or by an adult platform's name in its slug or website. */
+export function isAdultListing(listing: {
+  adult: boolean
+  slug: string
+  website: string
+}): boolean {
+  return listing.adult || ADULT_TERMS.test(listing.slug) || ADULT_TERMS.test(listing.website)
+}
+
+/**
+ * The owner's approved rebrands (#98 review round 2, S3): `slug` → the registrable domain its
+ * replacement page may be on. Checked in at `scripts/migration/legacy-media-allowed-domains.json`, and
+ * extended per run with `--allow-domain <slug>=<domain>`.
+ */
+export const ALLOWED_DOMAINS_FILE = 'scripts/migration/legacy-media-allowed-domains.json'
+
+/** The brand label of a registrable domain: `notion` for notion.ai, `lambdalabs` for lambdalabs.com. */
+function brandLabel(domain: string): string {
+  return domain.split('.')[0]?.replace(/[^a-z0-9]/gu, '') ?? ''
+}
+
+/**
+ * A likely rebrand: the off-domain page's brand label matches the listing's own (`notion.ai` →
+ * `notion.com`), or one contains the other (`lambdalabs.com` → `lambda.ai`). Only a hint for the
+ * owner's sign-off; nothing is accepted without the allowlist.
+ */
+export function isLikelyRebrand(own: ReadonlySet<string>, domain: string): boolean {
+  const target = brandLabel(domain)
+  if (target.length < 4) return false
+  return [...own].some(owned => {
+    const label = brandLabel(owned)
+    return (
+      label.length >= 4 && (label === target || label.includes(target) || target.includes(label))
+    )
+  })
 }
 
 /** Imported references known never to have existed (#89), for the report. */
@@ -542,12 +596,22 @@ interface SiteImages {
 }
 
 export async function migrateLegacyMedia(options: {
+  /** Owner-approved rebrands: slug → the registrable domain its page may be on. */
+  allowedDomains?: Readonly<Record<string, string>>
   fetcher: typeof fetch
   limit?: number
   listingsPerManifest?: number
+  /** The plan, report, and manifest id prefix (new ids for a regeneration, MEDIA.md). */
+  migrationId?: string
   snapshot?: CatalogSnapshot
 }): Promise<MigrationResult> {
   const perManifest = options.listingsPerManifest ?? LISTINGS_PER_MANIFEST
+  const migrationId = options.migrationId ?? MIGRATION_ID
+  const allowedDomains = options.allowedDomains ?? {}
+  if (!Number.isSafeInteger(perManifest) || perManifest < 1) {
+    throw new Error('A manifest holds at least one listing.')
+  }
+  if (!/^[a-z0-9][a-z0-9._-]+$/u.test(migrationId)) throw new Error('Invalid migration id.')
   const snapshot = options.snapshot ?? importSnapshot()
   const listings = snapshot.listings.slice(0, options.limit)
 
@@ -596,8 +660,17 @@ export async function migrateLegacyMedia(options: {
     }
     // A shortener page is never the product's (its icon would be the shortener's), and a dead
     // short link may still have a live product: the slug is the product's domain.
+    // A dead short link lands on serp.co's catch-all (#98 round 2 S3): not the product either.
     const isDomain = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/u.test(listing.slug)
-    const shortener = (url: string) => SHORTENER_HOSTS.has(new URL(url).host)
+    const shortener = (url: string) => {
+      const host = new URL(url).hostname
+      return (
+        SHORTENER_HOSTS.has(host) ||
+        (SHORTENER_HOSTS.has(new URL(listing.website).hostname) &&
+          host !== SERP_APP_HOST &&
+          registrableDomain(url) === 'serp.co')
+      )
+    }
     if (isDomain && (page.ok ? shortener(page.url) : shortener(listing.website))) {
       page = await readPage(`https://${listing.slug}/`)
     }
@@ -624,7 +697,13 @@ export async function migrateLegacyMedia(options: {
     const refused = pageFlags({ html, url: page.url })
     const domain = registrableDomain(page.url)
     const serpApp = new URL(page.url).hostname === SERP_APP_HOST
-    if (!serpApp && !ownDomains(listing).has(domain)) refused.unshift(`off-domain page ${domain}`)
+    const own = ownDomains(listing)
+    const allowed = allowedDomains[listing.slug] === domain
+    if (!serpApp && !allowed && !own.has(domain)) {
+      refused.unshift(
+        isLikelyRebrand(own, domain) ? `likely rebrand to ${domain}` : `off-domain page ${domain}`
+      )
+    }
     if (refused.length > 0) return none(page.url, 'site refused', refused)
 
     const metadata = parseSiteMetadata(html, page.url)
@@ -656,14 +735,14 @@ export async function migrateLegacyMedia(options: {
     if (metadata.socialImage && secure(metadata.socialImage)) {
       // Adult listings take only SERP's own curated screenshot (apps.serp.co, store-new).
       const curated = serpApp && new URL(metadata.socialImage).host === SERP_APP_HOST
-      if (listing.adult && !curated) {
+      if (isAdultListing(listing) && !curated) {
         socialReason = 'adult listing: only a SERP-curated screenshot is used'
       } else {
         const result = await resolveSource(metadata.socialImage, MIN_SOCIAL_IMAGE_PIXELS)
         if (result.ok) social = result
         else socialReason = `social image ${result.reason}`
       }
-    } else if (listing.adult) {
+    } else if (isAdultListing(listing)) {
       socialReason = 'adult listing: only a SERP-curated screenshot is used'
     }
     return { icon, iconReason, page: page.url, refused: [], social, socialReason }
@@ -686,7 +765,7 @@ export async function migrateLegacyMedia(options: {
       })
     )
     const outcome: ListingOutcome = {
-      adult: listing.adult,
+      adult: isAdultListing(listing),
       defaults: [],
       images: { kind: 'none' },
       logo: { kind: 'none' },
@@ -818,10 +897,10 @@ export async function migrateLegacyMedia(options: {
   const manifests: Array<{ file: string; text: string }> = []
   const chunks = Math.ceil(operations.length / perManifest)
   for (let index = 0; index < chunks; index += 1) {
-    const id = `${MIGRATION_ID}-${String(index + 1).padStart(2, '0')}`
+    const id = `${migrationId}-${String(index + 1).padStart(2, '0')}`
     const header = [
       `# serpcompany/best.serp.co#95, part ${index + 1} of ${chunks}: repoint listing logos and images to`,
-      `# hosted copies (scripts/migration/legacy-media.ts). Upload d1/media/${MIGRATION_ID}.json to the`,
+      `# hosted copies (scripts/migration/legacy-media.ts). Upload d1/media/${migrationId}.json to the`,
       '# environment first: the publisher refuses keys its bucket does not hold. Each part checks its',
       "# listings' rows, not a base version, so the parts apply in any order, staging first.",
       ''
@@ -840,7 +919,7 @@ export async function migrateLegacyMedia(options: {
   }
 
   const plan = {
-    id: MIGRATION_ID,
+    id: migrationId,
     objects: [...objects.values()].sort((a, b) => codePointCompare(a.key, b.key)),
     site: 'best.serp.co',
     version: 1 as const
@@ -850,7 +929,13 @@ export async function migrateLegacyMedia(options: {
     outcomes,
     plan,
     report: renderReport({
+      adultByName: listings
+        .filter(listing => !listing.adult && isAdultListing(listing))
+        .map(listing => listing.slug),
+      allowed: Object.keys(allowedDomains).length,
       manifests: manifests.length,
+      migrationId,
+      perManifest,
       operations: operations.length,
       outcomes,
       plan,
@@ -878,6 +963,7 @@ function counted(values: string[]): Array<[string, number]> {
 function reasonClass(reason: string): string {
   return reason
     .replace(/off-domain page [^\s;]+/gu, 'off-domain page')
+    .replace(/likely rebrand to [^\s;]+/gu, 'likely rebrand')
     .replace(/parking (host|asset) [^\s;]+/gu, 'parking $1')
     .replace(/\("[^"]*"\)/gu, '')
     .replace(
@@ -890,7 +976,11 @@ function reasonClass(reason: string): string {
 }
 
 function renderReport(input: {
+  adultByName: string[]
+  allowed: number
   manifests: number
+  migrationId: string
+  perManifest: number
   operations: number
   outcomes: ListingOutcome[]
   plan: MigrationResult['plan']
@@ -912,6 +1002,13 @@ function renderReport(input: {
           ? '128–255 px'
           : '64–127 px'
   const refused = outcomes.filter(outcome => outcome.refused)
+  const isRebrand = (outcome: ListingOutcome) =>
+    outcome.refused?.reasons.length === 1 &&
+    outcome.refused.reasons[0]?.startsWith('likely rebrand')
+  const rebrands = refused.filter(isRebrand)
+  const otherRefused = refused.filter(outcome => !isRebrand(outcome))
+  const refusedRow = (outcome: ListingOutcome) =>
+    `| \`${outcome.slug}\` | ${outcome.refused?.page.replace(/\|/gu, '%7C')} | ${outcome.refused?.reasons.join('; ').replace(/\|/gu, '/')} |`
   const curatedReplaced = outcomes.filter(
     outcome => outcome.images.kind === 'replaced' && outcome.images.from === 'serp-app'
   )
@@ -920,7 +1017,7 @@ function renderReport(input: {
       outcome.adult && outcome.images.kind === 'replaced' && outcome.images.from !== 'serp-app'
   ).length
   const lines = [
-    `# Legacy media migration (${MIGRATION_ID})`,
+    `# Legacy media migration (${input.migrationId})`,
     '',
     'Generated by `scripts/migration/legacy-media.ts` for serpcompany/best.serp.co#95. Every count',
     'below is computed from the committed plan and manifests.',
@@ -928,7 +1025,7 @@ function renderReport(input: {
     `- Listings with a logo or image: ${outcomes.length}`,
     `- Listings repointed (operations): ${input.operations}`,
     `- Objects to upload: ${plan.objects.length} (${mib} MiB)`,
-    `- Manifests: ${input.manifests} (listing-media-update, row-level, ${LISTINGS_PER_MANIFEST} listings each)`,
+    `- Manifests: ${input.manifests} (listing-media-update, row-level, ${input.perManifest} listings each)`,
     '',
     '## Objects by format',
     '',
@@ -1006,23 +1103,37 @@ function renderReport(input: {
     '',
     '## Owner sign-off',
     '',
-    '### Replacements refused: off-domain, parked, for sale, gambling, or spam',
+    '### Likely rebrands',
     '',
-    `${refused.length} listings. Their dead images were not replaced; they keep the fallback tile`,
-    '(and no featured image) until the owner decides. Listing content is unchanged; #100 covers',
-    'unpublishing hijacked listings.',
+    `${rebrands.length} listings whose page moved to a domain with the same brand. Approving one is a`,
+    `line in \`${ALLOWED_DOMAINS_FILE}\` (\`"<slug>": "<domain>"\`); the next regeneration then takes`,
+    `its replacement. Approved so far: ${input.allowed}.`,
     '',
     '| Listing | Final page | Why |',
     '| --- | --- | --- |',
-    ...refused.map(
-      outcome =>
-        `| \`${outcome.slug}\` | ${outcome.refused?.page.replace(/\|/gu, '%7C')} | ${outcome.refused?.reasons.join('; ').replace(/\|/gu, '/')} |`
-    ),
+    ...rebrands.map(refusedRow),
+    '',
+    '### Replacements refused: off-domain, parked, for sale, gambling, or spam',
+    '',
+    `${otherRefused.length} listings. Their dead images were not replaced; they keep the fallback`,
+    'tile (and no featured image) until the owner decides. Listing content is unchanged; #100',
+    'covers unpublishing hijacked listings.',
+    '',
+    '| Listing | Final page | Why |',
+    '| --- | --- | --- |',
+    ...otherRefused.map(refusedRow),
+    '',
+    '### Adult by name, not in the Adult category',
+    '',
+    `${input.adultByName.length} listings are treated as adult (only SERP's curated screenshots) by`,
+    'their platform name. Their category is a catalog data issue the owner may want to fix:',
+    '',
+    input.adultByName.map(slug => `\`${slug}\``).join(', ') || 'none',
     '',
     '### Featured images from SERP’s curated screenshots',
     '',
     `${curatedReplaced.length} SERP app listings get the screenshot their apps.serp.co page names`,
-    '(serpcompany/store-new) as their featured image; listings in the Adult category are marked.',
+    '(serpcompany/store-new) as their featured image; adult listings are marked.',
     `Adult listings with a featured image from any other site: ${adultFromSites} (none is allowed).`,
     '',
     ...curatedReplaced.map(outcome => {
@@ -1076,6 +1187,20 @@ async function main(): Promise<void> {
   }
   const limit = option('--limit') ? Number(option('--limit')) : undefined
   const current = option('--current')
+  // `--part-size <n>`: listings per manifest (smaller parts if staging refuses a batch).
+  const partSize = option('--part-size') ? Number(option('--part-size')) : undefined
+  // `--manifest-id <id>`: new ids for a regeneration (an id that succeeded is never reused).
+  const migrationId = option('--manifest-id') ?? MIGRATION_ID
+  // Owner-approved rebrands: the checked-in file, plus `--allow-domain <slug>=<domain>` flags.
+  const allowedDomains: Record<string, string> = existsSync(resolve(ALLOWED_DOMAINS_FILE))
+    ? (JSON.parse(readFileSync(resolve(ALLOWED_DOMAINS_FILE), 'utf8')) as Record<string, string>)
+    : {}
+  args.forEach((value, index) => {
+    if (value !== '--allow-domain') return
+    const [slug, domain] = (args[index + 1] ?? '').split('=')
+    if (!slug || !domain) throw new Error('--allow-domain <slug>=<domain>')
+    allowedDomains[slug] = domain
+  })
   // `--refresh <upload summary>`: refetch the source of every object an upload reported failed.
   const refresh = new Set<string>()
   const summaryPath = option('--refresh')
@@ -1083,7 +1208,7 @@ async function main(): Promise<void> {
     const summary = JSON.parse(readFileSync(resolve(summaryPath), 'utf8')) as {
       failed: Array<{ key: string }>
     }
-    const plan = JSON.parse(readFileSync(resolve(`d1/media/${MIGRATION_ID}.json`), 'utf8')) as {
+    const plan = JSON.parse(readFileSync(resolve(`d1/media/${migrationId}.json`), 'utf8')) as {
       objects: Array<{ key: string; source: string }>
     }
     const sources = new Map(plan.objects.map(object => [object.key, object.source]))
@@ -1098,19 +1223,22 @@ async function main(): Promise<void> {
     refresh
   )
   const result = await migrateLegacyMedia({
+    allowedDomains,
     fetcher,
     limit,
+    listingsPerManifest: partSize,
+    migrationId,
     snapshot: current ? currentSnapshot(current) : undefined
   })
   mkdirSync(resolve('d1/media'), { recursive: true })
   writeFileSync(
-    resolve(`d1/media/${MIGRATION_ID}.json`),
+    resolve(`d1/media/${migrationId}.json`),
     `${JSON.stringify(result.plan, null, 1)}\n`
   )
-  writeFileSync(resolve(`d1/media/${MIGRATION_ID}.report.md`), result.report)
+  writeFileSync(resolve(`d1/media/${migrationId}.report.md`), result.report)
   // A regeneration replaces every part: stale parts from an earlier, larger run are removed.
   for (const file of readdirSync(resolve('d1/publications'))) {
-    if (file.startsWith(`${MIGRATION_ID}-`)) rmSync(resolve('d1/publications', file))
+    if (file.startsWith(`${migrationId}-`)) rmSync(resolve('d1/publications', file))
   }
   for (const manifest of result.manifests) writeFileSync(resolve(manifest.file), manifest.text)
   console.log(result.report.split('## Owner sign-off')[0])

@@ -15,6 +15,8 @@ import {
   codePointCompare,
   currentSnapshot,
   DEFAULT_ASSETS,
+  isAdultListing,
+  isLikelyRebrand,
   migrateLegacyMedia,
   ownDomains,
   pageFlags,
@@ -136,10 +138,7 @@ describe('legacy media migration (#95)', () => {
       'parked.test':
         '<title>parked.test</title><body>This domain is for sale. Make an offer.</body>',
       // SERP's own app page (allowed for every listing).
-      'serpapp.test': '<meta http-equiv="refresh" content="0; url=https://apps.serp.co/serpapp">',
-      // A short link to a serp.co page that is not a SERP app's (a review): not the listing's.
-      'reviewed.test':
-        '<meta http-equiv="refresh" content="0; url=https://serp.co/reviews/reviewed">'
+      'serpapp.test': '<meta http-equiv="refresh" content="0; url=https://apps.serp.co/serpapp">'
     }
     const fetcher: typeof fetch = async input => {
       const url = new URL(input instanceof Request ? input.url : String(input))
@@ -158,7 +157,6 @@ describe('legacy media migration (#95)', () => {
         listing('lst_test_h_0000', 'hijacked.test', 'https://serp.ly/hijacked.test'),
         listing('lst_test_t_0000', 'togel.test', 'https://togel.test/'),
         listing('lst_test_p_0000', 'parked.test', 'https://parked.test/'),
-        listing('lst_test_r_0000', 'reviewed.test', 'https://serp.ly/reviewed.test'),
         // A SERP app, adult: its curated apps.serp.co screenshot is used, never SERP Apps' icon.
         {
           ...listing('lst_test_s_0000', 'serpapp-downloader', 'https://serp.ly/serpapp.test'),
@@ -172,7 +170,6 @@ describe('legacy media migration (#95)', () => {
     expect(reasons['hijacked.test']).toMatch(/^off-domain page casino-elsewhere\.test/u)
     expect(reasons['togel.test']).toMatch(/gambling or spam \("togel"\)/u)
     expect(reasons['parked.test']).toMatch(/for sale or parked/u)
-    expect(reasons['reviewed.test']).toBe('off-domain page serp.co')
     for (const outcome of result.outcomes) expect(outcome.logo.kind).toBe('tile')
     const serpApp = result.outcomes.find(outcome => outcome.slug === 'serpapp-downloader')
     expect(serpApp?.logo).toEqual({
@@ -185,6 +182,107 @@ describe('legacy media migration (#95)', () => {
     ])
     expect(result.report).toContain('### Replacements refused')
     expect(result.report).toContain('`hijacked.test` | https://casino-elsewhere.test/')
+  }, 120_000)
+
+  it('follows a dead short link to the slug’s domain, hints rebrands, and takes approved ones (#98 r2)', async () => {
+    const pages: Record<string, string> = {
+      // A dead short link ends on serp.co's catch-all: the product is still at its slug's domain.
+      'brightlocal.test': '<meta http-equiv="refresh" content="0; url=https://serp.co/?catchall">',
+      // The same brand on a new domain.
+      'notion.test': '<meta http-equiv="refresh" content="0; url=https://notion.example/">',
+      'lambdalabs.test': '<meta http-equiv="refresh" content="0; url=https://lambda.example/">'
+    }
+    const fetcher: typeof fetch = async input => {
+      const url = new URL(input instanceof Request ? input.url : String(input))
+      if (url.host === 'imagedelivery.net') return new Response('gone', { status: 404 })
+      if (url.host === 'serp.ly') return html(pages[url.pathname.slice(1)] ?? '')
+      if (url.pathname.endsWith('.png')) return image(icon)
+      return html('<title>Product</title><link rel="apple-touch-icon" href="/touch.png">')
+    }
+    const listings = [
+      listing('lst_test_b_0000', 'brightlocal.test', 'https://serp.ly/brightlocal.test'),
+      listing('lst_test_n_0000', 'notion.test', 'https://serp.ly/notion.test'),
+      listing('lst_test_l_0000', 'lambdalabs.test', 'https://serp.ly/lambdalabs.test')
+    ]
+    const first = await migrateLegacyMedia({ fetcher, snapshot: snapshot(listings) })
+    const bySlug = (result: typeof first, slug: string) =>
+      result.outcomes.find(outcome => outcome.slug === slug)
+    expect(bySlug(first, 'brightlocal.test')?.logo).toMatchObject({
+      kind: 'replaced',
+      source: 'brightlocal.test'
+    })
+    expect(bySlug(first, 'notion.test')?.refused?.reasons).toEqual([
+      'likely rebrand to notion.example'
+    ])
+    expect(bySlug(first, 'lambdalabs.test')?.refused?.reasons).toEqual([
+      'likely rebrand to lambda.example'
+    ])
+    expect(first.report).toContain('### Likely rebrands')
+    // The owner approves one: the next regeneration takes its replacement.
+    const approved = await migrateLegacyMedia({
+      allowedDomains: { 'notion.test': 'notion.example' },
+      fetcher,
+      listingsPerManifest: 1,
+      migrationId: 'legacy-media-regenerated',
+      snapshot: snapshot(listings)
+    })
+    expect(bySlug(approved, 'notion.test')?.logo).toMatchObject({ kind: 'replaced' })
+    expect(bySlug(approved, 'lambdalabs.test')?.logo.kind).toBe('tile')
+    // `--part-size` and `--manifest-id`: one listing per part, under the new id.
+    expect(approved.manifests.map(manifest => manifest.file)).toEqual([
+      'd1/publications/legacy-media-regenerated-01.yaml',
+      'd1/publications/legacy-media-regenerated-02.yaml',
+      'd1/publications/legacy-media-regenerated-03.yaml'
+    ])
+    expect(approved.plan.id).toBe('legacy-media-regenerated')
+    expect(isLikelyRebrand(new Set(['hijacked.test']), 'casino.example')).toBe(false)
+  }, 120_000)
+
+  it('treats adult platforms as adult by name, whatever their category (#98 r2 S2)', async () => {
+    const adultByName = listing(
+      'lst_test_x_0000',
+      'xhamster-downloader',
+      'https://xhamster.example/'
+    )
+    expect(isAdultListing(adultByName)).toBe(true)
+    expect(isAdultListing(listing('lst_test_y_0000', 'notion.ai', 'https://notion.ai/'))).toBe(
+      false
+    )
+    // A short brand never matches inside a word: "jerome" is not "erome".
+    expect(
+      isAdultListing(
+        listing('lst_test_z_0000', 'institutional.test', 'https://serp.ly/jerome-powell-bot')
+      )
+    ).toBe(false)
+    expect(
+      isAdultListing(listing('lst_test_w_0000', 'beeg-downloader', 'https://serp.ly/beeg'))
+    ).toBe(true)
+    const result = await migrateLegacyMedia({
+      fetcher: async input => {
+        const url = new URL(input instanceof Request ? input.url : String(input))
+        if (url.host === 'imagedelivery.net') return new Response('gone', { status: 404 })
+        if (url.pathname === '/touch.png') return image(icon)
+        if (url.pathname === '/card.png') return image(social)
+        return html(
+          '<link rel="apple-touch-icon" href="/touch.png"><meta property="og:image" content="/card.png">'
+        )
+      },
+      snapshot: snapshot([{ ...adultByName, slug: 'xhamster.example' }])
+    })
+    const [outcome] = result.outcomes
+    expect(outcome?.adult).toBe(true)
+    expect(outcome?.images).toEqual({
+      kind: 'dropped',
+      reason: 'adult listing: only a SERP-curated screenshot is used'
+    })
+    expect(result.report).toContain('`xhamster.example`')
+    // The create-react-app and current create-next-app defaults are blocked (#98 r2 S1).
+    for (const prefix of ['3d10f7da', 'c386396e', '9ea4f4da', 'c28fdd2a']) {
+      expect(
+        Object.keys(DEFAULT_ASSETS).some(digest => digest.startsWith(prefix)),
+        prefix
+      ).toBe(true)
+    }
   }, 120_000)
 
   it('keeps adult listings off other sites’ Open Graph images, and drops default assets (#98)', async () => {
