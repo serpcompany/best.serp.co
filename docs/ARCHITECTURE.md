@@ -189,6 +189,11 @@ extensions (`chart.js`), and a test checks the committed import.
   rather than give every logo-less listing the same image or the SERP logo
   (`packages/web-core/src/schema.ts`). `apps/e2e/tests/listing-logo-assets.spec.ts` checks
   that the Worker serves the tile and that sample pages reference no missing same-origin file.
+- **Listing offers.** D1 records no product pricing, so listing JSON-LD carries no `offers`.
+  A default `price: "0"` would call every paid product free. `generateWebsiteDetailSchema`
+  emits an Offer only for known `pricing` (free: price 0; paid: decimal price and ISO 4217
+  currency). The submission `plan` is the listing fee, never product pricing
+  (serpcompany/best.serp.co#88).
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other
   host serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)).
   The index lists the URL-set files
