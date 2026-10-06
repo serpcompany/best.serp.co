@@ -12,6 +12,11 @@ import type {
   PublishedCategory,
   UnpublishedListing
 } from '@serpdirectory/data-ops/contracts'
+import {
+  resolveListingDetailMedia,
+  resolveListingMedia,
+  validateMediaBaseUrl
+} from '@serpdirectory/data-ops/media-keys'
 import type { WebsiteDetailMetadata, WebsiteMetadata } from '@serpdirectory/web-core/content-query'
 import { cache } from 'react'
 
@@ -50,16 +55,34 @@ const getOperations = cache(async () => {
   })
 })
 
+/**
+ * The environment's media host (#95). The catalog and its data cache hold media keys; pages get
+ * URLs on this host. A missing or malformed value fails closed, like the D1 binding.
+ */
+const getMediaBaseUrl = cache(async (): Promise<string> => {
+  const { env } = await getCloudflareContext({ async: true })
+  const cloudflareEnv = env as CloudflareEnv
+  return validateMediaBaseUrl(cloudflareEnv.MEDIA_BASE_URL, cloudflareEnv.D1_RUNTIME_ENV)
+})
+
+async function withMediaUrls<T extends { media?: { images?: string[]; logo?: string } }>(
+  listings: T[]
+): Promise<T[]> {
+  const base = await getMediaBaseUrl()
+  return listings.map(listing => resolveListingMedia(listing, base))
+}
+
 const readPublishedListings = cache(
-  async (): Promise<WebsiteMetadata[]> => (await getOperations()).getPublishedListings()
+  async (): Promise<WebsiteMetadata[]> =>
+    withMediaUrls(await (await getOperations()).getPublishedListings())
 )
 
 const readShellStats = cache(async () => (await getOperations()).getShellStats())
 
-const readListingBySlug = cache(
-  async (slug: string): Promise<WebsiteDetailMetadata | null> =>
-    (await getOperations()).getListingBySlug(slug)
-)
+const readListingBySlug = cache(async (slug: string): Promise<WebsiteDetailMetadata | null> => {
+  const detail = await (await getOperations()).getListingBySlug(slug)
+  return detail && resolveListingDetailMedia(detail, await getMediaBaseUrl())
+})
 
 export const getPublishedListings = readPublishedListings
 
@@ -68,8 +91,13 @@ export const getPublishedListings = readPublishedListings
  * list pages read the catalog; never load `getPublishedListings()` for display.
  */
 const readListingNamePage = cache(
-  async (category: string, page: number): Promise<ListingNamePage> =>
-    (await getOperations()).getListingNamePage({ category: category || undefined, page })
+  async (category: string, page: number): Promise<ListingNamePage> => {
+    const result = await (await getOperations()).getListingNamePage({
+      category: category || undefined,
+      page
+    })
+    return { ...result, items: await withMediaUrls(result.items) }
+  }
 )
 
 export async function getListingNamePage(
@@ -91,7 +119,7 @@ export async function getListedCategorySlugs(): Promise<string[]> {
 }
 
 export async function getFeaturedListings(limit = 6): Promise<WebsiteMetadata[]> {
-  return (await getOperations()).getFeaturedListings(limit)
+  return withMediaUrls(await (await getOperations()).getFeaturedListings(limit))
 }
 
 export async function getFeaturedListingCount(): Promise<number> {
@@ -99,7 +127,7 @@ export async function getFeaturedListingCount(): Promise<number> {
 }
 
 export async function getLatestListings(limit = 12): Promise<WebsiteMetadata[]> {
-  return (await getOperations()).getLatestListings(limit)
+  return withMediaUrls(await (await getOperations()).getLatestListings(limit))
 }
 
 export const getListingBySlug = readListingBySlug
@@ -126,11 +154,11 @@ export async function getCategoryBySlug(slug: string): Promise<PublishedCategory
 }
 
 export async function searchListings(query: string, limit = 50): Promise<WebsiteMetadata[]> {
-  return (await getOperations()).searchListings(query, limit)
+  return withMediaUrls(await (await getOperations()).searchListings(query, limit))
 }
 
 export async function getAutocomplete(query: string, limit = 8): Promise<WebsiteMetadata[]> {
-  return (await getOperations()).getAutocomplete(query, limit)
+  return withMediaUrls(await (await getOperations()).getAutocomplete(query, limit))
 }
 
 export async function getPublicationVersion(): Promise<number> {
@@ -138,5 +166,5 @@ export async function getPublicationVersion(): Promise<number> {
 }
 
 export async function getSitemapListings(): Promise<WebsiteMetadata[]> {
-  return (await getOperations()).getSitemapListings()
+  return withMediaUrls(await (await getOperations()).getSitemapListings())
 }

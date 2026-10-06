@@ -16,6 +16,7 @@ interface WranglerConfig {
   }>
   main?: string
   name?: string
+  r2_buckets?: Array<{ binding?: string; bucket_name?: string }>
   vars?: Record<string, string | undefined>
 }
 
@@ -75,6 +76,15 @@ export function validateCanonicalLocalConfig(
   if (binding.migrations_table !== project.migrationsTable) {
     throw new Error(
       `Canonical local D1 must declare migrations_table "${project.migrationsTable}", the ledger staging and production use.`
+    )
+  }
+  const media = config.r2_buckets?.find(candidate => candidate.binding === 'MEDIA')
+  if (
+    media?.bucket_name !== project.local.media.bucket ||
+    config.vars?.MEDIA_BASE_URL !== project.local.media.baseUrl
+  ) {
+    throw new Error(
+      `Local listing media must use the ${project.local.media.bucket} bucket and MEDIA_BASE_URL ${project.local.media.baseUrl}, never a staging or production bucket.`
     )
   }
   return config

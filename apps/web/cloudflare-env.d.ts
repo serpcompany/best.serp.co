@@ -22,6 +22,27 @@ interface D1Database {
   prepare(query: string): D1PreparedStatement
 }
 
+/** The subset of Workers' R2 bucket binding the media code uses (#95). */
+interface R2ObjectBody {
+  body: ReadableStream
+  httpEtag: string
+  httpMetadata?: { cacheControl?: string; contentType?: string }
+  size: number
+}
+
+interface R2Bucket {
+  get(key: string): Promise<R2ObjectBody | null>
+  put(
+    key: string,
+    value: Uint8Array,
+    options?: {
+      customMetadata?: Record<string, string>
+      httpMetadata?: { cacheControl?: string; contentType?: string }
+      sha256?: string
+    }
+  ): Promise<unknown>
+}
+
 interface CloudflareEnv {
   ASSETS: { fetch(request: Request): Promise<Response> }
   /** Worker secret on staging and production; `apps/web/.dev.vars` locally (docs/DEVELOPMENT.md). */
@@ -40,6 +61,13 @@ interface CloudflareEnv {
   CF_ACCESS_TEAM_DOMAIN?: string
   DB: D1Database
   D1_RUNTIME_ENV: 'local' | 'staging' | 'production'
+  /**
+   * Listing media (#95): the bucket ingestion writes (`cdn-staging` on staging, `cdn` in
+   * production, local state locally). Pages read objects from `MEDIA_BASE_URL`, not through it.
+   */
+  MEDIA?: R2Bucket
+  /** The media host pages build image URLs on (`https://cdn.serp.co`, …; `/_media` locally). */
+  MEDIA_BASE_URL?: string
   /** Staging only: comma-separated recipients email may go to (`lib/email/config.ts`). */
   EMAIL_STAGING_ALLOWLIST?: string
   /** Crawl and analytics policy; anything but `production` is non-production. */

@@ -136,6 +136,7 @@ interface LocalConfigFixture {
   }>
   main: string
   name: string
+  r2_buckets: Array<{ binding: string; bucket_name: string }>
   vars: Record<string, string>
 }
 
@@ -156,8 +157,10 @@ function validLocalConfig(): LocalConfigFixture {
     ],
     main: resolve(project.workerEntryPath),
     name: project.local.workerName,
+    r2_buckets: [{ binding: 'MEDIA', bucket_name: project.local.media.bucket }],
     vars: {
-      D1_RUNTIME_ENV: 'local'
+      D1_RUNTIME_ENV: 'local',
+      MEDIA_BASE_URL: project.local.media.baseUrl
     }
   }
 }
@@ -645,6 +648,21 @@ describe('fresh Drizzle D1 history', () => {
         if (binding) binding.migrations_table = 'migrations'
       },
       /migrations_table "d1_migrations"/u
+    )
+    assertRejected(
+      'remote-media-bucket',
+      config => {
+        const bucket = config.r2_buckets[0]
+        if (bucket) bucket.bucket_name = 'cdn'
+      },
+      /Local listing media/u
+    )
+    assertRejected(
+      'remote-media-host',
+      config => {
+        config.vars.MEDIA_BASE_URL = 'https://cdn.serp.co'
+      },
+      /Local listing media/u
     )
   })
 

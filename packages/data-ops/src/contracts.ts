@@ -76,6 +76,11 @@ export interface CatalogDataCache {
   put(key: string, value: unknown, ttlSeconds: number): Promise<void>
 }
 
+/**
+ * A logo or image is a hosted media key (`best.serp.co/listings/…`, #95) or, until the legacy
+ * migration repoints it, the imported reference. The web adapter resolves keys against the
+ * environment's media host (`mediaUrl` in `media-keys.ts`); DTOs and their cache hold keys only.
+ */
 export interface ListingLogoMedia {
   logo?: string
 }
