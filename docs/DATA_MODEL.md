@@ -242,6 +242,13 @@ validates the base version, prior checksum, IDs, slugs, URLs, and categories bef
 sending one batch; `publish-d1.yml` applies a manifest to production after a D1 backup. Verification, rejection, and approval batches assert
 `changes() = 1` after every compare-and-swap step, so stale decisions roll back.
 
+A manifest's root-relative media path must name a file checked in under `apps/web/public`;
+`pnpm test:d1` (also run by `publish-d1.yml` before publishing) checks every manifest
+([Architecture](./ARCHITECTURE.md#url-canonicalization), "Listing images"). Manifests reach production only: local
+and staging D1 are seeded from the import, so a manifest's change shows there only after a
+reseed. For example, `2026-10-06-missing-product-images.yaml` (#89) drops two image references
+whose files never existed, and those two still 404 on local and staging.
+
 ## Initial import
 
 The catalog was bootstrapped once from `serpcompany/json-directory-template@25e2a8d`

@@ -1,3 +1,5 @@
+import { readdirSync } from 'node:fs'
+import { join, relative, resolve, sep } from 'node:path'
 import { type APIRequestContext, expect, type Page, test } from '@playwright/test'
 
 import { detailListing } from './listing-fixture'
@@ -18,10 +20,22 @@ const logoLessListing = {
 }
 /** A published listing whose logo is a remote image (Cloudflare Images). */
 const remoteLogoListingPath = listingPath('autoenhance.ai')
+/**
+ * Listings whose featured image is a `/media/products` file restored in
+ * serpcompany/best.serp.co#89: a WebP, a JPEG, and a JPEG stored under a `.webp` name (as on
+ * apps.serp.co, where the originals live; browsers decode images by content, not type).
+ */
+const restoredImageListings = [
+  { name: 'Beeg Video Downloader', path: listingPath('beeg-downloader') },
+  { name: 'Dailymotion Video Downloader', path: listingPath('dailymotion-downloader') },
+  { name: 'Coomer Downloader', path: listingPath('coomer-downloader') }
+]
+/** The checked-in listing images the catalog points at with root-relative URLs. */
+const productMediaDirectory = resolve(__dirname, '../../web/public/media/products')
 
 /**
  * Pages a visitor reaches first, plus listings whose logo is local (123movies), remote
- * (autoenhance.ai), and absent (321tube).
+ * (autoenhance.ai), and absent (321tube), and listings with a local featured image.
  */
 const samplePages = [
   '/',
@@ -32,7 +46,8 @@ const samplePages = [
   '/search/?q=video',
   detailListing.path,
   remoteLogoListingPath,
-  logoLessListing.path
+  logoLessListing.path,
+  ...restoredImageListings.map(listing => listing.path)
 ]
 
 const fileUrlPattern =
@@ -103,6 +118,14 @@ async function expectServed(request: APIRequestContext, path: string, referrer: 
   expect(response.status(), `${path} (referenced by ${referrer})`).toBe(200)
 }
 
+/** Every file under a directory, as URL paths relative to it. */
+function filePaths(directory: string): string[] {
+  return readdirSync(directory, { recursive: true, withFileTypes: true })
+    .filter(entry => entry.isFile())
+    .map(entry => relative(directory, join(entry.parentPath, entry.name)).split(sep).join('/'))
+    .sort()
+}
+
 function webPageNode(data: unknown[]): Record<string, unknown> {
   const nodes = data.flatMap(entry =>
     entry && typeof entry === 'object' && '@graph' in entry
@@ -162,6 +185,38 @@ test.describe('listing logo assets', () => {
         '@type': 'ImageObject',
         url: new URL(logoSrc ?? '', site.publicUrl).href
       })
+    }
+  })
+
+  test('the Worker serves every checked-in /media/products file as an image', async ({
+    request
+  }) => {
+    const files = filePaths(productMediaDirectory)
+    // launchbuzz.io's og.png and the 35 files restored in #89.
+    expect(files.length).toBeGreaterThanOrEqual(36)
+    for (const file of files) {
+      const path = `/media/products/${file}`
+      const response = await request.get(path, { maxRedirects: 0 })
+      expect(response.status(), path).toBe(200)
+      expect(response.headers()['content-type'], path).toMatch(/^image\//u)
+      expect((await response.body()).length, path).toBeGreaterThan(1000)
+    }
+  })
+
+  test('restored product images decode as the featured image on their listing pages', async ({
+    page
+  }) => {
+    for (const listing of restoredImageListings) {
+      const response = await page.goto(listing.path, { waitUntil: 'domcontentloaded' })
+      expect(response?.status(), listing.path).toBe(200)
+
+      const image = page.getByRole('img', { name: `${listing.name} featured image` })
+      await expect(image).toHaveAttribute('src', /^\/media\/products\//u)
+      await expect
+        .poll(() => image.evaluate(element => (element as HTMLImageElement).naturalWidth), {
+          message: `${listing.path} featured image decodes`
+        })
+        .toBeGreaterThan(0)
     }
   })
 

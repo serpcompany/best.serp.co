@@ -189,6 +189,12 @@ extensions (`chart.js`), and a test checks the committed import.
   rather than give every logo-less listing the same image or the SERP logo
   (`packages/web-core/src/schema.ts`). `apps/e2e/tests/listing-logo-assets.spec.ts` checks
   that the Worker serves the tile and that sample pages reference no missing same-origin file.
+  A listing logo, image, or video stored as a root-relative path (`/listing-logos/...`,
+  `/media/products/...`) is a static asset, so its file must be checked in under
+  `apps/web/public`. The `/media/products` originals live on `apps.serp.co`, which the legacy
+  import referenced without copying; #89 restored them. `scripts/catalog-media-assets.test.ts`
+  (in `pnpm test:d1`) fails when the published catalog (the import plus every
+  `d1/publications` manifest) names a missing file.
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other
   host serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)).
   The index lists the URL-set files

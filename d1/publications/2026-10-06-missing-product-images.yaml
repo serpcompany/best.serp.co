@@ -1,0 +1,290 @@
+# serpcompany/best.serp.co#89: drop the two listing image references whose files never
+# existed (the other 35 missing /media/products files are restored in apps/web/public).
+# - dr.serp.co: /media/products/dr.serp.co/logo.png was never created; the page falls back to
+#   the #86 "no logo" tile and its JSON-LD omits primaryImageOfPage.
+# - onlyfans-downloader: drops its 7th image, /media/products/onlyfans-downloader/onlyfans-downloader-1.jpg.
+# Every other field is the committed import's value (production D1 matched it on 2026-10-06);
+# publishedAt is the imported date as an ISO instant, which the publisher requires.
+# scripts/catalog-media-assets.test.ts applies this manifest to the import and checks that only
+# these media rows change. Apply only through Publish D1 Catalog (publish-d1.yml) from main.
+version: 1
+id: 2026-10-06-missing-product-images
+basePublicationVersion: 1
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+  beforeChecksum: 669f264f028acfd5cf32047e099fc180d01c51ce22903a8cf04bf6f947af0a5a
+operations:
+  - action: listing-update
+    listing:
+      id: lst_d67901bf15fe78e1414d74a1
+      slug: dr.serp.co
+      name: dr.serp.co
+      description: Free Domain Rating checker powered by SERP. Check any website's domain authority score instantly.
+      website: https://dr.serp.co
+      content: |-
+        ## Overview
+
+        Free Domain Rating checker powered by SERP. Check any website's domain authority score instantly.
+
+        DR by SERP is a free domain rating / domain authority checker tool. Enter any domain and instantly see its authority score. Part of the SERP network.
+      isUnofficial: false
+      featured: false
+      publishedAt: 2026-05-16T00:00:00.000Z
+      categories:
+        - seo
+      resources:
+        - label: dr.serp.co
+          url: https://dr.serp.co
+    previousCategories:
+      - seo
+  - action: listing-update
+    listing:
+      id: lst_4251455a4d740603c89dd58a
+      slug: onlyfans-downloader
+      name: OnlyFans Downloader
+      description: Save the OnlyFans content you're paying for before creators delete it or your subscription ends.
+      website: https://serp.ly/onlyfans-downloader
+      content: |-
+        ## Overview
+
+        You are paying for OnlyFans subscriptions every month, but when a creator deletes their page or you cancel, all that content you paid for vanishes. OnlyFans Downloader fixes that by saving videos, images, GIFs, and text posts straight to your computer while you still have access.
+
+        Hover over any post and hit the download button that appears right on the page, or use the bulk scanner to grab an entire creator's library in one sweep. Videos save as standard MP4 files, images keep their original quality, and everything gets sorted into neat folders organized by creator name. No extra software to install, no complicated setup.
+
+        The bulk scanner is where this shines for larger collections. It scrolls through a creator's entire media page automatically, collects everything it finds, and lets you filter by type before downloading. Your files, your device, your privacy. Nothing gets uploaded anywhere, and the extension works with your existing logged-in session.
+
+        ## Why It Exists
+
+        - Save OnlyFans videos, images, GIFs, and text from one extension instead of juggling multiple tools.
+        - Archive creator libraries faster with overlay buttons for single items and bulk scanner tools for larger saves.
+        - Get standard MP4 output for supported videos while keeping images in their original source formats.
+        - Keep downloads private and organized with local processing, per-creator folders, and session-aware access.
+
+        ## Key Features
+
+        - Detects videos, images, GIFs, and text posts directly on OnlyFans creator pages and media views.
+        - Adds in-page download overlay buttons to supported media cards so you can save individual items without copying URLs.
+        - Bulk gallery scanner auto-scrolls through creator media pages, collects visible assets, and supports media-type filtering.
+        - Side-panel or popup workflow organizes detected content into tabs for videos, images or GIFs, text posts, and bulk actions.
+        - Handles OnlyFans session-aware requests and API signing natively instead of depending on brittle generic download methods.
+        - Converts HLS video streams to MP4 locally in-browser while preserving a clean playback-friendly output format.
+        - Saves direct MP4 variants immediately when OnlyFans exposes them, reducing processing time.
+        - Flags DRM-protected video before download attempts so you know when a file is not supported.
+        - Creates per-creator folder organization for videos and bulk saves to keep archives sorted automatically.
+        - Supports File System Access API bulk saving on compatible browsers so you can choose a custom destination folder.
+
+        ## How It Works
+
+        - Install and activate: Add OnlyFans Downloader to your browser, complete secure email OTP activation, and sign in to your OnlyFans account as usual.
+        - Open a creator page: Navigate to an OnlyFans creator feed or media page while logged in and let the extension detect visible assets.
+        - Download one item or scan in bulk: Use overlay buttons for single downloads or open the bulk workflow to auto-scroll and collect more content.
+        - Save into organized folders: Videos save as MP4, images stay in original format, and files are written into OnlyFans folders or your chosen bulk destination when the browser supports it.
+
+        ## Reviews
+
+        - Bulk scanning is a game changer (5/5): The bulk scanner auto-scrolls through an entire creator page and grabs everything in one pass. Saved me hours compared to right-clicking each post. - Derek Holloway
+        - Organized and dependable (4.9/5): Per-creator folders keep my archive clean and the overlay buttons make single downloads instant. Detection is way more reliable than the generic tools I tried before. - Mina Takahashi
+        - Honest about what it can and cannot grab (4.8/5): I appreciate that DRM-locked videos get flagged upfront instead of silently failing. Saves a lot of guesswork when archiving a large creator library. - Lucas Ferreira
+
+        ## Platform Support
+
+        ### Browsers
+
+        - Chrome
+        - Edge
+        - Firefox
+        - Brave
+        - Opera
+        - Whale
+        - Yandex
+
+        ### Operating Systems
+
+        - Windows
+        - macOS
+        - Linux
+
+        ### Supported Content
+
+        - OnlyFans creator feed videos and media posts you can already access
+        - Images, GIFs, and text posts detected on supported pages
+        - Direct MP4 and HLS video workflows saved as MP4
+        - Bulk creator gallery scans with media-type filtering
+
+        ### Not Supported
+
+        - Safari and mobile browsers
+        - DRM-protected videos flagged as unsupported
+        - Content you cannot already access in your session
+        - Bypassing creator subscriptions, permissions, or site restrictions
+
+        ## Privacy and Permissions
+
+        Supported regions: Worldwide.
+
+        Limitations:
+        - You must be logged in to OnlyFans and have valid access to the creator's content.
+        - DRM-protected videos cannot be downloaded and are flagged in the UI.
+        - Available video quality depends on the source variants OnlyFans exposes for that item.
+        - Bulk scans depend on content loading successfully as the page auto-scrolls.
+        - Custom bulk-save folder selection depends on browser support for the File System Access API.
+        - Safari and mobile browsers are not supported.
+        - Email OTP activation is required before trial or paid usage.
+
+        Permissions:
+        - downloads: Saves videos, images, GIFs, and exported text assets to your device while tracking progress for active downloads.
+        - storage: Stores activation state, creator cache, UI preferences, and bulk workflow settings locally between sessions.
+        - activeTab: Limits media detection and in-page overlay injection to the OnlyFans tab you are currently viewing.
+        - tabs: Keeps the extension synchronized with navigation changes while you move between creator pages, posts, and media tabs.
+        - scripting: Injects overlay controls and extracts media sources, text content, and creator context from supported OnlyFans pages.
+        - offscreen: Handles HLS-to-MP4 processing in a hidden context so the active browsing tab stays responsive during longer conversions.
+
+        ## FAQ
+
+        ### How do I download a video from OnlyFans?
+
+        Open a creator page or post on OnlyFans while logged in, hover the media item, and click the download overlay button. You can also open the extension UI to review detected assets and start the download from there.
+
+        ### Can I download images, GIFs, and text posts too?
+
+        Yes. The extension detects videos, images, GIFs, and text posts. Images and GIFs save in their original format, and text posts can be exported from the detected content list.
+
+        ### How does bulk download work?
+
+        Use the bulk tab on a creator media page to start the built-in gallery scanner. It auto-scrolls, collects visible assets, and lets you download everything or filter by media type such as photos or videos.
+
+        ### What quality options are available for videos?
+
+        When multiple variants are exposed, the extension lists available qualities from direct MP4 or HLS sources and prefers higher-quality options first. The exact choices depend on what the creator page and OnlyFans delivery path provide.
+
+        ### What format are video downloads saved in?
+
+        Supported video downloads are saved as standard MP4 files. HLS streams are converted in-browser, and direct MP4 variants are saved directly when available.
+
+        ### Where are my files saved?
+
+        Default saves go into your browser's Downloads directory using OnlyFans or OnlyFans/\{creator\} subfolders. On compatible browsers, bulk workflows can also use the File System Access API so you can choose a custom destination folder.
+
+        ### Why does a video show as DRM protected?
+
+        Some OnlyFans videos use DRM or encrypted delivery paths that the extension cannot save. The downloader detects those cases and flags them before a failed download attempt instead of pretending the file is supported.
+
+        ### Do I need to be logged in and subscribed?
+
+        Yes. You must be logged in to OnlyFans and have valid access to the creator's content in your current session. The extension does not bypass subscriptions, permissions, or restricted access.
+
+        ### Does this work on Firefox?
+
+        Yes. Desktop builds are available for Chrome, Edge, Firefox, Brave, Opera, Whale, and Yandex on Windows, macOS, and Linux. Safari and mobile browsers are not supported.
+
+        ### Why does the extension need cookies permission?
+
+        OnlyFans uses your logged-in session to authorize media requests. The cookies permission lets the extension make those authorized requests on your behalf without asking for your account password.
+
+        ### How does the trial work?
+
+        The product uses entitlement-gated trial access after email OTP activation. Ongoing use requires the paid subscription.
+
+        ### Is my data private?
+
+        Yes. Detection, conversion, and download handling run locally in your browser. Creator media is not uploaded to third-party servers.
+
+        ### Is this legal?
+
+        DISCLAIMER: We are not attorneys and do not offer legal advice. Laws vary by country and platform. For any legal question please consult a qualified legal professional.
+
+        We give you full control over download speeds because we believe users should decide how they use their software.
+
+        That said, here are a few widely accepted best practices for safe, responsible downloading:
+
+        - Only download content you created, own, or have explicit permission from the rights holder to access.
+
+        - Protect your personal data by respecting platform rules and rate limits with reasonable download speeds to avoid automated abuse systems putting your account at risk.
+
+        - Protect your privacy by using a reputable VPN for IP protection before initiating downloads — this is the VPN we recommend & use.
+      isUnofficial: false
+      featured: true
+      publishedAt: 2026-05-16T00:00:00.000Z
+      categories:
+        - video-downloaders
+        - fansite-downloaders
+        - social-media-downloaders
+      media:
+        logo: /listing-logos/serpdownloaders.com/onlyfans-downloader.png
+        images:
+          - /media/products/onlyfans-downloader/screenshot-onlyfans-downloader-media-modal.jpg
+          - /media/products/onlyfans-downloader/screenshot-onlyfans-downloader-media-detection.jpg
+          - /media/products/onlyfans-downloader/screenshot-onlyfans-downloader-automatic-download-organization.jpg
+          - /media/products/onlyfans-downloader/screenshot-onlyfans-downloader-creator-selection.jpg
+          - /media/products/onlyfans-downloader/screenshot-onlyfans-downloader-download-button-overlay.jpg
+          - /media/products/onlyfans-downloader/screenshot-onlyfans-downloader-download-progress.jpg
+      resources:
+        - label: Install browser extension
+          url: https://serp.ly/onlyfans-downloader
+        - label: SERP Apps
+          url: https://apps.serp.co/onlyfans-downloader
+        - label: SERP Extensions
+          url: https://extensions.serp.co/extensions/serp/onlyfans-downloader/
+        - label: GitHub repository
+          url: https://github.com/serpapps/onlyfans-downloader
+        - label: ExtensionHub
+          url: https://www.extensionhub.io/extensions/Onlyfans-Downloader-886
+        - label: SERP
+          url: https://serp.co/products/onlyfans-downloader/reviews/
+        - label: SERP AI
+          url: https://serp.ai/products/onlyfans-downloader/reviews/
+        - label: Browser Extensions
+          url: https://browserextensions.io/products/onlyfans-downloader/
+        - label: Latest Release
+          url: https://github.com/serpapps/onlyfans-downloader/releases/latest
+        - label: Firefox Store
+          url: https://addons.mozilla.org/en-US/firefox/addon/onlyfans-video-downloader/
+        - label: Open Collective
+          url: https://opencollective.com/serpapps/projects/onlyfans-bulk-downloader
+        - label: Reddit
+          url: https://www.reddit.com/r/serpdownloaders/comments/1okjpfr/onlyfans_downloader_browser_extension_chrome/
+        - label: Product Hunt
+          url: https://www.producthunt.com/products/onlyfans-downloader-2
+      faqs:
+        - question: How do I download a video from OnlyFans?
+          answer: Open a creator page or post on OnlyFans while logged in, hover the media item, and click the download overlay button. You can also open the extension UI to review detected assets and start the download from there.
+        - question: Can I download images, GIFs, and text posts too?
+          answer: Yes. The extension detects videos, images, GIFs, and text posts. Images and GIFs save in their original format, and text posts can be exported from the detected content list.
+        - question: How does bulk download work?
+          answer: Use the bulk tab on a creator media page to start the built-in gallery scanner. It auto-scrolls, collects visible assets, and lets you download everything or filter by media type such as photos or videos.
+        - question: What quality options are available for videos?
+          answer: When multiple variants are exposed, the extension lists available qualities from direct MP4 or HLS sources and prefers higher-quality options first. The exact choices depend on what the creator page and OnlyFans delivery path provide.
+        - question: What format are video downloads saved in?
+          answer: Supported video downloads are saved as standard MP4 files. HLS streams are converted in-browser, and direct MP4 variants are saved directly when available.
+        - question: Where are my files saved?
+          answer: Default saves go into your browser's Downloads directory using OnlyFans or OnlyFans/{creator} subfolders. On compatible browsers, bulk workflows can also use the File System Access API so you can choose a custom destination folder.
+        - question: Why does a video show as DRM protected?
+          answer: Some OnlyFans videos use DRM or encrypted delivery paths that the extension cannot save. The downloader detects those cases and flags them before a failed download attempt instead of pretending the file is supported.
+        - question: Do I need to be logged in and subscribed?
+          answer: Yes. You must be logged in to OnlyFans and have valid access to the creator's content in your current session. The extension does not bypass subscriptions, permissions, or restricted access.
+        - question: Does this work on Firefox?
+          answer: Yes. Desktop builds are available for Chrome, Edge, Firefox, Brave, Opera, Whale, and Yandex on Windows, macOS, and Linux. Safari and mobile browsers are not supported.
+        - question: Why does the extension need cookies permission?
+          answer: OnlyFans uses your logged-in session to authorize media requests. The cookies permission lets the extension make those authorized requests on your behalf without asking for your account password.
+        - question: How does the trial work?
+          answer: The product uses entitlement-gated trial access after email OTP activation. Ongoing use requires the paid subscription.
+        - question: Is my data private?
+          answer: Yes. Detection, conversion, and download handling run locally in your browser. Creator media is not uploaded to third-party servers.
+        - question: Is this legal?
+          answer: |-
+            DISCLAIMER: We are not attorneys and do not offer legal advice. Laws vary by country and platform. For any legal question please consult a qualified legal professional.
+
+            We give you full control over download speeds because we believe users should decide how they use their software.
+
+            That said, here are a few widely accepted best practices for safe, responsible downloading:
+
+            - Only download content you created, own, or have explicit permission from the rights holder to access.
+
+            - Protect your personal data by respecting platform rules and rate limits with reasonable download speeds to avoid automated abuse systems putting your account at risk.
+
+            - Protect your privacy by using a reputable VPN for IP protection before initiating downloads — this is the VPN we recommend & use.
+    previousCategories:
+      - video-downloaders
+      - fansite-downloaders
+      - social-media-downloaders
