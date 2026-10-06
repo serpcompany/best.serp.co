@@ -64,12 +64,11 @@ interface CreatorProjectsSectionProps {
 const projects: Project[] = [
   {
     name: 'Front-End Checklist',
-    description:
-      'The perfect Front-End Checklist for modern websites and meticulous developers.',
+    description: 'The perfect Front-End Checklist for modern websites and meticulous developers.',
     url: 'https://frontendchecklist.io',
     githubUrl: 'https://github.com/thedaviddias/Front-End-Checklist',
     stars: 71954,
-    tags: ['Frontend', 'Checklist', 'Best Practices'],
+    tags: ['Frontend', 'Checklist', 'Best Practices']
   },
   {
     name: 'UX Patterns for Developers',
@@ -78,7 +77,7 @@ const projects: Project[] = [
     url: 'https://github.com/thedaviddias/ux-patterns-for-developers',
     githubUrl: 'https://github.com/thedaviddias/ux-patterns-for-developers',
     stars: 155,
-    tags: ['UX', 'Design Patterns', 'Accessibility'],
+    tags: ['UX', 'Design Patterns', 'Accessibility']
   },
   {
     name: 'Indie Dev Toolkit',
@@ -87,24 +86,13 @@ const projects: Project[] = [
     url: 'https://github.com/thedaviddias/indie-dev-toolkit',
     githubUrl: 'https://github.com/thedaviddias/indie-dev-toolkit',
     stars: 222,
-    tags: ['Toolkit', 'Indie Hacking', 'Resources'],
-  },
+    tags: ['Toolkit', 'Indie Hacking', 'Resources']
+  }
 ]
 
-export function CreatorProjectsSection({
-  onProjectClick,
-  slots,
-}: CreatorProjectsSectionProps) {
-  const {
-    Badge,
-    Button,
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-    Section,
-  } = slots
+export function CreatorProjectsSection({ onProjectClick, slots }: CreatorProjectsSectionProps) {
+  const { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Section } =
+    slots
 
   return (
     <Section
@@ -170,11 +158,7 @@ export function CreatorProjectsSection({
                         rel="noopener noreferrer"
                         className="flex items-center gap-1.5"
                         onClick={() => {
-                          onProjectClick?.(
-                            project.name,
-                            project.githubUrl as string,
-                            'github'
-                          )
+                          onProjectClick?.(project.name, project.githubUrl as string, 'github')
                         }}
                       >
                         <Github className="h-3 w-3" />
@@ -190,8 +174,7 @@ export function CreatorProjectsSection({
 
         <div className="border-t border-border/50 pt-4 text-center">
           <p className="mb-3 text-sm text-muted-foreground">
-            Like these projects? Check out David&apos;s GitHub for more open-source
-            contributions.
+            Like these projects? Check out David&apos;s GitHub for more open-source contributions.
           </p>
           <Button variant="outline" asChild>
             <a

@@ -2,14 +2,7 @@
 
 import { ArrowUp } from 'lucide-react'
 import Script from 'next/script'
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from 'react'
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react'
 
 interface GoogleTagManagerProps {
   gtmId?: string
@@ -128,8 +121,7 @@ export function FavoritesProvider({ children }: FavoritesProviderProps) {
 
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newFavorites))
-    } catch {
-    }
+    } catch {}
   }, [])
 
   const isFavorite = useCallback(
@@ -153,7 +145,7 @@ export function FavoritesProvider({ children }: FavoritesProviderProps) {
   const removeFavorite = useCallback(
     (slug: string) => {
       if (favorites.includes(slug)) {
-        const newFavorites = favorites.filter((fav) => fav !== slug)
+        const newFavorites = favorites.filter(fav => fav !== slug)
         setFavorites(newFavorites)
         saveFavoritesToStorage(newFavorites)
       }
@@ -178,14 +170,10 @@ export function FavoritesProvider({ children }: FavoritesProviderProps) {
     addFavorite,
     removeFavorite,
     toggleFavorite,
-    isLoading,
+    isLoading
   }
 
-  return (
-    <FavoritesContext.Provider value={value}>
-      {children}
-    </FavoritesContext.Provider>
-  )
+  return <FavoritesContext.Provider value={value}>{children}</FavoritesContext.Provider>
 }
 
 export function useFavorites(): FavoritesContextValue {
@@ -198,7 +186,7 @@ export function useFavorites(): FavoritesContextValue {
       addFavorite: () => {},
       removeFavorite: () => {},
       toggleFavorite: () => {},
-      isLoading: true,
+      isLoading: true
     }
   }
 

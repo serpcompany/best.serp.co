@@ -48,7 +48,7 @@ function getDifficultyColor(difficulty: GuideMetadata['difficulty']) {
 export function GuideCard({
   guide,
   index = 0,
-  slots: { Badge, Card, CardContent },
+  slots: { Badge, Card, CardContent }
 }: GuideCardProps) {
   return (
     <Card
