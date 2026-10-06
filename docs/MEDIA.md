@@ -55,7 +55,7 @@ a drifted binding or host. `next.config.ts` allows both hosts for `/best.serp.co
   all set or all null (`listing_media_hosted_complete`, null-safe, no LIKE pattern). `url` keeps
   where the bytes came from. A logo or image row without a key is an imported reference the
   legacy migration has not repointed yet; it renders as before until then.
-- `media_ingestions` (migration `0006`, a runtime table) holds slots that are not hosted yet: one
+- `media_ingestions` (migration `0007`, a runtime table) holds slots that are not hosted yet: one
   per listing, submission, or revision (exactly one), kind, and sort order. `pending` slots are
   due at `next_attempt_at`; `failed` slots stopped retrying and keep the reason; a submission's
   or a revision's slot becomes `hosted` with its pending key. A listing slot queued by an
