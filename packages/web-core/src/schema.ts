@@ -10,6 +10,14 @@ export interface SchemaOrg {
   [key: string]: any
 }
 
+/**
+ * What the listed product costs, when known: `price` is a decimal amount such as `19.99` and
+ * `currency` an ISO 4217 code such as `USD`. The D1 catalog records no product pricing yet
+ * (serpcompany/best.serp.co#88), so catalog listings carry none and their JSON-LD makes no
+ * price claim. This is not the submission plan, which is the fee a submitter pays the directory.
+ */
+export type ListingPricing = { model: 'free' } | { model: 'paid'; price: string; currency: string }
+
 export interface WebsiteMetadataLike {
   category: string
   description: string
@@ -19,6 +27,7 @@ export interface WebsiteMetadataLike {
     images?: string[]
     logo?: string
   }
+  pricing?: ListingPricing
   resourceLinks?: Array<{ label: string; url: string }>
   slug: string
   website: string
@@ -120,6 +129,7 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
   const listingLabel = siteCopy.listingName.singular
   const listingLabelTitle = siteCopy.listingName.singularTitle
   const primaryImageUrl = resolveSchemaImageUrl(website)
+  const offer = resolveSchemaOffer(website.pricing)
 
   return {
     '@context': 'https://schema.org',
@@ -174,12 +184,7 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
         url: website.website,
         applicationCategory: categoryFormatted,
         operatingSystem: 'Web Browser',
-        offers: {
-          '@type': 'Offer',
-          price: '0',
-          priceCurrency: 'USD',
-          availability: 'https://schema.org/InStock'
-        },
+        ...(offer ? { offers: offer } : {}),
         publisher: {
           '@type': 'Organization',
           name: website.name,
@@ -270,6 +275,43 @@ function resolveSchemaImageUrl(website: WebsiteMetadataLike): string | undefined
   if (!shouldUseProvidedListingLogo(logo) || !logo) return undefined
   if (logo.startsWith('/')) return `${SITE_PUBLIC_URL}${logo}`
   return logo
+}
+
+const schemaPricePattern = /^(?:0|[1-9]\d*)(?:\.\d+)?$/u
+const schemaCurrencyPattern = /^[A-Z]{3}$/u
+
+/**
+ * The SoftwareApplication offer, or undefined unless the product's pricing is known. Google
+ * reads `price: '0'` as "free", so a default offer would call every paid product free. Google's
+ * software app rich result needs `offers.price` and a rating or review; listings carry neither
+ * rating nor review, so omitting an unknown price costs no rich result. A model other than
+ * `free` or `paid`, a paid price that is not a plain positive decimal, or a currency that is not
+ * three uppercase letters is omitted rather than guessed.
+ */
+function resolveSchemaOffer(pricing: ListingPricing | undefined) {
+  if (!pricing) return undefined
+  if (pricing.model === 'free') {
+    return {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock'
+    }
+  }
+  if (
+    pricing.model !== 'paid' ||
+    !schemaPricePattern.test(pricing.price) ||
+    Number(pricing.price) <= 0 ||
+    !schemaCurrencyPattern.test(pricing.currency)
+  ) {
+    return undefined
+  }
+  return {
+    '@type': 'Offer',
+    price: pricing.price,
+    priceCurrency: pricing.currency,
+    availability: 'https://schema.org/InStock'
+  }
 }
 
 export function generateCollectionSchema(websites: WebsiteMetadataLike[]): CollectionPageSchema {
