@@ -377,7 +377,8 @@ describe('claim flow', () => {
   })
 
   it('claims a serp.ly-linked listing only through the product’s own domain', async () => {
-    // A domain slug is the product's domain; the badge is checked on that domain's page.
+    // A domain slug whose link lands on that domain: the badge is checked on the landing page.
+    landings['https://serp.ly/jasper'] = 'https://www.jasper.ai/?fpr=devin'
     const start = (listingSlug: string, email: string) =>
       startClaim(deps(), { email, listingSlug, method: 'badge', userId: 'user_a' })
     await expect(start('jasper.ai', 'jo@serp.ly')).resolves.toMatchObject({
@@ -390,10 +391,14 @@ describe('claim flow', () => {
       code: lastCode(),
       userId: 'user_a'
     })
-    await checkClaimBadge(badgeDeps(), { actor: 'a', claimId: jasper.claim.id, userId: 'user_a' })
-    expect(checkedPages).toEqual(['https://jasper.ai/'])
+    // Completion uses the stored domain: serp.ly being down now changes nothing.
+    landings['https://serp.ly/jasper'] = null
+    await expect(
+      checkClaimBadge(badgeDeps(), { actor: 'a', claimId: jasper.claim.id, userId: 'user_a' })
+    ).resolves.toMatchObject({ claim: { status: 'completed' }, ok: true })
+    expect(checkedPages).toEqual(['https://www.jasper.ai/'])
     expect(row(`SELECT product_url FROM listing_claims WHERE listing_id='lst_jasper'`)).toEqual({
-      product_url: 'https://jasper.ai/'
+      product_url: 'https://www.jasper.ai/'
     })
     // The weekly program checks the claimer's product page, not the serp.ly link.
     const program = createBadgeProgramOperations({ client: createDatabase(sqlite.asD1Database()) })
@@ -402,7 +407,9 @@ describe('claim flow', () => {
       limit: 10,
       now: new Date(clock).toISOString()
     })
-    expect(due.map(item => [item.id, item.website])).toEqual([['lst_jasper', 'https://jasper.ai/']])
+    expect(due.map(item => [item.id, item.website])).toEqual([
+      ['lst_jasper', 'https://www.jasper.ai/']
+    ])
 
     // A name slug: the serp.ly link's landing page decides (the safe fetcher follows it).
     landings['https://serp.ly/notion'] = 'https://www.notion.com/?fpr=devin'
@@ -415,14 +422,58 @@ describe('claim flow', () => {
       email_domain: 'notion.com',
       product_url: 'https://www.notion.com/'
     })
-    // A link that lands nowhere, or on SERP's own page: no product domain, no claim.
-    for (const landing of [null, 'https://serp.co/products/lost-tool/']) {
-      landings['https://serp.ly/lost'] = landing
-      await expect(start('lost-tool', 'jo@lost.example')).resolves.toMatchObject({
-        code: 'no_product_domain',
-        status: 409
-      })
-    }
+    // A link that lands on SERP's own page: no product domain. One that can't be followed: the
+    // owner reviews it, and the claimer gets the contact path.
+    landings['https://serp.ly/lost'] = 'https://serp.co/products/lost-tool/'
+    await expect(start('lost-tool', 'jo@lost.example')).resolves.toMatchObject({
+      code: 'no_product_domain',
+      status: 409
+    })
+    landings['https://serp.ly/lost'] = null
+    await expect(start('lost-tool', 'jo@lost.example')).resolves.toEqual({
+      code: 'review_required',
+      contactPath: '/contact/',
+      ok: false,
+      status: 409
+    })
+  })
+
+  it('sends #100’s owner-review listings and disagreeing links to the contact path', async () => {
+    // codementorgpt.com is unregistered today (#108 review round 2): whoever registers it and
+    // sets up mail would pass the email step, so an instant claim is refused.
+    sqlite.database.exec(`
+      INSERT INTO listings (id, slug, name, description, website, status, source_kind,
+        source_identity, checksum)
+      VALUES ('lst_lapsed', 'codementorgpt.com', 'CodeMentorGPT', 'd',
+        'https://serp.ly/codementorgpt', 'draft', 'fixture', 'lst_lapsed', 'c');
+      INSERT INTO listing_categories VALUES ('lst_lapsed', 1, 0, 1);
+      UPDATE listings SET status = 'approved', published_at = '2026-05-16' WHERE id = 'lst_lapsed';
+      INSERT INTO listing_claim_holds (listing_id, reason, source)
+        VALUES ('lst_lapsed', 'unreachable', 'd1/hygiene/2026-10-06-listing-domains.yaml');
+    `)
+    // Even with a page that seems right (the new registrant's), the hold refuses it.
+    landings['https://serp.ly/codementorgpt'] = 'https://codementorgpt.com/'
+    const start = (listingSlug: string, email: string) =>
+      startClaim(deps(), { email, listingSlug, method: 'badge', userId: 'user_a' })
+    await expect(start('codementorgpt.com', 'me@codementorgpt.com')).resolves.toMatchObject({
+      code: 'review_required',
+      contactPath: '/contact/'
+    })
+    // Off-domain: the slug says jasper.ai, the link lands elsewhere.
+    landings['https://serp.ly/jasper'] = 'https://evil.example/'
+    await expect(start('jasper.ai', 'jo@jasper.ai')).resolves.toMatchObject({
+      code: 'review_required'
+    })
+    await expect(start('jasper.ai', 'jo@evil.example')).resolves.toMatchObject({
+      code: 'review_required'
+    })
+    // A cleared hold lets the claim through.
+    sqlite.database.exec(`UPDATE listing_claim_holds SET cleared_at='2026-10-06T11:00:00.000Z',
+      cleared_by='admin@example.com' WHERE listing_id='lst_lapsed'`)
+    await expect(start('codementorgpt.com', 'me@codementorgpt.com')).resolves.toMatchObject({
+      ok: true
+    })
+    expect(sent).toHaveLength(1)
   })
 
   it('re-checks the product domain at completion and reports a removed ownership', async () => {

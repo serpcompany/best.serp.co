@@ -1348,6 +1348,12 @@ export const listingClaims = sqliteTable(
      * domain, the website, or where a `serp.ly` link lands (#108 review round 1).
      */
     productUrl: text('product_url').notNull(),
+    /**
+     * The listing's website when the product domain was resolved. Completion compares against the
+     * claim's stored domain and refetches only when the listing's website changed since (#108
+     * review round 2).
+     */
+    listingWebsite: text('listing_website').notNull(),
     codeHash: text('code_hash'),
     codeSentAt: text('code_sent_at').notNull(),
     codeExpiresAt: text('code_expires_at').notNull(),
@@ -1392,6 +1398,43 @@ export const listingClaims = sqliteTable(
       .where(sql`${table.status} IN (${sqlList(openListingClaimStatuses)})`),
     index('listing_claims_listing_idx').on(table.listingId),
     index('listing_claims_user_idx').on(table.userId, table.createdAt)
+  ]
+)
+
+export const listingClaimHoldReasons = ['off_domain', 'unreachable', 'admin'] as const
+export type ListingClaimHoldReason = (typeof listingClaimHoldReasons)[number]
+
+/**
+ * Listings whose instant claim is held for the owner's review (#67, #108 review round 2):
+ * #100's owner-review sets (the link ends on another company's domain, or the site is
+ * unreachable, `d1/hygiene/2026-10-06-listing-domains.yaml`), seeded by `0008_listing_claims`,
+ * and any an admin adds. A held listing answers every claim with the contact path, because a
+ * lapsed or reassigned domain could otherwise be registered and claimed by someone else. An admin
+ * clears a hold by setting `cleared_at`.
+ */
+export const listingClaimHolds = sqliteTable(
+  'listing_claim_holds',
+  {
+    listingId: text('listing_id')
+      .primaryKey()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    reason: text('reason', { enum: listingClaimHoldReasons }).notNull(),
+    /** Where the hold came from: the hygiene report, or the admin who added it. */
+    source: text('source').notNull(),
+    createdAt: text('created_at').notNull().default(currentTimestamp),
+    clearedAt: text('cleared_at'),
+    clearedBy: text('cleared_by')
+  },
+  table => [
+    check(
+      'listing_claim_holds_reason_valid',
+      sql`${table.reason} IN (${sqlList(listingClaimHoldReasons)})`
+    ),
+    check('listing_claim_holds_cleared_at_iso', isoInstantCheck(table.clearedAt)),
+    check(
+      'listing_claim_holds_cleared_complete',
+      sql`(${table.clearedAt} IS NULL) = (${table.clearedBy} IS NULL)`
+    )
   ]
 )
 

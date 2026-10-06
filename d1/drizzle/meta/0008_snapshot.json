@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "b4d114d3-cfd6-48a1-89c8-b05a9e5ed890",
+  "id": "fb964606-4635-4f81-8105-357f8e5df876",
   "prevId": "876f34c4-6293-4c68-be1b-a5b7bf95fb3f",
   "tables": {
     "accounts": {
@@ -578,6 +578,82 @@
         }
       }
     },
+    "listing_claim_holds": {
+      "name": "listing_claim_holds",
+      "columns": {
+        "listing_id": {
+          "name": "listing_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "cleared_at": {
+          "name": "cleared_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cleared_by": {
+          "name": "cleared_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "listing_claim_holds_listing_id_listings_id_fk": {
+          "name": "listing_claim_holds_listing_id_listings_id_fk",
+          "tableFrom": "listing_claim_holds",
+          "tableTo": "listings",
+          "columnsFrom": ["listing_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listing_claim_holds_reason_valid": {
+          "name": "listing_claim_holds_reason_valid",
+          "value": "\"listing_claim_holds\".\"reason\" IN ('off_domain', 'unreachable', 'admin')"
+        },
+        "listing_claim_holds_cleared_at_iso": {
+          "name": "listing_claim_holds_cleared_at_iso",
+          "value": "\"cleared_at\" IS strftime('%Y-%m-%dT%H:%M:%fZ', \"cleared_at\")"
+        },
+        "listing_claim_holds_cleared_complete": {
+          "name": "listing_claim_holds_cleared_complete",
+          "value": "(\"listing_claim_holds\".\"cleared_at\" IS NULL) = (\"listing_claim_holds\".\"cleared_by\" IS NULL)"
+        }
+      }
+    },
     "listing_claims": {
       "name": "listing_claims",
       "columns": {
@@ -633,6 +709,13 @@
         },
         "product_url": {
           "name": "product_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "listing_website": {
+          "name": "listing_website",
           "type": "text",
           "primaryKey": false,
           "notNull": true,

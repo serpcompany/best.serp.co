@@ -14,8 +14,9 @@ import { urlKey } from '@serpdirectory/utils/url-key'
  *    (HTTP redirects, then up to two `<meta http-equiv="refresh">` hops, as `serp.ly` answers),
  *    and the landing page's domain counts unless it is SERP's or another redirector.
  *
- * Otherwise there is no product domain and the listing can't be claimed. SERP's own domains are
- * never a claim domain, so `@serp.ly` mail never proves anything.
+ * The slug and the landing must agree, and a link that can't be followed is not guessed at:
+ * either goes to the owner's review (#108 review round 2). SERP's own domains are never a claim
+ * domain, so `@serp.ly` mail never proves anything.
  */
 
 /** SERP's own sites (`scripts/listing-domain-classifier.ts`). */
@@ -83,48 +84,65 @@ export interface ProductSite {
 export type ResolveLanding = (url: string) => Promise<string | null>
 
 /**
- * The product's site from what the listing stores, without the network, or null. The website
- * page counts when it is on the product's domain (a submitted listing's own site, with its
- * scheme and port); otherwise the slug's host.
+ * Why a listing has no product site to claim: `review` when the owner must decide (the slug's
+ * domain and where the link lands disagree, or the link can't be followed: a lapsed or
+ * reassigned domain could be registered by anyone), `none` when the link ends on SERP's own
+ * pages or a shortener.
  */
-export function storedProductSite(listing: { slug: string; website: string }): ProductSite | null {
-  const websiteDomain = registrableOf(listing.website)
-  const ownWebsite = websiteDomain && !isForeignDomain(websiteDomain) ? websiteDomain : null
-  if (listing.slug.includes('.')) {
-    try {
-      const key = urlKey(`https://${listing.slug}/`)
-      if (key.coversSubdomains && !isForeignDomain(key.blockKey)) {
-        return key.blockKey === ownWebsite
-          ? { domain: key.blockKey, url: listing.website }
-          : { domain: key.blockKey, url: `https://${key.hostKey}/` }
-      }
-    } catch {
-      // Not a host name: fall through.
-    }
+export type ProductSiteResult =
+  | { ok: false; reason: 'none' | 'review' }
+  | { ok: true; site: ProductSite }
+
+/** The slug's registrable domain and host, when the slug is a host outside SERP's domains. */
+function slugSite(slug: string): { domain: string; host: string } | null {
+  if (!slug.includes('.')) return null
+  try {
+    const key = urlKey(`https://${slug}/`)
+    return key.coversSubdomains && !isForeignDomain(key.blockKey)
+      ? { domain: key.blockKey, host: key.hostKey }
+      : null
+  } catch {
+    return null
   }
-  return ownWebsite ? { domain: ownWebsite, url: listing.website } : null
 }
 
-/** The product's site: stored, else where the website's link lands. */
+/**
+ * The product's site (#108 review rounds 1 and 2):
+ * - a website on the product's own domain is the product's site, provided the slug, when it is a
+ *   domain, is the same domain;
+ * - a website on SERP's or a shortener's domain (`serp.ly`) is followed to where it lands; the
+ *   landing's domain is the product's, provided it isn't SERP's and the slug, when it is a domain,
+ *   is the same domain.
+ * Anything else needs the owner's review, so the claim goes to the contact path.
+ */
 export async function productSite(
   listing: { slug: string; website: string },
   resolveLanding: ResolveLanding
-): Promise<ProductSite | null> {
-  const stored = storedProductSite(listing)
-  if (stored) return stored
-  if (!registrableOf(listing.website)) return null
+): Promise<ProductSiteResult> {
+  const slug = slugSite(listing.slug)
+  const websiteDomain = registrableOf(listing.website)
+  if (websiteDomain && !isForeignDomain(websiteDomain)) {
+    if (slug && slug.domain !== websiteDomain) return { ok: false, reason: 'review' }
+    return { ok: true, site: { domain: websiteDomain, url: listing.website } }
+  }
+  if (!websiteDomain) return { ok: false, reason: slug ? 'review' : 'none' }
   const landing = await resolveLanding(listing.website)
-  const domain = landing ? registrableOf(landing) : null
-  if (!landing || !domain || isForeignDomain(domain)) return null
-  return { domain, url: `${new URL(landing).origin}/` }
+  if (!landing) return { ok: false, reason: 'review' }
+  const domain = registrableOf(landing)
+  if (!domain || isForeignDomain(domain)) return { ok: false, reason: slug ? 'review' : 'none' }
+  if (slug && slug.domain !== domain) return { ok: false, reason: 'review' }
+  return { ok: true, site: { domain, url: `${new URL(landing).origin}/` } }
 }
 
-const MAX_REFRESH_HOPS = 2
-const LANDING_MAX_BYTES = 256_000
+/** Meta-refresh hops followed; a chain still refreshing after them doesn't resolve. */
+const MAX_REFRESH_HOPS = 5
+/** Real homepages are large (`www.jasper.ai` is past 256 KB). */
+const LANDING_MAX_BYTES = 2_000_000
 
 /** A `<meta http-equiv="refresh" content="0; url=…">` target, resolved against the page. */
 export function metaRefreshTarget(html: string, pageUrl: string): string | null {
-  for (const tag of html.match(/<meta\b[^>]*>/giu) ?? []) {
+  const live = html.replace(/<!--[\s\S]*?(?:-->|$)/gu, '')
+  for (const tag of live.match(/<meta\b[^>]*>/giu) ?? []) {
     if (!/http-equiv\s*=\s*["']?refresh/iu.test(tag)) continue
     const target = /content\s*=\s*["'][^"']*?url\s*=\s*['"]?([^"'>\s;]+)/iu.exec(
       tag.replaceAll('&amp;', '&')
@@ -139,7 +157,12 @@ export function metaRefreshTarget(html: string, pageUrl: string): string | null 
   return null
 }
 
-/** Follows a listing link to its landing page through the shared safe fetcher. */
+/**
+ * Follows a listing link to its landing page through the shared safe fetcher: HTTP redirects,
+ * then `meta refresh` hops (at most `MAX_REFRESH_HOPS`). Null when any page in the chain can't be
+ * loaded (a 403, a timeout, a page past the size cap) or the chain is still refreshing at the end:
+ * the claim then goes to the owner's review.
+ */
 export function safeResolveLanding(fetcher: typeof fetch = fetch): ResolveLanding {
   return async url => {
     let current = url
@@ -152,7 +175,7 @@ export function safeResolveLanding(fetcher: typeof fetch = fetch): ResolveLandin
       })
       if (!page.ok) return null
       const next = metaRefreshTarget(new TextDecoder().decode(page.body), page.url)
-      if (!next || next === page.url || hop === MAX_REFRESH_HOPS) return page.url
+      if (!next || next === page.url) return page.url
       current = next
     }
     return null

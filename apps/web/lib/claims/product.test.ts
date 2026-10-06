@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  domainPinnedFetcher,
-  metaRefreshTarget,
-  productSite,
-  safeResolveLanding,
-  storedProductSite
-} from './product'
+import { domainPinnedFetcher, metaRefreshTarget, productSite, safeResolveLanding } from './product'
 
 /** A fake web: `serp.ly` answers with a meta refresh (as Short.io does), the rest with pages. */
 function fakeWeb(pages: Record<string, { body?: string; location?: string; status?: number }>) {
@@ -30,38 +24,75 @@ const refresh = (target: string) =>
   `<!doctype html><html><head><meta http-equiv="refresh" content="0; url=${target}"></head></html>`
 
 describe('the product’s own site', () => {
-  it('uses the slug’s domain, or the website when it is the product’s own', () => {
-    expect(storedProductSite({ slug: 'jasper.ai', website: 'https://serp.ly/jasper' })).toEqual({
-      domain: 'jasper.ai',
-      url: 'https://jasper.ai/'
+  const offline: Parameters<typeof productSite>[1] = async () => {
+    throw new Error('no network expected')
+  }
+
+  it('uses a website on the product’s own domain, when the slug agrees', async () => {
+    await expect(
+      productSite({ slug: 'app.brieflow.ai', website: 'http://app.brieflow.ai:8080/x' }, offline)
+    ).resolves.toEqual({
+      ok: true,
+      site: { domain: 'brieflow.ai', url: 'http://app.brieflow.ai:8080/x' }
     })
-    expect(
-      storedProductSite({ slug: 'app.brieflow.ai', website: 'http://app.brieflow.ai:8080/x' })
-    ).toEqual({ domain: 'brieflow.ai', url: 'http://app.brieflow.ai:8080/x' })
-    expect(storedProductSite({ slug: 'notion', website: 'https://www.notion.so/' })).toEqual({
-      domain: 'notion.so',
-      url: 'https://www.notion.so/'
-    })
-    // SERP's domains and link shorteners are never the product's.
-    expect(storedProductSite({ slug: 'notion', website: 'https://serp.ly/notion' })).toBeNull()
-    expect(storedProductSite({ slug: 'serp.co', website: 'https://bit.ly/x' })).toBeNull()
+    await expect(
+      productSite({ slug: 'notion', website: 'https://www.notion.so/' }, offline)
+    ).resolves.toEqual({ ok: true, site: { domain: 'notion.so', url: 'https://www.notion.so/' } })
+    // A slug domain that isn't the website's: the owner reviews it.
+    await expect(
+      productSite({ slug: 'notion.com', website: 'https://www.notion.so/' }, offline)
+    ).resolves.toEqual({ ok: false, reason: 'review' })
   })
 
-  it('follows a serp.ly link’s meta refresh to the landing page through the safe fetcher', async () => {
+  it('follows a serp.ly link’s meta refresh chain to the landing page through the safe fetcher', async () => {
+    const big = `<html><body>${'x'.repeat(600_000)}</body></html>`
     const web = fakeWeb({
-      'https://serp.ly/notion': { body: refresh('https://www.notion.com/?fpr=devin') },
-      'https://www.notion.com/?fpr=devin': { body: '<html><body>Notion</body></html>' }
+      'https://serp.ly/jasper': { body: refresh('https://www.jasper.ai/?fpr=devin') },
+      // Real homepages are large: past the old 256 KB cap.
+      'https://www.jasper.ai/?fpr=devin': { body: big },
+      'https://serp.ly/notion': { body: refresh('https://hop.example/one') },
+      'https://hop.example/one': { body: refresh('https://www.notion.com/') },
+      'https://www.notion.com/': {
+        body: '<html><!-- <meta http-equiv="refresh" content="0; url=https://evil.example/"> --></html>'
+      }
     })
     const resolve = safeResolveLanding(web.fetcher)
     await expect(
+      productSite({ slug: 'jasper.ai', website: 'https://serp.ly/jasper' }, resolve)
+    ).resolves.toEqual({ ok: true, site: { domain: 'jasper.ai', url: 'https://www.jasper.ai/' } })
+    await expect(
       productSite({ slug: 'notion', website: 'https://serp.ly/notion' }, resolve)
-    ).resolves.toEqual({ domain: 'notion.com', url: 'https://www.notion.com/' })
-    // A slug domain needs no network.
-    await productSite({ slug: 'jasper.ai', website: 'https://serp.ly/jasper' }, resolve)
-    expect(web.requested).toEqual(['https://serp.ly/notion', 'https://www.notion.com/?fpr=devin'])
+    ).resolves.toEqual({ ok: true, site: { domain: 'notion.com', url: 'https://www.notion.com/' } })
   })
 
-  it('finds no product domain when the link fails or lands on SERP or a shortener', async () => {
+  it('sends a disagreeing or unresolvable link to the owner’s review', async () => {
+    const web = fakeWeb({
+      // The slug's domain lapsed: the link now lands on someone else's site (#100 off-domain).
+      'https://serp.ly/babbl': { body: refresh('https://babbl-labs.com/') },
+      'https://babbl-labs.com/': { body: '<html></html>' },
+      // A destination that refuses our checker, or doesn't exist (an unregistered domain).
+      'https://serp.ly/refused': { body: refresh('https://refused.example/') },
+      'https://refused.example/': { body: 'no', status: 403 },
+      'https://serp.ly/codementorgpt': { body: refresh('https://codementorgpt.com/') },
+      // A chain that never ends.
+      'https://serp.ly/loop': { body: refresh('https://a.example/') },
+      'https://a.example/': { body: refresh('https://serp.ly/loop') }
+    })
+    const resolve = safeResolveLanding(web.fetcher)
+    for (const [slug, website] of [
+      ['babbl.dev', 'https://serp.ly/babbl'],
+      ['refused.example', 'https://serp.ly/refused'],
+      ['codementorgpt.com', 'https://serp.ly/codementorgpt'],
+      ['loop-tool', 'https://serp.ly/loop']
+    ] as const) {
+      await expect(productSite({ slug, website }, resolve), slug).resolves.toEqual({
+        ok: false,
+        reason: 'review'
+      })
+    }
+  })
+
+  it('finds no product domain when a name slug’s link lands on SERP or a shortener', async () => {
     const web = fakeWeb({
       'https://serp.ly/a': { body: refresh('https://serp.co/products/a/') },
       'https://serp.co/products/a/': { body: '<html></html>' },
@@ -69,8 +100,11 @@ describe('the product’s own site', () => {
       'https://bit.ly/zz': { body: '<html></html>' }
     })
     const resolve = safeResolveLanding(web.fetcher)
-    for (const website of ['https://serp.ly/a', 'https://serp.ly/b', 'https://serp.ly/missing']) {
-      await expect(productSite({ slug: 'x', website }, resolve), website).resolves.toBeNull()
+    for (const website of ['https://serp.ly/a', 'https://serp.ly/b']) {
+      await expect(productSite({ slug: 'x', website }, resolve), website).resolves.toEqual({
+        ok: false,
+        reason: 'none'
+      })
     }
   })
 

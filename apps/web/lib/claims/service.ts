@@ -83,6 +83,7 @@ export type ClaimFailureCode =
   | 'already_owned'
   | 'no_product_domain'
   | 'not_owner'
+  | 'review_required'
   | 'blocked'
   | 'changed'
   | 'code_expired'
@@ -100,7 +101,7 @@ export type ClaimFailureCode =
 export interface ClaimFailure {
   attemptsLeft?: number
   code: ClaimFailureCode
-  /** Set for `already_owned`. */
+  /** Set for `already_owned` and `review_required`. */
   contactPath?: string
   ok: false
   retryAfterSeconds?: number
@@ -170,6 +171,11 @@ function owned(deps: ClaimDependencies): ClaimFailure {
   return fail(409, 'already_owned', { contactPath: deps.contactPath })
 }
 
+/** A listing whose ownership the owner decides: the claimer gets in touch instead. */
+function review(deps: Pick<ClaimDependencies, 'contactPath'>): ClaimFailure {
+  return fail(409, 'review_required', { contactPath: deps.contactPath })
+}
+
 /** The listing a claim may target, or why not. */
 async function claimableListing(
   deps: ClaimDependencies,
@@ -178,8 +184,13 @@ async function claimableListing(
   const listing = await deps.operations.listing(by)
   if (!listing?.live) return fail(404, 'not_found')
   if (listing.ownerUserId) return owned(deps)
-  const site = await productSite(listing, deps.resolveLanding)
-  if (!site) return fail(409, 'no_product_domain')
+  // #100's owner-review sets, and anything an admin holds: the owner decides, not a claim.
+  if (await deps.operations.held(listing.id)) return review(deps)
+  const resolved = await productSite(listing, deps.resolveLanding)
+  if (!resolved.ok) {
+    return resolved.reason === 'review' ? review(deps) : fail(409, 'no_product_domain')
+  }
+  const { site } = resolved
   if (await deps.operations.blocked(claimBlockKeys(site))) return fail(409, 'blocked')
   return { listing, ok: true, site }
 }
@@ -227,6 +238,7 @@ export async function startClaim(
     email: address.address,
     emailDomain: address.domain,
     method,
+    listingWebsite: listing.website,
     now: at,
     productUrl: site.url
   } as const
@@ -325,14 +337,19 @@ export async function confirmClaimEmail(
   })
 }
 
-/** True while the listing's product domain is still the one the claim's address proved. */
+/**
+ * True while the listing's product domain is still the one the claim's address proved. The claim
+ * stores the domain and the website it came from, so nothing is fetched unless an admin changed
+ * the website since (#108 review round 2): a fetch that fails then counts as a change.
+ */
 async function sameProductDomain(
   deps: Pick<ClaimDependencies, 'resolveLanding'>,
   claim: ListingClaim,
   listing: ClaimListing
 ): Promise<boolean> {
-  const site = await productSite(listing, deps.resolveLanding)
-  return site?.domain === claim.emailDomain
+  if (listing.website === claim.listingWebsite) return true
+  const resolved = await productSite(listing, deps.resolveLanding)
+  return resolved.ok && resolved.site.domain === claim.emailDomain
 }
 
 function confirmationExpired(claim: ListingClaim, now: Date): boolean {
@@ -401,7 +418,8 @@ export async function checkClaimBadge(
   const done = await deps.operations.complete({ actor: input.actor, claim, now: now.toISOString() })
   if (!done) {
     const current = await deps.operations.listing({ id: listing.id })
-    return current?.ownerUserId ? owned(deps) : fail(409, 'changed')
+    if (current?.ownerUserId) return owned(deps)
+    return (await deps.operations.held(listing.id)) ? review(deps) : fail(409, 'changed')
   }
   const completed = await deps.operations.claim(input)
   return { claim: view(completed ?? claim, listing), ok: true, result }

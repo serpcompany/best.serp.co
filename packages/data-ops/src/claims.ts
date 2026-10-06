@@ -62,6 +62,8 @@ export interface ListingClaim {
   listingId: string
   lockedUntil: string | null
   method: ListingClaimMethod
+  /** The listing's website when the claim's product domain was resolved. */
+  listingWebsite: string
   /** The product page the badge must be on (the claim domain's). */
   productUrl: string
   status: ListingClaimStatus
@@ -82,17 +84,22 @@ interface ClaimRow {
   id: string
   listing_id: string
   locked_until: string | null
+  listing_website: string
   method: ListingClaimMethod
   product_url: string
   status: ListingClaimStatus
   user_id: string
 }
 
-const CLAIM_COLUMNS = `c.id,c.listing_id,c.user_id,c.method,c.status,c.email,c.email_domain,c.product_url,
+const CLAIM_COLUMNS = `c.id,c.listing_id,c.user_id,c.method,c.status,c.email,c.email_domain,c.product_url,c.listing_website,
   c.code_sent_at,c.code_expires_at,c.codes_sent,c.attempts,c.locked_until,c.email_verified_at,
   c.badge_checked_at,c.completed_at,(c.code_hash IS NOT NULL) AS code_pending`
 
 const OPEN = `c.status IN ('code_sent','email_verified')`
+
+/** No active claim hold on listing `${listingSql}` (#108 review round 2). */
+const unheld = (listingSql: string) => `NOT EXISTS (SELECT 1 FROM listing_claim_holds h
+  WHERE h.listing_id=${listingSql} AND h.cleared_at IS NULL)`
 
 /** No current owner on listing `${listingSql}`. */
 const ownerless = (listingSql: string) => `NOT EXISTS (SELECT 1 FROM listing_owners o
@@ -124,6 +131,15 @@ export function selectClaimBlockedPlan(keys: readonly string[]): StatementPlan {
   }
 }
 
+/** True while an active claim hold covers the listing (#100's owner-review sets, or an admin). */
+export function selectClaimHeldPlan(listingId: string): StatementPlan {
+  return {
+    sql: `SELECT EXISTS (SELECT 1 FROM listing_claim_holds
+      WHERE listing_id=? AND cleared_at IS NULL) AS held`,
+    params: [listingId]
+  }
+}
+
 /** The claimer's own claim, by id. */
 export function selectClaimPlan(input: { claimId: string; userId: string }): StatementPlan {
   return {
@@ -147,6 +163,8 @@ export interface ClaimCodeInput {
   email: string
   emailDomain: string
   method: ListingClaimMethod
+  /** The listing's website the product domain was resolved from. */
+  listingWebsite: string
   now: string
   productUrl: string
 }
@@ -161,10 +179,10 @@ export function buildStartClaimPlans(
   return [
     {
       sql: `INSERT INTO listing_claims (id,listing_id,user_id,method,status,email,email_domain,
-          product_url,code_hash,code_sent_at,code_expires_at,codes_sent,attempts,created_at,
-          updated_at)
-        SELECT ?,?,?,?,'code_sent',?,?,?,?,?,?,1,0,?,? WHERE ${listingIsLiveGuard('?')}
-          AND ${ownerless('?')}`,
+          product_url,listing_website,code_hash,code_sent_at,code_expires_at,codes_sent,attempts,
+          created_at,updated_at)
+        SELECT ?,?,?,?,'code_sent',?,?,?,?,?,?,?,1,0,?,? WHERE ${listingIsLiveGuard('?')}
+          AND ${ownerless('?')} AND ${unheld('?')}`,
       params: [
         input.claimId,
         input.listingId,
@@ -173,11 +191,13 @@ export function buildStartClaimPlans(
         input.email,
         input.emailDomain,
         input.productUrl,
+        input.listingWebsite,
         input.codeHash,
         input.now,
         input.codeExpiresAt,
         input.now,
         input.now,
+        input.listingId,
         input.listingId,
         input.listingId
       ]
@@ -200,7 +220,7 @@ export function buildResendClaimCodePlans(
   return [
     {
       sql: `UPDATE listing_claims SET method=?,status='code_sent',email=?,email_domain=?,
-          product_url=?,code_hash=?,code_sent_at=?,code_expires_at=?,codes_sent=codes_sent+1,
+          product_url=?,listing_website=?,code_hash=?,code_sent_at=?,code_expires_at=?,codes_sent=codes_sent+1,
           attempts=CASE WHEN locked_until IS NOT NULL THEN 0 ELSE attempts END,
           locked_until=NULL,email_verified_at=NULL,badge_checked_at=NULL,updated_at=?
         WHERE id=? AND user_id=? AND status IN ('code_sent','email_verified')
@@ -212,6 +232,7 @@ export function buildResendClaimCodePlans(
         input.email,
         input.emailDomain,
         input.productUrl,
+        input.listingWebsite,
         input.codeHash,
         input.now,
         input.codeExpiresAt,
@@ -337,7 +358,10 @@ export function buildCompleteClaimPlans(input: {
       ]
     },
     assertPreviousStatementChangedOne('claim_completed'),
-    assertGuard('claim_listing_live', { sql: listingIsLiveGuard('?'), params: [input.listingId] }),
+    assertGuard('claim_listing_live', {
+      sql: `${listingIsLiveGuard('?')} AND ${unheld('?')}`,
+      params: [input.listingId, input.listingId]
+    }),
     ...buildGrantListingOwnerPlans({
       listingId: input.listingId,
       publication: input.publication,
@@ -368,6 +392,7 @@ function claimOf(row: ClaimRow): ListingClaim {
     listingId: row.listing_id,
     lockedUntil: row.locked_until,
     method: row.method,
+    listingWebsite: row.listing_website,
     productUrl: row.product_url,
     status: row.status,
     userId: row.user_id
@@ -376,6 +401,8 @@ function claimOf(row: ClaimRow): ListingClaim {
 
 export interface ClaimOperations {
   blocked(keys: readonly string[]): Promise<boolean>
+  /** True while the listing's instant claim is held for the owner's review. */
+  held(listingId: string): Promise<boolean>
   /** The claimer's claim, by id; null for anyone else's. */
   claim(input: { claimId: string; userId: string }): Promise<ListingClaim | null>
   /** False when the cooldown, the confirmation's age, or the listing refused the check. */
@@ -459,6 +486,11 @@ export function createClaimOperations(config: { client: Database }): ClaimOperat
     async blocked(keys) {
       const [row] = await rows<{ blocked: number }>(selectClaimBlockedPlan(keys))
       return Boolean(row?.blocked)
+    },
+
+    async held(listingId) {
+      const [row] = await rows<{ held: number }>(selectClaimHeldPlan(listingId))
+      return Boolean(row?.held)
     },
 
     async claim(input) {

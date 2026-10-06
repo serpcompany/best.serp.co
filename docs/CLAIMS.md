@@ -23,15 +23,19 @@ Order (#70): method → work email → code → badge check or payment → done,
 proving the address.
 
 1. **The product's domain** (`apps/web/lib/claims/product.ts`). Most imported listings store a
-   `serp.ly` affiliate link as their website, so the claim never uses the website's domain as
-   such. As for search (the owner's decision: match on the product slug, never the `serp.ly`
-   host), the product's domain is the slug's when the slug is a host with a registrable domain
-   (`jasper.ai`), else the website's when it is the product's own, else where the website's link
-   lands: it is followed server-side through the shared safe fetcher, HTTP redirects and then up
-   to two `<meta http-equiv="refresh">` hops (as `serp.ly` answers). SERP's own domains and link
-   shorteners never count. Without a product domain the listing can't be claimed
-   (`409 no_product_domain`). The product page found this way is stored with the claim
-   (`product_url`), and the badge is checked there.
+   `serp.ly` affiliate link as their website, so the claim never uses that domain. A website on
+   the product's own domain is the product's site; a `serp.ly` (or other shortener) link is
+   followed server-side through the shared safe fetcher, HTTP redirects and then up to five
+   `<meta http-equiv="refresh">` hops, reading pages up to 2 MB, and the landing page's domain is
+   the product's. When the slug is a domain (the owner's search decision: the product slug, never
+   the `serp.ly` host), it must be that same domain. SERP's own domains and link shorteners never
+   count (`409 no_product_domain`). A slug and landing that disagree, or a link that can't be
+   followed (a 403, a timeout, a chain that keeps refreshing), need the owner's review: the claim
+   answers `409 review_required` with the contact path, because a lapsed or reassigned domain
+   could be registered by anyone. So does a listing on #100's owner-review lists (off-domain,
+   unreachable), held in `listing_claim_holds` (seeded by `0008_listing_claims` from
+   `d1/hygiene/2026-10-06-listing-domains.yaml`; an admin clears a hold with `cleared_at`). The
+   product page found is stored with the claim (`product_url`), and the badge is checked there.
 2. **Start** (`POST /api/claims`, `{ listing: <slug>, method, email }`). The listing must be live,
    have no current owner (else `409 already_owned` with `contactPath`: `/contact/`, or a claim
    conversation once #73 ships), and not be under a prohibited-URL block on the product's
@@ -50,8 +54,9 @@ proving the address.
 4. **Badge** (`verify-badge`, free method). The submit flow's verifier checks the product page
    for the badge linking to the listing (one check per 30 seconds, the badge step's outbound
    budget); every request, redirects included, must stay on the claim domain, else the result is
-   `invalid_redirect`. The listing's product domain is checked again first (an admin edit since
-   the code makes it `409 changed`). A pass, within 24 hours of the confirmation, makes the
+   `invalid_redirect`. Completion compares with the domain stored with the claim, without
+   fetching, unless an admin changed the listing's website since (then a domain that no longer
+   matches, or can't be resolved, is `409 changed`). A pass, within 24 hours of the confirmation, makes the
    claimer the owner (`verified_via = badge_claim`), cancels other open claims, and advances the
    catalog version (the public "Verified owner" badge). The weekly
    [badge program](./BADGE_PROGRAM.md) then checks the claimer's product page, and removes the
@@ -71,7 +76,10 @@ admin sees and can transfer the owner (#64).
 (`code_sent` → `email_verified` → `completed`, or `cancelled`), the domain address and its
 registrable domain (the product's), `product_url`, the current code as an HMAC (`code_hash`,
 cleared once used or burned), its expiry, the codes sent, the wrong `attempts` (0 to 5), and
-`locked_until`. A user has at most one open claim per listing (`listing_claims_open_idx`).
+`locked_until`, and the listing's website it was resolved from (`listing_website`). A user has at
+most one open claim per listing (`listing_claims_open_idx`). `listing_claim_holds` (listing,
+reason `off_domain` | `unreachable` | `admin`, source, `cleared_at`/`cleared_by`) holds instant
+claims for the owner's review.
 Completing a claim writes the `listing_owners` row (`badge_claim` or `paid_claim`) and cancels the
 listing's other open claims in one batch.
 

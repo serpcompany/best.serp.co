@@ -20,6 +20,7 @@ const MESSAGES: Record<ClaimFailureCode, string> = {
   invalid_method: 'Choose how to claim this listing.',
   no_product_domain: 'This URL can’t be claimed.',
   not_owner: 'This claim no longer gives you ownership.',
+  review_required: 'This URL can’t be claimed.',
   not_confirmed: 'Confirm your email first.',
   not_found: 'Listing not found.',
   too_many_attempts: 'Too many wrong codes. Try again later.',

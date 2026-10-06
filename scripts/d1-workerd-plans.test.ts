@@ -1407,6 +1407,7 @@ describe('claims on Wrangler-local D1 (workerd, #67)', () => {
       emailDomain: 'claim-tool.example',
       method: 'badge' as const,
       now: NOW,
+      listingWebsite: 'https://www.claim-tool.example/',
       productUrl: 'https://www.claim-tool.example/'
     }
     expect(

@@ -33,6 +33,7 @@ const start = (claimId = 'claim_1', userId = 'user_owner') =>
     email: 'jo@lst_live.example',
     emailDomain: 'lst_live.example',
     productUrl: 'https://lst_live.example/',
+    listingWebsite: 'https://lst_live.example/',
     listingId: 'lst_live',
     method: 'badge',
     now: NOW,
@@ -94,6 +95,7 @@ describe('claim plans', () => {
         email: 'jo@lst_live.example',
         emailDomain: 'lst_live.example',
         productUrl: 'https://lst_live.example/',
+        listingWebsite: 'https://lst_live.example/',
         method: 'badge',
         now,
         userId: 'user_owner'
@@ -144,6 +146,7 @@ describe('claim plans', () => {
         method: 'badge',
         now: '2026-10-06T12:06:00.000Z',
         productUrl: 'https://lst_live.example/',
+        listingWebsite: 'https://lst_live.example/',
         userId: 'user_owner'
       })
     )
@@ -206,6 +209,38 @@ describe('claim plans', () => {
       { user_id: 'user_owner', verified_via: 'badge_claim' }
     ])
     expect(count(db, 'SELECT COUNT(*) AS count FROM publication_runs')).toBe(1)
+  })
+
+  it('refuses to open or complete a claim on a held listing until the hold is cleared', () => {
+    const db = seeded()
+    db.exec(`INSERT INTO listing_claim_holds (listing_id,reason,source)
+      VALUES ('lst_live','unreachable','d1/hygiene/2026-10-06-listing-domains.yaml')`)
+    refused(db, start())
+    db.exec(`UPDATE listing_claim_holds SET cleared_at='2026-10-06T11:00:00.000Z',
+      cleared_by='admin@example.com'`)
+    execute(db, start())
+    execute(
+      db,
+      buildConfirmClaimEmailPlans({
+        claimId: 'claim_1',
+        codeHash: 'hash-1',
+        now: NOW,
+        userId: 'user_owner'
+      })
+    )
+    // Held again before completion: the grant is refused.
+    db.exec(`UPDATE listing_claim_holds SET cleared_at=NULL, cleared_by=NULL`)
+    refused(
+      db,
+      buildCompleteClaimPlans({
+        claimId: 'claim_1',
+        listingId: 'lst_live',
+        method: 'badge',
+        publication: publication('listing-claim'),
+        userId: 'user_owner'
+      })
+    )
+    expect(count(db, 'SELECT COUNT(*) AS count FROM listing_owners')).toBe(0)
   })
 
   it('refuses inconsistent rows', () => {

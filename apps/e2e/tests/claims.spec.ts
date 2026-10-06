@@ -269,6 +269,21 @@ test('refuses expired and over-attempt codes, and requests without a session or 
   expect(serply.status()).toBe(422)
   expect(await serply.json()).toMatchObject({ code: 'domain_mismatch' })
 
+  // A listing on #100's owner-review list is held: the claimer gets the contact path.
+  const held = seedListing(`held-${key}`, 'Held product')
+  claimsD1(`INSERT INTO listing_claim_holds (listing_id, reason, source)
+    VALUES (${q(held.id)}, 'off_domain', 'd1/hygiene/2026-10-06-listing-domains.yaml')`)
+  const heldClaim = await claim(user.client, {
+    email: `team@${held.slug}`,
+    listing: held.slug,
+    method: 'badge'
+  })
+  expect(heldClaim.status()).toBe(409)
+  expect(await heldClaim.json()).toMatchObject({
+    code: 'review_required',
+    contactPath: '/contact/'
+  })
+
   // Someone else's claim reads as missing.
   const stranger = await account(`stranger-${key}@example.com`)
   expect((await step(stranger.client, opened.id, 'confirm', { code: fresh })).status()).toBe(404)
