@@ -364,7 +364,7 @@ covers unpublishing hijacked listings.
 ### Adult by name, not in the Adult category
 
 14 listings are treated as adult (only SERP's curated screenshots) by
-their platform name. Their category is a catalog data issue the owner may want to fix:
+their platform name. The separate `-adult-category` manifest adds the Adult category to them:
 
 `alphaporno-downloader`, `beeg-downloader`, `eporner-downloader`, `livejasmin-downloader`, `onlyfans-bulk-downloader`, `onlyfans-downloader`, `pornhub-downloader`, `redtube-downloader`, `spankbang-downloader`, `stripchat-downloader`, `tnaflix-downloader`, `xhamster-downloader`, `xnxx-downloader`, `youporn-downloader`
 

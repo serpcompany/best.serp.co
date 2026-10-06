@@ -267,8 +267,25 @@ describe('legacy media migration (#95)', () => {
           '<link rel="apple-touch-icon" href="/touch.png"><meta property="og:image" content="/card.png">'
         )
       },
-      snapshot: snapshot([{ ...adultByName, slug: 'xhamster.example' }])
+      snapshot: snapshot([
+        { ...adultByName, categories: ['video-downloaders'], slug: 'xhamster.example' }
+      ])
     })
+    // A separate row-level manifest adds the Adult category (owner decision on #98).
+    const category = parseManifest(result.categoryManifest?.text ?? '')
+    expect(result.categoryManifest?.file).toBe(
+      'd1/publications/2026-10-06-legacy-media-adult-category.yaml'
+    )
+    expect(category.concurrency).toBe('rows')
+    expect(category.operations).toEqual([
+      {
+        action: 'listing-categories-add',
+        add: ['adult'],
+        expected: ['video-downloaders'],
+        id: 'lst_test_x_0000',
+        slug: 'xhamster.example'
+      }
+    ])
     const [outcome] = result.outcomes
     expect(outcome?.adult).toBe(true)
     expect(outcome?.images).toEqual({

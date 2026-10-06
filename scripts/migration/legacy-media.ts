@@ -276,6 +276,8 @@ export function codePointCompare(a: string, b: string): number {
 
 export interface CatalogListing {
   adult: boolean
+  /** Category slugs in sort order (the snapshot's JSON array); absent in hand-built snapshots. */
+  categories?: string[] | string
   id: string
   slug: string
   website: string
@@ -303,7 +305,10 @@ export interface CatalogSnapshot {
 /** Listings with a logo or image, and whether each is in the Adult category. */
 export const SNAPSHOT_LISTINGS_SQL = `SELECT l.id, l.slug, l.website,
   EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
-    WHERE lc.listing_id = l.id AND c.slug = 'adult') AS adult
+    WHERE lc.listing_id = l.id AND c.slug = 'adult') AS adult,
+  (SELECT json_group_array(slug) FROM (SELECT c.slug FROM listing_categories lc
+    JOIN categories c ON c.id = lc.category_id WHERE lc.listing_id = l.id
+    ORDER BY lc.sort_order, c.slug)) AS categories
 FROM listings l
 WHERE EXISTS (SELECT 1 FROM listing_media m WHERE m.listing_id = l.id AND m.kind IN ('logo','image'))
 ORDER BY l.slug`
@@ -325,7 +330,14 @@ function snapshotFrom(listings: CatalogListing[], media: CatalogMediaRow[]): Cat
   }
   return {
     listings: [...listings]
-      .map(listing => ({ ...listing, adult: Boolean(Number(listing.adult)) }))
+      .map(listing => ({
+        ...listing,
+        adult: Boolean(Number(listing.adult)),
+        categories:
+          typeof listing.categories === 'string'
+            ? (JSON.parse(listing.categories) as string[])
+            : listing.categories
+      }))
       .sort((a, b) => codePointCompare(a.slug, b.slug)),
     rows: listingId => byListing.get(listingId) ?? []
   }
@@ -580,6 +592,11 @@ function alreadyHosted(row: CatalogMediaRow): HostedEntry | null {
 }
 
 export interface MigrationResult {
+  /**
+   * The Adult category for adult listings that lack it (owner decision on #98): a separate,
+   * row-level manifest of `listing-categories-add`, or null when none lacks it.
+   */
+  categoryManifest: { file: string; text: string } | null
   manifests: Array<{ file: string; text: string }>
   outcomes: ListingOutcome[]
   plan: { id: string; objects: HostedEntry[]; site: string; version: 1 }
@@ -924,7 +941,44 @@ export async function migrateLegacyMedia(options: {
     site: 'best.serp.co',
     version: 1 as const
   }
+  // Adult by name but not by category: add the Adult category, compared and swapped on each
+  // listing's current categories. Once applied, the category carries the adult rule.
+  const missingAdult = listings.filter(
+    listing =>
+      !listing.adult &&
+      isAdultListing(listing) &&
+      Array.isArray(listing.categories) &&
+      listing.categories.length > 0
+  )
+  const categoryId = `${migrationId}-adult-category`
+  const categoryManifest = missingAdult.length
+    ? {
+        file: `d1/publications/${categoryId}.yaml`,
+        text: `${[
+          '# serpcompany/best.serp.co#95 (#98 owner decision): add the Adult category to adult listings',
+          '# that lack it, as a secondary category. Row-level: each operation checks the listing',
+          '# still has exactly the categories it lists. Independent of the media parts.',
+          ''
+        ].join('\n')}${stringify(
+          {
+            version: 1,
+            id: categoryId,
+            concurrency: 'rows',
+            provenance: { actor: 'devinschumacher', workflow: 'github/publish-d1' },
+            operations: missingAdult.map(listing => ({
+              action: 'listing-categories-add',
+              id: listing.id,
+              slug: listing.slug,
+              expected: listing.categories,
+              add: ['adult']
+            }))
+          },
+          { lineWidth: 0 }
+        )}`
+      }
+    : null
   return {
+    categoryManifest,
     manifests,
     outcomes,
     plan,
@@ -1126,7 +1180,7 @@ function renderReport(input: {
     '### Adult by name, not in the Adult category',
     '',
     `${input.adultByName.length} listings are treated as adult (only SERP's curated screenshots) by`,
-    'their platform name. Their category is a catalog data issue the owner may want to fix:',
+    'their platform name. The separate `-adult-category` manifest adds the Adult category to them:',
     '',
     input.adultByName.map(slug => `\`${slug}\``).join(', ') || 'none',
     '',
@@ -1241,6 +1295,9 @@ async function main(): Promise<void> {
     if (file.startsWith(`${migrationId}-`)) rmSync(resolve('d1/publications', file))
   }
   for (const manifest of result.manifests) writeFileSync(resolve(manifest.file), manifest.text)
+  if (result.categoryManifest) {
+    writeFileSync(resolve(result.categoryManifest.file), result.categoryManifest.text)
+  }
   console.log(result.report.split('## Owner sign-off')[0])
 }
 
