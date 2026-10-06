@@ -444,6 +444,43 @@ describe('single-site D1-only repository architecture', () => {
     }
   })
 
+  // The submitter dashboard (#65): every page and write is scoped to the signed-in user, and its
+  // SQL (owner scoping included) lives in the shared data package.
+  it('makes every account page and account API route require the signed-in user (#65)', () => {
+    const accountRoutes = trackedFiles().filter(
+      file =>
+        (file.startsWith(`${project.appDirectory}/app/account/`) ||
+          file.startsWith(`${project.appDirectory}/app/api/account/`)) &&
+        /(?:^|\/)(?:page|route)\.tsx?$/u.test(file) &&
+        existsSync(resolve(file))
+    )
+    expect(accountRoutes).toEqual(
+      expect.arrayContaining([
+        `${project.appDirectory}/app/account/page.tsx`,
+        `${project.appDirectory}/app/account/submissions/[id]/page.tsx`,
+        `${project.appDirectory}/app/account/listings/[slug]/edit/page.tsx`,
+        `${project.appDirectory}/app/api/account/submissions/[id]/[action]/route.ts`,
+        `${project.appDirectory}/app/api/account/listings/[id]/[action]/route.ts`
+      ])
+    )
+    for (const file of accountRoutes) {
+      const source = readFileSync(resolve(file), 'utf8')
+      expect(source, `${file} must call requireAccountUser() or authorizeUserRequest()`).toMatch(
+        file.includes('/app/api/') ? /await authorizeUserRequest\(/u : /await requireAccountUser\(/u
+      )
+    }
+    const accountDirectory = resolve(project.appDirectory, 'lib/account')
+    for (const file of readdirSync(accountDirectory).filter(name => !name.includes('.test.'))) {
+      const source = readFileSync(resolve(accountDirectory, file), 'utf8')
+      expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
+    }
+    const runtime = readFileSync(resolve(accountDirectory, 'runtime.ts'), 'utf8')
+    expect(runtime).toContain("import 'server-only'")
+    expect(runtime).toContain('createDatabase(workerEnv.DB)')
+    const operations = readFileSync(resolve('packages/data-ops/src/account.ts'), 'utf8')
+    expect(operations).not.toMatch(/getCloudflareContext|process\.env/u)
+  })
+
   it('keeps admin panel SQL in the shared data package (#64)', () => {
     const adminDirectory = resolve(project.appDirectory, 'lib/admin')
     for (const file of readdirSync(adminDirectory).filter(name => !name.includes('.test.'))) {

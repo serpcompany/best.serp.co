@@ -17,7 +17,8 @@ const NETWORK_ERROR: ApiError = {
   error: 'We couldn’t reach best.serp.co. Check your connection and try again.'
 }
 
-async function call<T>(path: string, init: RequestInit): Promise<ApiResult<T>> {
+/** A same-origin JSON call; the account pages (#65) use it too. */
+export async function call<T>(path: string, init: RequestInit): Promise<ApiResult<T>> {
   let response: Response
   try {
     response = await fetch(path, {
