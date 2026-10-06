@@ -13,8 +13,21 @@ import { listingHasQueuedSubmission } from '@serpdirectory/data-ops/plan-support
 import { hasFileExtension } from '@serpdirectory/web-core/canonical-url'
 import { parse } from 'yaml'
 import { z } from 'zod'
+import { assertD1Compatible } from './d1-compat'
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { catalogSitemapRoutes, categoryRoute, listingIndexRoute, listingRoute } from './site-routes'
+
+/**
+ * How a publication batch refuses itself on D1 (#95 release blocker): an assertion `SELECT` whose
+ * failing branch raises `malformed JSON`, which rolls the whole batch back, the mechanism the
+ * Worker's own plans use (`assertGuard` in `packages/data-ops/src/plan-support.ts`). D1's remote
+ * API refuses a temporary table with `not authorized: SQLITE_AUTH`, so the earlier
+ * `CREATE TEMP TABLE publication_guard` could never run there. `scripts/d1-compat.ts` keeps every
+ * generated statement inside what D1 accepts.
+ */
+export const GUARD_FAILURE = "json_extract('', '$')"
+/** Refuses the batch unless the statement right before it changed exactly one row. */
+const CHANGED_ONE_GUARD = `SELECT CASE WHEN changes()=1 THEN 1 ELSE ${GUARD_FAILURE} END`
 
 /** A slug that already exists; renaming or unpublishing it must stay possible. */
 const existingSlug = z.string().regex(/^[a-z0-9.-]+$/)
@@ -420,7 +433,7 @@ const hash = (value: string): string => createHash('sha256').update(value).diges
 const statement = (query: string, ...bindings: unknown[]): PlannedStatement => ({ query, bindings })
 function membershipGuard(id: string, expected: string[]): PlannedStatement {
   return statement(
-    `INSERT INTO publication_guard SELECT CASE WHEN (SELECT COUNT(*) FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? AND c.is_active=1)=? AND NOT EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? AND c.is_active=1 AND c.slug NOT IN (${expected.map(() => '?').join(', ')})) THEN 1 ELSE 0 END`,
+    `SELECT CASE WHEN (SELECT COUNT(*) FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? AND c.is_active=1)=? AND NOT EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? AND c.is_active=1 AND c.slug NOT IN (${expected.map(() => '?').join(', ')})) THEN 1 ELSE ${GUARD_FAILURE} END`,
     id,
     expected.length,
     id,
@@ -463,7 +476,7 @@ function listingStatements(
         value.id,
         value.slug
       ),
-      statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
+      statement(CHANGED_ONE_GUARD),
       statement('DELETE FROM listing_categories WHERE listing_id=?', value.id),
       statement('DELETE FROM listing_media WHERE listing_id=?', value.id),
       // The manifest's media replace the listing's: no queued slot may overwrite them (#95).
@@ -501,7 +514,7 @@ function listingStatements(
   )
   out.push(
     statement(
-      'INSERT INTO publication_guard VALUES (CASE WHEN (SELECT COUNT(*) FROM listing_categories WHERE listing_id=?)=? THEN 1 ELSE 0 END)',
+      `SELECT CASE WHEN (SELECT COUNT(*) FROM listing_categories WHERE listing_id=?)=? THEN 1 ELSE ${GUARD_FAILURE} END`,
       value.id,
       value.categories.length
     )
@@ -600,10 +613,8 @@ export function buildPublicationPlan(
   const addCategories = (values: string[]) =>
     values.forEach(value => routes.add(categoryRoute(value)))
   const statements: PlannedStatement[] = [
-    statement('PRAGMA foreign_keys = ON'),
-    statement('CREATE TEMP TABLE publication_guard (valid INTEGER NOT NULL CHECK (valid=1))'),
     statement(
-      'INSERT INTO publication_guard SELECT CASE WHEN COUNT(*)=1 AND MAX(version)=? AND MAX(checksum)=? THEN 1 ELSE 0 END FROM publication_state WHERE id=1',
+      `SELECT CASE WHEN COUNT(*)=1 AND MAX(version)=? AND MAX(checksum)=? THEN 1 ELSE ${GUARD_FAILURE} END FROM publication_state WHERE id=1`,
       base.version,
       base.checksum
     ),
@@ -643,7 +654,7 @@ export function buildPublicationPlan(
           now,
           op.category.slug
         ),
-        statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)')
+        statement(CHANGED_ONE_GUARD)
       )
       addCategories([op.category.slug])
     }
@@ -654,7 +665,7 @@ export function buildPublicationPlan(
           now,
           op.slug
         ),
-        statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)')
+        statement(CHANGED_ONE_GUARD)
       )
       addCategories([op.slug])
     }
@@ -680,7 +691,7 @@ export function buildPublicationPlan(
         membershipGuard(op.id, op.categories),
         // As in the admin panel (#64): never while the listing's own submission is in review.
         statement(
-          `INSERT INTO publication_guard SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN 0 ELSE 1 END`,
+          `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${GUARD_FAILURE} ELSE 1 END`,
           op.id
         ),
         statement(
@@ -692,7 +703,7 @@ export function buildPublicationPlan(
           op.slug,
           ...website
         ),
-        statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
+        statement(CHANGED_ONE_GUARD),
         // The admin panel's activity records for an unpublish (#64).
         statement(
           "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'unpublished',?,?)",
@@ -715,7 +726,7 @@ export function buildPublicationPlan(
       statements.push(
         // As in the admin panel (#64): never while the listing's own submission is in review.
         statement(
-          `INSERT INTO publication_guard SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN 0 ELSE 1 END`,
+          `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${GUARD_FAILURE} ELSE 1 END`,
           op.id
         ),
         // A new checksum, so a revision or admin edit read before this change is refused as stale.
@@ -730,7 +741,7 @@ export function buildPublicationPlan(
           keep + 1,
           op.suffix
         ),
-        statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
+        statement(CHANGED_ONE_GUARD),
         // The admin panel's activity record for an edit (#64).
         statement(
           "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
@@ -744,7 +755,7 @@ export function buildPublicationPlan(
     if (op.action === 'listing-categories-add') {
       statements.push(
         statement(
-          `INSERT INTO publication_guard SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND (SELECT json_group_array(slug) FROM (SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? ORDER BY lc.sort_order, c.slug))=? THEN 1 ELSE 0 END`,
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND (SELECT json_group_array(slug) FROM (SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? ORDER BY lc.sort_order, c.slug))=? THEN 1 ELSE ${GUARD_FAILURE} END`,
           op.id,
           op.slug,
           op.id,
@@ -757,9 +768,7 @@ export function buildPublicationPlan(
             op.id,
             categorySlugToAdd
           ),
-          statement(
-            'INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'
-          )
+          statement(CHANGED_ONE_GUARD)
         ])
       )
       routes.add(listingRoute(op.slug))
@@ -769,7 +778,7 @@ export function buildPublicationPlan(
       const expected = expectedMediaJson(op.expected)
       statements.push(
         statement(
-          `INSERT INTO publication_guard SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND ${CURRENT_MEDIA_JSON}=? THEN 1 ELSE 0 END`,
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND ${CURRENT_MEDIA_JSON}=? THEN 1 ELSE ${GUARD_FAILURE} END`,
           op.id,
           op.slug,
           op.id,
@@ -815,7 +824,7 @@ export function buildPublicationPlan(
           op.from,
           op.to
         ),
-        statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
+        statement(CHANGED_ONE_GUARD),
         statement(
           'INSERT INTO listing_slug_redirects (listing_id,old_slug,new_slug,manifest_id,reason,created_at) VALUES (?,?,?,?,?,?)',
           op.id,
@@ -853,7 +862,7 @@ export function buildPublicationPlan(
       base.version,
       base.checksum
     ),
-    statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
+    statement(CHANGED_ONE_GUARD),
     statement(
       "UPDATE publication_runs SET published_version=?,affected_records=?,affected_routes=?,outcome='succeeded',completed_at=? WHERE manifest_id=? AND before_checksum=? AND after_checksum=?",
       base.version + 1,
@@ -865,6 +874,8 @@ export function buildPublicationPlan(
       afterChecksum
     )
   )
+  // A statement D1's remote API would refuse never leaves the planner (#95 release blocker).
+  assertD1Compatible(statements)
   return { affectedRoutes, afterChecksum, base, inputChecksum, manifest, statements }
 }
 export async function executePublicationPlan(

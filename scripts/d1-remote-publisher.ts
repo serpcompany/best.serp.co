@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { validateRemoteConfig } from './cloudflare-release'
+import { assertD1Compatible } from './d1-compat'
 import {
   buildPublicationPlan,
   CURRENT_MEDIA_JSON,
@@ -14,7 +15,7 @@ import {
 } from './d1-publisher.ts'
 import { verifyObject } from './media-upload'
 import { project } from './project'
-import { getR2Object } from './r2-objects'
+import { describeFetchError, getR2Object } from './r2-objects'
 
 interface D1ApiResult {
   results?: Array<Record<string, unknown>>
@@ -98,6 +99,7 @@ async function queryD1(
   const accountId = requireEnvironment(env, 'CLOUDFLARE_ACCOUNT_ID')
   const databaseId = requireEnvironment(env, 'CLOUDFLARE_D1_DATABASE_ID')
   const apiToken = requireEnvironment(env, 'CLOUDFLARE_API_TOKEN')
+  assertD1Compatible(statements)
   const response = await fetchImplementation(
     `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`,
     {
@@ -122,6 +124,12 @@ async function queryD1(
     !payload.result ||
     payload.result.some(result => result.success === false)
   ) {
+    // A publication guard refuses the batch by raising `malformed JSON` (`GUARD_FAILURE`).
+    if (errorMessage && /malformed JSON/iu.test(errorMessage)) {
+      throw new Error(
+        `A publication guard refused the batch (${errorMessage}): the publication version or a listing row is not what the manifest expects. Nothing was written.`
+      )
+    }
     throw new Error(errorMessage || `D1 API query failed with status ${response.status}.`)
   }
   return payload.result
@@ -197,7 +205,7 @@ export async function assertHostedMediaServed(
           const body = await getR2Object(bucket, image.key, env, fetchImplementation)
           problem = body ? verifyObject(image, body) : 'missing'
         } catch (error) {
-          problem = error instanceof Error ? error.message : 'unreadable'
+          problem = describeFetchError(error)
         }
         if (problem) problems.push(`${image.key} (${problem})`)
       }

@@ -76,7 +76,7 @@ function publishedDatabase(
           })
         : undefined
     const plan = buildPublicationPlan(manifest, source, '2026-10-06T00:00:00.000Z', live)
-    database.exec('DROP TABLE IF EXISTS publication_guard; BEGIN IMMEDIATE;')
+    database.exec('BEGIN IMMEDIATE;')
     try {
       for (const item of plan.statements) {
         assertD1StatementLimits(item.query, item.bindings)
