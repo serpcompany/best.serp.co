@@ -1,20 +1,59 @@
 'use client'
 
-import { SignOutButton as CoreSignOutButton } from '@serpdirectory/web-core/auth/sign-out-button'
-import { signOut } from 'next-auth/react'
-import type { ReactElement } from 'react'
+import { Button } from '@serpdirectory/design-system/button'
+import { cn } from '@serpdirectory/design-system/lib/utils'
+import {
+  DirectoryNavigationItem,
+  directoryNavigationInteractiveClassName
+} from '@serpdirectory/design-system/shadcnblocks/directory-navigation'
+import { useState } from 'react'
+import { signOut } from './sign-in-api'
 
-type SignOutButtonProps = {
-  className?: string
+/**
+ * Sign-out controls for the public header (serpcompany/best.serp.co#60): `POST
+ * /api/auth/sign-out` from this origin, then a full reload so the server renders the
+ * signed-out page (and `/account` sends the visitor to `/login`).
+ */
+
+function useSignOut(): [boolean, () => Promise<void>] {
+  const [pending, setPending] = useState(false)
+  return [
+    pending,
+    async () => {
+      setPending(true)
+      await signOut()
+      window.location.reload()
+    }
+  ]
 }
 
-export function SignOutButton({ className }: SignOutButtonProps): ReactElement {
+/** The desktop header's "Sign out", next to "Account" (#70 public layout). */
+export function HeaderSignOutButton() {
+  const [pending, onSignOut] = useSignOut()
   return (
-    <CoreSignOutButton
-      className={className}
-      onSignOut={() => {
-        void signOut({ callbackUrl: '/' })
-      }}
-    />
+    <Button
+      type="button"
+      variant="ghost"
+      disabled={pending}
+      onClick={onSignOut}
+      className="hidden sm:inline-flex items-center rounded-none text-sm font-bold h-9 px-4 hover:bg-accent shadow-none active:scale-100"
+    >
+      Sign out
+    </Button>
+  )
+}
+
+/** The mobile drawer's "Sign out", styled like its other navigation items. */
+export function DrawerSignOutButton() {
+  const [pending, onSignOut] = useSignOut()
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={onSignOut}
+      className={cn(directoryNavigationInteractiveClassName, 'w-full text-left')}
+    >
+      <DirectoryNavigationItem className="py-1.5">Sign out</DirectoryNavigationItem>
+    </button>
   )
 }

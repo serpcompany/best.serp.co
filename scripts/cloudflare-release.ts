@@ -1,5 +1,5 @@
 /**
- * Protected Cloudflare release operations for best.serp.co: remote D1 backup, migrations,
+ * Protected Cloudflare release operations for best.serp.co: D1 Time Travel bookmarks, migrations,
  * the one-time catalog bootstrap and its verification, database readiness, and Worker deploy.
  *
  *   pnpm tsx scripts/cloudflare-release.ts <command> <staging|production> [options]
@@ -10,8 +10,9 @@
  *   plan-release    read-only: `database-and-worker` when migrations are pending, otherwise
  *                   `worker-only`; refuses a database with migrations this commit lacks
  *   check-database  read-only: every d1/drizzle migration is applied and a publication exists
- *   verify-import   read-only: exact 16-table parity with the reviewed import and parity report
- *   backup          `wrangler d1 export` to --output <file>
+ *   verify-import   read-only: exact catalog-table parity with the reviewed import and parity report
+ *   bookmark        read-only: the current D1 Time Travel bookmark and its restore command, also
+ *                   written to the GitHub step summary; fails when no bookmark can be read
  *   migrate         `wrangler d1 migrations apply` (`pnpm db:migrate:<env>`)
  *   import          one-time bootstrap of an empty D1: refuse existing data, migrate, then
  *                   import the checksum-verified reviewed SQL
@@ -26,17 +27,28 @@
  * verified the same source tree on `staging` (`staging-verification.ts`, GITHUB_TOKEN with
  * actions: read and contents: read), except for an owner-approved hotfix dispatch of a merged
  * `hotfix-*` pull request, which may deploy the Worker but never migrate. They, and
- * `plan-release` inside the release workflow (before any backup), also refuse a stale
+ * `plan-release` inside the release workflow (before the bookmark), also refuse a stale
  * release: `main` must still point at GITHUB_SHA or a commit with its tree.
  * Wrangler authenticates with CLOUDFLARE_API_TOKEN and
- * CLOUDFLARE_ACCOUNT_ID. `--rehearse <directory>` runs the D1 commands except backup with
+ * CLOUDFLARE_ACCOUNT_ID. `--rehearse <directory>` runs the D1 commands except bookmark with
  * `--local --persist-to <directory>` instead of `--remote`; it never contacts Cloudflare.
+ *
+ * Nothing here exports a database. Workflow artifacts of this public repository are readable by
+ * any signed-in GitHub user, so D1 data stays in Cloudflare and recovery is Time Travel
+ * (docs/D1_RECOVERY.md).
  *
  * `list-migrations` reads the ledger with a SELECT instead of `wrangler d1 migrations list`,
  * because Wrangler's list first runs `CREATE TABLE IF NOT EXISTS` on the ledger table.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  appendFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -51,7 +63,7 @@ import {
   reviewedArtifactPaths,
   sha256
 } from './d1-import-artifact'
-import { applicationTableNames } from './d1-table-inventory'
+import { parityTableNames, runtimeTableNames } from './d1-table-inventory'
 import { project, type RemoteEnvironment } from './project'
 import {
   assertCurrentRelease,
@@ -62,7 +74,7 @@ import {
 } from './staging-verification'
 
 export const releaseCommands = [
-  'backup',
+  'bookmark',
   'check-database',
   'deploy',
   'import',
@@ -74,6 +86,7 @@ export const releaseCommands = [
 export type ReleaseCommand = (typeof releaseCommands)[number]
 
 export const readOnlyCommands: ReadonlySet<ReleaseCommand> = new Set([
+  'bookmark',
   'check-database',
   'list-migrations',
   'plan-release',
@@ -119,7 +132,7 @@ export const releaseAuthorizations: Readonly<Record<string, ReleaseAuthorization
   },
   'deploy-production.yml': {
     branch: 'main',
-    commands: ['backup', 'migrate', 'deploy'],
+    commands: ['migrate', 'deploy'],
     confirmation: project.confirmation.deploy,
     environment: 'production',
     events: ['push', 'workflow_dispatch'],
@@ -135,23 +148,6 @@ export const releaseAuthorizations: Readonly<Record<string, ReleaseAuthorization
     environment: 'production',
     events: ['workflow_dispatch'],
     requireVerifiedStaging: ['import']
-  },
-  'publish-d1.yml': {
-    // A reviewed data change to production, not a schema or code release.
-    branch: 'main',
-    commands: ['backup'],
-    confirmation: project.confirmation.publish,
-    environment: 'production',
-    events: ['workflow_dispatch'],
-    requireVerifiedStaging: []
-  },
-  'approve-d1-submission.yml': {
-    branch: 'main',
-    commands: ['backup'],
-    confirmation: project.confirmation.submission,
-    environment: 'production',
-    events: ['workflow_dispatch'],
-    requireVerifiedStaging: []
   }
 }
 
@@ -168,7 +164,6 @@ export type D1Row = Record<string, unknown>
 export interface D1Target {
   applyMigrations(): void
   executeFile(path: string): void
-  exportTo(path: string): void
   query(sql: string): Promise<D1Row[]>
 }
 
@@ -188,6 +183,7 @@ interface WranglerEnvironmentConfig {
     migrations_table?: string
   }>
   name?: string
+  r2_buckets?: Array<{ binding?: string; bucket_name?: string }>
   vars?: Record<string, string | undefined>
   workers_dev?: boolean
 }
@@ -206,7 +202,7 @@ function parseCommand(value: string | undefined): ReleaseCommand {
 /**
  * Refuses a Wrangler config whose `env.<environment>` block no longer matches the reviewed
  * remote identity in `project.ts` (Worker name, workers.dev exposure, D1 binding, migration
- * history and ledger table, runtime env).
+ * history and ledger table, runtime env, media bucket and host).
  */
 export function validateRemoteConfig(
   environment: RemoteEnvironment,
@@ -237,6 +233,11 @@ export function validateRemoteConfig(
     problems.push('the DB binding must apply d1/drizzle migrations')
   if (binding?.migrations_table !== project.migrationsTable)
     problems.push(`the DB binding must declare migrations_table ${project.migrationsTable}`)
+  const media = block?.r2_buckets?.find(candidate => candidate.binding === 'MEDIA')
+  if (media?.bucket_name !== expected.media.bucket)
+    problems.push(`the MEDIA binding must be the ${expected.media.bucket} bucket`)
+  if (block?.vars?.MEDIA_BASE_URL !== expected.media.baseUrl)
+    problems.push(`vars.MEDIA_BASE_URL must be ${expected.media.baseUrl}`)
   if (problems.length > 0) {
     throw new Error(
       `${configPath} env.${environment} does not match the reviewed ${environment} identity in scripts/project.ts: ${problems.join('; ')}.`
@@ -428,7 +429,6 @@ export function wranglerD1(
   return {
     applyMigrations: () => void d1(['migrations', 'apply'], [], false),
     executeFile: path => void d1(['execute'], ['--file', path, '--yes'], false),
-    exportTo: path => void d1(['export'], ['--output', path, '--skip-confirmation'], false),
     query: async sql => parseWranglerRows(d1(['execute'], ['--command', sql, '--json'], true))
   }
 }
@@ -544,10 +544,10 @@ export interface ReleasePlan {
 }
 
 /**
- * How a release ships: back up and migrate first when migrations are pending, otherwise deploy
- * the Worker only. Refuses, before any backup or migration starts, a database that carries
+ * How a release ships: bookmark and migrate first when migrations are pending, otherwise deploy
+ * the Worker only. Refuses, before the bookmark or any migration, a database that carries
  * migrations this commit lacks (which `deploy` would refuse anyway) and a hotfix with pending
- * migrations (which `migrate` would refuse after the backup).
+ * migrations (which `migrate` would refuse).
  */
 export function planRelease(
   ledger: MigrationLedger,
@@ -570,30 +570,120 @@ export function planRelease(
   }
 }
 
-export async function backupDatabase(
-  d1: D1Target,
+/** A Time Travel bookmark: dash-separated hex segments, safe in a shell command and Markdown. */
+const timeTravelBookmarkPattern = /^[0-9a-f]{1,64}(?:-[0-9a-f]{1,64}){1,7}$/iu
+
+/** Parses `wrangler d1 time-travel info --json`, refusing anything but one valid bookmark. */
+export function parseTimeTravelBookmark(output: string): string {
+  let payload: unknown
+  try {
+    payload = JSON.parse(output)
+  } catch {
+    payload = undefined
+  }
+  const bookmark =
+    typeof payload === 'object' && payload !== null && 'bookmark' in payload
+      ? payload.bookmark
+      : undefined
+  if (typeof bookmark !== 'string' || !timeTravelBookmarkPattern.test(bookmark)) {
+    throw new Error('D1 Time Travel returned no valid bookmark.')
+  }
+  return bookmark
+}
+
+/** The owner's restore command for `bookmark`, run from the repository root (docs/D1_RECOVERY.md). */
+export function timeTravelRestoreCommand(environment: RemoteEnvironment, bookmark: string): string {
+  return [
+    'pnpm exec wrangler d1 time-travel restore',
+    project.remote[environment].databaseName,
+    `--env ${environment}`,
+    `--config ${project.wranglerConfigPath}`,
+    `--bookmark ${bookmark}`
+  ].join(' ')
+}
+
+export interface TimeTravelRecord {
+  bookmark: string
+  database: string
+  environment: RemoteEnvironment
+  recordedAt: string
+  restore: string
+}
+
+/** The run summary entry: the bookmark and the exact command that restores it. */
+export function bookmarkSummary(record: TimeTravelRecord): string {
+  const guide = `https://github.com/${project.repository}/blob/main/docs/D1_RECOVERY.md#restore-a-workflow-bookmark`
+  return [
+    `### D1 Time Travel bookmark: ${record.database}`,
+    '',
+    `Bookmark \`${record.bookmark}\`, recorded at ${record.recordedAt}, before this job changes the database.`,
+    `Restoring it discards every later write, the Worker's included. Only the owner restores ([D1 recovery](${guide})):`,
+    '',
+    '```bash',
+    record.restore,
+    '```',
+    ''
+  ].join('\n')
+}
+
+/**
+ * Reads the current Time Travel bookmark of the environment's D1 (`GET .../time_travel/bookmark`
+ * accepts D1 Read or D1 Write, so the deploy token's D1 Edit suffices) and, inside GitHub
+ * Actions, appends it with its restore command to the step summary. Throws when either fails,
+ * so the workflow step fails and no later step changes D1 without a restore point. Time Travel
+ * exists only in Cloudflare, so this always reaches it.
+ */
+export function recordTimeTravelBookmark(
   environment: RemoteEnvironment,
-  outputPath: string
-): Promise<{ bytes: number; empty: boolean; output: string; sha256: string }> {
-  const output = resolve(outputPath)
-  mkdirSync(dirname(output), { recursive: true })
-  const empty = (await tableNames(d1)).size === 0
-  if (empty) {
-    // An export of a database with no tables has nothing to restore; record that explicitly.
-    writeFileSync(
-      output,
-      `-- ${project.remote[environment].databaseName} had no tables at backup time.\n`
+  runner: ProcessRunner,
+  env: NodeJS.ProcessEnv,
+  now: Date = new Date()
+): TimeTravelRecord {
+  const database = project.remote[environment].databaseName
+  let bookmark: string
+  try {
+    bookmark = parseTimeTravelBookmark(
+      runner.run(
+        'pnpm',
+        [
+          'exec',
+          'wrangler',
+          'd1',
+          'time-travel',
+          'info',
+          database,
+          '--env',
+          environment,
+          '--config',
+          project.wranglerConfigPath,
+          '--json'
+        ],
+        { capture: true }
+      )
     )
-  } else {
-    d1.exportTo(output)
+  } catch (error) {
+    throw new Error(
+      `Could not record a D1 Time Travel bookmark of ${database}; refusing to change it without a restore point. The Cloudflare token needs Account → D1 → Edit (docs/DEPLOY_RUNBOOK.md#cloudflare-api-token). ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    )
   }
-  const contents = readFileSync(output)
-  return {
-    bytes: contents.byteLength,
-    empty,
-    output,
-    sha256: sha256(contents.toString('utf8'))
+  const record: TimeTravelRecord = {
+    bookmark,
+    database,
+    environment,
+    recordedAt: now.toISOString(),
+    restore: timeTravelRestoreCommand(environment, bookmark)
   }
+  if (env.GITHUB_ACTIONS === 'true') {
+    if (!env.GITHUB_STEP_SUMMARY) {
+      throw new Error(
+        'GITHUB_STEP_SUMMARY is not set; refusing to continue without a recorded bookmark.'
+      )
+    }
+    appendFileSync(env.GITHUB_STEP_SUMMARY, bookmarkSummary(record))
+  }
+  return record
 }
 
 function requireReviewedChecksum(report: ParityReport): string {
@@ -706,6 +796,11 @@ export function parityCountMismatches(row: D1Row | undefined, report: ParityRepo
     .map(([key, expected]) => `${key} is ${String(row?.[key])}, expected ${String(expected)}`)
 }
 
+/** One row with the row count of every runtime table (identifiers are constants). */
+const runtimeRowsQuery = `SELECT ${runtimeTableNames
+  .map(table => `(SELECT count(*) FROM "${table}") AS "${table}"`)
+  .join(', ')}`
+
 /**
  * Proves the database holds exactly the reviewed initial catalog: every application table
  * matches the in-memory bootstrap of the checksum-verified SQL, and the publication checksum
@@ -723,11 +818,17 @@ export async function verifyImportedCatalog(
   }
   const [counts] = await d1.query(parityCountsQuery)
   const countMismatches = parityCountMismatches(counts, report)
+  // Bootstrap parity skips the rows of the runtime tables, but at bootstrap they must hold
+  // none: an import that planted a user, session, code, or delivery would otherwise go unnoticed.
+  const [runtimeRows] = await d1.query(runtimeRowsQuery)
+  const nonEmptyRuntimeTables = runtimeTableNames.filter(
+    table => Number(runtimeRows?.[table]) !== 0
+  )
   const expected = await expectedBootstrapSnapshot(sql)
   const actual = await captureApplicationSnapshot(snapshotTransport(d1), {
     pageSize: options.pageSize ?? 250
   })
-  const tableMismatches = applicationTableNames.filter(
+  const tableMismatches = parityTableNames.filter(
     table =>
       actual.tables[table].count !== expected.tables[table].count ||
       actual.tables[table].checksum !== expected.tables[table].checksum
@@ -735,12 +836,17 @@ export async function verifyImportedCatalog(
   if (
     countMismatches.length > 0 ||
     tableMismatches.length > 0 ||
+    nonEmptyRuntimeTables.length > 0 ||
     actual.checksum !== expected.checksum
   ) {
     throw new Error(
       `${environment} D1 does not match the reviewed ${project.artifact.name} import.${
         countMismatches.length > 0 ? ` Parity report: ${countMismatches.join('; ')}.` : ''
-      }${tableMismatches.length > 0 ? ` Tables: ${tableMismatches.join(', ')}.` : ''}`
+      }${tableMismatches.length > 0 ? ` Tables: ${tableMismatches.join(', ')}.` : ''}${
+        nonEmptyRuntimeTables.length > 0
+          ? ` Runtime tables must be empty at bootstrap: ${nonEmptyRuntimeTables.join(', ')}.`
+          : ''
+      }`
     )
   }
   return {
@@ -749,7 +855,7 @@ export async function verifyImportedCatalog(
     listings: counts?.listing_count,
     categories: counts?.category_count,
     snapshot: actual.checksum,
-    tables: applicationTableNames.length,
+    tables: parityTableNames.length,
     totalRows: actual.totalRows,
     version: counts?.version
   }
@@ -783,7 +889,6 @@ export async function deployWorker(
 export interface ReleaseArguments {
   command: ReleaseCommand
   environment: RemoteEnvironment
-  output?: string
   rehearse?: string
 }
 
@@ -796,21 +901,17 @@ export function parseReleaseArguments(argv: string[]): ReleaseArguments {
   for (let index = 0; index < rest.length; index += 2) {
     const flag = rest[index]
     const value = rest[index + 1]
-    if ((flag !== '--output' && flag !== '--rehearse') || !value || value.startsWith('--')) {
+    if (flag !== '--rehearse' || !value || value.startsWith('--')) {
       throw new Error(
-        'Usage: cloudflare-release.ts <command> <staging|production> [--output <file>] [--rehearse <directory>]'
+        'Usage: cloudflare-release.ts <command> <staging|production> [--rehearse <directory>]'
       )
     }
-    if (flag === '--output') parsed.output = value
-    else parsed.rehearse = value
-  }
-  if (parsed.command === 'backup' && !parsed.output) {
-    throw new Error('backup requires --output <file>.')
+    parsed.rehearse = value
   }
   if (parsed.rehearse !== undefined) {
     if (!isAbsolute(parsed.rehearse)) throw new Error('--rehearse requires an absolute directory.')
-    // `wrangler d1 export` cannot read a --persist-to state, and deploy always reaches Cloudflare.
-    if (parsed.command === 'deploy' || parsed.command === 'backup')
+    // Time Travel exists only in Cloudflare, and deploy always reaches Cloudflare.
+    if (parsed.command === 'deploy' || parsed.command === 'bookmark')
       throw new Error(`${parsed.command} cannot be rehearsed locally.`)
   }
   return parsed
@@ -903,7 +1004,7 @@ export async function runRelease(
       // Read-only and unauthorized, so the hotfix flag can only make the plan stricter.
       const running = protectedWorkflow(env.GITHUB_WORKFLOW_REF)
       // Inside a staging-gated release workflow, refuse a stale release here, before the
-      // backup step exports (and blocks) the database for a release that cannot ship.
+      // bookmark and migration steps of a release that cannot ship.
       if (running && running.authorization.requireVerifiedStaging.length > 0) {
         await assertCurrentRelease({
           apiUrl: env.GITHUB_API_URL,
@@ -927,12 +1028,8 @@ export async function runRelease(
     }
     case 'verify-import':
       return verifyImportedCatalog(d1, args.environment)
-    case 'backup':
-      if (!args.output) throw new Error('backup requires --output <file>.')
-      return {
-        environment: args.environment,
-        ...(await backupDatabase(d1, args.environment, args.output))
-      }
+    case 'bookmark':
+      return recordTimeTravelBookmark(args.environment, runner, env)
     case 'migrate':
       d1.applyMigrations()
       return { environment: args.environment, ...(await checkDatabase(d1)) }

@@ -187,6 +187,7 @@ describe('featured badge assets', () => {
       'badge/featured-on-serp.co-light.svg',
       'badge/featured-on-serp.co-dark.svg'
     ])
+    expect(site.badges?.featuredOn?.displayName).toBe('SERP Best')
   })
 
   it('has light and dark static badge SVGs in the web app', () => {

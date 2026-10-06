@@ -22,6 +22,7 @@ Status (serpcompany/best.serp.co#34):
 | Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`, noindex). The production HTTP gates run here with the smoke-test header and, after cutover, on best.serp.co, where they skip only zone protection (`cf-mitigated`, or a 403 or 429 without Worker headers) and GitHub Pages ([Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)). It stays after cutover: `CANONICAL_HOST_REDIRECT` flips to `on` and it 308s to best.serp.co except for smoke-test requests (#42 decision e). |
 | Branch | `staging` (the base branch; PRs squash-merge here, hotfix merge-backs use a merge commit) | `main` (promotions from `staging`, and `hotfix-*` PRs) |
 | GitHub environment | `staging` (`staging` branch only, no reviewers) | `production` (required reviewers, `main` only) |
+| Email ([useSend](./EMAIL.md)) | `mail.serp.co`, `[staging]` prefix, allowlist | `mail.serp.co` |
 
 The identities live in `env.staging` / `env.production` of `apps/web/wrangler.jsonc` and in
 `scripts/project.ts` (IDs are not secrets). `scripts/cloudflare-release.ts` refuses to run
@@ -47,14 +48,14 @@ account permissions:
 
 | Account permission | Used by |
 |---|---|
-| D1 → Edit | `wrangler d1 migrations apply`, `d1 execute` (bootstrap import, read-only checks), `d1 export` backups, and the D1 query API used by the publisher, approver, and notifier |
+| D1 → Edit | `wrangler d1 migrations apply`, `d1 execute` (bootstrap import, read-only checks), `d1 time-travel info` bookmarks, and the D1 query API used by the publisher, approver, and notifier |
 | Workers Scripts → Edit | `opennextjs-cloudflare deploy`: Worker upload, static assets, the workers.dev setting, observability |
 | Account Settings → Read | Wrangler account lookups during deploy |
+| Workers R2 Storage → Edit | the `MEDIA` bucket binding and listing media uploads (#95) |
 
 No zone permission is needed while the Custom Domain is attached in the dashboard. Add
 Zone → Workers Routes → Edit (zone `serp.co`) only if routes or the Custom Domain move into
-`wrangler.jsonc`. If an R2 or KV incremental cache is added to `apps/web/open-next.config.ts`,
-add Workers R2 Storage → Edit or Workers KV Storage → Edit, because the deploy populates it.
+`wrangler.jsonc`.
 
 Cloudflare's current Workers roles map Workers Scripts → Edit to Workers **Editor**, which
 cannot create a Worker. The first production deploy created `best-serp-co-production` with
@@ -73,16 +74,17 @@ Each holds two environment secrets:
 
 - `CLOUDFLARE_ACCOUNT_ID`: `cec5f04e1d18bcc65f2be0aefb04f059`
 - `CLOUDFLARE_API_TOKEN`: today, **both environments hold the account-wide token**
-  described above (#34), with Edit on every Worker and D1 database in the SERP account. A leak from
-  either environment therefore reaches staging and production alike.
+  described above (#34), with Edit on every Worker, D1 database, and R2 bucket (serp.co's `cdn`
+  too). A leak from either environment therefore reaches staging and production alike.
 
 The planned fix is #42 decision b, scheduled right after cutover. It gives each environment
-its own token, scoped to that environment's Worker and D1 database, plus a D1-only token for
-`production-notifier`. Each new token is proven in its workflow before the account-wide
-token is revoked. Until then, separate secrets do not limit the blast radius.
+its own token, scoped to its Worker, D1 database, and R2 bucket (production's also reads
+`cdn-staging`, the upload's copy source), plus a D1-only token for `production-notifier`,
+each proven in its workflow before the account-wide token goes. Until then, a leak reaches both.
 
 Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "Staging deploy
-skipped" notice. After they exist, the next push to `staging` deploys staging.
+skipped" notice. After they exist, the next push to `staging` deploys staging. The
+`BETTER_AUTH_SECRET` secret and the `/admin` Access app: [Accounts](./ACCOUNTS.md).
 
 ### Submission notifier (after the production bootstrap)
 
@@ -102,37 +104,38 @@ re-dispatches the notifier on `main`. When production accepts submissions:
 
 | Workflow | Trigger | Environment | Typed confirmation | Does |
 |---|---|---|---|---|
-| `deploy-staging.yml` | push to `staging`, manual from `staging` | `staging` | none | `pnpm harness:fast` → Worker build → staging D1 migrations → deploy → HTTP gates → Playwright smoke |
-| `deploy-production.yml` | push to `main`, manual | `production` | dispatch: `deploy-best.serp.co-production` (or `hotfix-…`) | Staging verification → `pnpm harness:fast` → build → `plan-release` → (pending migrations: backup → migrate) → deploy → HTTP gates |
-| `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → initial catalog import into an empty production D1 → parity verification |
-| `publish-d1.yml` | manual, `main` | `production` | `publish-best.serp.co-production` | D1 backup → apply one `d1/publications/*.yaml` manifest |
-| `approve-d1-submission.yml` | manual, `main` | `production` | `approve-best.serp.co-submission-production` | D1 backup → approve or reject one submission → close its review issue |
+| `deploy-staging.yml` | push to `staging`, manual from `staging` | `staging` | none | `pnpm harness:fast` → build → D1 bookmark → migrations → deploy → HTTP gates → Playwright smoke |
+| `deploy-production.yml` | push to `main`, manual | `production` | dispatch: `deploy-best.serp.co-production` (or `hotfix-…`) | Staging verification → `pnpm harness:fast` → build → `plan-release` → (pending migrations: bookmark → migrate) → deploy → HTTP gates |
+| `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → D1 bookmark → initial catalog import into an empty production D1 → parity verification |
+| `publish-d1.yml`, `publish-d1-staging.yml` (#95) | manual, `main` / `staging` | `production` / `staging` | `publish-best.serp.co-<env>` | D1 bookmark → apply one reviewed manifest, staging first |
+| `upload-media.yml`, `upload-media-staging.yml` | manual, `main` / `staging` | `production` / `staging` | `upload-media-best.serp.co-<env>` | Upload one reviewed `d1/media/` plan to R2, no D1 change ([media](./MEDIA.md)) |
+| `approve-d1-submission.yml` | manual, `main` | `production` | `approve-best.serp.co-submission-production` | D1 bookmark → approve or reject one submission → close its review issue |
 | `notify-d1-submissions.yml` | every 15 minutes, manual | `production-notifier` | none | Open an assigned review issue per badge-verified submission |
 
 Guards, in order:
 
-1. An `authorize` job with no secrets checks `main` and, on a dispatch, the typed
-   confirmation (and the manifest path or submission UUID), so a mistyped dispatch never
+1. An `authorize` job with no secrets checks the workflow's branch and, on a dispatch, the typed
+   confirmation (and the manifest or plan path, or submission UUID), so a mistyped dispatch never
    requests reviewer approval. Deploy Production and Bootstrap Production D1 also require
    Deploy Staging to have verified the commit's tree (see
    [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
 2. The GitHub `production` environment requires reviewer approval, for pushes and dispatches.
-3. `scripts/cloudflare-release.ts` refuses every mutating command (`backup`, `migrate`,
-   `import`, `deploy`) unless it runs in the workflow file that owns it, on that workflow's
+3. `scripts/cloudflare-release.ts` refuses every mutating command (`migrate`, `import`,
+   `deploy`) unless it runs in the workflow file that owns it, on that workflow's
    branch (`staging` or `main`) and events, against its environment, at a clean `GITHUB_SHA`,
    with the confirmation in `RELEASE_CONFIRM` on a dispatch. Production `migrate`, `deploy`,
    and `import` also require the verified Deploy Staging run (a hotfix dispatch of a merged
    `hotfix-*` PR may only `deploy` without it) and a `main` that still points at the release.
-   The publisher, approver, and notifier scripts apply their own guards.
+   The publisher, approver, notifier, and `media-upload.ts` apply their own guards.
 4. `plan-release` refuses a database with migrations this commit lacks. `deploy` first proves
    that every `d1/drizzle` migration is applied and that a catalog publication exists.
 
 The HTTP gates: [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts).
 
 Concurrency sits on the privileged job, after its guards: production jobs share
-`deploy-best-serp-co-production`, staging uses `deploy-best-serp-co-staging`, the notifier its
-own group, and none cancels a running job. A run refused by `authorize` or skipped by a branch
-`if` never joins a group, so it cannot replace a valid queued run.
+`deploy-best-serp-co-production`, staging uses `deploy-best-serp-co-staging`, the notifier and
+media uploads their own groups, and none cancels a running job. A run refused by `authorize`
+or skipped by a branch `if` never joins a group, so it cannot replace a valid queued run.
 
 Each deploy runs `pnpm harness:fast` in its own job rather than waiting on Main Validation
 through `workflow_run`. A `workflow_run` job receives the default branch head as
@@ -151,9 +154,9 @@ PR Review already gates every merge, and Main Validation re-runs the full loop o
    `d1/artifacts/best-serp-co-v1.sql.br`, refuses it unless its sha256 equals the parity
    report's `artifact.sqlChecksum`, and imports it in one D1 execution. If the execution
    fails, D1 rolls it back and the run can be repeated. A repeat after success is a no-op.
-   `verify-import` then compares all 16 application tables with an in-memory bootstrap of the
-   same SQL and checks the publication checksum (`669f264f…0af5a`), version, and every count
-   in the report.
+   `verify-import` then requires the runtime tables (accounts, limits, email ledger) to be
+   empty, compares every other table with an in-memory bootstrap of the same SQL, and checks
+   the publication checksum (`669f264f…0af5a`), version, and every count in the report.
 2. Run **Deploy Production** (the bootstrap already applied the migrations, so it plans
    `worker-only`). While GitHub Pages still serves best.serp.co, the HTTP gates run against
    the noindex review origin instead.
@@ -166,8 +169,8 @@ PR Review already gates every merge, and Main Validation re-runs the full loop o
 2. The owner opens a `staging` → `main` pull request (`gh pr create --base main --head
    staging`) and, after PR Review, merges it with **Create a merge commit**, never a squash.
 3. The push to `main` runs Deploy Production: the staging check matches the merge commit's
-   tree, the `production` reviewers approve, and `plan-release` backs up and migrates D1
-   first only when `d1/drizzle` migrations are pending.
+   tree, the `production` reviewers approve, and the release bookmarks and migrates D1 first
+   only when `d1/drizzle` migrations are pending.
 
 Migrations are forward-only and applied before the new Worker deploys, so each must stay
 compatible with the live Worker while it applies. A `deploy-best.serp.co-production` dispatch
@@ -175,18 +178,17 @@ re-runs a release of the `main` head; a release is refused once `main` has moved
 one you won't ship instead of leaving it waiting. Hotfixes follow
 [Release guards](./RELEASE_GUARDS.md#hotfixes).
 
-### Backups and recovery
+### Bookmarks and recovery
 
-- `backup` exports the whole production D1 (including submissions) to an Actions artifact
-  named `best-serp-co-production-d1-pre-{deploy,publication,review}-<run id>`, kept 30 days
-  and downloadable by anyone with read access to this repository. Running an export blocks
-  other queries to that database until it finishes.
-- Point-in-time recovery: D1 Time Travel, for example `wrangler d1 time-travel restore
-  best-serp-co-production --env production --timestamp <before the run>`, run by a
-  maintainer after reviewer agreement.
-- Worker rollback: Cloudflare dashboard → Workers → `best-serp-co-production` →
-  Deployments → Rollback, or `wrangler rollback --env production`. A rollback does not undo
-  a migration.
+- No workflow exports D1: this repository is public, so an Actions artifact would expose
+  sessions, OAuth tokens, and emails (#99). Before each D1 change, `cloudflare-release.ts
+  bookmark <env>` writes the Time Travel bookmark and its restore command to the run summary,
+  and fails the job, before any change, if it cannot.
+- Restore (the owner only; every later write is lost) from the first attempt's bookmark. After a
+  bad migration, roll the Worker back first and don't redeploy `main` until a fix is promoted
+  ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)). Time Travel keeps 30 days.
+- Worker rollback: dashboard → Workers → `best-serp-co-production` → Deployments → Rollback,
+  or `wrangler rollback --env production`. A rollback does not undo a migration.
 
 ## Rehearsals and read-only checks
 
@@ -200,9 +202,9 @@ pnpm tsx scripts/cloudflare-release.ts check-database production --rehearse "$di
 ```
 
 `list-migrations <env>`, `check-database <env>`, and `verify-import <env>` are read-only and
-may run against a remote database from a maintainer machine after `wrangler login`. `verify-import` issues about 90
-paged reads and takes about a minute and a half. Every other command refuses to run outside
-its protected workflow.
+may run against a remote database from a maintainer machine after `wrangler login`.
+`verify-import` issues about 90 paged reads and takes about a minute and a half. Every other
+command refuses to run outside its protected workflow.
 
 Evidence from 2026-09-30: the local production rehearsal and a read-only `verify-import`
 against staging both produced the exact 16-table snapshot `69a7bae9…e477` (3,422 listings,
@@ -227,11 +229,11 @@ publication or approval reaches cached pages within about a minute; nothing is p
 
 | Resource | Staging | Production |
 |---|---|---|
-| Workers Cache API (edge HTML and data cache) | built in, nothing to create | built in, nothing to create |
-| `version_metadata` binding `CF_VERSION_METADATA` | declared in `wrangler.jsonc` | declared in `wrangler.jsonc` |
+| Workers Cache API (edge HTML, data) | built in, nothing to create | built in, nothing to create |
+| `version_metadata` binding `CF_VERSION_METADATA` | in `wrangler.jsonc` | in `wrangler.jsonc` |
+| R2 `MEDIA` (#95) | `cdn-staging` on `cdn-staging.serp.co` | `cdn` on `cdn.serp.co` |
 
-Caching needs no R2 bucket, KV namespace, Durable Object, or queue, and no API token
-permission beyond the deploy token above.
+Caching needs no KV namespace, Durable Object, or queue. Media: [Listing media](./MEDIA.md).
 
 ## Cutover checklist
 
@@ -265,7 +267,7 @@ permission beyond the deploy token above.
    Worker there with the `x-best-serp-co-smoke-test` header. A flip before step 4 is live as
    soon as the deploy finishes (the review URL sends every visitor to GitHub Pages); the gates
    fail only afterwards. Recover by rolling the Worker back (see
-   [Backups and recovery](#backups-and-recovery)), then set the switch back to `"off"` with a
+   [Bookmarks and recovery](#bookmarks-and-recovery)), then set the switch back to `"off"` with a
    `hotfix-*` PR into `main` ([Release guards](./RELEASE_GUARDS.md#hotfixes)) or a change
    merged into `staging` and promoted.
 6. Submission review moves in-app (#52); `submit-gsc-sitemaps.yml` stays manual-only.

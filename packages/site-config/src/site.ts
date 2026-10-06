@@ -7,6 +7,7 @@ export const site: SiteDefinition = {
   badges: {
     featuredOn: {
       dark: 'badge/featured-on-serp.co-dark.svg',
+      displayName: 'SERP Best',
       light: 'badge/featured-on-serp.co-light.svg'
     }
   },
@@ -26,8 +27,22 @@ export const site: SiteDefinition = {
     networkLabel: 'Network',
     submitLabel: 'Submit'
   },
+  // A dedicated sending subdomain (verified in useSend) keeps this mail's reputation separate
+  // from serp.co (serpcompany/best.serp.co#59). Staging sends from it too (owner decision): its
+  // mail is marked by the `[staging]` subject prefix and limited to its allowlist. Nothing
+  // receives mail for it: emails carry no Reply-To, and their footer sends people to the
+  // dashboard (#73 adds its inbox).
+  email: {
+    // TODO(#73): '/admin/inbox/' once the admin inbox exists; the review queue (#64) until then.
+    adminDashboardPath: '/admin/submissions/',
+    // One alert recipient (serpcompany/best.serp.co#59), not every admin on the allowlist.
+    adminRecipient: 'devin@serp.co',
+    // TODO(#73): '/account/messages/' once the dashboard inbox exists; the dashboard until then.
+    dashboardPath: '/account/',
+    from: { address: 'noreply@mail.serp.co', name: 'SERP Directory' }
+  },
   features: {
-    showAuth: false,
+    showAuth: true,
     showBrands: true,
     showCreatorProjects: false,
     showDocs: false,
@@ -36,6 +51,8 @@ export const site: SiteDefinition = {
     showFeaturedGuides: false,
     showGuides: false,
     showNewsletter: true,
+    // Paid listings ship with checkout (#68); until then /submit offers the free badge listing.
+    showPaidListings: false,
     showProjects: false
   },
   id: 'best.serp.co',
@@ -76,6 +93,10 @@ export const site: SiteDefinition = {
       '/sponsor',
       '/submit'
     ]
+  },
+  submissions: {
+    // $49 USD, one-off and permanent (#59 owner decision, 2026-10-06).
+    paidListingPriceCents: 4900
   },
   site: {
     description:

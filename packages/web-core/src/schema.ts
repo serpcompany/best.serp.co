@@ -1,8 +1,5 @@
 import { getCategoryDisplayName } from './category-display'
-import {
-  getListingLogoFallbackPath,
-  shouldUseProvidedListingLogo
-} from './listing-logo-presentation'
+import { shouldUseProvidedListingLogo } from './listing-logo-presentation'
 import { getCanonicalListingListRoute, getRoute } from './routes'
 import { SITE_LOGO_URL, SITE_NAME, SITE_PUBLIC_URL, SITE_URL } from './seo-config'
 import { siteCopy } from './site-copy'
@@ -13,6 +10,14 @@ export interface SchemaOrg {
   [key: string]: any
 }
 
+/**
+ * What the listed product costs, when known: `price` is a decimal amount such as `19.99` and
+ * `currency` an ISO 4217 code such as `USD`. The D1 catalog records no product pricing yet
+ * (serpcompany/best.serp.co#88), so catalog listings carry none and their JSON-LD makes no
+ * price claim. This is not the submission plan, which is the fee a submitter pays the directory.
+ */
+export type ListingPricing = { model: 'free' } | { model: 'paid'; price: string; currency: string }
+
 export interface WebsiteMetadataLike {
   category: string
   description: string
@@ -22,6 +27,7 @@ export interface WebsiteMetadataLike {
     images?: string[]
     logo?: string
   }
+  pricing?: ListingPricing
   resourceLinks?: Array<{ label: string; url: string }>
   slug: string
   website: string
@@ -123,6 +129,7 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
   const listingLabel = siteCopy.listingName.singular
   const listingLabelTitle = siteCopy.listingName.singularTitle
   const primaryImageUrl = resolveSchemaImageUrl(website)
+  const offer = resolveSchemaOffer(website.pricing)
 
   return {
     '@context': 'https://schema.org',
@@ -136,10 +143,9 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
         isPartOf: {
           '@id': `${SITE_URL}/#website`
         },
-        primaryImageOfPage: {
-          '@type': 'ImageObject',
-          url: primaryImageUrl
-        },
+        ...(primaryImageUrl
+          ? { primaryImageOfPage: { '@type': 'ImageObject', url: primaryImageUrl } }
+          : {}),
         datePublished: website.publishedAt,
         dateModified: website.publishedAt,
         breadcrumb: {
@@ -178,12 +184,7 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
         url: website.website,
         applicationCategory: categoryFormatted,
         operatingSystem: 'Web Browser',
-        offers: {
-          '@type': 'Offer',
-          price: '0',
-          priceCurrency: 'USD',
-          availability: 'https://schema.org/InStock'
-        },
+        ...(offer ? { offers: offer } : {}),
         publisher: {
           '@type': 'Organization',
           name: website.name,
@@ -223,54 +224,60 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
           'resource links',
           categoryFormatted
         ].join(', ')
-      },
-      {
-        '@type': 'FAQPage',
-        '@id': `${pageUrl}#faq`,
-        mainEntity: [
-          {
-            '@type': 'Question',
-            name: `What is included in ${website.name}'s ${listingLabel}?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `${website.name}'s ${listingLabel} includes its summary, category details, primary link, and any supplemental resources included with the ${listingLabel}.`
-            }
-          },
-          {
-            '@type': 'Question',
-            name: `How do I access ${website.name}'s published links?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `You can visit ${website.name} directly at ${website.website}.${
-                website.resourceLinks && website.resourceLinks.length > 0
-                  ? ' This entry also includes supplemental resource links alongside the main destination.'
-                  : ''
-              }`
-            }
-          },
-          {
-            '@type': 'Question',
-            name: `What category does ${website.name} belong to?`,
-            acceptedAnswer: {
-              '@type': 'Answer',
-              text: `${website.name} is categorized under "${categoryFormatted}" in the ${SITE_NAME} directory. ${website.description}`
-            }
-          }
-        ]
       }
     ]
   }
 }
 
-function resolveSchemaImageUrl(website: WebsiteMetadataLike): string {
+/**
+ * The listing's own logo as an absolute URL, or undefined when it has none. The generic
+ * "no logo" fallback tile is a UI affordance, never structured data: it would tell search
+ * engines that every logo-less listing shares one image, and the site logo would misattribute
+ * the listing to SERP (the TechArticle publisher already carries that).
+ */
+function resolveSchemaImageUrl(website: WebsiteMetadataLike): string | undefined {
   const logo = website.media?.logo
 
-  if (shouldUseProvidedListingLogo(logo) && logo) {
-    if (logo.startsWith('/')) return `${SITE_PUBLIC_URL}${logo}`
-    return logo
-  }
+  if (!shouldUseProvidedListingLogo(logo) || !logo) return undefined
+  if (logo.startsWith('/')) return `${SITE_PUBLIC_URL}${logo}`
+  return logo
+}
 
-  return `${SITE_PUBLIC_URL}${getListingLogoFallbackPath()}`
+const schemaPricePattern = /^(?:0|[1-9]\d*)(?:\.\d+)?$/u
+const schemaCurrencyPattern = /^[A-Z]{3}$/u
+
+/**
+ * The SoftwareApplication offer, or undefined unless the product's pricing is known. Google
+ * reads `price: '0'` as "free", so a default offer would call every paid product free. Google's
+ * software app rich result needs `offers.price` and a rating or review; listings carry neither
+ * rating nor review, so omitting an unknown price costs no rich result. A model other than
+ * `free` or `paid`, a paid price that is not a plain positive decimal, or a currency that is not
+ * three uppercase letters is omitted rather than guessed.
+ */
+function resolveSchemaOffer(pricing: ListingPricing | undefined) {
+  if (!pricing) return undefined
+  if (pricing.model === 'free') {
+    return {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock'
+    }
+  }
+  if (
+    pricing.model !== 'paid' ||
+    !schemaPricePattern.test(pricing.price) ||
+    Number(pricing.price) <= 0 ||
+    !schemaCurrencyPattern.test(pricing.currency)
+  ) {
+    return undefined
+  }
+  return {
+    '@type': 'Offer',
+    price: pricing.price,
+    priceCurrency: pricing.currency,
+    availability: 'https://schema.org/InStock'
+  }
 }
 
 export function generateCollectionSchema(websites: WebsiteMetadataLike[]): CollectionPageSchema {

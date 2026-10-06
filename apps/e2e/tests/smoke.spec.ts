@@ -54,6 +54,32 @@ function isPublicProductionOrigin(baseURL: string | undefined): boolean {
   return baseURL !== undefined && new URL(baseURL).host === new URL(site.publicUrl).host
 }
 
+/** A local Worker, which serves the reviewed import as is (`pnpm test:e2e`, CI). */
+function isLocalOrigin(baseURL: string | undefined): boolean {
+  const host = new URL(baseURL ?? 'http://127.0.0.1').hostname
+  return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')
+}
+
+/**
+ * The live listing count every catalog surface must show. Locally it is exactly the import's.
+ * A deployed environment has published reviewed manifests and admin decisions since (#100
+ * unpublished 95 listings on staging, release blocker 4), so the count is read from the
+ * D1-derived JSON feed there, held to a floor, and the homepage, directory pagination, and
+ * sitemap must all agree with it.
+ */
+async function liveListingCount(
+  request: APIRequestContext,
+  baseURL: string | undefined
+): Promise<number> {
+  if (isLocalOrigin(baseURL)) return site.listingCount
+  const feed = await request.get('/rss.xml')
+  expect(feed.status()).toBe(200)
+  const count = ((await feed.json()) as { items: unknown[] }).items.length
+  expect(count, 'live listings').toBeGreaterThanOrEqual(site.minimumDeployedListingCount)
+  expect(count, 'live listings').toBeLessThanOrEqual(site.listingCount + 1000)
+  return count
+}
+
 function structuredDataUrls(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(structuredDataUrls)
   if (!value || typeof value !== 'object') return []
@@ -93,7 +119,12 @@ async function expectCanonicalStructuredData(page: Page): Promise<string[]> {
 }
 
 test.describe('best.serp.co D1 Worker smoke', () => {
-  test('renders the SERP homepage with the exact D1 catalog size', async ({ page }) => {
+  test('renders the SERP homepage with the exact D1 catalog size', async ({
+    baseURL,
+    page,
+    request
+  }) => {
+    const listingCount = await liveListingCount(request, baseURL)
     const response = await page.goto('/', { waitUntil: 'networkidle' })
     expect(response?.status()).toBe(200)
     await expect(page).toHaveTitle(site.title)
@@ -102,7 +133,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     ).toBeVisible()
     await expect(
       page.getByRole('link', {
-        name: new RegExp(`^${site.listingCount}\\s+products in directory$`, 'i')
+        name: new RegExp(`^${listingCount}\\s+products in directory$`, 'i')
       })
     ).toBeVisible()
     // The homepage is the bare origin in its canonical, og:url, and structured data.
@@ -238,11 +269,12 @@ test.describe('best.serp.co D1 Worker smoke', () => {
   })
 
   test('paginates the directory and large categories with crawlable links', async ({
+    baseURL,
     page,
     request
   }) => {
     const pageSize = 48
-    const lastDirectoryPage = Math.ceil(site.listingCount / pageSize)
+    const lastDirectoryPage = Math.ceil((await liveListingCount(request, baseURL)) / pageSize)
     const pagination = page.getByRole('navigation', { name: /pages$/i })
 
     // The homepage shows directory page 1 and links into /products/?page=N.
@@ -371,7 +403,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       { path: '/contact/', heading: /^contact serp$/i },
       { path: '/pricing/', heading: /^serp pricing$/i },
       { path: '/sponsor/', heading: /^sponsor serp$/i },
-      { path: '/submit/', heading: /^submit$/i },
+      { path: '/submit/', heading: /^submit a product$/i },
       { path: '/legal/privacy-policy/', heading: /^privacy policy$/i },
       { path: '/legal/privacy/', heading: /^privacy policy$/i },
       { path: '/legal/terms-conditions/', heading: /^terms of service$/i },
@@ -415,9 +447,10 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       expect(pages).not.toContain(absoluteUrl(excluded))
     }
 
+    const listingCount = await liveListingCount(request, baseURL)
     const listings = await getSitemap(request, '/sitemaps/directory/1.xml')
-    expect(listings).toHaveLength(site.listingCount)
-    expect(new Set(listings).size).toBe(site.listingCount)
+    expect(listings).toHaveLength(listingCount)
+    expect(new Set(listings).size).toBe(listingCount)
     for (const location of listings) {
       expect(location).toMatch(/^https:\/\/best\.serp\.co\/products\/[^/]+\/$/u)
     }
@@ -433,7 +466,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     expect(categories).not.toContain(absoluteUrl(categoryPath('other')))
   })
 
-  test('serves the D1-derived JSON feed', async ({ request }) => {
+  test('serves the D1-derived JSON feed', async ({ baseURL, request }) => {
     const feed = await request.get('/rss.xml')
     expect(feed.status()).toBe(200)
     expect(feed.headers()['content-type']).toContain('application/json')
@@ -441,7 +474,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     expect(payload.title).toBe(site.name)
     expect(payload.home_page_url).toBe(site.publicUrl)
     expect(payload.feed_url).toBe(absoluteUrl('/rss.xml'))
-    expect(payload.items).toHaveLength(site.listingCount)
+    expect(payload.items).toHaveLength(await liveListingCount(request, baseURL))
     expect(payload.items).toContainEqual(
       expect.objectContaining({
         id: detailListing.slug,

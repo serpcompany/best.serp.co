@@ -1,12 +1,20 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { catalogEpochToken, readCatalogEpoch } from './catalog-epoch'
+import {
+  catalogEpochToken,
+  parseCatalogEpochToken,
+  readCatalogEpoch,
+  shareCatalogEpochToken,
+  sharedCatalogEpoch
+} from './catalog-epoch'
 import { createDatabase } from './client'
 import type { CatalogCacheEvent, CatalogDataCache, CatalogQueryEvent } from './contracts'
 import { MemoryCatalogCache, SqliteD1, seedContractFixture } from './test-support'
 
 vi.mock('server-only', () => ({}))
 
-const { createCatalogOperations } = await import('./catalog')
+const { createCatalogOperations, MAX_SEARCH_LIMIT, normalizeSearchQuery } = await import(
+  './catalog'
+)
 
 const now = () => new Date('2026-07-30T00:00:00.000Z')
 /** Cache-key epoch of the fixture at `now`: version, then the newest public `published_at`. */
@@ -46,15 +54,15 @@ describe('shared catalog data operations', () => {
       'delta',
       'echo'
     ])
-    const page = await catalog.getPublishedListingPage(2, 2)
-    expect(page).toMatchObject({ page: 2, pageSize: 2, total: 5 })
+    const page = await catalog.getListingNamePage({ page: 2, pageSize: 2 })
+    expect(page).toMatchObject({ page: 2, pageCount: 3, pageSize: 2, total: 5 })
     expect(page.items.map(item => item.slug)).toEqual(['charlie', 'delta'])
-    expect((await catalog.getPublishedListingPage(99, 2)).items).toEqual([])
+    expect((await catalog.getListingNamePage({ page: 99, pageSize: 2 })).items).toEqual([])
   })
 
   it('keeps summary operations away from detail content and relationship tables', async () => {
     const start = sqlite.statements.length
-    await operations().operations.getPublishedListingPage(1, 3)
+    await operations().operations.getLatestListings(3)
     const statements = sqlite.statements.slice(start)
     expect(statements).toHaveLength(2)
     for (const { sql } of statements) {
@@ -76,6 +84,10 @@ describe('shared catalog data operations', () => {
     })
     expect(detail?.resourceLinks).toEqual([
       { label: 'Documentation', url: 'https://docs.example/serp-charlie' }
+    ])
+    // The listing's FAQs, in order (#105).
+    expect(detail?.faqs).toEqual([
+      { answer: 'Answer for serp-charlie', question: 'Question for serp-charlie' }
     ])
     expect(detail?.media?.images).toEqual(['https://assets.example/serp-charlie-image.png'])
     expect(detail?.relatedWebsites.map(item => item.slug)).toEqual([
@@ -185,7 +197,7 @@ describe('shared catalog data operations', () => {
     expect(after.listingCount).toBe(6)
     expect(after.publicationVersion).toBe(before.publicationVersion)
     expect((await later.getListingNamePage()).items.map(item => item.slug)).toContain('future')
-    expect([...cache.values.keys()]).toContain('catalog-shell:v3:1.2027-01-01T00:00:00.000Z')
+    expect([...cache.values.keys()]).toContain('catalog-shell:v6:1.2027-01-01T00:00:00.000Z')
   })
 
   it('reads the catalog epoch for the Worker edge cache with query telemetry', async () => {
@@ -228,6 +240,160 @@ describe('shared catalog data operations', () => {
     }
   })
 
+  it('searches name, short description, and active categories, never content or website', async () => {
+    const catalog = operations().operations
+    const slugs = async (query: string) =>
+      (await catalog.searchListings(query, 20)).map(item => item.slug)
+
+    expect(await slugs('charlie')).toEqual(['charlie'])
+    expect(await slugs('  ALPHA \t  Listing ')).toEqual(['alpha'])
+    expect(await slugs('bravo description')).toEqual(['bravo'])
+    // Category slug or name: alpha, charlie, and echo are also in `secondary`.
+    expect(await slugs('secondary')).toEqual(['alpha', 'charlie', 'echo'])
+    expect(await slugs('listing primary category')).toEqual([
+      'alpha',
+      'bravo',
+      'charlie',
+      'delta',
+      'echo'
+    ])
+    // A name match ranks first: exact, then prefix, then anywhere in the name.
+    expect(await slugs('delta listing')).toEqual(['delta'])
+    expect((await slugs('listing')).slice(0, 2)).toEqual(['alpha', 'bravo'])
+    // The slug matches (owner decision, #81), the website URL never does (#81 round 2)...
+    expect(await slugs('charlie')).toEqual(['charlie'])
+    expect(await slugs('example.com')).toEqual([])
+    expect(await slugs('https')).toEqual([])
+    // ...and neither does the long content (owner decision, #77).
+    expect(await slugs('detail content')).toEqual([])
+    expect(await slugs('100%_off')).toEqual([])
+  })
+
+  it('answers long, many-word, CJK, and empty queries with four bindings and no LIKE', async () => {
+    const catalog = operations().operations
+    const start = sqlite.statements.length
+    for (const query of [
+      'a'.repeat(1000),
+      Array.from({ length: 200 }, (_, index) => `word${index}`).join(' '),
+      'the best free online video downloader for youtube and more',
+      '视频下载器'.repeat(30),
+      '🎬'.repeat(120),
+      "'; DROP TABLE listings; --",
+      '%%%___\\\\'
+    ]) {
+      expect(await catalog.searchListings(query, 50), query.slice(0, 20)).toEqual([])
+    }
+    expect(await catalog.searchListings('   \n\t ')).toEqual([])
+    expect(await catalog.searchListings('')).toEqual([])
+
+    const searches = sqlite.statements
+      .slice(start)
+      .filter(statement => statement.sql.includes("json_extract(?1, '$[0]')"))
+    expect(searches).toHaveLength(7)
+    for (const statement of searches) {
+      expect(statement.sql).not.toMatch(/\b(?:LIKE|GLOB)\b/iu)
+      expect(statement.bindings).toHaveLength(4)
+      const terms = JSON.parse(String(statement.bindings[0])) as string[]
+      expect(terms.length).toBeGreaterThan(0)
+      expect(terms.length).toBeLessThanOrEqual(8)
+      expect(Array.from(String(statement.bindings[2])).length).toBeLessThanOrEqual(100)
+      expect(statement.bindings[3]).toBe(50)
+    }
+  })
+
+  it('normalizes and caps search input instead of rejecting it', () => {
+    // Only ASCII letters fold, exactly like SQLite's lower(); everything else matches as typed.
+    expect(normalizeSearchQuery('  Ｆｕｌｌ\u0000Width   QUERY OÜ ')).toEqual({
+      phrase: 'Ｆｕｌｌ width query oÜ',
+      terms: ['Ｆｕｌｌ', 'width', 'query', 'oÜ']
+    })
+    const capped = normalizeSearchQuery(`${'🎬'.repeat(99)}xyz`)
+    expect(Array.from(capped.phrase)).toHaveLength(100)
+    expect(capped.phrase.endsWith('🎬x')).toBe(true)
+    expect(normalizeSearchQuery('a b c d e f g h i j a b').terms).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+      'f',
+      'g',
+      'h'
+    ])
+    expect(normalizeSearchQuery(' \n ')).toEqual({ phrase: '', terms: [] })
+  })
+
+  it('caches search results per epoch and clamps the limit', async () => {
+    const cache = new MemoryCatalogCache()
+    const searchQueries = (events: Array<CatalogCacheEvent | CatalogQueryEvent>) =>
+      events.filter(event => event.event === 'd1_query' && event.queryShape === 'search-summaries')
+
+    const cold = operations(cache)
+    const results = await cold.operations.searchListings('Listing', 5000)
+    expect(results).toHaveLength(5)
+    expect(searchQueries(cold.events)).toHaveLength(1)
+    const limitBinding = sqlite.statements
+      .filter(statement => statement.sql.includes("json_extract(?1, '$[0]')"))
+      .at(-1)?.bindings[3]
+    expect(limitBinding).toBe(MAX_SEARCH_LIMIT)
+
+    const warm = operations(cache)
+    expect(await warm.operations.searchListings('  listing  ', 5000)).toEqual(results)
+    expect(searchQueries(warm.events)).toHaveLength(0)
+    expect(warm.events).toContainEqual({
+      event: 'catalog_cache',
+      operation: 'search-summaries',
+      state: 'hit'
+    })
+
+    sqlite.database.prepare('UPDATE publication_state SET version = 2').run()
+    const nextEpoch = operations(cache)
+    await nextEpoch.operations.searchListings('listing', 5000)
+    expect(searchQueries(nextEpoch.events)).toHaveLength(1)
+  })
+
+  it('reuses an epoch the Worker entry shared instead of reading it again', async () => {
+    const events: Array<CatalogCacheEvent | CatalogQueryEvent> = []
+    const catalog = createCatalogOperations({
+      cache: new MemoryCatalogCache(),
+      client: createDatabase(sqlite.asD1Database()),
+      clock: now,
+      observe: event => events.push(event),
+      reuseEpoch: () => ({ effectiveAt: '2026-07-05T00:00:00.000Z', version: 7 })
+    })
+    expect(await catalog.getPublicationVersion()).toBe(7)
+    await catalog.getShellStats()
+    expect(
+      events.some(event => event.event === 'd1_query' && event.operation === 'publication-version')
+    ).toBe(false)
+  })
+
+  it('logs a D1 error code, not the message, when a query fails', async () => {
+    const events: Array<CatalogCacheEvent | CatalogQueryEvent> = []
+    const failing = {
+      prepare() {
+        throw new Error(
+          "D1_ERROR: too many SQL variables at offset 6536: SQLITE_ERROR params: ['secret search terms']"
+        )
+      }
+    } as unknown as D1Database
+    const catalog = createCatalogOperations({
+      cache: new MemoryCatalogCache(),
+      client: createDatabase(failing),
+      clock: now,
+      observe: event => events.push(event),
+      reuseEpoch: () => ({ effectiveAt: null, version: 1 })
+    })
+    await expect(catalog.searchListings('anything')).rejects.toThrow()
+    const failure = events.find(event => event.event === 'd1_query')
+    expect(failure).toMatchObject({
+      errorCode: 'SQLITE_ERROR:too_many_variables',
+      operation: 'search-summaries',
+      success: false
+    })
+    expect(JSON.stringify(failure)).not.toContain('secret')
+  })
+
   it('caches shell counts by publication version', async () => {
     const cache = new MemoryCatalogCache()
     const coldCatalog = operations(cache)
@@ -268,14 +434,14 @@ describe('shared catalog data operations', () => {
       )
     ).toHaveLength(1)
     expect([...cache.values.keys()].sort()).toEqual([
-      `catalog-shell:v3:${epoch(1)}`,
-      `catalog-shell:v3:${epoch(2)}`
+      `catalog-shell:v6:${epoch(1)}`,
+      `catalog-shell:v6:${epoch(2)}`
     ])
   })
 
   it('falls back to live D1 when cached shell data is corrupt or unavailable', async () => {
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-shell:v3:${epoch(1)}`, { featuredCount: 'wrong' })
+    corrupt.values.set(`catalog-shell:v6:${epoch(1)}`, { featuredCount: 'wrong' })
     const corruptCatalog = operations(corrupt)
     expect((await corruptCatalog.operations.getShellStats()).featuredCount).toBe(2)
     expect(corruptCatalog.events).toContainEqual({
@@ -334,12 +500,6 @@ describe('shared catalog data operations', () => {
     const warm = operations(cache)
     expect(await warm.operations.getPublishedListings()).toEqual(listings)
     expect(await warm.operations.getListingBySlug('charlie')).toEqual(detail)
-    expect(
-      (await warm.operations.getPublishedListingPage(2, 2)).items.map(item => item.slug)
-    ).toEqual(['charlie', 'delta'])
-    expect(
-      (await warm.operations.getListingsByCategory('secondary')).map(item => item.slug)
-    ).toEqual(['alpha', 'charlie', 'echo'])
     expect((await warm.operations.getFeaturedListings()).map(item => item.slug)).toEqual([
       'alpha',
       'bravo'
@@ -387,8 +547,8 @@ describe('shared catalog data operations', () => {
     ).toHaveLength(2)
 
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-published:v3:${epoch(2)}`, { items: 'wrong' })
-    corrupt.values.set(`catalog-detail:v3:${epoch(2)}:charlie`, { detail: 'wrong' })
+    corrupt.values.set(`catalog-published:v6:${epoch(2)}`, { items: 'wrong' })
+    corrupt.values.set(`catalog-detail:v6:${epoch(2)}:charlie`, { detail: 'wrong' })
     const recovered = operations(corrupt)
     expect(await recovered.operations.getPublishedListings()).toHaveLength(5)
     expect((await recovered.operations.getListingBySlug('charlie'))?.slug).toBe('charlie')
@@ -421,5 +581,91 @@ describe('shared catalog data operations', () => {
     expect(queryEvent).not.toHaveProperty('sql')
     expect(queryEvent).not.toHaveProperty('bindings')
     expect(queryEvent).not.toHaveProperty('requestId')
+  })
+})
+
+describe('listing link rel, verified owner, and unpublished state (#62)', () => {
+  function catalogFor(sqlite: SqliteD1) {
+    return createCatalogOperations({
+      cache: new MemoryCatalogCache(),
+      client: createDatabase(sqlite.asD1Database()),
+      clock: now,
+      observe: () => {}
+    })
+  }
+
+  function seeded(): SqliteD1 {
+    const sqlite = new SqliteD1()
+    seedContractFixture(sqlite)
+    sqlite.database.exec(`
+      INSERT INTO users (id, name, email) VALUES ('owner', 'Owner', 'owner@example.com');
+      UPDATE listings SET link_rel = 'sponsored' WHERE slug = 'delta';
+      INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+        VALUES ('serp-delta', 'owner', 'badge_claim', '2026-07-01T00:00:00.000Z');
+      UPDATE listings SET is_active = 0 WHERE slug = 'echo';
+    `)
+    return sqlite
+  }
+
+  it('renders listings as follow by default and derives the owner badge from listing_owners', async () => {
+    const sqlite = seeded()
+    const catalog = catalogFor(sqlite)
+    const charlie = await catalog.getListingBySlug('charlie')
+    expect(charlie).toMatchObject({ linkRel: 'follow' })
+    expect(charlie?.verifiedOwner).toBeUndefined()
+    expect(await catalog.getListingBySlug('delta')).toMatchObject({
+      linkRel: 'sponsored',
+      verifiedOwner: true
+    })
+
+    sqlite.database.exec(
+      "UPDATE listing_owners SET revoked_at = '2026-07-02', revoked_reason = 'badge_removed'"
+    )
+    expect((await catalogFor(sqlite).getListingBySlug('delta'))?.verifiedOwner).toBeUndefined()
+  })
+
+  it('tells an unpublished listing (410) from a live, scheduled, or unknown slug', async () => {
+    const catalog = catalogFor(seeded())
+    expect(await catalog.getListingBySlug('echo')).toBeNull()
+    expect(await catalog.getUnpublishedListing('echo')).toEqual({
+      category: 'primary',
+      categoryName: 'primary category',
+      name: 'echo listing',
+      slug: 'echo'
+    })
+    for (const slug of ['charlie', 'future', 'missing']) {
+      expect(await catalog.getUnpublishedListing(slug), slug).toBeNull()
+    }
+    expect((await catalog.getPublishedListings()).map(item => item.slug)).not.toContain('echo')
+    expect(await catalog.searchListings('echo')).toEqual([])
+  })
+})
+
+describe('catalog epoch tokens shared by the Worker entry', () => {
+  it('round-trips a token and refuses anything else', () => {
+    for (const epoch of [
+      { effectiveAt: '2026-07-05T00:00:00.000Z', version: 3 },
+      { effectiveAt: null, version: 0 }
+    ]) {
+      expect(parseCatalogEpochToken(catalogEpochToken(epoch))).toEqual(epoch)
+    }
+    for (const token of ['', 'none', '.2026', 'x.2026-07-05', '1.', '-1.none', '1e3.none']) {
+      expect(parseCatalogEpochToken(token), token).toBeNull()
+    }
+  })
+
+  it('serves a shared epoch only while it is fresh', () => {
+    shareCatalogEpochToken('5.2026-07-05T00:00:00.000Z', 1_000)
+    expect(sharedCatalogEpoch(1_000 + 29_999)).toEqual({
+      effectiveAt: '2026-07-05T00:00:00.000Z',
+      version: 5
+    })
+    expect(sharedCatalogEpoch(1_000 + 30_000)).toBeNull()
+    expect(sharedCatalogEpoch(999)).toBeNull()
+    shareCatalogEpochToken('not a token', 2_000)
+    expect(sharedCatalogEpoch(2_000)).toEqual({
+      effectiveAt: '2026-07-05T00:00:00.000Z',
+      version: 5
+    })
   })
 })

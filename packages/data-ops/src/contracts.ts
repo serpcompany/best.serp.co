@@ -1,3 +1,4 @@
+import type { CatalogEpoch } from './catalog-epoch'
 import type { Database } from './client'
 
 export type CatalogOperation =
@@ -9,11 +10,12 @@ export type CatalogOperation =
   | 'listing-detail'
   | 'listing-name-order'
   | 'listing-name-page'
-  | 'listing-page'
   | 'published-summaries'
   | 'publication-version'
   | 'search-summaries'
   | 'shell-stats'
+  | 'unpublished-listing'
+  | 'unpublished-listing-status'
 
 export type CatalogQueryShape =
   | 'canonical-redirect'
@@ -23,8 +25,6 @@ export type CatalogQueryShape =
   | 'listing-detail'
   | 'listing-name-order'
   | 'listing-name-page-items'
-  | 'listing-page-count'
-  | 'listing-page-items'
   | 'navigation-next'
   | 'navigation-previous'
   | 'publication-version'
@@ -34,9 +34,17 @@ export type CatalogQueryShape =
   | 'related-single-category-seek'
   | 'search-summaries'
   | 'shell-stats'
+  | 'unpublished-listing'
+  | 'unpublished-listing-status'
 
 export interface CatalogQueryEvent {
   d1DurationMs: number | null
+  /**
+   * For a failed query: the SQLite result code and a stable reason, such as
+   * `SQLITE_ERROR:too_many_variables`. Never the SQL text or bound values (they can hold user
+   * input such as search terms).
+   */
+  errorCode?: string
   event: 'd1_query'
   operation: CatalogOperation
   queryShape: CatalogQueryShape
@@ -56,6 +64,7 @@ export interface CatalogCacheEvent {
     | 'listing-name-order'
     | 'listing-name-page'
     | 'published-summaries'
+    | 'search-summaries'
     | 'shell-stats'
   state: 'corrupt' | 'error' | 'hit' | 'miss' | 'write-error' | 'written'
 }
@@ -67,6 +76,11 @@ export interface CatalogDataCache {
   put(key: string, value: unknown, ttlSeconds: number): Promise<void>
 }
 
+/**
+ * A logo or image is a hosted media key (`best.serp.co/listings/…`, #95) or, until the legacy
+ * migration repoints it, the imported reference. The web adapter resolves keys against the
+ * environment's media host (`mediaUrl` in `media-keys.ts`); DTOs and their cache hold keys only.
+ */
 export interface ListingLogoMedia {
   logo?: string
 }
@@ -80,6 +94,12 @@ export interface ListingMedia {
 export interface ListingResourceLink {
   label: string
   url: string
+}
+
+/** An approved question and answer on a listing (`listing_faqs`, #105). */
+export interface ListingFaq {
+  answer: string
+  question: string
 }
 
 export interface ListingSummary {
@@ -111,22 +131,37 @@ export interface RelatedListing {
   website: string
 }
 
+/** The `rel` of our outbound link to the listing's website (an admin setting per listing). */
+export type ListingLinkRel = 'follow' | 'nofollow' | 'sponsored'
+
 export interface ListingDetail extends ListingSummary {
   content?: string
   entityType?: string
+  /** The listing's FAQs in order (#105); absent when it has none. */
+  faqs?: ListingFaq[]
+  /** Rendered on the outbound "Visit Site" link; imported and admin listings are `follow`. */
+  linkRel: ListingLinkRel
   media?: ListingMedia
   nextWebsite: ListingNavigation | null
   previousWebsite: ListingNavigation | null
   priority?: 'high' | 'medium' | 'low'
   relatedWebsites: RelatedListing[]
   resourceLinks?: ListingResourceLink[]
+  /** Present when the listing has a current owner (`listing_owners`): the "Verified owner" badge. */
+  verifiedOwner?: true
 }
 
-export interface ListingPage {
-  items: ListingSummary[]
-  page: number
-  pageSize: number
-  total: number
+/**
+ * A listing that was published and is now unpublished (`status = 'approved'`, `is_active = 0`).
+ * Its URL answers 410 Gone, not 404, until it is republished.
+ */
+export interface UnpublishedListing {
+  /** Primary category slug when that category is still active. */
+  category: string | null
+  /** That category's display name, for the 410 page's link (#64). */
+  categoryName: string | null
+  name: string
+  slug: string
 }
 
 /**
@@ -177,12 +212,17 @@ export interface CatalogOperations {
   getLatestListings(limit?: number): Promise<ListingSummary[]>
   getListingBySlug(slug: string): Promise<ListingDetail | null>
   getListingNamePage(query?: ListingNamePageQuery): Promise<ListingNamePage>
-  getListingsByCategory(slug: string): Promise<ListingSummary[]>
   getPublicationVersion(): Promise<number>
-  getPublishedListingPage(page?: number, pageSize?: number): Promise<ListingPage>
   getPublishedListings(): Promise<ListingSummary[]>
   getShellStats(): Promise<CatalogShellStats>
   getSitemapListings(): Promise<ListingSummary[]>
+  /** The unpublished listing at `slug`, or null when the slug is live or never existed. */
+  getUnpublishedListing(slug: string): Promise<UnpublishedListing | null>
+  /**
+   * Public listings whose name, short description, slug, or an active category (slug or name)
+   * contains every term of the normalized query (`normalizeSearchQuery`), at most
+   * `MAX_SEARCH_LIMIT`.
+   */
   searchListings(query: string, limit?: number): Promise<ListingSummary[]>
 }
 
@@ -191,4 +231,9 @@ export interface CatalogOperationsConfig {
   client: Database
   clock: () => Date
   observe: CatalogObserver
+  /**
+   * An epoch this isolate read moments ago (the Worker entry's, `sharedCatalogEpoch()`), so a
+   * render reuses it instead of reading the epoch again; null falls back to D1.
+   */
+  reuseEpoch?: () => CatalogEpoch | null
 }

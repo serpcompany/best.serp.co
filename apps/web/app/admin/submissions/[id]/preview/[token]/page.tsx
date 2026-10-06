@@ -2,6 +2,7 @@ import { ProjectNavigation } from '@serpdirectory/web-core/project-navigation'
 import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@serpdirectory/web-core/sections/external-resources-section-route'
 import { WebsiteContentSectionRoute as WebsiteContentSection } from '@serpdirectory/web-core/website/website-content-section-route'
 import { WebsiteDetailSidebar } from '@serpdirectory/web-core/website/website-detail-sidebar'
+import { WebsiteFaqsSection } from '@serpdirectory/web-core/website/website-faqs-section'
 import {
   WebsiteHeroRoute as WebsiteHero,
   type WebsiteHeroRouteProps
@@ -11,6 +12,7 @@ import { WebsiteResourcesSectionRoute as WebsiteResourcesSection } from '@serpdi
 import { WebsiteDetailRoutePage } from '@serpdirectory/web-core/website-routes/detail-page'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { requireAdmin } from '@/lib/auth/server'
 import { reviewPreviewAccessSchema } from '@/lib/submissions/review-preview'
 import { getSubmissionReviewPreview } from '@/lib/submissions/review-preview-repository'
 
@@ -42,6 +44,9 @@ function PrivatePreviewWebsiteHero(props: WebsiteHeroRouteProps) {
 }
 
 export default async function ReviewPreviewPage({ params }: ReviewPreviewPageProps) {
+  // Every /admin page needs an admin session (and Cloudflare Access in production, checked
+  // by the Worker entry); the capability token alone no longer opens the preview (#60).
+  await requireAdmin()
   const access = reviewPreviewAccessSchema.safeParse(await params)
   if (!access.success) notFound()
 
@@ -67,6 +72,7 @@ export default async function ReviewPreviewPage({ params }: ReviewPreviewPagePro
           ProjectNavigation,
           WebsiteContentSection,
           WebsiteDetailSidebar,
+          WebsiteFaqsSection,
           WebsiteHero: PrivatePreviewWebsiteHero,
           WebsiteRelatedProjects,
           WebsiteResourcesSection

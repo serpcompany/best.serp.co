@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    Source of apps/web/public/listing-logos/favicon-fallback-512x512.png, the logo shown for a
+    listing that has none (serpcompany/best.serp.co#86). A translucent zinc tile and the lucide
+    "globe" glyph read on light and dark surfaces alike; no text, so no fonts are baked in.
+    Render: rsvg-convert, width and height 512, piped through pngquant with quality 80-100 and
+    metadata stripped, written over the PNG above.
+  -->
+  <rect x="8" y="8" width="496" height="496" rx="112" fill="#71717a" fill-opacity="0.14" stroke="#71717a" stroke-opacity="0.36" stroke-width="8"/>
+  <g transform="translate(128 128) scale(10.6667)" fill="none" stroke="#8a8a94" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+    <path d="M2 12h20"/>
+  </g>
+</svg>

@@ -10,7 +10,8 @@
       "!**/.next",
       "!**/.turbo",
       "!**/coverage",
-      "!**/.content-collections"
+      "!**/.content-collections",
+      "!d1/media/*.json"
     ]
   },
   "vcs": {
@@ -63,6 +64,14 @@
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["docs/mockups/**"],
+      "assist": { "enabled": false },
+      "formatter": { "enabled": false },
+      "linter": { "enabled": false }
+    }
+  ],
   "javascript": {
     "formatter": {
       "arrowParentheses": "asNeeded",

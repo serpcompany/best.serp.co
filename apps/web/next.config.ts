@@ -50,6 +50,12 @@ let nextConfig: NextConfig = {
 
   transpilePackages: INTERNAL_PACKAGES,
 
+  // `unauthorized()` / `forbidden()` give admin pages real 401 and 403 responses
+  // (`requireAdmin()` in lib/auth/server.ts; docs/ACCOUNTS.md).
+  experimental: {
+    authInterrupts: true
+  },
+
   pageExtensions: ['mdx', 'ts', 'tsx'],
 
   // Configure logging behavior
@@ -86,6 +92,17 @@ let nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'icon.horse',
         pathname: '/icon/**'
+      },
+      // Hosted listing media (#95): production and staging media hosts, this site's keys only.
+      {
+        protocol: 'https',
+        hostname: 'cdn.serp.co',
+        pathname: '/best.serp.co/listings/**'
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn-staging.serp.co',
+        pathname: '/best.serp.co/listings/**'
       }
     ]
   },

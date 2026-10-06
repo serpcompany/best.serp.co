@@ -198,7 +198,7 @@ export async function assertCurrentRelease(
   }
   if (head === sha || (await treeOf(get, head)) === (await treeOf(get, sha))) return { head }
   throw new Error(
-    `${options.branch} now points at ${head}, not ${sha}, so this release is stale: the newer push has its own Deploy Production run. Roll back with Cloudflare rather than re-running an older release (docs/DEPLOY_RUNBOOK.md#backups-and-recovery).`
+    `${options.branch} now points at ${head}, not ${sha}, so this release is stale: the newer push has its own Deploy Production run. Roll back with Cloudflare rather than re-running an older release (docs/DEPLOY_RUNBOOK.md#bookmarks-and-recovery).`
   )
 }
 

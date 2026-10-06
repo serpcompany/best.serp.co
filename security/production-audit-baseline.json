@@ -9,12 +9,6 @@
       "rationale": "These packages are transitive runtime dependencies of the current Next.js, Vercel, and Cloudflare stack. They require upgrades through their direct framework owners plus both Worker builds and Preview verification.",
       "target": "Issue #93 — framework/runtime upgrade batch"
     },
-    "authentication-authjs": {
-      "batch": "authentication",
-      "modules": ["@auth/core", "next-auth"],
-      "rationale": "Auth.js core and NextAuth are coupled packages whose upgrade can change session and cookie behavior. They require the dedicated authentication validation gates rather than an isolated lockfile override.",
-      "target": "Issue #92 follow-up — authentication upgrade batch"
-    },
     "product-parsing-and-transport": {
       "batch": "product-libraries",
       "modules": ["fast-xml-parser", "form-data", "js-yaml", "serialize-javascript"],
@@ -54,24 +48,6 @@
       "batch": "product-libraries"
     },
     {
-      "id": "GHSA-7rqj-j65f-68wh",
-      "module": "@auth/core",
-      "severity": "critical",
-      "batch": "authentication"
-    },
-    {
-      "id": "GHSA-7rqj-j65f-68wh",
-      "module": "next-auth",
-      "severity": "critical",
-      "batch": "authentication"
-    },
-    {
-      "id": "GHSA-8fpg-xm3f-6cx3",
-      "module": "next-auth",
-      "severity": "critical",
-      "batch": "authentication"
-    },
-    {
       "id": "GHSA-8gc5-j5rx-235r",
       "module": "fast-xml-parser",
       "severity": "high",
@@ -106,18 +82,6 @@
       "module": "lodash-es",
       "severity": "high",
       "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-xmf8-cvqr-rfgj",
-      "module": "@auth/core",
-      "severity": "high",
-      "batch": "authentication"
-    },
-    {
-      "id": "GHSA-xmf8-cvqr-rfgj",
-      "module": "next-auth",
-      "severity": "high",
-      "batch": "authentication"
     }
   ]
 }

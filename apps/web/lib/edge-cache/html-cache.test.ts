@@ -82,7 +82,17 @@ describe('edge HTML cache', () => {
     expect(isCacheableRequest(page('/products/categories/other/?page=2'))).toBe(true)
     expect(isCacheableRequest(page('/sitemaps/directory/1.xml'))).toBe(true)
     expect(isCacheableRequest(page('/accounting-tools/'))).toBe(true)
-    for (const path of ['/api/search?q=x', '/admin/submissions/1/', '/account/', '/login/']) {
+    for (const path of [
+      '/api/search?q=x',
+      '/api/auth/get-session',
+      '/api/auth/sign-in/email-otp',
+      '/admin/',
+      '/admin/submissions/1/',
+      '/ADMIN/',
+      '/account/',
+      '/Account/',
+      '/login/'
+    ]) {
       expect(isCacheableRequest(page(path)), path).toBe(false)
     }
     expect(isCacheableRequest(page('/search/?q=video'))).toBe(false)
@@ -90,14 +100,47 @@ describe('edge HTML cache', () => {
     expect(isCacheableRequest(page('/', { method: 'POST' }))).toBe(false)
     expect(isCacheableRequest(page('/', { headers: { authorization: 'Bearer x' } }))).toBe(false)
     for (const cookie of [
-      'authjs.session-token=abc',
-      'theme=dark; __Secure-authjs.session-token=abc',
-      'next-auth.csrf-token=abc',
+      'better-auth.session_token=abc.sig',
+      'theme=dark; __Secure-better-auth.session_token=abc.sig',
+      '__Host-better-auth.session_token=abc',
+      'better-auth.session_data=abc',
+      'better-auth.dont_remember=true',
+      'better-auth-session_token=abc',
       '__prerender_bypass=1'
     ]) {
       expect(isCacheableRequest(page('/', { headers: { cookie } })), cookie).toBe(false)
     }
-    expect(isCacheableRequest(page('/', { headers: { cookie: 'theme=dark' } }))).toBe(true)
+    for (const cookie of ['theme=dark', 'not-better-auth=1', 'authjs.session-token=retired']) {
+      expect(isCacheableRequest(page('/', { headers: { cookie } })), cookie).toBe(true)
+    }
+  })
+
+  // serpcompany/best.serp.co#60: pages under auth are never served from the edge cache.
+  it('never serves a signed-in request from the cache and never stores its response', async () => {
+    const edge = harness()
+    const anonymous = await edge.serve(page('/products/'))
+    expect(anonymous.headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
+    expect(edge.cache.entries.size).toBe(1)
+    const stored = [...edge.cache.entries.keys()]
+
+    for (const cookie of [
+      'better-auth.session_token=token.signature',
+      'theme=dark; __Secure-better-auth.session_token=token.signature'
+    ]) {
+      const rendersBefore = edge.renders
+      const signedIn = await edge.serve(
+        page('/products/', { headers: { cookie } }),
+        () => new Response('<html>signed in</html>', { headers: { 'set-cookie': 'x=1' } })
+      )
+      expect(signedIn.headers.get(EDGE_CACHE_HEADER), cookie).toBe('BYPASS')
+      expect(await signedIn.text()).toBe('<html>signed in</html>')
+      expect(edge.renders).toBe(rendersBefore + 1)
+    }
+    // Nothing new was stored, and the anonymous entry is unchanged.
+    expect([...edge.cache.entries.keys()]).toEqual(stored)
+    const hit = await edge.serve(page('/products/'))
+    expect(hit.headers.get(EDGE_CACHE_HEADER)).toBe('HIT')
+    expect(await hit.text()).toBe('<html>render 1</html>')
   })
 
   it('stores a miss and serves the same bytes on a hit without rendering', async () => {
@@ -185,7 +228,9 @@ describe('edge HTML cache', () => {
     await edge.serve(page('/moved/'), () =>
       Response.redirect('https://best.serp.co/products/', 308)
     )
-    expect(edge.cache.entries.size).toBe(2)
+    // An unpublished listing's 410 gone page is public and epoch-keyed like any page (#64).
+    await edge.serve(page('/products/gone.example/'), () => new Response('gone', { status: 410 }))
+    expect(edge.cache.entries.size).toBe(3)
     const head = await edge.serve(page('/missing/', { method: 'HEAD' }))
     expect(head.status).toBe(404)
     expect(head.headers.get(EDGE_CACHE_HEADER)).toBe('HIT')
@@ -259,7 +304,7 @@ describe('edge HTML cache', () => {
     const seen: Request[] = []
     const edge = harness()
     await withEdgeCache(
-      page('/search/?q=x', { headers: { 'x-nonce': 'n', cookie: 'authjs.session-token=a' } }),
+      page('/search/?q=x', { headers: { 'x-nonce': 'n', cookie: 'better-auth.session_token=a' } }),
       { waitUntil: () => {} },
       { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => 'e' },
       async request => {

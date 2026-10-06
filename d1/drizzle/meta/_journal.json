@@ -8,6 +8,55 @@
       "when": 1790798725972,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791219171639,
+      "tag": "0001_email_deliveries",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791226100994,
+      "tag": "0002_better_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791228763538,
+      "tag": "0003_submissions_data_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791236713065,
+      "tag": "0004_query_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791241398664,
+      "tag": "0005_admin_panel",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791273167988,
+      "tag": "0006_badge_program",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791278791787,
+      "tag": "0007_hosted_media",
+      "breakpoints": true
     }
   ]
 }

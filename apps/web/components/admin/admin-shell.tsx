@@ -1,0 +1,142 @@
+'use client'
+
+import { Button } from '@serpdirectory/design-system/button'
+import { AppShell } from '@serpdirectory/web-core/dashboard/app-shell'
+import {
+  type DashboardNavItem,
+  isNavItemActive,
+  NavMain
+} from '@serpdirectory/web-core/dashboard/nav-main'
+import { NavSecondary } from '@serpdirectory/web-core/dashboard/nav-secondary'
+import { type DashboardUser, NavUser } from '@serpdirectory/web-core/dashboard/nav-user'
+import { SidebarBrand } from '@serpdirectory/web-core/dashboard/sidebar-brand'
+import { type DashboardCrumb, SiteHeader } from '@serpdirectory/web-core/dashboard/site-header'
+import { ModeToggle } from '@serpdirectory/web-core/mode-toggle'
+import { Box, CircleUser, ExternalLink, Inbox, Receipt, Users } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
+import { signOut } from '@/components/auth/sign-in-api'
+
+/**
+ * The admin shell (#64): shadcn sidebar-07 (`collapsible="icon"` with a rail, the logo tile,
+ * NavUser with the switch to the account area), built from the shared dashboard pieces in
+ * `@serpdirectory/web-core/dashboard/*` like the account shell. The layout renders it once, so
+ * the sidebar keeps its state across admin pages; each page names its breadcrumb with
+ * `AdminCrumbs`. Unbuilt areas are hidden: the Inbox arrives with #73 and Orders with #68
+ * (`showOrders`).
+ */
+
+const CrumbsContext = createContext<{
+  crumbs: readonly DashboardCrumb[] | null
+  setCrumbs: (crumbs: readonly DashboardCrumb[] | null) => void
+} | null>(null)
+
+/** The breadcrumb for pages without their own, from the path. */
+function defaultCrumbs(pathname: string): DashboardCrumb[] {
+  const root = { href: '/admin/', label: 'Admin' }
+  if (pathname.startsWith('/admin/listings/'))
+    return [root, { href: '/admin/listings/', label: 'Listings' }]
+  if (pathname.startsWith('/admin/admins/')) return [root, { label: 'Admins' }]
+  return [root, { href: '/admin/submissions/', label: 'Review queue' }]
+}
+
+/** Sets this page's breadcrumb in the admin header. */
+export function AdminCrumbs({ crumbs }: { crumbs: readonly DashboardCrumb[] }) {
+  const context = useContext(CrumbsContext)
+  const key = JSON.stringify(crumbs)
+  useEffect(() => {
+    context?.setCrumbs(crumbs)
+    return () => context?.setCrumbs(null)
+  }, [key])
+  return null
+}
+
+function AdminHeader() {
+  const pathname = usePathname() ?? ''
+  const context = useContext(CrumbsContext)
+  return (
+    <SiteHeader
+      crumbs={context?.crumbs ?? defaultCrumbs(pathname.toLowerCase())}
+      actions={
+        <>
+          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
+            <a href="/">
+              View site
+              <ExternalLink />
+            </a>
+          </Button>
+          <ModeToggle />
+        </>
+      }
+    />
+  )
+}
+
+export function AdminShell({
+  children,
+  queueCount,
+  showOrders,
+  user
+}: {
+  children: ReactNode
+  queueCount: number
+  showOrders: boolean
+  user: DashboardUser
+}) {
+  const pathname = usePathname()
+  const [crumbs, setCrumbs] = useState<readonly DashboardCrumb[] | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
+  const crumbsContext = useMemo(() => ({ crumbs, setCrumbs }), [crumbs])
+  // NavMain marks the current section from the path; a revision belongs to the review queue.
+  const nav: DashboardNavItem[] = [
+    {
+      badge: queueCount > 0 ? queueCount : undefined,
+      href: '/admin/submissions/',
+      icon: Inbox,
+      isActive:
+        isNavItemActive(pathname, '/admin/submissions/') ||
+        isNavItemActive(pathname, '/admin/revisions/'),
+      title: 'Review queue'
+    },
+    { href: '/admin/listings/', icon: Box, title: 'Listings' },
+    ...(showOrders ? [{ href: '/admin/orders/', icon: Receipt, title: 'Orders' }] : []),
+    { href: '/admin/admins/', icon: Users, title: 'Admins' }
+  ]
+
+  async function onSignOut() {
+    setSigningOut(true)
+    await signOut()
+    window.location.assign('/')
+  }
+
+  return (
+    <CrumbsContext.Provider value={crumbsContext}>
+      <AppShell
+        collapsible="icon"
+        variant="sidebar"
+        rail
+        sidebarHeader={<SidebarBrand href="/admin/submissions/" title="SERP" subtitle="Admin" />}
+        sidebarContent={
+          <>
+            <NavMain label="Admin" items={nav} />
+            <NavSecondary
+              className="mt-auto"
+              items={[{ href: '/', icon: ExternalLink, title: 'View best.serp.co' }]}
+            />
+          </>
+        }
+        sidebarFooter={
+          <NavUser
+            user={user}
+            links={[{ href: '/account/', icon: CircleUser, title: 'Switch to Account' }]}
+            onSignOut={() => void onSignOut()}
+            signingOut={signingOut}
+          />
+        }
+        header={<AdminHeader />}
+      >
+        {children}
+      </AppShell>
+    </CrumbsContext.Provider>
+  )
+}

@@ -1,0 +1,110 @@
+# serpcompany/best.serp.co#95 (#98 owner decision): add the Adult category to adult listings
+# that lack it, as a secondary category. Row-level: each operation checks the listing
+# still has exactly the categories it lists. Independent of the media parts.
+version: 1
+id: 2026-10-06-legacy-media-adult-category
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-categories-add
+    id: lst_bedaa65d78a770d9467f14bb
+    slug: alphaporno-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_9056916e924e69a757a158d6
+    slug: beeg-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_5568a59f7f88c1ba9cd44d47
+    slug: eporner-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_a615059eb5abaf07b309447b
+    slug: livejasmin-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_0d34a5b3397b463214cf708e
+    slug: onlyfans-bulk-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_4251455a4d740603c89dd58a
+    slug: onlyfans-downloader
+    expected:
+      - video-downloaders
+      - fansite-downloaders
+      - social-media-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_3ea2be5dd1c1715c51d64d9a
+    slug: pornhub-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_42d7b46cbb3545c9ca268af2
+    slug: redtube-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_a9c53917a85d2c242aebe247
+    slug: spankbang-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_cbe6998d975477aa1b4fc1f3
+    slug: stripchat-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_30be0d25fa0d2c222752c1c6
+    slug: tnaflix-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_d834dd88386322d7271f2536
+    slug: xhamster-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_ce347d01617088970080dbf4
+    slug: xnxx-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult
+  - action: listing-categories-add
+    id: lst_5791b63e205869357a498e51
+    slug: youporn-downloader
+    expected:
+      - video-downloaders
+    add:
+      - adult

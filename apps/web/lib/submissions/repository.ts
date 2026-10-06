@@ -2,19 +2,41 @@ import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { createDatabase } from '@serpdirectory/data-ops/client'
+import { validateMediaBaseUrl } from '@serpdirectory/data-ops/media-keys'
 import {
   createSubmissionOperations,
+  type DraftContent,
   isSubmissionError,
+  type NewDraftInput,
+  type OwnSubmission,
   SubmissionError,
-  type SubmissionState
+  type SubmissionVerificationResult,
+  type UrlAvailability
 } from '@serpdirectory/data-ops/submissions'
-import type { SubmissionRequest } from '@serpdirectory/web-core/forms/submission-contract'
-import type { BadgeVerificationResult } from './badge-verifier'
+
+/**
+ * Server-only adapter for native submissions (serpcompany/best.serp.co#63): it validates the
+ * Worker's `DB` binding and `D1_RUNTIME_ENV` and delegates every read and write to
+ * `@serpdirectory/data-ops/submissions`, scoped to the signed-in owner.
+ */
 
 export { isSubmissionError, SubmissionError }
-export type { SubmissionState }
+export type { DraftContent, NewDraftInput, OwnSubmission, UrlAvailability }
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
+
+/** True only for a Worker configured as local by both vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`). */
+function isLocalWorker(env: CloudflareEnv): boolean {
+  return env.D1_RUNTIME_ENV === 'local' && env.SITE_ENVIRONMENT === 'local'
+}
+
+function optionalMediaBaseUrl(env: CloudflareEnv): string | undefined {
+  try {
+    return validateMediaBaseUrl(env.MEDIA_BASE_URL, env.D1_RUNTIME_ENV)
+  } catch {
+    return undefined
+  }
+}
 
 async function operations() {
   const { env } = await getCloudflareContext({ async: true })
@@ -24,32 +46,78 @@ async function operations() {
     throw new Error('A valid D1_RUNTIME_ENV is required for submissions.')
   }
   return createSubmissionOperations({
-    client: createDatabase(workerEnv.DB)
+    // Logos must be https, except on a local Worker, whose e2e fixture sites are http.
+    allowInsecureLogos: isLocalWorker(workerEnv),
+    client: createDatabase(workerEnv.DB),
+    // A listed listing's logo is its hosted copy on this host (#95); without one, the tile.
+    mediaBaseUrl: optionalMediaBaseUrl(workerEnv)
   })
 }
 
-export async function createSubmission(
-  input: SubmissionRequest
-): Promise<SubmissionState & { token: string }> {
-  return (await operations()).createSubmission(input)
+/** Whether http logo URLs are accepted: only on a local Worker (see `operations`). */
+export async function insecureLogosAllowed(): Promise<boolean> {
+  try {
+    const { env } = await getCloudflareContext({ async: true })
+    return isLocalWorker(env as CloudflareEnv)
+  } catch {
+    return false
+  }
+}
+
+export async function checkSubmissionUrl(
+  website: string,
+  ownerUserId: string | null
+): Promise<UrlAvailability> {
+  return (await operations()).checkUrl(website, ownerUserId)
 }
 
 export async function consumeSubmissionRateLimit(fingerprint: string): Promise<void> {
   return (await operations()).consumeRateLimit(fingerprint)
 }
 
-export async function getSubmission(id: string, token: string): Promise<SubmissionState> {
-  return (await operations()).getSubmission(id, token)
+export async function createDraft(
+  ownerUserId: string,
+  submission: NewDraftInput
+): Promise<OwnSubmission> {
+  return (await operations()).createDraft({ ownerUserId, submission })
 }
 
-export async function beginVerification(id: string, token: string): Promise<SubmissionState> {
-  return (await operations()).beginVerification(id, token)
+export async function updateDraft(input: {
+  content: DraftContent
+  expectedContentVersion: number
+  ownerUserId: string
+  submissionId: string
+}): Promise<OwnSubmission> {
+  return (await operations()).updateDraft(input)
+}
+
+export async function getOwnSubmission(
+  id: string,
+  ownerUserId: string
+): Promise<OwnSubmission | null> {
+  return (await operations()).getOwnSubmission(id, ownerUserId)
+}
+
+export async function listOwnSubmissions(ownerUserId: string): Promise<OwnSubmission[]> {
+  return (await operations()).listOwnSubmissions(ownerUserId)
+}
+
+export async function chooseFreePlan(id: string, ownerUserId: string): Promise<OwnSubmission> {
+  return (await operations()).chooseFreePlan(id, ownerUserId)
+}
+
+export async function claimVerification(
+  id: string,
+  ownerUserId: string
+): Promise<{ claimedAt: string; submission: OwnSubmission }> {
+  return (await operations()).claimVerification(id, ownerUserId)
 }
 
 export async function finishVerification(
   id: string,
-  token: string,
-  result: BadgeVerificationResult
-): Promise<SubmissionState> {
-  return (await operations()).finishVerification(id, token, result)
+  ownerUserId: string,
+  claimedAt: string,
+  result: SubmissionVerificationResult
+): Promise<OwnSubmission> {
+  return (await operations()).finishVerification(id, ownerUserId, claimedAt, result)
 }

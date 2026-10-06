@@ -1,8 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { stringify } from 'yaml'
+import type { AccessEnv } from '../apps/web/lib/auth/cloudflare-access'
+import { accessConfig } from '../apps/web/lib/auth/cloudflare-access'
 import {
   SITE_ENVIRONMENT_HEADER,
   SMOKE_TEST_HEADER,
@@ -14,7 +16,10 @@ import {
   xRobotsTagBlocksIndexing
 } from './crawl-policy.ts'
 import {
+  adminLockStatusesFromConfig,
+  allowedAdminLockStatuses,
   deployedWorkerVersion,
+  expectedAdminLockStatus,
   expectedWorkerVersionFromEnvironment,
   type GateClock,
   type HttpGateOptions,
@@ -70,7 +75,19 @@ const canonicalRedirects: Record<string, string> = {
   '/robots.txt/': '/robots.txt'
 }
 
+/** Requests the admin-lock gate makes; anonymous, so never answered with an admin page. */
+const adminLockGatePaths = ['/admin/', '/api/admin']
+
+function adminLockResponse(url: URL): Response {
+  // Staging has no Access lock (401 without a session); production answers 503 until its
+  // Access vars are set.
+  return url.hostname.startsWith('best-serp-co-staging.')
+    ? new Response('Unauthorized\n', { status: 401 })
+    : new Response('Access not configured\n', { status: 503 })
+}
+
 function successfulResponse(url: URL, redirectLocation?: string, emptyBody = false): Response {
+  if (adminLockGatePaths.includes(url.pathname)) return adminLockResponse(url)
   const canonical = canonicalRedirects[url.pathname]
   if (canonical) return new Response(null, { status: 308, headers: { location: canonical } })
   if (url.pathname === `/${slug}/`)
@@ -101,7 +118,10 @@ describe('environment-specific HTTP gates', () => {
       const urls = installSuccessfulFetch()
       await expect(gates('production', given)).resolves.toBeUndefined()
       expect(urls).toHaveLength(
-        8 + trailingSlashGatePaths.length + CRAWL_POLICY_REQUESTS.production
+        8 +
+          trailingSlashGatePaths.length +
+          adminLockGatePaths.length +
+          CRAWL_POLICY_REQUESTS.production
       )
       // Routes and versions go through the platform host; only the public policy probes, last,
       // ask best.serp.co itself.
@@ -119,7 +139,9 @@ describe('environment-specific HTTP gates', () => {
           '/rss.xml',
           '/sitemap-index.xml',
           `/${slug}/`,
-          '/submit/'
+          '/submit/',
+          '/admin/',
+          '/api/admin'
         ])
       )
       expect(urls.some(url => url.pathname === '/api/search' && url.search.startsWith('?q='))).toBe(
@@ -1022,5 +1044,99 @@ describe('best.serp.co public policy in the production gates', () => {
     await expect(gates('public', origin)).rejects.toThrow(
       'best.serp.co route / was not answered by the production Worker (x-site-environment (none), status 403, server cloudflare, cf-mitigated challenge)'
     )
+  })
+})
+
+describe('admin lock gate', () => {
+  const accessConfiguredPath = join(fixtureDirectory, 'wrangler-access-on.jsonc')
+  writeFileSync(
+    accessConfiguredPath,
+    JSON.stringify({
+      env: {
+        production: {
+          vars: {
+            CANONICAL_HOST_REDIRECT: 'off',
+            CF_ACCESS_AUD: 'f'.repeat(64),
+            CF_ACCESS_TEAM_DOMAIN: 'example-team.cloudflareaccess.com'
+          }
+        },
+        staging: { vars: { CF_ACCESS_REQUIRED: 'on' } }
+      }
+    })
+  )
+  const adminAnswer = (status: number) => (url: URL, response: Response) =>
+    ['/admin/', '/api/admin'].includes(url.pathname)
+      ? new Response(status === 204 ? null : 'admin', { headers: response.headers, status })
+      : response
+
+  it('derives the expected answer from the checked-in production and staging vars', () => {
+    // Production has the owner's Access app values, so it must answer 403; staging has no
+    // Access lock, so 401 (no session).
+    expect(adminLockStatusesFromConfig()).toEqual({ production: 403, staging: 401 })
+    const wrangler = JSON.parse(readFileSync(resolve('apps/web/wrangler.jsonc'), 'utf8')) as {
+      env: { production: { vars: AccessEnv } }
+    }
+    expect(accessConfig(wrangler.env.production.vars)).toEqual({
+      audience: wrangler.env.production.vars.CF_ACCESS_AUD,
+      certsUrl: 'https://serpcompany.cloudflareaccess.com/cdn-cgi/access/certs',
+      issuer: 'https://serpcompany.cloudflareaccess.com'
+    })
+    expect(adminLockStatusesFromConfig(switchOffConfigPath)).toEqual({
+      production: 503,
+      staging: 401
+    })
+    expect(adminLockStatusesFromConfig(accessConfiguredPath)).toEqual({
+      production: 403,
+      staging: 503
+    })
+    expect(
+      expectedAdminLockStatus({ SITE_ENVIRONMENT: 'staging', CF_ACCESS_REQUIRED: 'off' })
+    ).toBe(401)
+    expect(allowedAdminLockStatuses(null, { production: 403, staging: 401 })).toEqual([
+      401, 403, 503
+    ])
+  })
+
+  it.each([200, 204, 308, 401, 404, 500, 503])(
+    'fails a production deploy with Access configured whose admin route answers %i',
+    async status => {
+      stubCrawlPolicy(adminAnswer(status))
+      await expect(
+        gates('production', origin, undefined, { wranglerConfigPath: accessConfiguredPath })
+      ).rejects.toThrow(`production admin route /admin/ returned ${status}, not 403`)
+    }
+  )
+
+  it('accepts a production Worker with Access configured that answers 403', async () => {
+    stubCrawlPolicy(adminAnswer(403))
+    await expect(
+      gates('production', origin, undefined, { wranglerConfigPath: accessConfiguredPath })
+    ).resolves.toBeUndefined()
+  })
+
+  it('expects 503 from a production Worker whose Access vars are unset', async () => {
+    stubCrawlPolicy(adminAnswer(403))
+    await expect(gates('production', origin)).rejects.toThrow(
+      'production admin route /admin/ returned 403, not 503'
+    )
+  })
+
+  it('follows CF_ACCESS_REQUIRED on staging', async () => {
+    const staging = 'https://best-serp-co-staging.serpcompany.workers.dev'
+    stubCrawlPolicy(adminAnswer(404))
+    await expect(gates('staging', staging)).rejects.toThrow(
+      'staging admin route /admin/ returned 404, not 401'
+    )
+    // With staging Access switched on but unconfigured, 401 is wrong and 503 is right.
+    stubCrawlPolicy(adminAnswer(401))
+    await expect(
+      gates('staging', staging, undefined, { wranglerConfigPath: accessConfiguredPath })
+    ).rejects.toThrow('staging admin route /admin/ returned 401, not 503')
+    stubCrawlPolicy((url, response) =>
+      withHeader(adminAnswer(503)(url, response), SITE_ENVIRONMENT_HEADER, 'staging')
+    )
+    await expect(
+      gates('staging', staging, undefined, { wranglerConfigPath: accessConfiguredPath })
+    ).resolves.toBeUndefined()
   })
 })

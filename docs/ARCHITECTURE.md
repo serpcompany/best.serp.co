@@ -18,7 +18,16 @@ Browser
         -> catalog operations (packages/data-ops) -> D1 (DB) public catalog tables
      -> server-only submission adapter (apps/web/lib/submissions)
         -> submission operations (packages/data-ops) -> D1 (DB) private intake tables
+     -> server-only account adapter (apps/web/lib/auth): Better Auth, requireUser/requireAdmin
+        -> account operations (packages/data-ops/auth) -> D1 (DB) users, sessions, allowlist
+     -> server-only admin adapter (apps/web/lib/admin), /admin and /api/admin only
+        -> admin reads and statement plans (packages/data-ops) -> D1 (DB), production included
 ```
+
+`/admin` and `/api/admin` pass the Worker entry's Cloudflare Access and session-cookie gate
+first ([Accounts](./ACCOUNTS.md)). The admin panel is the one place the app writes production
+D1 ([Admin panel](./ADMIN_PANEL.md#the-production-write-exception)); every other production
+change runs in a protected workflow.
 
 ## Responsibility map
 
@@ -36,11 +45,26 @@ Browser
   and URLs (`apps/web/lib/routing/`), applies the environment's crawl policy
   (`apps/web/lib/environment/`), serves anonymous pages from the edge HTML cache
   (`apps/web/lib/edge-cache/`), and otherwise delegates to the generated
-  `.open-next/worker.js`. It reads only the catalog epoch, through `packages/data-ops/`.
+  `.open-next/worker.js`. It reads only the catalog epoch and, after a listing page
+  rendered 404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is
+  rendered again as the 410 gone page), both through `packages/data-ops/`.
+  Its `scheduled()` handler runs `lib/worker/scheduled.ts`, which maps each Cron Trigger to its
+  jobs: [draft reminders](./SUBMISSION_FLOW.md#draft-reminders-and-expiry) (hourly) and the
+  [badge program](./BADGE_PROGRAM.md) (weekly, daily, and hourly).
 - `apps/web/lib/catalog/` acquires the binding, validates the runtime environment,
   and deduplicates reads per request. It contains no SQL.
-- `apps/web/lib/submissions/` validates the binding, performs bounded badge HTTP
-  verification, and delegates every submission write to `packages/data-ops/`.
+- `apps/web/lib/submissions/` validates the binding, fetches submitters' pages and images
+  only through its bounded safe fetcher (badge checks, URL prefill, logo checks), and
+  delegates every submission read and write to `packages/data-ops/`, scoped to the owner.
+- `apps/web/lib/email/` sends transactional email through the useSend API after the
+  response, claims each template and event key in the `email_deliveries` ledger
+  (`packages/data-ops/`) so it never sends twice, and only logs locally
+  ([Email](./EMAIL.md)).
+- `apps/web/lib/admin/` validates the binding for the admin panel, parses `/api/admin/*`
+  bodies, and runs each decision as reviewed plans from `packages/data-ops/` (no SQL here).
+- `apps/web/lib/auth/` configures Better Auth (email sign-in codes) on the `DB` binding,
+  serves `/api/auth/*`, guards admin routes, and verifies Cloudflare Access JWTs; account SQL
+  lives in `packages/data-ops/src/auth.ts` ([Accounts](./ACCOUNTS.md)).
 - `packages/site-config/` is the checked-in site definition (name, domain, copy,
   routes, sitemap layout, badges, feature flags) and site-owned content.
 - `packages/web-core/` owns reusable page/view behavior and reads the site definition
@@ -170,6 +194,16 @@ extensions (`chart.js`), and a test checks the committed import.
   noindex `*.workers.dev` hosts. This is deliberate: the e2e suite and the HTTP gates then
   verify on staging exactly the URLs production publishes, and those hosts are never
   indexed.
+- **Listing images.** A listing without a usable logo renders the checked-in "no logo" tile
+  `apps/web/public/listing-logos/favicon-fallback-512x512.png` (source and render notes in
+  `scripts/assets/listing-logo-fallback.svg`). The tile is UI only: listing JSON-LD names
+  the listing's own logo as `primaryImageOfPage` and omits the property when there is none,
+  rather than give every logo-less listing the same image or the SERP logo
+  (`packages/web-core/src/schema.ts`). `apps/e2e/tests/listing-logo-assets.spec.ts` checks
+  that the Worker serves the tile and that sample pages reference no missing same-origin file.
+- **Listing offers.** D1 holds no product pricing, so listing JSON-LD has no `offers`
+  (`generateWebsiteDetailSchema` emits one only for known `pricing`; the submission `plan` is
+  the listing fee). `listing-structured-data.spec.ts` checks it (serpcompany/best.serp.co#88).
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other
   host serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)).
   The index lists the URL-set files
@@ -208,39 +242,37 @@ reads it with one statement (two index seeks). Four layers, from the edge inward
    the Workers Cache API under a key of Worker version (`CF_VERSION_METADATA`), catalog
    epoch, host, path and query (and, for React Server Components requests, the router
    headers Next.js varies on). A hit loads neither Next.js nor D1. Misses render normally
-   and 200/301/308/404 responses without `Set-Cookie` are stored for 24 hours; visitors
+   and 200/301/308/404/410 responses without `Set-Cookie` are stored for 24 hours; visitors
    still receive the origin `Cache-Control`. A cacheable request reaches OpenNext with only
    `accept`, `host`, `user-agent`, and the router headers; every other request header
    (cookies, `x-nonce`, forwarded and framework-internal headers) is dropped, so nothing a
-   client sends can be stored and served to others (`renderRequestFor`). Bypassed: `/api`, `/admin`, `/account`,
-   `/login`, `/search`, `/_next`, requests with `Authorization`, and Auth.js or preview
-   cookies. Responses carry `x-edge-cache: HIT | MISS | BYPASS`.
+   client sends can be stored and served to others (`renderRequestFor`). Bypassed: `/api`
+   (including `/api/auth`), `/admin`, `/account`, `/login`, `/search`, `/_next` (first path
+   segment in any case), requests with `Authorization`, and requests carrying a Better Auth
+   (`better-auth.*`) or preview cookie, so a signed-in request is never served from or
+   stored in the cache. Responses carry `x-edge-cache: HIT | MISS | BYPASS`.
 2. **Epoch memo.** Each isolate reuses its epoch for 30 seconds and revalidates it in the
    background for up to 5 minutes; isolates in one data center share it through the Cache
    API for 30 seconds. D1 therefore sees about one one-row epoch read per data center per
    30 seconds, and a publication reaches cached pages within about a minute. Nothing is
-   purged: old keys stop matching and expire.
+   purged: old keys stop matching and expire. The entry shares the epoch with the renders in
+   its isolate (`shareCatalogEpochToken`, a global, never a request header), so a render
+   reuses it for up to 30 seconds instead of reading it again.
 3. **Data cache** (Workers Cache API, `packages/data-ops/src/cache.ts`). Shell counts,
-   name order, name pages, featured/latest heads, details, and the full summary list (for
-   sitemaps and the feed) are cached under epoch-scoped keys for 24 hours, with live D1
-   fallback when the cache fails.
+   name order, name pages, featured/latest heads, details, search results (per normalized
+   query and limit), and the full summary list (for sitemaps and the feed) are cached under
+   epoch-scoped keys for 24 hours, with live D1 fallback when the cache fails.
 4. React `cache()` deduplicates reads within a request.
 
 Both Cache API layers are per data center and populate on demand. A deployment gets a new
 Worker version and therefore a cold HTML cache; the data cache survives deployments.
 
 Alternatives evaluated for @opennextjs/cloudflare 1.20.6 / Next 16.3.6
-(serpcompany/best.serp.co#34): OpenNext ISR with the R2 incremental cache would need every
-page made static (the layout reads the session, and build-time prerendering would bake the
-build machine's D1 into the bundle), a Durable Object queue for revalidation, and a tag
-cache (D1 or Durable Objects) consulted on every request, plus a revalidation hook in the
-out-of-Worker publish workflows. Cache interception only applies to ISR/SSG routes, the KV
-incremental cache is eventually consistent and not recommended by OpenNext, and the KV tag
-cache is marked experimental. The epoch-keyed Cache API wrapper uses only the documented
-custom-Worker entry and needs no new Cloudflare resources. Cloudflare's newer Workers
-Caching (a cache in front of the Worker with request collapsing and tiered cache) could
-replace layer 1 later, but it bills every static asset request and needs a purge trigger
-the out-of-Worker publish flow cannot send today.
+(serpcompany/best.serp.co#34): OpenNext ISR with the R2 incremental cache would need static
+pages, a Durable Object revalidation queue, and a per-request tag cache; KV caches are
+eventually consistent or experimental. The epoch-keyed wrapper needs no new resources.
+Cloudflare's Workers Caching could replace layer 1 later, but it bills every static asset
+request and needs a purge trigger the out-of-Worker publish flow cannot send today.
 
 ## Trust direction
 

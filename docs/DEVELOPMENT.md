@@ -39,6 +39,23 @@ This builds the OpenNext Worker and serves it on http://localhost:8787 against l
 D1. `pnpm --filter web dev` runs `next dev` for UI work, but only the Worker preview
 exercises the real D1 binding.
 
+Listing media (#95) uses a local R2 bucket in the same state; the Worker serves it at
+`/_media/<key>`, and `curl localhost:8787/cdn-cgi/handler/scheduled` runs the media cron once
+([Listing media](./MEDIA.md#local-development-and-tests)).
+
+## Accounts locally
+
+Copy `apps/web/.dev.vars.example` to `apps/web/.dev.vars` (gitignored) and set
+`BETTER_AUTH_SECRET` to a random value of at least 32 characters (`openssl rand -base64 32`).
+Without it the local Worker uses a random secret per isolate, so sessions end on restart.
+
+Sign in at `/login/`. Codes are not emailed locally: the dev sender logs them, and
+`GET /api/auth/dev/otp-outbox?email=<email>` returns the latest one. `devin@serp.co` is the
+seeded admin. Cloudflare Access is off locally and on staging; to exercise it, set
+`CF_ACCESS_REQUIRED=on` with `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` in `.dev.vars`
+(which overrides vars locally) or, for staging, in `env.staging.vars`. See
+[Accounts](./ACCOUNTS.md).
+
 ## Schema changes
 
 Edit `packages/data-ops/src/schema.ts`, then generate and apply a migration locally:
@@ -58,6 +75,13 @@ Deploy Production sees the pending migration, backs up production D1, and applie
 migration, only after Deploy Staging verified that source tree. Check either remote database
 read-only with `pnpm db:migrations:list:staging` or `pnpm db:migrations:list:production`
 after `wrangler login`; see [Release guards](./RELEASE_GUARDS.md).
+
+## Email
+
+Locally, email is never sent: each message is written to the Worker output as an
+`email_logged` line (recipient, subject, text body). Apply migrations first so the
+`email_deliveries` ledger exists. Environment behavior, the template contract, and the owner
+prerequisites for staging and production are in [Email](./EMAIL.md).
 
 ## Parity against the live site
 

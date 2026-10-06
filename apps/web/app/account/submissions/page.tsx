@@ -1,0 +1,20 @@
+import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
+import type { Metadata } from 'next'
+import type { ReactElement } from 'react'
+import { AccountTablePage, accountTableRows } from '@/components/account/account-table-page'
+import { getAccountOverview } from '@/lib/account/overview'
+import { requireAccountUser } from '@/lib/account/pages'
+
+export const metadata: Metadata = generateBaseMetadata({
+  title: 'Submissions',
+  description: 'Your submissions to SERP.',
+  path: '/account/submissions/',
+  noindex: true
+})
+
+/** `/account/submissions/` (#65): the screen-5 table with the user's submissions only. */
+export default async function AccountSubmissionsPage(): Promise<ReactElement> {
+  const user = await requireAccountUser('/account/submissions/')
+  const rows = accountTableRows(await getAccountOverview(user.id))
+  return <AccountTablePage rows={rows} scope="submissions" />
+}

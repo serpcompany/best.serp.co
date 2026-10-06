@@ -49,9 +49,9 @@ in this order:
    Cloudflare/Wrangler, and tightly coupled runtime packages. Validate type checks,
    unit tests, the Worker build, the local D1-backed app, staging deployment, and
    representative route/search/submission smoke tests.
-2. **Authentication:** Auth.js/NextAuth, Clerk, adapters, and session/cookie
-   dependencies. Validate signed-out behavior, protected preview capabilities,
-   and cookie/session boundaries on staging before production.
+2. **Authentication:** Better Auth (`better-auth` and its `@better-auth/*` packages,
+   pinned together), `jose`, and session/cookie dependencies. Validate the email code
+   sign-in, admin gating, and cookie/session boundaries on staging before production.
 3. **Product libraries:** UI, forms, validation, parsing, image, feed, and other
    runtime libraries. Validate targeted package tests, full harness, browser smoke,
    sitemap/RSS output, and submission behavior.

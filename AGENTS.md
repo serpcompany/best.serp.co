@@ -16,7 +16,10 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `apps/web/`: the best.serp.co Next.js routes and OpenNext Worker (`wrangler.jsonc`).
   `worker.ts` is the Worker entry: an epoch-keyed edge HTML cache in front of OpenNext.
 - `apps/web/lib/catalog/`: server-only adapter that acquires and validates the `DB`
-  binding and delegates to `packages/data-ops/`.
+  binding and delegates to `packages/data-ops/`. `apps/web/lib/admin/` does the same for the
+  admin panel's decisions.
+- `apps/web/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
+  the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/ACCOUNTS.md)).
 - `apps/e2e/`: Playwright suites that run against the local or deployed Worker.
 - `packages/site-config/`: the checked-in site definition (routes, copy, badges,
   sitemap layout) and site-owned content such as the About page.
@@ -24,7 +27,8 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `packages/data-ops/`: Drizzle schema, catalog and submission queries, caching.
 - `packages/design-system/`: UI primitives.
 - `d1/drizzle/`: forward-only migration history applied by Wrangler.
-- `d1/publications/`: reviewed catalog mutation manifests.
+- `d1/publications/`: reviewed catalog mutation manifests (staging first, then production).
+- `d1/media/`: reviewed listing media upload plans (keys and sources; no image files).
 - `d1/artifacts/`: one-time JSON import; the parity report and the brotli-compressed
   SQL are committed, the uncompressed SQL and batches are generated.
 - `scripts/project.ts`: the single deployment target (app, local D1, artifacts).
@@ -62,7 +66,8 @@ pull requests into `staging` (`gh pr create --base staging`); each merge deploys
 commit) or a `hotfix-*` pull request ([Release guards](./docs/RELEASE_GUARDS.md#promotion)).
 Rulesets require a PR and the five PR Review checks, and block force pushes and deletion.
 Agents never merge; the owner approves every merge. Agents never dispatch a production
-workflow, type a production confirmation, or approve a deployment; only the owner does.
+workflow or a staging data workflow (catalog publication, media upload), type their
+confirmations, or approve a deployment; only the owner does.
 Issues and labels never grant production, database, or deployment authority.
 
 ## Non-negotiable architecture
@@ -77,7 +82,11 @@ Issues and labels never grant production, database, or deployment authority.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
 - Public URLs are part of the SEO contract: `/products/<slug>/`,
   `/products/categories/<category>/`. Changing a route requires permanent redirects.
-- Route production mutations through protected GitHub Actions only.
+- Route production mutations through protected GitHub Actions only. The one exception is the
+  admin panel (`/admin`, #64): an admin's decision writes production D1 from the Worker
+  through the reviewed plans, behind Cloudflare Access, the allowlist, and an `Origin` check
+  ([Admin panel](./docs/ADMIN_PANEL.md#the-production-write-exception)). Agents never use it
+  on production; recovery is D1 Time Travel ([D1 recovery](./docs/D1_RECOVERY.md)).
 
 ## Forbidden patterns
 

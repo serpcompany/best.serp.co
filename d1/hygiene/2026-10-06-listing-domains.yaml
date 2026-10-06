@@ -1,0 +1,5640 @@
+# serpcompany/best.serp.co#100: what each live listing's website shows (scripts/listing-domain-check.ts).
+# unpublish: gambling, betting, or spam pages, and parked or for-sale domains (owner decision of
+# 2026-10-06), the operations of the matching d1/publications manifest. ownerReview: listings
+# that end on another company's domain or are unreachable; the owner decides each, nothing is
+# unpublished automatically. Listings classified ok are counted only.
+generatedAt: 2026-10-06T08:59:30.627Z
+source: reviewed import 669f264f028a (publication 1), 3422 live listings
+counts:
+  gambling-spam: 32
+  parking: 63
+  off-domain: 266
+  unreachable: 391
+  ok: 2670
+unpublish:
+  - slug: autoportrait.ai
+    id: lst_f00afae9bdf428c53af4fd05
+    website: https://serp.ly/autoportrait
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/autoportrait.ai?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: autotextgenie.com
+    id: lst_b713896c8f2e26729d336a28
+    website: https://serp.ly/autotextgenie-ai
+    class: gambling-spam
+    finalUrl: https://allentownpc.com/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: slot gacor
+  - slug: bashsenpai.com
+    id: lst_093b390c4dfcdc5e3073342d
+    website: https://serp.ly/bashsenpai
+    class: gambling-spam
+    finalUrl: https://kaskuspay.com/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: togel
+  - slug: blockbot.ai
+    id: lst_afa491d51c544d35481eb291
+    website: https://serp.ly/blockbot
+    class: parking
+    finalUrl: https://www.blockbot.ai/
+    status: 200
+    reason: parked or for sale (title or heading)
+    marker: is for sale
+  - slug: brandfort.co
+    id: lst_089638c17961b929e6524223
+    website: https://serp.ly/brandfort
+    class: gambling-spam
+    finalUrl: https://situsduniabola.com/
+    status: 200
+    reason: gambling or spam terms in an off-domain page
+    marker: link alternatif
+  - slug: careerpen.org
+    id: lst_933e62a4b3d20c4f925a7eeb
+    website: https://serp.ly/careerpen
+    class: gambling-spam
+    finalUrl: https://bagustoto.mx/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: togel
+  - slug: chatgod.ai
+    id: lst_b073a1377cedf8501ca82e16
+    website: https://serp.ly/chatgodai
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/chatgod.ai?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp_tdfs...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: chatgpt-phantom.com
+    id: lst_2302df1c3e9ca30165fedcb0
+    website: https://serp.ly/phantom
+    class: gambling-spam
+    finalUrl: https://bwisc.org/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: nhà cái
+  - slug: cheesecakewizard.ai
+    id: lst_6a89885724dd7c1395933035
+    website: https://serp.ly/cheesecakewizard-5-01
+    class: gambling-spam
+    finalUrl: https://www.nauticalstarcoffee.com/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: slot gacor
+  - slug: chord.pub
+    id: lst_dac1c63c8178e3a25896bf61
+    website: https://serp.ly/chord-ooo
+    class: parking
+    finalUrl: https://chord.pub/
+    status: 200
+    reason: "own domain: parked or for sale (title or heading)"
+    marker: for sale
+  - slug: codableai.com
+    id: lst_6b8702bba7c88451de28cb19
+    website: https://serp.ly/codableai
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/codableai.com?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_t...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: code-genius.dev
+    id: lst_6dcb9c2a084a03e30f7e5e2a
+    website: https://serp.ly/code-genius
+    class: gambling-spam
+    finalUrl: https://angelapetgrooming.com/
+    status: 200
+    reason: gambling or spam terms in an off-domain page
+    marker: slot gacor
+  - slug: codeassist.tech
+    id: lst_6b0a93989b18b0f184b17d0e
+    website: https://serp.ly/codeassist-tech
+    class: gambling-spam
+    finalUrl: https://codeassist.tech/
+    status: 200
+    reason: gambling or spam terms in page text
+    marker: pragmatic play, live casino, online casino
+  - slug: codefy.ai
+    id: lst_4ed41993764c6f86c247eff2
+    website: https://serp.ly/codefy
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/www.codefy.ai?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_t...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: comaker.ai
+    id: lst_43b6416d2757c4e8b4cb67c9
+    website: https://serp.ly/comaker
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/www.comaker.ai?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp_...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: contentgeni.com
+    id: lst_c5eaee6105cea215f598ff99
+    website: https://serp.ly/contentgeni
+    class: parking
+    finalUrl: https://contentgeni.com/
+    status: 200
+    reason: parked or for sale (title or heading)
+    marker: for sale
+  - slug: cpumade.com
+    id: lst_092bc7e35869c6be8f9f327a
+    website: https://serp.ly/cpumade
+    class: gambling-spam
+    finalUrl: https://www.cpumade.com/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: link alternatif
+  - slug: dashai.xyz
+    id: lst_0dac6d7a44f101a71e180c8c
+    website: https://serp.ly/dashai
+    class: parking
+    finalUrl: https://www.dashai.xyz/lander
+    status: 200
+    reason: parked or for sale (markup)
+    marker: godaddy /lander
+  - slug: datalang.io
+    id: lst_edf22e5e809826b7aaa15254
+    website: https://serp.ly/datalang
+    class: gambling-spam
+    finalUrl: https://datalang.io/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: nhà cái
+  - slug: doodletale.me
+    id: lst_06651add36f42280c7c27ce2
+    website: https://serp.ly/doodle-tale
+    class: gambling-spam
+    finalUrl: https://doodletale.me/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: togel
+  - slug: dreamtapp.uk
+    id: lst_4568942237f2141c9de32432
+    website: https://serp.ly/dreamt
+    class: gambling-spam
+    finalUrl: https://dreamtapp.uk/
+    status: 200
+    reason: gambling or spam terms in page text
+    marker: gates of olympus, live casino, online casino
+  - slug: eddyai.com
+    id: lst_17bc0dd2e450be33cf9c2c94
+    website: https://eddyai.com
+    class: parking
+    finalUrl: https://www.atom.com/name/eddyai
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: eloise.ai
+    id: lst_9d1585fd9f3b7c988a2c494d
+    website: https://serp.ly/eloise
+    class: parking
+    finalUrl: https://www.atom.com/name/Eloise.ai
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: emogpt.com
+    id: lst_2ca99e4b6307ed552c4ceb0a
+    website: https://serp.ly/emogpt
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/emogpt.com?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_tdfs...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: epicurusapp.com
+    id: lst_755d76504f504754bb4a5f1b
+    website: https://serp.ly/epicurus
+    class: parking
+    finalUrl: https://epicurusapp.com/lander
+    status: 200
+    reason: parked or for sale (markup)
+    marker: godaddy /lander
+  - slug: evebyte.com
+    id: lst_0deb75f4d741fbe03ed6921e
+    website: https://serp.ly/eve-byte
+    class: parking
+    finalUrl: https://www.atom.com/name/EveByte
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: fabfab.ai
+    id: lst_4cf552f372504d77969e3be7
+    website: https://serp.ly/fabfab-ai-5-02
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/fabfab.ai?utm_source=TDFS_BINNS&utm_medium=parkedpages&utm_campaign=x_corp_tdfs-b...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: faithforward.app
+    id: lst_58ce441870f3e6cee2e563d0
+    website: https://serp.ly/faith-forward
+    class: gambling-spam
+    finalUrl: https://poker-boya.top/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: nhà cái
+  - slug: fama.one
+    id: lst_0238f70fd8ba0c3392b6d656
+    website: https://serp.ly/fama-one
+    class: parking
+    finalUrl: https://fama.one/
+    status: 200
+    reason: parked or for sale (title or heading)
+    marker: is for sale
+  - slug: feyn.ai
+    id: lst_2d1867617fe0f43d79e68ce4
+    website: https://serp.ly/feyn
+    class: parking
+    finalUrl: https://www.atom.com/name/Feyn.ai
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: fictiongpt.xyz
+    id: lst_13d8026a2f1eff20bcd224ef
+    website: https://serp.ly/fictiongpt-1-01
+    class: parking
+    finalUrl: https://fictiongpt.xyz/
+    status: 200
+    reason: parked or for sale (title or heading)
+    marker: for sale
+  - slug: flapper.ai
+    id: lst_1fccd923aceaa257bd36e072
+    website: https://serp.ly/flapper
+    class: parking
+    finalUrl: https://flapper.ai/
+    status: 200
+    reason: parked or for sale (title or heading)
+    marker: is for sale
+  - slug: fyli.ai
+    id: lst_0787b4b71b08782803a0e28e
+    website: https://serp.ly/fyli
+    class: parking
+    finalUrl: https://www.atom.com/name/Fyli.ai
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: garson.io
+    id: lst_6628b7980620dd2a587186f5
+    website: https://serp.ly/garson
+    class: gambling-spam
+    finalUrl: https://readysetmarketing.io/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: nhà cái
+  - slug: getmumu.com
+    id: lst_b2d55d519e35388ec5c2cdb5
+    website: https://serp.ly/mumu-x
+    class: gambling-spam
+    finalUrl: https://jnetoto.win/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: togel
+  - slug: gomarketplan.io
+    id: lst_a3ef55d0c1e280c092be6697
+    website: https://serp.ly/marketplan
+    class: gambling-spam
+    finalUrl: https://marketplan.io/
+    status: 200
+    reason: gambling or spam terms in the visible content of an off-domain page
+    marker: rtp slot, pragmatic play, online casino
+  - slug: gptservice.app
+    id: lst_25482329d627b97208e07c0e
+    website: https://serp.ly/gptservice
+    class: gambling-spam
+    finalUrl: https://8xbet.com.es/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: nhà cái
+  - slug: heythere.ai
+    id: lst_8381ad6056cb5f5f540b242a
+    website: https://serp.ly/hey-there
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/heythere.ai?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp_tdf...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: incribo.com
+    id: lst_6c85f63fee98f5de11b03e2d
+    website: https://serp.ly/incribo
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/incribo.com?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_tdf...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: inkdrop.ai
+    id: lst_779ffab4cb1cedf3a87f7fee
+    website: https://serp.ly/inkdrop
+    class: parking
+    finalUrl: https://www.atom.com/name/InkDrop.AI
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: insyte.tech
+    id: lst_be15b445c59ccb7baada1e0b
+    website: https://serp.ly/insyte-ai
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/www.insyte.tech?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: itagpt.it
+    id: lst_4be133e3afd65933d651dea0
+    website: https://serp.ly/itagpt
+    class: parking
+    finalUrl: https://itagpt.it/
+    status: 200
+    reason: parked or for sale (title or heading)
+    marker: for sale
+  - slug: ival-mbzuai.com
+    id: lst_fb14571415892d9252646bd2
+    website: https://serp.ly/video-chatgpt
+    class: gambling-spam
+    finalUrl: https://www.ival-mbzuai.com/video-chatgpt/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: gacor
+  - slug: jotgenius.com
+    id: lst_954a2f519ff402ecef657ab4
+    website: https://serp.ly/jotgenius-1-01
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/jotgenius.com?utm_source=TDFS_BINNS&utm_medium=parkedpages&utm_campaign=x_corp_td...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: learnsmarter.ai
+    id: lst_d90d75142056f0882408cdb1
+    website: https://serp.ly/learnsmarter
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/learnsmarter.ai?utm_source=TDFS_BINNS&utm_medium=parkedpages&utm_campaign=x_corp_...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: letsflyai.com
+    id: lst_c82143dd03a7d448667e1cb5
+    website: https://serp.ly/fly-ai
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/letsflyai.com?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_t...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: looti.io
+    id: lst_0bbd146004755f6edc358661
+    website: https://serp.ly/looti
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/www.looti.io?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp_td...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: magician.design
+    id: lst_9faae3d0534287c5798c508b
+    website: https://serp.ly/magician-(figma)
+    class: gambling-spam
+    finalUrl: https://remedia.lu/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: slot gacor
+  - slug: marketology.ai
+    id: lst_d5de8d01b0d7ee4347bcce14
+    website: https://serp.ly/marketology
+    class: parking
+    finalUrl: https://domains.atom.com/lpd/name/marketology.ai
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: mateai.io
+    id: lst_4c8f3d7c417b8f29c9c9d6cd
+    website: https://serp.ly/mateai
+    class: gambling-spam
+    finalUrl: https://kryptoria.io/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: xoilac
+  - slug: mentum.ai
+    id: lst_d1914766ff040426ecdd2463
+    website: https://serp.ly/mentum-ai
+    class: parking
+    finalUrl: https://www.atom.com/name/Mentum.ai
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: metagenieai.com
+    id: lst_b628163c8d271e11910eaf2f
+    website: https://serp.ly/metagenieai
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/www.metagenieai.com?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: nack.ai
+    id: lst_82ab9300bd4c1e2323a8a374
+    website: https://serp.ly/nack-ai
+    class: parking
+    finalUrl: https://www.atom.com/name/Nack.ai
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: noowai.com
+    id: lst_07f1a0db8ea301ede42dd26b
+    website: https://serp.ly/noowai-5-01
+    class: gambling-spam
+    finalUrl: https://prediksitoto5d.live/
+    status: 200
+    reason: gambling or spam terms in an off-domain page
+    marker: togel
+  - slug: nostalgia.photo
+    id: lst_78b34d822937934ae1ea2de1
+    website: https://serp.ly/nostalgia-photo
+    class: gambling-spam
+    finalUrl: https://www.nostalgia.photo/
+    status: 200
+    reason: gambling or spam terms in page text
+    marker: pragmatic play, casino online, casino bonus
+  - slug: notey.ai
+    id: lst_bee06a20ea5369cc0053b9f1
+    website: https://serp.ly/notey
+    class: parking
+    finalUrl: https://www.atom.com/name/Notey.ai
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: onetone.ai
+    id: lst_ffc2af48ba616ebf0ba6eed3
+    website: https://serp.ly/onetone
+    class: parking
+    finalUrl: https://onetone.ai/lander
+    status: 200
+    reason: parked or for sale (markup)
+    marker: godaddy /lander
+  - slug: opax.ai
+    id: lst_6b5a29630a2d13068e9d92fe
+    website: https://serp.ly/opax
+    class: parking
+    finalUrl: https://www.atom.com/name/OPAX.ai
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: outline.ai
+    id: lst_02b79ff220cf93f08f7af028
+    website: https://serp.ly/outline
+    class: parking
+    finalUrl: https://www.snagged.com/domains/outline-ai
+    status: 200
+    reason: parked or for sale (final host)
+    marker: snagged.com
+  - slug: parallelgpt.ai
+    id: lst_1d58a516ef8e041cee3860e5
+    website: https://serp.ly/parallelgpt
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/www.parallelgpt.ai?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_c...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: patience.ai
+    id: lst_12372c25aad05a4063218a26
+    website: https://serp.ly/patience
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/patience.ai?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_tdf...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: pdfai.io
+    id: lst_03cc850191fa10e41363bd3c
+    website: https://serp.ly/pdfai-io
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/www.pdfai.io?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_td...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: penparrot.com
+    id: lst_f9aaa7c2210f6a2abed7fffe
+    website: https://serp.ly/penparrot
+    class: gambling-spam
+    finalUrl: https://penparrot.com/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: gates of olympus
+  - slug: photoleaf.ai
+    id: lst_0e912d86b2bc89ff1bbdebee
+    website: https://photoleaf.ai
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/photoleaf.ai?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp_td...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: pictureperfect.ai
+    id: lst_2879e1c5650baf29d0900086
+    website: https://serp.ly/pictureperfect
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/pictureperfect.ai?utm_source=TDFS_BINNS&utm_medium=parkedpages&utm_campaign=x_cor...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: prettysmart.co
+    id: lst_b40ce12bf42930afad296c1e
+    website: https://serp.ly/prettysmart-co
+    class: parking
+    finalUrl: https://prettysmart.co/lander
+    status: 200
+    reason: parked or for sale (markup)
+    marker: godaddy /lander
+  - slug: ranklightning.com
+    id: lst_71b30a2916ff09a36f8f36ae
+    website: https://serp.ly/ranklightning.com
+    class: parking
+    finalUrl: https://ranklightning.com/lander
+    status: 200
+    reason: parked or for sale (markup)
+    marker: godaddy /lander
+  - slug: raregenie.com
+    id: lst_8f351e59c98a57031b74a475
+    website: https://serp.ly/rare-geanie
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/raregenie.com?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_t...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: rawshorts.com
+    id: lst_44dc543fc2d0b39cfa54d651
+    website: https://serp.ly/raw-shorts
+    class: parking
+    finalUrl: https://www.rawshorts.com/lander
+    status: 200
+    reason: parked or for sale (markup)
+    marker: godaddy /lander
+  - slug: readtrellis.com
+    id: lst_99b9e8c6dd111324c0a1df79
+    website: https://serp.ly/trellis
+    class: gambling-spam
+    finalUrl: https://timnas4dking.net/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: togel
+  - slug: releasesnotes.dev
+    id: lst_b549da02c7d11cd2675903cd
+    website: https://serp.ly/releasesnotes
+    class: gambling-spam
+    finalUrl: https://imagenode.org/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: link alternatif
+  - slug: replix.ai
+    id: lst_410f1938a0804e4dc106715c
+    website: https://serp.ly/replix
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/www.replix.ai?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_t...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: repromptify.com
+    id: lst_562f516cfb5bd9eb9ce2449d
+    website: https://repromptify.com
+    class: parking
+    finalUrl: https://repromptify.com/
+    status: 200
+    reason: parked or for sale (title or heading)
+    marker: for sale
+  - slug: reviewwriter.ai
+    id: lst_74814c8aad067133a02e6668
+    website: https://serp.ly/review-writer
+    class: parking
+    finalUrl: https://www.reviewwriter.ai/lander
+    status: 200
+    reason: parked or for sale (markup)
+    marker: godaddy /lander
+  - slug: reword.com
+    id: lst_88c90daa1b46864c885d5ae3
+    website: https://serp.ly/reword
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/reword.com?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_tdfs...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: roboweb.app
+    id: lst_cb9c8ab457bcdc525b179d7b
+    website: https://serp.ly/roboweb
+    class: gambling-spam
+    finalUrl: https://roboweb.app/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: gerbangwin
+  - slug: salespitch.pro
+    id: lst_ef54578f215d3ffc8d8f8351
+    website: https://serp.ly/salespitch
+    class: gambling-spam
+    finalUrl: https://airbuy.africa/payments/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: gacor
+  - slug: scribblediffusion.com
+    id: lst_bfa52442934b40aaecccde2b
+    website: https://serp.ly/scribble-diffusion
+    class: gambling-spam
+    finalUrl: https://xoilaczbh.tv/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: xoilac
+  - slug: shotrate.com
+    id: lst_35f09354b155707f9c88cfb5
+    website: https://serp.ly/shotrate
+    class: parking
+    finalUrl: https://www.atom.com/name/ShotRate
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: signature.ai
+    id: lst_a7160df1cf553c1f9c86b744
+    website: https://serp.ly/unfake
+    class: parking
+    finalUrl: https://www.atom.com/name/Signature.AI
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: simplemail.ai
+    id: lst_f5b7ec3261d4febbd597c379
+    website: https://serp.ly/simplemail
+    class: parking
+    finalUrl: https://simplemail.ai/lander
+    status: 200
+    reason: parked or for sale (markup)
+    marker: godaddy /lander
+  - slug: slayerai.com
+    id: lst_5c89d8f6822546cdbc56b2c5
+    website: https://serp.ly/slayer
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/www.slayerai.com?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_cor...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: smarterthangpt.com
+    id: lst_4c8bf7993f7f0d4c9c470f15
+    website: https://serp.ly/are-you-smarter-than-chatgpt
+    class: gambling-spam
+    finalUrl: https://smarterthangpt.com/
+    status: 200
+    reason: gambling or spam terms in page text
+    marker: online casino, casino online, casino bonus
+  - slug: smitty.ai
+    id: lst_306b67760513889af55821f1
+    website: https://serp.ly/smitty
+    class: parking
+    finalUrl: https://www.atom.com/name/Smitty.ai
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: soniclink.com
+    id: lst_b01a39fc31c2b13b3526ca6f
+    website: https://serp.ly/soniclink
+    class: parking
+    finalUrl: https://www.atom.com/name/SonicLink
+    status: 403
+    reason: parked or for sale (final host)
+    marker: atom.com
+  - slug: spiritme.tech
+    id: lst_6e12b1a68a9f574be058c356
+    website: https://serp.ly/spiritme
+    class: gambling-spam
+    finalUrl: https://xoilaclivettbdma.tv/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: xoilac
+  - slug: starsky.pro
+    id: lst_5cb312f0661d7fc9aef2a243
+    website: https://serp.ly/starsky
+    class: parking
+    finalUrl: https://starsky.pro/
+    status: 200
+    reason: parked or for sale (title or heading)
+    marker: is for sale
+  - slug: stellarapp.io
+    id: lst_fb3170b8f12a75f09a6e4fd5
+    website: https://serp.ly/stellarapp
+    class: gambling-spam
+    finalUrl: https://www.emotion-research.net/
+    status: 200
+    reason: gambling or spam terms in page text
+    marker: pragmatic play, live casino, casino bonus
+  - slug: tammy.ai
+    id: lst_c33dec36a835d096b9a6f772
+    website: https://serp.ly/tammy
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/tammy.ai?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_tdfs-b...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: telechat.ai
+    id: lst_16a84c85ee951720df1e3c1e
+    website: https://serp.ly/telechat
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/telechat.ai?utm_source=TDFS_BINNS&utm_medium=parkedpages&utm_campaign=x_corp_tdfs...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: tended.ai
+    id: lst_65034c5f7e769662f05dbe5b
+    website: https://serp.ly/tended
+    class: parking
+    finalUrl: https://forsale.godaddy.com/forsale/www.tended.ai?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_t...
+    status: 403
+    reason: parked or for sale (final host)
+    marker: godaddy.com
+  - slug: texti.app
+    id: lst_809f3470d04ab6e2d78782ca
+    website: https://serp.ly/texti
+    class: parking
+    finalUrl: https://texti.app/
+    status: 200
+    reason: parked or for sale (title or heading)
+    marker: is for sale
+  - slug: thekeys.ai
+    id: lst_1d2037843b7f0bb94b66186d
+    website: https://serp.ly/thekeys
+    class: parking
+    finalUrl: https://www.thekeys.ai/lander
+    status: 200
+    reason: parked or for sale (markup)
+    marker: godaddy /lander
+  - slug: upword.ai
+    id: lst_6766b4b72dc88928db0be4af
+    website: https://serp.ly/upword
+    class: parking
+    finalUrl: https://www.upword.ai/lander
+    status: 200
+    reason: parked or for sale (markup)
+    marker: godaddy /lander
+  - slug: urbansportsnetwork.com
+    id: lst_b9624d4137c23977109ce64f
+    website: https://urbansportsnetwork.com
+    class: gambling-spam
+    finalUrl: https://rmjasabundo.com/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: judi bola
+ownerReview:
+  - slug: autoslide.ai
+    id: lst_7b1a45c0619fb97c7c304e7e
+    website: https://serp.ly/autoslide
+    class: unreachable
+    finalUrl: https://autoslide.ai/
+    status: 503
+    reason: http_503
+  - slug: autowrite.app
+    id: lst_e83851c2a7cf40913ea26f97
+    website: https://serp.ly/autowrite-app
+    class: off-domain
+    finalUrl: https://apps.ee/autowrite/?ref=devinschumacher
+    status: 200
+    reason: ends on apps.ee, not autowrite.app
+    marker: apps.ee
+  - slug: avanz.ai
+    id: lst_acfb4bdefeb78908ee851cce
+    website: https://serp.ly/avanzai
+    class: unreachable
+    finalUrl: https://avanz.ai/
+    status: 404
+    reason: http_404
+  - slug: avatarize.club
+    id: lst_47f858aa9db42c693c80275d
+    website: https://serp.ly/proface
+    class: unreachable
+    finalUrl: https://avatarize.club/proface
+    status: 404
+    reason: http_404
+  - slug: avian.io
+    id: lst_8bc77f73f09943aae425434b
+    website: https://serp.ly/avian
+    class: unreachable
+    finalUrl: https://avian.io/product/avian-chatgpt-plugin/
+    status: 404
+    reason: http_404
+  - slug: ayfie.com
+    id: lst_0a01b162a0d05595a05781f5
+    website: https://serp.ly/ayfie
+    class: unreachable
+    finalUrl: https://ayfie.com/ayfie-personal-assistant/
+    status: 404
+    reason: http_404
+  - slug: aylien.com
+    id: lst_b2793b388b2e79618604847a
+    website: https://serp.ly/aylien
+    class: unreachable
+    finalUrl: https://aylien.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: b2metric.com
+    id: lst_17e478acd793f1b5d31bce8a
+    website: https://serp.ly/b2metric
+    class: unreachable
+    finalUrl: https://b2metric.com/iq/
+    status: 404
+    reason: http_404
+  - slug: babbl.dev
+    id: lst_9acb5ffb4584099383f51123
+    website: https://serp.ly/babbl-ai
+    class: off-domain
+    finalUrl: https://www.babbl-labs.com/
+    status: 200
+    reason: ends on babbl-labs.com, not babbl.dev
+    marker: www.babbl-labs.com
+  - slug: babble-ai.com
+    id: lst_0583310ad20a39ca29071981
+    website: https://serp.ly/babble
+    class: unreachable
+    finalUrl: https://babble-ai.com/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: babylonhealth.com
+    id: lst_6429d2ac7680c27bbd76e732
+    website: https://serp.ly/babylonhealth.com
+    class: unreachable
+    finalUrl: https://babylonhealth.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: banterai.business
+    id: lst_b37f8e7f660409b59c4cad74
+    website: https://serp.ly/banterai
+    class: off-domain
+    finalUrl: https://modify.net.nz/
+    status: 200
+    reason: "own domain is gambling or spam, but the link lands on a live site: owner review"
+    marker: gates of olympus, pragmatic play, casino bonus
+  - slug: baseplate.ai
+    id: lst_c55f2d9870d1d0ea046e1e05
+    website: https://serp.ly/baseplate
+    class: unreachable
+    finalUrl: https://www.baseplate.ai/
+    status: 525
+    reason: http_525
+  - slug: bbva.com
+    id: lst_1155e368a2b3ce2b9bc406d5
+    website: https://serp.ly/spanish-speaking-banking-agent
+    class: unreachable
+    finalUrl: https://www.bbva.com/en/can-gpt-3-help-during-conversations-with-our-spanish-speaking-customers/
+    status: 404
+    reason: http_404
+  - slug: beam.io
+    id: lst_3034fcacfd304ceb73dd0cdf
+    website: https://serp.ly/beam.io
+    class: off-domain
+    finalUrl: https://bend.eco/app/u/about
+    status: 401
+    reason: ends on bend.eco, not beam.io
+    marker: bend.eco
+  - slug: bec-ai.com
+    id: lst_f08f8b2a824c9e7d5d746ee8
+    website: https://serp.ly/bec
+    class: unreachable
+    finalUrl: https://www.bec-ai.com/
+    status: 502
+    reason: http_502
+  - slug: beingai.com
+    id: lst_3835f8420b787612ca2320b7
+    website: https://serp.ly/sophia-beingai
+    class: unreachable
+    finalUrl: https://beingai.com/say-hello-to-sophia-beingai-a-virtual-sophia-the-robot/
+    status: 404
+    reason: http_404
+  - slug: benchtalentcloud.com
+    id: lst_c16d7f8eec19008ddf7f8d86
+    website: https://serp.ly/fulcrum
+    class: off-domain
+    finalUrl: https://www.fulcrumworks.com/
+    status: EPROTO
+    reason: ends on fulcrumworks.com, not benchtalentcloud.com
+    marker: www.fulcrumworks.com
+  - slug: bettertravel.ai
+    id: lst_896f24b6e5753f1d006ba2f7
+    website: https://serp.ly/bettertravel
+    class: unreachable
+    finalUrl: https://bettertravel.ai/
+    status: 503
+    reason: http_503
+  - slug: bgrem.ai
+    id: lst_88beb484a3ff756cce46b6e0
+    website: https://serp.ly/bgrem
+    class: unreachable
+    finalUrl: https://bgrem.ai/
+    status: 503
+    reason: http_503
+  - slug: bigspeak.ai
+    id: lst_46959dbbf8193771fccb3277
+    website: https://serp.ly/big-speak
+    class: unreachable
+    finalUrl: https://bigspeak.ai/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: bigvu.tv
+    id: lst_7cce95a8503164da90799e66
+    website: https://serp.ly/ai-magic-writer
+    class: unreachable
+    finalUrl: https://bigvu.tv/create/ai-magic-writer-for-video-scripts
+    status: 404
+    reason: http_404
+  - slug: bizway.io
+    id: lst_6a6146c4c5e60e26dc7a5d33
+    website: https://serp.ly/bizway
+    class: unreachable
+    finalUrl: https://www.bizway.io/
+    status: 404
+    reason: http_404
+  - slug: bladerunner.ai
+    id: lst_402b78b74295830d56113487
+    website: https://serp.ly/bladerunner
+    class: unreachable
+    finalUrl: https://www.bladerunner.ai/
+    status: 404
+    reason: http_404
+  - slug: blinkn.shop
+    id: lst_44c6bab698e83c48df3762ec
+    website: https://serp.ly/blinkn-shop
+    class: unreachable
+    finalUrl: https://blinkn.shop/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: blobr.io
+    id: lst_4422b878e6cabe614c60f822
+    website: https://serp.ly/blobr
+    class: unreachable
+    finalUrl: https://www.blobr.io/api-gateway-chatgpt-plugins
+    status: 404
+    reason: http_404
+  - slug: blogassistant.co
+    id: lst_27ceaa3989fe1fc5b1cb3396
+    website: https://serp.ly/blog-assistant
+    class: unreachable
+    finalUrl: https://www.blogassistant.co/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: bloks.app
+    id: lst_72bccfc04c64acf8a148306f
+    website: https://serp.ly/bloks
+    class: off-domain
+    finalUrl: https://www.bloks.ai/
+    status: 200
+    reason: ends on bloks.ai, not bloks.app
+    marker: www.bloks.ai
+  - slug: bloop.ai
+    id: lst_4f8f6ba79ad5451a7a77bb98
+    website: https://serp.ly/bloop
+    class: unreachable
+    finalUrl: https://bloop.ai/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: boolv.tech
+    id: lst_075635fbfe38949b40f9310d
+    website: https://serp.ly/boolpic
+    class: unreachable
+    finalUrl: https://boolv.tech/toolkit
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: botika.io
+    id: lst_0247606544dbd5c7070a28bb
+    website: https://serp.ly/botika
+    class: off-domain
+    finalUrl: https://botika.com/
+    status: 200
+    reason: ends on botika.com, not botika.io
+    marker: botika.com
+  - slug: botx.cloud
+    id: lst_c6c7bd8bac32497cf073336e
+    website: https://serp.ly/botx
+    class: off-domain
+    finalUrl: https://synthreo.ai/
+    status: 200
+    reason: ends on synthreo.ai, not botx.cloud
+    marker: synthreo.ai
+  - slug: brainfishai.com
+    id: lst_28243484ea498865d2745518
+    website: https://serp.ly/brainfish
+    class: off-domain
+    finalUrl: https://www.brainfi.sh/
+    status: 429
+    reason: ends on brainfi.sh, not brainfishai.com
+    marker: www.brainfi.sh
+  - slug: branchbob.ai
+    id: lst_e140bbb21cc492b813b13787
+    website: https://serp.ly/branchbob
+    class: off-domain
+    finalUrl: https://www.branchbob.com/
+    status: 200
+    reason: ends on branchbob.com, not branchbob.ai
+    marker: www.branchbob.com
+  - slug: brandbastion.com
+    id: lst_72eb6a046566b20988764657
+    website: https://serp.ly/brandbastion-lite
+    class: unreachable
+    finalUrl: https://www.brandbastion.com/p/platform
+    status: 404
+    reason: http_404
+  - slug: buddygpt.ai
+    id: lst_29c3ea9f12e32184f8adb517
+    website: https://serp.ly/buddygpt-5-01
+    class: off-domain
+    finalUrl: https://www.heypat.ai/
+    status: 200
+    reason: ends on heypat.ai, not buddygpt.ai
+    marker: www.heypat.ai
+  - slug: bunni.ai
+    id: lst_07abc5db2ec61258103d686e
+    website: https://serp.ly/clarifypdf
+    class: off-domain
+    finalUrl: https://clarifypdf.com/
+    status: 500
+    reason: ends on clarifypdf.com, not bunni.ai
+    marker: clarifypdf.com
+  - slug: businessinsider.in
+    id: lst_2f5b449253e96531bd433a2c
+    website: https://serp.ly/content-generation-engine-by-dentsu
+    class: unreachable
+    finalUrl: https://www.businessinsider.in/advertising/ad-agencies/article/dentsu-apacs-data-sciences-division-launches-gpt-3-pow...
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: buzzli.in
+    id: lst_ce4cb6e8bc05d1b3dd88dafc
+    website: https://serp.ly/buzzli
+    class: off-domain
+    finalUrl: https://buzzli.io/
+    status: 200
+    reason: ends on buzzli.io, not buzzli.in
+    marker: buzzli.io
+  - slug: byautomata.io
+    id: lst_c4379c44b78e925dd45d274b
+    website: https://serp.ly/automata
+    class: unreachable
+    finalUrl: https://byautomata.io/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: bypeers.ai
+    id: lst_0cc022677b43293dee135c2c
+    website: https://serp.ly/bypeers
+    class: unreachable
+    finalUrl: https://bypeers.ai/find-and-close-b2b-clients-on-auto-pilot/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: byrdhouseapp.com
+    id: lst_4c510aae46dc358102a3b650
+    website: https://serp.ly/byrdhouse
+    class: off-domain
+    finalUrl: https://langfinity.ai/
+    status: 200
+    reason: ends on langfinity.ai, not byrdhouseapp.com
+    marker: langfinity.ai
+  - slug: byterat.io
+    id: lst_acdaff85baf34fb06024748f
+    website: https://serp.ly/byterat
+    class: off-domain
+    finalUrl: https://www.ohm.ai/
+    status: 200
+    reason: ends on ohm.ai, not byterat.io
+    marker: www.ohm.ai
+  - slug: ca.la
+    id: lst_2e730c948253ad95fd4a8da3
+    website: https://serp.ly/cala
+    class: off-domain
+    finalUrl: https://www.mercer.design/
+    status: 200
+    reason: ends on mercer.design, not ca.la
+    marker: www.mercer.design
+  - slug: campari.com
+    id: lst_25b448bfdf296ace3f929e62
+    website: https://serp.ly/red-diaries-fellini-forward-by-campari
+    class: unreachable
+    finalUrl: https://www.campari.com/red-diaries-fellini-forward
+    status: 404
+    reason: http_404
+  - slug: candideai.com
+    id: lst_a4f3aa19e80c4761171cd51d
+    website: https://serp.ly/candideai
+    class: unreachable
+    finalUrl: https://www.candideai.com/
+    status: 404
+    reason: http_404
+  - slug: capeprivacy.com
+    id: lst_25c7b91c4016c39983c3a683
+    website: https://serp.ly/capeprivacy
+    class: off-domain
+    finalUrl: https://cape.ai/
+    status: 200
+    reason: ends on cape.ai, not capeprivacy.com
+    marker: cape.ai
+  - slug: captionit.ai
+    id: lst_fe37a8a5cbddbbc1e2f1a64c
+    website: https://serp.ly/captionit
+    class: unreachable
+    finalUrl: https://www.captionit.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: cardinalapp.io
+    id: lst_b2dfe48f7723467fb584e1a2
+    website: https://serp.ly/cardinal
+    class: unreachable
+    finalUrl: https://cardinalapp.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: casehopper.com
+    id: lst_36bdf307aeed50e30dcbe22e
+    website: https://serp.ly/casehopper
+    class: unreachable
+    finalUrl: https://www.casehopper.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: casper.so
+    id: lst_a44353f4e0ee7e21ca21950f
+    website: https://serp.ly/explainthis
+    class: off-domain
+    finalUrl: https://explainthis.ai/
+    status: CERT_HAS_EXPIRED
+    reason: ends on explainthis.ai, not casper.so
+    marker: explainthis.ai
+  - slug: catalysttg.com
+    id: lst_d9803beb4a1b70fa3aa423ea
+    website: https://serp.ly/catalysttg.com
+    class: off-domain
+    finalUrl: https://acrisurecyber.com/
+    status: 200
+    reason: ends on acrisurecyber.com, not catalysttg.com
+    marker: acrisurecyber.com
+  - slug: catverse.app
+    id: lst_44e52d7e604bee603f938c80
+    website: https://serp.ly/catverse.app
+    class: unreachable
+    finalUrl: https://catverse.app/
+    status: 404
+    reason: http_404
+  - slug: ccleaner.com
+    id: lst_0a811c19542abd1bbb22b9f6
+    website: https://serp.ly/ccleaner
+    class: unreachable
+    finalUrl: https://www.ccleaner.com/
+    status: 403
+    reason: http_403
+  - slug: censius.ai
+    id: lst_4c3768427a691fe543bd911a
+    website: https://serp.ly/censius
+    class: unreachable
+    finalUrl: https://censius.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: certainly.io
+    id: lst_4af8f2cf23b138fb3b804d3d
+    website: https://serp.ly/certainly
+    class: unreachable
+    finalUrl: https://certainly.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: cfrexplorer.com
+    id: lst_e43313cc85b8834b970876bf
+    website: https://serp.ly/cfrexplorer
+    class: unreachable
+    finalUrl: https://cfrexplorer.com/
+    status: ECONNRESET
+    reason: site_unreachable (ECONNRESET)
+  - slug: channeladvisor.com
+    id: lst_58af207610a862d1a415324e
+    website: https://serp.ly/channeladvisor.com
+    class: off-domain
+    finalUrl: https://www.rithum.com/
+    status: 200
+    reason: ends on rithum.com, not channeladvisor.com
+    marker: www.rithum.com
+  - slug: characterlingo.com
+    id: lst_dddd3f5c762101ec77ecb2e7
+    website: https://serp.ly/character-lingo
+    class: unreachable
+    finalUrl: https://characterlingo.com/
+    status: 502
+    reason: http_502
+  - slug: chat.bahasa.ai
+    id: lst_e7c73aed58a6f45f0cc61e0b
+    website: https://serp.ly/bahasa
+    class: off-domain
+    finalUrl: https://meeting.ai/ja
+    status: 200
+    reason: ends on meeting.ai, not bahasa.ai
+    marker: meeting.ai
+  - slug: chatable.cc
+    id: lst_0f568e9c69a528f6c714c271
+    website: https://serp.ly/chatable
+    class: unreachable
+    finalUrl: https://www.chatable.cc/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: chatgpt4google.com
+    id: lst_aac03ba2d96393e2d0716689
+    website: https://serp.ly/chatgpt-for-google
+    class: off-domain
+    finalUrl: https://aichat4search.com/
+    status: 200
+    reason: ends on aichat4search.com, not chatgpt4google.com
+    marker: aichat4search.com
+  - slug: chatgptdemo.net
+    id: lst_14404f2d302aecdc516ceb6c
+    website: https://serp.ly/chat-gpt-demo
+    class: unreachable
+    finalUrl: https://chatgptdemo.net/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: chatgptwriter.ai
+    id: lst_ad1584505267227a9c6403d7
+    website: https://serp.ly/chatgpt-writer
+    class: off-domain
+    finalUrl: https://jetwriter.ai/
+    status: 200
+    reason: ends on jetwriter.ai, not chatgptwriter.ai
+    marker: jetwriter.ai
+  - slug: chatness.ai
+    id: lst_956c408ddce3d58a646633c8
+    website: https://serp.ly/chatness
+    class: off-domain
+    finalUrl: https://stewan.io/
+    status: 200
+    reason: ends on stewan.io, not chatness.ai
+    marker: stewan.io
+  - slug: chatq.co
+    id: lst_f08930d38719ceeef8545bb2
+    website: https://serp.ly/chatq
+    class: unreachable
+    finalUrl: https://chatq.co/
+    status: UNABLE_TO_GET_ISSUER_CERT_LOCALLY
+    reason: site_unreachable (UNABLE_TO_GET_ISSUER_CERT_LOCALLY)
+  - slug: chatsimple.ai
+    id: lst_6f0a5a041723c455cd147e15
+    website: https://serp.ly/chatsimple
+    class: off-domain
+    finalUrl: https://www.expertise.ai/
+    status: 200
+    reason: ends on expertise.ai, not chatsimple.ai
+    marker: www.expertise.ai
+  - slug: chattysurvey.com
+    id: lst_4f261be6ec6df080a926f331
+    website: https://serp.ly/chattysurvey
+    class: unreachable
+    finalUrl: https://chattysurvey.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: chatwebpage.com
+    id: lst_4886e8a49d6d97973c0fe293
+    website: https://serp.ly/chatwebpage
+    class: off-domain
+    finalUrl: https://60sec.site/chatbot
+    status: 200
+    reason: ends on 60sec.site, not chatwebpage.com
+    marker: 60sec.site
+  - slug: cheapnft.art
+    id: lst_f6aa21ced31302f1c43cd7ba
+    website: https://serp.ly/cheapnft-art
+    class: unreachable
+    finalUrl: https://cheapnft.art/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: cheerleaderai.com
+    id: lst_22a56d6294eaefdf74f5d196
+    website: https://serp.ly/cheerleaderai
+    class: unreachable
+    finalUrl: https://www.cheerleaderai.com/
+    status: ECONNRESET
+    reason: site_unreachable (ECONNRESET)
+  - slug: circleback.ai
+    id: lst_2717e98f81372e2cf06e1ff4
+    website: https://serp.ly/circleback-ai
+    class: unreachable
+    finalUrl: https://www.circleback.ai/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: clarifyze.ai
+    id: lst_178a3c394c6236db94434258
+    website: https://serp.ly/clarifyze
+    class: unreachable
+    finalUrl: https://clarifyze.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: clay.earth
+    id: lst_24e53ac2897603a19993b87f
+    website: https://serp.ly/clay-nexus
+    class: off-domain
+    finalUrl: https://me.sh/nexus
+    status: 200
+    reason: ends on me.sh, not clay.earth
+    marker: me.sh
+  - slug: clickable.so
+    id: lst_8be0318eeea23d21fd5f7f9a
+    website: https://serp.ly/clickable
+    class: unreachable
+    finalUrl: https://www.clickable.so/
+    status: 526
+    reason: http_526
+  - slug: cloudalize.com
+    id: lst_a8744924e0ba8798f7d44805
+    website: https://serp.ly/cloudalize.com
+    class: off-domain
+    finalUrl: https://www.radianarc.com/
+    status: 200
+    reason: ends on radianarc.com, not cloudalize.com
+    marker: www.radianarc.com
+  - slug: coda.io
+    id: lst_60654b29810d314ac4071b57
+    website: https://serp.ly/openai-for-coda
+    class: off-domain
+    finalUrl: https://docs.superhuman.com/@coda/openai-for-coda
+    status: 200
+    reason: ends on superhuman.com, not coda.io
+    marker: docs.superhuman.com
+  - slug: codedamn.com
+    id: lst_8df3a77bd639d01014b0b291
+    website: https://serp.ly/debugcode
+    class: off-domain
+    finalUrl: https://forsale.godaddy.com/forsale/debugcode.ai?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp_td...
+    status: 403
+    reason: "parked or for sale, but on godaddy.com, not the listing's codedamn.com: owner review"
+    marker: godaddy.com
+  - slug: codeium.com
+    id: lst_85908652262141d6359a78b3
+    website: https://serp.ly/codeium
+    class: off-domain
+    finalUrl: https://devin.ai/desktop
+    status: 200
+    reason: ends on devin.ai, not codeium.com
+    marker: devin.ai
+  - slug: codementorgpt.com
+    id: lst_993bfdf2dbd4a86e1b4641a7
+    website: https://serp.ly/codementorgpt
+    class: unreachable
+    finalUrl: https://codementorgpt.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: codesquire.ai
+    id: lst_af2c99a6351eff7b07920c4c
+    website: https://serp.ly/codesquire
+    class: unreachable
+    finalUrl: https://codesquire.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: codewp.ai
+    id: lst_5387624a53a7f1ba85d802f9
+    website: https://serp.ly/codewp
+    class: off-domain
+    finalUrl: https://telex.automattic.ai/from-codewp
+    status: 200
+    reason: ends on automattic.ai, not codewp.ai
+    marker: telex.automattic.ai
+  - slug: cognifystudio.com
+    id: lst_77c359ae60f8ad556d597774
+    website: https://serp.ly/cognify-studio
+    class: unreachable
+    finalUrl: https://cognifystudio.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: cognitivemill.com
+    id: lst_0e61e0fdbe71c1673d84878f
+    website: https://serp.ly/cognitivemill
+    class: off-domain
+    finalUrl: https://www.linque.com/
+    status: 200
+    reason: ends on linque.com, not cognitivemill.com
+    marker: www.linque.com
+  - slug: cognosys.ai
+    id: lst_006e7c97dc13ee5b03b30dad
+    website: https://serp.ly/cognosys-5-01
+    class: unreachable
+    finalUrl: https://www.cognosys.ai/
+    status: 402
+    reason: http_402
+  - slug: colibri.ai
+    id: lst_66cf58c836fdacddb5cf7140
+    website: https://serp.ly/colibri-ai
+    class: unreachable
+    finalUrl: https://colibri.ai/colibri-for-sales/
+    status: 404
+    reason: http_404
+  - slug: collegetools.io
+    id: lst_34a6254128744203a5387fca
+    website: https://serp.ly/college-tools
+    class: off-domain
+    finalUrl: https://www.mindko.com/
+    status: 200
+    reason: ends on mindko.com, not collegetools.io
+    marker: www.mindko.com
+  - slug: colourlab.ai
+    id: lst_e161631a7edc7644c9cf4011
+    website: https://serp.ly/colourlab
+    class: unreachable
+    finalUrl: https://www.colourlab.ai/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: command.ai
+    id: lst_64c3c5d97ea8d18314a34ebc
+    website: https://serp.ly/helphub-by-commandbar
+    class: off-domain
+    finalUrl: https://amplitude.com/guides-and-surveys
+    status: 200
+    reason: ends on amplitude.com, not command.ai
+    marker: amplitude.com
+  - slug: commentsanalytics.com
+    id: lst_55d6d0fc3a5ea5493eb09360
+    website: https://serp.ly/comments-analytics
+    class: off-domain
+    finalUrl: https://icebuddha.com/
+    status: 200
+    reason: ends on icebuddha.com, not commentsanalytics.com
+    marker: icebuddha.com
+  - slug: communion.so
+    id: lst_5abe381d7f1a48f616ada6f9
+    website: https://serp.ly/communion
+    class: unreachable
+    finalUrl: https://www.communion.so/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: connectyai.com
+    id: lst_b8438df285dbd5844f06ce0d
+    website: https://serp.ly/connectyai.com
+    class: off-domain
+    finalUrl: https://connecty.ai/
+    status: 200
+    reason: ends on connecty.ai, not connectyai.com
+    marker: connecty.ai
+  - slug: contenda.co
+    id: lst_e60ef7de89143fdf088f3850
+    website: https://serp.ly/contenda
+    class: off-domain
+    finalUrl: https://fsh.org/
+    status: 200
+    reason: ends on fsh.org, not contenda.co
+    marker: fsh.org
+  - slug: contlo.ai
+    id: lst_93044c21671c460d22248c33
+    website: https://serp.ly/contlo-ai
+    class: unreachable
+    finalUrl: https://contlo.ai/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: copernicai.com
+    id: lst_2d31bf3f2631a4c8ce8b25ba
+    website: https://serp.ly/copernic
+    class: unreachable
+    finalUrl: https://copernicai.com/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: copycopai.com
+    id: lst_68c479677bc8c132d0c5bd4b
+    website: https://serp.ly/copycop
+    class: unreachable
+    finalUrl: https://copycopai.com/
+    status: 406
+    reason: http_406
+  - slug: coqui.ai
+    id: lst_f121062e501253580ad061fb
+    website: https://serp.ly/coqui
+    class: unreachable
+    finalUrl: https://coqui.ai/
+    status: 404
+    reason: http_404
+  - slug: cosonify.com
+    id: lst_b21f84e0b5754fca097ac19a
+    website: https://serp.ly/cosonify
+    class: unreachable
+    finalUrl: https://cosonify.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: courseau.co
+    id: lst_532c3fd3ffac83b78407f2a4
+    website: https://serp.ly/courseau
+    class: off-domain
+    finalUrl: https://createupon.ai/
+    status: 200
+    reason: ends on createupon.ai, not courseau.co
+    marker: createupon.ai
+  - slug: coverquick.co
+    id: lst_01f35ba4e215a1fc56430576
+    website: https://serp.ly/coverquick
+    class: unreachable
+    finalUrl: https://www.coverquick.co/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: crear.ai
+    id: lst_d2ca31e07c1b99a2e847388c
+    website: https://serp.ly/crear-ai-5-01
+    class: unreachable
+    finalUrl: https://www.crear.ai/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: creativai.io
+    id: lst_4b2cf1006605c53c95815a8f
+    website: https://serp.ly/creativai
+    class: unreachable
+    finalUrl: https://creativai.io/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: crito.design
+    id: lst_90084d48cc93b960683a0522
+    website: https://serp.ly/crito-design
+    class: unreachable
+    finalUrl: https://crito.design/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: crossplag.com
+    id: lst_93de9a61df97ac8ef3c6b2e1
+    website: https://serp.ly/crossplag
+    class: off-domain
+    finalUrl: https://inspera.com/ai-content-detector/
+    status: 404
+    reason: ends on inspera.com, not crossplag.com
+    marker: inspera.com
+  - slug: crowdprisma.com
+    id: lst_3fe2f42294fd7d08c00b73d4
+    website: https://serp.ly/crowd-prisma
+    class: off-domain
+    finalUrl: https://buildsherpa.ai/
+    status: 503
+    reason: ends on buildsherpa.ai, not crowdprisma.com
+    marker: buildsherpa.ai
+  - slug: crypto.com
+    id: lst_2a8f0aaa0448a30066b73b47
+    website: https://serp.ly/amy-by-crypto-com
+    class: unreachable
+    finalUrl: https://crypto.com/en/product-news/crypto-com-continues-ambitious-product-and-service-rollout-with-new-pioneering-inn...
+    status: 404
+    reason: http_404
+  - slug: csm.ai
+    id: lst_baa50fff382b770bf487fe95
+    website: https://serp.ly/csm
+    class: unreachable
+    finalUrl: https://csm.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: cyracom.com
+    id: lst_c7d69228a72038141831e437
+    website: https://serp.ly/cyracom.com
+    class: off-domain
+    finalUrl: https://propio.com/
+    status: 200
+    reason: ends on propio.com, not cyracom.com
+    marker: propio.com
+  - slug: dashworks.ai
+    id: lst_5ce8d43ed2b187eae6bca081
+    website: https://serp.ly/dashworks-for-slack
+    class: unreachable
+    finalUrl: https://www.dashworks.ai/for-slack
+    status: 404
+    reason: http_404
+  - slug: databorg.ai
+    id: lst_931a3af89ec9d5fb91b64bef
+    website: https://serp.ly/databorg
+    class: unreachable
+    finalUrl: https://databorg.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: datachat.ai
+    id: lst_e5f6fa43dcb206688e9ad933
+    website: https://serp.ly/datachat
+    class: unreachable
+    finalUrl: https://datachat.ai/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: datacrunch.io
+    id: lst_20b9297ba604b6d4b976027b
+    website: https://serp.ly/datacrunch.io
+    class: off-domain
+    finalUrl: https://verda.com/
+    status: 200
+    reason: ends on verda.com, not datacrunch.io
+    marker: verda.com
+  - slug: datagpt.com
+    id: lst_74eb47c60441ad7038b18a4a
+    website: https://serp.ly/datagpt.com
+    class: unreachable
+    finalUrl: https://datagpt.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: dbsensei.com
+    id: lst_3c5798a201e7eca5fe67325d
+    website: https://serp.ly/dbsensei
+    class: unreachable
+    finalUrl: https://dbsensei.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: dealcode.ai
+    id: lst_a9c6fbca926a0ba681ea8802
+    website: https://serp.ly/sales-ai-message-generator
+    class: unreachable
+    finalUrl: https://www.dealcode.ai/lp/sales-ai-message-generator
+    status: 404
+    reason: http_404
+  - slug: dearflow.ai
+    id: lst_70cf4c6f0a9abde29505b38c
+    website: https://serp.ly/dearflow
+    class: unreachable
+    finalUrl: https://www.dearflow.ai/
+    status: 404
+    reason: http_404
+  - slug: decohere.ai
+    id: lst_ca911a4f0ae7c53c8bfeb0cf
+    website: https://serp.ly/decoherence
+    class: off-domain
+    finalUrl: https://www.decohere.co/
+    status: 200
+    reason: ends on decohere.co, not decohere.ai
+    marker: www.decohere.co
+  - slug: deflekt.ai
+    id: lst_65bf3a45aa8d73f4623a8b9c
+    website: https://serp.ly/deflekt
+    class: unreachable
+    finalUrl: https://deflekt.ai/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: delineate.co
+    id: lst_b06828d7f5df6b18a4141f51
+    website: https://serp.ly/delineate
+    class: unreachable
+    finalUrl: https://www.delineate.co/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: designify.com
+    id: lst_a4f6bfc69dca34ca676f457b
+    website: https://serp.ly/designify
+    class: off-domain
+    finalUrl: https://www.canva.com/features/ai-photo-editing/
+    status: 200
+    reason: ends on canva.com, not designify.com
+    marker: www.canva.com
+  - slug: designsparks.io
+    id: lst_cec8a8d863c8a886e789bc60
+    website: https://serp.ly/design-sparks
+    class: unreachable
+    finalUrl: https://designsparks.io/
+    status: DEPTH_ZERO_SELF_SIGNED_CERT
+    reason: site_unreachable (DEPTH_ZERO_SELF_SIGNED_CERT)
+  - slug: designstripe.com
+    id: lst_3de11c5b6f7f5f646af75103
+    website: https://serp.ly/ai-cards
+    class: off-domain
+    finalUrl: https://visual.app/ai-cards
+    status: 404
+    reason: ends on visual.app, not designstripe.com
+    marker: visual.app
+  - slug: deskflow.ai
+    id: lst_cee32e6d888d9d00b58e84ad
+    website: https://serp.ly/deskflow
+    class: unreachable
+    finalUrl: https://www.deskflow.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: desksense.com
+    id: lst_9d231c88ef2d39c873914cee
+    website: https://serp.ly/desksense
+    class: unreachable
+    finalUrl: https://desksense.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: devassistant.ai
+    id: lst_168d3bb288518bd21d9a70f2
+    website: https://serp.ly/devassistant
+    class: unreachable
+    finalUrl: https://devassistant.ai/index.html/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: devoid.pics
+    id: lst_9c78edc9a1146f69544e8009
+    website: https://serp.ly/devoid-ai
+    class: unreachable
+    finalUrl: https://devoid.pics/
+    status: 500
+    reason: http_500
+  - slug: dialoqai.com
+    id: lst_df10908c6b83e11bd93f7668
+    website: https://serp.ly/dialoq
+    class: unreachable
+    finalUrl: https://dialoqai.com/
+    status: ECONNREFUSED
+    reason: site_unreachable (ECONNREFUSED)
+  - slug: dipsway.com
+    id: lst_4d446d21cff900b1433b4d6d
+    website: https://serp.ly/dipsway
+    class: unreachable
+    finalUrl: https://dipsway.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: docsai.app
+    id: lst_38cdc15cde1ea0ef02f348c1
+    website: https://serp.ly/docsai
+    class: unreachable
+    finalUrl: https://docsai.app/
+    status: 404
+    reason: http_404
+  - slug: doctrina.ai
+    id: lst_1896b8cec3e5c64c4967949b
+    website: https://serp.ly/doctrina-ai
+    class: unreachable
+    finalUrl: https://www.doctrina.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: docudo.xyz
+    id: lst_87ea89956788621ff9d499c6
+    website: https://serp.ly/docudo
+    class: unreachable
+    finalUrl: https://docudo.xyz/
+    status: 404
+    reason: http_404
+  - slug: domainwoohoo.com
+    id: lst_53aac9c1a92ae2d405973aaf
+    website: https://serp.ly/domainwoohoo
+    class: unreachable
+    finalUrl: https://www.domainwoohoo.com/
+    status: 530
+    reason: http_530
+  - slug: dora.run
+    id: lst_fc60f89139942e4c334f9ea3
+    website: https://serp.ly/dora-ai
+    class: unreachable
+    finalUrl: https://www.dora.run/ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: drafthorseai.com
+    id: lst_f6104fe4186e8b7f81a55d08
+    website: https://serp.ly/drafthorse-ai
+    class: unreachable
+    finalUrl: https://www.drafthorseai.com/?via=serp
+    status: 503
+    reason: http_503
+  - slug: dreamcard.ai
+    id: lst_548ed1a5e46884de448cd05f
+    website: https://dreamcard.ai
+    class: unreachable
+    finalUrl: https://dreamcard.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: dreamstory.me
+    id: lst_b262c9bb9ec59cd655965ae7
+    website: https://serp.ly/dreamstory
+    class: unreachable
+    finalUrl: https://dreamstory.me/
+    status: 403
+    reason: http_403
+  - slug: dresma.com
+    id: lst_f1f63a8ed09e314e03d2d921
+    website: https://serp.ly/domyshoot
+    class: off-domain
+    finalUrl: https://www.domyshoot.com/
+    status: CERT_HAS_EXPIRED
+    reason: ends on domyshoot.com, not dresma.com
+    marker: www.domyshoot.com
+  - slug: durable.co
+    id: lst_098b59fd8840b1cb813e1c5c
+    website: https://serp.ly/durable
+    class: off-domain
+    finalUrl: https://durable.com/
+    status: 200
+    reason: ends on durable.com, not durable.co
+    marker: durable.com
+  - slug: earningscall.ai
+    id: lst_e41fa6f53c3dbf173400bc25
+    website: https://serp.ly/earningsdigest
+    class: off-domain
+    finalUrl: https://www.earningsdigest.ai/
+    status: 429
+    reason: ends on earningsdigest.ai, not earningscall.ai
+    marker: www.earningsdigest.ai
+  - slug: easymessage.ai
+    id: lst_8cecc6c21d87398db1bb68b0
+    website: https://serp.ly/easymessage
+    class: unreachable
+    finalUrl: https://easymessage.ai/ai-generated-messages/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: ecommerceprompts.com
+    id: lst_b7ef70fe32504c64bc6a273c
+    website: https://serp.ly/ecommerce-chatgpt-prompts
+    class: unreachable
+    finalUrl: https://www.ecommerceprompts.com/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: edward.ai
+    id: lst_80970ad26957ab787d90fa53
+    website: https://serp.ly/edward
+    class: unreachable
+    finalUrl: https://www.edward.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: eightsleep.com
+    id: lst_ccde81cef2a1a7ec07a003d2
+    website: https://serp.ly/pod-ai-by-eightsleep
+    class: unreachable
+    finalUrl: https://www.eightsleep.com/podai/
+    status: 404
+    reason: http_404
+  - slug: elaborate.ai
+    id: lst_b30de71bdf407dee20295863
+    website: https://serp.ly/elaborate
+    class: unreachable
+    finalUrl: https://elaborate.ai/
+    status: 404
+    reason: http_404
+  - slug: elusidate.app
+    id: lst_45441cbd45221ad435eece82
+    website: https://serp.ly/elusidateai
+    class: unreachable
+    finalUrl: https://www.elusidate.app/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: emailcomposer.ai
+    id: lst_ad1c22670c856720f5f78838
+    website: https://serp.ly/emailcomposer
+    class: unreachable
+    finalUrl: https://emailcomposer.ai/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: emailmagic.ai
+    id: lst_1a9a8ff7eb75a9e7f0160da7
+    website: https://serp.ly/emailmagic-ai
+    class: unreachable
+    finalUrl: https://www.emailmagic.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: embra.ai
+    id: lst_22ee062cf2eb619218df1adc
+    website: https://serp.ly/embra
+    class: unreachable
+    finalUrl: https://embra.ai/
+    status: 525
+    reason: http_525
+  - slug: emdash.ai
+    id: lst_5160dfb6ec27c2bd986c46d5
+    website: https://serp.ly/emdash-4-33
+    class: off-domain
+    finalUrl: https://emdash.com/
+    status: 200
+    reason: ends on emdash.com, not emdash.ai
+    marker: emdash.com
+  - slug: emojis.sh
+    id: lst_ee1674f0ad31392a7c9cc4fa
+    website: https://serp.ly/emojis.sh
+    class: off-domain
+    finalUrl: https://www.emojis.com/
+    status: 403
+    reason: ends on emojis.com, not emojis.sh
+    marker: www.emojis.com
+  - slug: engage-ai.co
+    id: lst_0c77bdd33d3404b0611ebfa1
+    website: https://serp.ly/engage-ai
+    class: off-domain
+    finalUrl: https://filtpod.com/
+    status: ABORT_ERR
+    reason: ends on filtpod.com, not engage-ai.co
+    marker: filtpod.com
+  - slug: enzyme.so
+    id: lst_6f2d81b9cc89c541205041d2
+    website: https://serp.ly/enzyme
+    class: off-domain
+    finalUrl: https://nocode.inc/
+    status: 200
+    reason: ends on nocode.inc, not enzyme.so
+    marker: nocode.inc
+  - slug: epique.cloud
+    id: lst_90ccbc16281099625abd96af
+    website: https://serp.ly/epique-ai
+    class: off-domain
+    finalUrl: https://epique.ai/
+    status: 200
+    reason: ends on epique.ai, not epique.cloud
+    marker: epique.ai
+  - slug: eplant.bio
+    id: lst_f6d1e4b00195fb8069ad07b2
+    website: https://serp.ly/eplant-treetag
+    class: off-domain
+    finalUrl: https://www.eplant.com/
+    status: EPROTO
+    reason: ends on eplant.com, not eplant.bio
+    marker: www.eplant.com
+  - slug: essaywriters.ai
+    id: lst_200354ee6d99cc882cf96231
+    website: https://serp.ly/essay-writer-ai
+    class: off-domain
+    finalUrl: https://essaywriter.com/
+    status: 200
+    reason: ends on essaywriter.com, not essaywriters.ai
+    marker: essaywriter.com
+  - slug: essense.io
+    id: lst_c3ce851285cb8b8ad8cdb870
+    website: https://serp.ly/essense
+    class: unreachable
+    finalUrl: https://www.essense.io/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: evabot.com
+    id: lst_26e0e512951586ad40533352
+    website: https://serp.ly/rapportai
+    class: off-domain
+    finalUrl: https://evabot.net/
+    status: 200
+    reason: ends on evabot.net, not evabot.com
+    marker: evabot.net
+  - slug: everyprompt.com
+    id: lst_09dd5efa1cc3399980504be3
+    website: https://serp.ly/everyprompt
+    class: unreachable
+    finalUrl: https://www.everyprompt.com/
+    status: 402
+    reason: http_402
+  - slug: exactbuyer.com
+    id: lst_ae30026ca891ce121ba35f4f
+    website: https://serp.ly/exactbuyer-search
+    class: unreachable
+    finalUrl: https://www.exactbuyer.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: excelly-ai.io
+    id: lst_78a6e67fd446a834c9e690fc
+    website: https://serp.ly/excelly
+    class: unreachable
+    finalUrl: https://excelly-ai.io/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: eyen.fr
+    id: lst_32ccc0dc12737d78beedeb74
+    website: https://serp.ly/taskheat-ai-assistant
+    class: unreachable
+    finalUrl: https://eyen.fr/taskheat/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: eyeq.photos
+    id: lst_450b340c4c30bc3a61f98f49
+    website: https://serp.ly/perfectly-clear
+    class: off-domain
+    finalUrl: https://perfectlyclear.ai/
+    status: 200
+    reason: ends on perfectlyclear.ai, not eyeq.photos
+    marker: perfectlyclear.ai
+  - slug: ezdubs.ai
+    id: lst_0ba6a13adca811dd78848807
+    website: https://serp.ly/ezdubs
+    class: unreachable
+    finalUrl: https://www.ezdubs.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: ezmail.ai
+    id: lst_05e87195e41d161404f69125
+    website: https://serp.ly/ezmail
+    class: unreachable
+    finalUrl: https://www.ezmail.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: fable-studio.com
+    id: lst_8db824b6d6973af521257115
+    website: https://serp.ly/fable-studio
+    class: off-domain
+    finalUrl: https://www.showrunnerstudio.com/
+    status: 200
+    reason: ends on showrunnerstudio.com, not fable-studio.com
+    marker: www.showrunnerstudio.com
+  - slug: facetuneapp.com
+    id: lst_2d05e9e7ac890a811641e3aa
+    website: https://serp.ly/facetune
+    class: unreachable
+    finalUrl: https://www.facetuneapp.com/
+    status: HPE_HEADER_OVERFLOW
+    reason: site_unreachable (HPE_HEADER_OVERFLOW)
+  - slug: fathom.video
+    id: lst_f9d6c0ea1f127a79dbb09d50
+    website: https://serp.ly/fathom-2-0
+    class: off-domain
+    finalUrl: https://usefathom.com/ref/ZKBXHI
+    status: 200
+    reason: ends on usefathom.com, not fathom.video
+    marker: usefathom.com
+  - slug: ferret.ai
+    id: lst_9a23188064d3326269f37915
+    website: https://serp.ly/ferret
+    class: unreachable
+    finalUrl: https://www.ferret.ai/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: fibery.io
+    id: lst_09278e43d6a3ec01d5abf19c
+    website: https://serp.ly/fibery-ai
+    class: off-domain
+    finalUrl: https://fibery.com/ai/Ai
+    status: 404
+    reason: ends on fibery.com, not fibery.io
+    marker: fibery.com
+  - slug: fiction.com
+    id: lst_159a57154c70db211a3af18c
+    website: https://serp.ly/fiction
+    class: off-domain
+    finalUrl: https://www.pagelines.com/
+    status: 200
+    reason: ends on pagelines.com, not fiction.com
+    marker: www.pagelines.com
+  - slug: fig.io
+    id: lst_8e367a32497a19e742504912
+    website: https://serp.ly/fig-ai
+    class: unreachable
+    finalUrl: https://fig.io/user-manual/ai
+    status: 503
+    reason: http_503
+  - slug: figma.com
+    id: lst_eb2eb75ce38971b317bc4b46
+    website: https://serp.ly/diagram
+    class: off-domain
+    finalUrl: https://diagram.com/
+    status: EPROTO
+    reason: ends on diagram.com, not figma.com
+    marker: diagram.com
+  - slug: findly.ai
+    id: lst_56026dcc111159d7c105d832
+    website: https://serp.ly/findly
+    class: unreachable
+    finalUrl: https://findly.ai/
+    status: 403
+    reason: http_403
+  - slug: finiite.com
+    id: lst_3499f325b71461901b35703d
+    website: https://serp.ly/finiite
+    class: unreachable
+    finalUrl: https://www.finiite.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: flexos.work
+    id: lst_d94d392151ee20f82b1e4eb4
+    website: https://serp.ly/small-steps
+    class: off-domain
+    finalUrl: https://www.leadwithai.co/tool/ai-action-plan-generator
+    status: 200
+    reason: ends on leadwithai.co, not flexos.work
+    marker: www.leadwithai.co
+  - slug: flowrite.com
+    id: lst_abfe947189d1a2c36bfc30bd
+    website: https://serp.ly/flowrite.com
+    class: off-domain
+    finalUrl: https://www.maestrolabs.com/flowrite
+    status: 200
+    reason: ends on maestrolabs.com, not flowrite.com
+    marker: www.maestrolabs.com
+  - slug: fluenthq.com
+    id: lst_85303e25c2513ed363f92037
+    website: https://serp.ly/channel
+    class: off-domain
+    finalUrl: https://www.usechannel.com/
+    status: 404
+    reason: ends on usechannel.com, not fluenthq.com
+    marker: www.usechannel.com
+  - slug: foxyapps.com
+    id: lst_ba08e9ec7a3659d018ac2e8e
+    website: https://serp.ly/foxyapps-4-73
+    class: off-domain
+    finalUrl: https://www.foxyapps.ai/
+    status: ENOTFOUND
+    reason: ends on foxyapps.ai, not foxyapps.com
+    marker: www.foxyapps.ai
+  - slug: framedrop.ai
+    id: lst_d86e06fa8095493f899fd07a
+    website: https://serp.ly/framedrop
+    class: off-domain
+    finalUrl: https://www.sloode.com/
+    status: 200
+    reason: ends on sloode.com, not framedrop.ai
+    marker: www.sloode.com
+  - slug: freesubtitles.ai
+    id: lst_105c64f979906b6aa969e8fc
+    website: https://serp.ly/free-subtitles-ai
+    class: off-domain
+    finalUrl: https://subtitles.app/?fs_ref=legacy
+    status: 200
+    reason: ends on subtitles.app, not freesubtitles.ai
+    marker: subtitles.app
+  - slug: frontitude.com
+    id: lst_c988a50a050772d6cd3fbc40
+    website: https://serp.ly/ux-writing-assistant
+    class: unreachable
+    finalUrl: https://www.frontitude.com/ux-writing-assistant
+    status: 404
+    reason: http_404
+  - slug: functime.ai
+    id: lst_96d1a2e8b7b2417ea6f98d03
+    website: https://serp.ly/functime
+    class: unreachable
+    finalUrl: https://www.functime.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: furwee.ai
+    id: lst_f124b0c88fdc8c8733fd0806
+    website: https://serp.ly/furwee
+    class: unreachable
+    finalUrl: https://www.furwee.ai/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: fuups.ai
+    id: lst_b83edbd83db9a52194c8d7f6
+    website: https://serp.ly/fuups
+    class: unreachable
+    finalUrl: https://fuups.ai/
+    status: 521
+    reason: http_521
+  - slug: galactica.org
+    id: lst_b4aefee35c84fc247bc2be0a
+    website: https://serp.ly/galactica
+    class: unreachable
+    finalUrl: https://galactica.org/
+    status: 530
+    reason: http_530
+  - slug: gemelo.ai
+    id: lst_34a78f346f6df5fbe351480a
+    website: https://serp.ly/charactr
+    class: off-domain
+    finalUrl: https://charactr.com/
+    status: 402
+    reason: ends on charactr.com, not gemelo.ai
+    marker: charactr.com
+  - slug: genesiscloud.com
+    id: lst_46c2ed90144159f47d99bb41
+    website: https://serp.ly/genesiscloud.com
+    class: unreachable
+    finalUrl: https://genesiscloud.com/
+    status: 522
+    reason: http_522
+  - slug: genly.ai
+    id: lst_7e131eb9c0cd98a3edf844ec
+    website: https://serp.ly/genly
+    class: unreachable
+    finalUrl: https://genly.ai/
+    status: 502
+    reason: http_502
+  - slug: gerwin.io
+    id: lst_fc890dfd4c7efbc0fcacb4bb
+    website: https://serp.ly/gerwin
+    class: off-domain
+    finalUrl: https://gerwin.ai/
+    status: 200
+    reason: ends on gerwin.ai, not gerwin.io
+    marker: gerwin.ai
+  - slug: getactyvphysio.com
+    id: lst_1a0dba635bb113a918fc5153
+    website: https://serp.ly/getactyv
+    class: off-domain
+    finalUrl: https://getactyv.com/lander
+    status: 200
+    reason: "parked or for sale, but on getactyv.com, not the listing's getactyvphysio.com: owner review"
+    marker: godaddy /lander
+  - slug: getcargo.io
+    id: lst_678b2e869e9c9e38973e290d
+    website: https://serp.ly/cargo
+    class: off-domain
+    finalUrl: https://www.getcargo.ai/
+    status: 200
+    reason: ends on getcargo.ai, not getcargo.io
+    marker: www.getcargo.ai
+  - slug: getcovey.com
+    id: lst_76aaa6afd92a52806eadf5e3
+    website: https://serp.ly/covey-scout
+    class: unreachable
+    finalUrl: https://getcovey.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: getessential.app
+    id: lst_67e6c3b47240c94b97c73e29
+    website: https://serp.ly/essential
+    class: unreachable
+    finalUrl: https://getessential.app/
+    status: 404
+    reason: http_404
+  - slug: getflux.io
+    id: lst_e67371d8bd0bec2641634b9c
+    website: https://serp.ly/flux
+    class: unreachable
+    finalUrl: https://getflux.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: getliner.com
+    id: lst_e2753dcdd67e8205881f18b1
+    website: https://serp.ly/liner
+    class: unreachable
+    finalUrl: https://getliner.com/en/
+    status: 410
+    reason: http_410
+  - slug: getmunch.com
+    id: lst_f17b749bb6cfd0600e7cf245
+    website: https://serp.ly/munch
+    class: off-domain
+    finalUrl: https://www.munchstudio.com/
+    status: 200
+    reason: ends on munchstudio.com, not getmunch.com
+    marker: www.munchstudio.com
+  - slug: getoptimal.ai
+    id: lst_7f0053a1e1a978b36430c909
+    website: https://serp.ly/tara-ai
+    class: off-domain
+    finalUrl: https://tara.ai/lander
+    status: 200
+    reason: "parked or for sale, but on tara.ai, not the listing's getoptimal.ai: owner review"
+    marker: godaddy /lander
+  - slug: getquizwizard.com
+    id: lst_bf54657e4eef9d9bba1e7fff
+    website: https://getquizwizard.com
+    class: off-domain
+    finalUrl: https://www.wooclap.com/fr/quiz-wizard/
+    status: 200
+    reason: ends on wooclap.com, not getquizwizard.com
+    marker: www.wooclap.com
+  - slug: getrecall.ai
+    id: lst_eb58e939ac2f0801a8560841
+    website: https://serp.ly/recall-ai
+    class: off-domain
+    finalUrl: https://www.recall.it/
+    status: 200
+    reason: ends on recall.it, not getrecall.ai
+    marker: www.recall.it
+  - slug: getslate.ai
+    id: lst_e1f97383042d765ad2fad2a4
+    website: https://serp.ly/zeeno
+    class: off-domain
+    finalUrl: https://www.zeeno.ai/
+    status: EPROTO
+    reason: ends on zeeno.ai, not getslate.ai
+    marker: www.zeeno.ai
+  - slug: getsmartgpt.com
+    id: lst_86883dc856ac753c5d29afd4
+    website: https://serp.ly/smartgpt
+    class: off-domain
+    finalUrl: https://smartprompt.pro/
+    status: 200
+    reason: ends on smartprompt.pro, not getsmartgpt.com
+    marker: smartprompt.pro
+  - slug: getvoiceline.com
+    id: lst_592c70a595cc6b027928f68a
+    website: https://serp.ly/voiceline
+    class: off-domain
+    finalUrl: https://voiceline.ai/
+    status: 200
+    reason: ends on voiceline.ai, not getvoiceline.com
+    marker: voiceline.ai
+  - slug: githubnext.com
+    id: lst_fb8cb45ea945475aa2623277
+    website: https://serp.ly/hey,-github!
+    class: unreachable
+    finalUrl: https://githubnext.com/projects/hey-github
+    status: 404
+    reason: http_404
+  - slug: glass.health
+    id: lst_ff033fe6adba15c676edcd28
+    website: https://serp.ly/glass-health
+    class: unreachable
+    finalUrl: https://glass.health/ai/
+    status: 404
+    reason: http_404
+  - slug: gocharlie.ai
+    id: lst_9e643bd841e746886c644f24
+    website: https://serp.ly/go-charlie
+    class: unreachable
+    finalUrl: https://gocharlie.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: goloti.com
+    id: lst_3e4d9d194556c1f23e629ec5
+    website: https://serp.ly/loti
+    class: off-domain
+    finalUrl: https://www.lotiai.com/
+    status: 200
+    reason: ends on lotiai.com, not goloti.com
+    marker: www.lotiai.com
+  - slug: goodsnooze.gumroad.com
+    id: lst_6f056f9165cf45a3354febaa
+    website: https://serp.ly/macwhisper
+    class: off-domain
+    finalUrl: https://www.macwhisper.com/
+    status: 200
+    reason: ends on macwhisper.com, not gumroad.com
+    marker: www.macwhisper.com
+  - slug: goteleport.com
+    id: lst_f8a67f719df72da7c82d419d
+    website: https://serp.ly/teleport-assist
+    class: unreachable
+    finalUrl: https://goteleport.com/features/assist/
+    status: 404
+    reason: http_404
+  - slug: govdash.com
+    id: lst_8b6bf8b5dea3e471120960e0
+    website: https://serp.ly/olli-ai
+    class: off-domain
+    finalUrl: https://www.olli.ai/
+    status: 404
+    reason: ends on olli.ai, not govdash.com
+    marker: www.olli.ai
+  - slug: gox.ai
+    id: lst_1af291bc5a42d7d46e6e7927
+    website: https://serp.ly/chatgpt-in-google-sheets
+    class: off-domain
+    finalUrl: https://twominutereports.com/integrations/chatgpt
+    status: 200
+    reason: ends on twominutereports.com, not gox.ai
+    marker: twominutereports.com
+  - slug: gpdf.cloud
+    id: lst_8b3696d628bde41140e145c9
+    website: https://serp.ly/genius-pdf
+    class: unreachable
+    finalUrl: https://gpdf.cloud/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: gpt6.ai
+    id: lst_bbd1f45bfd751ae712e0d851
+    website: https://serp.ly/gpt6-ai
+    class: unreachable
+    finalUrl: https://gpt6.ai/gpt6
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: gpthotline.com
+    id: lst_b24e6cb550aa3886bbf133cb
+    website: https://serp.ly/gpthotline
+    class: unreachable
+    finalUrl: https://www.gpthotline.com/
+    status: 404
+    reason: http_404
+  - slug: gptprompter.com
+    id: lst_d8f95295ac03ce2d1093502f
+    website: https://gptprompter.com
+    class: unreachable
+    finalUrl: https://gptprompter.com/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: gptprompttuner.com
+    id: lst_cf00305198a37d130ac08871
+    website: https://serp.ly/gpt-prompt-tuner
+    class: unreachable
+    finalUrl: https://gptprompttuner.com/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: gradientinsight.com
+    id: lst_c3d3d7679e44637433084bf2
+    website: https://serp.ly/logobrainstorm
+    class: off-domain
+    finalUrl: https://aikiustudio.com/
+    status: 200
+    reason: ends on aikiustudio.com, not gradientinsight.com
+    marker: aikiustudio.com
+  - slug: graydient.ai
+    id: lst_e4cd27584045e22d95fbd69e
+    website: https://serp.ly/pirate-diffusion
+    class: off-domain
+    finalUrl: https://piratediffusion.com/
+    status: 200
+    reason: ends on piratediffusion.com, not graydient.ai
+    marker: piratediffusion.com
+  - slug: greatheadlines.ai
+    id: lst_890b59b8cf69365204147f91
+    website: https://serp.ly/great-headlines
+    class: unreachable
+    finalUrl: https://greatheadlines.ai/
+    status: 402
+    reason: http_402
+  - slug: greenlite.ai
+    id: lst_a4c5c3718af1a67ca3930a9f
+    website: https://serp.ly/greenlite
+    class: off-domain
+    finalUrl: https://www2.bretton.com/
+    status: 200
+    reason: ends on bretton.com, not greenlite.ai
+    marker: www2.bretton.com
+  - slug: gretel.ai
+    id: lst_83b4bf0866bef7be04bc11c1
+    website: https://serp.ly/gretel
+    class: off-domain
+    finalUrl: https://www.nvidia.com/en-us/use-cases/synthetic-data-generation-for-agentic-ai/
+    status: 200
+    reason: ends on nvidia.com, not gretel.ai
+    marker: www.nvidia.com
+  - slug: growparabolic.com
+    id: lst_18a541a887f23a4a64e747ae
+    website: https://serp.ly/growparabolic
+    class: unreachable
+    finalUrl: https://www.growparabolic.com/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: growthbarseo.com
+    id: lst_75f58b5c808acf7ebc5d12f0
+    website: https://serp.ly/growthbar
+    class: off-domain
+    finalUrl: https://www.seoptimer.com/growthbar/
+    status: 200
+    reason: ends on seoptimer.com, not growthbarseo.com
+    marker: www.seoptimer.com
+  - slug: habitdriven.ai
+    id: lst_8f06365bb4d83ae20c9b3e71
+    website: https://serp.ly/habit-driven
+    class: unreachable
+    finalUrl: https://habitdriven.ai/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: halist.ai
+    id: lst_1bd27901ed18f411531a8c32
+    website: https://serp.ly/halist-browser-ai
+    class: unreachable
+    finalUrl: https://halist.ai/
+    status: 530
+    reason: http_530
+  - slug: happyaccidents.ai
+    id: lst_279b3daf42dc43a4a4a0f585
+    website: https://serp.ly/happyaccidents
+    class: unreachable
+    finalUrl: https://www.happyaccidents.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: headlessui.dev
+    id: lst_04c885ac61283075b47e7bd8
+    website: https://serp.ly/headlessui.dev
+    class: off-domain
+    finalUrl: https://headlessui.com/
+    status: 200
+    reason: ends on headlessui.com, not headlessui.dev
+    marker: headlessui.com
+  - slug: hearbitz.app
+    id: lst_3702cabfbcca8af5f2589f1c
+    website: https://serp.ly/hearbitz
+    class: unreachable
+    finalUrl: https://www.hearbitz.app/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: hebbia.ai
+    id: lst_8888a722aec6e36276ba79d9
+    website: https://serp.ly/hebbia
+    class: off-domain
+    finalUrl: https://www.hebbia.com/
+    status: 200
+    reason: ends on hebbia.com, not hebbia.ai
+    marker: www.hebbia.com
+  - slug: heficed.com
+    id: lst_03bb860846d52976dfd0877a
+    website: https://serp.ly/heficed.com
+    class: unreachable
+    finalUrl: https://heficed.com/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: hello.podium.page
+    id: lst_8bec07a278ff084b0f64333f
+    website: https://serp.ly/podium
+    class: unreachable
+    finalUrl: https://podium.page/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: helper.email
+    id: lst_1a03eb839a8195714aa2170c
+    website: https://serp.ly/helper-email
+    class: unreachable
+    finalUrl: https://helper.email/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: henchman.io
+    id: lst_998248d9d2fd7d5c81f8ec73
+    website: https://serp.ly/henchman
+    class: unreachable
+    finalUrl: https://henchman.io/
+    status: DEPTH_ZERO_SELF_SIGNED_CERT
+    reason: site_unreachable (DEPTH_ZERO_SELF_SIGNED_CERT)
+  - slug: hereafter.ai
+    id: lst_745c724331f5fb84115a10f7
+    website: https://hereafter.ai
+    class: unreachable
+    finalUrl: https://hereafter.ai/
+    status: 404
+    reason: http_404
+  - slug: hexomatic.com
+    id: lst_59e07a2c7b2f1695d58e9136
+    website: https://serp.ly/hexomatic
+    class: off-domain
+    finalUrl: https://hexowatch.com/?irclickid=xh-US9Q1pxyZU8R0lJx1r0DbUkrwL02hZ2hZ1o0&utm_source=Impact&irgwc=1&afsrc=1
+    status: 200
+    reason: ends on hexowatch.com, not hexomatic.com
+    marker: hexowatch.com
+  - slug: heykona.com
+    id: lst_ab40cc57e762bc07f55c7058
+    website: https://serp.ly/ai-powered-coaching-by-kona
+    class: off-domain
+    finalUrl: https://www.15five.com/
+    status: 200
+    reason: ends on 15five.com, not heykona.com
+    marker: www.15five.com
+  - slug: hirable.fyi
+    id: lst_e3e9c3b636cce031afdbe4f2
+    website: https://serp.ly/hirable-2-01
+    class: unreachable
+    finalUrl: https://hirable.fyi/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: hirematch.app
+    id: lst_5d817efe264f489481157c2c
+    website: https://serp.ly/hirematch
+    class: unreachable
+    finalUrl: https://hirematch.app/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: hollyhires.ai
+    id: lst_0ceae057e4a49cae91e039a0
+    website: https://serp.ly/holly
+    class: off-domain
+    finalUrl: https://www.hiringagents.ai/
+    status: 200
+    reason: ends on hiringagents.ai, not hollyhires.ai
+    marker: www.hiringagents.ai
+  - slug: hotball.ai
+    id: lst_a78794cff206ef513559a7f8
+    website: https://serp.ly/hotball
+    class: unreachable
+    finalUrl: https://hotball.ai/
+    status: 404
+    reason: http_404
+  - slug: hourone.ai
+    id: lst_c1ec0d557b71682742eb128e
+    website: https://serp.ly/hourone
+    class: unreachable
+    finalUrl: https://hourone.ai/
+    status: ECONNREFUSED
+    reason: site_unreachable (ECONNREFUSED)
+  - slug: how2terminal.com
+    id: lst_0f26e05aba0eac670c715936
+    website: https://serp.ly/how2
+    class: unreachable
+    finalUrl: https://how2terminal.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: hub.plexo.app
+    id: lst_a3310c30ac31a2739b605ecd
+    website: https://serp.ly/plexo
+    class: off-domain
+    finalUrl: https://acentoenlao.com/
+    status: 429
+    reason: ends on acentoenlao.com, not plexo.app
+    marker: acentoenlao.com
+  - slug: hubble.team
+    id: lst_8fc64c1da93c227304ea3a0a
+    website: https://serp.ly/hubble
+    class: off-domain
+    finalUrl: https://www.usehubble.io/
+    status: 200
+    reason: ends on usehubble.io, not hubble.team
+    marker: www.usehubble.io
+  - slug: hypercontext.com
+    id: lst_022b071031c8a0a1fd8ac959
+    website: https://serp.ly/hypercontext
+    class: off-domain
+    finalUrl: https://www.spinach.ai/features/performance-reviews
+    status: 200
+    reason: ends on spinach.ai, not hypercontext.com
+    marker: www.spinach.ai
+  - slug: hypertype.ai
+    id: lst_4635dc5a9df51b2e59581f5b
+    website: https://serp.ly/hypertype
+    class: off-domain
+    finalUrl: https://hypertype.co/
+    status: EPROTO
+    reason: ends on hypertype.co, not hypertype.ai
+    marker: hypertype.co
+  - slug: i18ncore.com
+    id: lst_9b6151659060212f04e6d3a2
+    website: https://serp.ly/i18ncore
+    class: unreachable
+    finalUrl: https://i18ncore.com/
+    status: ECONNREFUSED
+    reason: site_unreachable (ECONNREFUSED)
+  - slug: iatextos.com
+    id: lst_02ac9f14834df7f7fd690c6a
+    website: https://serp.ly/iatextos
+    class: unreachable
+    finalUrl: https://iatextos.com/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: icon.me
+    id: lst_541b58169b6d9a4cab1523a7
+    website: https://serp.ly/icon.me
+    class: off-domain
+    finalUrl: https://icon.com/
+    status: 200
+    reason: ends on icon.com, not icon.me
+    marker: icon.com
+  - slug: ideacadabra.com
+    id: lst_5f6634ea8761756487f9ed8c
+    website: https://serp.ly/ideacadabra
+    class: unreachable
+    finalUrl: https://ideacadabra.com/
+    status: 451
+    reason: http_451
+  - slug: imageai.app
+    id: lst_e928e30db511e3a3797a3828
+    website: https://serp.ly/image-ai-app
+    class: unreachable
+    finalUrl: https://imageai.app/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: imaginary.dev
+    id: lst_429d519616cbc28340ddd0ae
+    website: https://serp.ly/imaginary-programming
+    class: unreachable
+    finalUrl: https://imaginary.dev/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: imagineme.ai
+    id: lst_caeab714ae97578fc7773346
+    website: https://serp.ly/imagine-me
+    class: off-domain
+    finalUrl: https://imagineme.app/
+    status: 403
+    reason: ends on imagineme.app, not imagineme.ai
+    marker: imagineme.app
+  - slug: infomail.ai
+    id: lst_9f4a8b061b65d3fdae0c2b90
+    website: https://serp.ly/infomail-ai
+    class: unreachable
+    finalUrl: https://www.infomail.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: ingestai.io
+    id: lst_2b6e8391f24f8f569156bffc
+    website: https://serp.ly/ingestai
+    class: unreachable
+    finalUrl: https://ingestai.io/
+    status: ECONNREFUSED
+    reason: site_unreachable (ECONNREFUSED)
+  - slug: inkforall.com
+    id: lst_58759c538769da1b110511b6
+    website: https://serp.ly/ink
+    class: off-domain
+    finalUrl: https://smythos.com/
+    status: 500
+    reason: ends on smythos.com, not inkforall.com
+    marker: smythos.com
+  - slug: insightbase.ai
+    id: lst_cc182d2e6c6b9b5f823a37be
+    website: https://serp.ly/insightbase
+    class: unreachable
+    finalUrl: https://insightbase.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: insightful.page
+    id: lst_cf244bd28b39e1ca309d430e
+    website: https://serp.ly/insightful
+    class: unreachable
+    finalUrl: https://insightful.page/
+    status: 404
+    reason: http_404
+  - slug: instabase.com
+    id: lst_716fa9cf268166b94ef5231d
+    website: https://serp.ly/ai-hub
+    class: unreachable
+    finalUrl: https://www.instabase.com/platform/ai-hub
+    status: 404
+    reason: http_404
+  - slug: instantanswers.xyz
+    id: lst_a220842dfe0d2c474acab48d
+    website: https://serp.ly/instantanswers
+    class: off-domain
+    finalUrl: https://retrobezel.com/?utm_source=instantanswers&utm_medium=redirect
+    status: 200
+    reason: ends on retrobezel.com, not instantanswers.xyz
+    marker: retrobezel.com
+  - slug: intellecs.ai
+    id: lst_572895c0da43b89e7dedfc6b
+    website: https://serp.ly/intellecs
+    class: unreachable
+    finalUrl: https://www.intellecs.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: intercom.com
+    id: lst_ecaf56ae30e976ce6ccba9c1
+    website: https://serp.ly/fin-by-intercom
+    class: off-domain
+    finalUrl: https://fin.ai/
+    status: 200
+    reason: ends on fin.ai, not intercom.com
+    marker: fin.ai
+  - slug: intmath.com
+    id: lst_78d2de806538493c97a281e1
+    website: https://serp.ly/interactive-mathematics
+    class: unreachable
+    finalUrl: https://www.intmath.com/help/ai-problem-solver-home.php/
+    status: 404
+    reason: http_404
+  - slug: invictai.io
+    id: lst_544a1b144e3768f5418db7a5
+    website: https://serp.ly/invictaai-5-01
+    class: unreachable
+    finalUrl: https://invictai.io/
+    status: 402
+    reason: http_402
+  - slug: ipso.ai
+    id: lst_7709eb6c5836f52d130c19ba
+    website: https://serp.ly/ipso-ai
+    class: unreachable
+    finalUrl: https://ipso.ai/
+    status: 404
+    reason: http_404
+  - slug: ironiq.app
+    id: lst_f7a176ab183e35c921768be3
+    website: https://serp.ly/ironiq
+    class: unreachable
+    finalUrl: https://ironiq.app/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: itsdart.com
+    id: lst_ff1c7263f339cea0fd00f798
+    website: https://serp.ly/dart
+    class: off-domain
+    finalUrl: https://www.dartai.com/
+    status: 200
+    reason: ends on dartai.com, not itsdart.com
+    marker: www.dartai.com
+  - slug: jam.dev
+    id: lst_1bfd6ab711a3f13d26607774
+    website: https://serp.ly/jam
+    class: unreachable
+    finalUrl: https://jam.dev/jamgpt/
+    status: 404
+    reason: http_404
+  - slug: jaqnjil.ai
+    id: lst_f08aae1aa7b64bbced2df5ca
+    website: https://serp.ly/jaqnjil
+    class: off-domain
+    finalUrl: https://jaqnjil.com/
+    status: ECONNRESET
+    reason: ends on jaqnjil.com, not jaqnjil.ai
+    marker: jaqnjil.com
+  - slug: jarvis-lyrics.com
+    id: lst_a8e1e91be492de548786692f
+    website: https://serp.ly/jarvis-lyrics
+    class: unreachable
+    finalUrl: https://www.jarvis-lyrics.com/
+    status: 503
+    reason: http_503
+  - slug: jarvis.tel
+    id: lst_77080cb7da380d1f98fe4d6e
+    website: https://serp.ly/jarvis-tel
+    class: unreachable
+    finalUrl: https://jarvis.tel/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: jibewith.com
+    id: lst_416dd15af21618986adfda76
+    website: https://serp.ly/jibewith
+    class: unreachable
+    finalUrl: https://www.jibewith.com/
+    status: 404
+    reason: http_404
+  - slug: jit.dev
+    id: lst_f7c8cc00da20303d20abdd94
+    website: https://serp.ly/jit-codes
+    class: off-domain
+    finalUrl: https://jit.codes/
+    status: 200
+    reason: ends on jit.codes, not jit.dev
+    marker: jit.codes
+  - slug: jobtitlesai.com
+    id: lst_6fd27d15e7ab15d2f94db7c1
+    website: https://serp.ly/jobtitlesai
+    class: unreachable
+    finalUrl: https://jobtitlesai.com/
+    status: 404
+    reason: http_404
+  - slug: joinmilo.com
+    id: lst_d01278b663069eb4dd118da8
+    website: https://serp.ly/milo
+    class: unreachable
+    finalUrl: https://www.joinmilo.com/
+    status: 402
+    reason: http_402
+  - slug: joinrhubarb.com
+    id: lst_47f752f0373223f81dd5de9e
+    website: https://serp.ly/artickl
+    class: off-domain
+    finalUrl: https://artickl.com/
+    status: 403
+    reason: ends on artickl.com, not joinrhubarb.com
+    marker: artickl.com
+  - slug: jokelub.com
+    id: lst_b529ba1aae074baac7b9e905
+    website: https://serp.ly/jokelub
+    class: unreachable
+    finalUrl: https://jokelub.com/
+    status: 526
+    reason: http_526
+  - slug: jollyseo.com
+    id: lst_a2f58eeff69c3f9c0a181cf7
+    website: https://serp.ly/jollyseo.com
+    class: off-domain
+    finalUrl: https://jollysearch.com/
+    status: 200
+    reason: ends on jollysearch.com, not jollyseo.com
+    marker: jollysearch.com
+  - slug: juicelabs.co
+    id: lst_914951be41a06bb61885190c
+    website: https://serp.ly/juice
+    class: off-domain
+    finalUrl: https://www.hp.com/us-en/workstations/z-boost.html
+    status: 200
+    reason: ends on hp.com, not juicelabs.co
+    marker: www.hp.com
+  - slug: juji.io
+    id: lst_fa3cdc3d3d74bba85e9a8f27
+    website: https://serp.ly/juji
+    class: unreachable
+    finalUrl: https://juji.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: junilearning.com
+    id: lst_74c7a0c98676f6cfaa89d6fa
+    website: https://serp.ly/juni-learning
+    class: off-domain
+    finalUrl: https://acely.com/
+    status: 200
+    reason: ends on acely.com, not junilearning.com
+    marker: acely.com
+  - slug: kadoa.com
+    id: lst_0016fd7139440ce2b067e28b
+    website: https://serp.ly/joblens
+    class: unreachable
+    finalUrl: https://www.kadoa.com/joblens
+    status: 404
+    reason: http_404
+  - slug: kaiconversations.com
+    id: lst_9c9c23ff634aafb43ca22249
+    website: https://serp.ly/kai
+    class: off-domain
+    finalUrl: https://www.kaiconversations.ai/
+    status: EPROTO
+    reason: ends on kaiconversations.ai, not kaiconversations.com
+    marker: www.kaiconversations.ai
+  - slug: kalendar.ai
+    id: lst_f76673ea8c725e0eb4503a6c
+    website: https://serp.ly/kalendar-ai
+    class: unreachable
+    finalUrl: https://www.kalendar.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: kleverkreatorai.com
+    id: lst_c2a068963d670410f03a5d07
+    website: https://serp.ly/kleverkreator
+    class: unreachable
+    finalUrl: https://kleverkreatorai.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: kokocares.org
+    id: lst_2d8ef80f310cc98eef09b553
+    website: https://serp.ly/koko
+    class: off-domain
+    finalUrl: https://www.koko.ai/
+    status: EPROTO
+    reason: ends on koko.ai, not kokocares.org
+    marker: www.koko.ai
+  - slug: komandi.app
+    id: lst_2247bd0f206ec5d4d6e9785c
+    website: https://serp.ly/komandi
+    class: unreachable
+    finalUrl: https://komandi.app/
+    status: 526
+    reason: http_526
+  - slug: kraftful.com
+    id: lst_bcbfbc0dc08cf280af21eb53
+    website: https://serp.ly/kraftful
+    class: unreachable
+    finalUrl: https://www.kraftful.com/
+    status: 404
+    reason: http_404
+  - slug: kreateable.com
+    id: lst_399e2ceef4848a59f232241d
+    website: https://serp.ly/kreateable
+    class: unreachable
+    finalUrl: https://www.kreateable.com/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: lambdalabs.com
+    id: lst_125869b72bec8380b6e03430
+    website: https://serp.ly/lambda
+    class: off-domain
+    finalUrl: https://lambda.ai/
+    status: 200
+    reason: ends on lambda.ai, not lambdalabs.com
+    marker: lambda.ai
+  - slug: lamini.ai
+    id: lst_482e352ad4b23b4214fca020
+    website: https://serp.ly/lamini
+    class: unreachable
+    finalUrl: https://lamini.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: lancey.ai
+    id: lst_07e928ae34b779bddc04cb11
+    website: https://serp.ly/lancey
+    class: off-domain
+    finalUrl: https://trylancey.com/
+    status: ENOTFOUND
+    reason: ends on trylancey.com, not lancey.ai
+    marker: trylancey.com
+  - slug: latitude.so
+    id: lst_7c2078d09d1a6a9df2d7ee63
+    website: https://serp.ly/latitude
+    class: off-domain
+    finalUrl: https://www.latitude.sh/accelerate?utm_source=devin-s&amp
+    status: 200
+    reason: ends on latitude.sh, not latitude.so
+    marker: www.latitude.sh
+  - slug: lavo.ai
+    id: lst_3982f291783854f823ce7f0e
+    website: https://serp.ly/lavo-ai
+    class: unreachable
+    finalUrl: https://www.lavo.ai/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: leanbe.ai
+    id: lst_355c2e38f82ebefa91c3b0b4
+    website: https://serp.ly/leanbe
+    class: off-domain
+    finalUrl: https://productmix.com/
+    status: 200
+    reason: ends on productmix.com, not leanbe.ai
+    marker: productmix.com
+  - slug: leaselens.ai
+    id: lst_0fbbbc99277b058084af7223
+    website: https://serp.ly/leaselens
+    class: unreachable
+    finalUrl: https://leaselens.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: lettergram.net
+    id: lst_338c141ed6c9432a9f3db504
+    website: https://serp.ly/lettergram
+    class: unreachable
+    finalUrl: https://lettergram.net/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: lifecastvr.com
+    id: lst_bf14c5e714c577d4b48299bf
+    website: https://serp.ly/holovolo
+    class: off-domain
+    finalUrl: https://holovolo.tv/
+    status: 200
+    reason: ends on holovolo.tv, not lifecastvr.com
+    marker: holovolo.tv
+  - slug: lifesight.io
+    id: lst_c3685bbd8f03a485050b86f8
+    website: https://serp.ly/moda
+    class: off-domain
+    finalUrl: https://www.getmoda.io/
+    status: ENOTFOUND
+    reason: ends on getmoda.io, not lifesight.io
+    marker: www.getmoda.io
+  - slug: lifetimely.io
+    id: lst_d8217c804bc6e3421a17db61
+    website: https://serp.ly/lifetimely.io
+    class: off-domain
+    finalUrl: https://useamp.com/products/analytics/
+    status: 200
+    reason: ends on useamp.com, not lifetimely.io
+    marker: useamp.com
+  - slug: lightrail.ai
+    id: lst_9d1e30cfe8846e5b70301274
+    website: https://serp.ly/lightrail
+    class: unreachable
+    finalUrl: https://www.lightrail.ai/projects
+    status: 404
+    reason: http_404
+  - slug: lightricks.com
+    id: lst_e50ad17f5cd515ffaf55d389
+    website: https://serp.ly/lightricks
+    class: unreachable
+    finalUrl: https://www.lightricks.com/text-to-image
+    status: 404
+    reason: http_404
+  - slug: lingosync.ai
+    id: lst_002e980e4f95741a5e8f3496
+    website: https://serp.ly/lingosync-5-01
+    class: unreachable
+    finalUrl: https://lingosync.ai/en/
+    status: 404
+    reason: http_404
+  - slug: linktr.ee
+    id: lst_3697ffd0390be1797de944d2
+    website: https://serp.ly/dreamlife-ai
+    class: unreachable
+    finalUrl: https://linktr.ee/dreamlifeai
+    status: 404
+    reason: http_404
+  - slug: lintrule.com
+    id: lst_d43fa8b27a7e42275c51faa4
+    website: https://serp.ly/lintrule
+    class: unreachable
+    finalUrl: https://www.lintrule.com/
+    status: 402
+    reason: http_402
+  - slug: lionbrowser.app
+    id: lst_3d9d4ff16ce2bca095e87339
+    website: https://serp.ly/lion-browser
+    class: off-domain
+    finalUrl: https://lionfamily.org/
+    status: 200
+    reason: ends on lionfamily.org, not lionbrowser.app
+    marker: lionfamily.org
+  - slug: liquidweb.com
+    id: lst_66d49dfcd983118b2dcb8619
+    website: https://serp.ly/liquid-web-gpu-hosting
+    class: off-domain
+    finalUrl: https://www.atlantic.net/
+    status: 200
+    reason: ends on atlantic.net, not liquidweb.com
+    marker: www.atlantic.net
+  - slug: listener.fm
+    id: lst_3dc01f2f693f2c587b5d2f32
+    website: https://serp.ly/listener-fm
+    class: off-domain
+    finalUrl: https://listener.com/
+    status: 200
+    reason: ends on listener.com, not listener.fm
+    marker: listener.com
+  - slug: livehealthily.com
+    id: lst_2d5cc113fdd2a79b04dc0cb3
+    website: https://serp.ly/livehealthily.com
+    class: unreachable
+    finalUrl: https://www.livehealthily.com/
+    status: 404
+    reason: http_404
+  - slug: livekit.io
+    id: lst_fba8f8c4b45e258bb7536c19
+    website: https://serp.ly/kitt
+    class: off-domain
+    finalUrl: https://livekit.com/blog/meet-kitt
+    status: 200
+    reason: ends on livekit.com, not livekit.io
+    marker: livekit.com
+  - slug: localio.io
+    id: lst_35a530e88738613e879e0f01
+    website: https://serp.ly/localio
+    class: unreachable
+    finalUrl: https://localio.io/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: lodown.io
+    id: lst_3699f4ebc79c871760d96f94
+    website: https://serp.ly/lodown
+    class: unreachable
+    finalUrl: https://lodown.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: logicloop.com
+    id: lst_127af197ad2f3d3a264ef70b
+    website: https://serp.ly/logic-loop
+    class: unreachable
+    finalUrl: https://www.logicloop.com/ai-sql-query-generator/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: lovo.ai
+    id: lst_691d6cc2d8bd8b9313213334
+    website: https://serp.ly/lovo
+    class: unreachable
+    finalUrl: https://lovo.ai/
+    status: 402
+    reason: http_402
+  - slug: loyae.com
+    id: lst_ee77468d45e0a25afe9ea8e7
+    website: https://serp.ly/loyae
+    class: unreachable
+    finalUrl: https://www.loyae.com/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: lunabrain.com
+    id: lst_7c5419a2cd06520d8931f1fa
+    website: https://serp.ly/lunabrain
+    class: unreachable
+    finalUrl: https://lunabrain.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: maax.ai
+    id: lst_852c46c7f5100de388722ee2
+    website: https://serp.ly/maax-ai
+    class: unreachable
+    finalUrl: https://www.maax.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: madisonai.org
+    id: lst_41ea06e3925556dee0c4dbde
+    website: https://serp.ly/madison-ai
+    class: unreachable
+    finalUrl: https://madisonai.org/ai-tools/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: magicsalesbot.com
+    id: lst_409efac80cc8a38d4fb4e42e
+    website: https://serp.ly/magic-sales-bot
+    class: off-domain
+    finalUrl: https://www.rpdoyle.com/
+    status: 200
+    reason: ends on rpdoyle.com, not magicsalesbot.com
+    marker: www.rpdoyle.com
+  - slug: mailscribe.com
+    id: lst_37666b13fdd57148a809dcd5
+    website: https://serp.ly/mailmaker-by-mailscribe
+    class: unreachable
+    finalUrl: https://mailscribe.com/page/mailmaker/
+    status: 404
+    reason: http_404
+  - slug: maimovie.com
+    id: lst_2b0efadd844d1c6c5dae69a6
+    website: https://serp.ly/maimovie
+    class: unreachable
+    finalUrl: https://maimovie.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: makemebabies.com
+    id: lst_4e6fa28c0d40f8e9801a1cb8
+    website: https://serp.ly/makemebabies.com
+    class: unreachable
+    finalUrl: https://makemebabies.com/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: maker.ai
+    id: lst_74335d94c606bda7f2f8296b
+    website: https://serp.ly/maker-ai
+    class: unreachable
+    finalUrl: https://maker.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: makerbox.club
+    id: lst_a146de1e0bcadddc753d482c
+    website: https://serp.ly/makerbox
+    class: unreachable
+    finalUrl: https://www.makerbox.club/marketing-mega-prompts
+    status: 404
+    reason: http_404
+  - slug: maketafi.com
+    id: lst_455f49805c60ee0cc8bf35e7
+    website: https://serp.ly/tafi
+    class: off-domain
+    finalUrl: https://www.daz3d.com/ai-training-data
+    status: 200
+    reason: ends on daz3d.com, not maketafi.com
+    marker: www.daz3d.com
+  - slug: makeyourwp.com
+    id: lst_b5273f3c9cb3a203b52450d0
+    website: https://serp.ly/makeyourwp
+    class: unreachable
+    finalUrl: https://makeyourwp.com/
+    status: 500
+    reason: http_500
+  - slug: mangatv.shop
+    id: lst_0667e9795987cbef0f0d6773
+    website: https://serp.ly/manga-tv-5-01
+    class: unreachable
+    finalUrl: https://mangatv.shop/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: manticore.nz
+    id: lst_3d67cc65133bd6a65baa9ce7
+    website: https://serp.ly/legacy-ai
+    class: unreachable
+    finalUrl: https://manticore.nz/legacyai/
+    status: 404
+    reason: http_404
+  - slug: marcusaurelius.ai
+    id: lst_8a0c74d783730a931d20c13f
+    website: https://serp.ly/marcus-aurelius-ai
+    class: unreachable
+    finalUrl: https://marcusaurelius.ai/
+    status: DEPTH_ZERO_SELF_SIGNED_CERT
+    reason: site_unreachable (DEPTH_ZERO_SELF_SIGNED_CERT)
+  - slug: masterpiecestudio.com
+    id: lst_9e59fd25a7911b88d115020c
+    website: https://serp.ly/masterpiece-studio-
+    class: unreachable
+    finalUrl: https://masterpiecestudio.com/
+    status: 404
+    reason: http_404
+  - slug: maths.ai
+    id: lst_077f15553b9a44aea7cd59f9
+    website: https://serp.ly/maths-ai
+    class: unreachable
+    finalUrl: https://maths.ai/
+    status: 503
+    reason: http_503
+  - slug: mayaknows.com
+    id: lst_659da03f04394d32d533205b
+    website: https://serp.ly/meet-maya
+    class: off-domain
+    finalUrl: https://meetmaya.world/
+    status: 404
+    reason: ends on meetmaya.world, not mayaknows.com
+    marker: meetmaya.world
+  - slug: meddipop.com
+    id: lst_13fe96f6ea0474bab9548eed
+    website: https://serp.ly/meddipop
+    class: unreachable
+    finalUrl: https://meddipop.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: medgic.co
+    id: lst_156f313eea4449ef1f0fe6b8
+    website: https://serp.ly/medgic
+    class: unreachable
+    finalUrl: https://www.medgic.co/en
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: medoo.life
+    id: lst_0f4e09a8bbca94f66fc3e136
+    website: https://serp.ly/medoo
+    class: unreachable
+    finalUrl: https://medoo.life/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: meetassembly.com
+    id: lst_862444d77f7e790183d08a37
+    website: https://serp.ly/assembly-marketing
+    class: off-domain
+    finalUrl: https://www.tryordinal.com/
+    status: 200
+    reason: ends on tryordinal.com, not meetassembly.com
+    marker: www.tryordinal.com
+  - slug: meetfebin.com
+    id: lst_db72af4aecf4bd46034166d5
+    website: https://serp.ly/peace-messenger
+    class: unreachable
+    finalUrl: https://meetfebin.com/apps/peac/
+    status: 404
+    reason: http_404
+  - slug: meetz.ai
+    id: lst_a8fd0b466766f98445ad8131
+    website: https://serp.ly/meetz
+    class: unreachable
+    finalUrl: https://www.meetz.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: metabob.com
+    id: lst_56288147f7b462addc60aec7
+    website: https://serp.ly/metabob
+    class: unreachable
+    finalUrl: https://metabob.com/index.html/
+    status: 404
+    reason: http_404
+  - slug: metabrixlab.com
+    id: lst_316fe93c290055ecc7a0835e
+    website: https://serp.ly/voge-by-metabrix
+    class: unreachable
+    finalUrl: https://metabrixlab.com/voge
+    status: 404
+    reason: http_404
+  - slug: mgrworkbench.ai
+    id: lst_e52bef682d1fe105b158f585
+    website: https://serp.ly/mgrworkbench-ai
+    class: unreachable
+    finalUrl: https://www.mgrworkbench.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: mightygpt.com
+    id: lst_f74379e9d00329dbdb62d408
+    website: https://serp.ly/mightygpt
+    class: unreachable
+    finalUrl: https://www.mightygpt.com/
+    status: ECONNREFUSED
+    reason: site_unreachable (ECONNREFUSED)
+  - slug: mindos.com
+    id: lst_89af156dd6879392bf5d3144
+    website: https://serp.ly/mindos
+    class: off-domain
+    finalUrl: https://second.me/
+    status: 200
+    reason: ends on second.me, not mindos.com
+    marker: second.me
+  - slug: mindsdb.com
+    id: lst_1ca95f88c017c2eefe25fea5
+    website: https://serp.ly/mindsdb
+    class: off-domain
+    finalUrl: https://mindshub.ai/
+    status: 200
+    reason: ends on mindshub.ai, not mindsdb.com
+    marker: mindshub.ai
+  - slug: mindsum.org
+    id: lst_975c152109791249d78f5162
+    website: https://serp.ly/mindsum
+    class: off-domain
+    finalUrl: https://forsale.godaddy.com/forsale/www.mindsum.app?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp...
+    status: 403
+    reason: "parked or for sale, but on godaddy.com, not the listing's mindsum.org: owner review"
+    marker: godaddy.com
+  - slug: mirrorthink.ai
+    id: lst_d9b7038019521350945ec598
+    website: https://serp.ly/mirrorthink
+    class: off-domain
+    finalUrl: https://vicena.ai/
+    status: 200
+    reason: ends on vicena.ai, not mirrorthink.ai
+    marker: vicena.ai
+  - slug: moly.ai
+    id: lst_2414db042fdc86610bd0d962
+    website: https://serp.ly/moly
+    class: unreachable
+    finalUrl: https://moly.ai/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: monarchmoney.com
+    id: lst_37a131285dafa5df7b445d1f
+    website: https://serp.ly/monarch-money
+    class: off-domain
+    finalUrl: https://www.monarch.com/ai
+    status: 404
+    reason: ends on monarch.com, not monarchmoney.com
+    marker: www.monarch.com
+  - slug: multilings.com
+    id: lst_304ab0565f4ce4ff8de4efad
+    website: https://serp.ly/multilings
+    class: unreachable
+    finalUrl: https://multilings.com/
+    status: 503
+    reason: http_503
+  - slug: multion.ai
+    id: lst_b18ab4016ca31a0353551b0f
+    website: https://serp.ly/multion
+    class: off-domain
+    finalUrl: https://theagi.company/
+    status: 200
+    reason: ends on theagi.company, not multion.ai
+    marker: theagi.company
+  - slug: muze.one
+    id: lst_8fb482da1a9ab293ca378183
+    website: https://serp.ly/muze-one-5-01
+    class: unreachable
+    finalUrl: https://muze.one/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: myheritage.com
+    id: lst_d3d8797ed03a6ed8d7a24b34
+    website: https://serp.ly/ai-time-machine
+    class: off-domain
+    finalUrl: https://www.myheritage.jp/live-memory
+    status: 200
+    reason: ends on myheritage.jp, not myheritage.com
+    marker: www.myheritage.jp
+  - slug: myvoice.ai
+    id: lst_e54e5577d9f717a39b0bf6ca
+    website: https://serp.ly/my-voice-ai
+    class: unreachable
+    finalUrl: https://www.myvoice.ai/
+    status: 421
+    reason: http_421
+  - slug: mywhiteboard.ai
+    id: lst_2a69d1e1560bdfaf693ed9aa
+    website: https://serp.ly/whiteboard
+    class: off-domain
+    finalUrl: https://whiteboard.college/
+    status: ABORT_ERR
+    reason: ends on whiteboard.college, not mywhiteboard.ai
+    marker: whiteboard.college
+  - slug: namelyai.com
+    id: lst_f4eebe99eb569a99e17a804b
+    website: https://serp.ly/callconnect
+    class: off-domain
+    finalUrl: https://www.callconnect.ai/
+    status: 200
+    reason: ends on callconnect.ai, not namelyai.com
+    marker: www.callconnect.ai
+  - slug: nameverse.org
+    id: lst_ac34a2f708ed9695bad3990f
+    website: https://serp.ly/nameverse-ai
+    class: off-domain
+    finalUrl: https://nameverse.app/
+    status: 200
+    reason: ends on nameverse.app, not nameverse.org
+    marker: nameverse.app
+  - slug: narrative.bi
+    id: lst_10a7e90670ed2036134fd7ec
+    website: https://serp.ly/narrative.bi
+    class: off-domain
+    finalUrl: https://cube.dev/blog/building-the-future-of-agentic-analytics-narrative-bi-team-joins-cube
+    status: 200
+    reason: ends on cube.dev, not narrative.bi
+    marker: cube.dev
+  - slug: nat.dev
+    id: lst_b1633a2d3f4c546d83981b5e
+    website: https://serp.ly/openplayground
+    class: off-domain
+    finalUrl: https://nat.org/
+    status: 200
+    reason: ends on nat.org, not nat.dev
+    marker: nat.org
+  - slug: nautilushomeschool.com
+    id: lst_5dcb90595dbd5cd6f3aa781b
+    website: https://serp.ly/story-multiplier
+    class: unreachable
+    finalUrl: https://www.nautilushomeschool.com/story-multiplier/
+    status: 404
+    reason: http_404
+  - slug: neuralblender.com
+    id: lst_8533141d6b146dc62d1f557f
+    website: https://serp.ly/neuralblender
+    class: unreachable
+    finalUrl: https://neuralblender.com/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: neuronmake.com
+    id: lst_3b448f479539b802d266f08f
+    website: https://serp.ly/neuron-make
+    class: unreachable
+    finalUrl: https://neuronmake.com/
+    status: EBLOCKED
+    reason: site_unreachable (EBLOCKED)
+  - slug: neurospell.com
+    id: lst_2dabcff1fde82b4854984fe2
+    website: https://serp.ly/neurospell
+    class: unreachable
+    finalUrl: http://odyssee.neurospell.com:8006/
+    status: EPORT
+    reason: site_unreachable (EPORT)
+  - slug: neus.ai
+    id: lst_6b377f5ca088805efb90e58c
+    website: https://serp.ly/neus-ai
+    class: unreachable
+    finalUrl: https://neus.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: nexcess.net
+    id: lst_835f086aec9cbf1fa8a37f94
+    website: https://serp.ly/nexcess.net
+    class: off-domain
+    finalUrl: https://www.liquidweb.com/managed-hosting-services/
+    status: 200
+    reason: ends on liquidweb.com, not nexcess.net
+    marker: www.liquidweb.com
+  - slug: nextthreebooks.com
+    id: lst_ed56cb11b0b5963e1a4b1087
+    website: https://serp.ly/nextthreebooks
+    class: unreachable
+    finalUrl: https://www.nextthreebooks.com/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: noodl.net
+    id: lst_90bd6f50524fb7f1b4ac9427
+    website: https://serp.ly/noodl
+    class: unreachable
+    finalUrl: https://www.noodl.net/noodl-ai
+    status: 404
+    reason: http_404
+  - slug: notably.ai
+    id: lst_538b79eeed1c2679d92d7509
+    website: https://serp.ly/notably
+    class: unreachable
+    finalUrl: https://www.notably.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: notion.ai
+    id: lst_4b1393df1ad560e42c9b76e6
+    website: https://serp.ly/notion.ai
+    class: off-domain
+    finalUrl: https://www.notion.com/product/ai
+    status: 200
+    reason: ends on notion.com, not notion.ai
+    marker: www.notion.com
+  - slug: nourishingsoftware.com
+    id: lst_a3a7b0ac3de6e92997424afa
+    website: https://serp.ly/productivity-pet
+    class: unreachable
+    finalUrl: https://nourishingsoftware.com/productivity-pet-app
+    status: 404
+    reason: http_404
+  - slug: nuclia.com
+    id: lst_a567d7a30aaf2f551d6d811f
+    website: https://serp.ly/nuclia
+    class: off-domain
+    finalUrl: https://www.progress.com/agentic-rag
+    status: 200
+    reason: ends on progress.com, not nuclia.com
+    marker: www.progress.com
+  - slug: nutshellapp.com
+    id: lst_7bf94eaad07e1d335820c592
+    website: https://serp.ly/nutshell-summaries
+    class: unreachable
+    finalUrl: https://www.nutshellapp.com/
+    status: ECONNREFUSED
+    reason: site_unreachable (ECONNREFUSED)
+  - slug: obfuscat.com
+    id: lst_945cfc5069e6e23d44f086ce
+    website: https://serp.ly/obfuscat
+    class: unreachable
+    finalUrl: https://obfuscat.com/
+    status: 526
+    reason: http_526
+  - slug: octavia.one
+    id: lst_dfe24122b77fa797428f55b8
+    website: https://serp.ly/octavia-ai
+    class: off-domain
+    finalUrl: https://renatus.ai/
+    status: 200
+    reason: ends on renatus.ai, not octavia.one
+    marker: renatus.ai
+  - slug: olexdsgn.com
+    id: lst_4954a46085b7c351b4927c85
+    website: https://serp.ly/figgpt
+    class: unreachable
+    finalUrl: https://olexdsgn.com/figgpt/
+    status: 404
+    reason: http_404
+  - slug: oneai.com
+    id: lst_960e81807e1a55d93362a1b3
+    website: https://serp.ly/one-ai
+    class: off-domain
+    finalUrl: https://harmony.ai/?ref=oneai
+    status: 200
+    reason: ends on harmony.ai, not oneai.com
+    marker: harmony.ai
+  - slug: onetask.me
+    id: lst_be0db4b7d9c5ff6589f93827
+    website: https://serp.ly/simpler
+    class: off-domain
+    finalUrl: https://simplerlist.com/
+    status: 429
+    reason: ends on simplerlist.com, not onetask.me
+    marker: simplerlist.com
+  - slug: onfido.com
+    id: lst_4d7740fba3e7632b615ca97a
+    website: https://serp.ly/onfido.com
+    class: off-domain
+    finalUrl: https://www.entrust.com/products/identity-verification?edc_redirect=Onfido-Redirect
+    status: 200
+    reason: ends on entrust.com, not onfido.com
+    marker: www.entrust.com
+  - slug: openjourneybot.com
+    id: lst_344258a2d11f80d864ecd3f3
+    website: https://serp.ly/openjourney-bot
+    class: off-domain
+    finalUrl: https://openjourney.net/
+    status: ENOTFOUND
+    reason: ends on openjourney.net, not openjourneybot.com
+    marker: openjourney.net
+  - slug: opinio.ai
+    id: lst_274a11fa0b9355614da0ca3c
+    website: https://serp.ly/opinioai
+    class: unreachable
+    finalUrl: https://opinio.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: opinionate.io
+    id: lst_78198934430b9fb1eac7b110
+    website: https://serp.ly/opinionate
+    class: unreachable
+    finalUrl: https://opinionate.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: opnbx.ai
+    id: lst_df80ae7b17ba9316e346f388
+    website: https://serp.ly/opnbx-ai
+    class: off-domain
+    finalUrl: https://www.customerbase.ai/
+    status: ENOTFOUND
+    reason: ends on customerbase.ai, not opnbx.ai
+    marker: www.customerbase.ai
+  - slug: orbplugins.com
+    id: lst_18c9b51064732f2050f1765a
+    website: https://serp.ly/orb-producer
+    class: off-domain
+    finalUrl: https://www.landr.com/plugins/landr-composer
+    status: 200
+    reason: ends on landr.com, not orbplugins.com
+    marker: www.landr.com
+  - slug: orderhive.com
+    id: lst_66ac6d5550027a4a919958c4
+    website: https://serp.ly/orderhive.com
+    class: off-domain
+    finalUrl: https://www.cin7.com/
+    status: 200
+    reason: ends on cin7.com, not orderhive.com
+    marker: www.cin7.com
+  - slug: ouriginal.com
+    id: lst_00184c55b9d319adf8d4608d
+    website: https://serp.ly/ouriginal.com
+    class: off-domain
+    finalUrl: https://www.turnitin.com/products/ouriginal/
+    status: 200
+    reason: ends on turnitin.com, not ouriginal.com
+    marker: www.turnitin.com
+  - slug: outboundly.app
+    id: lst_e3d0d89cb7a9fef11e63eaee
+    website: https://serp.ly/outboundly
+    class: unreachable
+    finalUrl: https://outboundly.app/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: outplayhq.com
+    id: lst_38c872446d6bb798daa3037a
+    website: https://serp.ly/outplayhq
+    class: off-domain
+    finalUrl: https://outplay.ai/
+    status: 200
+    reason: ends on outplay.ai, not outplayhq.com
+    marker: outplay.ai
+  - slug: paintbytext.chat
+    id: lst_fbfd68be2c1aa97141fb6ba9
+    website: https://paintbytext.chat
+    class: unreachable
+    finalUrl: https://paintbytext.chat/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: pandachat.ai
+    id: lst_94ad538b65c71a44430113d6
+    website: https://serp.ly/pandachat
+    class: off-domain
+    finalUrl: https://forsale.godaddy.com/forsale/dataspot.ai?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_tdf...
+    status: 403
+    reason: "parked or for sale, but on godaddy.com, not the listing's pandachat.ai: owner review"
+    marker: godaddy.com
+  - slug: pandarocket.ai
+    id: lst_f9b04093641d4291b911e6ae
+    website: https://serp.ly/pandarocket
+    class: unreachable
+    finalUrl: https://www.pandarocket.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: papercup.com
+    id: lst_d26a3763621d5c0e4dc30394
+    website: https://serp.ly/papercup
+    class: off-domain
+    finalUrl: https://www.rws.com/localization/services/translation-services/video-and-audio-translation/ai-dubbing-and-vo/?utm_cam...
+    status: 200
+    reason: ends on rws.com, not papercup.com
+    marker: www.rws.com
+  - slug: paperrater.com
+    id: lst_92e80b1221bcb5c770819262
+    website: https://serp.ly/paperrater.com
+    class: off-domain
+    finalUrl: https://www.scribbr.com/
+    status: 200
+    reason: ends on scribbr.com, not paperrater.com
+    marker: www.scribbr.com
+  - slug: parrot.ai
+    id: lst_abcb2561bdd315d6cbb379cf
+    website: https://serp.ly/parrot-ai
+    class: unreachable
+    finalUrl: https://parrot.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: pawmenow.com
+    id: lst_a645e25da37f96825b96fef2
+    website: https://serp.ly/pawmenow
+    class: unreachable
+    finalUrl: https://www.pawmenow.com/ai-dog-travel-planner/
+    status: 404
+    reason: http_404
+  - slug: paxo.ai
+    id: lst_af0304a8344dc594b86cecc5
+    website: https://serp.ly/paxo
+    class: unreachable
+    finalUrl: https://www.paxo.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: peech-ai.com
+    id: lst_3f8cb71465044b0d86902e42
+    website: https://serp.ly/peech
+    class: unreachable
+    finalUrl: https://www.peech-ai.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: people.ai
+    id: lst_1dcc8a529a25f1859987f603
+    website: https://serp.ly/people-ai
+    class: off-domain
+    finalUrl: https://www.backstory.ai/
+    status: 200
+    reason: ends on backstory.ai, not people.ai
+    marker: www.backstory.ai
+  - slug: peppercontent.io
+    id: lst_aa017d8d4d0eb6fbf392edf1
+    website: https://serp.ly/peppertype-ai
+    class: off-domain
+    finalUrl: https://www.pepper.inc/
+    status: 200
+    reason: ends on pepper.inc, not peppercontent.io
+    marker: www.pepper.inc
+  - slug: perceptif.ai
+    id: lst_c1c87b01f93312a8de26ecb9
+    website: https://serp.ly/perceptif
+    class: unreachable
+    finalUrl: https://www.perceptif.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: permar.ai
+    id: lst_2e6e104c59354330cb61ad1c
+    website: https://serp.ly/permar-ai
+    class: off-domain
+    finalUrl: https://permar.xyz/
+    status: 200
+    reason: ends on permar.xyz, not permar.ai
+    marker: permar.xyz
+  - slug: pezzo.ai
+    id: lst_b1d4a1ee80fda782ef0e3781
+    website: https://serp.ly/pezzo-ai
+    class: unreachable
+    finalUrl: https://www.pezzo.ai/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: phenaki.video
+    id: lst_14ffff39dcd2c38369ed6ca9
+    website: https://serp.ly/phenaki
+    class: unreachable
+    finalUrl: https://phenaki.video/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: philipp-stelzel.com
+    id: lst_0ffc25173c816fec5d2028cf
+    website: https://serp.ly/midjourney-prompt-generator
+    class: unreachable
+    finalUrl: https://philipp-stelzel.com/en/midjourney-prompts-generator/
+    status: 404
+    reason: http_404
+  - slug: phind.com
+    id: lst_f85fb1cfc33e09bc79317046
+    website: https://serp.ly/phind
+    class: unreachable
+    finalUrl: https://phind.com/
+    status: 404
+    reason: http_404
+  - slug: phosus.com
+    id: lst_ec93fef07beac7f3af4941a4
+    website: https://serp.ly/phosus
+    class: unreachable
+    finalUrl: https://phosus.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: photoleapapp.com
+    id: lst_b480a68344b9a8eece879f3f
+    website: https://serp.ly/text-to-image-by-photoleap
+    class: unreachable
+    finalUrl: https://www.photoleapapp.com/
+    status: HPE_HEADER_OVERFLOW
+    reason: site_unreachable (HPE_HEADER_OVERFLOW)
+  - slug: photor.io
+    id: lst_01adc58b00d93212219058e1
+    website: https://serp.ly/photor-ai
+    class: unreachable
+    finalUrl: https://photor.io/photoscore
+    status: 404
+    reason: http_404
+  - slug: phrasee.co
+    id: lst_520c843ef16b99939a10de32
+    website: https://serp.ly/phrasee.co
+    class: off-domain
+    finalUrl: https://www.jacquard.com/
+    status: 200
+    reason: ends on jacquard.com, not phrasee.co
+    marker: www.jacquard.com
+  - slug: pi.exchange
+    id: lst_faea3cc9b312c8c275db57a7
+    website: https://pi.exchange
+    class: off-domain
+    finalUrl: https://www.mentana.ai/
+    status: 200
+    reason: ends on mentana.ai, not pi.exchange
+    marker: www.mentana.ai
+  - slug: picaii.com
+    id: lst_e4ab51b7971d4853fdcd9c81
+    website: https://serp.ly/picaii
+    class: unreachable
+    finalUrl: https://picaii.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: picsenhancer.com
+    id: lst_7569ec4d1abd3bec7a0cacb5
+    website: https://serp.ly/pics-enhancer
+    class: unreachable
+    finalUrl: https://picsenhancer.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: pictodream.com
+    id: lst_53177942e4a0fe40432862c5
+    website: https://serp.ly/pictodream
+    class: unreachable
+    finalUrl: https://pictodream.com/
+    status: ECONNRESET
+    reason: site_unreachable (ECONNRESET)
+  - slug: pioneer.app
+    id: lst_c3583ef0977cca5ec978ee75
+    website: https://serp.ly/gpt-3-demo-day-by-pioneer
+    class: unreachable
+    finalUrl: https://pioneer.app/gpt3
+    status: 404
+    reason: http_404
+  - slug: pipl.ai
+    id: lst_e30c6b57d0ea23721a2c8a63
+    website: https://serp.ly/pipl-ai
+    class: off-domain
+    finalUrl: https://plusvibe.ai/
+    status: 200
+    reason: ends on plusvibe.ai, not pipl.ai
+    marker: plusvibe.ai
+  - slug: pixelpet.io
+    id: lst_7a18def41fb4c64840652dc7
+    website: https://serp.ly/pixelpet
+    class: off-domain
+    finalUrl: https://brain.pet/
+    status: ECONNREFUSED
+    reason: ends on brain.pet, not pixelpet.io
+    marker: brain.pet
+  - slug: plagscan.com
+    id: lst_915bcfff602f33950aa0ebdb
+    website: https://serp.ly/plagscan.com
+    class: unreachable
+    finalUrl: https://plagscan.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: plagtracker.com
+    id: lst_cc6e20ad26c323e501745a77
+    website: https://serp.ly/plagtracker.com
+    class: unreachable
+    finalUrl: https://plagtracker.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: play.ht
+    id: lst_0453d1e00c6b00c9d562ff18
+    website: https://serp.ly/play-ht
+    class: unreachable
+    finalUrl: https://www.play.ht/?via=devin
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: playground.com
+    id: lst_289aaef3bcbd1fe786571947
+    website: https://serp.ly/playground-ai
+    class: off-domain
+    finalUrl: https://playgroundai.com/
+    status: 200
+    reason: ends on playgroundai.com, not playground.com
+    marker: playgroundai.com
+  - slug: playtext.app
+    id: lst_7002bcbc9a912bb93eed1755
+    website: https://serp.ly/playtext
+    class: off-domain
+    finalUrl: https://www.playtext.com/
+    status: 200
+    reason: ends on playtext.com, not playtext.app
+    marker: www.playtext.com
+  - slug: plumy.app
+    id: lst_a90c59c8f06369ed4a61cb92
+    website: https://serp.ly/plumy
+    class: unreachable
+    finalUrl: https://plumy.app/
+    status: 503
+    reason: http_503
+  - slug: plusdocs.com
+    id: lst_d2b096011b7cf4a03641f07a
+    website: https://serp.ly/plusdocs
+    class: off-domain
+    finalUrl: https://plusai.com/use-cases/market-research-report/
+    status: 200
+    reason: ends on plusai.com, not plusdocs.com
+    marker: plusai.com
+  - slug: pluto.fi
+    id: lst_26ce79d3d706ef45daf273f2
+    website: https://serp.ly/pluto
+    class: unreachable
+    finalUrl: https://www.pluto.fi/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: podcast.ai
+    id: lst_c92adb8aea803052609ddf3f
+    website: https://serp.ly/podcast
+    class: unreachable
+    finalUrl: https://podcast.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: podcastle.ai
+    id: lst_ab4d1ad0830429e80449a8e6
+    website: https://serp.ly/podcastle
+    class: off-domain
+    finalUrl: https://async.com/
+    status: 200
+    reason: ends on async.com, not podcastle.ai
+    marker: async.com
+  - slug: podcastworld.io
+    id: lst_49b36ab05426dce4b3af20df
+    website: https://serp.ly/podcast-disclosed
+    class: off-domain
+    finalUrl: https://podcastdisclosed.com/
+    status: UNABLE_TO_GET_ISSUER_CERT_LOCALLY
+    reason: ends on podcastdisclosed.com, not podcastworld.io
+    marker: podcastdisclosed.com
+  - slug: poemgenerator.com
+    id: lst_481ffd5ef63c571e6ac96ddc
+    website: https://serp.ly/poetry-tips-5-01
+    class: off-domain
+    finalUrl: https://www.poetry.tips/
+    status: ENOTFOUND
+    reason: ends on poetry.tips, not poemgenerator.com
+    marker: www.poetry.tips
+  - slug: pollwatcher.ai
+    id: lst_40d6d831ea85ad2235fdb28c
+    website: https://serp.ly/revisor
+    class: unreachable
+    finalUrl: https://pollwatcher.ai/
+    status: ECONNRESET
+    reason: site_unreachable (ECONNRESET)
+  - slug: poppylist.com
+    id: lst_9a9ed13e1494eed92ab55095
+    website: https://serp.ly/ask-poppy
+    class: unreachable
+    finalUrl: https://www.poppylist.com/askpoppy
+    status: 404
+    reason: http_404
+  - slug: postaga.com
+    id: lst_efa8281a586b66e06d2e569c
+    website: https://serp.ly/postaga
+    class: unreachable
+    finalUrl: https://postaga.com/
+    status: 404
+    reason: http_404
+  - slug: posterstudio.ai
+    id: lst_013d6d610d70fa50ea8c2ac9
+    website: https://posterstudio.ai
+    class: unreachable
+    finalUrl: https://posterstudio.ai/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: pragma.ai
+    id: lst_c34236f407c5b2f8b6a61aa4
+    website: https://serp.ly/pragma
+    class: off-domain
+    finalUrl: https://www.pragmaworld.net/
+    status: 200
+    reason: ends on pragmaworld.net, not pragma.ai
+    marker: www.pragmaworld.net
+  - slug: predibase.com
+    id: lst_0bc5ef415475fa89251810ad
+    website: https://serp.ly/predibase
+    class: off-domain
+    finalUrl: https://www.rubrik.com/products/rubrik-agent-cloud
+    status: 403
+    reason: ends on rubrik.com, not predibase.com
+    marker: www.rubrik.com
+  - slug: predictiveindex.com
+    id: lst_bb2da81f890780789e1c1e31
+    website: https://serp.ly/agendaai-by-charma
+    class: off-domain
+    finalUrl: https://www.charma.com/agenda-ai/
+    status: 451
+    reason: ends on charma.com, not predictiveindex.com
+    marker: www.charma.com
+  - slug: printnanny.ai
+    id: lst_0b96948a4efc1d9ecf2b9eef
+    website: https://serp.ly/printnanny
+    class: unreachable
+    finalUrl: https://printnanny.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: profilepro.ai
+    id: lst_dc9c30f5f546f6c5592ede8c
+    website: https://profilepro.ai
+    class: unreachable
+    finalUrl: https://profilepro.ai/
+    status: 503
+    reason: http_503
+  - slug: profitwell.com
+    id: lst_6fe81a5e8814178ec7e1e174
+    website: https://serp.ly/profitwell.com
+    class: off-domain
+    finalUrl: https://www.paddle.com/
+    status: 200
+    reason: ends on paddle.com, not profitwell.com
+    marker: www.paddle.com
+  - slug: projectelectricsheep.com
+    id: lst_0014567943df417a5def4e5d
+    website: https://projectelectricsheep.com
+    class: unreachable
+    finalUrl: https://projectelectricsheep.com/
+    status: 404
+    reason: http_404
+  - slug: promoterkit.com
+    id: lst_2c14b7831de4e9ca682b7737
+    website: https://serp.ly/freeaikit
+    class: off-domain
+    finalUrl: https://freeaikit.com/
+    status: UNABLE_TO_GET_ISSUER_CERT_LOCALLY
+    reason: ends on freeaikit.com, not promoterkit.com
+    marker: freeaikit.com
+  - slug: promptvibes.com
+    id: lst_803b1a0f1bae12d07b616288
+    website: https://promptvibes.com
+    class: unreachable
+    finalUrl: https://promptvibes.com/
+    status: 402
+    reason: http_402
+  - slug: protestgpt.com
+    id: lst_285317b9fb52da6be5d52764
+    website: https://serp.ly/protestgpt
+    class: off-domain
+    finalUrl: https://www.outcryai.com/protest
+    status: 200
+    reason: ends on outcryai.com, not protestgpt.com
+    marker: www.outcryai.com
+  - slug: publer.io
+    id: lst_73bf82550ee28af8413dea7d
+    website: https://serp.ly/publer-ai-assist
+    class: unreachable
+    finalUrl: https://publer.com/features/ai-assist
+    status: 302
+    reason: too_many_redirects (38 hops, stopped on publer.com)
+  - slug: purevpn.com
+    id: lst_561c5535a3d968759932fc2c
+    website: https://serp.ly/pureVPN
+    class: off-domain
+    finalUrl: https://www.flexoffers.com/links/?cid=683aa0b9-632f-47d5-a043-2e8a99910bd8
+    status: 200
+    reason: ends on flexoffers.com, not purevpn.com
+    marker: www.flexoffers.com
+  - slug: pwi.co
+    id: lst_250023b5a383ae41cb226ed0
+    website: https://serp.ly/product-ideas-service-by-pwi
+    class: unreachable
+    finalUrl: https://www.pwi.co/ai-generated-new-product-ideas.html
+    status: 404
+    reason: http_404
+  - slug: pyqai.com
+    id: lst_a23a74b78fe32c6b36e69c0b
+    website: https://serp.ly/image-generator-by-pyq
+    class: unreachable
+    finalUrl: https://www.pyqai.com/zoo/models/14
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: pythagora.ai
+    id: lst_8a40440fee782798b87cbc21
+    website: https://serp.ly/pythagora
+    class: off-domain
+    finalUrl: https://pazi.ai/
+    status: 200
+    reason: ends on pazi.ai, not pythagora.ai
+    marker: pazi.ai
+  - slug: qatalog.com
+    id: lst_8e5d9a68164b67fc48cae1b0
+    website: https://serp.ly/qatalog
+    class: off-domain
+    finalUrl: https://clickup.com/qatalog-acquisition
+    status: 200
+    reason: ends on clickup.com, not qatalog.com
+    marker: clickup.com
+  - slug: quadency.com
+    id: lst_c765a8419293540b2e6fcd41
+    website: https://serp.ly/quadency
+    class: off-domain
+    finalUrl: https://quadterminal.com/
+    status: 200
+    reason: ends on quadterminal.com, not quadency.com
+    marker: quadterminal.com
+  - slug: quench.ai
+    id: lst_30b69c0e88f6c71716a8ae6d
+    website: https://serp.ly/quench
+    class: unreachable
+    finalUrl: https://quench.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: quest.ai
+    id: lst_4364ab47cee1f1c570a02617
+    website: https://serp.ly/quest-ai
+    class: unreachable
+    finalUrl: https://www.quest.ai/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: questionbase.com
+    id: lst_b0ceabc32466b8cbad0305a5
+    website: https://serp.ly/question-base
+    class: unreachable
+    finalUrl: https://www.questionbase.com/home
+    status: 404
+    reason: http_404
+  - slug: quillnow.ai
+    id: lst_c15f89f39c1ec790a80cf38e
+    website: https://serp.ly/quillnow
+    class: unreachable
+    finalUrl: https://www.quillnow.ai/
+    status: ECONNRESET
+    reason: site_unreachable (ECONNRESET)
+  - slug: quinv.io
+    id: lst_32e4e05fb000fad62e01233a
+    website: https://serp.ly/quinvio-ai
+    class: unreachable
+    finalUrl: https://www.quinv.io/ai
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: quivr.com
+    id: lst_998af56e4c63c6a7da196b31
+    website: https://serp.ly/quivr
+    class: off-domain
+    finalUrl: https://www.quivr.app/
+    status: EPROTO
+    reason: ends on quivr.app, not quivr.com
+    marker: www.quivr.app
+  - slug: radionewsai.com
+    id: lst_814f992b5ede835f2195d397
+    website: https://serp.ly/radionewsai
+    class: off-domain
+    finalUrl: https://audio.co/
+    status: 200
+    reason: ends on audio.co, not radionewsai.com
+    marker: audio.co
+  - slug: ramanlabs.in
+    id: lst_2b8ec92d2c0a702860579921
+    website: https://serp.ly/hachi
+    class: unreachable
+    finalUrl: https://ramanlabs.in/static/hachi.html/
+    status: 404
+    reason: http_404
+  - slug: rapideditor.org
+    id: lst_4275884092ff11a244ddc555
+    website: https://serp.ly/mapwith-ai
+    class: off-domain
+    finalUrl: https://mapwith.ai/
+    status: CERT_HAS_EXPIRED
+    reason: ends on mapwith.ai, not rapideditor.org
+    marker: mapwith.ai
+  - slug: rapidscale.net
+    id: lst_f38b0ca931f1b49abbd846be
+    website: https://serp.ly/rapidscale.net
+    class: off-domain
+    finalUrl: https://rapidscale.com/
+    status: 200
+    reason: ends on rapidscale.com, not rapidscale.net
+    marker: rapidscale.com
+  - slug: readyplayer.me
+    id: lst_3c87e0fc81e8d20b6c0da417
+    website: https://serp.ly/ready-player-me
+    class: unreachable
+    finalUrl: https://readyplayer.me/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: realtor.com
+    id: lst_8ab78fb305e4f8563823c67f
+    website: https://serp.ly/dreaim-home
+    class: unreachable
+    finalUrl: https://www.realtor.com/ai/
+    status: 410
+    reason: http_410
+  - slug: rebuff.ai
+    id: lst_c45d7f1024a317219b4eaf0d
+    website: https://serp.ly/rebuff
+    class: unreachable
+    finalUrl: https://rebuff.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: recolorai.com
+    id: lst_0cd46714784eb4ee0cc3bb88
+    website: https://serp.ly/recolorai
+    class: unreachable
+    finalUrl: https://recolorai.com/
+    status: 502
+    reason: http_502
+  - slug: reflect.run
+    id: lst_f625a8f02447067c0052b538
+    website: https://serp.ly/reflect-run
+    class: off-domain
+    finalUrl: https://smartbear.com/product/reflect/
+    status: 200
+    reason: ends on smartbear.com, not reflect.run
+    marker: smartbear.com
+  - slug: refraction.dev
+    id: lst_7635951c4c6910bebdc11816
+    website: https://serp.ly/refraction
+    class: unreachable
+    finalUrl: https://refraction.dev/vscode
+    status: 404
+    reason: http_404
+  - slug: regie.ai
+    id: lst_2ee64ddfca2d5162ce08809e
+    website: https://serp.ly/regie
+    class: unreachable
+    finalUrl: https://join.regie.ai/l/DEVINSCHUM77/
+    status: 403
+    reason: http_403
+  - slug: reinforz.ai
+    id: lst_b0745c0d33c16107fac6085d
+    website: https://serp.ly/reinforz
+    class: unreachable
+    finalUrl: https://www.reinforz.ai/
+    status: ECONNRESET
+    reason: site_unreachable (ECONNRESET)
+  - slug: reiwaseda.com
+    id: lst_470bf1570b0ee70698ce7171
+    website: https://serp.ly/jet-cut-ready
+    class: unreachable
+    finalUrl: https://www.reiwaseda.com/en/JetCut-Ready
+    status: 404
+    reason: http_404
+  - slug: replicant.ai
+    id: lst_adc3b807e1a4757c617731cf
+    website: https://serp.ly/replicant.ai
+    class: off-domain
+    finalUrl: https://www.replicant.com/
+    status: 200
+    reason: ends on replicant.com, not replicant.ai
+    marker: www.replicant.com
+  - slug: replicastudios.com
+    id: lst_3a91b52697350d7e952e7c0a
+    website: https://serp.ly/replicastudios
+    class: unreachable
+    finalUrl: https://www.replicastudios.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: reprompt.dev
+    id: lst_1724c43ac224ca7eaf788ee5
+    website: https://serp.ly/reprompt
+    class: unreachable
+    finalUrl: https://reprompt.dev/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: resume-ai.me
+    id: lst_2eb53f3ae9f07260c9449eaa
+    website: https://serp.ly/resume-ai
+    class: unreachable
+    finalUrl: https://resume-ai.me/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: rewritewise.com
+    id: lst_c3c7d5bf1019553574b4fa8a
+    website: https://serp.ly/rewritewise
+    class: unreachable
+    finalUrl: https://rewritewise.com/
+    status: 502
+    reason: http_502
+  - slug: riffusion.com
+    id: lst_d18bb5bd94d45912b957eef4
+    website: https://serp.ly/riffusion
+    class: off-domain
+    finalUrl: https://www.flowmusic.app/
+    status: 200
+    reason: ends on flowmusic.app, not riffusion.com
+    marker: www.flowmusic.app
+  - slug: riverside.fm
+    id: lst_00700d96f8d85e30213dc9ef
+    website: https://serp.ly/ai-transcriptions-by-riverside
+    class: off-domain
+    finalUrl: https://riverside.com/?via=e9fe00
+    status: 200
+    reason: ends on riverside.com, not riverside.fm
+    marker: riverside.com
+  - slug: roamaround.io
+    id: lst_146e9c03725e7d0989d9ecff
+    website: https://serp.ly/roamaround.io
+    class: off-domain
+    finalUrl: https://layla.ai/
+    status: 429
+    reason: ends on layla.ai, not roamaround.io
+    marker: layla.ai
+  - slug: runway.ml
+    id: lst_86235ed58f16a48ccf93e016
+    website: https://serp.ly/runway.ml
+    class: off-domain
+    finalUrl: https://runway.com/
+    status: 200
+    reason: ends on runway.com, not runway.ml
+    marker: runway.com
+  - slug: runwayml.com
+    id: lst_9fdc5c8d2f7d54e4d4c71be7
+    website: https://serp.ly/runwayml
+    class: off-domain
+    finalUrl: https://runway.com/
+    status: 200
+    reason: ends on runway.com, not runwayml.com
+    marker: runway.com
+  - slug: saara.io
+    id: lst_974b005065fae65166ff73a7
+    website: https://serp.ly/ecoreturns
+    class: unreachable
+    finalUrl: https://saara.io/ecoreturns-best-shopify-returns-app
+    status: 404
+    reason: http_404
+  - slug: salee.pro
+    id: lst_eef6d66877148932d1b099c4
+    website: https://serp.ly/salee
+    class: off-domain
+    finalUrl: https://www.uselinxa.com/?source=salee_website
+    status: 200
+    reason: ends on uselinxa.com, not salee.pro
+    marker: www.uselinxa.com
+  - slug: save.day
+    id: lst_758ad5b10cbef4b022de956e
+    website: https://serp.ly/saveday
+    class: unreachable
+    finalUrl: https://www.save.day/
+    status: 404
+    reason: http_404
+  - slug: scaleserp.com
+    id: lst_43c3f8e25133ae6ea80b7e2e
+    website: https://serp.ly/scaleserp.com
+    class: off-domain
+    finalUrl: https://trajectdata.com/serp/scale-serp-api/
+    status: 200
+    reason: ends on trajectdata.com, not scaleserp.com
+    marker: trajectdata.com
+  - slug: scholarturbo.com
+    id: lst_2a73fc2a60565d8cf9b52707
+    website: https://serp.ly/scholarturbo
+    class: unreachable
+    finalUrl: https://scholarturbo.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: scrap.so
+    id: lst_d728f0a993cf9357683f529c
+    website: https://serp.ly/scrap-so
+    class: off-domain
+    finalUrl: https://adkit.so/
+    status: 200
+    reason: ends on adkit.so, not scrap.so
+    marker: adkit.so
+  - slug: scribehow.com
+    id: lst_717610716b6f5d002e715c69
+    website: https://serp.ly/scribe
+    class: off-domain
+    finalUrl: https://scribe.com/
+    status: 200
+    reason: ends on scribe.com, not scribehow.com
+    marker: scribe.com
+  - slug: scrol.ai
+    id: lst_f2691e25b75048d8da33a085
+    website: https://serp.ly/corpora
+    class: off-domain
+    finalUrl: https://www.askcorpora.com/
+    status: 402
+    reason: ends on askcorpora.com, not scrol.ai
+    marker: www.askcorpora.com
+  - slug: seanceai.com
+    id: lst_c16cddec67b6db5ba82941c5
+    website: https://serp.ly/seanceai
+    class: off-domain
+    finalUrl: https://www.ae.studio/seanceai
+    status: 200
+    reason: ends on ae.studio, not seanceai.com
+    marker: www.ae.studio
+  - slug: searchadsoptimization.com
+    id: lst_3e9014a0b983be63b6cf38c6
+    website: https://serp.ly/search-ads-optimization-ai
+    class: off-domain
+    finalUrl: https://appstance.com/
+    status: 200
+    reason: ends on appstance.com, not searchadsoptimization.com
+    marker: appstance.com
+  - slug: seek.ai
+    id: lst_eb3cebc4f3d68193a8f53cbb
+    website: https://serp.ly/seek
+    class: unreachable
+    finalUrl: https://www.seek.ai/
+    status: 301
+    reason: too_many_redirects (38 hops, stopped on seek.ai)
+  - slug: seekwell.io
+    id: lst_5773633b81f037817110be3b
+    website: https://serp.ly/seekwell
+    class: unreachable
+    finalUrl: https://seekwell.io/
+    status: 404
+    reason: http_404
+  - slug: semiform.ai
+    id: lst_74cc218f97e6206419d19a4c
+    website: https://serp.ly/semiform
+    class: unreachable
+    finalUrl: https://www.semiform.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: seo.app
+    id: lst_8423ce602d5591eedcaefb66
+    website: https://serp.ly/seo-app
+    class: unreachable
+    finalUrl: https://seo.app/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: seospark.io
+    id: lst_b6082f4c4c646133828b8475
+    website: https://serp.ly/hypersuggest
+    class: off-domain
+    finalUrl: https://www.hypersuggest.com/
+    status: 200
+    reason: ends on hypersuggest.com, not seospark.io
+    marker: www.hypersuggest.com
+  - slug: sereda.ai
+    id: lst_3d1772799aa8e1dafee79a5c
+    website: https://serp.ly/sreda-ai
+    class: off-domain
+    finalUrl: https://sreda.ai/
+    status: ENOTFOUND
+    reason: ends on sreda.ai, not sereda.ai
+    marker: sreda.ai
+  - slug: shakespearetoolbar.com
+    id: lst_3f963634ced0f0f81e6aa342
+    website: https://serp.ly/shakespeare-ai-toolbar
+    class: unreachable
+    finalUrl: https://www.shakespearetoolbar.com/
+    status: 404
+    reason: http_404
+  - slug: sharefable.com
+    id: lst_5ec82f5f0d13224d7a5f6711
+    website: https://serp.ly/sharefable.com
+    class: off-domain
+    finalUrl: http://172.235.245.66/
+    status: 200
+    reason: ends on 172.235.245.66, not sharefable.com
+    marker: 172.235.245.66
+  - slug: shello-ai.com
+    id: lst_353ad6a655ecb829238bb883
+    website: https://serp.ly/shello-ai
+    class: unreachable
+    finalUrl: https://www.shello-ai.com/homepage
+    status: UNABLE_TO_GET_ISSUER_CERT_LOCALLY
+    reason: site_unreachable (UNABLE_TO_GET_ISSUER_CERT_LOCALLY)
+  - slug: shopia.ai
+    id: lst_983aa8a8559ce6acd716a27d
+    website: https://serp.ly/shopia
+    class: off-domain
+    finalUrl: https://www.axelerate.ai/
+    status: 200
+    reason: ends on axelerate.ai, not shopia.ai
+    marker: www.axelerate.ai
+  - slug: shutterstock.com
+    id: lst_74b46fabf684074f077416e0
+    website: https://serp.ly/shutterstock-image-generator
+    class: unreachable
+    finalUrl: https://www.shutterstock.com/de/generate
+    status: 403
+    reason: http_403
+  - slug: sibylia.io
+    id: lst_3cf167d5f6adfd0823e33f5e
+    website: https://serp.ly/sibylia
+    class: unreachable
+    finalUrl: https://sibylia.io/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: siddharthverma.in
+    id: lst_6e135bc447fca1273d50cdc7
+    website: https://serp.ly/linkedin-posts-generator
+    class: off-domain
+    finalUrl: https://expireddomains.com/domain/sid.black
+    status: 200
+    reason: "parked or for sale, but on expireddomains.com, not the listing's siddharthverma.in: owner review"
+    marker: expireddomains.com
+  - slug: sidekiiick.com
+    id: lst_54c147aa433b82393a824bc1
+    website: https://serp.ly/sidekiiick
+    class: unreachable
+    finalUrl: https://sidekiiick.com/
+    status: UNABLE_TO_GET_ISSUER_CERT_LOCALLY
+    reason: site_unreachable (UNABLE_TO_GET_ISSUER_CERT_LOCALLY)
+  - slug: sider.ai
+    id: lst_dd47806cedb24d42d9daa261
+    website: https://serp.ly/sider-ai
+    class: off-domain
+    finalUrl: https://www.chatgpt-sidebar.com/
+    status: 200
+    reason: ends on chatgpt-sidebar.com, not sider.ai
+    marker: www.chatgpt-sidebar.com
+  - slug: silatus.com
+    id: lst_26221bba8143c0bfbdd8702f
+    website: https://serp.ly/silatus
+    class: unreachable
+    finalUrl: https://silatus.com/
+    status: 404
+    reason: http_404
+  - slug: simulai.co
+    id: lst_23a4e3fc8ba41711c57e48de
+    website: https://serp.ly/simulai
+    class: unreachable
+    finalUrl: https://www.simulai.co/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: skufetch.com
+    id: lst_39868285f71f7bc5842152fc
+    website: https://serp.ly/sku-fetch
+    class: unreachable
+    finalUrl: https://skufetch.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: skyglass.com
+    id: lst_8316854914caf6868f7a07d2
+    website: https://serp.ly/skyglass
+    class: unreachable
+    finalUrl: https://www.skyglass.com/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: slait.school
+    id: lst_5131d33a02588707dcedba93
+    website: https://serp.ly/slait-school
+    class: unreachable
+    finalUrl: https://slait.school/
+    status: ECONNRESET
+    reason: site_unreachable (ECONNRESET)
+  - slug: slashdreamer.com
+    id: lst_9b669e386179257df16f65b3
+    website: https://serp.ly/dreamer
+    class: unreachable
+    finalUrl: https://slashdreamer.com/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: slideas.ai
+    id: lst_3354e993ed89fd3538e734ec
+    website: https://serp.ly/slideas
+    class: unreachable
+    finalUrl: https://www.slideas.ai/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: smartdreams.ai
+    id: lst_d2391bfe138f0232bcfc59e7
+    website: https://serp.ly/smartdreams
+    class: unreachable
+    finalUrl: https://smartdreams.ai/
+    status: ECONNRESET
+    reason: site_unreachable (ECONNRESET)
+  - slug: smartflowai.com
+    id: lst_113360cefffd65a04905ccff
+    website: https://serp.ly/smartflowai
+    class: unreachable
+    finalUrl: https://smartflowai.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: smartproxy.com
+    id: lst_e5bf223af4c3e991eba440e0
+    website: https://serp.ly/smartproxy
+    class: off-domain
+    finalUrl: https://decodo.com/deals/hellodecodo?irclickid=xvy3bRQ1pxyZRuiUSRV-SXLpUkrwL02dZ2hZ1o0&mediapartnerid=1350615&utm_sou...
+    status: 200
+    reason: ends on decodo.com, not smartproxy.com
+    marker: decodo.com
+  - slug: socialbook.io
+    id: lst_f3b27359f8ce50d772188ddf
+    website: https://serp.ly/pandora-avatars
+    class: unreachable
+    finalUrl: https://socialbook.io/ai-avatar
+    status: 404
+    reason: http_404
+  - slug: socialiteai.com
+    id: lst_a6f0e9211a6316b867e1d7fc
+    website: https://serp.ly/socialiteai
+    class: unreachable
+    finalUrl: https://www.socialiteai.com/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: socratic.org
+    id: lst_4c95fae1842aa606b5eda28f
+    website: https://serp.ly/socratic-by-google
+    class: off-domain
+    finalUrl: https://search.google/ways-to-search/lens/
+    status: 200
+    reason: ends on search.google, not socratic.org
+    marker: search.google
+  - slug: socraticworks.com
+    id: lst_972c1b643563be16f60513e7
+    website: https://serp.ly/socratic
+    class: unreachable
+    finalUrl: https://socraticworks.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: solidgrids.com
+    id: lst_e0ace061284db0a453534683
+    website: https://serp.ly/solidgrids
+    class: unreachable
+    finalUrl: https://solidgrids.com/
+    status: 404
+    reason: http_404
+  - slug: sonara.ai
+    id: lst_a7df8d2ac3018f4d2486469b
+    website: https://serp.ly/sonara-ai
+    class: unreachable
+    finalUrl: https://www.sonara.ai/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: soundbite.ai
+    id: lst_66851137f4215ab525897a34
+    website: https://serp.ly/soundbite
+    class: unreachable
+    finalUrl: https://www.soundbite.ai/
+    status: 404
+    reason: http_404
+  - slug: sourceai.dev
+    id: lst_6960092252aa169084f85865
+    website: https://serp.ly/sourceai
+    class: off-domain
+    finalUrl: https://www.akinciborg.com/
+    status: 200
+    reason: ends on akinciborg.com, not sourceai.dev
+    marker: www.akinciborg.com
+  - slug: sparkbase.ai
+    id: lst_cf1a7e887bbd8714f0c51d17
+    website: https://serp.ly/webtastic
+    class: unreachable
+    finalUrl: https://sparkbase.ai/
+    status: 404
+    reason: http_404
+  - slug: speechllect.com
+    id: lst_8caea8063fae12d846addd72
+    website: https://serp.ly/speechllect
+    class: unreachable
+    finalUrl: https://speechllect.com/
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: spellbook.legal
+    id: lst_9f8c0cf86792cdc9b3d70f21
+    website: https://serp.ly/spellbook
+    class: off-domain
+    finalUrl: https://spellbook.com/
+    status: 200
+    reason: ends on spellbook.com, not spellbook.legal
+    marker: spellbook.com
+  - slug: spoke.app
+    id: lst_ccc2d470b78a5af8e929df2a
+    website: https://serp.ly/spoke-app
+    class: off-domain
+    finalUrl: https://www.meetingbaas.com/en
+    status: 200
+    reason: ends on meetingbaas.com, not spoke.app
+    marker: www.meetingbaas.com
+  - slug: sportsprediction.ai
+    id: lst_e370d3a896d1ed8ac6f25258
+    website: https://serp.ly/ai-sports-prediction
+    class: off-domain
+    finalUrl: https://copascore.ai/
+    status: 200
+    reason: ends on copascore.ai, not sportsprediction.ai
+    marker: copascore.ai
+  - slug: spreadsheet.com
+    id: lst_2980339a19852f3bf6ff8754
+    website: https://serp.ly/openai-in-spreadsheet
+    class: unreachable
+    finalUrl: https://www.spreadsheet.com/integrations/openai
+    status: ABORT_ERR
+    reason: fetch_timeout (ABORT_ERR)
+  - slug: stack-ai.com
+    id: lst_6f12137a460c02055f08dd9a
+    website: https://serp.ly/stack-ai
+    class: off-domain
+    finalUrl: https://www.stackai.com/
+    status: 200
+    reason: ends on stackai.com, not stack-ai.com
+    marker: www.stackai.com
+  - slug: staircase.ai
+    id: lst_7486a6b911f3220df5750666
+    website: https://serp.ly/staircase-ai
+    class: off-domain
+    finalUrl: https://www.gainsight.com/staircase-ai/?gsfrom=staircase
+    status: 403
+    reason: ends on gainsight.com, not staircase.ai
+    marker: www.gainsight.com
+  - slug: staypia.com
+    id: lst_03eaadfc4ae45549332ba611
+    website: https://serp.ly/staypia
+    class: unreachable
+    finalUrl: https://www.staypia.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: stellaris-ai.com
+    id: lst_d6a1a608675d099c6f80003f
+    website: https://serp.ly/stellaris
+    class: unreachable
+    finalUrl: https://www.stellaris-ai.com/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: story-world.app
+    id: lst_bf6675af56f69b859f3b2250
+    website: https://serp.ly/storyworld
+    class: off-domain
+    finalUrl: https://www.storyzone.app/
+    status: 200
+    reason: ends on storyzone.app, not story-world.app
+    marker: www.storyzone.app
+  - slug: storypear.com
+    id: lst_12b213bd138e9d1441f80a3f
+    website: https://serp.ly/storypear
+    class: unreachable
+    finalUrl: https://storypear.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: storytell.ai
+    id: lst_8e97b32a40019c6a99ff523d
+    website: https://serp.ly/storytell-ai
+    class: off-domain
+    finalUrl: https://chief.bot/
+    status: 429
+    reason: ends on chief.bot, not storytell.ai
+    marker: chief.bot
+  - slug: structuredlabs.com
+    id: lst_8aa16985176b9ad06e77fdaf
+    website: https://serp.ly/structured-labs
+    class: off-domain
+    finalUrl: https://www.structuredlabs.io/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: ends on structuredlabs.io, not structuredlabs.com
+    marker: www.structuredlabs.io
+  - slug: subtxt.app
+    id: lst_de2b811d3332d8f804ce7678
+    website: https://serp.ly/subtxt
+    class: off-domain
+    finalUrl: https://dramatica.com/
+    status: 200
+    reason: ends on dramatica.com, not subtxt.app
+    marker: dramatica.com
+  - slug: summarize.tech
+    id: lst_c78e7064e088ec199e997ec7
+    website: https://serp.ly/summarize-tech
+    class: unreachable
+    finalUrl: https://www.summarize.tech/
+    status: 503
+    reason: http_503
+  - slug: superdashhq.com
+    id: lst_5863501fd3fe96eef50091a9
+    website: https://serp.ly/superdash
+    class: off-domain
+    finalUrl: https://superdash.ai/
+    status: 200
+    reason: ends on superdash.ai, not superdashhq.com
+    marker: superdash.ai
+  - slug: supertone.ai
+    id: lst_b3f118d27e8f58e6f8ee2dd6
+    website: https://serp.ly/supertone
+    class: off-domain
+    finalUrl: https://antinodeaudio.com/
+    status: 200
+    reason: ends on antinodeaudio.com, not supertone.ai
+    marker: antinodeaudio.com
+  - slug: supertranslate.ai
+    id: lst_c1395a38ea9a9945770203db
+    website: https://serp.ly/supertranslate
+    class: unreachable
+    finalUrl: https://www.supertranslate.ai/
+    status: 402
+    reason: http_402
+  - slug: supportagent.ai
+    id: lst_5da218a318b8915945de9776
+    website: https://serp.ly/supportagent
+    class: off-domain
+    finalUrl: https://www.helpscout.com/
+    status: 200
+    reason: ends on helpscout.com, not supportagent.ai
+    marker: www.helpscout.com
+  - slug: sweephy.com
+    id: lst_79f243a39d59441d48ba65c2
+    website: https://serp.ly/sweephy
+    class: unreachable
+    finalUrl: https://www.sweephy.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: symanto.ai
+    id: lst_e3dde629a461abe3a1710f61
+    website: https://serp.ly/symanto-text-insights
+    class: off-domain
+    finalUrl: https://www.symanto.com/get-in-touch/
+    status: 200
+    reason: ends on symanto.com, not symanto.ai
+    marker: www.symanto.com
+  - slug: symbl.ai
+    id: lst_c0f13998300d957e2a683ea0
+    website: https://serp.ly/symbl-ai
+    class: unreachable
+    finalUrl: https://symbl.ai/
+    status: 500
+    reason: http_500
+  - slug: synthesys.io
+    id: lst_517748d31fbac0ea920e462e
+    website: https://serp.ly/synthesys-x
+    class: off-domain
+    finalUrl: https://www.phedra.ai/
+    status: 200
+    reason: ends on phedra.ai, not synthesys.io
+    marker: www.phedra.ai
+  - slug: tabnine.com
+    id: lst_e8376879cd8fc6a89b0ccc05
+    website: https://serp.ly/tabnine
+    class: off-domain
+    finalUrl: https://www.tricentis.com/products?utm_source=www.tabnine.com&utm_medium=referral&utm_campaign=redirect
+    status: HPE_HEADER_OVERFLOW
+    reason: ends on tricentis.com, not tabnine.com
+    marker: www.tricentis.com
+  - slug: tailwindui.com
+    id: lst_4e672d9525092d46d9f1d0a6
+    website: https://serp.ly/tailwindui.com
+    class: off-domain
+    finalUrl: https://tailwindcss.com/plus/login
+    status: 200
+    reason: ends on tailwindcss.com, not tailwindui.com
+    marker: tailwindcss.com
+  - slug: takomo.ai
+    id: lst_e46c716e49f17b17301f2fab
+    website: https://serp.ly/takomo
+    class: off-domain
+    finalUrl: https://verda.com/
+    status: 200
+    reason: ends on verda.com, not takomo.ai
+    marker: verda.com
+  - slug: talknotes.io
+    id: lst_180d684cd81d79d56ed5d99a
+    website: https://serp.ly/galeby
+    class: off-domain
+    finalUrl: https://adkit.so/
+    status: 200
+    reason: ends on adkit.so, not talknotes.io
+    marker: adkit.so
+  - slug: tangoagreements.com
+    id: lst_66e8ac9a383c828a7e70feab
+    website: https://serp.ly/tango
+    class: unreachable
+    finalUrl: https://www.tangoagreements.com/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: tappy.ai
+    id: lst_c428844a08efea064ef3c821
+    website: https://serp.ly/tappy
+    class: unreachable
+    finalUrl: https://www.tappy.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: teamsmart.ai
+    id: lst_05cdf4bbb0b3ea81fc76b86a
+    website: https://serp.ly/teamsmart-ai
+    class: off-domain
+    finalUrl: https://askai.free/team-ai
+    status: 200
+    reason: ends on askai.free, not teamsmart.ai
+    marker: askai.free
+  - slug: tellatv-downloader
+    id: lst_2eb70f2c088c9106dd5452bc
+    website: https://serp.ly/tellatv-downloader
+    class: unreachable
+    finalUrl: https://apps.serp.co/tellatv-downloader
+    status: 451
+    reason: http_451
+  - slug: thegigabrain.com
+    id: lst_fedefdc09e0c332841fd285a
+    website: https://serp.ly/giga-brain
+    class: unreachable
+    finalUrl: https://thegigabrain.com/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: therocketbrew.com
+    id: lst_3585160212177e3fdb3238b5
+    website: https://serp.ly/jeeves
+    class: unreachable
+    finalUrl: https://www.therocketbrew.com/jeeves
+    status: 404
+    reason: http_404
+  - slug: thesamur.ai
+    id: lst_ef1151105bb699c90ae59cb5
+    website: https://serp.ly/samurai
+    class: unreachable
+    finalUrl: https://www.thesamur.ai/login
+    status: 404
+    reason: http_404
+  - slug: threadcreator.com
+    id: lst_03ae4ffcf682be0adef32016
+    website: https://serp.ly/twitterbio
+    class: off-domain
+    finalUrl: https://pallyy.com/?threadcreator=true
+    status: 200
+    reason: ends on pallyy.com, not threadcreator.com
+    marker: pallyy.com
+  - slug: tiipe.ai
+    id: lst_7be76ee4ec7d5f6dd091e9a2
+    website: https://serp.ly/tiipe
+    class: unreachable
+    finalUrl: https://tiipe.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: timelyapp.com
+    id: lst_07bc2165413fbae535846dcb
+    website: https://serp.ly/timelyapp.com
+    class: off-domain
+    finalUrl: https://www.timely.com/
+    status: 200
+    reason: ends on timely.com, not timelyapp.com
+    marker: www.timely.com
+  - slug: timeos.ai
+    id: lst_ce9486f34a719d8172fdbf08
+    website: https://serp.ly/magical
+    class: off-domain
+    finalUrl: https://www.magical.so/
+    status: 200
+    reason: ends on magical.so, not timeos.ai
+    marker: www.magical.so
+  - slug: timworks.com
+    id: lst_40a10209584d6e57aed0988f
+    website: https://serp.ly/ariana-ai
+    class: unreachable
+    finalUrl: https://www.timworks.com/ariana
+    status: 404
+    reason: http_404
+  - slug: tinymagic.app
+    id: lst_1691b8066a36a2fcc168a8ce
+    website: https://serp.ly/auto-gmail
+    class: unreachable
+    finalUrl: https://www.tinymagic.app/gmail-gpt-support-agent/
+    status: 404
+    reason: http_404
+  - slug: todobot.ai
+    id: lst_9c3a11b6ada2e4775d03d9c8
+    website: https://serp.ly/todobot
+    class: unreachable
+    finalUrl: https://todobot.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: tokee.ai
+    id: lst_d6a81b4c031010027cc0ee9d
+    website: https://serp.ly/thumbly
+    class: off-domain
+    finalUrl: https://thumbly.ai/
+    status: 200
+    reason: ends on thumbly.ai, not tokee.ai
+    marker: thumbly.ai
+  - slug: tome.app
+    id: lst_a04a1c4192a539fcb159c39d
+    website: https://serp.ly/tome.app
+    class: unreachable
+    finalUrl: https://tome.app/
+    status: 404
+    reason: http_404
+  - slug: tonkean.com
+    id: lst_1aa3b87046419347b03a3c57
+    website: https://serp.ly/tonkean-invoicesgpt
+    class: unreachable
+    finalUrl: https://www.tonkean.com/usecases/invoices-gpt
+    status: 404
+    reason: http_404
+  - slug: toolbuilder.ai
+    id: lst_c896efc454d989e6b4789139
+    website: https://serp.ly/toolbuilder
+    class: off-domain
+    finalUrl: https://www.telefono.do/
+    status: 403
+    reason: ends on telefono.do, not toolbuilder.ai
+    marker: www.telefono.do
+  - slug: topaz.ai
+    id: lst_b9856976c3c0384d249226a7
+    website: https://serp.ly/topaz.ai
+    class: off-domain
+    finalUrl: https://www.topazlabs.com/
+    status: 200
+    reason: ends on topazlabs.com, not topaz.ai
+    marker: www.topazlabs.com
+  - slug: topseokit.com
+    id: lst_817dae924e0cfd20bf75c38b
+    website: https://serp.ly/topseokit
+    class: off-domain
+    finalUrl: https://intothumbnail.com/
+    status: 200
+    reason: ends on intothumbnail.com, not topseokit.com
+    marker: intothumbnail.com
+  - slug: towords.io
+    id: lst_6bd308870a06c69246f46ea6
+    website: https://serp.ly/towords
+    class: unreachable
+    finalUrl: https://www.towords.io/
+    status: 525
+    reason: http_525
+  - slug: tractatus.ai
+    id: lst_cf95737bab3c69a6accae12b
+    website: https://serp.ly/tractatus
+    class: unreachable
+    finalUrl: https://www.tractatus.ai/
+    status: 404
+    reason: http_404
+  - slug: transcribeme.app
+    id: lst_2dc27298f9c7e28e4e2e31c1
+    website: https://serp.ly/transcribeme
+    class: off-domain
+    finalUrl: https://transcribego.com/en/
+    status: 200
+    reason: ends on transcribego.com, not transcribeme.app
+    marker: transcribego.com
+  - slug: translateaudio.com
+    id: lst_6d56449fb4caec53edf0b053
+    website: https://serp.ly/translateaudio
+    class: unreachable
+    finalUrl: https://www.translateaudio.com/
+    status: 526
+    reason: http_526
+  - slug: travelgpt.art
+    id: lst_5095f842122776192d850fee
+    website: https://serp.ly/travelgpt
+    class: off-domain
+    finalUrl: https://balloonbar.ae/new/
+    status: 404
+    reason: ends on balloonbar.ae, not travelgpt.art
+    marker: balloonbar.ae
+  - slug: travelplan-ai.com
+    id: lst_0a88d592b99e8562ede91d9d
+    website: https://serp.ly/travelplan
+    class: off-domain
+    finalUrl: https://www.guidego.app/
+    status: 200
+    reason: ends on guidego.app, not travelplan-ai.com
+    marker: www.guidego.app
+  - slug: trendmate.xyz
+    id: lst_a03c54fa16df3954eb5001a8
+    website: https://serp.ly/trendmate
+    class: unreachable
+    finalUrl: https://www.trendmate.xyz/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: tribescaler.com
+    id: lst_94a83fb050540f134708e27f
+    website: https://serp.ly/tribescaler
+    class: unreachable
+    finalUrl: https://tribescaler.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: trustfinta.com
+    id: lst_98d348511e769332b3d28049
+    website: https://serp.ly/finta
+    class: off-domain
+    finalUrl: https://finta.ai/
+    status: 200
+    reason: ends on finta.ai, not trustfinta.com
+    marker: finta.ai
+  - slug: trustpilot.com
+    id: lst_32284dd344fc5f00bd1eb39a
+    website: https://serp.ly/trustpilot.com
+    class: unreachable
+    finalUrl: https://www.trustpilot.com/
+    status: 403
+    reason: http_403
+  - slug: tryastral.com
+    id: lst_e20903258bb816edc882e2d9
+    website: https://serp.ly/astral
+    class: unreachable
+    finalUrl: https://tryastral.com/
+    status: 404
+    reason: http_404
+  - slug: trynara.com
+    id: lst_7531566226542229d982ef53
+    website: https://serp.ly/nara
+    class: unreachable
+    finalUrl: https://www.trynara.com/
+    status: 404
+    reason: http_404
+  - slug: trypika.com
+    id: lst_8c9dd0252c7802d45a0a02c1
+    website: https://serp.ly/pika
+    class: unreachable
+    finalUrl: https://trypika.com/
+    status: ECONNRESET
+    reason: site_unreachable (ECONNRESET)
+  - slug: trypromptly.com
+    id: lst_34aee839994bd339855f11a8
+    website: https://serp.ly/trypromptly
+    class: unreachable
+    finalUrl: https://trypromptly.com/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: trysidekick.io
+    id: lst_6a01336469852cd77967246a
+    website: https://serp.ly/ai-sidekick
+    class: off-domain
+    finalUrl: https://www.attendancebot.com/
+    status: 200
+    reason: ends on attendancebot.com, not trysidekick.io
+    marker: www.attendancebot.com
+  - slug: ttcareforpet.com
+    id: lst_2cfc6e6a4c8bf94318572639
+    website: https://serp.ly/ttcare
+    class: off-domain
+    finalUrl: https://ttcare.ai/
+    status: 200
+    reason: ends on ttcare.ai, not ttcareforpet.com
+    marker: ttcare.ai
+  - slug: tubemagic.com
+    id: lst_ba7217e8db768dd57cecb220
+    website: https://serp.ly/morise-ai
+    class: off-domain
+    finalUrl: https://morise.ai/
+    status: 403
+    reason: ends on morise.ai, not tubemagic.com
+    marker: morise.ai
+  - slug: turbotax.com
+    id: lst_1acc8bdf0855440c862b231e
+    website: https://serp.ly/turbotax.com
+    class: off-domain
+    finalUrl: https://turbotax.intuit.com/
+    status: 200
+    reason: ends on intuit.com, not turbotax.com
+    marker: turbotax.intuit.com
+  - slug: typeset.io
+    id: lst_1d53a69d01674b19de393080
+    website: https://serp.ly/scispace
+    class: off-domain
+    finalUrl: https://scispace.com/
+    status: 202
+    reason: ends on scispace.com, not typeset.io
+    marker: scispace.com
+  - slug: typli.ai
+    id: lst_bac330dcc850e067652c401d
+    website: https://serp.ly/typli
+    class: off-domain
+    finalUrl: https://www.claudiacaldwell.com/oto-var-39a?el=splittest-090824-topbanner-control&aff=devinschumacher
+    status: 200
+    reason: ends on claudiacaldwell.com, not typli.ai
+    marker: www.claudiacaldwell.com
+  - slug: ugcscripts.com
+    id: lst_3861c71bbcd245f3e95c06a1
+    website: https://serp.ly/ugc-scripts
+    class: unreachable
+    finalUrl: https://www.ugcscripts.com/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: unicheck.com
+    id: lst_c1b9c18446b51b486c3e4711
+    website: https://serp.ly/unicheck.com
+    class: off-domain
+    finalUrl: https://www.turnitin.com/products/unicheck/
+    status: 200
+    reason: ends on turnitin.com, not unicheck.com
+    marker: www.turnitin.com
+  - slug: unrealme.io
+    id: lst_68b2b84e8c8cc975d53c98de
+    website: https://serp.ly/unrealme
+    class: unreachable
+    finalUrl: https://unrealme.io/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: unriddle.ai
+    id: lst_3f23c17a0ff9bf886e5638d0
+    website: https://serp.ly/unriddle
+    class: off-domain
+    finalUrl: https://anara.com/?via=devin
+    status: 200
+    reason: ends on anara.com, not unriddle.ai
+    marker: anara.com
+  - slug: unscreen.com
+    id: lst_bd59a31139c6c8e19fe0b25f
+    website: https://serp.ly/unscreen-com
+    class: off-domain
+    finalUrl: https://www.canva.com/features/video-background-remover/
+    status: 200
+    reason: ends on canva.com, not unscreen.com
+    marker: www.canva.com
+  - slug: useadrenaline.com
+    id: lst_6242a4298f056964dece6783
+    website: https://serp.ly/adrenaline
+    class: unreachable
+    finalUrl: https://teams.useadrenaline.com/playground
+    status: 404
+    reason: http_404
+  - slug: usechat.ai
+    id: lst_2ec303261e05237e7cea890b
+    website: https://serp.ly/usechat
+    class: off-domain
+    finalUrl: https://www.88agents.co/
+    status: 200
+    reason: ends on 88agents.co, not usechat.ai
+    marker: www.88agents.co
+  - slug: useclarity.com
+    id: lst_3f08ab7d1460d22c8ead75ae
+    website: https://serp.ly/clarity
+    class: unreachable
+    finalUrl: https://useclarity.com/
+    status: 402
+    reason: http_402
+  - slug: usemeru.com
+    id: lst_654f5db4eea3cc7ac92ef593
+    website: https://usemeru.com
+    class: unreachable
+    finalUrl: https://usemeru.com/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: user.com
+    id: lst_b7471a9d94fe805c7b97db1c
+    website: https://serp.ly/ai-chat
+    class: unreachable
+    finalUrl: https://www.user.com/en/ai-chat
+    status: 404
+    reason: http_404
+  - slug: useskillflow.com
+    id: lst_5df7eb72a68a572062a87a58
+    website: https://serp.ly/skillflow
+    class: unreachable
+    finalUrl: https://www.useskillflow.com/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: usestyle.ai
+    id: lst_f188582b639947fc362be011
+    website: https://serp.ly/style-ai
+    class: off-domain
+    finalUrl: https://conversion.ai/
+    status: 200
+    reason: ends on conversion.ai, not usestyle.ai
+    marker: conversion.ai
+  - slug: usesuperflow.com
+    id: lst_a0e0a2f9600893ed402e20c2
+    website: https://serp.ly/superflow-rewrite
+    class: off-domain
+    finalUrl: https://usesuperflow.ai/rewrite-chatgpt
+    status: 404
+    reason: ends on usesuperflow.ai, not usesuperflow.com
+    marker: usesuperflow.ai
+  - slug: variart.ai
+    id: lst_5c755ae5f9164a9bc44c2af2
+    website: https://serp.ly/variart
+    class: unreachable
+    finalUrl: https://variart.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: veedo.ai
+    id: lst_1dd1c2caf22ec4abaa87e21c
+    website: https://serp.ly/veedoai
+    class: off-domain
+    finalUrl: https://www.alfie-ten.app/
+    status: 200
+    reason: ends on alfie-ten.app, not veedo.ai
+    marker: www.alfie-ten.app
+  - slug: verbiai.com
+    id: lst_1d4a1388ac30ec5159ba62b1
+    website: https://serp.ly/verbiai
+    class: off-domain
+    finalUrl: https://pluginuseful.com/
+    status: 200
+    reason: ends on pluginuseful.com, not verbiai.com
+    marker: pluginuseful.com
+  - slug: versational.ai
+    id: lst_0204078c4430f48f1973cb0f
+    website: https://serp.ly/versational
+    class: unreachable
+    finalUrl: https://www.versational.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: vidds.co
+    id: lst_4e244b3e7d897231917d44d4
+    website: https://serp.ly/video-editor-by-vidds
+    class: unreachable
+    finalUrl: https://vidds.co/tools/online-video-editor/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID)
+  - slug: videoleapapp.com
+    id: lst_f648989e34fb850123fa2687
+    website: https://serp.ly/videoleap
+    class: unreachable
+    finalUrl: https://www.videoleapapp.com/
+    status: HPE_HEADER_OVERFLOW
+    reason: site_unreachable (HPE_HEADER_OVERFLOW)
+  - slug: vidyo.ai
+    id: lst_b59714ead0da10ecad522baf
+    website: https://serp.ly/vidyo
+    class: off-domain
+    finalUrl: https://quso.ai/?via=serp
+    status: 200
+    reason: ends on quso.ai, not vidyo.ai
+    marker: quso.ai
+  - slug: viralviews.co
+    id: lst_df9e80be6fcaf19bdcf8b6e1
+    website: https://serp.ly/viralviews
+    class: unreachable
+    finalUrl: https://www.viralviews.co/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: vivid.lol
+    id: lst_21742cfea1edc78d758ea6a0
+    website: https://serp.ly/vivid
+    class: unreachable
+    finalUrl: https://www.vivid.lol/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: vizcom.ai
+    id: lst_b557b9c39e0c53aac0563d7d
+    website: https://serp.ly/vizcom
+    class: off-domain
+    finalUrl: https://vizcom.com/
+    status: 200
+    reason: ends on vizcom.com, not vizcom.ai
+    marker: vizcom.com
+  - slug: vizly.fyi
+    id: lst_a9a868f81f9ca7185b0a42c4
+    website: https://serp.ly/vizly
+    class: off-domain
+    finalUrl: https://vizly.ai/
+    status: 200
+    reason: ends on vizly.ai, not vizly.fyi
+    marker: vizly.ai
+  - slug: voicera.co
+    id: lst_27998b235e3242ad6b8d8e92
+    website: https://serp.ly/voicera
+    class: unreachable
+    finalUrl: https://www.voicera.co/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: voicetype.io
+    id: lst_73525b9b7adffd68ba28df8e
+    website: https://serp.ly/voicetype
+    class: unreachable
+    finalUrl: https://voicetype.io/
+    status: 526
+    reason: http_526
+  - slug: voxqube.com
+    id: lst_11983b4daf385802e59d6cee
+    website: https://serp.ly/voxqube
+    class: unreachable
+    finalUrl: https://www.voxqube.com/dubbingforyoutube
+    status: 404
+    reason: http_404
+  - slug: vwo.com
+    id: lst_a22205c9716640c6d77da938
+    website: https://serp.ly/vwo
+    class: off-domain
+    finalUrl: https://wingify.com/?pscd=affiliates.vwo.com&ps_partner_key=ZGV2aW5zY2h1bWFjaGVyMTkzNw&ps_xid=4AadZ4QtAgzoea&gsxid=4A...
+    status: 200
+    reason: ends on wingify.com, not vwo.com
+    marker: wingify.com
+  - slug: warmest.ai
+    id: lst_5def671957f327721d4f3256
+    website: https://serp.ly/warmest
+    class: unreachable
+    finalUrl: https://www.warmest.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: wavechat.ai
+    id: lst_490518aeab0ddadd095a74cb
+    website: https://serp.ly/wavechat
+    class: unreachable
+    finalUrl: https://www.wavechat.ai/
+    status: 404
+    reason: http_404
+  - slug: web3summary.com
+    id: lst_8ea2ca6b8649197bf41b40a8
+    website: https://serp.ly/web3-summary
+    class: unreachable
+    finalUrl: https://www.web3summary.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: webcopilot.ai
+    id: lst_a4c336b0b43909134dd9751a
+    website: https://serp.ly/webcopilot
+    class: off-domain
+    finalUrl: https://www.webcopilot.co/
+    status: 200
+    reason: ends on webcopilot.co, not webcopilot.ai
+    marker: www.webcopilot.co
+  - slug: webflow.com
+    id: lst_2a3253fb3d661d8914a2e770
+    website: https://serp.ly/intellimize
+    class: unreachable
+    finalUrl: https://webflow.com/feature/optimize
+    status: HPE_HEADER_OVERFLOW
+    reason: site_unreachable (HPE_HEADER_OVERFLOW)
+  - slug: websitesummaryai.com
+    id: lst_e1d34b529f25aa6f6f36e330
+    website: https://serp.ly/website-summary-ai
+    class: unreachable
+    finalUrl: https://www.websitesummaryai.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: wepik.com
+    id: lst_0a1fc475d2ebe069d05208ab
+    website: https://serp.ly/wepik
+    class: off-domain
+    finalUrl: https://www.magnific.com/ai/image-generator#loaded-from-wepik
+    status: 403
+    reason: ends on magnific.com, not wepik.com
+    marker: www.magnific.com
+  - slug: whimsyapp.com
+    id: lst_591cfd6e2cfa056f99941b8c
+    website: https://serp.ly/whimsyworks
+    class: off-domain
+    finalUrl: https://www.whimsyaudio.com/
+    status: 200
+    reason: ends on whimsyaudio.com, not whimsyapp.com
+    marker: www.whimsyaudio.com
+  - slug: whismer.com
+    id: lst_31fc8260d3de2ad7fde6c8a8
+    website: https://serp.ly/whismer
+    class: unreachable
+    finalUrl: https://whismer.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: windsor.io
+    id: lst_8dfc2f075c5c449ff71f3cf8
+    website: https://serp.ly/windsor
+    class: unreachable
+    finalUrl: https://windsor.io/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: wiseone.io
+    id: lst_8239d45c25698bb1c685baf2
+    website: https://serp.ly/wiseone
+    class: unreachable
+    finalUrl: https://wiseone.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: wishpond.com
+    id: lst_ed85160928f41a840b04aaed
+    website: https://serp.ly/wishpond
+    class: unreachable
+    finalUrl: https://wishpond.com/ai/
+    status: 410
+    reason: http_410
+  - slug: withpoly.com
+    id: lst_361c73d9369d39c27c3c2adc
+    website: https://withpoly.com
+    class: off-domain
+    finalUrl: https://poly.app/
+    status: 200
+    reason: ends on poly.app, not withpoly.com
+    marker: poly.app
+  - slug: wizu.com
+    id: lst_217eaa52954b8a32eaae9ab0
+    website: https://serp.ly/case-study-writer
+    class: off-domain
+    finalUrl: https://casestudywriter.ai/
+    status: ENOTFOUND
+    reason: ends on casestudywriter.ai, not wizu.com
+    marker: casestudywriter.ai
+  - slug: wonderdynamics.com
+    id: lst_f0587b825ff7a0e7979bda3e
+    website: https://serp.ly/wonder-dynamics
+    class: off-domain
+    finalUrl: https://www.autodesk.com/products/flow-studio
+    status: 403
+    reason: ends on autodesk.com, not wonderdynamics.com
+    marker: www.autodesk.com
+  - slug: wonsulting.ai
+    id: lst_8fb86648d698418493ec3a7f
+    website: https://serp.ly/coverletterai-by-wonsulting
+    class: off-domain
+    finalUrl: https://www.wonsulting.com/coverletterai
+    status: 200
+    reason: ends on wonsulting.com, not wonsulting.ai
+    marker: www.wonsulting.com
+  - slug: wordhero.co
+    id: lst_8b2a79dbf4f1d5c7f49dd86f
+    website: https://serp.ly/wordhero
+    class: off-domain
+    finalUrl: https://aivolut.com/wordhero
+    status: 200
+    reason: ends on aivolut.com, not wordhero.co
+    marker: aivolut.com
+  - slug: wordmax.ai
+    id: lst_99077d31ddd7ec11836404e6
+    website: https://serp.ly/wordmax
+    class: unreachable
+    finalUrl: https://wordmax.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: workflos.ai
+    id: lst_c27f8f835f9b56489c2ad2e5
+    website: https://serp.ly/workflos
+    class: unreachable
+    finalUrl: https://workflos.ai/
+    status: 404
+    reason: http_404
+  - slug: workwithpod.com
+    id: lst_de02c374bd6c548662dc4f05
+    website: https://serp.ly/pod
+    class: unreachable
+    finalUrl: https://www.workwithpod.com/ai-copilot
+    status: 404
+    reason: http_404
+  - slug: wraithscribe.com
+    id: lst_b8db35e93561cddc19cf794e
+    website: https://serp.ly/wraithscribe
+    class: unreachable
+    finalUrl: https://www.wraithscribe.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: writegpt.ai
+    id: lst_4223e6f7ae54e5bb5b8da773
+    website: https://serp.ly/writegpt
+    class: unreachable
+    finalUrl: https://writegpt.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: writemyessays.ai
+    id: lst_b9fa8b0d8b223ebfafd0fc62
+    website: https://serp.ly/writemyessays
+    class: unreachable
+    finalUrl: https://writemyessays.ai/
+    status: CERT_HAS_EXPIRED
+    reason: site_unreachable (CERT_HAS_EXPIRED)
+  - slug: writewithlaika.com
+    id: lst_d1ae82761b5249172ad98b3d
+    website: https://serp.ly/writewithlaika
+    class: off-domain
+    finalUrl: https://cleverhumanizer.ai/
+    status: 200
+    reason: ends on cleverhumanizer.ai, not writewithlaika.com
+    marker: cleverhumanizer.ai
+  - slug: writio.com
+    id: lst_e5f1c8bcc2917c532d67fbc1
+    website: https://serp.ly/writio
+    class: unreachable
+    finalUrl: https://writio.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: xata.io
+    id: lst_315ed60646089aacc4011cd3
+    website: https://serp.ly/xata
+    class: unreachable
+    finalUrl: https://xata.io/chatgpt
+    status: 404
+    reason: http_404
+  - slug: xprt.is
+    id: lst_9c561f47fa97d1e6ec8d83e2
+    website: https://serp.ly/xprt
+    class: unreachable
+    finalUrl: https://xprt.is/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: xvgold-downloader
+    id: lst_eff11ad285b8ec45a00c6b47
+    website: https://serp.ly/xvgold-downloader
+    class: unreachable
+    finalUrl: https://apps.serp.co/xvgold-downloader
+    status: 404
+    reason: http_404
+  - slug: yack.fyi
+    id: lst_bf575d032abd5da5db64737c
+    website: https://serp.ly/yack
+    class: unreachable
+    finalUrl: https://www.yack.fyi/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: ycombinator.com
+    id: lst_7ab3ac3b9f6ac281166a386e
+    website: https://serp.ly/usebracket
+    class: off-domain
+    finalUrl: https://usebracket.com/
+    status: EPROTO
+    reason: ends on usebracket.com, not ycombinator.com
+    marker: usebracket.com
+  - slug: yepic.ai
+    id: lst_2d3a569e69a874d8b5dd6c33
+    website: https://serp.ly/yepic-ai
+    class: unreachable
+    finalUrl: https://www.yepic.ai/royalinvite
+    status: 404
+    reason: http_404
+  - slug: yobulk.dev
+    id: lst_bd4610b61e9280e3788a61ca
+    website: https://serp.ly/yobulk
+    class: unreachable
+    finalUrl: https://yobulk.dev/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: yoursidekick.xyz
+    id: lst_26e4f1e4a0c00db3f6a3b5d6
+    website: https://serp.ly/sidekick-ai
+    class: unreachable
+    finalUrl: https://yoursidekick.xyz/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: youtubesummarized.com
+    id: lst_e435db5c9404e33cea8a07de
+    website: https://serp.ly/youtube-summarized
+    class: off-domain
+    finalUrl: https://summyt.app/
+    status: 200
+    reason: ends on summyt.app, not youtubesummarized.com
+    marker: summyt.app
+  - slug: zaplingo.com
+    id: lst_ec10fdd6092272db3d0bbd54
+    website: https://serp.ly/zaplingo
+    class: off-domain
+    finalUrl: https://zaplingo.webflow.io/
+    status: 404
+    reason: ends on zaplingo.webflow.io, not zaplingo.com
+    marker: zaplingo.webflow.io
+  - slug: zeda.io
+    id: lst_ecf00a4d870d8936abaa6894
+    website: https://serp.ly/zeda
+    class: unreachable
+    finalUrl: https://zeda.io/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: zeg.ai
+    id: lst_e03306b36233640f6adeb0a0
+    website: https://serp.ly/zeg-ai
+    class: unreachable
+    finalUrl: https://zeg.ai/
+    status: 526
+    reason: http_526
+  - slug: zenen.ai
+    id: lst_3430b862ec915b0c2756ae7d
+    website: https://serp.ly/zenen-ai
+    class: unreachable
+    finalUrl: https://zenen.ai/
+    status: 526
+    reason: http_526
+  - slug: zerogptdetector.com
+    id: lst_f9f73e086b1bd76e2ced88a1
+    website: https://serp.ly/zerogpt-detector
+    class: unreachable
+    finalUrl: https://www.zerogptdetector.com/coupons/
+    status: 502
+    reason: http_502
+  - slug: zerotax.ai
+    id: lst_3e897e170ec6ffb6f430c78a
+    website: https://serp.ly/zerotax-al
+    class: unreachable
+    finalUrl: https://zerotax.ai/
+    status: 451
+    reason: http_451
+  - slug: zevi.ai
+    id: lst_851e3fa18c1e78bcd8040106
+    website: https://serp.ly/zevi-ai
+    class: unreachable
+    finalUrl: https://www.zevi.ai/
+    status: EPROTO
+    reason: site_unreachable (EPROTO)
+  - slug: ziteai.com
+    id: lst_41eed49abdfa8a4ead78f0ae
+    website: https://serp.ly/zite
+    class: off-domain
+    finalUrl: https://www.zite.ai/
+    status: ERR_TLS_CERT_ALTNAME_INVALID
+    reason: ends on zite.ai, not ziteai.com
+    marker: www.zite.ai
+  - slug: zuora.com
+    id: lst_bb7370710688ea402e9968e0
+    website: https://serp.ly/zuora.com
+    class: unreachable
+    finalUrl: https://www.zuora.com/
+    status: 502
+    reason: http_502

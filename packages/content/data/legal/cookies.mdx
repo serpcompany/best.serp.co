@@ -30,7 +30,9 @@ These cookies are only relevant when optional authentication is enabled:
 
 | Cookie Name | Purpose | Duration | Type |
 | ----------- | ------- | -------- | ---- |
-| `next-auth.*` | Optional GitHub sign-in session state | Session/default auth lifetime | Essential |
+| `better-auth.*` (`__Secure-better-auth.*` over HTTPS) | Sign-in session state after signing in with an emailed code | Up to 7 days, renewed while you stay signed in | Essential |
+| `bsc_code_binding` (`__Secure-bsc_code_binding` over HTTPS) | Ties a sign-in code to the browser that asked for it, so only that browser can enter it | 15 minutes | Essential |
+| `bsc_known_device` (`__Secure-bsc_known_device` over HTTPS) | Remembers that this browser has signed in to your account, so it can always request your next sign-in code | 180 days | Essential |
 
 ### 2.2 Analytics Cookies
 
@@ -87,7 +89,7 @@ You can control cookies through your browser settings:
 
 | Cookie Type | Impact if Disabled |
 | ----------- | ------------------ |
-| Essential (`next-auth.*`, if enabled) | Cannot log in or maintain sessions |
+| Essential (`better-auth.*`, if enabled) | Cannot log in or maintain sessions |
 | Analytics | No impact on functionality on the default starter |
 
 ### 4.4 Impact of Clearing Local Storage
@@ -100,11 +102,11 @@ You can control cookies through your browser settings:
 
 ## 5. Third-Party Services
 
-### 5.1 Optional Authentication (NextAuth + GitHub)
+### 5.1 Optional Authentication (Better Auth, email sign-in code)
 - **Purpose**: User authentication when a site owner enables sign-in
-- **Cookies Set**: Session and security cookies managed by the configured auth flow
-- **Data Processing**: Authentication and account-session data
-- **Privacy Policy**: Site owners should link the active auth provider policy when this is enabled
+- **Cookies Set**: Session cookies set by the site itself after you enter an emailed sign-in code
+- **Data Processing**: Your email address and account-session data, stored by the site
+- **Privacy Policy**: Accounts are handled by the site itself; no third-party sign-in provider is involved
 
 ### 5.2 Optional Analytics
 - **Purpose**: Usage measurement only when a site owner enables analytics

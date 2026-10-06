@@ -8,6 +8,7 @@ import {
   selectSubmissionForDecisionPlan
 } from '@serpdirectory/data-ops/submission-plans'
 import { hasFileExtension } from '@serpdirectory/web-core/canonical-url'
+import { assertD1Compatible } from './d1-compat'
 import { project } from './project'
 import { listingRoute } from './site-routes'
 
@@ -50,6 +51,7 @@ async function query(
   env: NodeJS.ProcessEnv,
   fetcher: typeof fetch
 ): Promise<D1Result[]> {
+  assertD1Compatible(statements.map(statement => ({ query: statement.sql })))
   const response = await fetcher(
     `https://api.cloudflare.com/client/v4/accounts/${required(env, 'CLOUDFLARE_ACCOUNT_ID')}/d1/database/${required(env, 'CLOUDFLARE_D1_DATABASE_ID')}/query`,
     {
@@ -100,7 +102,18 @@ export async function approveRemoteSubmission(
       throw new Error('Only a pending or verified submission can be rejected.')
     }
     const now = new Date().toISOString()
-    await query(buildRejectSubmissionPlans({ now, reviewer, submissionId }), env, fetcher)
+    // The legacy workflow takes no reason; `other` keeps the URL open for resubmission.
+    await query(
+      buildRejectSubmissionPlans({
+        category: 'other',
+        now,
+        reason: 'Rejected through the Review D1 Submission workflow.',
+        reviewer,
+        submissionId
+      }),
+      env,
+      fetcher
+    )
     return { idempotent: false, listingId: null }
   }
   const listingId =
@@ -113,7 +126,8 @@ export async function approveRemoteSubmission(
   if (
     typeof row.version !== 'number' ||
     typeof row.checksum !== 'string' ||
-    typeof row.slug !== 'string'
+    typeof row.slug !== 'string' ||
+    typeof row.content_version !== 'number'
   ) {
     throw new Error('Invalid publication state.')
   }
@@ -132,6 +146,8 @@ export async function approveRemoteSubmission(
       afterChecksum,
       affectedRoute: listingRoute(row.slug),
       beforeChecksum: row.checksum,
+      // The legacy flow has no edit path, so the reviewed preview is the snapshot's version.
+      expectedContentVersion: row.content_version,
       listingId,
       manifestId,
       now,

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { captureApplicationSnapshot } from './d1-application-snapshot'
@@ -14,7 +14,7 @@ import {
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { runCanonicalPreview } from './d1-local-preview'
 import { configuredFreshD1StateRoot } from './d1-local-state'
-import { applicationTableNames } from './d1-table-inventory'
+import { parityTableNames } from './d1-table-inventory'
 import { project } from './project'
 
 function wrangler(args: string[], capture = false): string {
@@ -94,7 +94,14 @@ function importArtifact(): void {
   console.log(`Imported the reviewed initial catalog into local ${project.domain}.`)
 }
 
-function localSqlitePath(directory: string): string {
+/** Miniflare's D1 storage directory; its Cache API, KV, and R2 SQLite files live elsewhere. */
+const D1_OBJECT_DIRECTORY = 'miniflare-D1DatabaseObject'
+
+/**
+ * The one D1 database file below `directory`. Only D1's own storage counts: a Worker preview also
+ * persists Cache API (and other) SQLite files under the same state directory (#81).
+ */
+export function localSqlitePath(directory: string): string {
   const matches: string[] = []
   const visit = (current: string) => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
@@ -103,7 +110,8 @@ function localSqlitePath(directory: string): string {
       else if (
         entry.isFile() &&
         entry.name.endsWith('.sqlite') &&
-        entry.name !== 'metadata.sqlite'
+        entry.name !== 'metadata.sqlite' &&
+        basename(current) === D1_OBJECT_DIRECTORY
       ) {
         matches.push(path)
       }
@@ -132,14 +140,14 @@ async function verify(): Promise<void> {
   } finally {
     actualDatabase.close()
   }
-  const mismatches = applicationTableNames.filter(
+  const mismatches = parityTableNames.filter(
     table =>
       actual.tables[table].count !== expected.tables[table].count ||
       actual.tables[table].checksum !== expected.tables[table].checksum
   )
   if (actual.checksum !== expected.checksum || mismatches.length > 0) {
     throw new Error(
-      `Local D1 exact ${applicationTableNames.length}-table bootstrap parity failed${mismatches.length > 0 ? `: ${mismatches.join(', ')}` : ''}.`
+      `Local D1 exact ${parityTableNames.length}-table bootstrap parity failed${mismatches.length > 0 ? `: ${mismatches.join(', ')}` : ''}.`
     )
   }
   const state = query('SELECT version, checksum FROM publication_state WHERE id=1') as Array<{
@@ -150,7 +158,7 @@ async function verify(): Promise<void> {
     throw new Error('D1 publication checksum does not match the migration report.')
   }
   console.log(
-    `Verified local D1 publication v${state[0]?.version}: exact ${applicationTableNames.length}-table snapshot ${actual.checksum}, checksum ${state[0]?.checksum}`
+    `Verified local D1 publication v${state[0]?.version}: exact ${parityTableNames.length}-table snapshot ${actual.checksum}, checksum ${state[0]?.checksum}`
   )
 }
 

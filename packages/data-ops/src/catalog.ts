@@ -7,7 +7,7 @@ import {
   catalogEpochToken,
   parseCatalogEpoch
 } from './catalog-epoch'
-import { type CompiledQuery, runQuery } from './client'
+import { type CompiledQuery, d1ErrorCode, runQuery } from './client'
 import type {
   CatalogCacheEvent,
   CatalogOperation,
@@ -17,18 +17,25 @@ import type {
   CatalogQueryShape,
   CatalogShellStats,
   ListingDetail,
+  ListingFaq,
+  ListingLinkRel,
   ListingNamePage,
   ListingNamePageQuery,
   ListingNavigation,
-  ListingPage,
   ListingResourceLink,
   ListingSummary,
   PublishedCategory,
-  RelatedListing
+  RelatedListing,
+  UnpublishedListing
 } from './contracts'
 import { listingSlugRedirects, listings } from './schema'
 
-const CACHE_SCHEMA = 'v3'
+/**
+ * v6: listing details carry `faqs` (#105); v5: a hosted logo or image is its media key (#95),
+ * which the web adapter turns into a URL on the environment's media host; v4 added `linkRel`
+ * and `verifiedOwner` (#62).
+ */
+const CACHE_SCHEMA = 'v6'
 /**
  * Keys include the catalog epoch (publication version plus the latest public
  * `published_at`), so an entry can never outlive the content it was built from; the TTL
@@ -39,6 +46,32 @@ const PUBLICATION_ORDER = 'l.published_at DESC, l.display_order ASC, l.slug ASC'
 /** Directory pages show this many listings unless a caller asks for another size. */
 export const LISTING_PAGE_SIZE = 48
 const MAX_LISTING_PAGE_SIZE = 100
+/** Search input past these bounds is ignored, never rejected (#77). */
+export const MAX_SEARCH_QUERY_CHARS = 100
+export const MAX_SEARCH_TERMS = 8
+export const MAX_SEARCH_LIMIT = 100
+
+/**
+ * The search phrase and its distinct terms: ASCII letters lowercased, control characters and
+ * runs of whitespace collapsed to one space, cut to `MAX_SEARCH_QUERY_CHARS` code points and
+ * `MAX_SEARCH_TERMS` terms. Both sides fold the same way: SQLite's `lower()` folds only ASCII,
+ * so matching is case-insensitive for ASCII letters and exact (as typed, no Unicode case
+ * folding or normalization) for every other character (#81 review).
+ */
+export function normalizeSearchQuery(query: string): { phrase: string; terms: string[] } {
+  const collapsed = query
+    .replace(/[A-Z]+/gu, letters => letters.toLowerCase())
+    .replace(/[\p{Cc}\s]+/gu, ' ')
+    .trim()
+  const phrase = Array.from(collapsed).slice(0, MAX_SEARCH_QUERY_CHARS).join('').trim()
+  const terms = [...new Set(phrase.split(' ').filter(Boolean))].slice(0, MAX_SEARCH_TERMS)
+  return { phrase, terms }
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+}
 /**
  * A single-category listing's related candidates are read from its category's members
  * when the category is at most this large; larger (dense) categories walk the name index
@@ -47,6 +80,7 @@ const MAX_LISTING_PAGE_SIZE = 100
  */
 const RELATED_MEMBER_SCAN_LIMIT = 128
 const runtimePriorities = new Set(['high', 'medium', 'low'])
+const runtimeLinkRels = new Set<string>(['follow', 'nofollow', 'sponsored'])
 /** Directory name order is the locale order the pages have always used (`localeCompare`). */
 const nameCollator = new Intl.Collator()
 
@@ -75,9 +109,19 @@ interface DetailRow extends SummaryRow {
   content: string | null
   entity_type: string | null
   images: string
+  link_rel: string
+  faqs: string
   priority: string | null
   resource_links: string
+  verified_owner: number
   video: string | null
+}
+
+interface UnpublishedRow {
+  category: string | null
+  category_name: string | null
+  name: string
+  slug: string
 }
 
 interface NavigationRow {
@@ -166,7 +210,7 @@ const summaryColumns = `
     ) ordered
   ) AS categories,
   (
-    SELECT m.url
+    SELECT COALESCE(m.media_key, m.url)
     FROM listing_media m
     WHERE m.listing_id = l.id AND m.kind = 'logo'
     ORDER BY m.sort_order ASC
@@ -241,17 +285,29 @@ function mapDetail(
       url: requireString(resource.url, `resource ${index + 1} URL`)
     }
   })
+  const faqs: ListingFaq[] = parseJsonArray(row.faqs, 'listing FAQs').map((value, index) => {
+    if (!value || typeof value !== 'object') throw new Error(`Invalid D1 FAQ ${index + 1}.`)
+    const faq = value as Record<string, unknown>
+    return {
+      answer: requireString(faq.answer, `FAQ ${index + 1} answer`),
+      question: requireString(faq.question, `FAQ ${index + 1} question`)
+    }
+  })
   const priority =
     typeof row.priority === 'string' && runtimePriorities.has(row.priority)
       ? (row.priority as 'high' | 'low' | 'medium')
       : undefined
   const logo = summary.media?.logo
   const video = row.video || undefined
+  if (!runtimeLinkRels.has(row.link_rel))
+    throw new Error(`Invalid D1 listing ${row.slug} link rel.`)
 
   return {
     ...summary,
     content: row.content || undefined,
     entityType: row.entity_type || undefined,
+    faqs: faqs.length ? faqs : undefined,
+    linkRel: row.link_rel as ListingLinkRel,
     media:
       logo || video || images.length
         ? {
@@ -261,7 +317,8 @@ function mapDetail(
           }
         : undefined,
     priority,
-    resourceLinks: resources.length ? resources : undefined
+    resourceLinks: resources.length ? resources : undefined,
+    verifiedOwner: row.verified_owner === 1 || undefined
   }
 }
 
@@ -385,10 +442,22 @@ function isListingDetail(value: unknown): value is ListingDetail {
   return (
     isOptionalString(candidate.content) &&
     isOptionalString(candidate.entityType) &&
+    runtimeLinkRels.has(candidate.linkRel) &&
+    (candidate.verifiedOwner === undefined || candidate.verifiedOwner === true) &&
     isDetailMedia(candidate.media) &&
     (candidate.nextWebsite === null || isNavigation(candidate.nextWebsite)) &&
     (candidate.previousWebsite === null || isNavigation(candidate.previousWebsite)) &&
     (candidate.priority === undefined || runtimePriorities.has(candidate.priority)) &&
+    (candidate.faqs === undefined ||
+      (Array.isArray(candidate.faqs) &&
+        candidate.faqs.every(
+          faq =>
+            faq &&
+            typeof faq.question === 'string' &&
+            faq.question.length > 0 &&
+            typeof faq.answer === 'string' &&
+            faq.answer.length > 0
+        ))) &&
     Array.isArray(candidate.relatedWebsites) &&
     candidate.relatedWebsites.every(isRelatedListing) &&
     (candidate.resourceLinks === undefined ||
@@ -510,6 +579,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       if (!eventEmitted) {
         observe({
           d1DurationMs: null,
+          errorCode: d1ErrorCode(error),
           event: 'd1_query',
           operation,
           queryShape,
@@ -603,7 +673,10 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   }
 
   function getCatalogEpoch(): Promise<CatalogEpoch> {
-    epochPromise ||= queryCatalogEpoch()
+    if (!epochPromise) {
+      const reused = config.reuseEpoch?.() ?? null
+      epochPromise = reused ? Promise.resolve(reused) : queryCatalogEpoch()
+    }
     return epochPromise
   }
 
@@ -765,7 +838,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         l.name,
         l.website,
         (
-          SELECT m.url FROM listing_media m
+          SELECT COALESCE(m.media_key, m.url) FROM listing_media m
           WHERE m.listing_id = l.id AND m.kind = 'logo'
           ORDER BY m.sort_order ASC LIMIT 1
         ) AS logo
@@ -801,10 +874,15 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         l.content,
         l.entity_type,
         l.priority,
+        l.link_rel,
+        EXISTS (
+          SELECT 1 FROM listing_owners o
+          WHERE o.listing_id = l.id AND o.role = 'owner' AND o.revoked_at IS NULL
+        ) AS verified_owner,
         COALESCE((
           SELECT json_group_array(ordered.url)
           FROM (
-            SELECT m.url FROM listing_media m
+            SELECT COALESCE(m.media_key, m.url) AS url FROM listing_media m
             WHERE m.listing_id = l.id AND m.kind = 'image'
             ORDER BY m.sort_order ASC
           ) ordered
@@ -821,7 +899,15 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
             WHERE r.listing_id = l.id
             ORDER BY r.sort_order ASC
           ) ordered
-        ), '[]') AS resource_links
+        ), '[]') AS resource_links,
+        COALESCE((
+          SELECT json_group_array(json_object('question', ordered.question, 'answer', ordered.answer))
+          FROM (
+            SELECT f.question, f.answer FROM listing_faqs f
+            WHERE f.listing_id = l.id
+            ORDER BY f.sort_order ASC
+          ) ordered
+        ), '[]') AS faqs
       FROM listings l
       WHERE ${publicEligibilitySql()} AND l.slug = ?
       LIMIT 1`,
@@ -927,7 +1013,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         related.website,
         related.is_unofficial,
         (
-          SELECT m.url FROM listing_media m
+          SELECT COALESCE(m.media_key, m.url) FROM listing_media m
           WHERE m.listing_id = related.id AND m.kind = 'logo'
           ORDER BY m.sort_order ASC LIMIT 1
         ) AS logo
@@ -961,6 +1047,51 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     return detail
   }
 
+  /**
+   * One index seek on the unique slug. Uncached: it only runs after a detail lookup missed,
+   * and an unpublished listing has no public epoch-keyed content to share.
+   */
+  async function getUnpublishedListing(slug: string): Promise<UnpublishedListing | null> {
+    const rows = await queryAll<UnpublishedRow>(
+      'unpublished-listing',
+      'unpublished-listing',
+      parameterizedQuery<UnpublishedRow>(
+        `SELECT
+        l.slug,
+        l.name,
+        (
+          SELECT c.slug
+          FROM listing_categories lc
+          JOIN categories c ON c.id = lc.category_id
+          WHERE lc.listing_id = l.id AND lc.is_primary = 1 AND c.is_active = 1
+          LIMIT 1
+        ) AS category,
+        (
+          SELECT c.name
+          FROM listing_categories lc
+          JOIN categories c ON c.id = lc.category_id
+          WHERE lc.listing_id = l.id AND lc.is_primary = 1 AND c.is_active = 1
+          LIMIT 1
+        ) AS category_name
+      FROM listings l
+      WHERE l.slug = ? AND l.status = 'approved' AND l.is_active = 0
+        AND l.published_at IS NOT NULL
+      LIMIT 1`,
+        [slug]
+      )
+    )
+    const row = rows[0]
+    if (!row) return null
+    return {
+      category: row.category ? requireString(row.category, 'unpublished listing category') : null,
+      categoryName: row.category_name
+        ? requireString(row.category_name, 'unpublished listing category name')
+        : null,
+      name: requireString(row.name, 'unpublished listing name'),
+      slug: requireString(row.slug, 'unpublished listing slug')
+    }
+  }
+
   function getListingBySlug(slug: string): Promise<ListingDetail | null> {
     const existing = detailPromises.get(slug)
     if (existing) return existing
@@ -992,39 +1123,6 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   function getPublishedListings(): Promise<ListingSummary[]> {
     publishedListingsPromise ||= loadPublishedListings()
     return publishedListingsPromise
-  }
-
-  async function getPublishedListingPage(
-    page = 1,
-    pageSize = LISTING_PAGE_SIZE
-  ): Promise<ListingPage> {
-    const safePage = Math.max(1, Math.trunc(page))
-    const safePageSize = Math.min(MAX_LISTING_PAGE_SIZE, Math.max(1, Math.trunc(pageSize)))
-    const asOf = operationTime()
-    const [rows, countRows] = await Promise.all([
-      queryAll<SummaryRow>(
-        'listing-page',
-        'listing-page-items',
-        parameterizedQuery<SummaryRow>(
-          `SELECT ${summaryColumns} FROM listings l WHERE ${publicEligibilitySql()} ORDER BY ${PUBLICATION_ORDER} LIMIT ? OFFSET ?`,
-          [asOf, safePageSize, (safePage - 1) * safePageSize]
-        )
-      ),
-      queryAll<{ total: number }>(
-        'listing-page',
-        'listing-page-count',
-        parameterizedQuery<{ total: number }>(
-          `SELECT COUNT(*) AS total FROM listings l WHERE ${publicEligibilitySql()}`,
-          [asOf]
-        )
-      )
-    ])
-    return {
-      items: rows.map(mapSummary),
-      page: safePage,
-      pageSize: safePageSize,
-      total: requireNonNegativeInteger(countRows[0]?.total, 'listing count')
-    }
   }
 
   /**
@@ -1166,31 +1264,73 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     return items
   }
 
+  /**
+   * Every normalized term must occur in the listing's name, short description, slug (the
+   * product's domain), or the slug or name of one of its active categories (owner decisions on
+   * #77 and #81). Never the long content, and never the website URL: almost every website is a
+   * `serp.ly` affiliate link, so its host would match nearly every short term.
+   * The terms are one JSON binding that each term reads with `json_extract(?1, '$[i]')`, and
+   * matching uses `instr()`, so the statement binds four values whatever the query and has no
+   * LIKE/GLOB pattern for D1's 50-byte limit. A term that matches no category name skips the
+   * per-listing membership lookup (the first EXISTS runs once per statement), which keeps a
+   * typical search near one read per listing. Results are cached per epoch.
+   */
   async function searchListings(query: string, limit = 50): Promise<ListingSummary[]> {
-    const normalized = query.trim().toLocaleLowerCase()
-    if (!normalized) return []
-    const terms = normalized.split(/\s+/u).filter(Boolean)
-    const patterns = terms.map(
-      term => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
-    )
-    const termClause = `(lower(l.name) LIKE ? ESCAPE '\\' OR lower(l.description) LIKE ? ESCAPE '\\' OR lower(l.website) LIKE ? ESCAPE '\\' OR lower(l.slug) LIKE ? ESCAPE '\\' OR lower(COALESCE(l.content, '')) LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id = lc.category_id WHERE lc.listing_id = l.id AND (lower(c.slug) LIKE ? ESCAPE '\\' OR lower(c.name) LIKE ? ESCAPE '\\')))`
-    const escaped = normalized
-      .replaceAll('\\', '\\\\')
-      .replaceAll('%', '\\%')
-      .replaceAll('_', '\\_')
-    return summaries(
+    const { phrase, terms } = normalizeSearchQuery(query)
+    if (terms.length === 0) return []
+    const safeLimit = Math.min(MAX_SEARCH_LIMIT, Math.max(1, Math.trunc(limit) || 1))
+    const { key, publicationVersion } = await epochKey('catalog-search')
+    const cacheKey = `${key}:${safeLimit}:${await sha256Hex(JSON.stringify([phrase, terms]))}`
+    const cached = await readCache(
       'search-summaries',
-      'search-summaries',
-      ` AND ${terms.map(() => termClause).join(' AND ')}`,
-      [
-        ...patterns.flatMap(pattern => Array(7).fill(pattern)),
-        normalized,
-        `${escaped}%`,
-        `%${escaped}%`
-      ],
-      `CASE WHEN lower(l.name) = ? THEN 0 WHEN lower(l.name) LIKE ? ESCAPE '\\' THEN 1 WHEN lower(l.name) LIKE ? ESCAPE '\\' THEN 2 ELSE 3 END, l.name ASC, l.slug ASC`,
-      Math.min(1000, Math.max(1, Math.trunc(limit)))
+      cacheKey,
+      (value): value is PublishedCacheEntry => isPublishedCacheEntry(value, publicationVersion)
     )
+    if (cached) return cached.items
+
+    const termClauses = terms.map((_, index) => {
+      const term = `json_extract(?1, '$[${index}]')`
+      const categoryText = (alias: string) =>
+        `(instr(lower(${alias}.slug), ${term}) > 0 OR instr(lower(${alias}.name), ${term}) > 0)`
+      return `(
+            instr(lower(l.name), ${term}) > 0
+            OR instr(lower(l.description), ${term}) > 0
+            OR instr(lower(l.slug), ${term}) > 0
+            OR (
+              EXISTS (SELECT 1 FROM categories any_c WHERE any_c.is_active = 1 AND ${categoryText('any_c')})
+              AND EXISTS (
+                SELECT 1
+                FROM listing_categories lc
+                JOIN categories c ON c.id = lc.category_id
+                WHERE lc.listing_id = l.id AND c.is_active = 1 AND ${categoryText('c')}
+              )
+            )
+          )`
+    })
+    const statement: CompiledQuery = {
+      toSQL: () => ({
+        sql: `SELECT ${summaryColumns}
+        FROM listings l
+        WHERE l.status = 'approved' AND l.is_active = 1 AND l.published_at IS NOT NULL
+          AND l.published_at <= ?2
+          AND ${termClauses.join('\n          AND ')}
+        ORDER BY
+          CASE
+            WHEN lower(l.name) = ?3 OR lower(l.slug) = ?3 THEN 0
+            WHEN instr(lower(l.name), ?3) = 1 THEN 1
+            WHEN instr(lower(l.name), ?3) > 0 THEN 2
+            ELSE 3
+          END,
+          l.name ASC,
+          l.slug ASC
+        LIMIT ?4`,
+        params: [JSON.stringify(terms), operationTime(), phrase, safeLimit]
+      })
+    }
+    const rows = await queryAll<SummaryRow>('search-summaries', 'search-summaries', statement)
+    const items = rows.map(mapSummary)
+    await writeCache('search-summaries', cacheKey, { items, publicationVersion })
+    return items
   }
 
   return {
@@ -1236,14 +1376,11 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     },
     getListingBySlug,
     getListingNamePage,
-    async getListingsByCategory(slug) {
-      return (await getPublishedListings()).filter(listing => listing.categories?.includes(slug))
-    },
     getPublicationVersion,
-    getPublishedListingPage,
     getPublishedListings,
     getShellStats,
     getSitemapListings: getPublishedListings,
+    getUnpublishedListing,
     searchListings
   }
 }

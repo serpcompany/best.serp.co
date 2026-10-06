@@ -21,10 +21,50 @@ describe('badge scanner', () => {
     ).toEqual({ ok: true })
     expect(
       scanFeaturedBadge(
-        `<a rel="nofollow" href="${listingUrl}"><img src="${lightBadgeUrl}"></a>`,
+        `<a rel="noopener noreferrer" target="_blank" href="${listingUrl}"><img src="${lightBadgeUrl}"></a>`,
         expected
       )
-    ).toEqual({ ok: false, code: 'nofollow' })
+    ).toEqual({ ok: true })
+  })
+
+  // Owner decision on #84: the badge must be a plain followed link.
+  it('fails a link marked nofollow, sponsored, or ugc, in any case or token order', () => {
+    const badge = (rel: string) =>
+      scanFeaturedBadge(`<a href="${listingUrl}" ${rel}><img src="${lightBadgeUrl}"></a>`, expected)
+    const cases: Array<[string, string[]]> = [
+      ['rel="nofollow"', ['nofollow']],
+      ['rel="sponsored"', ['sponsored']],
+      ['rel="ugc"', ['ugc']],
+      ['rel="NoFollow"', ['nofollow']],
+      ["rel='UGC noopener'", ['ugc']],
+      ['rel=sponsored', ['sponsored']],
+      ['rel="noopener\tSponsored\nnoreferrer"', ['sponsored']],
+      ['rel="ugc nofollow"', ['nofollow', 'ugc']],
+      ['rel="noopener sponsored nofollow ugc"', ['nofollow', 'sponsored', 'ugc']],
+      ['rel="&#110;ofollow"', ['nofollow']]
+    ]
+    for (const [rel, tokens] of cases) {
+      expect(badge(rel), rel).toEqual({ code: 'link_not_followed', ok: false, rel: tokens })
+    }
+    // Tokens only count whole: neither `nofollower` nor a `data-rel` attribute is a rel token.
+    for (const rel of ['rel="nofollower ugc-like"', 'data-rel="nofollow"', 'rel=""', '']) {
+      expect(badge(rel), rel).toEqual({ ok: true })
+    }
+    // The first rel attribute wins, as in a browser.
+    expect(badge('rel="noopener" rel="nofollow"')).toEqual({ ok: true })
+    expect(badge('rel="nofollow" rel="noopener"')).toMatchObject({ code: 'link_not_followed' })
+  })
+
+  it('passes when any badge on the page has a followed link to the listing', () => {
+    const marked = `<a rel="nofollow" href="${listingUrl}"><img src="${lightBadgeUrl}"></a>`
+    expect(scanFeaturedBadge(`${marked}${validBadgeHtml}`, expected)).toEqual({ ok: true })
+    // An unfollowed listing link is reported before a badge that links elsewhere.
+    const elsewhere = `<a href="https://best.serp.co/"><img src="${lightBadgeUrl}"></a>`
+    expect(scanFeaturedBadge(`${elsewhere}${marked}`, expected)).toEqual({
+      code: 'link_not_followed',
+      ok: false,
+      rel: ['nofollow']
+    })
   })
 
   it('rejects the wrong destination and absent badge', () => {
@@ -33,16 +73,249 @@ describe('badge scanner', () => {
         `<a href="https://best.serp.co/"><img src="${lightBadgeUrl}"></a>`,
         expected
       )
-    ).toEqual({ ok: false, code: 'wrong_destination' })
+    ).toEqual({ ok: false, code: 'wrong_destination', href: 'https://best.serp.co/' })
     expect(
       scanFeaturedBadge(
         `<a href="https://best.serp.co/products/example.com/reviews/"><img src="${lightBadgeUrl}"></a>`,
         expected
       )
-    ).toEqual({ ok: false, code: 'wrong_destination' })
+    ).toEqual({
+      ok: false,
+      code: 'wrong_destination',
+      href: 'https://best.serp.co/products/example.com/reviews/'
+    })
+    expect(scanFeaturedBadge(`<a><img src="${lightBadgeUrl}"></a>`, expected)).toEqual({
+      ok: false,
+      code: 'wrong_destination'
+    })
     expect(scanFeaturedBadge('<p>No badge</p>', expected)).toEqual({
       ok: false,
       code: 'badge_missing'
+    })
+  })
+})
+
+// PR #84 review round 1, finding 1: only what a browser renders, with the real attributes.
+describe('badge scanner tokenizer', () => {
+  const L = listingUrl
+  const B = lightBadgeUrl
+  const scan = (html: string, pageUrl?: string) => scanFeaturedBadge(html, expected, pageUrl)
+
+  it('reads only the real href and rel, never text inside another attribute', () => {
+    expect(
+      scan(`<a title=" href=${L} " href="https://evil.example/"><img src="${B}"></a>`)
+    ).toEqual({ code: 'wrong_destination', href: 'https://evil.example/', ok: false })
+    expect(
+      scan(`<a data-x=' href="${L}"' href="https://evil.example/"><img src="${B}"></a>`)
+    ).toEqual({ code: 'wrong_destination', href: 'https://evil.example/', ok: false })
+    expect(scan(`<a href="${L}" title='rel="me"' rel="nofollow"><img src="${B}"></a>`)).toEqual({
+      code: 'link_not_followed',
+      ok: false,
+      rel: ['nofollow']
+    })
+    expect(scan(`<a href="${L}" title="rel=nofollow"><img src="${B}"></a>`)).toEqual({ ok: true })
+    expect(scan(`<a data-href="${L}" href="https://evil.example/"><img src="${B}"></a>`)).toEqual({
+      code: 'wrong_destination',
+      href: 'https://evil.example/',
+      ok: false
+    })
+  })
+
+  it('needs a real img element, not markup inside an attribute or text', () => {
+    expect(
+      scan(`<a href="${L}"><img alt='<img src="${B}">' src="https://evil.example/x.png"></a>`)
+    ).toEqual({ code: 'badge_missing', ok: false })
+    expect(scan(`<a href="${L}"><span data-img='<img src="${B}">'>Featured</span></a>`)).toEqual({
+      code: 'badge_missing',
+      ok: false
+    })
+    expect(scan(`<a href="${L}">&lt;img src="${B}"&gt;</a>`)).toEqual({
+      code: 'badge_missing',
+      ok: false
+    })
+    expect(scan(`<a href="${L}"><img data-src="${B}"></a>`)).toEqual({
+      code: 'badge_missing',
+      ok: false
+    })
+    // The parser reads `<image>` as `<img>`.
+    expect(scan(`<a href="${L}"><image src="${B}"></a>`)).toEqual({ ok: true })
+  })
+
+  it.each([
+    ['a comment', `<!-- <a href="${L}"><img src="${B}"></a> -->`],
+    ['an unclosed comment', `<!-- <a href="${L}"><img src="${B}"></a>`],
+    ['a script string', `<script>document.write('<a href="${L}"><img src="${B}"></a>')</script>`],
+    ['a template', `<template><a href="${L}"><img src="${B}"></a></template>`],
+    [
+      'a nested template',
+      `<template><template></template><a href="${L}"><img src="${B}"></a></template>`
+    ],
+    ['noscript', `<noscript><a href="${L}"><img src="${B}"></a></noscript>`],
+    ['a textarea', `<textarea><a href="${L}"><img src="${B}"></a></textarea>`],
+    ['a style block', `<style>/* <a href="${L}"><img src="${B}"></a> */</style>`],
+    ['a title', `<title><a href="${L}"><img src="${B}"></a></title>`],
+    ['xmp', `<xmp><a href="${L}"><img src="${B}"></a></xmp>`],
+    ['an iframe body', `<iframe><a href="${L}"><img src="${B}"></a></iframe>`],
+    ['noembed', `<noembed><a href="${L}"><img src="${B}"></a></noembed>`],
+    ['noframes', `<noframes><a href="${L}"><img src="${B}"></a></noframes>`],
+    ['plaintext', `<plaintext><a href="${L}"><img src="${B}"></a>`],
+    ['a CDATA section', `<![CDATA[<a href="${L}"><img src="${B}"></a>]]>`],
+    ['an SVG link', `<svg><a href="${L}"><image href="${B}"></image></a></svg>`],
+    ['a tag cut off at the end', `<a href="${L}"><img src="${B}"`]
+  ])('ignores a badge in %s', (_label, html) => {
+    expect(scan(html)).toMatchObject({ ok: false })
+  })
+
+  it('fails a real nofollow badge even with a followed copy in a comment', () => {
+    const real = `<a rel="nofollow" href="${L}"><img src="${B}"></a>`
+    const commented = `<!-- <a href="${L}"><img src="${B}"></a> -->`
+    expect(scan(`${real}${commented}`)).toEqual({
+      code: 'link_not_followed',
+      ok: false,
+      rel: ['nofollow']
+    })
+    expect(scan(`${commented}${real}`)).toMatchObject({ code: 'link_not_followed' })
+    expect(scan(`${real}<script>'${validBadgeHtml}'</script>`)).toMatchObject({
+      code: 'link_not_followed'
+    })
+  })
+
+  it('finds the badge after raw text, comments, and templates end', () => {
+    expect(scan(`<script>var a = "</scrip";</script>${validBadgeHtml}`)).toEqual({ ok: true })
+    expect(scan(`<!-- x --!>${validBadgeHtml}`)).toEqual({ ok: true })
+    expect(scan(`<!-->${validBadgeHtml}`)).toEqual({ ok: true })
+    expect(scan(`<template><p></template>${validBadgeHtml}`)).toEqual({ ok: true })
+    expect(scan(`<svg><path d="M0 0"/></svg>${validBadgeHtml}`)).toEqual({ ok: true })
+    expect(scan(`<SCRIPT>x</SCRIPT ><A HREF="${L}"><IMG SRC="${B}"></A>`)).toEqual({ ok: true })
+  })
+
+  it('closes a link at the next link or its end tag', () => {
+    // The badge is on the page but outside any link.
+    expect(scan(`<a href="${L}"></a><img src="${B}">`)).toEqual({
+      code: 'wrong_destination',
+      ok: false
+    })
+    expect(scan(`<a href="${L}"><a href="https://evil.example/"><img src="${B}"></a>`)).toEqual({
+      code: 'wrong_destination',
+      href: 'https://evil.example/',
+      ok: false
+    })
+  })
+
+  it('resolves relative URLs against the page and its base element', () => {
+    expect(
+      scan(
+        '<base href="https://best.serp.co/"><a href="/products/example.com/"><img src="/badge/featured-on-serp.co-light.svg"></a>',
+        'https://example.com/'
+      )
+    ).toEqual({ ok: true })
+    expect(
+      scan(`<a href="/products/example.com/"><img src="${B}"></a>`, 'https://example.com/')
+    ).toEqual({
+      code: 'wrong_destination',
+      href: 'https://example.com/products/example.com/',
+      ok: false
+    })
+  })
+})
+
+describe('page-level nofollow', () => {
+  it.each([
+    '<meta name="robots" content="nofollow">',
+    '<meta name="robots" content="noindex, nofollow">',
+    '<META NAME="Robots" CONTENT="NoFollow">',
+    '<meta name="googlebot" content="none">',
+    '<meta content="nofollow" name="googlebot">',
+    '<meta name="robots" content="noindex nofollow">'
+  ])('fails a followed badge on a page with %s', meta => {
+    expect(scanFeaturedBadge(`${meta}${validBadgeHtml}`, expected)).toEqual({
+      code: 'page_not_followed',
+      ok: false,
+      source: 'meta'
+    })
+  })
+
+  it('ignores robots meta that does not skip links, or that never renders', () => {
+    for (const html of [
+      '<meta name="robots" content="noindex">',
+      '<meta name="description" content="nofollow">',
+      // Only the general rules and Googlebot's count.
+      '<meta name="bingbot" content="nofollow">',
+      '<meta name="otherbot" content="none">',
+      '<!-- <meta name="robots" content="nofollow"> -->',
+      '<template><meta name="robots" content="nofollow"></template>'
+    ]) {
+      expect(scanFeaturedBadge(`${html}${validBadgeHtml}`, expected), html).toEqual({ ok: true })
+    }
+    // Without a badge link to the listing, the missing badge is the problem to fix first.
+    expect(
+      scanFeaturedBadge('<meta name="robots" content="nofollow"><p>No badge</p>', expected)
+    ).toEqual({ code: 'badge_missing', ok: false })
+  })
+
+  it('fails on an X-Robots-Tag header that skips links', async () => {
+    for (const header of [
+      'nofollow',
+      'noindex, nofollow',
+      'googlebot: none',
+      'NOFOLLOW',
+      'max-snippet: 20, nofollow',
+      'otherbot: noindex, googlebot: nofollow',
+      'googlebot: noindex nofollow',
+      'GoogleBot: noarchive, nofollow',
+      // PR #84 review round 3: a prefix covers only its own directive, since repeated
+      // headers arrive joined with commas and an unprefixed one applies to every crawler.
+      'otherbot: noindex, nofollow',
+      'otherbot: noarchive, none'
+    ]) {
+      const page = async () =>
+        new Response(validBadgeHtml, {
+          headers: { 'Content-Type': 'text/html', 'X-Robots-Tag': header },
+          status: 200
+        })
+      await expect(
+        verifyFeaturedBadge('https://example.com', expected, page),
+        header
+      ).resolves.toEqual({ code: 'page_not_followed', ok: false, source: 'header' })
+    }
+    // PR #84 review round 2, finding 6: a rule for another crawler does not apply.
+    for (const header of [
+      'otherbot: nofollow',
+      'bingbot: none',
+      'otherbot: noindex, otherbot: nofollow',
+      'unavailable_after: 25 Jun 2030 15:00:00 PST',
+      'googlebot: noindex, otherbot: none'
+    ]) {
+      const page = async () =>
+        new Response(validBadgeHtml, {
+          headers: { 'Content-Type': 'text/html', 'X-Robots-Tag': header },
+          status: 200
+        })
+      await expect(
+        verifyFeaturedBadge('https://example.com', expected, page),
+        header
+      ).resolves.toEqual({ ok: true })
+    }
+    // Two headers, `otherbot: noarchive` and `nofollow`: the second is for every crawler.
+    const twoHeaders = async () =>
+      new Response(validBadgeHtml, {
+        headers: [
+          ['Content-Type', 'text/html'],
+          ['X-Robots-Tag', 'otherbot: noarchive'],
+          ['X-Robots-Tag', 'nofollow']
+        ],
+        status: 200
+      })
+    await expect(verifyFeaturedBadge('https://example.com', expected, twoHeaders)).resolves.toEqual(
+      { code: 'page_not_followed', ok: false, source: 'header' }
+    )
+    const indexOnly = async () =>
+      new Response(validBadgeHtml, {
+        headers: { 'Content-Type': 'text/html', 'X-Robots-Tag': 'noindex, noarchive' },
+        status: 200
+      })
+    await expect(verifyFeaturedBadge('https://example.com', expected, indexOnly)).resolves.toEqual({
+      ok: true
     })
   })
 })
@@ -51,7 +324,11 @@ describe('legacy listing URLs', () => {
   it('accepts badges that still link to the pre-simplification reviews URL', () => {
     const legacyHref = 'https://best.serp.co/products/example.com/reviews/'
     const html = `<a href="${legacyHref}"><img src="${lightBadgeUrl}"></a>`
-    expect(scanFeaturedBadge(html, expected)).toEqual({ ok: false, code: 'wrong_destination' })
+    expect(scanFeaturedBadge(html, expected)).toEqual({
+      ok: false,
+      code: 'wrong_destination',
+      href: legacyHref
+    })
     expect(scanFeaturedBadge(html, { ...expected, legacyListingUrls: [legacyHref] })).toEqual({
       ok: true
     })

@@ -1,25 +1,25 @@
-import { AccountPageRoute } from '@serpdirectory/web-core/account-page'
 import { getRoute } from '@serpdirectory/web-core/routes'
-import { redirect } from 'next/navigation'
+import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
+import type { Metadata } from 'next'
 import type { ReactElement } from 'react'
-import { getSafeCallbackUrl, getSession } from '@/lib/auth'
-import { requireRouteFeature } from '@/lib/route-feature-gates'
-import { isStaticExportBuild } from '@/lib/runtime-mode'
+import { AccountTablePage, accountTableRows } from '@/components/account/account-table-page'
+import { getAccountOverview } from '@/lib/account/overview'
+import { requireAccountUser } from '@/lib/account/pages'
 
+export const metadata: Metadata = generateBaseMetadata({
+  title: 'Account',
+  description: 'Your SERP account.',
+  path: '/account/',
+  noindex: true
+})
+
+/**
+ * `/account` (#60, #65; #70 screen 5): the section cards and the table of the user's
+ * submissions and listings, each with its status and next step, and the badge panel of a free
+ * listing. With nothing yet, the empty state. Signed-out visitors go to `/login` and come back.
+ */
 export default async function AccountPage(): Promise<ReactElement> {
-  requireRouteFeature('showAuth')
-
-  if (isStaticExportBuild()) {
-    return <AccountPageRoute isStaticExportBuild />
-  }
-
-  const session = await getSession()
-
-  if (!session?.user) {
-    redirect(
-      `${getRoute('login')}?callbackUrl=${encodeURIComponent(getSafeCallbackUrl('/account'))}`
-    )
-  }
-
-  return <AccountPageRoute user={session.user} />
+  const user = await requireAccountUser(getRoute('account'))
+  const rows = accountTableRows(await getAccountOverview(user.id))
+  return <AccountTablePage rows={rows} scope="overview" />
 }

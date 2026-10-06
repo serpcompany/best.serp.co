@@ -1,0 +1,13 @@
+# Names of the Worker secrets this app reads. Copy to apps/web/.dev.vars (gitignored) and fill
+# in only what you need locally; never commit .dev.vars or a real value.
+#
+# BETTER_AUTH_SECRET: signs sessions and derives the account keys (docs/ACCOUNTS.md). Set a
+# random value of at least 32 characters, for example the output of `openssl rand -base64 32`.
+# Without it, local runs use a random per-isolate secret and sessions end on restart. Staging
+# and production use Worker secrets set by the owner.
+BETTER_AUTH_SECRET=
+#
+# USESEND_API_KEY: the useSend API key for transactional email (docs/EMAIL.md). Staging and
+# production read it from a Worker secret (`wrangler secret put USESEND_API_KEY --env staging`
+# or `--env production`). Local development never sends email, so it does not need one.
+USESEND_API_KEY=

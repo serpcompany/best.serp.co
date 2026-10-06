@@ -1,5 +1,5 @@
 import { getRoute } from '@serpdirectory/web-core/routes'
-import { getAutocomplete } from '@/lib/catalog/repository'
+import { getAutocomplete, MAX_SEARCH_LIMIT } from '@/lib/catalog/repository'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,7 +8,7 @@ export async function GET(request: Request): Promise<Response> {
   const query = url.searchParams.get('q')?.trim() || ''
   const requestedLimit = Number(url.searchParams.get('limit') || 20)
   const limit = Number.isSafeInteger(requestedLimit)
-    ? Math.min(1000, Math.max(1, requestedLimit))
+    ? Math.min(MAX_SEARCH_LIMIT, Math.max(1, requestedLimit))
     : 20
   if (!query) return Response.json([])
 

@@ -1,12 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import type { CatalogDataCache } from './contracts'
+import { assertD1StatementLimits } from './sql-limits'
 
-const BASELINE_MIGRATION_PATH = resolve(
-  import.meta.dirname,
-  '../../../d1/drizzle/0000_baseline.sql'
-)
+const MIGRATIONS_DIRECTORY = resolve(import.meta.dirname, '../../../d1/drizzle')
 
 export class MemoryCatalogCache implements CatalogDataCache {
   readonly ttlSeconds = new Map<string, number>()
@@ -23,16 +21,21 @@ export class MemoryCatalogCache implements CatalogDataCache {
 }
 
 /**
- * Apply the checked-in D1 baseline migration statement by statement, exactly as
- * Drizzle/Wrangler do, so tests exercise the real STRICT tables, indexes, and
+ * Apply the checked-in D1 migrations in order, statement by statement, exactly as
+ * Drizzle/Wrangler do, so tests exercise the real STRICT tables, indexes, seeds, and
  * primary-category triggers instead of a hand-maintained copy.
  */
-export function applyBaselineMigration(database: DatabaseSync): void {
-  const statements = readFileSync(BASELINE_MIGRATION_PATH, 'utf8')
-    .split('--> statement-breakpoint')
-    .map(statement => statement.trim())
-    .filter(Boolean)
-  for (const statement of statements) database.exec(statement)
+export function applyMigrations(database: DatabaseSync): void {
+  const names = readdirSync(MIGRATIONS_DIRECTORY)
+    .filter(name => name.endsWith('.sql'))
+    .sort()
+  for (const name of names) {
+    const statements = readFileSync(resolve(MIGRATIONS_DIRECTORY, name), 'utf8')
+      .split('--> statement-breakpoint')
+      .map(statement => statement.trim())
+      .filter(Boolean)
+    for (const statement of statements) database.exec(statement)
+  }
 }
 
 export interface RecordedStatement {
@@ -40,31 +43,43 @@ export interface RecordedStatement {
   sql: string
 }
 
+export { findSelfComparison } from './sql-limits'
+
 export class SqliteD1 {
   readonly database: DatabaseSync
   readonly statements: RecordedStatement[] = []
+  private batches: Promise<unknown> = Promise.resolve()
 
   constructor(path = ':memory:') {
     this.database = new DatabaseSync(path)
-    applyBaselineMigration(this.database)
+    applyMigrations(this.database)
   }
 
   asD1Database(): D1Database {
     const owner = this
     const binding = {
       prepare(sql: string) {
+        // Every data-ops and app test that runs SQL through this binding gets the D1 limit
+        // and self-comparison checks (`sql-limits.ts`, #77 and #78).
+        assertD1StatementLimits(sql)
         let bindings: unknown[] = []
         const execute = <T>() => {
           owner.statements.push({ bindings, sql })
           const statement = owner.database.prepare(sql)
           const values = bindings as SQLInputValue[]
           let results: T[] = []
-          if (statement.columns().length > 0) results = statement.all(...values) as T[]
-          else statement.run(...values)
+          let changes = 0
+          if (statement.columns().length > 0) {
+            results = statement.all(...values) as T[]
+            changes = Number(owner.database.prepare('SELECT changes() AS changes').get()?.changes)
+          } else {
+            changes = Number(statement.run(...values).changes)
+          }
           return {
             results,
             success: true as const,
             meta: {
+              changes,
               duration: 0,
               rows_read: results.length,
               rows_written: 0
@@ -73,6 +88,7 @@ export class SqliteD1 {
         }
         return {
           bind(...values: unknown[]) {
+            assertD1StatementLimits(sql, values)
             bindings = values
             return this
           },
@@ -82,22 +98,36 @@ export class SqliteD1 {
           async first<T>() {
             return execute<T>().results[0] ?? null
           },
+          /** Rows as value arrays in column order, as D1's `raw()` returns them to Drizzle. */
+          async raw<T>() {
+            owner.statements.push({ bindings, sql })
+            const statement = owner.database.prepare(sql)
+            statement.setReturnArrays(true)
+            return statement.all(...(bindings as SQLInputValue[])) as T[]
+          },
           async run<T>() {
             return execute<T>()
           }
         } as unknown as D1PreparedStatement
       },
-      async batch<T>(statements: D1PreparedStatement[]) {
-        owner.database.exec('BEGIN')
-        try {
-          const results: D1Result<T>[] = []
-          for (const statement of statements) results.push(await statement.run<T>())
-          owner.database.exec('COMMIT')
-          return results
-        } catch (error) {
-          owner.database.exec('ROLLBACK')
-          throw error
+      // D1 runs one batch at a time, so overlapping callers (the badge program checks several
+      // sites at once) queue here instead of opening a transaction inside another.
+      batch<T>(statements: D1PreparedStatement[]) {
+        const run = async () => {
+          owner.database.exec('BEGIN')
+          try {
+            const results: D1Result<T>[] = []
+            for (const statement of statements) results.push(await statement.run<T>())
+            owner.database.exec('COMMIT')
+            return results
+          } catch (error) {
+            owner.database.exec('ROLLBACK')
+            throw error
+          }
         }
+        const result = owner.batches.then(run, run)
+        owner.batches = result.catch(() => undefined)
+        return result
       }
     }
     return binding as unknown as D1Database

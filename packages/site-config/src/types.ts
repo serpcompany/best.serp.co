@@ -72,6 +72,11 @@ export type SiteFeatureFlags = {
   showFeaturedGuides: boolean
   showGuides: boolean
   showNewsletter: boolean
+  /**
+   * The paid listing (serpcompany/best.serp.co#68). Off until checkout exists: the submit flow
+   * offers the free badge listing only and hides every paid option.
+   */
+  showPaidListings: boolean
   showProjects: boolean
 }
 
@@ -97,6 +102,23 @@ export type SiteDefinition = {
     opengraphImage?: AssetSource
   }
   copy: SiteCopyConfig
+  /** Transactional email identity (`apps/web/lib/email/`). */
+  email: {
+    /** Root-relative path of the admin dashboard that admin email footers link to. */
+    adminDashboardPath: string
+    /** Who receives admin alerts (submission ready for review, new message). */
+    adminRecipient: string
+    /**
+     * Root-relative path of the dashboard every user email footer links to. The sender is not
+     * monitored, so replies happen there (serpcompany/best.serp.co#73).
+     */
+    dashboardPath: string
+    /**
+     * The sender in every environment (staging and production send from the same domain
+     * verified in useSend; local logs show it). Sent with no Reply-To.
+     */
+    from: { address: string; name: string }
+  }
   features: SiteFeatureFlags
   id: string
   networkBrandGroup: string | null
@@ -105,6 +127,11 @@ export type SiteDefinition = {
     docsBasePath: string
     listingBasePath: string
     networkBasePath: string
+  }
+  /** The submit flow (serpcompany/best.serp.co#59). */
+  submissions: {
+    /** The paid listing's price: one-off and permanent, in US cents. */
+    paidListingPriceCents: number
   }
   site: {
     description: string
