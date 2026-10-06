@@ -10,22 +10,25 @@ import {
   test
 } from '@playwright/test'
 import {
+  ADMIN_EMAIL_PREFIXES,
+  accountServer,
   activeCategory,
   adminOrigin,
   adminSuiteEnabled,
   client,
-  localD1,
   q,
   removeAdmin,
+  removeLeftoverAdmins,
   seedAdminCatalog,
   signInAsNewAdmin,
+  localD1 as suiteD1,
   unique
 } from './admin-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
 
 /**
- * The submitter dashboard (serpcompany/best.serp.co#65) against the local Worker and local D1 of
- * the admin suite (it publishes listings): a submission moves through its statuses on
+ * The submitter dashboard (serpcompany/best.serp.co#65) against its own local Worker and D1
+ * (`accountServer`; it publishes listings and adds admins, like the admin suite): a submission moves through its statuses on
  * `/account`, is fixed and resubmitted after a change request, its live listing is edited as a
  * revision that an admin approves, a free listing's badge is checked from its panel, and a
  * pending submission is withdrawn. Every record is the user's own: another account, a missing
@@ -35,9 +38,14 @@ import { type FixtureSite, startFixtureSite } from './submit-fixture'
  * dark, for comparison with the #70 mockups.
  */
 
-test.skip(!adminSuiteEnabled, 'needs the local admin Worker from playwright.config.ts')
+test.skip(!adminSuiteEnabled, 'needs the local account Worker from playwright.config.ts')
 test.describe.configure({ mode: 'serial' })
-test.use({ baseURL: adminOrigin() })
+test.use({ baseURL: adminOrigin(accountServer) })
+
+/** SQL on this suite's own local D1 (`accountServer`). */
+function localD1<T = Record<string, unknown>>(sql: string): T[] {
+  return suiteD1<T>(sql, accountServer)
+}
 
 const screenshots = process.env.ACCOUNT_SCREENSHOT_DIRECTORY
   ? resolve(process.env.ACCOUNT_SCREENSHOT_DIRECTORY)
@@ -87,11 +95,11 @@ async function outboxCode(request: APIRequestContext, email: string): Promise<st
 async function signedIn(browser: Browser, label: string): Promise<Submitter> {
   const ip = uniqueIp()
   const context = await browser.newContext({
-    baseURL: adminOrigin(),
+    baseURL: adminOrigin(accountServer),
     extraHTTPHeaders: { 'cf-connecting-ip': ip }
   })
   const email = `e2e-account-${label}-${unique()}@example.com`
-  const headers = { origin: adminOrigin() }
+  const headers = { origin: adminOrigin(accountServer) }
   const requested = await context.request.post('/api/auth/email-otp/send-verification-otp', {
     data: { email, type: 'sign-in' },
     headers
@@ -143,13 +151,15 @@ let fixture: FixtureSite
 const admins: string[] = []
 
 test.beforeAll(async () => {
-  seedAdminCatalog()
+  seedAdminCatalog(accountServer)
+  // This suite's own leftovers (an interrupted run); its Worker and D1 are its own.
+  removeLeftoverAdmins([ADMIN_EMAIL_PREFIXES.accountDashboard], accountServer)
   fixture = await startFixtureSite()
 })
 
 test.afterAll(async () => {
   await fixture.close()
-  for (const email of admins) removeAdmin(email)
+  for (const email of admins) removeAdmin(email, accountServer)
 })
 
 test('a submission moves through its statuses, is resubmitted after a change request, and its listing is edited through an approved revision', async ({
@@ -166,7 +176,7 @@ test('a submission moves through its statuses, is resubmitted after a change req
   const user = await signedIn(browser, 'journey')
   const { page } = user
   const admin = client(adminPage.request, baseURL)
-  admins.push(await signInAsNewAdmin(admin))
+  admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.accountDashboard, accountServer))
 
   // Draft: it waits for a plan, and expires 30 days after it was saved.
   const id = await saveDraft(user, website, name)
@@ -527,7 +537,7 @@ test('shows and acts on the user’s own records only, never cached or indexed',
   try {
     const refused = await anonymous.post(`/api/account/submissions/${id}/withdraw`, {
       data: {},
-      headers: { origin: adminOrigin() }
+      headers: { origin: adminOrigin(accountServer) }
     })
     expect(refused.status()).toBe(401)
     for (const path of ['/account/', `/account/submissions/${id}/`, '/account/listings/']) {
