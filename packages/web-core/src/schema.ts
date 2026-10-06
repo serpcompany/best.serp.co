@@ -12,7 +12,7 @@ export interface SchemaOrg {
 
 /**
  * What the listed product costs, when known: `price` is a decimal amount such as `19.99` and
- * `currency` an ISO 4217 code. The D1 catalog records no product pricing yet
+ * `currency` an ISO 4217 code such as `USD`. The D1 catalog records no product pricing yet
  * (serpcompany/best.serp.co#88), so catalog listings carry none and their JSON-LD makes no
  * price claim. This is not the submission plan, which is the fee a submitter pays the directory.
  */
@@ -277,7 +277,7 @@ function resolveSchemaImageUrl(website: WebsiteMetadataLike): string | undefined
   return logo
 }
 
-const schemaPricePattern = /^\d+(?:\.\d+)?$/u
+const schemaPricePattern = /^(?:0|[1-9]\d*)(?:\.\d+)?$/u
 const schemaCurrencyPattern = /^[A-Z]{3}$/u
 
 /**
@@ -285,7 +285,8 @@ const schemaCurrencyPattern = /^[A-Z]{3}$/u
  * reads `price: '0'` as "free", so a default offer would call every paid product free. Google's
  * software app rich result needs `offers.price` and a rating or review; listings carry neither
  * rating nor review, so omitting an unknown price costs no rich result. A paid price that is
- * not a positive decimal, or a currency that is not ISO 4217, is omitted rather than guessed.
+ * not a plain positive decimal, or a currency that is not three uppercase letters, is omitted
+ * rather than guessed.
  */
 function resolveSchemaOffer(pricing: ListingPricing | undefined) {
   if (!pricing) return undefined

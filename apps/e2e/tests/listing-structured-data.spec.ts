@@ -5,8 +5,8 @@ import { listingPath } from './site-fixture'
 
 /**
  * The D1 catalog records no product pricing (serpcompany/best.serp.co#88), so a listing's
- * JSON-LD must not claim a price: no Offer at all, rather than a default "free" one. A free
- * download tool (123movies) and a paid photo editor (autoenhance.ai) are both unpriced.
+ * JSON-LD must not claim a price: no Offer at all, rather than a default "free" one. Both
+ * listings here are paid products that the old default offer called free.
  */
 const unpricedListingPaths = [detailListing.path, listingPath('autoenhance.ai')]
 

@@ -108,6 +108,7 @@ describe('listing detail JSON-LD offer', () => {
     ['a negative price', '-5', 'USD'],
     ['a currency symbol in the price', '$19.99', 'USD'],
     ['a thousands separator', '1,299.00', 'USD'],
+    ['leading zeros', '007', 'USD'],
     ['an empty price', '', 'USD'],
     ['a lowercase currency', '19.99', 'usd'],
     ['a currency symbol as the currency', '19.99', '$'],
