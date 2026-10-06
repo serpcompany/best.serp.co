@@ -89,4 +89,79 @@ describe('draft job operations', () => {
         .get()
     ).toEqual({ status: 'withdrawn', withdrawal_reason: 'expired' })
   })
+
+  // PR #84 review round 2, finding 5: failed draft emails that can never be sent again must
+  // not fill the page ahead of the ones that can.
+  it('retries only failed draft emails that still apply, past any number that never will', async () => {
+    const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+    const submission = sqlite.database.prepare(`INSERT INTO listing_submissions
+      (id,slug,block_key,block_covers_subdomains,name,description,website,content,category_slug,
+        logo_url,status,owner_user_id,plan,draft_saved_at,draft_reminders_sent,draft_last_reminder_at,
+        withdrawal_reason)
+      VALUES (?,?,?,1,?,'d',?,'','tools','https://x.example/l.png',?,'user_owner',?,?,?,?,?)`)
+    const add = (
+      n: number,
+      status: string,
+      plan: string | null,
+      reminders: number,
+      reason: string | null
+    ) => {
+      const slug = `s${n}.example`
+      submission.run(
+        id(n),
+        slug,
+        slug,
+        `S${n}`,
+        `https://${slug}/`,
+        status,
+        plan,
+        SAVED,
+        reminders,
+        atHour(13),
+        reason
+      )
+    }
+    const delivery = sqlite.database.prepare(`INSERT INTO email_deliveries
+      (template_id,event_key,provider,status,attempts,updated_at) VALUES (?,?,'test','failed',?,?)`)
+    // 100 drafts that moved on (a plan chosen) after their first reminder failed, and the same
+    // 100 with an expiry email that used up its attempts: all older than the real retries.
+    for (let n = 1; n <= 100; n += 1) {
+      add(n, 'pending_badge', 'free', 1, null)
+      delivery.run(
+        'draft-reminder',
+        `submission-draft-reminder:${id(n)}:1`,
+        1,
+        '2026-09-01 00:00:00'
+      )
+      delivery.run('draft-expired', `submission-draft-expired:${id(n)}`, 5, '2026-09-01 00:00:00')
+    }
+    // An earlier reminder of a draft whose second reminder is now the latest.
+    add(101, 'draft', null, 2, null)
+    delivery.run(
+      'draft-reminder',
+      `submission-draft-reminder:${id(101)}:1`,
+      1,
+      '2026-09-01 00:00:00'
+    )
+    // Still due: the latest reminder of an open draft, and an expired draft's notice.
+    add(102, 'draft', null, 1, null)
+    delivery.run(
+      'draft-reminder',
+      `submission-draft-reminder:${id(102)}:1`,
+      2,
+      '2026-09-02 00:00:00'
+    )
+    add(103, 'withdrawn', null, 1, 'expired')
+    delivery.run('draft-expired', `submission-draft-expired:${id(103)}`, 1, '2026-09-02 00:01:00')
+
+    const retry = (limit: number) =>
+      operations().retryableEmails({ limit, maxAttempts: 5, now: atHour(14) })
+    expect((await retry(100)).map(item => [item.kind, item.draft.id])).toEqual([
+      ['reminder', id(102)],
+      ['expired', id(103)]
+    ])
+    expect((await retry(1)).map(item => item.eventKey)).toEqual([
+      `submission-draft-reminder:${id(102)}:1`
+    ])
+  })
 })

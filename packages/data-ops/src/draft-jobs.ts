@@ -44,7 +44,10 @@ export interface ExpiredDraft {
 /**
  * A draft email whose last send failed and may be sent again (PR #84 review round 1,
  * finding 7): the ledger row is `failed` with attempts left, and the draft is still in the
- * state the email describes (the same reminder still the latest claimed, or expired).
+ * state the email describes (the same reminder still the latest claimed, or expired). The
+ * query applies all of that in SQL, so failed rows that can never be sent again (attempts
+ * used up, or a draft that moved on) never fill the page ahead of real retries (round 2,
+ * finding 5).
  */
 export type RetryableDraftEmail =
   | { eventKey: string; kind: 'expired'; draft: ExpiredDraft }
@@ -190,7 +193,10 @@ export function createDraftJobOperations(config: { client: Database }): DraftJob
     async retryableEmails({ limit, maxAttempts, now }) {
       const { expiryCutoff } = draftClockCutoffs(now)
       // The submission id is the event key's middle part: `submission-draft-reminder:<id>:<n>`
-      // (26-character prefix) or `submission-draft-expired:<id>` (25 characters).
+      // (26-character prefix) or `submission-draft-expired:<id>` (25 characters). A reminder
+      // still applies while it is the draft's latest, the draft is unexpired and has no plan
+      // or an unpaid paid one; an expiry email, while the draft is withdrawn as expired. The
+      // checks below repeat these conditions for each row read.
       const failed = await rows<RetryRow>({
         sql: `SELECT d.template_id,d.event_key,s.id,s.slug,s.name,s.website,s.status,s.plan,s.paid_at,
             s.draft_saved_at,s.draft_reminders_sent,s.withdrawal_reason,u.email AS owner_email
@@ -198,12 +204,18 @@ export function createDraftJobOperations(config: { client: Database }): DraftJob
           JOIN listing_submissions s ON s.id=CASE d.template_id
             WHEN 'draft-reminder' THEN substr(d.event_key,27,36)
             ELSE substr(d.event_key,26,36) END
-          LEFT JOIN users u ON u.id=s.owner_user_id
+          JOIN users u ON u.id=s.owner_user_id
           WHERE d.template_id IN ('draft-reminder','draft-expired') AND d.status='failed'
             AND d.attempts<?
+            AND ((d.template_id='draft-reminder'
+                AND d.event_key='submission-draft-reminder:'||s.id||':'||s.draft_reminders_sent
+                AND s.status='draft' AND s.draft_reminders_sent BETWEEN 1 AND ?
+                AND s.draft_saved_at>? AND (s.plan IS NULL OR (s.plan='paid' AND s.paid_at IS NULL)))
+              OR (d.template_id='draft-expired' AND d.event_key='submission-draft-expired:'||s.id
+                AND s.status='withdrawn' AND s.withdrawal_reason='expired'))
           ORDER BY d.updated_at,d.event_key
           LIMIT ?`,
-        params: [maxAttempts, limit]
+        params: [maxAttempts, DRAFT_REMINDER_COUNT, expiryCutoff, limit]
       })
       const retryable: RetryableDraftEmail[] = []
       for (const row of failed) {
