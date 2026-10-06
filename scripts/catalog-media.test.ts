@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
@@ -148,6 +150,32 @@ describe('hosted catalog media (#95)', () => {
       database.close()
     }
   }, 120_000)
+
+  it('checks in every repo: source, holding exactly the planned bytes (#95 release blocker 5)', () => {
+    // A seed a global ignore (`*.so`) kept out of Git failed Upload Listing Media with
+    // `repo_file_missing` (run 37495034303): every repo: file must be tracked, not just on disk.
+    const tracked = new Set(
+      execFileSync('git', ['ls-files', '-z', '--', 'apps/web/public'], { encoding: 'utf8' })
+        .split('\0')
+        .filter(Boolean)
+    )
+    let checked = 0
+    for (const file of files(mediaDirectory, /\.json$/u)) {
+      const plan = mediaPlanSchema.parse(
+        JSON.parse(readFileSync(resolve(mediaDirectory, file), 'utf8'))
+      )
+      for (const object of plan.objects.filter(entry => entry.source.startsWith('repo:'))) {
+        const path = object.source.slice('repo:'.length)
+        expect(tracked.has(path), `${path} is tracked`).toBe(true)
+        const bytes = readFileSync(resolve(path))
+        expect(bytes.byteLength, path).toBe(object.bytes)
+        expect(createHash('sha256').update(bytes).digest('hex'), path).toBe(object.sha256)
+        expect(createHash('md5').update(bytes).digest('hex'), path).toBe(object.md5)
+        checked += 1
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
+  })
 
   it('changes only listing logos and images when the manifests are applied', () => {
     // The other reviewed manifests (#100's unpublications, #105's FAQ move) are the baseline:

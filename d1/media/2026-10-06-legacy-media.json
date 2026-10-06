@@ -17458,7 +17458,7 @@
    "key": "best.serp.co/listings/medarc.ai/logo/9f518d307114fa87.webp",
    "md5": "04aeeae11d2826eb3a00eb874498232e",
    "sha256": "9f518d307114fa87545776fac9d39df0e114dd2855affa75c16acf6ceb0bfaf4",
-   "source": "https://images.squarespace-cdn.com/content/v1/63e0cf63cebdd84d59868b50/68347e14-1f07-49aa-b384-df94eba0d62d/favicon.ico?format=100w",
+   "source": "repo:apps/web/public/listing-media-seed/medarc.ai/logo/9f518d307114fa87.webp",
    "width": 100
   },
   {
@@ -18468,7 +18468,7 @@
    "key": "best.serp.co/listings/monitaur.ai/image/31bb16194ceabb40.avif",
    "md5": "4c503064b7f6e27707dac98288b189d3",
    "sha256": "31bb16194ceabb40d6f4301cd892d95c791768e04c7649429c13a3d07087ce21",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/monitaur/public",
+   "source": "repo:apps/web/public/listing-media-seed/monitaur.ai/image/31bb16194ceabb40.avif",
    "width": 800
   },
   {
@@ -18478,7 +18478,7 @@
    "key": "best.serp.co/listings/monitaur.ai/logo/31bb16194ceabb40.avif",
    "md5": "4c503064b7f6e27707dac98288b189d3",
    "sha256": "31bb16194ceabb40d6f4301cd892d95c791768e04c7649429c13a3d07087ce21",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/monitaur/public",
+   "source": "repo:apps/web/public/listing-media-seed/monitaur.ai/logo/31bb16194ceabb40.avif",
    "width": 800
   },
   {
@@ -18508,7 +18508,7 @@
    "key": "best.serp.co/listings/monterey.ai/logo/edb6e82d252e6f25.avif",
    "md5": "5ca0eb7d0f027b10c95962053d129b8c",
    "sha256": "edb6e82d252e6f25e1a2d5ce752f608f6b167d414f3487d8dab5c3579759edb6",
-   "source": "https://framerusercontent.com/images/L38TpeyRfbvA4GyDP9xQVNC5E.png",
+   "source": "repo:apps/web/public/listing-media-seed/monterey.ai/logo/edb6e82d252e6f25.avif",
    "width": 128
   },
   {
@@ -18528,7 +18528,7 @@
    "key": "best.serp.co/listings/moonbeamexchange.com/image/b488da1ff597a4ef.avif",
    "md5": "074200569bd9b73fc44b494e26006a8e",
    "sha256": "b488da1ff597a4ef07c993d28a0d62ec98dcd6023d77cb520093e1555e42d2cb",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/moonbeam-exchange/public",
+   "source": "repo:apps/web/public/listing-media-seed/moonbeamexchange.com/image/b488da1ff597a4ef.avif",
    "width": 800
   },
   {
@@ -18538,7 +18538,7 @@
    "key": "best.serp.co/listings/moonbeamexchange.com/logo/b488da1ff597a4ef.avif",
    "md5": "074200569bd9b73fc44b494e26006a8e",
    "sha256": "b488da1ff597a4ef07c993d28a0d62ec98dcd6023d77cb520093e1555e42d2cb",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/moonbeam-exchange/public",
+   "source": "repo:apps/web/public/listing-media-seed/moonbeamexchange.com/logo/b488da1ff597a4ef.avif",
    "width": 800
   },
   {
@@ -19868,7 +19868,7 @@
    "key": "best.serp.co/listings/nowy.io/logo/bf9256625fa8faa0.avif",
    "md5": "ac49e10e9c8b713c561945f7e3fe3650",
    "sha256": "bf9256625fa8faa0297a5bc23d35310fa6f47ce51163ede12d362106093774ac",
-   "source": "https://framerusercontent.com/images/Y2pHcgKK3nijpfWiqhGMCarjD5w.png",
+   "source": "repo:apps/web/public/listing-media-seed/nowy.io/logo/bf9256625fa8faa0.avif",
    "width": 512
   },
   {
@@ -20148,7 +20148,7 @@
    "key": "best.serp.co/listings/omnigpt.co/image/9b7cd6699c8ed23f.avif",
    "md5": "56cbfd90840adae540c73de296429d7d",
    "sha256": "9b7cd6699c8ed23fb5c029ec841afc03623af3001780b32049343befcc881d73",
-   "source": "https://framerusercontent.com/images/LMXQuR2R87nchHqgJQ3M6t2jyLQ.png",
+   "source": "repo:apps/web/public/listing-media-seed/omnigpt.co/image/9b7cd6699c8ed23f.avif",
    "width": 4800
   },
   {
@@ -20228,7 +20228,7 @@
    "key": "best.serp.co/listings/onloop.com/logo/e3c06021d9bc89f1.webp",
    "md5": "3a8e543d11cd7b160ff5bad060326555",
    "sha256": "e3c06021d9bc89f10a19ff80b0ca7c4f56163242b3e573d1425a64277fff4512",
-   "source": "https://images.squarespace-cdn.com/content/v1/68dbdbfed2173f5c19501604/6a04accb-aef2-4f57-8c76-97fc21e7f524/favicon.ico?format=100w",
+   "source": "repo:apps/web/public/listing-media-seed/onloop.com/logo/e3c06021d9bc89f1.webp",
    "width": 100
   },
   {
@@ -20788,7 +20788,7 @@
    "key": "best.serp.co/listings/outset.ai/image/b143a26ba9d96686.avif",
    "md5": "f531ad5e35b0428c1b61e8dec30abb45",
    "sha256": "b143a26ba9d96686ddd5d8e3562e0d5e53842857583786d307d00f4aa7f2dd1c",
-   "source": "https://framerusercontent.com/images/RDUaYx944RtZzuRpyCSHdqhk1g4.webp",
+   "source": "repo:apps/web/public/listing-media-seed/outset.ai/image/b143a26ba9d96686.avif",
    "width": 4096
   },
   {
@@ -20858,7 +20858,7 @@
    "key": "best.serp.co/listings/oxolo.com/logo/ff2fbedfe5a73f5d.avif",
    "md5": "c93911cb4ab1bc7f796d7f33880ebc85",
    "sha256": "ff2fbedfe5a73f5d269bdd331f99dbeade2cb603ba1fb10cecd73704aefde1eb",
-   "source": "https://framerusercontent.com/images/CSnxTnkUOkSgZnctwuQBj1m88.png",
+   "source": "repo:apps/web/public/listing-media-seed/oxolo.com/logo/ff2fbedfe5a73f5d.avif",
    "width": 180
   },
   {
@@ -21238,7 +21238,7 @@
    "key": "best.serp.co/listings/paypal.com/logo/eef960bbb6256de1.png",
    "md5": "b34a65e36f355a96fa75985ace2baaca",
    "sha256": "eef960bbb6256de1e65f518e230bee7b073f030d5957bd18ba48d6e03237b6d3",
-   "source": "https://www.paypalobjects.com/marketing/web/icons/monogram/pp258.png",
+   "source": "repo:apps/web/public/listing-media-seed/paypal.com/logo/eef960bbb6256de1.png",
    "width": 258
   },
   {
@@ -21278,7 +21278,7 @@
    "key": "best.serp.co/listings/perplexity.ai/image/1f9748a7d56ab32e.png",
    "md5": "d0066a3f65fce50291d3021281262e76",
    "sha256": "1f9748a7d56ab32e92f8d843bae1f47ec6a24daaebae2702e13ba54d0eda85da",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/perplexity-ai/public",
+   "source": "repo:apps/web/public/listing-media-seed/perplexity.ai/image/1f9748a7d56ab32e.png",
    "width": 800
   },
   {
@@ -21288,7 +21288,7 @@
    "key": "best.serp.co/listings/perplexity.ai/logo/1f9748a7d56ab32e.png",
    "md5": "d0066a3f65fce50291d3021281262e76",
    "sha256": "1f9748a7d56ab32e92f8d843bae1f47ec6a24daaebae2702e13ba54d0eda85da",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/perplexity-ai/public",
+   "source": "repo:apps/web/public/listing-media-seed/perplexity.ai/logo/1f9748a7d56ab32e.png",
    "width": 800
   },
   {
@@ -21468,7 +21468,7 @@
    "key": "best.serp.co/listings/photor.io/image/071528c7061f4fc7.png",
    "md5": "073913441e1d5ebe70f89e17e4e7b5e1",
    "sha256": "071528c7061f4fc755ec817e8621cb325bef1779a88ff433feacce81e2853d7e",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/photor-ai/public",
+   "source": "repo:apps/web/public/listing-media-seed/photor.io/image/071528c7061f4fc7.png",
    "width": 800
   },
   {
@@ -21478,7 +21478,7 @@
    "key": "best.serp.co/listings/photor.io/logo/071528c7061f4fc7.png",
    "md5": "073913441e1d5ebe70f89e17e4e7b5e1",
    "sha256": "071528c7061f4fc755ec817e8621cb325bef1779a88ff433feacce81e2853d7e",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/photor-ai/public",
+   "source": "repo:apps/web/public/listing-media-seed/photor.io/logo/071528c7061f4fc7.png",
    "width": 800
   },
   {
@@ -22898,7 +22898,7 @@
    "key": "best.serp.co/listings/profilepicture.ai/image/23977f7bc9afc689.avif",
    "md5": "827686a39276e9d73297c89741a3a43d",
    "sha256": "23977f7bc9afc689b1048f7078637949cd19fdaa4aceb936e071052fc6bf34ff",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/profile-picture-ai/public",
+   "source": "repo:apps/web/public/listing-media-seed/profilepicture.ai/image/23977f7bc9afc689.avif",
    "width": 800
   },
   {
@@ -22908,7 +22908,7 @@
    "key": "best.serp.co/listings/profilepicture.ai/logo/23977f7bc9afc689.avif",
    "md5": "827686a39276e9d73297c89741a3a43d",
    "sha256": "23977f7bc9afc689b1048f7078637949cd19fdaa4aceb936e071052fc6bf34ff",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/profile-picture-ai/public",
+   "source": "repo:apps/web/public/listing-media-seed/profilepicture.ai/logo/23977f7bc9afc689.avif",
    "width": 800
   },
   {
@@ -22968,7 +22968,7 @@
    "key": "best.serp.co/listings/promptbase.com/image/8a1463b9176982a1.avif",
    "md5": "b402a1341fa254fc750eb2a4d5dde52b",
    "sha256": "8a1463b9176982a123a4f1551188441c9cd84b383d4115542b33c44480499697",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/promptbase/public",
+   "source": "repo:apps/web/public/listing-media-seed/promptbase.com/image/8a1463b9176982a1.avif",
    "width": 800
   },
   {
@@ -22978,7 +22978,7 @@
    "key": "best.serp.co/listings/promptbase.com/logo/8a1463b9176982a1.avif",
    "md5": "b402a1341fa254fc750eb2a4d5dde52b",
    "sha256": "8a1463b9176982a123a4f1551188441c9cd84b383d4115542b33c44480499697",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/promptbase/public",
+   "source": "repo:apps/web/public/listing-media-seed/promptbase.com/logo/8a1463b9176982a1.avif",
    "width": 800
   },
   {
@@ -23438,7 +23438,7 @@
    "key": "best.serp.co/listings/qatalog.com/image/535b3f3524b58ee1.avif",
    "md5": "b8a5dba0ae9d11e081368e04a3ced381",
    "sha256": "535b3f3524b58ee15fb17529b2769f9f379ce64b1eab9747785cde050a229ebb",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/qatalog/public",
+   "source": "repo:apps/web/public/listing-media-seed/qatalog.com/image/535b3f3524b58ee1.avif",
    "width": 800
   },
   {
@@ -23448,7 +23448,7 @@
    "key": "best.serp.co/listings/qatalog.com/logo/535b3f3524b58ee1.avif",
    "md5": "b8a5dba0ae9d11e081368e04a3ced381",
    "sha256": "535b3f3524b58ee15fb17529b2769f9f379ce64b1eab9747785cde050a229ebb",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/qatalog/public",
+   "source": "repo:apps/web/public/listing-media-seed/qatalog.com/logo/535b3f3524b58ee1.avif",
    "width": 800
   },
   {
@@ -23578,7 +23578,7 @@
    "key": "best.serp.co/listings/questionbase.com/logo/61acdaedf52e6675.avif",
    "md5": "11b5af046a54ed46c32590d38c9a03ba",
    "sha256": "61acdaedf52e66750a7e79bda24e2de1dfcee3e5bec77d34b86266a63cf62163",
-   "source": "https://framerusercontent.com/images/QInOaATE3RMg9MCnSO9oY77oY.png",
+   "source": "repo:apps/web/public/listing-media-seed/questionbase.com/logo/61acdaedf52e6675.avif",
    "width": 180
   },
   {
@@ -25518,7 +25518,7 @@
    "key": "best.serp.co/listings/runpod.io/image/0d9388753f120b5f.avif",
    "md5": "33a7a229ac7a75e273bbd1b5c7656e87",
    "sha256": "0d9388753f120b5f0853c3df574fb1cda00114e242d199c54f9d7befb1c1fbbb",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/runpod/public",
+   "source": "repo:apps/web/public/listing-media-seed/runpod.io/image/0d9388753f120b5f.avif",
    "width": 800
   },
   {
@@ -25528,7 +25528,7 @@
    "key": "best.serp.co/listings/runpod.io/logo/0d9388753f120b5f.avif",
    "md5": "33a7a229ac7a75e273bbd1b5c7656e87",
    "sha256": "0d9388753f120b5f0853c3df574fb1cda00114e242d199c54f9d7befb1c1fbbb",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/runpod/public",
+   "source": "repo:apps/web/public/listing-media-seed/runpod.io/logo/0d9388753f120b5f.avif",
    "width": 800
   },
   {
@@ -25568,7 +25568,7 @@
    "key": "best.serp.co/listings/ryrob.com/logo/8e52e8aa73bed9df.png",
    "md5": "4db432ff06227d6bd4da32e9e2de5cce",
    "sha256": "8e52e8aa73bed9df123042efb51a77b050ec3ae01aad694d53793bc4a65ebbe7",
-   "source": "https://www.ryrob.com/wp-content/uploads/2022/08/cropped-ryrob-favicon-192x192.png",
+   "source": "repo:apps/web/public/listing-media-seed/ryrob.com/logo/8e52e8aa73bed9df.png",
    "width": 192
   },
   {
@@ -25718,7 +25718,7 @@
    "key": "best.serp.co/listings/salesforce.com/image/e382a0a88be1f460.jpg",
    "md5": "84b7702b7f8ed4997fdd8697f164ddb2",
    "sha256": "e382a0a88be1f4606576e7dec63ed2b4fb98cafb9e82268ef676ddac1f0cb89b",
-   "source": "https://wp.sfdcdigital.com/en-us/wp-content/uploads/sites/4/2026/09/AIforce-OG.webp?w=1024",
+   "source": "repo:apps/web/public/listing-media-seed/salesforce.com/image/e382a0a88be1f460.jpg",
    "width": 1024
   },
   {
@@ -25928,7 +25928,7 @@
    "key": "best.serp.co/listings/scarlettpanda.com/logo/3ad38896aefbedd3.webp",
    "md5": "c0c990e0b86ec84138db254f3ed85c8a",
    "sha256": "3ad38896aefbedd3a5763f591a35e026254bdbf5a7c5ae97d026ff0577270206",
-   "source": "https://images.squarespace-cdn.com/content/v1/6360ec442bc6967f7a5ef4c8/e617f8de-217f-4786-ac41-8083c3db5dd4/favicon.ico?format=100w",
+   "source": "repo:apps/web/public/listing-media-seed/scarlettpanda.com/logo/3ad38896aefbedd3.webp",
    "width": 100
   },
   {
@@ -26728,7 +26728,7 @@
    "key": "best.serp.co/listings/serper.dev/image/2fcf90387ea7505c.avif",
    "md5": "6334e690eb8b08b96afc04f8bc1ad9bd",
    "sha256": "2fcf90387ea7505c66dc7d38dd95ee1858258e6fd87bdb4ee5bebc352bebf048",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/serper.dev/public",
+   "source": "repo:apps/web/public/listing-media-seed/serper.dev/image/2fcf90387ea7505c.avif",
    "width": 800
   },
   {
@@ -26738,7 +26738,7 @@
    "key": "best.serp.co/listings/serper.dev/logo/2fcf90387ea7505c.avif",
    "md5": "6334e690eb8b08b96afc04f8bc1ad9bd",
    "sha256": "2fcf90387ea7505c66dc7d38dd95ee1858258e6fd87bdb4ee5bebc352bebf048",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/serper.dev/public",
+   "source": "repo:apps/web/public/listing-media-seed/serper.dev/logo/2fcf90387ea7505c.avif",
    "width": 800
   },
   {
@@ -27022,13 +27022,13 @@
    "width": 64
   },
   {
-   "bytes": 2939,
+   "bytes": 2738,
    "contentType": "image/avif",
    "height": 120,
-   "key": "best.serp.co/listings/shopify.com/logo/d1b518105cf96633.avif",
-   "md5": "77ea30295896249fe82a7f7f0132cb43",
-   "sha256": "d1b518105cf966336a65807a28c68190beef4be64d6a437fada498b17c655f8c",
-   "source": "https://www.shopify.com/apple-touch-icon.png",
+   "key": "best.serp.co/listings/shopify.com/logo/1cd456a83d0130b4.avif",
+   "md5": "483dea8bc260ca7a694c2fdf122496d1",
+   "sha256": "1cd456a83d0130b4cd1486b7f752fe414900969baf4c8d14d44b6b1fa95aeae9",
+   "source": "repo:apps/web/public/listing-media-seed/shopify.com/logo/1cd456a83d0130b4.avif",
    "width": 120
   },
   {
@@ -28008,7 +28008,7 @@
    "key": "best.serp.co/listings/socialbee.com/image/5fb134347a733d63.png",
    "md5": "3ca5d7e7949b30dd0091c18d6095aaa1",
    "sha256": "5fb134347a733d63e9a303d45bdd7532095a12b4f0d2d01091b3e267559ef558",
-   "source": "https://socialbee.com/wp-content/uploads/2023/11/SocialBee-AI-powered-social-media-management-tool.png",
+   "source": "repo:apps/web/public/listing-media-seed/socialbee.com/image/5fb134347a733d63.png",
    "width": 1800
   },
   {
@@ -28018,7 +28018,7 @@
    "key": "best.serp.co/listings/socialbee.com/logo/9dbdef9c9095cc47.webp",
    "md5": "4c6483bc2436faa17167530e68c2e80a",
    "sha256": "9dbdef9c9095cc47b3ffa1dfdda7c4021ca9c23c0b0bf312d27266a8b758d3f4",
-   "source": "https://socialbee.com/wp-content/uploads/2022/09/cropped-favicon-192x192.png",
+   "source": "repo:apps/web/public/listing-media-seed/socialbee.com/logo/9dbdef9c9095cc47.webp",
    "width": 192
   },
   {
@@ -28388,7 +28388,7 @@
    "key": "best.serp.co/listings/sowork.com/logo/c9824e3ebf896b01.avif",
    "md5": "f4e16cc37cff6fc885a6e69f6e914d82",
    "sha256": "c9824e3ebf896b019c55d928fff6f4e29060a3925587670844715ee815ba7b15",
-   "source": "https://framerusercontent.com/images/YdbaiNV1ZJ6rsYlv6sgBif8tx8.png",
+   "source": "repo:apps/web/public/listing-media-seed/sowork.com/logo/c9824e3ebf896b01.avif",
    "width": 180
   },
   {
@@ -28648,7 +28648,7 @@
    "key": "best.serp.co/listings/spellbox.app/image/a8a394ac2f93563e.avif",
    "md5": "0a2201ec721210cfb1d8a2ce642eed84",
    "sha256": "a8a394ac2f93563e25a6d03705c5dd1a7cbf5537c071b7cbad743a93dbc50e7a",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/spellbox/public",
+   "source": "repo:apps/web/public/listing-media-seed/spellbox.app/image/a8a394ac2f93563e.avif",
    "width": 800
   },
   {
@@ -28658,7 +28658,7 @@
    "key": "best.serp.co/listings/spellbox.app/logo/a8a394ac2f93563e.avif",
    "md5": "0a2201ec721210cfb1d8a2ce642eed84",
    "sha256": "a8a394ac2f93563e25a6d03705c5dd1a7cbf5537c071b7cbad743a93dbc50e7a",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/spellbox/public",
+   "source": "repo:apps/web/public/listing-media-seed/spellbox.app/logo/a8a394ac2f93563e.avif",
    "width": 800
   },
   {
@@ -29128,7 +29128,7 @@
    "key": "best.serp.co/listings/stableattribution.com/image/e6e873e56870a236.avif",
    "md5": "456a1e924586c1fd18bf91d60a38dde7",
    "sha256": "e6e873e56870a2365c37d5e801a1b76a5c12372f61a9dda82ecdb2d63e9bdda8",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/stable-attribution/public",
+   "source": "repo:apps/web/public/listing-media-seed/stableattribution.com/image/e6e873e56870a236.avif",
    "width": 800
   },
   {
@@ -29138,7 +29138,7 @@
    "key": "best.serp.co/listings/stableattribution.com/logo/e6e873e56870a236.avif",
    "md5": "456a1e924586c1fd18bf91d60a38dde7",
    "sha256": "e6e873e56870a2365c37d5e801a1b76a5c12372f61a9dda82ecdb2d63e9bdda8",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/stable-attribution/public",
+   "source": "repo:apps/web/public/listing-media-seed/stableattribution.com/logo/e6e873e56870a236.avif",
    "width": 800
   },
   {
@@ -30168,7 +30168,7 @@
    "key": "best.serp.co/listings/supertranslate.ai/image/c814b8263df9d296.avif",
    "md5": "a914a0d6c0023576ee344f7618fa26e9",
    "sha256": "c814b8263df9d296bb3666a09037a00cd53e830ee02efd6a12c20332d9d20665",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/supertranslate/public",
+   "source": "repo:apps/web/public/listing-media-seed/supertranslate.ai/image/c814b8263df9d296.avif",
    "width": 800
   },
   {
@@ -30178,7 +30178,7 @@
    "key": "best.serp.co/listings/supertranslate.ai/logo/c814b8263df9d296.avif",
    "md5": "a914a0d6c0023576ee344f7618fa26e9",
    "sha256": "c814b8263df9d296bb3666a09037a00cd53e830ee02efd6a12c20332d9d20665",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/supertranslate/public",
+   "source": "repo:apps/web/public/listing-media-seed/supertranslate.ai/logo/c814b8263df9d296.avif",
    "width": 800
   },
   {
@@ -30328,7 +30328,7 @@
    "key": "best.serp.co/listings/synthesia.io/image/85b0705c21ceee0e.avif",
    "md5": "c214850ed32e91c669932915f7f3590c",
    "sha256": "85b0705c21ceee0e35de2bf220bd5b6ff55f01560723002820a07e385e90e2d9",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/synthesia/public",
+   "source": "repo:apps/web/public/listing-media-seed/synthesia.io/image/85b0705c21ceee0e.avif",
    "width": 800
   },
   {
@@ -30338,7 +30338,7 @@
    "key": "best.serp.co/listings/synthesia.io/logo/85b0705c21ceee0e.avif",
    "md5": "c214850ed32e91c669932915f7f3590c",
    "sha256": "85b0705c21ceee0e35de2bf220bd5b6ff55f01560723002820a07e385e90e2d9",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/synthesia/public",
+   "source": "repo:apps/web/public/listing-media-seed/synthesia.io/logo/85b0705c21ceee0e.avif",
    "width": 800
   },
   {
@@ -30788,7 +30788,7 @@
    "key": "best.serp.co/listings/tattoosai.com/image/2e859e797201ce51.avif",
    "md5": "2b6328ffa0f4aa1bfba7a96b0bd1152b",
    "sha256": "2e859e797201ce51a14ae050dfdbcf80e2e293ab6abfa99611ddc24d65ec8260",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/tattoos-ai/public",
+   "source": "repo:apps/web/public/listing-media-seed/tattoosai.com/image/2e859e797201ce51.avif",
    "width": 800
   },
   {
@@ -30868,7 +30868,7 @@
    "key": "best.serp.co/listings/teachermatic.com/logo/fa02091fe30198d6.webp",
    "md5": "6cd8d2be098c7d369a9188c7c5d9706d",
    "sha256": "fa02091fe30198d636deb3c922036b52fbf18180c43690367f53daa0a76902c5",
-   "source": "https://i0.wp.com/teachermatic.com/wp-content/uploads/2024/10/cropped-icon_circle_master.png?fit=192%2C192&ssl=1",
+   "source": "repo:apps/web/public/listing-media-seed/teachermatic.com/logo/fa02091fe30198d6.webp",
    "width": 192
   },
   {
@@ -31908,7 +31908,7 @@
    "key": "best.serp.co/listings/toonly.com/logo/78277c2a86c738ad.webp",
    "md5": "180766381fc1407a8c82291a90749f63",
    "sha256": "78277c2a86c738add3c761bcdf4cd7d18248d3c39ee2c2e57b04795eb3480294",
-   "source": "https://statics.myclickfunnels.com/image/309092/file/03e324c05f753a9dfa1a3c2e748217a8.png",
+   "source": "repo:apps/web/public/listing-media-seed/toonly.com/logo/78277c2a86c738ad.webp",
    "width": 512
   },
   {
@@ -32008,7 +32008,7 @@
    "key": "best.serp.co/listings/towardsdatascience.com/image/079735a32526d695.jpg",
    "md5": "246a8b33353bcd28ad4bcf86a90b2247",
    "sha256": "079735a32526d69549b09ed46e36a8588fa612f37d9a5bf806ee4c0a087cd4de",
-   "source": "https://towardsdatascience.com/images/default-og-image.jpg",
+   "source": "repo:apps/web/public/listing-media-seed/towardsdatascience.com/image/079735a32526d695.jpg",
    "width": 1200
   },
   {
@@ -32018,7 +32018,7 @@
    "key": "best.serp.co/listings/towardsdatascience.com/logo/1f13bd645613fa13.png",
    "md5": "a8290c8a9bc03fea832dfc1b20a5048b",
    "sha256": "1f13bd645613fa13de4167e927155b2db18c57685e0999f4c7bf0c4d2b7eb9ef",
-   "source": "https://towardsdatascience.com/apple-touch-icon.png",
+   "source": "repo:apps/web/public/listing-media-seed/towardsdatascience.com/logo/1f13bd645613fa13.png",
    "width": 180
   },
   {
@@ -33098,7 +33098,7 @@
    "key": "best.serp.co/listings/unakin.ai/logo/7ad167c5aafe2e10.avif",
    "md5": "41f6bfe0ce2c08dca425c2b792f92023",
    "sha256": "7ad167c5aafe2e10e6d830d771ffa669db2e7c54216f8ff704ed2e40e1c10691",
-   "source": "https://framerusercontent.com/images/hVVTvI1iwzU68duGWlVwDlKupA.png",
+   "source": "repo:apps/web/public/listing-media-seed/unakin.ai/logo/7ad167c5aafe2e10.avif",
    "width": 2000
   },
   {
@@ -33118,7 +33118,7 @@
    "key": "best.serp.co/listings/undetectable.ai/image/bdb562fe894dc46c.webp",
    "md5": "519eeb99f947557190af868b8196c2a4",
    "sha256": "bdb562fe894dc46c63b0f4952ef83d0313fe14a88f2cdea28b969967d498585a",
-   "source": "https://undetectable.ai/assets/homepage-og.png",
+   "source": "repo:apps/web/public/listing-media-seed/undetectable.ai/image/bdb562fe894dc46c.webp",
    "width": 2560
   },
   {
@@ -34008,7 +34008,7 @@
    "key": "best.serp.co/listings/vid2txt.com/logo/7df286255cc46e94.avif",
    "md5": "710e46303200eaedc9a683cf0d323db5",
    "sha256": "7df286255cc46e94cfb7b4c098f03c58e7cd2b7f6ab0c0648ad5885413773780",
-   "source": "https://framerusercontent.com/images/l509Ct0rYPk2FneS7K9xFoyb4ds.png",
+   "source": "repo:apps/web/public/listing-media-seed/vid2txt.com/logo/7df286255cc46e94.avif",
    "width": 64
   },
   {
@@ -36388,7 +36388,7 @@
    "key": "best.serp.co/listings/writeseed.com/image/9cfefea314bec9d3.avif",
    "md5": "b17526603872fef54377af1a6e14cf18",
    "sha256": "9cfefea314bec9d337c18af8d2f715030a00fa1a05d464bc998e6e5eeb34a3cb",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writeseed/public",
+   "source": "repo:apps/web/public/listing-media-seed/writeseed.com/image/9cfefea314bec9d3.avif",
    "width": 800
   },
   {
@@ -36718,7 +36718,7 @@
    "key": "best.serp.co/listings/ycombinator.com/image/3922e513912fd7ae.avif",
    "md5": "1092febf403c1c4cd64b5d55305b732b",
    "sha256": "3922e513912fd7aef261f1276c3be4cab14a9173841546914b740907b437296d",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/usebracket/public",
+   "source": "repo:apps/web/public/listing-media-seed/ycombinator.com/image/3922e513912fd7ae.avif",
    "width": 800
   },
   {
@@ -36728,7 +36728,7 @@
    "key": "best.serp.co/listings/ycombinator.com/logo/3922e513912fd7ae.avif",
    "md5": "1092febf403c1c4cd64b5d55305b732b",
    "sha256": "3922e513912fd7aef261f1276c3be4cab14a9173841546914b740907b437296d",
-   "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/usebracket/public",
+   "source": "repo:apps/web/public/listing-media-seed/ycombinator.com/logo/3922e513912fd7ae.avif",
    "width": 800
   },
   {
@@ -37008,7 +37008,7 @@
    "key": "best.serp.co/listings/yourcoverletter.com/logo/5a92200bfdf571ec.png",
    "md5": "e7229d7834ef963f1c81fb24609bcd11",
    "sha256": "5a92200bfdf571ec41d76237d6ea5937e6a485882b21c153fdeb16719e133ee7",
-   "source": "https://c4681b.claudeassets.com/20250427002016im_/https://i0.wp.com/yourcoverletter.com/wp-content/uploads/2022/10/cropped-Your-Cover-Letter-512-1.png?fit=192%2C192&ssl=1",
+   "source": "repo:apps/web/public/listing-media-seed/yourcoverletter.com/logo/5a92200bfdf571ec.png",
    "width": 192
   },
   {
