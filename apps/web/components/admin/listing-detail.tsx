@@ -70,7 +70,7 @@ import { toast } from 'sonner'
 import { adminRequest } from './api'
 import { formatDay, initials, listingPath } from './format'
 import { Kv } from './kv'
-import { ProductLogo } from './product-cell'
+import { LogoPreview } from './logo-preview'
 import { RecordHeader } from './record-header'
 import { StatusBadge, type StatusKind } from './status-badge'
 
@@ -101,6 +101,9 @@ export interface ListingDetailView {
   linkRel: LinkRel
   /** Set while the logo is not hosted yet (#95). */
   logoNote: { text: string; tone: 'err' | 'warn' } | null
+  /** What the screen renders: the hosted copy or an own-origin path, else the tile (#96 S9). */
+  logoImage: string | null
+  /** The logo's source, edited in the form; never rendered as an image. */
   logoUrl: string | null
   meta: string
   name: string
@@ -285,7 +288,7 @@ export function ListingDetail({
       <RecordHeader
         actions={actions.length ? actions : null}
         chips={<StatusBadge kind={statusKinds[view.adminStatus]} />}
-        logoUrl={view.logoUrl}
+        logoUrl={view.logoImage}
         meta={view.meta}
         name={view.name}
         website={view.website}
@@ -449,11 +452,10 @@ export function ListingDetail({
           <Field>
             <FieldLabel htmlFor="listing-logo">Logo</FieldLabel>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <ProductLogo
-                className="rounded-lg"
-                logoUrl={details.logoUrl}
+              <LogoPreview
+                hosted={details.logoUrl.trim() === (view.logoUrl ?? '') ? view.logoImage : null}
                 name={details.name}
-                size={64}
+                source={details.logoUrl}
                 website={details.website}
               />
               <Input
@@ -465,8 +467,8 @@ export function ListingDetail({
               />
             </div>
             <FieldDescription>
-              A square image URL (PNG, JPG, WebP, GIF, AVIF or ICO). It is copied to our media host;
-              an SVG can't be hosted.
+              A square image URL (PNG, JPG, WebP, GIF, AVIF or ICO). It is copied to our media host
+              and shown from there; an SVG can't be hosted.
             </FieldDescription>
             {view.logoNote ? (
               view.logoNote.tone === 'err' ? (

@@ -53,6 +53,22 @@ const latestConclusiveBadge = (listingIdSql: string) => `(SELECT outcome FROM ba
   WHERE listing_id=${listingIdSql} AND conclusive=1 ORDER BY checked_at DESC,id DESC LIMIT 1)`
 
 /**
+ * Hosted copies the admin screens render instead of a source URL (#96 review S9): a
+ * submission's hosted slot for its current source, or the listing's hosted logo when a revision
+ * keeps it. A source with no hosted copy is shown as a link, never as an image.
+ */
+function submissionHostedKey(submission: string, kind: 'image' | 'logo', source?: string): string {
+  return `(SELECT j.media_key FROM media_ingestions j WHERE j.submission_id=${submission}.id
+    AND j.kind='${kind}' AND j.sort_order=0 AND j.status='hosted'${source ? ` AND j.source_url=${source}` : ''})`
+}
+
+function listingHostedLogoKey(listingId: string, source?: string): string {
+  return `(SELECT m.media_key FROM listing_media m WHERE m.listing_id=${listingId}
+    AND m.kind='logo' AND m.media_key IS NOT NULL${source ? ` AND m.url=${source}` : ''}
+    ORDER BY m.sort_order LIMIT 1)`
+}
+
+/**
  * The review queue for one tab: submissions and owner revisions in one list. `queued_at` is when
  * the item entered its current state (badge verified, paid, changes requested, or edited), so
  * the age column and the default sort (oldest first) read it.
@@ -62,7 +78,8 @@ export function selectReviewQueuePlan(view: ReviewQueueView): StatementPlan {
   const order = view === 'all' ? 'DESC' : 'ASC'
   return {
     sql: `SELECT * FROM (
-        SELECT 'submission' AS kind,s.id,s.slug,s.name,s.website,s.logo_url,s.status,s.plan,
+        SELECT 'submission' AS kind,s.id,s.slug,s.name,s.website,s.logo_url,
+          ${submissionHostedKey('s', 'logo', 's.logo_url')} AS logo_key,s.status,s.plan,
           s.paid_at,s.refunded_at,s.listing_id,u.email AS owner_email,
           CASE WHEN s.badge_verified_at IS NOT NULL THEN 'pass' END AS badge,
           CASE
@@ -75,7 +92,8 @@ export function selectReviewQueuePlan(view: ReviewQueueView): StatementPlan {
         FROM listing_submissions s LEFT JOIN users u ON u.id=s.owner_user_id
         WHERE s.status IN (${submissionStatusesByView[view]})
         UNION ALL
-        SELECT 'revision',r.id,l.slug,r.name,l.website,r.logo_url,r.status,
+        SELECT 'revision',r.id,l.slug,r.name,l.website,r.logo_url,
+          ${listingHostedLogoKey('r.listing_id', 'r.logo_url')},r.status,
           ${listingPaidSql('r.listing_id')},NULL,NULL,r.listing_id,u.email,
           ${latestConclusiveBadge('r.listing_id')},
           CASE WHEN r.status='changes_requested' THEN COALESCE(r.reviewed_at,r.updated_at)
@@ -130,6 +148,8 @@ export function selectSubmissionReviewPlans(submissionId: string): StatementPlan
     {
       sql: `SELECT s.id,s.slug,s.name,s.description,s.website,s.content,s.category_slug,
           c.name AS category_name,s.logo_url,s.video_url,s.status,s.plan,s.paid_at,s.refunded_at,
+          ${submissionHostedKey('s', 'logo', 's.logo_url')} AS logo_key,
+          ${submissionHostedKey('s', 'image')} AS image_key,
           s.verification_attempts,s.last_verification_at,s.last_verification_error,
           s.badge_verified_at,s.reviewed_at,s.reviewed_by,s.reviewer_note,s.rejection_reason,
           s.rejection_category,s.withdrawal_reason,s.created_at,s.updated_at,s.content_version,
@@ -184,6 +204,7 @@ export function selectRevisionReviewPlans(revisionId: string): StatementPlan[] {
     {
       sql: `SELECT r.id,r.listing_id,r.status,r.base_checksum,r.name,r.description,r.content,
           r.category_slug,c.name AS category_name,r.logo_url,r.video_url,r.reviewer_note,
+          ${listingHostedLogoKey('r.listing_id', 'r.logo_url')} AS logo_key,
           r.rejection_reason,r.reviewed_at,r.reviewed_by,r.created_at,r.updated_at,
           r.content_version,l.slug,l.website,l.name AS listing_name,l.checksum AS listing_checksum,
           l.link_rel AS listing_link_rel,
@@ -246,6 +267,7 @@ const adminListingColumns = `l.id,l.slug,l.name,l.website,l.source,l.link_rel,l.
     l.created_at,l.published_at,l.source_kind,
     (SELECT url FROM listing_media m WHERE m.listing_id=l.id AND m.kind='logo'
       ORDER BY m.sort_order LIMIT 1) AS logo_url,
+    ${listingHostedLogoKey('l.id')} AS logo_key,
     (SELECT u.email FROM listing_owners o JOIN users u ON u.id=o.user_id
       WHERE o.listing_id=l.id AND o.role='owner' AND o.revoked_at IS NULL) AS owner_email,
     (SELECT o.verified_via FROM listing_owners o
@@ -472,6 +494,8 @@ export interface ReviewQueueItem {
   id: string
   kind: 'revision' | 'submission'
   listingId: string | null
+  /** The hosted copy of `logoUrl`, if any (render this, never `logoUrl`). */
+  logoKey: string | null
   logoUrl: string
   name: string
   ownerEmail: string | null
@@ -558,6 +582,10 @@ export interface SubmissionReview {
     publishedAt: string | null
     slug: string
   } | null
+  /** The hosted copy of the submission's social image, if any (#95). */
+  imageKey: string | null
+  /** The hosted copy of `logoUrl`, if any: render this, never `logoUrl` (#96 S9). */
+  logoKey: string | null
   logoUrl: string
   name: string
   paidAt: string | null
@@ -601,6 +629,8 @@ export interface RevisionReview {
     name: string
     slug: string
   }
+  /** The hosted copy of `logoUrl`, if any: render this, never `logoUrl` (#96 S9). */
+  logoKey: string | null
   logoUrl: string
   name: string
   plan: SubmissionPlan
@@ -624,6 +654,8 @@ export interface AdminListingRow {
   createdAt: string | null
   id: string
   linkRel: ListingLinkRel
+  /** The hosted logo's key, if any: render this, never `logoUrl` (#96 S9). */
+  logoKey: string | null
   logoUrl: string | null
   name: string
   ownerEmail: string | null
@@ -762,6 +794,7 @@ function listingRow(row: Row): AdminListingRow {
     createdAt: toInstant(row.created_at),
     id: text(row.id),
     linkRel: text(row.link_rel) as ListingLinkRel,
+    logoKey: optionalText(row.logo_key),
     logoUrl: optionalText(row.logo_url),
     name: text(row.name),
     ownerEmail: optionalText(row.owner_email),
@@ -888,6 +921,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
           name: text(row.listing_name),
           slug: text(row.slug)
         },
+        logoKey: optionalText(row.logo_key),
         logoUrl: text(row.logo_url),
         name: text(row.name),
         plan: text(row.plan) as SubmissionPlan,
@@ -946,6 +980,8 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
                 slug: text(row.listing_slug)
               }
             : null,
+        imageKey: optionalText(row.image_key),
+        logoKey: optionalText(row.logo_key),
         logoUrl: text(row.logo_url),
         name: text(row.name),
         paidAt: toInstant(row.paid_at),
@@ -994,6 +1030,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         id: text(row.id),
         kind: text(row.kind) as ReviewQueueItem['kind'],
         listingId: optionalText(row.listing_id),
+        logoKey: optionalText(row.logo_key),
         logoUrl: text(row.logo_url),
         name: text(row.name),
         ownerEmail: optionalText(row.owner_email),

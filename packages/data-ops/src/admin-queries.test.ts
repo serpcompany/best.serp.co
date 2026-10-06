@@ -91,6 +91,24 @@ function fixture() {
     VALUES ('lst_other','logo',0,'https://zeta.example/logo.png','pending',1,
       '2026-10-06T12:15:00.000Z','http_503');
   `)
+  // Hosted copies the screens render instead of sources (#96 review S9): Brieflow's logo, and
+  // Quillmate's submitted logo and social image under the submission's prefix.
+  const hosted = (key: string) => `'${key}','${'a'.repeat(64)}','image/png',10,1,1`
+  db.exec(`
+    DELETE FROM listing_media WHERE listing_id='lst_brief' AND kind='logo';
+    INSERT INTO listing_media (listing_id,kind,url,sort_order,media_key,sha256,content_type,bytes,
+      width,height)
+    VALUES ('lst_brief','logo','https://assets.example/brief.png',0,
+      ${hosted(`best.serp.co/listings/brieflow.ai/logo/${'a'.repeat(16)}.png`)});
+    INSERT INTO media_ingestions (submission_id,kind,sort_order,source_url,status,attempts,
+      media_key,sha256,content_type,bytes,width,height)
+    VALUES ('sub_quill','logo',0,'https://quillmate.app/logo.png','hosted',1,
+        ${hosted(`best.serp.co/submissions/sub_quill/logo/${'b'.repeat(16)}.png`)}),
+      ('sub_quill','image',0,'https://quillmate.app/og.png','hosted',1,
+        ${hosted(`best.serp.co/submissions/sub_quill/image/${'c'.repeat(16)}.png`)}),
+      ('sub_old','logo',0,'https://pagecraft.io/old-logo.png','hosted',1,
+        ${hosted(`best.serp.co/submissions/sub_old/logo/${'d'.repeat(16)}.png`)});
+  `)
   return createAdminReadOperations({ client: createDatabase(d1.asD1Database()) })
 }
 
@@ -263,7 +281,11 @@ describe('admin listing reads', () => {
       },
       logoUrl: 'https://zeta.example/logo.png'
     })
-    expect(await reads.getAdminListing('brieflow.ai')).toMatchObject({ logoQueue: null })
+    expect(await reads.getAdminListing('brieflow.ai')).toMatchObject({
+      logoKey: `best.serp.co/listings/brieflow.ai/logo/${'a'.repeat(16)}.png`,
+      logoQueue: null
+    })
+    expect(await reads.getAdminListing('zeta.example')).toMatchObject({ logoKey: null })
     expect(await reads.getAdminListing('missing.example')).toBeNull()
     expect(await reads.listActiveCategories()).toEqual([
       { name: 'Tools', slug: 'tools' },
@@ -278,5 +300,28 @@ describe('admin listing reads', () => {
     expect(toInstant('2026-05-16')).toBe('2026-05-16T00:00:00.000Z')
     expect(toInstant(null)).toBeNull()
     expect(toInstant('not a time')).toBeNull()
+  })
+})
+
+describe('hosted copies on the admin screens (#96 review S9)', () => {
+  it('names the hosted copy of the current source only, never a stale one', async () => {
+    const reads = fixture()
+    expect(await reads.getSubmissionReview('sub_quill')).toMatchObject({
+      imageKey: `best.serp.co/submissions/sub_quill/image/${'c'.repeat(16)}.png`,
+      logoKey: `best.serp.co/submissions/sub_quill/logo/${'b'.repeat(16)}.png`
+    })
+    // sub_old's hosted logo is of an older source: the screen shows the tile and a link.
+    expect(await reads.getSubmissionReview('sub_old')).toMatchObject({
+      imageKey: null,
+      logoKey: null
+    })
+    const queue = await reads.listReviewQueue('all')
+    expect(Object.fromEntries(queue.map(item => [item.id, item.logoKey]))).toMatchObject({
+      rev_brief: null,
+      sub_old: null,
+      sub_quill: `best.serp.co/submissions/sub_quill/logo/${'b'.repeat(16)}.png`
+    })
+    // A revision keeps the listing's hosted logo only when it keeps the same source.
+    expect(await reads.getRevisionReview('rev_brief')).toMatchObject({ logoKey: null })
   })
 })

@@ -7,6 +7,7 @@ import { revisionView, stagedPreview } from '@/lib/admin/review-view'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { decisionIdSchema } from '@/lib/admin/schemas'
 import { requireAdmin } from '@/lib/auth/server'
+import { mediaBaseUrl } from '@/lib/media/media-base'
 
 /** One owner revision of a live listing under review (#64; screen 11's layout). */
 export const dynamic = 'force-dynamic'
@@ -26,6 +27,7 @@ export default async function RevisionReviewPage({ params }: Props) {
     reads.listActiveCategories()
   ])
   if (!review) notFound()
+  const media = await mediaBaseUrl()
   return (
     <>
       <AdminCrumbs
@@ -39,9 +41,12 @@ export default async function RevisionReviewPage({ params }: Props) {
       <ReviewDetail
         categories={categories}
         preview={
-          <PreviewCardBody categoryName={review.categoryName} preview={stagedPreview(review)} />
+          <PreviewCardBody
+            categoryName={review.categoryName}
+            preview={stagedPreview(review, media)}
+          />
         }
-        view={revisionView(review)}
+        view={revisionView(review, media)}
       />
     </>
   )

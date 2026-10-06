@@ -68,7 +68,7 @@ import { toast } from 'sonner'
 import { adminRequest } from './api'
 import { ageWords, formatDateTime, formatSince, formatUsd, initials, listingPath } from './format'
 import { Kv } from './kv'
-import { ProductLogo } from './product-cell'
+import { LogoPreview } from './logo-preview'
 import { RecordHeader } from './record-header'
 import { PlanBadge, StatusBadge, type StatusKind } from './status-badge'
 
@@ -96,6 +96,9 @@ export interface ReviewView {
   kind: 'revision' | 'submission'
   linkRel: LinkRel
   listing: { live: boolean; liveSince: string | null; slug: string } | null
+  /** The hosted copy of `logoUrl`, or null for the fallback tile (#96 review S9). */
+  logoImage: string | null
+  /** The submitted logo source; never rendered as an image. */
   logoUrl: string
   name: string
   paid: boolean
@@ -399,11 +402,10 @@ export function ReviewDetail({
               ) : null}
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <ProductLogo
-                className="rounded-lg"
-                logoUrl={edits.logoUrl}
+              <LogoPreview
+                hosted={edits.logoUrl.trim() === view.logoUrl ? view.logoImage : null}
                 name={edits.name}
-                size={64}
+                source={edits.logoUrl}
                 website={view.website}
               />
               <Input
@@ -413,7 +415,9 @@ export function ReviewDetail({
                 onChange={event => setEdits({ ...edits, logoUrl: event.target.value })}
               />
             </div>
-            <FieldDescription>A square image URL (PNG, JPG, SVG or WebP).</FieldDescription>
+            <FieldDescription>
+              A square image URL (PNG, JPG or WebP). It is copied to our media host on approval.
+            </FieldDescription>
           </Field>
           <Field>
             <div className="flex items-center gap-2">
@@ -518,7 +522,10 @@ export function ReviewDetail({
               ],
               ['Category', view.categoryName ?? view.categorySlug],
               ['Plan', view.paid ? `Paid · ${amount}` : 'Free (badge)'],
-              ['Logo', `From ${hostOf(view.logoUrl)}`]
+              [
+                'Logo',
+                `From ${hostOf(view.logoUrl)}${view.logoImage ? ', hosted' : ', not hosted yet'}`
+              ]
             ]}
           />
         </CardContent>
@@ -692,7 +699,7 @@ export function ReviewDetail({
             ) : null}
           </>
         }
-        logoUrl={view.logoUrl}
+        logoUrl={view.logoImage}
         meta={meta}
         name={view.name}
         website={view.website}
