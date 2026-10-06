@@ -19,13 +19,17 @@
     "./email-deliveries": "./src/email-deliveries.ts",
     "./listing-plans": "./src/listing-plans.ts",
     "./media-format": "./src/media-format.ts",
+    "./media-ingest": "./src/media-ingest.ts",
     "./media-keys": "./src/media-keys.ts",
+    "./media-operations": "./src/media-operations.ts",
     "./media-plans": "./src/media-plans.ts",
     "./plan-runner": "./src/plan-runner.ts",
     "./plan-support": "./src/plan-support.ts",
     "./public-url": "./src/public-url.ts",
     "./revision-plans": "./src/revision-plans.ts",
+    "./safe-fetch": "./src/safe-fetch.ts",
     "./schema": "./src/schema.ts",
+    "./site-metadata": "./src/site-metadata.ts",
     "./sql-limits": "./src/sql-limits.ts",
     "./submissions": "./src/submissions.ts",
     "./submission-plans": "./src/submission-plans.ts",
@@ -33,7 +37,7 @@
   },
   "scripts": {
     "benchmark": "vitest run src/benchmark.test.ts",
-    "test": "vitest run src/account.test.ts src/admin-plans.test.ts src/admin-queries.test.ts src/auth.test.ts src/test-support.test.ts src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/draft-plans.test.ts src/draft-jobs.test.ts src/badge-program.test.ts src/listing-plans.test.ts src/revision-plans.test.ts src/schema-invariants.test.ts src/url-key.test.ts src/media-format.test.ts src/media-keys.test.ts src/media-plans.test.ts src/benchmark.test.ts",
+    "test": "vitest run src/account.test.ts src/admin-plans.test.ts src/admin-queries.test.ts src/auth.test.ts src/test-support.test.ts src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/draft-plans.test.ts src/draft-jobs.test.ts src/badge-program.test.ts src/listing-plans.test.ts src/revision-plans.test.ts src/schema-invariants.test.ts src/url-key.test.ts src/media-format.test.ts src/media-keys.test.ts src/media-plans.test.ts src/media-ingest.test.ts src/media-operations.test.ts src/site-metadata.test.ts src/safe-fetch.test.ts src/benchmark.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {

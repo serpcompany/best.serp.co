@@ -13,6 +13,7 @@ import {
   DRAFT_JOBS_CRON,
   draftJobs,
   handleScheduled,
+  MEDIA_CRON,
   type ScheduledJob,
   scheduledJobs
 } from './scheduled'
@@ -83,11 +84,14 @@ describe('scheduled handler', () => {
       triggers?: { crons?: string[] }
     }
     const expected = Object.keys(scheduledJobs).sort()
-    expect(expected).toEqual([DRAFT_JOBS_CRON, BADGE_WEEKLY_CRON, BADGE_DAILY_CRON].sort())
+    expect(expected).toEqual(
+      [DRAFT_JOBS_CRON, BADGE_WEEKLY_CRON, BADGE_DAILY_CRON, MEDIA_CRON].sort()
+    )
     // The hourly trigger continues the badge program after its own draft job.
     expect(scheduledJobs[DRAFT_JOBS_CRON]).toEqual([draftJobs, badgeProgramJob])
     expect(scheduledJobs[BADGE_WEEKLY_CRON]).toEqual([badgeProgramJob])
     expect(scheduledJobs[BADGE_DAILY_CRON]).toEqual([badgeProgramJob])
+    expect(scheduledJobs[MEDIA_CRON]?.map(job => job.name)).toEqual(['listing-media'])
     for (const crons of [
       config.triggers?.crons,
       config.env.staging?.triggers?.crons,
