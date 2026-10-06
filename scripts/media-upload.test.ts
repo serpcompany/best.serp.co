@@ -159,7 +159,6 @@ describe('media upload plans', () => {
     expect(puts[0]?.[1]?.headers).toEqual({
       Authorization: 'Bearer token',
       'Cache-Control': 'public, max-age=31536000, immutable',
-      'Content-Length': String(remote.bytes),
       'Content-Type': 'image/png'
     })
   })

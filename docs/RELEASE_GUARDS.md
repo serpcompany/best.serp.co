@@ -147,6 +147,11 @@ bucket to bucket through the R2 API, before the manifest that names its keys is 
   overwrites, an object the bucket already holds.
 - The publisher refuses a media manifest until the target's own bucket holds every object it
   names, byte for byte.
+- The publisher, approver, and notifier refuse any statement D1's remote API would reject
+  (`scripts/d1-compat.ts`: no `PRAGMA`, temporary table, transaction control, or `ATTACH`). A
+  publication guard fails its batch with `malformed JSON`, as the Worker's plans do.
+- An upload failure names its cause (`fetch failed: <code> <message>`). `NETWORK_SMOKE=1` runs a
+  real HTTPS fetch through the pinned Node fetcher (`packages/data-ops/src/safe-fetch-node.test.ts`).
 - Media, category, FAQ, and unpublish manifests are row-level (`concurrency: rows`): each fits
   both environments whatever else each published, and a listing that changed since generation
   refuses it with nothing written. Any other manifest still names the base version both

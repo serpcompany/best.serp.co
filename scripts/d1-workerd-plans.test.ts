@@ -24,6 +24,7 @@ import * as submissionPlansModule from '@serpdirectory/data-ops/submission-plans
 import type { UrlKey } from '@serpdirectory/utils/url-key'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { getPlatformProxy, type Unstable_DevWorker, unstable_dev } from 'wrangler'
+import { buildPublicationPlan, executePublicationPlan, parseManifest } from './d1-publisher'
 import { project } from './project'
 
 /**
@@ -1208,6 +1209,77 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         .bind(listingId, hosted('logo', 'c').key)
         .run()
     ).rejects.toThrow(/listing_media_hosted_complete/u)
+  })
+
+  it('applies a publication plan on D1 and refuses a stale one with nothing written (#95 release blocker)', async () => {
+    // D1's authorizer refuses temporary tables, which the publisher's old guard table used:
+    // Publish D1 Catalog (staging) run 37471283341 failed with exactly this.
+    await expect(db.prepare('CREATE TEMP TABLE guard (valid INTEGER)').run()).rejects.toThrow(
+      /SQLITE_AUTH/u
+    )
+    const seed = (id: string, slug: string) =>
+      db.batch([
+        db
+          .prepare(
+            `INSERT INTO listings (id,slug,name,description,website,status,source_kind,source_identity,
+            checksum) VALUES (?,?,'Hijacked','d',?,'draft','test',?,'c')`
+          )
+          .bind(id, slug, `https://${slug}/`, slug),
+        db
+          .prepare(
+            `INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+            SELECT ?,id,0,1 FROM categories WHERE slug='tools'`
+          )
+          .bind(id),
+        db.prepare(`UPDATE listings SET status='approved',published_at=? WHERE id=?`).bind(NOW, id)
+      ])
+    await seed('lst_unpublish_workerd', 'parked.example')
+    await seed('lst_moved_workerd', 'moved.example')
+    const manifest = (id: string, slug: string, website: string) => {
+      const source = `version: 1
+id: workerd-unpublish-${slug}
+concurrency: rows
+provenance:
+  actor: test
+  workflow: test/workerd
+operations:
+  - action: listing-unpublish
+    id: ${id}
+    slug: ${slug}
+    categories: [tools]
+    reason: parked
+    expected:
+      website: ${website}
+`
+      return { parsed: parseManifest(source), source }
+    }
+    const live = async () =>
+      (await first<{ checksum: string; version: number }>(
+        'SELECT version, checksum FROM publication_state WHERE id=1'
+      )) as { checksum: string; version: number }
+    const before = await live()
+    const good = manifest('lst_unpublish_workerd', 'parked.example', 'https://parked.example/')
+    await executePublicationPlan(db, buildPublicationPlan(good.parsed, good.source, NOW, before))
+    expect(await listing('lst_unpublish_workerd')).toMatchObject({
+      is_active: 0,
+      status: 'approved'
+    })
+    expect((await live()).version).toBe(before.version + 1)
+
+    // A listing whose website moved: the guard's malformed JSON rolls the whole batch back.
+    const after = await live()
+    const stale = manifest('lst_moved_workerd', 'moved.example', 'https://elsewhere.example/')
+    await expect(
+      executePublicationPlan(db, buildPublicationPlan(stale.parsed, stale.source, NOW, after))
+    ).rejects.toThrow(/malformed JSON/u)
+    expect(await listing('lst_moved_workerd')).toMatchObject({ is_active: 1 })
+    expect(await live()).toEqual(after)
+    expect(
+      await first(
+        'SELECT outcome FROM publication_runs WHERE manifest_id=?',
+        'workerd-unpublish-moved.example'
+      )
+    ).toBeNull()
   })
 
   it('ran every exported plan builder on D1', () => {

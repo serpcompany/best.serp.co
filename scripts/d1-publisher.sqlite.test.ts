@@ -70,7 +70,7 @@ function d1Binding(value: unknown): SQLInputValue {
 }
 
 function executeInTestTransaction(db: DatabaseSync, publication: PublicationPlan): void {
-  db.exec('DROP TABLE IF EXISTS publication_guard; BEGIN IMMEDIATE;')
+  db.exec('BEGIN IMMEDIATE;')
   try {
     for (const item of publication.statements) {
       // The production publisher's SQL gets the same D1 limit and self-comparison checks (#77).

@@ -120,3 +120,24 @@ describe('safeFetch in Node (DNS-checked, connection pinned)', () => {
     }
   })
 })
+
+/**
+ * Opt-in network smoke test (`NETWORK_SMOKE=1`): a real public HTTPS fetch through the pinned
+ * dispatcher, its DNS lookup, and TLS, on whatever Node runs it (`.nvmrc` in the workflows). Off
+ * by default, so CI never depends on the network.
+ */
+describe.runIf(process.env.NETWORK_SMOKE === '1')('pinned Node fetch on the network', () => {
+  it('fetches a real public HTTPS page through the pinned dispatcher and safeFetch', async () => {
+    const response = await createNodeFetch()('https://www.example.com/')
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('Example Domain')
+    const result = await safeFetch('https://example.com/', {
+      accept: type => type === 'text/html',
+      acceptHeader: 'text/html',
+      fetcher: createNodeFetch(),
+      maxBytes: 1_000_000,
+      webPortsOnly: true
+    })
+    expect(result.ok).toBe(true)
+  })
+})
