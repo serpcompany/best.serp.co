@@ -71,6 +71,7 @@ import { hasFileExtension } from '@serpdirectory/utils/file-extensions'
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
+import { describeMediaFailure } from './logo-note'
 
 /** Sends one of the site's emails after the response (`enqueueEmail` in production). */
 export type AdminNotify = <K extends keyof AppEmailTemplates & string>(
@@ -105,6 +106,12 @@ export interface AdminMediaHost {
     slug: string
     sourceUrl: string
   }): Promise<ListingLogoIngestion>
+  /**
+   * Hosts a listing's queued slots after the response (an approval queues the submission's
+   * hosted logo and image for a copy into the listing's path), so the page leaves the fallback
+   * tile without waiting for the cron. Best effort: the cron retries whatever this misses.
+   */
+  settle?(listingId: string): void
 }
 
 export interface AdminContext {
@@ -450,6 +457,7 @@ async function approveSubmissionOnce(
     )
     version += 1
   }
+  const approvedListingId = snapshot.listing_id ?? `submission_${input.submissionId}`
   if (snapshot.status === 'verified') {
     const publication = await publicationFor(
       context,
@@ -466,7 +474,7 @@ async function approveSubmissionOnce(
         beforeChecksum: publication.beforeChecksum,
         expectedContentVersion: version,
         linkRel: input.linkRel,
-        listingId: snapshot.listing_id ?? `submission_${input.submissionId}`,
+        listingId: approvedListingId,
         manifestId: publication.manifestId,
         now,
         reviewer: context.actor,
@@ -526,6 +534,7 @@ async function approveSubmissionOnce(
     submissionRead(context, snapshot)
   )
   log(context, 'approve_submission', input.submissionId, decision.ok ? 'approved' : decision.error)
+  if (decision.ok && !decision.replayed) context.media?.settle?.(approvedListingId)
   if (decision.ok) await emailApproval(context, input.submissionId)
   return decision
 }
@@ -753,6 +762,7 @@ async function approveRevisionOnce(
     revisionRead(context, input.revisionId, snapshot)
   )
   log(context, 'approve_revision', input.revisionId, decision.ok ? 'approved' : decision.error)
+  if (decision.ok && !decision.replayed) context.media?.settle?.(snapshot.listing_id)
   return decision
 }
 
@@ -959,20 +969,26 @@ async function websiteConflict(
   return null
 }
 
-/** What became of a changed logo: hosted now, or queued (`pending`) or `failed` behind the tile. */
-export type LogoOutcome = 'failed' | 'hosted' | 'pending'
+/**
+ * What became of a changed logo (#96 review S4): hosted now, or `pending` (queued for the media
+ * cron, with a `notice` the screen shows instead of "Saved"). A logo that can never be hosted is
+ * refused with a 422 and nothing is saved.
+ */
+export type LogoOutcome = 'hosted' | 'pending'
+
+type DetailsResult = { fields: string[]; logo?: LogoOutcome; notice?: string }
 
 export function updateListingDetails(
   context: AdminContext,
   input: Parameters<typeof updateListingDetailsOnce>[1]
-): Promise<Decision<{ fields: string[]; logo?: LogoOutcome }>> {
+): Promise<Decision<DetailsResult>> {
   return retryPublicationRace(() => updateListingDetailsOnce(context, input))
 }
 
 async function updateListingDetailsOnce(
   context: AdminContext,
   input: { details: ListingDetailsEdit; expectedChecksum: string; listingId: string }
-): Promise<Decision<{ fields: string[]; logo?: LogoOutcome }>> {
+): Promise<Decision<DetailsResult>> {
   const snapshot = await listingSnapshot(context, input.listingId)
   if (!snapshot) return notFound('listing')
   const reads = createAdminReadOperations({ client: context.client })
@@ -1019,20 +1035,31 @@ async function updateListingDetailsOnce(
     if (conflict) return conflict
   }
   // A new logo is copied into the media bucket before the batch, never stored as a hotlink (#95).
+  const logoChanged = fields.includes('logo') && Boolean(details.logoUrl)
   const logoIngestion =
-    fields.includes('logo') && details.logoUrl && context.media
+    logoChanged && context.media
       ? await context.media.host({ kind: 'logo', slug: snapshot.slug, sourceUrl: details.logoUrl })
       : undefined
-  const logo: LogoOutcome | undefined =
-    !fields.includes('logo') || !details.logoUrl
-      ? undefined
-      : !logoIngestion
-        ? 'pending'
-        : 'hosted' in logoIngestion
-          ? 'hosted'
-          : logoIngestion.failure.retryable
-            ? 'pending'
-            : 'failed'
+  if (logoIngestion && 'failure' in logoIngestion && !logoIngestion.failure.retryable) {
+    // Nothing is saved: the listing keeps its working logo and the admin sees why (#96 S4).
+    return failure(
+      422,
+      'logo_unhostable',
+      `This logo can't be hosted: ${describeMediaFailure(logoIngestion.failure.code)}. Nothing was saved; the current logo stays.`
+    )
+  }
+  const result: DetailsResult = { fields }
+  if (logoChanged) {
+    if (logoIngestion && 'hosted' in logoIngestion) {
+      result.logo = 'hosted'
+    } else {
+      result.logo = 'pending'
+      const reason = logoIngestion
+        ? `couldn't be copied yet: ${describeMediaFailure(logoIngestion.failure.code)}`
+        : 'is queued to be copied'
+      result.notice = `Saved, but the new logo ${reason}. It will be retried; until it is hosted the page keeps its hosted logo, or shows the fallback tile if it had none.`
+    }
+  }
   const decision = await commit(
     context,
     buildUpdateListingDetailsPlans({
@@ -1044,7 +1071,7 @@ async function updateListingDetailsOnce(
       publication: await listingPublication(context, snapshot, 'listing-edit', nowIso(context))
     }),
     async () => false,
-    logo ? { fields, logo } : { fields },
+    result,
     listingRead(context, snapshot)
   )
   log(context, 'edit_listing', input.listingId, decision.ok ? fields.join(',') : decision.error)

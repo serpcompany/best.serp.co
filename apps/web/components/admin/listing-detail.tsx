@@ -231,7 +231,10 @@ export function ListingDetail({
       return false
     }
     setDialog(null)
-    toast.success(result.replayed ? 'Already done. Nothing changed.' : done)
+    // A save that went through with a caveat (a logo still queued, #96 S4) is not "Saved.".
+    const notice = typeof result.notice === 'string' ? result.notice : null
+    if (notice) toast.warning(notice)
+    else toast.success(result.replayed ? 'Already done. Nothing changed.' : done)
     router.refresh()
     return true
   }

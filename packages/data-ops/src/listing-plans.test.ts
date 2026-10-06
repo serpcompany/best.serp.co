@@ -792,17 +792,47 @@ describe('listing activity log and admin edits (#64)', () => {
     expect(() =>
       withIngestion(database(), { hosted: { ...hostedLogo, sourceUrl: 'https://other.example/' } })
     ).toThrow(/edited source/u)
-    for (const [retryable, status] of [
-      [true, 'pending'],
-      [false, 'failed']
-    ] as const) {
-      const failed = database()
-      execute(failed, withIngestion(failed, { failure: { code: 'http_503', retryable } }))
-      expect(logos(failed)).toEqual([])
-      expect(
-        failed.prepare('SELECT status,attempts,last_error FROM media_ingestions').all()
-      ).toEqual([{ attempts: 1, last_error: 'http_503', status }])
-    }
+    // A source that can never be hosted is not saved: the edit fails and nothing changes (#96 S4).
+    expect(() => withIngestion(database(), { failure: { code: 'svg', retryable: false } })).toThrow(
+      /cannot be hosted \(svg\) is not saved/u
+    )
+    // A retryable failure queues the new source with its reason; an unhosted current logo row
+    // gives way to the fallback tile until the copy lands.
+    const failed = database()
+    execute(failed, withIngestion(failed, { failure: { code: 'http_503', retryable: true } }))
+    expect(logos(failed)).toEqual([])
+    expect(
+      failed.prepare('SELECT status,attempts,last_error,source_url FROM media_ingestions').all()
+    ).toEqual([
+      { attempts: 1, last_error: 'http_503', source_url: edit.logoUrl, status: 'pending' }
+    ])
+    // A hosted working logo is kept until the queued copy replaces it (#96 S4).
+    const working = database()
+    execute(working, withIngestion(working, { hosted: hostedLogo }))
+    const next = 'https://lst_live.example/next-logo.png'
+    const state = publicationState(working)
+    const { checksum } = working
+      .prepare('SELECT checksum FROM listings WHERE id=?')
+      .get(listingId) as { checksum: string }
+    execute(
+      working,
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, logoUrl: next },
+        expectedChecksum: checksum,
+        fields: ['logo'],
+        listingId,
+        logoIngestion: { failure: { code: 'http_503', retryable: true } },
+        publication: publication('listing-edit-again', state)
+      })
+    )
+    expect(
+      working
+        .prepare("SELECT url,media_key FROM listing_media WHERE listing_id=? AND kind='logo'")
+        .all(listingId)
+    ).toEqual([{ media_key: hostedLogo.key, url: edit.logoUrl }])
+    expect(working.prepare('SELECT status,source_url FROM media_ingestions').all()).toEqual([
+      { source_url: next, status: 'pending' }
+    ])
     // A changed website must be a public URL.
     expect(() =>
       buildUpdateListingDetailsPlans({

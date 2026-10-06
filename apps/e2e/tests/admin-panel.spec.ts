@@ -380,7 +380,13 @@ test.describe('listings', () => {
         await page.reload()
         await page.getByLabel('Logo', { exact: true }).fill(unreachable)
         await page.getByRole('button', { name: 'Save changes' }).click()
-        await expect(page.getByText('Saved.')).toBeVisible()
+        // Saved with a warning that names the reason, never a plain "Saved." (#96 review S4).
+        await expect(
+          page.getByText(
+            /^Saved, but the new logo couldn't be copied yet: the site couldn't be reached \(site_unreachable\)/u
+          )
+        ).toBeVisible()
+        await expect(page.getByText('Saved.', { exact: true })).toHaveCount(0)
         expect(logos(listing.id)).toEqual([])
         expect(
           localD1<{ attempts: number; source_url: string; status: string }>(

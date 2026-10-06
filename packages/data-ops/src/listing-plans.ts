@@ -1,5 +1,5 @@
 import { urlKey, websiteSpellings } from '@serpdirectory/utils/url-key'
-import { type HostedMedia, isMediaKey } from './media-keys'
+import { type HostedMedia, isListingMediaKey } from './media-keys'
 import { buildQueueMediaPlans, buildRecordMediaFailurePlans } from './media-plans'
 import {
   assertPreviousStatementChangedOne,
@@ -405,14 +405,19 @@ export type ListingDetailsField = 'category' | 'description' | 'logo' | 'name' |
 
 /**
  * What became of a changed logo's source before the edit's batch (#95): hosted (its key and
- * metadata), or a failed first attempt (queued for the media cron, or failed for good). Without
- * an outcome (no media binding) the source is queued untried. The logo row is never the URL.
+ * metadata), or a failed first attempt the cron may still recover from. A failure that cannot
+ * recover (SVG, not an image, too large, 404) never reaches the batch: the admin sees the error
+ * and nothing is written. Without an outcome (no media binding) the source is queued untried.
  */
 export type ListingLogoIngestion =
   | { hosted: HostedMedia }
   | { failure: { code: string; retryable: boolean } }
 
-/** The changed logo's statements: hosted row, or a queued or failed slot behind the tile. */
+/**
+ * The changed logo's statements. A hosted copy replaces the logo row. Otherwise the new source is
+ * queued, and a hosted current logo stays until its replacement is hosted (an unhosted one is
+ * cleared, since it would be a hotlink). The logo row is never the URL.
+ */
 function changedLogoPlans(input: {
   ingestion?: ListingLogoIngestion
   listingId: string
@@ -420,19 +425,28 @@ function changedLogoPlans(input: {
   now: string
 }): StatementPlan[] {
   const { listingId, logoUrl } = input
-  const cleared: StatementPlan[] = [
-    { sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'`, params: [listingId] },
-    { sql: `DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo'`, params: [listingId] }
-  ]
-  if (!logoUrl) return cleared
+  const clearQueue: StatementPlan = {
+    sql: `DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo'`,
+    params: [listingId]
+  }
+  const clearLogo: StatementPlan = {
+    sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'`,
+    params: [listingId]
+  }
+  if (!logoUrl) return [clearLogo, clearQueue]
   const ingestion = input.ingestion
   if (ingestion && 'hosted' in ingestion) {
     const media = ingestion.hosted
-    if (media.sourceUrl !== logoUrl || !isMediaKey(media.key) || !media.key.includes('/logo/')) {
+    if (
+      media.sourceUrl !== logoUrl ||
+      !isListingMediaKey(media.key) ||
+      !media.key.includes('/logo/')
+    ) {
       throw new Error('The hosted logo must be a logo key for the edited source.')
     }
     return [
-      ...cleared,
+      clearLogo,
+      clearQueue,
       {
         sql: `INSERT INTO listing_media
           (listing_id,kind,url,sort_order,media_key,sha256,content_type,bytes,width,height)
@@ -450,16 +464,23 @@ function changedLogoPlans(input: {
       }
     ]
   }
+  if (ingestion && !ingestion.failure.retryable) {
+    throw new Error(`A logo that cannot be hosted (${ingestion.failure.code}) is not saved.`)
+  }
   const slot = { kind: 'logo' as const, sortOrder: 0, sourceUrl: logoUrl, target: { listingId } }
   return [
-    ...cleared,
+    {
+      sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo' AND media_key IS NULL`,
+      params: [listingId]
+    },
+    clearQueue,
     ...(ingestion
       ? buildRecordMediaFailurePlans({
           ...slot,
           attempts: 1,
           code: ingestion.failure.code,
           now: input.now,
-          retryable: ingestion.failure.retryable
+          retryable: true
         })
       : buildQueueMediaPlans({ ...slot, now: input.now }))
   ]
