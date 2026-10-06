@@ -2,6 +2,7 @@ import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { createDatabase } from '@serpdirectory/data-ops/client'
+import { validateMediaBaseUrl } from '@serpdirectory/data-ops/media-keys'
 import {
   createSubmissionOperations,
   type DraftContent,
@@ -29,6 +30,14 @@ function isLocalWorker(env: CloudflareEnv): boolean {
   return env.D1_RUNTIME_ENV === 'local' && env.SITE_ENVIRONMENT === 'local'
 }
 
+function optionalMediaBaseUrl(env: CloudflareEnv): string | undefined {
+  try {
+    return validateMediaBaseUrl(env.MEDIA_BASE_URL, env.D1_RUNTIME_ENV)
+  } catch {
+    return undefined
+  }
+}
+
 async function operations() {
   const { env } = await getCloudflareContext({ async: true })
   const workerEnv = env as CloudflareEnv
@@ -39,7 +48,9 @@ async function operations() {
   return createSubmissionOperations({
     // Logos must be https, except on a local Worker, whose e2e fixture sites are http.
     allowInsecureLogos: isLocalWorker(workerEnv),
-    client: createDatabase(workerEnv.DB)
+    client: createDatabase(workerEnv.DB),
+    // A listed listing's logo is its hosted copy on this host (#95); without one, the tile.
+    mediaBaseUrl: optionalMediaBaseUrl(workerEnv)
   })
 }
 

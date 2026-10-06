@@ -33,6 +33,14 @@ export function MiniListing({
           </div>
         </div>
       </div>
+      {listing.media?.images?.[0] ? (
+        // The hosted featured image approval would publish (#96 round 2 B1).
+        <img
+          alt={`${listing.name}, featured`}
+          className="max-h-72 w-full border-b object-cover"
+          src={listing.media.images[0]}
+        />
+      ) : null}
       <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1fr)_200px]">
         <div className="min-w-0 text-sm leading-7 [&_.animate-fade-in-up]:opacity-100">
           <WebsiteContentSectionRoute website={listing} />

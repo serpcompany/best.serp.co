@@ -5,6 +5,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
 import { listingIdsWithWebsite } from './listing-plans'
+import { isMediaKey, mediaUrl } from './media-keys'
 import { validatePublicHttpUrl } from './public-url'
 import {
   categories,
@@ -207,6 +208,13 @@ export interface SubmissionReviewPreviewRow {
   created_at: string
   description: string
   id: string
+  /**
+   * The submission's hosted featured image (#95), if any: the image approval would publish, and
+   * the only one the preview shows (#96 round 2 B1).
+   */
+  image_key?: string | null
+  /** The submission's hosted copy of `logo_url` (#95), if any: the only logo the preview shows. */
+  logo_key?: string | null
   logo_url: string
   name: string
   slug: string
@@ -337,7 +345,11 @@ export function buildSubmissionReviewPreview(
     throw new Error('Invalid D1 submission preview publication date.')
   }
   if (typeof row.content !== 'string') throw new Error('Invalid D1 submission preview content.')
-  const logo = assetReference(row.logo_url, 'logo URL')
+  // The source is still checked, but never rendered: the preview shows the hosted copy's key
+  // (the web adapter resolves it on the media host), or the fallback tile (#96 review S9).
+  assetReference(row.logo_url, 'logo URL')
+  const logo = row.logo_key && isMediaKey(row.logo_key) ? row.logo_key : undefined
+  const image = row.image_key && isMediaKey(row.image_key) ? row.image_key : undefined
   const video = row.video_url ? assetReference(row.video_url, 'video URL') : undefined
   const resourceLinks = resources.map((resource, index) => ({
     label: requiredTrimmedText(resource.label, `resource ${index + 1} label`),
@@ -350,7 +362,8 @@ export function buildSubmissionReviewPreview(
     content: row.content,
     description: requiredTrimmedText(row.description, 'description'),
     media: {
-      logo,
+      ...(image ? { images: [image] } : {}),
+      ...(logo ? { logo } : {}),
       ...(video ? { video } : {})
     },
     // New submissions are listed with a nofollow outbound link (#59); preview it that way.
@@ -430,8 +443,10 @@ export function createSubmissionOperations(config: {
   allowInsecureLogos?: boolean
   client: Database
   clock?: () => Date
+  /** The environment's media host (`MEDIA_BASE_URL`): a listed listing's logo is shown from it. */
+  mediaBaseUrl?: string
 }): SubmissionOperations {
-  const { client } = config
+  const { client, mediaBaseUrl } = config
   const allowInsecureLogos = config.allowInsecureLogos === true
   const clock = config.clock ?? (() => new Date())
 
@@ -473,14 +488,14 @@ export function createSubmissionOperations(config: {
         `SELECT l.slug,l.name,l.status,l.is_active,
             (SELECT c.name FROM listing_categories lc JOIN categories c ON c.id=lc.category_id
               WHERE lc.listing_id=l.id AND lc.is_primary=1 LIMIT 1) AS category_name,
-            (SELECT m.url FROM listing_media m WHERE m.listing_id=l.id AND m.kind='logo'
-              ORDER BY m.sort_order LIMIT 1) AS logo_url
+            (SELECT m.media_key FROM listing_media m WHERE m.listing_id=l.id AND m.kind='logo'
+              AND m.media_key IS NOT NULL ORDER BY m.sort_order LIMIT 1) AS logo_key
           FROM listings l WHERE l.id IN (${listed.sql}) ORDER BY l.slug<>? LIMIT 1`,
         [...listed.params, slug]
       ).first<{
         category_name: string | null
         is_active: number
-        logo_url: string | null
+        logo_key: string | null
         name: string
         slug: string
         status: string
@@ -500,7 +515,9 @@ export function createSubmissionOperations(config: {
         kind: 'listed',
         listing: {
           categoryName: listing.category_name,
-          logoUrl: listing.logo_url,
+          // The hosted copy on this environment's media host, never a source URL (#95).
+          logoUrl:
+            listing.logo_key && mediaBaseUrl ? mediaUrl(listing.logo_key, mediaBaseUrl) : null,
           name: listing.name,
           public: listing.status === 'approved' && Number(listing.is_active) === 1,
           slug: listing.slug
@@ -839,6 +856,13 @@ export function createSubmissionOperations(config: {
             created_at: listingSubmissions.createdAt,
             description: listingSubmissions.description,
             id: listingSubmissions.id,
+            image_key: sql<string | null>`(SELECT j.media_key FROM media_ingestions j
+              WHERE j.submission_id=${listingSubmissions.id} AND j.kind='image'
+                AND j.sort_order=0 AND j.status='hosted')`,
+            logo_key: sql<string | null>`(SELECT j.media_key FROM media_ingestions j
+              WHERE j.submission_id=${listingSubmissions.id} AND j.kind='logo'
+                AND j.sort_order=0 AND j.status='hosted'
+                AND j.source_url=${listingSubmissions.logoUrl})`,
             logo_url: listingSubmissions.logoUrl,
             name: listingSubmissions.name,
             slug: listingSubmissions.slug,

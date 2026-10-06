@@ -39,6 +39,10 @@ This builds the OpenNext Worker and serves it on http://localhost:8787 against l
 D1. `pnpm --filter web dev` runs `next dev` for UI work, but only the Worker preview
 exercises the real D1 binding.
 
+Listing media (#95) uses a local R2 bucket in the same state; the Worker serves it at
+`/_media/<key>`, and `curl localhost:8787/cdn-cgi/handler/scheduled` runs the media cron once
+([Listing media](./MEDIA.md#local-development-and-tests)).
+
 ## Accounts locally
 
 Copy `apps/web/.dev.vars.example` to `apps/web/.dev.vars` (gitignored) and set

@@ -10,13 +10,20 @@
   },
   "vars": {
     "D1_RUNTIME_ENV": "local",
+    "MEDIA_BASE_URL": "/_media",
     "SITE_ENVIRONMENT": "local"
   },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "best-serp-co-media-local"
+    }
+  ],
   "version_metadata": {
     "binding": "CF_VERSION_METADATA"
   },
   "triggers": {
-    "crons": ["0 * * * *", "15 3 * * 1", "45 3 * * *"]
+    "crons": ["0 * * * *", "15 3 * * 1", "45 3 * * *", "*/15 * * * *"]
   },
   "d1_databases": [
     {
@@ -43,6 +50,7 @@
         "CF_ACCESS_TEAM_DOMAIN": "",
         "D1_RUNTIME_ENV": "staging",
         "EMAIL_STAGING_ALLOWLIST": "devin@serp.co",
+        "MEDIA_BASE_URL": "https://cdn-staging.serp.co",
         "SITE_ENVIRONMENT": "staging",
         "USESEND_BASE_URL": "https://app.usesend.com"
       },
@@ -50,7 +58,7 @@
         "binding": "CF_VERSION_METADATA"
       },
       "triggers": {
-        "crons": ["0 * * * *", "15 3 * * 1", "45 3 * * *"]
+        "crons": ["0 * * * *", "15 3 * * 1", "45 3 * * *", "*/15 * * * *"]
       },
       "d1_databases": [
         {
@@ -59,6 +67,12 @@
           "database_id": "8e6b67e5-9c58-4fa9-aca1-25b0020c0833",
           "migrations_dir": "../../d1/drizzle",
           "migrations_table": "d1_migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA",
+          "bucket_name": "cdn-staging"
         }
       ]
     },
@@ -76,6 +90,7 @@
         "CF_ACCESS_AUD": "a30cbc5f875dd674644be917d50cce67c69747eccc127b8bb1a02d226c8b2491",
         "CF_ACCESS_TEAM_DOMAIN": "serpcompany.cloudflareaccess.com",
         "D1_RUNTIME_ENV": "production",
+        "MEDIA_BASE_URL": "https://cdn.serp.co",
         "SITE_ENVIRONMENT": "production",
         "USESEND_BASE_URL": "https://app.usesend.com"
       },
@@ -83,7 +98,7 @@
         "binding": "CF_VERSION_METADATA"
       },
       "triggers": {
-        "crons": ["0 * * * *", "15 3 * * 1", "45 3 * * *"]
+        "crons": ["0 * * * *", "15 3 * * 1", "45 3 * * *", "*/15 * * * *"]
       },
       "d1_databases": [
         {
@@ -92,6 +107,12 @@
           "database_id": "404ec437-53a2-4fbc-8b5f-b5e69065708e",
           "migrations_dir": "../../d1/drizzle",
           "migrations_table": "d1_migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA",
+          "bucket_name": "cdn"
         }
       ]
     }

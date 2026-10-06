@@ -132,7 +132,7 @@ const FIELD_ORDER: SubmissionField[] = [
   'content'
 ]
 
-const LOGO_SPEC = 'PNG, JPG, SVG or WebP, at least 128 × 128 px, up to 1 MB'
+const LOGO_SPEC = 'PNG, JPG or WebP, at least 128 × 128 px, up to 1 MB'
 const SIGN_IN_PATH = `/login/?callbackUrl=${encodeURIComponent('/submit/')}`
 
 function sourceTag(source: string | undefined): string | null {

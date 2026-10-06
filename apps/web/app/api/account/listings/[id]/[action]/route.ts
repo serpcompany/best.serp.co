@@ -12,6 +12,7 @@ import {
 import { accountOperations } from '@/lib/account/runtime'
 import { clientIp } from '@/lib/auth/rate-limits'
 import { authorizeUserRequest, consumeRequestRateLimit } from '@/lib/auth/server'
+import { hostRevisionLogo } from '@/lib/media/server'
 import { verifyFeaturedBadge } from '@/lib/submissions/badge-verifier'
 import {
   apiError,
@@ -32,7 +33,8 @@ export const dynamic = 'force-dynamic'
  *
  * - `revision`: stages edits of the live listing for review: a new revision, or the open one
  *   changed (and sent back to review when changes were requested). Nothing public changes until
- *   an admin approves it. A changed logo is checked as the submit flow checks one.
+ *   an admin approves it. A changed logo is checked as the submit flow checks one, then hosted
+ *   under the revision's own media prefix after the response (#95, #96).
  * - `discard-revision`: withdraws the open revision.
  * - `verify-badge`: checks a live free listing's badge with the badge step's verifier (#84): one
  *   claim in a compare-and-swap (30-second cooldown, ten checks that find a result per 24
@@ -88,6 +90,14 @@ export async function POST(
         newRevisionId: crypto.randomUUID(),
         userId: user.id
       })
+      // A logo other than the listing's is hosted under the revision's own prefix after the
+      // response, so the reviewer sees that copy and approval adopts exactly it (#96 round 4).
+      if (parsed.data.logoUrl.trim() !== current.logoUrl) {
+        await hostRevisionLogo({
+          logoUrl: parsed.data.logoUrl.trim(),
+          revisionId: saved.revisionId
+        }).catch(() => undefined)
+      }
       if (saved.queued) {
         const listing = await operations.listingById(user.id, id)
         if (listing) {

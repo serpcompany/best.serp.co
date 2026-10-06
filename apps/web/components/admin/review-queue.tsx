@@ -47,7 +47,8 @@ export interface QueueRow {
   id: string
   kind: 'revision' | 'submission'
   listingSlug: string | null
-  logoUrl: string
+  /** The hosted copy, or null for the fallback tile (#96 review S9). */
+  logoUrl: string | null
   name: string
   ownerEmail: string | null
   paid: boolean

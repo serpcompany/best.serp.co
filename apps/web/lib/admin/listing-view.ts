@@ -7,7 +7,9 @@ import {
   PAID_LISTING_PRICE_CENTS
 } from '@/components/admin/format'
 import type { ListingDetailView } from '@/components/admin/listing-detail'
+import { renderableImage } from '../media/renderable-image'
 import { verifiedViaLabel } from './listing-labels'
+import { logoNote } from './logo-note'
 
 /**
  * Maps the admin listing read to what the listing screen renders (#64 screen 12), including the
@@ -85,7 +87,10 @@ function activityItem(
   }
 }
 
-export function listingDetailView(listing: AdminListingDetail): ListingDetailView {
+export function listingDetailView(
+  listing: AdminListingDetail,
+  mediaBaseUrl: string
+): ListingDetailView {
   // An admin unpublish is in the listing log with its note; its submission event repeats it.
   const events = listing.activity.filter(
     event =>
@@ -151,7 +156,11 @@ export function listingDetailView(listing: AdminListingDetail): ListingDetailVie
     description: listing.description,
     id: listing.id,
     linkRel: listing.linkRel,
+    // The hosted copy (or an own-origin imported path), never a source URL (#96 review S9).
+    currentLogoUrl: listing.currentLogoUrl,
+    logoImage: renderableImage({ key: listing.logoKey, url: listing.currentLogoUrl }, mediaBaseUrl),
     logoUrl: listing.logoUrl,
+    logoNote: logoNote(listing.logoQueue, listing.logoKey !== null),
     meta,
     name: listing.name,
     owner: listing.owner

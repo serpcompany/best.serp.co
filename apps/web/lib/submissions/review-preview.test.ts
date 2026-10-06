@@ -50,15 +50,26 @@ describe('private submission review preview', () => {
         categories: ['adult'],
         publishedAt: '2026-07-30',
         resourceLinks: [{ label: 'Documentation', url: 'https://example.com/docs' }],
-        media: {
-          logo: 'https://example.com/logo.png',
-          video: 'https://example.com/video.mp4'
-        },
+        // The submitted logo source is never rendered: no hosted copy, no logo (#96 S9).
+        media: { video: 'https://example.com/video.mp4' },
         relatedWebsites: [],
         previousWebsite: null,
         nextWebsite: null
       })
     )
+  })
+
+  it('shows the submission’s hosted logo copy, never its source (#96 review S9)', () => {
+    const logoKey = `best.serp.co/submissions/${submission.id}/logo/${'a'.repeat(16)}.png`
+    const imageKey = `best.serp.co/submissions/${submission.id}/image/${'b'.repeat(16)}.png`
+    expect(
+      buildSubmissionReviewPreview({ ...submission, image_key: imageKey, logo_key: logoKey }, [])
+        .media
+    ).toEqual({ images: [imageKey], logo: logoKey, video: 'https://example.com/video.mp4' })
+    expect(
+      buildSubmissionReviewPreview({ ...submission, logo_key: 'https://example.com/x.png' }, [])
+        .media?.logo
+    ).toBeUndefined()
   })
 
   it('keeps the route D1-only, status-gated, and private to the capability', () => {
