@@ -6,37 +6,28 @@ against Cloudflare. Procedures: [Release guards](../RELEASE_GUARDS.md),
 [Deploy runbook](../DEPLOY_RUNBOOK.md), [Listing media](../MEDIA.md),
 [Catalog hygiene](../CATALOG_HYGIENE.md), [D1 recovery](../D1_RECOVERY.md).
 
-## Blockers and decisions before the first step
+## Blockers before the catalog steps
 
-1. **The hijacked-domains manifest cannot publish on staging as committed.** It is a
-   `publication`-mode manifest at base version 1 (`2026-10-06-hijacked-domains.yaml:9-13`), and
-   staging has moved past v1 through admin activity. `pnpm catalog:domains -- manifest --date
-   2026-10-06 --base-version <V> --base-checksum <C>` rewrites the same file and id (there is no
-   `--manifest-id`), so it no longer fits production at v1, and it fails
-   `scripts/listing-domain-check.test.ts` ("CHECK constraint failed: valid=1", reproduced here),
-   which runs in `pnpm test:d1`, the first step of both publish workflows. Choose one:
-   - **A (recommended):** a small PR into `staging` that admits `listing-unpublish` in
-     `concurrency: rows` manifests (its per-row guards already hold: categories, live, website,
-     no submission in review; `scripts/d1-publisher.ts:269-285` rejects it today, and
-     CATALOG_HYGIENE "The report and the manifest" anticipates this) and regenerates the manifest
-     row-level. One file then fits both environments in any order, which also removes blocker 2.
-   - **B:** the owner waives staging-first for #100 only: publish the committed manifest on
-     production first after the deploy (base v1 holds there), and unpublish on staging later.
-2. **Production must publish hijacked-domains before any other catalog write** (without A).
-   Production is at publication v1: no Publish D1 Catalog or Review D1 Submission run ever ran,
-   and main has no admin panel. After Deploy Production, any `/admin` decision or row-level
-   publish advances the version and the v1 manifest is refused. Freeze `/admin` until step P4.
-3. **29 of 3,756 media objects no longer match the plan.** `pnpm media:upload:dry-run -- d1/media/
-   2026-10-06-legacy-media.json` (3 min 28 s, writes nothing): 3,727 verified, 29 failed (20
-   changed bytes or SHA-256, 7 `http_403`, 2 `fetch_timeout`). They sit in parts 01–06 (5, 7, 4,
-   5, 6, 2); the publisher refuses a whole part when any key is missing from the bucket, so only
-   part 07 and the Adult category would publish. Fix before the staging upload: rerun the dry run
-   (the 403s and timeouts may be transient), then `pnpm migration:legacy-media -- --refresh
-   <dry-run summary JSON>`, review the diff, and merge it into `staging`. The fetch cache
-   (`.runtime/legacy-media-cache`) is not on this machine, so the regeneration refetches every
-   source unless it runs where the cache is; review the whole diff either way.
+Neither stops the code promotion itself. Both gate the catalog steps, and each has a PR into
+`staging` that must merge, with Deploy Staging green on the new head, first.
 
-None of these stops the code promotion itself. They gate the catalog steps.
+1. **Hijacked-domains could not publish on staging** (fixed by #110, the owner's option A). The
+   committed manifest was pinned to publication v1, staging is past v1 through admin decisions,
+   and regenerating it at another base rewrote the same id and failed
+   `scripts/listing-domain-check.test.ts` ("CHECK constraint failed: valid=1"), which
+   `pnpm test:d1` runs first in both publish workflows. #110 admits `listing-unpublish` with
+   `expected.website` in `concurrency: rows` manifests and regenerates the manifest row-level
+   (same id, same 95 operations). It applies on staging and production in any order, so
+   production needs no `/admin` freeze for it. On the import, FAQs at v1, Adult at v2, then
+   hijacked-domains at v3 leaves 95 listings unpublished at v4.
+2. **Media objects no longer matched the plan** (fixed by #113). The first dry run failed 29 of
+   3,756 objects (parts 01–06), and the publisher refuses a whole part while any object it names
+   is missing. #113 reran `pnpm migration:legacy-media -- --refresh <dry-run summary>` and takes
+   the result only for the 50 listings whose objects failed a dry run; every other listing keeps
+   its reviewed first generation. `ezai.app`, `turnitin.com`, and `ithenticate.com` drop to the
+   tile by hand, `reflectr.ai` by the generator. The plan is now 3,750 objects (439.1 MiB). Dry
+   runs after: 3,750/3,750 verified, then 3,748 (a timeout and `shopify.com`'s alternating CDN
+   encoding), so expect to rerun an upload until it reports `failed: []`.
 
 ## 1. What ships (`git log origin/main..origin/staging`)
 
@@ -46,8 +37,8 @@ None of these stops the code promotion itself. They gate the catalog steps.
 the badge program (off), hosted media with the legacy manifests, and listing FAQs. `main` has
 nothing `staging` lacks: `git merge-tree --write-tree origin/main origin/staging` equals the
 `staging` tree, so the staging check will match the merge commit. Deploy Staging verified
-`12b2547fe3` (run 37459075006, all four steps); `81aa4a49c7` (run 37461266928) was still running
-when this was written, and must be green before the promotion.
+`12b2547fe3` (run 37459075006) and `81aa4a49c7` (run 37461266928), all four steps. Merging #110
+and #113 moves the head: promote only once Deploy Staging is green on it.
 
 **Migrations.** Production has only `0000_baseline`; Deploy Production applies `0001`–`0007`
 (`0001` email ledger, `0002` auth tables plus the `devin@serp.co` allowlist row, `0003`
@@ -87,9 +78,9 @@ So the window keeps today's state: hotlinks, a tile for dead logos, and a broken
 where the source is dead (4,359 imported rows answer 404, per the legacy media report). No
 temporary render path is needed; the fix is to close the window promptly. **Window length:**
 Deploy Production about 8–10 min plus approval (the last one ran 8 min); the production upload
-copies 3,756 objects with three R2 REST calls each (about 11,300 calls, 6 workers, 60-min job
+copies 3,750 objects with three R2 REST calls each (about 11,300 calls, 6 workers, 60-min job
 timeout). If Cloudflare's API limit of 1,200 requests per 5 minutes applies to the token, that is
-at least 47 min and may need a rerun (a rerun skips what is present). Then 9 or 10 publishes of
+at least 47 min and may need a rerun (a rerun skips what is present). Then 10 publishes of
 about 4–6 min each, run one after another. Expect **1.5–2.5 hours** from deploy to the last
 media part; hijacked-domains, FAQs, and Adult do not depend on the upload and go first.
 
@@ -138,15 +129,14 @@ never show FAQs twice. The manifest removes those blocks; the net is then a no-o
 
 | Order | Manifest | Mode | Needs upload |
 |---|---|---|---|
-| 1 | `2026-10-06-hijacked-domains.yaml`: unpublish 95 (32 gambling or spam, 63 parked) | base v1 `669f264f…` (rows after option A) | no |
+| 1 | `2026-10-06-hijacked-domains.yaml`: unpublish 95 (32 gambling or spam, 63 parked) | rows (#110) | no |
 | 2 | `2026-10-06-listing-faqs.yaml`: trim 335 descriptions | rows, whole batch | no |
 | 3 | `2026-10-06-legacy-media-adult-category.yaml`: Adult on 14 listings | rows | no |
-| 4–10 | `2026-10-06-legacy-media-01` … `-07.yaml`: 3,199 listings | rows | yes |
+| 4–10 | `2026-10-06-legacy-media-01` … `-07.yaml`: 3,199 listings (#113) | rows | yes |
 
-**Production** (v1) applies the committed chain as is, hijacked-domains first; the publisher
-contract tests pass on the committed files (`listing-faq-move`, `catalog-media`,
-`listing-domain-check`: 33 tests). **Staging** needs blocker 1 resolved. Read its state
-read-only first:
+After #110 and #113 every manifest is row-level: the same files apply on staging and production
+in any order, and the table order is only a convention (the ones that need no upload first).
+`pnpm test:d1` passes on both branches. Before publishing on staging, read its state read-only:
 
 ```bash
 pnpm exec wrangler d1 execute best-serp-co-staging --env staging --remote --json \
@@ -158,8 +148,8 @@ pnpm exec wrangler d1 execute best-serp-co-staging --env staging --remote --json
    (SELECT COUNT(*) FROM publication_runs WHERE workflow='app/admin') AS admin_publications"
 ```
 
-If it still shows version 1 and `669f264f…0af5a`, the committed hijacked manifest applies. Row-level
-manifests need regeneration only if staging refuses one (it writes nothing and names the listings):
+`hosted_rows` above 0 means admin logo edits: those listings will refuse their media part. A
+row-level manifest needs regeneration only if staging refuses it (it writes nothing):
 media via `--current <dir> --manifest-id 2026-10-07-legacy-media`
 ([recovery](../MEDIA.md#recovering-a-refused-media-manifest)); FAQs via
 `pnpm catalog:faqs -- manifest --skip <slug> --manifest-id 2026-10-07-listing-faqs-staging`.
@@ -173,11 +163,12 @@ writes its Time Travel bookmark and restore command to the run summary: record i
 
 ### a. Staging
 
-- **S0.** Resolve blockers 1 and 3 (PRs into `staging`); wait for Deploy Staging to go green on
-  the new head.
+- **S0.** Owner merges #110 and #113 into `staging`; wait for Deploy Staging to go green on the
+  new head, and run the read-only queries in section 6.
 - **S1.** Upload Listing Media (staging):
   `gh workflow run upload-media-staging.yml --ref staging -f plan_path=d1/media/2026-10-06-legacy-media.json -f confirmation=upload-media-best.serp.co-staging`.
-  Require `failed: []` in the summary; rerun to finish 429s or timeouts.
+  Require `failed: []` in the summary; rerun (it skips present objects) for 429s, timeouts, or
+  a flapping source. A source that changed for good: refresh it as #113 did.
 - **S2.** Publish D1 Catalog (staging), once per manifest in section 6 order:
   `gh workflow run publish-d1-staging.yml --ref staging -f manifest_path=d1/publications/<file> -f confirmation=publish-best.serp.co-staging`.
 - **S3.** Accept staging: `MEDIA_ACCEPTANCE=1
@@ -202,14 +193,15 @@ writes its Time Travel bookmark and restore command to the run summary: record i
 - **P3.** Right after the merge (own concurrency group, may run during P2): Upload Listing Media
   `gh workflow run upload-media.yml --ref main -f plan_path=d1/media/2026-10-06-legacy-media.json -f confirmation=upload-media-best.serp.co-production`;
   `production` reviewers approve. It copies from `cdn-staging`.
-- **P4.** Immediately after P2, no `/admin` writes first: Publish D1 Catalog, hijacked-domains,
+- **P4.** After P2: Publish D1 Catalog, hijacked-domains,
   `gh workflow run publish-d1.yml --ref main -f manifest_path=d1/publications/2026-10-06-hijacked-domains.yaml -f confirmation=publish-best.serp.co-production`.
 - **P5.** Same workflow for listing FAQs, then Adult category; after P3 shows `failed: []`, media
   parts 01–07.
 - **P6.** Accept: `pnpm db:migrations:list:production` (none pending);
   `pnpm tsx scripts/d1-preview-http-gates.ts public https://best.serp.co`; the S3 checks with
   `PLAYWRIGHT_BASE_URL=https://best.serp.co`; `/admin/` 302 to Access; `/login/` 200 and a
-  sign-in code reaches an inbox (DKIM and DMARC pass). Then unfreeze `/admin`.
+  sign-in code reaches an inbox (DKIM and DMARC pass). Avoid `/admin` logo edits until the media
+  parts are published: an edited listing refuses its part.
 
 ### d. Rollback
 
@@ -230,7 +222,7 @@ shows no FAQs (it has no FAQ section).
   `upload-media-best.serp.co-production`, `publish-best.serp.co-production`, and
   `deploy-best.serp.co-production` (dispatch only), the `production` approvals, the promotion
   merge, any restore or rollback, and the owner checks in section 5.
-- **Agents, with the owner's go-ahead:** the blocker PRs (option A, the media refresh), read-only
+- **Agents, with the owner's go-ahead:** the blocker PRs (#110, #113), read-only
   queries and dry runs, the S3 and P6 acceptance checks, and the post-publish cleanup PR
   (delete `apps/web/public/listing-logos/serpdownloaders.com/` and `media/products/launchbuzz.io/`,
   MEDIA.md "Legacy migration").
