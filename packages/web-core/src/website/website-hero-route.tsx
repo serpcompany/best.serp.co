@@ -1,8 +1,8 @@
 import { Badge } from '@serpdirectory/design-system/badge'
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
 import type { ComponentProps } from 'react'
-import { FaviconWithFallback } from '../ui/favicon-with-fallback'
 import { FavoriteButton } from '../ui/favorite-button'
+import { ListingImage } from '../ui/listing-image'
 import { VerifiedOwnerBadge } from './verified-owner-badge'
 import {
   WebsiteHero as SharedWebsiteHero,
@@ -32,7 +32,7 @@ export function WebsiteHeroRoute({
         Badge,
         Breadcrumb: BreadcrumbSlot,
         FavoriteButton,
-        FaviconWithFallback,
+        ListingImage,
         VerifiedOwnerBadge
       }}
     />

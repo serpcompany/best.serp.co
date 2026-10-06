@@ -1,0 +1,88 @@
+name: Check Listing Media Health
+
+# Weekly and read-only (#122): scripts/media-health.ts lists every listing logo and image row in
+# production D1 (one SELECT), checks each hosted key against the cdn bucket with the R2 list API,
+# and HEADs a sample on cdn.serp.co. Findings open or update one GitHub issue; a clean run closes
+# it. GitHub runs schedules on the default branch; when that is staging, the relay job
+# re-dispatches this workflow on main, so only main's code reads production. Both jobs are
+# skipped until the repository variable MEDIA_HEALTH_CHECK is `on`, and the check is skipped until
+# the production-media-health environment holds Cloudflare credentials. It uses its own
+# environment because the production environment requires reviewer approval. See docs/MEDIA_HEALTH.md.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  relay:
+    name: Run the scheduled check on main
+    if: github.event_name == 'schedule' && github.ref != 'refs/heads/main' && vars.MEDIA_HEALTH_CHECK == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch this workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run media-health.yml --ref main --repo "$GITHUB_REPOSITORY"
+
+  check:
+    name: Check production listing media
+    if: github.ref == 'refs/heads/main' && vars.MEDIA_HEALTH_CHECK == 'on'
+    # Job-level, so a skipped run never joins the group.
+    concurrency:
+      group: media-health-best-serp-co-production
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+    environment:
+      name: production-media-health
+    steps:
+      - name: Check Cloudflare credentials
+        id: credentials
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          message="Media health check skipped: the production-media-health environment has no CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/MEDIA_HEALTH.md)."
+          echo "::warning title=Media health check skipped::$message"
+          echo "$message" >> "$GITHUB_STEP_SUMMARY"
+
+      # No token left in .git/config: the Cloudflare step never holds the job's issues: write.
+      - name: Checkout reviewed source
+        if: steps.credentials.outputs.configured == 'true'
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install
+        if: steps.credentials.outputs.configured == 'true'
+        uses: ./.github/actions/install
+
+      # Read-only: one D1 SELECT, R2 list calls, and HEADs on the media host. Exits 1 on findings.
+      - name: Check hosted media against D1 and the bucket
+        id: health
+        if: steps.credentials.outputs.configured == 'true'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm media:health -- production --report "$RUNNER_TEMP/media-health.json"
+
+      # No Cloudflare credential here: only the job's token, to file the report.
+      - name: Open, update, or close the media health issue
+        if: ${{ !cancelled() && steps.credentials.outputs.configured == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm media:health:issue -- "$RUNNER_TEMP/media-health.json"

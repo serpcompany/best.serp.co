@@ -26,10 +26,10 @@ function mediaHost(baseURL: string): string {
     : 'cdn-staging.serp.co'
 }
 
-/** Listing images on a page: logos, featured images, and the JSON-LD primary image. */
+/** Listing images on a page (every `ListingImage`, #122) and the JSON-LD primary image. */
 async function listingImageUrls(page: Page): Promise<string[]> {
   const fromMarkup = await page
-    .locator('img[alt$=" logo"], img[alt$=" featured image"], img[alt$=" fallback logo"]')
+    .locator('img[data-listing-image]')
     .evaluateAll(images =>
       images.map(image => (image as HTMLImageElement).currentSrc || image.getAttribute('src') || '')
     )

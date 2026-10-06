@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
-import { isMediaKey } from '@serpdirectory/data-ops/media-keys'
+import { isMediaKey, parseMediaKey } from '@serpdirectory/data-ops/media-keys'
 import { assertD1StatementLimits } from '@serpdirectory/data-ops/sql-limits'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
@@ -23,7 +23,9 @@ import { type MediaPlanObject, mediaPlanSchema } from './media-upload'
  * applied in order, as the publisher would), every listing logo and image is a hosted key, so
  * pages build its URL on the environment's media host and nothing is hotlinked; and every key a
  * manifest names is in a reviewed upload plan under `d1/media` with the same bytes, so the upload
- * that must run first covers it. Runs in `pnpm test:d1`, which Publish D1 Catalog runs too.
+ * that must run first covers it. Each key is its own listing's (slug and kind), every manifest
+ * names only such keys or no image, and listing content embeds no image, so no other host is ever
+ * rendered (#122). Runs in `pnpm test:d1`, which Publish D1 Catalog runs too.
  */
 const publicationsDirectory = resolve('d1/publications')
 const mediaDirectory = resolve('d1/media')
@@ -95,6 +97,9 @@ function publishedDatabase(
   return database
 }
 
+/** A Markdown image (`![alt](url)`) or HTML image in listing content. */
+const listingContentImage = /!\[[^\]]*\]\s*\(|<img\b|<picture\b/iu
+
 /** Every `repo:` source of every reviewed upload plan, with its repository-relative path. */
 function repoSources(): Array<{ object: MediaPlanObject; path: string }> {
   return files(mediaDirectory, /\.json$/u).flatMap(file =>
@@ -152,6 +157,14 @@ describe('hosted catalog media (#95)', () => {
         hotlinked,
         'Every listing logo and image must be a hosted key (docs/MEDIA.md). Repoint it with a listing-media-update manifest after uploading its plan, or drop it.'
       ).toEqual([])
+      // A key on the media host, and its own: the listing's slug and the row's kind (#122).
+      const foreign = rows.flatMap(row => {
+        const key = parseMediaKey(row.media_key ?? '')
+        return key?.scope === 'listings' && key.slug === row.slug && key.kind === row.kind
+          ? []
+          : [`${row.slug} ${row.kind} ${row.media_key}`]
+      })
+      expect(foreign, 'A listing row holds only its own listings/<slug>/<kind>/ key.').toEqual([])
 
       const uploaded = new Map<string, Record<string, unknown>>()
       for (const file of files(mediaDirectory, /\.json$/u)) {
@@ -172,6 +185,65 @@ describe('hosted catalog media (#95)', () => {
         return same ? [] : [`${row.slug} ${row.media_key}`]
       })
       expect(notUploaded, 'Each hosted key needs a matching object in a d1/media plan.').toEqual([])
+    } finally {
+      database.close()
+    }
+  }, 120_000)
+
+  it('lets manifests name only hosted keys of their own listing, or no image (#122)', () => {
+    const problems: string[] = []
+    let named = 0
+    for (const file of files(publicationsDirectory, /\.ya?ml$/u)) {
+      const manifest = parseManifest(readFileSync(resolve(publicationsDirectory, file), 'utf8'))
+      manifest.operations.forEach((op, index) => {
+        const at = `${file} operation ${index + 1}`
+        const target =
+          op.action === 'listing-create' || op.action === 'listing-update'
+            ? { content: op.listing.content, media: op.listing.media, slug: op.listing.slug }
+            : op.action === 'listing-media-update'
+              ? { content: undefined, media: op.media, slug: op.slug }
+              : null
+        if (!target) return
+        const images = [
+          ...(target.media?.logo ? [['logo', target.media.logo] as const] : []),
+          ...(target.media?.images ?? []).map(image => ['image', image] as const)
+        ]
+        for (const [kind, image] of images) {
+          named += 1
+          const key = parseMediaKey(image.key)
+          if (key?.scope !== 'listings' || key.slug !== target.slug || key.kind !== kind)
+            problems.push(`${at}: ${kind} ${image.key} is not ${target.slug}'s hosted ${kind}`)
+          // Where the bytes came from is provenance, never rendered: a public https URL or a
+          // file checked in under apps/web/public.
+          if (!/^(?:https:\/\/|repo:apps\/web\/public\/)/u.test(image.source))
+            problems.push(`${at}: ${kind} source ${image.source} is not https or repo:`)
+        }
+        if (target.content && listingContentImage.test(target.content))
+          problems.push(`${at}: content embeds an image`)
+      })
+    }
+    expect(named).toBeGreaterThan(1_000)
+    expect(
+      problems,
+      'A manifest image is a hosted listings/<slug>/<kind>/ key with its plan (docs/MEDIA.md).'
+    ).toEqual([])
+  })
+
+  it('renders no image from listing content, imported or published (#122)', () => {
+    const database = publishedDatabase()
+    try {
+      const embedded = (
+        database.prepare('SELECT slug, content FROM listings WHERE content IS NOT NULL').all() as {
+          content: string
+          slug: string
+        }[]
+      )
+        .filter(row => listingContentImage.test(row.content))
+        .map(row => row.slug)
+      expect(
+        embedded,
+        'Listing content may not embed images: they would render from another host, outside the hosted media and its fallback tile.'
+      ).toEqual([])
     } finally {
       database.close()
     }

@@ -245,12 +245,7 @@ export function SearchAutocomplete({
         : undefined,
       icon:
         suggestion.type === 'website' && suggestion.website ? (
-          <Favicon
-            website={suggestion.website}
-            fallbackIcon={Icon}
-            title={suggestion.title}
-            className="h-4 w-4"
-          />
+          <Favicon website={suggestion.website} title={suggestion.title} className="h-4 w-4" />
         ) : (
           <Icon className="h-4 w-4 text-muted-foreground" />
         ),
