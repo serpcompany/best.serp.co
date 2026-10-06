@@ -1,13 +1,20 @@
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { validateRemoteConfig } from './cloudflare-release'
 import {
   buildPublicationPlan,
+  CURRENT_MEDIA_JSON,
+  expectedMediaJson,
   type PlannedStatement,
+  type PublicationBase,
   type PublicationManifest,
   parseManifest
 } from './d1-publisher.ts'
+import { verifyObject } from './media-upload'
 import { project } from './project'
+import { getR2Object } from './r2-objects'
 
 interface D1ApiResult {
   results?: Array<Record<string, unknown>>
@@ -121,45 +128,149 @@ async function queryD1(
 }
 
 /**
- * Refuses a manifest whose hosted media the target's media host does not serve yet (#95): its
- * upload plan must run first, so a page never names a key that answers 404.
+ * Ties the run to its target's database (#97 review B4): `CLOUDFLARE_D1_DATABASE_ID` must be the
+ * target's ID in `scripts/project.ts`, which `wrangler.jsonc` must still match
+ * (`validateRemoteConfig`), and Cloudflare must name that database as the target's, read through
+ * the API before anything is written. A staging run can then never write to production D1, nor
+ * the other way round, whatever its workflow sets.
+ */
+export async function verifyTargetDatabase(
+  env: NodeJS.ProcessEnv,
+  target: PublicationTarget,
+  fetchImplementation: FetchImplementation,
+  configPath: string = project.wranglerConfigPath
+): Promise<void> {
+  const expected = project.remote[target]
+  const databaseId = requireEnvironment(env, 'CLOUDFLARE_D1_DATABASE_ID')
+  if (databaseId !== expected.databaseId) {
+    throw new Error(
+      `CLOUDFLARE_D1_DATABASE_ID is not the ${target} database ${expected.databaseName} (${expected.databaseId}).`
+    )
+  }
+  validateRemoteConfig(target, configPath)
+  const accountId = requireEnvironment(env, 'CLOUDFLARE_ACCOUNT_ID')
+  const apiToken = requireEnvironment(env, 'CLOUDFLARE_API_TOKEN')
+  const response = await fetchImplementation(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}`,
+    { headers: { Authorization: `Bearer ${apiToken}` }, method: 'GET' }
+  )
+  const payload = (await response.json().catch(() => null)) as {
+    result?: { name?: string; uuid?: string }
+    success?: boolean
+  } | null
+  const name = payload?.result?.name
+  if (!response.ok || payload?.success === false || name !== expected.databaseName) {
+    throw new Error(
+      `Cloudflare names database ${databaseId} ${name ?? '(unreadable)'}, not ${expected.databaseName}; refusing to publish to ${target}.`
+    )
+  }
+}
+
+function mediaUpdates(manifest: PublicationManifest) {
+  return manifest.operations.flatMap(op => (op.action === 'listing-media-update' ? [op] : []))
+}
+
+/**
+ * Refuses a manifest whose hosted media the target's bucket does not hold yet, byte for byte
+ * (#95; #97 review S4): its upload plan must run first, so a page never names a key that
+ * answers 404 or serves other bytes. Each object is read from the target's own bucket through
+ * the R2 API (never a CDN) and verified like an upload (`verifyObject`).
  */
 export async function assertHostedMediaServed(
   manifest: PublicationManifest,
   target: PublicationTarget,
+  env: NodeJS.ProcessEnv,
   fetchImplementation: FetchImplementation
 ): Promise<void> {
-  const images = manifest.operations.flatMap(op =>
-    op.action === 'listing-media-update'
-      ? [...(op.media.logo ? [op.media.logo] : []), ...(op.media.images ?? [])]
-      : []
-  )
-  const baseUrl = project.remote[target].media.baseUrl
-  const missing: string[] = []
-  const queue = [...images]
+  const images = mediaUpdates(manifest).flatMap(op => [
+    ...(op.media.logo ? [op.media.logo] : []),
+    ...(op.media.images ?? [])
+  ])
+  const { bucket } = project.remote[target].media
+  const problems: string[] = []
+  const queue = [...new Map(images.map(image => [image.key, image])).values()]
   await Promise.all(
     Array.from({ length: 8 }, async () => {
       for (let image = queue.shift(); image; image = queue.shift()) {
-        let served = false
+        let problem: string | null
         try {
-          const response = await fetchImplementation(`${baseUrl}/${image.key}`, {
-            method: 'HEAD',
-            signal: AbortSignal.timeout(15_000)
-          })
-          served = response.ok && Number(response.headers.get('content-length')) === image.bytes
-        } catch {
-          served = false
+          const body = await getR2Object(bucket, image.key, env, fetchImplementation)
+          problem = body ? verifyObject(image, body) : 'missing'
+        } catch (error) {
+          problem = error instanceof Error ? error.message : 'unreadable'
         }
-        if (!served) missing.push(image.key)
+        if (problem) problems.push(`${image.key} (${problem})`)
       }
     })
   )
-  if (missing.length > 0) {
+  if (problems.length > 0) {
+    problems.sort()
     throw new Error(
-      `${missing.length} hosted media keys are not on ${baseUrl} yet (first: ${missing.sort()[0]}). Run the media upload for this plan first.`
+      `${problems.length} hosted media objects are not in the ${bucket} bucket as reviewed (first: ${problems[0]}). Run the media upload for this plan first.`
     )
   }
 }
+
+export interface MediaDrift {
+  actual: string | null
+  expected: string
+  id: string
+  slug: string
+}
+
+/**
+ * A row-level manifest's preflight (#97 review B3): every listing it repoints must still exist
+ * under its slug with the logo and image rows the manifest expects. Nothing is written; a drifted
+ * listing is reported so the manifest is regenerated from the current state.
+ */
+export async function mediaDrift(
+  manifest: PublicationManifest,
+  env: NodeJS.ProcessEnv,
+  fetchImplementation: FetchImplementation
+): Promise<MediaDrift[]> {
+  const updates = mediaUpdates(manifest)
+  const drift: MediaDrift[] = []
+  for (let start = 0; start < updates.length; start += 50) {
+    const chunk = updates.slice(start, start + 50)
+    const [result] = await queryD1(
+      [
+        {
+          query: `SELECT l.id,l.slug,${CURRENT_MEDIA_JSON.replace('listing_id=?', 'listing_id=l.id')} AS media FROM listings l WHERE l.id IN (${chunk.map(() => '?').join(',')})`,
+          bindings: chunk.map(op => op.id)
+        }
+      ],
+      env,
+      fetchImplementation
+    )
+    const rows = new Map(
+      (result?.results ?? []).map(row => [String(row.id), row as Record<string, unknown>])
+    )
+    for (const op of chunk) {
+      const row = rows.get(op.id)
+      const expected = expectedMediaJson(op.expected)
+      const actual = row && row.slug === op.slug ? String(row.media) : null
+      if (actual !== expected) drift.push({ actual, expected, id: op.id, slug: op.slug })
+    }
+  }
+  return drift
+}
+
+async function readPublicationState(
+  env: NodeJS.ProcessEnv,
+  fetchImplementation: FetchImplementation
+): Promise<PublicationBase> {
+  const [result] = await queryD1(
+    [{ query: 'SELECT version,checksum FROM publication_state WHERE id=1', bindings: [] }],
+    env,
+    fetchImplementation
+  )
+  const row = result?.results?.[0]
+  if (!row) throw new Error('The target database has no publication state.')
+  return { checksum: String(row.checksum), version: Number(row.version) }
+}
+
+/** Publishes a row-level manifest at most this many times while other writes move the version. */
+const ROW_LEVEL_ATTEMPTS = 3
 
 export async function publishRemoteManifest(
   manifestPath: string,
@@ -173,8 +284,8 @@ export async function publishRemoteManifest(
   const resolvedPath = validatePublicationContext(manifestPath, env, target)
   if (resolvedPath !== unresolvedPath)
     throw new Error('Manifest path resolution changed unexpectedly.')
-  const plan = buildPublicationPlan(manifest, source, new Date().toISOString())
-  await assertHostedMediaServed(manifest, target, fetchImplementation)
+  const rowLevel = manifest.concurrency === 'rows'
+  await verifyTargetDatabase(env, target, fetchImplementation)
   const prior = await queryD1(
     [
       {
@@ -187,47 +298,77 @@ export async function publishRemoteManifest(
     fetchImplementation
   )
   const priorRow = prior[0]?.results?.[0]
+  const inputChecksum = createHash('sha256').update(source).digest('hex')
   if (priorRow?.outcome === 'succeeded') {
+    // A row-level manifest is the same publication when its input is (its base was read live).
+    const planned = rowLevel
+      ? null
+      : buildPublicationPlan(manifest, source, new Date().toISOString())
     if (
-      priorRow.input_checksum !== plan.inputChecksum ||
-      priorRow.after_checksum !== plan.afterChecksum
+      priorRow.input_checksum !== inputChecksum ||
+      (planned && priorRow.after_checksum !== planned.afterChecksum)
     ) {
       throw new Error('Publication manifest ID was already used by different content.')
     }
-    return { afterChecksum: plan.afterChecksum, idempotent: true }
+    return { afterChecksum: String(priorRow.after_checksum), idempotent: true }
   }
+  await assertHostedMediaServed(manifest, target, env, fetchImplementation)
 
-  try {
-    await queryD1(plan.statements, env, fetchImplementation)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    await queryD1(
-      [
-        {
-          query:
-            "INSERT INTO publication_runs (id,manifest_id,base_version,input_checksum,outcome,error,started_at,completed_at,actor,workflow,before_checksum,after_checksum) VALUES (?,?,?,?,'failed',?,?,?,?,?,?,?) ON CONFLICT(manifest_id) DO UPDATE SET outcome='failed',error=excluded.error,completed_at=excluded.completed_at",
-          bindings: [
-            `publish_failure_${manifest.id}`.slice(0, 64),
-            manifest.id,
-            manifest.basePublicationVersion,
-            plan.inputChecksum,
-            message.slice(0, 1000),
-            new Date().toISOString(),
-            new Date().toISOString(),
-            manifest.provenance.actor,
-            manifest.provenance.workflow,
-            manifest.provenance.beforeChecksum,
-            plan.afterChecksum
-          ]
-        }
-      ],
-      env,
-      fetchImplementation
-    )
-    throw error
+  let lastError: unknown
+  let plan = buildPublicationPlan(
+    manifest,
+    source,
+    new Date().toISOString(),
+    rowLevel ? await readPublicationState(env, fetchImplementation) : undefined
+  )
+  for (let attempt = 1; attempt <= (rowLevel ? ROW_LEVEL_ATTEMPTS : 1); attempt += 1) {
+    if (rowLevel) {
+      const drift = await mediaDrift(manifest, env, fetchImplementation)
+      if (drift.length > 0) {
+        const first = drift[0]
+        throw new Error(
+          `${drift.length} listings changed since this manifest was generated (first: ${first?.slug}, expected ${first?.expected}, found ${first?.actual ?? 'no such listing'}). Nothing was written. Regenerate the manifest from the current state and publish it again (docs/MEDIA.md#recovering-a-refused-media-manifest).`
+        )
+      }
+    }
+    try {
+      await queryD1(plan.statements, env, fetchImplementation)
+      return { afterChecksum: plan.afterChecksum, idempotent: false }
+    } catch (error) {
+      lastError = error
+      if (!rowLevel || attempt === ROW_LEVEL_ATTEMPTS) break
+      // Another write may have moved the version between the read and the batch; the rows are
+      // checked again before the next attempt, against the state read now.
+      const live = await readPublicationState(env, fetchImplementation)
+      if (live.version === plan.base.version && live.checksum === plan.base.checksum) break
+      plan = buildPublicationPlan(manifest, source, new Date().toISOString(), live)
+    }
   }
-
-  return { afterChecksum: plan.afterChecksum, idempotent: false }
+  const message = lastError instanceof Error ? lastError.message : String(lastError)
+  await queryD1(
+    [
+      {
+        query:
+          "INSERT INTO publication_runs (id,manifest_id,base_version,input_checksum,outcome,error,started_at,completed_at,actor,workflow,before_checksum,after_checksum) VALUES (?,?,?,?,'failed',?,?,?,?,?,?,?) ON CONFLICT(manifest_id) DO UPDATE SET outcome='failed',error=excluded.error,completed_at=excluded.completed_at",
+        bindings: [
+          `publish_failure_${manifest.id}`.slice(0, 64),
+          manifest.id,
+          plan.base.version,
+          plan.inputChecksum,
+          message.slice(0, 1000),
+          new Date().toISOString(),
+          new Date().toISOString(),
+          manifest.provenance.actor,
+          manifest.provenance.workflow,
+          plan.base.checksum,
+          plan.afterChecksum
+        ]
+      }
+    ],
+    env,
+    fetchImplementation
+  )
+  throw lastError
 }
 
 async function main(): Promise<void> {
