@@ -114,7 +114,7 @@ export function listingIdsWithWebsite(website: string): PlanGuard {
 
 /**
  * What stops a listing from moving to another website (#64 review), with the submission
- * intake's rules (`createSubmission`): the website must pass `validatePublicHttpUrl`; no other
+ * intake's rules (`createDraft`): the website must pass `validatePublicHttpUrl`; no other
  * listing may already have it (`listingWebsiteMatch`); its host must not be the slug of a
  * submission in flight (other than this listing's own); and no active prohibited-URL block may
  * cover it (the `listing_submissions_refuse_blocked_url` trigger's rule). Throws for an invalid
