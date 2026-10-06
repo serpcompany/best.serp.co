@@ -728,19 +728,165 @@ describe('listing decisions', () => {
         status: 422
       })
     }
+    // Without a media bucket the new logo is queued for the media cron, never hotlinked (#95).
     expect(
       await edit('lst_bare', 'bare.example', {
         logoUrl: 'https://assets.example/bare.png',
         name: 'Bare'
       })
-    ).toEqual({ fields: ['logo'], ok: true, replayed: false })
-    expect(logos('lst_bare')).toEqual([{ url: 'https://assets.example/bare.png' }])
+    ).toEqual({
+      fields: ['logo'],
+      logo: 'pending',
+      notice: expect.stringMatching(/^Saved, but the new logo is queued to be copied\./u),
+      ok: true,
+      replayed: false
+    })
+    expect(logos('lst_bare')).toEqual([])
+    expect(
+      row("SELECT source_url,status FROM media_ingestions WHERE listing_id='lst_bare'")
+    ).toEqual({ source_url: 'https://assets.example/bare.png', status: 'pending' })
     expect(await edit('lst_local', 'local.example', { logoUrl: '', name: 'Local' })).toEqual({
       fields: ['logo'],
       ok: true,
       replayed: false
     })
     expect(logos('lst_local')).toEqual([])
+  })
+
+  it('hosts a changed logo before the edit, or queues it with the failure the admin sees', async () => {
+    const { context, db, row } = fixture()
+    const sha256 = 'a'.repeat(64)
+    const hosted = {
+      bytes: 512,
+      contentType: 'image/png',
+      height: 256,
+      key: `best.serp.co/listings/brieflow.ai/logo/${sha256.slice(0, 16)}.png`,
+      sha256,
+      sourceUrl: 'https://assets.example/new.png',
+      width: 256
+    }
+    const host = vi.fn(async (input: { sourceUrl: string }) =>
+      input.sourceUrl === hosted.sourceUrl
+        ? { hosted }
+        : input.sourceUrl.endsWith('.svg')
+          ? { failure: { code: 'svg', retryable: false } }
+          : { failure: { code: 'http_503', retryable: true } }
+    )
+    const editLogo = (logoUrl: string) =>
+      updateListingDetails(context({ media: { host } }), {
+        details: {
+          categorySlug: String(
+            row(
+              "SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id='lst_brief' AND lc.is_primary=1"
+            )?.slug
+          ),
+          description: String(
+            row("SELECT description FROM listings WHERE id='lst_brief'")?.description
+          ),
+          logoUrl,
+          name: String(row("SELECT name FROM listings WHERE id='lst_brief'")?.name),
+          website: String(row("SELECT website FROM listings WHERE id='lst_brief'")?.website)
+        },
+        expectedChecksum: String(
+          row("SELECT checksum FROM listings WHERE id='lst_brief'")?.checksum
+        ),
+        listingId: 'lst_brief'
+      })
+    expect(await editLogo('https://assets.example/new.png')).toEqual({
+      fields: ['logo'],
+      logo: 'hosted',
+      ok: true,
+      replayed: false
+    })
+    expect(host).toHaveBeenCalledWith({
+      kind: 'logo',
+      slug: 'brieflow.ai',
+      sourceUrl: 'https://assets.example/new.png'
+    })
+    expect(
+      db
+        .prepare(
+          "SELECT url,media_key FROM listing_media WHERE listing_id='lst_brief' AND kind='logo'"
+        )
+        .all()
+    ).toEqual([{ media_key: hosted.key, url: hosted.sourceUrl }])
+    // A logo that can never be hosted is refused with its reason; nothing is saved (#96 S4).
+    const before = row("SELECT checksum FROM listings WHERE id='lst_brief'")?.checksum
+    expect(await editLogo('https://assets.example/vector.svg')).toEqual({
+      error: 'logo_unhostable',
+      message: expect.stringContaining('it is an SVG'),
+      ok: false,
+      status: 422
+    })
+    expect(row("SELECT checksum FROM listings WHERE id='lst_brief'")?.checksum).toBe(before)
+    expect(
+      db
+        .prepare(
+          "SELECT url,media_key FROM listing_media WHERE listing_id='lst_brief' AND kind='logo'"
+        )
+        .all()
+    ).toEqual([{ media_key: hosted.key, url: hosted.sourceUrl }])
+    // A retryable failure saves with a warning, keeps the hosted logo, and queues the new one.
+    expect(await editLogo('https://assets.example/busy.png')).toEqual({
+      fields: ['logo'],
+      logo: 'pending',
+      notice: expect.stringContaining('the server answered HTTP 503 (http_503)'),
+      ok: true,
+      replayed: false
+    })
+    expect(
+      db
+        .prepare(
+          "SELECT url,media_key FROM listing_media WHERE listing_id='lst_brief' AND kind='logo'"
+        )
+        .all()
+    ).toEqual([{ media_key: hosted.key, url: hosted.sourceUrl }])
+    expect(
+      row("SELECT source_url,status,last_error FROM media_ingestions WHERE listing_id='lst_brief'")
+    ).toEqual({
+      last_error: 'http_503',
+      source_url: 'https://assets.example/busy.png',
+      status: 'pending'
+    })
+    // Saving the current logo's URL again cancels the queued replacement, fetching nothing
+    // (#96 review round 2, S2).
+    const hostCalls = host.mock.calls.length
+    expect(await editLogo(hosted.sourceUrl)).toEqual({
+      fields: ['logo'],
+      ok: true,
+      replayed: false
+    })
+    expect(host.mock.calls).toHaveLength(hostCalls)
+    expect(
+      row("SELECT COUNT(*) AS count FROM media_ingestions WHERE listing_id='lst_brief'")
+    ).toEqual({ count: 0 })
+    expect(
+      db
+        .prepare(
+          "SELECT url,media_key FROM listing_media WHERE listing_id='lst_brief' AND kind='logo'"
+        )
+        .all()
+    ).toEqual([{ media_key: hosted.key, url: hosted.sourceUrl }])
+  })
+
+  it('settles the approved listing’s queued media after the response, once', async () => {
+    const { context, row, submission } = fixture()
+    submission('sub_quill', 'quillmate.app', 'verified')
+    const settle = vi.fn()
+    const media = { host: vi.fn(), settle }
+    const approve = () =>
+      approveSubmission(context({ media }), {
+        expectedContentVersion: 1,
+        submissionId: 'sub_quill'
+      })
+    expect(await approve()).toMatchObject({ ok: true, replayed: false })
+    const listingId = row(
+      "SELECT listing_id FROM listing_submissions WHERE id='sub_quill'"
+    )?.listing_id
+    expect(settle.mock.calls).toEqual([[listingId]])
+    // A replay changes nothing and settles nothing.
+    expect(await approve()).toMatchObject({ ok: true, replayed: true })
+    expect(settle).toHaveBeenCalledTimes(1)
   })
 
   it('transfers to an account that exists, then removes the owner', async () => {

@@ -43,7 +43,8 @@ describe('native submission intake', () => {
   function operations() {
     return createSubmissionOperations({
       client: createDatabase(sqlite.asD1Database()),
-      clock: () => now
+      clock: () => now,
+      mediaBaseUrl: 'https://cdn.serp.co'
     })
   }
 
@@ -202,16 +203,27 @@ describe('native submission intake', () => {
       slug: 'brieflow.ai',
       website: 'https://serp.ly/brieflow'
     })
+    // Only the hosted copy is ever shown, on the environment's media host (#95).
+    const logoKey = `best.serp.co/listings/brieflow.ai/logo/${'a'.repeat(16)}.png`
     sqlite.database
       .prepare(
         "INSERT INTO listing_media(listing_id,kind,url,sort_order) VALUES ('lst_brieflow','logo','https://assets.example.com/brieflow.png',0)"
       )
       .run()
+    await expect(operations().checkUrl('https://brieflow.ai/')).resolves.toMatchObject({
+      listing: { logoUrl: null }
+    })
+    sqlite.database
+      .prepare(
+        `UPDATE listing_media SET media_key=?,sha256=?,content_type='image/png',bytes=10,width=1,
+          height=1 WHERE listing_id='lst_brieflow'`
+      )
+      .run(logoKey, 'a'.repeat(64))
     const listed = {
       kind: 'listed',
       listing: {
         categoryName: 'Tools',
-        logoUrl: 'https://assets.example.com/brieflow.png',
+        logoUrl: `https://cdn.serp.co/${logoKey}`,
         name: 'Brieflow',
         public: true,
         slug: 'brieflow.ai'

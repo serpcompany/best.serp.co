@@ -5,6 +5,7 @@ import { ListingDetail } from '@/components/admin/listing-detail'
 import { listingDetailView } from '@/lib/admin/listing-view'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'
+import { mediaBaseUrl } from '@/lib/media/media-base'
 
 /** One listing (#64 screen 12). */
 export const dynamic = 'force-dynamic'
@@ -36,7 +37,10 @@ export default async function AdminListingPage({ params }: Props) {
         ]}
       />
 
-      <ListingDetail categories={categories} view={listingDetailView(listing)} />
+      <ListingDetail
+        categories={categories}
+        view={listingDetailView(listing, await mediaBaseUrl())}
+      />
     </>
   )
 }

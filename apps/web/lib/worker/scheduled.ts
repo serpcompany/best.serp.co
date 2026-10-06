@@ -6,8 +6,9 @@
  * Each cron expression maps to the jobs it runs. The hourly trigger runs the draft reminders
  * and expiry (#63), so the +12h reminder goes out within the hour it falls due, and continues
  * the badge program (#66) in batches; the badge program's weekly trigger opens its cycle and
- * its daily trigger its confirmation rechecks (`lib/badge-program/schedule.ts`). A trigger
- * with no jobs here is logged and ignored.
+ * its daily trigger its confirmation rechecks (`lib/badge-program/schedule.ts`). A 15-minute
+ * trigger hosts the queued listing media (#95). A trigger with no jobs here is logged and
+ * ignored.
  *
  * Like the request path, it fails closed: without a valid `DB` binding and `D1_RUNTIME_ENV`,
  * a job throws instead of guessing. Emails go through the same email module as requests
@@ -22,12 +23,16 @@ import { BADGE_DAILY_CRON, BADGE_WEEKLY_CRON } from '../badge-program/schedule'
 import { appEmailTemplates } from '../email/registry'
 import { createWorkerEmailService, type EmailWorkerEnv } from '../email/runtime'
 import { type SiteFeatures, features as siteFeatures } from '../features'
+import { runMediaCron } from '../media/worker-media'
 import { verifyFeaturedBadge } from '../submissions/badge-verifier'
 import { runDraftJobs } from '../submissions/draft-jobs'
 import { submissionBadgeVerificationTargets } from '../submissions/presentation'
 
 /** Hourly, on the hour: each draft reminder goes out within an hour of falling due. */
 export const DRAFT_JOBS_CRON = '0 * * * *'
+
+/** Every 15 minutes: the first media retry falls due 15 minutes after a failed attempt. */
+export const MEDIA_CRON = '*/15 * * * *'
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
@@ -40,6 +45,7 @@ export interface ScheduledEnv extends EmailWorkerEnv {
    * `D1_RUNTIME_ENV` are both `local`.
    */
   LOCAL_BADGE_PROGRAM?: string
+  MEDIA?: R2Bucket
   SITE_ENVIRONMENT?: string
 }
 
@@ -155,10 +161,23 @@ export function createBadgeProgramJob(features: SiteFeatures = siteFeatures): Sc
 
 export const badgeProgramJob = createBadgeProgramJob()
 
+/**
+ * Retries the due listing and submission media slots and deletes finished submissions' images
+ * (`runMediaCron`). Without a `DB` or `MEDIA` binding it logs `media_cron_disabled` and skips.
+ */
+export const mediaJobs: ScheduledJob = {
+  name: 'listing-media',
+  async run({ env }) {
+    const summary = await runMediaCron(env)
+    return summary ? { ...summary } : { disabled: true }
+  }
+}
+
 export const scheduledJobs: Readonly<Record<string, readonly ScheduledJob[]>> = {
   [DRAFT_JOBS_CRON]: [draftJobs, badgeProgramJob],
   [BADGE_WEEKLY_CRON]: [badgeProgramJob],
-  [BADGE_DAILY_CRON]: [badgeProgramJob]
+  [BADGE_DAILY_CRON]: [badgeProgramJob],
+  [MEDIA_CRON]: [mediaJobs]
 }
 
 function log(level: 'error' | 'info' | 'warn', entry: Record<string, unknown>): void {

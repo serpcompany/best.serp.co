@@ -233,6 +233,11 @@ export function buildRejectRevisionPlans(input: {
  */
 export function buildApproveRevisionPlans(input: {
   expectedContentVersion: number
+  /**
+   * The hosted logo the reviewer saw (null for the tile): only that logo is adopted, never a
+   * later fetch of the revision's logo URL (#96 review round 3, S1).
+   */
+  expectedLogoKey?: string | null
   listingId: string
   now: string
   publication: CatalogPublication
@@ -255,6 +260,7 @@ export function buildApproveRevisionPlans(input: {
       checksum: input.publication.afterChecksum,
       listingId: input.listingId,
       now: input.now,
+      reviewedLogoKey: input.expectedLogoKey,
       source: revisionContentSource(input.revisionId)
     }),
     {

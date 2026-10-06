@@ -40,7 +40,19 @@ export const applicationColumnInventory = {
     'link_rel'
   ],
   listing_categories: ['listing_id', 'category_id', 'sort_order', 'is_primary'],
-  listing_media: ['id', 'listing_id', 'kind', 'url', 'sort_order'],
+  listing_media: [
+    'id',
+    'listing_id',
+    'kind',
+    'url',
+    'sort_order',
+    'media_key',
+    'sha256',
+    'content_type',
+    'bytes',
+    'width',
+    'height'
+  ],
   listing_resource_links: ['id', 'listing_id', 'label', 'url', 'sort_order'],
   listing_faqs: ['id', 'listing_id', 'question', 'answer', 'sort_order'],
   publication_state: ['id', 'version', 'manifest_id', 'checksum', 'published_at'],
@@ -220,7 +232,29 @@ export const applicationColumnInventory = {
   listing_revision_faqs: ['id', 'revision_id', 'question', 'answer', 'sort_order'],
   listing_revision_events: ['id', 'revision_id', 'event_type', 'detail', 'actor', 'created_at'],
   badge_checks: ['id', 'listing_id', 'checked_at', 'outcome', 'reason', 'conclusive', 'kind'],
-  listing_events: ['id', 'listing_id', 'event_type', 'detail', 'actor', 'created_at']
+  listing_events: ['id', 'listing_id', 'event_type', 'detail', 'actor', 'created_at'],
+  media_ingestions: [
+    'id',
+    'listing_id',
+    'submission_id',
+    'revision_id',
+    'kind',
+    'sort_order',
+    'source_url',
+    'copy_from_key',
+    'status',
+    'attempts',
+    'next_attempt_at',
+    'last_error',
+    'media_key',
+    'sha256',
+    'content_type',
+    'bytes',
+    'width',
+    'height',
+    'created_at',
+    'updated_at'
+  ]
 } as const
 
 export type ApplicationTableName = keyof typeof applicationColumnInventory
@@ -230,10 +264,11 @@ export const applicationTableNames = Object.keys(
 ) as ApplicationTableName[]
 
 /**
- * Tables written at runtime: Better Auth and its sign-in limits (#60) and the transactional
- * email ledger (#71). They belong to the exact schema inventory, but not to bootstrap parity:
- * the import never writes them, and a database that has served a sign-in or sent an email
- * (local preview, Playwright, a deployed Worker) holds rows.
+ * Tables written at runtime: Better Auth and its sign-in limits (#60), the transactional email
+ * ledger (#71), and the media ingestion queue (#95). They belong to the exact schema inventory,
+ * but not to bootstrap parity: the import never writes them, and a database that has served a
+ * sign-in, sent an email, or ingested an image (local preview, Playwright, a deployed Worker)
+ * holds rows.
  */
 export const runtimeTableNames = [
   'users',
@@ -241,7 +276,8 @@ export const runtimeTableNames = [
   'accounts',
   'verification',
   'auth_rate_limit_hits',
-  'email_deliveries'
+  'email_deliveries',
+  'media_ingestions'
 ] as const satisfies readonly ApplicationTableName[]
 
 export type ParityTableName = Exclude<ApplicationTableName, (typeof runtimeTableNames)[number]>
@@ -283,7 +319,8 @@ export const importOrder: ApplicationTableName[] = [
   'listing_revision_faqs',
   'listing_revision_events',
   'badge_checks',
-  'listing_events'
+  'listing_events',
+  'media_ingestions'
 ]
 
 export const toolOwnedTableNames = ['d1_migrations'] as const

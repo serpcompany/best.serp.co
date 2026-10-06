@@ -216,6 +216,16 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 These tables are empty in the initial import, so bootstrap parity compares them like the
 submission tables (`scripts/d1-table-inventory.ts`).
 
+## Hosted listing media
+
+Listing logos and images are hosted in R2 under content-addressed keys, never hotlinked (#95).
+`listing_media` stores the key with `sha256`, `content_type`, `bytes`, `width`, and `height`
+(all or none, and only a `best.serp.co/listings/` key) and keeps the source in `url`;
+`media_ingestions` (a runtime table) queues slots that are not hosted yet and holds a
+submission's or a revision's hosted images (`best.serp.co/submissions/<id>/`,
+`best.serp.co/revisions/<id>/` keys) until approval copies them (`copy_from_key`). Approvals and admin edits host a logo or queue it, never store its URL.
+Details: [Listing media](./MEDIA.md).
+
 ## Statement plans
 
 Every transition is a credential-free statement plan in `packages/data-ops`

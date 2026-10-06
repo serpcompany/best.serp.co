@@ -136,6 +136,7 @@ interface LocalConfigFixture {
   }>
   main: string
   name: string
+  r2_buckets: Array<{ binding: string; bucket_name: string }>
   vars: Record<string, string>
 }
 
@@ -156,8 +157,10 @@ function validLocalConfig(): LocalConfigFixture {
     ],
     main: resolve(project.workerEntryPath),
     name: project.local.workerName,
+    r2_buckets: [{ binding: 'MEDIA', bucket_name: project.local.media.bucket }],
     vars: {
-      D1_RUNTIME_ENV: 'local'
+      D1_RUNTIME_ENV: 'local',
+      MEDIA_BASE_URL: project.local.media.baseUrl
     }
   }
 }
@@ -175,7 +178,8 @@ describe('fresh Drizzle D1 history', () => {
       '0003_submissions_data_model.sql',
       '0004_query_indexes.sql',
       '0005_admin_panel.sql',
-      '0006_badge_program.sql'
+      '0006_badge_program.sql',
+      '0007_hosted_media.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
@@ -343,7 +347,8 @@ describe('fresh Drizzle D1 history', () => {
     expect(
       database.prepare("SELECT sql FROM sqlite_master WHERE name='listing_submission_faqs'").get()
     ).toMatchObject({ sql: expect.stringContaining('REFERENCES "listing_submissions"') })
-    // Every later migration (0004: query indexes, #77; 0005: admin panel, #64) applies to the populated database too.
+    // Every later migration (0004: query indexes, #77; 0005: admin panel, #64; 0006: hosted media,
+    // #95) applies to the populated database too.
     for (const migration of names.slice(dataModelIndex + 1)) {
       database.exec('BEGIN')
       database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
@@ -643,6 +648,21 @@ describe('fresh Drizzle D1 history', () => {
         if (binding) binding.migrations_table = 'migrations'
       },
       /migrations_table "d1_migrations"/u
+    )
+    assertRejected(
+      'remote-media-bucket',
+      config => {
+        const bucket = config.r2_buckets[0]
+        if (bucket) bucket.bucket_name = 'cdn'
+      },
+      /Local listing media/u
+    )
+    assertRejected(
+      'remote-media-host',
+      config => {
+        config.vars.MEDIA_BASE_URL = 'https://cdn.serp.co'
+      },
+      /Local listing media/u
     )
   })
 

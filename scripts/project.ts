@@ -30,6 +30,8 @@ export const project = {
   local: {
     databaseId: '00000000-0000-0000-0000-000000000001',
     databaseName: 'best-serp-co-local',
+    /** Local listing media (#95): Wrangler state only; the Worker serves it at `/_media`. */
+    media: { baseUrl: '/_media', bucket: 'best-serp-co-media-local' },
     workerName: 'best-serp-co-local'
   },
   protectedEnvironment: {
@@ -45,6 +47,8 @@ export const project = {
     production: {
       databaseId: '404ec437-53a2-4fbc-8b5f-b5e69065708e',
       databaseName: 'best-serp-co-production',
+      /** The `cdn` bucket serp.co already uses; best.serp.co writes only under `best.serp.co/`. */
+      media: { baseUrl: 'https://cdn.serp.co', bucket: 'cdn' },
       origin: 'https://best.serp.co',
       /** noindex review URL until the best.serp.co Custom Domain is attached (#34 Phase 4b). */
       reviewOrigin: 'https://best-serp-co-production.serpcompany.workers.dev',
@@ -54,6 +58,8 @@ export const project = {
     staging: {
       databaseId: '8e6b67e5-9c58-4fa9-aca1-25b0020c0833',
       databaseName: 'best-serp-co-staging',
+      /** A separate bucket, so staging can never overwrite production objects (#95). */
+      media: { baseUrl: 'https://cdn-staging.serp.co', bucket: 'cdn-staging' },
       origin: 'https://best-serp-co-staging.serpcompany.workers.dev',
       workerName: 'best-serp-co-staging',
       workersDev: true

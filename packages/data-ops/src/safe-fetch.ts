@@ -1,18 +1,21 @@
-import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
-import { fetchMimeType } from './html-encoding'
+import { fetchMimeType } from './mime-type'
+import { validatePublicHttpUrl } from './public-url'
 
 /**
- * The one way submission code fetches a submitter's URLs (badge verification, URL prefill, and
- * logo checks): every hop, including each redirect, must be a public http(s) URL
+ * The one way server code fetches a URL someone else controls: submit v2's badge checks, URL
+ * prefill, and logo checks (#63, #84), and media ingestion and the legacy media migration
+ * (#95). Every hop, including each redirect, must be a public http(s) URL
  * (`validatePublicHttpUrl`); redirects are followed by hand, at most three; each request times
  * out after 8 seconds; and a body is read up to a byte cap, never past it.
  *
- * The policy reads the URL, not DNS: a public hostname that resolves to a private address
- * passes it. Production relies on Cloudflare's egress, which never reaches private ranges,
- * for that case (docs/SUBMISSION_FLOW.md#fetching-submitters-sites).
+ * The policy reads the URL, not DNS: a public hostname that resolves to a private address passes
+ * it. The Worker relies on Cloudflare's egress, which never reaches private ranges, for that
+ * case (docs/SUBMISSION_FLOW.md#fetching-submitters-sites); a Node script passes `nodeFetch`
+ * (`safe-fetch-node.ts`), which resolves every hop and refuses restricted addresses. Media
+ * fetches also refuse any port but 80 and 443 (`webPortsOnly`, #96 review S5).
  */
 
-export const SUBMISSION_FETCH_USER_AGENT = 'SERPSoftwareBadgeVerifier/1.0'
+export const SAFE_FETCH_USER_AGENT = 'SERPSoftwareBadgeVerifier/1.0'
 export const SAFE_FETCH_TIMEOUT_MS = 8_000
 export const SAFE_FETCH_MAX_REDIRECTS = 3
 
@@ -40,6 +43,9 @@ export interface SafeFetchOptions {
   fetcher?: typeof fetch
   maxBytes: number
   timeoutMs?: number
+  userAgent?: string
+  /** Refuse every hop on a port other than 80 and 443 (media fetches). */
+  webPortsOnly?: boolean
 }
 
 function isTimeout(error: unknown): boolean {
@@ -94,15 +100,25 @@ export async function safeFetch(url: string, options: SafeFetchOptions): Promise
   for (let redirect = 0; redirect <= SAFE_FETCH_MAX_REDIRECTS; redirect += 1) {
     const safe = validatePublicHttpUrl(current)
     if (!safe.ok) return { code: 'invalid_target', ok: false }
+    // Web ports only: no internal service on another port of a public host.
+    if (options.webPortsOnly && safe.url.port !== '' && !['80', '443'].includes(safe.url.port)) {
+      return { code: 'invalid_target', ok: false }
+    }
 
     let response: Response
     try {
       response = await fetcher(safe.url, {
-        headers: { Accept: options.acceptHeader, 'User-Agent': SUBMISSION_FETCH_USER_AGENT },
+        headers: {
+          Accept: options.acceptHeader,
+          'User-Agent': options.userAgent ?? SAFE_FETCH_USER_AGENT
+        },
         redirect: 'manual',
         signal: AbortSignal.timeout(options.timeoutMs ?? SAFE_FETCH_TIMEOUT_MS)
       })
     } catch (error) {
+      if (error instanceof Error && error.name === 'RestrictedAddressError') {
+        return { code: 'invalid_target', ok: false }
+      }
       return { code: isTimeout(error) ? 'fetch_timeout' : 'site_unreachable', ok: false }
     }
 

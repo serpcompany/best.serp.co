@@ -30,8 +30,12 @@ import type {
 } from './contracts'
 import { listingSlugRedirects, listings } from './schema'
 
-/** v4: listing details carry `linkRel` and `verifiedOwner` (#62); v5: `faqs` (#105). */
-const CACHE_SCHEMA = 'v5'
+/**
+ * v6: listing details carry `faqs` (#105); v5: a hosted logo or image is its media key (#95),
+ * which the web adapter turns into a URL on the environment's media host; v4 added `linkRel`
+ * and `verifiedOwner` (#62).
+ */
+const CACHE_SCHEMA = 'v6'
 /**
  * Keys include the catalog epoch (publication version plus the latest public
  * `published_at`), so an entry can never outlive the content it was built from; the TTL
@@ -206,7 +210,7 @@ const summaryColumns = `
     ) ordered
   ) AS categories,
   (
-    SELECT m.url
+    SELECT COALESCE(m.media_key, m.url)
     FROM listing_media m
     WHERE m.listing_id = l.id AND m.kind = 'logo'
     ORDER BY m.sort_order ASC
@@ -834,7 +838,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         l.name,
         l.website,
         (
-          SELECT m.url FROM listing_media m
+          SELECT COALESCE(m.media_key, m.url) FROM listing_media m
           WHERE m.listing_id = l.id AND m.kind = 'logo'
           ORDER BY m.sort_order ASC LIMIT 1
         ) AS logo
@@ -878,7 +882,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         COALESCE((
           SELECT json_group_array(ordered.url)
           FROM (
-            SELECT m.url FROM listing_media m
+            SELECT COALESCE(m.media_key, m.url) AS url FROM listing_media m
             WHERE m.listing_id = l.id AND m.kind = 'image'
             ORDER BY m.sort_order ASC
           ) ordered
@@ -1009,7 +1013,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         related.website,
         related.is_unofficial,
         (
-          SELECT m.url FROM listing_media m
+          SELECT COALESCE(m.media_key, m.url) FROM listing_media m
           WHERE m.listing_id = related.id AND m.kind = 'logo'
           ORDER BY m.sort_order ASC LIMIT 1
         ) AS logo

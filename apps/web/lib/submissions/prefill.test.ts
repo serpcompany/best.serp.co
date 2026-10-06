@@ -235,6 +235,30 @@ describe('site prefill', () => {
     })
   })
 
+  it('never proposes or accepts an SVG logo (#95: the media host never takes SVG)', async () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"/>'
+    const { calls, fetcher } = site({
+      '/': {
+        body: PAGE.replace(
+          '<link rel="icon" href="/favicon.ico" sizes="32x32">',
+          '<link rel="icon" type="image/svg+xml" href="/logo.svg">'
+        ),
+        type: 'text/html'
+      },
+      '/logo.svg': { body: svg, type: 'image/svg+xml' },
+      '/icon-192.png': { body: png(192, 192), type: 'image/png' },
+      '/og.png': { body: png(1200, 630), type: 'image/png' }
+    })
+    await expect(readSitePrefill('https://quillmate.app/', fetcher)).resolves.toMatchObject({
+      siteIcon: 'https://quillmate.app/icon-192.png'
+    })
+    expect(calls).not.toContain('/logo.svg')
+    await expect(checkLogoUrl('https://quillmate.app/logo.svg', fetcher)).resolves.toEqual({
+      code: 'logo_not_image',
+      ok: false
+    })
+  })
+
   it('reports a page it could not read, so the form can say so', async () => {
     const { fetcher } = site({ '/': { body: 'nope', status: 503, type: 'text/html' } })
     await expect(readSitePrefill('https://down.example/', fetcher)).resolves.toEqual({

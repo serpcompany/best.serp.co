@@ -195,8 +195,8 @@ owner except filling in the form; the anonymous capability-token flow is gone.
 
 ### Fetching submitters' sites
 
-Badge checks, prefill, and logo checks fetch only through `apps/web/lib/submissions/safe-fetch.ts`:
-every hop, including each of at most 3 manually followed redirects, must pass
+Badge checks, prefill, and logo checks fetch only through the shared `safeFetch`
+(`packages/data-ops/src/safe-fetch.ts`, which listing media ingestion uses too, #95): every hop, including each of at most 3 manually followed redirects, must pass
 `validatePublicHttpUrl` (`packages/data-ops/src/public-url.ts`: http or https, no credentials
 in the URL, no `localhost`, `*.local`, `*.localhost`, `*.internal`, `*.home.arpa` or similar
 names, and no private, shared, loopback, link-local, documentation, benchmark, multicast, or
@@ -209,16 +209,18 @@ for that case.
 
 ### Logos
 
-A logo is stored as the public https URL of an image on the submitter's site or wherever they
-host it (the catalog's logos are URLs too): the site icon, the social image, or a pasted image
-link, checked on save to be a PNG, JPEG, WebP, or SVG of at most 1 MB and at least 128 px on
-its shorter side when its size can be read. A local Worker also accepts http, for its fixture
-sites. Nothing is uploaded. The image is hotlinked, so it can change after the check: logos
-render only through `<img referrerpolicy="no-referrer" loading="lazy">`, never inline, in
-`<object>`, or in `<iframe>` (an SVG may contain a script), and the admin approval (#64) must
-re-check the logo URL before it publishes. Copying logos into R2 (an "Upload" option, and
-protection against a site changing or removing its image) needs an R2 bucket and binding,
-which only the owner can create: see the owner steps in the #63 pull request.
+A logo is given as the public https URL of an image: the site icon, the social image, or a
+pasted image link, checked on save to be a PNG, JPEG, or WebP of at most 1 MB and at least
+128 px on its shorter side when its size can be read. SVG is refused, and prefill never
+proposes an SVG icon. A local Worker also accepts http, for its fixture sites.
+
+The saved logo, and the social image the server's own prefill finds on the website, are then
+copied to our media host under the submission (`best.serp.co/submissions/<id>/…`, after the
+response, so hosting never fails the save; see [Listing media](./MEDIA.md)). The review screen
+and previews show those hosted copies, or the fallback tile with a link to the source; approval
+copies the logo, and the featured image exactly as the reviewer saw it, into the listing's path.
+Only the submitter's own form previews the URL they typed, through
+`<img referrerpolicy="no-referrer" loading="lazy">`.
 
 ### Draft reminders and expiry
 
@@ -270,3 +272,9 @@ Setup and guards are in [the deploy runbook](./DEPLOY_RUNBOOK.md#workflows).
 Code: `apps/web/app/submit/`, `apps/web/components/submit/`, `apps/web/app/api/submissions/`,
 `apps/web/lib/submissions/`, `packages/data-ops/src/submissions.ts`, and
 `packages/data-ops/src/submission-plans.ts`.
+
+## Listing media
+
+A submitted logo is never published as the submitter's URL (#95): approval adopts its hosted copy
+or queues the source behind the fallback tile. Submit v2 hosts it at intake
+([Listing media](./MEDIA.md#integration-points)).

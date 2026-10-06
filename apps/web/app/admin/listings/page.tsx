@@ -5,6 +5,8 @@ import { type ListingFilters, ListingSearch } from '@/components/admin/listing-s
 import { planLabel, sourceLabel } from '@/lib/admin/listing-labels'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'
+import { mediaBaseUrl } from '@/lib/media/media-base'
+import { renderableImage } from '@/lib/media/renderable-image'
 
 /** Listings (#64 screen 12): search, facets, and one page of results from D1. */
 export const dynamic = 'force-dynamic'
@@ -44,6 +46,7 @@ export default async function ListingsPage({ searchParams }: Props) {
     source: list(params.source, ['admin', 'submission']),
     status: list(params.status, ['live', 'unlisted', 'rejected', 'blocked'])
   }
+  const media = await mediaBaseUrl()
   const result = await (await getAdminReads()).searchListings(
     { linkRels: filters.link, query: filters.q, sources: filters.source, statuses: filters.status },
     { limit: filters.size, offset: (filters.page - 1) * filters.size }
@@ -64,7 +67,7 @@ export default async function ListingsPage({ searchParams }: Props) {
           adminStatus: row.adminStatus,
           id: row.id,
           linkRel: row.linkRel,
-          logoUrl: row.logoUrl,
+          logoUrl: renderableImage({ key: row.logoKey, url: row.logoUrl }, media),
           name: row.name,
           ownerEmail: row.ownerEmail,
           planLabel: planLabel(row),

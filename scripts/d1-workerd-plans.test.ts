@@ -15,6 +15,7 @@ import {
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import * as draftPlansModule from '@serpdirectory/data-ops/draft-plans'
 import * as listingPlansModule from '@serpdirectory/data-ops/listing-plans'
+import * as mediaPlansModule from '@serpdirectory/data-ops/media-plans'
 import { prepareCatalogPublication, type StatementPlan } from '@serpdirectory/data-ops/plan-support'
 import * as revisionPlansModule from '@serpdirectory/data-ops/revision-plans'
 import { assertD1StatementLimits } from '@serpdirectory/data-ops/sql-limits'
@@ -32,7 +33,8 @@ import { project } from './project'
  * fresh state directory, and the binding is the same persisted database, opened through
  * `getPlatformProxy`. URL keys come from `urlKey()` running inside workerd
  * (`scripts/fixtures/url-key-worker.ts`), so the Public Suffix List (`tldts`) runs there too.
- * The last test checks that every exported plan builder ran here.
+ * The #95 media plans run here as well. The last test checks that every exported plan builder
+ * ran here.
  */
 const NOW = '2026-10-06T12:00:00.000Z'
 const DAY = 24 * 60 * 60 * 1000
@@ -63,6 +65,7 @@ const A = tracked(adminPlansModule)
 const D = tracked(draftPlansModule)
 const Q = tracked(adminQueriesModule)
 const L = tracked(listingPlansModule)
+const M = tracked(mediaPlansModule)
 const R = tracked(revisionPlansModule)
 const S = tracked(submissionPlansModule)
 
@@ -983,7 +986,8 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         content: 'Owner revision',
         description: 'Edited from the account',
         faqs: [],
-        logoUrl: owned?.logoUrl ?? '',
+        // Approval adopted no unhosted logo (#96), so the owner names a new one.
+        logoUrl: 'https://dash.example/revised-logo.png',
         resourceLinks: []
       },
       listingId: 'lst-dash',
@@ -999,7 +1003,210 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         })
       ])
     )
+    // The revision's new logo is hosted under its own prefix when saved (#96 review round 4).
+    const revisionLogo = {
+      bytes: 512,
+      contentType: 'image/png',
+      height: 128,
+      key: `best.serp.co/revisions/rev-dash/logo/${'9'.repeat(16)}.png`,
+      sha256: '9'.repeat(64),
+      sourceUrl: 'https://dash.example/revised-logo.png',
+      width: 128
+    }
+    await run(
+      M.buildRecordPendingMediaPlans({
+        kind: 'logo',
+        media: revisionLogo,
+        now: NOW,
+        owner: { revisionId: 'rev-dash' },
+        sortOrder: 0
+      })
+    )
     await account.discardRevision({ listingId: 'lst-dash', userId: 'user_owner' })
+    // A withdrawn revision's logo is forgotten.
+    const [withdrawn] = await all<{ id: number; media_key: string | null }>(
+      M.selectFinishedPendingMediaPlan(50)
+    )
+    expect(withdrawn).toMatchObject({ media_key: revisionLogo.key })
+    if (!withdrawn) throw new Error('No finished revision media.')
+    await run(M.buildForgetPendingMediaPlans({ id: withdrawn.id, mediaKey: withdrawn.media_key }))
+    expect(await all(M.selectFinishedPendingMediaPlan(50))).toEqual([])
+  })
+
+  it('queues, retries, claims, and hosts listing and submission media (#95)', async () => {
+    const listingId = 'lst_media_workerd'
+    const slug = 'media.example'
+    await db.batch([
+      db
+        .prepare(
+          `INSERT INTO listings (id,slug,name,description,website,status,source_kind,source_identity,
+          checksum) VALUES (?,?,'Media','d','https://media.example/','draft','test','media','c')`
+        )
+        .bind(listingId, slug),
+      db
+        .prepare(
+          `INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+          SELECT ?,id,0,1 FROM categories WHERE slug='tools'`
+        )
+        .bind(listingId),
+      db
+        .prepare(`UPDATE listings SET status='approved',published_at=? WHERE id=?`)
+        .bind(NOW, listingId),
+      db.prepare(
+        `INSERT INTO listing_submissions (id,slug,block_key,block_covers_subdomains,name,
+          description,website,content,category_slug,logo_url,status,access_token_hash)
+        VALUES ('sub-media','media-sub.example','media-sub.example',1,'S','d',
+          'https://media-sub.example/','c','tools','https://media-sub.example/logo.png',
+          'pending_badge','hash')`
+      )
+    ])
+    const sha = (digit: string) => digit.repeat(64)
+    const hosted = (kind: 'image' | 'logo', digit: string, target = slug) => ({
+      bytes: 512,
+      contentType: 'image/webp',
+      height: 630,
+      key: `best.serp.co/listings/${target}/${kind}/${sha(digit).slice(0, 16)}.webp`,
+      sha256: sha(digit),
+      sourceUrl: `https://${target}/${kind}.webp`,
+      width: 1200
+    })
+    await run(
+      M.buildQueueMediaPlans({
+        kind: 'image',
+        now: NOW,
+        sortOrder: 0,
+        sourceUrl: 'https://media.example/og.png',
+        target: { listingId }
+      })
+    )
+    // The approvals above queued their logos (never hotlinked), so they are due as well.
+    const dueSlots = await all<{
+      id: number
+      listing_id: string | null
+      next_attempt_at: string
+      slug: string
+    }>(M.selectDueMediaPlan(NOW, 50))
+    expect(dueSlots.filter(slot => slot.listing_id !== listingId).length).toBeGreaterThan(0)
+    const due = dueSlots.find(slot => slot.listing_id === listingId)
+    expect(due).toMatchObject({ next_attempt_at: NOW, slug })
+    if (!due) throw new Error('No due media slot.')
+    const claim = M.buildClaimMediaPlans({ id: due.id, now: NOW, readNextAttemptAt: NOW })
+    await run(claim)
+    await expect(run(claim)).rejects.toThrow()
+    // The claimed failure lands on the claimed row only, and the spent claim is refused.
+    const held = {
+      currentMedia: null,
+      id: due.id,
+      leaseUntil: M.mediaClaimLease(NOW),
+      sourceUrl: 'https://media.example/og.png'
+    }
+    const claimedFailure = M.buildRecordClaimedFailurePlans({
+      attempts: 1,
+      claim: held,
+      code: 'http_502',
+      now: NOW,
+      retryable: true
+    })
+    await run(claimedFailure)
+    await expect(run(claimedFailure)).rejects.toThrow()
+    // A host under a claim that no longer holds is refused as superseded (#96 review B1).
+    await expect(
+      run(
+        M.buildHostListingMediaPlans({
+          claim: held,
+          kind: 'image',
+          listingId,
+          media: hosted('image', 'a'),
+          publication: await publication('listing-media', listingId),
+          sortOrder: 0
+        })
+      )
+    ).rejects.toThrow()
+    await run(
+      M.buildRecordMediaFailurePlans({
+        attempts: 1,
+        code: 'http_503',
+        kind: 'image',
+        now: NOW,
+        retryable: true,
+        sortOrder: 0,
+        sourceUrl: 'https://media.example/og.png',
+        target: { listingId }
+      })
+    )
+    expect(await all(M.selectListingMediaQueuePlan(listingId))).toMatchObject([
+      { attempts: 1, last_error: 'http_503', status: 'pending' }
+    ])
+    const [context] = await all<{ slug: string; version: number }>(
+      M.selectListingMediaContextPlan(listingId)
+    )
+    expect(context?.slug).toBe(slug)
+    await run(
+      M.buildHostListingMediaPlans({
+        kind: 'image',
+        listingId,
+        media: hosted('image', 'a'),
+        publication: await publication('listing-media', listingId),
+        sortOrder: 0
+      })
+    )
+    expect(await all(M.selectListingMediaQueuePlan(listingId))).toEqual([])
+    expect(
+      await first(
+        'SELECT media_key,content_type,width FROM listing_media WHERE listing_id=?',
+        listingId
+      )
+    ).toEqual({ content_type: 'image/webp', media_key: hosted('image', 'a').key, width: 1200 })
+    const submissionLogo = {
+      ...hosted('logo', 'b', 'media-sub.example'),
+      key: `best.serp.co/submissions/sub-media/logo/${sha('b').slice(0, 16)}.webp`
+    }
+    await run(
+      M.buildRecordSubmissionMediaPlans({
+        kind: 'logo',
+        media: submissionLogo,
+        now: NOW,
+        sortOrder: 0,
+        submissionId: 'sub-media'
+      })
+    )
+    expect(await all(M.selectSubmissionMediaPlan('sub-media'))).toMatchObject([
+      { kind: 'logo', media_key: submissionLogo.key, status: 'hosted' }
+    ])
+    // A listing slot may copy the submission's key; a finished submission's slots are forgotten
+    // once no listing slot still waits to copy them (#96 review S1).
+    await run(
+      M.buildQueueMediaPlans({
+        copyFromKey: submissionLogo.key,
+        kind: 'logo',
+        now: NOW,
+        sortOrder: 0,
+        sourceUrl: submissionLogo.sourceUrl,
+        target: { listingId }
+      })
+    )
+    await db.prepare("UPDATE listing_submissions SET status='rejected' WHERE id='sub-media'").run()
+    const finished = () =>
+      all<{ id: number; media_key: string | null }>(M.selectFinishedPendingMediaPlan(50))
+    expect(await finished()).toEqual([])
+    await db
+      .prepare("DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo'")
+      .bind(listingId)
+      .run()
+    const [done] = await finished()
+    expect(done).toMatchObject({ media_key: submissionLogo.key })
+    if (!done) throw new Error('No finished submission media.')
+    await run(M.buildForgetPendingMediaPlans({ id: done.id, mediaKey: done.media_key }))
+    expect(await all(M.selectSubmissionMediaPlan('sub-media'))).toEqual([])
+    await expect(
+      db
+        .prepare(
+          `INSERT INTO listing_media (listing_id,kind,url,sort_order,media_key)
+           VALUES (?,'logo','https://media.example/x.png',3,?)`
+        )
+        .bind(listingId, hosted('logo', 'c').key)
+        .run()
+    ).rejects.toThrow(/listing_media_hosted_complete/u)
   })
 
   it('ran every exported plan builder on D1', () => {

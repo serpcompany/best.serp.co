@@ -273,9 +273,22 @@ test('a submission moves through its statuses, is resubmitted after a change req
     )
     .toBe(2)
 
-  // Approved: the listing is live, with the FAQs and links, and owned by the submitter.
+  // Approved: the listing is live, with the FAQs and links, and owned by the submitter. The
+  // approval sends back the hosted logo and featured image the review screen shows (#96).
+  const reviewed = Object.fromEntries(
+    localD1<{ kind: string; media_key: string }>(
+      `SELECT j.kind, j.media_key FROM media_ingestions j
+        JOIN listing_submissions s ON s.id = j.submission_id
+        WHERE s.id = ${q(id)} AND j.sort_order = 0 AND j.status = 'hosted'
+          AND (j.kind = 'image' OR j.source_url = s.logo_url)`
+    ).map(slot => [slot.kind, slot.media_key])
+  )
   const approve = await adminPage.request.post(`/api/admin/submissions/${id}/approve`, {
-    data: { expectedContentVersion: 3 },
+    data: {
+      expectedContentVersion: 3,
+      expectedImageKey: reviewed.image ?? null,
+      expectedLogoKey: reviewed.logo ?? null
+    },
     headers: admin.headers
   })
   expect(approve.status(), await approve.text()).toBe(200)

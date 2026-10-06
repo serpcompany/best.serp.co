@@ -1,5 +1,7 @@
 import { draftClockCutoffs } from './draft-plans'
 import {
+  adoptStagedLogoPlans,
+  adoptSubmissionImagePlans,
   applyStagedContentPlans,
   assertGuard,
   assertPreviousStatementChangedOne,
@@ -151,8 +153,15 @@ export function selectSubmissionForDecisionPlan(submissionId: string): Statement
  */
 function createListingFromSubmissionPlans(input: {
   checksum: string
+  /**
+   * The hosted featured image the reviewer saw (or null for none); absent when nobody reviewed
+   * the submission (a paid listing goes live at payment), and then no image is adopted.
+   */
+  featuredImageKey?: string | null
   linkRel: ListingLinkRel
   listingId: string
+  /** The hosted logo the reviewer saw (null for the tile); absent when nobody reviewed it. */
+  logoKey?: string | null
   now: string
   sourceCondition: PlanGuard
   submissionId: string
@@ -187,12 +196,23 @@ function createListingFromSubmissionPlans(input: {
       params: [listingId, submissionId]
     },
     assertPreviousStatementChangedOne('primary_category_created'),
-    {
-      sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
-        SELECT ?,'logo',logo_url,0 FROM listing_submissions WHERE id=?`,
-      params: [listingId, submissionId]
-    },
-    assertPreviousStatementChangedOne('logo_created'),
+    // Never a hotlink (#95): the submission's hosted logo is queued for a copy into the
+    // listing's path (or its source for the cron), and its featured image only as reviewed.
+    ...adoptStagedLogoPlans({
+      listingId,
+      now: input.now,
+      reviewedKey: input.logoKey,
+      stagedId: submissionId,
+      stagedTable: 'listing_submissions'
+    }),
+    ...(input.featuredImageKey === undefined
+      ? []
+      : adoptSubmissionImagePlans({
+          listingId,
+          now: input.now,
+          reviewedKey: input.featuredImageKey,
+          submissionId
+        })),
     {
       sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
         SELECT ?,'video',video_url,1 FROM listing_submissions
@@ -237,6 +257,13 @@ export function buildApproveSubmissionPlans(input: {
   affectedRoute: string
   beforeChecksum: string
   expectedContentVersion: number
+  /**
+   * The hosted featured image key the reviewer saw (null for none). Absent for a caller that
+   * shows no images (the legacy approval workflow): then no featured image is adopted.
+   */
+  expectedImageKey?: string | null
+  /** The hosted logo key the reviewer saw (null for the tile), like `expectedImageKey`. */
+  expectedLogoKey?: string | null
   linkRel?: ListingLinkRel
   listingId: string
   manifestId: string
@@ -272,7 +299,9 @@ export function buildApproveSubmissionPlans(input: {
     ),
     ...createListingFromSubmissionPlans({
       checksum: input.afterChecksum,
+      featuredImageKey: input.expectedImageKey,
       linkRel: input.linkRel ?? 'nofollow',
+      logoKey: input.expectedLogoKey,
       listingId: input.listingId,
       now: input.now,
       sourceCondition: current,
@@ -443,6 +472,10 @@ export function buildUpgradeListingToPaidPlans(input: {
  */
 export function buildApproveLiveSubmissionPlans(input: {
   expectedContentVersion: number
+  /** As in `buildApproveSubmissionPlans`: the paid listing went live without its image. */
+  expectedImageKey?: string | null
+  /** The hosted logo key the reviewer saw (null for the tile). */
+  expectedLogoKey?: string | null
   listingId: string
   now: string
   publication: CatalogPublication
@@ -463,8 +496,17 @@ export function buildApproveLiveSubmissionPlans(input: {
       checksum: input.publication.afterChecksum,
       listingId: input.listingId,
       now: input.now,
+      reviewedLogoKey: input.expectedLogoKey,
       source: submissionContentSource(input.submissionId)
     }),
+    ...(input.expectedImageKey === undefined
+      ? []
+      : adoptSubmissionImagePlans({
+          listingId: input.listingId,
+          now: input.now,
+          reviewedKey: input.expectedImageKey,
+          submissionId: input.submissionId
+        })),
     {
       sql: `UPDATE listing_submissions SET status='approved',reviewed_at=?,reviewed_by=?,updated_at=?
         WHERE ${current}`,

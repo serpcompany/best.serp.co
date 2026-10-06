@@ -9,6 +9,7 @@ import {
   buildUnpublishListingPlans,
   buildUpdateListingDetailsPlans,
   type ListingDetailsField,
+  type ListingLogoIngestion,
   listingWebsiteMatch,
   selectListingForPublicationPlan
 } from './listing-plans'
@@ -496,9 +497,21 @@ describe('listing activity log and admin edits (#64)', () => {
         )
         .all(listingId)
     ).toEqual([{ is_primary: 1, slug: 'apps' }])
+    // The new logo is never stored as a hotlink: without an ingestion outcome it is queued.
     expect(
       db.prepare("SELECT url FROM listing_media WHERE listing_id=? AND kind='logo'").all(listingId)
-    ).toEqual([{ url: edit.logoUrl }])
+    ).toEqual([])
+    expect(
+      db.prepare('SELECT listing_id,kind,source_url,status,attempts FROM media_ingestions').all()
+    ).toEqual([
+      {
+        attempts: 0,
+        kind: 'logo',
+        listing_id: listingId,
+        source_url: edit.logoUrl,
+        status: 'pending'
+      }
+    ])
     // Other media stay.
     expect(
       count(
@@ -748,6 +761,102 @@ describe('listing activity log and admin edits (#64)', () => {
         listingId
       )
     ).toBe(1)
+    // A hosted copy of the new source becomes the logo row; a failed first attempt is queued with
+    // its reason, or fails for good, behind the fallback tile (#95).
+    const hostedLogo = {
+      bytes: 100,
+      contentType: 'image/png',
+      height: 256,
+      key: `best.serp.co/listings/lst_live.example/logo/${'1'.repeat(16)}.png`,
+      sha256: '1'.repeat(64),
+      sourceUrl: edit.logoUrl,
+      width: 256
+    }
+    const withIngestion = (db: DatabaseSync, logoIngestion: ListingLogoIngestion) =>
+      buildUpdateListingDetailsPlans({
+        details: edit,
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['logo'],
+        listingId,
+        logoIngestion,
+        publication: publication('listing-edit')
+      })
+    const hosted = database()
+    execute(hosted, withIngestion(hosted, { hosted: hostedLogo }))
+    expect(
+      hosted
+        .prepare("SELECT url,media_key FROM listing_media WHERE listing_id=? AND kind='logo'")
+        .all(listingId)
+    ).toEqual([{ media_key: hostedLogo.key, url: edit.logoUrl }])
+    expect(count(hosted, 'SELECT COUNT(*) AS count FROM media_ingestions')).toBe(0)
+    expect(() =>
+      withIngestion(database(), { hosted: { ...hostedLogo, sourceUrl: 'https://other.example/' } })
+    ).toThrow(/edited source/u)
+    // A source that can never be hosted is not saved: the edit fails and nothing changes (#96 S4).
+    expect(() => withIngestion(database(), { failure: { code: 'svg', retryable: false } })).toThrow(
+      /cannot be hosted \(svg\) is not saved/u
+    )
+    // A retryable failure queues the new source with its reason; an unhosted current logo row
+    // gives way to the fallback tile until the copy lands.
+    const failed = database()
+    execute(failed, withIngestion(failed, { failure: { code: 'http_503', retryable: true } }))
+    expect(logos(failed)).toEqual([])
+    expect(
+      failed.prepare('SELECT status,attempts,last_error,source_url FROM media_ingestions').all()
+    ).toEqual([
+      { attempts: 1, last_error: 'http_503', source_url: edit.logoUrl, status: 'pending' }
+    ])
+    // A hosted working logo is kept until the queued copy replaces it (#96 S4).
+    const working = database()
+    execute(working, withIngestion(working, { hosted: hostedLogo }))
+    const next = 'https://lst_live.example/next-logo.png'
+    const state = publicationState(working)
+    const { checksum } = working
+      .prepare('SELECT checksum FROM listings WHERE id=?')
+      .get(listingId) as { checksum: string }
+    execute(
+      working,
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, logoUrl: next },
+        expectedChecksum: checksum,
+        fields: ['logo'],
+        listingId,
+        logoIngestion: { failure: { code: 'http_503', retryable: true } },
+        publication: publication('listing-edit-again', state)
+      })
+    )
+    expect(
+      working
+        .prepare("SELECT url,media_key FROM listing_media WHERE listing_id=? AND kind='logo'")
+        .all(listingId)
+    ).toEqual([{ media_key: hostedLogo.key, url: edit.logoUrl }])
+    expect(working.prepare('SELECT status,source_url FROM media_ingestions').all()).toEqual([
+      { source_url: next, status: 'pending' }
+    ])
+    // Saving the hosted logo's source again cancels the queued replacement (#96 r2 S2).
+    const cancel = (db: DatabaseSync, logoUrl: string) => {
+      const live = publicationState(db)
+      const { checksum: current } = db
+        .prepare('SELECT checksum FROM listings WHERE id=?')
+        .get(listingId) as { checksum: string }
+      return buildUpdateListingDetailsPlans({
+        details: { ...edit, logoUrl },
+        expectedChecksum: current,
+        fields: ['logo'],
+        listingId,
+        logoCancelQueued: true,
+        publication: publication('listing-edit-cancel', live)
+      })
+    }
+    // Only the hosted logo's own source cancels; anything else is refused.
+    expect(() => execute(working, cancel(working, next))).toThrow(/malformed JSON/u)
+    execute(working, cancel(working, edit.logoUrl))
+    expect(count(working, 'SELECT COUNT(*) AS count FROM media_ingestions')).toBe(0)
+    expect(
+      working
+        .prepare("SELECT url,media_key FROM listing_media WHERE listing_id=? AND kind='logo'")
+        .all(listingId)
+    ).toEqual([{ media_key: hostedLogo.key, url: edit.logoUrl }])
     // A changed website must be a public URL.
     expect(() =>
       buildUpdateListingDetailsPlans({
