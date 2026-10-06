@@ -52,12 +52,26 @@ function d1Binding(value: unknown): SQLInputValue {
   return value as SQLInputValue
 }
 
-/** Applies every reviewed manifest in file-name order, each as one transaction. */
+/**
+ * Applies every reviewed manifest in file-name order, each as one transaction: a row-level
+ * manifest at the version the previous ones left, as the publisher plans it.
+ */
 function publishedDatabase(): DatabaseSync {
   const database = importedDatabase()
   for (const file of files(publicationsDirectory, /\.ya?ml$/u)) {
     const source = readFileSync(resolve(publicationsDirectory, file), 'utf8')
-    const plan = buildPublicationPlan(parseManifest(source), source, '2026-10-06T00:00:00.000Z')
+    const manifest = parseManifest(source)
+    // A row-level manifest applies at whatever version the environment is at (#97 review B3).
+    const live =
+      manifest.concurrency === 'rows'
+        ? (database
+            .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
+            .get() as {
+            checksum: string
+            version: number
+          })
+        : undefined
+    const plan = buildPublicationPlan(manifest, source, '2026-10-06T00:00:00.000Z', live)
     database.exec('DROP TABLE IF EXISTS publication_guard; BEGIN IMMEDIATE;')
     try {
       for (const item of plan.statements) {
