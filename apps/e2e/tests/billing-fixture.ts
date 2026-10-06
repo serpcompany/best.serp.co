@@ -70,6 +70,7 @@ export interface MockSession {
   currency: string
   expires_at: number
   id: string
+  livemode: false
   metadata: { order_id: string }
   object: 'checkout.session'
   payment_intent: string | null
@@ -153,6 +154,7 @@ export async function startStripeMock(): Promise<StripeMock> {
           currency: form.get('line_items[0][price_data][currency]') ?? '',
           expires_at: Number(form.get('expires_at')),
           id,
+          livemode: false,
           metadata: { order_id: form.get('metadata[order_id]') ?? '' },
           object: 'checkout.session',
           payment_intent: null,
@@ -162,6 +164,17 @@ export async function startStripeMock(): Promise<StripeMock> {
           url: `http://127.0.0.1:${stripeMockPort}/pay/${id}`
         }
         sessions.set(id, session)
+        answer = session
+      } else if (
+        request.method === 'POST' &&
+        /^\/v1\/checkout\/sessions\/[^/]+\/expire$/u.test(url.pathname)
+      ) {
+        const session = sessions.get(url.pathname.split('/')[4] ?? '')
+        if (!session || session.status !== 'open') {
+          json(400, { error: { code: 'checkout_session_not_open' } })
+          return
+        }
+        session.status = 'expired'
         answer = session
       } else if (request.method === 'GET' && url.pathname.startsWith('/v1/checkout/sessions/')) {
         const session = sessions.get(url.pathname.split('/').pop() ?? '')

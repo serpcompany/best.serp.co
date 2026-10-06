@@ -68,10 +68,15 @@ export interface BillingProvider {
   /** Stored in `orders.provider` and `billing_events.provider`. */
   readonly name: string
   createCheckout(request: CheckoutRequest): Promise<CheckoutSession>
+  /** Stops a checkout from accepting payment (a superseded one). A closed one is a no-op. */
+  expireCheckout(checkoutId: string): Promise<void>
   getCheckout(checkoutId: string): Promise<CheckoutState>
   /** The provider's refund id, or null when the payment had already been refunded. */
   refund(request: RefundRequest): Promise<{ refundId: string | null }>
-  /** Verifies the signature (raw body, timestamp tolerance) and reads the event. */
+  /**
+   * Verifies the signature (raw body, timestamp tolerance) and reads the event. An event from
+   * another mode (test vs live) or account than this Worker's is answered as `ignored`.
+   */
   verifyWebhook(input: { body: string; headers: Headers }): Promise<BillingEvent>
 }
 

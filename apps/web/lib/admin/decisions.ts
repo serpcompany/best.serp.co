@@ -96,8 +96,11 @@ export interface AdminRefunds {
   refundRejectedSubmission(input: { actor: string; submissionId: string }): Promise<void>
 }
 
-/** What a refund from Orders did to the order's listing (#70 screen 13). */
-export type OrderRefundListing = 'kept_free' | 'unchanged' | 'unpublished'
+/**
+ * What a refund from Orders did to the order's listing (#70 screen 13); `pending` when the
+ * money is back but the listing change didn't apply (the order is flagged for attention).
+ */
+export type OrderRefundListing = 'kept_free' | 'pending' | 'unchanged' | 'unpublished'
 
 /**
  * The admin Orders screen's refund (#68, `refundOrder` in `lib/billing/service.ts`): the badge

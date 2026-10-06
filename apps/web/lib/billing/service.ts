@@ -1,21 +1,27 @@
 import {
   type BillingOperations,
   buildAttachCheckoutPlans,
+  buildClaimRefundPlans,
+  buildFinishRefundPlans,
   buildMarkOrderAppliedPlans,
   buildMarkOrderFailedPlans,
   buildMarkOrderPaidPlans,
-  buildMarkOrderRefundedPlans,
   type CheckoutSubmission,
   listingCheckoutPurpose,
   type OrderRecord,
   orderTargetKey
 } from '@serpdirectory/data-ops/billing'
-import type { StatementPlan } from '@serpdirectory/data-ops/plan-support'
 import {
   type CatalogPublication,
-  prepareCatalogPublication
+  prepareCatalogPublication,
+  type StatementPlan
 } from '@serpdirectory/data-ops/plan-support'
-import type { OrderOutcome, OrderRefundReason } from '@serpdirectory/data-ops/schema'
+import type {
+  OrderAttention,
+  OrderOutcome,
+  OrderRefundListingAction,
+  OrderRefundReason
+} from '@serpdirectory/data-ops/schema'
 import {
   buildChooseSubmissionPlanPlans,
   buildRecordSubmissionPaymentPlans,
@@ -29,6 +35,7 @@ import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
 import type { GuardrailResult } from './guardrails'
 import {
+  type BillingEvent,
   type BillingProvider,
   BillingProviderError,
   BillingWebhookError,
@@ -39,14 +46,16 @@ import {
  * The billing service (serpcompany/best.serp.co#68): checkout, the webhook, fulfilment, and
  * refunds, on the provider interface (`provider.ts`) and the D1 ledger
  * (`@serpdirectory/data-ops/billing`). It holds no SQL and no provider specifics; the runtime
- * (`runtime.ts`) wires D1, the provider, email, and the badge check.
+ * (`worker-billing.ts`) wires D1, the provider, email, and the badge check.
  *
  * Every step is idempotent, because a payment reaches it up to three ways: the webhook (and its
  * replays), the buyer's return from checkout, and the hourly sweep. The order's status is the
  * compare-and-swap: `pending` → `paid` once, then applied once (`applied_at`, in the same batch
- * as the submission or listing change), and `paid` → `refunded` once. Provider calls carry
- * idempotency keys (`checkout:<order>`, `refund:<order>`), so a retry never charges or refunds
- * twice.
+ * as the submission or listing change). A refund is claimed in D1 first (`paid` →
+ * `refunding`, swapped on the state it was decided on), then asked of the provider, then
+ * finalized (`refunded`), so a fulfilment racing it can never apply a refunded payment, nor a
+ * refund undo an applied one. Provider calls carry idempotency keys (`checkout:<order>`,
+ * `refund:<order>`), so a retry never charges or refunds twice.
  */
 
 /** The actor recorded on billing events and publication runs. */
@@ -58,7 +67,9 @@ export const CHECKOUT_LIFETIME_MS = 60 * 60 * 1000
 const CHECKOUT_REUSE_MARGIN_MS = 5 * 60 * 1000
 /** The sweep looks again at orders this long after their checkout closed or they were paid. */
 const RECONCILE_AFTER_MS = 10 * 60 * 1000
-/** How often a fulfilment that lost the catalog publication race tries again. */
+/** A failed order's checkout is reconciled this long: the provider's webhook retry window. */
+const FAILED_RECONCILE_MS = 3 * 24 * 60 * 60 * 1000
+/** How often a write that lost the catalog publication race tries again. */
 const PUBLICATION_ATTEMPTS = 3
 
 export type Notify = <K extends keyof AppEmailTemplates & string>(
@@ -73,8 +84,9 @@ export interface RefundBadgeResult {
 }
 
 /**
- * Paid claims (#67). Absent until #67's claims module is merged and wired in `runtime.ts`: a
- * paid claim cannot start a checkout, and a claim payment that arrives anyway is refunded.
+ * Paid claims (#67). Absent until #67's claims module is merged and wired in
+ * `worker-billing.ts`: a paid claim cannot start a checkout, and a claim payment that arrives
+ * anyway is refunded.
  */
 export interface PaidClaims {
   /** `completePaidClaim` (#67): the claimer becomes the owner. */
@@ -130,6 +142,8 @@ function logError(event: string, error: unknown, detail: Record<string, unknown>
   )
 }
 
+const nowIso = (deps: BillingDependencies) => deps.now().toISOString()
+
 // ---------------------------------------------------------------------------------------------
 // Checkout
 
@@ -141,20 +155,31 @@ export type CheckoutStart =
 
 interface CheckoutTarget {
   cancelPath: string
+  claimId?: string
   description: string
   listingId?: string
   purpose: OrderRecord['purpose']
   submissionId?: string
-  claimId?: string
   successPath: (orderId: string) => string
   targetKey: string
+}
+
+/** Expires a checkout at the provider so it can't be paid any more (best effort). */
+async function expireCheckout(deps: BillingDependencies, checkoutId: string | null): Promise<void> {
+  if (!checkoutId) return
+  try {
+    await deps.provider.expireCheckout(checkoutId)
+  } catch (error) {
+    logError('billing_checkout_expire_failed', error, { checkout: checkoutId })
+  }
 }
 
 /**
  * Opens (or reuses) the provider checkout for one target. An open order whose checkout is
  * still good is reused, so a double click or a second tab never opens two payments; an older
- * one is failed first (`expired`). A late payment of a failed order is still recorded by the
- * webhook and refunded if it can't apply.
+ * one is expired at the provider and failed first. A payment that still reaches a superseded
+ * checkout is recorded (the webhook, or the sweep within the provider's retry window) and
+ * refunded if it can't apply.
  */
 async function openCheckout(
   deps: BillingDependencies,
@@ -172,8 +197,9 @@ async function openCheckout(
     ) {
       return { ok: true, url: open.checkoutUrl }
     }
+    await expireCheckout(deps, open.providerCheckoutId)
     await deps.operations.apply(
-      buildMarkOrderFailedPlans({ now: now.toISOString(), orderId: open.id, reason: 'expired' })
+      buildMarkOrderFailedPlans({ now: now.toISOString(), orderId: open.id, reason: 'superseded' })
     )
   }
   const order = await deps.operations.createOrder({
@@ -192,8 +218,15 @@ async function openCheckout(
     return failure(409, 'checkout_in_progress', 'A checkout for this is already open.')
   }
   if (order.checkoutUrl) return { ok: true, url: order.checkoutUrl }
+  const unavailable = async (reason: string) => {
+    await deps.operations.apply(
+      buildMarkOrderFailedPlans({ now: nowIso(deps), orderId: order.id, reason })
+    )
+    return failure(503, 'checkout_unavailable', 'Checkout is unavailable right now. Try again.')
+  }
+  let session: Awaited<ReturnType<BillingProvider['createCheckout']>>
   try {
-    const session = await deps.provider.createCheckout({
+    session = await deps.provider.createCheckout({
       amountCents: order.amountCents,
       cancelUrl: `${input.origin}${target.cancelPath}`,
       currency: order.currency,
@@ -204,28 +237,26 @@ async function openCheckout(
       orderId: order.id,
       successUrl: `${input.origin}${target.successPath(order.id)}`
     })
-    await deps.operations.apply(
-      buildAttachCheckoutPlans({
-        checkoutId: session.checkoutId,
-        expiresAt: session.expiresAt,
-        now: deps.now().toISOString(),
-        orderId: order.id,
-        url: session.url
-      })
-    )
-    log('billing_checkout_opened', { order: order.id, purpose: order.purpose })
-    return { ok: true, url: session.url }
   } catch (error) {
     logError('billing_checkout_failed', error, { order: order.id })
-    await deps.operations.apply(
-      buildMarkOrderFailedPlans({
-        now: deps.now().toISOString(),
-        orderId: order.id,
-        reason: 'checkout_unavailable'
-      })
-    )
-    return failure(503, 'checkout_unavailable', 'Checkout is unavailable right now. Try again.')
+    return unavailable('checkout_unavailable')
   }
+  const attached = await deps.operations.apply(
+    buildAttachCheckoutPlans({
+      checkoutId: session.checkoutId,
+      expiresAt: session.expiresAt,
+      now: nowIso(deps),
+      orderId: order.id,
+      url: session.url
+    })
+  )
+  if (!attached) {
+    // Never hand out a checkout the ledger doesn't know: expire it and fail the order.
+    await expireCheckout(deps, session.checkoutId)
+    return unavailable('checkout_not_recorded')
+  }
+  log('billing_checkout_opened', { order: order.id, purpose: order.purpose })
+  return { ok: true, url: session.url }
 }
 
 /** A submission that a payment applies to (`submissionTransitions.payPublish`). */
@@ -241,7 +272,9 @@ function payableSubmission(submission: CheckoutSubmission): boolean {
 
 /**
  * `/submit/<id>/checkout/` (#70 screen 4): the owner pays for their submission: a draft
- * (choosing paid on the way), one waiting for its badge, or a free one waiting for review.
+ * (choosing paid on the way), one waiting for its badge, or a free one waiting for review. A
+ * website that a prohibited block now covers, or another listing now has, is refused before
+ * anything is charged.
  */
 export async function startSubmissionCheckout(
   deps: BillingDependencies,
@@ -253,10 +286,18 @@ export async function startSubmissionCheckout(
   }
   const account = `/account/submissions/${submission.id}/`
   if (!payableSubmission(submission)) return { ok: true, redirect: account }
+  const conflicts = await deps.operations.websiteConflicts(submission.website)
+  if (conflicts.blocked || conflicts.listed) {
+    return failure(
+      409,
+      conflicts.blocked ? 'website_blocked' : 'website_listed',
+      'This website can’t be listed as a paid listing.'
+    )
+  }
   if (submission.status === 'draft' && submission.plan !== 'paid') {
     const chosen = await deps.operations.apply(
       buildChooseSubmissionPlanPlans({
-        now: deps.now().toISOString(),
+        now: nowIso(deps),
         ownerUserId: input.userId,
         plan: 'paid',
         submissionId: submission.id
@@ -326,8 +367,8 @@ export async function startClaimCheckout(
 }
 
 /**
- * The buyer's return from checkout: asks the provider about the order's checkout and, when it
- * is paid, records and applies the payment now, so the page they land on already shows it
+ * The buyer's return from checkout: asks the provider about the order's own checkout and, when
+ * it is paid, records and applies the payment now, so the page they land on already shows it
  * (whichever of this and the webhook comes first does the work). Never throws.
  */
 export async function confirmReturn(
@@ -358,15 +399,31 @@ export interface WebhookAnswer {
 }
 
 /**
- * The provider's webhook: verify (raw body, signature, timestamp), record the event once by its
- * id, act on it, and mark it processed. A replay of a processed event is a no-op. A failure
- * midway answers 500 and leaves the event unprocessed, so the provider's retry runs it again.
+ * The order an event's checkout belongs to: the order holding that checkout id. The order id
+ * the checkout echoes is trusted only for an order that never recorded its checkout.
+ */
+async function orderForCheckout(
+  deps: BillingDependencies,
+  checkout: CheckoutState
+): Promise<OrderRecord | null> {
+  const byCheckout = await deps.operations.orderByCheckout(deps.provider.name, checkout.checkoutId)
+  if (byCheckout) return byCheckout
+  if (!checkout.orderId) return null
+  const byReference = await deps.operations.order(checkout.orderId)
+  return byReference && byReference.providerCheckoutId === null ? byReference : null
+}
+
+/**
+ * The provider's webhook: verify (raw body, signature, timestamp; the provider also refuses an
+ * event from another mode or account as `ignored`), record the event once by its id, act on
+ * it, and mark it processed. A replay of a processed event is a no-op. A failure midway answers
+ * 500 and leaves the event unprocessed, so the provider's retry runs it again.
  */
 export async function handleWebhook(
   deps: BillingDependencies,
   input: { body: string; headers: Headers }
 ): Promise<WebhookAnswer> {
-  let event: Awaited<ReturnType<BillingProvider['verifyWebhook']>>
+  let event: BillingEvent
   try {
     event = await deps.provider.verifyWebhook(input)
   } catch (error) {
@@ -377,7 +434,7 @@ export async function handleWebhook(
     throw error
   }
   const provider = deps.provider.name
-  const now = deps.now().toISOString()
+  const now = nowIso(deps)
   const claim = await deps.operations.claimEvent({
     eventId: event.id,
     eventType: event.providerType,
@@ -388,9 +445,7 @@ export async function handleWebhook(
   let orderId: string | null = null
   let outcome = 'ignored'
   if (event.checkout && event.type !== 'ignored') {
-    const order =
-      (await deps.operations.orderByCheckout(provider, event.checkout.checkoutId)) ??
-      (event.checkout.orderId ? await deps.operations.order(event.checkout.orderId) : null)
+    const order = await orderForCheckout(deps, event.checkout)
     if (order) {
       orderId = order.id
       outcome = await actOnCheckout(deps, order, event.type, event.checkout)
@@ -406,7 +461,7 @@ export async function handleWebhook(
 async function actOnCheckout(
   deps: BillingDependencies,
   order: OrderRecord,
-  type: Exclude<Awaited<ReturnType<BillingProvider['verifyWebhook']>>['type'], 'ignored'>,
+  type: Exclude<BillingEvent['type'], 'ignored'>,
   checkout: CheckoutState
 ): Promise<string> {
   if (type === 'checkout_paid') return recordPayment(deps, order, checkout)
@@ -414,7 +469,7 @@ async function actOnCheckout(
   if (order.status !== 'pending') return `already_${order.status}`
   await deps.operations.apply(
     buildMarkOrderFailedPlans({
-      now: deps.now().toISOString(),
+      now: nowIso(deps),
       orderId: order.id,
       reason: type === 'checkout_expired' ? 'expired' : 'payment_failed'
     })
@@ -423,29 +478,37 @@ async function actOnCheckout(
 }
 
 /**
- * A paid checkout: the order becomes `paid` (once), then the payment is applied. A charge that
- * doesn't match the order's amount and currency is never applied; it stays for an admin.
+ * A paid checkout: the order becomes `paid` (once), recording what was actually charged, then
+ * the payment is applied. A charge that doesn't match the order's amount and currency is never
+ * applied: it is flagged for an admin (`amount_mismatch`) and refunded in full.
  */
 async function recordPayment(
   deps: BillingDependencies,
   order: OrderRecord,
   checkout: CheckoutState
 ): Promise<string> {
-  if (checkout.amountCents !== order.amountCents || checkout.currency !== order.currency) {
-    logError('billing_amount_mismatch', new Error('The charge does not match the order.'), {
-      order: order.id
-    })
-    return 'amount_mismatch'
+  if (order.providerCheckoutId && checkout.checkoutId !== order.providerCheckoutId) {
+    return 'checkout_mismatch'
   }
   if (order.status === 'pending' || order.status === 'failed') {
     if (!checkout.paymentId) return 'no_payment_id'
+    const mismatch =
+      checkout.amountCents !== order.amountCents || checkout.currency !== order.currency
     await deps.operations.apply(
       buildMarkOrderPaidPlans({
-        now: deps.now().toISOString(),
+        attention: mismatch ? 'amount_mismatch' : null,
+        chargedCents: checkout.amountCents ?? order.amountCents,
+        chargedCurrency: checkout.currency ?? order.currency,
+        now: nowIso(deps),
         orderId: order.id,
         paymentId: checkout.paymentId
       })
     )
+    if (mismatch) {
+      logError('billing_amount_mismatch', new Error('The charge does not match the order.'), {
+        order: order.id
+      })
+    }
     log('billing_order_paid', { order: order.id })
   }
   return fulfilOrder(deps, order.id)
@@ -456,19 +519,16 @@ async function recordPayment(
 
 async function publicationFor(
   deps: BillingDependencies,
-  action: string,
-  entityId: string,
-  slug: string,
-  now: string
+  input: { action: string; actor: string; entityId: string; now: string; slug: string }
 ): Promise<CatalogPublication> {
   const state = await deps.operations.publicationState()
   return prepareCatalogPublication({
-    action,
-    actor: BILLING_ACTOR,
-    affectedRoutes: `/products/${slug}/`,
+    action: input.action,
+    actor: input.actor,
+    affectedRoutes: `/products/${input.slug}/`,
     checksum: state.checksum,
-    entityId,
-    now,
+    entityId: input.entityId,
+    now: input.now,
     version: state.version,
     workflow: BILLING_WORKFLOW
   })
@@ -477,15 +537,18 @@ async function publicationFor(
 /**
  * Applies a paid order once and returns its outcome. Safe to call any number of times: an
  * applied (or refunded) order answers its recorded outcome. A payment the target can no longer
- * accept (withdrawn, rejected, already paid by another checkout, an admin unpublished it) is
- * refunded in full (`unapplied`).
+ * accept (withdrawn, rejected, already paid by another checkout, an admin unpublished it), or a
+ * charge that didn't match the order, is refunded in full (`unapplied`).
  */
 export async function fulfilOrder(deps: BillingDependencies, orderId: string): Promise<string> {
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const order = await deps.operations.order(orderId)
     if (!order) return 'unknown_order'
     if (order.status !== 'paid' || order.appliedAt !== null) return order.outcome ?? order.status
-    const applied = await applyOnce(deps, order)
+    const applied =
+      order.attention === 'amount_mismatch'
+        ? await refundUnapplied(deps, order)
+        : await applyOnce(deps, order)
     if (applied !== 'retry') return applied
   }
   const order = await deps.operations.order(orderId)
@@ -513,7 +576,7 @@ async function applied(
 ): Promise<boolean> {
   return deps.operations.apply([
     ...plans,
-    ...buildMarkOrderAppliedPlans({ now: deps.now().toISOString(), orderId: order.id, outcome })
+    ...buildMarkOrderAppliedPlans({ now: nowIso(deps), orderId: order.id, outcome })
   ])
 }
 
@@ -532,14 +595,14 @@ async function applySubmissionPayment(
       order,
       buildRecordUnappliedPaymentPlans({
         actor: BILLING_ACTOR,
-        now: deps.now().toISOString(),
+        now: nowIso(deps),
         submissionId: submission.id
       })
     )
   }
   if (!payableSubmission(submission)) return refundUnapplied(deps, order)
   const checks = await deps.guardrails(submission.website)
-  const now = deps.now().toISOString()
+  const now = nowIso(deps)
   if (checks.ok) {
     const done = await applied(
       deps,
@@ -549,13 +612,13 @@ async function applySubmissionPayment(
         listingId: deps.newId(),
         now,
         outcome: 'publish',
-        publication: await publicationFor(
-          deps,
-          'paid-listing',
-          submission.id,
-          submission.slug,
-          now
-        ),
+        publication: await publicationFor(deps, {
+          action: 'paid-listing',
+          actor: BILLING_ACTOR,
+          entityId: submission.id,
+          now,
+          slug: submission.slug
+        }),
         submissionId: submission.id
       }),
       'published'
@@ -640,7 +703,7 @@ async function applyListingPayment(deps: BillingDependencies, order: OrderRecord
     : null
   const purpose = listing ? listingCheckoutPurpose(listing) : null
   if (!listing?.submission || purpose !== order.purpose) return refundUnapplied(deps, order)
-  const now = deps.now().toISOString()
+  const now = nowIso(deps)
   if (purpose === 'upgrade') {
     const done = await applied(
       deps,
@@ -663,7 +726,13 @@ async function applyListingPayment(deps: BillingDependencies, order: OrderRecord
       actor: BILLING_ACTOR,
       listingId: listing.id,
       now,
-      publication: await publicationFor(deps, 'paid-relist', listing.id, listing.slug, now),
+      publication: await publicationFor(deps, {
+        action: 'paid-relist',
+        actor: BILLING_ACTOR,
+        entityId: listing.id,
+        now,
+        slug: listing.slug
+      }),
       submissionId: listing.submission.id
     }),
     'relisted'
@@ -686,14 +755,55 @@ async function applyClaimPayment(deps: BillingDependencies, order: OrderRecord):
   return 'claimed'
 }
 
-/** Refunds the provider payment once, under the order's refund key. */
+// ---------------------------------------------------------------------------------------------
+// Refunds: claim, then the provider, then finalize
+
+/** What a finished refund did to the listing; `pending` when its listing change didn't apply. */
+export type RefundListing = 'kept_free' | 'pending' | 'unchanged' | 'unpublished'
+
+function listingResult(action: OrderRefundListingAction | null): RefundListing {
+  if (action === 'keep_free') return 'kept_free'
+  if (action === 'unpublish') return 'unpublished'
+  return 'unchanged'
+}
+
+/**
+ * Claims the refund in D1 (`paid` → `refunding`) on the state it was decided on: an unapplied
+ * payment only while nothing has applied it, an applied one only with the outcome it was read
+ * with. `extra` (a withdrawn submission's record) joins the claim when it still applies. False
+ * when the order moved on.
+ */
+async function claimRefund(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  input: {
+    actor: string
+    badgeCheckId?: number | null
+    listingAction?: OrderRefundListingAction | null
+    reason: OrderRefundReason
+  },
+  extra: StatementPlan[] = []
+): Promise<boolean> {
+  const claim = buildClaimRefundPlans({
+    ...input,
+    now: nowIso(deps),
+    orderId: order.id,
+    ...(order.appliedAt === null
+      ? { from: 'unapplied' as const }
+      : { from: 'applied' as const, outcome: order.outcome ?? 'unapplied' })
+  })
+  if (extra.length > 0 && (await deps.operations.apply([...extra, ...claim]))) return true
+  return deps.operations.apply(claim)
+}
+
+/** The provider refund of exactly what was charged, under the order's refund key. */
 async function providerRefund(
   deps: BillingDependencies,
   order: OrderRecord
 ): Promise<string | null> {
   if (!order.providerPaymentId) throw new Error(`Order ${order.id} has no payment to refund.`)
   const { refundId } = await deps.provider.refund({
-    amountCents: order.amountCents,
+    amountCents: order.chargedCents ?? order.amountCents,
     idempotencyKey: `refund:${order.id}`,
     orderId: order.id,
     paymentId: order.providerPaymentId
@@ -701,43 +811,148 @@ async function providerRefund(
   return refundId
 }
 
-function refundedPlans(
+function finishPlans(
   deps: BillingDependencies,
   order: OrderRecord,
-  input: { actor: string; reason: OrderRefundReason; refundId: string | null }
+  refundId: string | null,
+  attention: OrderAttention | null = null
 ): StatementPlan[] {
-  return buildMarkOrderRefundedPlans({
-    actor: input.actor,
-    now: deps.now().toISOString(),
-    orderId: order.id,
-    reason: input.reason,
-    refundId: input.refundId
-  })
+  return buildFinishRefundPlans({ attention, now: nowIso(deps), orderId: order.id, refundId })
 }
 
-/** A payment its target can't accept: refunded in full, recorded with `extra` when given. */
+/** The listing change an admin's refund decided, built on the current publication state. */
+async function adminListingPlans(
+  deps: BillingDependencies,
+  order: OrderRecord
+): Promise<StatementPlan[]> {
+  const submissionId = order.submissionId
+  const actor = order.refundedBy ?? BILLING_ACTOR
+  const now = nowIso(deps)
+  if (!submissionId || order.refundListingAction === 'none') return []
+  const submission = await deps.operations.checkoutSubmission(submissionId)
+  // Recorded already (another attempt finished the listing change): refund the order only.
+  if (!submission || submission.refundedAt !== null) return []
+  switch (order.refundListingAction) {
+    case 'keep_free':
+      return buildRefundSubmissionPlans({
+        actor,
+        badgeCheckId: order.refundBadgeCheckId ?? 0,
+        mode: 'keep_free',
+        now,
+        submissionId
+      })
+    case 'unpublish':
+      return buildRefundSubmissionPlans({
+        actor,
+        badgeCheckId: order.refundBadgeCheckId ?? 0,
+        mode: 'unpublish',
+        now,
+        publication: await publicationFor(deps, {
+          action: 'refund-unpublish',
+          actor,
+          entityId: submissionId,
+          now,
+          slug: submission.slug
+        }),
+        submissionId
+      })
+    default:
+      return buildRefundSubmissionPlans({
+        actor,
+        mode: 'already_unpublished',
+        now,
+        submissionId
+      })
+  }
+}
+
+/**
+ * Finishes a claimed refund: the provider refunds (idempotently, so a retry is safe), then one
+ * batch records it: the rejection's or the admin's listing change, and `refunded`. An admin's
+ * listing change that keeps failing (the publication race, or the badge check at refund aged
+ * out before a retry) still records the refund, flagged `listing_update_failed`: the money is
+ * back, so the order must say so. Throws when the provider fails; the order stays `refunding`
+ * and the sweep finishes it.
+ */
+async function finishRefund(deps: BillingDependencies, orderId: string): Promise<RefundListing> {
+  const claimed = await deps.operations.order(orderId)
+  if (!claimed) throw new Error(`Order ${orderId} not found.`)
+  if (claimed.status === 'refunded') {
+    return claimed.attention === 'listing_update_failed'
+      ? 'pending'
+      : listingResult(claimed.refundListingAction)
+  }
+  if (claimed.status !== 'refunding') throw new Error(`Order ${orderId} has no claimed refund.`)
+  const refundId = await providerRefund(deps, claimed)
+  for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
+    const order = await deps.operations.order(orderId)
+    if (!order) throw new Error(`Order ${orderId} not found.`)
+    if (order.status === 'refunded') return listingResult(order.refundListingAction)
+    let plans: StatementPlan[] = []
+    if (order.refundReason === 'rejected' && order.submissionId) {
+      const submission = await deps.operations.checkoutSubmission(order.submissionId)
+      plans =
+        submission?.refundedAt === null
+          ? buildRefundSubmissionPlans({
+              actor: order.refundedBy ?? BILLING_ACTOR,
+              mode: 'after_rejection',
+              now: nowIso(deps),
+              submissionId: order.submissionId
+            })
+          : []
+    } else if (order.refundReason === 'admin') {
+      plans = await adminListingPlans(deps, order)
+    }
+    if (await deps.operations.apply([...plans, ...finishPlans(deps, order, refundId)])) {
+      log('billing_order_refunded', { order: order.id, reason: order.refundReason })
+      return listingResult(order.refundListingAction)
+    }
+    if (order.refundReason !== 'admin') break
+  }
+  const order = await deps.operations.order(orderId)
+  if (order?.status === 'refunded') return listingResult(order.refundListingAction)
+  if (order?.refundReason !== 'admin') {
+    throw new Error(`The refund of order ${orderId} could not be recorded.`)
+  }
+  await deps.operations.apply(finishPlans(deps, order, refundId, 'listing_update_failed'))
+  logError('billing_refund_listing_failed', new Error('The listing change did not apply.'), {
+    order: orderId
+  })
+  return 'pending'
+}
+
+/**
+ * A payment its target can't accept: claimed as unapplied (only while nothing applied it),
+ * refunded in full, and recorded, with `extra` when given. If a fulfilment applied it first,
+ * nothing is refunded and its outcome is answered.
+ */
 async function refundUnapplied(
   deps: BillingDependencies,
   order: OrderRecord,
   extra: StatementPlan[] = []
 ): Promise<string> {
-  const refundId = await providerRefund(deps, order)
-  const plans = refundedPlans(deps, order, { actor: BILLING_ACTOR, reason: 'unapplied', refundId })
-  if (!(await deps.operations.apply([...extra, ...plans])) && extra.length > 0) {
-    await deps.operations.apply(plans)
+  const claimed = await claimRefund(
+    deps,
+    order,
+    { actor: BILLING_ACTOR, reason: 'unapplied' },
+    extra
+  )
+  if (!claimed) {
+    const current = await deps.operations.order(order.id)
+    if (!current || current.status === 'paid' || current.status === 'refunded') {
+      return current?.outcome ?? 'retry'
+    }
   }
-  log('billing_order_refunded', { order: order.id, reason: 'unapplied' })
+  await finishRefund(deps, order.id)
   return 'unapplied'
 }
 
-// ---------------------------------------------------------------------------------------------
-// Refunds
-
 /**
  * The admin panel's refund hook for a paid submission rejected as `other` (`AdminRefunds`,
- * docs/ADMIN_PANEL.md "Refunds"): refunds its order, records it on the submission and the order
- * in one batch, and sends "rejected and refunded". Runs after the rejection, on every replay of
- * it, and from the sweep; throws when the refund didn't go through, so it stays pending.
+ * docs/ADMIN_PANEL.md "Refunds"): claims its order's refund, refunds at the provider, records
+ * it on the submission and the order in one batch, and sends "rejected and refunded". Runs
+ * after the rejection, on every replay of it, and from the sweep; throws when the refund didn't
+ * go through, so it stays pending.
  */
 export async function refundRejectedSubmission(
   deps: BillingDependencies,
@@ -751,31 +966,31 @@ export async function refundRejectedSubmission(
   if (review?.category !== 'other') throw new Error('A prohibited rejection is never refunded.')
   const order = await deps.operations.submissionPaymentOrder(input.submissionId)
   if (!order) throw new Error(`No paid order for submission ${input.submissionId}.`)
-  if (submission.refundedAt === null) {
-    const refundId = order.status === 'paid' ? await providerRefund(deps, order) : null
-    const plans = [
-      ...buildRefundSubmissionPlans({
+  if (order.status === 'paid') {
+    const claimed = await claimRefund(deps, order, { actor: input.actor, reason: 'rejected' })
+    const current = claimed ? null : await deps.operations.order(order.id)
+    if (current && current.status === 'paid') throw new Error('The refund could not be claimed.')
+  }
+  const current = await deps.operations.order(order.id)
+  if (current?.status === 'refunding') {
+    await finishRefund(deps, order.id)
+  } else if (current?.status === 'refunded' && submission.refundedAt === null) {
+    // Refunded from the order already (by an admin, before this rejection): record it here.
+    await deps.operations.apply(
+      buildRefundSubmissionPlans({
         actor: input.actor,
         mode: 'after_rejection',
-        now: deps.now().toISOString(),
+        now: nowIso(deps),
         submissionId: input.submissionId
-      }),
-      ...(order.status === 'paid'
-        ? refundedPlans(deps, order, { actor: input.actor, reason: 'rejected', refundId })
-        : [])
-    ]
-    if (!(await deps.operations.apply(plans))) {
-      const current = await deps.operations.checkoutSubmission(input.submissionId)
-      if (current?.refundedAt === null) throw new Error('The refund could not be recorded.')
-    }
-    log('billing_order_refunded', { order: order.id, reason: 'rejected' })
+      })
+    )
   }
   if (submission.ownerEmail) {
     await deps.notify('submission-rejected-refunded', {
       eventKey: deps.eventKey('submission-rejected', input.submissionId),
       input: {
         reason: review.reason,
-        refundedCents: order.amountCents,
+        refundedCents: order.chargedCents ?? order.amountCents,
         submissionId: input.submissionId,
         submissionName: submission.name
       },
@@ -785,145 +1000,96 @@ export async function refundRejectedSubmission(
 }
 
 export type RefundOrderResult =
-  | {
-      /** What happened to the listing: unpublished, kept live as free, or nothing to change. */
-      listing: 'kept_free' | 'unchanged' | 'unpublished'
-      ok: true
-      replayed: boolean
-    }
+  | { listing: RefundListing; ok: true; replayed: boolean }
   | BillingFailure
 
 /**
- * The admin "Refund" on an order (#70 screen 13; #59 amendment 2). A paid listing (a paid
- * submission, an upgrade, or a relist) that is live has its badge checked once, right now
- * (`checkBadgeAtRefund`): a pass keeps it live as a free listing, a miss or a result that can't
- * tell unpublishes it. One already down is refunded as it is. A submission still in review is
- * rejected instead (its rejection refunds it), and a prohibited rejection is never refunded.
- * A payment that was never applied, or a claim, is refunded from the order alone.
+ * The admin "Refund" on an order (#70 screen 13; #59 amendment 2). The decision is made and
+ * recorded first: a paid listing (a paid submission, an upgrade, or a relist) that is live has
+ * its badge checked once, right now (`checkBadgeAtRefund`): a pass keeps it live as a free
+ * listing, a miss or a result that can't tell unpublishes it. One already down is refunded as it
+ * is. The order is then claimed with that decision, refunded at the provider, and finalized. A
+ * retry after a lost write finishes the recorded decision without checking the badge again. A
+ * submission still in review is rejected instead (its rejection refunds it), and a prohibited
+ * rejection is never refunded. A payment that was never applied, or a claim, is refunded from
+ * the order alone.
  */
 export async function refundOrder(
   deps: BillingDependencies,
   input: { actor: string; orderId: string }
 ): Promise<RefundOrderResult> {
-  for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
-    const result = await refundOrderOnce(deps, input)
-    if (result !== 'retry') return result
-  }
-  return failure(
-    409,
-    'conflict',
-    'This changed since you opened it. Reload the page and try again.'
-  )
-}
-
-async function refundOrderOnce(
-  deps: BillingDependencies,
-  input: { actor: string; orderId: string }
-): Promise<RefundOrderResult | 'retry'> {
   const order = await deps.operations.order(input.orderId)
   if (!order) return failure(404, 'not_found', 'That order doesn’t exist.')
-  if (order.status === 'refunded') return { listing: 'unchanged', ok: true, replayed: true }
+  if (order.status === 'refunded') {
+    return { listing: await finishRefund(deps, order.id), ok: true, replayed: true }
+  }
+  if (order.status === 'refunding') {
+    return { listing: await finishRefund(deps, order.id), ok: true, replayed: false }
+  }
   if (order.status !== 'paid') {
     return failure(409, 'not_refundable', 'Only a paid order can be refunded.')
   }
+  let listingAction: OrderRefundListingAction = 'none'
+  let badgeCheckId: number | null = null
   const listingOrder =
     order.purpose !== 'claim' && order.appliedAt !== null && order.outcome !== 'unapplied'
   const submission =
     listingOrder && order.submissionId
       ? await deps.operations.checkoutSubmission(order.submissionId)
       : null
-  const refundOnly = async (): Promise<RefundOrderResult | 'retry'> => {
-    const refundId = await providerRefund(deps, order)
-    const done = await deps.operations.apply(
-      refundedPlans(deps, order, { actor: input.actor, reason: 'admin', refundId })
-    )
-    log('billing_order_refunded', { order: order.id, reason: 'admin' })
-    return done ? { listing: 'unchanged', ok: true, replayed: false } : 'retry'
-  }
-  if (!submission || submission.refundedAt !== null) return refundOnly()
-  if (submission.status === 'rejected') {
-    if ((await deps.operations.rejection(submission.id))?.category === 'prohibited') {
-      return failure(409, 'prohibited', 'A rejection for prohibited content isn’t refunded.')
+  if (submission && submission.refundedAt === null) {
+    if (submission.status === 'rejected') {
+      if ((await deps.operations.rejection(submission.id))?.category === 'prohibited') {
+        return failure(409, 'prohibited', 'A rejection for prohibited content isn’t refunded.')
+      }
+      await refundRejectedSubmission(deps, { actor: input.actor, submissionId: submission.id })
+      return { listing: 'unchanged', ok: true, replayed: false }
     }
-    await refundRejectedSubmission(deps, { actor: input.actor, submissionId: submission.id })
-    return { listing: 'unchanged', ok: true, replayed: false }
-  }
-  if (submission.status !== 'approved') {
-    return failure(
-      409,
-      'submission_in_review',
-      'This submission is still in review. Reject it from the review page instead.'
-    )
-  }
-  if (submission.plan !== 'paid' || submission.paidAt === null) return refundOnly()
-  const listing = submission.listingId
-    ? await deps.operations.checkoutListing({
-        listingId: submission.listingId,
-        userId: order.userId
-      })
-    : null
-  const live = await deps.operations.listingLive(submission.listingId)
-  const now = deps.now().toISOString()
-  let plans: StatementPlan[]
-  let outcome: 'kept_free' | 'unchanged' | 'unpublished'
-  if (!live || !submission.listingId) {
-    plans = buildRefundSubmissionPlans({
-      actor: input.actor,
-      mode: 'already_unpublished',
-      now,
-      submissionId: submission.id
-    })
-    outcome = 'unchanged'
-  } else {
-    const check = await deps.badgeAtRefund(submission.listingId)
-    if (check.keepFree) {
-      plans = buildRefundSubmissionPlans({
-        actor: input.actor,
-        badgeCheckId: check.checkId,
-        mode: 'keep_free',
-        now,
-        submissionId: submission.id
-      })
-      outcome = 'kept_free'
-    } else {
-      plans = buildRefundSubmissionPlans({
-        actor: input.actor,
-        badgeCheckId: check.checkId,
-        mode: 'unpublish',
-        now,
-        publication: {
-          ...(await publicationFor(
-            deps,
-            'refund-unpublish',
-            submission.id,
-            listing?.slug ?? submission.slug,
-            now
-          )),
-          actor: input.actor
-        },
-        submissionId: submission.id
-      })
-      outcome = 'unpublished'
+    if (submission.status !== 'approved') {
+      return failure(
+        409,
+        'submission_in_review',
+        'This submission is still in review. Reject it from the review page instead.'
+      )
+    }
+    if (submission.plan === 'paid' && submission.paidAt !== null) {
+      if (submission.listingId && (await deps.operations.listingLive(submission.listingId))) {
+        const check = await deps.badgeAtRefund(submission.listingId)
+        listingAction = check.keepFree ? 'keep_free' : 'unpublish'
+        badgeCheckId = check.checkId
+      } else {
+        listingAction = 'already_unpublished'
+      }
     }
   }
-  const refundId = await providerRefund(deps, order)
-  const done = await deps.operations.apply([
-    ...plans,
-    ...refundedPlans(deps, order, { actor: input.actor, reason: 'admin', refundId })
-  ])
-  if (!done) return 'retry'
-  log('billing_order_refunded', { listing: outcome, order: order.id, reason: 'admin' })
-  return { listing: outcome, ok: true, replayed: false }
+  const claimed = await claimRefund(deps, order, {
+    actor: input.actor,
+    badgeCheckId,
+    listingAction,
+    reason: 'admin'
+  })
+  if (!claimed) {
+    const current = await deps.operations.order(order.id)
+    if (current?.refundReason !== 'admin') {
+      return failure(
+        409,
+        'conflict',
+        'This changed since you opened it. Reload the page and try again.'
+      )
+    }
+  }
+  return { listing: await finishRefund(deps, order.id), ok: true, replayed: !claimed }
 }
 
 // ---------------------------------------------------------------------------------------------
 // Sweep
 
 /**
- * The hourly sweep: retries refunds still owed after an `other` rejection, asks the provider
- * about pending orders whose checkout has closed (paid → applied; otherwise failed), and applies
- * paid orders a crash left unapplied. Each item is independent; a failure is logged and retried
- * on the next run.
+ * The hourly sweep: retries refunds still owed after an `other` rejection, finishes claimed
+ * refunds a failure left, asks the provider about pending orders whose checkout has closed (paid
+ * → applied; otherwise failed) and about failed orders still inside the provider's retry window
+ * (a superseded checkout paid late), and applies paid orders a crash left unapplied. Each item
+ * is independent; a failure is logged and retried on the next run.
  */
 export async function runBillingSweep(
   deps: BillingDependencies,
@@ -939,9 +1105,19 @@ export async function runBillingSweep(
       logError('billing_sweep_refund_failed', error, { submission: submissionId })
     }
   }
-  const before = new Date(deps.now().getTime() - RECONCILE_AFTER_MS).toISOString()
-  for (const order of await deps.operations.ordersToReconcile({ before, limit: input.limit })) {
+  const now = deps.now().getTime()
+  const orders = await deps.operations.ordersToReconcile({
+    before: new Date(now - RECONCILE_AFTER_MS).toISOString(),
+    failedSince: new Date(now - FAILED_RECONCILE_MS).toISOString(),
+    limit: input.limit
+  })
+  for (const order of orders) {
     try {
+      if (order.status === 'refunding') {
+        await finishRefund(deps, order.id)
+        counts.refunds += 1
+        continue
+      }
       if (order.status === 'paid') {
         await fulfilOrder(deps, order.id)
         counts.applied += 1
@@ -951,10 +1127,10 @@ export async function runBillingSweep(
       if (checkout.state === 'paid') {
         await recordPayment(deps, order, checkout)
         counts.applied += 1
-      } else if (checkout.state !== 'processing') {
+      } else if (order.status === 'pending' && checkout.state !== 'processing') {
         await deps.operations.apply(
           buildMarkOrderFailedPlans({
-            now: deps.now().toISOString(),
+            now: nowIso(deps),
             orderId: order.id,
             reason: checkout.state === 'failed' ? 'payment_failed' : 'expired'
           })

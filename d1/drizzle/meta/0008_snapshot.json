@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4d172a5b-69cd-4b34-beeb-39f694afbbd3",
+  "id": "f4eac24f-9b33-4c24-ad6b-ce0c4430647d",
   "prevId": "876f34c4-6293-4c68-be1b-a5b7bf95fb3f",
   "tables": {
     "accounts": {
@@ -3157,6 +3157,27 @@
           "notNull": false,
           "autoincrement": false
         },
+        "charged_cents": {
+          "name": "charged_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "charged_currency": {
+          "name": "charged_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "attention": {
+          "name": "attention",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -3188,6 +3209,27 @@
         },
         "refunded_by": {
           "name": "refunded_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "refund_listing_action": {
+          "name": "refund_listing_action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "refund_badge_check_id": {
+          "name": "refund_badge_check_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "refund_requested_at": {
+          "name": "refund_requested_at",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -3312,11 +3354,19 @@
         },
         "orders_status_valid": {
           "name": "orders_status_valid",
-          "value": "\"orders\".\"status\" IN ('pending', 'paid', 'refunded', 'failed')"
+          "value": "\"orders\".\"status\" IN ('pending', 'paid', 'refunding', 'refunded', 'failed')"
         },
         "orders_outcome_valid": {
           "name": "orders_outcome_valid",
           "value": "\"orders\".\"outcome\" IS NULL OR \"orders\".\"outcome\" IN ('published', 'held', 'upgraded', 'relisted', 'claimed', 'unapplied')"
+        },
+        "orders_refund_listing_action_valid": {
+          "name": "orders_refund_listing_action_valid",
+          "value": "\"orders\".\"refund_listing_action\" IS NULL\n        OR \"orders\".\"refund_listing_action\" IN ('keep_free', 'unpublish', 'already_unpublished', 'none')"
+        },
+        "orders_attention_valid": {
+          "name": "orders_attention_valid",
+          "value": "\"orders\".\"attention\" IS NULL OR \"orders\".\"attention\" IN ('amount_mismatch', 'listing_update_failed')"
         },
         "orders_refund_reason_valid": {
           "name": "orders_refund_reason_valid",
@@ -3336,11 +3386,11 @@
         },
         "orders_paid_recorded": {
           "name": "orders_paid_recorded",
-          "value": "\"orders\".\"status\" IN ('pending', 'failed')\n        OR (\"orders\".\"paid_at\" IS NOT NULL AND \"orders\".\"provider_payment_id\" IS NOT NULL)"
+          "value": "\"orders\".\"status\" IN ('pending', 'failed')\n        OR (\"orders\".\"paid_at\" IS NOT NULL AND \"orders\".\"provider_payment_id\" IS NOT NULL\n          AND \"orders\".\"charged_cents\" IS NOT NULL AND \"orders\".\"charged_currency\" IS NOT NULL)"
         },
         "orders_refund_recorded": {
           "name": "orders_refund_recorded",
-          "value": "(\"orders\".\"status\" = 'refunded') = (\"orders\".\"refunded_at\" IS NOT NULL)\n        AND (\"orders\".\"refunded_at\" IS NULL OR \"orders\".\"refund_reason\" IS NOT NULL)"
+          "value": "(\"orders\".\"status\" = 'refunded') = (\"orders\".\"refunded_at\" IS NOT NULL)\n        AND (\"orders\".\"status\" IN ('refunding', 'refunded')) = (\"orders\".\"refund_reason\" IS NOT NULL)\n        AND (\"orders\".\"refund_reason\" IS NULL) = (\"orders\".\"refund_requested_at\" IS NULL)\n        AND (\"orders\".\"refund_reason\" = 'admin') = (\"orders\".\"refund_listing_action\" IS NOT NULL)"
         },
         "orders_outcome_after_payment": {
           "name": "orders_outcome_after_payment",

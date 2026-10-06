@@ -48,6 +48,8 @@ import { formatDay, formatUsd } from './format'
 
 export interface OrderRow {
   amountCents: number
+  /** Flagged for an admin: a charge that didn't match, or a refund's listing change. */
+  attention: 'amount_mismatch' | 'listing_update_failed' | null
   buyerEmail: string | null
   createdAt: string
   id: string
@@ -56,7 +58,7 @@ export interface OrderRow {
   productName: string | null
   purpose: 'claim' | 'relist' | 'submission' | 'upgrade'
   refundable: boolean
-  status: 'failed' | 'paid' | 'pending' | 'refunded'
+  status: 'failed' | 'paid' | 'pending' | 'refunded' | 'refunding'
   /** The listing's paid plan is live and approved: the refund checks the badge first. */
   checksBadge: boolean
   /** Its submission is still in review: rejecting it refunds it instead. */
@@ -69,7 +71,13 @@ const STATUS_LABEL: Record<OrderRow['status'], string> = {
   failed: 'Failed',
   paid: 'Paid',
   pending: 'Pending',
-  refunded: 'Refunded'
+  refunded: 'Refunded',
+  refunding: 'Refunding'
+}
+
+const ATTENTION_LABEL: Record<NonNullable<OrderRow['attention']>, string> = {
+  amount_mismatch: 'Amount mismatch',
+  listing_update_failed: 'Listing not updated'
 }
 
 const PURPOSE_LABEL: Record<OrderRow['purpose'], string> = {
@@ -79,7 +87,7 @@ const PURPOSE_LABEL: Record<OrderRow['purpose'], string> = {
   upgrade: 'Upgrade'
 }
 
-type RefundAnswer = { listing: 'kept_free' | 'unchanged' | 'unpublished' }
+type RefundAnswer = { listing: 'kept_free' | 'pending' | 'unchanged' | 'unpublished' }
 
 export function OrdersManager({ orders }: { orders: OrderRow[] }) {
   const router = useRouter()
@@ -106,7 +114,9 @@ export function OrdersManager({ orders }: { orders: OrderRow[] }) {
         ? `Refunded ${formatUsd(order.amountCents)}. ${name} was unpublished.`
         : result.listing === 'kept_free'
           ? `Refunded ${formatUsd(order.amountCents)}. ${name} stays live as a free listing.`
-          : `Refunded ${formatUsd(order.amountCents)}.`
+          : result.listing === 'pending'
+            ? `Refunded ${formatUsd(order.amountCents)}. The listing update is pending.`
+            : `Refunded ${formatUsd(order.amountCents)}.`
     )
     router.refresh()
   }
@@ -156,7 +166,12 @@ export function OrdersManager({ orders }: { orders: OrderRow[] }) {
                   <TableCell>{PURPOSE_LABEL[order.purpose]}</TableCell>
                   <TableCell className="tabular-nums">{formatUsd(order.amountCents)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">{STATUS_LABEL[order.status]}</Badge>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="outline">{STATUS_LABEL[order.status]}</Badge>
+                      {order.attention ? (
+                        <Badge variant="destructive">{ATTENTION_LABEL[order.attention]}</Badge>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDay(order.createdAt)}

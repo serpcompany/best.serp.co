@@ -153,6 +153,7 @@ function completedEvent(sessionId: string, eventId = `evt_e2e_${unique()}`): str
   return JSON.stringify({
     data: { object: stripe.pay(sessionId) },
     id: eventId,
+    livemode: false,
     object: 'event',
     type: 'checkout.session.completed'
   })

@@ -128,8 +128,8 @@ export type SiteDefinition = {
     /** The paid listing's price: one-off and permanent, in US cents. */
     paidListingPriceCents: number
     /**
-     * Stripe Tax on paid listing checkouts (`automatic_tax`, #68). Tax is deferred, so it stays
-     * off until the owner decides.
+     * Stripe Tax on paid listing checkouts (#68). Tax is deferred: billing refuses to start
+     * while this is on, because a taxed charge wouldn't match its order.
      */
     automaticTax: boolean
   }

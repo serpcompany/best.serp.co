@@ -19,6 +19,7 @@ export default async function OrdersPage() {
       order.purpose !== 'claim' && order.appliedAt !== null && order.outcome !== 'unapplied'
     return {
       amountCents: order.amountCents,
+      attention: order.attention,
       buyerEmail: order.buyerEmail,
       checksBadge: listingOrder && order.listingLive && order.submissionStatus === 'approved',
       createdAt: order.createdAt,
@@ -32,7 +33,8 @@ export default async function OrdersPage() {
       listingSlug: order.listingSlug,
       productName: order.productName,
       purpose: order.purpose,
-      refundable: order.status === 'paid',
+      // A claimed refund a failure left can be finished from here too.
+      refundable: order.status === 'paid' || order.status === 'refunding',
       status: order.status
     }
   })

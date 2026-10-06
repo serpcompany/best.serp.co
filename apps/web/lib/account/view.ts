@@ -284,7 +284,7 @@ function listingRow(
       ...base,
       // Relisting a listing the badge program unlisted is a paid listing (#68).
       action:
-        paid && listing.unlistedForBadge
+        paid && listing.checkoutPurpose === 'relist'
           ? {
               checkout: true,
               href: checkoutHref,
@@ -329,7 +329,7 @@ function listingRow(
     status: 'live',
     tab: 'live',
     upgrade:
-      paid && badge
+      paid && listing.checkoutPurpose === 'upgrade'
         ? { href: checkoutHref, label: `Upgrade: ${priceLabel(paid.priceCents)} one-off` }
         : null
   }

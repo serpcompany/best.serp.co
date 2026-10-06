@@ -1256,7 +1256,15 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       })
     )
     expect(await all(B.selectOrderByCheckoutPlan('stripe', 'cs_1'))).toHaveLength(1)
-    await run(B.buildMarkOrderPaidPlans({ now: NOW, orderId: 'ord-1', paymentId: 'pi_1' }))
+    await run(
+      B.buildMarkOrderPaidPlans({
+        chargedCents: 4900,
+        chargedCurrency: 'usd',
+        now: NOW,
+        orderId: 'ord-1',
+        paymentId: 'pi_1'
+      })
+    )
     await run([
       ...S.buildRecordSubmissionPaymentPlans({
         actor: 'billing',
@@ -1278,7 +1286,13 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       expect.objectContaining({ status: 'paid_pending_review', owner_email: 'owner@example.com' })
     ])
     expect(
-      await all(B.selectOrdersToReconcilePlan({ before: '2026-10-07T00:00:00.000Z', limit: 10 }))
+      await all(
+        B.selectOrdersToReconcilePlan({
+          before: '2026-10-07T00:00:00.000Z',
+          failedSince: '2026-10-01T00:00:00.000Z',
+          limit: 10
+        })
+      )
     ).toEqual([])
     expect(await all(B.selectAdminOrdersPlan())).toEqual([
       expect.objectContaining({ buyer_email: 'owner@example.com', id: 'ord-1', listing_live: 1 })
@@ -1314,21 +1328,51 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     )
     await run(B.buildMarkOrderFailedPlans({ now: NOW, orderId: 'ord-2', reason: 'expired' }))
     expect(await order('ord-2')).toMatchObject({ failure_reason: 'expired', status: 'failed' })
-    await run(B.buildMarkOrderPaidPlans({ now: NOW, orderId: 'ord-2', paymentId: 'pi_2' }))
     await run(
-      B.buildMarkOrderRefundedPlans({
-        actor: 'billing',
+      B.buildMarkOrderPaidPlans({
+        attention: 'amount_mismatch',
+        chargedCents: 5390,
+        chargedCurrency: 'usd',
         now: NOW,
         orderId: 'ord-2',
-        reason: 'unapplied',
-        refundId: 're_2'
+        paymentId: 'pi_2'
       })
     )
+    // The refund is claimed (only while nothing applied it), then finalized.
+    await run(
+      B.buildClaimRefundPlans({
+        actor: 'billing',
+        from: 'unapplied',
+        now: NOW,
+        orderId: 'ord-2',
+        reason: 'unapplied'
+      })
+    )
+    await expect(
+      run(B.buildMarkOrderAppliedPlans({ now: NOW, orderId: 'ord-2', outcome: 'published' }))
+    ).rejects.toThrow()
+    await run(B.buildFinishRefundPlans({ now: NOW, orderId: 'ord-2', refundId: 're_2' }))
     expect(await order('ord-2')).toMatchObject({
+      attention: 'amount_mismatch',
+      charged_cents: 5390,
       outcome: 'unapplied',
       refund_reason: 'unapplied',
       status: 'refunded'
     })
+    // An applied order is claimed only with the outcome it was read with.
+    await expect(
+      run(
+        B.buildClaimRefundPlans({
+          actor: 'admin@example.com',
+          from: 'applied',
+          listingAction: 'none',
+          now: NOW,
+          orderId: 'ord-1',
+          outcome: 'held',
+          reason: 'admin'
+        })
+      )
+    ).rejects.toThrow()
 
     // Upgrade and relist of an owned free listing.
     await insertDraft('sub-relist', 'https://relist.example/')

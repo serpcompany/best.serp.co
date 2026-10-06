@@ -41,7 +41,12 @@ describe('Stripe provider', () => {
     const { calls, fetcher } = recorder([
       { body: { expires_at: 1791295200, id: 'cs_test_1', url: 'https://checkout.stripe.com/c/1' } }
     ])
-    const stripe = createStripeProvider({ fetcher, secretKey: 'sk_test_x', webhookSecret: SECRET })
+    const stripe = createStripeProvider({
+      fetcher,
+      live: false,
+      secretKey: 'sk_test_x',
+      webhookSecret: SECRET
+    })
     const session = await stripe.createCheckout({
       amountCents: 4900,
       cancelUrl: 'https://best.serp.co/submit/s/choose/',
@@ -87,13 +92,19 @@ describe('Stripe provider', () => {
           client_reference_id: 'order-1',
           currency: 'usd',
           id: 'cs_test_1',
+          livemode: false,
           payment_intent: 'pi_1',
           payment_status: 'paid',
           status: 'complete'
         }
       }
     ])
-    const stripe = createStripeProvider({ fetcher, secretKey: 'sk_test_x', webhookSecret: SECRET })
+    const stripe = createStripeProvider({
+      fetcher,
+      live: false,
+      secretKey: 'sk_test_x',
+      webhookSecret: SECRET
+    })
     await expect(stripe.getCheckout('cs_test_1')).resolves.toEqual({
       amountCents: 4900,
       checkoutId: 'cs_test_1',
@@ -111,7 +122,12 @@ describe('Stripe provider', () => {
       { body: { error: { code: 'charge_already_refunded' } }, status: 400 },
       { body: { error: { code: 'resource_missing' } }, status: 404 }
     ])
-    const stripe = createStripeProvider({ fetcher, secretKey: 'sk_test_x', webhookSecret: SECRET })
+    const stripe = createStripeProvider({
+      fetcher,
+      live: false,
+      secretKey: 'sk_test_x',
+      webhookSecret: SECRET
+    })
     const request = {
       amountCents: 4900,
       idempotencyKey: 'refund:order-1',
@@ -157,6 +173,8 @@ describe('Stripe provider', () => {
 
   it('maps checkout events and ignores everything else', async () => {
     const stripe = createStripeProvider({
+      accountId: 'acct_serp',
+      live: false,
       now: () => NOW,
       secretKey: 'sk_test_x',
       webhookSecret: SECRET
@@ -170,8 +188,14 @@ describe('Stripe provider', () => {
       payment_intent: 'pi_1',
       ...extra
     })
-    const event = async (type: string, object: unknown) => {
-      const body = JSON.stringify({ data: { object }, id: `evt_${type}`, type })
+    const event = async (type: string, object: unknown, extra: Record<string, unknown> = {}) => {
+      const body = JSON.stringify({
+        data: { object },
+        id: `evt_${type}`,
+        livemode: false,
+        type,
+        ...extra
+      })
       return stripe.verifyWebhook({ body, headers: await signed(body) })
     }
     await expect(
@@ -189,8 +213,37 @@ describe('Stripe provider', () => {
     await expect(
       event('checkout.session.async_payment_failed', session({ status: 'complete' }))
     ).resolves.toMatchObject({ checkout: { state: 'failed' }, type: 'checkout_failed' })
+    // Another mode's or another account's checkout is never acted on.
+    const paid = session({ payment_status: 'paid', status: 'complete' })
+    await expect(
+      event('checkout.session.completed', paid, { livemode: true })
+    ).resolves.toMatchObject({ checkout: null, type: 'ignored' })
+    await expect(
+      event('checkout.session.completed', paid, { account: 'acct_other' })
+    ).resolves.toMatchObject({ checkout: null, type: 'ignored' })
     await expect(event('charge.refunded', { id: 'ch_1', object: 'charge' })).resolves.toMatchObject(
       { checkout: null, providerType: 'charge.refunded', type: 'ignored' }
     )
+  })
+
+  it('refuses a session of the other mode, and expires open sessions', async () => {
+    const { calls, fetcher } = recorder([
+      { body: { id: 'cs_test_1', livemode: true, status: 'complete' } },
+      { body: { id: 'cs_test_2', status: 'expired' } },
+      { body: { error: { code: 'checkout_session_not_open' } }, status: 400 }
+    ])
+    const stripe = createStripeProvider({
+      fetcher,
+      live: false,
+      secretKey: 'sk_test_x',
+      webhookSecret: SECRET
+    })
+    await expect(stripe.getCheckout('cs_test_1')).rejects.toMatchObject({ code: 'mode_mismatch' })
+    await expect(stripe.expireCheckout('cs_test_2')).resolves.toBeUndefined()
+    await expect(stripe.expireCheckout('cs_test_3')).resolves.toBeUndefined()
+    expect(calls.slice(1).map(call => call.url)).toEqual([
+      'https://api.stripe.com/v1/checkout/sessions/cs_test_2/expire',
+      'https://api.stripe.com/v1/checkout/sessions/cs_test_3/expire'
+    ])
   })
 })

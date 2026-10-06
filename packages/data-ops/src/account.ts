@@ -173,10 +173,12 @@ export interface AccountListing {
   /** The user's latest submission for the listing. */
   submission: { id: string; status: SubmissionStatus } | null
   /**
-   * Unlisted by the badge program (#66) from the free plan: relisting it is a paid listing
-   * (#68, "Relist for $49").
+   * What the owner can pay for (#68), by the same rule the checkout applies
+   * (`listingCheckoutPurpose`): `upgrade` for a live listing on the free plan that was never
+   * paid or refunded, `relist` for one the badge program (#66) unlisted; otherwise null, so the
+   * account never offers a payment the checkout would refuse.
    */
-  unlistedForBadge: boolean
+  checkoutPurpose: 'relist' | 'upgrade' | null
   verifiedVia: string
   website: string
 }
@@ -498,8 +500,14 @@ function toListing(row: Row, history: AccountBadgeCheck[], now: Date): AccountLi
     submission: submissionId
       ? { id: submissionId, status: text(row.submission_status) as SubmissionStatus }
       : null,
-    unlistedForBadge:
-      Number(row.live) !== 1 && free && optional(row.unpublished_reason) === 'badge_missing',
+    checkoutPurpose:
+      !free || row.refunded_at !== null
+        ? null
+        : Number(row.live) === 1
+          ? 'upgrade'
+          : optional(row.unpublished_reason) === 'badge_missing'
+            ? 'relist'
+            : null,
     verifiedVia: text(row.verified_via),
     website: text(row.website)
   }

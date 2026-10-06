@@ -39,9 +39,12 @@ const ORIGIN = 'https://best.serp.co'
 function fakeProvider() {
   const sessions = new Map<string, CheckoutState>()
   const refunds: RefundRequest[] = []
+  const expired: string[] = []
+  /** Throws on the next refund (the provider was down). */
+  const failNextRefund = { value: false }
   let created = 0
   const provider: BillingProvider & {
-    pay(checkoutId: string): CheckoutState
+    pay(checkoutId: string, charged?: number): CheckoutState
   } = {
     async createCheckout(request) {
       created += 1
@@ -60,20 +63,34 @@ function fakeProvider() {
         url: `https://pay.example/${checkoutId}`
       }
     },
+    async expireCheckout(checkoutId) {
+      expired.push(checkoutId)
+      const session = sessions.get(checkoutId)
+      if (session?.state === 'open') sessions.set(checkoutId, { ...session, state: 'expired' })
+    },
     async getCheckout(checkoutId) {
       const session = sessions.get(checkoutId)
       if (!session) throw new Error('unknown session')
       return session
     },
     name: 'fake',
-    pay(checkoutId) {
+    pay(checkoutId, charged) {
       const session = sessions.get(checkoutId)
       if (!session) throw new Error('unknown session')
-      const paid = { ...session, paymentId: `pi_${checkoutId}`, state: 'paid' as const }
+      const paid = {
+        ...session,
+        amountCents: charged ?? session.amountCents,
+        paymentId: `pi_${checkoutId}`,
+        state: 'paid' as const
+      }
       sessions.set(checkoutId, paid)
       return paid
     },
     async refund(request) {
+      if (failNextRefund.value) {
+        failNextRefund.value = false
+        throw new Error('provider down')
+      }
       refunds.push(request)
       return { refundId: `re_${refunds.length}` }
     },
@@ -83,7 +100,7 @@ function fakeProvider() {
       return event
     }
   }
-  return { provider, refunds, sessions }
+  return { expired, failNextRefund, provider, refunds, sessions }
 }
 
 function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'pass' } = {}) {
@@ -98,19 +115,22 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
   `)
   const client = createDatabase(sqlite.asD1Database())
   const operations = createBillingOperations({ client })
-  const { provider, refunds } = fakeProvider()
+  const { expired, failNextRefund, provider, refunds } = fakeProvider()
+  const badgeChecks = { count: 0 }
   const emails: Array<{ eventKey: string; template: string; to: string }> = []
   let ids = 0
   const deps: BillingDependencies = {
     adminRecipient: 'devin@serp.co',
-    badgeAtRefund: listingId =>
-      checkBadgeAtRefund({
+    badgeAtRefund: listingId => {
+      badgeChecks.count += 1
+      return checkBadgeAtRefund({
         listingId,
         now: NOW,
         operations: createBadgeProgramOperations({ client }),
         verify: async () =>
           options.badge === 'missing' ? { code: 'badge_missing', ok: false } : { ok: true }
-      }),
+      })
+    },
     currency: 'usd',
     eventKey: (event, ...parts) => [event, ...parts].join(':'),
     guardrails: async () => options.guardrails ?? { ok: true },
@@ -164,7 +184,21 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
   }
   const row = <T>(sql: string) => db.prepare(sql).get() as T
   const rows = <T>(sql: string) => db.prepare(sql).all() as T[]
-  return { client, db, deps, emails, listing, provider, refunds, row, rows, submission }
+  return {
+    badgeChecks,
+    client,
+    db,
+    deps,
+    emails,
+    expired,
+    failNextRefund,
+    listing,
+    provider,
+    refunds,
+    row,
+    rows,
+    submission
+  }
 }
 
 type Fixture = ReturnType<typeof fixture>
@@ -342,6 +376,9 @@ describe('payment', () => {
     const second = await checkout(f, 's1')
     expect(second).not.toBe(first)
     await webhook(f, paidEvent(f, second))
+    // The superseded checkout was expired at the provider; a payment that still lands on it
+    // is refunded.
+    expect(f.expired).toEqual([first])
     await webhook(f, paidEvent(f, first))
     expect(f.rows('SELECT status, outcome FROM orders ORDER BY created_at, id')).toEqual(
       expect.arrayContaining([
@@ -350,6 +387,177 @@ describe('payment', () => {
       ])
     )
     expect(f.refunds).toHaveLength(1)
+  })
+})
+
+describe('races and mismatches (#111 review round 1)', () => {
+  it('never refunds an order a racing delivery applied between its two reads', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    const checkoutId = await checkout(f, 's1')
+    const body = paidEvent(f, checkoutId)
+    const order = f.row<{ id: string }>('SELECT id FROM orders')
+    // The payment is recorded but not applied yet (a delivery is in flight).
+    f.db.exec(`UPDATE orders SET status='paid', provider_payment_id='pi_${checkoutId}',
+      charged_cents=4900, charged_currency='usd', paid_at='${NOW.toISOString()}'`)
+    // The return reads the order (paid, unapplied); the webhook applies it before the return
+    // reads the submission, which then looks already paid.
+    const read = f.deps.operations.checkoutSubmission
+    let raced = false
+    f.deps.operations.checkoutSubmission = async id => {
+      if (!raced) {
+        raced = true
+        await webhook(f, body)
+      }
+      return read(id)
+    }
+    await confirmReturn(f.deps, { orderId: order.id, userId: 'user_maya' })
+    expect(raced).toBe(true)
+    expect(f.refunds).toEqual([])
+    expect(f.row('SELECT status, outcome FROM orders')).toEqual({
+      outcome: 'published',
+      status: 'paid'
+    })
+    expect(f.row(`SELECT status FROM listing_submissions WHERE id='s1'`)).toEqual({
+      status: 'paid_pending_review'
+    })
+  })
+
+  it('never applies an order whose unapplied refund was claimed first', async () => {
+    const f = fixture()
+    f.submission('s1', 'pending_badge', 'free')
+    const checkoutId = await checkout(f, 's1')
+    await webhook(f, paidEvent(f, checkoutId))
+    // A second, unapplied order for the same submission is refunded by an admin while a
+    // fulfilment of it is in flight: the fulfilment's apply then loses.
+    const order = f.row<{ id: string }>('SELECT id FROM orders')
+    f.db.exec(`UPDATE orders SET applied_at=NULL, outcome=NULL`)
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).resolves.toMatchObject({ listing: 'unchanged', ok: true })
+    expect(f.row('SELECT status, outcome, refund_reason FROM orders')).toEqual({
+      outcome: 'unapplied',
+      refund_reason: 'admin',
+      status: 'refunded'
+    })
+  })
+
+  it('flags a charge that does not match its order and refunds exactly what was charged', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    const checkoutId = await checkout(f, 's1')
+    await webhook(
+      f,
+      JSON.stringify({
+        checkout: f.provider.pay(checkoutId, 5390),
+        id: 'evt_taxed',
+        providerType: 'checkout.session.completed',
+        type: 'checkout_paid'
+      })
+    )
+    expect(f.row('SELECT status, outcome, attention, charged_cents FROM orders')).toEqual({
+      attention: 'amount_mismatch',
+      charged_cents: 5390,
+      outcome: 'unapplied',
+      status: 'refunded'
+    })
+    expect(f.refunds).toEqual([expect.objectContaining({ amountCents: 5390 })])
+    expect(f.row(`SELECT status, paid_at FROM listing_submissions WHERE id='s1'`)).toEqual({
+      paid_at: null,
+      status: 'draft'
+    })
+  })
+
+  it('refuses a checkout for a website now blocked or already listed', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    f.listing('taken', 'free')
+    f.db.exec(`UPDATE listing_submissions SET website='https://taken.example/' WHERE id='s1'`)
+    await expect(
+      startSubmissionCheckout(f.deps, {
+        email: 'maya@example.com',
+        origin: ORIGIN,
+        submissionId: 's1',
+        userId: 'user_maya'
+      })
+    ).resolves.toMatchObject({ error: 'website_listed', ok: false, status: 409 })
+    expect(f.rows('SELECT id FROM orders')).toEqual([])
+  })
+
+  it('acts only on the order that owns the event’s checkout', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    const checkoutId = await checkout(f, 's1')
+    const order = f.row<{ id: string }>('SELECT id FROM orders')
+    const forged = {
+      ...f.provider.pay(checkoutId),
+      checkoutId: 'cs_someone_else',
+      orderId: order.id
+    }
+    await webhook(
+      f,
+      JSON.stringify({
+        checkout: forged,
+        id: 'evt_other',
+        providerType: 'checkout.session.completed',
+        type: 'checkout_paid'
+      })
+    )
+    expect(f.row('SELECT status FROM orders')).toEqual({ status: 'pending' })
+    expect(f.row('SELECT outcome FROM billing_events')).toEqual({ outcome: 'unknown_order' })
+  })
+
+  it('finishes an admin refund after a lost write without checking the badge again', async () => {
+    const f = fixture({ badge: 'missing' })
+    f.submission('s1', 'draft', null)
+    await webhook(f, paidEvent(f, await checkout(f, 's1')))
+    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+    const order = f.row<{ id: string }>('SELECT id FROM orders')
+    f.failNextRefund.value = true
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).rejects.toThrow('provider down')
+    expect(f.row('SELECT status, refund_listing_action FROM orders')).toEqual({
+      refund_listing_action: 'unpublish',
+      status: 'refunding'
+    })
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).resolves.toEqual({
+      listing: 'unpublished',
+      ok: true,
+      replayed: false
+    })
+    expect(f.badgeChecks.count).toBe(1)
+    expect(f.refunds).toHaveLength(1)
+    expect(
+      f.row(`SELECT l.is_active FROM listing_submissions s JOIN listings l ON l.id=s.listing_id`)
+    ).toEqual({ is_active: 0 })
+  })
+
+  it('records the refund and flags the order when the listing change keeps failing', async () => {
+    const f = fixture({ badge: 'pass' })
+    f.submission('s1', 'draft', null)
+    await webhook(f, paidEvent(f, await checkout(f, 's1')))
+    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+    const order = f.row<{ id: string }>('SELECT id FROM orders')
+    f.failNextRefund.value = true
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).rejects.toThrow()
+    // The badge check at refund aged out before the retry: keep_free can't apply any more.
+    f.db.exec(`UPDATE badge_checks SET checked_at='2026-10-06T09:00:00.000Z'`)
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).resolves.toEqual({
+      listing: 'pending',
+      ok: true,
+      replayed: false
+    })
+    expect(f.row('SELECT status, attention FROM orders')).toEqual({
+      attention: 'listing_update_failed',
+      status: 'refunded'
+    })
   })
 })
 
@@ -487,7 +695,7 @@ describe('refunds', () => {
         replayed: false
       })
       await expect(refundOrder(f.deps, { actor: 'devin@serp.co', orderId })).resolves.toEqual({
-        listing: 'unchanged',
+        listing,
         ok: true,
         replayed: true
       })
@@ -514,6 +722,21 @@ describe('refunds', () => {
 })
 
 describe('sweep', () => {
+  it('records a payment that reached a superseded checkout and finishes claimed refunds', async () => {
+    const f = fixture()
+    f.submission('s1', 'pending_badge', 'free')
+    const first = await checkout(f, 's1')
+    f.db.exec(`UPDATE orders SET checkout_expires_at='2026-10-06T12:01:00.000Z'`)
+    await checkout(f, 's1')
+    // The superseded checkout was paid anyway and its webhook never arrived.
+    f.provider.pay(first)
+    f.db.exec(`UPDATE orders SET failed_at='2026-10-06T11:00:00.000Z' WHERE status='failed'`)
+    await runBillingSweep(f.deps, { limit: 10 })
+    expect(
+      f.rows(`SELECT status, outcome FROM orders WHERE provider_checkout_id='${first}'`)
+    ).toEqual([{ outcome: 'published', status: 'paid' }])
+  })
+
   it('fails pending orders whose checkout closed unpaid and applies paid ones', async () => {
     const f = fixture()
     f.submission('s1', 'draft', null)

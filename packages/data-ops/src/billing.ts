@@ -8,9 +8,11 @@ import {
   type StatementPlan
 } from './plan-support'
 import type {
+  OrderAttention,
   OrderKind,
   OrderOutcome,
   OrderPurpose,
+  OrderRefundListingAction,
   OrderRefundReason,
   OrderStatus,
   RejectionCategory,
@@ -31,6 +33,9 @@ import { selectActiveUrlBlockStatement } from './submissions'
 export interface OrderRecord {
   amountCents: number
   appliedAt: string | null
+  attention: OrderAttention | null
+  chargedCents: number | null
+  chargedCurrency: string | null
   checkoutExpiresAt: string | null
   checkoutUrl: string | null
   claimId: string | null
@@ -47,7 +52,10 @@ export interface OrderRecord {
   providerPaymentId: string | null
   providerRefundId: string | null
   purpose: OrderPurpose
+  refundBadgeCheckId: number | null
+  refundListingAction: OrderRefundListingAction | null
   refundReason: OrderRefundReason | null
+  refundRequestedAt: string | null
   refundedAt: string | null
   refundedBy: string | null
   status: OrderStatus
@@ -63,7 +71,8 @@ const ORDER_COLUMNS = `o.id,o.user_id,o.kind,o.purpose,o.target_key,o.submission
   o.claim_id,o.amount_cents,o.currency,o.provider,o.provider_checkout_id,o.checkout_url,
   o.checkout_expires_at,o.provider_payment_id,o.provider_refund_id,o.status,o.outcome,
   o.failure_reason,o.refund_reason,o.refunded_by,o.paid_at,o.applied_at,o.refunded_at,
-  o.created_at,o.updated_at`
+  o.charged_cents,o.charged_currency,o.attention,o.refund_listing_action,o.refund_badge_check_id,
+  o.refund_requested_at,o.created_at,o.updated_at`
 
 function optional(value: unknown): string | null {
   return value === null || value === undefined ? null : String(value)
@@ -73,6 +82,12 @@ function toOrder(row: Row): OrderRecord {
   return {
     amountCents: Number(row.amount_cents),
     appliedAt: optional(row.applied_at),
+    attention: optional(row.attention) as OrderAttention | null,
+    chargedCents:
+      row.charged_cents === null || row.charged_cents === undefined
+        ? null
+        : Number(row.charged_cents),
+    chargedCurrency: optional(row.charged_currency),
     checkoutExpiresAt: optional(row.checkout_expires_at),
     checkoutUrl: optional(row.checkout_url),
     claimId: optional(row.claim_id),
@@ -89,7 +104,13 @@ function toOrder(row: Row): OrderRecord {
     providerPaymentId: optional(row.provider_payment_id),
     providerRefundId: optional(row.provider_refund_id),
     purpose: row.purpose as OrderPurpose,
+    refundBadgeCheckId:
+      row.refund_badge_check_id === null || row.refund_badge_check_id === undefined
+        ? null
+        : Number(row.refund_badge_check_id),
+    refundListingAction: optional(row.refund_listing_action) as OrderRefundListingAction | null,
     refundReason: optional(row.refund_reason) as OrderRefundReason | null,
+    refundRequestedAt: optional(row.refund_requested_at),
     refundedAt: optional(row.refunded_at),
     refundedBy: optional(row.refunded_by),
     status: row.status as OrderStatus,
@@ -183,20 +204,32 @@ export function buildAttachCheckoutPlans(input: {
 }
 
 /**
- * `pending` (or `failed`, a checkout the provider reported failed and then paid) → `paid`. The
- * caller checked the amount and currency against the order before calling.
+ * `pending` (or `failed`, a checkout the provider reported failed and then paid) → `paid`,
+ * recording what the provider actually charged. A charge that doesn't match the order is
+ * recorded with `attention = 'amount_mismatch'` and never applied: the caller refunds it.
  */
 export function buildMarkOrderPaidPlans(input: {
+  attention?: OrderAttention | null
+  chargedCents: number
+  chargedCurrency: string
   now: string
   orderId: string
   paymentId: string
 }): StatementPlan[] {
   return [
     {
-      sql: `UPDATE orders SET status='paid',provider_payment_id=?,paid_at=?,failed_at=NULL,
-          failure_reason=NULL,updated_at=?
+      sql: `UPDATE orders SET status='paid',provider_payment_id=?,charged_cents=?,charged_currency=?,
+          attention=COALESCE(?,attention),paid_at=?,failed_at=NULL,failure_reason=NULL,updated_at=?
         WHERE id=? AND status IN ('pending','failed')`,
-      params: [input.paymentId, input.now, input.now, input.orderId]
+      params: [
+        input.paymentId,
+        input.chargedCents,
+        input.chargedCurrency,
+        input.attention ?? null,
+        input.now,
+        input.now,
+        input.orderId
+      ]
     },
     assertPreviousStatementChangedOne('order_paid')
   ]
@@ -238,31 +271,63 @@ export function buildMarkOrderFailedPlans(input: {
 }
 
 /**
- * `paid` → `refunded`, after the provider confirmed the refund. An unapplied payment is
- * recorded as applied (`unapplied`) in the same statement, so the ledger shows why.
+ * Claims a refund: `paid` → `refunding`, compared and swapped on the state the refund was
+ * decided on, before the provider is asked. `unapplied` claims a payment nothing applied yet
+ * (it is recorded as applied with the outcome `unapplied` in the same statement), so a racing
+ * fulfilment can no longer apply it; `applied` claims an order applied with `outcome`, so an
+ * order applied in the meantime is never refunded as unapplied. An admin's refund records the
+ * listing action it decided (and its badge check), so a retry finishes the same decision.
  */
-export function buildMarkOrderRefundedPlans(input: {
-  actor: string
+export function buildClaimRefundPlans(
+  input: {
+    actor: string
+    badgeCheckId?: number | null
+    listingAction?: OrderRefundListingAction | null
+    now: string
+    orderId: string
+    reason: OrderRefundReason
+  } & ({ from: 'unapplied' } | { from: 'applied'; outcome: OrderOutcome })
+): StatementPlan[] {
+  const unapplied = input.from === 'unapplied'
+  if ((input.reason === 'admin') !== Boolean(input.listingAction)) {
+    throw new Error('An admin refund (and only one) records its listing action.')
+  }
+  return [
+    {
+      sql: `UPDATE orders SET status='refunding',refund_reason=?,refunded_by=?,refund_requested_at=?,
+          refund_listing_action=?,refund_badge_check_id=?,
+          ${unapplied ? "outcome='unapplied',applied_at=?," : ''}updated_at=?
+        WHERE id=? AND status='paid'
+          AND ${unapplied ? 'applied_at IS NULL' : 'applied_at IS NOT NULL AND outcome=?'}`,
+      params: [
+        input.reason,
+        input.actor,
+        input.now,
+        input.listingAction ?? null,
+        input.badgeCheckId ?? null,
+        ...(unapplied ? [input.now] : []),
+        input.now,
+        input.orderId,
+        ...(input.from === 'applied' ? [input.outcome] : [])
+      ]
+    },
+    assertPreviousStatementChangedOne('order_refund_claimed')
+  ]
+}
+
+/** `refunding` → `refunded`, once the provider confirmed the refund. */
+export function buildFinishRefundPlans(input: {
+  attention?: OrderAttention | null
   now: string
   orderId: string
-  reason: OrderRefundReason
   refundId: string | null
 }): StatementPlan[] {
   return [
     {
-      sql: `UPDATE orders SET status='refunded',provider_refund_id=?,refund_reason=?,refunded_by=?,
-          refunded_at=?,outcome=COALESCE(outcome,'unapplied'),applied_at=COALESCE(applied_at,?),
-          updated_at=?
-        WHERE id=? AND status='paid'`,
-      params: [
-        input.refundId,
-        input.reason,
-        input.actor,
-        input.now,
-        input.now,
-        input.now,
-        input.orderId
-      ]
+      sql: `UPDATE orders SET status='refunded',provider_refund_id=?,refunded_at=?,
+          attention=COALESCE(?,attention),updated_at=?
+        WHERE id=? AND status='refunding'`,
+      params: [input.refundId, input.now, input.attention ?? null, input.now, input.orderId]
     },
     assertPreviousStatementChangedOne('order_refunded')
   ]
@@ -293,7 +358,7 @@ export function selectOpenOrderPlan(targetKey: string): StatementPlan {
 export function selectSubmissionPaymentOrderPlan(submissionId: string): StatementPlan {
   return {
     sql: `SELECT ${ORDER_COLUMNS} FROM orders o
-      WHERE o.submission_id=? AND o.status IN ('paid','refunded')
+      WHERE o.submission_id=? AND o.status IN ('paid','refunding','refunded')
         AND o.outcome IN ('published','held','upgraded','relisted')
       ORDER BY o.paid_at DESC,o.id DESC LIMIT 1`,
     params: [submissionId]
@@ -302,20 +367,25 @@ export function selectSubmissionPaymentOrderPlan(submissionId: string): Statemen
 
 /**
  * Orders the hourly sweep looks at again: pending orders whose checkout should have finished
- * (`before`), and paid orders never applied (a crash between recording the payment and
- * applying it).
+ * (`before`); failed orders whose checkout might still have been paid (since `failedSince`,
+ * the provider's retry window); paid orders never applied (a crash between recording the
+ * payment and applying it); and claimed refunds a failure left unfinished.
  */
 export function selectOrdersToReconcilePlan(input: {
   before: string
+  failedSince: string
   limit: number
 }): StatementPlan {
   return {
     sql: `SELECT ${ORDER_COLUMNS} FROM orders o
       WHERE (o.status='pending' AND o.provider_checkout_id IS NOT NULL
           AND o.checkout_expires_at<?)
+        OR (o.status='failed' AND o.provider_checkout_id IS NOT NULL AND o.failed_at>=?
+          AND o.failed_at<?)
         OR (o.status='paid' AND o.applied_at IS NULL AND o.paid_at<?)
+        OR (o.status='refunding' AND o.refund_requested_at<?)
       ORDER BY o.created_at,o.id LIMIT ?`,
-    params: [input.before, input.before, input.limit]
+    params: [input.before, input.failedSince, input.before, input.before, input.before, input.limit]
   }
 }
 
@@ -568,7 +638,11 @@ export interface BillingOperations {
   openOrder(targetKey: string): Promise<OrderRecord | null>
   order(orderId: string): Promise<OrderRecord | null>
   orderByCheckout(provider: string, checkoutId: string): Promise<OrderRecord | null>
-  ordersToReconcile(input: { before: string; limit: number }): Promise<OrderRecord[]>
+  ordersToReconcile(input: {
+    before: string
+    failedSince: string
+    limit: number
+  }): Promise<OrderRecord[]>
   /** Paid submissions rejected as `other` whose refund isn't recorded yet, oldest first. */
   refundPendingSubmissions(limit: number): Promise<string[]>
   /** A rejected submission's category and reason. */

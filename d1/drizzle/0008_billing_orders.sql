@@ -28,11 +28,17 @@ CREATE TABLE `orders` (
 	`checkout_expires_at` text,
 	`provider_payment_id` text,
 	`provider_refund_id` text,
+	`charged_cents` integer,
+	`charged_currency` text,
+	`attention` text,
 	`status` text DEFAULT 'pending' NOT NULL,
 	`outcome` text,
 	`failure_reason` text,
 	`refund_reason` text,
 	`refunded_by` text,
+	`refund_listing_action` text,
+	`refund_badge_check_id` integer,
+	`refund_requested_at` text,
 	`paid_at` text,
 	`applied_at` text,
 	`refunded_at` text,
@@ -44,8 +50,11 @@ CREATE TABLE `orders` (
 	FOREIGN KEY (`listing_id`) REFERENCES `listings`(`id`) ON UPDATE no action ON DELETE no action,
 	CONSTRAINT "orders_kind_valid" CHECK("orders"."kind" IN ('paid_listing', 'paid_claim')),
 	CONSTRAINT "orders_purpose_valid" CHECK("orders"."purpose" IN ('submission', 'upgrade', 'relist', 'claim')),
-	CONSTRAINT "orders_status_valid" CHECK("orders"."status" IN ('pending', 'paid', 'refunded', 'failed')),
+	CONSTRAINT "orders_status_valid" CHECK("orders"."status" IN ('pending', 'paid', 'refunding', 'refunded', 'failed')),
 	CONSTRAINT "orders_outcome_valid" CHECK("orders"."outcome" IS NULL OR "orders"."outcome" IN ('published', 'held', 'upgraded', 'relisted', 'claimed', 'unapplied')),
+	CONSTRAINT "orders_refund_listing_action_valid" CHECK("orders"."refund_listing_action" IS NULL
+        OR "orders"."refund_listing_action" IN ('keep_free', 'unpublish', 'already_unpublished', 'none')),
+	CONSTRAINT "orders_attention_valid" CHECK("orders"."attention" IS NULL OR "orders"."attention" IN ('amount_mismatch', 'listing_update_failed')),
 	CONSTRAINT "orders_refund_reason_valid" CHECK("orders"."refund_reason" IS NULL OR "orders"."refund_reason" IN ('rejected', 'admin', 'unapplied')),
 	CONSTRAINT "orders_target_matches_purpose" CHECK(("orders"."purpose" = 'claim' AND "orders"."kind" = 'paid_claim'
         AND "orders"."claim_id" IS NOT NULL AND "orders"."listing_id" IS NOT NULL
@@ -59,9 +68,12 @@ CREATE TABLE `orders` (
 	CONSTRAINT "orders_amount_positive" CHECK("orders"."amount_cents" > 0),
 	CONSTRAINT "orders_currency_valid" CHECK("orders"."currency" GLOB '[a-z][a-z][a-z]'),
 	CONSTRAINT "orders_paid_recorded" CHECK("orders"."status" IN ('pending', 'failed')
-        OR ("orders"."paid_at" IS NOT NULL AND "orders"."provider_payment_id" IS NOT NULL)),
+        OR ("orders"."paid_at" IS NOT NULL AND "orders"."provider_payment_id" IS NOT NULL
+          AND "orders"."charged_cents" IS NOT NULL AND "orders"."charged_currency" IS NOT NULL)),
 	CONSTRAINT "orders_refund_recorded" CHECK(("orders"."status" = 'refunded') = ("orders"."refunded_at" IS NOT NULL)
-        AND ("orders"."refunded_at" IS NULL OR "orders"."refund_reason" IS NOT NULL)),
+        AND ("orders"."status" IN ('refunding', 'refunded')) = ("orders"."refund_reason" IS NOT NULL)
+        AND ("orders"."refund_reason" IS NULL) = ("orders"."refund_requested_at" IS NULL)
+        AND ("orders"."refund_reason" = 'admin') = ("orders"."refund_listing_action" IS NOT NULL)),
 	CONSTRAINT "orders_outcome_after_payment" CHECK(("orders"."outcome" IS NULL) = ("orders"."applied_at" IS NULL)
         AND ("orders"."applied_at" IS NULL OR "orders"."paid_at" IS NOT NULL)),
 	CONSTRAINT "orders_failed_recorded" CHECK(("orders"."status" = 'failed') = ("orders"."failed_at" IS NOT NULL))

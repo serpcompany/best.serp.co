@@ -23,9 +23,14 @@ export const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300
 export interface StripeConfig {
   /** `https://api.stripe.com`; a local Worker may point it at the end-to-end mock. */
   apiBase?: string
-  /** Stripe Tax (`automatic_tax`); off until tax is decided (#68). */
-  automaticTax?: boolean
+  /**
+   * The Stripe account events must come from (`acct_1RiT0QCp8si97z5s`): an event that names
+   * another account is ignored.
+   */
+  accountId?: string
   fetcher?: typeof fetch
+  /** Live mode (production) or test mode: an event or session of the other mode is refused. */
+  live: boolean
   now?: () => Date
   secretKey: string
   webhookSecret: string
@@ -192,7 +197,6 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
         'POST',
         '/v1/checkout/sessions',
         form({
-          'automatic_tax[enabled]': config.automaticTax === true ? 'true' : undefined,
           cancel_url: request.cancelUrl,
           client_reference_id: request.orderId,
           customer_email: request.customerEmail,
@@ -227,7 +231,22 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
       if (!/^cs_[A-Za-z0-9_]+$/u.test(checkoutId)) {
         throw new BillingProviderError('Not a Checkout Session id.', 'invalid_checkout', 400)
       }
-      return stripeCheckoutState(await call('GET', `/v1/checkout/sessions/${checkoutId}`))
+      const session = await call('GET', `/v1/checkout/sessions/${checkoutId}`)
+      if (session.livemode !== config.live) {
+        throw new BillingProviderError('The session is from the other mode.', 'mode_mismatch', 409)
+      }
+      return stripeCheckoutState(session)
+    },
+
+    async expireCheckout(checkoutId) {
+      if (!/^cs_[A-Za-z0-9_]+$/u.test(checkoutId)) return
+      try {
+        await call('POST', `/v1/checkout/sessions/${checkoutId}/expire`, form({}))
+      } catch (error) {
+        // Already complete or expired: nothing left to stop.
+        if (error instanceof BillingProviderError && error.status === 400) return
+        throw error
+      }
     },
 
     async refund(request) {
@@ -271,7 +290,11 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
       const id = text(event.id)
       const providerType = text(event.type)
       if (!id || !providerType) throw new BillingWebhookError('The event has no id or type.')
-      const type = CHECKOUT_EVENTS[providerType] ?? 'ignored'
+      // Another mode's or account's event is never acted on, whatever it names.
+      const foreign =
+        event.livemode !== config.live ||
+        (typeof event.account === 'string' && event.account !== config.accountId)
+      const type = foreign ? 'ignored' : (CHECKOUT_EVENTS[providerType] ?? 'ignored')
       const object = ((event.data as StripeObject | undefined)?.object ??
         null) as StripeObject | null
       if (type === 'ignored' || !object || object.object !== 'checkout.session') {

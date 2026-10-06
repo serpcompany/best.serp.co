@@ -1309,7 +1309,12 @@ export type OrderKind = (typeof orderKinds)[number]
 export const orderPurposes = ['submission', 'upgrade', 'relist', 'claim'] as const
 export type OrderPurpose = (typeof orderPurposes)[number]
 
-export const orderStatuses = ['pending', 'paid', 'refunded', 'failed'] as const
+/**
+ * `refunding`: the refund is claimed (a compare-and-swap from the status it was decided on)
+ * before the provider is asked, so nothing else can apply or refund the order meanwhile; the
+ * provider's answer then finalizes it as `refunded`. The sweep finishes one a failure left.
+ */
+export const orderStatuses = ['pending', 'paid', 'refunding', 'refunded', 'failed'] as const
 export type OrderStatus = (typeof orderStatuses)[number]
 
 /**
@@ -1330,6 +1335,22 @@ export type OrderOutcome = (typeof orderOutcomes)[number]
 /** Why an order was refunded: an `other` rejection, an admin's refund, or an unapplied payment. */
 export const orderRefundReasons = ['rejected', 'admin', 'unapplied'] as const
 export type OrderRefundReason = (typeof orderRefundReasons)[number]
+
+/**
+ * What an admin's refund does to the listing, decided (with the badge check at refund) before
+ * the refund is claimed, so a retry never checks the badge again.
+ */
+export const orderRefundListingActions = [
+  'keep_free',
+  'unpublish',
+  'already_unpublished',
+  'none'
+] as const
+export type OrderRefundListingAction = (typeof orderRefundListingActions)[number]
+
+/** Why an order needs an admin's attention. */
+export const orderAttentions = ['amount_mismatch', 'listing_update_failed'] as const
+export type OrderAttention = (typeof orderAttentions)[number]
 
 export const orders = sqliteTable(
   'orders',
@@ -1354,11 +1375,18 @@ export const orders = sqliteTable(
     checkoutExpiresAt: text('checkout_expires_at'),
     providerPaymentId: text('provider_payment_id'),
     providerRefundId: text('provider_refund_id'),
+    /** What the provider actually charged (the refund returns exactly this). */
+    chargedCents: integer('charged_cents'),
+    chargedCurrency: text('charged_currency'),
+    attention: text('attention', { enum: orderAttentions }),
     status: text('status', { enum: orderStatuses }).notNull().default('pending'),
     outcome: text('outcome', { enum: orderOutcomes }),
     failureReason: text('failure_reason'),
     refundReason: text('refund_reason', { enum: orderRefundReasons }),
     refundedBy: text('refunded_by'),
+    refundListingAction: text('refund_listing_action', { enum: orderRefundListingActions }),
+    refundBadgeCheckId: integer('refund_badge_check_id'),
+    refundRequestedAt: text('refund_requested_at'),
     paidAt: text('paid_at'),
     appliedAt: text('applied_at'),
     refundedAt: text('refunded_at'),
@@ -1373,6 +1401,15 @@ export const orders = sqliteTable(
     check(
       'orders_outcome_valid',
       sql`${table.outcome} IS NULL OR ${table.outcome} IN (${sqlList(orderOutcomes)})`
+    ),
+    check(
+      'orders_refund_listing_action_valid',
+      sql`${table.refundListingAction} IS NULL
+        OR ${table.refundListingAction} IN (${sqlList(orderRefundListingActions)})`
+    ),
+    check(
+      'orders_attention_valid',
+      sql`${table.attention} IS NULL OR ${table.attention} IN (${sqlList(orderAttentions)})`
     ),
     check(
       'orders_refund_reason_valid',
@@ -1395,12 +1432,15 @@ export const orders = sqliteTable(
     check(
       'orders_paid_recorded',
       sql`${table.status} IN ('pending', 'failed')
-        OR (${table.paidAt} IS NOT NULL AND ${table.providerPaymentId} IS NOT NULL)`
+        OR (${table.paidAt} IS NOT NULL AND ${table.providerPaymentId} IS NOT NULL
+          AND ${table.chargedCents} IS NOT NULL AND ${table.chargedCurrency} IS NOT NULL)`
     ),
     check(
       'orders_refund_recorded',
       sql`(${table.status} = 'refunded') = (${table.refundedAt} IS NOT NULL)
-        AND (${table.refundedAt} IS NULL OR ${table.refundReason} IS NOT NULL)`
+        AND (${table.status} IN ('refunding', 'refunded')) = (${table.refundReason} IS NOT NULL)
+        AND (${table.refundReason} IS NULL) = (${table.refundRequestedAt} IS NULL)
+        AND (${table.refundReason} = 'admin') = (${table.refundListingAction} IS NOT NULL)`
     ),
     check(
       'orders_outcome_after_payment',

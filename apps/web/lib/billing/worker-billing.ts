@@ -22,6 +22,9 @@ import { createStripeProvider } from './stripe'
  * test key, so staging can never charge a card.
  */
 
+/** SERP's Stripe account (#68): test mode on staging, live mode in production. */
+export const STRIPE_ACCOUNT_ID = 'acct_1RiT0QCp8si97z5s'
+
 export const STRIPE_SECRET_KEY_SECRET = 'STRIPE_SECRET_KEY'
 export const STRIPE_WEBHOOK_SECRET_SECRET = 'STRIPE_WEBHOOK_SECRET'
 
@@ -71,6 +74,11 @@ export function createBillingDependencies(input: {
   if (!stripeKeyAllowed(secretKey, env.D1_RUNTIME_ENV)) {
     throw new Error(`${STRIPE_SECRET_KEY_SECRET} is not a key for this environment.`)
   }
+  if (site.submissions.automaticTax) {
+    // Tax changes what Stripe charges, and the ledger refuses a charge that doesn't match the
+    // order (and refunds it), so Stripe Tax stays off until billing handles it.
+    throw new Error('Stripe Tax is not supported by billing yet.')
+  }
   const client = createDatabase(env.DB)
   const operations = createBillingOperations({ client })
   const badgeProgram = createBadgeProgramOperations({ client })
@@ -96,8 +104,9 @@ export function createBillingDependencies(input: {
     paidClaims: undefined,
     priceCents: site.submissions.paidListingPriceCents,
     provider: createStripeProvider({
+      accountId: STRIPE_ACCOUNT_ID,
       apiBase: stripeApiBase(env),
-      automaticTax: site.submissions.automaticTax,
+      live: env.D1_RUNTIME_ENV === 'production',
       secretKey,
       webhookSecret
     })
