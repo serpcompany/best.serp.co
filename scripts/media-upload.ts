@@ -16,7 +16,17 @@ import { safeFetch } from '@serpdirectory/data-ops/safe-fetch'
 import { nodeFetch } from '@serpdirectory/data-ops/safe-fetch-node'
 import { z } from 'zod'
 import { project } from './project'
-import { describeFetchError, getR2Object, putR2Object } from './r2-objects'
+import {
+  describeFetchError,
+  getR2Object,
+  type ListedObject,
+  listedMismatch,
+  listR2Objects,
+  md5Hex,
+  putR2Object,
+  type R2CallOptions,
+  systemClock
+} from './r2-objects'
 
 /**
  * Uploads a reviewed listing media plan (`d1/media/<id>.json`, serpcompany/best.serp.co#95) into
@@ -32,11 +42,15 @@ import { describeFetchError, getR2Object, putR2Object } from './r2-objects'
  * however the source changed since. Either way an object is uploaded only when its bytes,
  * SHA-256, format, and dimensions match the reviewed plan.
  *
- * An object already in the target bucket is read back through the R2 API and verified the same
- * way: a match is skipped (`present`), so a rerun only finishes what is missing; a mismatch fails
- * that key (`present_mismatch`) and is never overwritten, since something else wrote it (#97
- * review B2). Keys outside `best.serp.co/listings/` are refused: the production bucket is shared
- * with serp.co.
+ * What the target bucket already holds is found with the R2 list API, 1,000 objects per request
+ * (#95 release blocker 3: one verification GET per object spent the API's rate limit before the
+ * missing objects were reached). A listed object is verified, never trusted: its size, its ETag,
+ * which R2 computes as the MD5 of the stored bytes, its type, and its cache policy must match the
+ * plan, whose `md5` and `sha256` were both taken from the same reviewed bytes. A match is skipped
+ * (`present`), so a rerun only finishes what is missing; a mismatch fails that key
+ * (`present_mismatch`) and is never overwritten, since something else wrote it (#97 review B2).
+ * Every API call shares one rate limiter and retries 429s (`r2-objects.ts`). Keys outside
+ * `best.serp.co/listings/` are refused: the production bucket is shared with serp.co.
  */
 
 export type UploadTarget = 'production' | 'staging'
@@ -70,6 +84,8 @@ export const uploadTargets: Readonly<
 }
 
 const sha256Pattern = /^[0-9a-f]{64}$/u
+/** Fetches of one source before its object is reported failed. */
+const SOURCE_ATTEMPTS = 3
 const publicDirectory = resolve(project.appDirectory, 'public')
 
 const planObject = z
@@ -80,6 +96,8 @@ const planObject = z
     key: z
       .string()
       .refine(isListingMediaKey, { message: `Keys live under ${MEDIA_SITE}/listings/.` }),
+    /** The MD5 of the same bytes: R2's ETag, so a listed object is verified without a GET. */
+    md5: z.string().regex(/^[0-9a-f]{32}$/u),
     sha256: z.string().regex(sha256Pattern),
     source: z.string().refine(value => value.startsWith('https://') || value.startsWith('repo:'), {
       message: 'A source is an https URL or a repo: path.'
@@ -197,10 +215,18 @@ async function sourceBytes(
 }
 
 /** Why fetched bytes are not the reviewed object, or null when they are. */
-export function verifyObject(object: MediaPlanObject, body: Uint8Array): string | null {
+/**
+ * Why `body` is not the reviewed object, or null when it is. `md5` is checked when the object
+ * names one (a plan object always does; a manifest image, read back by the publisher, does not).
+ */
+export function verifyObject(
+  object: Omit<MediaPlanObject, 'md5' | 'source'> & { md5?: string },
+  body: Uint8Array
+): string | null {
   if (body.byteLength !== object.bytes) return `bytes ${body.byteLength} != ${object.bytes}`
   const digest = createHash('sha256').update(body).digest('hex')
   if (digest !== object.sha256) return 'sha256_mismatch'
+  if (object.md5 !== undefined && md5Hex(body) !== object.md5) return 'md5_mismatch'
   const sniffed = sniffImage(body)
   if (!sniffed.ok) return sniffed.reason
   if (IMAGE_CONTENT_TYPES[sniffed.format] !== object.contentType) return 'content_type_mismatch'
@@ -212,6 +238,8 @@ export function verifyObject(object: MediaPlanObject, body: Uint8Array): string 
 
 export interface UploadOptions {
   concurrency?: number
+  /** The rate limiter and retry clock for every R2 call (tests pass fakes). */
+  r2?: R2CallOptions
   dryRun?: boolean
   env?: NodeJS.ProcessEnv
   fetcher?: typeof fetch
@@ -234,30 +262,53 @@ export async function uploadMediaPlan(
     requireEnvironment(env, 'CLOUDFLARE_API_TOKEN')
   }
 
+  const r2 = options.r2 ?? {}
+  // One listing of the bucket finds what is already there (a few API calls, not one per object).
+  const listed: Map<string, ListedObject> | null = options.dryRun
+    ? null
+    : await listR2Objects(target.bucket, `${MEDIA_SITE}/listings/`, env, api, r2)
+  if (listed)
+    console.error(`${target.bucket}: ${listed.size} objects listed under ${MEDIA_SITE}/listings/`)
+
   async function handle(object: MediaPlanObject): Promise<ObjectOutcome> {
-    if (!options.dryRun) {
+    const existing = listed?.get(object.key)
+    if (existing) {
       // What the bucket already holds is verified, never trusted or overwritten (#97 B2).
-      const existing = await getR2Object(target.bucket, object.key, env, api)
-      if (existing) {
-        const mismatch = verifyObject(object, existing)
-        return mismatch
-          ? { key: object.key, reason: `present_mismatch:${mismatch}`, status: 'failed' }
-          : { key: object.key, status: 'present' }
-      }
+      const mismatch = listedMismatch(object, existing, MEDIA_CACHE_CONTROL)
+      return mismatch
+        ? { key: object.key, reason: `present_mismatch:${mismatch}`, status: 'failed' }
+        : { key: object.key, status: 'present' }
     }
     // Production copies staging's verified object; staging fetches the recorded source.
-    const body =
-      options.target === 'production'
-        ? ((await getR2Object(uploadTargets.staging.bucket, object.key, env, api)) ?? {
-            reason: 'not_in_staging_bucket'
-          })
-        : await sourceBytes(object.source, options.fetcher)
-    if (!(body instanceof Uint8Array))
-      return { key: object.key, reason: body.reason, status: 'failed' }
-    const mismatch = verifyObject(object, body)
-    if (mismatch) return { key: object.key, reason: mismatch, status: 'failed' }
+    let body: Uint8Array | { reason: string } = { reason: 'not_fetched' }
+    let mismatch: string | null = null
+    // A source is fetched up to three times: a timeout, or a CDN that alternates encodings,
+    // often answers with the reviewed bytes on the next try. Staging's bucket is read once.
+    const tries = options.target === 'production' ? 1 : SOURCE_ATTEMPTS
+    for (let attempt = 1; attempt <= tries; attempt += 1) {
+      if (attempt > 1) await (r2.clock ?? systemClock).sleep(2000 * (attempt - 1))
+      body =
+        options.target === 'production'
+          ? ((await getR2Object(uploadTargets.staging.bucket, object.key, env, api, r2)) ?? {
+              reason: 'not_in_staging_bucket'
+            })
+          : await sourceBytes(object.source, options.fetcher)
+      mismatch = body instanceof Uint8Array ? verifyObject(object, body) : body.reason
+      if (!mismatch) break
+    }
+    if (mismatch || !(body instanceof Uint8Array)) {
+      return { key: object.key, reason: mismatch ?? 'not_fetched', status: 'failed' }
+    }
     if (options.dryRun) return { key: object.key, status: 'verified' }
-    const failure = await putR2Object(object, body, target.bucket, MEDIA_CACHE_CONTROL, env, api)
+    const failure = await putR2Object(
+      object,
+      body,
+      target.bucket,
+      MEDIA_CACHE_CONTROL,
+      env,
+      api,
+      r2
+    )
     return failure
       ? { key: object.key, reason: failure, status: 'failed' }
       : { key: object.key, status: 'uploaded' }
@@ -272,6 +323,14 @@ export async function uploadMediaPlan(
       } catch (error) {
         const reason = describeFetchError(error).slice(0, 200)
         outcomes.push({ key: object.key, reason, status: 'failed' })
+      }
+      // Progress in the log, so a run the job timeout stops still shows how far it got.
+      if (outcomes.length % 250 === 0 || outcomes.length === plan.objects.length) {
+        const count = (status: ObjectOutcome['status']) =>
+          outcomes.filter(outcome => outcome.status === status).length
+        console.error(
+          `${outcomes.length}/${plan.objects.length}: ${count('present')} present, ${count('uploaded')} uploaded, ${count('verified')} verified, ${count('failed')} failed`
+        )
       }
     }
   })
