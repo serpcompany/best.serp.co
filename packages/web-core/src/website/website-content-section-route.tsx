@@ -6,6 +6,13 @@ interface WebsiteContentSectionRouteProps {
   website: WebsiteMetadata
 }
 
-export function WebsiteContentSectionRoute({ website }: WebsiteContentSectionRouteProps) {
-  return <SharedWebsiteContentSection website={website} mdxComponents={components} />
+export function WebsiteContentSectionRoute({
+  website,
+}: WebsiteContentSectionRouteProps) {
+  return (
+    <SharedWebsiteContentSection
+      website={website}
+      mdxComponents={components}
+    />
+  )
 }

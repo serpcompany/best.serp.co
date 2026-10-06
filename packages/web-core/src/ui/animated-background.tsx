@@ -1,103 +1,103 @@
-'use client'
+'use client';
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react';
 
 export function AnimatedBackground() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     const setCanvasSize = () => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
-    }
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
 
-    setCanvasSize()
-    window.addEventListener('resize', setCanvasSize)
+    setCanvasSize();
+    window.addEventListener('resize', setCanvasSize);
 
-    let isDark = document.documentElement.classList.contains('dark')
+    let isDark = document.documentElement.classList.contains('dark');
 
-    const themeObserver = new MutationObserver(mutations => {
+    const themeObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.attributeName === 'class') {
-          isDark = document.documentElement.classList.contains('dark')
+          isDark = document.documentElement.classList.contains('dark');
         }
       }
-    })
+    });
 
     themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['class']
-    })
+      attributeFilter: ['class'],
+    });
 
     class Particle {
-      x: number
-      y: number
-      size: number
-      speedX: number
-      speedY: number
-      opacity: number
+      x: number;
+      y: number;
+      size: number;
+      speedX: number;
+      speedY: number;
+      opacity: number;
 
       constructor() {
-        this.x = Math.random() * (canvas?.width ?? 800)
-        this.y = Math.random() * (canvas?.height ?? 600)
-        this.size = Math.random() * 1.5 + 0.5
-        this.speedX = (Math.random() - 0.5) * 0.2
-        this.speedY = (Math.random() - 0.5) * 0.2
-        this.opacity = Math.random() * 0.2 + 0.05
+        this.x = Math.random() * (canvas?.width ?? 800);
+        this.y = Math.random() * (canvas?.height ?? 600);
+        this.size = Math.random() * 1.5 + 0.5;
+        this.speedX = (Math.random() - 0.5) * 0.2;
+        this.speedY = (Math.random() - 0.5) * 0.2;
+        this.opacity = Math.random() * 0.2 + 0.05;
       }
 
       update() {
-        this.x += this.speedX
-        this.y += this.speedY
+        this.x += this.speedX;
+        this.y += this.speedY;
 
-        if (this.x > (canvas?.width ?? 800)) this.x = 0
-        if (this.x < 0) this.x = canvas?.width ?? 800
-        if (this.y > (canvas?.height ?? 600)) this.y = 0
-        if (this.y < 0) this.y = canvas?.height ?? 600
+        if (this.x > (canvas?.width ?? 800)) this.x = 0;
+        if (this.x < 0) this.x = canvas?.width ?? 800;
+        if (this.y > (canvas?.height ?? 600)) this.y = 0;
+        if (this.y < 0) this.y = canvas?.height ?? 600;
       }
 
       draw() {
-        if (!ctx) return
-        const rgb = isDark ? '255, 255, 255' : '0, 0, 0'
-        ctx.fillStyle = `rgba(${rgb}, ${this.opacity})`
-        ctx.beginPath()
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-        ctx.fill()
+        if (!ctx) return;
+        const rgb = isDark ? '255, 255, 255' : '0, 0, 0';
+        ctx.fillStyle = `rgba(${rgb}, ${this.opacity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
 
-    const particles: Particle[] = []
-    const particleCount = 30
+    const particles: Particle[] = [];
+    const particleCount = 30;
     for (let index = 0; index < particleCount; index += 1) {
-      particles.push(new Particle())
+      particles.push(new Particle());
     }
 
-    let animationId: number
+    let animationId: number;
     const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      particles.forEach(particle => {
-        particle.update()
-        particle.draw()
-      })
+      particles.forEach((particle) => {
+        particle.update();
+        particle.draw();
+      });
 
-      animationId = requestAnimationFrame(animate)
-    }
+      animationId = requestAnimationFrame(animate);
+    };
 
-    animate()
+    animate();
 
     return () => {
-      window.removeEventListener('resize', setCanvasSize)
-      themeObserver.disconnect()
-      cancelAnimationFrame(animationId)
-    }
-  }, [])
+      window.removeEventListener('resize', setCanvasSize);
+      themeObserver.disconnect();
+      cancelAnimationFrame(animationId);
+    };
+  }, []);
 
   return (
     <div className="absolute inset-0 -z-10 overflow-hidden">
@@ -108,7 +108,7 @@ export function AnimatedBackground() {
             linear-gradient(to right, currentColor 1px, transparent 1px),
             linear-gradient(to bottom, currentColor 1px, transparent 1px)
           `,
-          backgroundSize: '60px 60px'
+          backgroundSize: '60px 60px',
         }}
       />
 
@@ -122,5 +122,5 @@ export function AnimatedBackground() {
 
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/30 to-background pointer-events-none" />
     </div>
-  )
+  );
 }

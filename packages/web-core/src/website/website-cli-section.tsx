@@ -18,7 +18,10 @@ export interface WebsiteCliSectionProps {
   }
 }
 
-export function WebsiteCliSection({ website, slots: { CopyButton } }: WebsiteCliSectionProps) {
+export function WebsiteCliSection({
+  website,
+  slots: { CopyButton },
+}: WebsiteCliSectionProps) {
   const cliInstall = siteContent.listingCliInstall
 
   if (!cliInstall) {

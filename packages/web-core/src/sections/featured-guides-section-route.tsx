@@ -7,8 +7,13 @@ interface FeaturedGuidesSectionRouteProps {
   guides: GuideMetadata[]
 }
 
-export function FeaturedGuidesSectionRoute({ guides }: FeaturedGuidesSectionRouteProps) {
+export function FeaturedGuidesSectionRoute({
+  guides,
+}: FeaturedGuidesSectionRouteProps) {
   return (
-    <SharedFeaturedGuidesSection guides={guides} slots={{ GuideCard: GuideCardRoute, Section }} />
+    <SharedFeaturedGuidesSection
+      guides={guides}
+      slots={{ GuideCard: GuideCardRoute, Section }}
+    />
   )
 }

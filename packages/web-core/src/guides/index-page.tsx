@@ -33,7 +33,7 @@ export function GuidesIndexPage({
   emptyState,
   guideCard,
   guides,
-  jsonLd
+  jsonLd,
 }: GuidesIndexPageProps) {
   return (
     <div className="container mx-auto py-8">

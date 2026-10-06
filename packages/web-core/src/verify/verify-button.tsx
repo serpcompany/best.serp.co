@@ -24,7 +24,7 @@ export function VerifyButton({ token, verifyEndpoint }: VerifyButtonProps) {
       const response = await fetch(verifyEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
+        body: JSON.stringify({ token }),
       })
 
       const data = (await response.json()) as {
@@ -75,7 +75,9 @@ export function VerifyButton({ token, verifyEndpoint }: VerifyButtonProps) {
         </div>
         <p className="text-sm text-muted-foreground">
           Make sure the badge is visible on your homepage and the{' '}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">data-verify-token</code>{' '}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+            data-verify-token
+          </code>{' '}
           attribute matches exactly. Then try again.
         </p>
         <button

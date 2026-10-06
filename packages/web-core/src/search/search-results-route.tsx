@@ -21,7 +21,7 @@ export function SearchResultsRoute() {
       slots={{
         EmptyState,
         SearchFilters,
-        WebsitesListWithSort: WebsitesListWithSortRoute
+        WebsitesListWithSort: WebsitesListWithSortRoute,
       }}
     />
   )
