@@ -12,6 +12,17 @@ export interface WebsiteFaqsSectionProps {
 }
 
 /**
+ * The FAQs the section shows: those the listing's long description doesn't already contain.
+ * The one-time import stored every imported FAQ twice, in `listing_faqs` and as a heading in the
+ * long description (335 listings, 2,254 FAQs, all verbatim), so showing both would repeat them
+ * on the page. Submitters' FAQs aren't in the description, so they all show.
+ */
+export function faqsToShow(faqs: readonly WebsiteFaq[] | undefined, content: string | undefined) {
+  const text = content ?? ''
+  return (faqs ?? []).filter(faq => !text.includes(faq.question))
+}
+
+/**
  * The listing's FAQs (#105): the owner-approved questions and answers from D1, in a stock shadcn
  * Accordion inside the same card as the Links section. Nothing renders when there are none.
  * Answers stay in the HTML while closed (`forceMount`, hidden by CSS until opened), so the page

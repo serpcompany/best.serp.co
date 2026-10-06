@@ -1,7 +1,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { WebsiteFaqsSection } from './website-faqs-section'
+import { faqsToShow, WebsiteFaqsSection } from './website-faqs-section'
 
 // This package's tests compile JSX with the classic runtime, which reads a global React.
 Object.assign(globalThis, { React })
@@ -34,5 +34,16 @@ describe('listing FAQs (#105)', () => {
     // Closed, and hidden by the item's CSS rather than left out.
     expect(html).toContain('data-slot="accordion-content"')
     expect(html).toContain('[&amp;_[data-slot=accordion-content][data-state=closed]]:hidden')
+  })
+
+  it('leaves out FAQs the long description already contains (the import repeats them there)', () => {
+    const faqs = [
+      { answer: 'From the import.', question: 'How do I download a video?' },
+      { answer: 'Added by the owner.', question: 'Is there a mobile app?' }
+    ]
+    const content = '## FAQ\n\n### How do I download a video?\nPaste the link.'
+    expect(faqsToShow(faqs, content)).toEqual([faqs[1]])
+    expect(faqsToShow(faqs, undefined)).toEqual(faqs)
+    expect(faqsToShow(undefined, content)).toEqual([])
   })
 })

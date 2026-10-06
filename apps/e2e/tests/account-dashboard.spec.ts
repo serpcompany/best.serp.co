@@ -569,7 +569,12 @@ test('shows and acts on the user’s own records only, never cached or indexed',
 })
 
 /** A live listing owned by `ownerEmail`'s account, with these FAQs, as an approval leaves it. */
-function seedOwnedListing(label: string, ownerEmail: string, faqs: Array<[string, string]>) {
+function seedOwnedListing(
+  label: string,
+  ownerEmail: string,
+  faqs: Array<[string, string]>,
+  content = ''
+) {
   const id = `e2e-faqs-${label}-${unique()}`
   const slug = `${id}.example`
   const [owner] = localD1<{ id: string }>(`SELECT id FROM users WHERE email = ${q(ownerEmail)}`)
@@ -577,7 +582,7 @@ function seedOwnedListing(label: string, ownerEmail: string, faqs: Array<[string
     INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
       source_kind, source_identity, checksum, source, link_rel)
     VALUES (${q(id)}, ${q(slug)}, ${q(`FAQ ${label}`)}, 'A listing for the FAQ section.',
-      ${q(`https://${slug}/`)}, '', 'draft', '2026-09-01', 'verified-submission', ${q(id)},
+      ${q(`https://${slug}/`)}, ${q(content)}, 'draft', '2026-09-01', 'verified-submission', ${q(id)},
       ${q(`e2e-${id}`)}, 'submission', 'nofollow');
     INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
       SELECT ${q(id)}, id, 0, 1 FROM categories WHERE slug = ${q(activeCategory())};
@@ -609,6 +614,13 @@ test('listing pages show approved FAQs, none without, and an approved FAQ revisi
     ['Which banks can I connect?', 'Most US banks and credit unions.']
   ])
   const without = seedOwnedListing('without', owner.email, [])
+  // As the one-time import stored them: each FAQ also a heading in the long description.
+  const imported = seedOwnedListing(
+    'imported',
+    owner.email,
+    [['How do I export a report?', 'From the Reports page.']],
+    '## FAQ\n\n### How do I export a report?\n\nFrom the Reports page.'
+  )
   const visitor = await playwrightRequest.newContext({ baseURL })
   try {
     // With FAQs: the section, every question, and the answers (in the HTML while closed).
@@ -627,6 +639,10 @@ test('listing pages show approved FAQs, none without, and an approved FAQ revisi
     expect(await (await visitor.get(`/products/${without.slug}/`)).text()).not.toContain(
       'id="faqs"'
     )
+    // FAQs the long description already shows aren't repeated in a section.
+    const importedHtml = await (await visitor.get(`/products/${imported.slug}/`)).text()
+    expect(importedHtml).toContain('How do I export a report?')
+    expect(importedHtml).not.toContain('id="faqs"')
 
     // The page in a browser: questions as an Accordion, an answer shown when opened.
     const page = await (await browser.newContext({ baseURL })).newPage()

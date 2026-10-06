@@ -13,6 +13,7 @@ import { generateWebsiteDetailSchema } from '../schema'
 import { generateDynamicMetadata } from '../seo-config'
 import { siteConfig } from '../site-config'
 import { siteCopy } from '../site-copy'
+import { faqsToShow } from '../website/website-faqs-section'
 
 type JsonLdProps = {
   data: Record<string, unknown>
@@ -213,7 +214,7 @@ export function WebsiteDetailRoutePage({
 
               <WebsiteResourcesSection website={resourcesWebsite} />
 
-              <WebsiteFaqsSection website={{ faqs: project.faqs }} />
+              <WebsiteFaqsSection website={{ faqs: faqsToShow(project.faqs, project.content) }} />
             </div>
 
             <div className="lg:col-span-4">
