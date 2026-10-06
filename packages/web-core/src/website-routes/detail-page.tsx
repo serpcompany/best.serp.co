@@ -27,7 +27,7 @@ type LogoOnlyMedia = {
 
 type WebsiteHeroWebsite = Pick<
   WebsiteDetailMetadata,
-  'description' | 'isUnofficial' | 'name' | 'slug' | 'website'
+  'description' | 'isUnofficial' | 'name' | 'slug' | 'verifiedOwner' | 'website'
 > &
   LogoOnlyMedia
 
@@ -42,7 +42,7 @@ type WebsiteHeroProps = {
 
 type WebsiteDetailSidebarWebsite = Pick<
   WebsiteDetailMetadata,
-  'category' | 'categories' | 'name' | 'publishedAt' | 'slug' | 'website'
+  'category' | 'categories' | 'name' | 'publishedAt' | 'slug' | 'verifiedOwner' | 'website'
 > &
   Required<Pick<WebsiteDetailMetadata, 'linkRel'>>
 
@@ -173,6 +173,7 @@ export function WebsiteDetailRoutePage({
     description: project.description,
     website: project.website,
     ...(project.isUnofficial !== undefined ? { isUnofficial: project.isUnofficial } : {}),
+    ...(project.verifiedOwner ? { verifiedOwner: true as const } : {}),
     ...(logoMedia ? { media: logoMedia } : {})
   }
   const sidebarWebsite: WebsiteDetailSidebarWebsite = {
@@ -183,6 +184,7 @@ export function WebsiteDetailRoutePage({
     linkRel: project.linkRel ?? 'nofollow',
     category: project.category,
     publishedAt: project.publishedAt,
+    ...(project.verifiedOwner ? { verifiedOwner: true as const } : {}),
     ...(project.categories?.length ? { categories: project.categories } : {})
   }
   const resourcesWebsite: WebsiteResourcesSectionWebsite = {

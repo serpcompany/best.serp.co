@@ -232,6 +232,30 @@ export const applicationColumnInventory = {
   listing_revision_faqs: ['id', 'revision_id', 'question', 'answer', 'sort_order'],
   listing_revision_events: ['id', 'revision_id', 'event_type', 'detail', 'actor', 'created_at'],
   badge_checks: ['id', 'listing_id', 'checked_at', 'outcome', 'reason', 'conclusive', 'kind'],
+  listing_claims: [
+    'id',
+    'listing_id',
+    'user_id',
+    'method',
+    'status',
+    'email',
+    'email_domain',
+    'product_url',
+    'listing_website',
+    'code_hash',
+    'code_sent_at',
+    'code_expires_at',
+    'codes_sent',
+    'attempts',
+    'locked_until',
+    'email_verified_at',
+    'badge_checked_at',
+    'badge_attempts',
+    'completed_at',
+    'created_at',
+    'updated_at'
+  ],
+  listing_claim_holds: ['listing_id', 'reason', 'source', 'created_at', 'cleared_at', 'cleared_by'],
   listing_events: ['id', 'listing_id', 'event_type', 'detail', 'actor', 'created_at'],
   media_ingestions: [
     'id',
@@ -265,7 +289,8 @@ export const applicationTableNames = Object.keys(
 
 /**
  * Tables written at runtime: Better Auth and its sign-in limits (#60), the transactional email
- * ledger (#71), and the media ingestion queue (#95). They belong to the exact schema inventory,
+ * ledger (#71), the media ingestion queue (#95), and claim holds (#67: seeded by migration from
+ * the live catalog, then cleared by admins). They belong to the exact schema inventory,
  * but not to bootstrap parity: the import never writes them, and a database that has served a
  * sign-in, sent an email, or ingested an image (local preview, Playwright, a deployed Worker)
  * holds rows.
@@ -277,7 +302,8 @@ export const runtimeTableNames = [
   'verification',
   'auth_rate_limit_hits',
   'email_deliveries',
-  'media_ingestions'
+  'media_ingestions',
+  'listing_claim_holds'
 ] as const satisfies readonly ApplicationTableName[]
 
 export type ParityTableName = Exclude<ApplicationTableName, (typeof runtimeTableNames)[number]>
@@ -319,6 +345,8 @@ export const importOrder: ApplicationTableName[] = [
   'listing_revision_faqs',
   'listing_revision_events',
   'badge_checks',
+  'listing_claims',
+  'listing_claim_holds',
   'listing_events',
   'media_ingestions'
 ]

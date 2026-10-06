@@ -33,7 +33,7 @@ import {
   type SessionSnapshot,
   type SessionUser
 } from './guards'
-import { deriveKey, RATE_LIMIT_KEY_LABEL } from './keys'
+import { CLAIM_CODE_KEY_LABEL, deriveKey, RATE_LIMIT_KEY_LABEL } from './keys'
 import { SIGN_IN_CODE_TEMPLATE_ID, selectOtpSender } from './otp-sender'
 import {
   AuthConfigurationError,
@@ -270,4 +270,9 @@ export async function consumeRequestRateLimit(
   rules: readonly AuthRateLimitRule[]
 ): Promise<AuthRateLimitDecision> {
   return (await getAccountRuntime()).operations.consumeRateLimit(rules)
+}
+
+/** The key claim codes (#67) are hashed under, derived from the auth secret. */
+export async function claimCodeKey(): Promise<string> {
+  return deriveKey((await getAccountRuntime()).settings.secret, CLAIM_CODE_KEY_LABEL)
 }

@@ -1,0 +1,56 @@
+CREATE TABLE `listing_claim_holds` (
+	`listing_id` text PRIMARY KEY NOT NULL,
+	`reason` text NOT NULL,
+	`source` text NOT NULL,
+	`created_at` text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	`cleared_at` text,
+	`cleared_by` text,
+	FOREIGN KEY (`listing_id`) REFERENCES `listings`(`id`) ON UPDATE no action ON DELETE cascade,
+	CONSTRAINT "listing_claim_holds_reason_valid" CHECK("reason" IN ('off_domain', 'unreachable', 'admin')),
+	CONSTRAINT "listing_claim_holds_cleared_at_iso" CHECK("cleared_at" IS strftime('%Y-%m-%dT%H:%M:%fZ', "cleared_at")),
+	CONSTRAINT "listing_claim_holds_cleared_complete" CHECK(("cleared_at" IS NULL) = ("cleared_by" IS NULL))
+) STRICT;
+--> statement-breakpoint
+CREATE TABLE `listing_claims` (
+	`id` text PRIMARY KEY NOT NULL,
+	`listing_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`method` text NOT NULL,
+	`status` text DEFAULT 'code_sent' NOT NULL,
+	`email` text NOT NULL,
+	`email_domain` text NOT NULL,
+	`product_url` text NOT NULL,
+	`listing_website` text NOT NULL,
+	`code_hash` text,
+	`code_sent_at` text NOT NULL,
+	`code_expires_at` text NOT NULL,
+	`codes_sent` integer DEFAULT 1 NOT NULL,
+	`attempts` integer DEFAULT 0 NOT NULL,
+	`locked_until` text,
+	`email_verified_at` text,
+	`badge_checked_at` text,
+	`badge_attempts` integer DEFAULT 0 NOT NULL,
+	`completed_at` text,
+	`created_at` text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	`updated_at` text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	FOREIGN KEY (`listing_id`) REFERENCES `listings`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE restrict,
+	CONSTRAINT "listing_claims_method_valid" CHECK("method" IN ('badge', 'paid')),
+	CONSTRAINT "listing_claims_status_valid" CHECK("status" IN ('code_sent', 'email_verified', 'completed', 'cancelled')),
+	CONSTRAINT "listing_claims_attempts_range" CHECK("attempts" BETWEEN 0 AND 5),
+	CONSTRAINT "listing_claims_codes_sent_positive" CHECK("codes_sent" >= 1),
+	CONSTRAINT "listing_claims_badge_attempts_range" CHECK("badge_attempts" BETWEEN 0 AND 10),
+	CONSTRAINT "listing_claims_code_sent_at_iso" CHECK("code_sent_at" IS strftime('%Y-%m-%dT%H:%M:%fZ', "code_sent_at")),
+	CONSTRAINT "listing_claims_code_expires_at_iso" CHECK("code_expires_at" IS strftime('%Y-%m-%dT%H:%M:%fZ', "code_expires_at")),
+	CONSTRAINT "listing_claims_locked_until_iso" CHECK("locked_until" IS strftime('%Y-%m-%dT%H:%M:%fZ', "locked_until")),
+	CONSTRAINT "listing_claims_email_verified_at_iso" CHECK("email_verified_at" IS strftime('%Y-%m-%dT%H:%M:%fZ', "email_verified_at")),
+	CONSTRAINT "listing_claims_badge_checked_at_iso" CHECK("badge_checked_at" IS strftime('%Y-%m-%dT%H:%M:%fZ', "badge_checked_at")),
+	CONSTRAINT "listing_claims_completed_at_iso" CHECK("completed_at" IS strftime('%Y-%m-%dT%H:%M:%fZ', "completed_at")),
+	CONSTRAINT "listing_claims_code_while_sent" CHECK("code_hash" IS NULL OR "status" = 'code_sent'),
+	CONSTRAINT "listing_claims_verified_complete" CHECK("status" NOT IN ('email_verified', 'completed') OR "email_verified_at" IS NOT NULL),
+	CONSTRAINT "listing_claims_completed_complete" CHECK(("status" = 'completed') = ("completed_at" IS NOT NULL))
+) STRICT;
+--> statement-breakpoint
+CREATE UNIQUE INDEX `listing_claims_open_idx` ON `listing_claims` (`listing_id`,`user_id`) WHERE "listing_claims"."status" IN ('code_sent', 'email_verified');--> statement-breakpoint
+CREATE INDEX `listing_claims_listing_idx` ON `listing_claims` (`listing_id`);--> statement-breakpoint
+CREATE INDEX `listing_claims_user_idx` ON `listing_claims` (`user_id`,`created_at`);
