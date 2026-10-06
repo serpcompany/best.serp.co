@@ -40,6 +40,8 @@ export interface CheckedListing {
 
 export interface Classification {
   class: DomainClass
+  /** Which trace decided: the listing's link, or its own domain fetched directly. */
+  source?: 'own-domain'
   /** Short evidence: why, in a few words. */
   reason: string
   /** The marker that matched (a term, a host, a fingerprint), at most 80 characters. */
@@ -176,6 +178,11 @@ export const GAMBLING_TERMS: readonly Marker[] = [
   term('taruhan'),
   term('agen bola'),
   term('link alternatif'),
+  term('link resmi'),
+  // Soccer-streaming piracy that runs betting ads on hijacked domains (#104 review).
+  term('xoilac', 'xoilac[a-z0-9]*'),
+  term('xôi lạc'),
+  term('90phut'),
   term('live casino'),
   term('online casino'),
   term('casino online'),
@@ -200,7 +207,8 @@ export const GAMBLING_TERMS: readonly Marker[] = [
   term('bắn cá'),
   term('game bài'),
   term('casino trực tuyến'),
-  // Operators seen on hijacked domains.
+  // Operators seen on hijacked domains (names of three characters or fewer, such as m88, are
+  // left out: they turn up in chord names and model numbers).
   ...[
     '1xbet',
     '8xbet',
@@ -220,16 +228,15 @@ export const GAMBLING_TERMS: readonly Marker[] = [
     '789bet',
     'mb66',
     'fb88',
-    'w88',
     'fun88',
-    'bk8',
-    'm88',
     'sv388',
     'ae888',
     'okvip',
     'dafabet',
     'cmd368',
-    'parimatch'
+    'parimatch',
+    'betwin188',
+    'gerbangwin'
   ].map(brand => term(brand))
 ]
 
@@ -326,7 +333,9 @@ export const PARKING_HOSTS: ReadonlySet<string> = new Set([
   'domainnamesales.com',
   'name.com',
   'namesilo.com',
-  'hostinger.com'
+  'hostinger.com',
+  'expireddomains.com',
+  'expireddomains.net'
 ])
 
 /** "For sale" and "parked" in a page's title, heading, or description. */
@@ -379,8 +388,37 @@ function prominentText(page: PageSignals): string {
 }
 
 /**
+ * What a visitor reads on a page, including ad image and link labels: the text without scripts,
+ * styles, and comments, plus `alt`, `title`, and `aria-label` values. Class names and bundles
+ * (`.slot[data-large-columns]`, Radix `data-slot`) never count.
+ */
+export function visibleWords(html: string): string {
+  const cleaned = html
+    .slice(0, 2_000_000)
+    .replace(/<!--[\s\S]*?-->/gu, ' ')
+    .replace(/<(script|style|noscript|template|svg)\b[\s\S]*?<\/\1\s*>/giu, ' ')
+  const labels = [
+    ...cleaned.matchAll(/\s(?:alt|title|aria-label)\s*=\s*(?:"([^"]*)"|'([^']*)')/giu)
+  ].map(match => match[1] ?? match[2] ?? '')
+  return `${cleaned.replace(/<[^>]+>/gu, ' ')} ${labels.join(' ')}`.replace(/\s+/gu, ' ')
+}
+
+/** Gambling markers in what a page shows (ads included), and how often it says "slot". */
+export function markupSignals(html: string): { markers: string[]; slots: number } {
+  const words = visibleWords(html)
+  return {
+    markers: matches([...GAMBLING_TERMS, ...SPAM_TERMS], words).map(marker => marker.id),
+    slots: (words.match(/(?<![\p{L}\p{N}])slots?(?![\p{L}\p{N}])/giu) ?? []).length
+  }
+}
+
+/** Off the listing's domain, a page carrying this many "slot" mentions is a slot-ad page. */
+const SLOT_AD_PAGE = 30
+
+/**
  * Gambling or spam: a prominent phrase backed by a second one, four anywhere, one in the host
- * name backed by the page, or, off the listing's domain, one backed by three gambling-SEO words.
+ * name backed by the page, or, off the listing's domain, one backed by three gambling-SEO words,
+ * two in the markup (betting ads), or a page full of slot ads.
  */
 export function gamblingSignal(
   page: PageSignals,
@@ -407,6 +445,15 @@ export function gamblingSignal(
     return { marker: inHost[0]?.id ?? '', where: 'host and page' }
   if (offDomain && anywhere.length >= 1 && matches(GAMBLING_SEO_WORDS, everywhere).length >= 3)
     return { marker: anywhere[0]?.id ?? '', where: 'an off-domain page' }
+  const known = new Set(markers.map(marker => marker.id))
+  const inMarkup = (page.markup?.markers ?? []).filter(id => known.has(id))
+  if (offDomain && inMarkup.length >= 2)
+    return {
+      marker: inMarkup.slice(0, 3).join(', '),
+      where: 'the visible content of an off-domain page'
+    }
+  if (offDomain && (page.markup?.slots ?? 0) >= SLOT_AD_PAGE)
+    return { marker: `slot × ${page.markup?.slots}`, where: 'slot ads on an off-domain page' }
   return null
 }
 
@@ -430,10 +477,45 @@ export function parkingSignal(
 
 const PROTECTION = /cloudflare|akamai|ddos-guard|sucuri|vercel|imperva|incapsula/iu
 
+/** True when some hop of the trace was on the listing's own registrable domain. */
+export function reachedOwnDomain(listing: CheckedListing, observation: SiteObservation): boolean {
+  const expected = expectedDomain(listing, observation.hops)
+  return observation.hops.some(hop => registrableDomain(hostOf(hop.url)) === expected)
+}
+
+/**
+ * The listing's own domain, to fetch directly, when its slug is a domain and its link never
+ * reached it (the link points at another domain, or failed on the way). Null otherwise.
+ */
+export function ownDomainUrl(listing: CheckedListing, observation: SiteObservation): string | null {
+  if (!listing.slug.includes('.') || reachedOwnDomain(listing, observation)) return null
+  try {
+    if (!urlKey(`https://${listing.slug}/`).coversSubdomains) return null
+  } catch {
+    return null
+  }
+  return `https://${listing.slug}/`
+}
+
+/**
+ * Classifies the listing from its link's trace and, when the link never reached the listing's
+ * own domain, from that domain fetched directly. A parked or for-sale page counts only on the
+ * listing's own domain; a link to another, parked domain is an off-domain link for the owner.
+ */
 export function classifyListing(
   listing: CheckedListing,
-  observation: SiteObservation
+  observation: SiteObservation,
+  own?: SiteObservation | null
 ): Classification {
+  const link = classifyTrace(listing, observation)
+  if (link.class === 'gambling-spam' || link.class === 'parking' || !own) return link
+  const direct = classifyTrace(listing, own)
+  if (direct.class === 'gambling-spam' || direct.class === 'parking')
+    return { ...direct, reason: `own domain: ${direct.reason}`, source: 'own-domain' }
+  return link
+}
+
+function classifyTrace(listing: CheckedListing, observation: SiteObservation): Classification {
   const finalHost = hostOf(observation.finalUrl)
   const finalDomain = finalHost ? registrableDomain(finalHost) : ''
   const expected = expectedDomain(listing, observation.hops)
@@ -470,6 +552,12 @@ export function classifyListing(
   ]
   const parking = parkingSignal(pages, finalDomain, expected)
   if (parking) {
+    if (!reachedOwnDomain(listing, observation))
+      return {
+        class: 'off-domain',
+        reason: `parked or for sale, but on ${finalDomain}, not the listing's ${expected}: owner review`,
+        marker: short(parking.marker)
+      }
     if (!aboutDomains)
       return {
         class: 'parking',
@@ -483,6 +571,12 @@ export function classifyListing(
     }
   }
 
+  if (observation.result === 'too_many_redirects')
+    return {
+      class: 'unreachable',
+      reason: `too_many_redirects (${observation.hops.length} hops, stopped on ${finalDomain})`,
+      marker: null
+    }
   if (offDomain)
     return {
       class: 'off-domain',

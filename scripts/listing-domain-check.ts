@@ -31,6 +31,7 @@ import {
   type DomainClass,
   domainClasses,
   isRedirectorHost,
+  ownDomainUrl,
   unpublishClasses
 } from './listing-domain-classifier'
 import { isTransient, type SiteObservation, traceWebsite } from './listing-domain-fetch'
@@ -92,9 +93,11 @@ const shortUrl = (url: string) => (url.length > 120 ? `${url.slice(0, 117)}...` 
 
 export function reportEntry(
   listing: CheckedListing,
-  observation: SiteObservation,
-  classification: Classification
+  link: SiteObservation,
+  classification: Classification,
+  own?: SiteObservation | null
 ): ReportEntry {
+  const observation = classification.source === 'own-domain' && own ? own : link
   return {
     slug: listing.slug,
     id: listing.id,
@@ -107,8 +110,15 @@ export function reportEntry(
   }
 }
 
+export interface CheckedEntry {
+  listing: CheckedListing
+  observation: SiteObservation
+  /** The listing's own domain fetched directly, when its link never reached it. */
+  own?: SiteObservation | null
+}
+
 export function buildReport(
-  checked: ReadonlyArray<{ listing: CheckedListing; observation: SiteObservation }>,
+  checked: ReadonlyArray<CheckedEntry>,
   generatedAt: string,
   source: string
 ): DomainReport {
@@ -118,13 +128,13 @@ export function buildReport(
   >
   const unpublish: ReportEntry[] = []
   const ownerReview: ReportEntry[] = []
-  for (const { listing, observation } of [...checked].sort((a, b) =>
+  for (const { listing, observation, own } of [...checked].sort((a, b) =>
     a.listing.slug < b.listing.slug ? -1 : a.listing.slug > b.listing.slug ? 1 : 0
   )) {
-    const classification = classifyListing(listing, observation)
+    const classification = classifyListing(listing, observation, own)
     counts[classification.class] += 1
     if (classification.class === 'ok') continue
-    const entry = reportEntry(listing, observation, classification)
+    const entry = reportEntry(listing, observation, classification, own)
     if (unpublishClasses.has(classification.class)) unpublish.push(entry)
     else ownerReview.push(entry)
   }
@@ -256,7 +266,8 @@ export function parseArguments(argv: readonly string[]): Arguments {
   return parsed
 }
 
-const cachePath = resolve('.runtime/listing-domains/observations.ndjson')
+// v2 (#104 review): markup signals, longer redirect chains, and own-domain traces.
+const cachePath = resolve('.runtime/listing-domains/observations-v2.ndjson')
 
 /** Failed at a link shortener or affiliate hop, not at the product: our fetch, not the site. */
 export function throttled(observation: SiteObservation): boolean {
@@ -308,7 +319,7 @@ async function main(): Promise<void> {
   const cache = args.reuse ? readCache() : new Map<string, SiteObservation & { id: string }>()
   mkdirSync(dirname(cachePath), { recursive: true })
   let done = 0
-  const checked = await pool(selected, args.concurrency, async listing => {
+  const checked: CheckedEntry[] = await pool(selected, args.concurrency, async listing => {
     const cached = cache.get(listing.id)
     let observation: SiteObservation
     if (cached?.website === listing.website && !throttled(cached)) observation = cached
@@ -319,6 +330,18 @@ async function main(): Promise<void> {
     done += 1
     if (done % 100 === 0) console.error(`${done}/${selected.length}`)
     return { listing, observation }
+  })
+  // A link that never reached the listing's own domain says nothing about that domain: fetch it.
+  await pool(checked, args.concurrency, async entry => {
+    const url = ownDomainUrl(entry.listing, entry.observation)
+    if (!url) return
+    const key = `${entry.listing.id}#own`
+    const cached = cache.get(key)
+    if (cached?.website === url) entry.own = cached
+    else {
+      entry.own = await traceWebsite(url)
+      appendFileSync(cachePath, `${JSON.stringify({ id: key, ...entry.own })}\n`)
+    }
   })
   // The links pass through serp.ly, which rate-limits a fast scan. Check those again, slowly, so
   // our own throttling never reads as a dead listing.

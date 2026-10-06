@@ -19,6 +19,7 @@ import {
   type CheckedListing,
   classifyListing,
   expectedDomain,
+  ownDomainUrl,
   registrableDomain
 } from './listing-domain-classifier'
 import {
@@ -241,6 +242,177 @@ describe('listing domain classifier', () => {
     ).toMatchObject({ class: 'parking', marker: 'godaddy /lander' })
   })
 
+  it('counts a parked page only on the listing’s own domain (#104 review)', () => {
+    // pandachat.ai: the short link points at dataspot.ai, which is for sale; PandaChat is live.
+    const forSale = observed(
+      viaSerpLy(
+        {
+          url: 'https://dataspot.ai/',
+          status: 302,
+          location: 'https://forsale.godaddy.com/forsale/dataspot.ai'
+        },
+        { url: 'https://forsale.godaddy.com/forsale/dataspot.ai', status: 403, server: 'nginx' }
+      ),
+      null,
+      { result: 'http_403' }
+    )
+    const live = observed(
+      [{ url: 'https://acme.ai/', status: 200 }],
+      html('Acme | A digital twin of your support team', '<p>Acme.</p>')
+    )
+    const link = classifyListing(listing(), forSale)
+    expect(link).toMatchObject({ class: 'off-domain' })
+    expect(link.reason).toContain('not the listing')
+    expect(classifyListing(listing(), forSale, live)).toMatchObject({ class: 'off-domain' })
+    // getoptimal.ai: the link lands on another domain's GoDaddy /lander stub.
+    const stub =
+      '<html><body><script>window.onload=function(){window.location.href="/lander"}</script></body></html>'
+    expect(
+      classifyListing(
+        listing(),
+        observed(
+          viaSerpLy(
+            {
+              url: 'https://tara.ai/',
+              status: 200,
+              location: 'https://tara.ai/lander',
+              client: true
+            },
+            { url: 'https://tara.ai/lander', status: 200 }
+          ),
+          html('', ''),
+          { stubs: [stub] }
+        ),
+        live
+      ).class
+    ).toBe('off-domain')
+    // When the listing's own domain is parked too, it is parked, whatever the link does.
+    const ownParked = observed(
+      [{ url: 'https://acme.ai/', status: 200 }],
+      html('acme.ai is for sale', '<p>Buy it.</p>')
+    )
+    expect(classifyListing(listing(), forSale, ownParked)).toMatchObject({
+      class: 'parking',
+      reason: 'own domain: parked or for sale (title or heading)',
+      source: 'own-domain'
+    })
+    expect(ownDomainUrl(listing(), forSale)).toBe('https://acme.ai/')
+    expect(
+      ownDomainUrl(listing(), observed(viaSerpLy({ url: 'https://acme.ai/', status: 200 }), ''))
+    ).toBeNull()
+    expect(ownDomainUrl(listing({ slug: '123movies-downloader' }), forSale)).toBeNull()
+  })
+
+  it('catches the hijacks round 1 missed (#104 review)', () => {
+    const offDomain = (url: string, page: string) =>
+      classifyListing(
+        listing(),
+        observed(
+          viaSerpLy({ url: 'https://acme.ai/', status: 301, location: url }, { url, status: 200 }),
+          page
+        )
+      )
+    // Xoilac soccer-streaming pages that carry betting ads.
+    expect(
+      offDomain(
+        'https://kryptoria.io/',
+        html('XoilacTV Trực Tiếp Bóng Đá 24/24 - TTBD Xôi Lạc 90phut #1 VN', '<p>Xem bóng đá.</p>')
+      ).class
+    ).toBe('gambling-spam')
+    // Betting ads only in the markup (image alt text and links).
+    expect(
+      offDomain(
+        'https://stream.example/',
+        html(
+          'Live football',
+          '<a href="https://x.example/"><img alt="nhà cái uy tín"></a><img alt="cá cược thể thao">'
+        )
+      )
+    ).toMatchObject({
+      class: 'gambling-spam',
+      reason: 'gambling or spam terms in the visible content of an off-domain page'
+    })
+    // A piracy page full of slot ads.
+    expect(
+      offDomain(
+        'https://acentoenlao.com/',
+        html(
+          'AnimePlay - Nonton Anime Sub Indo',
+          `<p>Episode list</p>${'<img alt="slot">'.repeat(40)}`
+        )
+      ).class
+    ).toBe('gambling-spam')
+    // Class names and component markup are not words: a modern app says "slot" in its CSS.
+    expect(
+      offDomain(
+        'https://www.fathom.ai/',
+        html(
+          'Fathom AI notetaker',
+          `<style>${'.slot[data-large-columns="1"]{}'.repeat(60)}</style>${'<div data-slot="card" class="slot">Notes</div>'.repeat(60)}`
+        )
+      ).class
+    ).toBe('off-domain')
+    // The same counts on the listing's own domain are not enough.
+    expect(
+      classifyListing(
+        listing(),
+        observed(
+          viaSerpLy({ url: 'https://acme.ai/', status: 200 }),
+          html('Acme booking', `<p>${'Pick a slot. '.repeat(40)}</p>`)
+        )
+      ).class
+    ).toBe('ok')
+    // roboweb.app: GERBANGWIN on its own domain.
+    expect(
+      classifyListing(
+        listing(),
+        observed(
+          viaSerpLy({ url: 'https://acme.ai/', status: 200 }),
+          html('GERBANGWIN Fitur AI Cerdas Acme', '<p>Akses praktis melalui link resmi.</p>')
+        )
+      ).class
+    ).toBe('gambling-spam')
+    // siddharthverma.in: an expireddomains.com listing, through the listing's own domain.
+    expect(
+      classifyListing(
+        listing(),
+        observed(
+          viaSerpLy(
+            {
+              url: 'https://acme.ai/',
+              status: 302,
+              location: 'https://member.expireddomains.net/x'
+            },
+            { url: 'https://member.expireddomains.net/x', status: 200 }
+          ),
+          html('Domain', '')
+        )
+      ).class
+    ).toBe('parking')
+    // magician.design: a redirect chain that runs out is not judged by where it stopped.
+    expect(
+      classifyListing(
+        listing(),
+        observed(
+          viaSerpLy(
+            { url: 'https://acme.ai/', status: 301, location: 'https://a.example/' },
+            { url: 'https://landsharkspizza.com/', status: 301, location: 'https://b.example/' }
+          ),
+          null,
+          { result: 'too_many_redirects' }
+        )
+      ).class
+    ).toBe('unreachable')
+    // typli.ai (an affiliate offer) and sharefable.com (a bare IP) stay with the owner.
+    expect(
+      offDomain('https://www.claudiacaldwell.com/oto', html('Secret Gift For You', '<p>STOP!</p>'))
+        .class
+    ).toBe('off-domain')
+    expect(
+      offDomain('http://172.235.245.66/', html('WOE! SSL Jangan Lupa Di-install!', '')).class
+    ).toBe('off-domain')
+  })
+
   it('keeps "for sale" in a page body, and domain tools, out of the parking class', () => {
     expect(
       classifyListing(
@@ -454,6 +626,9 @@ describe('listing domain fetch', () => {
     expect(trace.hops.map(hop => hop.url)).toEqual(['https://acme.ai/'])
     await expect(guardedFetch('https://example.com:8443/')).rejects.toMatchObject({ code: 'EPORT' })
     await expect(guardedFetch('ftp://example.com/')).rejects.toMatchObject({ code: 'EPORT' })
+    // Node skips the lookup hook for IP literals, so the fetcher checks them itself.
+    for (const url of ['http://127.0.0.1/', 'http://[::1]/', 'http://169.254.169.254/'])
+      await expect(guardedFetch(url), url).rejects.toMatchObject({ code: 'EBLOCKED' })
     for (const address of [
       '10.0.0.1',
       '127.0.0.1',

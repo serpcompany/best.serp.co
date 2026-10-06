@@ -3,12 +3,12 @@
 # 2026-10-06), the operations of the matching d1/publications manifest. ownerReview: listings
 # that end on another company's domain or are unreachable; the owner decides each, nothing is
 # unpublished automatically. Listings classified ok are counted only.
-generatedAt: 2026-10-06T07:17:47.398Z
+generatedAt: 2026-10-06T08:38:46.294Z
 source: reviewed import 669f264f028a (publication 1), 3422 live listings
 counts:
-  gambling-spam: 26
-  parking: 67
-  off-domain: 268
+  gambling-spam: 33
+  parking: 63
+  off-domain: 265
   unreachable: 391
   ok: 2670
 unpublish:
@@ -28,6 +28,14 @@ unpublish:
     status: 200
     reason: gambling or spam terms in title or heading
     marker: slot gacor
+  - slug: banterai.business
+    id: lst_b37f8e7f660409b59c4cad74
+    website: https://serp.ly/banterai
+    class: gambling-spam
+    finalUrl: https://modify.net.nz/
+    status: 200
+    reason: "own domain: gambling or spam terms in the visible content of an off-domain page"
+    marker: gates of olympus, pragmatic play, casino bonus
   - slug: bashsenpai.com
     id: lst_093b390c4dfcdc5e3073342d
     website: https://serp.ly/bashsenpai
@@ -84,6 +92,14 @@ unpublish:
     status: 200
     reason: gambling or spam terms in title or heading
     marker: slot gacor
+  - slug: chord.pub
+    id: lst_dac1c63c8178e3a25896bf61
+    website: https://serp.ly/chord-ooo
+    class: parking
+    finalUrl: https://chord.pub/
+    status: 200
+    reason: "own domain: parked or for sale (title or heading)"
+    marker: for sale
   - slug: codableai.com
     id: lst_6b8702bba7c88451de28cb19
     website: https://serp.ly/codableai
@@ -108,14 +124,6 @@ unpublish:
     status: 200
     reason: gambling or spam terms in page text
     marker: pragmatic play, live casino, online casino
-  - slug: codedamn.com
-    id: lst_8df3a77bd639d01014b0b291
-    website: https://serp.ly/debugcode
-    class: parking
-    finalUrl: https://forsale.godaddy.com/forsale/debugcode.ai?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp_td...
-    status: 403
-    reason: parked or for sale (final host)
-    marker: godaddy.com
   - slug: codefy.ai
     id: lst_4ed41993764c6f86c247eff2
     website: https://serp.ly/codefy
@@ -284,14 +292,6 @@ unpublish:
     status: 200
     reason: gambling or spam terms in title or heading
     marker: nhà cái
-  - slug: getactyvphysio.com
-    id: lst_1a0dba635bb113a918fc5153
-    website: https://serp.ly/getactyv
-    class: parking
-    finalUrl: https://getactyv.com/lander
-    status: 200
-    reason: parked or for sale (markup)
-    marker: godaddy /lander
   - slug: getmumu.com
     id: lst_b2d55d519e35388ec5c2cdb5
     website: https://serp.ly/mumu-x
@@ -300,14 +300,14 @@ unpublish:
     status: 200
     reason: gambling or spam terms in title or heading
     marker: togel
-  - slug: getoptimal.ai
-    id: lst_7f0053a1e1a978b36430c909
-    website: https://serp.ly/tara-ai
-    class: parking
-    finalUrl: https://tara.ai/lander
+  - slug: gomarketplan.io
+    id: lst_a3ef55d0c1e280c092be6697
+    website: https://serp.ly/marketplan
+    class: gambling-spam
+    finalUrl: https://marketplan.io/
     status: 200
-    reason: parked or for sale (markup)
-    marker: godaddy /lander
+    reason: gambling or spam terms in the visible content of an off-domain page
+    marker: rtp slot, pragmatic play, online casino
   - slug: gptservice.app
     id: lst_25482329d627b97208e07c0e
     website: https://serp.ly/gptservice
@@ -396,6 +396,14 @@ unpublish:
     status: 403
     reason: parked or for sale (final host)
     marker: godaddy.com
+  - slug: magician.design
+    id: lst_9faae3d0534287c5798c508b
+    website: https://serp.ly/magician-(figma)
+    class: gambling-spam
+    finalUrl: https://remedia.lu/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: slot gacor
   - slug: marketology.ai
     id: lst_d5de8d01b0d7ee4347bcce14
     website: https://serp.ly/marketology
@@ -404,6 +412,14 @@ unpublish:
     status: 403
     reason: parked or for sale (final host)
     marker: atom.com
+  - slug: mateai.io
+    id: lst_4c8f3d7c417b8f29c9c9d6cd
+    website: https://serp.ly/mateai
+    class: gambling-spam
+    finalUrl: https://kryptoria.io/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: xoilac
   - slug: mentum.ai
     id: lst_d1914766ff040426ecdd2463
     website: https://serp.ly/mentum-ai
@@ -417,14 +433,6 @@ unpublish:
     website: https://serp.ly/metagenieai
     class: parking
     finalUrl: https://forsale.godaddy.com/forsale/www.metagenieai.com?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_...
-    status: 403
-    reason: parked or for sale (final host)
-    marker: godaddy.com
-  - slug: mindsum.org
-    id: lst_975c152109791249d78f5162
-    website: https://serp.ly/mindsum
-    class: parking
-    finalUrl: https://forsale.godaddy.com/forsale/www.mindsum.app?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp...
     status: 403
     reason: parked or for sale (final host)
     marker: godaddy.com
@@ -484,14 +492,6 @@ unpublish:
     status: 200
     reason: parked or for sale (final host)
     marker: snagged.com
-  - slug: pandachat.ai
-    id: lst_94ad538b65c71a44430113d6
-    website: https://serp.ly/pandachat
-    class: parking
-    finalUrl: https://forsale.godaddy.com/forsale/dataspot.ai?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_tdf...
-    status: 403
-    reason: parked or for sale (final host)
-    marker: godaddy.com
   - slug: parallelgpt.ai
     id: lst_1d58a516ef8e041cee3860e5
     website: https://serp.ly/parallelgpt
@@ -620,6 +620,14 @@ unpublish:
     status: 403
     reason: parked or for sale (final host)
     marker: godaddy.com
+  - slug: roboweb.app
+    id: lst_cb9c8ab457bcdc525b179d7b
+    website: https://serp.ly/roboweb
+    class: gambling-spam
+    finalUrl: https://roboweb.app/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: gerbangwin
   - slug: salespitch.pro
     id: lst_ef54578f215d3ffc8d8f8351
     website: https://serp.ly/salespitch
@@ -628,6 +636,14 @@ unpublish:
     status: 200
     reason: gambling or spam terms in title or heading
     marker: gacor
+  - slug: scribblediffusion.com
+    id: lst_bfa52442934b40aaecccde2b
+    website: https://serp.ly/scribble-diffusion
+    class: gambling-spam
+    finalUrl: https://xoilaczbh.tv/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: xoilac
   - slug: shotrate.com
     id: lst_35f09354b155707f9c88cfb5
     website: https://serp.ly/shotrate
@@ -684,6 +700,14 @@ unpublish:
     status: 403
     reason: parked or for sale (final host)
     marker: atom.com
+  - slug: spiritme.tech
+    id: lst_6e12b1a68a9f574be058c356
+    website: https://serp.ly/spiritme
+    class: gambling-spam
+    finalUrl: https://xoilaclivettbdma.tv/
+    status: 200
+    reason: gambling or spam terms in title or heading
+    marker: xoilac
   - slug: starsky.pro
     id: lst_5cb312f0661d7fc9aef2a243
     website: https://serp.ly/starsky
@@ -836,14 +860,6 @@ ownerReview:
     finalUrl: https://babylonhealth.com/
     status: ENOTFOUND
     reason: site_unreachable (ENOTFOUND)
-  - slug: banterai.business
-    id: lst_b37f8e7f660409b59c4cad74
-    website: https://serp.ly/banterai
-    class: off-domain
-    finalUrl: https://www.0-holdings.com/
-    status: 200
-    reason: ends on 0-holdings.com, not banterai.business
-    marker: www.0-holdings.com
   - slug: baseplate.ai
     id: lst_c55f2d9870d1d0ea046e1e05
     website: https://serp.ly/baseplate
@@ -1280,14 +1296,6 @@ ownerReview:
     finalUrl: https://www.cheerleaderai.com/
     status: ECONNRESET
     reason: site_unreachable (ECONNRESET)
-  - slug: chord.pub
-    id: lst_dac1c63c8178e3a25896bf61
-    website: https://serp.ly/chord-ooo
-    class: off-domain
-    finalUrl: https://chord.ooo/
-    status: ENOTFOUND
-    reason: ends on chord.ooo, not chord.pub
-    marker: chord.ooo
   - slug: circleback.ai
     id: lst_2717e98f81372e2cf06e1ff4
     website: https://serp.ly/circleback-ai
@@ -1333,6 +1341,14 @@ ownerReview:
     status: 200
     reason: ends on superhuman.com, not coda.io
     marker: docs.superhuman.com
+  - slug: codedamn.com
+    id: lst_8df3a77bd639d01014b0b291
+    website: https://serp.ly/debugcode
+    class: off-domain
+    finalUrl: https://forsale.godaddy.com/forsale/debugcode.ai?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp_td...
+    status: 403
+    reason: "parked or for sale, but on godaddy.com, not the listing's codedamn.com: owner review"
+    marker: godaddy.com
   - slug: codeium.com
     id: lst_85908652262141d6359a78b3
     website: https://serp.ly/codeium
@@ -2151,6 +2167,14 @@ ownerReview:
     status: 200
     reason: ends on gerwin.ai, not gerwin.io
     marker: gerwin.ai
+  - slug: getactyvphysio.com
+    id: lst_1a0dba635bb113a918fc5153
+    website: https://serp.ly/getactyv
+    class: off-domain
+    finalUrl: https://getactyv.com/lander
+    status: 200
+    reason: "parked or for sale, but on getactyv.com, not the listing's getactyvphysio.com: owner review"
+    marker: godaddy /lander
   - slug: getcargo.io
     id: lst_678b2e869e9c9e38973e290d
     website: https://serp.ly/cargo
@@ -2195,6 +2219,14 @@ ownerReview:
     status: 200
     reason: ends on munchstudio.com, not getmunch.com
     marker: www.munchstudio.com
+  - slug: getoptimal.ai
+    id: lst_7f0053a1e1a978b36430c909
+    website: https://serp.ly/tara-ai
+    class: off-domain
+    finalUrl: https://tara.ai/lander
+    status: 200
+    reason: "parked or for sale, but on tara.ai, not the listing's getoptimal.ai: owner review"
+    marker: godaddy /lander
   - slug: getquizwizard.com
     id: lst_bf54657e4eef9d9bba1e7fff
     website: https://getquizwizard.com
@@ -2264,14 +2296,6 @@ ownerReview:
     status: 200
     reason: ends on lotiai.com, not goloti.com
     marker: www.lotiai.com
-  - slug: gomarketplan.io
-    id: lst_a3ef55d0c1e280c092be6697
-    website: https://serp.ly/marketplan
-    class: off-domain
-    finalUrl: https://marketplan.io/
-    status: 200
-    reason: ends on marketplan.io, not gomarketplan.io
-    marker: marketplan.io
   - slug: goodsnooze.gumroad.com
     id: lst_6f056f9165cf45a3354febaa
     website: https://serp.ly/macwhisper
@@ -2475,7 +2499,7 @@ ownerReview:
     id: lst_59e07a2c7b2f1695d58e9136
     website: https://serp.ly/hexomatic
     class: off-domain
-    finalUrl: https://hexowatch.com/?irclickid=xSfz%3AGQ1mxyZRSH2tHV1UwQbUkrwOvStZ2hZ1o0&utm_source=Impact&irgwc=1&afsrc=1
+    finalUrl: https://hexowatch.com/?irclickid=xh-US9Q1pxyZU8R0lJx1r0DbUkrwL02hZ2hZ1o0&utm_source=Impact&irgwc=1&afsrc=1
     status: 200
     reason: ends on hexowatch.com, not hexomatic.com
     marker: hexowatch.com
@@ -2516,13 +2540,6 @@ ownerReview:
     finalUrl: https://hotball.ai/
     status: 404
     reason: http_404
-  - slug: hotbot.com
-    id: lst_1ac2780c3c34103d703c78bb
-    website: https://serp.ly/hotbot
-    class: unreachable
-    finalUrl: https://www.hotbot.com/
-    status: ABORT_ERR
-    reason: fetch_timeout (ABORT_ERR)
   - slug: hourone.ai
     id: lst_c1ec0d557b71682742eb128e
     website: https://serp.ly/hourone
@@ -2542,7 +2559,7 @@ ownerReview:
     website: https://serp.ly/plexo
     class: off-domain
     finalUrl: https://acentoenlao.com/
-    status: 200
+    status: 429
     reason: ends on acentoenlao.com, not plexo.app
     marker: acentoenlao.com
   - slug: hubble.team
@@ -3098,14 +3115,6 @@ ownerReview:
     finalUrl: https://madisonai.org/ai-tools/
     status: ENOTFOUND
     reason: site_unreachable (ENOTFOUND)
-  - slug: magician.design
-    id: lst_9faae3d0534287c5798c508b
-    website: https://serp.ly/magician-(figma)
-    class: off-domain
-    finalUrl: https://landsharkspizza.com/
-    status: 301
-    reason: ends on landsharkspizza.com, not magician.design
-    marker: landsharkspizza.com
   - slug: magicsalesbot.com
     id: lst_409efac80cc8a38d4fb4e42e
     website: https://serp.ly/magic-sales-bot
@@ -3192,14 +3201,6 @@ ownerReview:
     finalUrl: https://masterpiecestudio.com/
     status: 404
     reason: http_404
-  - slug: mateai.io
-    id: lst_4c8f3d7c417b8f29c9c9d6cd
-    website: https://serp.ly/mateai
-    class: off-domain
-    finalUrl: https://kryptoria.io/
-    status: 200
-    reason: ends on kryptoria.io, not mateai.io
-    marker: kryptoria.io
   - slug: maths.ai
     id: lst_077f15553b9a44aea7cd59f9
     website: https://serp.ly/maths-ai
@@ -3302,6 +3303,14 @@ ownerReview:
     status: 200
     reason: ends on mindshub.ai, not mindsdb.com
     marker: mindshub.ai
+  - slug: mindsum.org
+    id: lst_975c152109791249d78f5162
+    website: https://serp.ly/mindsum
+    class: off-domain
+    finalUrl: https://forsale.godaddy.com/forsale/www.mindsum.app?utm_source=TDFS_DASLNC&utm_medium=parkedpages&utm_campaign=x_corp...
+    status: 403
+    reason: "parked or for sale, but on godaddy.com, not the listing's mindsum.org: owner review"
+    marker: godaddy.com
   - slug: mirrorthink.ai
     id: lst_d9b7038019521350945ec598
     website: https://serp.ly/mirrorthink
@@ -3618,6 +3627,14 @@ ownerReview:
     finalUrl: https://paintbytext.chat/
     status: ENOTFOUND
     reason: site_unreachable (ENOTFOUND)
+  - slug: pandachat.ai
+    id: lst_94ad538b65c71a44430113d6
+    website: https://serp.ly/pandachat
+    class: off-domain
+    finalUrl: https://forsale.godaddy.com/forsale/dataspot.ai?utm_source=TDFS_BINNS2&utm_medium=parkedpages&utm_campaign=x_corp_tdf...
+    status: 403
+    reason: "parked or for sale, but on godaddy.com, not the listing's pandachat.ai: owner review"
+    marker: godaddy.com
   - slug: pandarocket.ai
     id: lst_f9b04093641d4291b911e6ae
     website: https://serp.ly/pandarocket
@@ -4006,16 +4023,15 @@ ownerReview:
   - slug: publer.io
     id: lst_73bf82550ee28af8413dea7d
     website: https://serp.ly/publer-ai-assist
-    class: off-domain
+    class: unreachable
     finalUrl: https://publer.com/features/ai-assist
     status: 302
-    reason: ends on publer.com, not publer.io
-    marker: publer.com
+    reason: too_many_redirects (38 hops, stopped on publer.com)
   - slug: purevpn.com
     id: lst_561c5535a3d968759932fc2c
     website: https://serp.ly/pureVPN
     class: off-domain
-    finalUrl: https://www.flexoffers.com/links/?cid=e1d875cc-f033-43dd-965a-171f6f75403e
+    finalUrl: https://www.flexoffers.com/links/?cid=683aa0b9-632f-47d5-a043-2e8a99910bd8
     status: 200
     reason: ends on flexoffers.com, not purevpn.com
     marker: www.flexoffers.com
@@ -4316,14 +4332,6 @@ ownerReview:
     status: 200
     reason: ends on adkit.so, not scrap.so
     marker: adkit.so
-  - slug: scribblediffusion.com
-    id: lst_bfa52442934b40aaecccde2b
-    website: https://serp.ly/scribble-diffusion
-    class: off-domain
-    finalUrl: https://xoilaczbh.tv/
-    status: 200
-    reason: ends on xoilaczbh.tv, not scribblediffusion.com
-    marker: xoilaczbh.tv
   - slug: scribehow.com
     id: lst_717610716b6f5d002e715c69
     website: https://serp.ly/scribe
@@ -4362,7 +4370,7 @@ ownerReview:
     class: unreachable
     finalUrl: https://www.seek.ai/
     status: 301
-    reason: too_many_redirects
+    reason: too_many_redirects (38 hops, stopped on seek.ai)
   - slug: seekwell.io
     id: lst_5773633b81f037817110be3b
     website: https://serp.ly/seekwell
@@ -4450,7 +4458,7 @@ ownerReview:
     class: off-domain
     finalUrl: https://expireddomains.com/domain/sid.black
     status: 200
-    reason: ends on expireddomains.com, not siddharthverma.in
+    reason: "parked or for sale, but on expireddomains.com, not the listing's siddharthverma.in: owner review"
     marker: expireddomains.com
   - slug: sidekiiick.com
     id: lst_54c147aa433b82393a824bc1
@@ -4534,7 +4542,7 @@ ownerReview:
     id: lst_e5bf223af4c3e991eba440e0
     website: https://serp.ly/smartproxy
     class: off-domain
-    finalUrl: https://decodo.com/deals/hellodecodo?irclickid=SiV0p7Q1mxyZUH6VNG312RecUkrwOMyhZ2hZ1o0&mediapartnerid=1350615&utm_sou...
+    finalUrl: https://decodo.com/deals/hellodecodo?irclickid=xvy3bRQ1pxyZRuiUSRV-SXLpUkrwL02dZ2hZ1o0&mediapartnerid=1350615&utm_sou...
     status: 200
     reason: ends on decodo.com, not smartproxy.com
     marker: decodo.com
@@ -4618,14 +4626,6 @@ ownerReview:
     status: 200
     reason: ends on spellbook.com, not spellbook.legal
     marker: spellbook.com
-  - slug: spiritme.tech
-    id: lst_6e12b1a68a9f574be058c356
-    website: https://serp.ly/spiritme
-    class: off-domain
-    finalUrl: https://xoilaclivettbdma.tv/
-    status: 200
-    reason: ends on xoilaclivettbdma.tv, not spiritme.tech
-    marker: xoilaclivettbdma.tv
   - slug: spoke.app
     id: lst_ccc2d470b78a5af8e929df2a
     website: https://serp.ly/spoke-app
@@ -5320,7 +5320,7 @@ ownerReview:
     id: lst_a22205c9716640c6d77da938
     website: https://serp.ly/vwo
     class: off-domain
-    finalUrl: https://wingify.com/?pscd=affiliates.vwo.com&ps_partner_key=ZGV2aW5zY2h1bWFjaGVyMTkzNw&ps_xid=JxDNMLRXwdlVMf&gsxid=Jx...
+    finalUrl: https://wingify.com/?pscd=affiliates.vwo.com&ps_partner_key=ZGV2aW5zY2h1bWFjaGVyMTkzNw&ps_xid=4AadZ4QtAgzoea&gsxid=4A...
     status: 200
     reason: ends on wingify.com, not vwo.com
     marker: wingify.com

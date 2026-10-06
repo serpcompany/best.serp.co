@@ -13,14 +13,18 @@
 import { lookup as dnsLookup, type LookupAddress } from 'node:dns'
 import { request as httpRequest, type IncomingMessage } from 'node:http'
 import { request as httpsRequest } from 'node:https'
-import type { LookupFunction } from 'node:net'
-import { Readable } from 'node:stream'
+import { isIP, type LookupFunction } from 'node:net'
+import { pipeline, Readable } from 'node:stream'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
 import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
 import { decodeHtml, fetchMimeType } from '../apps/web/lib/submissions/html-encoding'
 import { parseSiteMetadata } from '../apps/web/lib/submissions/prefill'
-import { type SafeFetchFailure, safeFetch } from '../apps/web/lib/submissions/safe-fetch'
-import { THIN_PAGE_TEXT } from './listing-domain-classifier'
+import {
+  type SafeFetchFailure,
+  type SafeFetchResult,
+  safeFetch
+} from '../apps/web/lib/submissions/safe-fetch'
+import { markupSignals, THIN_PAGE_TEXT } from './listing-domain-classifier'
 
 /** A browser-like agent with our name in it: hijacked domains often cloak bots. */
 export const DOMAIN_CHECK_USER_AGENT =
@@ -28,7 +32,7 @@ export const DOMAIN_CHECK_USER_AGENT =
 export const PAGE_MAX_BYTES = 2_000_000
 export const REQUEST_TIMEOUT_MS = 12_000
 /** `safeFetch` follows three redirects; a trace may continue for this many more segments. */
-const MAX_SEGMENTS = 3
+const MAX_SEGMENTS = 8
 /** Meta-refresh or script redirects (`/lander`) followed after a page loads. */
 const MAX_CLIENT_REDIRECTS = 2
 const MAX_ATTEMPTS = 3
@@ -71,18 +75,24 @@ export const vettedLookup: LookupFunction = (hostname, options, callback) => {
   })
 }
 
+/** The body, decompressed; `pipeline` passes a dropped connection on, so a read never hangs. */
 function decodedBody(response: IncomingMessage): Readable {
-  switch ((response.headers['content-encoding'] ?? '').trim().toLowerCase()) {
-    case 'gzip':
-    case 'x-gzip':
-      return response.pipe(createGunzip())
-    case 'deflate':
-      return response.pipe(createInflate())
-    case 'br':
-      return response.pipe(createBrotliDecompress())
-    default:
-      return response
-  }
+  const decoder = (() => {
+    switch ((response.headers['content-encoding'] ?? '').trim().toLowerCase()) {
+      case 'gzip':
+      case 'x-gzip':
+        return createGunzip()
+      case 'deflate':
+        return createInflate()
+      case 'br':
+        return createBrotliDecompress()
+      default:
+        return null
+    }
+  })()
+  if (!decoder) return response
+  pipeline(response, decoder, () => undefined)
+  return decoder
 }
 
 /**
@@ -94,6 +104,12 @@ export const guardedFetch: typeof fetch = (input, init) =>
     const url = new URL(input instanceof Request ? input.url : String(input))
     if (url.port !== '' || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
       reject(new BlockedTargetError('EPORT', `Refusing ${url.origin}: ports 80 and 443 only.`))
+      return
+    }
+    // Node skips the lookup hook for an IP literal, so check it here.
+    const literal = url.hostname.replace(/^\[|\]$/gu, '')
+    if (isIP(literal) !== 0 && !isPublicAddress(literal)) {
+      reject(new BlockedTargetError('EBLOCKED', `Refusing ${url.origin}: not a public address.`))
       return
     }
     const headers: Record<string, string> = {
@@ -139,9 +155,28 @@ export const guardedFetch: typeof fetch = (input, init) =>
         }
       }
     )
+    // An idle socket (a server that stops sending mid-body) is destroyed, which ends the read.
+    request.setTimeout(REQUEST_TIMEOUT_MS, () =>
+      request.destroy(new BlockedTargetError('ETIMEDOUT', `${url.origin} stopped responding.`))
+    )
     request.on('error', reject)
     request.end()
   })
+
+/** Longest one `safeFetch` (up to four requests and a body) may take before it counts as a timeout. */
+const SEGMENT_DEADLINE_MS = 4 * REQUEST_TIMEOUT_MS + 15_000
+
+/** Resolves a hung fetch as a timeout, so one stalled server never stops a scan. */
+function withDeadline(work: Promise<SafeFetchResult>): Promise<SafeFetchResult> {
+  let timer: NodeJS.Timeout | undefined
+  const deadline = new Promise<SafeFetchResult>(resolveDeadline => {
+    timer = setTimeout(
+      () => resolveDeadline({ code: 'fetch_timeout', ok: false }),
+      SEGMENT_DEADLINE_MS
+    )
+  })
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer))
+}
 
 /** One request of a trace: where it went and what came back. */
 export interface Hop {
@@ -166,6 +201,8 @@ export interface PageSignals {
   text: string
   /** The first 48 KB of markup of a thin page, for parking-provider fingerprints; else ''. */
   html: string
+  /** Gambling markers in the whole markup (ads), and how often it says "slot". */
+  markup?: { markers: string[]; slots: number }
 }
 
 export interface SiteObservation {
@@ -229,7 +266,8 @@ export function pageSignals(html: string, url: string): PageSignals {
     siteName: metadata.ogSiteName,
     headings,
     text: text.slice(0, TEXT_LIMIT),
-    html: text.length < THIN_PAGE_TEXT ? html.slice(0, HTML_LIMIT) : ''
+    html: text.length < THIN_PAGE_TEXT ? html.slice(0, HTML_LIMIT) : '',
+    markup: markupSignals(html)
   }
 }
 
@@ -324,13 +362,15 @@ export async function traceWebsite(
     let result: SiteObservation['result'] = 'site_unreachable'
     let page: PageSignals | null = null
     while (true) {
-      const fetched = await safeFetch(current, {
-        accept: type => type === 'text/html' || type === 'application/xhtml+xml',
-        acceptHeader: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5',
-        fetcher: recorder,
-        maxBytes: PAGE_MAX_BYTES,
-        timeoutMs: REQUEST_TIMEOUT_MS
-      })
+      const fetched = await withDeadline(
+        safeFetch(current, {
+          accept: type => type === 'text/html' || type === 'application/xhtml+xml',
+          acceptHeader: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5',
+          fetcher: recorder,
+          maxBytes: PAGE_MAX_BYTES,
+          timeoutMs: REQUEST_TIMEOUT_MS
+        })
+      )
       const last = hops.at(-1)
       if (!fetched.ok) {
         if (fetched.code === 'too_many_redirects' && segments < MAX_SEGMENTS && last?.location) {

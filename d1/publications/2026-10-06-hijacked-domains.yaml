@@ -1,4 +1,4 @@
-# serpcompany/best.serp.co#100: unpublish 93 listings whose domain is hijacked (gambling, betting,
+# serpcompany/best.serp.co#100: unpublish 96 listings whose domain is hijacked (gambling, betting,
 # or spam), parked, or for sale, as the owner decided on 2026-10-06. Their pages answer 410 Gone and
 # leave the sitemap, search, and RSS; the rows stay (Republish in /admin brings one back).
 # Evidence: d1/hygiene/2026-10-06-listing-domains.yaml.
@@ -28,6 +28,14 @@ operations:
     reason: "#100 hijacked domain, gambling, betting, or spam: slot gacor"
     expected:
       website: https://serp.ly/autotextgenie-ai
+  - action: listing-unpublish
+    id: lst_b37f8e7f660409b59c4cad74
+    slug: banterai.business
+    categories:
+      - other
+    reason: "#100 hijacked domain, gambling, betting, or spam: gates of olympus, pragmatic play, casino bonus"
+    expected:
+      website: https://serp.ly/banterai
   - action: listing-unpublish
     id: lst_093b390c4dfcdc5e3073342d
     slug: bashsenpai.com
@@ -85,6 +93,14 @@ operations:
     expected:
       website: https://serp.ly/cheesecakewizard-5-01
   - action: listing-unpublish
+    id: lst_dac1c63c8178e3a25896bf61
+    slug: chord.pub
+    categories:
+      - other
+    reason: "#100 hijacked domain, parked or for sale: for sale"
+    expected:
+      website: https://serp.ly/chord-ooo
+  - action: listing-unpublish
     id: lst_6b8702bba7c88451de28cb19
     slug: codableai.com
     categories:
@@ -108,14 +124,6 @@ operations:
     reason: "#100 hijacked domain, gambling, betting, or spam: pragmatic play, live casino, online casino"
     expected:
       website: https://serp.ly/codeassist-tech
-  - action: listing-unpublish
-    id: lst_8df3a77bd639d01014b0b291
-    slug: codedamn.com
-    categories:
-      - other
-    reason: "#100 hijacked domain, parked or for sale: godaddy.com"
-    expected:
-      website: https://serp.ly/debugcode
   - action: listing-unpublish
     id: lst_4ed41993764c6f86c247eff2
     slug: codefy.ai
@@ -285,14 +293,6 @@ operations:
     expected:
       website: https://serp.ly/garson
   - action: listing-unpublish
-    id: lst_1a0dba635bb113a918fc5153
-    slug: getactyvphysio.com
-    categories:
-      - other
-    reason: "#100 hijacked domain, parked or for sale: godaddy /lander"
-    expected:
-      website: https://serp.ly/getactyv
-  - action: listing-unpublish
     id: lst_b2d55d519e35388ec5c2cdb5
     slug: getmumu.com
     categories:
@@ -301,13 +301,13 @@ operations:
     expected:
       website: https://serp.ly/mumu-x
   - action: listing-unpublish
-    id: lst_7f0053a1e1a978b36430c909
-    slug: getoptimal.ai
+    id: lst_a3ef55d0c1e280c092be6697
+    slug: gomarketplan.io
     categories:
       - other
-    reason: "#100 hijacked domain, parked or for sale: godaddy /lander"
+    reason: "#100 hijacked domain, gambling, betting, or spam: rtp slot, pragmatic play, online casino"
     expected:
-      website: https://serp.ly/tara-ai
+      website: https://serp.ly/marketplan
   - action: listing-unpublish
     id: lst_25482329d627b97208e07c0e
     slug: gptservice.app
@@ -397,6 +397,14 @@ operations:
     expected:
       website: https://serp.ly/looti
   - action: listing-unpublish
+    id: lst_9faae3d0534287c5798c508b
+    slug: magician.design
+    categories:
+      - other
+    reason: "#100 hijacked domain, gambling, betting, or spam: slot gacor"
+    expected:
+      website: https://serp.ly/magician-(figma)
+  - action: listing-unpublish
     id: lst_d5de8d01b0d7ee4347bcce14
     slug: marketology.ai
     categories:
@@ -404,6 +412,14 @@ operations:
     reason: "#100 hijacked domain, parked or for sale: atom.com"
     expected:
       website: https://serp.ly/marketology
+  - action: listing-unpublish
+    id: lst_4c8f3d7c417b8f29c9c9d6cd
+    slug: mateai.io
+    categories:
+      - other
+    reason: "#100 hijacked domain, gambling, betting, or spam: xoilac"
+    expected:
+      website: https://serp.ly/mateai
   - action: listing-unpublish
     id: lst_d1914766ff040426ecdd2463
     slug: mentum.ai
@@ -420,14 +436,6 @@ operations:
     reason: "#100 hijacked domain, parked or for sale: godaddy.com"
     expected:
       website: https://serp.ly/metagenieai
-  - action: listing-unpublish
-    id: lst_975c152109791249d78f5162
-    slug: mindsum.org
-    categories:
-      - other
-    reason: "#100 hijacked domain, parked or for sale: godaddy.com"
-    expected:
-      website: https://serp.ly/mindsum
   - action: listing-unpublish
     id: lst_82ab9300bd4c1e2323a8a374
     slug: nack.ai
@@ -484,14 +492,6 @@ operations:
     reason: "#100 hijacked domain, parked or for sale: snagged.com"
     expected:
       website: https://serp.ly/outline
-  - action: listing-unpublish
-    id: lst_94ad538b65c71a44430113d6
-    slug: pandachat.ai
-    categories:
-      - other
-    reason: "#100 hijacked domain, parked or for sale: godaddy.com"
-    expected:
-      website: https://serp.ly/pandachat
   - action: listing-unpublish
     id: lst_1d58a516ef8e041cee3860e5
     slug: parallelgpt.ai
@@ -621,6 +621,14 @@ operations:
     expected:
       website: https://serp.ly/reword
   - action: listing-unpublish
+    id: lst_cb9c8ab457bcdc525b179d7b
+    slug: roboweb.app
+    categories:
+      - other
+    reason: "#100 hijacked domain, gambling, betting, or spam: gerbangwin"
+    expected:
+      website: https://serp.ly/roboweb
+  - action: listing-unpublish
     id: lst_ef54578f215d3ffc8d8f8351
     slug: salespitch.pro
     categories:
@@ -628,6 +636,14 @@ operations:
     reason: "#100 hijacked domain, gambling, betting, or spam: gacor"
     expected:
       website: https://serp.ly/salespitch
+  - action: listing-unpublish
+    id: lst_bfa52442934b40aaecccde2b
+    slug: scribblediffusion.com
+    categories:
+      - other
+    reason: "#100 hijacked domain, gambling, betting, or spam: xoilac"
+    expected:
+      website: https://serp.ly/scribble-diffusion
   - action: listing-unpublish
     id: lst_35f09354b155707f9c88cfb5
     slug: shotrate.com
@@ -684,6 +700,14 @@ operations:
     reason: "#100 hijacked domain, parked or for sale: atom.com"
     expected:
       website: https://serp.ly/soniclink
+  - action: listing-unpublish
+    id: lst_6e12b1a68a9f574be058c356
+    slug: spiritme.tech
+    categories:
+      - other
+    reason: "#100 hijacked domain, gambling, betting, or spam: xoilac"
+    expected:
+      website: https://serp.ly/spiritme
   - action: listing-unpublish
     id: lst_5cb312f0661d7fc9aef2a243
     slug: starsky.pro
