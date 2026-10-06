@@ -200,12 +200,9 @@ extensions (`chart.js`), and a test checks the committed import.
   rather than give every logo-less listing the same image or the SERP logo
   (`packages/web-core/src/schema.ts`). `apps/e2e/tests/listing-logo-assets.spec.ts` checks
   that the Worker serves the tile and that sample pages reference no missing same-origin file.
-- **Listing offers.** D1 records no product pricing, so listing JSON-LD carries no `offers`.
-  A default `price: "0"` would call every paid product free. `generateWebsiteDetailSchema`
-  emits an Offer only for known `pricing` (free: price 0; paid: decimal price and three-letter
-  currency code). The submission `plan` is the listing fee, never product pricing
-  (serpcompany/best.serp.co#88). `apps/e2e/tests/listing-structured-data.spec.ts` checks that
-  rendered listings carry no Offer.
+- **Listing offers.** D1 holds no product pricing, so listing JSON-LD has no `offers`
+  (`generateWebsiteDetailSchema` emits one only for known `pricing`; the submission `plan` is
+  the listing fee). `listing-structured-data.spec.ts` checks it (serpcompany/best.serp.co#88).
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other
   host serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)).
   The index lists the URL-set files
@@ -270,17 +267,11 @@ Both Cache API layers are per data center and populate on demand. A deployment g
 Worker version and therefore a cold HTML cache; the data cache survives deployments.
 
 Alternatives evaluated for @opennextjs/cloudflare 1.20.6 / Next 16.3.6
-(serpcompany/best.serp.co#34): OpenNext ISR with the R2 incremental cache would need every
-page made static (the layout reads the session, and build-time prerendering would bake the
-build machine's D1 into the bundle), a Durable Object queue for revalidation, and a tag
-cache (D1 or Durable Objects) consulted on every request, plus a revalidation hook in the
-out-of-Worker publish workflows. Cache interception only applies to ISR/SSG routes, the KV
-incremental cache is eventually consistent and not recommended by OpenNext, and the KV tag
-cache is marked experimental. The epoch-keyed Cache API wrapper uses only the documented
-custom-Worker entry and needs no new Cloudflare resources. Cloudflare's newer Workers
-Caching (a cache in front of the Worker with request collapsing and tiered cache) could
-replace layer 1 later, but it bills every static asset request and needs a purge trigger
-the out-of-Worker publish flow cannot send today.
+(serpcompany/best.serp.co#34): OpenNext ISR with the R2 incremental cache would need static
+pages, a Durable Object revalidation queue, and a per-request tag cache; KV caches are
+eventually consistent or experimental. The epoch-keyed wrapper needs no new resources.
+Cloudflare's Workers Caching could replace layer 1 later, but it bills every static asset
+request and needs a purge trigger the out-of-Worker publish flow cannot send today.
 
 ## Trust direction
 
