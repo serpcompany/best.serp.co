@@ -55,7 +55,7 @@ export default async function OrdersPage() {
   const deps = await billingOrNull()
   const media = await mediaBaseUrl()
   const orders: OrderRow[] = (await getAdminOrders()).map(order => {
-    const stripeRef = order.providerPaymentId ?? order.providerCheckoutId
+    const paymentRef = order.providerPaymentId ?? order.providerCheckoutId
     return {
       amountCents: order.amountCents,
       createdAt: order.createdAt,
@@ -77,8 +77,8 @@ export default async function OrdersPage() {
       // A refund a failure left can be finished from here too (the sweep also retries it).
       refundable: order.status === 'paid' || order.status === 'refunding',
       status: order.status,
-      stripeRef,
-      stripeUrl: stripeRef && deps ? deps.provider.dashboardUrl(stripeRef) : null
+      paymentRef,
+      paymentUrl: paymentRef && deps ? deps.provider.dashboardUrl(paymentRef) : null
     }
   })
   return (

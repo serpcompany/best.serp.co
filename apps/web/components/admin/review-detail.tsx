@@ -895,7 +895,7 @@ export function ReviewDetail({
                 : 'This rejects it'}
               {category === 'prohibited'
                 ? ' and blocks the domain. It can’t be undone from here.'
-                : ` and refunds ${amount} through Stripe. It can’t be undone from here.`}
+                : ` and refunds ${amount} through our payment provider. It can’t be undone from here.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <FieldError>{error}</FieldError> : null}

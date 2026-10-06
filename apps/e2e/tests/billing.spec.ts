@@ -43,7 +43,13 @@ let site: FixtureSite
 
 /** `BILLING_SCREENSHOT_DIRECTORY` captures each screen for review (desktop width, light). */
 const screenshots = process.env.BILLING_SCREENSHOT_DIRECTORY
+
+/**
+ * Each screen of ours: the payment provider is never named on it (owner decision on #70), then
+ * the optional capture.
+ */
 async function capture(page: Page, name: string): Promise<void> {
+  expect(await page.locator('body').innerText(), name).not.toMatch(/stripe/iu)
   if (!screenshots) return
   await page.screenshot({ fullPage: true, path: `${screenshots}/${name}.png` })
 }
@@ -175,19 +181,18 @@ async function openCheckout(request: APIRequestContext, path: string): Promise<s
   return location.split('/').pop() ?? ''
 }
 
-test('checkout success: paid at Stripe, live at once and in the review queue', async ({ page }) => {
+test('checkout success: paid at checkout, live at once and in the review queue', async ({
+  page
+}) => {
   const submitter = await signInSubmitter(page, 'success')
   const draft = seedDraft(submitter.id, 'success')
-  if (screenshots) {
-    // 4a stays on screen while the start route is held back.
-    // A 204 keeps the browser on 4a.
-    await page.route('**/checkout/start/', route => route.fulfill({ status: 204 }))
-    await page.goto(`/submit/${draft.id}/checkout/`)
-    await expect(page.getByText('Taking you to Stripe')).toBeVisible()
-    await capture(page, '4a-handoff')
-    await page.unroute('**/checkout/start/')
-  }
-  // The handoff (4a) sends the browser on to Stripe by itself.
+  // 4a stays on screen while the start route is held back (a 204 keeps the browser there).
+  await page.route('**/checkout/start/', route => route.fulfill({ status: 204 }))
+  await page.goto(`/submit/${draft.id}/checkout/`)
+  await expect(page.getByText('Taking you to secure checkout')).toBeVisible()
+  await capture(page, '4a-handoff')
+  await page.unroute('**/checkout/start/')
+  // The handoff (4a) sends the browser on to the provider's checkout by itself.
   await page.goto(`/submit/${draft.id}/checkout/`)
   await expect(page).toHaveURL(/127\.0\.0\.1:\d+\/pay\/cs_test_/u)
   await page.getByRole('button', { name: 'Pay' }).click()

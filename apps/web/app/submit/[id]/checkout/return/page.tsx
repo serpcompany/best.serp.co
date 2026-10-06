@@ -29,8 +29,8 @@ interface Props {
 }
 
 /**
- * `/submit/<id>/checkout/return/?order=<order id>` (#68, #70 screens 4c–4e and 4g): Stripe's
- * return after payment. It confirms the order's own checkout with Stripe and applies a paid one
+ * `/submit/<id>/checkout/return/?order=<order id>` (#68, #70 screens 4c–4e and 4g): the
+ * return after payment. It confirms the order's own checkout with the provider and applies a paid one
  * if the webhook hasn't yet, then shows where it stands: confirming (refreshing until settled),
  * live and in review, waiting for review after a failed check, or failed.
  */

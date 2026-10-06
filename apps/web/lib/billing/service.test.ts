@@ -244,7 +244,7 @@ function paidEvent(f: Fixture, checkoutId: string, id = `evt_${checkoutId}`): st
   return JSON.stringify({
     checkout: f.provider.pay(checkoutId),
     id,
-    providerType: 'checkout.session.completed',
+    providerType: 'fake.checkout.paid',
     type: 'checkout_paid'
   } satisfies BillingEvent)
 }
@@ -477,7 +477,7 @@ describe('races and mismatches (#111 review round 1)', () => {
       JSON.stringify({
         checkout: f.provider.pay(checkoutId, 5390),
         id: 'evt_taxed',
-        providerType: 'checkout.session.completed',
+        providerType: 'fake.checkout.paid',
         type: 'checkout_paid'
       })
     )
@@ -525,7 +525,7 @@ describe('races and mismatches (#111 review round 1)', () => {
       JSON.stringify({
         checkout: forged,
         id: 'evt_other',
-        providerType: 'checkout.session.completed',
+        providerType: 'fake.checkout.paid',
         type: 'checkout_paid'
       })
     )

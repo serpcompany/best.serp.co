@@ -251,7 +251,7 @@ export function ChoosePlan({
                     </a>
                   </Button>
                   <p className="flex items-center justify-center gap-1.5 text-muted-foreground text-xs">
-                    <Lock className="size-3" aria-hidden="true" /> Secure checkout by Stripe
+                    <Lock className="size-3" aria-hidden="true" /> Secure checkout
                   </p>
                 </div>
               </CardFooter>

@@ -11,7 +11,7 @@ function answer(body: Record<string, unknown>, status: number): Response {
 }
 
 /**
- * `POST /api/billing/webhook/` (#68): the billing provider's webhook (Stripe today). The raw
+ * `POST /api/billing/webhook/` (#68): the billing provider's webhook. The raw
  * body is verified against the signature header and its timestamp before anything is read, and
  * each event id is processed once (`billing_events`). 404 while orders are off.
  */

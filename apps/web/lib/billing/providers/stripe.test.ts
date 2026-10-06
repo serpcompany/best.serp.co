@@ -5,7 +5,7 @@
  * tolerance before anything is read.
  */
 import { describe, expect, it } from 'vitest'
-import { BillingProviderError, BillingWebhookError } from './provider'
+import { BillingProviderError, BillingWebhookError } from '../provider'
 import { createStripeProvider, stripeSignature, verifyStripeSignature } from './stripe'
 
 const NOW = new Date('2026-10-06T12:00:00.000Z')

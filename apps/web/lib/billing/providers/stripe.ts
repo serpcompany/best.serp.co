@@ -4,7 +4,7 @@ import {
   BillingProviderError,
   BillingWebhookError,
   type CheckoutState
-} from './provider'
+} from '../provider'
 
 /**
  * Stripe Checkout behind the billing interface (serpcompany/best.serp.co#68), on the Worker's

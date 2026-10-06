@@ -29,7 +29,8 @@ import { ProductLogo, ToneAlert } from './submit-ui'
 
 /**
  * The paid checkout screens (#68; #70 screen 4, approved copy in
- * docs/mockups/submissions/COPY.md): the handoff to Stripe (4a), and the return states:
+ * docs/mockups/submissions/COPY.md, with the payment provider never named: owner decision on
+ * #70): the handoff to checkout (4a), and the return states:
  * confirming (4c), live and in review (4d), checks failed (4e), cancelled (4f), and failed (4g).
  * The checkout itself opens from `startHref`, a route that opens (or reuses) the provider's
  * checkout and redirects there.
@@ -90,7 +91,7 @@ function OrderDetails({ order }: { order: CheckoutOrder }) {
         ['Order', <span key="order" className="font-mono">{`ORD-${order.number}`}</span>],
         ['Amount', `${formatUsd(order.amountCents)} USD, one-off`],
         ['Status', <StatusBadge key="status" kind="o_paid" />],
-        ['Receipt', `Emailed to ${order.email} by Stripe`]
+        ['Receipt', `Emailed to ${order.email} by our payment provider`]
       ]}
     />
   )
@@ -135,11 +136,11 @@ export function CheckoutHandoff({
         <CardHeader>
           <CardTitle>
             <h1 className="flex items-center gap-2 font-semibold text-2xl tracking-tight">
-              <Spinner className="size-5" /> Taking you to Stripe
+              <Spinner className="size-5" /> Taking you to secure checkout
             </h1>
           </CardTitle>
           <CardDescription>
-            You’ll pay on Stripe’s checkout page and come straight back here.
+            You’ll pay on our payment provider’s secure checkout page and come straight back here.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -322,7 +323,7 @@ export function CheckoutHeld({
   )
 }
 
-/** 4f. Back from Stripe without paying. */
+/** 4f. Back from checkout without paying. */
 export function CheckoutCancelled({
   amountCents,
   backHref,
@@ -384,7 +385,7 @@ export function CheckoutFailed({
   return (
     <Page>
       <ToneAlert tone="destructive" title="Payment didn’t go through">
-        <p>Stripe declined the payment, so you weren’t charged.</p>
+        <p>Your payment was declined, so you weren’t charged.</p>
       </ToneAlert>
       <Card>
         <CardHeader>

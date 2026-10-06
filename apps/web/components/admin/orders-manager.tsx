@@ -52,7 +52,7 @@ import { PlanBadge, StatusBadge } from './status-badge'
 /**
  * Orders (#68; #70 screen 13, approved copy in docs/mockups/submissions/COPY.md): tabs with
  * counts, a filter, the table (order, date, customer, kind, item, amount, status with its
- * note, the Stripe reference), the row menu, and the refund dialogs. Opening "Refund…" checks
+ * note, the payment reference), the row menu, and the refund dialogs. Opening "Refund…" checks
  * the listing's badge at refund first, so the dialog says what the refund will do: a passing
  * badge keeps it live as a free listing (13c), otherwise it is unpublished (13b).
  */
@@ -70,8 +70,8 @@ export interface OrderRow {
   number: number
   refundable: boolean
   status: 'failed' | 'paid' | 'pending' | 'refunded' | 'refunding'
-  stripeRef: string | null
-  stripeUrl: string | null
+  paymentRef: string | null
+  paymentUrl: string | null
 }
 
 type StatusTab = 'all' | 'failed' | 'paid' | 'pending' | 'refunded'
@@ -227,7 +227,7 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
                 <TableHead className="text-foreground">Item</TableHead>
                 <TableHead className="text-right text-foreground">Amount</TableHead>
                 <TableHead className="text-foreground">Status</TableHead>
-                <TableHead className="text-foreground">Stripe</TableHead>
+                <TableHead className="text-foreground">Payment</TableHead>
                 <TableHead className="text-right text-foreground last:pr-4">
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -271,7 +271,7 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
                     </div>
                   </TableCell>
                   <TableCell className="whitespace-nowrap font-mono text-muted-foreground text-xs">
-                    {order.stripeRef ? shortRef(order.stripeRef) : '—'}
+                    {order.paymentRef ? shortRef(order.paymentRef) : '—'}
                   </TableCell>
                   <TableCell className="last:pr-4">
                     <div className="flex justify-end">
@@ -287,11 +287,11 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                          {order.stripeUrl ? (
+                          {order.paymentUrl ? (
                             <DropdownMenuItem asChild>
-                              <a href={order.stripeUrl} target="_blank" rel="noreferrer">
+                              <a href={order.paymentUrl} target="_blank" rel="noreferrer">
                                 <ExternalLink />
-                                View in Stripe
+                                View payment
                               </a>
                             </DropdownMenuItem>
                           ) : null}
@@ -393,8 +393,8 @@ function RefundDialog({
               : `Refund ${amount} for ${name}?`}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            Refunds the full amount to {order.customer ?? 'the customer'} through Stripe. This can’t
-            be undone.
+            Refunds the full amount to {order.customer ?? 'the customer'} through our payment
+            provider. This can’t be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <FieldGroup className="gap-5">

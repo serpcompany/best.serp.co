@@ -365,7 +365,7 @@ describe('submission decisions', () => {
     // pending, and a replay of the rejection retries it.
     const refundRejectedSubmission = vi
       .fn<(input: { actor: string; submissionId: string }) => Promise<void>>()
-      .mockRejectedValueOnce(new Error('stripe down'))
+      .mockRejectedValueOnce(new Error('provider down'))
       .mockResolvedValue(undefined)
     const reject = () =>
       rejectSubmission(context({ refunds: { refundRejectedSubmission } }), {

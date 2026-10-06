@@ -1,8 +1,9 @@
 /**
- * The billing provider interface (serpcompany/best.serp.co#68). Stripe implements it today
- * (`stripe.ts`); SERP's self-hosted Lago is the planned replacement. Everything provider-specific
- * (API calls, webhook signatures, event names, ids) stays behind this interface: the billing
- * service, the routes, and D1 only ever see these provider-neutral shapes.
+ * The billing provider interface (serpcompany/best.serp.co#68). The providers in `providers/`
+ * implement it; SERP's self-hosted Lago is the planned replacement. Everything provider-specific
+ * (API calls, webhook signatures, event names, ids, its name) stays behind this interface: the
+ * billing service, the routes, D1, and everything people see only ever use these
+ * provider-neutral shapes.
  */
 
 export interface CheckoutRequest {

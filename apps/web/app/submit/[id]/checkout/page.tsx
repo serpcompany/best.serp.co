@@ -13,7 +13,7 @@ export const metadata: Metadata = generateBaseMetadata({
 })
 
 /**
- * `/submit/<id>/checkout/` (#68, #70 screen 4a): the handoff to Stripe. The choose and badge
+ * `/submit/<id>/checkout/` (#68, #70 screen 4a): the handoff to checkout. The choose and badge
  * steps' "$49" links and the draft reminder's "Complete checkout" open it.
  */
 export default async function CheckoutPage({ params }: { params: Promise<{ id: string }> }) {

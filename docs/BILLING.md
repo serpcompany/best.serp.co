@@ -10,15 +10,22 @@ here is off while `features.orders` (`apps/web/lib/features.ts`) is off, which i
 | Piece | Where | Does |
 |---|---|---|
 | Provider interface | `apps/web/lib/billing/provider.ts` | `createCheckout`, `getCheckout`, `verifyWebhook`, `refund` |
-| Stripe | `apps/web/lib/billing/stripe.ts` | The only Stripe code: `fetch` and Web Crypto, no Node SDK |
+| Provider | `apps/web/lib/billing/providers/{index,stripe}.ts` | The only Stripe code (secrets, key modes, API): `fetch` and Web Crypto, no Node SDK |
 | Service | `apps/web/lib/billing/service.ts` | Checkout, webhook, fulfilment, refunds, the sweep |
 | Guardrails | `apps/web/lib/billing/guardrails.ts` | Checks before a paid submission goes live |
-| Runtime | `apps/web/lib/billing/{runtime,worker-billing,flags,http}.ts` | Bindings, secrets, the flag, route helpers |
+| Runtime | `apps/web/lib/billing/{runtime,worker-billing,flags,http}.ts` | Bindings, the flag, route helpers |
 | Ledger | `packages/data-ops/src/billing.ts` | `orders` and `billing_events` statement plans and reads |
 
 The architecture guard keeps billing SQL in `packages/data-ops` and every Stripe specific (API
-host, signature header, event names, secret names) inside `lib/billing/`. Swapping in Lago
-means a `lago.ts` implementing `BillingProvider` and a change in `worker-billing.ts`.
+host, signature header, event names, secret names) in `lib/billing/providers/`. Swapping in Lago
+means a `providers/lago.ts` implementing `BillingProvider` and a change in `providers/index.ts`.
+
+**The provider is never named to people** (owner decision on #70): no "Stripe" on pages, in
+emails, in the admin panel, in error lines, in the legal pages, or in the item names sent to the
+provider's own checkout page. Copy says "secure checkout", "our payment provider", or "payment".
+An architecture guard fails on the name in any string or JSX text outside
+`lib/billing/providers/` (and in `packages/content/data/`), and the end-to-end suite checks every
+screen it visits.
 
 ## Data
 

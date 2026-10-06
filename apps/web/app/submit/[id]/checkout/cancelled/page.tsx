@@ -12,7 +12,7 @@ export const metadata: Metadata = generateBaseMetadata({
   noindex: true
 })
 
-/** `/submit/<id>/checkout/cancelled/` (#68, #70 screen 4f): back from Stripe without paying. */
+/** `/submit/<id>/checkout/cancelled/` (#68, #70 screen 4f): back from checkout without paying. */
 export default async function CheckoutCancelledPage({
   params
 }: {
