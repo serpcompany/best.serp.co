@@ -219,8 +219,8 @@ Listing logos and images are hosted in R2 under content-addressed keys, never ho
 `listing_media` stores the key with `sha256`, `content_type`, `bytes`, `width`, and `height`
 (all or none, and only a `best.serp.co/listings/` key) and keeps the source in `url`;
 `media_ingestions` (a runtime table) queues slots that are not hosted yet and holds a
-submission's hosted images (`best.serp.co/submissions/<id>/` keys) until approval copies them
-(`copy_from_key`). Approvals and admin edits host a logo or queue it, never store its URL.
+submission's or a revision's hosted images (`best.serp.co/submissions/<id>/`,
+`best.serp.co/revisions/<id>/` keys) until approval copies them (`copy_from_key`). Approvals and admin edits host a logo or queue it, never store its URL.
 Details: [Listing media](./MEDIA.md).
 
 ## Statement plans
