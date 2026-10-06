@@ -147,7 +147,8 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    under the cap of 10 conclusive checks), so parallel requests get one check and 429
    `cooldown` for the rest, and a stale result is refused with 409, never a 500. Refusals
    carry the current submission, so the page catches up (a check verified in another tab
-   shows as verified) or says when to check again. It then counts
+   shows as verified). The page sends one check per click burst and keeps Verify disabled
+   while it runs and through any wait the server asks for, behind its countdown. It then counts
    the fetch against an outbound budget whatever its result (20 an hour per submission, 60 per
    account, and 120 per client address, which accounts behind it share; 429 `check_budget`
    with `retryAfterSeconds`), fetches the website, and parses it as a browser would

@@ -495,13 +495,16 @@ test.describe('submit v2', () => {
     await stranger.close()
   })
 
-  test('explains a spent check budget and a check that finished elsewhere', async ({
+  test('starts one check per burst of clicks and keeps Verify disabled through every wait', async ({
     baseURL,
     browser
   }) => {
-    // PR #84 review round 2, finding 4. Both answers are slow to provoke for real (the budget
-    // is 20 checks an hour per submission, 30 seconds apart), so the test serves the verify
-    // API's answers in their real shapes and checks how the page handles them.
+    // Owner decision on #84: the first click starts the check, later clicks are ignored, and
+    // Verify stays disabled while the check runs and through any wait the server asks for,
+    // with no copy beyond the approved countdown. PR #84 review round 2, finding 4: refusals
+    // carry the submission, so the page catches up. A spent budget (20 checks an hour) and a
+    // check that finished elsewhere are slow to provoke for real, so the test serves those
+    // answers in their real shapes; the last check is real.
     const headers = { origin: new URL(baseURL ?? '').origin }
     const id = unique()
     const label = `stale-${id}`
@@ -533,10 +536,17 @@ test.describe('submit v2', () => {
     const verifyRoute = `**/api/submissions/${submission.id}/verify`
     const page = await owner.newPage()
     await page.goto(`/submit/${submission.id}/badge/`)
+    const verifyButton = page.getByRole('button', { name: 'Verify badge' })
+    const checkingButton = page.getByRole('button', { name: 'Checking…' })
+    let requests = 0
+    const slowly = () => new Promise(resolve => setTimeout(resolve, 1_000))
 
-    // The outbound check budget is spent: say when to come back, and wait until then.
-    await page.route(verifyRoute, route =>
-      route.fulfill({
+    // The outbound check budget is spent: a triple click sends one request, and Verify waits
+    // out the server's 10 minutes behind the countdown.
+    await page.route(verifyRoute, async route => {
+      requests += 1
+      await slowly()
+      await route.fulfill({
         headers: { 'Retry-After': '600' },
         json: {
           code: 'check_budget',
@@ -546,18 +556,23 @@ test.describe('submit v2', () => {
         },
         status: 429
       })
-    )
-    await page.getByRole('button', { name: 'Verify badge' }).click()
-    await expect(page.getByText('Too many checks for now')).toBeVisible()
-    await expect(page.getByText('10 minutes')).toBeVisible()
+    })
+    await verifyButton.click({ clickCount: 3 })
+    await expect(checkingButton).toBeDisabled()
     await expect(page.getByRole('button', { name: /Check again in (9:5\d|10:00)/u })).toBeDisabled()
+    expect(requests).toBe(1)
+    await expect(page.getByText('Too many checks for now')).toHaveCount(0)
     await expect(page.getByText('10 of 10')).toBeVisible()
 
-    // Another tab's check verified it first: show that, not an error.
+    // Another tab's check verified it first: three clicks in one tick, before the button can
+    // re-render as disabled, still send one request, and the page shows it verified.
     await page.unroute(verifyRoute)
     await page.reload()
-    await page.route(verifyRoute, route =>
-      route.fulfill({
+    requests = 0
+    await page.route(verifyRoute, async route => {
+      requests += 1
+      await slowly()
+      await route.fulfill({
         json: {
           code: 'verification_superseded',
           error: 'Another check of this badge finished first. Reload to see its result.',
@@ -565,10 +580,31 @@ test.describe('submit v2', () => {
         },
         status: 409
       })
-    )
-    await page.getByRole('button', { name: 'Verify badge' }).click()
+    })
+    await verifyButton.evaluate(button => {
+      for (let click = 0; click < 3; click += 1) (button as HTMLButtonElement).click()
+    })
+    await expect(checkingButton).toBeDisabled()
     await expect(page.getByText('Badge verified')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Stale is in the review queue' })).toBeVisible()
+    expect(requests).toBe(1)
+
+    // A real check: a double click sends one request, and Verify stays disabled while it runs
+    // and through the 30-second cooldown after it.
+    await page.unroute(verifyRoute)
+    await page.reload()
+    requests = 0
+    await page.route(verifyRoute, async route => {
+      requests += 1
+      await slowly()
+      await route.continue()
+    })
+    await verifyButton.dblclick()
+    await expect(checkingButton).toBeDisabled()
+    await expect(page.getByText('Page reached, badge not found')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Check again in 0:[0-3]\d/u })).toBeDisabled()
+    await expect(page.getByText('9 of 10')).toBeVisible()
+    expect(requests).toBe(1)
     await owner.close()
   })
 

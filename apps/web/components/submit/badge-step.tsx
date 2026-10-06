@@ -31,7 +31,7 @@ import {
   ShieldCheck
 } from 'lucide-react'
 import Link from 'next/link'
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import {
   checksLeft,
   checksPaused,
@@ -100,13 +100,6 @@ function unreachableReason(code: string): string {
 function formatCountdown(seconds: number): string {
   const whole = Math.max(0, Math.ceil(seconds))
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
-}
-
-/** "45 seconds", "1 minute", "12 minutes" */
-function formatWait(seconds: number): string {
-  if (seconds < 60) return `${Math.max(1, Math.ceil(seconds))} seconds`
-  const minutes = Math.ceil(seconds / 60)
-  return minutes === 1 ? '1 minute' : `${minutes} minutes`
 }
 
 function useNow(active: boolean): number {
@@ -187,10 +180,14 @@ export function BadgeStep({
 }: BadgeStepProps) {
   const [submission, setSubmission] = useState(initial)
   const [checking, setChecking] = useState(false)
+  // Owner decision on #84: one click starts one check. Clicks while it runs, even before the
+  // button re-renders as disabled, are dropped.
+  const inFlight = useRef(false)
   const [outcome, setOutcome] = useState<Outcome>(
     initial.lastVerificationError ? { code: initial.lastVerificationError } : null
   )
-  // When the outbound check budget allows another check (429 `check_budget`).
+  // When the outbound check budget allows another check (429 `check_budget`); until then
+  // Verify stays disabled with the countdown, and nothing else changes.
   const [budgetUntil, setBudgetUntil] = useState(0)
   const lastAt = verificationInstant(submission.lastVerificationAt)
   const cooldownUntil = lastAt === null ? 0 : lastAt + VERIFICATION_COOLDOWN_SECONDS * 1000
@@ -211,9 +208,13 @@ export function BadgeStep({
   }
 
   async function verify() {
+    if (inFlight.current) return
+    inFlight.current = true
     setChecking(true)
-    const response = await verifyBadge(submission.id)
-    setChecking(false)
+    const response = await verifyBadge(submission.id).finally(() => {
+      inFlight.current = false
+      setChecking(false)
+    })
     if (response.ok) {
       setSubmission(response.data.submission)
       setOutcome(response.data.result.ok ? null : response.data.result)
@@ -237,7 +238,6 @@ export function BadgeStep({
     if (current) setSubmission(current)
     if (error.code === 'check_budget') {
       setBudgetUntil(Date.now() + (error.retryAfterSeconds ?? VERIFICATION_COOLDOWN_SECONDS) * 1000)
-      setOutcome({ code: 'check_budget' })
       return
     }
     if (error.code === 'cooldown') {
@@ -353,17 +353,6 @@ export function BadgeStep({
         </p>
       </ToneAlert>
     ) : null
-  } else if (code === 'check_budget') {
-    result =
-      budgetSeconds > 0 ? (
-        <ToneAlert icon={Clock} title="Too many checks for now">
-          <p>
-            We’ve loaded {domain} as often as we can for the moment. You can check again in{' '}
-            <b className="text-foreground tabular-nums">{formatWait(budgetSeconds)}</b>. This didn’t
-            use up a check.
-          </p>
-        </ToneAlert>
-      ) : null
   } else if (code === 'badge_missing') {
     result = (
       <ToneAlert tone="warning" title="Page reached, badge not found">
