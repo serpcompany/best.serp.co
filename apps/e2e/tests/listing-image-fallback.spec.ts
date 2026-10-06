@@ -80,7 +80,10 @@ test.describe('listing image fallback (#122)', () => {
         images.map(element => {
           const image = element as HTMLImageElement
           const after = getComputedStyle(image, '::after')
+          const own = getComputedStyle(image)
           return {
+            // Alt text is drawn in the image's color: transparent and clipped in every engine.
+            altText: `${own.color} ${own.overflow}`,
             broken: image.complete && image.naturalWidth === 0,
             content: after.content,
             cover: after.backgroundImage,
@@ -91,6 +94,7 @@ test.describe('listing image fallback (#122)', () => {
       const broken = covers.filter(cover => cover.broken)
       expect(broken.length).toBeGreaterThan(0)
       for (const cover of broken) {
+        expect(cover.altText).toBe('rgba(0, 0, 0, 0) hidden')
         expect(cover.content).toBe('""')
         expect(cover.position).toBe('absolute')
         expect(cover.cover).toContain(tilePath)

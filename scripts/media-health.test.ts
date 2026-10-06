@@ -218,7 +218,10 @@ describe('media health issue (#122)', () => {
   })
   const finding = { key: key('alpha'), kind: 'logo', live: true, problem: 'missing', slug: 'alpha' }
 
-  function github(open: Array<{ body: string; number: number }>) {
+  const bot = { login: 'github-actions[bot]', type: 'Bot' }
+  function github(
+    open: Array<{ body: string; number: number; user: { login: string; type: string } }>
+  ) {
     const calls: string[] = []
     const fetcher = (async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input).replace('https://api.github.com', '')
@@ -231,14 +234,23 @@ describe('media health issue (#122)', () => {
 
   it('opens an issue for findings, updates the open one, and closes it when clean', async () => {
     const env = { GITHUB_TOKEN: 'token' }
-    const fresh = github([{ body: 'another issue', number: 3 }])
+    const marker = mediaHealthMarker('production')
+    // Someone else's issue holding the marker is never the report (#123 review S2).
+    const fresh = github([
+      { body: 'another issue', number: 3, user: bot },
+      { body: `${marker}\nplanted`, number: 4, user: { login: 'someone', type: 'User' } },
+      { body: `${marker}\nplanted`, number: 5, user: { login: 'github-actions', type: 'User' } }
+    ])
     expect(await fileMediaHealthIssue(report([finding]), env, fresh.fetcher)).toEqual({
       action: 'created',
       number: 7
     })
     expect(fresh.calls.at(-1)).toBe('POST /repos/serpcompany/best.serp.co/issues')
 
-    const open = [{ body: `${mediaHealthMarker('production')}\nold`, number: 12 }]
+    const open = [
+      { body: `${marker}\nplanted`, number: 13, user: { login: 'someone', type: 'User' } },
+      { body: `${marker}\nold`, number: 12, user: bot }
+    ]
     const update = github(open)
     expect(await fileMediaHealthIssue(report([finding]), env, update.fetcher)).toEqual({
       action: 'updated',

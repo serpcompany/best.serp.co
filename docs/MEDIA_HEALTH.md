@@ -18,6 +18,9 @@ suggestions, and the admin, account, and submit previews (`ProductLogo` in
   finds the broken image (`complete`, no natural width, and `decode()` rejects) and swaps it. Until
   then its `::after`, which Chromium and Firefox draw only for a broken image, paints the tile
   over the broken-image icon and the alt text.
+- **Alt text, in every engine and without JavaScript:** a broken image draws it in its own
+  `color`, which is transparent and clipped (`text-transparent overflow-hidden`), so Safari never
+  shows it either. The `alt` attribute stays for assistive technology.
 
 Every listing image carries `data-listing-image="logo|image"`. Guards:
 
@@ -57,7 +60,8 @@ never writes, so it never re-queues anything itself.
 `media-health.yml` runs every Monday (and on dispatch) for production: the check, then
 `pnpm media:health:issue`, which holds only the job's `GITHUB_TOKEN` (issues: write) and opens one
 issue with the findings, updates the open one, or closes it with a comment once the check is
-clean. As with the notifier, a schedule on `staging` (the default branch) relays to `main`. In the
+clean. Only an issue `github-actions[bot]` opened counts, so a planted marker is ignored, and the
+checkout keeps no token (`persist-credentials: false`) for the step that holds the Cloudflare one. As with the notifier, a schedule on `staging` (the default branch) relays to `main`. In the
 [credential guards](./RELEASE_GUARDS.md#d1-data-stays-in-cloudflare) the check's exact command is a
 token step without D1 changes, so it needs no bookmark; any variant still does.
 

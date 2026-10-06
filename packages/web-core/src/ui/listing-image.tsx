@@ -17,7 +17,10 @@ import {
  * - a load error after hydration: `onError` swaps in the tile, in the same box (no layout shift);
  * - a load error before hydration, when no listener was attached yet: the ref finds the broken
  *   image on mount and swaps it, and until then its `::after` (drawn only for a broken image in
- *   Chromium and Firefox) paints the tile over the icon and the alt text.
+ *   Chromium and Firefox) paints the tile over the icon and the alt text;
+ * - in every engine, Safari included, and without JavaScript: a broken image draws its alt text
+ *   in the image's own `color`, which is transparent and clipped to the box, so the alt text
+ *   stays in the markup for assistive technology but is never visible (#123 review S1).
  *
  * `scripts/listing-image-guard.test.ts` fails when a listing image renders anywhere else.
  */
@@ -29,7 +32,9 @@ export const LISTING_IMAGE_ATTRIBUTE = 'data-listing-image'
 /** Featured images are social images: 1200×630, so a swap to the tile keeps the box. */
 export const LISTING_FEATURED_IMAGE_RATIO = 1200 / 630
 
-// Full class names, so Tailwind finds them: the tile over a broken image, before hydration.
+// Full class names, so Tailwind finds them. Alt text is drawn in the image's `color`: never seen.
+const hiddenAltText = 'overflow-hidden text-transparent'
+// The tile over a broken image, before hydration.
 const brokenLogoCover =
   "relative after:absolute after:inset-0 after:bg-card after:bg-[url('/listing-logos/favicon-fallback-512x512.png')] after:bg-contain after:bg-center after:bg-no-repeat after:content-['']"
 const brokenImageCover =
@@ -87,7 +92,11 @@ export function ListingImage({
         <img
           {...shared}
           alt={showTile ? '' : `${name} featured image`}
-          className={cn('size-full object-contain', showTile ? 'p-[10%]' : brokenImageCover)}
+          className={cn(
+            'size-full object-contain',
+            hiddenAltText,
+            showTile ? 'p-[10%]' : brokenImageCover
+          )}
         />
       </AspectRatio>
     )
@@ -99,7 +108,12 @@ export function ListingImage({
       alt={showTile ? `${name} fallback logo` : `${name} logo`}
       width={size}
       height={size}
-      className={cn('shrink-0 object-contain', !showTile && brokenLogoCover, className)}
+      className={cn(
+        'shrink-0 object-contain',
+        hiddenAltText,
+        !showTile && brokenLogoCover,
+        className
+      )}
       style={{ height: size, width: size }}
     />
   )

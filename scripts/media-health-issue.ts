@@ -6,8 +6,8 @@ import { project } from './project'
 
 /**
  * Files a media health report (`media-health.ts`, serpcompany/best.serp.co#122) as one GitHub
- * issue per environment: findings open the issue, or update the open one; a clean report closes
- * it with a comment. It holds only the workflow's `GITHUB_TOKEN` (issues: write), never a
+ * issue per environment: findings open the issue, or update the open one the workflow opened; a
+ * clean report closes it with a comment. It holds only the workflow's `GITHUB_TOKEN` (issues: write), never a
  * Cloudflare credential, and exits 1 while there are findings so the run shows them.
  */
 
@@ -15,6 +15,22 @@ interface GitHubIssue {
   body?: string | null
   number: number
   pull_request?: unknown
+  user?: { login?: string; type?: string } | null
+}
+
+/**
+ * Who opens the report issue: the workflow's `GITHUB_TOKEN`. The repository is public, so anyone
+ * can open an issue holding the marker; only the bot's own issue is the report (#123 review S2).
+ */
+export const REPORT_ISSUE_AUTHOR = 'github-actions[bot]'
+
+export function isReportIssue(issue: GitHubIssue, marker: string): boolean {
+  return (
+    !issue.pull_request &&
+    issue.user?.login === REPORT_ISSUE_AUTHOR &&
+    issue.user.type === 'Bot' &&
+    Boolean(issue.body?.includes(marker))
+  )
 }
 
 type Request = <T>(path: string, init?: RequestInit) => Promise<T>
@@ -45,7 +61,7 @@ async function findOpenIssue(request: Request, marker: string): Promise<GitHubIs
     const issues = await request<GitHubIssue[]>(
       `/repos/${project.repository}/issues?state=open&per_page=100&page=${page}`
     )
-    const match = issues.find(issue => !issue.pull_request && issue.body?.includes(marker))
+    const match = issues.find(issue => isReportIssue(issue, marker))
     if (match) return match
     if (issues.length < 100) return null
   }

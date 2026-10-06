@@ -42,6 +42,9 @@ describe('ListingImage (#122)', () => {
     // Drawn only for a broken image, so the icon and alt text never show before hydration.
     expect(img.class).toContain("after:bg-[url('/listing-logos/favicon-fallback-512x512.png')]")
     expect(img.class).toContain("after:content-['']")
+    // Every engine (Safari draws no ::after on an <img>): the alt text is transparent and clipped.
+    expect(img.class).toContain('text-transparent')
+    expect(img.class).toContain('overflow-hidden')
   })
 
   it('renders a featured image in a fixed 1200x630 box, as the tile would be', () => {
@@ -53,6 +56,8 @@ describe('ListingImage (#122)', () => {
     expect(img.alt).toBe('Acme featured image')
     expect(img['data-listing-image']).toBe('image')
     expect(img.class).toContain('after:bg-[url(')
+    expect(img.class).toContain('text-transparent')
+    expect(img.class).toContain('overflow-hidden')
 
     const tile = image(renderToStaticMarkup(<ListingImage kind="image" name="Acme" src={null} />))
     expect(tile.src).toBe(LISTING_LOGO_FALLBACK_PATH)

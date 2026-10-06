@@ -1295,6 +1295,9 @@ describe('D1 data stays in Cloudflare', () => {
       GITHUB_TOKEN: expression('github.token')
     })
     expect(job.permissions).toEqual({ contents: 'read', issues: 'write' })
+    // The checkout leaves no GITHUB_TOKEN behind for the Cloudflare step (#123 review S2).
+    const checkout = stepsOf(job).find(step => step.uses?.startsWith('actions/checkout@'))
+    expect(checkout?.with?.['persist-credentials']).toBe(false)
     expect(workflow.on.schedule).toHaveLength(1)
 
     const audit = d1ChangeAudit([[mediaHealthWorkflow, workflow]])

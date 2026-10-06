@@ -60,9 +60,12 @@ jobs:
           echo "::warning title=Media health check skipped::$message"
           echo "$message" >> "$GITHUB_STEP_SUMMARY"
 
+      # No token left in .git/config: the Cloudflare step never holds the job's issues: write.
       - name: Checkout reviewed source
         if: steps.credentials.outputs.configured == 'true'
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Install
         if: steps.credentials.outputs.configured == 'true'
