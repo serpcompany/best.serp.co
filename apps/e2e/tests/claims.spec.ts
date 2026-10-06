@@ -248,6 +248,27 @@ test('refuses expired and over-attempt codes, and requests without a session or 
   expect(await locked.json()).toMatchObject({ code: 'too_many_attempts', retryAfterSeconds: 900 })
   expect((await step(user.client, opened.id, 'confirm', { code: fresh })).status()).toBe(429)
 
+  // An imported listing that links through serp.ly is claimed through its product's domain:
+  // SERP's own mail never proves it (#108 review round 1).
+  const imported = `e2e-claim-serply-${key}`
+  claimsD1(`
+    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
+      source_kind, source_identity, checksum)
+    VALUES (${q(imported)}, ${q(`${key}-tool.example`)}, 'Imported product', 'd',
+      ${q(`https://serp.ly/${key}`)}, 'Imported.', 'draft', '2026-05-16',
+      'legacy-json-migration-v1', ${q(imported)}, ${q(`e2e-${imported}`)});
+    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+      SELECT ${q(imported)}, id, 0, 1 FROM categories WHERE slug = 'e2e-claim-tools';
+    UPDATE listings SET status = 'approved' WHERE id = ${q(imported)};
+  `)
+  const serply = await claim(user.client, {
+    email: 'team@serp.ly',
+    listing: `${key}-tool.example`,
+    method: 'badge'
+  })
+  expect(serply.status()).toBe(422)
+  expect(await serply.json()).toMatchObject({ code: 'domain_mismatch' })
+
   // Someone else's claim reads as missing.
   const stranger = await account(`stranger-${key}@example.com`)
   expect((await step(stranger.client, opened.id, 'confirm', { code: fresh })).status()).toBe(404)

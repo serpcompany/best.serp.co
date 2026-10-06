@@ -21,21 +21,19 @@ const SECOND = 1000
 const MINUTE = 60 * SECOND
 
 describe('claim addresses', () => {
-  const website = 'https://www.brieflow.ai/'
-  it('accepts an address on the website’s registrable domain, subdomains included', () => {
+  const website = 'brieflow.ai'
+  it('accepts an address on the product’s registrable domain, subdomains included', () => {
     expect(checkClaimAddress(' Jordan@Brieflow.AI ', website)).toEqual({
       address: 'jordan@brieflow.ai',
       domain: 'brieflow.ai',
       ok: true
     })
-    expect(checkClaimAddress('jordan@mail.brieflow.ai', 'https://app.brieflow.ai/x')).toMatchObject(
-      {
-        domain: 'brieflow.ai',
-        ok: true
-      }
-    )
+    expect(checkClaimAddress('jordan@mail.brieflow.ai', 'brieflow.ai')).toMatchObject({
+      domain: 'brieflow.ai',
+      ok: true
+    })
     // The Public Suffix List's private section: each github.io site is its own domain.
-    expect(checkClaimAddress('me@alice.github.io', 'https://alice.github.io/')).toMatchObject({
+    expect(checkClaimAddress('me@alice.github.io', 'alice.github.io')).toMatchObject({
       ok: true
     })
   })
@@ -46,7 +44,7 @@ describe('claim addresses', () => {
       problem: 'webmail'
     })
     // Webmail is refused even on the provider’s own listing.
-    expect(checkClaimAddress('someone@gmail.com', 'https://gmail.com/')).toEqual({
+    expect(checkClaimAddress('someone@gmail.com', 'gmail.com')).toEqual({
       ok: false,
       problem: 'webmail'
     })
@@ -57,12 +55,19 @@ describe('claim addresses', () => {
     expect(checkClaimAddress('jordan@notbrieflow.ai', website)).toMatchObject({
       problem: 'domain_mismatch'
     })
-    expect(checkClaimAddress('me@bob.github.io', 'https://alice.github.io/')).toMatchObject({
+    expect(checkClaimAddress('me@bob.github.io', 'alice.github.io')).toMatchObject({
       problem: 'domain_mismatch'
     })
-    expect(checkClaimAddress('me@github.io', 'https://github.io/')).toMatchObject({
+    expect(checkClaimAddress('me@github.io', 'github.io')).toMatchObject({
       problem: 'invalid_email'
     })
+    // SERP's own domains never prove a product (#108 review round 1).
+    for (const serp of ['serp.ly', 'serp.co']) {
+      expect(checkClaimAddress(`team@${serp}`, serp)).toEqual({
+        ok: false,
+        problem: 'domain_mismatch'
+      })
+    }
     for (const bad of ['jordan', 'jordan@', '@brieflow.ai', 'a b@brieflow.ai', 'x@brieflow']) {
       expect(checkClaimAddress(bad, website), bad).toEqual({ ok: false, problem: 'invalid_email' })
     }
@@ -119,6 +124,11 @@ describe('claim flow', () => {
     to: string
   }>
   let badge: BadgeVerificationResult
+  /** Where each listing link lands (`serp.ly` links), as the safe fetcher would find. */
+  let landings: Record<string, string | null>
+  let checkedPages: string[]
+  /** Sends per address, for the recipient cap. */
+  let sendsTo: Record<string, number>
 
   function deps(paidClaims = false): ClaimDependencies {
     return {
@@ -127,6 +137,11 @@ describe('claim flow', () => {
       now: () => new Date(clock),
       operations: createClaimOperations({ client: createDatabase(sqlite.asD1Database()) }),
       paidClaims,
+      resolveLanding: async url => landings[url] ?? null,
+      async sendBudget({ address }) {
+        sendsTo[address] = (sendsTo[address] ?? 0) + 1
+        return sendsTo[address] > 3 ? { retryAfterSeconds: 3600 } : null
+      },
       async sendCode(input) {
         sent.push(input)
       }
@@ -137,7 +152,10 @@ describe('claim flow', () => {
     return {
       ...deps(),
       budget: async () => null,
-      verifyBadge: async () => badge
+      verifyBadge: async (claim: { productUrl: string }) => {
+        checkedPages.push(claim.productUrl)
+        return badge
+      }
     }
   }
 
@@ -147,6 +165,9 @@ describe('claim flow', () => {
   beforeEach(() => {
     clock = START
     sent = []
+    landings = {}
+    checkedPages = []
+    sendsTo = {}
     badge = { ok: true }
     sqlite = new SqliteD1()
     sqlite.database.exec(`
@@ -159,7 +180,11 @@ describe('claim flow', () => {
     `)
     for (const [id, slug, website] of [
       ['lst_brief', 'brieflow', 'https://www.brieflow.ai/'],
-      ['lst_owned', 'owned-tool', 'https://owned.example/']
+      ['lst_owned', 'owned-tool', 'https://owned.example/'],
+      // Imported listings link through serp.ly: by a domain slug, or a name slug.
+      ['lst_jasper', 'jasper.ai', 'https://serp.ly/jasper'],
+      ['lst_named', 'notion', 'https://serp.ly/notion'],
+      ['lst_lost', 'lost-tool', 'https://serp.ly/lost']
     ] as const) {
       sqlite.database.exec(`
         INSERT INTO listings (id, slug, name, description, website, status, source_kind,
@@ -298,26 +323,15 @@ describe('claim flow', () => {
     expect(sent).toEqual([])
   })
 
-  it('expires codes, limits resends, and locks after five wrong codes', async () => {
+  it('expires codes, limits resends, and counts wrong codes across resends', async () => {
     const claim = await startBadge()
-    // Resend: not within a minute, then a new code that replaces the old one.
-    await expect(
-      startClaim(deps(), {
-        email: 'jordan@brieflow.ai',
-        listingSlug: 'brieflow',
-        method: 'badge',
-        userId: 'user_a'
-      })
-    ).resolves.toMatchObject({ code: 'cooldown', status: 429 })
-    const first = lastCode()
+    const again = (email = 'jordan@brieflow.ai') =>
+      startClaim(deps(), { email, listingSlug: 'brieflow', method: 'badge', userId: 'user_a' })
+    // Resend: not within a minute.
+    await expect(again()).resolves.toMatchObject({ code: 'cooldown', status: 429 })
     clock += 61 * SECOND
     await startBadge()
     expect(sent.map(item => item.codesSent)).toEqual([1, 2])
-    if (first !== lastCode()) {
-      await expect(
-        confirmClaimEmail(deps(), { claimId: claim.id, code: first, userId: 'user_a' })
-      ).resolves.toMatchObject({ code: 'invalid_code', attemptsLeft: 4 })
-    }
 
     // Expired after 10 minutes.
     clock += 10 * MINUTE + SECOND
@@ -325,38 +339,112 @@ describe('claim flow', () => {
       confirmClaimEmail(deps(), { claimId: claim.id, code: lastCode(), userId: 'user_a' })
     ).resolves.toMatchObject({ code: 'code_expired', status: 410 })
 
-    // A fresh code, then five wrong ones: locked for 15 minutes, and the code is burned.
+    // Four wrong codes, then a new code to another address: the count carries over, so the
+    // next wrong code locks the claim for 15 minutes (#108 review round 1, finding 2).
     await startBadge()
-    const right = lastCode()
-    const wrong = right === '000000' ? '111111' : '000000'
+    const wrongFor = (code: string) => (code === '000000' ? '111111' : '000000')
     for (let attempt = 1; attempt <= 4; attempt += 1) {
       await expect(
-        confirmClaimEmail(deps(), { claimId: claim.id, code: wrong, userId: 'user_a' })
+        confirmClaimEmail(deps(), {
+          claimId: claim.id,
+          code: wrongFor(lastCode()),
+          userId: 'user_a'
+        })
       ).resolves.toMatchObject({ attemptsLeft: 5 - attempt, code: 'invalid_code' })
     }
+    clock += 61 * SECOND
+    await startBadge('ops@brieflow.ai')
+    const right = lastCode()
     await expect(
-      confirmClaimEmail(deps(), { claimId: claim.id, code: wrong, userId: 'user_a' })
+      confirmClaimEmail(deps(), { claimId: claim.id, code: wrongFor(right), userId: 'user_a' })
     ).resolves.toMatchObject({ code: 'too_many_attempts', retryAfterSeconds: 900, status: 429 })
     await expect(
       confirmClaimEmail(deps(), { claimId: claim.id, code: right, userId: 'user_a' })
     ).resolves.toMatchObject({ code: 'too_many_attempts' })
-    await expect(
-      startClaim(deps(), {
-        email: 'jordan@brieflow.ai',
-        listingSlug: 'brieflow',
-        method: 'badge',
-        userId: 'user_a'
-      })
-    ).resolves.toMatchObject({ code: 'too_many_attempts' })
-    // After the lockout the right code is still spent; a new one works.
+    await expect(again('ops@brieflow.ai')).resolves.toMatchObject({ code: 'too_many_attempts' })
+    // After the lockout the burned code stays spent; a new one works.
     clock += 15 * MINUTE + SECOND
     await expect(
       confirmClaimEmail(deps(), { claimId: claim.id, code: right, userId: 'user_a' })
     ).resolves.toMatchObject({ code: 'code_expired' })
-    await startBadge()
+    await startBadge('ops@brieflow.ai')
     await expect(
       confirmClaimEmail(deps(), { claimId: claim.id, code: lastCode(), userId: 'user_a' })
     ).resolves.toMatchObject({ claim: { status: 'email_verified' }, ok: true })
+    // Three codes an hour to one address: a fourth to jordan@ is refused.
+    clock += 61 * SECOND
+    await expect(again()).resolves.toMatchObject({ code: 'cooldown', retryAfterSeconds: 3600 })
+  })
+
+  it('claims a serp.ly-linked listing only through the product’s own domain', async () => {
+    // A domain slug is the product's domain; the badge is checked on that domain's page.
+    const start = (listingSlug: string, email: string) =>
+      startClaim(deps(), { email, listingSlug, method: 'badge', userId: 'user_a' })
+    await expect(start('jasper.ai', 'jo@serp.ly')).resolves.toMatchObject({
+      code: 'domain_mismatch'
+    })
+    const jasper = await start('jasper.ai', 'jo@jasper.ai')
+    if (!jasper.ok) throw new Error(jasper.code)
+    await confirmClaimEmail(deps(), {
+      claimId: jasper.claim.id,
+      code: lastCode(),
+      userId: 'user_a'
+    })
+    await checkClaimBadge(badgeDeps(), { actor: 'a', claimId: jasper.claim.id, userId: 'user_a' })
+    expect(checkedPages).toEqual(['https://jasper.ai/'])
+    expect(row(`SELECT product_url FROM listing_claims WHERE listing_id='lst_jasper'`)).toEqual({
+      product_url: 'https://jasper.ai/'
+    })
+    // The weekly program checks the claimer's product page, not the serp.ly link.
+    const program = createBadgeProgramOperations({ client: createDatabase(sqlite.asD1Database()) })
+    const due = await program.weeklyDue({
+      cycleStart: '2026-10-05T03:15:00.000Z',
+      limit: 10,
+      now: new Date(clock).toISOString()
+    })
+    expect(due.map(item => [item.id, item.website])).toEqual([['lst_jasper', 'https://jasper.ai/']])
+
+    // A name slug: the serp.ly link's landing page decides (the safe fetcher follows it).
+    landings['https://serp.ly/notion'] = 'https://www.notion.com/?fpr=devin'
+    await expect(start('notion', 'jo@serp.ly')).resolves.toMatchObject({ code: 'domain_mismatch' })
+    const notion = await start('notion', 'jo@notion.com')
+    if (!notion.ok) throw new Error(notion.code)
+    expect(
+      row(`SELECT email_domain, product_url FROM listing_claims WHERE listing_id='lst_named'`)
+    ).toEqual({
+      email_domain: 'notion.com',
+      product_url: 'https://www.notion.com/'
+    })
+    // A link that lands nowhere, or on SERP's own page: no product domain, no claim.
+    for (const landing of [null, 'https://serp.co/products/lost-tool/']) {
+      landings['https://serp.ly/lost'] = landing
+      await expect(start('lost-tool', 'jo@lost.example')).resolves.toMatchObject({
+        code: 'no_product_domain',
+        status: 409
+      })
+    }
+  })
+
+  it('re-checks the product domain at completion and reports a removed ownership', async () => {
+    const claim = await startBadge()
+    await confirmClaimEmail(deps(), { claimId: claim.id, code: lastCode(), userId: 'user_a' })
+    // An admin moved the website to another domain meanwhile: the claim can't complete.
+    sqlite.database.exec(`UPDATE listings SET website='https://brieflow.com/' WHERE id='lst_brief'`)
+    await expect(
+      checkClaimBadge(badgeDeps(), { actor: 'a', claimId: claim.id, userId: 'user_a' })
+    ).resolves.toMatchObject({ code: 'changed', status: 409 })
+    sqlite.database.exec(
+      `UPDATE listings SET website='https://www.brieflow.ai/' WHERE id='lst_brief'`
+    )
+    await expect(
+      checkClaimBadge(badgeDeps(), { actor: 'a', claimId: claim.id, userId: 'user_a' })
+    ).resolves.toMatchObject({ claim: { status: 'completed' }, ok: true })
+    // The badge program removes the owner later: a replay no longer reports success.
+    sqlite.database.exec(`UPDATE listing_owners SET revoked_at='2026-10-07T00:00:00.000Z',
+      revoked_reason='badge_removed' WHERE listing_id='lst_brief'`)
+    await expect(
+      checkClaimBadge(badgeDeps(), { actor: 'a', claimId: claim.id, userId: 'user_a' })
+    ).resolves.toMatchObject({ code: 'not_owner', status: 409 })
   })
 
   it('keeps each claim to its claimer and lets only the first completion win', async () => {
@@ -420,6 +508,19 @@ describe('claim flow', () => {
     await expect(
       checkClaimBadge(badgeDeps(), { actor: 'a', claimId: started.claim.id, userId: 'user_a' })
     ).resolves.toMatchObject({ code: 'invalid_method' })
+    // A rival's confirmed paid claim, completed after this one, answers with the contact path.
+    const rival = await startClaim(deps(true), {
+      email: 'priya@brieflow.ai',
+      listingSlug: 'brieflow',
+      method: 'paid',
+      userId: 'user_b'
+    })
+    if (!rival.ok) throw new Error(rival.code)
+    await confirmClaimEmail(deps(true), {
+      claimId: rival.claim.id,
+      code: lastCode(),
+      userId: 'user_b'
+    })
     await expect(
       completePaidClaim(deps(false), {
         actor: 'stripe',
@@ -437,6 +538,9 @@ describe('claim flow', () => {
     expect(row(`SELECT verified_via FROM listing_owners WHERE listing_id='lst_brief'`)).toEqual({
       verified_via: 'paid_claim'
     })
+    await expect(
+      completePaidClaim(deps(true), { actor: 'stripe', claimId: rival.claim.id, userId: 'user_b' })
+    ).resolves.toMatchObject({ code: 'already_owned', contactPath: '/contact/' })
     // Never badge-checked by the weekly program.
     const program = createBadgeProgramOperations({ client: createDatabase(sqlite.asD1Database()) })
     await expect(

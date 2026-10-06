@@ -382,19 +382,36 @@ describe('single-site D1-only repository architecture', () => {
     expect(notifier).toContain('validateNotificationContext')
 
     expect(existsSync(resolve(project.appDirectory, 'lib/url-safety.ts'))).toBe(false)
-    // Every fetch of a submitter's URL (badge checks, prefill, logos) goes through the safe
-    // fetcher, which validates each hop with the shared public-URL policy.
-    const safeFetch = readFileSync(
-      resolve(project.appDirectory, 'lib/submissions/safe-fetch.ts'),
-      'utf8'
-    )
-    expect(safeFetch).toContain("from '@serpdirectory/data-ops/public-url'")
+    // Every fetch of a submitter's URL (badge checks, prefill, logos) and of listing media goes
+    // through the one shared safe fetcher, which validates each hop with the public-URL policy
+    // (#95 moved submit v2's copy into data-ops).
+    expect(existsSync(resolve(project.appDirectory, 'lib/submissions/safe-fetch.ts'))).toBe(false)
+    const safeFetch = readFileSync(resolve('packages/data-ops/src/safe-fetch.ts'), 'utf8')
+    expect(safeFetch).toContain("from './public-url'")
+    expect(safeFetch).toContain("from './mime-type'")
     expect(safeFetch).toContain("redirect: 'manual'")
     for (const file of ['badge-verifier.ts', 'prefill.ts']) {
       const source = readFileSync(resolve(project.appDirectory, 'lib/submissions', file), 'utf8')
-      expect(source, file).toContain("from './safe-fetch'")
+      expect(source, file).toContain("from '@serpdirectory/data-ops/safe-fetch'")
       expect(source, file).not.toMatch(/\bfetcher\(|\bawait fetch\(/u)
     }
+    const ingest = readFileSync(resolve('packages/data-ops/src/media-ingest.ts'), 'utf8')
+    expect(ingest).toContain("from './safe-fetch'")
+    expect(ingest).not.toMatch(/\bfetcher\(|\bawait fetch\(/u)
+    // The site parser has one copy, in data-ops; prefill re-exports it.
+    expect(
+      readFileSync(resolve(project.appDirectory, 'lib/submissions/prefill.ts'), 'utf8')
+    ).not.toMatch(/function parseSiteMetadata|const NAMED_ENTITIES/u)
+    // Only the media adapter touches the R2 binding; everything else goes through it.
+    const mediaBindingUsers = trackedFiles().filter(
+      file =>
+        file.startsWith('apps/web/') &&
+        /\.(?:m?[jt]sx?)$/u.test(file) &&
+        !/\.test\.[jt]sx?$/u.test(file) &&
+        existsSync(resolve(file)) &&
+        /\benv\.MEDIA\b|\.MEDIA\??\./u.test(readFileSync(resolve(file), 'utf8'))
+    )
+    expect(mediaBindingUsers).toEqual(['apps/web/lib/media/worker-media.ts'])
     const publicUrl = readFileSync(resolve('packages/data-ops/src/public-url.ts'), 'utf8')
     expect(publicUrl).toContain('validatePublicHttpUrl')
     expect(publicUrl).not.toMatch(/getCloudflareContext|process\.env|node:net/u)

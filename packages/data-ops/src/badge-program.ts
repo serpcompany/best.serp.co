@@ -210,13 +210,23 @@ const SUBMISSION_OWNER = (listingSql: string, submitterSql: string) => `COALESCE
         AND ro.revoked_at IS NOT NULL)))`
 
 /**
+ * The page the program checks: a badge claimer's product page, recorded when they claimed it
+ * (#67: most imported listings link through `serp.ly`, whose page never shows the badge; #108
+ * review round 1), else the listing's website (a submitted listing's own site).
+ */
+const CHECKED_WEBSITE = `COALESCE(CASE WHEN fs.id IS NULL THEN (SELECT cl.product_url
+    FROM listing_claims cl WHERE cl.listing_id=l.id AND cl.user_id=o.user_id
+      AND cl.status='completed' AND cl.method='badge'
+    ORDER BY cl.completed_at DESC,cl.id DESC LIMIT 1) END,l.website)`
+
+/**
  * The live listings the program checks, with their branch, owner, and warning (columns
  * `warning_*` are null unless the listing is in warning). Binds the warning cutoff, then now.
  * A free listing whose own submission is in review (`paid_pending_review`: an upgrade, or
  * `changes_requested`) waits until that decision: unpublishing is refused meanwhile, so checking
  * it would only fetch the site again every hour (round 1, suggestion 4).
  */
-const PROGRAM_LISTINGS = `SELECT l.id,l.slug,l.name,l.website,
+const PROGRAM_LISTINGS = `SELECT l.id,l.slug,l.name,${CHECKED_WEBSITE} AS website,
     CASE WHEN fs.id IS NULL THEN 'revoke' ELSE 'unpublish' END AS branch,
     u.id AS owner_user_id,u.email AS owner_email,
     w.id AS warning_id,w.checked_at AS warning_checked_at,w.reason AS warning_reason

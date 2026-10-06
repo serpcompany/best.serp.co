@@ -1,13 +1,28 @@
-import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
-import { type SafeFetchFailure, safeFetch } from './safe-fetch'
+import { type SafeFetchFailure, safeFetch } from '@serpdirectory/data-ops/safe-fetch'
+import {
+  iconCandidates,
+  type ProposedText,
+  parseSiteMetadata,
+  type SiteMetadata
+} from '@serpdirectory/data-ops/site-metadata'
+
+// The page parser is shared with media ingestion (#95); the form-specific proposals stay here.
+export {
+  decodeEntities,
+  iconCandidates,
+  type MetadataSource,
+  type ProposedText,
+  parseSiteMetadata,
+  type SiteMetadata
+} from '@serpdirectory/data-ops/site-metadata'
 
 /**
  * URL prefill for `/submit` (serpcompany/best.serp.co#59, #63), without AI: read the submitted
  * page's title, description, icons, and social image, and propose them. Every proposal stays
- * editable in the form. Logos are referenced by their public URL (the logo decision in
- * docs/SUBMISSION_FLOW.md), so a proposed image is fetched once to check that it is a PNG,
- * JPEG, WebP, or SVG image of at most 1 MB and, when its size can be read, at least 128 px on
- * its shorter side.
+ * editable in the form. A proposed or pasted logo is fetched once to check that it is a PNG,
+ * JPEG, or WebP image of at most 1 MB and, when its size can be read, at least 128 px on its
+ * shorter side. An SVG is refused (#95: logos are copied to our media host, which never serves
+ * SVG); the saved logo is then hosted under the submission (`hostSubmissionMedia`).
  */
 
 export const MAX_PAGE_BYTES = 1_000_000
@@ -31,19 +46,6 @@ export type LogoCheck =
   | { image: ImageInfo; ok: true; url: string }
   | { code: 'logo_not_image' | 'logo_too_large' | 'logo_too_small' | 'logo_unreachable'; ok: false }
 
-export type MetadataSource =
-  | 'application-name'
-  | 'meta description'
-  | 'og:description'
-  | 'og:site_name'
-  | 'page title'
-  | 'twitter:description'
-
-export interface ProposedText {
-  source: MetadataSource
-  value: string
-}
-
 export interface SitePrefill {
   description: ProposedText | null
   /** The page's host, without `www.`, for the form's messages ("We filled in 3 fields from…"). */
@@ -58,155 +60,6 @@ export interface SitePrefill {
 export type SitePrefillResult =
   | ({ ok: true } & SitePrefill)
   | { code: SafeFetchFailure; host: string; ok: false }
-
-interface IconCandidate {
-  href: string
-  /** The larger declared side; null for `any` or undeclared. */
-  size: number | null
-  touch: boolean
-  vector: boolean
-}
-
-export interface SiteMetadata {
-  applicationName: string | null
-  description: ProposedText | null
-  icons: IconCandidate[]
-  ogSiteName: string | null
-  socialImage: string | null
-  title: string | null
-}
-
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: '&',
-  apos: "'",
-  gt: '>',
-  hellip: '…',
-  laquo: '«',
-  ldquo: '“',
-  lsquo: '‘',
-  lt: '<',
-  mdash: '—',
-  middot: '·',
-  nbsp: ' ',
-  ndash: '–',
-  quot: '"',
-  raquo: '»',
-  rdquo: '”',
-  rsquo: '’'
-}
-
-export function decodeEntities(value: string): string {
-  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/giu, (match, entity: string) => {
-    if (entity[0] === '#') {
-      const code =
-        entity[1]?.toLowerCase() === 'x'
-          ? Number.parseInt(entity.slice(2), 16)
-          : Number.parseInt(entity.slice(1), 10)
-      return Number.isInteger(code) && code > 0 && code <= 0x10ffff
-        ? String.fromCodePoint(code)
-        : match
-    }
-    return NAMED_ENTITIES[entity.toLowerCase()] ?? match
-  })
-}
-
-function clean(value: string | null | undefined): string | null {
-  if (!value) return null
-  const text = decodeEntities(value)
-    // Control characters and the replacement character never belong in a listing.
-    .replace(/[\p{Cc}�]/gu, ' ')
-    .replace(/\s+/gu, ' ')
-    .trim()
-  return text || null
-}
-
-function attribute(tag: string, name: string): string | null {
-  const match = tag.match(
-    new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'iu')
-  )
-  return match ? (match[1] ?? match[2] ?? match[3] ?? null) : null
-}
-
-function absolute(href: string | null, base: string): string | null {
-  const value = href?.trim()
-  if (!value || value.startsWith('data:')) return null
-  try {
-    const url = new URL(decodeEntities(value), base)
-    return validatePublicHttpUrl(url.toString()).ok ? url.toString() : null
-  } catch {
-    return null
-  }
-}
-
-function declaredSize(sizes: string | null): number | null {
-  if (!sizes) return null
-  let largest: number | null = null
-  for (const token of sizes.toLowerCase().split(/\s+/u)) {
-    const match = token.match(/^(\d{1,5})x(\d{1,5})$/u)
-    if (match) largest = Math.max(largest ?? 0, Math.min(Number(match[1]), Number(match[2])))
-  }
-  return largest
-}
-
-/** The document head (or the first 256 KB), where metadata lives. */
-function headOf(html: string): string {
-  const end = html.search(/<\/head\s*>|<body[\s>]/iu)
-  return (end === -1 ? html : html.slice(0, end)).slice(0, 256_000)
-}
-
-export function parseSiteMetadata(html: string, pageUrl: string): SiteMetadata {
-  const head = headOf(html)
-  const meta = new Map<string, string>()
-  for (const match of head.matchAll(/<meta\b[^>]*>/giu)) {
-    const tag = match[0]
-    const key = (attribute(tag, 'property') ?? attribute(tag, 'name'))?.trim().toLowerCase()
-    const content = attribute(tag, 'content')
-    if (key && content !== null && !meta.has(key)) meta.set(key, content)
-  }
-  const icons: IconCandidate[] = []
-  for (const match of head.matchAll(/<link\b[^>]*>/giu)) {
-    const tag = match[0]
-    const rel = (attribute(tag, 'rel') ?? '').toLowerCase().split(/\s+/u)
-    const touch = rel.includes('apple-touch-icon') || rel.includes('apple-touch-icon-precomposed')
-    if (!touch && !rel.includes('icon')) continue
-    const href = absolute(attribute(tag, 'href'), pageUrl)
-    if (!href) continue
-    const type = (attribute(tag, 'type') ?? '').toLowerCase()
-    const vector = type === 'image/svg+xml' || /\.svg(?:[?#]|$)/iu.test(href)
-    // An apple-touch-icon without `sizes` is 180 × 180 by convention.
-    icons.push({
-      href,
-      size: declaredSize(attribute(tag, 'sizes')) ?? (touch ? 180 : null),
-      touch,
-      vector
-    })
-  }
-  const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/iu)?.[1] ?? null
-  const descriptionSources: Array<[string, MetadataSource]> = [
-    ['description', 'meta description'],
-    ['og:description', 'og:description'],
-    ['twitter:description', 'twitter:description']
-  ]
-  let description: ProposedText | null = null
-  for (const [key, source] of descriptionSources) {
-    const value = clean(meta.get(key))
-    if (value) {
-      description = { source, value }
-      break
-    }
-  }
-  return {
-    applicationName: clean(meta.get('application-name')),
-    description,
-    icons,
-    ogSiteName: clean(meta.get('og:site_name')),
-    socialImage:
-      absolute(meta.get('og:image:secure_url') ?? null, pageUrl) ??
-      absolute(meta.get('og:image') ?? null, pageUrl) ??
-      absolute(meta.get('twitter:image') ?? null, pageUrl),
-    title: clean(title)
-  }
-}
 
 /** The product name: `og:site_name`, then `application-name`, then the title's first part. */
 export function proposeName(metadata: SiteMetadata): ProposedText | null {
@@ -227,20 +80,6 @@ export function fitShortDescription(value: string): string {
   const cut = value.slice(0, SHORT_DESCRIPTION_MAX - 1)
   const space = cut.lastIndexOf(' ')
   return `${(space > SHORT_DESCRIPTION_MAX / 2 ? cut.slice(0, space) : cut).replace(/[\s,;:.–—-]+$/u, '')}…`
-}
-
-/** Site icons to try, best first: declared size (SVG counts as large), touch icons, then `/favicon`. */
-export function iconCandidates(metadata: SiteMetadata, pageUrl: string): string[] {
-  const ranked = [...metadata.icons].sort((a, b) => {
-    const size = (icon: IconCandidate) => (icon.vector ? 10_000 : (icon.size ?? 0))
-    return size(b) - size(a) || Number(b.touch) - Number(a.touch)
-  })
-  const hrefs = ranked
-    .filter(icon => icon.vector || icon.size === null || icon.size >= MIN_LOGO_PIXELS)
-    .map(icon => icon.href)
-  const fallback = absolute('/apple-touch-icon.png', pageUrl)
-  if (fallback) hrefs.push(fallback)
-  return [...new Set(hrefs)]
 }
 
 function uint16be(bytes: Uint8Array, offset: number): number {
@@ -320,14 +159,15 @@ export function inspectImage(bytes: Uint8Array): ImageInfo | null {
 }
 
 /**
- * Checks that `url` is a usable logo: a public URL that answers with a PNG, JPEG, WebP, or SVG
- * image of at most 1 MB, at least 128 px on its shorter side when the size can be read.
+ * Checks that `url` is a usable logo: a public URL that answers with a PNG, JPEG, or WebP image
+ * of at most 1 MB, at least 128 px on its shorter side when the size can be read. `inspectImage`
+ * still recognizes SVG so that it is refused here by name, never hosted.
  */
 export async function checkLogoUrl(url: string, fetcher: typeof fetch = fetch): Promise<LogoCheck> {
   const result = await safeFetch(url, {
     // The bytes decide the format; servers often label images loosely.
     accept: type => type === '' || type.startsWith('image/') || type === 'application/octet-stream',
-    acceptHeader: 'image/png,image/jpeg,image/webp,image/svg+xml;q=0.9,image/*;q=0.5',
+    acceptHeader: 'image/png,image/jpeg,image/webp,image/*;q=0.5',
     fetcher,
     maxBytes: MAX_LOGO_BYTES
   })
@@ -337,7 +177,7 @@ export async function checkLogoUrl(url: string, fetcher: typeof fetch = fetch): 
     return { code: 'logo_unreachable', ok: false }
   }
   const image = inspectImage(result.body)
-  if (!image) return { code: 'logo_not_image', ok: false }
+  if (!image || image.format === 'svg') return { code: 'logo_not_image', ok: false }
   if (
     image.width !== null &&
     image.height !== null &&
@@ -378,7 +218,8 @@ export async function readSitePrefill(
   const metadata = parseSiteMetadata(new TextDecoder().decode(page.body), page.url)
 
   let siteIcon: string | null = null
-  const candidates = iconCandidates(metadata, page.url).filter(usableImage)
+  // SVG icons are skipped: a logo is hosted, and the media host never takes SVG (#95).
+  const candidates = iconCandidates(metadata, page.url, { vector: false }).filter(usableImage)
   for (const candidate of candidates.slice(0, MAX_ICON_ATTEMPTS)) {
     const checked = await checkLogoUrl(candidate, fetcher)
     if (checked.ok) {

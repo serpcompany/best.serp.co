@@ -6,6 +6,7 @@ CREATE TABLE `listing_claims` (
 	`status` text DEFAULT 'code_sent' NOT NULL,
 	`email` text NOT NULL,
 	`email_domain` text NOT NULL,
+	`product_url` text NOT NULL,
 	`code_hash` text,
 	`code_sent_at` text NOT NULL,
 	`code_expires_at` text NOT NULL,

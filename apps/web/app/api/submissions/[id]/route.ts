@@ -1,4 +1,5 @@
 import { authorizeUserRequest } from '@/lib/auth/server'
+import { hostSubmissionImages } from '@/lib/media/server'
 import {
   draftUpdateSchema,
   fieldErrors,
@@ -74,6 +75,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       ownerUserId: owner,
       submissionId: id
     })
+    // A changed logo replaces the submission's hosted copy after the response (#95).
+    if (updated.logoUrl !== current.logoUrl) {
+      await hostSubmissionImages({ logoUrl: updated.logoUrl, submissionId: id }).catch(
+        () => undefined
+      )
+    }
     const next = nextStepPath(updated)
     return json({
       next: updated.status === 'draft' ? `${next}?saved=1` : next,

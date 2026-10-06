@@ -3,10 +3,12 @@ import 'server-only'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { createClaimOperations } from '@serpdirectory/data-ops/claims'
 import { createDatabase } from '@serpdirectory/data-ops/client'
-import { claimCodeKey } from '@/lib/auth/server'
+import { claimCodeKey, consumeRequestRateLimit } from '@/lib/auth/server'
 import { emailEventKey, enqueueEmail } from '@/lib/email/server'
 import { features as siteFeatures } from '@/lib/features'
 import { type ClaimFlags, claimFlags } from './flags'
+import { claimRecipientRateLimitRules } from './limits'
+import { safeResolveLanding } from './product'
 import type { ClaimDependencies } from './service'
 
 /**
@@ -47,6 +49,11 @@ export async function claimDependencies(): Promise<ClaimDependencies> {
     now: () => new Date(),
     operations: createClaimOperations({ client: createDatabase(env.DB) }),
     paidClaims: flags.paid,
+    resolveLanding: safeResolveLanding(),
+    async sendBudget(input) {
+      const decision = await consumeRequestRateLimit(claimRecipientRateLimitRules(input))
+      return decision.allowed ? null : { retryAfterSeconds: decision.retryAfterSeconds }
+    },
     async sendCode({ claimId, code, codesSent, listingName, to }) {
       // Each code is its own email: the claim and the count of codes sent key the ledger.
       await enqueueEmail('claim-code', {

@@ -8,6 +8,7 @@
 | [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review |
 | [Claims](./CLAIMS.md) | Claiming an existing listing: domain-email code, badge or payment |
 | [Badge program](./BADGE_PROGRAM.md) | Weekly badge checks, rechecks, unpublishing, ownership removal |
+| [Listing media](./MEDIA.md) | Hosted logos and images: R2 keys, ingestion, the media cron |
 | [Email](./EMAIL.md) | Transactional email, environments, owner prerequisites |
 | [Email templates](./EMAIL_TEMPLATES.md) | Every email, its trigger, recipient, and link |
 | [Submitter dashboard](./ACCOUNT_DASHBOARD.md) | `/account`: statuses, edits, revisions, the badge panel |

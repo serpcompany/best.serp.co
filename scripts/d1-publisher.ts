@@ -2,6 +2,13 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { IMAGE_CONTENT_TYPES, MAX_IMAGE_SIDE } from '@serpdirectory/data-ops/media-format'
+import {
+  contentTypeForKey,
+  MAX_MEDIA_BYTES,
+  MEDIA_HASH_LENGTH,
+  parseMediaKey
+} from '@serpdirectory/data-ops/media-keys'
 import { listingHasQueuedSubmission } from '@serpdirectory/data-ops/plan-support'
 import { hasFileExtension } from '@serpdirectory/web-core/canonical-url'
 import { parse } from 'yaml'
@@ -46,14 +53,42 @@ const category = z
   .strict()
 const resource = z.object({ label: z.string().min(1), url: z.string().url() }).strict()
 const faq = z.object({ question: z.string().min(1), answer: z.string().min(1) }).strict()
+/**
+ * A hosted image a manifest names (#95): its key in the media bucket, the metadata D1 records,
+ * and where the bytes came from. The catalog stores keys, never image URLs, so a manifest's logo
+ * and images are hosted images; the key must carry the digest and the type's extension.
+ */
+export const hostedImage = z
+  .object({
+    bytes: z.number().int().min(1).max(MAX_MEDIA_BYTES),
+    contentType: z.enum(Object.values(IMAGE_CONTENT_TYPES) as [string, ...string[]]),
+    height: z.number().int().min(1).max(MAX_IMAGE_SIDE),
+    key: z.string(),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    source: z.string().min(1),
+    width: z.number().int().min(1).max(MAX_IMAGE_SIDE)
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const key = parseMediaKey(value.key)
+    if (key?.scope !== 'listings' || key.hash !== value.sha256.slice(0, MEDIA_HASH_LENGTH)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid hosted media key.' })
+    } else if (contentTypeForKey(value.key) !== value.contentType) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A media key’s extension must match its content type.'
+      })
+    }
+  })
+export type HostedImageEntry = z.infer<typeof hostedImage>
 const media = z
   .object({
-    logo: z.string().min(1).optional(),
+    logo: hostedImage.optional(),
     images: z
-      .array(z.string().min(1))
-      .superRefine(unique('Duplicate listing image.', value => value))
+      .array(hostedImage)
+      .superRefine(unique('Duplicate listing image.', value => value.key))
       .optional(),
-    video: z.string().min(1).optional()
+    video: z.string().url().optional()
   })
   .strict()
 const listing = z
@@ -71,7 +106,10 @@ const listing = z
     priority: z.enum(['high', 'medium', 'low']).optional(),
     isUnofficial: z.boolean().default(false),
     featured: z.boolean().default(false),
-    publishedAt: z.string().datetime(),
+    // An ISO instant, or a calendar date as every imported listing stores it. Listings sort by
+    // `published_at` text, so rewriting an imported `2026-05-16` as `2026-05-16T00:00:00.000Z`
+    // would move that listing above every other listing published that day (#89).
+    publishedAt: z.union([z.string().datetime(), z.string().date()]),
     categories: z
       .array(categorySlug)
       .min(1)
@@ -259,6 +297,8 @@ function listingStatements(
       statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
       statement('DELETE FROM listing_categories WHERE listing_id=?', value.id),
       statement('DELETE FROM listing_media WHERE listing_id=?', value.id),
+      // The manifest's media replace the listing's: no queued slot may overwrite them (#95).
+      statement('DELETE FROM media_ingestions WHERE listing_id=?', value.id),
       statement('DELETE FROM listing_resource_links WHERE listing_id=?', value.id),
       statement('DELETE FROM listing_faqs WHERE listing_id=?', value.id),
       statement(
@@ -297,24 +337,22 @@ function listingStatements(
       value.categories.length
     )
   )
-  if (value.media?.logo)
-    out.push(
-      statement(
-        "INSERT INTO listing_media (listing_id,kind,url,sort_order) VALUES (?,'logo',?,0)",
-        value.id,
-        value.media.logo
-      )
+  const hostedRow = (kind: 'image' | 'logo', image: HostedImageEntry, order: number) =>
+    statement(
+      'INSERT INTO listing_media (listing_id,kind,url,sort_order,media_key,sha256,content_type,bytes,width,height) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      value.id,
+      kind,
+      image.source,
+      order,
+      image.key,
+      image.sha256,
+      image.contentType,
+      image.bytes,
+      image.width,
+      image.height
     )
-  value.media?.images?.forEach((url, order) =>
-    out.push(
-      statement(
-        "INSERT INTO listing_media (listing_id,kind,url,sort_order) VALUES (?,'image',?,?)",
-        value.id,
-        url,
-        order
-      )
-    )
-  )
+  if (value.media?.logo) out.push(hostedRow('logo', value.media.logo, 0))
+  value.media?.images?.forEach((image, order) => out.push(hostedRow('image', image, order)))
   if (value.media?.video)
     out.push(
       statement(

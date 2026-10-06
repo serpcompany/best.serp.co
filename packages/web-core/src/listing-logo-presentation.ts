@@ -1,6 +1,15 @@
 export const DEFAULT_SITE_LISTING_LOGO_FALLBACK_PATH = '/listing-logos/favicon-fallback-512x512.png'
 export const SITE_BRAND_LISTING_LOGO_FALLBACK_PATH = '/logo.png'
-const supportedRelativeLogoExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.avif', '.svg'] as const
+const supportedRelativeLogoExtensions = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.avif',
+  '.gif',
+  '.ico',
+  '.svg'
+] as const
 
 function normalizeAssetReference(assetReference?: string): string {
   return assetReference?.split('#')[0].split('?')[0].trim().toLowerCase() ?? ''

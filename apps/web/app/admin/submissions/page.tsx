@@ -6,6 +6,8 @@ import { ageWords, PAID_LISTING_PRICE_CENTS } from '@/components/admin/format'
 import { type QueueRow, ReviewQueue } from '@/components/admin/review-queue'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'
+import { mediaBaseUrl } from '@/lib/media/media-base'
+import { renderableImage } from '@/lib/media/renderable-image'
 
 /** The review queue (#64 screen 10). */
 export const dynamic = 'force-dynamic'
@@ -23,7 +25,7 @@ function list(value: string | string[] | undefined, allowed: readonly string[]):
     .filter(item => allowed.includes(item))
 }
 
-function toRow(item: ReviewQueueItem): QueueRow {
+function toRow(item: ReviewQueueItem, media: string): QueueRow {
   const paid = item.plan === 'paid'
   return {
     badge: item.badge,
@@ -34,7 +36,8 @@ function toRow(item: ReviewQueueItem): QueueRow {
     id: item.id,
     kind: item.kind,
     listingSlug: item.listingId ? item.slug : null,
-    logoUrl: item.logoUrl,
+    // Only a hosted copy is shown, never the submitted source (#96 review S9).
+    logoUrl: renderableImage({ key: item.logoKey }, media),
     name: item.name,
     ownerEmail: item.ownerEmail,
     paid,
@@ -53,9 +56,10 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
   const view: ReviewQueueView =
     params.view === 'changes' || params.view === 'all' ? params.view : 'waiting'
   const reads = await getAdminReads()
-  const [items, counts] = await Promise.all([
+  const [items, counts, media] = await Promise.all([
     reads.listReviewQueue(view),
-    reads.reviewQueueCounts()
+    reads.reviewQueueCounts(),
+    mediaBaseUrl()
   ])
   const description =
     counts.waiting === 0
@@ -73,7 +77,7 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
           plan: list(params.plan, ['free', 'paid']),
           source: list(params.source, ['submission', 'revision'])
         }}
-        rows={items.map(toRow)}
+        rows={items.map(item => toRow(item, media))}
         view={view}
       />
     </>

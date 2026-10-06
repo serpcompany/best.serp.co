@@ -183,6 +183,7 @@ interface WranglerEnvironmentConfig {
     migrations_table?: string
   }>
   name?: string
+  r2_buckets?: Array<{ binding?: string; bucket_name?: string }>
   vars?: Record<string, string | undefined>
   workers_dev?: boolean
 }
@@ -201,7 +202,7 @@ function parseCommand(value: string | undefined): ReleaseCommand {
 /**
  * Refuses a Wrangler config whose `env.<environment>` block no longer matches the reviewed
  * remote identity in `project.ts` (Worker name, workers.dev exposure, D1 binding, migration
- * history and ledger table, runtime env).
+ * history and ledger table, runtime env, media bucket and host).
  */
 export function validateRemoteConfig(
   environment: RemoteEnvironment,
@@ -232,6 +233,11 @@ export function validateRemoteConfig(
     problems.push('the DB binding must apply d1/drizzle migrations')
   if (binding?.migrations_table !== project.migrationsTable)
     problems.push(`the DB binding must declare migrations_table ${project.migrationsTable}`)
+  const media = block?.r2_buckets?.find(candidate => candidate.binding === 'MEDIA')
+  if (media?.bucket_name !== expected.media.bucket)
+    problems.push(`the MEDIA binding must be the ${expected.media.bucket} bucket`)
+  if (block?.vars?.MEDIA_BASE_URL !== expected.media.baseUrl)
+    problems.push(`vars.MEDIA_BASE_URL must be ${expected.media.baseUrl}`)
   if (problems.length > 0) {
     throw new Error(
       `${configPath} env.${environment} does not match the reviewed ${environment} identity in scripts/project.ts: ${problems.join('; ')}.`

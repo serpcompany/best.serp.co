@@ -1,8 +1,10 @@
 import { urlKey } from '@serpdirectory/utils/url-key'
+import { isForeignDomain } from './product'
 
 /**
  * The domain address of a claim (serpcompany/best.serp.co#67): the claimer proves they work at
- * the listed product by receiving a code at an address on its website's registrable domain.
+ * the listed product by receiving a code at an address on the product's registrable domain
+ * (`./product.ts`: the slug's or the website's, never `serp.ly`).
  * `www.` and any subdomain normalize to that domain (`jordan@mail.brieflow.ai` claims
  * `https://www.brieflow.ai/`), using the Public Suffix List with its private section, so
  * `user.github.io` is its own site and a website on a shared host with no registrable domain
@@ -83,22 +85,12 @@ function registrable(host: string): string | null {
   }
 }
 
-/** The listing website's registrable domain, or null when it has none (shared hosts, IPs). */
-export function websiteClaimDomain(website: string): string | null {
-  try {
-    const key = urlKey(website)
-    return key.coversSubdomains ? key.blockKey : null
-  } catch {
-    return null
-  }
-}
-
 /**
- * Checks `email` against the listing `website`: a well-formed address, not webmail, whose
- * domain's registrable domain is the website's. Returns the normalized (lowercase) address and
- * that domain.
+ * Checks `email` against the product's domain (`productSite`): a well-formed address, not
+ * webmail, never SERP's own domains, whose domain's registrable domain is the product's.
+ * Returns the normalized (lowercase) address and that domain.
  */
-export function checkClaimAddress(email: string, website: string): ClaimAddress {
+export function checkClaimAddress(email: string, productDomain: string): ClaimAddress {
   const address = email.trim().toLowerCase()
   if (address.length > 254) return { ok: false, problem: 'invalid_email' }
   const match = ADDRESS.exec(address)
@@ -107,16 +99,19 @@ export function checkClaimAddress(email: string, website: string): ClaimAddress 
   const domain = registrable(host)
   if (!domain) return { ok: false, problem: 'invalid_email' }
   if (WEBMAIL_DOMAINS.has(domain)) return { ok: false, problem: 'webmail' }
-  if (domain !== websiteClaimDomain(website)) return { ok: false, problem: 'domain_mismatch' }
+  if (isForeignDomain(domain) || domain !== productDomain) {
+    return { ok: false, problem: 'domain_mismatch' }
+  }
   return { address, domain, ok: true }
 }
 
-/** The keys an active prohibited-URL block on this website would use. */
-export function claimBlockKeys(website: string): string[] {
+/** The keys an active prohibited-URL block on the product would use. */
+export function claimBlockKeys(site: { domain: string; url: string }): string[] {
+  const keys = [site.domain]
   try {
-    const key = urlKey(website)
-    return [...new Set([key.blockKey, key.hostKey])]
+    keys.push(urlKey(site.url).hostKey)
   } catch {
-    return []
+    // The domain alone.
   }
+  return [...new Set(keys)]
 }

@@ -1,6 +1,7 @@
 import { clientIp } from '@/lib/auth/rate-limits'
 import { authorizeUserRequest, consumeRequestRateLimit } from '@/lib/auth/server'
 import { claimFailure, claimsOff, json } from '@/lib/claims/http'
+import { domainPinnedFetcher } from '@/lib/claims/product'
 import { claimDependencies, currentClaimFlags } from '@/lib/claims/runtime'
 import { checkClaimBadge, confirmClaimEmail } from '@/lib/claims/service'
 import { verifyFeaturedBadge } from '@/lib/submissions/badge-verifier'
@@ -62,8 +63,16 @@ export async function POST(
             )
             return decision.allowed ? null : { retryAfterSeconds: decision.retryAfterSeconds }
           },
-          verifyBadge: listing =>
-            verifyFeaturedBadge(listing.website, submissionBadgeVerificationTargets(listing.slug))
+          // The product page, and every redirect, must stay on the claim domain.
+          async verifyBadge(claim, listing) {
+            const pinned = domainPinnedFetcher(claim.emailDomain)
+            const result = await verifyFeaturedBadge(
+              claim.productUrl,
+              submissionBadgeVerificationTargets(listing.slug),
+              pinned.fetch
+            )
+            return pinned.left() ? { code: 'invalid_redirect', ok: false } : result
+          }
         },
         { actor: user.email, claimId: id, userId: user.id }
       )

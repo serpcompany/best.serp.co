@@ -371,6 +371,22 @@ describe('submission status transitions (compare-and-swap with changes() asserti
         })
         expect(count(db, 'SELECT COUNT(*) AS count FROM listing_owners')).toBe(1)
         expect(publicationState(db).version).toBe(2)
+        // Live before review: no featured image is adopted until a reviewer has seen it.
+        expect(
+          count(db, 'SELECT COUNT(*) AS count FROM media_ingestions WHERE listing_id IS NOT NULL')
+        ).toBe(0)
+        expect(
+          JSON.stringify(
+            buildRecordSubmissionPaymentPlans({
+              actor: 'stripe',
+              listingId: liveListingId,
+              now: NOW,
+              outcome: 'publish',
+              publication: publication('paid-listing'),
+              submissionId
+            })
+          )
+        ).not.toContain('reviewed_image_current')
       },
       event: 'paid',
       plans: () =>

@@ -62,6 +62,8 @@ export interface ListingClaim {
   listingId: string
   lockedUntil: string | null
   method: ListingClaimMethod
+  /** The product page the badge must be on (the claim domain's). */
+  productUrl: string
   status: ListingClaimStatus
   userId: string
 }
@@ -81,11 +83,12 @@ interface ClaimRow {
   listing_id: string
   locked_until: string | null
   method: ListingClaimMethod
+  product_url: string
   status: ListingClaimStatus
   user_id: string
 }
 
-const CLAIM_COLUMNS = `c.id,c.listing_id,c.user_id,c.method,c.status,c.email,c.email_domain,
+const CLAIM_COLUMNS = `c.id,c.listing_id,c.user_id,c.method,c.status,c.email,c.email_domain,c.product_url,
   c.code_sent_at,c.code_expires_at,c.codes_sent,c.attempts,c.locked_until,c.email_verified_at,
   c.badge_checked_at,c.completed_at,(c.code_hash IS NOT NULL) AS code_pending`
 
@@ -145,6 +148,7 @@ export interface ClaimCodeInput {
   emailDomain: string
   method: ListingClaimMethod
   now: string
+  productUrl: string
 }
 
 /**
@@ -157,8 +161,9 @@ export function buildStartClaimPlans(
   return [
     {
       sql: `INSERT INTO listing_claims (id,listing_id,user_id,method,status,email,email_domain,
-          code_hash,code_sent_at,code_expires_at,codes_sent,attempts,created_at,updated_at)
-        SELECT ?,?,?,?,'code_sent',?,?,?,?,?,1,0,?,? WHERE ${listingIsLiveGuard('?')}
+          product_url,code_hash,code_sent_at,code_expires_at,codes_sent,attempts,created_at,
+          updated_at)
+        SELECT ?,?,?,?,'code_sent',?,?,?,?,?,?,1,0,?,? WHERE ${listingIsLiveGuard('?')}
           AND ${ownerless('?')}`,
       params: [
         input.claimId,
@@ -167,6 +172,7 @@ export function buildStartClaimPlans(
         input.method,
         input.email,
         input.emailDomain,
+        input.productUrl,
         input.codeHash,
         input.now,
         input.codeExpiresAt,
@@ -182,8 +188,10 @@ export function buildStartClaimPlans(
 
 /**
  * Sends a new code on the user's open claim (a resend, another address, or the other method):
- * the claim goes back to `code_sent` with its attempts reset, unless a code went out less than
- * `CLAIM_RESEND_COOLDOWN_SECONDS` ago or a lockout still holds.
+ * the claim goes back to `code_sent`, unless a code went out less than
+ * `CLAIM_RESEND_COOLDOWN_SECONDS` ago or a lockout still holds. Wrong guesses carry over to the
+ * new code (#108 review round 1): only a lockout that has run out resets them, so the fifth wrong
+ * guess locks the claim however many codes were sent.
  */
 export function buildResendClaimCodePlans(
   input: ClaimCodeInput & { claimId: string; userId: string }
@@ -192,7 +200,8 @@ export function buildResendClaimCodePlans(
   return [
     {
       sql: `UPDATE listing_claims SET method=?,status='code_sent',email=?,email_domain=?,
-          code_hash=?,code_sent_at=?,code_expires_at=?,codes_sent=codes_sent+1,attempts=0,
+          product_url=?,code_hash=?,code_sent_at=?,code_expires_at=?,codes_sent=codes_sent+1,
+          attempts=CASE WHEN locked_until IS NOT NULL THEN 0 ELSE attempts END,
           locked_until=NULL,email_verified_at=NULL,badge_checked_at=NULL,updated_at=?
         WHERE id=? AND user_id=? AND status IN ('code_sent','email_verified')
           AND code_sent_at<=? AND (locked_until IS NULL OR locked_until<=?)
@@ -202,6 +211,7 @@ export function buildResendClaimCodePlans(
         input.method,
         input.email,
         input.emailDomain,
+        input.productUrl,
         input.codeHash,
         input.now,
         input.codeExpiresAt,
@@ -358,6 +368,7 @@ function claimOf(row: ClaimRow): ListingClaim {
     listingId: row.listing_id,
     lockedUntil: row.locked_until,
     method: row.method,
+    productUrl: row.product_url,
     status: row.status,
     userId: row.user_id
   }

@@ -68,7 +68,7 @@ import { toast } from 'sonner'
 import { adminRequest } from './api'
 import { ageWords, formatDateTime, formatSince, formatUsd, initials, listingPath } from './format'
 import { Kv } from './kv'
-import { ProductLogo } from './product-cell'
+import { LogoPreview } from './logo-preview'
 import { RecordHeader } from './record-header'
 import { PlanBadge, StatusBadge, type StatusKind } from './status-badge'
 
@@ -96,6 +96,17 @@ export interface ReviewView {
   kind: 'revision' | 'submission'
   linkRel: LinkRel
   listing: { live: boolean; liveSince: string | null; slug: string } | null
+  /**
+   * A submission's featured image as approval would publish it (#96 round 2 B1): the hosted
+   * copy, which the listing preview shows, and its key, which approval sends back. Null for a
+   * revision.
+   */
+  featuredImage: { image: string | null; key: string | null } | null
+  /** The hosted copy of `logoUrl`, or null for the fallback tile (#96 review S9). */
+  logoImage: string | null
+  /** The hosted logo's key, which approval sends back (null: approval leaves the tile). */
+  logoKey: string | null
+  /** The submitted logo source; never rendered as an image. */
   logoUrl: string
   name: string
   paid: boolean
@@ -235,9 +246,14 @@ export function ReviewDetail({
         ? {
             edits: editing && editedFields.length > 0 ? edits : undefined,
             expectedContentVersion: view.contentVersion,
+            // Approval adopts only the images shown here (#96 rounds 2 and 3).
+            expectedImageKey: view.featuredImage?.key ?? null,
+            // An edited logo URL has no hosted copy yet: the tile, until an admin sets one.
+            expectedLogoKey:
+              editing && editedFields.includes('logoUrl') ? null : (view.logoKey ?? null),
             linkRel
           }
-        : { expectedContentVersion: view.contentVersion },
+        : { expectedContentVersion: view.contentVersion, expectedLogoKey: view.logoKey ?? null },
       paidLive ? `Approved. ${view.name} stays live.` : `Approved. ${view.name} is published.`
     )
 
@@ -399,11 +415,10 @@ export function ReviewDetail({
               ) : null}
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <ProductLogo
-                className="rounded-lg"
-                logoUrl={edits.logoUrl}
+              <LogoPreview
+                hosted={edits.logoUrl.trim() === view.logoUrl ? view.logoImage : null}
                 name={edits.name}
-                size={64}
+                source={edits.logoUrl}
                 website={view.website}
               />
               <Input
@@ -413,7 +428,9 @@ export function ReviewDetail({
                 onChange={event => setEdits({ ...edits, logoUrl: event.target.value })}
               />
             </div>
-            <FieldDescription>A square image URL (PNG, JPG, SVG or WebP).</FieldDescription>
+            <FieldDescription>
+              A square image URL (PNG, JPG or WebP). It is copied to our media host on approval.
+            </FieldDescription>
           </Field>
           <Field>
             <div className="flex items-center gap-2">
@@ -692,7 +709,7 @@ export function ReviewDetail({
             ) : null}
           </>
         }
-        logoUrl={view.logoUrl}
+        logoUrl={view.logoImage}
         meta={meta}
         name={view.name}
         website={view.website}

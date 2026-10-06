@@ -12,6 +12,7 @@ import type { ListingClaimMethod } from '@serpdirectory/data-ops/schema'
 import { CLAIM_CODE_LENGTH, CLAIM_CODE_TTL_SECONDS } from '../email/emails/codes'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'
 import { checkClaimAddress, claimBlockKeys } from './address'
+import { type ProductSite, productSite, type ResolveLanding } from './product'
 
 /**
  * The claim flow (serpcompany/best.serp.co#59, #67; #70 screen 8's order: method → work email →
@@ -42,6 +43,17 @@ export interface ClaimDependencies {
   operations: ClaimOperations
   /** Whether paid claims (#68) are on. */
   paidClaims: boolean
+  /** Follows a listing link (`serp.ly`) to its landing page (`./product.ts`). */
+  resolveLanding: ResolveLanding
+  /**
+   * Counts one code send against the per-recipient, per-domain, and per-listing caps (#108 review
+   * round 1); null when allowed.
+   */
+  sendBudget(input: {
+    address: string
+    domain: string
+    listingId: string
+  }): Promise<{ retryAfterSeconds: number } | null>
   /** Sends the code; resolves once queued. `codesSent` keys the email ledger. */
   sendCode(input: {
     claimId: string
@@ -69,6 +81,8 @@ export interface ClaimView {
 
 export type ClaimFailureCode =
   | 'already_owned'
+  | 'no_product_domain'
+  | 'not_owner'
   | 'blocked'
   | 'changed'
   | 'code_expired'
@@ -160,13 +174,14 @@ function owned(deps: ClaimDependencies): ClaimFailure {
 async function claimableListing(
   deps: ClaimDependencies,
   by: { id: string } | { slug: string }
-): Promise<ClaimResult<{ listing: ClaimListing }>> {
+): Promise<ClaimResult<{ listing: ClaimListing; site: ProductSite }>> {
   const listing = await deps.operations.listing(by)
   if (!listing?.live) return fail(404, 'not_found')
   if (listing.ownerUserId) return owned(deps)
-  const keys = claimBlockKeys(listing.website)
-  if (keys.length > 0 && (await deps.operations.blocked(keys))) return fail(409, 'blocked')
-  return { listing, ok: true }
+  const site = await productSite(listing, deps.resolveLanding)
+  if (!site) return fail(409, 'no_product_domain')
+  if (await deps.operations.blocked(claimBlockKeys(site))) return fail(409, 'blocked')
+  return { listing, ok: true, site }
 }
 
 export async function startClaim(
@@ -179,8 +194,8 @@ export async function startClaim(
   }
   const target = await claimableListing(deps, { slug: input.listingSlug })
   if (!target.ok) return target
-  const { listing } = target
-  const address = checkClaimAddress(input.email, listing.website)
+  const { listing, site } = target
+  const address = checkClaimAddress(input.email, site.domain)
   if (!address.ok) return fail(422, address.problem)
 
   const now = deps.now()
@@ -197,6 +212,12 @@ export async function startClaim(
   if (existing && resendAt > now.getTime()) {
     return fail(429, 'cooldown', { retryAfterSeconds: secondsUntil(new Date(resendAt), now) })
   }
+  const capped = await deps.sendBudget({
+    address: address.address,
+    domain: address.domain,
+    listingId: listing.id
+  })
+  if (capped) return fail(429, 'cooldown', { retryAfterSeconds: capped.retryAfterSeconds })
 
   const claimId = existing?.id ?? crypto.randomUUID()
   const code = generateClaimCode()
@@ -206,7 +227,8 @@ export async function startClaim(
     email: address.address,
     emailDomain: address.domain,
     method,
-    now: at
+    now: at,
+    productUrl: site.url
   } as const
   const written = existing
     ? await deps.operations.resend({ ...codeInput, claimId, userId: input.userId })
@@ -303,6 +325,16 @@ export async function confirmClaimEmail(
   })
 }
 
+/** True while the listing's product domain is still the one the claim's address proved. */
+async function sameProductDomain(
+  deps: Pick<ClaimDependencies, 'resolveLanding'>,
+  claim: ListingClaim,
+  listing: ClaimListing
+): Promise<boolean> {
+  const site = await productSite(listing, deps.resolveLanding)
+  return site?.domain === claim.emailDomain
+}
+
 function confirmationExpired(claim: ListingClaim, now: Date): boolean {
   return (
     !claim.emailVerifiedAt ||
@@ -314,7 +346,8 @@ export async function checkClaimBadge(
   deps: ClaimDependencies & {
     /** Counts one check against the outbound budget; null when allowed. */
     budget(claimId: string): Promise<{ retryAfterSeconds: number } | null>
-    verifyBadge(listing: ClaimListing): Promise<BadgeVerificationResult>
+    /** Checks the badge on the claim's product page, pinned to the claim domain. */
+    verifyBadge(claim: ListingClaim, listing: ClaimListing): Promise<BadgeVerificationResult>
   },
   input: { actor: string; claimId: string; userId: string }
 ): Promise<ClaimResult<{ claim: ClaimView; result: BadgeVerificationResult }>> {
@@ -322,13 +355,20 @@ export async function checkClaimBadge(
   if (!found.ok) return found
   const { claim, listing } = found
   if (claim.status === 'completed') {
-    return { claim: view(claim, listing), ok: true, result: { ok: true } }
+    // A replay reports success only while the claim still gives ownership: the badge program
+    // may have removed it since (#108 review round 1, finding 3).
+    if (listing.ownerUserId === input.userId) {
+      return { claim: view(claim, listing), ok: true, result: { ok: true } }
+    }
+    return listing.ownerUserId ? owned(deps) : fail(409, 'not_owner')
   }
   if (claim.method !== 'badge') return fail(422, 'invalid_method')
   if (claim.status !== 'email_verified') return fail(409, 'not_confirmed')
   if (listing.ownerUserId) return owned(deps)
   const now = deps.now()
   if (confirmationExpired(claim, now)) return fail(410, 'confirmation_expired')
+  // The listing's product domain may have changed since the code was sent (an admin edit).
+  if (!(await sameProductDomain(deps, claim, listing))) return fail(409, 'changed')
   const started = await deps.operations.claimBadgeCheck({
     claimId: claim.id,
     now: now.toISOString(),
@@ -350,7 +390,7 @@ export async function checkClaimBadge(
   if (limited) return fail(429, 'cooldown', { retryAfterSeconds: limited.retryAfterSeconds })
   let result: BadgeVerificationResult
   try {
-    result = await deps.verifyBadge(listing)
+    result = await deps.verifyBadge(claim, listing)
   } catch {
     result = { code: 'verification_service_error', ok: false }
   }
@@ -372,19 +412,34 @@ export async function checkClaimBadge(
  * nothing does while `features.orders` is off). The claimer becomes the owner (`paid_claim`).
  */
 export async function completePaidClaim(
-  deps: Pick<ClaimDependencies, 'now' | 'operations' | 'paidClaims'>,
+  deps: Pick<
+    ClaimDependencies,
+    'contactPath' | 'now' | 'operations' | 'paidClaims' | 'resolveLanding'
+  >,
   input: { actor: string; claimId: string; userId: string }
 ): Promise<ClaimResult<{ completed: boolean }>> {
   if (!deps.paidClaims) return fail(404, 'not_found')
   const claim = await deps.operations.claim(input)
   if (!claim) return fail(404, 'not_found')
   if (claim.status === 'completed') return { completed: true, ok: true }
+  if (claim.status === 'cancelled') {
+    const listing = await deps.operations.listing({ id: claim.listingId })
+    return listing?.ownerUserId
+      ? fail(409, 'already_owned', { contactPath: deps.contactPath })
+      : fail(409, 'changed')
+  }
   if (claim.method !== 'paid') return fail(422, 'invalid_method')
   if (claim.status !== 'email_verified') return fail(409, 'not_confirmed')
   const now = deps.now()
   if (confirmationExpired(claim, now)) return fail(410, 'confirmation_expired')
+  const current = await deps.operations.listing({ id: claim.listingId })
+  if (!current) return fail(404, 'not_found')
+  if (current.ownerUserId) return fail(409, 'already_owned', { contactPath: deps.contactPath })
+  if (!(await sameProductDomain(deps, claim, current))) return fail(409, 'changed')
   const done = await deps.operations.complete({ actor: input.actor, claim, now: now.toISOString() })
   if (done) return { completed: true, ok: true }
   const listing = await deps.operations.listing({ id: claim.listingId })
-  return listing?.ownerUserId ? fail(409, 'already_owned') : fail(409, 'changed')
+  return listing?.ownerUserId
+    ? fail(409, 'already_owned', { contactPath: deps.contactPath })
+    : fail(409, 'changed')
 }

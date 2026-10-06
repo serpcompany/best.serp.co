@@ -32,6 +32,7 @@ const start = (claimId = 'claim_1', userId = 'user_owner') =>
     codeHash: 'hash-1',
     email: 'jo@lst_live.example',
     emailDomain: 'lst_live.example',
+    productUrl: 'https://lst_live.example/',
     listingId: 'lst_live',
     method: 'badge',
     now: NOW,
@@ -92,6 +93,7 @@ describe('claim plans', () => {
         codeHash: 'hash-2',
         email: 'jo@lst_live.example',
         emailDomain: 'lst_live.example',
+        productUrl: 'https://lst_live.example/',
         method: 'badge',
         now,
         userId: 'user_owner'
@@ -114,6 +116,40 @@ describe('claim plans', () => {
       code_hash: null,
       codes_sent: 2,
       status: 'email_verified'
+    })
+  })
+
+  it('keeps wrong guesses across a resend until a lockout has run out', () => {
+    const db = seeded()
+    execute(db, start())
+    for (let i = 0; i < 4; i += 1) {
+      execute(
+        db,
+        buildWrongClaimCodePlans({
+          claimId: 'claim_1',
+          lockedUntil: '2026-10-06T12:20:00.000Z',
+          now: LATER,
+          userId: 'user_owner'
+        })
+      )
+    }
+    execute(
+      db,
+      buildResendClaimCodePlans({
+        claimId: 'claim_1',
+        codeExpiresAt: '2026-10-06T12:31:00.000Z',
+        codeHash: 'hash-2',
+        email: 'ops@lst_live.example',
+        emailDomain: 'lst_live.example',
+        method: 'badge',
+        now: '2026-10-06T12:06:00.000Z',
+        productUrl: 'https://lst_live.example/',
+        userId: 'user_owner'
+      })
+    )
+    expect(db.prepare('SELECT attempts,locked_until FROM listing_claims').get()).toEqual({
+      attempts: 4,
+      locked_until: null
     })
   })
 

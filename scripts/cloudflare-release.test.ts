@@ -969,6 +969,9 @@ describe('remote Wrangler identity', () => {
       expect(bindings[0].migrations_table).toBe(project.migrationsTable)
     }
     expect(project.remote.production.origin).toBe(project.publicUrl)
+    // Staging and production media live in different buckets on different hosts (#95).
+    expect(project.remote.staging.media.bucket).not.toBe(project.remote.production.media.bucket)
+    expect(project.remote.staging.media.baseUrl).not.toBe(project.remote.production.media.baseUrl)
     // Pre-cutover review URL; *.workers.dev responses carry X-Robots-Tag noindex.
     expect(project.remote.production.workersDev).toBe(true)
   })
@@ -1019,6 +1022,24 @@ describe('remote Wrangler identity', () => {
         'migrations_table d1_migrations',
         config => {
           delete config.env.production.d1_databases[0].migrations_table
+        }
+      ],
+      [
+        'MEDIA binding must be the cdn bucket',
+        config => {
+          config.env.production.r2_buckets[0].bucket_name = 'cdn-staging'
+        }
+      ],
+      [
+        'MEDIA binding must be the cdn bucket',
+        config => {
+          delete config.env.production.r2_buckets
+        }
+      ],
+      [
+        'MEDIA_BASE_URL must be https://cdn.serp.co',
+        config => {
+          config.env.production.vars.MEDIA_BASE_URL = 'https://cdn-staging.serp.co'
         }
       ]
     ]

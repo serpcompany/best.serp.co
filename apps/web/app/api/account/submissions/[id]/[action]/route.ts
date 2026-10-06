@@ -12,6 +12,7 @@ import {
 } from '@/lib/account/requests'
 import { accountOperations } from '@/lib/account/runtime'
 import { authorizeUserRequest } from '@/lib/auth/server'
+import { hostSubmissionImages } from '@/lib/media/server'
 import {
   apiError,
   authorizationFailure,
@@ -85,6 +86,12 @@ export async function POST(
         submissionId: id,
         userId: user.id
       })
+      // A changed logo replaces the submission's hosted copy after the response (#95).
+      if (submission.logoUrl !== current.logoUrl) {
+        await hostSubmissionImages({ logoUrl: submission.logoUrl, submissionId: id }).catch(
+          () => undefined
+        )
+      }
       await sendResubmittedAlert({ submission, submitterEmail: user.email })
       return json({ ok: true, status: submission.status })
     }

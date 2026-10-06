@@ -51,11 +51,11 @@ account permissions:
 | D1 → Edit | `wrangler d1 migrations apply`, `d1 execute` (bootstrap import, read-only checks), `d1 time-travel info` bookmarks, and the D1 query API used by the publisher, approver, and notifier |
 | Workers Scripts → Edit | `opennextjs-cloudflare deploy`: Worker upload, static assets, the workers.dev setting, observability |
 | Account Settings → Read | Wrangler account lookups during deploy |
+| Workers R2 Storage → Edit | the `MEDIA` bucket binding and listing media uploads (#95) |
 
 No zone permission is needed while the Custom Domain is attached in the dashboard. Add
 Zone → Workers Routes → Edit (zone `serp.co`) only if routes or the Custom Domain move into
-`wrangler.jsonc`. If an R2 or KV incremental cache is added to `apps/web/open-next.config.ts`,
-add Workers R2 Storage → Edit or Workers KV Storage → Edit, because the deploy populates it.
+`wrangler.jsonc`.
 
 Cloudflare's current Workers roles map Workers Scripts → Edit to Workers **Editor**, which
 cannot create a Worker. The first production deploy created `best-serp-co-production` with
@@ -228,11 +228,11 @@ publication or approval reaches cached pages within about a minute; nothing is p
 
 | Resource | Staging | Production |
 |---|---|---|
-| Workers Cache API (edge HTML and data cache) | built in, nothing to create | built in, nothing to create |
+| Workers Cache API (edge HTML, data) | built in, nothing to create | built in, nothing to create |
 | `version_metadata` binding `CF_VERSION_METADATA` | declared in `wrangler.jsonc` | declared in `wrangler.jsonc` |
+| R2 `MEDIA` (#95) | `cdn-staging` on `cdn-staging.serp.co` | `cdn` on `cdn.serp.co` |
 
-Caching needs no R2 bucket, KV namespace, Durable Object, or queue, and no API token
-permission beyond the deploy token above.
+Caching needs no KV namespace, Durable Object, or queue. Media: [Listing media](./MEDIA.md).
 
 ## Cutover checklist
 
