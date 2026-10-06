@@ -439,8 +439,25 @@ test.describe('submit v2', () => {
     expect(await verify(headerRobots)).toMatchObject({
       body: { result: { code: 'page_not_followed', ok: false, source: 'header' } }
     })
-    // One check every 30 seconds.
-    expect(await verify(nofollow)).toMatchObject({ body: { code: 'cooldown' }, status: 429 })
+    // One check every 30 seconds. A refusal carries the submission as it is now, so a page
+    // that missed a check (another tab) can catch up (PR #84 review round 2, finding 4).
+    expect(await verify(nofollow)).toMatchObject({
+      body: { code: 'cooldown', submission: { id: nofollow, status: 'pending_badge' } },
+      status: 429
+    })
+    const valid = await pendingBadge(`valid-${id}`, {
+      badge: 'valid',
+      description: 'Valid badge.',
+      name: 'Valid'
+    })
+    expect(await verify(valid)).toMatchObject({
+      body: { result: { ok: true }, submission: { status: 'verified' } },
+      status: 200
+    })
+    expect(await verify(valid)).toMatchObject({
+      body: { code: 'not_pending_badge', submission: { id: valid, status: 'verified' } },
+      status: 409
+    })
 
     // PR #84 review round 1, finding 2: parallel checks claim one check; the rest get 429.
     const racing = await pendingBadge(`race-${id}`, {
@@ -476,6 +493,83 @@ test.describe('submit v2', () => {
     expect(again.status()).toBe(409)
     await owner.close()
     await stranger.close()
+  })
+
+  test('explains a spent check budget and a check that finished elsewhere', async ({
+    baseURL,
+    browser
+  }) => {
+    // PR #84 review round 2, finding 4. Both answers are slow to provoke for real (the budget
+    // is 20 checks an hour per submission, 30 seconds apart), so the test serves the verify
+    // API's answers in their real shapes and checks how the page handles them.
+    const headers = { origin: new URL(baseURL ?? '').origin }
+    const id = unique()
+    const label = `stale-${id}`
+    const owner = await newClient(browser)
+    await signInContext(owner, baseURL ?? '', `e2e-submit-stale-${id}@example.com`)
+    fixture.set(label, { badge: 'missing', description: 'Stale page.', name: 'Stale' })
+    const created = await owner.request.post('/api/submissions', {
+      data: {
+        categorySlug: 'video-downloaders',
+        content: '',
+        description: 'Stale page.',
+        logoUrl: `${fixture.website(label)}icon.png`,
+        name: 'Stale',
+        website: fixture.website(label)
+      },
+      headers
+    })
+    expect(created.status(), await created.text()).toBe(201)
+    const { submission: draft } = (await created.json()) as { submission: { id: string } }
+    const chosen = await owner.request.post(`/api/submissions/${draft.id}/plan`, {
+      data: { plan: 'free' },
+      headers
+    })
+    expect(chosen.status(), await chosen.text()).toBe(200)
+    const { submission } = (await chosen.json()) as {
+      submission: { id: string; status: string }
+    }
+    expect(submission.status).toBe('pending_badge')
+    const verifyRoute = `**/api/submissions/${submission.id}/verify`
+    const page = await owner.newPage()
+    await page.goto(`/submit/${submission.id}/badge/`)
+
+    // The outbound check budget is spent: say when to come back, and wait until then.
+    await page.route(verifyRoute, route =>
+      route.fulfill({
+        headers: { 'Retry-After': '600' },
+        json: {
+          code: 'check_budget',
+          error: 'Too many checks for now. Try again later.',
+          retryAfterSeconds: 600,
+          submission
+        },
+        status: 429
+      })
+    )
+    await page.getByRole('button', { name: 'Verify badge' }).click()
+    await expect(page.getByText('Too many checks for now')).toBeVisible()
+    await expect(page.getByText('10 minutes')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Check again in (9:5\d|10:00)/u })).toBeDisabled()
+    await expect(page.getByText('10 of 10')).toBeVisible()
+
+    // Another tab's check verified it first: show that, not an error.
+    await page.unroute(verifyRoute)
+    await page.reload()
+    await page.route(verifyRoute, route =>
+      route.fulfill({
+        json: {
+          code: 'verification_superseded',
+          error: 'Another check of this badge finished first. Reload to see its result.',
+          submission: { ...submission, status: 'verified' }
+        },
+        status: 409
+      })
+    )
+    await page.getByRole('button', { name: 'Verify badge' }).click()
+    await expect(page.getByText('Badge verified')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Stale is in the review queue' })).toBeVisible()
+    await owner.close()
   })
 
   test('refuses writes without a session or from another origin', async ({ baseURL, request }) => {

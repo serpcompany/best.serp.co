@@ -173,6 +173,10 @@ export interface ApiError {
   code: string
   error: string
   fields?: Partial<Record<SubmissionField, string>>
+  /** With a 429 `check_budget`: when the badge can be checked again. */
+  retryAfterSeconds?: number
+  /** With a badge check refused as stale: the submission as it is now. */
+  submission?: SubmissionSummary
 }
 
 export const DRAFT_LIFETIME_DAYS = 30

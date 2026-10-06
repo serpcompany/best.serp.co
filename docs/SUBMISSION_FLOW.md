@@ -145,7 +145,9 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    `POST /api/submissions/<id>/verify` first claims the check in one compare-and-swap
    (`claimVerification`: the owner's `pending_badge` submission, past the 30-second cooldown,
    under the cap of 10 conclusive checks), so parallel requests get one check and 429
-   `cooldown` for the rest, and a stale result is refused with 409, never a 500. It then counts
+   `cooldown` for the rest, and a stale result is refused with 409, never a 500. Refusals
+   carry the current submission, so the page catches up (a check verified in another tab
+   shows as verified) or says when to check again. It then counts
    the fetch against an outbound budget whatever its result (20 an hour per submission, 60 per
    account, and 120 per client address, which accounts behind it share; 429 `check_budget`
    with `retryAfterSeconds`), fetches the website, and parses it as a browser would
