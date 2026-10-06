@@ -165,9 +165,9 @@ export interface BadgeProgramOperations {
     result: BadgeCheckRecord
   }): Promise<RecordedBadgeCheck>
   /**
-   * Records the one-off badge check of a listing being refunded (#68): `kind = 'refund'`. A
-   * conclusive pass is what `buildRefundSubmissionPlans` (`keep_free`) reads to keep the listing
-   * as a free one. Throws when the listing is gone or was never approved.
+   * Records the one-off badge check of a listing being refunded (#68): `kind = 'refund'`. The
+   * refund passes its id to `buildRefundSubmissionPlans`, which decides on it alone: `keep_free`
+   * on a pass, `unpublish` otherwise. Throws when the listing is gone or was never approved.
    */
   recordRefundCheck(input: { listingId: string; now: string; result: BadgeCheckRecord }): Promise<{
     id: number

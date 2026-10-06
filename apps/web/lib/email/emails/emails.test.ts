@@ -482,7 +482,18 @@ describe('badge missing', () => {
     expect(text('page_not_followed')).toContain(
       '09:14 UTC. Badge found, but the page tells search engines not to follow links.'
     )
-    expect(text('http_status', 403)).toContain('09:14 UTC. The site answered with HTTP 403.')
+    // A 4xx: the page refused our checker, so the email neither says it loaded the page nor asks
+    // to put the badge back; it gives the submit page's firewall advice.
+    const refused = text('http_status', 403)
+    expect(refused).toContain(
+      "Our weekly check couldn't reach https://ledgerly.app/ on Mon, Oct 5 at 09:14 UTC. The site answered with HTTP 403."
+    )
+    expect(refused).toContain(
+      "Make sure the page is public and that a firewall or bot protection isn't blocking our checker."
+    )
+    expect(refused).not.toMatch(/check loaded|put the badge code/u)
+    expect(text('missing')).toContain('Our weekly check loaded https://ledgerly.app/')
+    expect(text('missing')).toContain('put the badge code from your dashboard back on the page')
     expect(() => text('http_status', 503)).toThrow(EmailTemplateError)
     expect(() => text('http_status')).toThrow(EmailTemplateError)
   })

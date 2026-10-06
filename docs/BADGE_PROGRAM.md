@@ -40,7 +40,11 @@ its flag is off. A local Worker can run it with the flag off
   link's `rel` has `nofollow`. A `sponsored` or `ugc` link (or a resent email, whose tokens are no
   longer known), a robots-blocked page, and a 4xx reuse the submit page's approved lines for the
   same results: "Badge found, but the link isn’t followed.", "Badge found, but the page tells
-  search engines not to follow links.", and "The site answered with HTTP <status>." 
+  search engines not to follow links.", and "The site answered with HTTP <status>.". For a 4xx
+  the email says the check "couldn’t reach" the site (the submit page's "We couldn’t reach
+  <site>") instead of "loaded", and gives the submit page's advice for that result, "Make sure
+  the page is public and that a firewall or bot protection isn’t blocking our checker.", instead
+  of asking to put the badge back. 
 - **Triggers** (UTC, `apps/web/lib/badge-program/schedule.ts`): weekly
   `15 3 * * 1` opens a cycle, daily `45 3 * * *` opens a confirmation window, and the hourly
   `0 * * * *` continues both. Each run sends again failed program emails that still apply, then
@@ -76,13 +80,20 @@ its flag is off. A local Worker can run it with the flag off
 
 ## The check at refund (#68)
 
-When a paid listing is refunded, its badge is checked once, right then (owner decision,
-2026-10-06): `checkBadgeAtRefund` (`apps/web/lib/badge-program/refund.ts`) checks the listing's
-website and records the result as `kind = 'refund'`, the only `badge_checks` write outside the
-weekly program. A pass returns `keepFree: true`: the refund's `keep_free` plan reads that pass,
-keeps the listing up as free, and the weekly program then checks it. A miss, a 4xx, or a result
-that can't tell returns `keepFree: false`, and the refund unpublishes it. #68 calls it before it
-builds the refund plans; nothing calls it yet.
+When a paid listing is refunded, its badge is checked once, right then, and the refund decides on
+that check alone (owner decision, 2026-10-06; #106 review round 2): `checkBadgeAtRefund`
+(`apps/web/lib/badge-program/refund.ts`) checks the listing's website and records the result as
+`kind = 'refund'`, the only `badge_checks` write outside the weekly program. #68 passes its
+`checkId` to `buildRefundSubmissionPlans` within `REFUND_BADGE_CHECK_MAX_AGE_HOURS` (one hour; a
+retried refund checks again):
+
+- `keepFree: true` (a pass): `keep_free` keeps the listing up as free, and the weekly program then
+  checks it. The plan refuses unless that check is the listing's latest refund check and passed.
+- `keepFree: false` (a miss, a 4xx, or a result that can't tell): `unpublish` takes it down. The
+  plan refuses unless that check did not pass, so an earlier weekly pass can neither keep the
+  listing nor block the refund.
+
+Nothing calls it yet.
 
 ## Checking it on staging
 

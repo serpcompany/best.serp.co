@@ -1093,7 +1093,7 @@ export const badgeChecks = sqliteTable(
     check('badge_checks_outcome_valid', sql`${table.outcome} IN (${sqlList(badgeCheckOutcomes)})`),
     check('badge_checks_kind_valid', sql`${table.kind} IN (${sqlList(badgeCheckKinds)})`),
     check('badge_checks_conclusive_boolean', booleanCheck(table.conclusive)),
-    // ISO instants compare as text: the keep-free refund window reads `checked_at`.
+    // ISO instants compare as text: the refund plans read the refund check's `checked_at`.
     check('badge_checks_checked_at_iso', isoInstantCheck(table.checkedAt)),
     check(
       'badge_checks_pass_conclusive',

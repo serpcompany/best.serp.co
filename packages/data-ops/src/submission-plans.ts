@@ -37,8 +37,12 @@ export interface SubmissionApprovalSnapshot {
 const CHANNEL = 'github_issue'
 const LEGACY_APPROVAL_WORKFLOW = 'github/approve-d1-submission'
 
-/** A refund keeps a listing live as free only on a conclusive badge pass this recent (#62 r1). */
-export const KEEP_FREE_BADGE_MAX_AGE_HOURS = 7 * 24
+/**
+ * How old the refund's own badge check (`badge_checks.kind = 'refund'`, #66) may be when the
+ * refund is recorded: the owner decided the badge is checked once, right at refund (2026-10-06),
+ * so a refund retried later checks again (`checkBadgeAtRefund`).
+ */
+export const REFUND_BADGE_CHECK_MAX_AGE_HOURS = 1
 
 /**
  * The submission transition map (docs/SUBMISSION_FLOW.md). Each plan below compares and swaps
@@ -667,28 +671,30 @@ export function buildRejectSubmissionPlans(input: {
   return plans
 }
 
-/** The listing's latest conclusive badge check, as a correlated subquery on `s.listing_id`. */
-const latestConclusiveCheck = (column: 'checked_at' | 'id' | 'outcome') => `(SELECT ${column}
-  FROM badge_checks WHERE listing_id=s.listing_id AND conclusive=1
-  ORDER BY checked_at DESC,id DESC LIMIT 1)`
-
 /**
- * The latest conclusive check passed at or after `?` (the keep-free window). EXISTS is never
- * NULL, so `NOT` is also true for a listing without any check.
+ * The refund's own badge check (#66 review round 2): check `?` is this listing's latest `refund`
+ * check, made at or after `?`, and (`passed`) passed or (`!passed`) did not. The refund decides on
+ * that check alone, so an earlier weekly pass can neither keep a listing whose refund check
+ * missed or couldn't tell, nor block its unpublish.
  */
-const recentBadgePass = `EXISTS (SELECT 1 FROM (SELECT outcome,checked_at FROM badge_checks
-  WHERE listing_id=s.listing_id AND conclusive=1 ORDER BY checked_at DESC,id DESC LIMIT 1) latest
-  WHERE latest.outcome='pass' AND latest.checked_at>=?)`
+function refundBadgeCheck(passed: boolean): string {
+  return `EXISTS (SELECT 1 FROM badge_checks rc WHERE rc.id=? AND rc.listing_id=s.listing_id
+    AND rc.kind='refund' AND rc.checked_at>=? AND ${passed ? "rc.outcome='pass'" : "rc.outcome<>'pass'"}
+    AND NOT EXISTS (SELECT 1 FROM badge_checks later WHERE later.listing_id=rc.listing_id
+      AND later.kind='refund' AND (later.checked_at>rc.checked_at
+        OR (later.checked_at=rc.checked_at AND later.id>rc.id))))`
+}
 
 /**
  * Records a refund of a paid submission (`refunded_at`; #59 amendment 2026-10-06):
  * - `after_rejection`: only a rejection tagged `other` (a `prohibited` one is never refunded;
  *   a CHECK refuses that combination); the rejection already unpublished it.
- * - `keep_free`: an approved paid listing whose latest conclusive badge check passed within
- *   `KEEP_FREE_BADGE_MAX_AGE_HOURS` stays live as a free listing: its plan becomes `free`
- *   (paid → free), the badge program applies from now on, and the event records that check.
- * - `unpublish`: an approved paid listing that is live without such a pass is taken down in
- *   the same batch.
+ * - `keep_free`: an approved paid listing whose refund badge check (`badgeCheckId`, recorded by
+ *   `checkBadgeAtRefund` within `REFUND_BADGE_CHECK_MAX_AGE_HOURS`) passed stays live as a free
+ *   listing: its plan becomes `free` (paid → free), the badge program applies from now on, and
+ *   the event records that check.
+ * - `unpublish`: an approved paid listing that is live, whose refund badge check missed or
+ *   couldn't tell (owner decision, 2026-10-06), is taken down in the same batch.
  * - `already_unpublished`: an approved paid listing that is already down (unpublished by an
  *   admin, or deleted) is refunded without touching the catalog.
  */
@@ -696,12 +702,12 @@ export function buildRefundSubmissionPlans(
   input: { actor: string; now: string; submissionId: string } & (
     | { mode: 'after_rejection' }
     | { mode: 'already_unpublished' }
-    | { mode: 'keep_free' }
-    | { mode: 'unpublish'; publication: CatalogPublication }
+    | { badgeCheckId: number; mode: 'keep_free' }
+    | { badgeCheckId: number; mode: 'unpublish'; publication: CatalogPublication }
   )
 ): StatementPlan[] {
   const paid = `s.id=? AND s.plan='paid' AND s.paid_at IS NOT NULL AND s.refunded_at IS NULL`
-  const badgeWindow = hoursBefore(input.now, KEEP_FREE_BADGE_MAX_AGE_HOURS)
+  const checkWindow = hoursBefore(input.now, REFUND_BADGE_CHECK_MAX_AGE_HOURS)
   const refund = (condition: PlanGuard, plan: 'free' | 'paid', label: string): StatementPlan[] => [
     {
       sql: `UPDATE listing_submissions SET plan=?,refunded_at=?,updated_at=?
@@ -734,26 +740,29 @@ export function buildRefundSubmissionPlans(
   if (input.mode === 'keep_free') {
     return [
       ...refund(
-        { sql: `s.status='approved' AND ${live} AND ${recentBadgePass}`, params: [badgeWindow] },
+        {
+          sql: `s.status='approved' AND ${live} AND ${refundBadgeCheck(true)}`,
+          params: [input.badgeCheckId, checkWindow]
+        },
         'free',
         'refunded_listing_kept_free'
       ),
       {
         sql: `INSERT INTO listing_submission_events (submission_id,event_type,detail,actor)
           SELECT s.id,'refunded',json_object('mode','kept_as_free',
-            'badge_check_id',${latestConclusiveCheck('id')},
-            'badge_checked_at',${latestConclusiveCheck('checked_at')}),?
-          FROM listing_submissions s WHERE s.id=?`,
-        params: [input.actor, input.submissionId]
+            'badge_check_id',c.id,'badge_checked_at',c.checked_at),?
+          FROM listing_submissions s JOIN badge_checks c ON c.id=? AND c.listing_id=s.listing_id
+          WHERE s.id=?`,
+        params: [input.actor, input.badgeCheckId, input.submissionId]
       },
       assertPreviousStatementChangedOne('kept_free_badge_recorded')
     ]
   }
-  const condition = `s.status='approved' AND ${live} AND NOT ${recentBadgePass}`
+  const condition = `s.status='approved' AND ${live} AND ${refundBadgeCheck(false)}`
   return [
     ...beginCatalogPublicationPlans(input.publication, {
       sql: `EXISTS (SELECT 1 FROM listing_submissions s WHERE ${paid} AND ${condition})`,
-      params: [input.submissionId, badgeWindow]
+      params: [input.submissionId, input.badgeCheckId, checkWindow]
     }),
     {
       sql: `UPDATE listings SET is_active=0,updated_at=?

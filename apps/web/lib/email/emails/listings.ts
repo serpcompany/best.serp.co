@@ -151,6 +151,7 @@ export const badgeMissingEmail = defineEmailTemplate<BadgeMissingInput>({
     const name = required(input.listingName, 'a listing name')
     const website = required(input.website, 'a website')
     const finding = badgeFinding(input)
+    const refused = input.problem === 'http_status'
     return composeEmail(
       {
         // The paid upgrade is #68's: offered only while `features.orders` is on.
@@ -162,8 +163,12 @@ export const badgeMissingEmail = defineEmailTemplate<BadgeMissingInput>({
             ]
           : [],
         body: [
+          // A 4xx (#106 round 2): the page refused our checker, so the email says it couldn't
+          // reach it, as the submit page's approved result does ("We couldn’t reach <site>").
           paragraph(
-            `Our weekly check loaded ${website} on ${formatCheckTime(input.checkedAt)}. `,
+            refused
+              ? `Our weekly check couldn’t reach ${website} on ${formatCheckTime(input.checkedAt)}. `
+              : `Our weekly check loaded ${website} on ${formatCheckTime(input.checkedAt)}. `,
             ...finding
           ),
           paragraph(
@@ -171,8 +176,12 @@ export const badgeMissingEmail = defineEmailTemplate<BadgeMissingInput>({
             bold(formatCheckTime(input.recheckAt)),
             `. If there still isn’t a badge with a dofollow link to your listing, ${name} will be removed from SERP.`
           ),
+          // The badge is usually still there behind a firewall or bot protection: the submit
+          // page's approved advice for the same result, word for word.
           paragraph(
-            'To fix it, put the badge code from your dashboard back on the page, then run a check.'
+            refused
+              ? 'Make sure the page is public and that a firewall or bot protection isn’t blocking our checker.'
+              : 'To fix it, put the badge code from your dashboard back on the page, then run a check.'
           )
         ],
         cta: {

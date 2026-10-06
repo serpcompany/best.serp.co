@@ -533,10 +533,40 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
   })
 
   it('records every refund mode, a held payment, and an unapplied payment', async () => {
-    // unpublish: the upgraded listing has no recent badge pass.
+    // unpublish: the refund's own badge check couldn't tell (#66), even after a recent pass.
+    const refundCheck = async (listingId: string, outcome: 'fail' | 'pass') => {
+      await db
+        .prepare(
+          `INSERT INTO badge_checks (listing_id, checked_at, outcome, reason, conclusive, kind)
+          VALUES (?, ?, ?, ?, ?, 'refund')`
+        )
+        .bind(
+          listingId,
+          new Date(Date.parse(NOW) - 60_000).toISOString(),
+          outcome,
+          outcome === 'pass' ? null : 'fetch_timeout',
+          outcome === 'pass' ? 1 : 0
+        )
+        .run()
+      const row = await first<{ id: number }>(
+        `SELECT id FROM badge_checks WHERE listing_id = ? AND kind = 'refund'
+          ORDER BY id DESC LIMIT 1`,
+        listingId
+      )
+      return Number(row?.id)
+    }
+    await db
+      .prepare(
+        `INSERT INTO badge_checks (listing_id, checked_at, outcome, reason, conclusive)
+        VALUES ('lst-free', ?, 'pass', NULL, 1)`
+      )
+      .bind(daysBefore(1))
+      .run()
+    const inconclusive = await refundCheck('lst-free', 'fail')
     await run(
       S.buildRefundSubmissionPlans({
         actor: 'admin',
+        badgeCheckId: inconclusive,
         mode: 'unpublish',
         now: NOW,
         publication: await publication('refund-unpublish', 'sub-free'),
@@ -545,7 +575,7 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     )
     expect(await listing('lst-free')).toMatchObject({ is_active: 0 })
 
-    // keep_free: a recent conclusive pass keeps the listing live as free.
+    // keep_free: the refund check passed, so the listing stays live as free.
     await paidLive('sub-keep', 'https://keep.example/', 'lst-keep')
     await approveLive('sub-keep', 'lst-keep')
     await db
@@ -566,6 +596,7 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     await run(
       S.buildRefundSubmissionPlans({
         actor: 'admin',
+        badgeCheckId: await refundCheck('lst-keep', 'pass'),
         mode: 'keep_free',
         now: NOW,
         submissionId: 'sub-keep'

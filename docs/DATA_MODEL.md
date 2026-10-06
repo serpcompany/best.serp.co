@@ -129,7 +129,8 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   `ON DELETE RESTRICT`: account deletion must resolve ownership first.
 - `listing_submissions.plan` is the plan the submitter chose (`free` | `paid`, null while a
   draft has not chosen); `paid_at` and `refunded_at` record payment. A refund that keeps a
-  listing live with a recent badge pass sets the plan to `free` (paid → free). Owners
+  listing live because its refund badge check passed (`badge_checks.kind = 'refund'`, the check
+  the refund names) sets the plan to `free` (paid → free). Owners
   (`owner_user_id`), `reviewer_note`, and `rejection_reason` with `rejection_category`
   (`prohibited` | `other`) complete the review record. CHECK constraints tie these together:
   a refund never coexists with a `prohibited` rejection, a withdrawn row never holds an
