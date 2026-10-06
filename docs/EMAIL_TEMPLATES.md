@@ -56,8 +56,9 @@ it on (owner decision on #64):
   resubmit from your account at <`/account/` link>" with an "Open your account" button (owner
   decision, 2026-10-06: the submission keeps its URL key, so `/submit/` would refuse it), and
   `submission-rejected` says "Update your details and submit again at <`/submit/` link>" with
-  a "Submit again" button. Other submission buttons open `/account/`. On, they ask to edit and
-  resubmit and link to `/account/submissions/<id>/` (`submissionPath`).
+  a "Submit again" button, and `submission-received` leaves out "Meanwhile, you can add FAQs
+  and links from your dashboard." Other submission buttons open `/account/`. On, they ask to
+  edit and resubmit and link to `/account/submissions/<id>/` (`submissionPath`).
 - `features.messages` (#73). Off, `changes-requested` ends "Questions? Contact us at
   <`/contact/` link>" and the prohibited rejection's "Message us" opens `/contact/`. On, they
   point to the dashboard conversation (`messageUsPath`).
@@ -67,8 +68,9 @@ for a dashboard action whose flag is off, apart from the owner-approved interim 
 word for word (`APPROVED_INTERIM_COPY`: "resubmit from your account"). It lists the links still waiting for their page, all
 in emails nothing sends yet: `/account/listings/<slug>/` (badge-missing and unlisted, #65;
 screen 7 only defines `/account/listings/<slug>/edit`), `/account/messages/...` and
-`/admin/inbox/<thread>/` (#73), and the draft reminder's `/submit/<id>/choose/` (#63) and
-`/submit/<id>/checkout/` (#68).
+`/admin/inbox/<thread>/` (#73). The draft reminder, which the hourly job sends (#63), renders
+with the site's `showPaidListings` flag as the job passes it, so its "Complete checkout" link
+to `/submit/<id>/checkout/` must exist once #68 turns the flag on.
 
 ## Recipients and footers
 

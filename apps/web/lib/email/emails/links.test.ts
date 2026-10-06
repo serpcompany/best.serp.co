@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { site } from '@serpdirectory/site-config'
 import { describe, expect, it } from 'vitest'
 import { features, type SiteFeatures } from '../../features'
 import { type AppEmailTemplates, appEmailTemplates } from '../registry'
@@ -27,10 +28,6 @@ const APP_DIRECTORY = join(WEB_DIRECTORY, 'app')
 const DEFERRED: Partial<Record<TemplateId, Array<{ issue: string; path: RegExp }>>> = {
   'admin-new-message': [{ issue: '#73', path: /^\/admin\/inbox\/[^/]+\/$/u }],
   'badge-missing': [{ issue: '#65', path: /^\/account\/listings\/[^/]+\/$/u }],
-  'draft-reminder': [
-    { issue: '#63', path: /^\/submit\/[^/]+\/choose\/$/u },
-    { issue: '#68', path: /^\/submit\/[^/]+\/checkout\/$/u }
-  ],
   'listing-unlisted': [{ issue: '#65', path: /^\/account\/listings\/[^/]+\/$/u }],
   'new-message': [{ issue: '#73', path: /^\/account\/messages\/[^/]+\/$/u }]
 }
@@ -136,13 +133,23 @@ function siteLinks(html: string): string[] {
 
 type Rendered = { html: string; subject: string; text: string }
 
+/**
+ * A sample's input as the app sends it. The draft reminder's paid copy and its checkout link
+ * (#68) follow `site.features.showPaidListings`, which the draft job passes as `paidListings`
+ * (#63), so it renders here with the site's flag rather than the mockups' `true`.
+ */
+function sentInput(id: TemplateId, input: unknown): unknown {
+  if (id !== 'draft-reminder') return input
+  return { ...(input as object), paidListings: site.features.showPaidListings }
+}
+
 /** Every sample of every template, rendered in production with the given site areas. */
 function renderAll(siteFeatures: SiteFeatures): Array<{ email: Rendered; id: TemplateId }> {
   return (
     Object.entries(EMAIL_SAMPLES) as Array<[TemplateId, Array<{ input: unknown; to: string }>]>
   ).flatMap(([id, samples]) =>
     samples.map(sample => ({
-      email: renderAppEmail(id, sample.input as never, {
+      email: renderAppEmail(id, sentInput(id, sample.input) as never, {
         environment: 'production',
         features: siteFeatures,
         to: sample.to

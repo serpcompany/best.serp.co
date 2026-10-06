@@ -258,7 +258,7 @@ You're getting this because this address was entered at best.serp.co/login.`)
 
 describe('submission received', () => {
   it('lists the submission and links to the dashboard', () => {
-    const email = render('submission-received')
+    const email = renderWith('submission-received', AFTER)
     expect(email.subject).toBe('We received Quillmate')
     expect(email.text).toBe(`Quillmate is in the review queue
 
@@ -277,6 +277,14 @@ This address isn't monitored. Reply from your dashboard: https://best.serp.co/ac
 You're getting this because you have an account on best.serp.co.`)
     expect(linksTo(email.html, 'https://best.serp.co/account/')).toBe(true)
     expect(email.html).toContain('>Free (badge)</td>')
+  })
+
+  it('until #65, promises nothing the dashboard cannot do yet', () => {
+    const email = renderWith('submission-received', BEFORE)
+    expect(bodyText(email)).toContain(
+      "Plan: Free (badge)\nWe'll email you when it's been reviewed.\n\nOpen your dashboard: https://best.serp.co/account/"
+    )
+    expect(bodyText(email)).not.toMatch(/FAQs and links/u)
   })
 })
 
