@@ -262,7 +262,11 @@ describe('page-level nofollow', () => {
       'max-snippet: 20, nofollow',
       'otherbot: noindex, googlebot: nofollow',
       'googlebot: noindex nofollow',
-      'GoogleBot: noarchive, nofollow'
+      'GoogleBot: noarchive, nofollow',
+      // PR #84 review round 3: a prefix covers only its own directive, since repeated
+      // headers arrive joined with commas and an unprefixed one applies to every crawler.
+      'otherbot: noindex, nofollow',
+      'otherbot: noarchive, none'
     ]) {
       const page = async () =>
         new Response(validBadgeHtml, {
@@ -278,7 +282,7 @@ describe('page-level nofollow', () => {
     for (const header of [
       'otherbot: nofollow',
       'bingbot: none',
-      'otherbot: noindex, nofollow',
+      'otherbot: noindex, otherbot: nofollow',
       'unavailable_after: 25 Jun 2030 15:00:00 PST',
       'googlebot: noindex, otherbot: none'
     ]) {
@@ -292,6 +296,19 @@ describe('page-level nofollow', () => {
         header
       ).resolves.toEqual({ ok: true })
     }
+    // Two headers, `otherbot: noarchive` and `nofollow`: the second is for every crawler.
+    const twoHeaders = async () =>
+      new Response(validBadgeHtml, {
+        headers: [
+          ['Content-Type', 'text/html'],
+          ['X-Robots-Tag', 'otherbot: noarchive'],
+          ['X-Robots-Tag', 'nofollow']
+        ],
+        status: 200
+      })
+    await expect(verifyFeaturedBadge('https://example.com', expected, twoHeaders)).resolves.toEqual(
+      { code: 'page_not_followed', ok: false, source: 'header' }
+    )
     const indexOnly = async () =>
       new Response(validBadgeHtml, {
         headers: { 'Content-Type': 'text/html', 'X-Robots-Tag': 'noindex, noarchive' },

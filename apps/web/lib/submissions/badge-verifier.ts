@@ -106,15 +106,18 @@ export function robotsMetaSkipsLinks(content: string | null | undefined): boolea
 
 /**
  * True when an `X-Robots-Tag` value skips links for the crawlers that count: a `nofollow` or
- * `none` directive with no user-agent prefix, or after a `googlebot:` prefix. A prefix applies
- * to the directives after it (`otherbot: noindex, nofollow` applies only to otherbot), until the
- * next prefix (a fetch joins repeated headers with commas, so a later unprefixed line reads as
- * part of the last prefix). Directives with their own colon value (`max-snippet: 20`) are not
- * prefixes.
+ * `none` directive with no user-agent prefix, or with a `googlebot:` prefix. A prefix covers
+ * only its own comma-separated directive (PR #84 review round 3, owner rule): a fetch joins
+ * repeated headers with commas, so `otherbot: noarchive` and a separate `nofollow` header
+ * arrive as `otherbot: noarchive, nofollow`, and Google applies that `nofollow` to every
+ * crawler. Reading every unprefixed directive as one for all crawlers errs the way Google
+ * does, at the cost of failing a single `otherbot: noindex, nofollow` header (which
+ * `otherbot: noindex, otherbot: nofollow` avoids). Directives with their own colon value
+ * (`max-snippet: 20`) are not prefixes.
  */
 export function robotsHeaderSkipsLinks(value: string | null | undefined): boolean {
-  let agent: string | null = null
   for (const part of (value ?? '').split(',')) {
+    let agent: string | null = null
     let directive = part.trim()
     const prefix = /^([a-z0-9_.-]+)\s*:\s*(.*)$/iu.exec(directive)
     if (prefix?.[1] && !VALUED_ROBOTS_DIRECTIVES.has(prefix[1].toLowerCase())) {

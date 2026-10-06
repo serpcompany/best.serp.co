@@ -167,8 +167,11 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    decision on #84). A page that tells search engines to skip its links fails as
    `page_not_followed`: a `nofollow` or `none` directive in `<meta name="robots">` or
    `<meta name="googlebot">`, or in an `X-Robots-Tag` header with no user-agent prefix or a
-   `googlebot:` one. A prefix covers the directives after it up to the next prefix, so
-   `otherbot: noindex, nofollow` (or a `bingbot` rule) does not count. One followed badge link
+   `googlebot:` one. A rule for another crawler alone (`otherbot: nofollow`, or `bingbot`)
+   does not count. A prefix covers only its own comma-separated directive: repeated headers
+   arrive joined with commas, and Google applies an unprefixed one to every crawler, so
+   `otherbot: noindex, nofollow` fails (`otherbot: noindex, otherbot: nofollow` does not;
+   PR #84 review round 3). One followed badge link
    anywhere on the page passes. Only static HTML is read: a badge added by JavaScript fails,
    and a badge hidden with CSS passes, since detecting it would need rendering (accepted).
    Conclusive results (`badge_missing`, `link_not_followed`, `page_not_followed`,
