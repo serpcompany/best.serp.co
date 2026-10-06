@@ -1,3 +1,4 @@
+import { clientIp } from '@/lib/auth/rate-limits'
 import { authorizeUserRequest, consumeRequestRateLimit } from '@/lib/auth/server'
 import { verifyFeaturedBadge } from '@/lib/submissions/badge-verifier'
 import { sendSubmissionVerifiedEmails } from '@/lib/submissions/emails'
@@ -21,8 +22,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
  *
  * 1. Claim the check in one compare-and-swap before anything is fetched (cooldown of 30
  *    seconds, ten conclusive checks): a request that loses the race gets 429 or 409.
- * 2. Count the fetch against the outbound budget per submission and per account, whatever its
- *    result, since connection problems never use up one of the ten checks.
+ * 2. Count the fetch against the outbound budget per submission, per account and per client
+ *    address, whatever its result, since connection problems never use up one of the ten
+ *    checks.
  * 3. Fetch and scan the site, then record the result against the claim.
  *
  * A pass moves the submission to `verified` (the review queue) and sends "submission received"
@@ -37,7 +39,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     const { claimedAt, submission } = await claimVerification(id, user.id)
     const budget = await consumeRequestRateLimit(
-      badgeCheckRateLimitRules({ submissionId: id, userId: user.id })
+      badgeCheckRateLimitRules({ ip: clientIp(request.headers), submissionId: id, userId: user.id })
     )
     if (!budget.allowed) {
       return json(
