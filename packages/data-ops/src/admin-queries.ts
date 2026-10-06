@@ -1,5 +1,6 @@
 import { selectAdminAllowlistPlan } from './admin-plans'
 import type { Database } from './client'
+import { listingWebsiteConflicts } from './listing-plans'
 import type { StatementPlan } from './plan-support'
 import type {
   BadgeCheckOutcome,
@@ -386,6 +387,42 @@ export function selectActiveUrlBlockPlan(urlKey: string): StatementPlan {
       WHERE url_key=? AND lifted_at IS NULL`,
     params: [urlKey]
   }
+}
+
+/**
+ * Which rule stops a listing from moving to `website` (`listingWebsiteConflicts`): 1 or 0 for
+ * `listing` (another listing), `submission` (one in flight), and `blocked` (an active block).
+ */
+export function selectListingWebsiteConflictPlan(input: {
+  listingId: string
+  website: string
+}): StatementPlan {
+  const conflicts = listingWebsiteConflicts(input)
+  return {
+    sql: `SELECT ${conflicts.listing.sql} AS listing,${conflicts.submission.sql} AS submission,
+      ${conflicts.block.sql} AS blocked`,
+    params: [...conflicts.listing.params, ...conflicts.submission.params, ...conflicts.block.params]
+  }
+}
+
+/**
+ * The block key a record's "Allow resubmission" acts on: a submission's own key, or the key of
+ * a listing's latest submission (null when it has none). No row when the record doesn't exist.
+ */
+export function selectResubmissionTargetPlan(
+  target: { listingId: string } | { submissionId: string }
+): StatementPlan {
+  return 'submissionId' in target
+    ? {
+        sql: `SELECT id,COALESCE(block_key,slug) AS block_key FROM listing_submissions WHERE id=?`,
+        params: [target.submissionId]
+      }
+    : {
+        sql: `SELECT l.id,(SELECT COALESCE(s.block_key,s.slug) FROM listing_submissions s
+            WHERE s.listing_id=l.id ORDER BY s.created_at DESC,s.id DESC LIMIT 1) AS block_key
+          FROM listings l WHERE l.id=?`,
+        params: [target.listingId]
+      }
 }
 
 /** Active categories for the category select, in display order. */

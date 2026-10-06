@@ -736,6 +736,28 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     )
     expect(await all(Q.selectActiveCategoriesPlan())).toHaveLength(2)
     expect(await all(Q.selectActiveUrlBlockPlan('casino.example'))).toEqual([])
+    // "Allow resubmission" targets: a submission's own key, a listing's latest submission's key.
+    expect(await all(Q.selectResubmissionTargetPlan({ submissionId: 'sub-free' }))).toEqual([
+      { block_key: expect.any(String), id: 'sub-free' }
+    ])
+    expect(await all(Q.selectResubmissionTargetPlan({ listingId: 'lst-missing' }))).toEqual([])
+    // A website move collides with another listing's host; a free host does not.
+    expect(
+      await all(
+        Q.selectListingWebsiteConflictPlan({
+          listingId: 'lst-free',
+          website: 'https://www.keep.example/'
+        })
+      )
+    ).toEqual([{ blocked: 0, listing: 1, submission: 0 }])
+    expect(
+      await all(
+        Q.selectListingWebsiteConflictPlan({
+          listingId: 'lst-free',
+          website: 'https://new.example/'
+        })
+      )
+    ).toEqual([{ blocked: 0, listing: 0, submission: 0 }])
     const reads = createAdminReadOperations({ client: createDatabase(db) })
     expect(await reads.getAdminListing('free-tool.example')).toMatchObject({
       adminStatus: 'unlisted',

@@ -26,7 +26,9 @@ import {
 } from '@serpdirectory/data-ops/admin-plans'
 import {
   createAdminReadOperations,
-  selectActiveUrlBlockPlan
+  selectActiveUrlBlockPlan,
+  selectListingWebsiteConflictPlan,
+  selectResubmissionTargetPlan
 } from '@serpdirectory/data-ops/admin-queries'
 import type { Database } from '@serpdirectory/data-ops/client'
 import {
@@ -45,6 +47,7 @@ import {
   prepareCatalogPublication,
   type StatementPlan
 } from '@serpdirectory/data-ops/plan-support'
+import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
 import {
   buildApproveRevisionPlans,
   buildRejectRevisionPlans,
@@ -619,13 +622,26 @@ async function rejectSubmissionOnce(
   return { ...decision, ...(await afterRejection(context, input.submissionId)) }
 }
 
-/** "Allow resubmission": lifts the active prohibited-URL block on a block key. */
+/**
+ * "Allow resubmission" on a submission or listing page: lifts the active prohibited-URL block on
+ * that record's own block key (the submission's, or the listing's latest submission's), read
+ * from D1 for the id in the path. An unknown id is 404. The body's `urlKey`, the key the admin
+ * confirmed, is only checked against it (409 when they differ); it never picks the target.
+ */
 export async function allowResubmission(
   context: AdminContext,
-  input: { urlKey: string }
+  input: ({ listingId: string } | { submissionId: string }) & { urlKey?: string }
 ): Promise<Decision> {
-  const urlKey = input.urlKey.trim().toLowerCase()
-  if (!urlKey) return failure(422, 'url_key_required', 'Which URL should be allowed again?')
+  const target =
+    'submissionId' in input ? { submissionId: input.submissionId } : { listingId: input.listingId }
+  const [record] = await queryPlan<{ block_key: string | null }>(
+    context.client,
+    selectResubmissionTargetPlan(target)
+  )
+  if (!record) return notFound('submissionId' in target ? 'submission' : 'listing')
+  const urlKey = record.block_key
+  if (!urlKey) return failure(409, 'not_blocked', 'Nothing blocks this listing’s URL.')
+  if (input.urlKey !== undefined && input.urlKey.trim().toLowerCase() !== urlKey) return changed
   const blocked = async () =>
     (await queryPlan(context.client, selectActiveUrlBlockPlan(urlKey))).length > 0
   if (!(await blocked())) return { ok: true, replayed: true }
@@ -834,13 +850,9 @@ function listingPublication(
 const NAME_MAX = 80
 const DESCRIPTION_MAX = 160
 
-function isWebUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'https:' || url.protocol === 'http:'
-  } catch {
-    return false
-  }
+/** URLs follow the submission intake's rule: public HTTP(S) only (`validatePublicHttpUrl`). */
+function isPublicUrl(value: string): boolean {
+  return validatePublicHttpUrl(value).ok
 }
 
 /** Field rules shared by the reviewer's inline edit and the listing details form. */
@@ -869,11 +881,47 @@ export function validateListingFields(
   if (!categories.some(category => category.slug === fields.categorySlug)) {
     return failure(422, 'invalid_category', 'Choose an active category.')
   }
-  if (!isWebUrl(fields.logoUrl.trim())) {
-    return failure(422, 'invalid_logo', 'The logo needs an http or https image URL.')
+  if (!isPublicUrl(fields.logoUrl.trim())) {
+    return failure(422, 'invalid_logo', 'The logo needs a public http or https image URL.')
   }
-  if (fields.website !== undefined && !isWebUrl(fields.website.trim())) {
-    return failure(422, 'invalid_website', 'The website needs an http or https URL.')
+  if (fields.website !== undefined && !isPublicUrl(fields.website.trim())) {
+    return failure(422, 'invalid_website', 'The website needs a public http or https URL.')
+  }
+  return null
+}
+
+/**
+ * Why a listing can't move to `website`, with the submission intake's duplicate and block
+ * rules (`listingWebsiteConflicts`; the edit's batch enforces the same rules), or null.
+ */
+async function websiteConflict(
+  context: AdminContext,
+  listingId: string,
+  website: string
+): Promise<DecisionFailure | null> {
+  let rows: Array<{ blocked: number; listing: number; submission: number }>
+  try {
+    rows = await queryPlan(context.client, selectListingWebsiteConflictPlan({ listingId, website }))
+  } catch {
+    return failure(422, 'invalid_website', 'The website needs a public http or https URL.')
+  }
+  const [conflict] = rows
+  if (conflict?.listing) {
+    return failure(409, 'website_listed', 'Another listing already uses this website.')
+  }
+  if (conflict?.submission) {
+    return failure(
+      409,
+      'website_in_review',
+      'A submission for this website is in progress. Review it instead.'
+    )
+  }
+  if (conflict?.blocked) {
+    return failure(
+      409,
+      'website_blocked',
+      'This website was rejected as prohibited and is blocked.'
+    )
   }
   return null
 }
@@ -923,6 +971,10 @@ async function updateListingDetailsOnce(
   }
   if (current.adminStatus === 'blocked' || current.adminStatus === 'rejected') {
     return failure(409, 'listing_rejected', 'A rejected listing is read-only.')
+  }
+  if (fields.includes('website')) {
+    const conflict = await websiteConflict(context, input.listingId, details.website)
+    if (conflict) return conflict
   }
   const decision = await commit(
     context,

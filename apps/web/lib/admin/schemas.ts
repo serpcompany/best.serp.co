@@ -39,7 +39,8 @@ export const approveRevisionSchema = z.object({
 
 export const rejectRevisionSchema = z.object({ reason: text(2_000) })
 
-export const allowResubmissionSchema = z.object({ urlKey: text(300) })
+/** The block key the admin confirmed; the target is the record in the path. */
+export const allowResubmissionSchema = z.object({ urlKey: text(300).optional() })
 
 export const listingDetailsSchema = z.object({
   details: z

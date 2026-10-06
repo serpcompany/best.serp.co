@@ -67,8 +67,9 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
         removeListingOwner(context, { ...body, ...target })
       )
     case 'allow-resubmission':
+      // The listing in the path is the target; the body only confirms its block key.
       return runAdminDecision(request, actor, allowResubmissionSchema, (context, body) =>
-        allowResubmission(context, body)
+        allowResubmission(context, { ...body, ...target })
       )
     default:
       return unknownAdminEndpoint()

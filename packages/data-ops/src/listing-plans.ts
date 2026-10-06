@@ -1,3 +1,4 @@
+import { urlKey } from '@serpdirectory/utils/url-key'
 import {
   assertPreviousStatementChangedOne,
   beginCatalogPublicationPlans,
@@ -5,9 +6,12 @@ import {
   finishCatalogPublicationPlans,
   listingHasQueuedSubmission,
   listingIsLiveGuard,
+  type PlanGuard,
   type StatementPlan
 } from './plan-support'
+import { validatePublicHttpUrl } from './public-url'
 import {
+  activeSubmissionStatuses,
   type ListingEventType,
   type ListingLinkRel,
   type ListingOwnerVerification,
@@ -50,6 +54,40 @@ function listingEvent(
 }
 
 /** True while the listing's originating submission stands rejected (either category). */
+/**
+ * What stops a listing from moving to another website (#64 review), with the submission
+ * intake's rules (`createSubmission`): the website must pass `validatePublicHttpUrl`, and its
+ * host (`urlKey`) must not be another listing's slug or website, the slug of a submission in
+ * flight (other than this listing's own), or covered by an active prohibited-URL block (the
+ * `listing_submissions_refuse_blocked_url` trigger's rule). Throws for an invalid website.
+ */
+export function listingWebsiteConflicts(input: { listingId: string; website: string }): {
+  block: PlanGuard
+  listing: PlanGuard
+  submission: PlanGuard
+} {
+  const website = input.website.trim()
+  if (!validatePublicHttpUrl(website).ok) throw new Error('A website must be a public HTTP(S) URL.')
+  const host = urlKey(website).hostKey
+  const statuses = activeSubmissionStatuses.map(() => '?').join(',')
+  return {
+    block: {
+      sql: `EXISTS (SELECT 1 FROM listing_submission_url_blocks WHERE lifted_at IS NULL
+        AND (url_key=? OR (covers_subdomains=1 AND substr(?, -1 - length(url_key))='.' || url_key)))`,
+      params: [host, host]
+    },
+    listing: {
+      sql: `EXISTS (SELECT 1 FROM listings WHERE id<>? AND (slug=? OR website=?))`,
+      params: [input.listingId, host, website]
+    },
+    submission: {
+      sql: `EXISTS (SELECT 1 FROM listing_submissions WHERE slug=? AND status IN (${statuses})
+        AND (listing_id IS NULL OR listing_id<>?))`,
+      params: [host, ...activeSubmissionStatuses, input.listingId]
+    }
+  }
+}
+
 function listingSubmissionRejected(listingIdSql: string): string {
   return `EXISTS (SELECT 1 FROM listing_submissions rejected
     WHERE rejected.listing_id=${listingIdSql} AND rejected.status='rejected')`
@@ -323,13 +361,29 @@ export function buildUpdateListingDetailsPlans(input: {
     if (!value.trim()) throw new Error(`A listing's ${field} cannot be empty.`)
   }
   if (input.fields.length === 0) throw new Error('A listing edit must change something.')
+  for (const url of [details.website, details.logoUrl]) {
+    if (!validatePublicHttpUrl(url.trim()).ok)
+      throw new Error('Listing URLs must be public HTTP(S) URLs.')
+  }
   const category = `(SELECT id FROM categories WHERE slug=? AND is_active=1)`
+  // A new website must not collide with another listing, a submission, or a block.
+  const conflicts = input.fields.includes('website')
+    ? Object.values(listingWebsiteConflicts({ listingId, website: details.website }))
+    : []
   return [
     ...beginCatalogPublicationPlans(input.publication, {
       sql: `EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved' AND checksum=?)
         AND EXISTS (SELECT 1 FROM categories WHERE slug=? AND is_active=1)
-        AND NOT ${listingHasQueuedSubmission('?')} AND NOT ${listingSubmissionRejected('?')}`,
-      params: [listingId, input.expectedChecksum, details.categorySlug, listingId, listingId]
+        AND NOT ${listingHasQueuedSubmission('?')} AND NOT ${listingSubmissionRejected('?')}
+        ${conflicts.map(conflict => `AND NOT ${conflict.sql}`).join(' ')}`,
+      params: [
+        listingId,
+        input.expectedChecksum,
+        details.categorySlug,
+        listingId,
+        listingId,
+        ...conflicts.flatMap(conflict => conflict.params)
+      ]
     }),
     {
       sql: `UPDATE listings SET status='draft' WHERE id=? AND status='approved' AND checksum=?`,

@@ -47,8 +47,9 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
         rejectSubmission(context, { ...body, submissionId: submissionId.data })
       )
     case 'allow-resubmission':
+      // The submission in the path is the target; the body only confirms its block key.
       return runAdminDecision(request, actor, allowResubmissionSchema, (context, body) =>
-        allowResubmission(context, body)
+        allowResubmission(context, { ...body, submissionId: submissionId.data })
       )
     default:
       return unknownAdminEndpoint()

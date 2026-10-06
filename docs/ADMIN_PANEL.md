@@ -31,7 +31,7 @@ forbids `'use server'`): an action id is reachable from any path, so no path gat
 | `/api/admin/submissions/<id>/approve` | `expectedContentVersion`, optional `edits`, `linkRel` | `approveSubmission` |
 | `/api/admin/submissions/<id>/request-changes` | `note` | `requestSubmissionChanges` |
 | `/api/admin/submissions/<id>/reject` | `reason`, `category` (`prohibited` \| `other`) | `rejectSubmission` |
-| `/api/admin/submissions/<id>/allow-resubmission` | `urlKey` | `allowResubmission` |
+| `/api/admin/{submissions,listings}/<id>/allow-resubmission` | optional `urlKey` (checked only) | `allowResubmission` |
 | `/api/admin/revisions/<id>/{approve,request-changes,reject}` | as above, no category | `approveRevision`, … |
 | `/api/admin/listings/<id>/details` | `details`, `expectedChecksum` | `updateListingDetails` |
 | `/api/admin/listings/<id>/{unpublish,republish}` | optional `note` | `unpublishListing`, `republishListing` |
@@ -73,6 +73,15 @@ below), and otherwise sends the reviewed statement plans as one D1 batch:
   unpublished (edit or reject the submission instead); a rejected listing stays down and
   read-only; a transfer needs a verified account; the last admin cannot be removed (the plan
   refuses it inside the batch, so two admins cannot remove each other at once).
+- **URLs follow the submission intake.** Website and logo URLs pass `validatePublicHttpUrl`
+  (public HTTP(S) only). A new website must not collide, by its host (`urlKey`), with another
+  listing, a submission in flight, or an active prohibited-URL block
+  (`listingWebsiteConflicts`). The decision answers 409 with which one, and the edit's batch
+  refuses the same collisions. The slug never changes.
+- **"Allow resubmission" acts on the record in the path.** It lifts the block on that
+  submission's block key, or on the key of the listing's latest submission. An unknown id is
+  404. A body `urlKey`, the key the admin confirmed, is only compared with it (409 when they
+  differ), so a request can't lift a block on another URL.
 
 Emails go through `enqueueEmail` ([Email](./EMAIL.md)), built from the stored state whenever
 the decision holds. A replay enqueues the same email under the same event key: the ledger sends

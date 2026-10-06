@@ -298,17 +298,55 @@ describe('submission decisions', () => {
       ['submission-rejected-prohibited', 'submission-rejected:sub_bad']
     ])
     expect(emails[2]?.input).toMatchObject({ reason: 'Gambling without a license.' })
-    // "Allow resubmission" lifts the block once; a second click is a no-op.
-    expect(await allowResubmission(context(), { urlKey: 'casino.example' })).toEqual({
-      ok: true,
-      replayed: false
-    })
-    expect(await allowResubmission(context(), { urlKey: 'casino.example' })).toEqual({
+    // "Allow resubmission" acts on the submission in the path, never on a key from the body:
+    // an unknown submission is 404, and a confirmed key that isn't this submission's is 409.
+    expect(
+      await allowResubmission(context(), { submissionId: 'sub_missing', urlKey: 'casino.example' })
+    ).toMatchObject({ error: 'not_found', status: 404 })
+    expect(
+      await allowResubmission(context(), { submissionId: 'sub_other', urlKey: 'casino.example' })
+    ).toMatchObject({ error: 'conflict', status: 409 })
+    expect(
+      row('SELECT COUNT(*) AS active FROM listing_submission_url_blocks WHERE lifted_at IS NULL')
+    ).toEqual({ active: 1 })
+    // It lifts the block once; a second click is a no-op.
+    expect(
+      await allowResubmission(context(), { submissionId: 'sub_bad', urlKey: 'casino.example' })
+    ).toEqual({ ok: true, replayed: false })
+    expect(await allowResubmission(context(), { submissionId: 'sub_bad' })).toEqual({
       ok: true,
       replayed: true
     })
     expect(row('SELECT lifted_by FROM listing_submission_url_blocks')).toEqual({
       lifted_by: 'devin@serp.co'
+    })
+  })
+
+  it('allows resubmission from a listing page through its latest submission', async () => {
+    const { context, paidLive, row } = fixture()
+    // A listing without submissions has nothing to lift.
+    expect(await allowResubmission(context(), { listingId: 'lst_brief' })).toMatchObject({
+      error: 'not_blocked',
+      status: 409
+    })
+    expect(await allowResubmission(context(), { listingId: 'lst_missing' })).toMatchObject({
+      error: 'not_found',
+      status: 404
+    })
+    paidLive('sub_paid')
+    expect(
+      await rejectSubmission(context(), {
+        category: 'prohibited',
+        reason: 'Counterfeit goods.',
+        submissionId: 'sub_paid'
+      })
+    ).toMatchObject({ ok: true, replayed: false })
+    expect(
+      await allowResubmission(context(), { listingId: 'lst_brief', urlKey: 'brieflow.ai' })
+    ).toEqual({ ok: true, replayed: false })
+    expect(row('SELECT url_key, lifted_by FROM listing_submission_url_blocks')).toEqual({
+      lifted_by: 'devin@serp.co',
+      url_key: 'brieflow.ai'
     })
   })
 
@@ -488,6 +526,82 @@ describe('listing decisions', () => {
         "SELECT group_concat(event_type) AS events FROM listing_events WHERE listing_id='lst_brief'"
       )
     ).toEqual({ events: 'edited,unpublished,republished,link_rel_changed' })
+  })
+
+  it('validates a new website like a submission and refuses one that collides', async () => {
+    const { context, db, row, submission } = fixture()
+    insertPublishedListing(db, {
+      categoryIds: [1],
+      content: 'Content',
+      description: 'Notewise description',
+      displayOrder: 1,
+      id: 'lst_note',
+      isFeatured: false,
+      name: 'Notewise',
+      publishedAt: '2026-05-16',
+      slug: 'notewise.app',
+      website: 'https://notewise.app/'
+    })
+    db.exec(`INSERT INTO listing_media (listing_id, kind, url, sort_order)
+      VALUES ('lst_note', 'logo', 'https://assets.example/note.png', 0)`)
+    submission('sub_flight', 'inflight.example', 'verified')
+    submission('sub_bad', 'casino.example', 'verified')
+    await rejectSubmission(context(), {
+      category: 'prohibited',
+      reason: 'Gambling without a license.',
+      submissionId: 'sub_bad'
+    })
+    const checksum = () =>
+      String(row("SELECT checksum FROM listings WHERE id='lst_brief'")?.checksum)
+    const moveTo = async (website: string, logoUrl = 'https://assets.example/brief.png') =>
+      updateListingDetails(context(), {
+        details: {
+          categorySlug: 'tools',
+          description: 'Brieflow description',
+          logoUrl,
+          name: 'Brieflow',
+          website
+        },
+        expectedChecksum: checksum(),
+        listingId: 'lst_brief'
+      })
+    // The intake's URL rule: public http(s) only, for the website and the logo.
+    for (const website of ['http://127.0.0.1/', 'https://localhost/', 'ftp://brieflow.ai/']) {
+      expect(await moveTo(website), website).toMatchObject({
+        error: 'invalid_website',
+        status: 422
+      })
+    }
+    expect(await moveTo('https://brieflow.ai/', 'http://10.0.0.1/logo.png')).toMatchObject({
+      error: 'invalid_logo',
+      status: 422
+    })
+    // Another listing's host or URL, a submission in flight, or a block: refused.
+    expect(await moveTo('https://www.notewise.app/pricing')).toMatchObject({
+      error: 'website_listed',
+      status: 409
+    })
+    expect(await moveTo('https://inflight.example/')).toMatchObject({
+      error: 'website_in_review',
+      status: 409
+    })
+    expect(await moveTo('https://app.casino.example/')).toMatchObject({
+      error: 'website_blocked',
+      status: 409
+    })
+    expect(row("SELECT website FROM listings WHERE id='lst_brief'")).toEqual({
+      website: 'https://brieflow.ai/'
+    })
+    // A free host moves.
+    expect(await moveTo('https://brieflow.com/')).toEqual({
+      fields: ['website'],
+      ok: true,
+      replayed: false
+    })
+    expect(row("SELECT slug, website FROM listings WHERE id='lst_brief'")).toEqual({
+      slug: 'brieflow.ai',
+      website: 'https://brieflow.com/'
+    })
   })
 
   it('transfers to an account that exists, then removes the owner', async () => {

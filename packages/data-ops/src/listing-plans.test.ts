@@ -590,4 +590,57 @@ describe('listing activity log and admin edits (#64)', () => {
       })
     ).toThrow(/name cannot be empty/u)
   })
+
+  it('refuses a website that collides, inside the batch, with the submission intake rules', () => {
+    const move = (db: DatabaseSync, website: string, fields = ['website']) =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, website },
+        expectedChecksum: 'checksum-lst_live',
+        fields,
+        listingId,
+        publication: publication('listing-edit')
+      })
+    // Another listing's host (www. and the path don't matter) or URL.
+    const listed = database()
+    seedLiveListing(listed, 'lst_other', { slug: 'other.example' })
+    expectRefused(listed, move(listed, 'https://www.other.example/pricing'))
+    // A submission in flight for the host.
+    const inFlight = database()
+    inFlight
+      .prepare(
+        `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+          logo_url,status,plan) VALUES ('sub','flight.example','Flight','d',
+          'https://flight.example/','c','tools','https://flight.example/l.png','verified','free')`
+      )
+      .run()
+    expectRefused(inFlight, move(inFlight, 'https://flight.example/'))
+    // An active block on a parent domain.
+    const blocked = database()
+    blocked
+      .prepare(
+        `INSERT INTO listing_submission_url_blocks (url_key,covers_subdomains,reason,blocked_by,
+          blocked_at) VALUES ('casino.example',1,'Gambling','admin',?)`
+      )
+      .run(NOW)
+    expectRefused(blocked, move(blocked, 'https://app.casino.example/'))
+    // The intake's URL rule, for the website and the logo.
+    expect(() => move(database(), 'http://127.0.0.1/')).toThrow(/public HTTP\(S\)/u)
+    expect(() =>
+      buildUpdateListingDetailsPlans({
+        details: { ...edit, logoUrl: 'http://localhost/logo.png' },
+        expectedChecksum: 'checksum-lst_live',
+        fields: ['logo'],
+        listingId,
+        publication: publication('listing-edit')
+      })
+    ).toThrow(/public HTTP\(S\)/u)
+    // An edit that keeps the website isn't checked against legacy duplicates.
+    const legacy = database()
+    seedLiveListing(legacy, 'lst_twin', { slug: 'twin.example' })
+    legacy
+      .prepare("UPDATE listings SET website='https://lst_live.example/home' WHERE id='lst_twin'")
+      .run()
+    execute(legacy, move(legacy, 'https://lst_live.example/home', ['name']))
+    expect(listing(legacy)).toMatchObject({ name: 'Renamed' })
+  })
 })
