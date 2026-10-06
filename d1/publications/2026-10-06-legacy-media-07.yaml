@@ -1,14 +1,13 @@
 # serpcompany/best.serp.co#95, part 7 of 7: repoint listing logos and images to
 # hosted copies (scripts/migration/legacy-media.ts). Upload d1/media/2026-10-06-legacy-media.json to the
-# environment first; the publisher refuses keys its media host does not serve. Apply in order,
-# staging first: Publish D1 Catalog (staging), then Publish D1 Catalog after promotion.
+# environment first: the publisher refuses keys its bucket does not hold. Each part checks its
+# listings' rows, not a base version, so the parts apply in any order, staging first.
 version: 1
 id: 2026-10-06-legacy-media-07
-basePublicationVersion: 7
+concurrency: rows
 provenance:
   actor: devinschumacher
   workflow: github/publish-d1
-  beforeChecksum: c7585ab53b26d94c9dbfe0be65354310f01114671f4c6beff04b6d119e7393d6
 operations:
   - action: listing-media-update
     id: lst_f70f9db8e746ed4bda12c99f
@@ -16,23 +15,26 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/waiheke.ai/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 2486
+        contentType: image/png
+        height: 64
+        key: best.serp.co/listings/waiheke.ai/logo/e774a294706d9017.png
+        sha256: e774a294706d9017ec083a00db645bb00aee7357f48a433c8e3f1d3c4281e39b
+        source: https://waiheke.ai/favicon.png
+        width: 64
   - action: listing-media-update
     id: lst_d30e7f1d494c8763f2cd3e5d
     slug: wallubot.com
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wallu/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wallu/public
+        key: null
     media:
       logo:
         bytes: 14171
@@ -56,8 +58,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wand-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wand-ai/public
+        key: null
     media:
       logo:
         bytes: 26968
@@ -81,17 +85,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wanywhere/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wanywhere/public
+        key: null
     media:
-      logo:
-        bytes: 3600
-        contentType: image/png
-        height: 40
-        key: best.serp.co/listings/wanywhere.com/logo/7737aeba6bf831a8.png
-        sha256: 7737aeba6bf831a874033de282e70ac2acb86f8f22fa56bfffe26ddcbcf94286
-        source: https://www.wanywhere.com/wp-content/uploads/2021/12/fav-1.png
-        width: 40
       images:
         - bytes: 329756
           contentType: image/jpeg
@@ -106,8 +104,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warmer-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warmer-ai/public
+        key: null
     media:
       logo:
         bytes: 23797
@@ -131,8 +131,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warmest/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warmest/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_fef20e110470167e8b29b742
@@ -140,8 +142,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warp-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/warp-ai/public
+        key: null
     media:
       logo:
         bytes: 2739
@@ -165,8 +169,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/gpt-3-vs-water-cooler-trivia-participants/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/gpt-3-vs-water-cooler-trivia-participants/public
+        key: null
     media:
       logo:
         bytes: 9579
@@ -190,8 +196,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/watermarkremover-io/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/watermarkremover-io/public
+        key: null
     media:
       logo:
         bytes: 78509
@@ -215,8 +223,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/watermelon-pulse/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/watermelon-pulse/public
+        key: null
     media:
       logo:
         bytes: 1725
@@ -240,8 +250,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavechat/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavechat/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_44b278e879e4d1f8d12107fd
@@ -249,8 +261,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavel-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavel-ai/public
+        key: null
     media:
       logo:
         bytes: 3766
@@ -274,17 +288,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavtool/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wavtool/public
+        key: null
     media:
-      logo:
-        bytes: 15086
-        contentType: image/x-icon
-        height: 48
-        key: best.serp.co/listings/wavtool.com/logo/74c733ceaaa3b514.ico
-        sha256: 74c733ceaaa3b51464cec8dea46dc27f053aa7650393df44ebae2543ad5bc2f6
-        source: https://wavtool.com/favicon.ico
-        width: 48
       images:
         - bytes: 2374236
           contentType: image/png
@@ -299,8 +307,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/waylay/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/waylay/public
+        key: null
     media:
       logo:
         bytes: 3289
@@ -324,23 +334,18 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-    media:
-      logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/wealthfront.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_a336079ee76e7f15760a376a
     slug: wearenova.ai
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/nova-a-i/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/nova-a-i/public
+        key: null
     media:
       logo:
         bytes: 7057
@@ -364,17 +369,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weaverse/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weaverse/public
+        key: null
     media:
-      logo:
-        bytes: 15406
-        contentType: image/x-icon
-        height: 48
-        key: best.serp.co/listings/weaverse.io/logo/250b08a207f28359.ico
-        sha256: 250b08a207f283599a415ef196119163ef2c1cc4baeb76a0a8909b17a44393e7
-        source: https://weaverse.io/favicon.ico
-        width: 48
       images:
         - bytes: 249676
           contentType: image/webp
@@ -389,17 +388,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weaviate/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weaviate/public
+        key: null
     media:
-      logo:
-        bytes: 15406
-        contentType: image/x-icon
-        height: 48
-        key: best.serp.co/listings/weaviate.io/logo/93b6184e6cb19de4.ico
-        sha256: 93b6184e6cb19de4584b804191e9b399178423fbdd7dbc08c33ff86ca3ba024b
-        source: https://weaviate.io/img/favicon.ico
-        width: 48
       images:
         - bytes: 269796
           contentType: image/jpeg
@@ -414,8 +407,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/web3-summary/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/web3-summary/public
+        key: null
     media:
       logo:
         bytes: 30096
@@ -439,25 +434,21 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webapi-ai-2-0/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webapi-ai-2-0/public
-    media:
-      logo:
-        bytes: 15406
-        contentType: image/x-icon
-        height: 48
-        key: best.serp.co/listings/webapi.ai/logo/b3474816332d5264.ico
-        sha256: b3474816332d52646ca8f8f009c9fae86840b206b0f3dae52d1f58ff089571d4
-        source: https://webapi.ai/img/favicon.ico
-        width: 48
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_a4c336b0b43909134dd9751a
     slug: webcopilot.ai
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webcopilot/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webcopilot/public
+        key: null
     media:
       logo:
         bytes: 45558
@@ -481,8 +472,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/intellimize/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/intellimize/public
+        key: null
     media:
       logo:
         bytes: 2661
@@ -506,8 +499,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weblium/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weblium/public
+        key: null
     media:
       logo:
         bytes: 8664
@@ -531,8 +526,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webondemand/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webondemand/public
+        key: null
     media:
       logo:
         bytes: 14395
@@ -556,17 +553,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webquery/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webquery/public
+        key: null
     media:
-      logo:
-        bytes: 25931
-        contentType: image/x-icon
-        height: 256
-        key: best.serp.co/listings/webquery.net/logo/2b8ad2d33455a8f7.ico
-        sha256: 2b8ad2d33455a8f736fc3a8ebf8f0bdea8848ad4c0db48a2833bd0f9cd775932
-        source: https://www.webquery.net/favicon.ico
-        width: 256
       images:
         - bytes: 110281
           contentType: image/png
@@ -581,25 +572,21 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webscrapeai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webscrapeai/public
-    media:
-      logo:
-        bytes: 15406
-        contentType: image/x-icon
-        height: 48
-        key: best.serp.co/listings/webscrapeai.com/logo/c5287c30bb159eac.ico
-        sha256: c5287c30bb159eac82792d49bd582e7b95bb0e0573c7c81de141625a01f85b47
-        source: https://webscrapeai.com/favicon.ico
-        width: 48
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_33b6470b9a4da9d89946f1c8
     slug: webscrapingapi.com
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webscrapingapi.com/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webscrapingapi.com/public
+        key: null
     media:
       logo:
         bytes: 68620
@@ -623,8 +610,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/website-summary-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/website-summary-ai/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_0902f55715a154e9875ef775
@@ -632,8 +621,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webwhiz/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webwhiz/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_1618571bbdcdc43254ddf5d5
@@ -641,8 +632,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webyn/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/webyn/public
+        key: null
     media:
       logo:
         bytes: 3358
@@ -658,17 +651,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weet/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weet/public
+        key: null
     media:
-      logo:
-        bytes: 3325
-        contentType: image/png
-        height: 61
-        key: best.serp.co/listings/weet.co/logo/0950055f59e4b287.png
-        sha256: 0950055f59e4b2870ff84419088e070dfc2de346a80ca45f552fbb69cbf66efe
-        source: https://weet.co/lib_vQVzvuJZDDyoBAPh/eahhb50q67fqal3d.png?w=64&h=64
-        width: 64
       images:
         - bytes: 6897
           contentType: image/png
@@ -683,8 +670,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weld-5-01/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/weld-5-01/public
+        key: null
     media:
       logo:
         bytes: 4027
@@ -708,23 +697,26 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/welling.ai/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 11756
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/welling.ai/logo/d2f65595b0ee84f0.png
+        sha256: d2f65595b0ee84f0b9a36ac937d24cc45fcdddd73914883ff05d5b9f73d52ffa
+        source: https://www.welling.ai/apple-touch-icon.png
+        width: 180
   - action: listing-media-update
     id: lst_4537e2f15efdc8f6b30aad2b
     slug: wellsaid.io
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wellsaidlabs/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wellsaidlabs/public
+        key: null
     media:
       logo:
         bytes: 67801
@@ -748,8 +740,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/welltested/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/welltested/public
+        key: null
     media:
       logo:
         bytes: 410598
@@ -765,8 +759,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/we-made-a-story/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/we-made-a-story/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_0a1fc475d2ebe069d05208ab
@@ -774,8 +770,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wepik/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wepik/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_ac7d629671f07134ba9b6aae
@@ -783,23 +781,26 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/wesendcv.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 6045
+        contentType: image/jpeg
+        height: 192
+        key: best.serp.co/listings/wesendcv.com/logo/ba0323e07bd81cb2.jpg
+        sha256: ba0323e07bd81cb2b7f7e7a5077ea9aa2b122554b8db50368313bb7ec2afdeab
+        source: https://wesendcv.com/wp-content/uploads/2024/02/cropped-wesendcv-com-192x192.jpg
+        width: 192
   - action: listing-media-update
     id: lst_2e181c4008b54028a4e80024
     slug: wevo.ai
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wevo/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wevo/public
+        key: null
     media:
       images:
         - bytes: 11578
@@ -815,8 +816,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/we-write-cards/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/we-write-cards/public
+        key: null
     media:
       logo:
         bytes: 20817
@@ -840,17 +843,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/what-the-chef/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/what-the-chef/public
+        key: null
     media:
-      logo:
-        bytes: 4286
-        contentType: image/x-icon
-        height: 32
-        key: best.serp.co/listings/what-the-chef.com/logo/351b59535d156e7f.ico
-        sha256: 351b59535d156e7f501469b8233c2da0f67cf5c48b36e888852a53dcb4dff03d
-        source: https://what-the-chef.com/favicon.ico
-        width: 32
       images:
         - bytes: 229433
           contentType: image/png
@@ -865,8 +862,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatdoesthiscodedo/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatdoesthiscodedo/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_f83322ee35635a3ce3d19feb
@@ -874,8 +873,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatgpt/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatgpt/public
+        key: null
     media:
       logo:
         bytes: 8718
@@ -899,8 +900,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatthediff/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whatthediff/public
+        key: null
     media:
       logo:
         bytes: 36589
@@ -924,8 +927,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whelp/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whelp/public
+        key: null
     media:
       logo:
         bytes: 58542
@@ -949,17 +954,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whimsical-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whimsical-ai/public
+        key: null
     media:
-      logo:
-        bytes: 1281
-        contentType: image/png
-        height: 32
-        key: best.serp.co/listings/whimsical.com/logo/829828a1bbc2e16e.png
-        sha256: 829828a1bbc2e16ee2f8616aa25d18076394f834895050f7989de46be1e13328
-        source: https://whimsical.com/_next_public/favicon-32.png
-        width: 32
       images:
         - bytes: 227232
           contentType: image/png
@@ -974,33 +973,21 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whimsyworks/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whimsyworks/public
-    media:
-      logo:
-        bytes: 72875
-        contentType: image/png
-        height: 180
-        key: best.serp.co/listings/whimsyapp.com/logo/580dea94319f2da2.png
-        sha256: 580dea94319f2da23e26f1cdbff9a1721409a68464ed08dfcdce1f80df85e4d1
-        source: https://www.whimsyaudio.com/apple-touch-icon.png
-        width: 180
-      images:
-        - bytes: 78124
-          contentType: image/jpeg
-          height: 630
-          key: best.serp.co/listings/whimsyapp.com/image/453f6d76138ecbb8.jpg
-          sha256: 453f6d76138ecbb8289a8261dd4f93cfdf492c5e2208cc74a399eecb212c8c1a
-          source: https://www.whimsyaudio.com/og-image.jpg
-          width: 1200
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_31fc8260d3de2ad7fde6c8a8
     slug: whismer.com
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whismer/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whismer/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_9829df7eb3f3feb949ca8aee
@@ -1008,8 +995,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisperapi/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisperapi/public
+        key: null
     media:
       logo:
         bytes: 125061
@@ -1025,8 +1014,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisperbot/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisperbot/public
+        key: null
     media:
       logo:
         bytes: 7875
@@ -1050,8 +1041,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisper-memos/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/whisper-memos/public
+        key: null
     media:
       logo:
         bytes: 53904
@@ -1075,18 +1068,25 @@ operations:
     expected:
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-1.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-2.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-3.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-4.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/whop-video-downloader.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/main/images/whop-video-downloader.gif
+        key: null
       - kind: logo
         url: /listing-logos/serpdownloaders.com/whop-downloader.png
+        key: null
     media:
       logo:
         bytes: 9960
@@ -1145,16 +1145,22 @@ operations:
     expected:
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/whop-video-downloader.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/main/images/whop-video-downloader.gif
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-1.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-2.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-3.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-4.jpg
+        key: null
     media:
       images:
         - bytes: 45139
@@ -1205,25 +1211,21 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/windowai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/windowai/public
-    media:
-      logo:
-        bytes: 4286
-        contentType: image/x-icon
-        height: 32
-        key: best.serp.co/listings/windowai.io/logo/83cf814e58fc6fc8.ico
-        sha256: 83cf814e58fc6fc87f18ccfd0ab0b626a8e54ec4e8af08c96a816c71e2925af1
-        source: https://windowai.io/favicon.ico
-        width: 32
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_8dfc2f075c5c449ff71f3cf8
     slug: windsor.io
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/windsor/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/windsor/public
+        key: null
     media:
       logo:
         bytes: 43415
@@ -1247,8 +1249,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wisdomise/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wisdomise/public
+        key: null
     media:
       logo:
         bytes: 19827
@@ -1272,8 +1276,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wisecut/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wisecut/public
+        key: null
     media:
       logo:
         bytes: 36437
@@ -1297,8 +1303,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wiseone/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wiseone/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_95546321da94053fbcce0d64
@@ -1306,8 +1314,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wishes-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wishes-ai/public
+        key: null
     media:
       logo:
         bytes: 39703
@@ -1323,8 +1333,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wishpond/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wishpond/public
+        key: null
     media:
       logo:
         bytes: 4694
@@ -1348,8 +1360,10 @@ operations:
     expected:
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/wistia-video-downloader.jpg
+        key: null
       - kind: logo
         url: /listing-logos/serpdownloaders.com/wistia-downloader.png
+        key: null
     media:
       logo:
         bytes: 796
@@ -1373,8 +1387,10 @@ operations:
     expected:
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/wistia-video-downloader.jpg
+        key: null
       - kind: logo
         url: /listing-logos/serpdownloaders.com/wistia-downloader.png
+        key: null
     media:
       logo:
         bytes: 796
@@ -1398,8 +1414,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/broadcast/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/broadcast/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_c284c0a1b8460c8abb24af5a
@@ -1407,21 +1425,23 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/withorb.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 24531
+        contentType: image/png
+        height: 800
+        key: best.serp.co/listings/withorb.com/logo/8b913b2647b46068.png
+        sha256: 8b913b2647b46068b980b6b48f377ed4908dd8e0a8bd808f640dc598ac2f628d
+        source: https://www.withorb.com/apple-touch-icon.png
+        width: 800
   - action: listing-media-update
     id: lst_361c73d9369d39c27c3c2adc
     slug: withpoly.com
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/poly/public
+        key: null
     media:
       logo:
         bytes: 41862
@@ -1437,8 +1457,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/sutro/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/sutro/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_b4d2f9f4314f39472ad55f00
@@ -1446,23 +1468,26 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/wix.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 3477
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/wix.com/logo/295a1f6f927fd11a.png
+        sha256: 295a1f6f927fd11a3842a4c9f508b4152eca150cb4c54d6cfb64736fad659b80
+        source: https://www.wix.com/favicon.ico
+        width: 192
   - action: listing-media-update
     id: lst_dd2e21700357ffbf55a374fb
     slug: wiz.chat
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wiz-chat/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wiz-chat/public
+        key: null
     media:
       logo:
         bytes: 24121
@@ -1478,23 +1503,26 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/wizu.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 76515
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/wizu.com/logo/f495608fc4d6cf90.png
+        sha256: f495608fc4d6cf9078a48b2f770e804240a4250c08635692c76b053d3b77da11
+        source: https://cdn.prod.website-files.com/656d91bbb149e5acd87cbc9c/6595cc8cb7c8338d9537dcb4_wizu-master.png
+        width: 256
   - action: listing-media-update
     id: lst_e2679b55281eb985e69245b7
     slug: wnr.ai
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wnr/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wnr/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_d13334d5e93955f6d17f78d0
@@ -1502,8 +1530,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/woebot-health/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/woebot-health/public
+        key: null
     media:
       logo:
         bytes: 45386
@@ -1527,8 +1557,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wolfia/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wolfia/public
+        key: null
     media:
       logo:
         bytes: 5230
@@ -1552,8 +1584,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wolframalpha/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wolframalpha/public
+        key: null
     media:
       logo:
         bytes: 49961
@@ -1577,17 +1611,19 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderchat/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderchat/public
+        key: null
     media:
       logo:
-        bytes: 1593
+        bytes: 1807
         contentType: image/avif
-        height: 60
-        key: best.serp.co/listings/wonderchat.io/logo/8731f23e78141b38.avif
-        sha256: 8731f23e78141b3812d8a839fa83677821c8168191744d141f6408578c12173e
-        source: https://framerusercontent.com/images/U9crVI1Z5qffaGdQxgGBwM8utE.png
-        width: 60
+        height: 96
+        key: best.serp.co/listings/wonderchat.io/logo/cc62155f808e3730.avif
+        sha256: cc62155f808e3730b4ba09540ec513db52b07d9590478e2255f21869a58a6905
+        source: https://framerusercontent.com/images/0OUenhRWAuJaqwaKYfjdN6zlNs.png
+        width: 96
       images:
         - bytes: 290134
           contentType: image/png
@@ -1602,8 +1638,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wondercraft/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wondercraft/public
+        key: null
     media:
       logo:
         bytes: 15540
@@ -1627,8 +1665,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonder-dynamics/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonder-dynamics/public
+        key: null
     media:
       logo:
         bytes: 29704
@@ -1652,8 +1692,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderplan/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderplan/public
+        key: null
     media:
       logo:
         bytes: 11155
@@ -1677,8 +1719,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderway-coach/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wonderway-coach/public
+        key: null
     media:
       logo:
         bytes: 11426
@@ -1702,8 +1746,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/coverletterai-by-wonsulting/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/coverletterai-by-wonsulting/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_cb3ddeb489426957820620c0
@@ -1711,8 +1757,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/network-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/network-ai/public
+        key: null
     media:
       logo:
         bytes: 30723
@@ -1736,23 +1784,26 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/woocommerce.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 3350
+        contentType: image/webp
+        height: 192
+        key: best.serp.co/listings/woocommerce.com/logo/e39016874d5d792d.webp
+        sha256: e39016874d5d792d4c57b108a41e640e3dcc1be12000aef0402944bdbc5d197f
+        source: https://woocommerce.com/wp-content/uploads/2024/12/cropped-logo-w-favicon.png?w=192
+        width: 192
   - action: listing-media-update
     id: lst_71d3f22afac72ddd631c1674
     slug: word-spinner.com
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/word-spinner/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/word-spinner/public
+        key: null
     media:
       logo:
         bytes: 4089
@@ -1776,8 +1827,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordai/public
+        key: null
     media:
       logo:
         bytes: 18750
@@ -1801,8 +1854,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordfixerbot/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordfixerbot/public
+        key: null
     media:
       logo:
         bytes: 22030
@@ -1826,8 +1881,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordhero/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordhero/public
+        key: null
     media:
       logo:
         bytes: 28958
@@ -1851,8 +1908,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordkraft/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordkraft/public
+        key: null
     media:
       logo:
         bytes: 6525
@@ -1868,8 +1927,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordmax/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordmax/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_44ec9e19d5571fa46e9f47af
@@ -1877,8 +1938,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordmetrics/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordmetrics/public
+        key: null
     media:
       logo:
         bytes: 9435
@@ -1902,8 +1965,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordtune/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wordtune/public
+        key: null
     media:
       logo:
         bytes: 42795
@@ -1927,8 +1992,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/workflos/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/workflos/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_a77dd388ba2c907ff4283ae0
@@ -1936,8 +2003,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/workist/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/workist/public
+        key: null
     media:
       logo:
         bytes: 5357
@@ -1961,8 +2030,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/pod/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/pod/public
+        key: null
     media:
       logo:
         bytes: 6048
@@ -1986,8 +2057,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wowto/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wowto/public
+        key: null
     media:
       logo:
         bytes: 30212
@@ -2011,8 +2084,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wpaibot/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wpaibot/public
+        key: null
     media:
       logo:
         bytes: 358742
@@ -2036,8 +2111,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/chatwp/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/chatwp/public
+        key: null
     media:
       logo:
         bytes: 9755
@@ -2061,8 +2138,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wpturbo/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wpturbo/public
+        key: null
     media:
       logo:
         bytes: 2309
@@ -2086,17 +2165,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wp-wand/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wp-wand/public
+        key: null
     media:
-      logo:
-        bytes: 413
-        contentType: image/png
-        height: 32
-        key: best.serp.co/listings/wpwand.com/logo/9c698c0e5ebb8944.png
-        sha256: 9c698c0e5ebb894425acd489c8ea38ab1eaf3f2b422c87fe19a8a587a7b9b134
-        source: https://wpwand.com/wp-content/uploads/2023/04/favicon.png
-        width: 32
       images:
         - bytes: 99766
           contentType: image/png
@@ -2111,8 +2184,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wraithscribe/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wraithscribe/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_42d06798f44bb70022037328
@@ -2120,17 +2195,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/write-homes/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/write-homes/public
+        key: null
     media:
-      logo:
-        bytes: 15406
-        contentType: image/x-icon
-        height: 48
-        key: best.serp.co/listings/write.homes/logo/88e6cffaff5163a3.ico
-        sha256: 88e6cffaff5163a325c2454cbe0c639668e166ba22e4cfcbeaf74706488c5074
-        source: https://write.homes/favicon.ico
-        width: 48
       images:
         - bytes: 4316155
           contentType: image/png
@@ -2145,8 +2214,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writechamp/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writechamp/public
+        key: null
     media:
       images:
         - bytes: 2952818
@@ -2162,8 +2233,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writecream/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writecream/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_3693dd8b899a1becb1103128
@@ -2171,8 +2244,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writefull/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writefull/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_4223e6f7ae54e5bb5b8da773
@@ -2180,8 +2255,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writegpt/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writegpt/public
+        key: null
     media:
       logo:
         bytes: 40937
@@ -2205,8 +2282,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemage/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemage/public
+        key: null
     media:
       logo:
         bytes: 1571
@@ -2230,8 +2309,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemail/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemail/public
+        key: null
     media:
       logo:
         bytes: 25549
@@ -2255,8 +2336,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemyessays/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writemyessays/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_0e5cd99ce24dde040f38a543
@@ -2264,8 +2347,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writenow-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writenow-ai/public
+        key: null
     media:
       logo:
         bytes: 11558
@@ -2289,8 +2374,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/write-panda/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/write-panda/public
+        key: null
     media:
       logo:
         bytes: 4821
@@ -2314,8 +2401,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writepaw/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writepaw/public
+        key: null
     media:
       logo:
         bytes: 3006
@@ -2339,8 +2428,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writer/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writer/public
+        key: null
     media:
       logo:
         bytes: 50537
@@ -2364,23 +2455,26 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/writer.hix.ai/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 1334
+        contentType: image/webp
+        height: 115
+        key: best.serp.co/listings/writer.hix.ai/logo/1d6dd7b38d91fadc.webp
+        sha256: 1d6dd7b38d91fadc1c1795bd25f865d314b2e191e2056adb9e57677235cda809
+        source: https://hix.ai/apple-touch-icon.png
+        width: 115
   - action: listing-media-update
     id: lst_50d6d9ff63e66dd82c859b51
     slug: writerly.ai
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writerly-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writerly-ai/public
+        key: null
     media:
       logo:
         bytes: 16726
@@ -2404,8 +2498,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writers-brew/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writers-brew/public
+        key: null
     media:
       logo:
         bytes: 38437
@@ -2429,8 +2525,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writerzen/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writerzen/public
+        key: null
     media:
       images:
         - bytes: 508811
@@ -2446,8 +2544,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writeseed/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writeseed/public
+        key: null
     media:
       logo:
         bytes: 24096
@@ -2471,8 +2571,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writesmart/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writesmart/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_70c946c2551e22e26774ae44
@@ -2480,8 +2582,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writesonic/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writesonic/public
+        key: null
     media:
       logo:
         bytes: 40911
@@ -2505,8 +2609,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writewithlaika/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writewithlaika/public
+        key: null
     media:
       logo:
         bytes: 42255
@@ -2530,8 +2636,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writier/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writier/public
+        key: null
     media:
       logo:
         bytes: 1686
@@ -2555,8 +2663,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writio/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/writio/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_492a69de4c847750665f243f
@@ -2564,8 +2674,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wudpecker/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wudpecker/public
+        key: null
     media:
       logo:
         bytes: 5283
@@ -2589,8 +2701,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wurkzen/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wurkzen/public
+        key: null
     media:
       images:
         - bytes: 40743
@@ -2606,25 +2720,21 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wysa/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wysa/public
-    media:
-      logo:
-        bytes: 1606
-        contentType: image/png
-        height: 51
-        key: best.serp.co/listings/wysa.com/logo/63cd1679b099ce3c.png
-        sha256: 63cd1679b099ce3cf32eb66ceadf65ea3dccee6f8c4f89c765b84f4ae2b7ea18
-        source: https://user-images.strikinglycdn.com/res/hrscywv4p/image/upload/c_limit,fl_lossy,h_64,w_64,q_auto/250253/Asset_22xxxhdpi_kw5dnj.png
-        width: 51
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_9b367eb8315b889740e8b6d1
     slug: wzrd.ai
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wzrd-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/wzrd-ai/public
+        key: null
     media:
       logo:
         bytes: 27564
@@ -2648,8 +2758,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xata/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xata/public
+        key: null
     media:
       logo:
         bytes: 4513
@@ -2673,17 +2785,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xebra-biztech/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xebra-biztech/public
+        key: null
     media:
-      logo:
-        bytes: 2047
-        contentType: image/png
-        height: 42
-        key: best.serp.co/listings/xebra.in/logo/1ba7c76f72ab095c.png
-        sha256: 1ba7c76f72ab095cdc5a097d33b71be78035b7bc4ed88cde92c39cf1fc34e8c6
-        source: https://xebra.in/public/images/xebra-favicon.png
-        width: 44
       images:
         - bytes: 110435
           contentType: image/png
@@ -2698,17 +2804,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xenonstack/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xenonstack/public
+        key: null
     media:
-      logo:
-        bytes: 2706
-        contentType: image/png
-        height: 50
-        key: best.serp.co/listings/xenonstack.com/logo/434b5bd6837802cb.png
-        sha256: 434b5bd6837802cb1e36d342416267b04247ef37a4b0fd2167de78f1066e3377
-        source: https://www.xenonstack.com/hubfs/xenonstack-favicon.png
-        width: 50
       images:
         - bytes: 482244
           contentType: image/png
@@ -2723,6 +2823,7 @@ operations:
     expected:
       - kind: logo
         url: /listing-logos/serpdownloaders.com/xfantazy-downloader.png
+        key: null
     media:
       logo:
         bytes: 7983
@@ -2738,6 +2839,7 @@ operations:
     expected:
       - kind: logo
         url: /listing-logos/serpdownloaders.com/xhamster-downloader.png
+        key: null
     media:
       logo:
         bytes: 1675
@@ -2753,10 +2855,13 @@ operations:
     expected:
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/xhamsterlive-downloader.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/xhamsterlive-downloader/main/images/featured.gif
+        key: null
       - kind: logo
         url: /listing-logos/serpdownloaders.com/xhamsterlive-downloader.png
+        key: null
     media:
       logo:
         bytes: 1861
@@ -2772,8 +2877,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/ximilar/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/ximilar/public
+        key: null
     media:
       logo:
         bytes: 2638
@@ -2797,8 +2904,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xinva/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xinva/public
+        key: null
     media:
       logo:
         bytes: 10737
@@ -2822,10 +2931,13 @@ operations:
     expected:
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/xlovecam-video-downloader.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/xlovecam-video-downloader/main/images/featured.gif
+        key: null
       - kind: logo
         url: /listing-logos/serpdownloaders.com/xlovecam-downloader.png
+        key: null
     media:
       logo:
         bytes: 3416
@@ -2841,6 +2953,7 @@ operations:
     expected:
       - kind: logo
         url: /listing-logos/serpdownloaders.com/xnxx-downloader.png
+        key: null
     media:
       logo:
         bytes: 5358
@@ -2856,6 +2969,7 @@ operations:
     expected:
       - kind: logo
         url: /listing-logos/serpdownloaders.com/xnxx-downloader.png
+        key: null
     media:
       logo:
         bytes: 5358
@@ -2871,8 +2985,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xpression-camera/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xpression-camera/public
+        key: null
     media:
       logo:
         bytes: 34519
@@ -2896,8 +3012,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xprt/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/xprt/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_e20bed0f9f95ab363505ac89
@@ -2905,8 +3023,10 @@ operations:
     expected:
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/xvideos-video-downloader/main/images/xvideos-video-downloader.gif
+        key: null
       - kind: logo
         url: /listing-logos/serpdownloaders.com/xvideos-downloader.png
+        key: null
     media:
       logo:
         bytes: 14707
@@ -2930,8 +3050,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yaara/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yaara/public
+        key: null
     media:
       logo:
         bytes: 30116
@@ -2955,8 +3077,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yack/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yack/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_7ab3ac3b9f6ac281166a386e
@@ -2964,8 +3088,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/usebracket/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/usebracket/public
+        key: null
     media:
       logo:
         bytes: 40714
@@ -2989,8 +3115,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yellow-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yellow-ai/public
+        key: null
     media:
       logo:
         bytes: 4168
@@ -3014,8 +3142,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yepic-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yepic-ai/public
+        key: null
     media:
       logo:
         bytes: 4716
@@ -3031,8 +3161,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yesil-health/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yesil-health/public
+        key: null
     media:
       logo:
         bytes: 430608
@@ -3056,6 +3188,7 @@ operations:
     expected:
       - kind: logo
         url: /listing-logos/serpdownloaders.com/yespornplease-downloader.png
+        key: null
     media:
       logo:
         bytes: 13604
@@ -3071,8 +3204,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yext-chat/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yext-chat/public
+        key: null
     media:
       logo:
         bytes: 12740
@@ -3096,38 +3231,34 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/yo-kart.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 8069
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/yo-kart.com/logo/ce592831a8a9a6dc.png
+        sha256: ce592831a8a9a6dc98f184f744d4740125403792365e55d000a7d0624761b8c2
+        source: https://www.yo-kart.com/images/apple-touch-icon-192.png
+        width: 192
   - action: listing-media-update
     id: lst_bd4610b61e9280e3788a61ca
     slug: yobulk.dev
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-    media:
-      logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/yobulk.dev/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_0ecec553c1cf538fef957e71
     slug: yodlee.com
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/abe-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/abe-ai/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_ebb0f78d4057325bee01a84b
@@ -3135,32 +3266,27 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/yotpo.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 8942
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/yotpo.com/logo/c7f2dc540e72ec71.png
+        sha256: c7f2dc540e72ec71c9d71fec2dda402f9f534ac627ea6cf827fcaddbd2dbe778
+        source: https://www.yotpo.com/apple-touch-icon.png
+        width: 180
   - action: listing-media-update
     id: lst_1f75790010eb55831efd914b
     slug: you-tldr.com
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/you-tldr/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/you-tldr/public
+        key: null
     media:
-      logo:
-        bytes: 15086
-        contentType: image/x-icon
-        height: 48
-        key: best.serp.co/listings/you-tldr.com/logo/94e4f6e810c0a07e.ico
-        sha256: 94e4f6e810c0a07e76242d799242873d35d05913597df2e95869f02d0dfd6639
-        source: https://you-tldr.com/favicon/favicon.ico
-        width: 48
       images:
         - bytes: 71406
           contentType: image/png
@@ -3175,8 +3301,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yougotcooking/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yougotcooking/public
+        key: null
     media:
       logo:
         bytes: 32746
@@ -3192,6 +3320,7 @@ operations:
     expected:
       - kind: logo
         url: /listing-logos/serpdownloaders.com/youjizz-downloader.png
+        key: null
     media:
       logo:
         bytes: 9232
@@ -3207,8 +3336,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youlearn/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youlearn/public
+        key: null
     media:
       logo:
         bytes: 4666
@@ -3232,18 +3363,25 @@ operations:
     expected:
       - kind: image
         url: /media/products/youporn-video-downloader/youporn-downloader-screenshot1.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/youporn-downloader-screenshot2.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/youporn-downloader-screenshot3.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/youporn-downloader-screenshot4.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/youporn-downloader-screenshot5.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/featured.webp
+        key: null
       - kind: logo
         url: /listing-logos/serpdownloaders.com/youporn-downloader.png
+        key: null
     media:
       logo:
         bytes: 1573
@@ -3295,24 +3433,34 @@ operations:
     expected:
       - kind: image
         url: https://apps.serp.co/media/products/youporn-video-downloader/featured.webp
+        key: null
       - kind: image
         url: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot1.webp
+        key: null
       - kind: image
         url: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot2.webp
+        key: null
       - kind: image
         url: https://apps.serp.co/media/products/youporn-video-downloader/youporn-downloader-screenshot3.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/youporn-downloader-screenshot1.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/youporn-downloader-screenshot2.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/youporn-downloader-screenshot3.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/youporn-downloader-screenshot4.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/youporn-downloader-screenshot5.webp
+        key: null
       - kind: image
         url: /media/products/youporn-video-downloader/featured.webp
+        key: null
     media:
       images:
         - bytes: 56468
@@ -3356,8 +3504,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/your-cover-letter/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/your-cover-letter/public
+        key: null
     media:
       logo:
         bytes: 3778
@@ -3381,8 +3531,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yourgpt/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yourgpt/public
+        key: null
     media:
       logo:
         bytes: 10148
@@ -3406,8 +3558,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/your-own-story-book/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/your-own-story-book/public
+        key: null
     media:
       logo:
         bytes: 15824
@@ -3431,8 +3585,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yoursearch/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yoursearch/public
+        key: null
     media:
       logo:
         bytes: 14528
@@ -3448,8 +3604,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/sidekick-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/sidekick-ai/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_f385a4fc8137a43e6c773b67
@@ -3457,8 +3615,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yous/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yous/public
+        key: null
     media:
       logo:
         bytes: 38135
@@ -3482,33 +3642,33 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youscan/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youscan/public
-    media:
-      logo:
-        bytes: 15406
-        contentType: image/x-icon
-        height: 48
-        key: best.serp.co/listings/youscan.io/logo/73fbf65594dbce9c.ico
-        sha256: 73fbf65594dbce9c906d1ae66f197e0bc7b1d7313330ff50a9fcf45e94fb0854
-        source: https://youscan.io/favicon.ico
-        width: 48
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_5c78bbdb78f3fa13970399c1
     slug: youtube-downloader
     expected:
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-1.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-2.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-3.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-4.jpg
+        key: null
       - kind: image
         url: https://raw.githubusercontent.com/serpapps/youtube-downloader/refs/heads/main/screenshots/youtube-downloader-5.jpg
+        key: null
       - kind: logo
         url: /listing-logos/serpdownloaders.com/youtube-downloader.png
+        key: null
     media:
       logo:
         bytes: 448
@@ -3560,8 +3720,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youtube-summarized/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/youtube-summarized/public
+        key: null
     media:
       logo:
         bytes: 24250
@@ -3585,8 +3747,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yoya/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yoya/public
+        key: null
     media:
       logo:
         bytes: 7285
@@ -3610,8 +3774,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yt-copycat/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yt-copycat/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_a93cc48ba00f495b001f2fee
@@ -3619,8 +3785,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yuma/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/yuma/public
+        key: null
     media:
       logo:
         bytes: 3701
@@ -3644,8 +3812,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zaphire/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zaphire/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_0565f93eca3315cb1d8d4c04
@@ -3653,8 +3823,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zapier/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zapier/public
+        key: null
     media:
       logo:
         bytes: 57638
@@ -3678,8 +3850,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zaplingo/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zaplingo/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_c2dd242b3dd6aad4d568fbff
@@ -3687,25 +3861,21 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zappr/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zappr/public
-    media:
-      logo:
-        bytes: 9662
-        contentType: image/x-icon
-        height: 48
-        key: best.serp.co/listings/zappr.ai/logo/fd949849b5535ad3.ico
-        sha256: fd949849b5535ad3839787a907feecbdf1e7ef9c065b2f167be839c96e998631
-        source: https://zappr.ai/favicon.ico
-        width: 48
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_e1313cf323208cde5dd0652a
     slug: zazow.com
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zazow/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zazow/public
+        key: null
     media:
       logo:
         bytes: 27933
@@ -3729,8 +3899,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zbrain/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zbrain/public
+        key: null
     media:
       logo:
         bytes: 1429
@@ -3754,8 +3926,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeda/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeda/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_83115e11a2bed1031871cf61
@@ -3763,25 +3937,21 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeemo/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeemo/public
-    media:
-      logo:
-        bytes: 2663
-        contentType: image/png
-        height: 56
-        key: best.serp.co/listings/zeemo.ai/logo/174c8745e12b77a7.png
-        sha256: 174c8745e12b77a78e9735b6c15689217882b9e2a33aa3b79170c21f93732253
-        source: https://zeemo.ai/zeemo.png
-        width: 56
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_e03306b36233640f6adeb0a0
     slug: zeg.ai
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeg-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zeg-ai/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_65a5016a0d5290fe1058ac25
@@ -3789,8 +3959,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zekai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zekai/public
+        key: null
     media:
       images:
         - bytes: 53790
@@ -3806,8 +3978,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zencall/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zencall/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_3430b862ec915b0c2756ae7d
@@ -3815,8 +3989,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zenen-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zenen-ai/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_ce1b4968aa0304fd4916a0e3
@@ -3824,8 +4000,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zenmate-vpn/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zenmate-vpn/public
+        key: null
     media:
       logo:
         bytes: 40436
@@ -3849,23 +4027,18 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-    media:
-      logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/zenrows.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_ff14ba1e657dbda08cc34ca9
     slug: zerogpt.cc
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerogpt-cc/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerogpt-cc/public
+        key: null
     media:
       logo:
         bytes: 102558
@@ -3889,23 +4062,26 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/zerogpt.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 11861
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/zerogpt.com/logo/33be3d6f020c5e32.png
+        sha256: 33be3d6f020c5e32e1fafc97f84af37a020bf4491b62234b4b8eb4aef1666351
+        source: https://www.zerogpt.com/favicon180.png
+        width: 180
   - action: listing-media-update
     id: lst_f9f73e086b1bd76e2ced88a1
     slug: zerogptdetector.com
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerogpt-detector/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerogpt-detector/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_3e897e170ec6ffb6f430c78a
@@ -3913,8 +4089,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerotax-al/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zerotax-al/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_79f7acea3dc465d7d1bc0bf8
@@ -3922,8 +4100,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zev/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zev/public
+        key: null
     media:
       logo:
         bytes: 46745
@@ -3947,8 +4127,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zevi-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zevi-ai/public
+        key: null
     media: {}
   - action: listing-media-update
     id: lst_e47b130dc842c30d3d058130
@@ -3956,8 +4138,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zigpoll/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zigpoll/public
+        key: null
     media:
       logo:
         bytes: 1562
@@ -3981,8 +4165,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zipchat/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zipchat/public
+        key: null
     media:
       logo:
         bytes: 514311
@@ -4006,8 +4192,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zipwp/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zipwp/public
+        key: null
     media:
       logo:
         bytes: 34434
@@ -4031,8 +4219,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zite/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zite/public
+        key: null
     media:
       logo:
         bytes: 2964
@@ -4048,8 +4238,10 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zizoto/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zizoto/public
+        key: null
     media:
       logo:
         bytes: 33731
@@ -4065,17 +4257,11 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/notes-for-chatgpt/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/notes-for-chatgpt/public
+        key: null
     media:
-      logo:
-        bytes: 15086
-        contentType: image/x-icon
-        height: 48
-        key: best.serp.co/listings/zoho.com/logo/578688454641bfca.ico
-        sha256: 578688454641bfca876d506e911b1ad9e6a0521a773e9dabe18a1adaa1a0a013
-        source: https://www.zohowebstatic.com/sites/zweb/images/favicon.ico
-        width: 48
       images:
         - bytes: 17431
           contentType: image/png
@@ -4090,17 +4276,19 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zoom-iq/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zoom-iq/public
+        key: null
     media:
       logo:
-        bytes: 4286
-        contentType: image/x-icon
-        height: 32
-        key: best.serp.co/listings/zoom.com/logo/58b6fee1a883d9b7.ico
-        sha256: 58b6fee1a883d9b798dea9dbf8f262fb8875e035bfa571792b8967c4c0434d26
-        source: https://st1.zoom.us/homepage/20260930-1234/primary/favicon.ico
-        width: 32
+        bytes: 4380
+        contentType: image/png
+        height: 72
+        key: best.serp.co/listings/zoom.com/logo/9ebe81173b0722df.png
+        sha256: 9ebe81173b0722df0a6cab4b27bfb4784d72ee11dfa8ab33d8fcbed381631366
+        source: https://www.zoom.com/apple-touch-icon.png
+        width: 72
       images:
         - bytes: 16986
           contentType: image/jpeg
@@ -4115,23 +4303,26 @@ operations:
     expected:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
+        key: null
     media:
       logo:
-        bytes: 6958
-        contentType: image/avif
-        height: 768
-        key: best.serp.co/listings/zuora.com/logo/b912cda4106db3a6.avif
-        sha256: b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf
-        source: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
-        width: 768
+        bytes: 9491
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/zuora.com/logo/196a3213d3045e39.png
+        sha256: 196a3213d3045e392e97d11fc480ef0c0424038bd6b8d77e6ab743bcdd59cae6
+        source: https://www.zuora.com/wp-content/uploads/2022/08/cropped-z-fav-icon-192x192.png
+        width: 192
   - action: listing-media-update
     id: lst_35593f6c25b348eadfbf27f1
     slug: zuva.ai
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zuva-contracts-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zuva-contracts-ai/public
+        key: null
     media:
       images:
         - bytes: 25214
@@ -4147,31 +4338,19 @@ operations:
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zyng-ai/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zyng-ai/public
-    media:
-      logo:
-        bytes: 845
-        contentType: image/png
-        height: 50
-        key: best.serp.co/listings/zyngai.com/logo/51507289c4ee469e.png
-        sha256: 51507289c4ee469ee392c8ea20a53b6f42135ed920f08993187d19a7832fa8dc
-        source: https://zyngai.com/asset/icon.png
-        width: 50
+        key: null
+    media: {}
   - action: listing-media-update
     id: lst_d21e976439664fe1aaf00ac3
     slug: zzzcode.ai
     expected:
       - kind: image
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zzzcode/public
+        key: null
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/zzzcode/public
-    media:
-      logo:
-        bytes: 1259
-        contentType: image/png
-        height: 48
-        key: best.serp.co/listings/zzzcode.ai/logo/bbf396bff5a08fdb.png
-        sha256: bbf396bff5a08fdb2d6c8daff127e4564dc11c0cfbc3e449e2d256d47311bde5
-        source: https://zzzcode.ai/assets/images/logo.png
-        width: 48
+        key: null
+    media: {}
