@@ -1,12 +1,18 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { solidPng } from './fixtures/solid-png'
-import { mediaPlanSchema, uploadMediaPlan, verifyObject } from './media-upload'
+import { mediaPlanSchema, type UploadOptions, uploadMediaPlan, verifyObject } from './media-upload'
 import { type Clock, type R2CallOptions, RateLimiter } from './r2-objects'
 
-const planPath = resolve('d1/media/media-upload-test.json')
+/**
+ * The plan under test lives in its own directory, never d1/media: the publisher and the catalog
+ * media guard read every plan there while this suite runs in parallel with theirs.
+ */
+const planDirectory = mkdtempSync(join(tmpdir(), 'media-upload-test-'))
+const planPath = join(planDirectory, 'media-upload-test.json')
 const fallbackTile = 'apps/web/public/listing-logos/favicon-fallback-512x512.png'
 const png = solidPng(64, 32, [1, 2, 3])
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
@@ -31,9 +37,11 @@ const remote = object(png, 'https://assets.example/logo.png', 'remote.example', 
 const repo = object(tile, `repo:${fallbackTile}`, 'repo.example', 512, 512)
 const plan = { id: 'media-upload-test', objects: [remote, repo], site: 'best.serp.co', version: 1 }
 
-mkdirSync(resolve('d1/media'), { recursive: true })
 writeFileSync(planPath, JSON.stringify(plan))
-afterAll(() => rmSync(planPath, { force: true }))
+afterAll(() => rmSync(planDirectory, { force: true, recursive: true }))
+
+/** Uploads the test plan from its own directory. */
+const upload = (options: UploadOptions) => uploadMediaPlan(planPath, { ...options, planDirectory })
 
 const workflowEnvironment = {
   CI: 'true',
@@ -181,9 +189,7 @@ describe('media upload plans', () => {
 
   it('dry-runs locally: fetches and verifies every source, writes nothing', async () => {
     const fetcher = fakeFetch()
-    expect(
-      await uploadMediaPlan(planPath, { dryRun: true, env: {}, fetcher, target: 'staging' })
-    ).toEqual({
+    expect(await upload({ dryRun: true, env: {}, fetcher, target: 'staging' })).toEqual({
       failed: [],
       id: 'media-upload-test',
       present: 0,
@@ -208,7 +214,7 @@ describe('media upload plans', () => {
       [{ MEDIA_UPLOAD_CONFIRM: 'upload-media-best.serp.co-production' }, 'confirmation']
     ] as const) {
       await expect(
-        uploadMediaPlan(planPath, {
+        upload({
           env: { ...workflowEnvironment, ...overrides },
           fetcher,
           target: 'staging'
@@ -216,18 +222,22 @@ describe('media upload plans', () => {
       ).rejects.toThrow(message)
     }
     await expect(
-      uploadMediaPlan(planPath, { env: workflowEnvironment, fetcher, target: 'production' })
+      upload({ env: workflowEnvironment, fetcher, target: 'production' })
     ).rejects.toThrow('upload-media.yml')
     await expect(
       uploadMediaPlan('d1/publications/x.json', { dryRun: true, fetcher, target: 'staging' })
     ).rejects.toThrow('d1/media')
+    // Without a test's own directory, a plan outside d1/media (like this suite's) is refused.
+    await expect(
+      uploadMediaPlan(planPath, { dryRun: true, fetcher, target: 'staging' })
+    ).rejects.toThrow('Media plans must be checked in directly under d1/media.')
     expect(fetcher).not.toHaveBeenCalled()
   })
 
   it('uploads what the bucket lacks, into the target bucket, with the immutable policy', async () => {
     const fetcher = fakeFetch({ [`cdn-staging/${repo.key}`]: tile })
     expect(
-      await uploadMediaPlan(planPath, {
+      await upload({
         env: workflowEnvironment,
         fetcher,
         r2: fast(),
@@ -256,7 +266,7 @@ describe('media upload plans', () => {
       [`cdn-staging/${remote.key}`]: impostor,
       [`cdn-staging/${repo.key}`]: tile
     })
-    const summary = await uploadMediaPlan(planPath, {
+    const summary = await upload({
       env: workflowEnvironment,
       fetcher,
       r2: fast(),
@@ -283,7 +293,7 @@ describe('media upload plans', () => {
       MEDIA_UPLOAD_CONFIRM: 'upload-media-best.serp.co-production'
     }
     const fetcher = fakeFetch({ [`cdn-staging/${remote.key}`]: png })
-    const summary = await uploadMediaPlan(planPath, {
+    const summary = await upload({
       env: production,
       fetcher,
       r2: fast(),
@@ -310,7 +320,7 @@ describe('media upload plans', () => {
       [`cdn-staging/${repo.key}`]: tile
     })
     expect(
-      await uploadMediaPlan(planPath, {
+      await upload({
         env: production,
         fetcher: poisoned,
         r2: fast(),
@@ -327,7 +337,7 @@ describe('media upload plans', () => {
     }
     writeFileSync(planPath, JSON.stringify(changedPlan))
     try {
-      const summary = await uploadMediaPlan(planPath, {
+      const summary = await upload({
         env: workflowEnvironment,
         fetcher: fakeFetch(),
         r2: fast(),
@@ -346,7 +356,7 @@ describe('media upload plans', () => {
   it('rides out 429s: waits Retry-After, retries, and still uploads everything (#95 release blocker 3)', async () => {
     const r2 = fast()
     const fetcher = fakeFetch({}, { [remote.source]: png }, { throttle: 5 })
-    const summary = await uploadMediaPlan(planPath, {
+    const summary = await upload({
       env: workflowEnvironment,
       fetcher,
       r2,
@@ -363,21 +373,21 @@ describe('media upload plans', () => {
     const fetcher = fakeFetch({}, { [remote.source]: png }, { throttle: 9 })
     // The list call and one object exhaust their attempts on 429s.
     await expect(
-      uploadMediaPlan(planPath, {
+      upload({
         env: workflowEnvironment,
         fetcher,
         r2: fast(),
         target: 'staging'
       })
     ).rejects.toThrow('r2_list_429')
-    const rerun = await uploadMediaPlan(planPath, {
+    const rerun = await upload({
       env: workflowEnvironment,
       fetcher,
       r2: fast(),
       target: 'staging'
     })
     expect(rerun).toMatchObject({ failed: [], uploaded: 2 })
-    const again = await uploadMediaPlan(planPath, {
+    const again = await upload({
       env: workflowEnvironment,
       fetcher,
       r2: fast(),
@@ -395,7 +405,7 @@ describe('media upload plans', () => {
       { pageSize: 1 }
     )
     expect(
-      await uploadMediaPlan(planPath, {
+      await upload({
         env: workflowEnvironment,
         fetcher,
         r2: fast(),

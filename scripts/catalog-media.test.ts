@@ -30,11 +30,7 @@ import { type MediaPlanObject, mediaPlanSchema } from './media-upload'
 const publicationsDirectory = resolve('d1/publications')
 const mediaDirectory = resolve('d1/media')
 /** Written and removed by other tests while the suite runs. */
-const transientFiles = new Set([
-  'media-upload-test.json',
-  'remote-publisher-media-test.yaml',
-  'remote-publisher-test.yaml'
-])
+const transientFiles = new Set(['remote-publisher-media-test.yaml', 'remote-publisher-test.yaml'])
 
 let importSql = ''
 beforeAll(() => {
