@@ -356,7 +356,12 @@ export function AccountDashboard({
                 </Button>
               ) : action ? (
                 <Button asChild size="sm" variant={action.variant}>
-                  <Link href={action.href}>{action.label}</Link>
+                  {action.checkout ? (
+                    // A plain link: the checkout route opens a provider checkout (#68).
+                    <a href={action.href}>{action.label}</a>
+                  ) : (
+                    <Link href={action.href}>{action.label}</Link>
+                  )}
                 </Button>
               ) : null}
               <DropdownMenu>

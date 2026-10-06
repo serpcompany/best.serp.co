@@ -15,6 +15,6 @@ export const metadata: Metadata = generateBaseMetadata({
 /** `/account/listings/` (#65): the screen-5 table with the listings the user owns. */
 export default async function AccountListingsPage(): Promise<ReactElement> {
   const user = await requireAccountUser('/account/listings/')
-  const rows = accountTableRows(await getAccountOverview(user.id))
+  const rows = await accountTableRows(await getAccountOverview(user.id))
   return <AccountTablePage rows={rows} scope="listings" />
 }

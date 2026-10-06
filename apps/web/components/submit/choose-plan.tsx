@@ -32,8 +32,8 @@ import { ProductLogo, StepProgress, SubmissionStatusBadge, ToneAlert } from './s
 
 /**
  * `/submit/<id>/choose/` (#70 screen 2b): the saved draft, then free (install the badge) or
- * paid. The paid card and every $49 link stay hidden until the paid listing ships (#68,
- * `features.showPaidListings`). "Decide later" shows the saved state; the draft stays in the
+ * paid. The paid card and every $49 link stay hidden while orders are off (#68,
+ * `features.orders`). "Decide later" shows the saved state; the draft stays in the
  * account until it expires.
  */
 
@@ -244,13 +244,14 @@ export function ChoosePlan({
               <CardFooter className="mt-auto">
                 <div className="flex w-full flex-col gap-2">
                   <Button asChild className="w-full">
-                    <Link href={`/submit/${submission.id}/checkout/`}>
+                    {/* A plain link: the checkout route opens a provider checkout (#68). */}
+                    <a href={`/submit/${submission.id}/checkout/`}>
                       Pay {price} and go live
                       <ArrowRight />
-                    </Link>
+                    </a>
                   </Button>
                   <p className="flex items-center justify-center gap-1.5 text-muted-foreground text-xs">
-                    <Lock className="size-3" aria-hidden="true" /> Secure checkout by Stripe
+                    <Lock className="size-3" aria-hidden="true" /> Secure checkout
                   </p>
                 </div>
               </CardFooter>

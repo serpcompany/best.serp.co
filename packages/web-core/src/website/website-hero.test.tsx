@@ -64,7 +64,7 @@ describe('WebsiteHero', () => {
         Badge: ({ children }) => <span>{children}</span>,
         Breadcrumb: () => <nav />,
         FavoriteButton: () => <button type="button">Favorite</button>,
-        FaviconWithFallback: ({ name }) => <img alt={name} />
+        ListingImage: ({ name }) => <img alt={name} />
       }
     })
 

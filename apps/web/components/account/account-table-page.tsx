@@ -9,7 +9,6 @@ import {
   EmptyMedia,
   EmptyTitle
 } from '@serpdirectory/design-system/empty'
-import { site } from '@serpdirectory/site-config'
 import { DashboardPageHeader } from '@serpdirectory/web-core/dashboard/page-header'
 import { getRoute } from '@serpdirectory/web-core/routes'
 import { Inbox, Plus, Search } from 'lucide-react'
@@ -17,6 +16,7 @@ import Link from 'next/link'
 import type { ReactElement } from 'react'
 import { accountBadgeTarget, badgePanelCopy, badgeSiteName } from '@/lib/account/presentation'
 import { type AccountRow, accountCards, accountRows } from '@/lib/account/view'
+import { ordersEnabled } from '@/lib/billing/runtime'
 import { featureCopy } from '@/lib/feature-copy'
 import { features } from '@/lib/features'
 import { AccountDashboard } from './account-dashboard'
@@ -63,15 +63,16 @@ const SCOPES = {
   }
 } as const
 
-export function accountTableRows(overview: AccountOverview): AccountRow[] {
+export async function accountTableRows(overview: AccountOverview): Promise<AccountRow[]> {
   return accountRows(overview, {
     badgeTarget: accountBadgeTarget,
     now: new Date(),
-    showPaid: site.features.showPaidListings
+    // Paid listings, the upgrade, and the relist follow the orders flag (#68).
+    showPaid: await ordersEnabled()
   })
 }
 
-export function AccountTablePage({
+export async function AccountTablePage({
   initialBadge = null,
   rows,
   scope
@@ -79,8 +80,9 @@ export function AccountTablePage({
   initialBadge?: string | null
   rows: readonly AccountRow[]
   scope: keyof typeof SCOPES
-}): ReactElement {
+}): Promise<ReactElement> {
   const copy = SCOPES[scope]
+  const showPaid = await ordersEnabled()
   const shown =
     scope === 'overview'
       ? rows
@@ -132,7 +134,7 @@ export function AccountTablePage({
           legend={statusLegend({
             badgeProgram: features.badgeProgram,
             messages: features.messages,
-            showPaid: site.features.showPaidListings
+            showPaid
           })}
           noun={copy.noun}
           rows={shown}

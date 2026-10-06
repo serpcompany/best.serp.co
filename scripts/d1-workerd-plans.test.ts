@@ -12,6 +12,8 @@ import {
   badgeProgramEmailKey,
   createBadgeProgramOperations
 } from '@serpdirectory/data-ops/badge-program'
+import * as billingModule from '@serpdirectory/data-ops/billing'
+import { createClaimOperations } from '@serpdirectory/data-ops/claims'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import * as draftPlansModule from '@serpdirectory/data-ops/draft-plans'
 import * as listingPlansModule from '@serpdirectory/data-ops/listing-plans'
@@ -23,6 +25,7 @@ import * as submissionPlansModule from '@serpdirectory/data-ops/submission-plans
 import type { UrlKey } from '@serpdirectory/utils/url-key'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { getPlatformProxy, type Unstable_DevWorker, unstable_dev } from 'wrangler'
+import { assertD1Compatible } from './d1-compat'
 import { buildPublicationPlan, executePublicationPlan, parseManifest } from './d1-publisher'
 import { project } from './project'
 
@@ -69,15 +72,18 @@ const L = tracked(listingPlansModule)
 const M = tracked(mediaPlansModule)
 const R = tracked(revisionPlansModule)
 const S = tracked(submissionPlansModule)
+const B = tracked(billingModule)
 
 let stateDirectory: string
 let proxyDispose: (() => Promise<void>) | undefined
 let keyWorker: Unstable_DevWorker | undefined
 let db: D1Database
 
-/** Every plan statement gets the D1 limit and self-comparison checks before it runs (#77). */
+/** Every plan statement gets the D1 limit, self-comparison (#77) and D1-compat (#114) checks. */
 function checked(sql: string, params: readonly unknown[]): string {
   assertD1StatementLimits(sql, params)
+  // And nothing D1's remote API refuses (#114): the app's plans, billing's included, run there.
+  assertD1Compatible([{ query: sql }])
   return sql
 }
 
@@ -1210,6 +1216,226 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     ).rejects.toThrow(/listing_media_hosted_complete/u)
   })
 
+  it('records orders, webhook events, upgrades, relists, and refunds (#68)', async () => {
+    const order = async (id: string) =>
+      (await all<Record<string, unknown>>(B.selectOrderPlan(id)))[0] ?? null
+    // A paid submission: the order is opened, gets its checkout, is paid, and is applied in the
+    // same batch as the payment plans.
+    await insertDraft('sub-order', 'https://order.example/')
+    await choose('sub-order', 'paid')
+    await run(
+      B.buildCreateOrderPlans({
+        amountCents: 4900,
+        currency: 'usd',
+        id: 'ord-1',
+        now: NOW,
+        provider: 'stripe',
+        purpose: 'submission',
+        submissionId: 'sub-order',
+        userId: 'user_owner'
+      })
+    )
+    // One open order per target.
+    await expect(
+      run(
+        B.buildCreateOrderPlans({
+          amountCents: 4900,
+          currency: 'usd',
+          id: 'ord-dup',
+          now: NOW,
+          provider: 'stripe',
+          purpose: 'submission',
+          submissionId: 'sub-order',
+          userId: 'user_owner'
+        })
+      )
+    ).rejects.toThrow(/UNIQUE/u)
+    expect(await all(B.selectOpenOrderPlan('submission:sub-order'))).toHaveLength(1)
+    await run(
+      B.buildAttachCheckoutPlans({
+        checkoutId: 'cs_1',
+        expiresAt: '2026-10-06T13:00:00.000Z',
+        now: NOW,
+        orderId: 'ord-1',
+        url: 'https://checkout.example/cs_1'
+      })
+    )
+    expect(await all(B.selectOrderByCheckoutPlan('stripe', 'cs_1'))).toHaveLength(1)
+    await run(
+      B.buildMarkOrderPaidPlans({
+        chargedCents: 4900,
+        chargedCurrency: 'usd',
+        now: NOW,
+        orderId: 'ord-1',
+        paymentId: 'pi_1'
+      })
+    )
+    await run([
+      ...S.buildRecordSubmissionPaymentPlans({
+        actor: 'billing',
+        listingId: 'lst-order',
+        now: NOW,
+        outcome: 'publish',
+        publication: await publication('paid-listing', 'sub-order'),
+        submissionId: 'sub-order'
+      }),
+      ...B.buildMarkOrderAppliedPlans({ now: NOW, orderId: 'ord-1', outcome: 'published' })
+    ])
+    expect(await order('ord-1')).toMatchObject({ outcome: 'published', status: 'paid' })
+    // Applied once: a second application is refused.
+    await expect(
+      run(B.buildMarkOrderAppliedPlans({ now: NOW, orderId: 'ord-1', outcome: 'held' }))
+    ).rejects.toThrow()
+    expect(await all(B.selectSubmissionPaymentOrderPlan('sub-order'))).toHaveLength(1)
+    expect(await all(B.selectCheckoutSubmissionPlan('sub-order'))).toEqual([
+      expect.objectContaining({ status: 'paid_pending_review', owner_email: 'owner@example.com' })
+    ])
+    expect(
+      await all(
+        B.selectOrdersToReconcilePlan({
+          before: '2026-10-07T00:00:00.000Z',
+          failedSince: '2026-10-01T00:00:00.000Z',
+          limit: 10,
+          now: NOW
+        })
+      )
+    ).toEqual([])
+    expect(await all(B.selectAdminOrdersPlan())).toEqual([
+      expect.objectContaining({ buyer_email: 'owner@example.com', id: 'ord-1', listing_live: 1 })
+    ])
+
+    // Webhook events are recorded once.
+    const event = {
+      eventId: 'evt_1',
+      eventType: 'checkout.session.completed',
+      now: NOW,
+      provider: 'stripe'
+    }
+    await run(B.buildRecordBillingEventPlans(event))
+    await run(B.buildRecordBillingEventPlans(event))
+    await run(B.buildFinishBillingEventPlans({ ...event, orderId: 'ord-1', outcome: 'published' }))
+    expect(
+      await first('SELECT COUNT(*) AS n, MAX(outcome) AS outcome FROM billing_events')
+    ).toEqual({ n: 1, outcome: 'published' })
+
+    // An unpaid order fails; a refund records the reason and the actor.
+    await insertDraft('sub-failed', 'https://failed.example/')
+    await run(
+      B.buildCreateOrderPlans({
+        amountCents: 4900,
+        currency: 'usd',
+        id: 'ord-2',
+        now: NOW,
+        provider: 'stripe',
+        purpose: 'submission',
+        submissionId: 'sub-failed',
+        userId: 'user_owner'
+      })
+    )
+    await run(
+      B.buildMarkOrderFailedPlans({ now: NOW, orderId: 'ord-2', reason: 'superseded_unconfirmed' })
+    )
+    await run(B.buildMarkFailedReasonPlans({ now: NOW, orderId: 'ord-2', reason: 'expired' }))
+    expect(await order('ord-2')).toMatchObject({ failure_reason: 'expired', status: 'failed' })
+    await run(
+      B.buildMarkOrderPaidPlans({
+        attention: 'amount_mismatch',
+        chargedCents: 5390,
+        chargedCurrency: 'usd',
+        now: NOW,
+        orderId: 'ord-2',
+        paymentId: 'pi_2'
+      })
+    )
+    // The refund is claimed (only while nothing applied it), then finalized.
+    await run(
+      B.buildClaimRefundPlans({
+        actor: 'billing',
+        from: 'unapplied',
+        now: NOW,
+        orderId: 'ord-2',
+        reason: 'unapplied'
+      })
+    )
+    await expect(
+      run(B.buildMarkOrderAppliedPlans({ now: NOW, orderId: 'ord-2', outcome: 'published' }))
+    ).rejects.toThrow()
+    // A provider failure is counted (swapped on the count read), with its retry time.
+    await run(
+      B.buildRecordRefundFailurePlans({
+        attempts: 0,
+        now: NOW,
+        orderId: 'ord-2',
+        retryAt: '2026-10-06T13:00:00.000Z'
+      })
+    )
+    expect(await order('ord-2')).toMatchObject({ refund_attempts: 1 })
+    await run(B.buildFinishRefundPlans({ now: NOW, orderId: 'ord-2', refundId: 're_2' }))
+    expect(await order('ord-2')).toMatchObject({
+      attention: 'amount_mismatch',
+      charged_cents: 5390,
+      outcome: 'unapplied',
+      refund_reason: 'unapplied',
+      status: 'refunded'
+    })
+    // An applied order is claimed only with the outcome it was read with.
+    await expect(
+      run(
+        B.buildClaimRefundPlans({
+          actor: 'admin@example.com',
+          from: 'applied',
+          listingAction: 'none',
+          now: NOW,
+          orderId: 'ord-1',
+          outcome: 'held',
+          reason: 'admin'
+        })
+      )
+    ).rejects.toThrow()
+
+    // Upgrade and relist of an owned free listing.
+    await insertDraft('sub-relist', 'https://relist.example/')
+    await choose('sub-relist', 'free')
+    await db.prepare(`UPDATE listing_submissions SET status='verified' WHERE id='sub-relist'`).run()
+    await run(
+      S.buildApproveSubmissionPlans({
+        ...(await publication('approve', 'sub-relist')),
+        affectedRoute: '/products/relist.example/',
+        expectedContentVersion: 1,
+        listingId: 'lst-relist',
+        reviewer: 'reviewer',
+        submissionId: 'sub-relist'
+      })
+    )
+    const [owned] = await all<Record<string, unknown>>(
+      B.selectCheckoutListingPlan({ slug: 'relist.example' }, 'user_owner')
+    )
+    expect(owned).toMatchObject({ live: 1, plan: 'free', submission_status: 'approved' })
+    await run(
+      L.buildUnpublishListingPlans({
+        listingId: 'lst-relist',
+        publication: await publication('badge-unpublish', 'lst-relist'),
+        reason: 'badge_missing'
+      })
+    )
+    await run(
+      S.buildRelistListingToPaidPlans({
+        actor: 'billing',
+        listingId: 'lst-relist',
+        now: NOW,
+        publication: await publication('paid-relist', 'lst-relist'),
+        submissionId: 'sub-relist'
+      })
+    )
+    expect(await listing('lst-relist')).toMatchObject({ is_active: 1 })
+    expect(await submission('sub-relist')).toMatchObject({ paid_at: NOW, plan: 'paid' })
+    expect(
+      await all(B.selectCheckoutListingPlan({ listingId: 'lst-relist' }, 'user_owner'))
+    ).toEqual([
+      expect.objectContaining({ live: 1, plan: 'paid', unpublished_reason: 'badge_missing' })
+    ])
+  })
+
   it('applies a publication plan on D1 and refuses a stale one with nothing written (#95 release blocker)', async () => {
     // D1's authorizer refuses temporary tables, which the publisher's old guard table used:
     // Publish D1 Catalog (staging) run 37471283341 failed with exactly this.
@@ -1443,5 +1669,102 @@ describe('badge program on Wrangler-local D1 (workerd, #66)', () => {
       ['listing-unlisted', 'free@badge.example'],
       ['ownership-removed', 'claim@badge.example']
     ])
+  })
+})
+
+describe('claims on Wrangler-local D1 (workerd, #67)', () => {
+  it('starts, confirms, checks, and completes a badge claim, then refuses a second claimer', async () => {
+    const operations = createClaimOperations({ client: createDatabase(db) })
+    await db.batch([
+      db.prepare(
+        `INSERT INTO users (id, name, email, email_verified) VALUES
+          ('claim_user', 'Claimer', 'claimer@example.com', 1),
+          ('claim_other', 'Other', 'other-claimer@example.com', 1)`
+      ),
+      db.prepare(
+        `INSERT INTO listings (id, slug, name, description, website, status, source_kind,
+          source_identity, checksum) VALUES ('lst-claim', 'claim-tool', 'Claim tool', 'd',
+          'https://www.claim-tool.example/', 'draft', 'fixture', 'lst-claim', 'c')`
+      ),
+      db.prepare(
+        `INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+          SELECT 'lst-claim', id, 0, 1 FROM categories WHERE slug = 'tools'`
+      ),
+      db.prepare(
+        `UPDATE listings SET status = 'approved', published_at = '2026-05-16' WHERE id = 'lst-claim'`
+      )
+    ])
+    const listing = await operations.listing({ slug: 'claim-tool' })
+    expect(listing).toMatchObject({ id: 'lst-claim', live: true, ownerUserId: null })
+    expect(await operations.blocked(['claim-tool.example'])).toBe(false)
+    const code = {
+      codeExpiresAt: '2026-10-06T12:10:00.000Z',
+      codeHash: 'hash',
+      email: 'jo@claim-tool.example',
+      emailDomain: 'claim-tool.example',
+      method: 'badge' as const,
+      now: NOW,
+      listingWebsite: 'https://www.claim-tool.example/',
+      productUrl: 'https://www.claim-tool.example/'
+    }
+    expect(
+      await operations.start({
+        ...code,
+        claimId: 'c-1',
+        listingId: 'lst-claim',
+        userId: 'claim_user'
+      })
+    ).toBe(true)
+    expect(
+      await operations.start({
+        ...code,
+        claimId: 'c-dup',
+        listingId: 'lst-claim',
+        userId: 'claim_user'
+      })
+    ).toBe(false)
+    expect(
+      await operations.start({
+        ...code,
+        claimId: 'c-2',
+        listingId: 'lst-claim',
+        userId: 'claim_other'
+      })
+    ).toBe(true)
+    const later = '2026-10-06T12:01:00.000Z'
+    expect(
+      await operations.recordWrongCode({
+        claimId: 'c-1',
+        lockedUntil: '2026-10-06T12:16:00.000Z',
+        now: later,
+        userId: 'claim_user'
+      })
+    ).toBe(true)
+    expect(
+      await operations.confirmEmail({
+        claimId: 'c-1',
+        codeHash: 'hash',
+        now: later,
+        userId: 'claim_user'
+      })
+    ).toBe(true)
+    expect(
+      await operations.claimBadgeCheck({ claimId: 'c-1', now: later, userId: 'claim_user' })
+    ).toBe(true)
+    const claim = await operations.claim({ claimId: 'c-1', userId: 'claim_user' })
+    if (!claim) throw new Error('missing claim')
+    expect(claim).toMatchObject({ attempts: 1, codePending: false, status: 'email_verified' })
+    expect(await operations.complete({ actor: 'claimer@example.com', claim, now: later })).toBe(
+      true
+    )
+    expect(await operations.listing({ id: 'lst-claim' })).toMatchObject({
+      ownerUserId: 'claim_user'
+    })
+    expect(await operations.claim({ claimId: 'c-2', userId: 'claim_other' })).toMatchObject({
+      status: 'cancelled'
+    })
+    expect(
+      await first("SELECT verified_via FROM listing_owners WHERE listing_id = 'lst-claim'")
+    ).toEqual({ verified_via: 'badge_claim' })
   })
 })

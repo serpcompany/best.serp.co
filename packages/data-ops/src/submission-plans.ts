@@ -465,6 +465,58 @@ export function buildUpgradeListingToPaidPlans(input: {
 }
 
 /**
+ * A free listing the badge program unlisted (its latest `unpublished` event is `badge_missing`,
+ * #66) comes back as a paid listing (#68, "Relist for $49"): the listing is republished at the
+ * same URL and its approved submission moves to the paid plan, in one batch that advances the
+ * catalog version. A listing an admin unpublished, or one whose submission is not approved and
+ * free and unpaid, is refused.
+ */
+export function buildRelistListingToPaidPlans(input: {
+  actor: string
+  listingId: string
+  now: string
+  publication: CatalogPublication
+  submissionId: string
+}): StatementPlan[] {
+  const relistable = `EXISTS (SELECT 1 FROM listing_submissions s JOIN listings l ON l.id=s.listing_id
+      WHERE s.id=? AND s.listing_id=? AND s.status='approved' AND s.plan='free'
+        AND s.paid_at IS NULL AND s.refunded_at IS NULL
+        AND l.status='approved' AND l.is_active=0 AND l.published_at IS NOT NULL
+        AND (SELECT e.detail FROM listing_submission_events e
+          WHERE e.submission_id=s.id AND e.event_type='unpublished'
+          ORDER BY e.id DESC LIMIT 1)='badge_missing')`
+  return [
+    ...beginCatalogPublicationPlans(input.publication, {
+      sql: relistable,
+      params: [input.submissionId, input.listingId]
+    }),
+    {
+      sql: `UPDATE listings SET is_active=1,updated_at=?
+        WHERE id=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL`,
+      params: [input.now, input.listingId]
+    },
+    assertPreviousStatementChangedOne('listing_relisted'),
+    {
+      sql: `UPDATE listing_submissions SET plan='paid',paid_at=?,updated_at=?
+        WHERE id=? AND listing_id=? AND status='approved' AND plan='free' AND paid_at IS NULL`,
+      params: [input.now, input.now, input.submissionId, input.listingId]
+    },
+    assertPreviousStatementChangedOne('relisted_submission_paid'),
+    event(input.submissionId, 'paid', input.actor, 'relist'),
+    {
+      sql: `INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,?,?,?)`,
+      params: [
+        input.listingId,
+        'republished',
+        JSON.stringify({ reason: 'relisted_paid' }),
+        input.actor
+      ]
+    },
+    ...finishCatalogPublicationPlans(input.publication)
+  ]
+}
+
+/**
  * `paid_pending_review` → `approved`. The listing is already live; its content is replaced by
  * the submission's staged content (which a reviewer may have edited before approving). Refused
  * unless the staged content is the version the reviewer saw and the live listing is unchanged
@@ -719,9 +771,13 @@ export function buildRejectSubmissionPlans(input: {
  * that check alone, so an earlier weekly pass can neither keep a listing whose refund check
  * missed or couldn't tell, nor block its unpublish.
  */
-function refundBadgeCheck(passed: boolean): string {
-  return `EXISTS (SELECT 1 FROM badge_checks rc WHERE rc.id=? AND rc.listing_id=s.listing_id
-    AND rc.kind='refund' AND rc.checked_at>=? AND ${passed ? "rc.outcome='pass'" : "rc.outcome<>'pass'"}
+function refundBadgeCheck(passed: boolean, recorded: boolean): string {
+  const outcome = passed ? "rc.outcome='pass'" : "rc.outcome<>'pass'"
+  const check = `rc.id=? AND rc.listing_id=s.listing_id AND rc.kind='refund' AND rc.checked_at>=?
+    AND ${outcome}`
+  // A decision recorded with a claimed refund (#68) is final: newer checks don't undo it.
+  if (recorded) return `EXISTS (SELECT 1 FROM badge_checks rc WHERE ${check})`
+  return `EXISTS (SELECT 1 FROM badge_checks rc WHERE ${check}
     AND NOT EXISTS (SELECT 1 FROM badge_checks later WHERE later.listing_id=rc.listing_id
       AND later.kind='refund' AND (later.checked_at>rc.checked_at
         OR (later.checked_at=rc.checked_at AND later.id>rc.id))))`
@@ -741,7 +797,18 @@ function refundBadgeCheck(passed: boolean): string {
  *   admin, or deleted) is refunded without touching the catalog.
  */
 export function buildRefundSubmissionPlans(
-  input: { actor: string; now: string; submissionId: string } & (
+  input: {
+    actor: string
+    /**
+     * When the refund was decided and claimed (#68's `orders.refund_requested_at`): the badge
+     * check recorded with that claim then decides, whatever its age at `now` and whatever
+     * checks came after it. Without it, the check must be the listing's latest refund check
+     * and recent at `now`.
+     */
+    decidedAt?: string
+    now: string
+    submissionId: string
+  } & (
     | { mode: 'after_rejection' }
     | { mode: 'already_unpublished' }
     | { badgeCheckId: number; mode: 'keep_free' }
@@ -749,7 +816,8 @@ export function buildRefundSubmissionPlans(
   )
 ): StatementPlan[] {
   const paid = `s.id=? AND s.plan='paid' AND s.paid_at IS NOT NULL AND s.refunded_at IS NULL`
-  const checkWindow = hoursBefore(input.now, REFUND_BADGE_CHECK_MAX_AGE_HOURS)
+  const checkWindow = hoursBefore(input.decidedAt ?? input.now, REFUND_BADGE_CHECK_MAX_AGE_HOURS)
+  const recorded = input.decidedAt !== undefined
   const refund = (condition: PlanGuard, plan: 'free' | 'paid', label: string): StatementPlan[] => [
     {
       sql: `UPDATE listing_submissions SET plan=?,refunded_at=?,updated_at=?
@@ -783,7 +851,7 @@ export function buildRefundSubmissionPlans(
     return [
       ...refund(
         {
-          sql: `s.status='approved' AND ${live} AND ${refundBadgeCheck(true)}`,
+          sql: `s.status='approved' AND ${live} AND ${refundBadgeCheck(true, recorded)}`,
           params: [input.badgeCheckId, checkWindow]
         },
         'free',
@@ -800,7 +868,7 @@ export function buildRefundSubmissionPlans(
       assertPreviousStatementChangedOne('kept_free_badge_recorded')
     ]
   }
-  const condition = `s.status='approved' AND ${live} AND ${refundBadgeCheck(false)}`
+  const condition = `s.status='approved' AND ${live} AND ${refundBadgeCheck(false, recorded)}`
   return [
     ...beginCatalogPublicationPlans(input.publication, {
       sql: `EXISTS (SELECT 1 FROM listing_submissions s WHERE ${paid} AND ${condition})`,

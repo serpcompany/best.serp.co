@@ -4,6 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-syste
 import { Badge } from '@serpdirectory/design-system/badge'
 import { cn } from '@serpdirectory/design-system/lib/utils'
 import { Progress } from '@serpdirectory/design-system/progress'
+import { ListingImage } from '@serpdirectory/web-core/ui/listing-image'
 import {
   CircleAlert,
   CircleCheck,
@@ -16,7 +17,7 @@ import {
   TriangleAlert,
   Undo2
 } from 'lucide-react'
-import { type ReactNode, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { SubmissionStatusName } from '@/lib/submissions/contract'
 
 /**
@@ -136,7 +137,10 @@ export function SubmissionStatusBadge({ status }: { status: SubmissionStatusName
   )
 }
 
-/** The product's logo in a rounded square; its first letter when there is none or it fails. */
+/**
+ * The product's logo in a rounded square: the shared listing image (#122), so a missing or
+ * broken logo is the #86 tile, never alt text or a broken-image icon.
+ */
 export function ProductLogo({
   className,
   name,
@@ -148,36 +152,5 @@ export function ProductLogo({
   size?: number
   src: string | null | undefined
 }) {
-  const [failed, setFailed] = useState(false)
-  const box = cn(
-    'flex shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted',
-    className
-  )
-  if (!src || failed) {
-    return (
-      <span
-        aria-hidden="true"
-        className={cn(box, 'font-semibold text-muted-foreground')}
-        style={{ fontSize: Math.round(size * 0.4), height: size, width: size }}
-      >
-        {(name.trim()[0] ?? '?').toUpperCase()}
-      </span>
-    )
-  }
-  return (
-    <span className={box} style={{ height: size, width: size }}>
-      <img
-        src={src}
-        alt=""
-        width={size}
-        height={size}
-        className="size-full object-contain"
-        // Logos are hotlinked from the submitter's site: no referrer, loaded when in view.
-        referrerPolicy="no-referrer"
-        loading="lazy"
-        decoding="async"
-        onError={() => setFailed(true)}
-      />
-    </span>
-  )
+  return <ListingImage className={cn('rounded-lg', className)} name={name} size={size} src={src} />
 }

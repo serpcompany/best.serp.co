@@ -64,7 +64,7 @@ export interface BadgeStepProps {
   submission: SubmissionSummary
 }
 
-type Outcome = { code: string; href?: string; rel?: string[]; source?: string } | null
+export type BadgeOutcome = { code: string; href?: string; rel?: string[]; source?: string } | null
 
 /** "nofollow", "nofollow and ugc", "nofollow, sponsored and ugc" */
 function joinTokens(tokens: string[]): string {
@@ -170,6 +170,126 @@ function BadgeCard({
   )
 }
 
+/**
+ * The badge step's approved alert for a check result (#70 screen 3): a missing, unfollowed, or
+ * misdirected badge, a page the checker couldn't read, or a site it couldn't reach. Shared with
+ * the claim dialog's badge step (#67), which shows the same results.
+ */
+export function badgeCheckResultAlert(
+  code: string | undefined,
+  outcome: BadgeOutcome,
+  context: { domain: string; listingUrl: string; site: string }
+): ReactNode {
+  const { domain, listingUrl, site } = context
+  if (code === 'badge_missing') {
+    return (
+      <ToneAlert tone="warning" title="Page reached, badge not found">
+        <p>
+          We loaded {site}, but the badge wasn’t in the HTML it returned. Publish the snippet on
+          that exact URL, then check again.
+        </p>
+      </ToneAlert>
+    )
+  } else if (code === 'link_not_followed' || code === 'nofollow') {
+    // The tokens the check just found. After a reload only the result is stored, so the alert
+    // gives the general rule, with no sample of tokens the site may not have.
+    const found = outcome?.rel?.length ? outcome.rel : code === 'nofollow' ? ['nofollow'] : null
+    return found ? (
+      <ToneAlert tone="warning" title={`Badge found, but the link is marked ${joinTokens(found)}`}>
+        <p>
+          The badge has to be a plain link that search engines follow. Remove{' '}
+          {found.map((token, index) => (
+            <span key={token}>
+              {index > 0 ? (index === found.length - 1 ? ' and ' : ', ') : ''}
+              <code>{token}</code>
+            </span>
+          ))}{' '}
+          from its <code>rel</code>, publish the change, then check again.
+        </p>
+        <div className="mt-2 w-full overflow-x-auto rounded-md border bg-muted/50 px-3 py-2 font-mono text-[11px] text-foreground">
+          &lt;a href="{listingUrl}" rel="
+          {found.map(token => (
+            <span key={token}>
+              <span className="rounded bg-red-500/15 px-0.5 text-red-700 line-through dark:text-red-400">
+                {token}
+              </span>{' '}
+            </span>
+          ))}
+          noopener"&gt;
+        </div>
+      </ToneAlert>
+    ) : (
+      <ToneAlert tone="warning" title="Badge found, but the link isn’t followed">
+        <p>
+          The badge has to be a plain link that search engines follow. Remove <UnfollowedTokens />{' '}
+          from its <code>rel</code>, publish the change, then check again.
+        </p>
+      </ToneAlert>
+    )
+  } else if (code === 'page_not_followed') {
+    const source = outcome?.source
+    return (
+      <ToneAlert
+        tone="warning"
+        title="Badge found, but the page tells search engines not to follow links"
+      >
+        <p>
+          {source === 'header' ? (
+            <>
+              {site} is served with an <code>X-Robots-Tag</code> header that includes{' '}
+              <code>nofollow</code> or <code>none</code>.
+            </>
+          ) : source === 'meta' ? (
+            <>
+              {site} has a <code>&lt;meta name="robots"&gt;</code> tag that includes{' '}
+              <code>nofollow</code> or <code>none</code>.
+            </>
+          ) : (
+            <>
+              {site} has a robots meta tag or an <code>X-Robots-Tag</code> header that includes{' '}
+              <code>nofollow</code> or <code>none</code>.
+            </>
+          )}{' '}
+          Search engines then follow no link on the page, the badge included. Remove it, publish the
+          change, then check again.
+        </p>
+      </ToneAlert>
+    )
+  } else if (code === 'page_unreadable') {
+    // A type or encoding the checker can't be sure of (PR #84 review round 5): the approved
+    // checker-problem copy, not the unreachable-site one, since nothing about the site is down.
+    return (
+      <ToneAlert title="Our checker had a problem reading the page">
+        <p>This didn’t use up a check.</p>
+      </ToneAlert>
+    )
+  } else if (code === 'wrong_destination') {
+    return (
+      <ToneAlert tone="warning" title="Badge found, but it links elsewhere">
+        <p>
+          {outcome?.href ? (
+            <>
+              Your badge links to <b>{outcome.href}</b>.{' '}
+            </>
+          ) : null}
+          It has to link to your listing: <b>{listingUrl}</b>. Replace it with the snippet above,
+          publish, then check again.
+        </p>
+      </ToneAlert>
+    )
+  } else if (code) {
+    return (
+      <ToneAlert icon={Globe} title={`We couldn’t reach ${domain}`}>
+        <p>
+          {unreachableReason(code)} Make sure the page is public and that a firewall or bot
+          protection isn’t blocking our checker. This didn’t use up a check.
+        </p>
+      </ToneAlert>
+    )
+  }
+  return null
+}
+
 export function BadgeStep({
   badgePreviewUrls,
   badgeUrls,
@@ -184,7 +304,7 @@ export function BadgeStep({
   // Owner decision on #84: one click starts one check. Clicks while it runs, even before the
   // button re-renders as disabled, are dropped.
   const inFlight = useRef(false)
-  const [outcome, setOutcome] = useState<Outcome>(
+  const [outcome, setOutcome] = useState<BadgeOutcome>(
     initial.lastVerificationError ? { code: initial.lastVerificationError } : null
   )
   // When the outbound check budget allows another check (429 `check_budget`); until then
@@ -335,7 +455,7 @@ export function BadgeStep({
             </Button>
             {showPaid ? (
               <Button asChild size="sm" variant="outline">
-                <Link href={`/submit/${submission.id}/checkout/`}>Skip the badge: $49 one-off</Link>
+                <a href={`/submit/${submission.id}/checkout/`}>Skip the badge: $49 one-off</a>
               </Button>
             ) : null}
           </>
@@ -357,111 +477,8 @@ export function BadgeStep({
         </p>
       </ToneAlert>
     ) : null
-  } else if (code === 'badge_missing') {
-    result = (
-      <ToneAlert tone="warning" title="Page reached, badge not found">
-        <p>
-          We loaded {site}, but the badge wasn’t in the HTML it returned. Publish the snippet on
-          that exact URL, then check again.
-        </p>
-      </ToneAlert>
-    )
-  } else if (code === 'link_not_followed' || code === 'nofollow') {
-    // The tokens the check just found. After a reload only the result is stored, so the alert
-    // gives the general rule, with no sample of tokens the site may not have.
-    const found = outcome?.rel?.length ? outcome.rel : code === 'nofollow' ? ['nofollow'] : null
-    result = found ? (
-      <ToneAlert tone="warning" title={`Badge found, but the link is marked ${joinTokens(found)}`}>
-        <p>
-          The badge has to be a plain link that search engines follow. Remove{' '}
-          {found.map((token, index) => (
-            <span key={token}>
-              {index > 0 ? (index === found.length - 1 ? ' and ' : ', ') : ''}
-              <code>{token}</code>
-            </span>
-          ))}{' '}
-          from its <code>rel</code>, publish the change, then check again.
-        </p>
-        <div className="mt-2 w-full overflow-x-auto rounded-md border bg-muted/50 px-3 py-2 font-mono text-[11px] text-foreground">
-          &lt;a href="{listingUrl}" rel="
-          {found.map(token => (
-            <span key={token}>
-              <span className="rounded bg-red-500/15 px-0.5 text-red-700 line-through dark:text-red-400">
-                {token}
-              </span>{' '}
-            </span>
-          ))}
-          noopener"&gt;
-        </div>
-      </ToneAlert>
-    ) : (
-      <ToneAlert tone="warning" title="Badge found, but the link isn’t followed">
-        <p>
-          The badge has to be a plain link that search engines follow. Remove <UnfollowedTokens />{' '}
-          from its <code>rel</code>, publish the change, then check again.
-        </p>
-      </ToneAlert>
-    )
-  } else if (code === 'page_not_followed') {
-    const source = outcome?.source
-    result = (
-      <ToneAlert
-        tone="warning"
-        title="Badge found, but the page tells search engines not to follow links"
-      >
-        <p>
-          {source === 'header' ? (
-            <>
-              {site} is served with an <code>X-Robots-Tag</code> header that includes{' '}
-              <code>nofollow</code> or <code>none</code>.
-            </>
-          ) : source === 'meta' ? (
-            <>
-              {site} has a <code>&lt;meta name="robots"&gt;</code> tag that includes{' '}
-              <code>nofollow</code> or <code>none</code>.
-            </>
-          ) : (
-            <>
-              {site} has a robots meta tag or an <code>X-Robots-Tag</code> header that includes{' '}
-              <code>nofollow</code> or <code>none</code>.
-            </>
-          )}{' '}
-          Search engines then follow no link on the page, the badge included. Remove it, publish the
-          change, then check again.
-        </p>
-      </ToneAlert>
-    )
-  } else if (code === 'page_unreadable') {
-    // A type or encoding the checker can't be sure of (PR #84 review round 5): the approved
-    // checker-problem copy, not the unreachable-site one, since nothing about the site is down.
-    result = (
-      <ToneAlert title="Our checker had a problem reading the page">
-        <p>This didn’t use up a check.</p>
-      </ToneAlert>
-    )
-  } else if (code === 'wrong_destination') {
-    result = (
-      <ToneAlert tone="warning" title="Badge found, but it links elsewhere">
-        <p>
-          {outcome?.href ? (
-            <>
-              Your badge links to <b>{outcome.href}</b>.{' '}
-            </>
-          ) : null}
-          It has to link to your listing: <b>{listingUrl}</b>. Replace it with the snippet above,
-          publish, then check again.
-        </p>
-      </ToneAlert>
-    )
-  } else if (code) {
-    result = (
-      <ToneAlert icon={Globe} title={`We couldn’t reach ${domain}`}>
-        <p>
-          {unreachableReason(code)} Make sure the page is public and that a firewall or bot
-          protection isn’t blocking our checker. This didn’t use up a check.
-        </p>
-      </ToneAlert>
-    )
+  } else {
+    result = badgeCheckResultAlert(code, outcome, { domain, listingUrl, site })
   }
 
   return (
@@ -530,7 +547,7 @@ export function BadgeStep({
               {' '}
               Rather not add a badge?{' '}
               <Button asChild variant="link" className="h-auto p-0">
-                <Link href={`/submit/${submission.id}/checkout/`}>Skip the badge: $49 one-off</Link>
+                <a href={`/submit/${submission.id}/checkout/`}>Skip the badge: $49 one-off</a>
               </Button>
             </>
           ) : null}

@@ -16,7 +16,7 @@ export interface WebsitesListWithSortProps {
     Badge: ComponentType<any>
     Card: ComponentType<any>
     EmptyState: ComponentType<any>
-    FaviconWithFallback: ComponentType<any>
+    ListingImage: ComponentType<any>
     ToggleGroup: ComponentType<any>
     ToggleGroupItem: ComponentType<any>
   }
@@ -32,7 +32,7 @@ export function WebsitesListWithSort({
   emptyTitle = siteCopy.categoryEmptyTitle,
   emptyDescription = siteCopy.categoryEmptyDescription,
   trackSortChange,
-  slots: { Badge, Card, EmptyState, FaviconWithFallback, ToggleGroup, ToggleGroupItem }
+  slots: { Badge, Card, EmptyState, ListingImage, ToggleGroup, ToggleGroupItem }
 }: WebsitesListWithSortProps) {
   const [sortBy, setSortBy] = useState<'name' | 'latest'>('name')
   const [isClient, setIsClient] = useState(false)
@@ -71,11 +71,11 @@ export function WebsitesListWithSort({
     >
       <div className="space-y-3">
         <div className="space-y-2">
-          <FaviconWithFallback
-            website={website.website}
+          <ListingImage
             name={website.name}
-            logoUrl={website.media?.logo}
+            src={website.media?.logo}
             size={32}
+            className="rounded-lg"
           />
           <div className="flex items-center gap-2">
             <h3 className="font-semibold">

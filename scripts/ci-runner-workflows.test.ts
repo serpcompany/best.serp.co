@@ -41,6 +41,7 @@ const credentialedWorkflows = [
   'bootstrap-production-d1.yml',
   'deploy-production.yml',
   'deploy-staging.yml',
+  'media-health.yml',
   'notify-d1-submissions.yml',
   'publish-d1-staging.yml',
   'publish-d1.yml',

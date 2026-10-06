@@ -22,8 +22,9 @@ export interface SiteFeatures {
    */
   readonly badgeProgram: boolean
   /**
-   * #67: claiming an existing listing with the badge or a payment. Off: emails don't offer to
-   * claim a listing (again), as the draft reminder leaves out the paid plan while #68 is off.
+   * #67: claiming an existing listing with the badge or a payment (`lib/claims/`). Off: every
+   * claim endpoint answers 404, and emails don't offer to claim a listing (again). It stays off
+   * until the claim dialog (#70 screen 8) is built; see docs/CLAIMS.md.
    */
   readonly claims: boolean
   /**
@@ -37,7 +38,7 @@ export interface SiteFeatures {
    */
   readonly messages: boolean
   /**
-   * #68: orders (admin screen 13), with Stripe. Off: the admin sidebar hides Orders and
+   * #68: orders (admin screen 13), through the billing provider. Off: the admin sidebar hides Orders and
    * `/admin/orders/` stays a 404 (the admin catch-all), and the badge program's emails leave out
    * the paid upgrade and "Relist" offers.
    */

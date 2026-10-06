@@ -70,7 +70,7 @@ The catalog reads `COALESCE(media_key, url)`, so DTOs and the data cache (`v5`) 
 web adapter (`apps/web/lib/catalog/repository.ts`) turns keys into URLs on `MEDIA_BASE_URL` and
 fails closed when the variable is missing or malformed. Listing JSON-LD names the hosted logo, so
 on staging and in production it names the media host rather than best.serp.co. A slot that is not
-hosted shows the #86 fallback tile.
+hosted, or an image that fails to load, shows the #86 tile ([image safety](./MEDIA_HEALTH.md)).
 
 The admin screens and the review previews render the same way (#96 review S9,
 `apps/web/lib/media/renderable-image.ts`): the hosted copy, or an imported site-relative path on
@@ -249,8 +249,10 @@ refused replacements, and each logo left on the tile are in `d1/media/2026-10-06
 - `scripts/catalog-media.test.ts` applies the manifests to the import and checks that every logo
   and image is then a hosted key with a matching object in the plan, and that nothing else
   changes.
-- After the production publish, delete `apps/web/public/listing-logos/serpdownloaders.com/`,
-  `listing-media-seed/` (sources a GitHub runner sees re-encoded), and `media/products/launchbuzz.io/`.
+- **Cleanup (#124).** Once production had published every part, the plan's 145 `repo:` files were
+  deleted (the #86 tile stays). The plan still names them, and their bytes stay in Git at
+  `0e17a98e20`, where the migration reads them (`scripts/media-repo-archive.ts`). See the
+  [report](../d1/media/2026-10-06-legacy-media.report.md) for details and the restore command.
 
 Fetches are cached under `.runtime/legacy-media-cache`, through the DNS-checked Node fetcher, so
 a rerun reproduces the outputs byte for byte. `--part-size <n>` sets the listings per manifest,

@@ -101,7 +101,7 @@ prohibited URL, "Allow resubmission" lifts the block. Each decision is these pla
 `content_version` guard, is idempotent (a replay answers `replayed: true` and sends nothing),
 records the admin's email in the events, and emails the submitter once ("approved", "changes
 requested", "rejected", or "rejected: prohibited"). Rejecting a paid submission as `other`
-waits for #68's refund. These decisions write production D1 directly: the documented
+refunds it ([Billing](./BILLING.md)). These decisions write production D1 directly: the documented
 production-write exception ([Admin panel](./ADMIN_PANEL.md#the-production-write-exception)).
 
 ## Submit v2 (#63)
@@ -142,7 +142,8 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    bodies are capped at 32 KB as they stream in, with or without `Content-Length`.
 5. **`/submit/<id>/choose/`** (screen 2b): "Get the badge code" chooses free
    (`POST /api/submissions/<id>/plan`, `draft` → `pending_badge`). The paid card and every $49
-   link stay hidden while `features.showPaidListings` is off (until #68). "Decide later" leaves
+   link stay hidden while `features.orders` is off; with it on, "Pay $49 and go live" opens
+   the checkout ([Billing](./BILLING.md)). "Decide later" leaves
    the draft in the account (`/account/` lists it with "Expires in N days" and Continue).
 6. **`/submit/<id>/badge/`** (screen 3): the light and dark snippets link to the future listing.
    `POST /api/submissions/<id>/verify` first claims the check in one compare-and-swap
@@ -232,7 +233,7 @@ attempts left, for a draft still in the state the email describes), then withdra
 days old as `expired` and sends `draft-expired`, then claims and sends the latest due
 `draft-reminder` of each remaining draft, so a reminder goes out within the hour it falls due.
 Emails go out one at a time, and a D1 failure other than a lost claim fails the run. The
-reminder copy follows `features.showPaidListings`: while it is off it offers the free badge
+reminder copy follows `features.orders`: while it is off it offers the free badge
 listing only, with no price, and sends a draft left in checkout to the plan choice. A run
 handles at most 100 of each and logs whether more remain. The same hourly trigger then continues
 the [badge program](./BADGE_PROGRAM.md). The deploy that ships the Worker registers the

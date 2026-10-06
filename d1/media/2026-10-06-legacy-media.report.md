@@ -1734,3 +1734,42 @@ and MD5 (`scripts/catalog-media.test.ts`), and keys of uploaded objects are unch
   seeded from the staging bucket's copy, so a dry run no longer depends on their sources.
 
 None drops to the tile. Dry run after: 3,747 of 3,747 verified.
+
+## Cleanup 2026-10-07 (#124)
+
+Production published all seven parts on 2026-10-06 (publication v11; release summary on #59).
+Read-only `wrangler d1 execute --remote` queries on 2026-10-07 found, on production and staging
+alike, all 3,747 logo and image rows hosted under `best.serp.co/listings/`, an empty
+`media_ingestions`, and no row, submission, or revision naming a site-relative path. So the
+plan's 145 `repo:` files (3,510,910 bytes) were deleted:
+
+- `apps/web/public/listing-logos/serpdownloaders.com/`: 74 logos;
+- `apps/web/public/listing-media-seed/`: the 70 seeds above, with their `.gitignore` exception;
+- `apps/web/public/media/products/launchbuzz.io/`: one image.
+
+`apps/web/public/listing-logos/favicon-fallback-512x512.png`, the #86 tile, stays.
+
+- **The plan is unchanged**, as the record of what was uploaded. The 80 rows hosted from the
+  serpdownloaders.com and launchbuzz.io files keep their `repo:` path as `url` (seeded rows keep
+  their original URL): provenance only, since pages render the key.
+- **Recoverable from Git.** The bytes stay at `0e17a98e20` (#120), recorded in
+  `scripts/media-repo-archive.ts`. `pnpm migration:legacy-media` reads a deleted file from there,
+  so a replay hosts the same bytes under the same keys: the 85 listings with site-relative rows,
+  replayed with `--current` before and after the deletion, gave identical plans, reports, and
+  manifests. In a checkout without that commit (`git fetch --unshallow`) it stops and names the
+  commit. The R2-only uploader never reads Git (`scripts/deploy-workflows.test.ts` pins its
+  imports), so a dry run or rerun of this plan needs the files back on disk first; every object
+  is already in both buckets, so a rerun lists them as present without reading a source:
+
+  ```bash
+  git restore --source=0e17a98e20 -- apps/web/public/listing-media-seed \
+    apps/web/public/listing-logos/serpdownloaders.com apps/web/public/media/products/launchbuzz.io
+  ```
+
+  Delete them again afterwards; they are never committed again.
+- **Checked.** `scripts/catalog-media.test.ts` checks every deleted file at that commit against
+  the plan wherever the history is present (PR Review; Publish D1 Catalog and the deploys check
+  out one commit and skip it), and that nothing is checked in under those directories again.
+- **Local D1** is still the raw import, where those 80 rows are site-relative paths, so locally
+  those images do not load. `apps/e2e/tests/listing-logo-assets.spec.ts` allows exactly those
+  paths to be missing, and only on a local Worker.

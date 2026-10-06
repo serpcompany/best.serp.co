@@ -20,6 +20,6 @@ export const metadata: Metadata = generateBaseMetadata({
  */
 export default async function AccountPage(): Promise<ReactElement> {
   const user = await requireAccountUser(getRoute('account'))
-  const rows = accountTableRows(await getAccountOverview(user.id))
+  const rows = await accountTableRows(await getAccountOverview(user.id))
   return <AccountTablePage rows={rows} scope="overview" />
 }

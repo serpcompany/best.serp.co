@@ -9,6 +9,7 @@ import { submissionBadgeVerificationTargets } from '../submissions/presentation'
 import {
   badgeProgramEnabled,
   badgeProgramJob,
+  billingJob,
   createBadgeProgramJob,
   DRAFT_JOBS_CRON,
   draftJobs,
@@ -88,7 +89,7 @@ describe('scheduled handler', () => {
       [DRAFT_JOBS_CRON, BADGE_WEEKLY_CRON, BADGE_DAILY_CRON, MEDIA_CRON].sort()
     )
     // The hourly trigger continues the badge program after its own draft job.
-    expect(scheduledJobs[DRAFT_JOBS_CRON]).toEqual([draftJobs, badgeProgramJob])
+    expect(scheduledJobs[DRAFT_JOBS_CRON]).toEqual([draftJobs, badgeProgramJob, billingJob])
     expect(scheduledJobs[BADGE_WEEKLY_CRON]).toEqual([badgeProgramJob])
     expect(scheduledJobs[BADGE_DAILY_CRON]).toEqual([badgeProgramJob])
     expect(scheduledJobs[MEDIA_CRON]?.map(job => job.name)).toEqual(['listing-media'])
@@ -125,7 +126,7 @@ describe('scheduled handler', () => {
       'Finish your submission: Waiting',
       'Your Old draft expired'
     ])
-    // The paid listing is off (`features.showPaidListings`): no price, and a draft left in
+    // The paid listing is off (`features.orders`): no price, and a draft left in
     // checkout is sent to the plan choice.
     const checkout = readDevEmailOutbox(OWNER).find(message => message.subject.endsWith('Checkout'))
     expect(checkout?.text).toContain('/submit/checkout/choose/')

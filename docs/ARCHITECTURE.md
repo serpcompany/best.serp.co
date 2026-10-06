@@ -49,13 +49,14 @@ change runs in a protected workflow.
   rendered 404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is
   rendered again as the 410 gone page), both through `packages/data-ops/`.
   Its `scheduled()` handler runs `lib/worker/scheduled.ts`, which maps each Cron Trigger to its
-  jobs: [draft reminders](./SUBMISSION_FLOW.md#draft-reminders-and-expiry) (hourly) and the
-  [badge program](./BADGE_PROGRAM.md) (weekly, daily, and hourly).
+  jobs: [draft reminders](./SUBMISSION_FLOW.md#draft-reminders-and-expiry) and the
+  [billing sweep](./BILLING.md) (hourly), and the [badge program](./BADGE_PROGRAM.md).
 - `apps/web/lib/catalog/` acquires the binding, validates the runtime environment,
   and deduplicates reads per request. It contains no SQL.
 - `apps/web/lib/submissions/` validates the binding, fetches submitters' pages and images
   only through its bounded safe fetcher (badge checks, URL prefill, logo checks), and
   delegates every submission read and write to `packages/data-ops/`, scoped to the owner.
+  `apps/web/lib/claims/` does the same for [claims](./CLAIMS.md) (#67).
 - `apps/web/lib/email/` sends transactional email through the useSend API after the
   response, claims each template and event key in the `email_deliveries` ledger
   (`packages/data-ops/`) so it never sends twice, and only logs locally

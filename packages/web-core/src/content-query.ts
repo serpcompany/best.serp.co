@@ -20,6 +20,8 @@ export interface WebsiteMetadata {
   website: string
   /** Detail pages from D1 always carry it; imported and admin listings are `follow`. */
   linkRel?: WebsiteLinkRel
+  /** True when the listing has a current owner: the public "Verified owner" badge (#62, #70 9b). */
+  verifiedOwner?: true
   category: string
   categories?: string[]
   publishedAt: string

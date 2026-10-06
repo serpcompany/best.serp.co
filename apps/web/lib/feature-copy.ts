@@ -32,6 +32,19 @@ export function featureCopy(features: SiteFeatures = siteFeatures) {
       programCheckBy: features.badgeProgram ? 'Weekly' : 'SERP'
     },
     /**
+     * The claim dialog (#67, #70 screen 8): the badge method's card and the success alert say the
+     * badge program (#66) checks it weekly and removes ownership; while that program is off, they
+     * leave it out.
+     */
+    claim: {
+      badgeCardNote: features.badgeProgram
+        ? 'We check it weekly. If it’s removed, you lose ownership and the listing stays up.'
+        : null,
+      keepTheBadge: features.badgeProgram
+        ? 'We check it weekly. If it’s missing on two checks about 24 hours apart, ownership is removed. The listing stays up.'
+        : null
+    },
+    /**
      * The FAQ fields' hint in the account (#65, #70 screen 7): the public listing page shows
      * FAQs once #105 ships (owner decision on #102).
      */
