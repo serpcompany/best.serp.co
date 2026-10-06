@@ -102,8 +102,9 @@ Where it runs:
 - **Submit v2** (#84): saving a submission hosts its logo under `submissions/<id>/` after the
   response (`hostSubmissionImages` in `apps/web/lib/media/server.ts`), and its featured image:
   the social image the server's own prefill finds on the submitted website, never a URL the
-  client sends. A changed logo replaces the copy. Intake refuses SVG logos and prefill skips SVG
-  icons. Nothing here can fail the save.
+  client sends. A changed logo or image replaces the copy, and the superseded, never-reviewed
+  object is deleted unless a slot still names it (submissions and revisions alike). Intake
+  refuses SVG logos and prefill skips SVG icons. Nothing here can fail the save.
 - **Admin listing edit** (#64): `updateListingDetails` hosts a changed logo before its batch
   (`createMediaHost`). A logo that can never be hosted (SVG, not an image, 404, too large) is
   refused with a 422 that names the reason, and nothing is saved. A retryable failure saves, the
