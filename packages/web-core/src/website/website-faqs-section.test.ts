@@ -36,13 +36,17 @@ describe('listing FAQs (#105)', () => {
     expect(html).toContain('[&amp;_[data-slot=accordion-content][data-state=closed]]:hidden')
   })
 
-  it('leaves out FAQs the long description already contains (the import repeats them there)', () => {
+  it('leaves out only FAQs whose exact heading line the description still holds (#105)', () => {
     const faqs = [
       { answer: 'From the import.', question: 'How do I download a video?' },
-      { answer: 'Added by the owner.', question: 'Is there a mobile app?' }
+      { answer: 'Added by the owner.', question: 'Is it free?' }
     ]
-    const content = '## FAQ\n\n### How do I download a video?\nPaste the link.'
+    const content =
+      '## Pricing\n\nIs it free? Yes, for personal use.\n\n## FAQ\n\n### How do I download a video?\n\nPaste the link.'
+    // The import's heading hides its copy; the same question in prose never hides an FAQ.
     expect(faqsToShow(faqs, content)).toEqual([faqs[1]])
+    expect(faqsToShow(faqs, '#### How do I download a video?')).toEqual(faqs)
+    expect(faqsToShow(faqs, '### How do I download a video? (2026)')).toEqual(faqs)
     expect(faqsToShow(faqs, undefined)).toEqual(faqs)
     expect(faqsToShow(undefined, content)).toEqual([])
   })
