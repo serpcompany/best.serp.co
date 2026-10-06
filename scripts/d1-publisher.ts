@@ -108,6 +108,22 @@ const operation = z.discriminatedUnion('action', [
       expected: z.object({ website: z.string().url() }).strict().optional()
     })
     .strict(),
+  /**
+   * Removes the end of a listing's long description, keeping every other character (#105: the
+   * import's FAQ blocks, which the FAQs section now shows). Row-level guarded: the description
+   * must still be `expected.contentLength` characters (SQLite characters, code points) and end
+   * with exactly `suffix`, so a description edited since is refused, never cut elsewhere.
+   */
+  z
+    .object({
+      action: z.literal('listing-content-remove-suffix'),
+      id: listingId,
+      slug: existingSlug,
+      reason: z.string().trim().min(1).max(200),
+      expected: z.object({ contentLength: z.number().int().positive() }).strict(),
+      suffix: z.string().min(1)
+    })
+    .strict(),
   z
     .object({
       action: z.literal('listing-slug-change'),
@@ -143,6 +159,15 @@ export const manifestSchema = z
     const slugs = new Set<string>()
     const categoryTargets = new Set<string>()
     value.operations.forEach((op, index) => {
+      if (
+        op.action === 'listing-content-remove-suffix' &&
+        [...op.suffix].length >= op.expected.contentLength
+      )
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'The suffix must be shorter than the description.',
+          path: ['operations', index, 'suffix']
+        })
       if (op.action === 'listing-slug-change' && op.from === op.to)
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -470,6 +495,37 @@ export function buildPublicationPlan(
       )
       routes.add(listingRoute(op.slug))
       addCategories(op.categories)
+    }
+    if (op.action === 'listing-content-remove-suffix') {
+      const keep = op.expected.contentLength - [...op.suffix].length
+      statements.push(
+        // As in the admin panel (#64): never while the listing's own submission is in review.
+        statement(
+          `INSERT INTO publication_guard SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN 0 ELSE 1 END`,
+          op.id
+        ),
+        // A new checksum, so a revision or admin edit read before this change is refused as stale.
+        statement(
+          "UPDATE listings SET content=substr(content,1,?),checksum=?,updated_at=? WHERE id=? AND slug=? AND status='approved' AND length(content)=? AND substr(content,?)=?",
+          keep,
+          hash(`${manifest.id}\0${op.id}\0content`),
+          now,
+          op.id,
+          op.slug,
+          op.expected.contentLength,
+          keep + 1,
+          op.suffix
+        ),
+        statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'),
+        // The admin panel's activity record for an edit (#64).
+        statement(
+          "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
+          op.id,
+          JSON.stringify({ fields: ['content'], manifest: manifest.id, reason: op.reason }),
+          manifest.provenance.actor
+        )
+      )
+      routes.add(listingRoute(op.slug))
     }
     if (op.action === 'listing-slug-change') {
       statements.push(

@@ -75,3 +75,33 @@ moved on anyway (another publication or an admin decision), regenerate it with
 `--base-version` and `--base-checksum`; its per-row guards (`expected.website`, categories, live,
 no submission in review) hold on either environment, so `listing-unpublish` could also join a
 row-level mode like #97's without other changes.
+
+## Listing FAQs (#105)
+
+The one-time import wrote each listing's FAQs twice: as `listing_faqs` rows and as a closing
+`## FAQ` block in the long description (`scripts/migration/generate-initial-artifact.ts` appended
+it after the body and a blank line): 335 listings, 2,254 FAQs, each under a `### <question>`
+heading. The listing page now shows `listing_faqs` in its FAQs section, so the owner decided on
+2026-10-06 to move them: `d1/publications/2026-10-06-listing-faqs.yaml` removes each block.
+
+```bash
+pnpm catalog:faqs                  # count what would change
+pnpm catalog:faqs -- manifest      # write the manifest from the reviewed import
+```
+
+- Each operation is `listing-content-remove-suffix`: the description must still be exactly its
+  imported length (in SQLite characters) and end with exactly the block, or the whole batch is
+  refused. It keeps every other character, sets a new checksum (so a revision or admin edit read
+  before it is stale), and logs an `edited` event. The generator refuses a listing whose block
+  isn't the last section or doesn't say exactly its FAQs, and a test applies the manifest to the
+  reviewed import and checks every description byte by byte.
+- **Order:** it is based on the state #100's manifest leaves (publication version 2). Publish
+  #100's, then this one, then #98's media manifests (row-level, any version). Staging first
+  (#97's staging path), then production after promotion. If an environment has moved on,
+  regenerate with `--base-version` and `--base-checksum` (and a new `--manifest-id`); the row
+  guards hold on either environment.
+- **Until it is published**, the FAQs section leaves out an FAQ whose exact `### <question>`
+  heading line the description still holds (`faqsToShow`), so imported FAQs never show twice.
+  It never matches text in prose, and is a no-op once the manifest is published; remove it
+  then.
+
