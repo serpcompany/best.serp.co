@@ -146,7 +146,8 @@ const operation = z.discriminatedUnion('action', [
    * Live → unpublished, the admin panel's state (#64): `status` stays `approved`, `is_active`
    * becomes 0, the row is kept, and the URL answers 410 Gone. `reason` goes to the activity log.
    * `expected` is the row the manifest was generated against (#100): the batch refuses a listing
-   * whose website changed since, so the operation stays correct on any environment.
+   * whose website changed since, so the operation stays correct on any environment, and a
+   * row-level (`rows`) manifest requires it.
    */
   z
     .object({
@@ -270,12 +271,15 @@ const provenance = z
 export const manifestConcurrency = ['publication', 'rows'] as const
 /**
  * Operations that carry their own row-level compare-and-swap, so a `rows` manifest may hold them:
- * media rows (`expected`), categories (`expected`), and a description's length and ending (#105).
+ * media rows (`expected`), categories (`expected`), a description's length and ending (#105), and
+ * an unpublish with its `expected.website` (#100: categories, live, website, no submission in
+ * review).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
   'listing-categories-add',
   'listing-content-remove-suffix',
+  'listing-unpublish',
   'listing-claim-hold-add',
   'listing-claim-hold-clear'
 ])
@@ -307,8 +311,16 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add, listing-content-remove-suffix, and listing-claim-hold-add/-clear operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add, listing-content-remove-suffix, listing-unpublish, and listing-claim-hold-add/-clear operations.',
             path: ['operations', index, 'action']
+          })
+        }
+        // Without its website, an unpublish would guard only the categories and live state.
+        if (op.action === 'listing-unpublish' && !op.expected) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'A row-level listing-unpublish needs expected.website.',
+            path: ['operations', index, 'expected']
           })
         }
       })

@@ -73,15 +73,14 @@ website it was checked against (`expected.website`). The batch refuses the whole
 listing's website or categories changed, it is no longer live, or its own submission is in
 review, and a test keeps the committed manifest identical to what the report generates.
 
-The manifest is applied like any publication: on staging first (the staging publish path is
-#97), then on production after promotion. It keeps the publisher's version check: its
-`basePublicationVersion` and `beforeChecksum` are the reviewed import's (version 1), so it
-applies only while an environment's `publication_state` is still there. **Publish it before
-#98's media manifests**, which are row-level and apply at any version. If an environment has
-moved on anyway (another publication or an admin decision), regenerate it with
-`--base-version` and `--base-checksum`; its per-row guards (`expected.website`, categories, live,
-no submission in review) hold on either environment, so `listing-unpublish` could also join a
-row-level mode like #97's without other changes.
+The manifest is row-level (`concurrency: rows`, as #97 introduced): it names no base version,
+and each operation's own guards (`expected.website`, categories, live, no submission in review)
+decide whether it applies, so one file fits staging and production whatever else each published
+(admin decisions, #98's and #105's manifests) and publishes in any order relative to them. A row-level
+`listing-unpublish` must carry `expected.website`. It is applied like any publication: on
+staging first (the staging publish path is #97), then on production after promotion. If an
+environment refuses it (a listing changed there), nothing is written: drop or fix that listing
+in a new report and manifest under a new date.
 
 ## Listing FAQs (#105)
 
@@ -103,7 +102,7 @@ pnpm catalog:faqs -- manifest      # write the manifest from the reviewed import
   isn't the last section or doesn't say exactly its FAQs, and a test applies the manifest to the
   reviewed import and checks every description byte by byte.
 - **Order:** the manifest is row-level (`concurrency: rows`, as #97 introduced): it names no
-  base version, so it publishes in any order relative to #100's and #98's manifests and fits
+  base version, so it publishes in any order relative to #100's and #98's (also row-level) and fits
   staging and production whatever else each published. Staging first (#97's staging path), then
   production after promotion.
 - **A description that changed** on an environment (an approved revision, an admin edit) makes

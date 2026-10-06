@@ -236,11 +236,11 @@
    "width": 800
   },
   {
-   "bytes": 54210,
-   "contentType": "image/webp",
+   "bytes": 40385,
+   "contentType": "image/avif",
    "height": 1200,
-   "key": "best.serp.co/listings/ayfie.com/image/b5fcc2048921d27a.webp",
-   "sha256": "b5fcc2048921d27a073f3553a89fef67999e4fe096e8751a95fee369f85aae49",
+   "key": "best.serp.co/listings/ayfie.com/image/da66d7580756d691.avif",
+   "sha256": "da66d7580756d691acbde16f14a9edcfaed10c6f61cb64123b8c5b44b65f2abe",
    "source": "https://framerusercontent.com/images/UFM6xkZzwIGx0Zi35dL4teO1f0M.png",
    "width": 1200
   },
@@ -758,11 +758,11 @@
    "width": 192
   },
   {
-   "bytes": 603262,
+   "bytes": 590730,
    "contentType": "image/gif",
    "height": 700,
-   "key": "best.serp.co/listings/benchmarkemail.com/image/544f84dafdd675c7.gif",
-   "sha256": "544f84dafdd675c764ef433765ef888688608b3c0d05e51a29374f411961f4e1",
+   "key": "best.serp.co/listings/benchmarkemail.com/image/fa4c1d123d8fbd23.gif",
+   "sha256": "fa4c1d123d8fbd2360cefa06738557e7f64d2706184dcb722aa67b0c23bb6f6e",
    "source": "https://www.benchmarkemail.com/wp-content/uploads/2024/08/Header.gif",
    "width": 700
   },
@@ -1424,11 +1424,11 @@
    "width": 256
   },
   {
-   "bytes": 8972,
-   "contentType": "image/png",
+   "bytes": 6346,
+   "contentType": "image/webp",
    "height": 206,
-   "key": "best.serp.co/listings/botsify.com/logo/c5c6c25f271ffc4d.png",
-   "sha256": "c5c6c25f271ffc4dd016d455d9cb68f1a020475b09508f5077cc853ddfc4caa1",
+   "key": "best.serp.co/listings/botsify.com/logo/2ff2f0b6f00fd2ca.webp",
+   "sha256": "2ff2f0b6f00fd2ca5d317e9a2f625fd55b90a5ac3460815688b763abc270006f",
    "source": "https://botsify.com/assets/img/favicon.png",
    "width": 180
   },
@@ -2315,11 +2315,11 @@
    "width": 800
   },
   {
-   "bytes": 6666,
-   "contentType": "image/png",
+   "bytes": 2530,
+   "contentType": "image/webp",
    "height": 180,
-   "key": "best.serp.co/listings/caspio.com/logo/929fd01c9de16012.png",
-   "sha256": "929fd01c9de160126273d42c7da84eab6678b1bc3443cc42dbda469de75111da",
+   "key": "best.serp.co/listings/caspio.com/logo/c6b457f0fa72b242.webp",
+   "sha256": "c6b457f0fa72b242f75a0a699a4b427b5d6810cf511decb373d22ea4172c5a5f",
    "source": "https://www.caspio.com/wp-content/themes/caspio/img/favicon/apple-touch-icon.png",
    "width": 180
   },
@@ -2999,11 +2999,11 @@
    "width": 180
   },
   {
-   "bytes": 60495,
-   "contentType": "image/png",
+   "bytes": 20280,
+   "contentType": "image/webp",
    "height": 1260,
-   "key": "best.serp.co/listings/checklist.gg/image/c33ec188964f1f46.png",
-   "sha256": "c33ec188964f1f46233b103075fa7df7c3bc1b709715bab6dcd64f375d5f4e66",
+   "key": "best.serp.co/listings/checklist.gg/image/17317772de5be0c8.webp",
+   "sha256": "17317772de5be0c8e20b9eb66b6125f4741187c2e4aeee570665889af98d99b1",
    "source": "https://images.blocksurvey.io/checklistgg-home-meta.png",
    "width": 2400
   },
@@ -3269,11 +3269,11 @@
    "width": 192
   },
   {
-   "bytes": 9323,
+   "bytes": 12005,
    "contentType": "image/png",
    "height": 192,
-   "key": "best.serp.co/listings/clevr.ai/logo/ddf65b745e49f477.png",
-   "sha256": "ddf65b745e49f4772e81970a35dbfa3481989c2928304ea193123f1f9ab35840",
+   "key": "best.serp.co/listings/clevr.ai/logo/d3e133cb7a6b9493.png",
+   "sha256": "d3e133cb7a6b949381c434adcc26aef7808cab6681d5175ded43b5615c1062b0",
    "source": "https://clevr.ai/wp-content/uploads/2023/01/cropped-ClevrAI_logo_reg-512-%C3%97-512-px-copy-3-1-192x192.png",
    "width": 192
   },
@@ -5294,11 +5294,11 @@
    "width": 144
   },
   {
-   "bytes": 16900,
+   "bytes": 15989,
    "contentType": "image/png",
    "height": 1256,
-   "key": "best.serp.co/listings/databricks.com/image/2506f9b1bd21d6b6.png",
-   "sha256": "2506f9b1bd21d6b6df17782b5604053b87dd1a46d7c4110ba265c592c6571265",
+   "key": "best.serp.co/listings/databricks.com/image/33da3de37c0c3eba.png",
+   "sha256": "33da3de37c0c3eba3e38e1f6322f1847d185cefe3f10b084173db79ed4a64750",
    "source": "https://www.databricks.com/sites/default/files/2025-01/hello-dolly-democratizing-magic-chatgpt-open-models.png",
    "width": 2400
   },
@@ -6541,7 +6541,7 @@
    "height": 482,
    "key": "best.serp.co/listings/earkind.com/image/e0dd7a6e237248dc.png",
    "sha256": "e0dd7a6e237248dcf1310f1a44bc00d6d5db53f72f1261bcc13022ca2c71b7f2",
-   "source": "https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72uLz2RABL-p-aae3GiVH6He5Zzl3ZJdDvINv0axJw8bHc-AhG4xMFHJM5m0t0-HnofEnuqsUjDEgMUF5lnQwqgiZd1Hm_kbfvlzOpXe2JRG0AGaINieUMYMNOMnwkmTFr-szZlLfN-csO76DGc2Jk5gEfZREkl0bixU_FiDy55Tmj_4pN5k1ct3YGlPeAo=w16383",
+   "source": "https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72taFJ8nxriB2fCO2WiuWurNiiWul3v-uBsHunlHpWVwVFx6zgerRu0ocZJEfecB7IwkL1sGMijN4-7nfc5Nmtdlp5ADcVZ3wq3JH1hOI_Q-2jORT6yklozHWMq0IEY8JWb7jcIZhKxkO-vyBx6bMGYwM4qm_p_AR4ECD6ChGN_tQgUC99oE-IsAam4hKak=w16383",
    "width": 263
   },
   {
@@ -6550,7 +6550,7 @@
    "height": 482,
    "key": "best.serp.co/listings/earkind.com/logo/3fca568b313c9d78.png",
    "sha256": "3fca568b313c9d781b05a2bb7fa670c589b8c3feef039468637acc1ee51c740c",
-   "source": "https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72tK690DppGlKFb8Mrr7DYc63O5N-iZRhPxG56ykeTzO60C2cpdMc0D6nfsf_9s495KDRmCZhO8I3AAq0Q5dHpfY-LbP21QjgaBtp1fSI-pBih3kkoN9-qoNu_oJkrK4ADOMj6zMl6gxjlfUabTzCfaOlTSpbq_eEhs_1Bz5wmKBdKHSeae34F_66gjKs9fQNIPKWzrXoLBYN9zd8ScPxcUFYA",
+   "source": "https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72tPBBzADzDA62AGSFRmPqcYs2JTInjD5dN-wT1JGkzF4FYrjDnenROZME5N6u6jl6to0CoKcP4ps1y0i6WLIOQBIGMsezYZpg3aHvPtJRh_sy9KKTIzuBET8slX2_74ww0mNG3sRrwKZlIn0RiRm4VOU3Y9bahvE7n9ZTSDVPsxYSIaKoc6SajhKaIiTUSbRBZJJS-uqH3zEP68RHnw9OL9rQ",
    "width": 482
   },
   {
@@ -6761,11 +6761,11 @@
    "width": 180
   },
   {
-   "bytes": 16542,
-   "contentType": "image/webp",
+   "bytes": 12006,
+   "contentType": "image/avif",
    "height": 630,
-   "key": "best.serp.co/listings/eesel.app/image/ae6438ef537dd364.webp",
-   "sha256": "ae6438ef537dd36432e0433e1cfeba34fe742862b3b14d8f302a123a3e58d0b5",
+   "key": "best.serp.co/listings/eesel.app/image/c1cab06fc713c2f0.avif",
+   "sha256": "c1cab06fc713c2f0ba8aa10a52d1db67ea2c998f56f3fe57fa53e728c1630297",
    "source": "https://framerusercontent.com/images/eMyhiNTdQvov1IYveqxD3cps5q8.png",
    "width": 1200
   },
@@ -7157,11 +7157,11 @@
    "width": 800
   },
   {
-   "bytes": 4282,
-   "contentType": "image/png",
+   "bytes": 1362,
+   "contentType": "image/webp",
    "height": 76,
-   "key": "best.serp.co/listings/epic-avatar.com/logo/801d0657e0c4e2d7.png",
-   "sha256": "801d0657e0c4e2d7159f30b5eabdfd7512a6544b392483cf6fbe50a9533a6ec8",
+   "key": "best.serp.co/listings/epic-avatar.com/logo/924a5711707a7441.webp",
+   "sha256": "924a5711707a7441072a87482dbf7e514e6a1d4d5c117fedc0f8095a47c48527",
    "source": "https://epic-avatar.com/assets/apple-touch-icon.png",
    "width": 76
   },
@@ -7445,15 +7445,6 @@
    "width": 800
   },
   {
-   "bytes": 292709,
-   "contentType": "image/png",
-   "height": 500,
-   "key": "best.serp.co/listings/ezai.app/image/00da8389bbc456b4.png",
-   "sha256": "00da8389bbc456b437ddd3df4872eb976b6ec87bea9906d7091733e27c52b53a",
-   "source": "https://ezai.app/wp-admin/admin-ajax.php?action=rank_math_overlay_thumb&id=260&type=play&hash=549224334425c4140285c1f4ebac57e6",
-   "width": 1024
-  },
-  {
    "bytes": 6271,
    "contentType": "image/x-icon",
    "height": 256,
@@ -7652,11 +7643,11 @@
    "width": 800
   },
   {
-   "bytes": 95169,
+   "bytes": 88759,
    "contentType": "image/jpeg",
    "height": 479,
-   "key": "best.serp.co/listings/fast.ai/image/35254d27f10cf06e.jpg",
-   "sha256": "35254d27f10cf06e96ffaa0e8d98c9d413d473bfdc451f2b467bc78fbe84273f",
+   "key": "best.serp.co/listings/fast.ai/image/0e1be8a80561b437.jpg",
+   "sha256": "0e1be8a80561b437668d5ed84c88b7326adebded48233e5f0e10d58d5f3e9292",
    "source": "https://www.fast.ai/posts/2026-02-17-education/Interactive_whiteboard_thumbnail.jpg",
    "width": 800
   },
@@ -8300,11 +8291,11 @@
    "width": 256
   },
   {
-   "bytes": 130313,
-   "contentType": "image/jpeg",
+   "bytes": 29936,
+   "contentType": "image/webp",
    "height": 315,
-   "key": "best.serp.co/listings/fotor.com/image/d0f91ddf7d28465a.jpg",
-   "sha256": "d0f91ddf7d28465af6d45205171714c989867105224a9327d363fc6298ea180f",
+   "key": "best.serp.co/listings/fotor.com/image/2556e7cefa32379d.webp",
+   "sha256": "2556e7cefa32379dc7f5fccc686072fe1e0922473c5e672deea67770b86ab5a8",
    "source": "https://imgv3.fotor.com/images/share/ai-generated-a-beautiful-girl-like-a-gorgeous-model-with-fotor-ai-image-generator.jpg",
    "width": 600
   },
@@ -10001,11 +9992,11 @@
    "width": 180
   },
   {
-   "bytes": 77551,
+   "bytes": 116215,
    "contentType": "image/png",
    "height": 630,
-   "key": "best.serp.co/listings/gptforslides.app/image/b3ca7441dd16b23c.png",
-   "sha256": "b3ca7441dd16b23cd7d2cbf926ec7f11e48c0d67fa3f8c677479da40c84eef55",
+   "key": "best.serp.co/listings/gptforslides.app/image/afe20564be8ec345.png",
+   "sha256": "afe20564be8ec345b2581e8562b363993a587ea1b3f16bc9c769d87da21b4d53",
    "source": "https://www.gptforslides.app/api/screenshot?url=https%3A%2F%2Fwww.gptforslides.app%2F",
    "width": 1200
   },
@@ -10019,11 +10010,11 @@
    "width": 816
   },
   {
-   "bytes": 26606,
-   "contentType": "image/png",
+   "bytes": 17128,
+   "contentType": "image/webp",
    "height": 192,
-   "key": "best.serp.co/listings/gptgo.ai/logo/4dc56b909f687343.png",
-   "sha256": "4dc56b909f6873434faf46aa8cd813710b08760ad98e87969072e76fa61f5e2a",
+   "key": "best.serp.co/listings/gptgo.ai/logo/92ebebed49911ed3.webp",
+   "sha256": "92ebebed49911ed385a64a1dd035478f427e3b86907b8cec3c205d95418bef4b",
    "source": "https://gptgo.ai/assets/img/android-chrome-192x192.png",
    "width": 192
   },
@@ -10802,11 +10793,11 @@
    "width": 800
   },
   {
-   "bytes": 267510,
-   "contentType": "image/png",
+   "bytes": 237874,
+   "contentType": "image/webp",
    "height": 994,
-   "key": "best.serp.co/listings/hocoos.com/image/2467ace6de1a9d8f.png",
-   "sha256": "2467ace6de1a9d8f21f275442bb1bacf32e9536d536d8c642b60fb05a0e157d4",
+   "key": "best.serp.co/listings/hocoos.com/image/0203db96410010be.webp",
+   "sha256": "0203db96410010be8833df626a4f0bf45abacb11f1447dc4cc3e995c71b81edb",
    "source": "https://hocoos.com/wp-content/uploads/2025/06/home-hero.png",
    "width": 1213
   },
@@ -11531,11 +11522,11 @@
    "width": 2400
   },
   {
-   "bytes": 3131,
-   "contentType": "image/png",
+   "bytes": 2886,
+   "contentType": "image/webp",
    "height": 192,
-   "key": "best.serp.co/listings/influencermarketing.ai/logo/c451bd7bcb3053d7.png",
-   "sha256": "c451bd7bcb3053d707f4b79b87c42a0dd7c2c56471aae7de6945a3e8e8fd9873",
+   "key": "best.serp.co/listings/influencermarketing.ai/logo/c5397aa8bd54f5d1.webp",
+   "sha256": "c5397aa8bd54f5d1d10ffe500cdd8cfda966a5453693dca223a71bc2a094faa5",
    "source": "https://influencermarketing.ai/wp-content/uploads/2022/12/cropped-imai_logo_icon-192x192.png",
    "width": 192
   },
@@ -12026,15 +12017,6 @@
    "width": 256
   },
   {
-   "bytes": 1137,
-   "contentType": "image/png",
-   "height": 192,
-   "key": "best.serp.co/listings/ithenticate.com/logo/cdeca91dfc3005a3.png",
-   "sha256": "cdeca91dfc3005a39be87d374ab6399247446b60b75a2207cca672ba28e6cf30",
-   "source": "https://www.turnitin.com/system/favicon/favicon.png",
-   "width": 192
-  },
-  {
    "bytes": 24331,
    "contentType": "image/png",
    "height": 192,
@@ -12125,11 +12107,11 @@
    "width": 192
   },
   {
-   "bytes": 1479,
-   "contentType": "image/png",
+   "bytes": 834,
+   "contentType": "image/webp",
    "height": 85,
-   "key": "best.serp.co/listings/jaeves.com/logo/16c5a8c56dbcf4db.png",
-   "sha256": "16c5a8c56dbcf4db17b50b6248c972cdc4faa91fac1cfe9b9b68e86e6a273139",
+   "key": "best.serp.co/listings/jaeves.com/logo/8cc7dd79913e08f4.webp",
+   "sha256": "8cc7dd79913e08f4f46268a22d5f728100ffcea4852189fb560c4ae87ea8e7af",
    "source": "https://139767802.fs1.hubspotusercontent-eu1.net/hubfs/139767802/jaeves_mini_logo.png",
    "width": 88
   },
@@ -12422,11 +12404,11 @@
    "width": 800
   },
   {
-   "bytes": 39960,
-   "contentType": "image/webp",
+   "bytes": 25766,
+   "contentType": "image/avif",
    "height": 630,
-   "key": "best.serp.co/listings/jochem.ai/image/133fb59f90a492c8.webp",
-   "sha256": "133fb59f90a492c8b7a1ad0d1df26ba111eaa2605b84a27cb465f64337bdb557",
+   "key": "best.serp.co/listings/jochem.ai/image/11f159b2ead9a182.avif",
+   "sha256": "11f159b2ead9a18212a3c15c5a717699439f12a241fb84bd3b65c14ece2064d7",
    "source": "https://framerusercontent.com/images/gSWnJSHK01Q49RlzeVK2QiFe0.png",
    "width": 1200
   },
@@ -12440,11 +12422,11 @@
    "width": 1200
   },
   {
-   "bytes": 64148,
-   "contentType": "image/webp",
+   "bytes": 20781,
+   "contentType": "image/avif",
    "height": 511,
-   "key": "best.serp.co/listings/joinrhubarb.com/logo/c552a91e7c97e265.webp",
-   "sha256": "c552a91e7c97e265a641401b44b94a8b913aae5473aa9698089e5a4dd236c9fc",
+   "key": "best.serp.co/listings/joinrhubarb.com/logo/0ddab141b040d7bf.avif",
+   "sha256": "0ddab141b040d7bf8346b7ea16093efb61133226a92ed761b74c26dc010a261c",
    "source": "https://framerusercontent.com/images/Xq7MHsUkYfrDzM47HEhw24RKq0.png",
    "width": 511
   },
@@ -14141,11 +14123,11 @@
    "width": 256
   },
   {
-   "bytes": 102728,
-   "contentType": "image/webp",
+   "bytes": 64854,
+   "contentType": "image/avif",
    "height": 1198,
-   "key": "best.serp.co/listings/libraria.ai/image/444dea3e718cc1b5.webp",
-   "sha256": "444dea3e718cc1b578c6d47578da44baff37103fcb3f3fb5b7e52df9b2f4d1d8",
+   "key": "best.serp.co/listings/libraria.ai/image/7cc6c391d6d85dd9.avif",
+   "sha256": "7cc6c391d6d85dd9eb7e24dafad2c02dfb0515fe11d83858615772c509a9cad6",
    "source": "https://framerusercontent.com/images/m5j3OX5sJJAWtsUrq4QNrILtI.png",
    "width": 2286
   },
@@ -15896,11 +15878,11 @@
    "width": 1284
   },
   {
-   "bytes": 52586,
-   "contentType": "image/webp",
+   "bytes": 36849,
+   "contentType": "image/avif",
    "height": 630,
-   "key": "best.serp.co/listings/meiro.cc/image/897dd3d018fe093e.webp",
-   "sha256": "897dd3d018fe093ea82c345d74025ed744931e0fa126d9f9c38f6cccadfc3c8b",
+   "key": "best.serp.co/listings/meiro.cc/image/ef4d2dab7aa62002.avif",
+   "sha256": "ef4d2dab7aa62002ced9a4c5f71f09e1006cb4c7ae4d7de9dbaf6f27d84dd894",
    "source": "https://framerusercontent.com/images/uXSQjQbx9FAPgaFPN9eswFWNQis.jpg",
    "width": 1200
   },
@@ -15977,11 +15959,11 @@
    "width": 2084
   },
   {
-   "bytes": 10967,
-   "contentType": "image/png",
+   "bytes": 4874,
+   "contentType": "image/webp",
    "height": 180,
-   "key": "best.serp.co/listings/meowapps.com/logo/ba8d9b8db6737de5.png",
-   "sha256": "ba8d9b8db6737de5de3210422a95d994f99c8091f9d617dfac49b18ef7ef1aa7",
+   "key": "best.serp.co/listings/meowapps.com/logo/5b481cfed422fa91.webp",
+   "sha256": "5b481cfed422fa91292db0c1e3ed5c3eb877b3c510bbe8514a8cad72ff4bb71b",
    "source": "https://meowapps.com/apple-touch-icon.png",
    "width": 180
   },
@@ -16130,11 +16112,11 @@
    "width": 256
   },
   {
-   "bytes": 63686,
+   "bytes": 71155,
    "contentType": "image/png",
    "height": 630,
-   "key": "best.serp.co/listings/metrotechs.io/image/257e3cfcf6d8912d.png",
-   "sha256": "257e3cfcf6d8912d3e96a4878572b8b32fbf108b207e81c906f19b758d4116f2",
+   "key": "best.serp.co/listings/metrotechs.io/image/ee46fff6d689cb09.png",
+   "sha256": "ee46fff6d689cb092a0e8f040541c1b41fc4257e13aeb51f1f3417a891c8bb60",
    "source": "https://metrotechs.io/opengraph-image",
    "width": 1200
   },
@@ -17912,11 +17894,11 @@
    "width": 129
   },
   {
-   "bytes": 255366,
-   "contentType": "image/webp",
+   "bytes": 190875,
+   "contentType": "image/avif",
    "height": 1260,
-   "key": "best.serp.co/listings/nowy.io/image/0be60d6a48ed0836.webp",
-   "sha256": "0be60d6a48ed0836b7ee06b536b6e31c2d1da1a6d5f078d226b55fbbfc3c67a6",
+   "key": "best.serp.co/listings/nowy.io/image/056af2ecc2762f1d.avif",
+   "sha256": "056af2ecc2762f1dc0296e890e180a82b6b426884a4b854cbea73d64608d490d",
    "source": "https://framerusercontent.com/images/fODitfW7ZZLyBZAYtVJEzNKCU.png",
    "width": 2400
   },
@@ -18074,13 +18056,13 @@
    "width": 800
   },
   {
-   "bytes": 26240,
-   "contentType": "image/png",
-   "height": 600,
-   "key": "best.serp.co/listings/octoeverywhere.com/image/e3603defe4c0e0a7.png",
-   "sha256": "e3603defe4c0e0a7607c49dfc3bf8eedf7c77c09bf0433c3685225db703deb8a",
-   "source": "https://octoeverywhere.com/img/social_website_external_image.png",
-   "width": 1200
+   "bytes": 24226,
+   "contentType": "image/webp",
+   "height": 2500,
+   "key": "best.serp.co/listings/octoeverywhere.com/image/344c1d3d9f5dfbca.webp",
+   "sha256": "344c1d3d9f5dfbcaf74e4f45f30e1234db9b8afbfc6a32fa11b0615dcf97c655",
+   "source": "https://octoeverywhere.com/img/social_gadget_external_image.png",
+   "width": 5000
   },
   {
    "bytes": 10472,
@@ -18137,11 +18119,11 @@
    "width": 180
   },
   {
-   "bytes": 47504,
-   "contentType": "image/webp",
+   "bytes": 31338,
+   "contentType": "image/avif",
    "height": 601,
-   "key": "best.serp.co/listings/olvy.co/image/4c2f236af8a43d66.webp",
-   "sha256": "4c2f236af8a43d668ffda2de403294334756efe09cc1d3bf6432aefacd85e417",
+   "key": "best.serp.co/listings/olvy.co/image/5201d20c0982adc9.avif",
+   "sha256": "5201d20c0982adc9051948fcf3e498cef6344f6605e6570491c14407c1b6244e",
    "source": "https://framerusercontent.com/images/NiWtUcEotg4bs3goS6dhxGN4pHQ.png",
    "width": 1200
   },
@@ -18857,29 +18839,29 @@
    "width": 800
   },
   {
-   "bytes": 48446,
-   "contentType": "image/webp",
+   "bytes": 35887,
+   "contentType": "image/avif",
    "height": 649,
-   "key": "best.serp.co/listings/palettebrain.com/image/db1192ab23b6c1b7.webp",
-   "sha256": "db1192ab23b6c1b7134c32cdb1b8f53a7dd3d9b2d235cfc6b540504916e57825",
+   "key": "best.serp.co/listings/palettebrain.com/image/19e93fa18f309806.avif",
+   "sha256": "19e93fa18f309806ecbcd7dbe52bd93cbe4c6ee2c3da1917f3527567b5c31f77",
    "source": "https://framerusercontent.com/images/wCCZCjAdlQnzl5LkRggnVB4YcEY.png",
    "width": 1200
   },
   {
-   "bytes": 3894,
-   "contentType": "image/webp",
+   "bytes": 3329,
+   "contentType": "image/avif",
    "height": 250,
-   "key": "best.serp.co/listings/palettebrain.com/logo/a332d961ab691e22.webp",
-   "sha256": "a332d961ab691e2289ce8d8f9bb2dd18a88fa6e2796add1b342ba3af41a38ee7",
+   "key": "best.serp.co/listings/palettebrain.com/logo/c1208b823ee5d4c5.avif",
+   "sha256": "c1208b823ee5d4c5b04e2e792f9f7f1bf3a5ea0ccbe417266593233394ecb538",
    "source": "https://framerusercontent.com/images/95JXsBPEuPKbvh0WIIT05Qa2jI.png",
    "width": 250
   },
   {
-   "bytes": 104834,
+   "bytes": 44154,
    "contentType": "image/jpeg",
    "height": 630,
-   "key": "best.serp.co/listings/pandachat.ai/image/92a641f6d541a795.jpg",
-   "sha256": "92a641f6d541a7952c2e0ecade9cd4c04b6b14dc734c027f83e15313c8616ced",
+   "key": "best.serp.co/listings/pandachat.ai/image/39df07a5d263cb92.jpg",
+   "sha256": "39df07a5d263cb921430aea1fde26595e5860b5929b9a26395a5f5ebaafad0a7",
    "source": "https://pandachat.ai/img/share-team.jpg",
    "width": 1200
   },
@@ -19154,11 +19136,11 @@
    "width": 256
   },
   {
-   "bytes": 2037,
+   "bytes": 2252,
    "contentType": "image/png",
    "height": 258,
-   "key": "best.serp.co/listings/paypal.com/logo/9e6353008c497a9a.png",
-   "sha256": "9e6353008c497a9afd66c1d5bc5e75b817f4246321fe50c17475e78c8768a952",
+   "key": "best.serp.co/listings/paypal.com/logo/eef960bbb6256de1.png",
+   "sha256": "eef960bbb6256de1e65f518e230bee7b073f030d5957bd18ba48d6e03237b6d3",
    "source": "https://www.paypalobjects.com/marketing/web/icons/monogram/pp258.png",
    "width": 258
   },
@@ -19541,11 +19523,11 @@
    "width": 800
   },
   {
-   "bytes": 443785,
-   "contentType": "image/png",
+   "bytes": 374268,
+   "contentType": "image/webp",
    "height": 829,
-   "key": "best.serp.co/listings/picwish.com/image/64b6ff717738fb60.png",
-   "sha256": "64b6ff717738fb604b6d3262b157831169ebcdc8f0b48b4634e129a2f768a2af",
+   "key": "best.serp.co/listings/picwish.com/image/992977c65f25ef8e.webp",
+   "sha256": "992977c65f25ef8e32e1670bc39b50b268f30a10dbaaa45d5fc7e7af6f835b78",
    "source": "https://cfcdn.apowersoft.info/astro/picwish/_astro/seo-image.ZWK5Yj2N.png",
    "width": 1600
   },
@@ -19802,11 +19784,11 @@
    "width": 180
   },
   {
-   "bytes": 104782,
-   "contentType": "image/webp",
+   "bytes": 79738,
+   "contentType": "image/avif",
    "height": 1260,
-   "key": "best.serp.co/listings/pixop.com/image/b4384aef37b91157.webp",
-   "sha256": "b4384aef37b911573c98c60bb265585548bdfb8600b1f272fff866d943740d83",
+   "key": "best.serp.co/listings/pixop.com/image/fc1bdc1b84df1995.avif",
+   "sha256": "fc1bdc1b84df19955e931f21bfd11bf461473556f9c80ab61cb7fc0ffe539b1b",
    "source": "https://framerusercontent.com/images/b0byKw00DESdi8cdZWJk6ktMGY8.jpg",
    "width": 2400
   },
@@ -21179,11 +21161,11 @@
    "width": 1024
   },
   {
-   "bytes": 6568,
-   "contentType": "image/png",
+   "bytes": 3448,
+   "contentType": "image/webp",
    "height": 192,
-   "key": "best.serp.co/listings/qualifyed.ai/logo/00f6b1d9b4ee2ebf.png",
-   "sha256": "00f6b1d9b4ee2ebf55c4497e573d0139e14dc5d260b678644c5cfcb8816e4ea8",
+   "key": "best.serp.co/listings/qualifyed.ai/logo/956bfaa65c752547.webp",
+   "sha256": "956bfaa65c752547df18aabc1b0987bcc5d143852b249ebbd39dad7a1a536a6f",
    "source": "https://qualifyed.ai/wp-content/uploads/2021/03/cropped-qualifyed-logos-favicon-192x192.png",
    "width": 192
   },
@@ -21251,11 +21233,11 @@
    "width": 180
   },
   {
-   "bytes": 21858,
-   "contentType": "image/webp",
+   "bytes": 13921,
+   "contentType": "image/avif",
    "height": 630,
-   "key": "best.serp.co/listings/questionbase.com/image/8a3732d938fa302c.webp",
-   "sha256": "8a3732d938fa302ce686f5dea1a171ed41aed98e8953da344a1e0ac99860f4c1",
+   "key": "best.serp.co/listings/questionbase.com/image/e4bd6d35736ca2a5.avif",
+   "sha256": "e4bd6d35736ca2a50f564470cc5016a3c1e05f8f109adad0246daf1ea8e1685a",
    "source": "https://framerusercontent.com/images/ouygxZh5inaUtQ6n6fXeCvSTFE.png",
    "width": 1200
   },
@@ -21386,11 +21368,11 @@
    "width": 268
   },
   {
-   "bytes": 70657,
-   "contentType": "image/png",
+   "bytes": 23910,
+   "contentType": "image/webp",
    "height": 630,
-   "key": "best.serp.co/listings/quizbot.ai/image/bf63685d149ec1f1.png",
-   "sha256": "bf63685d149ec1f10bc07faee7064e232b1a92d4d84a0a459c890b0aa8e1c92f",
+   "key": "best.serp.co/listings/quizbot.ai/image/5b5b1388c08c812b.webp",
+   "sha256": "5b5b1388c08c812be0865a006595c05d77dea4c426cd86819ba89068b0110dc3",
    "source": "https://quizbot.ai/assets/social/og-default.png",
    "width": 1200
   },
@@ -21557,11 +21539,11 @@
    "width": 200
   },
   {
-   "bytes": 3551,
-   "contentType": "image/png",
+   "bytes": 2290,
+   "contentType": "image/webp",
    "height": 628,
-   "key": "best.serp.co/listings/rasa.io/image/c63082c79446a529.png",
-   "sha256": "c63082c79446a529a5be9d6b6d3fc9e95bed37eced1621c95623d71165f256dc",
+   "key": "best.serp.co/listings/rasa.io/image/d37c518eb2f0af90.webp",
+   "sha256": "d37c518eb2f0af90c9f39ecc93f16b0e0c7a9d907c3826578e27ea55993d98ae",
    "source": "https://rasa.io/wp-content/uploads/2019/10/blog_featuredimage_white-darkteal.png",
    "width": 1200
   },
@@ -21933,24 +21915,6 @@
    "sha256": "8f6662dd547b8cc7a26ace54c5c292b7ab713d4478b5cdb3244a401d2ef7bab6",
    "source": "https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/reflect-ai/public",
    "width": 800
-  },
-  {
-   "bytes": 15789,
-   "contentType": "image/png",
-   "height": 512,
-   "key": "best.serp.co/listings/reflectr.ai/image/27d99d50ef39313f.png",
-   "sha256": "27d99d50ef39313f0eb8fa1bb06d864306d31b46b488c34042c2e784e7514787",
-   "source": "https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72vzPN7RK1KrDTFuOLf9TiFjsjHkcUlmlXSIAYLY-LlL1WGodoqlWvtAVxMuyCo4RtTrY8q-ebwf6j9rANLOvfZUi2BNf0Jn8uHAvU-tvK74q_oxyCGz3IA5h-Qbd9lXjxhjyW53lTQEJ0PpERB-y-IvJqt9FYwFTUcbSeVZHdC76k7OjHAQ1dMnEkWLsAM=w16383",
-   "width": 512
-  },
-  {
-   "bytes": 8944,
-   "contentType": "image/png",
-   "height": 512,
-   "key": "best.serp.co/listings/reflectr.ai/logo/80931adcf5f366aa.png",
-   "sha256": "80931adcf5f366aa0c2c1ca634c4d24802eebc901053ddb03ecb333b4f53cc47",
-   "source": "https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72t0OQfQg88O0Vfvuf21ZDE5c8zlYtWUSQOR21k2gpEmduVtwmNkvbABBluVIgduvOEJrPJaFvIZdiMKXaTQKLusQ45lhxuS2xyHgN3efPQ3pERoEF2m4dV39hnuevBQBw8BXbtLsYl5hCnQZXH6sVBBJArwfUTPFyF7Q01ThHEUCALu_-N32mBE1PvKrqMYQLpdQFsTyAJbbBE-XFU9BIwsUg",
-   "width": 512
   },
   {
    "bytes": 461137,
@@ -23276,11 +23240,11 @@
    "width": 256
   },
   {
-   "bytes": 186773,
-   "contentType": "image/jpeg",
+   "bytes": 22624,
+   "contentType": "image/webp",
    "height": 630,
-   "key": "best.serp.co/listings/sambanova.ai/image/3ddcbcee374c9da4.jpg",
-   "sha256": "3ddcbcee374c9da4ebffd7465b60815a80264113a2a7af8a0f9a360e8973414f",
+   "key": "best.serp.co/listings/sambanova.ai/image/4a4b45d5cb7667e3.webp",
+   "sha256": "4a4b45d5cb7667e364c02c70d9e4bf165658fdc51382a299257cb9b8d822b428",
    "source": "https://sambanova.ai/hubfs/sambanova-banner.jpg",
    "width": 1200
   },
@@ -23465,13 +23429,13 @@
    "width": 180
   },
   {
-   "bytes": 522816,
-   "contentType": "image/png",
-   "height": 630,
-   "key": "best.serp.co/listings/sciencelogic.com/image/6d5bac0fd069a28e.png",
-   "sha256": "6d5bac0fd069a28e4cde5e9955646e67ecced1b723b9785b2b1fb4407e9da72e",
-   "source": "https://sciencelogic.com/wp-content/uploads/2024/09/skylar-advisor-thumb.png",
-   "width": 1200
+   "bytes": 125743,
+   "contentType": "image/jpeg",
+   "height": 500,
+   "key": "best.serp.co/listings/sciencelogic.com/image/cfe0e0d6b5e39788.jpg",
+   "sha256": "cfe0e0d6b5e39788b30776f4fd2a3695f68743f165477562d8173aecbfe40433",
+   "source": "https://sciencelogic.com/wp-content/uploads/2021/04/website-featured-image.jpg",
+   "width": 500
   },
   {
    "bytes": 2742,
@@ -24302,13 +24266,13 @@
    "width": 400
   },
   {
-   "bytes": 159084,
-   "contentType": "image/jpeg",
-   "height": 1260,
-   "key": "best.serp.co/listings/sheetai.app/image/8f1e19d58a587fbc.jpg",
-   "sha256": "8f1e19d58a587fbcd394c85abef294ca7535e9bd232d4309ab0c7a81ddb5d16b",
-   "source": "https://www.sheetai.app/api/screenshot?url=https%3A%2F%2Fwww.sheetai.app%2F",
-   "width": 2400
+   "bytes": 191430,
+   "contentType": "image/png",
+   "height": 627,
+   "key": "best.serp.co/listings/sheetai.app/image/de8eb334d17ee2e3.png",
+   "sha256": "de8eb334d17ee2e3152c1d9dce5cb95e5186ea6bcc780c0a0ceb05415b2cf59c",
+   "source": "https://www.sheetai.app/assets/sheetai-open-graph-image.png",
+   "width": 1200
   },
   {
    "bytes": 7679,
@@ -24500,11 +24464,11 @@
    "width": 1200
   },
   {
-   "bytes": 2000,
-   "contentType": "image/webp",
+   "bytes": 1808,
+   "contentType": "image/avif",
    "height": 180,
-   "key": "best.serp.co/listings/siddharthverma.in/logo/369ac7627d1b38b2.webp",
-   "sha256": "369ac7627d1b38b29187034d8e1545bdade524efc131a4a30b19765ed9da0ac4",
+   "key": "best.serp.co/listings/siddharthverma.in/logo/55343c2e6127b60c.avif",
+   "sha256": "55343c2e6127b60cc3bd3e59781ac649c9b069fe3d9ab159dee58cf0ae51b9c4",
    "source": "https://framerusercontent.com/images/zSvfkTxfYxV9dzpqlGxTSYayQ1w.png",
    "width": 180
   },
@@ -26723,20 +26687,20 @@
    "width": 181
   },
   {
-   "bytes": 789649,
-   "contentType": "image/png",
+   "bytes": 70080,
+   "contentType": "image/webp",
    "height": 630,
-   "key": "best.serp.co/listings/streamroutine.com/image/f14141d5d0edd4d5.png",
-   "sha256": "f14141d5d0edd4d5952318cb49731ffe99cde600db4d694a2f3685575a7c1c4e",
+   "key": "best.serp.co/listings/streamroutine.com/image/0901940f2d1539b4.webp",
+   "sha256": "0901940f2d1539b410835bdf3e1762b4acb64c44069f7bb5333f8b38ac55990a",
    "source": "https://streamroutine.com/themes/streamroutine/assets/images/streamroutine-social-share-og-image.png",
    "width": 1200
   },
   {
-   "bytes": 22816,
-   "contentType": "image/png",
+   "bytes": 14088,
+   "contentType": "image/webp",
    "height": 512,
-   "key": "best.serp.co/listings/streamroutine.com/logo/6bc62bc3698a92b6.png",
-   "sha256": "6bc62bc3698a92b619ed4381c053d794b1576da8d74c3c43bad0615199292b86",
+   "key": "best.serp.co/listings/streamroutine.com/logo/c4f27344622a7d9e.webp",
+   "sha256": "c4f27344622a7d9e95a6c4bfa8cf420f4df01a788e01e9dce26c445b0d4635e0",
    "source": "https://streamroutine.com/themes/streamroutine/assets/images/streamroutine-logo-color.png",
    "width": 512
   },
@@ -26822,11 +26786,11 @@
    "width": 260
   },
   {
-   "bytes": 59418,
-   "contentType": "image/jpeg",
+   "bytes": 30220,
+   "contentType": "image/webp",
    "height": 630,
-   "key": "best.serp.co/listings/stunning.so/image/0d206cd6cacd5449.jpg",
-   "sha256": "0d206cd6cacd5449f3a899be8185768917ec5f7fda003b0947c15b83b4a33fb6",
+   "key": "best.serp.co/listings/stunning.so/image/f904b4c27e8c06b2.webp",
+   "sha256": "f904b4c27e8c06b26a6d5c0dde2386186b80955bdbbba785e38bdb36a60104b3",
    "source": "https://stunning.so/images/og/og-en.jpg?v=3",
    "width": 1200
   },
@@ -27335,11 +27299,11 @@
    "width": 192
   },
   {
-   "bytes": 35231,
-   "contentType": "image/png",
+   "bytes": 17788,
+   "contentType": "image/webp",
    "height": 419,
-   "key": "best.serp.co/listings/synthace.com/image/00b164e2873414ce.png",
-   "sha256": "00b164e2873414ce4925f9dc523a84be717ad68376e8bd530cbac85bb6fdb612",
+   "key": "best.serp.co/listings/synthace.com/image/eea3b390fc103c3d.webp",
+   "sha256": "eea3b390fc103c3d5bdfe44048a8954bf063e3fde8dd310ece088a85eed66292",
    "source": "https://www.synthace.com/hubfs/Homepage%20feature%20image.png",
    "width": 722
   },
@@ -27614,11 +27578,11 @@
    "width": 192
   },
   {
-   "bytes": 5193,
-   "contentType": "image/png",
+   "bytes": 1594,
+   "contentType": "image/webp",
    "height": 144,
-   "key": "best.serp.co/listings/tailwindapp.com/logo/70df523cfbd079b1.png",
-   "sha256": "70df523cfbd079b1c3c28318811d5fb8a99c66a5852efb68c4e1c8285596952e",
+   "key": "best.serp.co/listings/tailwindapp.com/logo/f273b4a7f210581b.webp",
+   "sha256": "f273b4a7f210581b866eeb92877973f359c76ee465f97e95939de872a0a998b9",
    "source": "https://www.tailwindapp.com/apple-touch-icon.png",
    "width": 144
   },
@@ -29198,20 +29162,20 @@
    "width": 256
   },
   {
-   "bytes": 13186,
-   "contentType": "image/webp",
+   "bytes": 8905,
+   "contentType": "image/avif",
    "height": 900,
-   "key": "best.serp.co/listings/tryvelos.com/image/201340aa4540ff55.webp",
-   "sha256": "201340aa4540ff550b89a948a71b0cde1fe0718ecf30dfa32d3f6ce588f9d294",
+   "key": "best.serp.co/listings/tryvelos.com/image/bd5740ac8fe8eb1f.avif",
+   "sha256": "bd5740ac8fe8eb1fcb71739caa3d52cc7738bc833533869a7efa63da53787bb6",
    "source": "https://framerusercontent.com/images/0eyuFy49JARfXwssMQSulkkEE.png",
    "width": 1644
   },
   {
-   "bytes": 2290,
-   "contentType": "image/webp",
+   "bytes": 1948,
+   "contentType": "image/avif",
    "height": 192,
-   "key": "best.serp.co/listings/tryvelos.com/logo/880dbfe9709ea793.webp",
-   "sha256": "880dbfe9709ea79331ee54ad8a23cf93b21e2dfbfc4f2e18f0a1ad5041fc3cb7",
+   "key": "best.serp.co/listings/tryvelos.com/logo/16bc03a8a6c36c12.avif",
+   "sha256": "16bc03a8a6c36c12e27cd62931870062622a208cb52defaa3a81ffa54319b915",
    "source": "https://framerusercontent.com/images/ZmpAnbZPhek6tsmZSFwae3RiQ.png",
    "width": 192
   },
@@ -29286,24 +29250,6 @@
    "sha256": "5349e7e4acea157280ad2921e1a325bd6406b4c5141a633783b9bd3942e3d20a",
    "source": "https://turncage.com/wp-content/uploads/2024/12/turncage-ico.png",
    "width": 576
-  },
-  {
-   "bytes": 13756,
-   "contentType": "image/png",
-   "height": 418,
-   "key": "best.serp.co/listings/turnitin.com/image/4d44f4576c86a958.png",
-   "sha256": "4d44f4576c86a9581e9d9f7c303e505f3ad8b794ade9ac06d6101d010a15cff1",
-   "source": "https://www.turnitin.com/assets/images/resources/open-graph-page-images/default-turnitin-image.png",
-   "width": 800
-  },
-  {
-   "bytes": 1137,
-   "contentType": "image/png",
-   "height": 192,
-   "key": "best.serp.co/listings/turnitin.com/logo/cdeca91dfc3005a3.png",
-   "sha256": "cdeca91dfc3005a39be87d374ab6399247446b60b75a2207cca672ba28e6cf30",
-   "source": "https://www.turnitin.com/system/favicon/favicon.png",
-   "width": 192
   },
   {
    "bytes": 39011,
@@ -29882,11 +29828,11 @@
    "width": 256
   },
   {
-   "bytes": 72971,
-   "contentType": "image/png",
+   "bytes": 48916,
+   "contentType": "image/webp",
    "height": 1600,
-   "key": "best.serp.co/listings/undetectable.ai/image/f40f965eb4e8a3b6.png",
-   "sha256": "f40f965eb4e8a3b69cabb2d4ac9703e8f81ec5663de9fb3546ed2c4e3d243427",
+   "key": "best.serp.co/listings/undetectable.ai/image/bdb562fe894dc46c.webp",
+   "sha256": "bdb562fe894dc46c63b0f4952ef83d0313fe14a88f2cdea28b969967d498585a",
    "source": "https://undetectable.ai/assets/homepage-og.png",
    "width": 2560
   },
@@ -30674,11 +30620,11 @@
    "width": 192
   },
   {
-   "bytes": 158876,
-   "contentType": "image/webp",
+   "bytes": 106045,
+   "contentType": "image/avif",
    "height": 1260,
-   "key": "best.serp.co/listings/vid2txt.com/image/bc1f3bf9948e3497.webp",
-   "sha256": "bc1f3bf9948e3497995092798418977436569a18e1eca17598dd9b04430b0751",
+   "key": "best.serp.co/listings/vid2txt.com/image/71ba67567c5d7db8.avif",
+   "sha256": "71ba67567c5d7db8aeab1b6ed6f4042684e24eb89cac7fbf2bbb67c9cde42205",
    "source": "https://framerusercontent.com/images/xq8F77lMf895mb2eAIWYmK5qNeA.png",
    "width": 2400
   },

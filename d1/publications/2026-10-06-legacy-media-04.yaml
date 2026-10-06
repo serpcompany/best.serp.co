@@ -1529,11 +1529,11 @@ operations:
         source: https://framerusercontent.com/images/rWBL2RBdFniSR5AhZbBjKwSGl0.png
         width: 256
       images:
-        - bytes: 52586
-          contentType: image/webp
+        - bytes: 36849
+          contentType: image/avif
           height: 630
-          key: best.serp.co/listings/meiro.cc/image/897dd3d018fe093e.webp
-          sha256: 897dd3d018fe093ea82c345d74025ed744931e0fa126d9f9c38f6cccadfc3c8b
+          key: best.serp.co/listings/meiro.cc/image/ef4d2dab7aa62002.avif
+          sha256: ef4d2dab7aa62002ced9a4c5f71f09e1006cb4c7ae4d7de9dbaf6f27d84dd894
           source: https://framerusercontent.com/images/uXSQjQbx9FAPgaFPN9eswFWNQis.jpg
           width: 1200
   - action: listing-media-update
@@ -1662,11 +1662,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 10967
-        contentType: image/png
+        bytes: 4874
+        contentType: image/webp
         height: 180
-        key: best.serp.co/listings/meowapps.com/logo/ba8d9b8db6737de5.png
-        sha256: ba8d9b8db6737de5de3210422a95d994f99c8091f9d617dfac49b18ef7ef1aa7
+        key: best.serp.co/listings/meowapps.com/logo/5b481cfed422fa91.webp
+        sha256: 5b481cfed422fa91292db0c1e3ed5c3eb877b3c510bbe8514a8cad72ff4bb71b
         source: https://meowapps.com/apple-touch-icon.png
         width: 180
       images:
@@ -1945,11 +1945,11 @@ operations:
         key: null
     media:
       images:
-        - bytes: 63686
+        - bytes: 71155
           contentType: image/png
           height: 630
-          key: best.serp.co/listings/metrotechs.io/image/257e3cfcf6d8912d.png
-          sha256: 257e3cfcf6d8912d3e96a4878572b8b32fbf108b207e81c906f19b758d4116f2
+          key: best.serp.co/listings/metrotechs.io/image/ee46fff6d689cb09.png
+          sha256: ee46fff6d689cb092a0e8f040541c1b41fc4257e13aeb51f1f3417a891c8bb60
           source: https://metrotechs.io/opengraph-image
           width: 1200
   - action: listing-media-update
@@ -5246,11 +5246,11 @@ operations:
         source: https://framerusercontent.com/images/Y2pHcgKK3nijpfWiqhGMCarjD5w.png
         width: 512
       images:
-        - bytes: 255366
-          contentType: image/webp
+        - bytes: 190875
+          contentType: image/avif
           height: 1260
-          key: best.serp.co/listings/nowy.io/image/0be60d6a48ed0836.webp
-          sha256: 0be60d6a48ed0836b7ee06b536b6e31c2d1da1a6d5f078d226b55fbbfc3c67a6
+          key: best.serp.co/listings/nowy.io/image/056af2ecc2762f1d.avif
+          sha256: 056af2ecc2762f1dc0296e890e180a82b6b426884a4b854cbea73d64608d490d
           source: https://framerusercontent.com/images/fODitfW7ZZLyBZAYtVJEzNKCU.png
           width: 2400
   - action: listing-media-update
@@ -5563,13 +5563,13 @@ operations:
         source: https://octoeverywhere.com/apple-touch-icon.png
         width: 750
       images:
-        - bytes: 26240
-          contentType: image/png
-          height: 600
-          key: best.serp.co/listings/octoeverywhere.com/image/e3603defe4c0e0a7.png
-          sha256: e3603defe4c0e0a7607c49dfc3bf8eedf7c77c09bf0433c3685225db703deb8a
-          source: https://octoeverywhere.com/img/social_website_external_image.png
-          width: 1200
+        - bytes: 24226
+          contentType: image/webp
+          height: 2500
+          key: best.serp.co/listings/octoeverywhere.com/image/344c1d3d9f5dfbca.webp
+          sha256: 344c1d3d9f5dfbcaf74e4f45f30e1234db9b8afbfc6a32fa11b0615dcf97c655
+          source: https://octoeverywhere.com/img/social_gadget_external_image.png
+          width: 5000
   - action: listing-media-update
     id: lst_6351cf96cd2abbc7973af070
     slug: ohdear.app
@@ -5663,11 +5663,11 @@ operations:
         source: https://framerusercontent.com/images/kZCvNKHEXA4hpQ0BWg2J6dwNv4.png
         width: 201
       images:
-        - bytes: 47504
-          contentType: image/webp
+        - bytes: 31338
+          contentType: image/avif
           height: 601
-          key: best.serp.co/listings/olvy.co/image/4c2f236af8a43d66.webp
-          sha256: 4c2f236af8a43d668ffda2de403294334756efe09cc1d3bf6432aefacd85e417
+          key: best.serp.co/listings/olvy.co/image/5201d20c0982adc9.avif
+          sha256: 5201d20c0982adc9051948fcf3e498cef6344f6605e6570491c14407c1b6244e
           source: https://framerusercontent.com/images/NiWtUcEotg4bs3goS6dhxGN4pHQ.png
           width: 1200
   - action: listing-media-update
@@ -6995,19 +6995,19 @@ operations:
         key: null
     media:
       logo:
-        bytes: 3894
-        contentType: image/webp
+        bytes: 3329
+        contentType: image/avif
         height: 250
-        key: best.serp.co/listings/palettebrain.com/logo/a332d961ab691e22.webp
-        sha256: a332d961ab691e2289ce8d8f9bb2dd18a88fa6e2796add1b342ba3af41a38ee7
+        key: best.serp.co/listings/palettebrain.com/logo/c1208b823ee5d4c5.avif
+        sha256: c1208b823ee5d4c5b04e2e792f9f7f1bf3a5ea0ccbe417266593233394ecb538
         source: https://framerusercontent.com/images/95JXsBPEuPKbvh0WIIT05Qa2jI.png
         width: 250
       images:
-        - bytes: 48446
-          contentType: image/webp
+        - bytes: 35887
+          contentType: image/avif
           height: 649
-          key: best.serp.co/listings/palettebrain.com/image/db1192ab23b6c1b7.webp
-          sha256: db1192ab23b6c1b7134c32cdb1b8f53a7dd3d9b2d235cfc6b540504916e57825
+          key: best.serp.co/listings/palettebrain.com/image/19e93fa18f309806.avif
+          sha256: 19e93fa18f309806ecbcd7dbe52bd93cbe4c6ee2c3da1917f3527567b5c31f77
           source: https://framerusercontent.com/images/wCCZCjAdlQnzl5LkRggnVB4YcEY.png
           width: 1200
   - action: listing-media-update
@@ -7022,11 +7022,11 @@ operations:
         key: null
     media:
       images:
-        - bytes: 104834
+        - bytes: 44154
           contentType: image/jpeg
           height: 630
-          key: best.serp.co/listings/pandachat.ai/image/92a641f6d541a795.jpg
-          sha256: 92a641f6d541a7952c2e0ecade9cd4c04b6b14dc734c027f83e15313c8616ced
+          key: best.serp.co/listings/pandachat.ai/image/39df07a5d263cb92.jpg
+          sha256: 39df07a5d263cb921430aea1fde26595e5860b5929b9a26395a5f5ebaafad0a7
           source: https://pandachat.ai/img/share-team.jpg
           width: 1200
   - action: listing-media-update
@@ -7543,11 +7543,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 2037
+        bytes: 2252
         contentType: image/png
         height: 258
-        key: best.serp.co/listings/paypal.com/logo/9e6353008c497a9a.png
-        sha256: 9e6353008c497a9afd66c1d5bc5e75b817f4246321fe50c17475e78c8768a952
+        key: best.serp.co/listings/paypal.com/logo/eef960bbb6256de1.png
+        sha256: eef960bbb6256de1e65f518e230bee7b073f030d5957bd18ba48d6e03237b6d3
         source: https://www.paypalobjects.com/marketing/web/icons/monogram/pp258.png
         width: 258
   - action: listing-media-update
@@ -8430,11 +8430,11 @@ operations:
         key: null
     media:
       images:
-        - bytes: 443785
-          contentType: image/png
+        - bytes: 374268
+          contentType: image/webp
           height: 829
-          key: best.serp.co/listings/picwish.com/image/64b6ff717738fb60.png
-          sha256: 64b6ff717738fb604b6d3262b157831169ebcdc8f0b48b4634e129a2f768a2af
+          key: best.serp.co/listings/picwish.com/image/992977c65f25ef8e.webp
+          sha256: 992977c65f25ef8e32e1670bc39b50b268f30a10dbaaa45d5fc7e7af6f835b78
           source: https://cfcdn.apowersoft.info/astro/picwish/_astro/seo-image.ZWK5Yj2N.png
           width: 1600
   - action: listing-media-update
@@ -8889,11 +8889,11 @@ operations:
         source: https://framerusercontent.com/images/Nuv8uJmmXz74OYvdpFouXhJWl8.png
         width: 128
       images:
-        - bytes: 104782
-          contentType: image/webp
+        - bytes: 79738
+          contentType: image/avif
           height: 1260
-          key: best.serp.co/listings/pixop.com/image/b4384aef37b91157.webp
-          sha256: b4384aef37b911573c98c60bb265585548bdfb8600b1f272fff866d943740d83
+          key: best.serp.co/listings/pixop.com/image/fc1bdc1b84df1995.avif
+          sha256: fc1bdc1b84df19955e931f21bfd11bf461473556f9c80ab61cb7fc0ffe539b1b
           source: https://framerusercontent.com/images/b0byKw00DESdi8cdZWJk6ktMGY8.jpg
           width: 2400
   - action: listing-media-update
