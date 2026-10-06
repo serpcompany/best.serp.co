@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildPublicationPlan, type PlannedStatement, parseManifest } from './d1-publisher.ts'
+import {
+  buildPublicationPlan,
+  type PlannedStatement,
+  type PublicationManifest,
+  parseManifest
+} from './d1-publisher.ts'
 import { project } from './project'
 
 interface D1ApiResult {
@@ -115,6 +120,47 @@ async function queryD1(
   return payload.result
 }
 
+/**
+ * Refuses a manifest whose hosted media the target's media host does not serve yet (#95): its
+ * upload plan must run first, so a page never names a key that answers 404.
+ */
+export async function assertHostedMediaServed(
+  manifest: PublicationManifest,
+  target: PublicationTarget,
+  fetchImplementation: FetchImplementation
+): Promise<void> {
+  const images = manifest.operations.flatMap(op =>
+    op.action === 'listing-media-update'
+      ? [...(op.media.logo ? [op.media.logo] : []), ...(op.media.images ?? [])]
+      : []
+  )
+  const baseUrl = project.remote[target].media.baseUrl
+  const missing: string[] = []
+  const queue = [...images]
+  await Promise.all(
+    Array.from({ length: 8 }, async () => {
+      for (let image = queue.shift(); image; image = queue.shift()) {
+        let served = false
+        try {
+          const response = await fetchImplementation(`${baseUrl}/${image.key}`, {
+            method: 'HEAD',
+            signal: AbortSignal.timeout(15_000)
+          })
+          served = response.ok && Number(response.headers.get('content-length')) === image.bytes
+        } catch {
+          served = false
+        }
+        if (!served) missing.push(image.key)
+      }
+    })
+  )
+  if (missing.length > 0) {
+    throw new Error(
+      `${missing.length} hosted media keys are not on ${baseUrl} yet (first: ${missing.sort()[0]}). Run the media upload for this plan first.`
+    )
+  }
+}
+
 export async function publishRemoteManifest(
   manifestPath: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -128,6 +174,7 @@ export async function publishRemoteManifest(
   if (resolvedPath !== unresolvedPath)
     throw new Error('Manifest path resolution changed unexpectedly.')
   const plan = buildPublicationPlan(manifest, source, new Date().toISOString())
+  await assertHostedMediaServed(manifest, target, fetchImplementation)
   const prior = await queryD1(
     [
       {

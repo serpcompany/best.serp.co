@@ -91,6 +91,34 @@ const media = z
     video: z.string().url().optional()
   })
   .strict()
+/**
+ * A hosted image a manifest names (#95): its key in the media bucket, the metadata D1 records,
+ * and where the bytes came from. The key must carry the digest and the type's extension.
+ */
+const hostedImage = z
+  .object({
+    bytes: z.number().int().min(1).max(MAX_MEDIA_BYTES),
+    contentType: z.enum(Object.values(IMAGE_CONTENT_TYPES) as [string, ...string[]]),
+    height: z.number().int().min(1).max(MAX_IMAGE_SIDE),
+    key: z.string(),
+    sha256: checksum,
+    source: z.string().min(1),
+    width: z.number().int().min(1).max(MAX_IMAGE_SIDE)
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const key = parseMediaKey(value.key)
+    if (!key || key.hash !== value.sha256.slice(0, MEDIA_HASH_LENGTH)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid hosted media key.' })
+    } else if (contentTypeForKey(value.key) !== value.contentType) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A media key’s extension must match its content type.'
+      })
+    }
+  })
+export type HostedImageEntry = z.infer<typeof hostedImage>
+const mediaRow = z.object({ kind: z.enum(['logo', 'image']), url: z.string().min(1) }).strict()
 const listing = z
   .object({
     id: listingId,
@@ -156,6 +184,28 @@ const operation = z.discriminatedUnion('action', [
       reason: z.string().min(1)
     })
     .strict(),
+  /**
+   * Replaces a listing's logo and images with hosted copies (#95). `expected` is the listing's
+   * logo and image rows (kind and url, ordered by kind then sort order) when the manifest was
+   * generated: the batch refuses a listing whose media changed since. Keys belong to the slug.
+   */
+  z
+    .object({
+      action: z.literal('listing-media-update'),
+      id: listingId,
+      slug: existingSlug,
+      expected: z.array(mediaRow),
+      media: z
+        .object({
+          logo: hostedImage.optional(),
+          images: z
+            .array(hostedImage)
+            .superRefine(unique('Duplicate listing image.', value => value.key))
+            .optional()
+        })
+        .strict()
+    })
+    .strict(),
   z.object({ action: z.literal('category-create'), category }).strict(),
   z.object({ action: z.literal('category-update'), category }).strict(),
   z.object({ action: z.literal('category-unpublish'), slug: categorySlug }).strict()
@@ -181,6 +231,22 @@ export const manifestSchema = z
     const slugs = new Set<string>()
     const categoryTargets = new Set<string>()
     value.operations.forEach((op, index) => {
+      if (op.action === 'listing-media-update') {
+        const keyed = [
+          ...(op.media.logo ? [['logo', op.media.logo.key] as const] : []),
+          ...(op.media.images ?? []).map(image => ['image', image.key] as const)
+        ]
+        for (const [kind, key] of keyed) {
+          const parsed = parseMediaKey(key)
+          if (parsed && (parsed.slug !== op.slug || parsed.kind !== kind)) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Media key ${key} is not this listing's ${kind}.`,
+              path: ['operations', index, 'media']
+            })
+          }
+        }
+      }
       if (op.action === 'listing-slug-change' && op.from === op.to)
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -508,6 +574,45 @@ export function buildPublicationPlan(
       )
       routes.add(listingRoute(op.slug))
       addCategories(op.categories)
+    }
+    if (op.action === 'listing-media-update') {
+      const expected = JSON.stringify(op.expected.map(row => [row.kind, row.url]))
+      statements.push(
+        statement(
+          `INSERT INTO publication_guard SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND (SELECT json_group_array(json_array(kind,url)) FROM (SELECT kind,url FROM listing_media WHERE listing_id=? AND kind IN ('logo','image') ORDER BY kind,sort_order))=? THEN 1 ELSE 0 END`,
+          op.id,
+          op.slug,
+          op.id,
+          expected
+        ),
+        statement(
+          "DELETE FROM listing_media WHERE listing_id=? AND kind IN ('logo','image')",
+          op.id
+        ),
+        statement(
+          "DELETE FROM media_ingestions WHERE listing_id=? AND kind IN ('logo','image')",
+          op.id
+        ),
+        ...[
+          ...(op.media.logo ? [['logo', op.media.logo, 0] as const] : []),
+          ...(op.media.images ?? []).map((image, order) => ['image', image, order] as const)
+        ].map(([kind, image, order]) =>
+          statement(
+            'INSERT INTO listing_media (listing_id,kind,url,sort_order,media_key,sha256,content_type,bytes,width,height) VALUES (?,?,?,?,?,?,?,?,?,?)',
+            op.id,
+            kind,
+            image.source,
+            order,
+            image.key,
+            image.sha256,
+            image.contentType,
+            image.bytes,
+            image.width,
+            image.height
+          )
+        )
+      )
+      routes.add(listingRoute(op.slug))
     }
     if (op.action === 'listing-slug-change') {
       statements.push(

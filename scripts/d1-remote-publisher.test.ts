@@ -115,6 +115,56 @@ describe('remote D1 publisher', () => {
     expect(fetchImplementation).toHaveBeenCalledTimes(2)
   })
 
+  it('refuses a media update until the target media host serves every key (#95)', async () => {
+    const sha256 = 'c'.repeat(64)
+    const key = `best.serp.co/listings/testing/logo/${sha256.slice(0, 16)}.png`
+    const mediaPath = resolve('d1/publications/remote-publisher-media-test.yaml')
+    writeFileSync(
+      mediaPath,
+      source.replace(
+        /operations:[\s\S]*$/u,
+        `operations:
+  - action: listing-media-update
+    id: lst_remote_media_test
+    slug: testing
+    expected: []
+    media:
+      logo:
+        bytes: 10
+        contentType: image/png
+        height: 1
+        key: ${key}
+        sha256: ${sha256}
+        source: https://assets.example/logo.png
+        width: 1
+`
+      )
+    )
+    try {
+      const head = (status: number, length = '10') =>
+        new Response(null, { headers: { 'Content-Length': length }, status })
+      const missing = vi.fn().mockResolvedValueOnce(head(404))
+      await expect(publishRemoteManifest(mediaPath, environment, missing)).rejects.toThrow(
+        'not on https://cdn.serp.co yet'
+      )
+      expect(missing.mock.calls[0]?.[0]).toBe(`https://cdn.serp.co/${key}`)
+      const truncated = vi.fn().mockResolvedValueOnce(head(200, '9'))
+      await expect(publishRemoteManifest(mediaPath, environment, truncated)).rejects.toThrow(
+        'Run the media upload'
+      )
+      const served = vi
+        .fn()
+        .mockResolvedValueOnce(head(200))
+        .mockResolvedValueOnce(response([{ success: true, results: [] }]))
+        .mockResolvedValueOnce(response([{ success: true, results: [] }]))
+      await expect(publishRemoteManifest(mediaPath, environment, served)).resolves.toMatchObject({
+        idempotent: false
+      })
+    } finally {
+      rmSync(mediaPath, { force: true })
+    }
+  })
+
   it('requires the explicit D1 database identity', async () => {
     const { CLOUDFLARE_D1_DATABASE_ID: _databaseId, ...withoutDatabase } = environment
     await expect(publishRemoteManifest(manifestPath, withoutDatabase, vi.fn())).rejects.toThrow(
