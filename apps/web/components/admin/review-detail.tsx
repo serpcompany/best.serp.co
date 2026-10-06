@@ -67,6 +67,7 @@ import { type ReactNode, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { adminRequest } from './api'
 import { ageWords, formatDateTime, formatSince, formatUsd, initials, listingPath } from './format'
+import { Kv } from './kv'
 import { ProductLogo } from './product-cell'
 import { PlanBadge, StatusBadge, type StatusKind } from './status-badge'
 
@@ -142,22 +143,6 @@ function statusChip(view: ReviewView): { kind: StatusKind; label?: string } {
     default:
       return { kind: 'withdrawn' }
   }
-}
-
-function Kv({ rows }: { rows: Array<[string, ReactNode]> }) {
-  // A container query: in the narrow side column the keys stack above their values.
-  return (
-    <div className="@container">
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm @sm:grid-cols-[max-content_1fr]">
-        {rows.map(([key, value]) => (
-          <div key={key} className="contents">
-            <dt className="text-muted-foreground">{key}</dt>
-            <dd className="min-w-0 break-words font-medium">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  )
 }
 
 function hostOf(url: string): string {
@@ -695,8 +680,10 @@ export function ReviewDetail({
 
   return (
     <>
+      {/* The actions stay on one row beside the title from lg up (#64 review); a long name
+          truncates instead of pushing a button onto a second row. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex items-start gap-3">
+        <div className="flex min-w-0 items-start gap-3 lg:flex-1">
           <ProductLogo
             className="rounded-lg"
             logoUrl={view.logoUrl}
@@ -704,9 +691,11 @@ export function ReviewDetail({
             size={48}
             website={view.website}
           />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{view.name}</h1>
+              <h1 className="min-w-0 max-w-full truncate text-2xl font-semibold tracking-tight">
+                {view.name}
+              </h1>
               <StatusBadge kind={chips.kind} label={chips.label} />
               <PlanBadge paid={view.paid} />
               {isSubmission && !view.paid && view.badge?.verifiedAt ? (
@@ -716,7 +705,9 @@ export function ReviewDetail({
             <p className="mt-1 text-sm text-muted-foreground">{meta}</p>
           </div>
         </div>
-        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+        {actions ? (
+          <div className="flex flex-wrap gap-2 lg:shrink-0 lg:flex-nowrap">{actions}</div>
+        ) : null}
       </div>
       {banner}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">

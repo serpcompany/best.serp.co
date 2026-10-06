@@ -69,6 +69,7 @@ import { type ReactNode, useState } from 'react'
 import { toast } from 'sonner'
 import { adminRequest } from './api'
 import { formatDay, initials, listingPath } from './format'
+import { Kv } from './kv'
 import { ProductLogo } from './product-cell'
 import { StatusBadge, type StatusKind } from './status-badge'
 
@@ -143,22 +144,6 @@ function ownerNote(verifiedVia: string): string {
   if (verifiedVia === 'paid_claim') return 'Paid claim: ownership doesn’t depend on a badge.'
   if (verifiedVia === 'submission') return 'They submitted this listing.'
   return 'An admin made them the owner.'
-}
-
-function Kv({ rows }: { rows: Array<[string, ReactNode]> }) {
-  // A container query: in the narrow side column the keys stack above their values.
-  return (
-    <div className="@container">
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm @sm:grid-cols-[max-content_1fr]">
-        {rows.map(([key, value]) => (
-          <div key={key} className="contents">
-            <dt className="text-muted-foreground">{key}</dt>
-            <dd className="min-w-0 break-words font-medium">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  )
 }
 
 function Timeline({ items }: { items: ListingDetailView['activity'] }) {
