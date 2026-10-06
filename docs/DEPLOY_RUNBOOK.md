@@ -107,7 +107,8 @@ re-dispatches the notifier on `main`. When production accepts submissions:
 | `deploy-staging.yml` | push to `staging`, manual from `staging` | `staging` | none | `pnpm harness:fast` → build → D1 bookmark → migrations → deploy → HTTP gates → Playwright smoke |
 | `deploy-production.yml` | push to `main`, manual | `production` | dispatch: `deploy-best.serp.co-production` (or `hotfix-…`) | Staging verification → `pnpm harness:fast` → build → `plan-release` → (pending migrations: bookmark → migrate) → deploy → HTTP gates |
 | `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → D1 bookmark → initial catalog import into an empty production D1 → parity verification |
-| `publish-d1.yml` | manual, `main` | `production` | `publish-best.serp.co-production` | D1 bookmark → apply one `d1/publications/*.yaml` manifest |
+| `publish-d1.yml`, `publish-d1-staging.yml` (#95) | manual, `main` / `staging` | `production` / `staging` | `publish-best.serp.co-<env>` | D1 bookmark → apply one reviewed manifest, staging first |
+| `upload-media.yml`, `upload-media-staging.yml` | manual, `main` / `staging` | `production` / `staging` | `upload-media-best.serp.co-<env>` | Upload one reviewed `d1/media/` plan to R2, no D1 change ([media](./MEDIA.md)) |
 | `approve-d1-submission.yml` | manual, `main` | `production` | `approve-best.serp.co-submission-production` | D1 bookmark → approve or reject one submission → close its review issue |
 | `notify-d1-submissions.yml` | every 15 minutes, manual | `production-notifier` | none | Open an assigned review issue per badge-verified submission |
 
@@ -229,7 +230,7 @@ publication or approval reaches cached pages within about a minute; nothing is p
 | Resource | Staging | Production |
 |---|---|---|
 | Workers Cache API (edge HTML, data) | built in, nothing to create | built in, nothing to create |
-| `version_metadata` binding `CF_VERSION_METADATA` | declared in `wrangler.jsonc` | declared in `wrangler.jsonc` |
+| `version_metadata` binding `CF_VERSION_METADATA` | in `wrangler.jsonc` | in `wrangler.jsonc` |
 | R2 `MEDIA` (#95) | `cdn-staging` on `cdn-staging.serp.co` | `cdn` on `cdn.serp.co` |
 
 Caching needs no KV namespace, Durable Object, or queue. Media: [Listing media](./MEDIA.md).

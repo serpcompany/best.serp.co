@@ -153,6 +153,26 @@ on `*.localtest.me:<port>`. `curl localhost:8787/cdn-cgi/handler/scheduled` runs
 e2e media server (`apps/e2e/tests/media-fixture.ts`) does on throwaway state;
 `apps/e2e/tests/listing-media.spec.ts` checks the rendered media against local R2.
 
+## Uploading and publishing
+
+A catalog-wide change (the legacy migration) is two reviewed files: an upload plan under
+`d1/media/` (each object's key, SHA-256, size, type, dimensions, and source: a public https URL
+or a `repo:` file under `apps/web/public`) and a manifest under `d1/publications/` that names
+the keys. `pnpm media:upload:dry-run -- d1/media/<plan>.json` fetches and verifies every object
+locally and writes nothing. The owner then runs, in order:
+
+1. **Upload Listing Media (staging)** from `staging`, typing `upload-media-best.serp.co-staging`.
+   Every object is fetched again and uploaded only if its bytes still match the plan; objects the
+   media host already serves are skipped, so a rerun finishes what is missing.
+2. **Publish D1 Catalog (staging)** from `staging` with `publish-best.serp.co-staging`, and check
+   staging.
+3. After the `staging` → `main` promotion: **Upload Listing Media** with
+   `upload-media-best.serp.co-production`, then **Publish D1 Catalog** with
+   `publish-best.serp.co-production`.
+
+Agents prepare and review these files; they never run the uploads or publications
+([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)).
+
 ## Owner setup
 
 Done on 2026-10-06: the `cdn-staging` bucket and both custom domains exist, and the deploy token

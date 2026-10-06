@@ -27,7 +27,8 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `packages/data-ops/`: Drizzle schema, catalog and submission queries, caching.
 - `packages/design-system/`: UI primitives.
 - `d1/drizzle/`: forward-only migration history applied by Wrangler.
-- `d1/publications/`: reviewed catalog mutation manifests.
+- `d1/publications/`: reviewed catalog mutation manifests (staging first, then production).
+- `d1/media/`: reviewed listing media upload plans (keys and sources; no image files).
 - `d1/artifacts/`: one-time JSON import; the parity report and the brotli-compressed
   SQL are committed, the uncompressed SQL and batches are generated.
 - `scripts/project.ts`: the single deployment target (app, local D1, artifacts).

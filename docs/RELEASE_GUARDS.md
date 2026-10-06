@@ -20,7 +20,10 @@ ambiguous `db:migrate`.
 | `pnpm db:migrate:staging` | staging D1 | `cloudflare-release.ts migrate staging`; runs only in `deploy-staging.yml` on `staging` |
 | `pnpm db:migrations:list:production` | production D1 | Read-only: applied, pending, and unknown migrations |
 | `pnpm db:migrate:production` | production D1 | `cloudflare-release.ts migrate production`; runs only in `deploy-production.yml` on `main` when `plan-release` finds pending migrations, after Deploy Staging verified the commit's tree |
+| `pnpm db:publish:staging` | staging D1 | Apply a reviewed manifest; runs only in `publish-d1-staging.yml` on `staging` |
 | `pnpm db:publish:production`, `pnpm db:approve:production`, `pnpm db:notify:production` | production D1 | Data operations; each runs only in its own workflow |
+| `pnpm media:upload:<staging\|production>` | media bucket | Upload a reviewed `d1/media/` plan; runs only in `upload-media-staging.yml` on `staging` or `upload-media.yml` on `main` |
+| `pnpm media:upload:dry-run -- <plan>` | none | Fetch and verify every object of a plan; writes nothing |
 
 The remote `migrations:list` commands run `cloudflare-release.ts list-migrations <env>`, which
 reads the ledger with `wrangler d1 execute --remote --env <env>` and a `SELECT`. They do not
@@ -123,7 +126,20 @@ GITHUB_TOKEN="$(gh auth token)" pnpm tsx scripts/staging-verification.ts <commit
 The bootstrap gate matters even after the first import (run 36800330629). The bootstrap
 applies every migration at its commit to an empty production database, for example a
 re-created one. The publication and submission workflows change production data, not schema
-or code, so they are not gated on staging.
+or code, so they are not gated on staging by a check.
+
+## Catalog data: staging first
+
+Every reviewed catalog change reaches staging before production (#95, owner decision). A manifest
+under `d1/publications/` is applied by **Publish D1 Catalog (staging)** (`publish-d1-staging.yml`,
+dispatched from `staging` with `publish-best.serp.co-staging`, `staging` environment, staging D1
+backup first), checked there, and then, after promotion, by **Publish D1 Catalog** from `main`.
+Listing media follows the same order: a plan under `d1/media/` is uploaded by **Upload Listing
+Media (staging)** (`upload-media-best.serp.co-staging`) and later by **Upload Listing Media**
+from `main` (`upload-media-best.serp.co-production`), before the manifest that names its keys
+is published. `scripts/d1-remote-publisher.ts` and `scripts/media-upload.ts` each refuse to
+run outside their own workflow, branch, and confirmation; the uploader also refuses any key
+outside `best.serp.co/listings/`. Procedure: [Listing media](./MEDIA.md#uploading-and-publishing).
 
 ## Hotfixes
 
