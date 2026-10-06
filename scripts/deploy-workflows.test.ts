@@ -544,11 +544,60 @@ describe('D1 data stays in Cloudflare', () => {
   // This repository is public: any signed-in GitHub user can download a workflow artifact, and
   // fork pull requests can restore caches. A D1 export holds sessions, OAuth tokens, and emails,
   // so no workflow exports D1; recovery is a Time Travel bookmark (#99, docs/D1_RECOVERY.md).
+  // These checks read workflow and script text, not data; RELEASE_GUARDS lists what they miss.
   const databaseExport =
     /backup|dump|export|snapshot|\.sql\b|\.sqlite|\.db\b|(?:^|[^a-z0-9])d1(?:[^a-z0-9]|$)|database/iu
   const uploads = /upload-artifact|actions\/cache|upload-pages-artifact/u
-  const mutation =
-    /cloudflare-release\.ts (?:migrate|import) (staging|production)|db:(?:migrate|publish|approve):(staging|production)/u
+  /**
+   * Every artifact and cache a workflow or composite action saves today, by action, name, and
+   * path. Add one only after review: none may ever hold database content.
+   */
+  const allowedUploads: Array<{ action: RegExp; name: RegExp; paths: string[] }> = [
+    {
+      action: /^actions\/upload-artifact@/u,
+      name: /^playwright-report$/u,
+      paths: ['apps/e2e/playwright-report/']
+    },
+    {
+      action: /^actions\/upload-artifact@/u,
+      name: /^staging-smoke-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}$/u,
+      paths: ['apps/e2e/playwright-report/', 'apps/e2e/test-results/']
+    },
+    {
+      // The install action's dependency and Next.js build caches.
+      action: /^actions\/cache@/u,
+      name: /^$/u,
+      paths: [
+        '~/.pnpm',
+        '${{ github.workspace }}/.next/cache',
+        '${{ github.workspace }}/apps/*/.next/cache'
+      ]
+    }
+  ]
+  /** Actions a job holding the Cloudflare token may use. */
+  const credentialedJobActions = new Set([
+    'actions/checkout@v7',
+    './.github/actions/install',
+    'actions/github-script@v9',
+    'actions/upload-artifact@v7'
+  ])
+  const outboundUpload =
+    /\bgh\s+(?:release\s+(?:upload|create)|gist)\b|\bcurl\b[^\n]*?(?:\s-T\b|--upload-file|\s-F\b|--form\b|\s-d\s*@|--data(?:-binary|-raw|-urlencode)?\s+@)|\bwget\b[^\n]*--post-(?:file|data)/u
+  const bookmarkCommand = (environment: string) =>
+    `pnpm tsx scripts/cloudflare-release.ts bookmark ${environment}`
+  /** Credentialed commands that change no D1 data: reads, the bookmark, and the Worker deploy. */
+  const readOnlyRelease =
+    /^pnpm tsx scripts\/cloudflare-release\.ts (?:bookmark|plan-release|list-migrations|check-database|verify-import|deploy) (?:staging|production)$/u
+  const programs =
+    /(?:^|[\s;&|(`$])(?:pnpm|npx|node|tsx|wrangler|curl|wget|gh|python3?|bash|sh)\b[^\n;&|)]*/gu
+  /** A status function replaces `if`'s implicit `success()`, so a failed bookmark stops nothing. */
+  const statusFunction = /\b(?:always|failure|cancelled|success)\s*\(/u
+  /** D1 writers without a bookmark, each justified in RELEASE_GUARDS. */
+  const unbookmarkedWriters = new Set([
+    'notify-d1-submissions.yml:notify:pnpm db:notify:production'
+  ])
+
+  const stepsOf = (job: WorkflowJob) => job.steps ?? []
 
   /** Every step of every workflow and composite action under .github, wherever it is nested. */
   function githubSteps(): Array<[string, WorkflowStep]> {
@@ -572,11 +621,75 @@ describe('D1 data stays in Cloudflare', () => {
     return steps
   }
 
-  function exportedData(step: WorkflowStep): string[] {
+  function uploadViolations(step: WorkflowStep): string[] {
     if (!step.uses || !uploads.test(step.uses)) return []
-    return [step.with?.name, step.with?.path, step.with?.key]
-      .map(value => String(value ?? ''))
-      .filter(value => databaseExport.test(value))
+    const values = [step.with?.name, step.with?.path, step.with?.key].map(value =>
+      String(value ?? '')
+    )
+    const problems = values.filter(value => databaseExport.test(value))
+    const paths = String(step.with?.path ?? '')
+      .split('\n')
+      .map(path => path.trim())
+      .filter(Boolean)
+    const allowed = allowedUploads.some(
+      upload =>
+        upload.action.test(step.uses ?? '') &&
+        upload.name.test(String(step.with?.name ?? '')) &&
+        paths.length > 0 &&
+        paths.every(path => upload.paths.includes(path))
+    )
+    return allowed ? problems : [...problems, `${step.uses} ${values.join(' ')} is not allowlisted`]
+  }
+
+  const holdsToken = (workflow: WorkflowDefinition, job: WorkflowJob, step?: WorkflowStep) =>
+    JSON.stringify([(workflow as { env?: unknown }).env ?? {}, job.env ?? {}, step ?? {}]).includes(
+      'CLOUDFLARE_API_TOKEN'
+    )
+
+  /**
+   * Every step that gets the Cloudflare token and may change D1 (anything but a credential
+   * check, a read-only release command, or the Worker deploy) must directly follow a successful
+   * bookmark of its environment's database, in the same job, under the same condition.
+   */
+  function d1ChangeAudit(workflows: Array<[string, WorkflowDefinition]>) {
+    const changes: string[] = []
+    const violations: string[] = []
+    for (const [file, workflow] of workflows) {
+      for (const [name, job] of Object.entries(workflow.jobs)) {
+        const steps = stepsOf(job)
+        steps.forEach((step, index) => {
+          if (!holdsToken(workflow, job, step)) return
+          const invoked = [...(step.run ?? '').matchAll(programs)].map(match =>
+            match[0].replace(/^[\s;&|(`$]/u, '').trim()
+          )
+          if (!step.uses && invoked.length === 0) return // a credential presence check
+          if (!step.uses && invoked.every(command => readOnlyRelease.test(command))) return
+          const label = `${file}:${name}:${step.run?.trim() ?? step.uses}`
+          if (unbookmarkedWriters.has(label)) return
+          const environment = environmentName(job)
+          changes.push(`${file}:${name}:${environment}`)
+          const problem = (message: string) => violations.push(`${label}: ${message}`)
+          if (environment !== 'staging' && environment !== 'production') {
+            problem('changes D1 outside the staging or production environment')
+            return
+          }
+          const bookmark = steps[index - 1]
+          if (bookmark?.run !== bookmarkCommand(environment))
+            problem(`must directly follow \`${bookmarkCommand(environment)}\``)
+          if (bookmark?.if !== step.if) problem('must share its bookmark step’s condition')
+          for (const checked of [bookmark, step]) {
+            if (checked && statusFunction.test(String(checked.if ?? '')))
+              problem(`\`if: ${checked.if}\` would run after a failed bookmark`)
+            if (checked?.['continue-on-error'] !== undefined)
+              problem('continue-on-error would let a failed bookmark through')
+          }
+          const database = step.env?.CLOUDFLARE_D1_DATABASE_ID
+          if (database !== undefined && database !== project.remote[environment].databaseId)
+            problem(`CLOUDFLARE_D1_DATABASE_ID is not the ${environment} database`)
+        })
+      }
+    }
+    return { changes: changes.sort(), violations }
   }
 
   it('recognises the D1 backup uploads this repository used to run', () => {
@@ -588,63 +701,77 @@ describe('D1 data stays in Cloudflare', () => {
           path: `${expression('runner.temp')}/d1-backup/`
         }
       },
-      { uses: 'actions/upload-artifact@v4', with: { name: 'x', path: '/tmp/production.sql' } },
-      { uses: 'actions/cache/save@v4', with: { key: 'k', path: 'db-export/' } }
+      // A neutral name and path is still refused: only reviewed artifacts are allowed.
+      { uses: 'actions/upload-artifact@v7', with: { name: 'out', path: '/tmp/out/' } },
+      { uses: 'actions/cache/save@v4', with: { key: 'k', path: 'db-export/' } },
+      { uses: 'actions/cache@v5', with: { key: 'k', path: '${{ runner.temp }}/out' } }
     ]
-    for (const step of removed) expect(exportedData(step), JSON.stringify(step)).not.toEqual([])
+    for (const step of removed) expect(uploadViolations(step), JSON.stringify(step)).not.toEqual([])
     // The evidence the workflows do upload stays allowed.
-    for (const path of ['apps/e2e/playwright-report/', 'apps/e2e/test-results/']) {
-      expect(exportedData({ uses: 'actions/upload-artifact@v7', with: { path } })).toEqual([])
-    }
+    expect(
+      uploadViolations({
+        uses: 'actions/upload-artifact@v7',
+        with: { name: 'playwright-report', path: 'apps/e2e/playwright-report/' }
+      })
+    ).toEqual([])
   })
 
-  it('uploads or caches nothing that looks like a database export', () => {
+  it('uploads or caches only the reviewed test evidence', () => {
     const steps = githubSteps()
     expect(steps.some(([, step]) => step.uses?.includes('upload-artifact'))).toBe(true)
-    const offending = steps
-      .filter(([, step]) => exportedData(step).length > 0)
-      .map(
-        ([file, step]) => `${file}: ${step.name ?? step.uses} (${exportedData(step).join(', ')})`
-      )
+    const offending = steps.flatMap(([file, step]) =>
+      uploadViolations(step).map(problem => `${file}: ${step.name ?? step.uses}: ${problem}`)
+    )
     expect(offending).toEqual([])
   })
 
-  it('never exports a D1 database in a workflow', () => {
+  it('never exports a D1 database, in a workflow or a script', () => {
     for (const [file, step] of githubSteps()) {
       expect(step.run ?? '', `${file}: ${step.name}`).not.toMatch(
         /\bd1 export\b|cloudflare-release\.ts backup\b/u
       )
     }
     expect(Object.values(packageScripts).join('\n')).not.toMatch(/\bd1 export\b/u)
+    // `backup` called `wrangler d1 export` through `d1(['export'], ...)`; any spelling of that
+    // argument in a script is refused, whatever the command is called.
+    const scripts = readdirSync(resolve('scripts'), { recursive: true, encoding: 'utf8' })
+      .filter(file => /\.(?:m?js|ts)$/u.test(file) && !/\.test\./u.test(file))
+      .filter(file =>
+        /\bd1\s+export\b|['"`]export['"`]/u.test(readFileSync(resolve('scripts', file), 'utf8'))
+      )
+    expect(scripts).toEqual([])
   })
 
-  it('records a Time Travel bookmark immediately before every remote D1 mutation', () => {
-    const mutations: string[] = []
+  it('keeps uploads off the network in every job that holds the Cloudflare token', () => {
     for (const [file, workflow] of allWorkflows()) {
       for (const [name, job] of Object.entries(workflow.jobs)) {
-        const steps = job.steps ?? []
-        steps.forEach((step, index) => {
-          const match = step.run?.match(mutation)
-          if (!match) return
-          const environment = match[1] ?? match[2]
-          const label = `${file}:${name}: ${step.name}`
-          mutations.push(`${file}:${name}:${environment}`)
-          const bookmark = steps[index - 1]
-          // Same environment, same condition, and nothing that would let it fail open.
-          expect(bookmark?.run, label).toBe(
-            `pnpm tsx scripts/cloudflare-release.ts bookmark ${environment}`
-          )
-          expect(bookmark?.if, label).toBe(step.if)
-          expect(bookmark?.['continue-on-error'], label).toBeUndefined()
-          expect(step['continue-on-error'], label).toBeUndefined()
-          expect(bookmark?.env, label).toEqual({
-            CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
-            CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN')
-          })
-        })
+        if (!holdsToken(workflow, job)) continue
+        for (const step of stepsOf(job)) {
+          if (step.uses)
+            expect(credentialedJobActions.has(step.uses), `${file}:${name}: ${step.uses}`).toBe(
+              true
+            )
+          expect(step.run ?? '', `${file}:${name}: ${step.name}`).not.toMatch(outboundUpload)
+        }
       }
     }
-    expect(mutations.sort()).toEqual([
+    for (const command of [
+      'gh release upload v1 dump.sql',
+      'gh gist create dump.sql',
+      'curl -T dump.sql https://example.com/',
+      'curl -sS --data-binary @dump.sql https://example.com/',
+      'wget --post-file=dump.sql https://example.com/'
+    ]) {
+      expect(command).toMatch(outboundUpload)
+    }
+    // The production HTTP gates read headers with curl; that is not an upload.
+    expect('curl -sSI https://best.serp.co').not.toMatch(outboundUpload)
+  })
+
+  it('bookmarks D1 directly before every step that can change it, and only after success', () => {
+    const { changes, violations } = d1ChangeAudit(allWorkflows())
+    expect(violations).toEqual([])
+    expect(changes).toEqual([
       'approve-d1-submission.yml:review:production',
       'bootstrap-production-d1.yml:bootstrap:production',
       'deploy-production.yml:release:production',
@@ -653,16 +780,104 @@ describe('D1 data stays in Cloudflare', () => {
     ])
   })
 
-  it('lets only the scheduled notifier write production D1 without a bookmark', () => {
-    // It records notification state every 15 minutes with a D1-only token; a bookmark per run
-    // would bury the reviewed mutations' bookmarks, and Time Travel still covers it.
-    const unbookmarked = allWorkflows().flatMap(([file, workflow]) =>
-      Object.entries(workflow.jobs)
-        .filter(([, job]) => runs(job).some(run => /db:[a-z]+:production/u.test(run)))
-        .filter(([, job]) => !runs(job).some(run => run.includes('cloudflare-release.ts bookmark')))
-        .map(([name]) => `${file}:${name}`)
-    )
-    expect(unbookmarked).toEqual(['notify-d1-submissions.yml:notify'])
+  it('refuses a change that could run after a failed or missing bookmark (#101 review)', () => {
+    const publish = loadWorkflow('publish-d1.yml')
+    const job = publish.jobs.publish as WorkflowJob
+    const at = stepIndex(job, 'db:publish:production')
+    const edited = (edit: (steps: WorkflowStep[]) => void): WorkflowDefinition => {
+      const steps = structuredClone(stepsOf(job))
+      edit(steps)
+      return { ...publish, jobs: { ...publish.jobs, publish: { ...job, steps } } }
+    }
+    const audit = (workflow: WorkflowDefinition) =>
+      d1ChangeAudit([['publish-d1.yml', workflow]]).violations.join('\n')
+    expect(audit(publish)).toBe('')
+    // The reviewer's probe: `always()` on both steps runs the publish after a failed bookmark.
+    for (const condition of ['always()', 'failure()', '!cancelled()', 'success() || true']) {
+      expect(
+        audit(
+          edited(steps => {
+            for (const step of [steps[at - 1], steps[at]]) if (step) step.if = condition
+          })
+        ),
+        condition
+      ).toContain('would run after a failed bookmark')
+    }
+    expect(
+      audit(
+        edited(steps => {
+          if (steps[at - 1]) steps[at - 1]['continue-on-error'] = true
+        })
+      )
+    ).toContain('continue-on-error')
+    // A bookmark skipped by its own condition counts as success, so conditions must match.
+    expect(
+      audit(
+        edited(steps => {
+          if (steps[at - 1]) steps[at - 1].if = 'false'
+        })
+      )
+    ).toContain('condition')
+    expect(audit(edited(steps => steps.splice(at - 1, 1)))).toContain('must directly follow')
+    expect(
+      audit(
+        edited(steps => {
+          const change = steps[at]
+          if (change?.env) change.env.CLOUDFLARE_D1_DATABASE_ID = project.remote.staging.databaseId
+        })
+      )
+    ).toContain('is not the production database')
+  })
+
+  it('finds D1 changes by credential, not by script name (#101 review)', () => {
+    const token = {
+      CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
+      CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN')
+    }
+    const workflow = (steps: WorkflowStep[]): WorkflowDefinition => ({
+      jobs: { cleanup: { environment: 'production', 'runs-on': 'ubuntu-latest', steps } },
+      on: { workflow_dispatch: null }
+    })
+    for (const step of [
+      {
+        env: token,
+        run: 'pnpm exec wrangler d1 execute best-serp-co-production --remote --env production --command "DELETE FROM listings"'
+      },
+      { env: token, run: 'pnpm tsx scripts/d1-remote-publisher.ts d1/publications/x.yaml' },
+      {
+        env: token,
+        run: 'curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/x/d1/database/y/query"'
+      },
+      { env: token, uses: './.github/actions/anything' }
+    ] satisfies WorkflowStep[]) {
+      const { changes, violations } = d1ChangeAudit([['cleanup.yml', workflow([step])]])
+      expect(changes, JSON.stringify(step)).toEqual(['cleanup.yml:cleanup:production'])
+      expect(violations.join('\n'), JSON.stringify(step)).toContain('must directly follow')
+    }
+    // With its bookmark in front, the same change passes.
+    const guarded = d1ChangeAudit([
+      [
+        'cleanup.yml',
+        workflow([
+          { env: token, run: bookmarkCommand('production') },
+          { env: token, run: 'pnpm tsx scripts/d1-remote-publisher.ts d1/publications/x.yaml' }
+        ])
+      ]
+    ])
+    expect(guarded.violations).toEqual([])
+    // Reads, credential checks, and the Worker deploy are not D1 changes.
+    expect(
+      d1ChangeAudit([
+        [
+          'reads.yml',
+          workflow([
+            { env: token, run: 'if [ -z "$CLOUDFLARE_API_TOKEN" ]; then exit 1; fi' },
+            { env: token, run: 'pnpm tsx scripts/cloudflare-release.ts verify-import production' },
+            { env: token, run: 'pnpm tsx scripts/cloudflare-release.ts deploy production' }
+          ])
+        ]
+      ]).changes
+    ).toEqual([])
   })
 })
 

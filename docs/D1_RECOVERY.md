@@ -47,10 +47,24 @@ pnpm exec wrangler d1 time-travel restore best-serp-co-production --env producti
 ```
 
 The bookmark is the database just before that run changed it. Restoring it also discards every
-later write, including the Worker's own (sessions, sign-ins, submissions, admin decisions), so
-follow [Restore](#restore) below with that command in step 2. A bookmark is not a secret: using
-it requires D1 Edit on the SERP account. Bookmarks older than the 30-day window cannot be
-restored.
+later write, including the Worker's own (sessions, sign-ins, submissions, admin decisions). A
+bookmark is not a secret: using it requires D1 Edit on the SERP account. Bookmarks older than
+the 30-day window cannot be restored.
+
+**Use the first attempt's bookmark.** A change can be partly committed when its step fails:
+`wrangler d1 migrations apply` commits each migration on its own, so a release that failed on
+its second migration keeps the first. "Re-run failed jobs" then records a new bookmark that
+already includes it. Open the run, pick the earliest attempt in the attempt menu whose summary
+shows a bookmark, and use that one. The same goes across runs: a new dispatch after a failed run
+records its bookmark after whatever the failed run committed.
+
+Which procedure:
+
+- A Deploy Production bookmark (a migration ran after it): [Undo a bad
+  migration](#undo-a-bad-migration). Restoring D1 alone and redeploying would apply the same
+  migration again.
+- Any other bookmark (Publish D1 Catalog, Review D1 Submission, the bootstrap): follow
+  [Restore](#restore) below with the bookmark in step 2, then [After a restore](#after-a-restore).
 
 ## Find the moment
 
@@ -74,8 +88,9 @@ restored.
 
 ## Restore
 
-1. Write down the current bookmark first (`time-travel info` without `--timestamp`), so the
-   restore itself can be undone.
+1. Pause the scheduled notifier, so it does not act on rows the restore is about to change
+   (`gh workflow disable notify-d1-submissions.yml`), and write down the current bookmark
+   (`time-travel info` without `--timestamp`), so the restore itself can be undone.
 2. Restore (to a workflow bookmark, use `--bookmark <bookmark>` instead of `--timestamp`):
 
    ```bash
@@ -86,18 +101,67 @@ restored.
    Wrangler prints the previous bookmark; keep it with the one from step 1.
 3. Check the result read-only (`pnpm db:migrations:list:production`, and the rows from "Find
    the moment"). If the restore went to a time before a migration, that migration is pending
-   again: the next Deploy Production applies it (it records a bookmark first).
+   again and the next Deploy Production applies it: stop and follow [Undo a bad
+   migration](#undo-a-bad-migration) instead of step 4.
 4. Public pages are cached under the catalog epoch (`publication_state.version` plus the newest
    public `published_at`), not the checksum. A restore moves the version back, so the next
    publications reuse version numbers that were already used before the restore, and the edge
    HTML cache and the data cache could serve pages stored under them for up to 24 hours.
-   Redeploy the Worker right after a restore (Deploy Production): a new Worker version starts
-   with a cold edge HTML cache. The data cache survives deploys and expires within 24 hours;
-   in that window, an epoch that repeats a pre-restore one (same version and same newest
-   `published_at`) can show the data cached before the restore. A new approval gives a new
-   `published_at`, and so a new epoch.
+   When no migration is pending, redeploy the Worker right after a restore (Deploy Production
+   plans `worker-only`): a new Worker version starts with a cold edge HTML cache. The data
+   cache survives deploys and expires within 24 hours; in that window, an epoch that repeats a
+   pre-restore one (same version and same newest `published_at`) can show the data cached
+   before the restore. A new approval gives a new `published_at`, and so a new epoch.
 
 To undo the restore, run `time-travel restore` again with the bookmark from step 1.
+
+## Undo a bad migration
+
+Deploy Production applies pending migrations, then deploys the new Worker. Each migration must
+stay compatible with the Worker that was live while it applied, so the previous Worker runs on
+both the migrated and the restored schema; the new Worker may not run on the restored one.
+Hence the order:
+
+1. **Roll the Worker back first** to the version that was live before the release:
+
+   ```bash
+   pnpm exec wrangler deployments list --env production --config apps/web/wrangler.jsonc
+   pnpm exec wrangler rollback <previous-version-id> --env production \
+     --config apps/web/wrangler.jsonc
+   ```
+
+2. **Restore D1** to the release run's bookmark, from its first attempt (see above), with
+   [Restore](#restore) steps 1 to 3. Skip step 4: no redeploy.
+3. **Don't release `main` again until the fix is promoted.** The restore removed the migration
+   from the `d1_migrations` ledger, but `main` still has its file, so `plan-release` finds it
+   pending: any Deploy Production of `main` (a push, a re-run, or a dispatch) plans
+   `database-and-worker`, records a new bookmark, and applies the same migration again. The
+   hotfix path cannot ship around it either: `plan-release` refuses a hotfix while migrations
+   are pending ([Release guards](./RELEASE_GUARDS.md#hotfixes)). Reject every Deploy Production
+   run that waits for approval until then.
+4. **Fix forward through `staging`.** If running the bad migration again is harmless once a
+   corrective migration follows it, add that migration in a pull request into `staging` and
+   promote it. If it is not (it destroys data), production must never apply it. That means
+   changing a migration `staging` already applied, against the forward-only rule, so it is the
+   owner's decision; staging's D1 then needs the same restore before Deploy Staging can verify
+   the fixed tree.
+5. Do [After a restore](#after-a-restore).
+
+## After a restore
+
+A restore rewinds D1 only (the notifier was paused in [Restore](#restore) step 1). Then:
+
+- **Review issues the notifier opened after the bookmark.** Their submissions may no longer
+  exist: close those issues as not planned. For a submission that still exists, the notifier's
+  own record rolled back too, so it notifies again; it finds the issue by its marker and
+  updates it instead of opening a second one, but a closed issue stays closed.
+- **Review issues that Review D1 Submission closed after the bookmark.** The approval or
+  rejection is undone, and the submission is back in its state at the bookmark (usually
+  badge-verified). Reopen the issue and decide again, or tell the submitter.
+- **Emails already sent stay sent.** The `email_deliveries` ledger forgot them, so a repeated
+  decision emails again. Tell submitters whose submissions or edits were lost to submit again.
+- **Accounts and sign-ins after the bookmark are gone.** Those users sign in again.
+- Re-enable the notifier: `gh workflow enable notify-d1-submissions.yml`.
 
 ## Staging
 

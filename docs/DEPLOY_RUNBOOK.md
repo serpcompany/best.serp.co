@@ -183,8 +183,8 @@ one you won't ship instead of leaving it waiting. Hotfixes follow
   sessions, OAuth tokens, and emails (#99). Before each D1 change, `cloudflare-release.ts
   bookmark <env>` writes the Time Travel bookmark and its restore command to the run summary,
   and fails the job, before any change, if it cannot.
-- Restore (the owner only; every later write is lost, including admin panel writes): run the
-  summary's `wrangler d1 time-travel restore … --bookmark <bookmark>`, then check and redeploy
+- Restore (the owner only; every later write is lost) from the first attempt's bookmark. After a
+  bad migration, roll the Worker back first and don't redeploy `main` until a fix is promoted
   ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)). Time Travel keeps 30 days.
 - Worker rollback: dashboard → Workers → `best-serp-co-production` → Deployments → Rollback,
   or `wrangler rollback --env production`. A rollback does not undo a migration.

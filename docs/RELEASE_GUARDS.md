@@ -150,20 +150,39 @@ staging check because staging never verified that tree. To release it anyway:
 
 No workflow exports a D1 database (#99). The repository is public, so any signed-in GitHub user
 can download its workflow artifacts, and once accounts exist an export would hold session and
-OAuth tokens, verification values, and submitter emails. Instead, each workflow step that changes
-D1 (`cloudflare-release.ts migrate` or `import`, `db:publish:production`, `db:approve:production`)
-directly follows a step running `cloudflare-release.ts bookmark <env>`. That read-only command
-reads the Time Travel bookmark (`wrangler d1 time-travel info --json`), writes it and the exact
-`wrangler d1 time-travel restore … --bookmark` command to the run summary, and fails the job
-when it cannot, so no change runs without a restore point. The endpoint accepts D1 Read, which
-the deploy token's D1 → Edit includes. Only the owner restores
-([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
+OAuth tokens, verification values, and submitter emails. Instead, each workflow step that can
+change D1 directly follows a step running `cloudflare-release.ts bookmark <env>`. That read-only
+command reads the Time Travel bookmark (`wrangler d1 time-travel info --json`), writes it and the
+exact `wrangler d1 time-travel restore … --bookmark` command to the run summary, and fails when
+it cannot. The endpoint accepts D1 Read, which the deploy token's D1 → Edit includes. Only the
+owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
 
-`scripts/deploy-workflows.test.ts` enforces it: no workflow or composite action uploads or
-caches anything whose name, path, or key looks like a database export; no workflow runs
-`d1 export`; and every D1 mutation step follows a bookmark step for the same environment and
-condition, without `continue-on-error`. The scheduled notifier, which only records review
-notifications, is the one D1 writer without a bookmark.
+`scripts/deploy-workflows.test.ts` enforces it:
+
+- **Changes are found by credential, not by script name.** Every step that gets
+  `CLOUDFLARE_API_TOKEN` counts as a D1 change unless it only checks that the secret exists or
+  runs a read-only `cloudflare-release.ts` command (`bookmark`, `plan-release`,
+  `list-migrations`, `check-database`, `verify-import`) or the Worker `deploy`. A new
+  `wrangler d1 execute`, D1 query API call, publisher run, or composite action with the token is
+  therefore checked too, and so is #97's staging publish once it lands.
+- **A change runs only after a successful bookmark.** Its bookmark is the step right before it in
+  the same job, for the job's environment, with the same `if:`. Neither step may use
+  `continue-on-error` or a status function (`always()`, `failure()`, `cancelled()`,
+  `success()`), so the implicit `success()` skips the change when the bookmark fails. A change
+  that sets `CLOUDFLARE_D1_DATABASE_ID` must name its environment's database.
+- **The scheduled notifier is the one exception:** it only records review notifications, every
+  15 minutes, with a D1-only token. Time Travel still covers it by timestamp.
+- **Nothing leaves as a file.** Only the reviewed uploads and caches are allowed (the Playwright
+  reports, the staging smoke evidence, and the install action's dependency caches), matched by
+  action, name, and path. No workflow runs `d1 export` or `cloudflare-release.ts backup`, and no
+  script under `scripts/` passes `export` to Wrangler. A job holding the Cloudflare token uses
+  only reviewed actions and runs no `gh release`, `gh gist`, or `curl`/`wget` upload.
+
+These checks read workflow and script text, not data. An allowlisted upload path, a log line or
+job summary, a remote reusable workflow, or a script that writes rows to its output could still
+carry data, and a pull request can edit the checks themselves. Review of every workflow and
+script change stays the control; the per-environment token split (decision b) limits what a
+leaked token reaches.
 
 ## Security boundary
 
