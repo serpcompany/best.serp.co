@@ -75,3 +75,38 @@ moved on anyway (another publication or an admin decision), regenerate it with
 `--base-version` and `--base-checksum`; its per-row guards (`expected.website`, categories, live,
 no submission in review) hold on either environment, so `listing-unpublish` could also join a
 row-level mode like #97's without other changes.
+
+## Listing FAQs (#105)
+
+The one-time import wrote each listing's FAQs twice: as `listing_faqs` rows and as a closing
+`## FAQ` block in the long description (`scripts/migration/generate-initial-artifact.ts` appended
+it after the body and a blank line): 335 listings, 2,254 FAQs, each under a `### <question>`
+heading. The listing page now shows `listing_faqs` in its FAQs section, so the owner decided on
+2026-10-06 to move them: `d1/publications/2026-10-06-listing-faqs.yaml` removes each block.
+
+```bash
+pnpm catalog:faqs                  # count what would change
+pnpm catalog:faqs -- manifest      # write the manifest from the reviewed import
+```
+
+- Each operation is `listing-content-remove-suffix`: the description must still be exactly its
+  imported length (in SQLite characters) and end with exactly the block, or the whole batch is
+  refused. It keeps every other character, sets a new checksum (so a revision or admin edit read
+  before it is stale), and logs an `edited` event. The generator refuses a listing whose block
+  isn't the last section or doesn't say exactly its FAQs, and a test applies the manifest to the
+  reviewed import and checks every description byte by byte.
+- **Order:** the manifest is row-level (`concurrency: rows`, as #97 introduced): it names no
+  base version, so it publishes in any order relative to #100's and #98's manifests and fits
+  staging and production whatever else each published. Staging first (#97's staging path), then
+  production after promotion.
+- **A description that changed** on an environment (an approved revision, an admin edit) makes
+  the publisher refuse the whole batch. Leave such listings out of a new manifest with
+  `pnpm catalog:faqs -- manifest --skip <slug> --manifest-id 2026-10-07-listing-faqs-staging`
+  (`--skip` is repeatable or comma-separated; the id names the file, `d1/publications/<id>.yaml`,
+  so the reviewed manifest stays) and fix them by hand, as their FAQs already show in the section.
+- **Until it is published**, the FAQs section leaves out an FAQ whose exact `### <question>`
+  heading line the description still holds after its last `## FAQ` line (`faqsToShow`), so
+  imported FAQs never show twice.
+  It never matches text in prose, and is a no-op once the manifest is published; remove it
+  then.
+

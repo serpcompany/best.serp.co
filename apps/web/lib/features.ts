@@ -27,8 +27,8 @@ export interface SiteFeatures {
    */
   readonly claims: boolean
   /**
-   * #105: listing FAQs on the public listing page. Off: the account's FAQ fields say FAQs will
-   * appear on the listing page soon, instead of "Shown on your listing page."
+   * #105: listing FAQs on the public listing page. On since #105 renders them; off, the
+   * account's FAQ fields say FAQs will appear on the listing page soon.
    */
   readonly listingFaqs: boolean
   /**
@@ -48,7 +48,7 @@ export const features: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: false,
   claims: false,
-  listingFaqs: false,
+  listingFaqs: true,
   messages: false,
   orders: false
 }

@@ -13,6 +13,7 @@ import { generateWebsiteDetailSchema } from '../schema'
 import { generateDynamicMetadata } from '../seo-config'
 import { siteConfig } from '../site-config'
 import { siteCopy } from '../site-copy'
+import { faqsToShow } from '../website/website-faqs-section'
 
 type JsonLdProps = {
   data: Record<string, unknown>
@@ -55,6 +56,10 @@ type WebsiteResourcesSectionProps = {
   website: WebsiteResourcesSectionWebsite
 }
 
+type WebsiteFaqsSectionProps = {
+  website: Pick<WebsiteDetailMetadata, 'faqs'>
+}
+
 type WebsiteRelatedProjectsProps = {
   websites: WebsiteRelatedCardMetadata[]
 }
@@ -75,6 +80,7 @@ type WebsiteDetailRouteSlots = {
   ProjectNavigation: ComponentType<ProjectNavigationProps>
   WebsiteContentSection: ComponentType<WebsiteContentSectionProps>
   WebsiteDetailSidebar: ComponentType<WebsiteDetailSidebarProps>
+  WebsiteFaqsSection: ComponentType<WebsiteFaqsSectionProps>
   WebsiteHero: ComponentType<WebsiteHeroProps>
   WebsiteRelatedProjects: ComponentType<WebsiteRelatedProjectsProps>
   WebsiteResourcesSection: ComponentType<WebsiteResourcesSectionProps>
@@ -139,6 +145,7 @@ export function WebsiteDetailRoutePage({
     ProjectNavigation,
     WebsiteContentSection,
     WebsiteDetailSidebar,
+    WebsiteFaqsSection,
     WebsiteHero,
     WebsiteRelatedProjects,
     WebsiteResourcesSection
@@ -206,6 +213,8 @@ export function WebsiteDetailRoutePage({
               )}
 
               <WebsiteResourcesSection website={resourcesWebsite} />
+
+              <WebsiteFaqsSection website={{ faqs: faqsToShow(project.faqs, project.content) }} />
             </div>
 
             <div className="lg:col-span-4">

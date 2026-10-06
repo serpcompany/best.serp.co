@@ -65,10 +65,10 @@ The owner adds FAQs and links to a submission waiting for review ("Add them now 
 reviewed with the listing", screen 6): `ownerExtras` in `submission-plans.ts` replaces only the
 staged FAQs and links and increments `content_version`, so an approval of the older content is
 refused (409) and the reviewer reloads. Name, descriptions, category, and logo stay locked in
-the queue (`ownerEdit` is unchanged). The public listing page does not render listing FAQs
-yet (#105); until `features.listingFaqs` is on, the FAQ fields say "FAQs will appear on your
-listing page soon." instead of the mockup's "Shown on your listing page." (owner decision on
-#102, guarded by `feature-copy.test.ts`). Links render as resource links.
+the queue (`ownerEdit` is unchanged). Approved FAQs show on the listing page in an FAQs
+section (#105), so `features.listingFaqs` is on and the FAQ fields say "Shown on your listing
+page."; off, they say "FAQs will appear on your listing page soon." (`feature-copy.test.ts`).
+Links render as resource links.
 
 ## Badge panel
 
