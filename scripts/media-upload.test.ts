@@ -43,23 +43,36 @@ const workflowEnvironment = {
   MEDIA_UPLOAD_CONFIRM: 'upload-media-best.serp.co-staging'
 }
 
-/** Sources answer with their bytes; the media host knows `present`; R2 accepts every PUT. */
-function fakeFetch(present: string[] = []) {
-  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+/**
+ * Sources answer with their bytes; each R2 bucket (`bucket/key` → bytes) answers GETs through the
+ * API and stores PUTs. Nothing is read from a media host's CDN.
+ */
+function fakeFetch(
+  buckets: Record<string, Uint8Array> = {},
+  sources: Record<string, Uint8Array> = { [remote.source]: png }
+) {
+  const stored = new Map(Object.entries(buckets))
+  const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
-    if (init?.method === 'HEAD') {
-      const key = url.replace('https://cdn-staging.serp.co/', '')
-      const known = plan.objects.find(entry => entry.key === key)
-      return present.includes(key) && known
-        ? new Response(null, { headers: { 'Content-Length': String(known.bytes) } })
-        : new Response(null, { status: 404 })
+    const r2 = url.match(
+      /^https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/account\/r2\/buckets\/([^/]+)\/objects\/(.+)$/u
+    )
+    if (r2) {
+      const id = `${r2[1]}/${r2[2]}`
+      if (init?.method === 'PUT') {
+        stored.set(id, new Uint8Array(init.body as Uint8Array))
+        return new Response('{}', { status: 200 })
+      }
+      const body = stored.get(id)
+      return body ? new Response(new Uint8Array(body)) : new Response('missing', { status: 404 })
     }
-    if (init?.method === 'PUT') return new Response('{}', { status: 200 })
-    if (url === remote.source) {
-      return new Response(new Uint8Array(png), { headers: { 'Content-Type': 'image/png' } })
-    }
+    if (url.startsWith('https://cdn')) throw new Error(`read the CDN: ${url}`)
+    const body = sources[url]
+    if (body)
+      return new Response(new Uint8Array(body), { headers: { 'Content-Type': 'image/png' } })
     throw new TypeError('fetch failed')
   })
+  return Object.assign(fetcher, { stored })
 }
 
 describe('media upload plans', () => {
@@ -101,7 +114,9 @@ describe('media upload plans', () => {
       uploaded: 0,
       verified: 2
     })
-    expect(fetcher.mock.calls.map(([, init]) => init?.method ?? 'GET')).toEqual(['GET'])
+    expect(fetcher.mock.calls.map(([url, init]) => [String(url), init?.method ?? 'GET'])).toEqual([
+      [remote.source, 'GET']
+    ])
   })
 
   it('uploads for real only from its protected workflow, branch, and confirmation', async () => {
@@ -132,8 +147,8 @@ describe('media upload plans', () => {
     expect(fetcher).not.toHaveBeenCalled()
   })
 
-  it('uploads what the media host lacks, into the target bucket, with the immutable policy', async () => {
-    const fetcher = fakeFetch([repo.key])
+  it('uploads what the bucket lacks, into the target bucket, with the immutable policy', async () => {
+    const fetcher = fakeFetch({ [`cdn-staging/${repo.key}`]: tile })
     expect(
       await uploadMediaPlan(planPath, { env: workflowEnvironment, fetcher, target: 'staging' })
     ).toMatchObject({ failed: [], present: 1, uploaded: 1 })
@@ -149,37 +164,75 @@ describe('media upload plans', () => {
     })
   })
 
-  it('copies production objects from staging, never from the original source', async () => {
+  it('verifies an object already in the bucket and never overwrites a mismatch (#97 review B2)', async () => {
+    // Right size, wrong bytes: the skip path checks the digest like an upload does.
+    const impostor = new Uint8Array(png)
+    impostor[impostor.length - 5] = 0
+    const fetcher = fakeFetch({
+      [`cdn-staging/${remote.key}`]: impostor,
+      [`cdn-staging/${repo.key}`]: tile
+    })
+    const summary = await uploadMediaPlan(planPath, {
+      env: workflowEnvironment,
+      fetcher,
+      target: 'staging'
+    })
+    expect(summary).toMatchObject({
+      failed: [{ key: remote.key, reason: 'present_mismatch:sha256_mismatch' }],
+      present: 1,
+      uploaded: 0
+    })
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'PUT')).toEqual([])
+    expect(fetcher.stored.get(`cdn-staging/${remote.key}`)).toEqual(impostor)
+    // The source is not even fetched for a key the bucket already holds.
+    expect(fetcher.mock.calls.map(([url]) => String(url))).not.toContain(remote.source)
+  })
+
+  it('copies production objects from the staging bucket through the R2 API (#97 review S3)', async () => {
     const production = {
       ...workflowEnvironment,
       GITHUB_REF: 'refs/heads/main',
       GITHUB_WORKFLOW_REF: 'owner/repo/.github/workflows/upload-media.yml@refs/heads/main',
       MEDIA_UPLOAD_CONFIRM: 'upload-media-best.serp.co-production'
     }
-    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input)
-      if (init?.method === 'HEAD') return new Response(null, { status: 404 })
-      if (init?.method === 'PUT') return new Response('{}', { status: 200 })
-      if (url === `https://cdn-staging.serp.co/${remote.key}`) {
-        return new Response(new Uint8Array(png), { headers: { 'Content-Type': 'image/png' } })
-      }
-      return new Response('not on staging', { status: 404 })
-    })
+    const fetcher = fakeFetch({ [`cdn-staging/${remote.key}`]: png })
     const summary = await uploadMediaPlan(planPath, {
       env: production,
       fetcher,
       target: 'production'
     })
-    expect(summary).toMatchObject({ failed: [{ key: repo.key, reason: 'http_404' }], uploaded: 1 })
-    const gets = fetcher.mock.calls.filter(([, init]) => !init?.method || init.method === 'GET')
-    expect(gets.map(([url]) => String(url)).sort()).toEqual(
+    expect(summary).toMatchObject({
+      failed: [{ key: repo.key, reason: 'not_in_staging_bucket' }],
+      uploaded: 1
+    })
+    const gets = fetcher.mock.calls
+      .filter(([, init]) => (init?.method ?? 'GET') === 'GET')
+      .map(([url]) =>
+        String(url)
+          .replace('https://api.cloudflare.com/client/v4/accounts/account/r2/buckets/', '')
+          .replace('/objects/', '/')
+      )
+      .sort()
+    expect(gets).toEqual(
       [
-        `https://cdn-staging.serp.co/${remote.key}`,
-        `https://cdn-staging.serp.co/${repo.key}`
+        `cdn/${remote.key}`,
+        `cdn/${repo.key}`,
+        `cdn-staging/${remote.key}`,
+        `cdn-staging/${repo.key}`
       ].sort()
     )
-    const puts = fetcher.mock.calls.filter(([, init]) => init?.method === 'PUT')
-    expect(String(puts[0]?.[0])).toContain('/r2/buckets/cdn/objects/')
+    expect(fetcher.stored.get(`cdn/${remote.key}`)).toEqual(png)
+    // A tampered staging object fails closed with sha256_mismatch and no PUT.
+    const tampered = new Uint8Array(png)
+    tampered[tampered.length - 5] = 0
+    const poisoned = fakeFetch({
+      [`cdn-staging/${remote.key}`]: tampered,
+      [`cdn-staging/${repo.key}`]: tile
+    })
+    expect(
+      await uploadMediaPlan(planPath, { env: production, fetcher: poisoned, target: 'production' })
+    ).toMatchObject({ failed: [{ key: remote.key, reason: 'sha256_mismatch' }], uploaded: 1 })
+    expect(poisoned.stored.has(`cdn/${remote.key}`)).toBe(false)
   })
 
   it('reports a source that changed or vanished instead of uploading it', async () => {

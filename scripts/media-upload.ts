@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { IMAGE_CONTENT_TYPES, sniffImage } from '@serpdirectory/data-ops/media-format'
 import {
   contentTypeForKey,
-  isMediaKey,
+  isListingMediaKey,
   MAX_MEDIA_BYTES,
   MEDIA_CACHE_CONTROL,
   MEDIA_HASH_LENGTH,
@@ -13,8 +13,10 @@ import {
   parseMediaKey
 } from '@serpdirectory/data-ops/media-keys'
 import { safeFetch } from '@serpdirectory/data-ops/safe-fetch'
+import { nodeFetch } from '@serpdirectory/data-ops/safe-fetch-node'
 import { z } from 'zod'
 import { project } from './project'
+import { getR2Object, putR2Object } from './r2-objects'
 
 /**
  * Uploads a reviewed listing media plan (`d1/media/<id>.json`, serpcompany/best.serp.co#95) into
@@ -24,12 +26,17 @@ import { project } from './project'
  * credentials and writes nothing.
  *
  * A staging upload fetches every object again from its recorded source (a public https URL
- * through `safeFetch`, or `repo:` a file checked in under `apps/web/public`). A production upload
- * copies the object staging serves under the same key instead, so production gets exactly the
- * bytes staging verified, however the source changed since. Either way an object is uploaded only
- * when its bytes, SHA-256, format, and dimensions match the reviewed plan, and an object the media
- * host already serves at that size is skipped, so a rerun only finishes what is missing. Keys
- * outside `best.serp.co/listings/` are refused: the production bucket is shared with serp.co.
+ * through `safeFetch` with the DNS-checked Node fetcher, or `repo:` a file checked in under
+ * `apps/web/public`). A production upload copies the object from the staging bucket through the
+ * R2 API instead (never through the CDN), so production gets exactly the bytes staging verified,
+ * however the source changed since. Either way an object is uploaded only when its bytes,
+ * SHA-256, format, and dimensions match the reviewed plan.
+ *
+ * An object already in the target bucket is read back through the R2 API and verified the same
+ * way: a match is skipped (`present`), so a rerun only finishes what is missing; a mismatch fails
+ * that key (`present_mismatch`) and is never overwritten, since something else wrote it (#97
+ * review B2). Keys outside `best.serp.co/listings/` are refused: the production bucket is shared
+ * with serp.co.
  */
 
 export type UploadTarget = 'production' | 'staging'
@@ -70,7 +77,9 @@ const planObject = z
     bytes: z.number().int().min(1).max(MAX_MEDIA_BYTES),
     contentType: z.enum(Object.values(IMAGE_CONTENT_TYPES) as [string, ...string[]]),
     height: z.number().int().min(1),
-    key: z.string().refine(isMediaKey, { message: `Keys live under ${MEDIA_SITE}/listings/.` }),
+    key: z
+      .string()
+      .refine(isListingMediaKey, { message: `Keys live under ${MEDIA_SITE}/listings/.` }),
     sha256: z.string().regex(sha256Pattern),
     source: z.string().refine(value => value.startsWith('https://') || value.startsWith('repo:'), {
       message: 'A source is an https URL or a repo: path.'
@@ -161,7 +170,7 @@ export function validateUploadContext(env: NodeJS.ProcessEnv, target: UploadTarg
 
 async function sourceBytes(
   source: string,
-  fetcher: typeof fetch
+  fetcher: typeof fetch | undefined
 ): Promise<Uint8Array | { reason: string }> {
   if (source.startsWith('repo:')) {
     const path = resolve(source.slice('repo:'.length))
@@ -179,8 +188,10 @@ async function sourceBytes(
   const result = await safeFetch(source, {
     accept: type => type !== 'text/html' && type !== 'application/xhtml+xml',
     acceptHeader: 'image/avif,image/webp,image/png,image/jpeg,image/gif,image/*;q=0.8',
-    fetcher,
-    maxBytes: MAX_MEDIA_BYTES
+    // DNS-checked on every hop (#96 review S5); tests pass their own fetcher.
+    fetcher: fetcher ?? nodeFetch,
+    maxBytes: MAX_MEDIA_BYTES,
+    webPortsOnly: true
   })
   return result.ok ? result.body : { reason: result.code }
 }
@@ -199,49 +210,6 @@ export function verifyObject(object: MediaPlanObject, body: Uint8Array): string 
   return null
 }
 
-async function alreadyServed(
-  object: MediaPlanObject,
-  baseUrl: string,
-  fetcher: typeof fetch
-): Promise<boolean> {
-  try {
-    const response = await fetcher(`${baseUrl}/${object.key}`, {
-      method: 'HEAD',
-      signal: AbortSignal.timeout(15_000)
-    })
-    return response.ok && Number(response.headers.get('content-length')) === object.bytes
-  } catch {
-    return false
-  }
-}
-
-async function putObject(
-  object: MediaPlanObject,
-  body: Uint8Array,
-  bucket: string,
-  env: NodeJS.ProcessEnv,
-  fetcher: typeof fetch
-): Promise<string | null> {
-  const accountId = requireEnvironment(env, 'CLOUDFLARE_ACCOUNT_ID')
-  const apiToken = requireEnvironment(env, 'CLOUDFLARE_API_TOKEN')
-  const response = await fetcher(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}/objects/${object.key}`,
-    {
-      body: new Uint8Array(body),
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        'Cache-Control': MEDIA_CACHE_CONTROL,
-        'Content-Length': String(object.bytes),
-        'Content-Type': object.contentType
-      },
-      method: 'PUT',
-      signal: AbortSignal.timeout(60_000)
-    }
-  )
-  await response.body?.cancel()
-  return response.ok ? null : `r2_put_${response.status}`
-}
-
 export interface UploadOptions {
   concurrency?: number
   dryRun?: boolean
@@ -255,32 +223,41 @@ export async function uploadMediaPlan(
   options: UploadOptions
 ): Promise<UploadSummary> {
   const env = options.env ?? process.env
-  const fetcher = options.fetcher ?? fetch
+  const api = options.fetcher ?? fetch
   const resolvedPath = resolvePlanPath(planPath)
   const plan = mediaPlanSchema.parse(JSON.parse(readFileSync(resolvedPath, 'utf8')))
   const target = uploadTargets[options.target]
-  if (!options.dryRun) {
-    validateUploadContext(env, options.target)
+  if (!options.dryRun) validateUploadContext(env, options.target)
+  // Production reads staging's bucket through the R2 API, so even a dry run needs credentials.
+  if (!options.dryRun || options.target === 'production') {
     requireEnvironment(env, 'CLOUDFLARE_ACCOUNT_ID')
     requireEnvironment(env, 'CLOUDFLARE_API_TOKEN')
   }
 
   async function handle(object: MediaPlanObject): Promise<ObjectOutcome> {
-    if (!options.dryRun && (await alreadyServed(object, target.baseUrl, fetcher))) {
-      return { key: object.key, status: 'present' }
+    if (!options.dryRun) {
+      // What the bucket already holds is verified, never trusted or overwritten (#97 B2).
+      const existing = await getR2Object(target.bucket, object.key, env, api)
+      if (existing) {
+        const mismatch = verifyObject(object, existing)
+        return mismatch
+          ? { key: object.key, reason: `present_mismatch:${mismatch}`, status: 'failed' }
+          : { key: object.key, status: 'present' }
+      }
     }
     // Production copies staging's verified object; staging fetches the recorded source.
-    const source =
+    const body =
       options.target === 'production'
-        ? `${uploadTargets.staging.baseUrl}/${object.key}`
-        : object.source
-    const body = await sourceBytes(source, fetcher)
+        ? ((await getR2Object(uploadTargets.staging.bucket, object.key, env, api)) ?? {
+            reason: 'not_in_staging_bucket'
+          })
+        : await sourceBytes(object.source, options.fetcher)
     if (!(body instanceof Uint8Array))
       return { key: object.key, reason: body.reason, status: 'failed' }
     const mismatch = verifyObject(object, body)
     if (mismatch) return { key: object.key, reason: mismatch, status: 'failed' }
     if (options.dryRun) return { key: object.key, status: 'verified' }
-    const failure = await putObject(object, body, target.bucket, env, fetcher)
+    const failure = await putR2Object(object, body, target.bucket, MEDIA_CACHE_CONTROL, env, api)
     return failure
       ? { key: object.key, reason: failure, status: 'failed' }
       : { key: object.key, status: 'uploaded' }
@@ -304,7 +281,7 @@ export async function uploadMediaPlan(
       .flatMap(outcome =>
         outcome.status === 'failed' ? [{ key: outcome.key, reason: outcome.reason }] : []
       )
-      .sort((a, b) => a.key.localeCompare(b.key)),
+      .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)),
     id: plan.id,
     present: outcomes.filter(outcome => outcome.status === 'present').length,
     target: options.target,
