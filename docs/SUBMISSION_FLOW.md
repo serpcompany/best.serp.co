@@ -270,3 +270,9 @@ Setup and guards are in [the deploy runbook](./DEPLOY_RUNBOOK.md#workflows).
 Code: `apps/web/app/submit/`, `apps/web/components/submit/`, `apps/web/app/api/submissions/`,
 `apps/web/lib/submissions/`, `packages/data-ops/src/submissions.ts`, and
 `packages/data-ops/src/submission-plans.ts`.
+
+## Listing media
+
+A submitted logo is never published as the submitter's URL (#95): approval adopts its hosted copy
+or queues the source behind the fallback tile. Submit v2 hosts it at intake
+([Listing media](./MEDIA.md#integration-points)).
