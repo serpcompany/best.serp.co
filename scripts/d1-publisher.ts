@@ -783,9 +783,9 @@ export function buildPublicationPlan(
       const website = op.expected ? [op.expected.website] : []
       statements.push(
         statement(
-          `INSERT INTO publication_guard SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?${
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?${
             op.expected ? ' AND website=?' : ''
-          }) THEN 1 ELSE 0 END`,
+          }) THEN 1 ELSE ${GUARD_FAILURE} END`,
           op.id,
           op.slug,
           ...website
@@ -798,7 +798,7 @@ export function buildPublicationPlan(
           now
         ),
         statement(
-          'INSERT INTO publication_guard SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_claim_holds WHERE listing_id=? AND cleared_at IS NULL) THEN 1 ELSE 0 END',
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_claim_holds WHERE listing_id=? AND cleared_at IS NULL) THEN 1 ELSE ${GUARD_FAILURE} END`,
           op.id
         )
       )
@@ -814,7 +814,7 @@ export function buildPublicationPlan(
           op.id,
           op.slug
         ),
-        statement('INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)')
+        statement(CHANGED_ONE_GUARD)
       )
       routes.add(listingRoute(op.slug))
     }
