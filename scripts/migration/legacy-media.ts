@@ -22,6 +22,7 @@ import { stringify } from 'yaml'
 import { parseWranglerRows } from '../cloudflare-release'
 import { freshMigrationNames, freshMigrationsDirectory } from '../d1-drizzle-local'
 import { readParityReport, readReviewedImportSql } from '../d1-import-artifact'
+import { isArchivedRepoMedia, readArchivedRepoMedia } from '../media-repo-archive'
 import { project } from '../project'
 
 /**
@@ -33,7 +34,8 @@ import { project } from '../project'
  *   fetched as is;
  * - a `/media/products/…` path the import copied from apps.serp.co without its file is fetched
  *   from apps.serp.co, where the originals live (byte-identical to serpcompany/store-new);
- * - a file checked in under `apps/web/public` is read from the repository (`repo:` source).
+ * - a file checked in under `apps/web/public` is read from the repository (`repo:` source); one
+ *   deleted after the production publish (#124) is read from Git (`media-repo-archive.ts`).
  *
  * A source that is dead, not a hostable image, or a known default asset (`DEFAULT_ASSETS`: the
  * placeholder chevron of 387 imported logos, framework favicons, builder default images,
@@ -514,8 +516,17 @@ export function cachingFetch(
   }
 }
 
+/** A site-relative path's file in the repository: checked in, or deleted in #124. */
+function repoPath(url: string): string {
+  return `${project.appDirectory}/public${url}`
+}
+
 export function classifySource(url: string): SourceClass {
-  if (url.startsWith('/media/products/') && !existsSync(resolve(publicDirectory, `.${url}`))) {
+  if (
+    url.startsWith('/media/products/') &&
+    !existsSync(resolve(publicDirectory, `.${url}`)) &&
+    !isArchivedRepoMedia(repoPath(url))
+  ) {
     return 'media-products'
   }
   if (url.startsWith('/')) return 'repo'
@@ -535,16 +546,18 @@ export function classifySource(url: string): SourceClass {
 export function sourceFor(url: string): string {
   const kind = classifySource(url)
   if (kind === 'media-products') return `${PRODUCT_MEDIA_ORIGIN}${url}`
-  if (kind === 'repo') return `repo:${project.appDirectory}/public${url}`
+  if (kind === 'repo') return `repo:${repoPath(url)}`
   return url
 }
 
 function readRepoImage(source: string): Resolution {
   const path = resolve(source.slice('repo:'.length))
-  if (!path.startsWith(`${publicDirectory}/`) || !existsSync(path)) {
-    return { ok: false, reason: 'repo_file_missing' }
-  }
-  const body = new Uint8Array(readFileSync(path))
+  if (!path.startsWith(`${publicDirectory}/`)) return { ok: false, reason: 'repo_file_missing' }
+  // A file deleted after the production publish is read from Git, so a replay is unchanged.
+  const body = existsSync(path)
+    ? new Uint8Array(readFileSync(path))
+    : readArchivedRepoMedia(source.slice('repo:'.length))
+  if (!body) return { ok: false, reason: 'repo_file_missing' }
   const sniffed = sniffImage(body)
   if (!sniffed.ok) return { ok: false, reason: sniffed.reason }
   return {

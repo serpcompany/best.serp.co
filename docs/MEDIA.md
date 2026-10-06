@@ -249,8 +249,10 @@ refused replacements, and each logo left on the tile are in `d1/media/2026-10-06
 - `scripts/catalog-media.test.ts` applies the manifests to the import and checks that every logo
   and image is then a hosted key with a matching object in the plan, and that nothing else
   changes.
-- After the production publish, delete `apps/web/public/listing-logos/serpdownloaders.com/`,
-  `listing-media-seed/` (sources a GitHub runner sees re-encoded), and `media/products/launchbuzz.io/`.
+- **Cleanup (#124).** Once production had published every part, the plan's 145 `repo:` files were
+  deleted (the #86 tile stays). The plan still names them, and their bytes stay in Git at
+  `0e17a98e20`, where the migration reads them (`scripts/media-repo-archive.ts`). See the
+  [report](../d1/media/2026-10-06-legacy-media.report.md) for details and the restore command.
 
 Fetches are cached under `.runtime/legacy-media-cache`, through the DNS-checked Node fetcher, so
 a rerun reproduces the outputs byte for byte. `--part-size <n>` sets the listings per manifest,
