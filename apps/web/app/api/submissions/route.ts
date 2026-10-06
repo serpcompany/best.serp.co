@@ -60,13 +60,14 @@ export async function POST(request: Request) {
         fields: { logoUrl: LOGO_MESSAGES[logo.code] }
       })
     }
-    const { socialImageUrl, ...draftInput } = parsed.data
-    const draft = await createDraft(owner, draftInput)
-    // Copied to the media host under the submission after the response (#95); never fails the save.
+    const draft = await createDraft(owner, parsed.data)
+    // Copied to the media host under the submission after the response (#95); never fails the
+    // save. The featured image is the server's own prefill of the submitted website, never a
+    // URL the client sends (#96 review round 2, B1).
     await hostSubmissionImages({
       logoUrl: draft.logoUrl,
-      socialImageUrl,
-      submissionId: draft.id
+      submissionId: draft.id,
+      website: draft.website
     }).catch(() => undefined)
     return json({ next: `/submit/${draft.id}/choose/?saved=1`, submission: toSummary(draft) }, 201)
   } catch (error) {

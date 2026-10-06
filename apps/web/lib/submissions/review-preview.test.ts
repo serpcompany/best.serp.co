@@ -61,10 +61,11 @@ describe('private submission review preview', () => {
 
   it('shows the submission’s hosted logo copy, never its source (#96 review S9)', () => {
     const logoKey = `best.serp.co/submissions/${submission.id}/logo/${'a'.repeat(16)}.png`
-    expect(buildSubmissionReviewPreview({ ...submission, logo_key: logoKey }, []).media).toEqual({
-      logo: logoKey,
-      video: 'https://example.com/video.mp4'
-    })
+    const imageKey = `best.serp.co/submissions/${submission.id}/image/${'b'.repeat(16)}.png`
+    expect(
+      buildSubmissionReviewPreview({ ...submission, image_key: imageKey, logo_key: logoKey }, [])
+        .media
+    ).toEqual({ images: [imageKey], logo: logoKey, video: 'https://example.com/video.mp4' })
     expect(
       buildSubmissionReviewPreview({ ...submission, logo_key: 'https://example.com/x.png' }, [])
         .media?.logo

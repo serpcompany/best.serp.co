@@ -153,6 +153,11 @@ export function selectSubmissionForDecisionPlan(submissionId: string): Statement
  */
 function createListingFromSubmissionPlans(input: {
   checksum: string
+  /**
+   * The hosted featured image the reviewer saw (or null for none); absent when nobody reviewed
+   * the submission (a paid listing goes live at payment), and then no image is adopted.
+   */
+  featuredImageKey?: string | null
   linkRel: ListingLinkRel
   listingId: string
   now: string
@@ -189,15 +194,22 @@ function createListingFromSubmissionPlans(input: {
       params: [listingId, submissionId]
     },
     assertPreviousStatementChangedOne('primary_category_created'),
-    // Never a hotlink (#95): the submission's hosted logo and featured image are queued for a
-    // copy into the listing's path, or their sources for the cron.
+    // Never a hotlink (#95): the submission's hosted logo is queued for a copy into the
+    // listing's path (or its source for the cron), and its featured image only as reviewed.
     ...adoptStagedLogoPlans({
       listingId,
       now: input.now,
       stagedId: submissionId,
       stagedTable: 'listing_submissions'
     }),
-    ...adoptSubmissionImagePlans({ listingId, now: input.now, submissionId }),
+    ...(input.featuredImageKey === undefined
+      ? []
+      : adoptSubmissionImagePlans({
+          listingId,
+          now: input.now,
+          reviewedKey: input.featuredImageKey,
+          submissionId
+        })),
     {
       sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
         SELECT ?,'video',video_url,1 FROM listing_submissions
@@ -242,6 +254,11 @@ export function buildApproveSubmissionPlans(input: {
   affectedRoute: string
   beforeChecksum: string
   expectedContentVersion: number
+  /**
+   * The hosted featured image key the reviewer saw (null for none). Absent for a caller that
+   * shows no images (the legacy approval workflow): then no featured image is adopted.
+   */
+  expectedImageKey?: string | null
   linkRel?: ListingLinkRel
   listingId: string
   manifestId: string
@@ -277,6 +294,7 @@ export function buildApproveSubmissionPlans(input: {
     ),
     ...createListingFromSubmissionPlans({
       checksum: input.afterChecksum,
+      featuredImageKey: input.expectedImageKey,
       linkRel: input.linkRel ?? 'nofollow',
       listingId: input.listingId,
       now: input.now,
@@ -448,6 +466,8 @@ export function buildUpgradeListingToPaidPlans(input: {
  */
 export function buildApproveLiveSubmissionPlans(input: {
   expectedContentVersion: number
+  /** As in `buildApproveSubmissionPlans`: the paid listing went live without its image. */
+  expectedImageKey?: string | null
   listingId: string
   now: string
   publication: CatalogPublication
@@ -470,6 +490,14 @@ export function buildApproveLiveSubmissionPlans(input: {
       now: input.now,
       source: submissionContentSource(input.submissionId)
     }),
+    ...(input.expectedImageKey === undefined
+      ? []
+      : adoptSubmissionImagePlans({
+          listingId: input.listingId,
+          now: input.now,
+          reviewedKey: input.expectedImageKey,
+          submissionId: input.submissionId
+        })),
     {
       sql: `UPDATE listing_submissions SET status='approved',reviewed_at=?,reviewed_by=?,updated_at=?
         WHERE ${current}`,

@@ -96,6 +96,11 @@ export interface ReviewView {
   kind: 'revision' | 'submission'
   linkRel: LinkRel
   listing: { live: boolean; liveSince: string | null; slug: string } | null
+  /**
+   * A submission's featured image as approval would publish it (#96 round 2 B1): the hosted
+   * copy (`image`, `key`) or none, and what the reviewer should know. Null for a revision.
+   */
+  featuredImage: { image: string | null; key: string | null; note: string } | null
   /** The hosted copy of `logoUrl`, or null for the fallback tile (#96 review S9). */
   logoImage: string | null
   /** The submitted logo source; never rendered as an image. */
@@ -238,6 +243,8 @@ export function ReviewDetail({
         ? {
             edits: editing && editedFields.length > 0 ? edits : undefined,
             expectedContentVersion: view.contentVersion,
+            // Approval adopts only the featured image shown here (#96 round 2 B1).
+            expectedImageKey: view.featuredImage?.key ?? null,
             linkRel
           }
         : { expectedContentVersion: view.contentVersion },
@@ -528,6 +535,20 @@ export function ReviewDetail({
               ]
             ]}
           />
+          {view.featuredImage ? (
+            <div className="mt-4 flex flex-col gap-2" data-testid="review-featured-image">
+              <p className="text-sm font-medium">Featured image</p>
+              {view.featuredImage.image ? (
+                // The hosted copy on our media host, never the submitter's source.
+                <img
+                  alt={`${view.name}, featured`}
+                  className="max-h-48 w-full rounded-md border object-contain"
+                  src={view.featuredImage.image}
+                />
+              ) : null}
+              <p className="text-xs text-muted-foreground">{view.featuredImage.note}</p>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
       {isSubmission ? (

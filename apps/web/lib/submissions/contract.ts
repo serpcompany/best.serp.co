@@ -65,11 +65,6 @@ export const draftContentSchema = z.object({
 })
 
 export const newDraftSchema = draftContentSchema.extend({
-  /**
-   * The social (Open Graph) image prefill found, if any: hosted under the submission as its
-   * featured image (#95), never stored as a URL to render. Ignored when it isn't a public URL.
-   */
-  socialImageUrl: z.string().trim().max(2048).nullish(),
   website: httpUrl(FIELD_MESSAGES.website)
 })
 

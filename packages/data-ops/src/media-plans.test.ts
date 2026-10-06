@@ -82,7 +82,7 @@ function slots(db: DatabaseSync): unknown[] {
     .all()
 }
 
-function approve(db: DatabaseSync): void {
+function approve(db: DatabaseSync, expectedImageKey?: string | null): void {
   execute(
     db,
     buildApproveSubmissionPlans({
@@ -90,6 +90,7 @@ function approve(db: DatabaseSync): void {
       affectedRoute: '/products/example.com/',
       beforeChecksum: 'before',
       expectedContentVersion: 1,
+      expectedImageKey,
       listingId: 'lst_approved',
       manifestId: `verified-submission-${submissionId}`,
       now: NOW,
@@ -369,7 +370,7 @@ describe('submission media and approval', () => {
     const image = pendingCopy('image', 'e', 'https://example.com/og.png')
     record('logo', logo)
     record('image', image)
-    approve(db)
+    approve(db, image.key)
     // Nothing renders from the submission's path: the page shows the tile until the copy lands.
     expect(
       count(db, "SELECT COUNT(*) AS count FROM listing_media WHERE listing_id='lst_approved'")
@@ -397,6 +398,60 @@ describe('submission media and approval', () => {
         status: 'pending'
       }
     ])
+  })
+
+  it('adopts only the featured image the reviewer saw (#96 review round 2, B1)', () => {
+    const withImage = (key: string | null | undefined, hosted: HostedMedia | null) => {
+      const db = planDatabase()
+      seedSubmission(db)
+      if (hosted) {
+        execute(
+          db,
+          buildRecordSubmissionMediaPlans({
+            kind: 'image',
+            media: hosted,
+            now: NOW,
+            sortOrder: 0,
+            submissionId
+          })
+        )
+      }
+      return { approveNow: () => approve(db, key), db }
+    }
+    const image = pendingCopy('image', 'e', 'https://example.com/og.png')
+    const imageSlots = (db: DatabaseSync) =>
+      count(
+        db,
+        "SELECT COUNT(*) AS count FROM media_ingestions WHERE listing_id='lst_approved' AND kind='image'"
+      )
+    // The image changed (or appeared) after the reviewer looked: the approval is refused.
+    const stale = withImage(pendingCopy('image', 'f', '').key, image)
+    expect(stale.approveNow).toThrow(/malformed JSON/u)
+    expect(count(stale.db, 'SELECT COUNT(*) AS count FROM listings')).toBe(0)
+    const appeared = withImage(null, image)
+    expect(appeared.approveNow).toThrow(/malformed JSON/u)
+    // The reviewer saw none, and there is none: approved without a featured image.
+    const none = withImage(null, null)
+    none.approveNow()
+    expect(imageSlots(none.db)).toBe(0)
+    // A caller that shows no images (the legacy approval workflow) never adopts one.
+    const legacy = withImage(undefined, image)
+    legacy.approveNow()
+    expect(imageSlots(legacy.db)).toBe(0)
+    // A waiting image the reviewer could not see is not adopted, and approval stays possible.
+    const waiting = withImage(null, null)
+    execute(
+      waiting.db,
+      buildQueueMediaPlans({
+        kind: 'image',
+        now: NOW,
+        sortOrder: 0,
+        sourceUrl: 'https://example.com/og.png',
+        target: { submissionId }
+      })
+    )
+    waiting.approveNow()
+    expect(imageSlots(waiting.db)).toBe(0)
   })
 
   it('queues the logo, never hotlinks it, when no hosted copy of that source exists', () => {

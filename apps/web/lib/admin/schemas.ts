@@ -23,6 +23,11 @@ export const approveSubmissionSchema = z.object({
     .strict()
     .optional(),
   expectedContentVersion: z.number().int().positive(),
+  /**
+   * The hosted featured image the review screen showed, or null for none: approval adopts only
+   * that image, and is refused if the submission's image changed since (#96 round 2 B1).
+   */
+  expectedImageKey: text(300).nullable().default(null),
   linkRel: linkRel.optional()
 })
 

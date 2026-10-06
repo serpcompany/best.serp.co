@@ -208,6 +208,11 @@ export interface SubmissionReviewPreviewRow {
   created_at: string
   description: string
   id: string
+  /**
+   * The submission's hosted featured image (#95), if any: the image approval would publish, and
+   * the only one the preview shows (#96 round 2 B1).
+   */
+  image_key?: string | null
   /** The submission's hosted copy of `logo_url` (#95), if any: the only logo the preview shows. */
   logo_key?: string | null
   logo_url: string
@@ -344,6 +349,7 @@ export function buildSubmissionReviewPreview(
   // (the web adapter resolves it on the media host), or the fallback tile (#96 review S9).
   assetReference(row.logo_url, 'logo URL')
   const logo = row.logo_key && isMediaKey(row.logo_key) ? row.logo_key : undefined
+  const image = row.image_key && isMediaKey(row.image_key) ? row.image_key : undefined
   const video = row.video_url ? assetReference(row.video_url, 'video URL') : undefined
   const resourceLinks = resources.map((resource, index) => ({
     label: requiredTrimmedText(resource.label, `resource ${index + 1} label`),
@@ -356,6 +362,7 @@ export function buildSubmissionReviewPreview(
     content: row.content,
     description: requiredTrimmedText(row.description, 'description'),
     media: {
+      ...(image ? { images: [image] } : {}),
       ...(logo ? { logo } : {}),
       ...(video ? { video } : {})
     },
@@ -849,6 +856,9 @@ export function createSubmissionOperations(config: {
             created_at: listingSubmissions.createdAt,
             description: listingSubmissions.description,
             id: listingSubmissions.id,
+            image_key: sql<string | null>`(SELECT j.media_key FROM media_ingestions j
+              WHERE j.submission_id=${listingSubmissions.id} AND j.kind='image'
+                AND j.sort_order=0 AND j.status='hosted')`,
             logo_key: sql<string | null>`(SELECT j.media_key FROM media_ingestions j
               WHERE j.submission_id=${listingSubmissions.id} AND j.kind='logo'
                 AND j.sort_order=0 AND j.status='hosted'

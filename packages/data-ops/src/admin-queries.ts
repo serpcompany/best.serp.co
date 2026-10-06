@@ -150,6 +150,10 @@ export function selectSubmissionReviewPlans(submissionId: string): StatementPlan
           c.name AS category_name,s.logo_url,s.video_url,s.status,s.plan,s.paid_at,s.refunded_at,
           ${submissionHostedKey('s', 'logo', 's.logo_url')} AS logo_key,
           ${submissionHostedKey('s', 'image')} AS image_key,
+          (SELECT json_object('attempts',j.attempts,'lastError',j.last_error,
+              'nextAttemptAt',j.next_attempt_at,'sourceUrl',j.source_url,'status',j.status)
+            FROM media_ingestions j WHERE j.submission_id=s.id AND j.kind='image'
+              AND j.sort_order=0) AS image_slot,
           s.verification_attempts,s.last_verification_at,s.last_verification_error,
           s.badge_verified_at,s.reviewed_at,s.reviewed_by,s.reviewer_note,s.rejection_reason,
           s.rejection_category,s.withdrawal_reason,s.created_at,s.updated_at,s.content_version,
@@ -584,6 +588,8 @@ export interface SubmissionReview {
   } | null
   /** The hosted copy of the submission's social image, if any (#95). */
   imageKey: string | null
+  /** The featured image slot (hosted, waiting, or failed), for the reviewer (#96 round 2 B1). */
+  imageSlot: AdminListingDetail['logoQueue']
   /** The hosted copy of `logoUrl`, if any: render this, never `logoUrl` (#96 S9). */
   logoKey: string | null
   logoUrl: string
@@ -689,6 +695,8 @@ export interface AdminListingDetail extends AdminListingRow {
    * The logo when it is not hosted yet (#95): queued for the media cron (`pending`) or given up
    * (`failed`, with the reason). The page shows the fallback tile meanwhile.
    */
+  /** The logo row's source the page shows now; `logoUrl` is the form's (queued or current). */
+  currentLogoUrl: string | null
   logoQueue: {
     attempts: number
     lastError: string | null
@@ -850,8 +858,10 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
       const listing = listingRow(row)
       return {
         ...listing,
-        // A queued logo is still the logo the admin set: the form shows its source.
-        logoUrl: listing.logoUrl ?? logoQueue?.sourceUrl ?? null,
+        // The logo row the page shows now (hosted, imported, or none).
+        currentLogoUrl: listing.logoUrl,
+        // A queued logo is the logo the admin set last: the form shows its source (#96 r2 S2).
+        logoUrl: logoQueue?.sourceUrl ?? listing.logoUrl ?? null,
         logoQueue,
         activity: events(activity ?? [], 'listing'),
         badgeChecks: badgeChecks(checks ?? []),
@@ -981,6 +991,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
               }
             : null,
         imageKey: optionalText(row.image_key),
+        imageSlot: parseLogoQueue(row.image_slot),
         logoKey: optionalText(row.logo_key),
         logoUrl: text(row.logo_url),
         name: text(row.name),

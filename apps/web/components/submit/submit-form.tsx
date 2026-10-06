@@ -430,12 +430,7 @@ export function SubmitForm({
           ...fields,
           expectedContentVersion: editing.contentVersion
         })
-      : await createDraft({
-          ...fields,
-          // Hosted as the submission's featured image (#95); only what prefill found.
-          socialImageUrl: socialImage,
-          website: normalizeWebsiteInput(website)
-        })
+      : await createDraft({ ...fields, website: normalizeWebsiteInput(website) })
     if (response.ok) {
       saved.current = true
       if (!editing) clearLocalDraft(signedInUserId)

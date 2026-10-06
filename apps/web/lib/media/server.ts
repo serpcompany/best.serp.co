@@ -3,6 +3,7 @@ import 'server-only'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { MediaOperations } from '@serpdirectory/data-ops/media-operations'
 import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
+import { readSitePrefill } from '../submissions/prefill'
 import { createWorkerMediaOperations } from './worker-media'
 
 /**
@@ -30,15 +31,18 @@ function hostableSource(value: string | null | undefined, local: boolean): strin
 }
 
 /**
- * Copies a saved submission's logo and social image into the media bucket after the response
- * (`waitUntil`), under the submission's own prefix. Never fails the save: a slot that cannot be
- * hosted now is recorded and retried by the media cron (or fails with its reason, which the
- * reviewer sees). Without a `MEDIA` binding it logs and does nothing.
+ * Copies a saved submission's logo and featured image into the media bucket after the response
+ * (`waitUntil`), under the submission's own prefix. The featured image is the social image the
+ * server's own prefill finds on the submitted website, never a URL the client sends (#96 review
+ * round 2, B1); the reviewer sees it before approval adopts it. Never fails the save: a slot
+ * that cannot be hosted now is recorded and retried by the media cron (or fails with its
+ * reason, which the reviewer sees). Without a `MEDIA` binding it logs and does nothing.
  */
 export async function hostSubmissionImages(input: {
   logoUrl?: string | null
-  socialImageUrl?: string | null
   submissionId: string
+  /** The submission's website: when given, its prefill's social image becomes the image. */
+  website?: string
 }): Promise<void> {
   const { ctx, env } = await getCloudflareContext({ async: true })
   const workerEnv = env as CloudflareEnv
@@ -53,23 +57,29 @@ export async function hostSubmissionImages(input: {
     })
     return
   }
-  const slots = [
-    { kind: 'logo' as const, sourceUrl: hostableSource(input.logoUrl, local) },
-    { kind: 'image' as const, sourceUrl: hostableSource(input.socialImageUrl, local) }
-  ]
-  for (const slot of slots) {
-    if (!slot.sourceUrl) continue
-    const { kind, sourceUrl } = slot
+  const host = async (kind: 'image' | 'logo', source: string | null | undefined) => {
+    const sourceUrl = hostableSource(source, local)
+    if (!sourceUrl) return
+    await operations.hostSubmissionMedia({
+      kind,
+      sortOrder: 0,
+      sourceUrl,
+      submissionId: input.submissionId
+    })
+  }
+  const failed = (kind: string) => (error: unknown) =>
+    log({
+      event: 'submission_media_error',
+      kind,
+      message: error instanceof Error ? error.message : String(error)
+    })
+  ctx.waitUntil(host('logo', input.logoUrl).catch(failed('logo')))
+  const { website } = input
+  if (website) {
     ctx.waitUntil(
-      operations
-        .hostSubmissionMedia({ kind, sortOrder: 0, sourceUrl, submissionId: input.submissionId })
-        .catch(error => {
-          log({
-            event: 'submission_media_error',
-            kind,
-            message: error instanceof Error ? error.message : String(error)
-          })
-        })
+      readSitePrefill(website, fetch, { allowInsecureLogos: local })
+        .then(prefill => (prefill.ok ? host('image', prefill.socialImage) : undefined))
+        .catch(failed('image'))
     )
   }
 }

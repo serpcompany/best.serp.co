@@ -5,6 +5,7 @@ import { PAID_LISTING_PRICE_CENTS } from '@/components/admin/format'
 import type { ReviewView } from '@/components/admin/review-detail'
 import { renderableImage } from '../media/renderable-image'
 import { buildSubmissionReviewPreview } from '../submissions/review-preview'
+import { featuredImageView } from './featured-image'
 
 /**
  * Maps the admin reads to what the review screen renders (#64 screen 11), and builds the
@@ -50,6 +51,7 @@ export function submissionView(review: SubmissionReview, mediaBaseUrl: string): 
           slug: review.listing.slug
         }
       : null,
+    featuredImage: featuredImageView(review, mediaBaseUrl),
     // The hosted copy, never the submitted source (#96 review S9).
     logoImage: renderableImage({ key: review.logoKey }, mediaBaseUrl),
     logoUrl: review.logoUrl,
@@ -76,6 +78,7 @@ export function submissionView(review: SubmissionReview, mediaBaseUrl: string): 
 
 export function revisionView(review: RevisionReview, mediaBaseUrl: string): ReviewView {
   return {
+    featuredImage: null,
     badge: null,
     badgeChecks: review.badgeChecks.map(check => ({
       checkedAt: check.checkedAt,
@@ -130,6 +133,8 @@ export function stagedPreview(
     createdAt: string | null
     description: string
     id: string
+    /** The hosted featured image a submission's approval would publish (none for a revision). */
+    imageKey?: string | null
     logoKey: string | null
     logoUrl: string
     name: string
@@ -148,6 +153,7 @@ export function stagedPreview(
         created_at: staged.createdAt ?? new Date().toISOString(),
         description: staged.description,
         id: staged.id,
+        image_key: staged.imageKey ?? null,
         logo_key: staged.logoKey,
         logo_url: staged.logoUrl,
         name: staged.name,

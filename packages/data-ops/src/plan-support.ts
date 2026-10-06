@@ -302,24 +302,40 @@ export function adoptStagedLogoPlans(input: {
 }
 
 /**
- * Gives a new listing the submission's featured (social) image, hosted or still waiting, as its
- * first image: queued for a copy into the listing's path, never inserted as a URL. Runs inside
- * the approval batch that creates the listing.
+ * Gives a listing the submission's featured image only as the reviewer saw it (#96 review
+ * round 2, B1): `reviewedKey` is the hosted image key the review screen showed, or null when it
+ * showed none. The batch is refused unless that is still the submission's hosted image (a
+ * compare-and-swap, like `content_version`), and only that key is queued for a copy into the
+ * listing's path. A pending or failed image the reviewer could not see is never adopted.
  */
 export function adoptSubmissionImagePlans(input: {
   listingId: string
   now: string
+  reviewedKey: string | null
   submissionId: string
 }): StatementPlan[] {
   hoursBefore(input.now, 0)
+  const hostedImage = `(SELECT media_key FROM media_ingestions WHERE submission_id=?
+    AND kind='image' AND sort_order=0 AND status='hosted')`
   return [
-    queueFromSubmissionSlot({
-      kind: 'image',
-      listingId: input.listingId,
-      now: input.now,
-      slotCondition: { sql: '1', params: [] },
-      submissionId: input.submissionId
-    })
+    assertGuard('reviewed_image_current', {
+      sql: `${hostedImage} IS ?`,
+      params: [input.submissionId, input.reviewedKey]
+    }),
+    ...(input.reviewedKey
+      ? [
+          queueFromSubmissionSlot({
+            kind: 'image',
+            listingId: input.listingId,
+            now: input.now,
+            slotCondition: {
+              sql: `j.status='hosted' AND j.media_key=?`,
+              params: [input.reviewedKey]
+            },
+            submissionId: input.submissionId
+          })
+        ]
+      : [])
   ]
 }
 
