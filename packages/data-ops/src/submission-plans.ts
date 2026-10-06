@@ -1,6 +1,7 @@
 import { draftClockCutoffs } from './draft-plans'
 import {
   adoptStagedLogoPlans,
+  adoptSubmissionImagePlans,
   applyStagedContentPlans,
   assertGuard,
   assertPreviousStatementChangedOne,
@@ -188,13 +189,15 @@ function createListingFromSubmissionPlans(input: {
       params: [listingId, submissionId]
     },
     assertPreviousStatementChangedOne('primary_category_created'),
-    // Never a hotlink (#95): the submission's hosted logo, or its source queued for the cron.
+    // Never a hotlink (#95): the submission's hosted logo and featured image are queued for a
+    // copy into the listing's path, or their sources for the cron.
     ...adoptStagedLogoPlans({
       listingId,
       now: input.now,
       stagedId: submissionId,
       stagedTable: 'listing_submissions'
     }),
+    ...adoptSubmissionImagePlans({ listingId, now: input.now, submissionId }),
     {
       sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
         SELECT ?,'video',video_url,1 FROM listing_submissions

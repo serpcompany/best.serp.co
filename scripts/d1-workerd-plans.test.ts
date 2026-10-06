@@ -1065,6 +1065,35 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     const claim = M.buildClaimMediaPlans({ id: due.id, now: NOW, readNextAttemptAt: NOW })
     await run(claim)
     await expect(run(claim)).rejects.toThrow()
+    // The claimed failure lands on the claimed row only, and the spent claim is refused.
+    const held = {
+      currentMedia: null,
+      id: due.id,
+      leaseUntil: M.mediaClaimLease(NOW),
+      sourceUrl: 'https://media.example/og.png'
+    }
+    const claimedFailure = M.buildRecordClaimedFailurePlans({
+      attempts: 1,
+      claim: held,
+      code: 'http_502',
+      now: NOW,
+      retryable: true
+    })
+    await run(claimedFailure)
+    await expect(run(claimedFailure)).rejects.toThrow()
+    // A host under a claim that no longer holds is refused as superseded (#96 review B1).
+    await expect(
+      run(
+        M.buildHostListingMediaPlans({
+          claim: held,
+          kind: 'image',
+          listingId,
+          media: hosted('image', 'a'),
+          publication: await publication('listing-media', listingId),
+          sortOrder: 0
+        })
+      )
+    ).rejects.toThrow()
     await run(
       M.buildRecordMediaFailurePlans({
         attempts: 1,
@@ -1100,18 +1129,47 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         listingId
       )
     ).toEqual({ content_type: 'image/webp', media_key: hosted('image', 'a').key, width: 1200 })
+    const submissionLogo = {
+      ...hosted('logo', 'b', 'media-sub.example'),
+      key: `best.serp.co/submissions/sub-media/logo/${sha('b').slice(0, 16)}.webp`
+    }
     await run(
       M.buildRecordSubmissionMediaPlans({
         kind: 'logo',
-        media: hosted('logo', 'b', 'media-sub.example'),
+        media: submissionLogo,
         now: NOW,
         sortOrder: 0,
         submissionId: 'sub-media'
       })
     )
     expect(await all(M.selectSubmissionMediaPlan('sub-media'))).toMatchObject([
-      { kind: 'logo', status: 'hosted' }
+      { kind: 'logo', media_key: submissionLogo.key, status: 'hosted' }
     ])
+    // A listing slot may copy the submission's key; a finished submission's slots are forgotten
+    // once no listing slot still waits to copy them (#96 review S1).
+    await run(
+      M.buildQueueMediaPlans({
+        copyFromKey: submissionLogo.key,
+        kind: 'logo',
+        now: NOW,
+        sortOrder: 0,
+        sourceUrl: submissionLogo.sourceUrl,
+        target: { listingId }
+      })
+    )
+    await db.prepare("UPDATE listing_submissions SET status='rejected' WHERE id='sub-media'").run()
+    const finished = () =>
+      all<{ id: number; media_key: string | null }>(M.selectFinishedSubmissionMediaPlan(50))
+    expect(await finished()).toEqual([])
+    await db
+      .prepare("DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo'")
+      .bind(listingId)
+      .run()
+    const [done] = await finished()
+    expect(done).toMatchObject({ media_key: submissionLogo.key })
+    if (!done) throw new Error('No finished submission media.')
+    await run(M.buildForgetSubmissionMediaPlans({ id: done.id, mediaKey: done.media_key }))
+    expect(await all(M.selectSubmissionMediaPlan('sub-media'))).toEqual([])
     await expect(
       db
         .prepare(

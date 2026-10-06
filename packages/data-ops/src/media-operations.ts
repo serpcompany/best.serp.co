@@ -1,20 +1,34 @@
 import {
+  copyHostedMedia,
   type IngestImageInput,
   ingestImage,
   type MediaBucket,
+  type MediaFailure,
   scopedMediaBucket
 } from './media-ingest'
-import { MEDIA_KINDS, type MediaKind } from './media-keys'
+import {
+  type HostedMedia,
+  listingKeyForSubmissionKey,
+  MEDIA_KINDS,
+  type MediaKind,
+  type MediaOwner,
+  parseMediaKey
+} from './media-keys'
 import {
   buildClaimMediaPlans,
+  buildForgetSubmissionMediaPlans,
   buildHostListingMediaPlans,
   buildQueueMediaPlans,
+  buildRecordClaimedFailurePlans,
   buildRecordMediaFailurePlans,
   buildRecordSubmissionMediaPlans,
   MAX_MEDIA_ATTEMPTS,
   MEDIA_INGESTION_BATCH_LIMIT,
+  type MediaClaim,
   type MediaTarget,
+  mediaClaimLease,
   selectDueMediaPlan,
+  selectFinishedSubmissionMediaPlan,
   selectListingMediaContextPlan,
   selectListingMediaQueuePlan,
   selectSubmissionMediaPlan
@@ -47,6 +61,8 @@ export interface MediaRunSummary {
   hosted: number
   processed: number
   retried: number
+  /** Slots an admin edit, approval, or publication changed while the run fetched them. */
+  superseded: number
 }
 
 export interface MediaOperationsConfig {
@@ -77,6 +93,10 @@ export interface MediaOperations {
   }): Promise<MediaOutcome>
   /** The cron: retry due slots, oldest first. */
   processDueMedia(limit?: number): Promise<MediaRunSummary>
+  /** One listing's due slots now (after an admin approval queued its copies). */
+  processListingMedia(listingId: string): Promise<MediaRunSummary>
+  /** Deletes the images and slots of finished submissions (approved and copied, rejected, withdrawn). */
+  forgetFinishedSubmissionMedia(limit?: number): Promise<number>
   /** Queued or failed slots of a listing, for the admin (#85). */
   listingMediaQueue(listingId: string): Promise<MediaSlotStatus[]>
   /** A submission's media slots and their state, for the review screen (#85). */
@@ -96,6 +116,8 @@ interface SlotRow {
 
 interface DueRow {
   attempts: number
+  copy_from_key: string | null
+  current_media: string | null
   id: number
   kind: string
   listing_id: string | null
@@ -104,6 +126,16 @@ interface DueRow {
   sort_order: number
   source_url: string
   submission_id: string | null
+}
+
+/** A plan refused by its own compare-and-swap (`assertPreviousStatementChangedOne`). */
+function isPlanConflict(error: unknown): boolean {
+  let current: unknown = error
+  for (let depth = 0; current && depth < 4; depth += 1) {
+    if (current instanceof Error && /malformed JSON/iu.test(current.message)) return true
+    current = current instanceof Error ? (current as Error & { cause?: unknown }).cause : null
+  }
+  return false
 }
 
 interface ListingContextRow {
@@ -168,15 +200,17 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
 
   const bucket = scopedMediaBucket(config.bucket)
 
-  async function ingest(input: Omit<IngestImageInput, 'bucket' | 'fetcher'>) {
-    return ingestImage({ ...input, bucket, fetcher: config.fetcher })
+  async function ingest(input: { kind: MediaKind; sourceUrl: string } & MediaOwner) {
+    const image: IngestImageInput = { ...input, bucket, fetcher: config.fetcher }
+    return ingestImage(image)
   }
 
   async function hostOnListing(input: {
     actor: string
+    claim?: MediaClaim
     kind: MediaKind
     listingId: string
-    media: Parameters<typeof buildHostListingMediaPlans>[0]['media']
+    media: HostedMedia
     sortOrder: number
     workflow: string
   }): Promise<void> {
@@ -193,6 +227,7 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
     })
     await run(
       buildHostListingMediaPlans({
+        claim: input.claim,
         kind: input.kind,
         listingId: input.listingId,
         media: input.media,
@@ -221,6 +256,129 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
     return { code: failure.code, status: pending ? 'pending' : 'failed' }
   }
 
+  /** Hosts one claimed slot: copy a submission's image, or fetch the source; never write it twice. */
+  async function processClaimed(
+    row: DueRow,
+    claim: MediaClaim,
+    summary: MediaRunSummary
+  ): Promise<void> {
+    const kind = requireKind(row.kind)
+    const attempts = row.attempts + 1
+    const fail = async (failure: { code: string; retryable: boolean }) => {
+      await run(buildRecordClaimedFailurePlans({ ...failure, attempts, claim, now: now() }))
+      if (failure.retryable && attempts < MAX_MEDIA_ATTEMPTS) summary.retried += 1
+      else summary.failed += 1
+    }
+    try {
+      if (row.listing_id) {
+        if (!row.slug) return await fail({ code: 'target_missing', retryable: false })
+        let result: { media: HostedMedia; ok: true } | MediaFailure | null = null
+        const copied = row.copy_from_key ? parseMediaKey(row.copy_from_key) : null
+        if (row.copy_from_key && copied) {
+          // The submission's hosted copy, checked against its own digest.
+          const [source] = await all<{
+            bytes: number
+            content_type: string
+            height: number
+            sha256: string
+            width: number
+          }>({
+            sql: `SELECT bytes,content_type,height,sha256,width FROM media_ingestions
+              WHERE media_key=? AND status='hosted' LIMIT 1`,
+            params: [row.copy_from_key]
+          })
+          if (source) {
+            result = await copyHostedMedia(bucket, row.copy_from_key, {
+              bytes: source.bytes,
+              contentType: source.content_type,
+              height: source.height,
+              key: listingKeyForSubmissionKey(row.copy_from_key, row.slug),
+              sha256: source.sha256,
+              sourceUrl: row.source_url,
+              width: source.width
+            })
+          }
+        }
+        // No usable copy (expired, rejected, or mismatched): fetch the source again.
+        if (!result?.ok) {
+          result = await ingest({ kind, slug: row.slug, sourceUrl: row.source_url })
+        }
+        if (!result.ok) return await fail(result)
+        await hostOnListing({
+          actor: 'media-cron',
+          claim,
+          kind,
+          listingId: row.listing_id,
+          media: result.media,
+          sortOrder: row.sort_order,
+          workflow: 'worker/media-cron'
+        })
+      } else {
+        const submissionId = row.submission_id ?? ''
+        const result = await ingest({ kind, sourceUrl: row.source_url, submissionId })
+        if (!result.ok) return await fail(result)
+        await run(
+          buildRecordSubmissionMediaPlans({
+            claim,
+            kind,
+            media: result.media,
+            now: now(),
+            sortOrder: row.sort_order,
+            submissionId
+          })
+        )
+      }
+      summary.hosted += 1
+    } catch (error) {
+      if (isPlanConflict(error)) {
+        // An admin edit, approval, or publication changed the slot: its result wins.
+        summary.superseded += 1
+        observe({ event: 'media_cron_superseded', id: row.id })
+        return
+      }
+      // Anything else (D1 or R2 unavailable): the lease expires and the slot comes due again.
+      observe({ event: 'media_cron_error', id: row.id })
+    }
+  }
+
+  async function processDue(limit: number, listingId?: string): Promise<MediaRunSummary> {
+    const summary: MediaRunSummary = {
+      failed: 0,
+      hosted: 0,
+      processed: 0,
+      retried: 0,
+      superseded: 0
+    }
+    const due = await all<DueRow>(selectDueMediaPlan(now(), limit, listingId))
+    for (const row of due) {
+      const claimedAt = now()
+      try {
+        await run(
+          buildClaimMediaPlans({
+            id: row.id,
+            now: claimedAt,
+            readNextAttemptAt: row.next_attempt_at
+          })
+        )
+      } catch {
+        continue // Another run claimed it.
+      }
+      summary.processed += 1
+      await processClaimed(
+        row,
+        {
+          currentMedia: row.current_media,
+          id: row.id,
+          leaseUntil: mediaClaimLease(claimedAt),
+          sourceUrl: row.source_url
+        },
+        summary
+      )
+    }
+    observe({ event: 'media_cron', ...summary })
+    return summary
+  }
+
   return {
     async hostListingMedia(input) {
       const { slug } = await listingContext(input.listingId)
@@ -239,15 +397,16 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
     },
 
     async hostSubmissionMedia(input) {
-      const [submission] = await all<{ slug: string }>({
-        sql: 'SELECT slug FROM listing_submissions WHERE id=?',
+      const [submission] = await all<{ id: string }>({
+        sql: 'SELECT id FROM listing_submissions WHERE id=?',
         params: [input.submissionId]
       })
       if (!submission) throw new Error('Submission not found.')
+      // Under the submission's own prefix, never a live listing's path (#95 review S1).
       const result = await ingest({
         kind: input.kind,
-        slug: submission.slug,
-        sourceUrl: input.sourceUrl
+        sourceUrl: input.sourceUrl,
+        submissionId: input.submissionId
       })
       observe({
         event: 'media_ingest',
@@ -270,68 +429,31 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
       return { key: result.media.key, status: 'hosted' }
     },
 
-    async processDueMedia(limit = MEDIA_INGESTION_BATCH_LIMIT) {
-      const summary: MediaRunSummary = { failed: 0, hosted: 0, processed: 0, retried: 0 }
-      const due = await all<DueRow>(selectDueMediaPlan(now(), limit))
-      for (const row of due) {
+    processDueMedia(limit = MEDIA_INGESTION_BATCH_LIMIT) {
+      return processDue(limit)
+    },
+
+    processListingMedia(listingId) {
+      return processDue(MEDIA_INGESTION_BATCH_LIMIT, listingId)
+    },
+
+    async forgetFinishedSubmissionMedia(limit = MEDIA_INGESTION_BATCH_LIMIT) {
+      let forgotten = 0
+      const rows = await all<{ id: number; media_key: string | null }>(
+        selectFinishedSubmissionMediaPlan(limit)
+      )
+      for (const row of rows) {
         try {
-          await run(
-            buildClaimMediaPlans({ id: row.id, now: now(), readNextAttemptAt: row.next_attempt_at })
-          )
+          // The object first: a row is only forgotten once nothing is left behind in R2.
+          if (row.media_key) await bucket.delete?.(row.media_key)
+          await run(buildForgetSubmissionMediaPlans({ id: row.id, mediaKey: row.media_key }))
+          forgotten += 1
         } catch {
-          continue // Another run claimed it.
-        }
-        summary.processed += 1
-        const kind = requireKind(row.kind)
-        const target: MediaTarget = row.listing_id
-          ? { listingId: row.listing_id }
-          : { submissionId: row.submission_id ?? '' }
-        const slot = { kind, sortOrder: row.sort_order, sourceUrl: row.source_url }
-        const attempts = row.attempts + 1
-        try {
-          const result = row.slug
-            ? await ingest({ kind, slug: row.slug, sourceUrl: row.source_url })
-            : ({ code: 'target_missing', ok: false, retryable: false } as const)
-          if (!result.ok) {
-            const outcome = await recordFailure(target, slot, result, attempts)
-            if (outcome.status === 'failed') summary.failed += 1
-            else summary.retried += 1
-            continue
-          }
-          if ('listingId' in target) {
-            await hostOnListing({
-              actor: 'media-cron',
-              kind,
-              listingId: target.listingId,
-              media: result.media,
-              sortOrder: row.sort_order,
-              workflow: 'worker/media-cron'
-            })
-          } else {
-            await run(
-              buildRecordSubmissionMediaPlans({
-                kind,
-                media: result.media,
-                now: now(),
-                sortOrder: row.sort_order,
-                submissionId: target.submissionId
-              })
-            )
-          }
-          summary.hosted += 1
-        } catch {
-          // A failed write (for example a concurrent publication) is retried on the next run;
-          // if even that cannot be recorded, the lease expires and the slot comes due again.
-          try {
-            await recordFailure(target, slot, { code: 'write_failed', retryable: true }, attempts)
-          } catch {
-            observe({ event: 'media_cron_record_failed', id: row.id })
-          }
-          summary.retried += 1
+          observe({ event: 'media_forget_error', id: row.id })
         }
       }
-      observe({ event: 'media_cron', ...summary })
-      return summary
+      if (rows.length) observe({ event: 'media_forget', forgotten })
+      return forgotten
     },
 
     async listingMediaQueue(listingId) {

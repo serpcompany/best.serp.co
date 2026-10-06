@@ -3,6 +3,7 @@ import { MEDIA_CACHE_CONTROL, sha256Hex } from './media-keys'
 import { createMediaOperations } from './media-operations'
 import { buildQueueMediaPlans } from './media-plans'
 import { imageResponse, memoryBucket, pngBytes, routedFetch } from './media-test-support'
+import type { StatementPlan } from './plan-support'
 import { insertPublishedListing, SqliteD1 } from './test-support'
 
 const listingId = 'lst_ops'
@@ -170,7 +171,8 @@ describe('media operations', () => {
       failed: 0,
       hosted: 1,
       processed: 1,
-      retried: 0
+      retried: 0,
+      superseded: 0
     })
     expect(rows('SELECT kind,media_key IS NOT NULL AS hosted FROM listing_media')).toEqual([
       { hosted: 1, kind: 'image' }
@@ -185,11 +187,193 @@ describe('media operations', () => {
       failed: 0,
       hosted: 1,
       processed: 1,
-      retried: 0
+      retried: 0,
+      superseded: 0
     })
     expect(await operations.submissionMedia(submissionId)).toMatchObject([
       { attempts: 2, kind: 'logo', status: 'hosted' }
     ])
     expect(bucket.objects.size).toBe(2)
   })
+
+  it('drops a cron result when an admin hosted another logo while it fetched (#96 review B1)', async () => {
+    const a = pngBytes(64, 64)
+    const b = pngBytes(96, 96)
+    const adminLogo = 'https://ops.example/b.png'
+    let edit: () => Promise<unknown> = async () => undefined
+    const { operations, rows, sqlite } = fixture({
+      // The cron's fetch of A is in flight when the admin's edit lands.
+      [logo]: async () => {
+        await edit()
+        return imageResponse(a)
+      },
+      [adminLogo]: () => imageResponse(b)
+    })
+    await runPlans(
+      sqlite,
+      buildQueueMediaPlans({
+        kind: 'logo',
+        now: '2026-10-06T12:00:00.000Z',
+        sortOrder: 0,
+        sourceUrl: logo,
+        target: { listingId }
+      })
+    )
+    edit = () =>
+      operations.hostListingMedia({
+        actor: 'admin@example.com',
+        kind: 'logo',
+        listingId,
+        sortOrder: 0,
+        sourceUrl: adminLogo,
+        workflow: 'app/admin'
+      })
+    expect(await operations.processDueMedia()).toEqual({
+      failed: 0,
+      hosted: 0,
+      processed: 1,
+      retried: 0,
+      superseded: 1
+    })
+    const bKey = `best.serp.co/listings/${slug}/logo/${(await sha256Hex(b)).slice(0, 16)}.png`
+    expect(rows("SELECT url,media_key FROM listing_media WHERE kind='logo'")).toEqual([
+      { media_key: bKey, url: adminLogo }
+    ])
+    expect(rows('SELECT COUNT(*) AS count FROM media_ingestions')).toEqual([{ count: 0 }])
+    expect(rows('SELECT version FROM publication_state')).toEqual([{ version: 2 }])
+  })
+
+  it('drops a cron failure when the slot was replaced meanwhile, never re-creating it', async () => {
+    const b = pngBytes(96, 96)
+    const adminLogo = 'https://ops.example/b.png'
+    let edit: () => Promise<unknown> = async () => undefined
+    const { operations, rows, sqlite } = fixture({
+      [logo]: async () => {
+        await edit()
+        return new Response('busy', { status: 503 })
+      },
+      [adminLogo]: () => imageResponse(b)
+    })
+    await runPlans(
+      sqlite,
+      buildQueueMediaPlans({
+        kind: 'logo',
+        now: '2026-10-06T12:00:00.000Z',
+        sortOrder: 0,
+        sourceUrl: logo,
+        target: { listingId }
+      })
+    )
+    edit = () =>
+      operations.hostListingMedia({
+        actor: 'admin@example.com',
+        kind: 'logo',
+        listingId,
+        sortOrder: 0,
+        sourceUrl: adminLogo,
+        workflow: 'app/admin'
+      })
+    expect((await operations.processDueMedia()).superseded).toBe(1)
+    expect(rows("SELECT url FROM listing_media WHERE kind='logo'")).toEqual([{ url: adminLogo }])
+    expect(rows('SELECT COUNT(*) AS count FROM media_ingestions')).toEqual([{ count: 0 }])
+  })
+
+  it('copies an approved submission’s hosted image into the listing path without refetching', async () => {
+    const png = pngBytes(256, 256)
+    const hash = (await sha256Hex(png)).slice(0, 16)
+    const { bucket, operations, rows, sqlite } = fixture({ [logo]: imageResponse(png) })
+    expect(
+      await operations.hostSubmissionMedia({
+        kind: 'logo',
+        sortOrder: 0,
+        sourceUrl: logo,
+        submissionId
+      })
+    ).toEqual({
+      key: `best.serp.co/submissions/${submissionId}/logo/${hash}.png`,
+      status: 'hosted'
+    })
+    await runPlans(
+      sqlite,
+      buildQueueMediaPlans({
+        copyFromKey: `best.serp.co/submissions/${submissionId}/logo/${hash}.png`,
+        kind: 'logo',
+        now: '2026-10-06T12:00:00.000Z',
+        sortOrder: 0,
+        sourceUrl: logo,
+        target: { listingId }
+      })
+    )
+    // The source answers once (it was used for the submission): a refetch would fail.
+    expect((await operations.processListingMedia(listingId)).hosted).toBe(1)
+    const listingKey = `best.serp.co/listings/${slug}/logo/${hash}.png`
+    expect(rows('SELECT media_key FROM listing_media')).toEqual([{ media_key: listingKey }])
+    expect(bucket.objects.get(listingKey)?.body).toEqual(png)
+    // The submission is not finished yet, so its own copy stays.
+    expect(await operations.forgetFinishedSubmissionMedia()).toBe(0)
+    expect(bucket.objects.size).toBe(2)
+  })
+
+  it('fetches the source again when the submission’s copy is gone', async () => {
+    const png = pngBytes(128, 128)
+    const { operations, rows, sqlite } = fixture({ [logo]: () => imageResponse(png) })
+    await runPlans(
+      sqlite,
+      buildQueueMediaPlans({
+        copyFromKey: `best.serp.co/submissions/${submissionId}/logo/${'0'.repeat(16)}.png`,
+        kind: 'logo',
+        now: '2026-10-06T12:00:00.000Z',
+        sortOrder: 0,
+        sourceUrl: logo,
+        target: { listingId }
+      })
+    )
+    expect((await operations.processDueMedia()).hosted).toBe(1)
+    expect(rows('SELECT media_key FROM listing_media')).toEqual([
+      { media_key: `best.serp.co/listings/${slug}/logo/${(await sha256Hex(png)).slice(0, 16)}.png` }
+    ])
+  })
+
+  it('deletes a finished submission’s images and stops retrying its slots (#96 review S1)', async () => {
+    const png = pngBytes(64, 64)
+    const { bucket, operations, rows, sqlite } = fixture({
+      [logo]: imageResponse(png),
+      [social]: () => new Response('busy', { status: 503 })
+    })
+    await operations.hostSubmissionMedia({
+      kind: 'logo',
+      sortOrder: 0,
+      sourceUrl: logo,
+      submissionId
+    })
+    await operations.hostSubmissionMedia({
+      kind: 'image',
+      sortOrder: 0,
+      sourceUrl: social,
+      submissionId
+    })
+    const listingObject = `best.serp.co/listings/${slug}/logo/${'1'.repeat(16)}.png`
+    bucket.objects.set(listingObject, {
+      body: png,
+      options: { httpMetadata: { cacheControl: '', contentType: 'image/png' } }
+    })
+    expect(await operations.forgetFinishedSubmissionMedia()).toBe(0)
+    sqlite.database
+      .prepare("UPDATE listing_submissions SET status='rejected' WHERE id=?")
+      .run(submissionId)
+    expect(await operations.forgetFinishedSubmissionMedia()).toBe(2)
+    expect(rows('SELECT COUNT(*) AS count FROM media_ingestions')).toEqual([{ count: 0 }])
+    // Only the submission's object went; a listing's hosted image is never deleted.
+    expect([...bucket.objects.keys()]).toEqual([listingObject])
+  })
 })
+
+async function runPlans(sqlite: SqliteD1, plans: StatementPlan[]): Promise<void> {
+  const db = sqlite.asD1Database()
+  for (const plan of plans) {
+    await db
+      .prepare(plan.sql)
+      .bind(...plan.params)
+      .run()
+  }
+}

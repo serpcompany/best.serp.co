@@ -40,13 +40,14 @@ export const getAdminReads = cache(
  * payment provider's refund hook.
  */
 export async function adminDecisionContext(actor: string): Promise<AdminContext> {
-  const { env } = await getCloudflareContext({ async: true })
+  const { ctx, env } = await getCloudflareContext({ async: true })
   return {
     actor: actor.trim().toLowerCase(),
     client: await adminDatabase(),
     eventKey: emailEventKey,
-    // A changed logo is hosted in the environment's media bucket (#95).
-    media: createMediaHost(env as CloudflareEnv),
+    // A changed logo is hosted in the environment's media bucket; an approval's queued copies
+    // are hosted after the response (#95).
+    media: createMediaHost(env as CloudflareEnv, task => ctx.waitUntil(task)),
     notify: enqueueEmail
   }
 }

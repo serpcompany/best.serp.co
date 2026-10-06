@@ -47,16 +47,35 @@ export interface MediaHost {
     slug: string
     sourceUrl: string
   }): Promise<ListingLogoIngestion>
+  settle?(listingId: string): void
 }
 
 /**
  * Copies one image into the bucket without touching D1, for a caller whose own batch records the
- * result (the admin listing edit, #85). Undefined without a `MEDIA` binding.
+ * result (the admin listing edit, #85), and, given the request's `waitUntil`, hosts a listing's
+ * queued slots after the response (an approval). Undefined without a `MEDIA` binding.
  */
-export function createMediaHost(env: MediaWorkerEnv): MediaHost | undefined {
+export function createMediaHost(
+  env: MediaWorkerEnv,
+  waitUntil?: (task: Promise<unknown>) => void
+): MediaHost | undefined {
   const bucket = env.MEDIA
   if (!bucket) return undefined
   return {
+    settle(listingId) {
+      if (!waitUntil) return
+      let operations: MediaOperations
+      try {
+        operations = createWorkerMediaOperations(env)
+      } catch {
+        return // The cron logs a disabled environment; nothing to settle here.
+      }
+      waitUntil(
+        operations.processListingMedia(listingId).catch(error => {
+          log({ event: 'media_settle_error', message: error instanceof Error ? error.message : '' })
+        })
+      )
+    },
     async host(input) {
       const result = await ingestImage({ ...input, bucket: scopedMediaBucket(bucket) })
       log({
@@ -80,7 +99,12 @@ export async function runMediaCron(env: MediaWorkerEnv): Promise<MediaRunSummary
     log({ event: 'media_cron_disabled', message: error instanceof Error ? error.message : '' })
     return null
   }
-  return operations.processDueMedia()
+  const summary = await operations.processDueMedia()
+  // Finished submissions' own images (rejected, withdrawn, or approved and copied): #96 S1.
+  await operations.forgetFinishedSubmissionMedia().catch(error => {
+    log({ event: 'media_forget_failed', message: error instanceof Error ? error.message : '' })
+  })
+  return summary
 }
 
 /**
@@ -106,8 +130,7 @@ export async function serveLocalMedia(
       'Cache-Control': object.httpMetadata?.cacheControl ?? MEDIA_CACHE_CONTROL,
       'Content-Length': String(object.size),
       'Content-Type': object.httpMetadata?.contentType ?? 'application/octet-stream',
-      ETag: object.httpEtag,
-      'X-Content-Type-Options': 'nosniff'
+      ETag: object.httpEtag
     }
   })
 }

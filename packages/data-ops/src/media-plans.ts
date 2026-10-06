@@ -1,4 +1,4 @@
-import { type HostedMedia, isMediaKey, MEDIA_KINDS, type MediaKind } from './media-keys'
+import { type HostedMedia, MEDIA_KINDS, type MediaKind, parseMediaKey } from './media-keys'
 import {
   assertPreviousStatementChangedOne,
   beginCatalogPublicationPlans,
@@ -16,8 +16,13 @@ import {
  * fallback tile.
  *
  * Callers: request-time ingestion (submit v2 #84, admin edits #85) and the Worker cron that
- * retries pending slots. Approvals adopt a submission's hosted logo or queue it
- * (`adoptStagedLogoPlans` in plan-support).
+ * retries pending slots. Approvals queue a submission's hosted images for a copy into the
+ * listing's path (`adoptStagedLogoPlans`, `adoptSubmissionImagePlans` in plan-support).
+ *
+ * The cron writes only while its claim holds: the claimed row (id, lease, source) must still be
+ * there, and the listing's slot must still hold what it held when the slot was read. An admin
+ * edit, an approval, or a publication that changes the slot meanwhile wins; the cron's result is
+ * dropped as superseded and never retried.
  */
 
 /** Minutes to wait after the 1st, 2nd, … failed attempt; after the last one a slot fails. */
@@ -71,9 +76,14 @@ function assertSlot(slot: MediaSlot): void {
   if (!id) throw new Error('A media slot needs its listing or submission.')
 }
 
-function assertHosted(media: HostedMedia, kind: MediaKind): void {
-  if (!isMediaKey(media.key) || !media.key.includes(`/${kind}/`)) {
-    throw new Error(`Media key ${media.key} is not a hosted ${kind} key.`)
+function assertHosted(
+  media: HostedMedia,
+  kind: MediaKind,
+  scope: 'listings' | 'submissions'
+): void {
+  const parsed = parseMediaKey(media.key)
+  if (parsed?.scope !== scope || parsed.kind !== kind) {
+    throw new Error(`Media key ${media.key} is not a hosted ${kind} key for ${scope}.`)
   }
 }
 
@@ -97,11 +107,32 @@ function hostedValues(media: HostedMedia): unknown[] {
 }
 
 /**
+ * A due slot one cron run claimed: its row, the lease it set, the source it read, and what the
+ * listing's slot held when it was read (`COALESCE(media_key,url)`, null for an empty slot).
+ */
+export interface MediaClaim {
+  currentMedia: string | null
+  id: number
+  leaseUntil: string
+  sourceUrl: string
+}
+
+/** The lease a claim sets: the slot comes due again if the run never finishes. */
+export function mediaClaimLease(now: string): string {
+  return minutesAfter(now, MEDIA_CLAIM_LEASE_MINUTES)
+}
+
+const claimHolds = `EXISTS (SELECT 1 FROM media_ingestions WHERE id=? AND status='pending'
+  AND next_attempt_at=? AND source_url=?)`
+
+/**
  * Hosts a listing's logo or image slot: writes (or replaces) its `listing_media` row with the
  * key and metadata, clears the slot's queue entry, and advances the catalog version so cached
- * pages turn over. Used by admin edits (#85) and by the cron for queued listing slots.
+ * pages turn over. With a `claim` (the cron), it applies only while the claim holds and the slot
+ * still holds what it held when read; otherwise the batch is refused as superseded.
  */
 export function buildHostListingMediaPlans(input: {
+  claim?: MediaClaim
   kind: MediaKind
   listingId: string
   media: HostedMedia
@@ -113,12 +144,31 @@ export function buildHostListingMediaPlans(input: {
     sortOrder: input.sortOrder,
     target: { listingId: input.listingId }
   })
-  assertHosted(input.media, input.kind)
+  assertHosted(input.media, input.kind, 'listings')
+  const { claim } = input
+  const slotValue = `(SELECT COALESCE(media_key,url) FROM listing_media
+    WHERE listing_id=? AND kind=? AND sort_order=?)`
   return [
-    ...beginCatalogPublicationPlans(input.publication, {
-      sql: 'EXISTS (SELECT 1 FROM listings WHERE id=?)',
-      params: [input.listingId]
-    }),
+    ...beginCatalogPublicationPlans(
+      input.publication,
+      claim
+        ? {
+            sql: `EXISTS (SELECT 1 FROM listings WHERE id=?) AND ${claimHolds}
+              AND ${slotValue} IS ?`,
+            params: [
+              input.listingId,
+              claim.id,
+              claim.leaseUntil,
+              claim.sourceUrl,
+              input.listingId,
+              input.kind,
+              input.sortOrder,
+              claim.currentMedia
+            ]
+          }
+        : { sql: 'EXISTS (SELECT 1 FROM listings WHERE id=?)', params: [input.listingId] },
+      claim ? 'media_claim_current' : 'publication_snapshot_current'
+    ),
     {
       sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order,${hostedColumns})
         VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -143,10 +193,12 @@ export function buildHostListingMediaPlans(input: {
 }
 
 /**
- * Records a submission's hosted logo or image (submit v2, #84, at submit time or from the cron).
- * Approval later copies it onto the listing when the submission still names the same source.
+ * Records a submission's hosted logo or image (`best.serp.co/submissions/<id>/…`): at submit time
+ * (submit v2, #84) as an upsert, or from the cron while its claim holds. Approval later queues a
+ * copy into the listing's path.
  */
 export function buildRecordSubmissionMediaPlans(input: {
+  claim?: MediaClaim
   kind: MediaKind
   media: HostedMedia
   now: string
@@ -155,8 +207,26 @@ export function buildRecordSubmissionMediaPlans(input: {
 }): StatementPlan[] {
   const target = { submissionId: input.submissionId }
   assertSlot({ kind: input.kind, sortOrder: input.sortOrder, target })
-  assertHosted(input.media, input.kind)
+  assertHosted(input.media, input.kind, 'submissions')
   requireInstant(input.now)
+  if (input.claim) {
+    return [
+      {
+        sql: `UPDATE media_ingestions SET status='hosted',attempts=attempts+1,next_attempt_at=NULL,
+            last_error=NULL,media_key=?,sha256=?,content_type=?,bytes=?,width=?,height=?,
+            updated_at=?
+          WHERE id=? AND status='pending' AND next_attempt_at=? AND source_url=?`,
+        params: [
+          ...hostedValues(input.media),
+          input.now,
+          input.claim.id,
+          input.claim.leaseUntil,
+          input.claim.sourceUrl
+        ]
+      },
+      assertPreviousStatementChangedOne('media_claim_current')
+    ]
+  }
   const { conflict } = targetColumns(target)
   return [
     {
@@ -167,7 +237,7 @@ export function buildRecordSubmissionMediaPlans(input: {
         WHERE EXISTS (SELECT 1 FROM listing_submissions WHERE id=?)
         ${conflict} DO UPDATE SET source_url=excluded.source_url,status='hosted',
           attempts=media_ingestions.attempts+1,next_attempt_at=NULL,last_error=NULL,
-          media_key=excluded.media_key,sha256=excluded.sha256,
+          copy_from_key=NULL,media_key=excluded.media_key,sha256=excluded.sha256,
           content_type=excluded.content_type,bytes=excluded.bytes,width=excluded.width,
           height=excluded.height,updated_at=excluded.updated_at`,
       params: [
@@ -187,33 +257,52 @@ export function buildRecordSubmissionMediaPlans(input: {
 
 /**
  * Queues a slot for the cron without trying it first (attempts 0, due now), replacing whatever
- * the slot held before.
+ * the slot held before. `copyFromKey` names a submission's hosted copy to use instead of the
+ * source (approval).
  */
 export function buildQueueMediaPlans(
-  input: MediaSlot & { now: string; sourceUrl: string }
+  input: MediaSlot & { copyFromKey?: string; now: string; sourceUrl: string }
 ): StatementPlan[] {
   assertSlot(input)
   requireInstant(input.now)
+  if (input.copyFromKey && parseMediaKey(input.copyFromKey)?.scope !== 'submissions') {
+    throw new Error('Only a submission key is copied into a listing.')
+  }
   const { column, conflict, id } = targetColumns(input.target)
   return [
     {
       sql: `INSERT INTO media_ingestions
-        (${column},kind,sort_order,source_url,status,attempts,next_attempt_at,created_at,updated_at)
-        VALUES (?,?,?,?,'pending',0,?,?,?)
-        ${conflict} DO UPDATE SET source_url=excluded.source_url,status='pending',attempts=0,
+        (${column},kind,sort_order,source_url,copy_from_key,status,attempts,next_attempt_at,
+         created_at,updated_at)
+        VALUES (?,?,?,?,?,'pending',0,?,?,?)
+        ${conflict} DO UPDATE SET source_url=excluded.source_url,
+          copy_from_key=excluded.copy_from_key,status='pending',attempts=0,
           next_attempt_at=excluded.next_attempt_at,last_error=NULL,${clearedResult},
           updated_at=excluded.updated_at`,
-      params: [id, input.kind, input.sortOrder, input.sourceUrl, input.now, input.now, input.now]
+      params: [
+        id,
+        input.kind,
+        input.sortOrder,
+        input.sourceUrl,
+        input.copyFromKey ?? null,
+        input.now,
+        input.now,
+        input.now
+      ]
     },
     assertPreviousStatementChangedOne('media_queued')
   ]
 }
 
+function failureState(input: { attempts: number; now: string; retryable: boolean }) {
+  const next = input.retryable ? nextMediaAttemptAt(input.now, input.attempts) : null
+  return { next, status: next ? 'pending' : 'failed' }
+}
+
 /**
- * Records a failed attempt. A retryable failure stays `pending` until the backoff runs out
- * (`MEDIA_RETRY_DELAYS_MINUTES`); any other failure, or the last retry, marks the slot
- * `failed` with its reason, which the admin review screen shows (#85). `attempts` counts this
- * attempt.
+ * Records a failed request-time attempt (attempts 1). A retryable failure stays `pending` until
+ * the backoff runs out (`MEDIA_RETRY_DELAYS_MINUTES`); any other failure, or the last retry,
+ * marks the slot `failed` with its reason, which the admin sees.
  */
 export function buildRecordMediaFailurePlans(
   input: MediaSlot & {
@@ -226,8 +315,7 @@ export function buildRecordMediaFailurePlans(
 ): StatementPlan[] {
   assertSlot(input)
   if (!input.code.trim()) throw new Error('A media failure needs its reason.')
-  const next = input.retryable ? nextMediaAttemptAt(input.now, input.attempts) : null
-  const status = next ? 'pending' : 'failed'
+  const { next, status } = failureState(input)
   const { column, conflict, id } = targetColumns(input.target)
   return [
     {
@@ -235,9 +323,10 @@ export function buildRecordMediaFailurePlans(
         (${column},kind,sort_order,source_url,status,attempts,next_attempt_at,last_error,
          created_at,updated_at)
         VALUES (?,?,?,?,?,?,?,?,?,?)
-        ${conflict} DO UPDATE SET source_url=excluded.source_url,status=excluded.status,
-          attempts=excluded.attempts,next_attempt_at=excluded.next_attempt_at,
-          last_error=excluded.last_error,${clearedResult},updated_at=excluded.updated_at`,
+        ${conflict} DO UPDATE SET source_url=excluded.source_url,copy_from_key=NULL,
+          status=excluded.status,attempts=excluded.attempts,
+          next_attempt_at=excluded.next_attempt_at,last_error=excluded.last_error,
+          ${clearedResult},updated_at=excluded.updated_at`,
       params: [
         id,
         input.kind,
@@ -255,30 +344,65 @@ export function buildRecordMediaFailurePlans(
   ]
 }
 
-/** Pending slots that are due, oldest first, with the slug their key is built from. */
+/** Records a failed cron attempt on the claimed row only; a lost claim is superseded. */
+export function buildRecordClaimedFailurePlans(input: {
+  attempts: number
+  claim: MediaClaim
+  code: string
+  now: string
+  retryable: boolean
+}): StatementPlan[] {
+  if (!input.code.trim()) throw new Error('A media failure needs its reason.')
+  const { next, status } = failureState(input)
+  return [
+    {
+      sql: `UPDATE media_ingestions SET status=?,attempts=?,next_attempt_at=?,last_error=?,
+          updated_at=?
+        WHERE id=? AND status='pending' AND next_attempt_at=? AND source_url=?`,
+      params: [
+        status,
+        input.attempts,
+        next,
+        input.code.slice(0, 200),
+        input.now,
+        input.claim.id,
+        input.claim.leaseUntil,
+        input.claim.sourceUrl
+      ]
+    },
+    assertPreviousStatementChangedOne('media_claim_current')
+  ]
+}
+
+/**
+ * Pending slots that are due (one listing's, or all), oldest first, with the slug or submission
+ * id their key is built from, the submission copy to use, and what the listing's slot holds now.
+ */
 export function selectDueMediaPlan(
   now: string,
-  limit = MEDIA_INGESTION_BATCH_LIMIT
+  limit = MEDIA_INGESTION_BATCH_LIMIT,
+  listingId?: string
 ): StatementPlan {
   requireInstant(now)
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
     throw new Error('A media batch takes 1 to 50 slots.')
   }
   return {
-    sql: `SELECT j.id,j.listing_id,j.submission_id,j.kind,j.sort_order,j.source_url,j.attempts,
-        j.next_attempt_at,COALESCE(l.slug,s.slug) AS slug
+    sql: `SELECT j.id,j.listing_id,j.submission_id,j.kind,j.sort_order,j.source_url,
+        j.copy_from_key,j.attempts,j.next_attempt_at,l.slug,
+        (SELECT COALESCE(m.media_key,m.url) FROM listing_media m WHERE m.listing_id=j.listing_id
+          AND m.kind=j.kind AND m.sort_order=j.sort_order) AS current_media
       FROM media_ingestions j
       LEFT JOIN listings l ON l.id=j.listing_id
-      LEFT JOIN listing_submissions s ON s.id=j.submission_id
-      WHERE j.status='pending' AND j.next_attempt_at<=?
+      WHERE j.status='pending' AND j.next_attempt_at<=?${listingId ? ' AND j.listing_id=?' : ''}
       ORDER BY j.next_attempt_at ASC, j.id ASC
       LIMIT ?`,
-    params: [now, limit]
+    params: listingId ? [now, listingId, limit] : [now, limit]
   }
 }
 
 /**
- * Claims a due slot for one cron run by moving its next attempt past the lease, compared and
+ * Claims a due slot for one cron run by moving its next attempt to the lease, compared and
  * swapped on the time the run read, so two runs never process the same slot.
  */
 export function buildClaimMediaPlans(input: {
@@ -290,14 +414,51 @@ export function buildClaimMediaPlans(input: {
     {
       sql: `UPDATE media_ingestions SET next_attempt_at=?,updated_at=?
         WHERE id=? AND status='pending' AND next_attempt_at=?`,
-      params: [
-        minutesAfter(input.now, MEDIA_CLAIM_LEASE_MINUTES),
-        input.now,
-        input.id,
-        input.readNextAttemptAt
-      ]
+      params: [mediaClaimLease(input.now), input.now, input.id, input.readNextAttemptAt]
     },
     assertPreviousStatementChangedOne('media_claimed')
+  ]
+}
+
+/**
+ * Submission media slots whose submission is finished (#96 review S1): rejected or withdrawn
+ * (which covers an expired draft), or approved with no listing slot still waiting to copy its
+ * image. Their images under `best.serp.co/submissions/<id>/` are deleted, then the rows; the
+ * cron stops retrying slots nobody will review. An R2 lifecycle rule on that prefix (an owner
+ * action, docs/MEDIA.md) catches anything this misses.
+ */
+export function selectFinishedSubmissionMediaPlan(
+  limit = MEDIA_INGESTION_BATCH_LIMIT
+): StatementPlan {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+    throw new Error('A media batch takes 1 to 50 slots.')
+  }
+  return {
+    sql: `SELECT j.id,j.media_key FROM media_ingestions j
+      JOIN listing_submissions s ON s.id=j.submission_id
+      WHERE s.status IN ('approved','rejected','withdrawn')
+        AND (j.media_key IS NULL OR NOT EXISTS (SELECT 1 FROM media_ingestions q
+          WHERE q.copy_from_key=j.media_key AND q.status='pending'))
+      ORDER BY j.id ASC
+      LIMIT ?`,
+    params: [limit]
+  }
+}
+
+/** Removes a finished submission's slot once its image (if any) is deleted. */
+export function buildForgetSubmissionMediaPlans(input: {
+  id: number
+  mediaKey: string | null
+}): StatementPlan[] {
+  if (input.mediaKey !== null && parseMediaKey(input.mediaKey)?.scope !== 'submissions') {
+    throw new Error('Only a submission’s own media is forgotten.')
+  }
+  return [
+    {
+      sql: `DELETE FROM media_ingestions WHERE id=? AND submission_id IS NOT NULL
+        AND media_key IS ?`,
+      params: [input.id, input.mediaKey]
+    }
   ]
 }
 

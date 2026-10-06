@@ -1,14 +1,17 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
-import type { HostedMedia } from './media-keys'
+import { type HostedMedia, type MediaOwner, mediaKey } from './media-keys'
 import {
   buildClaimMediaPlans,
   buildHostListingMediaPlans,
   buildQueueMediaPlans,
+  buildRecordClaimedFailurePlans,
   buildRecordMediaFailurePlans,
   buildRecordSubmissionMediaPlans,
   MAX_MEDIA_ATTEMPTS,
   MEDIA_RETRY_DELAYS_MINUTES,
+  type MediaClaim,
+  mediaClaimLease,
   nextMediaAttemptAt,
   selectDueMediaPlan,
   selectListingMediaContextPlan,
@@ -31,17 +34,27 @@ const listingId = 'lst_media'
 const slug = 'lst_media.example'
 const submissionId = 'sub_media'
 
-function hosted(kind: 'image' | 'logo', hash = 'a', sourceUrl = 'https://assets.example/new.png') {
+function hosted(
+  kind: 'image' | 'logo',
+  hash = 'a',
+  sourceUrl = 'https://assets.example/new.png',
+  owner: MediaOwner = { slug }
+) {
   const sha256 = hash.repeat(64)
   return {
     bytes: 2048,
     contentType: 'image/png',
     height: 256,
-    key: `best.serp.co/listings/${slug}/${kind}/${sha256.slice(0, 16)}.png`,
+    key: mediaKey({ format: 'png', kind, sha256, ...owner }),
     sha256,
     sourceUrl,
     width: 256
   } satisfies HostedMedia
+}
+
+/** A submission's hosted image (`best.serp.co/submissions/<id>/…`). */
+function pendingCopy(kind: 'image' | 'logo', hash: string, sourceUrl: string) {
+  return hosted(kind, hash, sourceUrl, { submissionId })
 }
 
 function seededDatabase(): DatabaseSync {
@@ -259,9 +272,25 @@ describe('the media queue', () => {
       })
     )
     const due = query(db, selectDueMediaPlan(NOW)) as Array<{ id: number; next_attempt_at: string }>
+    // A submission's key is built from its id, a listing's from its slug; the listing row
+    // carries what its slot holds now, which the cron's write compares and swaps on.
     expect(due).toMatchObject([
-      { kind: 'image', listing_id: null, slug: 'example.com', submission_id: submissionId },
-      { kind: 'logo', listing_id: listingId, slug, submission_id: null }
+      {
+        copy_from_key: null,
+        current_media: null,
+        kind: 'image',
+        listing_id: null,
+        slug: null,
+        submission_id: submissionId
+      },
+      {
+        copy_from_key: null,
+        current_media: 'https://assets.example/old-logo.png',
+        kind: 'logo',
+        listing_id: listingId,
+        slug,
+        submission_id: null
+      }
     ])
     const first = due[0]
     if (!first) throw new Error('No due slot.')
@@ -289,14 +318,14 @@ describe('submission media and approval', () => {
         sortOrder: 0,
         submissionId
       })
-    execute(db, plans(hosted('logo', 'b', 'https://example.com/logo.png')))
-    execute(db, plans(hosted('logo', 'c', 'https://example.com/logo.png')))
+    execute(db, plans(pendingCopy('logo', 'b', 'https://example.com/logo.png')))
+    execute(db, plans(pendingCopy('logo', 'c', 'https://example.com/logo.png')))
     expect(query(db, selectSubmissionMediaPlan(submissionId))).toEqual([
       {
         attempts: 2,
         kind: 'logo',
         last_error: null,
-        media_key: hosted('logo', 'c').key,
+        media_key: pendingCopy('logo', 'c', '').key,
         next_attempt_at: null,
         sort_order: 0,
         source_url: 'https://example.com/logo.png',
@@ -308,35 +337,66 @@ describe('submission media and approval', () => {
         db,
         buildRecordSubmissionMediaPlans({
           kind: 'logo',
-          media: hosted('logo'),
+          media: hosted('logo', 'c', 'https://x.example/', { submissionId: 'sub_missing' }),
           now: NOW,
           sortOrder: 0,
           submissionId: 'sub_missing'
         })
       )
     ).toThrow(/malformed JSON/u)
+    // A submission's image never lands under a listing's path, nor a listing's under a submission.
+    expect(() => plans(hosted('logo', 'c'))).toThrow(/not a hosted logo key for submissions/u)
+    expect(() =>
+      buildHostListingMediaPlans({
+        kind: 'logo',
+        listingId,
+        media: pendingCopy('logo', 'c', 'https://example.com/logo.png'),
+        publication: publication('listing-media'),
+        sortOrder: 0
+      })
+    ).toThrow(/not a hosted logo key for listings/u)
   })
 
-  it("adopts the submission's hosted logo when it is still the submitted source", () => {
+  it("queues a copy of the submission's hosted logo and image into the listing's path", () => {
     const db = planDatabase()
     seedSubmission(db)
-    execute(
-      db,
-      buildRecordSubmissionMediaPlans({
-        kind: 'logo',
-        media: hosted('logo', 'd', 'https://example.com/logo.png'),
-        now: NOW,
-        sortOrder: 0,
-        submissionId
-      })
-    )
+    const record = (kind: 'image' | 'logo', media: HostedMedia) =>
+      execute(
+        db,
+        buildRecordSubmissionMediaPlans({ kind, media, now: NOW, sortOrder: 0, submissionId })
+      )
+    const logo = pendingCopy('logo', 'd', 'https://example.com/logo.png')
+    const image = pendingCopy('image', 'e', 'https://example.com/og.png')
+    record('logo', logo)
+    record('image', image)
     approve(db)
+    // Nothing renders from the submission's path: the page shows the tile until the copy lands.
     expect(
-      db.prepare("SELECT url,media_key FROM listing_media WHERE listing_id='lst_approved'").all()
-    ).toEqual([{ media_key: hosted('logo', 'd').key, url: 'https://example.com/logo.png' }])
-    expect(
-      count(db, 'SELECT COUNT(*) AS count FROM media_ingestions WHERE listing_id IS NOT NULL')
+      count(db, "SELECT COUNT(*) AS count FROM listing_media WHERE listing_id='lst_approved'")
     ).toBe(0)
+    expect(
+      db
+        .prepare(
+          `SELECT kind,source_url,copy_from_key,status,next_attempt_at FROM media_ingestions
+           WHERE listing_id='lst_approved' ORDER BY kind`
+        )
+        .all()
+    ).toEqual([
+      {
+        copy_from_key: image.key,
+        kind: 'image',
+        next_attempt_at: NOW,
+        source_url: image.sourceUrl,
+        status: 'pending'
+      },
+      {
+        copy_from_key: logo.key,
+        kind: 'logo',
+        next_attempt_at: NOW,
+        source_url: logo.sourceUrl,
+        status: 'pending'
+      }
+    ])
   })
 
   it('queues the logo, never hotlinks it, when no hosted copy of that source exists', () => {
@@ -346,7 +406,7 @@ describe('submission media and approval', () => {
       db,
       buildRecordSubmissionMediaPlans({
         kind: 'logo',
-        media: hosted('logo', 'e', 'https://example.com/old-logo.png'),
+        media: pendingCopy('logo', 'e', 'https://example.com/old-logo.png'),
         now: NOW,
         sortOrder: 0,
         submissionId
@@ -371,6 +431,207 @@ describe('submission media and approval', () => {
         submission_id: null
       }
     ])
+    expect(
+      count(db, 'SELECT COUNT(*) AS count FROM media_ingestions WHERE copy_from_key IS NOT NULL')
+    ).toBe(0)
+  })
+})
+
+describe('a cron claim against concurrent writers (#96 review B1)', () => {
+  const source = 'https://assets.example/a.png'
+
+  /** Queues logo A and claims it as the cron would: read, claim, remember the slot's value. */
+  function claimLogo(db: DatabaseSync): MediaClaim {
+    execute(
+      db,
+      buildQueueMediaPlans({
+        kind: 'logo',
+        now: NOW,
+        sortOrder: 0,
+        sourceUrl: source,
+        target: { listingId }
+      })
+    )
+    const [row] = query(db, selectDueMediaPlan(NOW, 10, listingId)) as Array<{
+      current_media: string | null
+      id: number
+      next_attempt_at: string
+    }>
+    if (!row) throw new Error('No due slot.')
+    execute(
+      db,
+      buildClaimMediaPlans({ id: row.id, now: NOW, readNextAttemptAt: row.next_attempt_at })
+    )
+    return {
+      currentMedia: row.current_media,
+      id: row.id,
+      leaseUntil: mediaClaimLease(NOW),
+      sourceUrl: source
+    }
+  }
+
+  function cronHosts(db: DatabaseSync, claim: MediaClaim) {
+    const state = publicationState(db)
+    execute(
+      db,
+      buildHostListingMediaPlans({
+        claim,
+        kind: 'logo',
+        listingId,
+        media: hosted('logo', 'a', source),
+        publication: publication('media-cron', state),
+        sortOrder: 0
+      })
+    )
+  }
+
+  function logo(db: DatabaseSync) {
+    return db
+      .prepare("SELECT url,media_key FROM listing_media WHERE listing_id=? AND kind='logo'")
+      .all(listingId)
+  }
+
+  it('hosts the claimed source while nothing else touched the slot', () => {
+    const db = seededDatabase()
+    const claim = claimLogo(db)
+    cronHosts(db, claim)
+    expect(logo(db)).toEqual([{ media_key: hosted('logo', 'a').key, url: source }])
+    expect(slots(db)).toEqual([])
+  })
+
+  it('drops the cron result when an admin hosted another logo while it fetched', () => {
+    const db = seededDatabase()
+    const claim = claimLogo(db)
+    // The admin's edit hosts logo B and clears the queue while the cron is fetching A.
+    const b = hosted('logo', 'b', 'https://assets.example/b.png')
+    execute(
+      db,
+      buildHostListingMediaPlans({
+        kind: 'logo',
+        listingId,
+        media: b,
+        publication: publication('listing-edit', publicationState(db)),
+        sortOrder: 0
+      })
+    )
+    const version = publicationState(db).version
+    expect(() => cronHosts(db, claim)).toThrow(/malformed JSON/u)
+    expect(() =>
+      execute(
+        db,
+        buildRecordClaimedFailurePlans({
+          attempts: 1,
+          claim,
+          code: 'http_503',
+          now: NOW,
+          retryable: true
+        })
+      )
+    ).toThrow(/malformed JSON/u)
+    // B stays, the queue is not re-created, and the catalog version did not move.
+    expect(logo(db)).toEqual([{ media_key: b.key, url: b.sourceUrl }])
+    expect(slots(db)).toEqual([])
+    expect(publicationState(db).version).toBe(version)
+  })
+
+  it('drops the cron result when the slot was re-queued or changed under the claim', () => {
+    // The same slot re-queued (a new source, or the same source with a fresh schedule).
+    const requeued = seededDatabase()
+    const claim = claimLogo(requeued)
+    execute(
+      requeued,
+      buildQueueMediaPlans({
+        kind: 'logo',
+        now: NOW,
+        sortOrder: 0,
+        sourceUrl: source,
+        target: { listingId }
+      })
+    )
+    expect(() => cronHosts(requeued, claim)).toThrow(/malformed JSON/u)
+    expect(slots(requeued)).toMatchObject([{ next_attempt_at: NOW, status: 'pending' }])
+    // The claim still holds, but a publication replaced the slot's current value.
+    const republished = seededDatabase()
+    const held = claimLogo(republished)
+    republished
+      .prepare("UPDATE listing_media SET url=? WHERE listing_id=? AND kind='logo'")
+      .run('https://assets.example/published.png', listingId)
+    expect(() => cronHosts(republished, held)).toThrow(/malformed JSON/u)
+    expect(logo(republished)).toEqual([
+      { media_key: null, url: 'https://assets.example/published.png' }
+    ])
+  })
+
+  it('records a failure only on the claimed row', () => {
+    const db = seededDatabase()
+    const claim = claimLogo(db)
+    execute(
+      db,
+      buildRecordClaimedFailurePlans({
+        attempts: 1,
+        claim,
+        code: 'http_503',
+        now: NOW,
+        retryable: true
+      })
+    )
+    expect(slots(db)).toMatchObject([
+      { attempts: 1, last_error: 'http_503', next_attempt_at: '2026-10-06T12:15:00.000Z' }
+    ])
+    // The claim is spent: a second write with it is refused.
+    expect(() =>
+      execute(
+        db,
+        buildRecordClaimedFailurePlans({ attempts: 2, claim, code: 'x', now: NOW, retryable: true })
+      )
+    ).toThrow(/malformed JSON/u)
+  })
+
+  it('records a claimed submission image only while the claim holds', () => {
+    const db = seededDatabase()
+    seedSubmission(db)
+    execute(
+      db,
+      buildQueueMediaPlans({
+        kind: 'image',
+        now: NOW,
+        sortOrder: 0,
+        sourceUrl: 'https://example.com/og.png',
+        target: { submissionId }
+      })
+    )
+    const [row] = query(db, selectDueMediaPlan(NOW)) as Array<{
+      id: number
+      next_attempt_at: string
+    }>
+    if (!row) throw new Error('No due slot.')
+    execute(
+      db,
+      buildClaimMediaPlans({ id: row.id, now: NOW, readNextAttemptAt: row.next_attempt_at })
+    )
+    const claim = {
+      currentMedia: null,
+      id: row.id,
+      leaseUntil: mediaClaimLease(NOW),
+      sourceUrl: 'https://example.com/og.png'
+    }
+    const record = () =>
+      execute(
+        db,
+        buildRecordSubmissionMediaPlans({
+          claim,
+          kind: 'image',
+          media: pendingCopy('image', 'f', 'https://example.com/og.png'),
+          now: NOW,
+          sortOrder: 0,
+          submissionId
+        })
+      )
+    record()
+    expect(query(db, selectSubmissionMediaPlan(submissionId))).toMatchObject([
+      { attempts: 1, media_key: pendingCopy('image', 'f', '').key, status: 'hosted' }
+    ])
+    expect(record).toThrow(/malformed JSON/u)
   })
 })
 
@@ -430,5 +691,26 @@ describe('hosted media constraints', () => {
          VALUES ('${listingId}','logo','https://x.example/a.png','failed')`
       )
     ).toThrow(/media_ingestions_failed_explained/u)
+    // Only a listing slot copies, and only from a submission's key.
+    const submissionKey = `best.serp.co/submissions/${submissionId}/logo/${'f'.repeat(16)}.png`
+    expect(() =>
+      db.exec(
+        `INSERT INTO media_ingestions (submission_id,kind,source_url,next_attempt_at,copy_from_key)
+         VALUES ('${submissionId}','logo','https://x.example/a.png','${NOW}','${submissionKey}')`
+      )
+    ).toThrow(/media_ingestions_copy_from_submission/u)
+    expect(() =>
+      db.exec(
+        `INSERT INTO media_ingestions (listing_id,kind,source_url,next_attempt_at,copy_from_key)
+         VALUES ('${listingId}','logo','https://x.example/a.png','${NOW}',
+           'best.serp.co/listings/${slug}/logo/${'f'.repeat(16)}.png')`
+      )
+    ).toThrow(/media_ingestions_copy_from_submission/u)
+    expect(() =>
+      db.exec(
+        `INSERT INTO media_ingestions (listing_id,kind,source_url,next_attempt_at,copy_from_key)
+         VALUES ('${listingId}','logo','https://x.example/a.png','${NOW}','${submissionKey}')`
+      )
+    ).not.toThrow()
   })
 })

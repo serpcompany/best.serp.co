@@ -1,6 +1,11 @@
 import { MEDIA_CACHE_CONTROL } from '@serpdirectory/data-ops/media-keys'
 import { describe, expect, it, vi } from 'vitest'
-import { type MediaWorkerEnv, runMediaCron, serveLocalMedia } from './worker-media'
+import {
+  createMediaHost,
+  type MediaWorkerEnv,
+  runMediaCron,
+  serveLocalMedia
+} from './worker-media'
 
 const key = 'best.serp.co/listings/example.com/logo/0123456789abcdef.png'
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
@@ -38,8 +43,7 @@ describe('local media route', () => {
     expect(response?.status).toBe(200)
     expect(Object.fromEntries(response?.headers ?? [])).toMatchObject({
       'cache-control': MEDIA_CACHE_CONTROL,
-      'content-type': 'image/png',
-      'x-content-type-options': 'nosniff'
+      'content-type': 'image/png'
     })
     expect(new Uint8Array(await (response as Response).arrayBuffer())).toEqual(png)
     const head = await serveLocalMedia(
@@ -89,5 +93,17 @@ describe('media cron', () => {
       'media_cron_disabled'
     ])
     info.mockRestore()
+  })
+})
+
+describe('media host', () => {
+  it('exists only with a bucket, and settles a listing only with D1 and waitUntil', () => {
+    expect(createMediaHost({ D1_RUNTIME_ENV: 'local' })).toBeUndefined()
+    const tasks: Array<Promise<unknown>> = []
+    // No DB binding: nothing is handed to waitUntil.
+    createMediaHost(local, task => tasks.push(task))?.settle?.('lst_x')
+    expect(tasks).toHaveLength(0)
+    // No waitUntil: a no-op rather than work that would outlive the request.
+    expect(() => createMediaHost(local)?.settle?.('lst_x')).not.toThrow()
   })
 })

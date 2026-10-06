@@ -189,10 +189,50 @@ export const CLEARED_MEDIA_RESULT = `media_key=NULL,sha256=NULL,content_type=NUL
   width=NULL,height=NULL`
 
 /**
- * Gives a listing the logo staged on a submission or revision, never as a hotlink: the live
- * hosted logo stays when it came from the same source; otherwise a submission's hosted copy of
- * that source is adopted; otherwise the source is queued for the cron and the page shows the
- * fallback tile until it is hosted. Runs inside an approval batch.
+ * The submission's hosted copy for a listing slot: queued with `copy_from_key`, so the cron
+ * copies it into the listing's path (`best.serp.co/listings/<slug>/…`); a slot still waiting on
+ * the submission side is queued with its source. Runs inside an approval batch.
+ */
+function queueFromSubmissionSlot(input: {
+  kind: 'image' | 'logo'
+  listingId: string
+  now: string
+  /** Extra condition on the submission's slot `j` (SQL, with `params`). */
+  slotCondition: { params: unknown[]; sql: string }
+  submissionId: string
+}): StatementPlan {
+  return {
+    sql: `INSERT INTO media_ingestions
+      (listing_id,kind,sort_order,source_url,copy_from_key,status,attempts,next_attempt_at,
+       created_at,updated_at)
+      SELECT ?,j.kind,0,j.source_url,CASE WHEN j.status='hosted' THEN j.media_key END,'pending',
+        0,?,?,?
+      FROM media_ingestions j
+      WHERE j.submission_id=? AND j.kind=? AND j.sort_order=0 AND j.status IN ('hosted','pending')
+        AND (${input.slotCondition.sql})
+      ON CONFLICT(listing_id,kind,sort_order) WHERE listing_id IS NOT NULL DO UPDATE SET
+        source_url=excluded.source_url,copy_from_key=excluded.copy_from_key,status='pending',
+        attempts=0,next_attempt_at=excluded.next_attempt_at,last_error=NULL,
+        ${CLEARED_MEDIA_RESULT},updated_at=excluded.updated_at`,
+    params: [
+      input.listingId,
+      input.now,
+      input.now,
+      input.now,
+      input.submissionId,
+      input.kind,
+      ...input.slotCondition.params
+    ]
+  }
+}
+
+/**
+ * Gives a listing the logo staged on a submission or revision, never as a hotlink:
+ * - the live logo row stays when its source is the staged logo, hosted or not (an imported logo
+ *   keeps rendering until the legacy migration repoints it, #95 review S7);
+ * - otherwise a submission's hosted copy of that source is queued to be copied into the
+ *   listing's path, or the source itself is queued for the cron.
+ * The page shows the fallback tile until the new logo is hosted. Runs inside an approval batch.
  */
 export function adoptStagedLogoPlans(input: {
   listingId: string
@@ -204,47 +244,81 @@ export function adoptStagedLogoPlans(input: {
   const { listingId, stagedId, stagedTable } = input
   const stagedLogo = `(SELECT logo_url FROM ${stagedTable} WHERE id=?)`
   const logoRow = `EXISTS (SELECT 1 FROM listing_media WHERE listing_id=? AND kind='logo')`
-  const adoptHostedSubmissionLogo: StatementPlan[] =
+  const queueFromSubmission: StatementPlan[] =
     stagedTable === 'listing_submissions'
       ? [
-          {
-            sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order,${HOSTED_MEDIA_COLUMNS})
-              SELECT ?,'logo',j.source_url,0,j.media_key,j.sha256,j.content_type,j.bytes,
-                j.width,j.height
-              FROM listing_submissions s JOIN media_ingestions j ON j.submission_id=s.id
-                AND j.kind='logo' AND j.sort_order=0 AND j.status='hosted'
-                AND j.source_url=s.logo_url
-              WHERE s.id=? AND NOT ${logoRow}`,
-            params: [listingId, stagedId, listingId]
-          }
+          queueFromSubmissionSlot({
+            kind: 'logo',
+            listingId,
+            now: input.now,
+            slotCondition: {
+              sql: `j.source_url=${stagedLogo} AND NOT ${logoRow}`,
+              params: [stagedId, listingId]
+            },
+            submissionId: stagedId
+          })
         ]
       : []
   return [
     {
       sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'
-        AND NOT (media_key IS NOT NULL AND url IS ${stagedLogo})`,
+        AND url IS NOT ${stagedLogo}`,
       params: [listingId, stagedId]
-    },
-    ...adoptHostedSubmissionLogo,
-    {
-      sql: `INSERT INTO media_ingestions
-        (listing_id,kind,sort_order,source_url,status,attempts,next_attempt_at,created_at,updated_at)
-        SELECT ?,'logo',0,logo_url,'pending',0,?,?,? FROM ${stagedTable}
-        WHERE id=? AND NOT ${logoRow}
-        ON CONFLICT(listing_id,kind,sort_order) WHERE listing_id IS NOT NULL DO UPDATE SET
-          source_url=excluded.source_url,status='pending',attempts=0,
-          next_attempt_at=excluded.next_attempt_at,last_error=NULL,${CLEARED_MEDIA_RESULT},
-          updated_at=excluded.updated_at`,
-      params: [listingId, input.now, input.now, input.now, stagedId, listingId]
     },
     {
       sql: `DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo' AND ${logoRow}`,
       params: [listingId, listingId]
     },
-    assertGuard('staged_logo_hosted_or_queued', {
+    ...queueFromSubmission,
+    {
+      sql: `INSERT INTO media_ingestions
+        (listing_id,kind,sort_order,source_url,status,attempts,next_attempt_at,created_at,updated_at)
+        SELECT ?,'logo',0,logo_url,'pending',0,?,?,? FROM ${stagedTable}
+        WHERE id=? AND NOT ${logoRow} AND NOT EXISTS (SELECT 1 FROM media_ingestions
+          WHERE listing_id=? AND kind='logo' AND sort_order=0 AND source_url IS ${stagedLogo}
+          AND next_attempt_at=?)
+        ON CONFLICT(listing_id,kind,sort_order) WHERE listing_id IS NOT NULL DO UPDATE SET
+          source_url=excluded.source_url,copy_from_key=NULL,status='pending',attempts=0,
+          next_attempt_at=excluded.next_attempt_at,last_error=NULL,${CLEARED_MEDIA_RESULT},
+          updated_at=excluded.updated_at`,
+      params: [
+        listingId,
+        input.now,
+        input.now,
+        input.now,
+        stagedId,
+        listingId,
+        listingId,
+        stagedId,
+        input.now
+      ]
+    },
+    assertGuard('staged_logo_kept_or_queued', {
       sql: `${logoRow} OR EXISTS (SELECT 1 FROM media_ingestions WHERE listing_id=?
         AND kind='logo' AND sort_order=0 AND status='pending' AND source_url IS ${stagedLogo})`,
       params: [listingId, listingId, stagedId]
+    })
+  ]
+}
+
+/**
+ * Gives a new listing the submission's featured (social) image, hosted or still waiting, as its
+ * first image: queued for a copy into the listing's path, never inserted as a URL. Runs inside
+ * the approval batch that creates the listing.
+ */
+export function adoptSubmissionImagePlans(input: {
+  listingId: string
+  now: string
+  submissionId: string
+}): StatementPlan[] {
+  hoursBefore(input.now, 0)
+  return [
+    queueFromSubmissionSlot({
+      kind: 'image',
+      listingId: input.listingId,
+      now: input.now,
+      slotCondition: { sql: '1', params: [] },
+      submissionId: input.submissionId
     })
   ]
 }
