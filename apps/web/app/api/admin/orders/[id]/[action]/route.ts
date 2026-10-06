@@ -19,6 +19,10 @@ interface Params {
 const emptyBody = z.object({}).passthrough()
 const refundBody = z.object({
   badgeCheckId: z.number().int().positive().nullable().optional(),
+  listingAction: z
+    .enum(['already_unpublished', 'keep_free', 'none', 'unpublish'])
+    .nullable()
+    .optional(),
   note: z.string().max(500).optional()
 })
 

@@ -18,6 +18,8 @@ export const metadata: Metadata = { title: 'Orders' }
 
 /** The line under an order's status (#70 screen 13's notes). */
 function note(order: AdminOrderRow): string | null {
+  // The provider kept refusing this refund; the sweep stopped, and "Refund…" retries it.
+  if (order.attention === 'refund_failed') return 'Refund failed'
   if (order.status === 'refunded') {
     if (order.refundReason === 'rejected') return 'Auto refund on reject'
     if (order.refundListingAction === 'unpublish') return 'Listing unpublished (no badge)'
@@ -72,9 +74,8 @@ export default async function OrdersPage() {
         : null,
       note: note(order),
       number: order.number,
-      // An admin's refund a failure left can be finished from here too; others, by the sweep.
-      refundable:
-        order.status === 'paid' || (order.status === 'refunding' && order.refundReason === 'admin'),
+      // A refund a failure left can be finished from here too (the sweep also retries it).
+      refundable: order.status === 'paid' || order.status === 'refunding',
       status: order.status,
       stripeRef,
       stripeUrl: stripeRef && deps ? deps.provider.dashboardUrl(stripeRef) : null

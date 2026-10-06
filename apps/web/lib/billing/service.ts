@@ -7,6 +7,7 @@ import {
   buildMarkOrderAppliedPlans,
   buildMarkOrderFailedPlans,
   buildMarkOrderPaidPlans,
+  buildRecordRefundFailurePlans,
   type CheckoutSubmission,
   listingCheckoutPurpose,
   type OrderRecord,
@@ -776,6 +777,12 @@ async function applyClaimPayment(deps: BillingDependencies, order: OrderRecord):
 /** What a finished refund did to the listing. */
 export type RefundListing = 'kept_free' | 'unchanged' | 'unpublished'
 
+const CHANGED = failure(
+  409,
+  'conflict',
+  'This changed since you opened it. Reload the page and try again.'
+)
+
 function listingResult(action: OrderRefundListingAction | null): RefundListing {
   if (action === 'keep_free') return 'kept_free'
   if (action === 'unpublish') return 'unpublished'
@@ -907,7 +914,22 @@ async function finishRefund(deps: BillingDependencies, orderId: string): Promise
   if (!claimed) throw new Error(`Order ${orderId} not found.`)
   if (claimed.status === 'refunded') return listingResult(claimed.refundListingAction)
   if (claimed.status !== 'refunding') throw new Error(`Order ${orderId} has no claimed refund.`)
-  const refundId = await providerRefund(deps, claimed)
+  let refundId: string | null
+  try {
+    refundId = await providerRefund(deps, claimed)
+  } catch (error) {
+    // Backed off (1, 2, 4, 8 hours…); the last allowed failure flags it for an admin.
+    const delay = RECONCILE_AFTER_MS * 6 * 2 ** Math.min(claimed.refundAttempts, 5)
+    await deps.operations.apply(
+      buildRecordRefundFailurePlans({
+        attempts: claimed.refundAttempts,
+        now: nowIso(deps),
+        orderId: claimed.id,
+        retryAt: new Date(deps.now().getTime() + delay).toISOString()
+      })
+    )
+    throw error
+  }
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const order = await deps.operations.order(orderId)
     if (!order) throw new Error(`Order ${orderId} not found.`)
@@ -1087,18 +1109,23 @@ async function decideRefund(
       listingNow: { live, paid }
     }
   }
-  let check: RefundBadgeResult | null = null
+  let check: RefundBadgeResult
   if (badgeCheckId) {
+    // The dialog's check decides, exactly as it showed it. One a newer dialog replaced, or one
+    // left open over an hour, is refused (409): the dialog previews again rather than the
+    // refund silently doing what another check says.
     const shown = await deps.operations.refundBadgeCheck(badgeCheckId)
     if (
-      shown?.latest &&
-      shown.listingId === submission.listingId &&
-      deps.now().getTime() - Date.parse(shown.checkedAt) < REFUND_CHECK_MAX_AGE_MS
+      !shown?.latest ||
+      shown.listingId !== submission.listingId ||
+      deps.now().getTime() - Date.parse(shown.checkedAt) >= REFUND_CHECK_MAX_AGE_MS
     ) {
-      check = { checkId: shown.id, keepFree: shown.outcome === 'pass' }
+      return CHANGED
     }
+    check = { checkId: shown.id, keepFree: shown.outcome === 'pass' }
+  } else {
+    check = await deps.badgeAtRefund(submission.listingId)
   }
-  check ??= await deps.badgeAtRefund(submission.listingId)
   return {
     badgeCheckId: check.checkId,
     kind: 'refund',
@@ -1114,7 +1141,7 @@ export async function previewRefund(
 ): Promise<({ ok: true } & RefundDecision) | BillingFailure> {
   const order = await deps.operations.order(input.orderId)
   if (!order) return failure(404, 'not_found', 'That order doesn’t exist.')
-  if (order.status === 'refunding' && order.refundReason === 'admin') {
+  if (order.status === 'refunding') {
     // A refund a failure left: finishing it repeats the recorded decision.
     return {
       badgeCheckId: order.refundBadgeCheckId,
@@ -1138,7 +1165,14 @@ export async function previewRefund(
  */
 export async function refundOrder(
   deps: BillingDependencies,
-  input: { actor: string; badgeCheckId?: number | null; note?: string | null; orderId: string }
+  input: {
+    actor: string
+    badgeCheckId?: number | null
+    /** What the dialog said the refund does to the listing; a different decision is a 409. */
+    listingAction?: OrderRefundListingAction | null
+    note?: string | null
+    orderId: string
+  }
 ): Promise<RefundOrderResult> {
   const order = await deps.operations.order(input.orderId)
   if (!order) return failure(404, 'not_found', 'That order doesn’t exist.')
@@ -1153,6 +1187,12 @@ export async function refundOrder(
   }
   const decision = await decideRefund(deps, order, input.badgeCheckId)
   if (!('kind' in decision)) return decision
+  if (
+    input.listingAction &&
+    (decision.kind !== 'refund' || decision.listingAction !== input.listingAction)
+  ) {
+    return CHANGED
+  }
   if (decision.kind === 'rejection') {
     await refundRejectedSubmission(deps, {
       actor: input.actor,
@@ -1201,15 +1241,19 @@ export async function runBillingSweep(
   const orders = await deps.operations.ordersToReconcile({
     before: new Date(now - RECONCILE_AFTER_MS).toISOString(),
     failedSince: new Date(now - FAILED_RECONCILE_MS).toISOString(),
-    limit: input.limit
+    limit: input.limit,
+    now: new Date(now).toISOString()
   })
-  // Most urgent first: claimed refunds, then paid orders never applied, then checkouts.
+  // Most urgent first: paid orders never applied, then claimed refunds (at most half the
+  // calls, so refunds the provider keeps refusing can't starve the rest), then checkouts.
+  let refundCalls = Math.ceil(calls / 2)
   for (const order of orders) {
-    if (calls <= 0) {
+    if (calls <= 0 || (order.status === 'refunding' && refundCalls <= 0)) {
       counts.skipped += 1
       continue
     }
     calls -= 1
+    if (order.status === 'refunding') refundCalls -= 1
     try {
       if (order.status === 'refunding') {
         await finishRefund(deps, order.id)

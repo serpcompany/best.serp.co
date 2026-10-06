@@ -153,12 +153,15 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
     setBusy(true)
     const result = await adminRequest<{ listing: string }>(`/api/admin/orders/${order.id}/refund`, {
       badgeCheckId: preview.badgeCheckId,
+      listingAction: preview.listingAction,
       note
     })
     setBusy(false)
     setRefunding(null)
     if (!result.ok) {
       toast.error(result.message)
+      // The badge check or the listing changed since the dialog opened: show it again, fresh.
+      if (result.error === 'conflict') void openRefund(order)
       return
     }
     const name = order.item?.name ?? orderLabel(order)

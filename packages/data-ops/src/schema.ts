@@ -1349,7 +1349,11 @@ export const orderRefundListingActions = [
 export type OrderRefundListingAction = (typeof orderRefundListingActions)[number]
 
 /** Why an order needs an admin's attention. */
-export const orderAttentions = ['amount_mismatch'] as const
+/**
+ * Why an order needs an admin: a charge that didn't match its order (refunded), or a refund
+ * the provider kept refusing (`refund_failed`, after `REFUND_MAX_ATTEMPTS`; the sweep stops).
+ */
+export const orderAttentions = ['amount_mismatch', 'refund_failed'] as const
 export type OrderAttention = (typeof orderAttentions)[number]
 
 export const orders = sqliteTable(
@@ -1391,6 +1395,9 @@ export const orders = sqliteTable(
     refundListingAction: text('refund_listing_action', { enum: orderRefundListingActions }),
     refundBadgeCheckId: integer('refund_badge_check_id'),
     refundRequestedAt: text('refund_requested_at'),
+    /** Provider refund attempts that failed, and when the sweep may try again (backoff). */
+    refundAttempts: integer('refund_attempts').notNull().default(0),
+    refundRetryAt: text('refund_retry_at'),
     /** The admin's reason for the activity log (#70 screen 13). */
     refundNote: text('refund_note'),
     paidAt: text('paid_at'),
@@ -1434,6 +1441,7 @@ export const orders = sqliteTable(
         AND ${table.claimId} IS NULL AND ${table.targetKey} = 'listing:' || ${table.listingId})`
     ),
     check('orders_amount_positive', sql`${table.amountCents} > 0`),
+    check('orders_refund_attempts_valid', sql`${table.refundAttempts} >= 0`),
     check('orders_currency_valid', sql`${table.currency} GLOB '[a-z][a-z][a-z]'`),
     check(
       'orders_paid_recorded',

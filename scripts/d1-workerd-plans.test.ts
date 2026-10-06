@@ -1294,7 +1294,8 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         B.selectOrdersToReconcilePlan({
           before: '2026-10-07T00:00:00.000Z',
           failedSince: '2026-10-01T00:00:00.000Z',
-          limit: 10
+          limit: 10,
+          now: NOW
         })
       )
     ).toEqual([])
@@ -1358,6 +1359,16 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     await expect(
       run(B.buildMarkOrderAppliedPlans({ now: NOW, orderId: 'ord-2', outcome: 'published' }))
     ).rejects.toThrow()
+    // A provider failure is counted (swapped on the count read), with its retry time.
+    await run(
+      B.buildRecordRefundFailurePlans({
+        attempts: 0,
+        now: NOW,
+        orderId: 'ord-2',
+        retryAt: '2026-10-06T13:00:00.000Z'
+      })
+    )
+    expect(await order('ord-2')).toMatchObject({ refund_attempts: 1 })
     await run(B.buildFinishRefundPlans({ now: NOW, orderId: 'ord-2', refundId: 're_2' }))
     expect(await order('ord-2')).toMatchObject({
       attention: 'amount_mismatch',

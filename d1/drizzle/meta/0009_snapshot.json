@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7d50882e-5f88-45bc-8fa8-ca42b22dbb7a",
+  "id": "1b87a91c-7b20-4654-99fd-ac650b7f0242",
   "prevId": "876f34c4-6293-4c68-be1b-a5b7bf95fb3f",
   "tables": {
     "accounts": {
@@ -3249,6 +3249,21 @@
           "notNull": false,
           "autoincrement": false
         },
+        "refund_attempts": {
+          "name": "refund_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "refund_retry_at": {
+          "name": "refund_retry_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "refund_note": {
           "name": "refund_note",
           "type": "text",
@@ -3392,7 +3407,7 @@
         },
         "orders_attention_valid": {
           "name": "orders_attention_valid",
-          "value": "\"orders\".\"attention\" IS NULL OR \"orders\".\"attention\" IN ('amount_mismatch')"
+          "value": "\"orders\".\"attention\" IS NULL OR \"orders\".\"attention\" IN ('amount_mismatch', 'refund_failed')"
         },
         "orders_refund_reason_valid": {
           "name": "orders_refund_reason_valid",
@@ -3405,6 +3420,10 @@
         "orders_amount_positive": {
           "name": "orders_amount_positive",
           "value": "\"orders\".\"amount_cents\" > 0"
+        },
+        "orders_refund_attempts_valid": {
+          "name": "orders_refund_attempts_valid",
+          "value": "\"orders\".\"refund_attempts\" >= 0"
         },
         "orders_currency_valid": {
           "name": "orders_currency_valid",

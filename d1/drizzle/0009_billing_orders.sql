@@ -41,6 +41,8 @@ CREATE TABLE `orders` (
 	`refund_listing_action` text,
 	`refund_badge_check_id` integer,
 	`refund_requested_at` text,
+	`refund_attempts` integer DEFAULT 0 NOT NULL,
+	`refund_retry_at` text,
 	`refund_note` text,
 	`paid_at` text,
 	`applied_at` text,
@@ -57,7 +59,7 @@ CREATE TABLE `orders` (
 	CONSTRAINT "orders_outcome_valid" CHECK("orders"."outcome" IS NULL OR "orders"."outcome" IN ('published', 'held', 'upgraded', 'relisted', 'claimed', 'unapplied')),
 	CONSTRAINT "orders_refund_listing_action_valid" CHECK("orders"."refund_listing_action" IS NULL
         OR "orders"."refund_listing_action" IN ('keep_free', 'unpublish', 'already_unpublished', 'none')),
-	CONSTRAINT "orders_attention_valid" CHECK("orders"."attention" IS NULL OR "orders"."attention" IN ('amount_mismatch')),
+	CONSTRAINT "orders_attention_valid" CHECK("orders"."attention" IS NULL OR "orders"."attention" IN ('amount_mismatch', 'refund_failed')),
 	CONSTRAINT "orders_refund_reason_valid" CHECK("orders"."refund_reason" IS NULL OR "orders"."refund_reason" IN ('rejected', 'admin', 'unapplied')),
 	CONSTRAINT "orders_target_matches_purpose" CHECK(("orders"."purpose" = 'claim' AND "orders"."kind" = 'paid_claim'
         AND "orders"."claim_id" IS NOT NULL AND "orders"."listing_id" IS NOT NULL
@@ -69,6 +71,7 @@ CREATE TABLE `orders` (
         AND "orders"."submission_id" IS NOT NULL AND "orders"."listing_id" IS NOT NULL
         AND "orders"."claim_id" IS NULL AND "orders"."target_key" = 'listing:' || "orders"."listing_id")),
 	CONSTRAINT "orders_amount_positive" CHECK("orders"."amount_cents" > 0),
+	CONSTRAINT "orders_refund_attempts_valid" CHECK("orders"."refund_attempts" >= 0),
 	CONSTRAINT "orders_currency_valid" CHECK("orders"."currency" GLOB '[a-z][a-z][a-z]'),
 	CONSTRAINT "orders_paid_recorded" CHECK("orders"."status" IN ('pending', 'failed')
         OR ("orders"."paid_at" IS NOT NULL AND "orders"."provider_payment_id" IS NOT NULL

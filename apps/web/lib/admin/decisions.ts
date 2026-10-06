@@ -120,6 +120,7 @@ export interface AdminBilling {
   refundOrder(input: {
     actor: string
     badgeCheckId?: number | null
+    listingAction?: 'already_unpublished' | 'keep_free' | 'none' | 'unpublish' | null
     note?: string | null
     orderId: string
   }): Promise<{ listing: OrderRefundListing; ok: true; replayed: boolean } | DecisionFailure>
@@ -1397,7 +1398,12 @@ export async function removeAdmin(
  */
 export async function refundOrder(
   context: AdminContext,
-  input: { badgeCheckId?: number | null; note?: string | null; orderId: string }
+  input: {
+    badgeCheckId?: number | null
+    listingAction?: 'already_unpublished' | 'keep_free' | 'none' | 'unpublish' | null
+    note?: string | null
+    orderId: string
+  }
 ): Promise<Decision<{ listing: OrderRefundListing }>> {
   if (!context.billing) return notFound('order')
   const result = await context.billing.refundOrder({ ...input, actor: context.actor })

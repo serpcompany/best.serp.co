@@ -285,6 +285,8 @@ export const applicationColumnInventory = {
     'refund_listing_action',
     'refund_badge_check_id',
     'refund_requested_at',
+    'refund_attempts',
+    'refund_retry_at',
     'refund_note',
     'paid_at',
     'applied_at',

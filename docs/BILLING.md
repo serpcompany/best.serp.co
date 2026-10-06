@@ -30,7 +30,7 @@ the target (submission, listing, or claim), amount and currency, provider and it
 `refunding` → `refunded`, or `failed`), `outcome` once applied (`published`, `held`,
 `upgraded`, `relisted`, `claimed`, `unapplied`), the refund reason (`rejected`, `admin`,
 `unapplied`), actor, note, and an admin refund's listing decision and badge check, `attention`
-(`amount_mismatch`), and timestamps. A partial unique index allows
+(`amount_mismatch`, `refund_failed`), refund attempts and their backoff, and timestamps. A partial unique index allows
 one `pending` order per target, so a double click or a second tab reuses the open checkout.
 `billing_events` records each provider event once by `(provider, event_id)`.
 
@@ -98,11 +98,15 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   The badge check and the listing decision are recorded with the claim, and finishing applies
   that decision whatever its age or any later check (`decidedAt`), so a retry (a lost write,
   Stripe down, the sweep an hour later) never checks again and never leaves the listing live on
-  the paid plan. A dialog's check that a newer dialog replaced is refused and checked again. A
-  listing that went down meanwhile is refunded as it is. No email: #70 has none for it.
+  the paid plan. The refund sends the dialog's check and listing decision; a check a newer
+  dialog replaced, one over an hour old, or a decision that no longer holds answers 409 and the
+  dialog previews again, so a refund never does other than the button said. A listing that went
+  down meanwhile is refunded as it is. No email: #70 has none for it.
 - **Sweep.** The hourly cron (`billing-sweep` in `lib/worker/scheduled.ts`) works most urgent
-  first, with at most 20 Stripe calls a run: claimed refunds, paid orders a crash left
-  unapplied, pending orders whose checkout closed (paid → applied, otherwise `failed`), failed
+  first, with at most 20 Stripe calls a run: paid orders a crash left unapplied, claimed refunds
+  (at most half the calls; a refund Stripe refuses backs off 1, 2, 4, 8 and 16 hours and is
+  flagged `refund_failed` for an admin after five failures, after which only "Refund…" retries
+  it), pending orders whose checkout closed (paid → applied, otherwise `failed`), failed
   orders whose superseded checkout couldn't be confirmed expired (for three days; it expires an
   open one and drops one Stripe expired), then refunds still owed after an `other` rejection.
 

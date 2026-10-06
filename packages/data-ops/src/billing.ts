@@ -56,11 +56,13 @@ export interface OrderRecord {
   providerPaymentId: string | null
   providerRefundId: string | null
   purpose: OrderPurpose
+  refundAttempts: number
   refundBadgeCheckId: number | null
   refundListingAction: OrderRefundListingAction | null
   refundNote: string | null
   refundReason: OrderRefundReason | null
   refundRequestedAt: string | null
+  refundRetryAt: string | null
   refundedAt: string | null
   refundedBy: string | null
   status: OrderStatus
@@ -77,7 +79,7 @@ const ORDER_COLUMNS = `o.id,o.number,o.check_problem,o.refund_note,o.user_id,o.k
   o.checkout_expires_at,o.provider_payment_id,o.provider_refund_id,o.status,o.outcome,
   o.failure_reason,o.refund_reason,o.refunded_by,o.paid_at,o.applied_at,o.refunded_at,
   o.charged_cents,o.charged_currency,o.attention,o.refund_listing_action,o.refund_badge_check_id,
-  o.refund_requested_at,o.created_at,o.updated_at`
+  o.refund_requested_at,o.refund_attempts,o.refund_retry_at,o.created_at,o.updated_at`
 
 function optional(value: unknown): string | null {
   return value === null || value === undefined ? null : String(value)
@@ -111,6 +113,7 @@ function toOrder(row: Row): OrderRecord {
     providerPaymentId: optional(row.provider_payment_id),
     providerRefundId: optional(row.provider_refund_id),
     purpose: row.purpose as OrderPurpose,
+    refundAttempts: Number(row.refund_attempts ?? 0),
     refundBadgeCheckId:
       row.refund_badge_check_id === null || row.refund_badge_check_id === undefined
         ? null
@@ -119,6 +122,7 @@ function toOrder(row: Row): OrderRecord {
     refundNote: optional(row.refund_note),
     refundReason: optional(row.refund_reason) as OrderRefundReason | null,
     refundRequestedAt: optional(row.refund_requested_at),
+    refundRetryAt: optional(row.refund_retry_at),
     refundedAt: optional(row.refunded_at),
     refundedBy: optional(row.refunded_by),
     status: row.status as OrderStatus,
@@ -346,6 +350,39 @@ export function buildClaimRefundPlans(
   ]
 }
 
+/** A claimed refund gives up after this many provider failures, for an admin to look at. */
+export const REFUND_MAX_ATTEMPTS = 5
+
+/**
+ * A provider refund that failed: counted (compared and swapped on the count read), with the
+ * time the sweep may try again. The last allowed failure flags the order `refund_failed`, and
+ * the sweep stops trying; an admin's "Refund…" still can.
+ */
+export function buildRecordRefundFailurePlans(input: {
+  attempts: number
+  now: string
+  orderId: string
+  retryAt: string
+}): StatementPlan[] {
+  const next = input.attempts + 1
+  return [
+    {
+      sql: `UPDATE orders SET refund_attempts=?,refund_retry_at=?,
+          attention=CASE WHEN ?>=? THEN 'refund_failed' ELSE attention END,updated_at=?
+        WHERE id=? AND status='refunding' AND refund_attempts=?`,
+      params: [
+        next,
+        input.retryAt,
+        next,
+        REFUND_MAX_ATTEMPTS,
+        input.now,
+        input.orderId,
+        input.attempts
+      ]
+    }
+  ]
+}
+
 /** `refunding` → `refunded`, once the provider confirmed the refund. */
 export function buildFinishRefundPlans(input: {
   now: string
@@ -402,9 +439,9 @@ export function selectSubmissionPaymentOrderPlan(submissionId: string): Statemen
 export const RECONCILABLE_FAILURES = ['superseded_unconfirmed', 'checkout_not_recorded_unconfirmed']
 
 /**
- * Orders the hourly sweep looks at again, most urgent first: claimed refunds a failure left
- * unfinished, then paid orders never applied (a crash between recording the payment and
- * applying it), then pending orders whose checkout should have finished (`before`), then failed
+ * Orders the hourly sweep looks at again, most urgent first: paid orders never applied (a crash
+ * between recording the payment and applying it: the buyer is waiting), then claimed refunds a
+ * failure left unfinished (when their backoff is over, until `refund_failed`), then pending orders whose checkout should have finished (`before`), then failed
  * orders whose checkout might still have been paid (`RECONCILABLE_FAILURES`, since
  * `failedSince`, the provider's retry window).
  */
@@ -412,21 +449,25 @@ export function selectOrdersToReconcilePlan(input: {
   before: string
   failedSince: string
   limit: number
+  now: string
 }): StatementPlan {
   return {
     sql: `SELECT ${ORDER_COLUMNS} FROM orders o
-      WHERE (o.status='refunding' AND o.refund_requested_at<?)
+      WHERE (o.status='refunding' AND o.refund_requested_at<?
+          AND (o.refund_retry_at IS NULL OR o.refund_retry_at<=?)
+          AND (o.attention IS NULL OR o.attention<>'refund_failed'))
         OR (o.status='paid' AND o.applied_at IS NULL AND o.paid_at<?)
         OR (o.status='pending' AND o.provider_checkout_id IS NOT NULL
           AND o.checkout_expires_at<?)
         OR (o.status='failed' AND o.provider_checkout_id IS NOT NULL
           AND o.failure_reason IN (${RECONCILABLE_FAILURES.map(() => '?').join(',')})
           AND o.failed_at>=? AND o.failed_at<?)
-      ORDER BY CASE o.status WHEN 'refunding' THEN 0 WHEN 'paid' THEN 1 WHEN 'pending' THEN 2
+      ORDER BY CASE o.status WHEN 'paid' THEN 0 WHEN 'refunding' THEN 1 WHEN 'pending' THEN 2
         ELSE 3 END,o.created_at,o.id
       LIMIT ?`,
     params: [
       input.before,
+      input.now,
       input.before,
       input.before,
       ...RECONCILABLE_FAILURES,
@@ -704,6 +745,7 @@ export interface BillingOperations {
     before: string
     failedSince: string
     limit: number
+    now: string
   }): Promise<OrderRecord[]>
   /** A badge check at refund (`kind = 'refund'`), to confirm the one an admin's dialog showed. */
   refundBadgeCheck(checkId: number): Promise<{
