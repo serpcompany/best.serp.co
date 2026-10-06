@@ -1,10 +1,10 @@
 name: Upload Listing Media
 
-# Uploads one reviewed listing media plan from d1/media into the production media bucket (#95). Every
-# object is fetched again from its recorded source and uploaded only when its bytes still match
-# the plan; objects the media host already serves are skipped. scripts/media-upload.ts re-checks
-# main, this workflow, the plan location, and the typed confirmation, and refuses any key
-# outside best.serp.co/listings/.
+# Uploads one reviewed listing media plan from d1/media into the production media bucket (#95),
+# after Upload Listing Media (staging) uploaded the same plan: every object is copied from
+# cdn-staging.serp.co and uploaded only when its bytes still match the plan; objects the media
+# host already serves are skipped. scripts/media-upload.ts re-checks main, this workflow, the
+# plan location, and the typed confirmation, and refuses any key outside best.serp.co/listings/.
 on:
   workflow_dispatch:
     inputs:

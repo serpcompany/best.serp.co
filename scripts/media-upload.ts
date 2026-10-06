@@ -23,11 +23,13 @@ import { project } from './project'
  * never write to staging or production R2. `--dry-run` fetches and verifies every source without
  * credentials and writes nothing.
  *
- * Every object is fetched again from its recorded source (a public https URL through `safeFetch`,
- * or `repo:` a file checked in under `apps/web/public`) and uploaded only when its bytes, SHA-256,
- * format, and dimensions still match the reviewed plan. An object the media host already serves
- * at that size is skipped, so a rerun only finishes what is missing. Keys outside
- * `best.serp.co/listings/` are refused: the production bucket is shared with serp.co.
+ * A staging upload fetches every object again from its recorded source (a public https URL
+ * through `safeFetch`, or `repo:` a file checked in under `apps/web/public`). A production upload
+ * copies the object staging serves under the same key instead, so production gets exactly the
+ * bytes staging verified, however the source changed since. Either way an object is uploaded only
+ * when its bytes, SHA-256, format, and dimensions match the reviewed plan, and an object the media
+ * host already serves at that size is skipped, so a rerun only finishes what is missing. Keys
+ * outside `best.serp.co/listings/` are refused: the production bucket is shared with serp.co.
  */
 
 export type UploadTarget = 'production' | 'staging'
@@ -267,7 +269,12 @@ export async function uploadMediaPlan(
     if (!options.dryRun && (await alreadyServed(object, target.baseUrl, fetcher))) {
       return { key: object.key, status: 'present' }
     }
-    const body = await sourceBytes(object.source, fetcher)
+    // Production copies staging's verified object; staging fetches the recorded source.
+    const source =
+      options.target === 'production'
+        ? `${uploadTargets.staging.baseUrl}/${object.key}`
+        : object.source
+    const body = await sourceBytes(source, fetcher)
     if (!(body instanceof Uint8Array))
       return { key: object.key, reason: body.reason, status: 'failed' }
     const mismatch = verifyObject(object, body)

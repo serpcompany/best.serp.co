@@ -149,6 +149,39 @@ describe('media upload plans', () => {
     })
   })
 
+  it('copies production objects from staging, never from the original source', async () => {
+    const production = {
+      ...workflowEnvironment,
+      GITHUB_REF: 'refs/heads/main',
+      GITHUB_WORKFLOW_REF: 'owner/repo/.github/workflows/upload-media.yml@refs/heads/main',
+      MEDIA_UPLOAD_CONFIRM: 'upload-media-best.serp.co-production'
+    }
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (init?.method === 'HEAD') return new Response(null, { status: 404 })
+      if (init?.method === 'PUT') return new Response('{}', { status: 200 })
+      if (url === `https://cdn-staging.serp.co/${remote.key}`) {
+        return new Response(new Uint8Array(png), { headers: { 'Content-Type': 'image/png' } })
+      }
+      return new Response('not on staging', { status: 404 })
+    })
+    const summary = await uploadMediaPlan(planPath, {
+      env: production,
+      fetcher,
+      target: 'production'
+    })
+    expect(summary).toMatchObject({ failed: [{ key: repo.key, reason: 'http_404' }], uploaded: 1 })
+    const gets = fetcher.mock.calls.filter(([, init]) => !init?.method || init.method === 'GET')
+    expect(gets.map(([url]) => String(url)).sort()).toEqual(
+      [
+        `https://cdn-staging.serp.co/${remote.key}`,
+        `https://cdn-staging.serp.co/${repo.key}`
+      ].sort()
+    )
+    const puts = fetcher.mock.calls.filter(([, init]) => init?.method === 'PUT')
+    expect(String(puts[0]?.[0])).toContain('/r2/buckets/cdn/objects/')
+  })
+
   it('reports a source that changed or vanished instead of uploading it', async () => {
     const changedPlan = {
       ...plan,

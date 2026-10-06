@@ -167,8 +167,12 @@ locally and writes nothing. The owner then runs, in order:
 2. **Publish D1 Catalog (staging)** from `staging` with `publish-best.serp.co-staging`, and check
    staging.
 3. After the `staging` → `main` promotion: **Upload Listing Media** with
-   `upload-media-best.serp.co-production`, then **Publish D1 Catalog** with
-   `publish-best.serp.co-production`.
+   `upload-media-best.serp.co-production`, which copies each object from `cdn-staging.serp.co`
+   (the bytes staging verified, whatever the source does since), then **Publish D1 Catalog**
+   with `publish-best.serp.co-production`.
+
+A source that changed between the plan and the staging upload fails that object
+(`sha256_mismatch`); regenerate the plan for it, then rerun the upload, which skips the rest.
 
 Agents prepare and review these files; they never run the uploads or publications
 ([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)).

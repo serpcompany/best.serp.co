@@ -136,8 +136,8 @@ dispatched from `staging` with `publish-best.serp.co-staging`, `staging` environ
 backup first), checked there, and then, after promotion, by **Publish D1 Catalog** from `main`.
 Listing media follows the same order: a plan under `d1/media/` is uploaded by **Upload Listing
 Media (staging)** (`upload-media-best.serp.co-staging`) and later by **Upload Listing Media**
-from `main` (`upload-media-best.serp.co-production`), before the manifest that names its keys
-is published. `scripts/d1-remote-publisher.ts` and `scripts/media-upload.ts` each refuse to
+from `main` (`upload-media-best.serp.co-production`), which copies staging's verified objects,
+before the manifest that names its keys is published. `scripts/d1-remote-publisher.ts` and `scripts/media-upload.ts` each refuse to
 run outside their own workflow, branch, and confirmation; the uploader also refuses any key
 outside `best.serp.co/listings/`. Procedure: [Listing media](./MEDIA.md#uploading-and-publishing).
 
