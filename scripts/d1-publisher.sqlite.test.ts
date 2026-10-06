@@ -15,6 +15,15 @@ const afterChecksum = createHash('sha256')
   .update(`${beforeChecksum}\0${createHash('sha256').update('sqlite manifest').digest('hex')}`)
   .digest('hex')
 const now = '2026-07-13T01:00:00.000Z'
+const hostedLogo = (slug: string) => ({
+  bytes: 2048,
+  contentType: 'image/png',
+  height: 128,
+  key: `best.serp.co/listings/${slug}/logo/${'a'.repeat(16)}.png`,
+  sha256: 'a'.repeat(64),
+  source: 'https://created.example/logo.png',
+  width: 128
+})
 
 function database(): DatabaseSync {
   const db = new DatabaseSync(':memory:')
@@ -241,7 +250,7 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
               website: 'https://created.example',
               publishedAt: now,
               categories: ['analytics', 'seo'],
-              media: { logo: 'https://created.example/logo.png' },
+              media: { logo: hostedLogo('created-listing') },
               faqs: [{ question: 'Q?', answer: 'A.' }]
             }
           }
@@ -272,6 +281,94 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
     ])
     expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
       version: 5
+    })
+    // Media are written as hosted keys, never as URLs (#95).
+    expect(
+      db
+        .prepare(
+          "SELECT kind,url,media_key,content_type FROM listing_media WHERE listing_id='lst_created_listing'"
+        )
+        .all()
+    ).toEqual([
+      {
+        content_type: 'image/png',
+        kind: 'logo',
+        media_key: hostedLogo('created-listing').key,
+        url: 'https://created.example/logo.png'
+      }
+    ])
+  })
+
+  it('refuses logo and image URLs, and keys of another kind or a forged digest (#95)', () => {
+    const create = (logo: unknown) =>
+      manifestSchema.safeParse({
+        version: 1,
+        id: 'sqlite-release',
+        basePublicationVersion: 4,
+        provenance: { actor: 'test@example.com', workflow: 'test/sqlite', beforeChecksum },
+        operations: [
+          {
+            action: 'listing-create',
+            listing: {
+              id: 'lst_created_listing',
+              slug: 'created-listing',
+              name: 'Created',
+              description: 'Created listing',
+              website: 'https://created.example',
+              publishedAt: now,
+              categories: ['seo'],
+              media: { logo }
+            }
+          }
+        ]
+      }).success
+    expect(create(hostedLogo('created-listing'))).toBe(true)
+    expect(create('https://created.example/logo.png')).toBe(false)
+    expect(create({ ...hostedLogo('created-listing'), sha256: 'b'.repeat(64) })).toBe(false)
+    expect(create({ ...hostedLogo('created-listing'), contentType: 'image/webp' })).toBe(false)
+    expect(
+      create({
+        ...hostedLogo('created-listing'),
+        key: hostedLogo('created-listing').key.replace(
+          '/listings/created-listing/',
+          '/submissions/s1/'
+        )
+      })
+    ).toBe(false)
+  })
+
+  it('clears queued media slots when a listing update replaces its media (#95)', () => {
+    const db = database()
+    db.exec(`
+      INSERT INTO media_ingestions (listing_id,kind,sort_order,source_url,next_attempt_at)
+        VALUES ('lst_sqlite_test','logo',0,'https://old.example/logo.png','${now}');
+    `)
+    executeInTestTransaction(
+      db,
+      plan({
+        operations: [
+          {
+            action: 'listing-update',
+            previousCategories: ['seo'],
+            listing: {
+              id: 'lst_sqlite_test',
+              slug: 'old-slug',
+              name: 'Old',
+              description: 'Description',
+              website: 'https://example.com',
+              publishedAt: now,
+              categories: ['seo'],
+              media: { logo: hostedLogo('old-slug') }
+            }
+          }
+        ]
+      })
+    )
+    expect(db.prepare('SELECT COUNT(*) AS count FROM media_ingestions').get()).toEqual({
+      count: 0
+    })
+    expect(db.prepare("SELECT media_key FROM listing_media WHERE kind='logo'").get()).toEqual({
+      media_key: hostedLogo('old-slug').key
     })
   })
 
