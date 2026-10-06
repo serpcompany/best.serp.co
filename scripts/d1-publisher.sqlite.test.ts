@@ -532,6 +532,80 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
       expect(changed.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 4 })
     })
 
+    it('applies a row-level manifest at whatever version each environment is (#97 review B3)', () => {
+      const rows = (overrides: Record<string, unknown> = {}) =>
+        manifestSchema.parse({
+          version: 1,
+          id: 'rows-release',
+          concurrency: 'rows',
+          provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+          operations: [mediaUpdate()],
+          ...overrides
+        })
+      // Two environments that published different things since the manifest was generated.
+      for (const version of [4, 17]) {
+        const db = mediaDatabase()
+        db.prepare('UPDATE publication_state SET version=?').run(version)
+        const live = { checksum: beforeChecksum, version }
+        const publication = buildPublicationPlan(rows(), 'rows manifest', now, live)
+        expect(publication.base).toEqual(live)
+        executeInTestTransaction(db, publication)
+        expect(db.prepare('SELECT version,manifest_id FROM publication_state').get()).toEqual({
+          manifest_id: 'rows-release',
+          version: version + 1
+        })
+        expect(db.prepare("SELECT media_key FROM listing_media WHERE kind='logo'").get()).toEqual({
+          media_key: hosted('logo', 'a').key
+        })
+      }
+      // The live state is required, and a stale one still rolls the batch back.
+      expect(() => buildPublicationPlan(rows(), 'rows manifest', now)).toThrow(/live publication/u)
+      const stale = mediaDatabase()
+      expect(() =>
+        executeInTestTransaction(
+          stale,
+          buildPublicationPlan(rows(), 'rows manifest', now, {
+            checksum: beforeChecksum,
+            version: 3
+          })
+        )
+      ).toThrow()
+      // The row-level guard compares the hosted key too: a row the cron hosted meanwhile wins.
+      const hostedMeanwhile = mediaDatabase()
+      hostedMeanwhile.exec(
+        `UPDATE listing_media SET media_key='${hosted('logo', 'f').key}',sha256='${sha('f')}',
+          content_type='image/png',bytes=1,width=1,height=1 WHERE kind='logo'`
+      )
+      expect(() =>
+        executeInTestTransaction(
+          hostedMeanwhile,
+          buildPublicationPlan(rows(), 'rows manifest', now, {
+            checksum: beforeChecksum,
+            version: 4
+          })
+        )
+      ).toThrow()
+      expect(
+        hostedMeanwhile.prepare("SELECT media_key FROM listing_media WHERE kind='logo'").get()
+      ).toEqual({ media_key: hosted('logo', 'f').key })
+      // A row-level manifest names no base and holds only media updates; others need their base.
+      expect(() => rows({ basePublicationVersion: 4 })).toThrow(/names no base/u)
+      expect(() =>
+        rows({ provenance: { actor: 'test@example.com', workflow: 'test/sqlite', beforeChecksum } })
+      ).toThrow(/names no base/u)
+      expect(() =>
+        rows({ operations: [mediaUpdate(), { action: 'category-unpublish', slug: 'seo' }] })
+      ).toThrow(/only listing-media-update/u)
+      expect(() =>
+        manifestSchema.parse({
+          version: 1,
+          id: 'no-base',
+          provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+          operations: [mediaUpdate()]
+        })
+      ).toThrow(/needs basePublicationVersion/u)
+    })
+
     it("refuses another listing's key, a key of the wrong kind, and a forged digest", () => {
       const refused = (operation: Record<string, unknown>) => () =>
         manifestSchema.parse({
