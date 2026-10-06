@@ -1427,7 +1427,7 @@ describe('staging catalog publication and media uploads (#95)', () => {
     return job
   }
 
-  it('applies a reviewed manifest to staging D1 from staging only, after a staging backup', () => {
+  it('applies a reviewed manifest to staging D1 from staging only, after a Time Travel bookmark', () => {
     const job = expectAuthorizedDispatch(
       'publish-d1-staging.yml',
       'staging',
@@ -1435,16 +1435,15 @@ describe('staging catalog publication and media uploads (#95)', () => {
       project.confirmation.publishStaging,
       'publish'
     )
-    expect(releaseAuthorizations['publish-d1-staging.yml']).toMatchObject({
-      branch: 'staging',
-      commands: ['backup'],
-      confirmation: project.confirmation.publishStaging,
-      environment: 'staging',
-      events: ['workflow_dispatch']
-    })
-    expect(stepIndex(job, 'cloudflare-release.ts backup staging')).toBeLessThan(
+    // The bookmark is read-only, so the workflow needs no release authorization (#97 review B1).
+    expect(releaseAuthorizations['publish-d1-staging.yml']).toBeUndefined()
+    const bookmark = stepRunning(job, 'cloudflare-release.ts bookmark staging')
+    expect(bookmark.run).toBe('pnpm tsx scripts/cloudflare-release.ts bookmark staging')
+    expect(stepIndex(job, 'cloudflare-release.ts bookmark staging')).toBeLessThan(
       stepIndex(job, 'db:publish:staging')
     )
+    // No database export, and nothing uploaded as an artifact of this public repository.
+    expect(JSON.stringify(job)).not.toMatch(/upload-artifact|\bbackup\b|d1 export/u)
     const publish = stepRunning(job, 'db:publish:staging')
     expect(publish.run).toBe('pnpm db:publish:staging -- "$MANIFEST_PATH"')
     expect(publish.env).toMatchObject({
@@ -1529,9 +1528,12 @@ describe('protected deployment boundaries', () => {
       'publish-d1-staging.yml': {
         publish: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
       },
-      'upload-media.yml': { upload: productionGroup },
+      // Uploads hold their own groups, never the deploy groups (#97 review S5).
+      'upload-media.yml': {
+        upload: { group: 'media-upload-best-serp-co-production', 'cancel-in-progress': false }
+      },
       'upload-media-staging.yml': {
-        upload: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
+        upload: { group: 'media-upload-best-serp-co-staging', 'cancel-in-progress': false }
       }
     }
     expect(Object.keys(expected).sort()).toEqual([...newWorkflows].sort())

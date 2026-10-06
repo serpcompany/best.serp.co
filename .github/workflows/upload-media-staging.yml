@@ -2,9 +2,10 @@ name: Upload Listing Media (staging)
 
 # Uploads one reviewed listing media plan from d1/media into the staging media bucket (#95). Every
 # object is fetched again from its recorded source and uploaded only when its bytes still match
-# the plan; objects the media host already serves are skipped. scripts/media-upload.ts re-checks
-# staging, this workflow, the plan location, and the typed confirmation, and refuses any key
-# outside best.serp.co/listings/.
+# the plan. An object the bucket already holds is read back through the R2 API and verified:
+# a match is skipped, a mismatch fails and is never overwritten. scripts/media-upload.ts
+# re-checks staging, this workflow, the plan location, and the typed confirmation, and refuses
+# any key outside best.serp.co/listings/.
 on:
   workflow_dispatch:
     inputs:
@@ -46,9 +47,12 @@ jobs:
   upload:
     name: Upload to the staging media bucket
     needs: [authorize]
-    # Job-level, so a run refused by authorize never replaces a valid queued staging job.
+    # Its own group (#97 review S5): an hour-long upload never holds the deploy group, where a
+    # waiting publication or deploy could be replaced. Uploads add objects only; a publication
+    # refuses a manifest whose objects its bucket does not hold yet. Job-level, so a run refused
+    # by authorize never replaces a valid queued upload.
     concurrency:
-      group: deploy-best-serp-co-staging
+      group: media-upload-best-serp-co-staging
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 60
