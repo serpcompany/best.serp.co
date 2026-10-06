@@ -198,20 +198,12 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   listing's `checksum` at the time (`base_checksum`). A listing has at most one open revision,
   and none while its own submission is still in review; the logo is required, like a
   submission's.
-- `badge_checks` (listing, `checked_at`, `outcome` `pass` | `fail`, `reason`, `conclusive`,
-  `kind` `weekly` | `confirmation` | `refund`) is the badge program history, written only by
-  `packages/data-ops/src/badge-program.ts` ([Badge program](./BADGE_PROGRAM.md)); an owner's
-  own checks from the account are recorded on the submission instead
-  ([Submitter dashboard](./ACCOUNT_DASHBOARD.md#badge-panel)). A network error, timeout, or 5xx
-  is an inconclusive `fail` and never counts as a miss; `checked_at` is an ISO instant (a
-  CHECK), compared as text. `kind` tells a weekly miss, which opens a warning, from the
-  confirmation recheck, which is written in the same batch as its unpublish or revocation, and
-  from the one-off check at refund (#68). `0006_badge_program` rebuilds the table to add `kind`
-  (existing rows become `weekly`; nothing references it). It is outside the catalog: writing it
-  never changes the catalog epoch.
-- `listing_claims` (#67, `0008_listing_claims`) holds claims of existing listings: claimer,
-  method, status, the product-domain address, the badge page, the code's HMAC, attempts, and
-  lockout. Completing one writes the `listing_owners` row ([Claims](./CLAIMS.md)).
+- `badge_checks` (listing, `checked_at`, `outcome`, `reason`, `conclusive`, `kind` `weekly` |
+  `confirmation` | `refund`) is the badge program history, written only by
+  `packages/data-ops/src/badge-program.ts` ([Badge program](./BADGE_PROGRAM.md)); an owner's own
+  checks are recorded on the submission ([Submitter dashboard](./ACCOUNT_DASHBOARD.md#badge-panel)).
+  Writing it never changes the catalog epoch.
+- `listing_claims` (`0008_listing_claims`) holds claims of existing listings ([Claims](./CLAIMS.md)).
 
 These tables are empty in the initial import, so bootstrap parity compares them like the
 submission tables (`scripts/d1-table-inventory.ts`).
