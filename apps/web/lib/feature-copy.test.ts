@@ -142,6 +142,7 @@ describe('page copy', () => {
         failingTitle: 'Fix the badge',
         programCheckBy: 'SERP'
       },
+      claim: { badgeCardNote: null, keepTheBadge: null },
       contentHint: 'Shown on your listing page.',
       faqsHint: null,
       freePlanBadgeCheck: null,
@@ -161,6 +162,12 @@ describe('page copy', () => {
           'If it’s still failing at the recheck about 24 hours later, the listing is unlisted.',
         failingTitle: 'Fix the badge before the recheck',
         programCheckBy: 'Weekly'
+      },
+      claim: {
+        badgeCardNote:
+          'We check it weekly. If it’s removed, you lose ownership and the listing stays up.',
+        keepTheBadge:
+          'We check it weekly. If it’s missing on two checks about 24 hours apart, ownership is removed. The listing stays up.'
       },
       contentHint:
         'Shown on your listing page. FAQs and links can be added from your account later.',

@@ -21,6 +21,7 @@
     "agent:logs": "pnpm tsx scripts/harness/agent-runtime.ts logs",
     "agent:evidence": "pnpm tsx scripts/harness/agent-runtime.ts evidence",
     "agent:ui:capture": "pnpm tsx scripts/harness/ui-capture.ts",
+    "catalog:claim-holds": "pnpm tsx scripts/claim-holds-manifest.ts",
     "catalog:domains": "pnpm tsx scripts/listing-domain-check.ts",
     "catalog:faqs": "pnpm tsx scripts/listing-faq-move.ts",
     "worktree:new": "pnpm tsx scripts/harness/worktree.ts new",

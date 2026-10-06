@@ -236,6 +236,31 @@ const operation = z.discriminatedUnion('action', [
       add: categories
     })
     .strict(),
+  /**
+   * Holds a listing's instant claim for the owner's review (#67, #108 review round 3): #100's
+   * owner-review sets, or one an admin names. Row-level guarded: the listing must still have this
+   * slug and, with `expected`, this website. An active hold is left as it is; a cleared one is
+   * placed again.
+   */
+  z
+    .object({
+      action: z.literal('listing-claim-hold-add'),
+      id: listingId,
+      slug: existingSlug,
+      reason: z.enum(['off_domain', 'unreachable', 'admin']),
+      note: z.string().trim().min(1).max(200),
+      expected: z.object({ website: z.string().url() }).strict().optional()
+    })
+    .strict(),
+  /** Clears a listing's active claim hold (#67): the owner decided it can be claimed. */
+  z
+    .object({
+      action: z.literal('listing-claim-hold-clear'),
+      id: listingId,
+      slug: existingSlug,
+      note: z.string().trim().min(1).max(200)
+    })
+    .strict(),
   z.object({ action: z.literal('category-create'), category }).strict(),
   z.object({ action: z.literal('category-update'), category }).strict(),
   z.object({ action: z.literal('category-unpublish'), slug: categorySlug }).strict()
@@ -267,7 +292,9 @@ const rowLevelActions = new Set<string>([
   'listing-media-update',
   'listing-categories-add',
   'listing-content-remove-suffix',
-  'listing-unpublish'
+  'listing-unpublish',
+  'listing-claim-hold-add',
+  'listing-claim-hold-clear'
 ])
 export const manifestSchema = z
   .object({
@@ -297,7 +324,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add, listing-content-remove-suffix, and listing-unpublish operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add, listing-content-remove-suffix, listing-unpublish, and listing-claim-hold-add/-clear operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -749,6 +776,45 @@ export function buildPublicationPlan(
           JSON.stringify({ fields: ['content'], manifest: manifest.id, reason: op.reason }),
           manifest.provenance.actor
         )
+      )
+      routes.add(listingRoute(op.slug))
+    }
+    if (op.action === 'listing-claim-hold-add') {
+      const website = op.expected ? [op.expected.website] : []
+      statements.push(
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?${
+            op.expected ? ' AND website=?' : ''
+          }) THEN 1 ELSE ${GUARD_FAILURE} END`,
+          op.id,
+          op.slug,
+          ...website
+        ),
+        statement(
+          'INSERT INTO listing_claim_holds (listing_id,reason,source,created_at) VALUES (?,?,?,?) ON CONFLICT(listing_id) DO UPDATE SET reason=excluded.reason,source=excluded.source,created_at=excluded.created_at,cleared_at=NULL,cleared_by=NULL WHERE listing_claim_holds.cleared_at IS NOT NULL',
+          op.id,
+          op.reason,
+          `manifest ${manifest.id}: ${op.note}`,
+          now
+        ),
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_claim_holds WHERE listing_id=? AND cleared_at IS NULL) THEN 1 ELSE ${GUARD_FAILURE} END`,
+          op.id
+        )
+      )
+      routes.add(listingRoute(op.slug))
+    }
+    if (op.action === 'listing-claim-hold-clear') {
+      statements.push(
+        statement(
+          'UPDATE listing_claim_holds SET cleared_at=?,cleared_by=? WHERE listing_id=? AND cleared_at IS NULL AND EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?)',
+          now,
+          `${manifest.provenance.actor} (manifest ${manifest.id}: ${op.note})`.slice(0, 300),
+          op.id,
+          op.id,
+          op.slug
+        ),
+        statement(CHANGED_ONE_GUARD)
       )
       routes.add(listingRoute(op.slug))
     }

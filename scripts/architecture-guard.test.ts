@@ -637,6 +637,16 @@ describe('single-site D1-only repository architecture', () => {
     expect(shown).toEqual([])
   })
 
+  it('keeps claim SQL in the shared data package (#67)', () => {
+    const claimsDirectory = resolve(project.appDirectory, 'lib/claims')
+    for (const file of readdirSync(claimsDirectory).filter(name => !name.includes('.test.'))) {
+      const source = readFileSync(resolve(claimsDirectory, file), 'utf8')
+      expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
+    }
+    const runtime = readFileSync(resolve(claimsDirectory, 'runtime.ts'), 'utf8')
+    expect(runtime).toContain("import 'server-only'")
+  })
+
   it('catches every way code can write badge checks (#66 review round 1)', () => {
     for (const write of [
       'INSERT INTO badge_checks (listing_id) VALUES (?)',

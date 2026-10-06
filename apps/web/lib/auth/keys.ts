@@ -8,6 +8,8 @@
 export const RATE_LIMIT_KEY_LABEL = 'best.serp.co/auth-rate-limit/v1'
 export const KNOWN_DEVICE_KEY_LABEL = 'best.serp.co/known-device/v1'
 export const CODE_BINDING_KEY_LABEL = 'best.serp.co/code-binding/v1'
+/** Claim domain-email codes (#67) are stored as an HMAC under this key. */
+export const CLAIM_CODE_KEY_LABEL = 'best.serp.co/claim-code/v1'
 
 const encoder = new TextEncoder()
 

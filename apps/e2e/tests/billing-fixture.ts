@@ -6,8 +6,8 @@ import { adminSuiteEnabled, localD1, type SuiteServer } from './admin-fixture'
 
 /**
  * The orders suite (serpcompany/best.serp.co#68) runs on its own local Worker and D1, started by
- * `playwright.config.ts` from the already-built Worker with orders on (`LOCAL_ORDERS=on`, a local
- * Worker only) and pointed at a mocked Stripe API on 127.0.0.1 (`LOCAL_STRIPE_MOCK_PORT`), with
+ * `playwright.config.ts` from the already-built Worker with orders and claims on (`LOCAL_ORDERS`,
+ * `LOCAL_CLAIMS`, a local Worker only) and pointed at a mocked Stripe API on 127.0.0.1 (`LOCAL_STRIPE_MOCK_PORT`), with
  * the suite's own test-mode values for `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. Nothing
  * reaches Stripe: the mock answers the Checkout Session and refund calls the Worker makes, and
  * serves the "Stripe page" the buyer pays or cancels on. Never used against a deployed Worker.
@@ -18,13 +18,13 @@ const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 export const billingSuiteEnabled = adminSuiteEnabled
 
 export const billingServer: SuiteServer = {
-  // +3 admin, +4 media, +5 account, +6 badge program.
-  port: playwrightPort + 7,
-  stateDirectory: resolve(tmpdir(), `best-serp-co-e2e-billing-${playwrightPort + 7}`)
+  // +3 admin, +4 media, +5 account, +6 badge program, +7 claims (#67).
+  port: playwrightPort + 9,
+  stateDirectory: resolve(tmpdir(), `best-serp-co-e2e-billing-${playwrightPort + 9}`)
 }
 
 /** Where the mocked Stripe API listens (the Worker reads it from `LOCAL_STRIPE_MOCK_PORT`). */
-export const stripeMockPort = playwrightPort + 8
+export const stripeMockPort = playwrightPort + 10
 
 /** Test-mode values for this suite's local Worker only; never real keys. */
 export const E2E_STRIPE_SECRET_KEY = 'sk_test_e2emock'
@@ -37,6 +37,7 @@ export function billingOrigin(): string {
 export function billingServerCommand(): string {
   const state = billingServer.stateDirectory
   const vars = [
+    'LOCAL_CLAIMS=on',
     'LOCAL_ORDERS=on',
     `LOCAL_STRIPE_MOCK_PORT=${stripeMockPort}`,
     `STRIPE_SECRET_KEY=${E2E_STRIPE_SECRET_KEY}`,

@@ -193,17 +193,12 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   listing's `checksum` at the time (`base_checksum`). A listing has at most one open revision,
   and none while its own submission is still in review; the logo is required, like a
   submission's.
-- `badge_checks` (listing, `checked_at`, `outcome` `pass` | `fail`, `reason`, `conclusive`,
-  `kind` `weekly` | `confirmation` | `refund`) is the badge program history, written only by
-  `packages/data-ops/src/badge-program.ts` ([Badge program](./BADGE_PROGRAM.md)); an owner's
-  own checks from the account are recorded on the submission instead
-  ([Submitter dashboard](./ACCOUNT_DASHBOARD.md#badge-panel)). A network error, timeout, or 5xx
-  is an inconclusive `fail` and never counts as a miss; `checked_at` is an ISO instant (a
-  CHECK), compared as text. `kind` tells a weekly miss, which opens a warning, from the
-  confirmation recheck, which is written in the same batch as its unpublish or revocation, and
-  from the one-off check at refund (#68). `0006_badge_program` rebuilds the table to add `kind`
-  (existing rows become `weekly`; nothing references it). It is outside the catalog: writing it
-  never changes the catalog epoch.
+- `badge_checks` (listing, `checked_at`, `outcome`, `reason`, `conclusive`, `kind` `weekly` |
+  `confirmation` | `refund`) is the badge program history, written only by
+  `packages/data-ops/src/badge-program.ts` ([Badge program](./BADGE_PROGRAM.md)); an owner's own
+  checks are recorded on the submission ([Submitter dashboard](./ACCOUNT_DASHBOARD.md#badge-panel)).
+  Writing it never changes the catalog epoch.
+- `listing_claims` (`0008_listing_claims`) holds claims of existing listings ([Claims](./CLAIMS.md)).
 
 - `orders` and `billing_events` (`0009_billing_orders`): the billing ledger and the provider's
   webhook events, written only by `packages/data-ops/src/billing.ts`.
@@ -278,7 +273,8 @@ sending one batch. `publish-d1-staging.yml` applies a manifest to staging first,
 `publish-d1.yml` to production ([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)),
 each after recording a D1 Time Travel bookmark (no export). A row-level manifest
 (`concurrency: rows`: `listing-media-update`, `listing-categories-add`,
-`listing-content-remove-suffix`, and `listing-unpublish` with `expected.website`) checks each
+`listing-content-remove-suffix`, `listing-unpublish` with `expected.website`, and
+`listing-claim-hold-add`/`-clear` for [claim](./CLAIMS.md) holds) checks each
 listing's rows, not a base version ([media](./MEDIA.md)). Verification, rejection, and approval
 batches assert `changes() = 1` after every compare-and-swap step, so stale decisions roll back.
 

@@ -13,6 +13,7 @@ import {
   createBadgeProgramOperations
 } from '@serpdirectory/data-ops/badge-program'
 import * as billingModule from '@serpdirectory/data-ops/billing'
+import { createClaimOperations } from '@serpdirectory/data-ops/claims'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import * as draftPlansModule from '@serpdirectory/data-ops/draft-plans'
 import * as listingPlansModule from '@serpdirectory/data-ops/listing-plans'
@@ -1668,5 +1669,102 @@ describe('badge program on Wrangler-local D1 (workerd, #66)', () => {
       ['listing-unlisted', 'free@badge.example'],
       ['ownership-removed', 'claim@badge.example']
     ])
+  })
+})
+
+describe('claims on Wrangler-local D1 (workerd, #67)', () => {
+  it('starts, confirms, checks, and completes a badge claim, then refuses a second claimer', async () => {
+    const operations = createClaimOperations({ client: createDatabase(db) })
+    await db.batch([
+      db.prepare(
+        `INSERT INTO users (id, name, email, email_verified) VALUES
+          ('claim_user', 'Claimer', 'claimer@example.com', 1),
+          ('claim_other', 'Other', 'other-claimer@example.com', 1)`
+      ),
+      db.prepare(
+        `INSERT INTO listings (id, slug, name, description, website, status, source_kind,
+          source_identity, checksum) VALUES ('lst-claim', 'claim-tool', 'Claim tool', 'd',
+          'https://www.claim-tool.example/', 'draft', 'fixture', 'lst-claim', 'c')`
+      ),
+      db.prepare(
+        `INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+          SELECT 'lst-claim', id, 0, 1 FROM categories WHERE slug = 'tools'`
+      ),
+      db.prepare(
+        `UPDATE listings SET status = 'approved', published_at = '2026-05-16' WHERE id = 'lst-claim'`
+      )
+    ])
+    const listing = await operations.listing({ slug: 'claim-tool' })
+    expect(listing).toMatchObject({ id: 'lst-claim', live: true, ownerUserId: null })
+    expect(await operations.blocked(['claim-tool.example'])).toBe(false)
+    const code = {
+      codeExpiresAt: '2026-10-06T12:10:00.000Z',
+      codeHash: 'hash',
+      email: 'jo@claim-tool.example',
+      emailDomain: 'claim-tool.example',
+      method: 'badge' as const,
+      now: NOW,
+      listingWebsite: 'https://www.claim-tool.example/',
+      productUrl: 'https://www.claim-tool.example/'
+    }
+    expect(
+      await operations.start({
+        ...code,
+        claimId: 'c-1',
+        listingId: 'lst-claim',
+        userId: 'claim_user'
+      })
+    ).toBe(true)
+    expect(
+      await operations.start({
+        ...code,
+        claimId: 'c-dup',
+        listingId: 'lst-claim',
+        userId: 'claim_user'
+      })
+    ).toBe(false)
+    expect(
+      await operations.start({
+        ...code,
+        claimId: 'c-2',
+        listingId: 'lst-claim',
+        userId: 'claim_other'
+      })
+    ).toBe(true)
+    const later = '2026-10-06T12:01:00.000Z'
+    expect(
+      await operations.recordWrongCode({
+        claimId: 'c-1',
+        lockedUntil: '2026-10-06T12:16:00.000Z',
+        now: later,
+        userId: 'claim_user'
+      })
+    ).toBe(true)
+    expect(
+      await operations.confirmEmail({
+        claimId: 'c-1',
+        codeHash: 'hash',
+        now: later,
+        userId: 'claim_user'
+      })
+    ).toBe(true)
+    expect(
+      await operations.claimBadgeCheck({ claimId: 'c-1', now: later, userId: 'claim_user' })
+    ).toBe(true)
+    const claim = await operations.claim({ claimId: 'c-1', userId: 'claim_user' })
+    if (!claim) throw new Error('missing claim')
+    expect(claim).toMatchObject({ attempts: 1, codePending: false, status: 'email_verified' })
+    expect(await operations.complete({ actor: 'claimer@example.com', claim, now: later })).toBe(
+      true
+    )
+    expect(await operations.listing({ id: 'lst-claim' })).toMatchObject({
+      ownerUserId: 'claim_user'
+    })
+    expect(await operations.claim({ claimId: 'c-2', userId: 'claim_other' })).toMatchObject({
+      status: 'cancelled'
+    })
+    expect(
+      await first("SELECT verified_via FROM listing_owners WHERE listing_id = 'lst-claim'")
+    ).toEqual({ verified_via: 'badge_claim' })
   })
 })

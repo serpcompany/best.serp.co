@@ -29,6 +29,9 @@ its flag is off. A local Worker can run it with the flag off
   has nobody to warn and stays out). A free listing whose own submission is in review
   (`paid_pending_review` or `changes_requested`) waits for that decision, because unpublishing
   is refused meanwhile; it is not fetched again every hour.
+- **The page checked** is a submitted listing's website, or for a badge claimer the product page
+  recorded with their claim (`listing_claims.product_url`, [Claims](./CLAIMS.md)): an imported
+  listing's website is usually a `serp.ly` link, whose page never shows the badge.
 - **The check** is the submit flow's verifier (`badge-verifier.ts`): the page must link the
   badge to the listing with a plain followed link. A **conclusive miss** is a loaded page whose
   badge is missing, not followed (`nofollow`, `sponsored`, `ugc`, or robots rules for all crawlers

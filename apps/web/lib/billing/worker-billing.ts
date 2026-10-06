@@ -5,9 +5,11 @@ import { site } from '@serpdirectory/site-config'
 import { checkBadgeAtRefund } from '../badge-program/refund'
 import { EMAIL_ADMIN_RECIPIENT } from '../email/config'
 import { emailEventKey } from '../email/service'
+import { features as siteFeatures } from '../features'
 import { verifyFeaturedBadge } from '../submissions/badge-verifier'
 import { submissionBadgeVerificationTargets } from '../submissions/presentation'
 import { runGuardrails } from './guardrails'
+import { createPaidClaims } from './paid-claims'
 import { createConfiguredProvider, type ProviderEnv } from './providers'
 import type { BillingDependencies, Notify } from './service'
 
@@ -20,6 +22,8 @@ import type { BillingDependencies, Notify } from './service'
 
 export interface BillingEnv extends ProviderEnv {
   DB?: D1Database
+  /** `on` turns claims on for a local Worker (`lib/claims/flags.ts`); paid claims need both. */
+  LOCAL_CLAIMS?: string
 }
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
@@ -55,8 +59,8 @@ export function createBillingDependencies(input: {
     notify: input.notify,
     now: () => new Date(),
     operations,
-    // #67's claims module wires `completePaidClaim` here once it is merged.
-    paidClaims: undefined,
+    // Paid claims need claims on as well as orders (#67's `completePaidClaim`).
+    paidClaims: createPaidClaims({ client, env, features: siteFeatures }),
     priceCents: site.submissions.paidListingPriceCents,
     provider
   }

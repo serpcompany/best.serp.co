@@ -14,7 +14,9 @@ import { buildRejectSubmissionPlans } from '@serpdirectory/data-ops/submission-p
 import { insertPublishedListing, SqliteD1 } from '@serpdirectory/data-ops/test-support'
 import { describe, expect, it } from 'vitest'
 import { checkBadgeAtRefund } from '../badge-program/refund'
+import { features } from '../features'
 import type { GuardrailResult } from './guardrails'
+import { createPaidClaims } from './paid-claims'
 import {
   type BillingEvent,
   type BillingProvider,
@@ -30,6 +32,7 @@ import {
   refundOrder,
   refundRejectedSubmission,
   runBillingSweep,
+  startClaimCheckout,
   startListingCheckout,
   startSubmissionCheckout
 } from './service'
@@ -684,6 +687,97 @@ describe('refund dialog', () => {
       refund_badge_check_id: badgeCheckId,
       refund_note: 'Duplicate charge.'
     })
+  })
+})
+
+describe('paid claims (#67)', () => {
+  const localBoth = {
+    D1_RUNTIME_ENV: 'local',
+    LOCAL_CLAIMS: 'on',
+    LOCAL_ORDERS: 'on',
+    SITE_ENVIRONMENT: 'local'
+  }
+
+  function claimFixture(env: Record<string, string> = localBoth) {
+    const f = fixture()
+    insertPublishedListing(f.db, {
+      categoryIds: [1],
+      content: 'Content',
+      description: 'Description',
+      displayOrder: 0,
+      id: 'lst_claim',
+      isFeatured: false,
+      name: 'Claimable',
+      publishedAt: '2026-05-16',
+      slug: 'claimable.example',
+      website: 'https://claimable.example/'
+    })
+    f.db.exec(`
+      INSERT INTO listing_claims (id, listing_id, user_id, method, status, email, email_domain,
+        product_url, listing_website, code_sent_at, code_expires_at, email_verified_at)
+      VALUES ('00000000-0000-4000-8000-00000000c1a1', 'lst_claim', 'user_maya', 'paid',
+        'email_verified', 'maya@claimable.example', 'claimable.example',
+        'https://claimable.example/', 'https://claimable.example/',
+        '2026-10-06T11:00:00.000Z', '2026-10-06T11:15:00.000Z', '2026-10-06T11:05:00.000Z')
+    `)
+    f.deps.paidClaims = createPaidClaims({
+      client: f.client,
+      env,
+      features,
+      now: () => f.clock.now
+    })
+    return f
+  }
+  const claim = { claimId: '00000000-0000-4000-8000-00000000c1a1', userId: 'user_maya' }
+
+  it('pays for a confirmed paid claim, and the payment makes the claimer the owner', async () => {
+    const f = claimFixture()
+    const start = await startClaimCheckout(f.deps, {
+      ...claim,
+      email: 'maya@example.com',
+      origin: ORIGIN
+    })
+    if (!start.ok || !('url' in start)) throw new Error(`no checkout: ${JSON.stringify(start)}`)
+    await webhook(f, paidEvent(f, start.url.split('/').pop() ?? ''))
+    expect(f.row('SELECT purpose, status, outcome FROM orders')).toEqual({
+      outcome: 'claimed',
+      purpose: 'claim',
+      status: 'paid'
+    })
+    expect(
+      f.row(`SELECT user_id, verified_via FROM listing_owners WHERE listing_id='lst_claim'`)
+    ).toEqual({ user_id: 'user_maya', verified_via: 'paid_claim' })
+    // Owned now: nothing more to pay; the route goes back to the claim dialog.
+    await expect(
+      startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
+    ).resolves.toEqual({ ok: true, redirect: '/products/claimable.example/#claim' })
+  })
+
+  it('refunds a claim payment the claim can no longer accept', async () => {
+    const f = claimFixture()
+    const start = await startClaimCheckout(f.deps, {
+      ...claim,
+      email: 'maya@example.com',
+      origin: ORIGIN
+    })
+    if (!start.ok || !('url' in start)) throw new Error('no checkout')
+    // Someone else became the owner while the checkout was open.
+    f.db.exec(`INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+      VALUES ('lst_claim', 'user_priya', 'badge_claim', '2026-10-06T11:30:00.000Z')`)
+    await webhook(f, paidEvent(f, start.url.split('/').pop() ?? ''))
+    expect(f.row('SELECT status, outcome FROM orders')).toEqual({
+      outcome: 'unapplied',
+      status: 'refunded'
+    })
+    expect(f.refunds).toHaveLength(1)
+  })
+
+  it('offers no paid claim unless claims are on as well as orders', async () => {
+    const f = claimFixture({ ...localBoth, LOCAL_CLAIMS: 'off' })
+    expect(f.deps.paidClaims).toBeUndefined()
+    await expect(
+      startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
+    ).resolves.toMatchObject({ ok: false, status: 404 })
   })
 })
 

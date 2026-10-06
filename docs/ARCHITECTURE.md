@@ -56,6 +56,7 @@ change runs in a protected workflow.
 - `apps/web/lib/submissions/` validates the binding, fetches submitters' pages and images
   only through its bounded safe fetcher (badge checks, URL prefill, logo checks), and
   delegates every submission read and write to `packages/data-ops/`, scoped to the owner.
+  `apps/web/lib/claims/` does the same for [claims](./CLAIMS.md) (#67).
 - `apps/web/lib/email/` sends transactional email through the useSend API after the
   response, claims each template and event key in the `email_deliveries` ledger
   (`packages/data-ops/`) so it never sends twice, and only logs locally

@@ -456,6 +456,46 @@ test('refund with a badge miss: the listing is unpublished (410)', async ({ page
   }
 })
 
+test('a paid claim: the payment makes the claimer the owner (#67)', async ({ page }) => {
+  const claimer = await signInSubmitter(page, 'claim')
+  const key = `claim-${unique()}`
+  site.set(key, product(`Claim ${key.slice(-5)}`, 'missing'))
+  const slug = site.slug(key)
+  const listingId = `e2e-billing-claim-${key}`
+  const claimId = crypto.randomUUID()
+  const verifiedAt = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  billingD1(`
+    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
+      source_kind, source_identity, checksum)
+    VALUES (${q(listingId)}, ${q(slug)}, ${q(`Claim ${key.slice(-5)}`)}, 'A curated listing.',
+      ${q(site.website(key))}, 'Content.', 'draft', '2026-05-16', 'e2e', ${q(listingId)},
+      ${q(`e2e-${key}`)});
+    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+      SELECT ${q(listingId)}, id, 0, 1 FROM categories WHERE slug = 'e2e-billing-tools';
+    UPDATE listings SET status = 'approved' WHERE id = ${q(listingId)};
+    INSERT INTO listing_claims (id, listing_id, user_id, method, status, email, email_domain,
+      product_url, listing_website, code_sent_at, code_expires_at, email_verified_at)
+    VALUES (${q(claimId)}, ${q(listingId)}, ${q(claimer.id)}, 'paid', 'email_verified',
+      ${q(`team@${slug}`)}, ${q(slug)}, ${q(site.website(key))}, ${q(site.website(key))},
+      ${q(verifiedAt)}, ${q(verifiedAt)}, ${q(verifiedAt)});
+  `)
+  // Screen 8's "Continue to payment" opens this route.
+  await page.goto(`/claims/${claimId}/checkout/`)
+  await expect(page).toHaveURL(/\/pay\/cs_test_/u)
+  await page.getByRole('button', { name: 'Pay' }).click()
+  await expect(page).toHaveURL(new RegExp(`/products/${slug.replaceAll('.', '\\.')}/#claim$`, 'u'))
+  expect(order(`claim_id = ${q(claimId)}`)).toMatchObject({
+    outcome: 'claimed',
+    purpose: 'claim',
+    status: 'paid'
+  })
+  expect(
+    billingD1(
+      `SELECT user_id, verified_via FROM listing_owners WHERE listing_id = ${q(listingId)} AND revoked_at IS NULL`
+    )
+  ).toEqual([{ user_id: claimer.id, verified_via: 'paid_claim' }])
+})
+
 test('a paid submission rejected as other is refunded automatically', async ({ page }) => {
   const submitter = await signInSubmitter(page, 'reject')
   const draft = seedDraft(submitter.id, 'reject')

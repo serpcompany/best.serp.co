@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1b87a91c-7b20-4654-99fd-ac650b7f0242",
-  "prevId": "876f34c4-6293-4c68-be1b-a5b7bf95fb3f",
+  "id": "3e2f3328-1088-453a-95a9-827e46820c1b",
+  "prevId": "bdb9cbfc-99c8-4999-a23f-cb89c32699f0",
   "tables": {
     "accounts": {
       "name": "accounts",
@@ -655,6 +655,338 @@
         "listing_categories_is_primary_boolean": {
           "name": "listing_categories_is_primary_boolean",
           "value": "\"is_primary\" IN (0, 1)"
+        }
+      }
+    },
+    "listing_claim_holds": {
+      "name": "listing_claim_holds",
+      "columns": {
+        "listing_id": {
+          "name": "listing_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "cleared_at": {
+          "name": "cleared_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cleared_by": {
+          "name": "cleared_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "listing_claim_holds_listing_id_listings_id_fk": {
+          "name": "listing_claim_holds_listing_id_listings_id_fk",
+          "tableFrom": "listing_claim_holds",
+          "tableTo": "listings",
+          "columnsFrom": ["listing_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listing_claim_holds_reason_valid": {
+          "name": "listing_claim_holds_reason_valid",
+          "value": "\"listing_claim_holds\".\"reason\" IN ('off_domain', 'unreachable', 'admin')"
+        },
+        "listing_claim_holds_cleared_at_iso": {
+          "name": "listing_claim_holds_cleared_at_iso",
+          "value": "\"cleared_at\" IS strftime('%Y-%m-%dT%H:%M:%fZ', \"cleared_at\")"
+        },
+        "listing_claim_holds_cleared_complete": {
+          "name": "listing_claim_holds_cleared_complete",
+          "value": "(\"listing_claim_holds\".\"cleared_at\" IS NULL) = (\"listing_claim_holds\".\"cleared_by\" IS NULL)"
+        }
+      }
+    },
+    "listing_claims": {
+      "name": "listing_claims",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "listing_id": {
+          "name": "listing_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "method": {
+          "name": "method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'code_sent'"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email_domain": {
+          "name": "email_domain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "product_url": {
+          "name": "product_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "listing_website": {
+          "name": "listing_website",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code_hash": {
+          "name": "code_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "code_sent_at": {
+          "name": "code_sent_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code_expires_at": {
+          "name": "code_expires_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "codes_sent": {
+          "name": "codes_sent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "locked_until": {
+          "name": "locked_until",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email_verified_at": {
+          "name": "email_verified_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "badge_checked_at": {
+          "name": "badge_checked_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "badge_attempts": {
+          "name": "badge_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "listing_claims_open_idx": {
+          "name": "listing_claims_open_idx",
+          "columns": ["listing_id", "user_id"],
+          "isUnique": true,
+          "where": "\"listing_claims\".\"status\" IN ('code_sent', 'email_verified')"
+        },
+        "listing_claims_listing_idx": {
+          "name": "listing_claims_listing_idx",
+          "columns": ["listing_id"],
+          "isUnique": false
+        },
+        "listing_claims_user_idx": {
+          "name": "listing_claims_user_idx",
+          "columns": ["user_id", "created_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "listing_claims_listing_id_listings_id_fk": {
+          "name": "listing_claims_listing_id_listings_id_fk",
+          "tableFrom": "listing_claims",
+          "tableTo": "listings",
+          "columnsFrom": ["listing_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "listing_claims_user_id_users_id_fk": {
+          "name": "listing_claims_user_id_users_id_fk",
+          "tableFrom": "listing_claims",
+          "tableTo": "users",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "listing_claims_method_valid": {
+          "name": "listing_claims_method_valid",
+          "value": "\"listing_claims\".\"method\" IN ('badge', 'paid')"
+        },
+        "listing_claims_status_valid": {
+          "name": "listing_claims_status_valid",
+          "value": "\"listing_claims\".\"status\" IN ('code_sent', 'email_verified', 'completed', 'cancelled')"
+        },
+        "listing_claims_attempts_range": {
+          "name": "listing_claims_attempts_range",
+          "value": "\"listing_claims\".\"attempts\" BETWEEN 0 AND 5"
+        },
+        "listing_claims_codes_sent_positive": {
+          "name": "listing_claims_codes_sent_positive",
+          "value": "\"listing_claims\".\"codes_sent\" >= 1"
+        },
+        "listing_claims_badge_attempts_range": {
+          "name": "listing_claims_badge_attempts_range",
+          "value": "\"listing_claims\".\"badge_attempts\" BETWEEN 0 AND 10"
+        },
+        "listing_claims_code_sent_at_iso": {
+          "name": "listing_claims_code_sent_at_iso",
+          "value": "\"code_sent_at\" IS strftime('%Y-%m-%dT%H:%M:%fZ', \"code_sent_at\")"
+        },
+        "listing_claims_code_expires_at_iso": {
+          "name": "listing_claims_code_expires_at_iso",
+          "value": "\"code_expires_at\" IS strftime('%Y-%m-%dT%H:%M:%fZ', \"code_expires_at\")"
+        },
+        "listing_claims_locked_until_iso": {
+          "name": "listing_claims_locked_until_iso",
+          "value": "\"locked_until\" IS strftime('%Y-%m-%dT%H:%M:%fZ', \"locked_until\")"
+        },
+        "listing_claims_email_verified_at_iso": {
+          "name": "listing_claims_email_verified_at_iso",
+          "value": "\"email_verified_at\" IS strftime('%Y-%m-%dT%H:%M:%fZ', \"email_verified_at\")"
+        },
+        "listing_claims_badge_checked_at_iso": {
+          "name": "listing_claims_badge_checked_at_iso",
+          "value": "\"badge_checked_at\" IS strftime('%Y-%m-%dT%H:%M:%fZ', \"badge_checked_at\")"
+        },
+        "listing_claims_completed_at_iso": {
+          "name": "listing_claims_completed_at_iso",
+          "value": "\"completed_at\" IS strftime('%Y-%m-%dT%H:%M:%fZ', \"completed_at\")"
+        },
+        "listing_claims_code_while_sent": {
+          "name": "listing_claims_code_while_sent",
+          "value": "\"listing_claims\".\"code_hash\" IS NULL OR \"listing_claims\".\"status\" = 'code_sent'"
+        },
+        "listing_claims_verified_complete": {
+          "name": "listing_claims_verified_complete",
+          "value": "\"listing_claims\".\"status\" NOT IN ('email_verified', 'completed') OR \"listing_claims\".\"email_verified_at\" IS NOT NULL"
+        },
+        "listing_claims_completed_complete": {
+          "name": "listing_claims_completed_complete",
+          "value": "(\"listing_claims\".\"status\" = 'completed') = (\"listing_claims\".\"completed_at\" IS NOT NULL)"
         }
       }
     },

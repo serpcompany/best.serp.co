@@ -18,7 +18,14 @@ pnpm catalog:domains                # fetch and classify; writes d1/hygiene/<dat
 pnpm catalog:domains -- --reuse     # reuse .runtime/listing-domains/, fetch only what is missing
 pnpm catalog:domains -- --only a.ai,b.io   # print the classification of a few listings
 pnpm catalog:domains -- manifest    # write d1/publications/<date>-hijacked-domains.yaml
+pnpm catalog:claim-holds -- d1/hygiene/<date>-listing-domains.yaml <date>-listing-claim-holds
+                                    # hold instant claims of the owner list (#67)
 ```
+
+Re-run the check periodically (a lapsed product domain can be re-registered by anyone), then
+generate a claim-hold manifest from the new report and publish it like any catalog manifest:
+holds already placed stay as they are. The owner clears a hold with a
+`listing-claim-hold-clear` operation ([Claims](./CLAIMS.md)).
 
 It is read-only. The listings come from the reviewed import (`d1/artifacts`), the catalog both
 environments were bootstrapped from. Most websites are `serp.ly` links that redirect in the

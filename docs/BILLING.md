@@ -85,9 +85,12 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   listing stays live; the badge becomes optional). A relist republishes a listing whose latest
   unpublish was the badge program's (`badge_missing`) on the paid plan. Neither sends an email:
   #70 has none for them.
-- **Paid claim (#67).** The service has `startClaimCheckout` and applies a claim payment through
-  `PaidClaims.complete` (`completePaidClaim`). Until #67's module is wired in
-  `worker-billing.ts`, a claim checkout is a 404 and a claim payment is refunded.
+- **Paid claim (#67).** Only while claims are on as well as orders (`lib/billing/paid-claims.ts`).
+  The claim dialog's "Continue to payment" opens `GET /claims/<id>/checkout/` for a confirmed
+  paid claim (in time, the listing unowned); the return `/claims/<id>/checkout/success/` and a
+  cancel both go back to `/products/<slug>/#claim`. The payment completes the claim through
+  `completePaidClaim` (the claimer becomes the owner, `paid_claim`); a claim that can't complete
+  any more (someone else owns the listing, the confirmation expired) is refunded.
 - **Unapplied payments.** A payment the target can no longer accept (withdrawn or expired, already
   paid by another checkout, rejected, unlisted by an admin) is refunded in full and recorded
   (`unapplied`); a withdrawn submission records it with `buildRecordUnappliedPaymentPlans`.
@@ -145,6 +148,6 @@ wouldn't match its order. Then set `features.orders` to `true`.
 
 `apps/web/lib/billing/{stripe,service}.test.ts` (node:sqlite and a fake provider),
 `scripts/d1-drizzle-local.test.ts` (the migration), and `apps/e2e/tests/billing.spec.ts`
-(Playwright on its own Worker, `PLAYWRIGHT_PORT` + 7, with orders on through `LOCAL_ORDERS` and a
-mocked Stripe API on `PLAYWRIGHT_PORT` + 8: checkout success and cancel, webhook replay, upgrade,
+(Playwright on its own Worker, `PLAYWRIGHT_PORT` + 9, with orders on through `LOCAL_ORDERS` and a
+mocked Stripe API on `PLAYWRIGHT_PORT` + 10: checkout success and cancel, webhook replay, upgrade,
 refunds with a badge pass and a miss, and the `other` rejection refund).

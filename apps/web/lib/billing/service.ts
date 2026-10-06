@@ -86,19 +86,24 @@ export interface RefundBadgeResult {
   keepFree: boolean
 }
 
+/** A claim's listing, as the claim checkout's routes need it. */
+export interface PaidClaimListing {
+  listingId: string
+  listingName: string
+  listingSlug: string
+}
+
 /**
- * Paid claims (#67). Absent until #67's claims module is merged and wired in
- * `worker-billing.ts`: a paid claim cannot start a checkout, and a claim payment that arrives
- * anyway is refunded.
+ * Paid claims (#67, `paid-claims.ts`): present only while claims are on too. Absent, a paid
+ * claim cannot start a checkout, and a claim payment that arrives anyway is refunded.
  */
 export interface PaidClaims {
-  /** `completePaidClaim` (#67): the claimer becomes the owner. */
+  /** `completePaidClaim` (#67): the claimer becomes the owner. True once they are. */
   complete(input: { actor: string; claimId: string; userId: string }): Promise<boolean>
-  /** The claim the user may pay for: confirmed, paid method, still open. */
-  forCheckout(input: {
-    claimId: string
-    userId: string
-  }): Promise<{ listingId: string; listingName: string } | null>
+  /** The claim the user may pay for: the paid method, confirmed in time, the listing unowned. */
+  forCheckout(input: { claimId: string; userId: string }): Promise<PaidClaimListing | null>
+  /** The user's claim's listing, whatever its state (the return after paying). */
+  listing(input: { claimId: string; userId: string }): Promise<PaidClaimListing | null>
 }
 
 export interface BillingDependencies {
@@ -357,25 +362,22 @@ export async function startListingCheckout(
 /** A paid claim's checkout (#67), once its address is confirmed. */
 export async function startClaimCheckout(
   deps: BillingDependencies,
-  input: {
-    cancelPath: string
-    claimId: string
-    email: string
-    origin: string
-    successPath: (orderId: string) => string
-    userId: string
-  }
+  input: { claimId: string; email: string; origin: string; userId: string }
 ): Promise<CheckoutStart> {
   if (!deps.paidClaims) return failure(404, 'not_found', 'Claim not found.')
-  const claim = await deps.paidClaims.forCheckout({ claimId: input.claimId, userId: input.userId })
-  if (!claim) return failure(409, 'not_payable', 'This claim can’t be paid for.')
+  const listing = await deps.paidClaims.listing(input)
+  if (!listing) return failure(404, 'not_found', 'Claim not found.')
+  // Back to the listing's claim dialog, which shows where the claim stands.
+  const dialog = `/products/${listing.listingSlug}/#claim`
+  const claim = await deps.paidClaims.forCheckout(input)
+  if (!claim) return { ok: true, redirect: dialog }
   return openCheckout(deps, input, {
-    cancelPath: input.cancelPath,
+    cancelPath: dialog,
     claimId: input.claimId,
     description: `Paid claim: ${claim.listingName}`,
     listingId: claim.listingId,
     purpose: 'claim',
-    successPath: input.successPath,
+    successPath: orderId => `/claims/${input.claimId}/checkout/success/?order=${orderId}`,
     targetKey: orderTargetKey({ claimId: input.claimId, purpose: 'claim' })
   })
 }

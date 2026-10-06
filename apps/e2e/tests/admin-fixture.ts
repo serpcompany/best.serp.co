@@ -234,7 +234,8 @@ export const ADMIN_EMAIL_PREFIXES = {
   accountDashboard: 'e2e-account-admin',
   adminPanel: 'e2e-panel-admin',
   billing: 'e2e-billing-admin',
-  adminPanelAdded: 'e2e-panel-added'
+  adminPanelAdded: 'e2e-panel-added',
+  claims: 'e2e-claims-admin'
 } as const
 
 export type AdminEmailPrefix = (typeof ADMIN_EMAIL_PREFIXES)[keyof typeof ADMIN_EMAIL_PREFIXES]
