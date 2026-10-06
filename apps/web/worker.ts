@@ -29,7 +29,7 @@ import {
   loadSharedEpoch,
   withEdgeCache
 } from './lib/edge-cache/html-cache'
-import { withGoneListing } from './lib/routing/gone-listing'
+import { goneListingRenderer } from './lib/routing/gone-listing'
 import { configRedirectPatterns } from './lib/routing/trailing-slash'
 import { handleWorkerRequest } from './lib/worker/handle-request'
 
@@ -104,7 +104,8 @@ function catalogEpoch(
 
 /**
  * Renders through OpenNext; a listing page's 404 for an unpublished slug becomes the 410 gone
- * page (`lib/routing/gone-listing.ts`, #64). Without a valid binding the 404 stands.
+ * page, and no incoming request carries the internal gone-render header
+ * (`lib/routing/gone-listing.ts`, #64). Without a valid binding the 404 stands.
  */
 function renderer(
   env: WorkerEnv,
@@ -113,13 +114,12 @@ function renderer(
   const render = (request: Request): Promise<Response> =>
     openNextWorker.fetch(request, env, context)
   const database = env.DB
-  if (!database || !runtimeEnvironments.has(env.D1_RUNTIME_ENV ?? '')) return render
-  return async request =>
-    withGoneListing(request, await render(request), {
-      isUnpublished: slug =>
-        isUnpublishedListingSlug({ client: createDatabase(database), observe: log, slug }),
-      render
-    })
+  if (!database || !runtimeEnvironments.has(env.D1_RUNTIME_ENV ?? '')) {
+    return goneListingRenderer(render)
+  }
+  return goneListingRenderer(render, slug =>
+    isUnpublishedListingSlug({ client: createDatabase(database), observe: log, slug })
+  )
 }
 
 export default {

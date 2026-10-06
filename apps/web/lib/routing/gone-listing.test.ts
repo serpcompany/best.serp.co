@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { GONE_RENDER_HEADER, listingSlugFromPath, withGoneListing } from './gone-listing'
+import {
+  GONE_RENDER_HEADER,
+  goneListingRenderer,
+  listingSlugFromPath,
+  withGoneListing
+} from './gone-listing'
 
 const ORIGIN = 'https://best.serp.co'
 
@@ -77,5 +82,30 @@ describe('410 for unpublished listings (#64)', () => {
       })
     ).toBe(again)
     expect(render).not.toHaveBeenCalled()
+  })
+
+  it('strips the gone-render header from incoming requests; only its own render sets it', async () => {
+    const seen: Array<string | null> = []
+    const render = vi.fn(async (request: Request) => {
+      seen.push(request.headers.get(GONE_RENDER_HEADER))
+      return new Response('page', {
+        status: request.headers.has(GONE_RENDER_HEADER) ? 200 : 404
+      })
+    })
+    const forged = (path: string) =>
+      new Request(`${ORIGIN}${path}`, { headers: { [GONE_RENDER_HEADER]: '1' } })
+
+    // A live or unknown slug: the forged header never reaches the page, so the 404 stands.
+    const unknown = await goneListingRenderer(
+      render,
+      async () => false
+    )(forged('/products/x.example/'))
+    expect(unknown.status).toBe(404)
+    // Without a binding, too.
+    expect((await goneListingRenderer(render)(forged('/products/x.example/'))).status).toBe(404)
+    // An unpublished slug: the second render, and only it, carries the header.
+    const gone = await goneListingRenderer(render, async () => true)(forged('/products/y.example/'))
+    expect(gone.status).toBe(410)
+    expect(seen).toEqual([null, null, null, '1'])
   })
 })

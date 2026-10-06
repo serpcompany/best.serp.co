@@ -10,9 +10,35 @@
  * under the catalog epoch, which unpublishing and republishing advance.
  *
  * The header is not a secret: the gone page is public, and the page renders it only for a slug
- * that is unpublished.
+ * that is unpublished. Still, only the Worker's own second render may carry it:
+ * `goneListingRenderer` strips it from every incoming request, so a client cannot turn the 410
+ * into a 200 for itself on a request that bypasses the edge cache (#64 review).
  */
 export const GONE_RENDER_HEADER = 'x-best-serp-co-render-gone'
+
+/** The request without `GONE_RENDER_HEADER`. */
+export function withoutGoneRenderHeader(request: Request): Request {
+  if (!request.headers.has(GONE_RENDER_HEADER)) return request
+  const headers = new Headers(request.headers)
+  headers.delete(GONE_RENDER_HEADER)
+  return new Request(request, { headers })
+}
+
+/**
+ * The Worker's renderer: strips `GONE_RENDER_HEADER` from the incoming request, renders it, and
+ * turns an unpublished listing's 404 into the 410 gone page. Without `isUnpublished` (no valid
+ * D1 binding) the 404 stands.
+ */
+export function goneListingRenderer(
+  render: (request: Request) => Promise<Response>,
+  isUnpublished?: (slug: string) => Promise<boolean>
+): (request: Request) => Promise<Response> {
+  return async incoming => {
+    const request = withoutGoneRenderHeader(incoming)
+    const response = await render(request)
+    return isUnpublished ? withGoneListing(request, response, { isUnpublished, render }) : response
+  }
+}
 
 const LISTING_PATH = /^\/products\/([^/]+)\/$/u
 
