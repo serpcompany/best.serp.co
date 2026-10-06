@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { githubHostedRunner } from './ci-runners'
 import { type ReleaseCommand, readOnlyCommands, releaseAuthorizations } from './cloudflare-release'
 import { buildReviewIssue } from './d1-submission-notifier'
+import { MEDIA_HEALTH_SQL } from './media-health'
 import { project } from './project'
 import { stagingWorkflow } from './staging-verification'
 
@@ -107,9 +108,12 @@ const mediaUploadWorkflows = {
   'upload-media-staging.yml': 'staging',
   'upload-media.yml': 'production'
 } as const
+/** The weekly read-only media health check (#122): one D1 SELECT, R2 list, CDN HEADs. */
+const mediaHealthWorkflow = 'media-health.yml'
 const newWorkflows = [
   ...productionDispatchWorkflows,
   'deploy-staging.yml',
+  mediaHealthWorkflow,
   'notify-d1-submissions.yml',
   'publish-d1-staging.yml',
   ...Object.keys(mediaUploadWorkflows)
@@ -574,6 +578,7 @@ describe('D1 data stays in Cloudflare', () => {
     'bootstrap-production-d1.yml:bootstrap',
     'deploy-production.yml:release',
     'deploy-staging.yml:deploy',
+    'media-health.yml:check',
     'notify-d1-submissions.yml:notify',
     'publish-d1-staging.yml:publish',
     'publish-d1.yml:publish',
@@ -659,6 +664,15 @@ describe('D1 data stays in Cloudflare', () => {
       // is not a D1 change. Any other spelling still needs a bookmark (fail closed).
       id: 'R2-only media upload',
       run: /^pnpm media:upload:(?:staging|production) -- "\$PLAN_PATH"\n?$/u
+    },
+    {
+      // The weekly media health check (#122): `scripts/media-health.ts` runs one SELECT through
+      // the release tooling's Wrangler D1 target (`query`, never `executeFile` or migrations),
+      // lists the bucket through the R2 API, and HEADs the media host. It writes nothing; the
+      // issue is filed by the next step, which holds no Cloudflare credential. Any other
+      // spelling still needs a bookmark (fail closed).
+      id: 'read-only media health check',
+      run: /^pnpm media:health -- production --report "\$RUNNER_TEMP\/media-health\.json"\n?$/u
     },
     {
       id: 'Deploy Production plan',
@@ -1240,6 +1254,74 @@ describe('D1 data stays in Cloudflare', () => {
     }
   })
 
+  it('exempts exactly the read-only media health check; any variant needs a bookmark (#122)', () => {
+    expect(packageScripts['media:health']).toBe('pnpm tsx scripts/media-health.ts')
+    expect(packageScripts['media:health:issue']).toBe('pnpm tsx scripts/media-health-issue.ts')
+    const imports = (file: string) =>
+      [...readFileSync(resolve(file), 'utf8').matchAll(/^import [^;]*?from '([^']+)'/gmsu)]
+        .map(match => match[1])
+        .sort()
+    expect(imports('scripts/media-health.ts')).toEqual([
+      './cloudflare-release',
+      './project',
+      './r2-objects',
+      '@serpdirectory/data-ops/media-format',
+      '@serpdirectory/data-ops/media-keys',
+      'node:fs',
+      'node:path',
+      'node:url'
+    ])
+    // Reads only: the D1 target's `query` with one SELECT, the R2 list, and HEADs.
+    const health = readFileSync(resolve('scripts/media-health.ts'), 'utf8')
+    expect(health).not.toMatch(
+      /executeFile|applyMigrations|putR2Object|getR2Object|api\.cloudflare\.com|method: '(?!HEAD')[A-Z]+'/u
+    )
+    expect(health.match(/\.query\(/gu)).toHaveLength(1)
+    expect(MEDIA_HEALTH_SQL).toMatch(/^SELECT\b/u)
+    expect(MEDIA_HEALTH_SQL).not.toMatch(
+      /;|\b(?:INSERT|UPDATE|DELETE|REPLACE|DROP|ALTER|CREATE|PRAGMA|ATTACH|VACUUM)\b/iu
+    )
+    // The issue step files the report with the job's token alone.
+    expect(readFileSync(resolve('scripts/media-health-issue.ts'), 'utf8')).not.toMatch(
+      /CLOUDFLARE|cloudflare-release|r2-objects/u
+    )
+    const workflow = loadWorkflow(mediaHealthWorkflow)
+    const job = workflow.jobs.check as WorkflowJob
+    expect(stepRunning(job, 'media:health -- production').env).toEqual({
+      CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
+      CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN')
+    })
+    expect(stepRunning(job, 'media:health:issue').env).toEqual({
+      GITHUB_TOKEN: expression('github.token')
+    })
+    expect(job.permissions).toEqual({ contents: 'read', issues: 'write' })
+    expect(workflow.on.schedule).toHaveLength(1)
+
+    const audit = d1ChangeAudit([[mediaHealthWorkflow, workflow]])
+    expect(audit).toEqual({ changes: [], violations: [] })
+    const at = stepIndex(job, 'media:health -- production')
+    const original = stepsOf(job)[at] as WorkflowStep
+    const withStep = (step: WorkflowStep) => {
+      const steps = [...stepsOf(job)]
+      steps[at] = step
+      return d1ChangeAudit([
+        [mediaHealthWorkflow, { ...workflow, jobs: { check: { ...job, steps } } }]
+      ])
+    }
+    for (const [label, step] of [
+      [
+        'an appended command',
+        { ...original, run: `${original.run} && pnpm db:publish:production` }
+      ],
+      ['another script', { ...original, run: 'pnpm tsx scripts/media-health.ts production' }],
+      ['an unreviewed env', { ...original, env: { ...original.env, NODE_OPTIONS: '--require x' } }]
+    ] as Array<[string, WorkflowStep]>) {
+      const result = withStep(step)
+      expect(result.changes, label).toEqual(['media-health.yml:check:production-media-health'])
+      expect(result.violations.join('\n'), label).toMatch(/outside the staging or production/u)
+    }
+  })
+
   it('exempts a reviewed command only when nothing else can change what it runs (#101 round 3)', () => {
     const publish = loadWorkflow('publish-d1.yml')
     const job = publish.jobs.publish as WorkflowJob
@@ -1627,6 +1709,9 @@ describe('protected deployment boundaries', () => {
       'deploy-staging.yml': {
         deploy: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
       },
+      'media-health.yml': {
+        check: { group: 'media-health-best-serp-co-production', 'cancel-in-progress': false }
+      },
       'notify-d1-submissions.yml': {
         notify: { group: 'best-serp-co-production-notifier', 'cancel-in-progress': false }
       },
@@ -1678,6 +1763,11 @@ describe('protected deployment boundaries', () => {
           expect(triggers.sort()).toEqual(['push', 'workflow_dispatch'])
           expect(job.needs).toEqual(['authorize'])
           expect(environmentName(job)).toBe('production')
+        } else if (file === mediaHealthWorkflow) {
+          // The weekly media health check reads production, in its own environment (#122).
+          expect(`${file}:${name}`).toBe('media-health.yml:check')
+          expect(environmentName(job)).toBe('production-media-health')
+          expect(mutation).toBeNull()
         } else {
           // The scheduled notifier only records review notifications, in its own environment.
           expect(`${file}:${name}`).toBe('notify-d1-submissions.yml:notify')
@@ -1690,6 +1780,7 @@ describe('protected deployment boundaries', () => {
     }
     expect(automaticMutations.sort()).toEqual([
       'deploy-production.yml:release',
+      'media-health.yml:check',
       'notify-d1-submissions.yml:notify'
     ])
   })

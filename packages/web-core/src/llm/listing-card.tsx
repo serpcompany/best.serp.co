@@ -9,8 +9,8 @@ import {
 import Link from 'next/link'
 import type { WebsiteRelatedCardMetadata } from '../content-query'
 import { getRoute } from '../routes'
-import { FaviconWithFallback } from '../ui/favicon-with-fallback'
 import { FavoriteButton } from '../ui/favorite-button'
+import { ListingImage } from '../ui/listing-image'
 
 interface ListingCardProps {
   item: WebsiteRelatedCardMetadata
@@ -71,12 +71,7 @@ export function CompactListingCard({ item, analyticsSource, className }: Listing
     <DirectoryProductRow
       className={cn(className)}
       media={
-        <FaviconWithFallback
-          website={item.website}
-          name={item.name}
-          logoUrl={item.media?.logo}
-          size={32}
-        />
+        <ListingImage name={item.name} src={item.media?.logo} size={32} className="rounded-lg" />
       }
       title={
         <ListingCardLink
@@ -96,12 +91,7 @@ export function ListingCard({ item, analyticsSource }: ListingCardProps) {
   return (
     <DirectoryProductCard
       media={
-        <FaviconWithFallback
-          website={item.website}
-          name={item.name}
-          logoUrl={item.media?.logo}
-          size={32}
-        />
+        <ListingImage name={item.name} src={item.media?.logo} size={32} className="rounded-lg" />
       }
       title={
         <ListingCardLink

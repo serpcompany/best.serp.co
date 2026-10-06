@@ -24,12 +24,11 @@ type FavoriteButtonProps = {
   variant?: 'default' | 'ghost'
 }
 
-type FaviconWithFallbackProps = {
+type ListingImageProps = {
   className?: string
-  logoUrl?: string
   name: string
   size?: number
-  website: string
+  src?: string | null
 }
 
 type BreadcrumbProps = {
@@ -50,14 +49,14 @@ export type WebsiteHeroProps = {
     Badge: ComponentType<BadgeProps>
     Breadcrumb: ComponentType<BreadcrumbProps>
     FavoriteButton: ComponentType<FavoriteButtonProps>
-    FaviconWithFallback: ComponentType<FaviconWithFallbackProps>
+    ListingImage: ComponentType<ListingImageProps>
   }
 }
 
 export function WebsiteHero({
   breadcrumbItems,
   website,
-  slots: { Badge, Breadcrumb, FavoriteButton, FaviconWithFallback }
+  slots: { Badge, Breadcrumb, FavoriteButton, ListingImage }
 }: WebsiteHeroProps) {
   return (
     <section className="relative overflow-hidden border-b border-border/50 bg-gradient-to-b from-muted/30 via-background to-background">
@@ -76,10 +75,9 @@ export function WebsiteHero({
             <div className="flex-shrink-0">
               <div className="relative block rounded-2xl">
                 <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-3 shadow-lg">
-                  <FaviconWithFallback
-                    website={website.website}
+                  <ListingImage
                     name={website.name}
-                    logoUrl={website.media?.logo}
+                    src={website.media?.logo}
                     size={72}
                     className="rounded-xl"
                   />

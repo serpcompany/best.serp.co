@@ -53,9 +53,8 @@ account permissions:
 | Account Settings → Read | Wrangler account lookups during deploy |
 | Workers R2 Storage → Edit | the `MEDIA` bucket binding and listing media uploads (#95) |
 
-No zone permission is needed while the Custom Domain is attached in the dashboard. Add
-Zone → Workers Routes → Edit (zone `serp.co`) only if routes or the Custom Domain move into
-`wrangler.jsonc`.
+No zone permission is needed while the Custom Domain is attached in the dashboard. Add Zone →
+Workers Routes → Edit (zone `serp.co`) only if routes or the Custom Domain move to `wrangler.jsonc`.
 
 Cloudflare's current Workers roles map Workers Scripts → Edit to Workers **Editor**, which
 cannot create a Worker. The first production deploy created `best-serp-co-production` with
@@ -111,6 +110,7 @@ re-dispatches the notifier on `main`. When production accepts submissions:
 | `upload-media.yml`, `upload-media-staging.yml` | manual, `main` / `staging` | `production` / `staging` | `upload-media-best.serp.co-<env>` | Upload one reviewed `d1/media/` plan to R2, no D1 change ([media](./MEDIA.md)) |
 | `approve-d1-submission.yml` | manual, `main` | `production` | `approve-best.serp.co-submission-production` | D1 bookmark → approve or reject one submission → close its review issue |
 | `notify-d1-submissions.yml` | every 15 minutes, manual | `production-notifier` | none | Open an assigned review issue per badge-verified submission |
+| `media-health.yml` | weekly | `production-media-health` | none | [Health](./MEDIA_HEALTH.md) |
 
 Guards, in order:
 
