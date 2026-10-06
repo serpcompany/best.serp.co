@@ -164,7 +164,7 @@ object locally and writes nothing. The owner then runs, in order:
 1. **Upload Listing Media (staging)** from `staging`, typing `upload-media-best.serp.co-staging`.
    Every object is fetched again and uploaded only if its bytes still match the plan.
 2. **Publish D1 Catalog (staging)** from `staging` with `publish-best.serp.co-staging`, once per
-   manifest, and check staging.
+   manifest (#100's `hijacked-domains` first: its base version is 1), and check staging.
 3. After the `staging` → `main` promotion: **Upload Listing Media** with
    `upload-media-best.serp.co-production`, then **Publish D1 Catalog** with
    `publish-best.serp.co-production` for the same manifests.
@@ -245,8 +245,8 @@ refused replacements, and each logo left on the tile are in `d1/media/2026-10-06
 - `scripts/catalog-media.test.ts` applies the manifests to the import and checks that every logo
   and image is then a hosted key with a matching object in the plan, and that nothing else
   changes.
-- After the production publish, delete the repository's `apps/web/public/listing-logos/serpdownloaders.com/`
-  logos and `media/products/launchbuzz.io/` (the fallback tile stays).
+- After the production publish, delete `apps/web/public/listing-logos/serpdownloaders.com/` and
+  `media/products/launchbuzz.io/` (the fallback tile stays).
 
 Fetches are cached under `.runtime/legacy-media-cache`, through the DNS-checked Node fetcher, so
 a rerun reproduces the outputs byte for byte. `--part-size <n>` sets the listings per manifest,
