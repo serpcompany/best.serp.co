@@ -394,10 +394,13 @@ async function approveSubmissionOnce(
   input: {
     edits?: SubmissionEdits
     expectedContentVersion: number
+    /** The hosted featured image the reviewer saw; missing means none (#96 round 2 B1). */
+    expectedImageKey?: string | null
     linkRel?: ListingLinkRel
     submissionId: string
   }
 ): Promise<Decision<{ listingSlug: string }>> {
+  const expectedImageKey = input.expectedImageKey ?? null
   const snapshot = await submissionSnapshot(context, input.submissionId)
   if (!snapshot) return notFound('submission')
   const result = { listingSlug: snapshot.slug }
@@ -473,6 +476,7 @@ async function approveSubmissionOnce(
         affectedRoute: publication.affectedRoutes,
         beforeChecksum: publication.beforeChecksum,
         expectedContentVersion: version,
+        expectedImageKey,
         linkRel: input.linkRel,
         listingId: approvedListingId,
         manifestId: publication.manifestId,
@@ -500,6 +504,7 @@ async function approveSubmissionOnce(
     plans.push(
       ...buildApproveLiveSubmissionPlans({
         expectedContentVersion: version,
+        expectedImageKey,
         listingId,
         now,
         publication,
@@ -1034,8 +1039,16 @@ async function updateListingDetailsOnce(
     const conflict = await websiteConflict(context, input.listingId, details.website)
     if (conflict) return conflict
   }
+  // Re-entering the hosted logo's source while a replacement is queued cancels the replacement
+  // (#96 review round 2, S2): nothing is fetched, and the hosted logo stays.
+  const logoCancelQueued =
+    fields.includes('logo') &&
+    Boolean(details.logoUrl) &&
+    current.logoQueue !== null &&
+    current.logoKey !== null &&
+    details.logoUrl === (current.currentLogoUrl ?? '').trim()
   // A new logo is copied into the media bucket before the batch, never stored as a hotlink (#95).
-  const logoChanged = fields.includes('logo') && Boolean(details.logoUrl)
+  const logoChanged = fields.includes('logo') && Boolean(details.logoUrl) && !logoCancelQueued
   const logoIngestion =
     logoChanged && context.media
       ? await context.media.host({ kind: 'logo', slug: snapshot.slug, sourceUrl: details.logoUrl })
@@ -1067,6 +1080,7 @@ async function updateListingDetailsOnce(
       expectedChecksum: input.expectedChecksum,
       fields,
       listingId: input.listingId,
+      logoCancelQueued,
       logoIngestion,
       publication: await listingPublication(context, snapshot, 'listing-edit', nowIso(context))
     }),

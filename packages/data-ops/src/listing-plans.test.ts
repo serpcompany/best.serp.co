@@ -833,6 +833,30 @@ describe('listing activity log and admin edits (#64)', () => {
     expect(working.prepare('SELECT status,source_url FROM media_ingestions').all()).toEqual([
       { source_url: next, status: 'pending' }
     ])
+    // Saving the hosted logo's source again cancels the queued replacement (#96 r2 S2).
+    const cancel = (db: DatabaseSync, logoUrl: string) => {
+      const live = publicationState(db)
+      const { checksum: current } = db
+        .prepare('SELECT checksum FROM listings WHERE id=?')
+        .get(listingId) as { checksum: string }
+      return buildUpdateListingDetailsPlans({
+        details: { ...edit, logoUrl },
+        expectedChecksum: current,
+        fields: ['logo'],
+        listingId,
+        logoCancelQueued: true,
+        publication: publication('listing-edit-cancel', live)
+      })
+    }
+    // Only the hosted logo's own source cancels; anything else is refused.
+    expect(() => execute(working, cancel(working, next))).toThrow(/malformed JSON/u)
+    execute(working, cancel(working, edit.logoUrl))
+    expect(count(working, 'SELECT COUNT(*) AS count FROM media_ingestions')).toBe(0)
+    expect(
+      working
+        .prepare("SELECT url,media_key FROM listing_media WHERE listing_id=? AND kind='logo'")
+        .all(listingId)
+    ).toEqual([{ media_key: hostedLogo.key, url: edit.logoUrl }])
     // A changed website must be a public URL.
     expect(() =>
       buildUpdateListingDetailsPlans({

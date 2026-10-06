@@ -32,9 +32,27 @@ export function describeMediaFailure(code: string): string {
  * cron, or given up with the reason. Null when the logo is hosted (or there is none).
  */
 export function logoNote(
-  queue: AdminListingDetail['logoQueue']
+  queue: AdminListingDetail['logoQueue'],
+  /** A hosted logo stays on the page while its replacement is queued (#96 round 2 S2). */
+  hostedLogo = false
 ): { text: string; tone: 'err' | 'warn' } | null {
   if (!queue) return null
+  if (hostedLogo) {
+    if (queue.status === 'failed') {
+      return {
+        text: `Couldn't host the new logo: ${describeMediaFailure(queue.lastError ?? 'unknown error')}. The page keeps the current logo. Save another image URL, or the current logo's URL to cancel.`,
+        tone: 'err'
+      }
+    }
+    const tried = queue.attempts
+      ? ` after ${queue.attempts} failed attempt${queue.attempts === 1 ? '' : 's'}: ${describeMediaFailure(queue.lastError ?? 'unknown error')}`
+      : ''
+    const next = queue.nextAttemptAt ? ` Next attempt: ${formatDateTime(queue.nextAttemptAt)}.` : ''
+    return {
+      text: `New logo pending${tried}. The page keeps the current logo until the new one is hosted; save the current logo's URL to cancel.${next}`,
+      tone: 'warn'
+    }
+  }
   if (queue.status === 'failed') {
     return {
       text: `Couldn't host this logo: ${describeMediaFailure(queue.lastError ?? 'unknown error')}. The page shows the fallback tile. Save another image URL to try again.`,

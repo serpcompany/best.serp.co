@@ -848,6 +848,25 @@ describe('listing decisions', () => {
       source_url: 'https://assets.example/busy.png',
       status: 'pending'
     })
+    // Saving the current logo's URL again cancels the queued replacement, fetching nothing
+    // (#96 review round 2, S2).
+    const hostCalls = host.mock.calls.length
+    expect(await editLogo(hosted.sourceUrl)).toEqual({
+      fields: ['logo'],
+      ok: true,
+      replayed: false
+    })
+    expect(host.mock.calls).toHaveLength(hostCalls)
+    expect(
+      row("SELECT COUNT(*) AS count FROM media_ingestions WHERE listing_id='lst_brief'")
+    ).toEqual({ count: 0 })
+    expect(
+      db
+        .prepare(
+          "SELECT url,media_key FROM listing_media WHERE listing_id='lst_brief' AND kind='logo'"
+        )
+        .all()
+    ).toEqual([{ media_key: hosted.key, url: hosted.sourceUrl }])
   })
 
   it('settles the approved listing’s queued media after the response, once', async () => {

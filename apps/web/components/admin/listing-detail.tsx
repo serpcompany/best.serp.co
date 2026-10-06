@@ -101,6 +101,8 @@ export interface ListingDetailView {
   linkRel: LinkRel
   /** Set while the logo is not hosted yet (#95). */
   logoNote: { text: string; tone: 'err' | 'warn' } | null
+  /** The source of the logo the page shows now (a queued replacement is `logoUrl`). */
+  currentLogoUrl: string | null
   /** What the screen renders: the hosted copy or an own-origin path, else the tile (#96 S9). */
   logoImage: string | null
   /** The logo's source, edited in the form; never rendered as an image. */
@@ -453,7 +455,12 @@ export function ListingDetail({
             <FieldLabel htmlFor="listing-logo">Logo</FieldLabel>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <LogoPreview
-                hosted={details.logoUrl.trim() === (view.logoUrl ?? '') ? view.logoImage : null}
+                hosted={
+                  // The page's current logo, also while a saved replacement waits (#96 r2 S2).
+                  [view.logoUrl ?? '', view.currentLogoUrl ?? ''].includes(details.logoUrl.trim())
+                    ? view.logoImage
+                    : null
+                }
                 name={details.name}
                 source={details.logoUrl}
                 website={details.website}

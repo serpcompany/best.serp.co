@@ -157,9 +157,10 @@ export function listingDetailView(
     id: listing.id,
     linkRel: listing.linkRel,
     // The hosted copy (or an own-origin imported path), never a source URL (#96 review S9).
-    logoImage: renderableImage({ key: listing.logoKey, url: listing.logoUrl }, mediaBaseUrl),
+    currentLogoUrl: listing.currentLogoUrl,
+    logoImage: renderableImage({ key: listing.logoKey, url: listing.currentLogoUrl }, mediaBaseUrl),
     logoUrl: listing.logoUrl,
-    logoNote: logoNote(listing.logoQueue),
+    logoNote: logoNote(listing.logoQueue, listing.logoKey !== null),
     meta,
     name: listing.name,
     owner: listing.owner

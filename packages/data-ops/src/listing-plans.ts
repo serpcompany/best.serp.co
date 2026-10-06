@@ -2,6 +2,7 @@ import { urlKey, websiteSpellings } from '@serpdirectory/utils/url-key'
 import { type HostedMedia, isListingMediaKey } from './media-keys'
 import { buildQueueMediaPlans, buildRecordMediaFailurePlans } from './media-plans'
 import {
+  assertGuard,
   assertPreviousStatementChangedOne,
   beginCatalogPublicationPlans,
   type CatalogPublication,
@@ -419,6 +420,7 @@ export type ListingLogoIngestion =
  * cleared, since it would be a hotlink). The logo row is never the URL.
  */
 function changedLogoPlans(input: {
+  cancelQueued?: boolean
   ingestion?: ListingLogoIngestion
   listingId: string
   logoUrl: string
@@ -428,6 +430,17 @@ function changedLogoPlans(input: {
   const clearQueue: StatementPlan = {
     sql: `DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo'`,
     params: [listingId]
+  }
+  if (input.cancelQueued) {
+    // Saving the current hosted logo's source again cancels a queued replacement (#96 r2 S2).
+    return [
+      assertGuard('current_logo_hosted', {
+        sql: `EXISTS (SELECT 1 FROM listing_media WHERE listing_id=? AND kind='logo' AND url=?
+          AND media_key IS NOT NULL)`,
+        params: [listingId, logoUrl]
+      }),
+      clearQueue
+    ]
   }
   const clearLogo: StatementPlan = {
     sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'`,
@@ -508,6 +521,11 @@ export function buildUpdateListingDetailsPlans(input: {
   listingId: string
   /** The changed logo's ingestion outcome (`ListingLogoIngestion`); ignored without a logo change. */
   logoIngestion?: ListingLogoIngestion
+  /**
+   * The edit re-enters the current hosted logo's source while a replacement is queued: the
+   * queued replacement is cancelled and the hosted logo stays (#96 review round 2, S2).
+   */
+  logoCancelQueued?: boolean
   publication: CatalogPublication
 }): StatementPlan[] {
   const { details, listingId } = input
@@ -578,6 +596,7 @@ export function buildUpdateListingDetailsPlans(input: {
     // A changed logo is hosted or queued, never stored as a hotlink (#95).
     ...(changesLogo
       ? changedLogoPlans({
+          cancelQueued: input.logoCancelQueued,
           ingestion: input.logoIngestion,
           listingId,
           logoUrl,

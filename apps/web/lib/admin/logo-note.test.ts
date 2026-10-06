@@ -46,4 +46,22 @@ describe('logo hosting note (#95)', () => {
     )
     expect(describeMediaFailure('something_new')).toBe('something_new')
   })
+
+  it('keeps the current logo in the note while a replacement waits (#96 round 2 S2)', () => {
+    const queue = {
+      attempts: 1,
+      lastError: 'http_503',
+      nextAttemptAt: null,
+      sourceUrl: 'https://example.com/new.png',
+      status: 'pending' as const
+    }
+    expect(logoNote(queue, true)).toEqual({
+      text: "New logo pending after 1 failed attempt: the server answered HTTP 503 (http_503). The page keeps the current logo until the new one is hosted; save the current logo's URL to cancel.",
+      tone: 'warn'
+    })
+    expect(logoNote({ ...queue, status: 'failed' }, true)?.text).toMatch(
+      /^Couldn't host the new logo: .*The page keeps the current logo\./u
+    )
+    expect(logoNote(queue, false)?.text).toMatch(/fallback tile/u)
+  })
 })

@@ -285,7 +285,12 @@ describe('admin listing reads', () => {
       logoKey: `best.serp.co/listings/brieflow.ai/logo/${'a'.repeat(16)}.png`,
       logoQueue: null
     })
-    expect(await reads.getAdminListing('zeta.example')).toMatchObject({ logoKey: null })
+    expect(await reads.getAdminListing('zeta.example')).toMatchObject({
+      // The form shows the queued source; the page still shows the current row (none here).
+      currentLogoUrl: null,
+      logoKey: null,
+      logoUrl: 'https://zeta.example/logo.png'
+    })
     expect(await reads.getAdminListing('missing.example')).toBeNull()
     expect(await reads.listActiveCategories()).toEqual([
       { name: 'Tools', slug: 'tools' },
@@ -310,6 +315,7 @@ describe('hosted copies on the admin screens (#96 review S9)', () => {
       imageKey: `best.serp.co/submissions/sub_quill/image/${'c'.repeat(16)}.png`,
       logoKey: `best.serp.co/submissions/sub_quill/logo/${'b'.repeat(16)}.png`
     })
+    expect((await reads.getSubmissionReview('sub_quill'))?.imageSlot).toBeNull()
     // sub_old's hosted logo is of an older source: the screen shows the tile and a link.
     expect(await reads.getSubmissionReview('sub_old')).toMatchObject({
       imageKey: null,
