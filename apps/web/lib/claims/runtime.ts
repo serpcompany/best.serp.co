@@ -5,7 +5,9 @@ import { createClaimOperations } from '@serpdirectory/data-ops/claims'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import { claimCodeKey, consumeRequestRateLimit } from '@/lib/auth/server'
 import { emailEventKey, enqueueEmail } from '@/lib/email/server'
+import { featureCopy } from '@/lib/feature-copy'
 import { features as siteFeatures } from '@/lib/features'
+import { badgeProgramEnabled } from '@/lib/worker/scheduled'
 import { type ClaimFlags, claimFlags } from './flags'
 import { claimRecipientRateLimitRules } from './limits'
 import { safeResolveLanding } from './product'
@@ -22,6 +24,7 @@ const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 interface ClaimEnv {
   D1_RUNTIME_ENV?: string
   DB?: D1Database
+  LOCAL_BADGE_PROGRAM?: string
   LOCAL_CLAIMS?: string
   SITE_ENVIRONMENT?: string
 }
@@ -34,6 +37,16 @@ async function claimEnv(): Promise<ClaimEnv> {
 /** Whether claims are on for this Worker (`features.claims`, or a local Worker that asks). */
 export async function currentClaimFlags(): Promise<ClaimFlags> {
   return claimFlags(await claimEnv(), siteFeatures)
+}
+
+/**
+ * The claim dialog's flagged copy (`featureCopy().claim`): it promises weekly checks only while
+ * the badge program actually runs on this Worker (#66, `badgeProgramEnabled`).
+ */
+export async function currentClaimCopy() {
+  const env = await claimEnv()
+  return featureCopy({ ...siteFeatures, badgeProgram: badgeProgramEnabled(env, siteFeatures) })
+    .claim
 }
 
 export async function claimDependencies(): Promise<ClaimDependencies> {

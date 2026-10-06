@@ -4,7 +4,6 @@ import { ProjectNavigation } from '@serpdirectory/web-core/project-navigation'
 import { getRoute } from '@serpdirectory/web-core/routes'
 import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@serpdirectory/web-core/sections/external-resources-section-route'
 import { siteConfig } from '@serpdirectory/web-core/site-config'
-import { buildFeaturedOnBadgeEmbedHtml } from '@serpdirectory/web-core/website/featured-on-badge-embed-panel'
 import { getFeaturedOnBadgePreviewPathFromKey } from '@serpdirectory/web-core/website/featured-on-badge-url'
 import { WebsiteContentSectionRoute as WebsiteContentSection } from '@serpdirectory/web-core/website/website-content-section-route'
 import { WebsiteDetailSidebar } from '@serpdirectory/web-core/website/website-detail-sidebar'
@@ -23,9 +22,8 @@ import type { ComponentProps } from 'react'
 import { ClaimListing } from '@/components/claims/claim-listing'
 import { GoneListing } from '@/components/listing/gone-listing'
 import { getUnpublishedListing } from '@/lib/catalog/repository'
-import { currentClaimFlags } from '@/lib/claims/runtime'
+import { currentClaimCopy, currentClaimFlags } from '@/lib/claims/runtime'
 import { getWebsiteBySlug, getWebsiteCanonicalRedirect } from '@/lib/content-loader'
-import { featureCopy } from '@/lib/feature-copy'
 import { GONE_RENDER_HEADER } from '@/lib/routing/gone-listing'
 import { submissionBadgeTargets } from '@/lib/submissions/presentation'
 
@@ -85,7 +83,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   // The claim link (#67, #70 screen 9a) on a listing without an owner, while claims are on.
   const claim =
     !project.verifiedOwner && (await currentClaimFlags()).enabled
-      ? claimLink(project.name, project.slug)
+      ? claimLink(project.name, project.slug, await currentClaimCopy())
       : undefined
   const Sidebar = (props: ComponentProps<typeof WebsiteDetailSidebar>) => (
     <WebsiteDetailSidebar {...props} claim={claim} />
@@ -109,21 +107,18 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   )
 }
 
-function claimLink(name: string, slug: string) {
+function claimLink(name: string, slug: string, copy: Awaited<ReturnType<typeof currentClaimCopy>>) {
   const targets = submissionBadgeTargets(slug)
   const featuredOn = siteConfig.badges.featuredOn
   return (
     <ClaimListing
       badge={{
-        embed: buildFeaturedOnBadgeEmbedHtml({
-          badgeUrl: targets.badgeUrls[0] ?? '',
-          listingUrl: targets.listingUrl,
-          siteName: featuredOn.displayName
-        }),
+        badgeUrl: targets.badgeUrls[0] ?? '',
+        siteName: featuredOn.displayName,
         listingUrl: targets.listingUrl,
         previewUrl: getFeaturedOnBadgePreviewPathFromKey(featuredOn.light)
       }}
-      copy={featureCopy().claim}
+      copy={copy}
       listing={{ name, slug }}
       priceCents={site.submissions.paidListingPriceCents}
     />

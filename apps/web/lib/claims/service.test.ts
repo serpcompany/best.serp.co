@@ -9,6 +9,7 @@ import { claimFlags } from './flags'
 import {
   type ClaimDependencies,
   checkClaimBadge,
+  claimTarget,
   completePaidClaim,
   confirmClaimEmail,
   generateClaimCode,
@@ -622,6 +623,60 @@ describe('claim flow', () => {
         now: new Date(clock).toISOString()
       })
     ).resolves.toEqual([])
+  })
+
+  it('gives the dialog its target, and resumes an open claim', async () => {
+    await expect(
+      claimTarget(deps(), { listingSlug: 'brieflow', userId: 'user_a' })
+    ).resolves.toEqual({
+      ok: true,
+      target: {
+        domain: 'brieflow.ai',
+        listing: { name: 'Name brieflow', slug: 'brieflow' },
+        openClaim: null,
+        paid: false,
+        productUrl: 'https://www.brieflow.ai/'
+      }
+    })
+    const claim = await startBadge()
+    await expect(
+      claimTarget(deps(true), { listingSlug: 'brieflow', userId: 'user_a' })
+    ).resolves.toMatchObject({
+      target: { openClaim: { checksLeft: 10, id: claim.id, status: 'code_sent' }, paid: true }
+    })
+    await expect(
+      claimTarget(deps(), { listingSlug: 'owned-tool', userId: 'user_a' })
+    ).resolves.toMatchObject({
+      code: 'already_owned',
+      contactPath: '/contact/'
+    })
+  })
+
+  it('allows ten badge checks that find a result, as at submit, and none after', async () => {
+    const claim = await startBadge()
+    await confirmClaimEmail(deps(), { claimId: claim.id, code: lastCode(), userId: 'user_a' })
+    badge = { code: 'badge_missing', ok: false }
+    for (let check = 1; check <= 10; check += 1) {
+      const result = await checkClaimBadge(badgeDeps(), {
+        actor: 'a',
+        claimId: claim.id,
+        userId: 'user_a'
+      })
+      expect(result).toMatchObject({ claim: { checksLeft: 10 - check }, ok: true })
+      clock += 31 * SECOND
+    }
+    await expect(
+      checkClaimBadge(badgeDeps(), { actor: 'a', claimId: claim.id, userId: 'user_a' })
+    ).resolves.toMatchObject({ code: 'checks_used', status: 409 })
+  })
+
+  it('doesn’t count a check that couldn’t reach the site', async () => {
+    const claim = await startBadge()
+    await confirmClaimEmail(deps(), { claimId: claim.id, code: lastCode(), userId: 'user_a' })
+    badge = { code: 'fetch_timeout', ok: false }
+    await expect(
+      checkClaimBadge(badgeDeps(), { actor: 'a', claimId: claim.id, userId: 'user_a' })
+    ).resolves.toMatchObject({ claim: { checksLeft: 10 }, result: { code: 'fetch_timeout' } })
   })
 
   it('needs a fresh confirmation to finish', async () => {

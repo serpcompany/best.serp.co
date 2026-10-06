@@ -45,6 +45,7 @@ import { RadioGroup, RadioGroupItem } from '@serpdirectory/design-system/radio-g
 import { Separator } from '@serpdirectory/design-system/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@serpdirectory/design-system/tooltip'
 import { useIsMobile } from '@serpdirectory/design-system/use-mobile'
+import { buildFeaturedOnBadgeEmbedHtml } from '@serpdirectory/web-core/website/featured-on-badge-embed-panel'
 import { ArrowRight, BadgeCheck, Copy, MessageSquare, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -103,7 +104,7 @@ type Step =
   | 'unclaimable'
 
 export interface ClaimListingProps {
-  badge: { embed: string; listingUrl: string; previewUrl: string }
+  badge: { badgeUrl: string; listingUrl: string; previewUrl: string; siteName: string }
   copy: { badgeCardNote: string | null; keepTheBadge: string | null }
   listing: { name: string; slug: string }
   priceCents: number
@@ -187,11 +188,20 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
   const inFlight = useRef(false)
   const name = listing.name
   const domain = target?.domain ?? ''
+  const embed = buildFeaturedOnBadgeEmbedHtml({
+    badgeUrl: badge.badgeUrl,
+    listingUrl: badge.listingUrl,
+    siteName: badge.siteName
+  })
 
   const resendAt = claim ? Date.parse(claim.resendAvailableAt) : 0
   const now = useNow(open && (resendAt > Date.now() || badgeWaitUntil > Date.now()))
   const resendSeconds = Math.max(0, (resendAt - now) / 1000)
-  const badgeWaitSeconds = Math.max(0, (badgeWaitUntil - now) / 1000)
+  // Clamped: the check time is the server's, so a slow answer could read 0:31.
+  const badgeWaitSeconds = Math.min(
+    BADGE_COOLDOWN_SECONDS,
+    Math.max(0, (badgeWaitUntil - now) / 1000)
+  )
 
   const signIn = useCallback(() => {
     const back = `/products/${listing.slug}/#claim`
@@ -251,6 +261,13 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
       setStep('unclaimable')
     }
   }, [elsewhere, listing.slug, resume])
+
+  // The page refreshes only once the dialog closes: an owned listing no longer renders the claim
+  // link, so refreshing while the success (or already-owned) answer shows would unmount it.
+  const changeOpen = (next: boolean) => {
+    setOpen(next)
+    if (!next && (step === 'done' || step === 'owned')) router.refresh()
+  }
 
   const openDialog = useCallback(() => {
     setOpen(true)
@@ -337,7 +354,6 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
       setClaim(response.data.claim)
       if (response.data.claim.status === 'completed') {
         setStep('done')
-        router.refresh()
         return
       }
       setOutcome(response.data.result)
@@ -357,7 +373,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
 
   async function copyEmbed() {
     try {
-      await navigator.clipboard.writeText(badge.embed)
+      await navigator.clipboard.writeText(embed)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -431,7 +447,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     )
     footer = (
       <>
-        <Button variant="outline" onClick={() => setOpen(false)}>
+        <Button variant="outline" onClick={() => changeOpen(false)}>
           Cancel
         </Button>
         <Button onClick={() => setStep('email')}>Continue</Button>
@@ -585,7 +601,8 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         {/* biome-ignore lint/performance/noImgElement: the badge preview, as on the badge step */}
         <img src={badge.previewUrl} alt="Featured on SERP" width={170} height={42} />
         <div className="w-full overflow-x-auto rounded-md border border-input px-3 py-2 font-mono text-[11px] leading-relaxed shadow-xs dark:bg-input/30">
-          <pre className="whitespace-pre">{badge.embed}</pre>
+          {/* A div, not a <pre>: the site's global <pre> style is a dark code block. */}
+          <div className="whitespace-pre text-foreground">{embed}</div>
         </div>
         <div className="flex items-center justify-between gap-2">
           <Tooltip open={copied}>
@@ -685,7 +702,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     )
     footer = (
       <>
-        <Button variant="outline" onClick={() => setOpen(false)}>
+        <Button variant="outline" onClick={() => changeOpen(false)}>
           Close
         </Button>
         <Button asChild>
@@ -700,7 +717,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     body = <FieldError>This URL can’t be claimed.</FieldError>
     footer = (
       <>
-        <Button variant="outline" onClick={() => setOpen(false)}>
+        <Button variant="outline" onClick={() => changeOpen(false)}>
           Close
         </Button>
         <Button asChild>
@@ -735,13 +752,13 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     return (
       <>
         {trigger}
-        <Drawer open={open} onOpenChange={setOpen}>
+        <Drawer open={open} onOpenChange={changeOpen}>
           <DrawerContent>
             <DrawerHeader className="text-left">
               <DrawerTitle>{title}</DrawerTitle>
               <DrawerDescription>{description}</DrawerDescription>
             </DrawerHeader>
-            <div className="overflow-y-auto px-4">{body}</div>
+            <div className="min-w-0 overflow-y-auto px-4">{body}</div>
             <DrawerFooter>{footer}</DrawerFooter>
           </DrawerContent>
         </Drawer>
@@ -751,8 +768,8 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
   return (
     <>
       {trigger}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg">
+      <Dialog open={open} onOpenChange={changeOpen}>
+        <DialogContent className="sm:max-w-lg [&>*]:min-w-0">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
