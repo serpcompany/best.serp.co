@@ -80,8 +80,10 @@ describe('Stripe provider', () => {
       mode: 'payment',
       'payment_method_types[0]': 'card'
     })
-    // Stripe Tax stays off unless the site switches it on.
+    // Stripe Tax stays off.
     expect(form.has('automatic_tax[enabled]')).toBe(false)
+    // Nothing shown on the provider's page names the provider (owner decision on #70).
+    for (const [key, value] of form) expect(`${key}=${value}`).not.toMatch(/stripe/iu)
   })
 
   it('reads a session as a provider-neutral state', async () => {

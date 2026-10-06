@@ -614,9 +614,13 @@ describe('single-site D1-only repository architecture', () => {
         (['app/', 'components/', 'lib/'].some(dir =>
           file.startsWith(`${project.appDirectory}/${dir}`)
         ) ||
-          ['packages/site-config/src/', 'packages/web-core/src/', 'packages/design-system/'].some(
-            dir => file.startsWith(dir)
-          )) &&
+          [
+            'packages/site-config/src/',
+            'packages/web-core/src/',
+            'packages/design-system/',
+            // Validation and error messages the data layer returns to pages (#111 round 4).
+            'packages/data-ops/src/'
+          ].some(dir => file.startsWith(dir))) &&
         !file.startsWith(`${project.appDirectory}/lib/billing/providers/`) &&
         existsSync(resolve(file))
     )
@@ -628,6 +632,17 @@ describe('single-site D1-only repository architecture', () => {
         .filter(({ text }) => named.test(text))
         .map(({ line, text }) => `${file}:${line}: ${text.trim().slice(0, 80)}`)
     )
+    // The provider's own folder names it in code, but what it shows on the provider's page comes
+    // only from the order's neutral description (#111 round 4), checked above where it is built.
+    const provider = readFileSync(
+      resolve(project.appDirectory, 'lib/billing/providers/stripe.ts'),
+      'utf8'
+    )
+    expect(provider).toMatch(
+      /'line_items\[0\]\[price_data\]\[product_data\]\[name\]': request\.description,/u
+    )
+    expect(provider).not.toMatch(/product_data\]\[(?!name\])/u)
+    expect(provider).not.toMatch(/custom_text|submit_type|statement_descriptor/u)
     // The legal pages and the site's other written content.
     for (const file of trackedFiles().filter(
       name => name.startsWith('packages/content/data/') && existsSync(resolve(name))

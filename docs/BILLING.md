@@ -24,8 +24,9 @@ means a `providers/lago.ts` implementing `BillingProvider` and a change in `prov
 emails, in the admin panel, in error lines, in the legal pages, or in the item names sent to the
 provider's own checkout page. Copy says "secure checkout", "our payment provider", or "payment".
 An architecture guard fails on the name in any string or JSX text outside
-`lib/billing/providers/` (and in `packages/content/data/`), and the end-to-end suite checks every
-screen it visits.
+`lib/billing/providers/` (the app, the UI packages, `packages/data-ops/src`, and
+`packages/content/data/`), pins the provider page's item name to the order's neutral
+description, and the end-to-end suite checks every screen it visits.
 
 ## Data
 
@@ -88,9 +89,12 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
 - **Paid claim (#67).** Only while claims are on as well as orders (`lib/billing/paid-claims.ts`).
   The claim dialog's "Continue to payment" opens `GET /claims/<id>/checkout/` for a confirmed
   paid claim (in time, the listing unowned); the return `/claims/<id>/checkout/success/` and a
-  cancel both go back to `/products/<slug>/#claim`. The payment completes the claim through
-  `completePaidClaim` (the claimer becomes the owner, `paid_claim`); a claim that can't complete
-  any more (someone else owns the listing, the confirmation expired) is refunded.
+  cancel both go back to `/products/<slug>/#claim`. The checkout closes when the confirmation
+  does (none opens in its last half hour). The payment completes the claim through
+  `completePaidClaim` (the claimer becomes the owner, `paid_claim`) in one D1 batch with the
+  order's applied record, so a payment completed the claim exactly when it is applied. Any other
+  payment for it (a second tab, a claim completed by the badge, one an admin refunded meanwhile,
+  someone else owning the listing, an expired confirmation) is refunded.
 - **Unapplied payments.** A payment the target can no longer accept (withdrawn or expired, already
   paid by another checkout, rejected, unlisted by an admin) is refunded in full and recorded
   (`unapplied`); a withdrawn submission records it with `buildRecordUnappliedPaymentPlans`.

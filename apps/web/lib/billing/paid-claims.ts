@@ -44,17 +44,24 @@ export function createPaidClaims(input: {
   }
   return {
     async complete(claim) {
+      // True only when this call completed the claim, in one batch with `together`.
       const result = await completePaidClaim(deps, claim)
-      return result.ok && result.completed
+      return result.ok && result.completedNow
     },
     async forCheckout(claim) {
       const found = await operations.claim(claim)
       if (found?.method !== 'paid' || found.status !== 'email_verified') return null
       const verifiedAt = found.emailVerifiedAt ? Date.parse(found.emailVerifiedAt) : 0
-      if (verifiedAt < now().getTime() - CLAIM_VERIFIED_TTL_HOURS * 60 * 60 * 1000) return null
+      const confirmedUntil = new Date(verifiedAt + CLAIM_VERIFIED_TTL_HOURS * 60 * 60 * 1000)
+      if (confirmedUntil.getTime() <= now().getTime()) return null
       const target = await operations.listing({ id: found.listingId })
       if (!target || target.ownerUserId) return null
-      return { listingId: target.id, listingName: target.name, listingSlug: target.slug }
+      return {
+        confirmedUntil,
+        listingId: target.id,
+        listingName: target.name,
+        listingSlug: target.slug
+      }
     },
     listing
   }

@@ -435,7 +435,16 @@ export interface ClaimOperations {
    * Grants ownership; false when the claim or the listing moved on. A lost publication race is
    * retried once. `actor` is recorded on the listing log.
    */
-  complete(input: { actor: string; claim: ListingClaim; now: string }): Promise<boolean>
+  complete(input: {
+    actor: string
+    claim: ListingClaim
+    now: string
+    /**
+     * Statements that must commit with the completion or not at all: #68's paid claim records
+     * its order as applied here, so a payment completes the claim exactly when it is applied.
+     */
+    together?: StatementPlan[]
+  }): Promise<boolean>
   /** Counts a badge check that found no working badge; false when the claim moved on. */
   recordBadgeMiss(input: { claimId: string; now: string; userId: string }): Promise<boolean>
   /** False when the code was wrong, expired, spent, or the claim is locked. */
@@ -536,7 +545,7 @@ export function createClaimOperations(config: { client: Database }): ClaimOperat
     claimBadgeCheck: input => apply(buildClaimBadgeCheckPlans(input)),
     recordBadgeMiss: input => apply(buildRecordClaimBadgeMissPlans(input)),
 
-    async complete({ actor, claim, now }) {
+    async complete({ actor, claim, now, together = [] }) {
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const [snapshot] = await rows<{
           publication_checksum: string
@@ -561,7 +570,7 @@ export function createClaimOperations(config: { client: Database }): ClaimOperat
             method: claim.method,
             publication,
             userId: claim.userId
-          })
+          }).concat(together)
         )
         if (done) return true
       }

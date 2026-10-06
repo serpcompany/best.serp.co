@@ -64,6 +64,8 @@ export const BILLING_ACTOR = 'billing'
 const BILLING_WORKFLOW = 'app/billing'
 /** A checkout stays open this long; an unpaid order is then failed and a new one opened. */
 export const CHECKOUT_LIFETIME_MS = 60 * 60 * 1000
+/** The shortest checkout the provider opens (Stripe: 30 minutes), with a minute's margin. */
+const SHORTEST_CHECKOUT_MS = 31 * 60 * 1000
 /** An open checkout is reused unless it closes sooner than this. */
 const CHECKOUT_REUSE_MARGIN_MS = 5 * 60 * 1000
 /** The sweep looks again at orders this long after their checkout closed or they were paid. */
@@ -98,10 +100,25 @@ export interface PaidClaimListing {
  * claim cannot start a checkout, and a claim payment that arrives anyway is refunded.
  */
 export interface PaidClaims {
-  /** `completePaidClaim` (#67): the claimer becomes the owner. True once they are. */
-  complete(input: { actor: string; claimId: string; userId: string }): Promise<boolean>
-  /** The claim the user may pay for: the paid method, confirmed in time, the listing unowned. */
-  forCheckout(input: { claimId: string; userId: string }): Promise<PaidClaimListing | null>
+  /**
+   * `completePaidClaim` (#67): the claimer becomes the owner, in one batch with `together` (the
+   * order's applied record). True only when this call completed the claim; false when it was
+   * complete already (another payment, the badge) or can't complete.
+   */
+  complete(input: {
+    actor: string
+    claimId: string
+    together: StatementPlan[]
+    userId: string
+  }): Promise<boolean>
+  /**
+   * The claim the user may pay for: the paid method, the listing unowned, and confirmed in time,
+   * with when the confirmation lapses (a checkout must close before that).
+   */
+  forCheckout(input: {
+    claimId: string
+    userId: string
+  }): Promise<(PaidClaimListing & { confirmedUntil: Date }) | null>
   /** The user's claim's listing, whatever its state (the return after paying). */
   listing(input: { claimId: string; userId: string }): Promise<PaidClaimListing | null>
 }
@@ -163,6 +180,8 @@ export type CheckoutStart =
 
 interface CheckoutTarget {
   cancelPath: string
+  /** The checkout closes by then at the latest (a paid claim's confirmation). */
+  closesBy?: Date
   claimId?: string
   description: string
   listingId?: string
@@ -251,7 +270,9 @@ async function openCheckout(
       currency: order.currency,
       customerEmail: input.email,
       description: target.description,
-      expiresAt: new Date(now.getTime() + CHECKOUT_LIFETIME_MS),
+      expiresAt: new Date(
+        Math.min(now.getTime() + CHECKOUT_LIFETIME_MS, target.closesBy?.getTime() ?? Infinity)
+      ),
       idempotencyKey: `checkout:${order.id}`,
       orderId: order.id,
       successUrl: `${input.origin}${target.successPath(order.id)}`
@@ -371,8 +392,14 @@ export async function startClaimCheckout(
   const dialog = `/products/${listing.listingSlug}/#claim`
   const claim = await deps.paidClaims.forCheckout(input)
   if (!claim) return { ok: true, redirect: dialog }
+  // The checkout closes with the confirmation, so nobody pays for a claim that can't complete;
+  // with less left than a checkout's shortest life, the address is confirmed again first.
+  if (claim.confirmedUntil.getTime() - deps.now().getTime() < SHORTEST_CHECKOUT_MS) {
+    return failure(409, 'not_payable', 'This claim can’t be paid for.')
+  }
   return openCheckout(deps, input, {
     cancelPath: dialog,
+    closesBy: claim.confirmedUntil,
     claimId: input.claimId,
     description: `Paid claim: ${claim.listingName}`,
     listingId: claim.listingId,
@@ -760,17 +787,31 @@ async function applyListingPayment(deps: BillingDependencies, order: OrderRecord
   return 'relisted'
 }
 
+/**
+ * A paid claim: the claim's completion and this order's applied record commit in one batch, so
+ * the payment completed the claim exactly when it is applied. A claim completed some other way
+ * (another payment, the badge), or one that can't complete, leaves this payment unapplied, and
+ * it is refunded; a racing delivery of this same order that applied it is answered as is.
+ */
 async function applyClaimPayment(deps: BillingDependencies, order: OrderRecord): Promise<string> {
   if (!deps.paidClaims || !order.claimId) return refundUnapplied(deps, order)
   const completed = await deps.paidClaims.complete({
     actor: BILLING_ACTOR,
     claimId: order.claimId,
+    together: buildMarkOrderAppliedPlans({
+      now: nowIso(deps),
+      orderId: order.id,
+      outcome: 'claimed'
+    }),
     userId: order.userId
   })
-  if (!completed) return refundUnapplied(deps, order)
-  if (!(await applied(deps, order, [], 'claimed'))) return 'retry'
-  log('billing_order_applied', { order: order.id, outcome: 'claimed' })
-  return 'claimed'
+  if (completed) {
+    log('billing_order_applied', { order: order.id, outcome: 'claimed' })
+    return 'claimed'
+  }
+  const current = await deps.operations.order(order.id)
+  if (current?.appliedAt) return current.outcome ?? 'claimed'
+  return refundUnapplied(deps, current ?? order)
 }
 
 // ---------------------------------------------------------------------------------------------

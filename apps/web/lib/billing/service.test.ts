@@ -772,6 +772,79 @@ describe('paid claims (#67)', () => {
     expect(f.refunds).toHaveLength(1)
   })
 
+  async function openClaimCheckout(f: Fixture): Promise<string> {
+    const start = await startClaimCheckout(f.deps, {
+      ...claim,
+      email: 'maya@example.com',
+      origin: ORIGIN
+    })
+    if (!start.ok || !('url' in start)) throw new Error(`no checkout: ${JSON.stringify(start)}`)
+    return start.url.split('/').pop() ?? ''
+  }
+
+  it('refunds the second payment when two tabs both pay for one claim', async () => {
+    const f = claimFixture()
+    const first = await openClaimCheckout(f)
+    // The first checkout is about to close and couldn't be expired; a second tab opens another.
+    f.db.exec(`UPDATE orders SET checkout_expires_at='2026-10-06T12:01:00.000Z'`)
+    f.expireFails.value = true
+    const second = await openClaimCheckout(f)
+    expect(second).not.toBe(first)
+    await webhook(f, paidEvent(f, second))
+    await webhook(f, paidEvent(f, first))
+    expect(f.rows('SELECT status, outcome FROM orders ORDER BY number')).toEqual([
+      { outcome: 'unapplied', status: 'refunded' },
+      { outcome: 'claimed', status: 'paid' }
+    ])
+    expect(f.refunds).toHaveLength(1)
+    expect(
+      f.rows(
+        `SELECT user_id FROM listing_owners WHERE listing_id='lst_claim' AND revoked_at IS NULL`
+      )
+    ).toEqual([{ user_id: 'user_maya' }])
+  })
+
+  it('never completes a claim whose payment an admin refunded meanwhile', async () => {
+    const f = claimFixture()
+    const checkoutId = await openClaimCheckout(f)
+    const order = f.row<{ id: string }>('SELECT id FROM orders')
+    const paidClaims = f.deps.paidClaims
+    if (!paidClaims) throw new Error('paid claims are on')
+    // The admin refunds the order between the payment being recorded and it being applied.
+    f.deps.paidClaims = {
+      ...paidClaims,
+      async complete(input) {
+        await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+        return paidClaims.complete(input)
+      }
+    }
+    await webhook(f, paidEvent(f, checkoutId))
+    expect(f.row('SELECT status, outcome FROM orders')).toEqual({
+      outcome: 'unapplied',
+      status: 'refunded'
+    })
+    expect(f.refunds).toHaveLength(1)
+    expect(f.rows(`SELECT user_id FROM listing_owners WHERE listing_id='lst_claim'`)).toEqual([])
+    expect(f.row(`SELECT status FROM listing_claims`)).toEqual({ status: 'email_verified' })
+  })
+
+  it('closes the checkout with the confirmation, and opens none in its last half hour', async () => {
+    const f = claimFixture()
+    // Confirmed 23 h 20 min ago: 40 minutes left, so the checkout closes then, not in an hour.
+    f.db.exec(`UPDATE listing_claims SET email_verified_at='2026-10-05T12:40:00.000Z'`)
+    await openClaimCheckout(f)
+    expect(f.row('SELECT checkout_expires_at FROM orders')).toEqual({
+      checkout_expires_at: '2026-10-06T12:40:00.000Z'
+    })
+    f.db.exec(`DELETE FROM orders`)
+    // 20 minutes left: shorter than the shortest checkout.
+    f.db.exec(`UPDATE listing_claims SET email_verified_at='2026-10-05T12:20:00.000Z'`)
+    await expect(
+      startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
+    ).resolves.toMatchObject({ ok: false, status: 409 })
+    expect(f.rows('SELECT id FROM orders')).toEqual([])
+  })
+
   it('offers no paid claim unless claims are on as well as orders', async () => {
     const f = claimFixture({ ...localBoth, LOCAL_CLAIMS: 'off' })
     expect(f.deps.paidClaims).toBeUndefined()
