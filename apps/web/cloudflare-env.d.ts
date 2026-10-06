@@ -24,6 +24,7 @@ interface D1Database {
 
 /** The subset of Workers' R2 bucket binding the media code uses (#95). */
 interface R2ObjectBody {
+  arrayBuffer(): Promise<ArrayBuffer>
   body: ReadableStream
   httpEtag: string
   httpMetadata?: { cacheControl?: string; contentType?: string }
@@ -31,6 +32,7 @@ interface R2ObjectBody {
 }
 
 interface R2Bucket {
+  delete(key: string): Promise<void>
   get(key: string): Promise<R2ObjectBody | null>
   put(
     key: string,

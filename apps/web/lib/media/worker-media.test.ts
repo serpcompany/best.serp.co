@@ -1,11 +1,6 @@
 import { MEDIA_CACHE_CONTROL } from '@serpdirectory/data-ops/media-keys'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  createMediaHost,
-  type MediaWorkerEnv,
-  runMediaCron,
-  serveLocalMedia
-} from './worker-media'
+import { createMediaHost, type MediaWorkerEnv, runMediaCron, serveLocalMedia } from './worker-media'
 
 const key = 'best.serp.co/listings/example.com/logo/0123456789abcdef.png'
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
@@ -16,12 +11,14 @@ function bucket(objects: Record<string, Uint8Array> = { [key]: png }): R2Bucket 
       const body = objects[name]
       if (!body) return null
       return {
+        arrayBuffer: async () => body.slice().buffer as ArrayBuffer,
         body: new Response(body).body as ReadableStream,
         httpEtag: '"etag"',
         httpMetadata: { cacheControl: MEDIA_CACHE_CONTROL, contentType: 'image/png' },
         size: body.byteLength
       }
     },
+    async delete() {},
     async put() {
       return {}
     }

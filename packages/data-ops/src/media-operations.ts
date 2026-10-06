@@ -72,6 +72,8 @@ export interface MediaOperationsConfig {
   fetcher?: typeof fetch
   /** Structured log sink (no source URLs beyond their host, no bodies). */
   observe?: (event: Record<string, unknown>) => void
+  /** Refuse ports other than 80 and 443 (default); a local Worker's fixture sites use others. */
+  webPortsOnly?: boolean
 }
 
 export interface MediaOperations {
@@ -201,7 +203,12 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
   const bucket = scopedMediaBucket(config.bucket)
 
   async function ingest(input: { kind: MediaKind; sourceUrl: string } & MediaOwner) {
-    const image: IngestImageInput = { ...input, bucket, fetcher: config.fetcher }
+    const image: IngestImageInput = {
+      ...input,
+      bucket,
+      fetcher: config.fetcher,
+      webPortsOnly: config.webPortsOnly ?? true
+    }
     return ingestImage(image)
   }
 

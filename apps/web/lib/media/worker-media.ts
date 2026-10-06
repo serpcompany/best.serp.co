@@ -38,7 +38,13 @@ export function createWorkerMediaOperations(env: MediaWorkerEnv): MediaOperation
   }
   if (!env.DB) throw new Error('D1 binding DB is required for listing media.')
   if (!env.MEDIA) throw new Error('R2 binding MEDIA is required for listing media.')
-  return createMediaOperations({ bucket: env.MEDIA, db: env.DB, observe: log })
+  return createMediaOperations({
+    bucket: env.MEDIA,
+    db: env.DB,
+    observe: log,
+    // A local Worker reads the e2e fixture sites on their own ports (`*.localtest.me:<port>`).
+    webPortsOnly: env.D1_RUNTIME_ENV !== 'local'
+  })
 }
 
 export interface MediaHost {
@@ -77,7 +83,11 @@ export function createMediaHost(
       )
     },
     async host(input) {
-      const result = await ingestImage({ ...input, bucket: scopedMediaBucket(bucket) })
+      const result = await ingestImage({
+        ...input,
+        bucket: scopedMediaBucket(bucket),
+        webPortsOnly: env.D1_RUNTIME_ENV !== 'local'
+      })
       log({
         event: 'media_ingest',
         outcome: result.ok ? 'hosted' : result.code,

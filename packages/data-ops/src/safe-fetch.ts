@@ -1,19 +1,18 @@
+import { fetchMimeType } from './mime-type'
 import { validatePublicHttpUrl } from './public-url'
 
 /**
- * The one way server code fetches a URL someone else controls (a listing's site, its icon, its
- * social image): every hop, including each redirect, must be a public http(s) URL
+ * The one way server code fetches a URL someone else controls: submit v2's badge checks, URL
+ * prefill, and logo checks (#63, #84), and media ingestion and the legacy media migration
+ * (#95). Every hop, including each redirect, must be a public http(s) URL
  * (`validatePublicHttpUrl`); redirects are followed by hand, at most three; each request times
- * out; and a body is read up to a byte cap, never past it.
- *
- * Shared by media ingestion (serpcompany/best.serp.co#95) and the legacy media migration. Submit
- * v2 (#84) carries the same function in `apps/web/lib/submissions/safe-fetch.ts`; it should
- * import this module instead once both are on `staging`.
+ * out after 8 seconds; and a body is read up to a byte cap, never past it.
  *
  * The policy reads the URL, not DNS: a public hostname that resolves to a private address passes
  * it. The Worker relies on Cloudflare's egress, which never reaches private ranges, for that
- * case; a Node script passes `nodeFetch` (`safe-fetch-node.ts`), which resolves every hop and
- * refuses restricted addresses. Only ports 80 and 443 are fetched.
+ * case (docs/SUBMISSION_FLOW.md#fetching-submitters-sites); a Node script passes `nodeFetch`
+ * (`safe-fetch-node.ts`), which resolves every hop and refuses restricted addresses. Media
+ * fetches also refuse any port but 80 and 443 (`webPortsOnly`, #96 review S5).
  */
 
 export const SAFE_FETCH_USER_AGENT = 'SERPSoftwareBadgeVerifier/1.0'
@@ -45,6 +44,8 @@ export interface SafeFetchOptions {
   maxBytes: number
   timeoutMs?: number
   userAgent?: string
+  /** Refuse every hop on a port other than 80 and 443 (media fetches). */
+  webPortsOnly?: boolean
 }
 
 function isTimeout(error: unknown): boolean {
@@ -85,8 +86,12 @@ async function readBounded(response: Response, maxBytes: number): Promise<Uint8A
   return body
 }
 
+/**
+ * The response's MIME type essence as Fetch extracts it (repeated headers arrive joined with
+ * commas, and the last valid type wins), or '' when there is none.
+ */
 export function mediaTypeOf(contentType: string | null): string {
-  return (contentType ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
+  return fetchMimeType(contentType)?.essence ?? ''
 }
 
 export async function safeFetch(url: string, options: SafeFetchOptions): Promise<SafeFetchResult> {
@@ -96,7 +101,7 @@ export async function safeFetch(url: string, options: SafeFetchOptions): Promise
     const safe = validatePublicHttpUrl(current)
     if (!safe.ok) return { code: 'invalid_target', ok: false }
     // Web ports only: no internal service on another port of a public host.
-    if (safe.url.port !== '' && safe.url.port !== '80' && safe.url.port !== '443') {
+    if (options.webPortsOnly && safe.url.port !== '' && !['80', '443'].includes(safe.url.port)) {
       return { code: 'invalid_target', ok: false }
     }
 

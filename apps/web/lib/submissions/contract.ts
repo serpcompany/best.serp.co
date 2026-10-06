@@ -65,6 +65,11 @@ export const draftContentSchema = z.object({
 })
 
 export const newDraftSchema = draftContentSchema.extend({
+  /**
+   * The social (Open Graph) image prefill found, if any: hosted under the submission as its
+   * featured image (#95), never stored as a URL to render. Ignored when it isn't a public URL.
+   */
+  socialImageUrl: z.string().trim().max(2048).nullish(),
   website: httpUrl(FIELD_MESSAGES.website)
 })
 
@@ -242,11 +247,11 @@ export function checksLeft(submission: {
 export const LOGO_HTTPS_MESSAGE = 'Use an image address that starts with https://.'
 
 /**
- * Logos are hotlinked on https pages, so their URL must be https (PR #84 review round 1,
- * finding 6); a local Worker also accepts http for its fixture sites. Logos only ever render
- * through `<img referrerpolicy="no-referrer" loading="lazy">`, never inline, `<object>`, or
- * `<iframe>` (an SVG may hold a script). #64: re-check the logo URL (`checkLogoUrl`) when an
- * admin approves, since the image can change after it was saved.
+ * A logo's source URL must be https (PR #84 review round 1, finding 6); a local Worker also
+ * accepts http for its fixture sites. The saved logo is copied to our media host under the
+ * submission (#95), and public pages and the review preview render only that hosted copy; the
+ * submitter's own form previews their source through `<img referrerpolicy="no-referrer">`.
+ * SVG is refused (`checkLogoUrl`).
  */
 export function logoUrlProblem(value: string, allowInsecure: boolean): string | null {
   try {
@@ -262,7 +267,7 @@ export function logoUrlProblem(value: string, allowInsecure: boolean): string | 
 
 /** Why a logo URL was refused (`checkLogoUrl` in `./prefill.ts`). */
 export const LOGO_MESSAGES = {
-  logo_not_image: 'That link isn’t a PNG, JPG, SVG or WebP image.',
+  logo_not_image: 'That link isn’t a PNG, JPG or WebP image.',
   logo_too_large: 'That image is larger than 1 MB.',
   logo_too_small: 'That image is smaller than 128 × 128 px.',
   logo_unreachable:

@@ -91,6 +91,8 @@ export interface FetchImageOptions {
   minPixels?: number
   timeoutMs?: number
   userAgent?: string
+  /** Refuse ports other than 80 and 443 (the default); a local Worker's fixtures use others. */
+  webPortsOnly?: boolean
 }
 
 /** Failures worth retrying later: the source may answer next time. */
@@ -122,7 +124,8 @@ export async function fetchImage(
     fetcher: options.fetcher,
     maxBytes: options.maxBytes ?? MAX_MEDIA_BYTES,
     timeoutMs: options.timeoutMs,
-    userAgent: options.userAgent
+    userAgent: options.userAgent,
+    webPortsOnly: options.webPortsOnly ?? true
   })
   if (!result.ok) return failure(result.code)
   const sniffed = sniffImage(result.body)

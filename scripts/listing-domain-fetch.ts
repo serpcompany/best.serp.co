@@ -17,13 +17,13 @@ import { isIP, type LookupFunction } from 'node:net'
 import { pipeline, Readable } from 'node:stream'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
 import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
-import { decodeHtml, fetchMimeType } from '../apps/web/lib/submissions/html-encoding'
-import { parseSiteMetadata } from '../apps/web/lib/submissions/prefill'
 import {
   type SafeFetchFailure,
   type SafeFetchResult,
   safeFetch
-} from '../apps/web/lib/submissions/safe-fetch'
+} from '@serpdirectory/data-ops/safe-fetch'
+import { decodeHtml, fetchMimeType } from '../apps/web/lib/submissions/html-encoding'
+import { parseSiteMetadata } from '../apps/web/lib/submissions/prefill'
 import { markupSignals, THIN_PAGE_TEXT } from './listing-domain-classifier'
 
 /** A browser-like agent with our name in it: hijacked domains often cloak bots. */

@@ -23,6 +23,7 @@
     "./media-keys": "./src/media-keys.ts",
     "./media-operations": "./src/media-operations.ts",
     "./media-plans": "./src/media-plans.ts",
+    "./mime-type": "./src/mime-type.ts",
     "./plan-runner": "./src/plan-runner.ts",
     "./plan-support": "./src/plan-support.ts",
     "./public-url": "./src/public-url.ts",
