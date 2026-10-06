@@ -59,8 +59,9 @@ it on (owner decision on #64):
   a "Submit again" button, and `submission-received` leaves out "Meanwhile, you can add FAQs
   and links from your dashboard." Other submission buttons open `/account/`. On, they ask to
   edit and resubmit and link to `/account/submissions/<id>/` (`submissionPath`).
-- `features.badgeProgram` (#66, weekly badge checks). Off, the submit pages leave out the
-  weekly-check promises.
+- `features.badgeProgram` (#66, weekly badge checks). Off, `listing-approved` says only "Keep
+  the badge on <website>." (without "We check it every week, and a free listing whose badge
+  goes missing is removed.") and the submit pages leave out the weekly-check promises.
 - `features.messages` (#73). Off, `changes-requested` ends "Questions? Contact us at
   <`/contact/` link>" and the prohibited rejection's "Message us" opens `/contact/`. On, they
   point to the dashboard conversation (`messageUsPath`).

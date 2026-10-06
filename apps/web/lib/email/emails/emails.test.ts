@@ -360,7 +360,7 @@ describe('changes requested', () => {
 
 describe('listing approved', () => {
   it('shows the listing URL and links to it', () => {
-    const email = render('listing-approved')
+    const email = renderWith('listing-approved', AFTER)
     expect(email.subject).toBe('Quillmate is live on SERP')
     expect(email.text).toBe(`Quillmate is live
 
@@ -379,6 +379,14 @@ You're getting this because you have an account on best.serp.co.`)
     expect(render('listing-approved', 0, 'staging').html).toContain(
       'Your listing is published at best-serp-co-staging.serpcompany.workers.dev/products/quillmate.app/'
     )
+  })
+
+  it('until #66, asks to keep the badge without promising weekly checks', () => {
+    const email = renderWith('listing-approved', BEFORE)
+    expect(bodyText(email)).toContain(
+      'https://best.serp.co/products/quillmate.app/\nKeep the badge on https://quillmate.app/.\n\nView your listing'
+    )
+    expect(bodyText(email)).not.toMatch(/week|removed/iu)
   })
 })
 

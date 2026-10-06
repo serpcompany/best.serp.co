@@ -13,7 +13,8 @@ import { EMAIL_SAMPLES, renderAppEmail } from './samples'
  *   allowed only while it is listed in `DEFERRED` with that issue, and only in emails nothing
  *   sends yet. When a deferred page lands, its entry fails here until it is removed.
  * - an email the app sends never asks for a dashboard action whose area is still off in
- *   `lib/features.ts` (editing a submission before #65, replying before #73). Flagged copy
+ *   `lib/features.ts` (editing a submission before #65, replying before #73), or promises
+ *   weekly badge checks before #66's badge program. Flagged copy
  *   switches back to the approved wording when the issue turns its flag on, and the links that
  *   come back with it must then exist.
  */
@@ -43,6 +44,11 @@ const DASHBOARD_PROMISES: ReadonlyArray<{
     issue: '#65',
     pattern:
       /\bresubmit\b|\bedit the submission\b|\b(?:open|view) submission\b|(?<!\bmessage us )\bfrom your dashboard\b/iu
+  },
+  {
+    feature: 'badgeProgram',
+    issue: '#66',
+    pattern: /\bevery week\b|\bweekly\b|\bcheck again about 24 hours\b/iu
   },
   {
     feature: 'messages',
@@ -264,6 +270,7 @@ describe('email copy', () => {
   it('switches the flagged copy with its flags: interim wording off, approved wording on', () => {
     const flagged: Partial<Record<TemplateId, Array<keyof SiteFeatures>>> = {
       'changes-requested': ['accountDashboard', 'messages'],
+      'listing-approved': ['badgeProgram'],
       'submission-rejected': ['accountDashboard'],
       'submission-rejected-prohibited': ['messages']
     }
