@@ -191,8 +191,8 @@ extensions (`chart.js`), and a test checks the committed import.
   that the Worker serves the tile and that sample pages reference no missing same-origin file.
 - **Listing offers.** D1 records no product pricing, so listing JSON-LD carries no `offers`.
   A default `price: "0"` would call every paid product free. `generateWebsiteDetailSchema`
-  emits an Offer only for known `pricing` (free: price 0; paid: decimal price and ISO 4217
-  currency). The submission `plan` is the listing fee, never product pricing
+  emits an Offer only for known `pricing` (free: price 0; paid: decimal price and three-letter
+  currency code). The submission `plan` is the listing fee, never product pricing
   (serpcompany/best.serp.co#88). `apps/e2e/tests/listing-structured-data.spec.ts` checks that
   rendered listings carry no Offer.
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other

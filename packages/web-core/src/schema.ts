@@ -284,9 +284,9 @@ const schemaCurrencyPattern = /^[A-Z]{3}$/u
  * The SoftwareApplication offer, or undefined unless the product's pricing is known. Google
  * reads `price: '0'` as "free", so a default offer would call every paid product free. Google's
  * software app rich result needs `offers.price` and a rating or review; listings carry neither
- * rating nor review, so omitting an unknown price costs no rich result. A paid price that is
- * not a plain positive decimal, or a currency that is not three uppercase letters, is omitted
- * rather than guessed.
+ * rating nor review, so omitting an unknown price costs no rich result. A model other than
+ * `free` or `paid`, a paid price that is not a plain positive decimal, or a currency that is not
+ * three uppercase letters is omitted rather than guessed.
  */
 function resolveSchemaOffer(pricing: ListingPricing | undefined) {
   if (!pricing) return undefined
@@ -299,6 +299,7 @@ function resolveSchemaOffer(pricing: ListingPricing | undefined) {
     }
   }
   if (
+    pricing.model !== 'paid' ||
     !schemaPricePattern.test(pricing.price) ||
     Number(pricing.price) <= 0 ||
     !schemaCurrencyPattern.test(pricing.currency)

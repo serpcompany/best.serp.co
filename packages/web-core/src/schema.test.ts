@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SITE_LISTING_LOGO_FALLBACK_PATH } from './listing-logo-presentation'
-import { generateWebsiteDetailSchema, type WebsiteMetadataLike } from './schema'
+import {
+  generateWebsiteDetailSchema,
+  type ListingPricing,
+  type WebsiteMetadataLike
+} from './schema'
 import { SITE_LOGO_URL, SITE_PUBLIC_URL } from './seo-config'
 
 const listing: WebsiteMetadataLike = {
@@ -89,19 +93,34 @@ describe('listing detail JSON-LD offer', () => {
     })
   })
 
-  it('offers a paid product at its price and currency', () => {
+  it.each([
+    ['19.99', 'EUR'],
+    ['0.99', 'USD'],
+    ['49', 'GBP']
+  ])('offers a paid product at %s %s', (price, currency) => {
     const schema = generateWebsiteDetailSchema({
       ...listing,
-      pricing: { model: 'paid', price: '19.99', currency: 'EUR' }
+      pricing: { model: 'paid', price, currency }
     })
 
     expect(softwareNode(schema).offers).toEqual({
       '@type': 'Offer',
-      price: '19.99',
-      priceCurrency: 'EUR',
+      price,
+      priceCurrency: currency,
       availability: 'https://schema.org/InStock'
     })
   })
+
+  it.each(['Paid', 'subscription', 'freemium'])(
+    'omits the offer for an unknown pricing model (%s)',
+    model => {
+      // Pricing will come from stored data, so a model outside the union must fail closed.
+      const pricing = { model, price: '19.99', currency: 'USD' } as unknown as ListingPricing
+      const schema = generateWebsiteDetailSchema({ ...listing, pricing })
+
+      expect(softwareNode(schema)).not.toHaveProperty('offers')
+    }
+  )
 
   it.each([
     ['a zero price', '0', 'USD'],
