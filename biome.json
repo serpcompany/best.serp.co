@@ -10,7 +10,8 @@
       "!**/.next",
       "!**/.turbo",
       "!**/coverage",
-      "!**/.content-collections"
+      "!**/.content-collections",
+      "!d1/media/*.json"
     ]
   },
   "vcs": {

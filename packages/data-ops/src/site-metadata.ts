@@ -172,6 +172,20 @@ export function parseSiteMetadata(html: string, pageUrl: string): SiteMetadata {
   }
 }
 
+/**
+ * The target of a `<meta http-equiv="refresh" content="0; url=…">` redirect, which link
+ * shorteners use instead of an HTTP redirect, as a public absolute URL, or null.
+ */
+export function metaRefreshUrl(html: string, pageUrl: string): string | null {
+  for (const match of headOf(html).matchAll(/<meta\b[^>]*>/giu)) {
+    const tag = match[0]
+    if ((attribute(tag, 'http-equiv') ?? '').trim().toLowerCase() !== 'refresh') continue
+    const target = (attribute(tag, 'content') ?? '').match(/url\s*=\s*['"]?([^'"\s>]+)/iu)?.[1]
+    return target ? absoluteUrl(target, pageUrl) : null
+  }
+  return null
+}
+
 export interface IconCandidateOptions {
   /** Well-known paths tried after the declared icons, in order. */
   fallbacks?: readonly string[]
