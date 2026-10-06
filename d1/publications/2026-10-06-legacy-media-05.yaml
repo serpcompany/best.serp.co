@@ -1686,11 +1686,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 6568
-        contentType: image/png
+        bytes: 3448
+        contentType: image/webp
         height: 192
-        key: best.serp.co/listings/qualifyed.ai/logo/00f6b1d9b4ee2ebf.png
-        sha256: 00f6b1d9b4ee2ebf55c4497e573d0139e14dc5d260b678644c5cfcb8816e4ea8
+        key: best.serp.co/listings/qualifyed.ai/logo/956bfaa65c752547.webp
+        sha256: 956bfaa65c752547df18aabc1b0987bcc5d143852b249ebbd39dad7a1a536a6f
         source: https://qualifyed.ai/wp-content/uploads/2021/03/cropped-qualifyed-logos-favicon-192x192.png
         width: 192
   - action: listing-media-update
@@ -1857,11 +1857,11 @@ operations:
         source: https://framerusercontent.com/images/QInOaATE3RMg9MCnSO9oY77oY.png
         width: 180
       images:
-        - bytes: 21858
-          contentType: image/webp
+        - bytes: 13921
+          contentType: image/avif
           height: 630
-          key: best.serp.co/listings/questionbase.com/image/8a3732d938fa302c.webp
-          sha256: 8a3732d938fa302ce686f5dea1a171ed41aed98e8953da344a1e0ac99860f4c1
+          key: best.serp.co/listings/questionbase.com/image/e4bd6d35736ca2a5.avif
+          sha256: e4bd6d35736ca2a50f564470cc5016a3c1e05f8f109adad0246daf1ea8e1685a
           source: https://framerusercontent.com/images/ouygxZh5inaUtQ6n6fXeCvSTFE.png
           width: 1200
   - action: listing-media-update
@@ -2119,11 +2119,11 @@ operations:
         source: https://quizbot.ai/favicon-192.png
         width: 192
       images:
-        - bytes: 70657
-          contentType: image/png
+        - bytes: 23910
+          contentType: image/webp
           height: 630
-          key: best.serp.co/listings/quizbot.ai/image/bf63685d149ec1f1.png
-          sha256: bf63685d149ec1f10bc07faee7064e232b1a92d4d84a0a459c890b0aa8e1c92f
+          key: best.serp.co/listings/quizbot.ai/image/5b5b1388c08c812b.webp
+          sha256: 5b5b1388c08c812be0865a006595c05d77dea4c426cd86819ba89068b0110dc3
           source: https://quizbot.ai/assets/social/og-default.png
           width: 1200
   - action: listing-media-update
@@ -2484,11 +2484,11 @@ operations:
         source: https://rasa.io/wp-content/uploads/2020/06/cropped-r-mark-cyan-transparent-large-03-192x192.png
         width: 192
       images:
-        - bytes: 3551
-          contentType: image/png
+        - bytes: 2290
+          contentType: image/webp
           height: 628
-          key: best.serp.co/listings/rasa.io/image/c63082c79446a529.png
-          sha256: c63082c79446a529a5be9d6b6d3fc9e95bed37eced1621c95623d71165f256dc
+          key: best.serp.co/listings/rasa.io/image/d37c518eb2f0af90.webp
+          sha256: d37c518eb2f0af90c9f39ecc93f16b0e0c7a9d907c3826578e27ea55993d98ae
           source: https://rasa.io/wp-content/uploads/2019/10/blog_featuredimage_white-darkteal.png
           width: 1200
   - action: listing-media-update
@@ -3197,23 +3197,7 @@ operations:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/reflectr-5-01/public
         key: null
-    media:
-      logo:
-        bytes: 8944
-        contentType: image/png
-        height: 512
-        key: best.serp.co/listings/reflectr.ai/logo/80931adcf5f366aa.png
-        sha256: 80931adcf5f366aa0c2c1ca634c4d24802eebc901053ddb03ecb333b4f53cc47
-        source: https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72t0OQfQg88O0Vfvuf21ZDE5c8zlYtWUSQOR21k2gpEmduVtwmNkvbABBluVIgduvOEJrPJaFvIZdiMKXaTQKLusQ45lhxuS2xyHgN3efPQ3pERoEF2m4dV39hnuevBQBw8BXbtLsYl5hCnQZXH6sVBBJArwfUTPFyF7Q01ThHEUCALu_-N32mBE1PvKrqMYQLpdQFsTyAJbbBE-XFU9BIwsUg
-        width: 512
-      images:
-        - bytes: 15789
-          contentType: image/png
-          height: 512
-          key: best.serp.co/listings/reflectr.ai/image/27d99d50ef39313f.png
-          sha256: 27d99d50ef39313f0eb8fa1bb06d864306d31b46b488c34042c2e784e7514787
-          source: https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72vzPN7RK1KrDTFuOLf9TiFjsjHkcUlmlXSIAYLY-LlL1WGodoqlWvtAVxMuyCo4RtTrY8q-ebwf6j9rANLOvfZUi2BNf0Jn8uHAvU-tvK74q_oxyCGz3IA5h-Qbd9lXjxhjyW53lTQEJ0PpERB-y-IvJqt9FYwFTUcbSeVZHdC76k7OjHAQ1dMnEkWLsAM=w16383
-          width: 512
+    media: {}
   - action: listing-media-update
     id: lst_7635951c4c6910bebdc11816
     slug: refraction.dev
@@ -5623,11 +5607,11 @@ operations:
         source: https://sambanova.ai/hubfs/sambanova-favicon.png
         width: 579
       images:
-        - bytes: 186773
-          contentType: image/jpeg
+        - bytes: 22624
+          contentType: image/webp
           height: 630
-          key: best.serp.co/listings/sambanova.ai/image/3ddcbcee374c9da4.jpg
-          sha256: 3ddcbcee374c9da4ebffd7465b60815a80264113a2a7af8a0f9a360e8973414f
+          key: best.serp.co/listings/sambanova.ai/image/4a4b45d5cb7667e3.webp
+          sha256: 4a4b45d5cb7667e364c02c70d9e4bf165658fdc51382a299257cb9b8d822b428
           source: https://sambanova.ai/hubfs/sambanova-banner.jpg
           width: 1200
   - action: listing-media-update
@@ -5961,13 +5945,13 @@ operations:
         source: https://sciencelogic.com/wp-content/uploads/2021/05/cropped-MicrosoftTeams-image-23-192x192.png
         width: 192
       images:
-        - bytes: 522816
-          contentType: image/png
-          height: 630
-          key: best.serp.co/listings/sciencelogic.com/image/6d5bac0fd069a28e.png
-          sha256: 6d5bac0fd069a28e4cde5e9955646e67ecced1b723b9785b2b1fb4407e9da72e
-          source: https://sciencelogic.com/wp-content/uploads/2024/09/skylar-advisor-thumb.png
-          width: 1200
+        - bytes: 125743
+          contentType: image/jpeg
+          height: 500
+          key: best.serp.co/listings/sciencelogic.com/image/cfe0e0d6b5e39788.jpg
+          sha256: cfe0e0d6b5e39788b30776f4fd2a3695f68743f165477562d8173aecbfe40433
+          source: https://sciencelogic.com/wp-content/uploads/2021/04/website-featured-image.jpg
+          width: 500
   - action: listing-media-update
     id: lst_fc6b933c8130659438184cea
     slug: scisummary.com
@@ -7464,13 +7448,13 @@ operations:
         source: https://www.sheetai.app/assets/sheetai-logo.png
         width: 512
       images:
-        - bytes: 159084
-          contentType: image/jpeg
-          height: 1260
-          key: best.serp.co/listings/sheetai.app/image/8f1e19d58a587fbc.jpg
-          sha256: 8f1e19d58a587fbcd394c85abef294ca7535e9bd232d4309ab0c7a81ddb5d16b
-          source: https://www.sheetai.app/api/screenshot?url=https%3A%2F%2Fwww.sheetai.app%2F
-          width: 2400
+        - bytes: 191430
+          contentType: image/png
+          height: 627
+          key: best.serp.co/listings/sheetai.app/image/de8eb334d17ee2e3.png
+          sha256: de8eb334d17ee2e3152c1d9dce5cb95e5186ea6bcc780c0a0ceb05415b2cf59c
+          source: https://www.sheetai.app/assets/sheetai-open-graph-image.png
+          width: 1200
   - action: listing-media-update
     id: lst_8a842628e5e1a3177f8c87d0
     slug: sheeter.ai
@@ -7862,11 +7846,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 2000
-        contentType: image/webp
+        bytes: 1808
+        contentType: image/avif
         height: 180
-        key: best.serp.co/listings/siddharthverma.in/logo/369ac7627d1b38b2.webp
-        sha256: 369ac7627d1b38b29187034d8e1545bdade524efc131a4a30b19765ed9da0ac4
+        key: best.serp.co/listings/siddharthverma.in/logo/55343c2e6127b60c.avif
+        sha256: 55343c2e6127b60cc3bd3e59781ac649c9b069fe3d9ab159dee58cf0ae51b9c4
         source: https://framerusercontent.com/images/zSvfkTxfYxV9dzpqlGxTSYayQ1w.png
         width: 180
       images:

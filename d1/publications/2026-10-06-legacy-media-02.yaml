@@ -371,11 +371,11 @@ operations:
         key: null
     media:
       images:
-        - bytes: 16900
+        - bytes: 15989
           contentType: image/png
           height: 1256
-          key: best.serp.co/listings/databricks.com/image/2506f9b1bd21d6b6.png
-          sha256: 2506f9b1bd21d6b6df17782b5604053b87dd1a46d7c4110ba265c592c6571265
+          key: best.serp.co/listings/databricks.com/image/33da3de37c0c3eba.png
+          sha256: 33da3de37c0c3eba3e38e1f6322f1847d185cefe3f10b084173db79ed4a64750
           source: https://www.databricks.com/sites/default/files/2025-01/hello-dolly-democratizing-magic-chatgpt-open-models.png
           width: 2400
   - action: listing-media-update
@@ -2832,7 +2832,7 @@ operations:
         height: 482
         key: best.serp.co/listings/earkind.com/logo/3fca568b313c9d78.png
         sha256: 3fca568b313c9d781b05a2bb7fa670c589b8c3feef039468637acc1ee51c740c
-        source: https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72tK690DppGlKFb8Mrr7DYc63O5N-iZRhPxG56ykeTzO60C2cpdMc0D6nfsf_9s495KDRmCZhO8I3AAq0Q5dHpfY-LbP21QjgaBtp1fSI-pBih3kkoN9-qoNu_oJkrK4ADOMj6zMl6gxjlfUabTzCfaOlTSpbq_eEhs_1Bz5wmKBdKHSeae34F_66gjKs9fQNIPKWzrXoLBYN9zd8ScPxcUFYA
+        source: https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72tPBBzADzDA62AGSFRmPqcYs2JTInjD5dN-wT1JGkzF4FYrjDnenROZME5N6u6jl6to0CoKcP4ps1y0i6WLIOQBIGMsezYZpg3aHvPtJRh_sy9KKTIzuBET8slX2_74ww0mNG3sRrwKZlIn0RiRm4VOU3Y9bahvE7n9ZTSDVPsxYSIaKoc6SajhKaIiTUSbRBZJJS-uqH3zEP68RHnw9OL9rQ
         width: 482
       images:
         - bytes: 143867
@@ -2840,7 +2840,7 @@ operations:
           height: 482
           key: best.serp.co/listings/earkind.com/image/e0dd7a6e237248dc.png
           sha256: e0dd7a6e237248dcf1310f1a44bc00d6d5db53f72f1261bcc13022ca2c71b7f2
-          source: https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72uLz2RABL-p-aae3GiVH6He5Zzl3ZJdDvINv0axJw8bHc-AhG4xMFHJM5m0t0-HnofEnuqsUjDEgMUF5lnQwqgiZd1Hm_kbfvlzOpXe2JRG0AGaINieUMYMNOMnwkmTFr-szZlLfN-csO76DGc2Jk5gEfZREkl0bixU_FiDy55Tmj_4pN5k1ct3YGlPeAo=w16383
+          source: https://lh7-us.googleusercontent.com/sitesv-images-rt/AMxu72taFJ8nxriB2fCO2WiuWurNiiWul3v-uBsHunlHpWVwVFx6zgerRu0ocZJEfecB7IwkL1sGMijN4-7nfc5Nmtdlp5ADcVZ3wq3JH1hOI_Q-2jORT6yklozHWMq0IEY8JWb7jcIZhKxkO-vyBx6bMGYwM4qm_p_AR4ECD6ChGN_tQgUC99oE-IsAam4hKak=w16383
           width: 263
   - action: listing-media-update
     id: lst_e41fa6f53c3dbf173400bc25
@@ -3265,11 +3265,11 @@ operations:
         key: null
     media:
       images:
-        - bytes: 16542
-          contentType: image/webp
+        - bytes: 12006
+          contentType: image/avif
           height: 630
-          key: best.serp.co/listings/eesel.app/image/ae6438ef537dd364.webp
-          sha256: ae6438ef537dd36432e0433e1cfeba34fe742862b3b14d8f302a123a3e58d0b5
+          key: best.serp.co/listings/eesel.app/image/c1cab06fc713c2f0.avif
+          sha256: c1cab06fc713c2f0ba8aa10a52d1db67ea2c998f56f3fe57fa53e728c1630297
           source: https://framerusercontent.com/images/eMyhiNTdQvov1IYveqxD3cps5q8.png
           width: 1200
   - action: listing-media-update
@@ -4034,11 +4034,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 4282
-        contentType: image/png
+        bytes: 1362
+        contentType: image/webp
         height: 76
-        key: best.serp.co/listings/epic-avatar.com/logo/801d0657e0c4e2d7.png
-        sha256: 801d0657e0c4e2d7159f30b5eabdfd7512a6544b392483cf6fbe50a9533a6ec8
+        key: best.serp.co/listings/epic-avatar.com/logo/924a5711707a7441.webp
+        sha256: 924a5711707a7441072a87482dbf7e514e6a1d4d5c117fedc0f8095a47c48527
         source: https://epic-avatar.com/assets/apple-touch-icon.png
         width: 76
   - action: listing-media-update
@@ -4686,15 +4686,7 @@ operations:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/ezai-ai/public
         key: null
-    media:
-      images:
-        - bytes: 292709
-          contentType: image/png
-          height: 500
-          key: best.serp.co/listings/ezai.app/image/00da8389bbc456b4.png
-          sha256: 00da8389bbc456b437ddd3df4872eb976b6ec87bea9906d7091733e27c52b53a
-          source: https://ezai.app/wp-admin/admin-ajax.php?action=rank_math_overlay_thumb&id=260&type=play&hash=549224334425c4140285c1f4ebac57e6
-          width: 1024
+    media: {}
   - action: listing-media-update
     id: lst_0ba6a13adca811dd78848807
     slug: ezdubs.ai
@@ -5093,11 +5085,11 @@ operations:
         key: null
     media:
       images:
-        - bytes: 95169
+        - bytes: 88759
           contentType: image/jpeg
           height: 479
-          key: best.serp.co/listings/fast.ai/image/35254d27f10cf06e.jpg
-          sha256: 35254d27f10cf06e96ffaa0e8d98c9d413d473bfdc451f2b467bc78fbe84273f
+          key: best.serp.co/listings/fast.ai/image/0e1be8a80561b437.jpg
+          sha256: 0e1be8a80561b437668d5ed84c88b7326adebded48233e5f0e10d58d5f3e9292
           source: https://www.fast.ai/posts/2026-02-17-education/Interactive_whiteboard_thumbnail.jpg
           width: 800
   - action: listing-media-update
@@ -6394,11 +6386,11 @@ operations:
         source: https://static.fotor.com/web/_next/static/images/favicon-d4b8dbe4630a2bc790117e61267bbb33.png
         width: 128
       images:
-        - bytes: 130313
-          contentType: image/jpeg
+        - bytes: 29936
+          contentType: image/webp
           height: 315
-          key: best.serp.co/listings/fotor.com/image/d0f91ddf7d28465a.jpg
-          sha256: d0f91ddf7d28465af6d45205171714c989867105224a9327d363fc6298ea180f
+          key: best.serp.co/listings/fotor.com/image/2556e7cefa32379d.webp
+          sha256: 2556e7cefa32379dc7f5fccc686072fe1e0922473c5e672deea67770b86ab5a8
           source: https://imgv3.fotor.com/images/share/ai-generated-a-beautiful-girl-like-a-gorgeous-model-with-fotor-ai-image-generator.jpg
           width: 600
   - action: listing-media-update
@@ -9568,11 +9560,11 @@ operations:
         key: null
     media:
       images:
-        - bytes: 77551
+        - bytes: 116215
           contentType: image/png
           height: 630
-          key: best.serp.co/listings/gptforslides.app/image/b3ca7441dd16b23c.png
-          sha256: b3ca7441dd16b23cd7d2cbf926ec7f11e48c0d67fa3f8c677479da40c84eef55
+          key: best.serp.co/listings/gptforslides.app/image/afe20564be8ec345.png
+          sha256: afe20564be8ec345b2581e8562b363993a587ea1b3f16bc9c769d87da21b4d53
           source: https://www.gptforslides.app/api/screenshot?url=https%3A%2F%2Fwww.gptforslides.app%2F
           width: 1200
   - action: listing-media-update
@@ -9598,11 +9590,11 @@ operations:
         key: null
     media:
       logo:
-        bytes: 26606
-        contentType: image/png
+        bytes: 17128
+        contentType: image/webp
         height: 192
-        key: best.serp.co/listings/gptgo.ai/logo/4dc56b909f687343.png
-        sha256: 4dc56b909f6873434faf46aa8cd813710b08760ad98e87969072e76fa61f5e2a
+        key: best.serp.co/listings/gptgo.ai/logo/92ebebed49911ed3.webp
+        sha256: 92ebebed49911ed385a64a1dd035478f427e3b86907b8cec3c205d95418bef4b
         source: https://gptgo.ai/assets/img/android-chrome-192x192.png
         width: 192
       images:
