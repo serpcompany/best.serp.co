@@ -17,6 +17,8 @@ scheme = ["https"]
 
 #############################  Exclusions  ##########################
 base_url = "https://github.com/serpcompany/best.serp.co/"
+# Design mockups use fictional example products and URLs.
+exclude_path = ["docs/mockups"]
 exclude = [
   "https://openphone.com/",
   "https://www.openphone.com/docs/llms.txt",
