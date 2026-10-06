@@ -232,12 +232,12 @@ days old as `expired` and sends `draft-expired`, then claims and sends the lates
 Emails go out one at a time, and a D1 failure other than a lost claim fails the run. The
 reminder copy follows `features.showPaidListings`: while it is off it offers the free badge
 listing only, with no price, and sends a draft left in checkout to the plan choice. A run
-handles at most 100 of each and logs whether more remain. The weekly badge program (#66) adds
-its own cron expression and job to `scheduledJobs`. The deploy that ships the Worker registers
-the trigger (the dashboard lists it under the Worker's Settings → Triggers), and each run logs
-`scheduled_job_finished` or `scheduled_job_failed`. Locally, `wrangler dev --test-scheduled`
-exposes `/__scheduled`; the job's behavior is covered by `scheduled.test.ts` and
-`draft-jobs.test.ts` against SQLite.
+handles at most 100 of each and logs whether more remain. The same hourly trigger then continues
+the [badge program](./BADGE_PROGRAM.md). The deploy that ships the Worker registers the
+triggers (the dashboard lists them under the Worker's Settings → Triggers), and each run logs
+`scheduled_job_finished` or `scheduled_job_failed` per job. The local preview runs Wrangler with
+`--test-scheduled`, so `/__scheduled?cron=<expression>` runs `scheduled()` on demand; the job's
+behavior is covered by `scheduled.test.ts` and `draft-jobs.test.ts` against SQLite.
 
 ## Legacy review (until #69)
 

@@ -147,6 +147,20 @@ const sharedDataOperations = [
   'packages/data-ops/src/submissions.ts'
 ]
 
+/**
+ * SQL that writes `badge_checks` (any quoting, `INSERT OR …`, `REPLACE`), or a Drizzle
+ * `insert`/`update`/`delete` of the `badgeChecks` table.
+ */
+function writesBadgeChecks(source: string): boolean {
+  const table = String.raw`["'\x60\[]?badge_checks["'\x60\]]?(?![\w])`
+  return (
+    new RegExp(
+      String.raw`\b(?:INSERT(?:\s+OR\s+\w+)?\s+INTO|REPLACE\s+INTO|UPDATE(?:\s+OR\s+\w+)?|DELETE\s+FROM)\s+${table}`,
+      'iu'
+    ).test(source) || /\.(?:insert|update|delete)\(\s*(?:\w+\.)?badgeChecks\b/u.test(source)
+  )
+}
+
 describe('single-site D1-only repository architecture', () => {
   it('builds exactly one web application from one checked-in site config', () => {
     const appDirectories = readdirSync(resolve('apps'), { withFileTypes: true })
@@ -492,6 +506,49 @@ describe('single-site D1-only repository architecture', () => {
     expect(runtime).toContain('createDatabase(workerEnv.DB)')
     const requests = readFileSync(resolve(adminDirectory, 'requests.ts'), 'utf8')
     expect(requests).toContain("import 'server-only'")
+  })
+
+  it('catches every way code can write badge checks (#66 review round 1)', () => {
+    for (const write of [
+      'INSERT INTO badge_checks (listing_id) VALUES (?)',
+      'insert into "badge_checks" (listing_id) values (?)',
+      'INSERT OR REPLACE INTO `badge_checks` VALUES (?)',
+      "UPDATE 'badge_checks' SET reason = ?",
+      'DELETE FROM [badge_checks] WHERE id = ?',
+      'REPLACE INTO badge_checks VALUES (?)',
+      'db.insert(badgeChecks).values(row)',
+      'db.update( badgeChecks ).set(row)',
+      'db.delete(schema.badgeChecks)'
+    ]) {
+      expect(writesBadgeChecks(write), write).toBe(true)
+    }
+    for (const read of [
+      'SELECT outcome FROM badge_checks',
+      'db.select().from(badgeChecks)',
+      'badge_checks_listing_time_idx'
+    ]) {
+      expect(writesBadgeChecks(read), read).toBe(false)
+    }
+  })
+
+  it('lets only the badge program write badge checks, through the shared data package (#66)', () => {
+    // `badge_checks` is the weekly program's history. An owner's "Verify badge" or "Re-verify
+    // now" (#63, #65) records its result on the submission, never here, so a manual check can
+    // neither open nor end a warning.
+    const writers = trackedFiles().filter(
+      file =>
+        /\.(?:ts|tsx)$/u.test(file) &&
+        !/\.test\.tsx?$/u.test(file) &&
+        !file.startsWith('packages/data-ops/src/test-support') &&
+        !file.startsWith('apps/e2e/') &&
+        writesBadgeChecks(readFileSync(resolve(file), 'utf8'))
+    )
+    expect(writers).toEqual(['packages/data-ops/src/badge-program.ts'])
+    const programDirectory = resolve(project.appDirectory, 'lib/badge-program')
+    for (const file of readdirSync(programDirectory).filter(name => !name.includes('.test.'))) {
+      const source = readFileSync(resolve(programDirectory, file), 'utf8')
+      expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
+    }
   })
 
   // A Server Action is reachable by its action id from any page path, so no path-based gate

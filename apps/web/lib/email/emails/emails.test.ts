@@ -28,6 +28,7 @@ function render(
 const BEFORE: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
+  claims: false,
   listingFaqs: false,
   messages: false,
   orders: false
@@ -36,10 +37,14 @@ const BEFORE: SiteFeatures = {
 const AFTER: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: true,
+  claims: true,
   listingFaqs: true,
   messages: true,
   orders: false
 }
+
+/** Once claims (#67) and paid listings (#68) ship too: the badge emails' approved offers. */
+const LAUNCHED: SiteFeatures = { ...AFTER, claims: true, orders: true }
 
 /** A sample rendered in production with the given site areas. */
 function renderWith(id: TemplateId, features: SiteFeatures) {
@@ -447,7 +452,7 @@ describe('rejected', () => {
 
 describe('badge missing', () => {
   it('gives the check and recheck times in UTC and links to the listing', () => {
-    const email = render('badge-missing')
+    const email = renderWith('badge-missing', LAUNCHED)
     expect(email.subject).toBe('Action needed: the SERP badge is missing on ledgerly.app')
     expect(email.text).toContain(
       "Our weekly check loaded https://ledgerly.app/ on Mon, Oct 5 at 09:14 UTC. The badge is there, but its link is marked nofollow.\nWe'll check again around Tue, Oct 6 at 09:14 UTC. If there still isn't a badge with a dofollow link to your listing, Ledgerly will be removed from SERP."
@@ -460,28 +465,52 @@ describe('badge missing', () => {
     expect(linksTo(email.html, 'https://best.serp.co/account/listings/ledgerly.app/')).toBe(true)
   })
 
-  it('names what the check found', () => {
+  it('names what the check found, in approved words that are true of it', () => {
     const sample = EMAIL_SAMPLES['badge-missing'][0]
     if (!sample) throw new Error('sample')
-    const text = (problem: 'missing' | 'nofollow' | 'wrong_destination') =>
-      renderAppEmail(
-        'badge-missing',
-        { ...sample.input, problem },
-        {
-          environment: 'production',
-          to: sample.to
-        }
-      ).text
+    const text = (problem: string, httpStatus?: number) =>
+      renderAppEmail('badge-missing', { ...sample.input, httpStatus, problem } as never, {
+        environment: 'production',
+        to: sample.to
+      }).text
     expect(text('missing')).toContain("09:14 UTC. We couldn't find the badge on the page.")
     expect(text('wrong_destination')).toContain(
       "The badge is there, but its link doesn't point to your listing."
+    )
+    // The submit page's approved lines (#70 screen 3) for the same results.
+    expect(text('not_followed')).toContain("09:14 UTC. Badge found, but the link isn't followed.")
+    expect(text('page_not_followed')).toContain(
+      '09:14 UTC. Badge found, but the page tells search engines not to follow links.'
+    )
+    // A 4xx: the page refused our checker, so the email neither says it loaded the page nor asks
+    // to put the badge back; it gives the submit page's firewall advice.
+    const refused = text('http_status', 403)
+    expect(refused).toContain(
+      "Our weekly check couldn't reach https://ledgerly.app/ on Mon, Oct 5 at 09:14 UTC. The site answered with HTTP 403."
+    )
+    expect(refused).toContain(
+      "Make sure the page is public and that a firewall or bot protection isn't blocking our checker."
+    )
+    expect(refused).not.toMatch(/check loaded|put the badge code/u)
+    expect(text('missing')).toContain('Our weekly check loaded https://ledgerly.app/')
+    expect(text('missing')).toContain('put the badge code from your dashboard back on the page')
+    expect(() => text('http_status', 503)).toThrow(EmailTemplateError)
+    expect(() => text('http_status')).toThrow(EmailTemplateError)
+  })
+
+  it('offers the paid upgrade only while paid listings (#68) are on', () => {
+    expect(renderWith('badge-missing', LAUNCHED).text).toContain('Upgrade to a paid listing')
+    const before = renderWith('badge-missing', { ...LAUNCHED, orders: false })
+    expect(before.text).not.toMatch(/\$49|paid listing|upgrade/iu)
+    expect(before.text).toContain(
+      'Check my badge: https://best.serp.co/account/listings/ledgerly.app/'
     )
   })
 })
 
 describe('unlisted', () => {
   it('says when it was removed and offers the paid relisting', () => {
-    const email = render('listing-unlisted')
+    const email = renderWith('listing-unlisted', LAUNCHED)
     expect(email.subject).toBe('Scrapebird has been removed from SERP')
     expect(email.text).toContain(
       'We rechecked https://scrapebird.dev/ on Wed, Sep 30 at 10:02 UTC and the badge was still missing, so Scrapebird has been removed from SERP, as we warned on Tue, Sep 29.'
@@ -490,6 +519,17 @@ describe('unlisted', () => {
       'Relist for $49: https://best.serp.co/account/listings/scrapebird.dev/'
     )
     expect(linksTo(email.html, 'https://best.serp.co/account/listings/scrapebird.dev/')).toBe(true)
+  })
+
+  it('offers relisting only while paid listings (#68) are on', () => {
+    const before = renderWith('listing-unlisted', { ...LAUNCHED, orders: false })
+    expect(before.text).toContain(
+      'Scrapebird has been removed from SERP, as we warned on Tue, Sep 29.'
+    )
+    expect(before.text).not.toMatch(/\$49|paid listing|relist/iu)
+    expect(linksTo(before.html, 'https://best.serp.co/account/listings/scrapebird.dev/')).toBe(
+      false
+    )
   })
 })
 
@@ -564,13 +604,26 @@ You're getting this because devin@serp.co receives review alerts for best.serp.c
 
 describe('ownership removed', () => {
   it('explains the removal and links to the listing to claim again', () => {
-    const email = render('ownership-removed')
+    const email = renderWith('ownership-removed', LAUNCHED)
     expect(email.subject).toBe('You no longer manage Brieflow on SERP')
     expect(email.text).toContain(
       'We rechecked https://brieflow.ai/ on Tue, Sep 22 at 09:10 UTC and the badge was still missing. Ownership came from the badge, so you no longer manage the Brieflow listing.'
     )
     expect(email.text).toContain('Claim Brieflow again: https://best.serp.co/products/brieflow.ai/')
     expect(linksTo(email.html, 'https://best.serp.co/products/brieflow.ai/')).toBe(true)
+  })
+
+  it('offers to claim again only while claims (#67) and paid listings (#68) are on', () => {
+    for (const features of [
+      { ...LAUNCHED, claims: false },
+      { ...LAUNCHED, orders: false }
+    ]) {
+      const email = renderWith('ownership-removed', features)
+      expect(bodyText(email)).toContain(
+        'so you no longer manage the Brieflow listing.\nThe listing stays on SERP.'
+      )
+      expect(email.text).not.toMatch(/claim .*again|\$49/iu)
+    }
   })
 })
 

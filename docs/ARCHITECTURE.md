@@ -48,8 +48,9 @@ change runs in a protected workflow.
   `.open-next/worker.js`. It reads only the catalog epoch and, after a listing page
   rendered 404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is
   rendered again as the 410 gone page), both through `packages/data-ops/`.
-  Its `scheduled()` handler runs `lib/worker/scheduled.ts`, which maps each Cron Trigger to
-  its jobs ([draft reminders](./SUBMISSION_FLOW.md#draft-reminders-and-expiry), hourly).
+  Its `scheduled()` handler runs `lib/worker/scheduled.ts`, which maps each Cron Trigger to its
+  jobs: [draft reminders](./SUBMISSION_FLOW.md#draft-reminders-and-expiry) (hourly) and the
+  [badge program](./BADGE_PROGRAM.md) (weekly, daily, and hourly).
 - `apps/web/lib/catalog/` acquires the binding, validates the runtime environment,
   and deduplicates reads per request. It contains no SQL.
 - `apps/web/lib/submissions/` validates the binding, fetches submitters' pages and images

@@ -1186,20 +1186,34 @@ describe('the owner’s account actions (#65)', () => {
 })
 
 describe('refunds keep the plan model consistent (paid → free)', () => {
-  function badgeCheck(db: DatabaseSync, outcome: 'fail' | 'pass', conclusive: boolean, at: string) {
-    db.prepare(
-      'INSERT INTO badge_checks (listing_id,checked_at,outcome,reason,conclusive) VALUES (?,?,?,?,?)'
-    ).run(
-      liveListingId,
-      at,
-      outcome,
-      outcome === 'pass' ? null : 'badge_missing',
-      conclusive ? 1 : 0
+  /** A badge check of the live listing; returns its id. */
+  function badgeCheck(
+    db: DatabaseSync,
+    outcome: 'fail' | 'pass',
+    conclusive: boolean,
+    at: string,
+    kind: 'confirmation' | 'refund' | 'weekly' = 'weekly'
+  ): number {
+    return Number(
+      db
+        .prepare(
+          `INSERT INTO badge_checks (listing_id,checked_at,outcome,reason,conclusive,kind)
+          VALUES (?,?,?,?,?,?)`
+        )
+        .run(
+          liveListingId,
+          at,
+          outcome,
+          outcome === 'pass' ? null : conclusive ? 'badge_missing' : 'fetch_timeout',
+          conclusive ? 1 : 0,
+          kind
+        ).lastInsertRowid
     )
   }
-  /** Inside the seven-day keep-free window before `NOW`, and outside it. */
+  /** Earlier than `NOW`: a recent weekly check, and the refund's own check (minutes before). */
   const RECENT = '2026-10-01T00:00:00.000Z'
-  const STALE = '2026-09-08T00:00:00.000Z'
+  const AT_REFUND = '2026-10-06T11:55:00.000Z'
+  const STALE_REFUND = '2026-10-06T10:00:00.000Z'
 
   it('refunds only an other-category rejection, once', () => {
     const db = database('rejected', { paid: true })
@@ -1243,15 +1257,20 @@ describe('refunds keep the plan model consistent (paid → free)', () => {
     expect(submission(queued)).toMatchObject({ plan: 'paid', refunded_at: null })
   })
 
-  it('keeps a refunded listing live as free only on a recent conclusive pass, and records it', () => {
-    const keep = () =>
-      buildRefundSubmissionPlans({ actor: 'admin', mode: 'keep_free', now: NOW, submissionId })
+  it('keeps a refunded listing live as free only when its refund check passed, and records it', () => {
+    const keep = (badgeCheckId: number) =>
+      buildRefundSubmissionPlans({
+        actor: 'admin',
+        badgeCheckId,
+        mode: 'keep_free',
+        now: NOW,
+        submissionId
+      })
 
     const passing = database('approved', { paid: true })
-    badgeCheck(passing, 'fail', true, STALE)
-    badgeCheck(passing, 'pass', true, RECENT)
-    badgeCheck(passing, 'fail', false, '2026-10-02T00:00:00.000Z')
-    execute(passing, keep())
+    badgeCheck(passing, 'fail', true, RECENT)
+    const refundPass = badgeCheck(passing, 'pass', true, AT_REFUND, 'refund')
+    execute(passing, keep(refundPass))
     expect(submission(passing)).toMatchObject({
       plan: 'free',
       refunded_at: NOW,
@@ -1263,38 +1282,53 @@ describe('refunds keep the plan model consistent (paid → free)', () => {
       .prepare("SELECT detail FROM listing_submission_events WHERE event_type='refunded'")
       .get() as { detail: string }
     expect(JSON.parse(recorded.detail)).toEqual({
-      badge_check_id: 2,
-      badge_checked_at: RECENT,
+      badge_check_id: refundPass,
+      badge_checked_at: AT_REFUND,
       mode: 'kept_as_free'
     })
 
-    for (const checks of [
-      [['pass', STALE]],
-      [
-        ['pass', STALE],
-        ['fail', RECENT]
-      ]
-    ] as const) {
+    // Refused: a recent weekly pass is not the refund check; a refund check that missed, that
+    // couldn't tell, that is stale, or that a later refund check replaced.
+    const refused: Array<(db: DatabaseSync) => number> = [
+      db => badgeCheck(db, 'pass', true, RECENT),
+      db => {
+        badgeCheck(db, 'pass', true, RECENT)
+        return badgeCheck(db, 'fail', false, AT_REFUND, 'refund')
+      },
+      db => badgeCheck(db, 'fail', true, AT_REFUND, 'refund'),
+      db => badgeCheck(db, 'pass', true, STALE_REFUND, 'refund'),
+      db => {
+        const first = badgeCheck(db, 'pass', true, STALE_REFUND, 'refund')
+        badgeCheck(db, 'fail', false, AT_REFUND, 'refund')
+        return first
+      }
+    ]
+    for (const [index, seed] of refused.entries()) {
       const db = database('approved', { paid: true })
-      for (const [outcome, at] of checks) badgeCheck(db, outcome, true, at)
-      expect(() => execute(db, keep())).toThrow(/malformed JSON/u)
+      const id = seed(db)
+      expect(() => execute(db, keep(id)), String(index)).toThrow(/malformed JSON/u)
       expect(submission(db)).toMatchObject({ plan: 'paid', refunded_at: null })
     }
   })
 
-  it('unpublishes a refunded live listing unless a recent pass keeps it free', () => {
-    const plans = () =>
+  it('unpublishes a refunded live listing whose refund check missed or could not tell', () => {
+    const plans = (badgeCheckId: number) =>
       buildRefundSubmissionPlans({
         actor: 'admin',
+        badgeCheckId,
         mode: 'unpublish',
         now: NOW,
         publication: publication('refund-unpublish'),
         submissionId
       })
-    for (const stalePass of [false, true]) {
+    // A recent weekly pass doesn't stop it: the refund decides on its own check (#66 round 2).
+    for (const [outcome, conclusive] of [
+      ['fail', true],
+      ['fail', false]
+    ] as const) {
       const db = database('approved', { paid: true })
-      if (stalePass) badgeCheck(db, 'pass', true, STALE)
-      execute(db, plans())
+      badgeCheck(db, 'pass', true, RECENT)
+      execute(db, plans(badgeCheck(db, outcome, conclusive, AT_REFUND, 'refund')))
       expect(submission(db)).toMatchObject({ plan: 'paid', refunded_at: NOW, status: 'approved' })
       expect(listing(db)).toMatchObject({ is_active: 0, status: 'approved' })
       expect(events(db, 'refunded')).toBe(1)
@@ -1302,11 +1336,16 @@ describe('refunds keep the plan model consistent (paid → free)', () => {
       expect(publicationState(db).version).toBe(2)
     }
 
-    const passing = database('approved', { paid: true })
-    badgeCheck(passing, 'pass', true, RECENT)
-    expect(() => execute(passing, plans())).toThrow(/malformed JSON/u)
-    expect(listing(passing)).toMatchObject({ is_active: 1 })
-    expect(publicationState(passing).version).toBe(1)
+    // Refused when the refund check passed (keep it free instead), or is not a refund check.
+    for (const seed of [
+      (db: DatabaseSync) => badgeCheck(db, 'pass', true, AT_REFUND, 'refund'),
+      (db: DatabaseSync) => badgeCheck(db, 'fail', true, AT_REFUND, 'weekly')
+    ]) {
+      const db = database('approved', { paid: true })
+      expect(() => execute(db, plans(seed(db)))).toThrow(/malformed JSON/u)
+      expect(listing(db)).toMatchObject({ is_active: 1 })
+      expect(publicationState(db).version).toBe(1)
+    }
   })
 
   it('refunds an approved paid listing that is already down, without a publication', () => {

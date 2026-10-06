@@ -7,14 +7,18 @@ import { project } from './project'
 
 /**
  * Vars a local preview may override, as `NAME=value` pairs separated by commas in
- * `LOCAL_PREVIEW_VARS`: only the Cloudflare Access switches, so Playwright can run the built
- * Worker with the production Access lock (apps/e2e/tests/access-lock.spec.ts). Identity and
- * environment vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`) can never be overridden here.
+ * `LOCAL_PREVIEW_VARS`: the Cloudflare Access switches, so Playwright can run the built Worker
+ * with the production Access lock (apps/e2e/tests/access-lock.spec.ts), and
+ * `LOCAL_BADGE_PROGRAM`, which runs the badge program on a local Worker while its flag is off
+ * (apps/e2e/tests/badge-program.spec.ts; `lib/worker/scheduled.ts` ignores it anywhere but
+ * local). Identity and environment vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`) can never be
+ * overridden here.
  */
 export const LOCAL_PREVIEW_OVERRIDABLE_VARS = [
   'CF_ACCESS_AUD',
   'CF_ACCESS_REQUIRED',
-  'CF_ACCESS_TEAM_DOMAIN'
+  'CF_ACCESS_TEAM_DOMAIN',
+  'LOCAL_BADGE_PROGRAM'
 ] as const
 
 export function localPreviewVarArgs(value: string | undefined): string[] {
@@ -55,6 +59,9 @@ export function canonicalPreviewCommand(): {
       statePath,
       '--port',
       process.env.PORT || '8787',
+      // Exposes `/__scheduled?cron=<expression>` on the local Worker, which runs `scheduled()`
+      // (the draft job and the badge program) on demand; Cron Triggers never fire locally.
+      '--test-scheduled',
       ...localPreviewVarArgs(process.env.LOCAL_PREVIEW_VARS)
     ],
     statePath

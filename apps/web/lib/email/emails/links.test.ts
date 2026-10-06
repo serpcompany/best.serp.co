@@ -49,6 +49,18 @@ const DASHBOARD_PROMISES: ReadonlyArray<{
     pattern: /\bevery week\b|\bweekly\b|\bcheck again about 24 hours\b/iu
   },
   {
+    // Paid listings, upgrades, and relisting are #68's.
+    feature: 'orders',
+    issue: '#68',
+    pattern: /\$\d+|\bpaid listing\b|\brelist\b/iu
+  },
+  {
+    // Claiming a listing (again) is #67's.
+    feature: 'claims',
+    issue: '#67',
+    pattern: /\bclaim it again\b|\bclaim [^.\n]{1,80} again\b/iu
+  },
+  {
     feature: 'messages',
     issue: '#73',
     pattern:
@@ -69,9 +81,23 @@ const APPROVED_INTERIM_COPY: Partial<Record<TemplateId, RegExp[]>> = {
 /** Templates sent through a constant rather than a literal id. */
 const SENT_THROUGH_CONSTANTS: TemplateId[] = [SIGN_IN_CODE_TEMPLATE]
 
-/** App source outside the email module (tests excluded). */
-function senderSources(): string[] {
-  const sources: string[] = []
+/**
+ * Templates that only a flagged job sends, by the flag that switches the job on and the one
+ * source directory that names them. The badge program (#66) sends its emails only while
+ * `features.badgeProgram` is on (`lib/worker/scheduled.ts`), so they count as sent from then on,
+ * and must then link only to pages that exist and promise nothing that is still off.
+ */
+const FLAGGED_SENDERS: Partial<
+  Record<TemplateId, { directory: string; feature: keyof SiteFeatures }>
+> = {
+  'badge-missing': { directory: 'lib/badge-program', feature: 'badgeProgram' },
+  'listing-unlisted': { directory: 'lib/badge-program', feature: 'badgeProgram' },
+  'ownership-removed': { directory: 'lib/badge-program', feature: 'badgeProgram' }
+}
+
+/** App source outside the email module (tests excluded), by path from `apps/web`. */
+function senderSources(): Array<{ code: string; path: string }> {
+  const sources: Array<{ code: string; path: string }> = []
   const visit = (directory: string) => {
     for (const name of readdirSync(directory)) {
       const path = join(directory, name)
@@ -80,7 +106,7 @@ function senderSources(): string[] {
         continue
       }
       if (/\.tsx?$/u.test(name) && !/\.test\.tsx?$/u.test(name)) {
-        sources.push(readFileSync(path, 'utf8'))
+        sources.push({ code: readFileSync(path, 'utf8'), path: relative(WEB_DIRECTORY, path) })
       }
     }
   }
@@ -88,13 +114,20 @@ function senderSources(): string[] {
   return sources
 }
 
-/** The emails the app sends today: every template whose id app code names. */
-function sentTemplates(): Set<TemplateId> {
+/**
+ * The emails the app sends today: every template whose id app code names, except those only a
+ * flagged job sends while its flag is off.
+ */
+function sentTemplates(siteFeatures: SiteFeatures = features): Set<TemplateId> {
   const sources = senderSources()
   const ids = Object.keys(appEmailTemplates) as TemplateId[]
   return new Set([
     ...SENT_THROUGH_CONSTANTS,
-    ...ids.filter(id => sources.some(code => code.includes(`'${id}'`)))
+    ...ids.filter(id => {
+      const flagged = FLAGGED_SENDERS[id]
+      if (flagged && !siteFeatures[flagged.feature]) return false
+      return sources.some(source => source.code.includes(`'${id}'`))
+    })
   ])
 }
 
@@ -186,6 +219,7 @@ function promisesIn(email: Rendered, id: TemplateId): Array<keyof SiteFeatures> 
 const ALL_OFF: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
+  claims: false,
   listingFaqs: false,
   messages: false,
   orders: false
@@ -193,6 +227,7 @@ const ALL_OFF: SiteFeatures = {
 const ALL_ON: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: true,
+  claims: true,
   listingFaqs: true,
   messages: true,
   orders: true
@@ -248,6 +283,20 @@ describe('email links', () => {
   it('sends nothing that links to a page still to be built', () => {
     for (const id of sent) expect(DEFERRED[id], id).toBeUndefined()
   })
+
+  it('names flagged templates only in their job, and counts them as sent once the flag is on', () => {
+    for (const [id, flagged] of Object.entries(FLAGGED_SENDERS) as Array<
+      [TemplateId, { directory: string; feature: keyof SiteFeatures }]
+    >) {
+      const naming = senderSources()
+        .filter(source => source.code.includes(`'${id}'`))
+        .map(source => source.path)
+      expect(naming.length, id).toBeGreaterThan(0)
+      for (const path of naming) expect(path.startsWith(`${flagged.directory}/`), path).toBe(true)
+      expect(sentTemplates({ ...features, [flagged.feature]: true }).has(id), id).toBe(true)
+      expect(sentTemplates({ ...features, [flagged.feature]: false }).has(id), id).toBe(false)
+    }
+  })
 })
 
 describe('email copy', () => {
@@ -284,6 +333,25 @@ describe('email copy', () => {
       expect(before && promisesIn(before.email, id), id).toEqual([])
       expect(after && promisesIn(after.email, id), id).toEqual(expected)
     }
+  })
+
+  it('keeps the badge emails from offering paid listings (#68) or claims (#67) while they are off', () => {
+    const badgeEmails: TemplateId[] = ['badge-missing', 'listing-unlisted', 'ownership-removed']
+    const promised = (siteFeatures: SiteFeatures) =>
+      renderAll(siteFeatures)
+        .filter(({ id }) => badgeEmails.includes(id))
+        .map(({ email, id }) => [id, promisesIn(email, id)] as const)
+    const launching = { ...ALL_ON, claims: false, orders: false }
+    for (const [id, features] of promised(launching)) {
+      expect(features, id).not.toContain('orders')
+      expect(features, id).not.toContain('claims')
+    }
+    // The approved offers come back with their flags, and the audit sees them.
+    expect(Object.fromEntries(promised(ALL_ON))).toMatchObject({
+      'badge-missing': expect.arrayContaining(['orders']),
+      'listing-unlisted': expect.arrayContaining(['orders']),
+      'ownership-removed': expect.arrayContaining(['claims', 'orders'])
+    })
   })
 
   it('exempts only the owner-approved interim copy, and only where it is used', () => {

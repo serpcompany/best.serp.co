@@ -174,7 +174,8 @@ describe('fresh Drizzle D1 history', () => {
       '0002_better_auth.sql',
       '0003_submissions_data_model.sql',
       '0004_query_indexes.sql',
-      '0005_admin_panel.sql'
+      '0005_admin_panel.sql',
+      '0006_badge_program.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
@@ -422,6 +423,56 @@ describe('fresh Drizzle D1 history', () => {
     database.close()
   })
 
+  it('upgrades populated badge checks to the #66 check kinds', () => {
+    // `badge_checks` is rebuilt to add `kind`; nothing references it, so every row is kept as a
+    // weekly check under enforced foreign keys, and the CHECKs and index survive.
+    const database = new DatabaseSync(':memory:')
+    const names = freshMigrationNames()
+    const badgeProgram = '0006_badge_program.sql'
+    for (const migration of names.slice(0, names.indexOf(badgeProgram))) {
+      database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
+    }
+    database.exec(`
+      INSERT INTO listings (id, slug, name, description, website, status, source_kind,
+        source_identity, checksum)
+      VALUES ('lst_badge', 'badge.example', 'Badge', 'd', 'https://badge.example/', 'draft',
+        'legacy-json-migration-v1', 'badge', 'c');
+      INSERT INTO badge_checks (listing_id, checked_at, outcome, reason, conclusive)
+      VALUES ('lst_badge', '2026-10-01T00:00:00.000Z', 'pass', NULL, 1),
+        ('lst_badge', '2026-10-02T00:00:00.000Z', 'fail', 'fetch_timeout', 0);
+    `)
+    database.exec('BEGIN')
+    database.exec(readFileSync(resolve(freshMigrationsDirectory, badgeProgram), 'utf8'))
+    database.exec('COMMIT')
+
+    expect(
+      database.prepare('SELECT id, outcome, reason, conclusive, kind FROM badge_checks').all()
+    ).toEqual([
+      { conclusive: 1, id: 1, kind: 'weekly', outcome: 'pass', reason: null },
+      { conclusive: 0, id: 2, kind: 'weekly', outcome: 'fail', reason: 'fetch_timeout' }
+    ])
+    expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect(
+      database
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'badge_checks'"
+        )
+        .all()
+    ).toEqual([{ name: 'badge_checks_listing_time_idx' }])
+    expect(() =>
+      database.exec(`INSERT INTO badge_checks (listing_id, checked_at, outcome, reason, conclusive,
+        kind) VALUES ('lst_badge', '2026-10-03T00:00:00.000Z', 'pass', NULL, 1, 'manual')`)
+    ).toThrow(/CHECK constraint/u)
+    database.exec(`INSERT INTO badge_checks (listing_id, checked_at, outcome, reason, conclusive,
+      kind) VALUES ('lst_badge', '2026-10-03T00:00:00.000Z', 'fail', 'badge_missing', 1,
+      'confirmation')`)
+    database.exec("DELETE FROM listings WHERE id = 'lst_badge'")
+    expect(database.prepare('SELECT COUNT(*) AS count FROM badge_checks').get()).toEqual({
+      count: 0
+    })
+    database.close()
+  })
+
   it('migrates empty canonical local state and verifies the exact fresh schema', () => {
     const stateDirectory = temporaryDirectory('best-serp-co-drizzle-')
     // pnpm db:migrations:list:local lists what pnpm db:migrate:local will apply: every migration.
@@ -612,6 +663,7 @@ describe('fresh Drizzle D1 history', () => {
       expect(configPath).toBe(resolve(project.wranglerConfigPath))
       expect(configPath && existsSync(configPath)).toBe(true)
       expect(command.args).toContain(expected)
+      expect(command.args).toContain('--test-scheduled')
       expect(expected.startsWith('/')).toBe(true)
 
       const appPackage = JSON.parse(
@@ -627,6 +679,10 @@ describe('fresh Drizzle D1 history', () => {
         'CF_ACCESS_REQUIRED:on',
         '--var',
         'CF_ACCESS_AUD:abc123'
+      ])
+      expect(localPreviewVarArgs('LOCAL_BADGE_PROGRAM=on')).toEqual([
+        '--var',
+        'LOCAL_BADGE_PROGRAM:on'
       ])
       for (const refused of [
         'SITE_ENVIRONMENT=production',

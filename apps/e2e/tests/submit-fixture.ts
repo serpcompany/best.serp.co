@@ -71,6 +71,8 @@ export interface FixtureProduct {
 
 export interface FixtureSite {
   close(): Promise<void>
+  /** How many requests the label's home page has answered. */
+  requests(label: string): number
   /** `http://<label>.localtest.me:<port>/` */
   website(label: string): string
   /** The submission slug (the host, without the port). */
@@ -98,6 +100,7 @@ function page(product: FixtureProduct, slug: string): string {
 
 export async function startFixtureSite(): Promise<FixtureSite> {
   const products = new Map<string, FixtureProduct>()
+  const homeRequests = new Map<string, number>()
   const icon = pngImage(180)
   const social = pngImage(256, [194, 85, 31])
   const server: Server = createServer((request, response) => {
@@ -110,6 +113,7 @@ export async function startFixtureSite(): Promise<FixtureSite> {
     }
     const path = (request.url ?? '/').split('?')[0]
     if (path === '/') {
+      homeRequests.set(label, (homeRequests.get(label) ?? 0) + 1)
       const respond = () =>
         response
           .writeHead(product.status ?? 200, {
@@ -131,6 +135,7 @@ export async function startFixtureSite(): Promise<FixtureSite> {
   const { port } = server.address() as AddressInfo
   return {
     close: () => new Promise(resolveClose => server.close(() => resolveClose())),
+    requests: label => homeRequests.get(label) ?? 0,
     set: (label, product) => products.set(label, product),
     slug: label => `${label}.localtest.me`,
     update: (label, change) => {

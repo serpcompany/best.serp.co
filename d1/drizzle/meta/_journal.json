@@ -43,6 +43,13 @@
       "when": 1791241398664,
       "tag": "0005_admin_panel",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791273167988,
+      "tag": "0006_badge_program",
+      "breakpoints": true
     }
   ]
 }
