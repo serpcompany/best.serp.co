@@ -14,6 +14,7 @@
 | [Submitter dashboard](./ACCOUNT_DASHBOARD.md) | `/account`: statuses, edits, revisions, the badge panel |
 | [Accounts](./ACCOUNTS.md) | Better Auth sign-in codes, admins, Cloudflare Access |
 | [Admin panel](./ADMIN_PANEL.md) | `/admin` screens, decisions, the production-write exception |
+| [Submissions mockups](./mockups/submissions/README.md) | The owner-approved #70 mockups and their copy |
 | [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, release flow, cutover checklist |
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel |
 | [Catalog hygiene](./CATALOG_HYGIENE.md) | The listing domain check: hijacked, parked, and moved domains |
