@@ -101,6 +101,8 @@ export interface ListingDetailView {
   linkRel: LinkRel
   /** Set while the logo is not hosted yet (#95). */
   logoNote: { text: string; tone: 'err' | 'warn' } | null
+  /** The featured image slot when it waits or failed (#96 round 3 B1). */
+  imageNote: { text: string; tone: 'err' | 'warn' } | null
   /** The source of the logo the page shows now (a queued replacement is `logoUrl`). */
   currentLogoUrl: string | null
   /** What the screen renders: the hosted copy or an own-origin path, else the tile (#96 S9). */
@@ -477,6 +479,13 @@ export function ListingDetail({
               A square image URL (PNG, JPG, WebP, GIF, AVIF or ICO). It is copied to our media host
               and shown from there; an SVG can't be hosted.
             </FieldDescription>
+            {view.imageNote ? (
+              view.imageNote.tone === 'err' ? (
+                <FieldError>{view.imageNote.text}</FieldError>
+              ) : (
+                <FieldDescription>{view.imageNote.text}</FieldDescription>
+              )
+            ) : null}
             {view.logoNote ? (
               view.logoNote.tone === 'err' ? (
                 <FieldError>{view.logoNote.text}</FieldError>

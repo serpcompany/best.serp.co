@@ -374,6 +374,10 @@ export function selectAdminListingPlans(slug: string): StatementPlan[] {
               'nextAttemptAt',j.next_attempt_at,'sourceUrl',j.source_url,'status',j.status)
             FROM media_ingestions j WHERE j.listing_id=l.id AND j.kind='logo' AND j.sort_order=0)
             AS logo_queue,
+          (SELECT json_object('attempts',j.attempts,'lastError',j.last_error,
+              'nextAttemptAt',j.next_attempt_at,'sourceUrl',j.source_url,'status',j.status)
+            FROM media_ingestions j WHERE j.listing_id=l.id AND j.kind='image' AND j.sort_order=0)
+            AS image_queue,
           s.id AS submission_id,s.status AS submission_status,s.paid_at AS submission_paid_at,
           s.refunded_at AS submission_refunded_at,s.rejection_reason,s.rejection_category,
           s.reviewed_by AS submission_reviewed_by,s.reviewed_at AS submission_reviewed_at,
@@ -697,6 +701,8 @@ export interface AdminListingDetail extends AdminListingRow {
    */
   /** The logo row's source the page shows now; `logoUrl` is the form's (queued or current). */
   currentLogoUrl: string | null
+  /** The featured image slot waiting or failed (a reviewed copy that could not land, #96 r3). */
+  imageQueue: AdminListingDetail['logoQueue']
   logoQueue: {
     attempts: number
     lastError: string | null
@@ -863,6 +869,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         // A queued logo is the logo the admin set last: the form shows its source (#96 r2 S2).
         logoUrl: logoQueue?.sourceUrl ?? listing.logoUrl ?? null,
         logoQueue,
+        imageQueue: parseLogoQueue(row.image_queue),
         activity: events(activity ?? [], 'listing'),
         badgeChecks: badgeChecks(checks ?? []),
         block: block(row),

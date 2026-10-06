@@ -45,6 +45,9 @@ describe('logo hosting note (#95)', () => {
       'the image has more than 40 megapixels (too_many_pixels)'
     )
     expect(describeMediaFailure('something_new')).toBe('something_new')
+    expect(describeMediaFailure('reviewed_copy_changed')).toMatch(
+      /^the reviewed copy is gone and the source now serves different bytes/u
+    )
   })
 
   it('keeps the current logo in the note while a replacement waits (#96 round 2 S2)', () => {

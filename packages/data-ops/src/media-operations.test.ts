@@ -314,13 +314,61 @@ describe('media operations', () => {
     expect(bucket.objects.size).toBe(2)
   })
 
-  it('fetches the source again when the submission’s copy is gone', async () => {
-    const png = pngBytes(128, 128)
-    const { operations, rows, sqlite } = fixture({ [logo]: () => imageResponse(png) })
+  it('never publishes a refetch the reviewer did not see when the copy is gone (#96 round 3 B1)', async () => {
+    const reviewed = pngBytes(128, 128)
+    const other = pngBytes(96, 96)
+    let served = other
+    const { bucket, operations, rows, sqlite } = fixture({ [logo]: () => imageResponse(served) })
+    const reviewedKey = `best.serp.co/submissions/${submissionId}/logo/${(await sha256Hex(reviewed)).slice(0, 16)}.png`
+    const queue = () =>
+      runPlans(
+        sqlite,
+        buildQueueMediaPlans({
+          copyFromKey: reviewedKey,
+          kind: 'logo',
+          now: '2026-10-06T12:00:00.000Z',
+          sortOrder: 0,
+          sourceUrl: logo,
+          target: { listingId }
+        })
+      )
+    // The reviewed object is gone and the source now serves other bytes: refused, recorded.
+    await queue()
+    expect(await operations.processDueMedia()).toMatchObject({ failed: 1, hosted: 0 })
+    expect(rows('SELECT COUNT(*) AS count FROM listing_media')).toEqual([{ count: 0 }])
+    expect(rows('SELECT status,last_error FROM media_ingestions')).toEqual([
+      { last_error: 'reviewed_copy_changed', status: 'failed' }
+    ])
+    expect([...bucket.objects.keys()].filter(key => key.includes('/listings/'))).toEqual([])
+    // A refetch of exactly the reviewed bytes may stand in for the gone copy.
+    served = reviewed
+    await queue()
+    expect((await operations.processDueMedia()).hosted).toBe(1)
+    expect(rows('SELECT media_key FROM listing_media')).toEqual([
+      {
+        media_key: `best.serp.co/listings/${slug}/logo/${(await sha256Hex(reviewed)).slice(0, 16)}.png`
+      }
+    ])
+  })
+
+  it('retries the copy, never refetching, while R2 is unavailable', async () => {
+    const png = pngBytes(64, 64)
+    const { bucket, operations, rows, sqlite } = fixture({ [logo]: imageResponse(png) })
+    await operations.hostSubmissionMedia({
+      kind: 'logo',
+      sortOrder: 0,
+      sourceUrl: logo,
+      submissionId
+    })
+    const [submitted] = [...bucket.objects.keys()]
+    // Reads fail (R2 unavailable); the scoped bucket reads through the same map.
+    bucket.objects.get = () => {
+      throw new Error('R2 unavailable')
+    }
     await runPlans(
       sqlite,
       buildQueueMediaPlans({
-        copyFromKey: `best.serp.co/submissions/${submissionId}/logo/${'0'.repeat(16)}.png`,
+        copyFromKey: submitted ?? '',
         kind: 'logo',
         now: '2026-10-06T12:00:00.000Z',
         sortOrder: 0,
@@ -328,10 +376,10 @@ describe('media operations', () => {
         target: { listingId }
       })
     )
-    expect((await operations.processDueMedia()).hosted).toBe(1)
-    expect(rows('SELECT media_key FROM listing_media')).toEqual([
-      { media_key: `best.serp.co/listings/${slug}/logo/${(await sha256Hex(png)).slice(0, 16)}.png` }
-    ])
+    expect(await operations.processListingMedia(listingId)).toMatchObject({ hosted: 0, retried: 1 })
+    expect(
+      rows('SELECT status,last_error FROM media_ingestions WHERE listing_id IS NOT NULL')
+    ).toEqual([{ last_error: 'store_failed', status: 'pending' }])
   })
 
   it('deletes a finished submission’s images and stops retrying its slots (#96 review S1)', async () => {

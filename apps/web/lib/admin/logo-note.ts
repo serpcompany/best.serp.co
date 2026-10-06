@@ -9,6 +9,9 @@ const failureText: Record<string, string> = {
   invalid_redirect: 'it redirected to an address that is not a public HTTP(S) URL',
   invalid_target: 'the URL is not a public HTTP(S) address on port 80 or 443',
   read_failed: 'the download broke off',
+  reviewed_copy_changed:
+    'the reviewed copy is gone and the source now serves different bytes, which are never published',
+  reviewed_copy_missing: 'the reviewed copy is gone and the source no longer serves it',
   response_too_large: 'the file is larger than 5 MB',
   site_unreachable: "the site couldn't be reached",
   store_failed: "the copy couldn't be stored",

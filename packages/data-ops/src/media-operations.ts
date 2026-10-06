@@ -1,10 +1,13 @@
 import {
   copyHostedMedia,
+  fetchImage,
+  hostedMediaFor,
   type IngestImageInput,
   ingestImage,
   type MediaBucket,
   type MediaFailure,
-  scopedMediaBucket
+  scopedMediaBucket,
+  storeHostedMedia
 } from './media-ingest'
 import {
   type HostedMedia,
@@ -281,6 +284,9 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
         if (!row.slug) return await fail({ code: 'target_missing', retryable: false })
         let result: { media: HostedMedia; ok: true } | MediaFailure | null = null
         const copied = row.copy_from_key ? parseMediaKey(row.copy_from_key) : null
+        if (row.copy_from_key && !copied) {
+          return await fail({ code: 'reviewed_copy_missing', retryable: false })
+        }
         if (row.copy_from_key && copied) {
           // The submission's hosted copy, checked against its own digest.
           const [source] = await all<{
@@ -294,6 +300,7 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
               WHERE media_key=? AND status='hosted' LIMIT 1`,
             params: [row.copy_from_key]
           })
+          result = { code: 'reviewed_copy_missing', ok: false, retryable: false }
           if (source) {
             result = await copyHostedMedia(bucket, row.copy_from_key, {
               bytes: source.bytes,
@@ -305,12 +312,40 @@ export function createMediaOperations(config: MediaOperationsConfig): MediaOpera
               width: source.width
             })
           }
-        }
-        // No usable copy (expired, rejected, or mismatched): fetch the source again.
-        if (!result?.ok) {
+          // A reviewed slot is only ever filled with the reviewed bytes (#96 review round 3,
+          // B1): an R2 outage retries the copy; a gone or mismatched copy may be replaced only
+          // by a refetch whose key, the content hash, is the reviewed one. Anything else leaves
+          // the tile, with its reason for the admin, and is never published.
+          if (!result.ok && !result.retryable) {
+            const expected = listingKeyForSubmissionKey(row.copy_from_key, row.slug)
+            const image = await fetchImage(row.source_url, {
+              fetcher: config.fetcher,
+              webPortsOnly: config.webPortsOnly ?? true
+            })
+            if (image.ok) {
+              const media = hostedMediaFor(image, {
+                kind,
+                slug: row.slug,
+                sourceUrl: row.source_url
+              })
+              result =
+                media.key !== expected
+                  ? { code: 'reviewed_copy_changed', ok: false, retryable: false }
+                  : (await storeHostedMedia(bucket, media, image.body))
+                    ? { media, ok: true }
+                    : { code: 'store_failed', ok: false, retryable: true }
+            } else if (!image.retryable) {
+              result = { code: 'reviewed_copy_missing', ok: false, retryable: false }
+            } else {
+              result = image
+            }
+          }
+        } else {
           result = await ingest({ kind, slug: row.slug, sourceUrl: row.source_url })
         }
-        if (!result.ok) return await fail(result)
+        if (!result?.ok) {
+          return await fail(result ?? { code: 'reviewed_copy_missing', retryable: false })
+        }
         await hostOnListing({
           actor: 'media-cron',
           claim,

@@ -67,6 +67,10 @@ export type MediaFetchFailure =
   | SafeFetchFailure
   | ImageSniffFailure
   | 'copy_mismatch'
+  /** The reviewed submission object is gone, and the source no longer serves its bytes. */
+  | 'reviewed_copy_missing'
+  /** The source now serves other bytes than the reviewed ones (never published). */
+  | 'reviewed_copy_changed'
   | 'image_too_small'
   | 'store_failed'
 
@@ -211,8 +215,15 @@ export async function copyHostedMedia(
   fromKey: string,
   media: HostedMedia
 ): Promise<{ media: HostedMedia; ok: true } | MediaFailure> {
-  const object = bucket.get ? await bucket.get(fromKey).catch(() => null) : null
-  if (!object) return failure('store_failed')
+  if (!bucket.get) return failure('store_failed')
+  let object: Awaited<ReturnType<NonNullable<MediaBucket['get']>>>
+  try {
+    object = await bucket.get(fromKey)
+  } catch {
+    // R2 unavailable: worth retrying the copy later.
+    return failure('store_failed')
+  }
+  if (!object) return failure('reviewed_copy_missing')
   const body = new Uint8Array(await object.arrayBuffer())
   const sniffed = sniffImage(body)
   if (!sniffed.ok) return failure(sniffed.reason)

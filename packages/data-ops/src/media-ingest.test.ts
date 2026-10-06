@@ -254,11 +254,24 @@ describe('copyHostedMedia', () => {
       sourceUrl: source,
       width: 128
     }
+    // A gone object is final (the cron never refetches unreviewed bytes); an R2 error retries.
     expect(await copyHostedMedia(bucket, from, media)).toEqual({
-      code: 'store_failed',
+      code: 'reviewed_copy_missing',
       ok: false,
-      retryable: true
+      retryable: false
     })
+    expect(
+      await copyHostedMedia(
+        {
+          ...bucket,
+          get: async () => {
+            throw new Error('R2 unavailable')
+          }
+        },
+        from,
+        media
+      )
+    ).toEqual({ code: 'store_failed', ok: false, retryable: true })
     bucket.objects.set(from, {
       body: png,
       options: { httpMetadata: { cacheControl: '', contentType: '' } }

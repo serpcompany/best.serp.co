@@ -285,6 +285,7 @@ describe('admin listing reads', () => {
       logoKey: `best.serp.co/listings/brieflow.ai/logo/${'a'.repeat(16)}.png`,
       logoQueue: null
     })
+    expect(await reads.getAdminListing('zeta.example')).toMatchObject({ imageQueue: null })
     expect(await reads.getAdminListing('zeta.example')).toMatchObject({
       // The form shows the queued source; the page still shows the current row (none here).
       currentLogoUrl: null,
