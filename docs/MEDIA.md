@@ -213,6 +213,29 @@ until its rows match staging's again, and is never repointed without the staging
 Agents prepare and review these files; they never run the uploads or publications
 ([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)).
 
+## Legacy migration
+
+`pnpm migration:legacy-media` (`scripts/migration/legacy-media.ts`) resolved every logo and image
+of the committed import into `d1/media/2026-10-06-legacy-media.json` (4,437 objects, 470 MiB)
+and seven chained manifests `d1/publications/2026-10-06-legacy-media-01…07.yaml` of
+`listing-media-update` operations (500 listings each, from publication v1). The full counts and
+every logo left on the fallback tile are in `d1/media/2026-10-06-legacy-media.report.md`.
+
+- Sources: Cloudflare Images (5,723 rows, 4,308 of them dead: their IDs were never uploaded),
+  raw.githubusercontent.com (49 of 184 dead), the 35 `/media/products` originals on
+  apps.serp.co (#89), the repository's 74 logos and launchbuzz.io's image, apps.serp.co, serp.ai.
+- A dead or unusable source is replaced from the product's own site with the prefill logic (the
+  shortener's meta refresh followed, https only): 1,543 logos from the site icon, 1,223 featured
+  images from the social image. 636 listings keep the fallback tile for their logo: the site is
+  gone or blocks fetching, or has no raster icon of at least 32 px. Both #89 references are
+  dropped: dr.serp.co never had a logo, and onlyfans-downloader's 7th image duplicated its first.
+- Each operation names the listing's media as the manifest saw it (`expected`), so a listing
+  changed since is refused rather than overwritten. `scripts/catalog-media.test.ts` applies the
+  manifests to the import and checks that every logo and image is then a hosted key with a
+  matching object in the plan, and that nothing else changes.
+- After the production publish, delete the repository's `apps/web/public/listing-logos/serpdownloaders.com/`
+  logos and `media/products/launchbuzz.io/` (the fallback tile stays).
+
 ## Owner setup
 
 Done on 2026-10-06: the `cdn-staging` bucket and both custom domains exist, and the deploy token

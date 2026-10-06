@@ -274,7 +274,9 @@ stops at the first branch that finds a row.
 
 ## Changing data
 
-Ongoing changes use reviewed YAML manifests under `d1/publications/`. The publisher
+Ongoing changes use reviewed YAML manifests under `d1/publications/`, applied to staging first
+(`listing-media-update` repoints a listing's logo and images to hosted keys; see
+[Listing media](./MEDIA.md)). The publisher
 validates the base version, prior checksum, IDs, slugs, URLs, and categories before
 sending one batch. `publish-d1-staging.yml` applies a manifest to staging first, then
 `publish-d1.yml` to production ([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)),
