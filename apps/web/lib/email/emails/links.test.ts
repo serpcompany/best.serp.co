@@ -179,8 +179,18 @@ function promisesIn(email: Rendered, id: TemplateId): Array<keyof SiteFeatures> 
   )
 }
 
-const ALL_OFF: SiteFeatures = { accountDashboard: false, messages: false, orders: false }
-const ALL_ON: SiteFeatures = { accountDashboard: true, messages: true, orders: true }
+const ALL_OFF: SiteFeatures = {
+  accountDashboard: false,
+  badgeProgram: false,
+  messages: false,
+  orders: false
+}
+const ALL_ON: SiteFeatures = {
+  accountDashboard: true,
+  badgeProgram: true,
+  messages: true,
+  orders: true
+}
 
 describe('email links', () => {
   const routes = appRoutes()

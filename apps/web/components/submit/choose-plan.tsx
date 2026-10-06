@@ -25,6 +25,7 @@ import { ArrowRight, Check, Info, Lock, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { featureCopy } from '@/lib/feature-copy'
 import { hostOf, type SubmissionSummary } from '@/lib/submissions/contract'
 import { chooseFreePlan } from './submit-api'
 import { ProductLogo, StepProgress, SubmissionStatusBadge, ToneAlert } from './submit-ui'
@@ -96,6 +97,7 @@ export function ChoosePlan({
   signedInEmail,
   submission
 }: ChoosePlanProps) {
+  const { freePlanBadgeCheck } = featureCopy()
   const router = useRouter()
   const [later, setLater] = useState(false)
   const [pending, setPending] = useState(false)
@@ -208,7 +210,8 @@ export function ChoosePlan({
                 items={[
                   `Add the Featured on SERP badge to ${domain} with a dofollow link to your listing`,
                   'We verify it, then a reviewer looks at your listing',
-                  'Keep the badge up: we check it every week'
+                  // Weekly checks are #66's, so the point waits for its flag.
+                  ...(freePlanBadgeCheck ? [freePlanBadgeCheck] : [])
                 ]}
               />
             </CardContent>

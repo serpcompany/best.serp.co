@@ -25,9 +25,19 @@ function render(
 }
 
 /** Today's site: no account dashboard pages (#65), no conversations (#73). */
-const BEFORE: SiteFeatures = { accountDashboard: false, messages: false, orders: false }
+const BEFORE: SiteFeatures = {
+  accountDashboard: false,
+  badgeProgram: false,
+  messages: false,
+  orders: false
+}
 /** Once #65 and #73 ship. */
-const AFTER: SiteFeatures = { accountDashboard: true, messages: true, orders: false }
+const AFTER: SiteFeatures = {
+  accountDashboard: true,
+  badgeProgram: true,
+  messages: true,
+  orders: false
+}
 
 /** A sample rendered in production with the given site areas. */
 function renderWith(id: TemplateId, features: SiteFeatures) {

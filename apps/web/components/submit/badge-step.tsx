@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { featureCopy } from '@/lib/feature-copy'
 import {
   checksLeft,
   checksPaused,
@@ -253,6 +254,8 @@ export function BadgeStep({
   }
 
   if (submission.status === 'verified') {
+    // Each card promises a later step of #59 (#65, #66), so each waits for its flag.
+    const { addFaqsAndLinks, keepTheBadgeUp } = featureCopy()
     return (
       <section className="mx-auto w-full max-w-3xl px-4 py-10 md:py-14">
         <div className="flex flex-col gap-6">
@@ -271,33 +274,34 @@ export function BadgeStep({
                 A reviewer looks at it next. We’ll email {signedInEmail} with the result.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <Item variant="muted">
-                  <ItemMedia variant="icon">
-                    <ShieldCheck />
-                  </ItemMedia>
-                  <ItemContent>
-                    <ItemTitle>Keep the badge up</ItemTitle>
-                    <ItemDescription>
-                      We check it every week. If it goes missing, we email you and check again about
-                      24 hours later.
-                    </ItemDescription>
-                  </ItemContent>
-                </Item>
-                <Item variant="muted">
-                  <ItemMedia variant="icon">
-                    <Plus />
-                  </ItemMedia>
-                  <ItemContent>
-                    <ItemTitle>Add FAQs and links</ItemTitle>
-                    <ItemDescription>
-                      From your account while the listing is in review.
-                    </ItemDescription>
-                  </ItemContent>
-                </Item>
-              </div>
-            </CardContent>
+            {keepTheBadgeUp || addFaqsAndLinks ? (
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {keepTheBadgeUp ? (
+                    <Item variant="muted">
+                      <ItemMedia variant="icon">
+                        <ShieldCheck />
+                      </ItemMedia>
+                      <ItemContent>
+                        <ItemTitle>{keepTheBadgeUp.title}</ItemTitle>
+                        <ItemDescription>{keepTheBadgeUp.description}</ItemDescription>
+                      </ItemContent>
+                    </Item>
+                  ) : null}
+                  {addFaqsAndLinks ? (
+                    <Item variant="muted">
+                      <ItemMedia variant="icon">
+                        <Plus />
+                      </ItemMedia>
+                      <ItemContent>
+                        <ItemTitle>{addFaqsAndLinks.title}</ItemTitle>
+                        <ItemDescription>{addFaqsAndLinks.description}</ItemDescription>
+                      </ItemContent>
+                    </Item>
+                  ) : null}
+                </div>
+              </CardContent>
+            ) : null}
             <CardFooter>
               <Button asChild>
                 <Link href="/account/">

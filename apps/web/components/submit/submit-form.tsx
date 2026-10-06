@@ -56,6 +56,7 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { featureCopy } from '@/lib/feature-copy'
 import {
   type Availability,
   descriptionLengthMessage,
@@ -746,10 +747,7 @@ export function SubmitForm({
                   {errors.content ? (
                     <FieldError>{errors.content}</FieldError>
                   ) : (
-                    <FieldDescription>
-                      Shown on your listing page. FAQs and links can be added from your account
-                      later.
-                    </FieldDescription>
+                    <FieldDescription>{featureCopy().contentHint}</FieldDescription>
                   )}
                 </Field>
               </div>
