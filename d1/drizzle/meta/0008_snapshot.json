@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fb964606-4635-4f81-8105-357f8e5df876",
+  "id": "bdb9cbfc-99c8-4999-a23f-cb89c32699f0",
   "prevId": "876f34c4-6293-4c68-be1b-a5b7bf95fb3f",
   "tables": {
     "accounts": {
@@ -779,6 +779,14 @@
           "notNull": false,
           "autoincrement": false
         },
+        "badge_attempts": {
+          "name": "badge_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "completed_at": {
           "name": "completed_at",
           "type": "text",
@@ -859,6 +867,10 @@
         "listing_claims_codes_sent_positive": {
           "name": "listing_claims_codes_sent_positive",
           "value": "\"listing_claims\".\"codes_sent\" >= 1"
+        },
+        "listing_claims_badge_attempts_range": {
+          "name": "listing_claims_badge_attempts_range",
+          "value": "\"listing_claims\".\"badge_attempts\" BETWEEN 0 AND 10"
         },
         "listing_claims_code_sent_at_iso": {
           "name": "listing_claims_code_sent_at_iso",

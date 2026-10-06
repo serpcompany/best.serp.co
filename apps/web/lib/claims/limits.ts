@@ -46,3 +46,14 @@ export function claimRecipientRateLimitRules(input: {
     { key: input.listingId, scope: 'claim-code-listing', ...CLAIM_RECIPIENT_LIMITS.listingHourly }
   ]
 }
+
+/** Claim dialog lookups: each may follow a listing's link, so they count per account and address. */
+export function claimLookupRateLimitRules(input: {
+  ip: string
+  userId: string
+}): AuthRateLimitRule[] {
+  return [
+    { key: input.userId, scope: 'claim-lookup-user', max: 60, windowMs: HOUR },
+    { key: input.ip, scope: 'claim-lookup-ip', max: 120, windowMs: HOUR }
+  ]
+}

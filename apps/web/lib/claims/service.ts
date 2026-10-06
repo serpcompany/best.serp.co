@@ -1,5 +1,6 @@
 import {
   CLAIM_BADGE_COOLDOWN_SECONDS,
+  CLAIM_BADGE_MAX_ATTEMPTS,
   CLAIM_CODE_MAX_ATTEMPTS,
   CLAIM_LOCK_MINUTES,
   CLAIM_RESEND_COOLDOWN_SECONDS,
@@ -9,6 +10,7 @@ import {
   type ListingClaim
 } from '@serpdirectory/data-ops/claims'
 import type { ListingClaimMethod } from '@serpdirectory/data-ops/schema'
+import { CONCLUSIVE_VERIFICATION_FAILURES } from '@serpdirectory/data-ops/submissions'
 import { CLAIM_CODE_LENGTH, CLAIM_CODE_TTL_SECONDS } from '../email/emails/codes'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'
 import { checkClaimAddress, claimBlockKeys, screenClaimAddress } from './address'
@@ -67,6 +69,8 @@ export interface ClaimDependencies {
 export interface ClaimView {
   /** Wrong codes still allowed for the current code. */
   attemptsLeft: number
+  /** Badge checks that can still find a result (of `CLAIM_BADGE_MAX_ATTEMPTS`). */
+  checksLeft: number
   codeExpiresAt: string
   /** The address the code went to. */
   email: string
@@ -81,6 +85,7 @@ export interface ClaimView {
 
 export type ClaimFailureCode =
   | 'already_owned'
+  | 'checks_used'
   | 'no_product_domain'
   | 'not_owner'
   | 'review_required'
@@ -129,6 +134,7 @@ function secondsUntil(instant: string | Date, now: Date): number {
 function view(claim: ListingClaim, listing: { name: string; slug: string }): ClaimView {
   return {
     attemptsLeft: Math.max(0, CLAIM_CODE_MAX_ATTEMPTS - claim.attempts),
+    checksLeft: Math.max(0, CLAIM_BADGE_MAX_ATTEMPTS - claim.badgeAttempts),
     codeExpiresAt: claim.codeExpiresAt,
     email: claim.email,
     id: claim.id,
@@ -390,6 +396,7 @@ export async function checkClaimBadge(
   if (claim.method !== 'badge') return fail(422, 'invalid_method')
   if (claim.status !== 'email_verified') return fail(409, 'not_confirmed')
   if (listing.ownerUserId) return owned(deps)
+  if (claim.badgeAttempts >= CLAIM_BADGE_MAX_ATTEMPTS) return fail(409, 'checks_used')
   const now = deps.now()
   if (confirmationExpired(claim, now)) return fail(410, 'confirmation_expired')
   // The listing's product domain may have changed since the code was sent (an admin edit).
@@ -420,6 +427,14 @@ export async function checkClaimBadge(
     result = { code: 'verification_service_error', ok: false }
   }
   if (!result.ok) {
+    // A check that found a result uses one of the ten, as at submit (#63); an outage doesn't.
+    if ((CONCLUSIVE_VERIFICATION_FAILURES as readonly string[]).includes(result.code)) {
+      await deps.operations.recordBadgeMiss({
+        claimId: claim.id,
+        now: now.toISOString(),
+        userId: input.userId
+      })
+    }
     const current = await deps.operations.claim(input)
     return { claim: view(current ?? claim, listing), ok: true, result }
   }
@@ -468,4 +483,41 @@ export async function completePaidClaim(
   return listing?.ownerUserId
     ? fail(409, 'already_owned', { contactPath: deps.contactPath })
     : fail(409, 'changed')
+}
+
+export interface ClaimTarget {
+  /** The product's registrable domain: claim addresses must be on it. */
+  domain: string
+  listing: { name: string; slug: string }
+  /** The claimer's open claim of it, to resume. */
+  openClaim: ClaimView | null
+  /** Whether the paid method is offered (#68). */
+  paid: boolean
+  /** The product page the badge goes on. */
+  productUrl: string
+}
+
+/**
+ * What the claim dialog needs before its first step (#70 screen 8): the listing, its product
+ * domain, and the claimer's open claim, or why it can't be claimed (`already_owned` with the
+ * contact path, a hold or an unresolvable link, a block).
+ */
+export async function claimTarget(
+  deps: ClaimDependencies,
+  input: { listingSlug: string; userId: string }
+): Promise<ClaimResult<{ target: ClaimTarget }>> {
+  const target = await claimableListing(deps, { slug: input.listingSlug })
+  if (!target.ok) return target
+  const { listing, site } = target
+  const open = await deps.operations.openClaim({ listingId: listing.id, userId: input.userId })
+  return {
+    ok: true,
+    target: {
+      domain: site.domain,
+      listing: { name: listing.name, slug: listing.slug },
+      openClaim: open ? view(open, listing) : null,
+      paid: deps.paidClaims,
+      productUrl: site.url
+    }
+  }
 }

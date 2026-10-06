@@ -32,6 +32,8 @@ export const CLAIM_RESEND_COOLDOWN_SECONDS = 60
 export const CLAIM_VERIFIED_TTL_HOURS = 24
 /** Seconds between two badge checks of one claim (as at submit, #63). */
 export const CLAIM_BADGE_COOLDOWN_SECONDS = 30
+/** Badge checks per claim that can find a result (missing, unfollowed, elsewhere), as at submit. */
+export const CLAIM_BADGE_MAX_ATTEMPTS = 10
 /** The actor recorded on the listing log for a claim's ownership grant. */
 export const CLAIM_WORKFLOW = 'claims'
 
@@ -48,6 +50,8 @@ export interface ClaimListing {
 
 export interface ListingClaim {
   attempts: number
+  /** Badge checks that found a result (counted against `CLAIM_BADGE_MAX_ATTEMPTS`). */
+  badgeAttempts: number
   badgeCheckedAt: string | null
   codeExpiresAt: string
   /** True while a code waits to be entered (not used, not burned by a lockout). */
@@ -72,6 +76,7 @@ export interface ListingClaim {
 
 interface ClaimRow {
   attempts: number
+  badge_attempts: number
   badge_checked_at: string | null
   code_expires_at: string
   code_pending: number
@@ -93,7 +98,7 @@ interface ClaimRow {
 
 const CLAIM_COLUMNS = `c.id,c.listing_id,c.user_id,c.method,c.status,c.email,c.email_domain,c.product_url,c.listing_website,
   c.code_sent_at,c.code_expires_at,c.codes_sent,c.attempts,c.locked_until,c.email_verified_at,
-  c.badge_checked_at,c.completed_at,(c.code_hash IS NOT NULL) AS code_pending`
+  c.badge_checked_at,c.badge_attempts,c.completed_at,(c.code_hash IS NOT NULL) AS code_pending`
 
 const OPEN = `c.status IN ('code_sent','email_verified')`
 
@@ -313,6 +318,7 @@ export function buildClaimBadgeCheckPlans(input: {
       sql: `UPDATE listing_claims SET badge_checked_at=?,updated_at=?
         WHERE id=? AND user_id=? AND status='email_verified' AND method='badge'
           AND email_verified_at>=? AND (badge_checked_at IS NULL OR badge_checked_at<=?)
+          AND badge_attempts<${CLAIM_BADGE_MAX_ATTEMPTS}
           AND ${listingIsLiveGuard('listing_claims.listing_id')}
           AND ${ownerless('listing_claims.listing_id')}`,
       params: [
@@ -325,6 +331,23 @@ export function buildClaimBadgeCheckPlans(input: {
       ]
     },
     assertPreviousStatementChangedOne('claim_badge_check_started')
+  ]
+}
+
+/** A badge check that found a result but no working badge: one of the claim's ten checks. */
+export function buildRecordClaimBadgeMissPlans(input: {
+  claimId: string
+  now: string
+  userId: string
+}): StatementPlan[] {
+  return [
+    {
+      sql: `UPDATE listing_claims SET badge_attempts=badge_attempts+1,updated_at=?
+        WHERE id=? AND user_id=? AND status='email_verified'
+          AND badge_attempts<${CLAIM_BADGE_MAX_ATTEMPTS}`,
+      params: [input.now, input.claimId, input.userId]
+    },
+    assertPreviousStatementChangedOne('claim_badge_miss_recorded')
   ]
 }
 
@@ -379,6 +402,7 @@ export function buildCompleteClaimPlans(input: {
 function claimOf(row: ClaimRow): ListingClaim {
   return {
     attempts: Number(row.attempts),
+    badgeAttempts: Number(row.badge_attempts),
     badgeCheckedAt: row.badge_checked_at,
     codeExpiresAt: row.code_expires_at,
     codePending: Boolean(row.code_pending),
@@ -412,6 +436,8 @@ export interface ClaimOperations {
    * retried once. `actor` is recorded on the listing log.
    */
   complete(input: { actor: string; claim: ListingClaim; now: string }): Promise<boolean>
+  /** Counts a badge check that found no working badge; false when the claim moved on. */
+  recordBadgeMiss(input: { claimId: string; now: string; userId: string }): Promise<boolean>
   /** False when the code was wrong, expired, spent, or the claim is locked. */
   confirmEmail(input: {
     claimId: string
@@ -508,6 +534,7 @@ export function createClaimOperations(config: { client: Database }): ClaimOperat
     recordWrongCode: input => apply(buildWrongClaimCodePlans(input)),
     confirmEmail: input => apply(buildConfirmClaimEmailPlans(input)),
     claimBadgeCheck: input => apply(buildClaimBadgeCheckPlans(input)),
+    recordBadgeMiss: input => apply(buildRecordClaimBadgeMissPlans(input)),
 
     async complete({ actor, claim, now }) {
       for (let attempt = 0; attempt < 2; attempt += 1) {

@@ -9,6 +9,7 @@ import type { ClaimFailure, ClaimFailureCode } from './service'
  */
 const MESSAGES: Record<ClaimFailureCode, string> = {
   already_owned: 'This listing already has an owner.',
+  checks_used: 'No badge checks left for this claim.',
   blocked: 'This URL can’t be claimed.',
   changed: 'This claim changed. Reload and try again.',
   code_expired: 'This code expired. Ask for a new one.',

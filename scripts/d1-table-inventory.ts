@@ -250,6 +250,7 @@ export const applicationColumnInventory = {
     'locked_until',
     'email_verified_at',
     'badge_checked_at',
+    'badge_attempts',
     'completed_at',
     'created_at',
     'updated_at'

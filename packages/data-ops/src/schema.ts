@@ -1362,6 +1362,8 @@ export const listingClaims = sqliteTable(
     lockedUntil: text('locked_until'),
     emailVerifiedAt: text('email_verified_at'),
     badgeCheckedAt: text('badge_checked_at'),
+    /** Badge checks that found a result (missing, unfollowed, elsewhere): at most 10 (#70). */
+    badgeAttempts: integer('badge_attempts').notNull().default(0),
     completedAt: text('completed_at'),
     createdAt: text('created_at').notNull().default(currentTimestamp),
     updatedAt: text('updated_at').notNull().default(currentTimestamp)
@@ -1374,6 +1376,7 @@ export const listingClaims = sqliteTable(
     ),
     check('listing_claims_attempts_range', sql`${table.attempts} BETWEEN 0 AND 5`),
     check('listing_claims_codes_sent_positive', sql`${table.codesSent} >= 1`),
+    check('listing_claims_badge_attempts_range', sql`${table.badgeAttempts} BETWEEN 0 AND 10`),
     check('listing_claims_code_sent_at_iso', isoInstantCheck(table.codeSentAt)),
     check('listing_claims_code_expires_at_iso', isoInstantCheck(table.codeExpiresAt)),
     check('listing_claims_locked_until_iso', isoInstantCheck(table.lockedUntil)),
