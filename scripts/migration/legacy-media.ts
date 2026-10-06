@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
@@ -9,58 +9,98 @@ import {
   fetchImage,
   type MediaFailure
 } from '@serpdirectory/data-ops/media-ingest'
-import { type MediaKind, mediaKey } from '@serpdirectory/data-ops/media-keys'
+import { isListingMediaKey, type MediaKind, mediaKey } from '@serpdirectory/data-ops/media-keys'
 import { safeFetch } from '@serpdirectory/data-ops/safe-fetch'
+import { nodeFetch } from '@serpdirectory/data-ops/safe-fetch-node'
 import {
   iconCandidates,
   metaRefreshUrl,
   parseSiteMetadata
 } from '@serpdirectory/data-ops/site-metadata'
+import { urlKey } from '@serpdirectory/utils/url-key'
 import { stringify } from 'yaml'
+import { parseWranglerRows } from '../cloudflare-release'
 import { freshMigrationNames, freshMigrationsDirectory } from '../d1-drizzle-local'
 import { readParityReport, readReviewedImportSql } from '../d1-import-artifact'
 import { project } from '../project'
 
 /**
  * The one-time legacy media migration (serpcompany/best.serp.co#95): every logo and image of the
- * committed import moves into the media bucket, and nothing stays hotlinked.
+ * catalog moves into the media bucket, and nothing stays hotlinked.
  *
- * Each `listing_media` logo or image row is resolved to bytes we can host:
+ * Each `listing_media` logo or image row without a hosted key is resolved to bytes we can host:
  * - an https source (Cloudflare Images, raw.githubusercontent.com, apps.serp.co, serp.ai) is
  *   fetched as is;
  * - a `/media/products/…` path the import copied from apps.serp.co without its file is fetched
  *   from apps.serp.co, where the originals live (byte-identical to serpcompany/store-new);
- * - a file checked in under `apps/web/public` (`/listing-logos/…`, launchbuzz.io's og.png) is
- *   read from the repository (`repo:` source).
- * A source that is dead or not a hostable image (404, SVG, not an image, too large) is replaced
- * from the product's own site, with submit v2's prefill logic: its site icon (apple-touch-icon,
- * declared icons, `/favicon.ico`) for the logo, its social (Open Graph) image for the featured
- * image. A listing that yields nothing keeps the fallback tile; nothing is hotlinked.
+ * - a file checked in under `apps/web/public` is read from the repository (`repo:` source).
+ *
+ * A source that is dead, not a hostable image, or a known default asset (`DEFAULT_ASSETS`: the
+ * placeholder chevron of 387 imported logos, framework favicons, builder default images,
+ * parking-page icons) is replaced from the product's own site with submit v2's prefill logic:
+ * its site icon for the logo (at least `MIN_ICON_PIXELS`), its social (Open Graph) image for the
+ * featured image. A replacement is taken only from a page the listing owns (owner decisions on
+ * #95, 2026-10-06):
+ * - the final page, after redirects and a shortener's meta refresh, is on the listing's own
+ *   registrable domain (its website's or its slug's), or on serp.co (SERP's own app pages);
+ * - the page is not a parking, for-sale, gambling, or spam page (`pageFlags`).
+ * Adult listings never get a featured image from another site's Open Graph tag: only SERP's own
+ * curated screenshot, served by apps.serp.co from serpcompany/store-new. A listing that yields
+ * nothing keeps the fallback tile, and every refused replacement is listed in the report for the
+ * owner's sign-off; listing content never changes here (#100 handles hijacked listings).
  *
  * Outputs (all reviewed, none uploaded or published here):
  * - `d1/media/<id>.json`, the upload plan (`scripts/media-upload.ts`);
- * - `d1/publications/<id>-NN.yaml`, chained manifests of `listing-media-update` operations;
- * - `d1/media/<id>.report.md`, counts per source and the listings left without an image.
+ * - `d1/publications/<id>-NN.yaml`, row-level manifests (`concurrency: rows`) of
+ *   `listing-media-update` operations: each applies on any environment whose rows still match;
+ * - `d1/media/<id>.report.md`, counts by source and reason, and the owner sign-off lists.
  *
- * Fetches are cached under `.runtime/legacy-media-cache` (ignored by Git), so a rerun is fast and
+ * The catalog is the committed import, or with `--current <directory>` an environment's current
+ * rows (docs/MEDIA.md#recovering-a-refused-media-manifest): rows already hosted are kept as
+ * they are. Fetches are cached under `.runtime/legacy-media-cache` (ignored by Git), so a rerun
  * reproduces the same outputs. Usage:
- *   pnpm migration:legacy-media [-- --retry-errors] [--limit <n>] [--refresh <upload-summary.json>]
- * `--refresh` refetches the sources an upload reported as changed (`sha256_mismatch`), so their
- * keys follow the new bytes; everything else replays from the cache.
+ *   pnpm migration:legacy-media [-- --retry-errors] [--limit <n>] [--current <directory>]
+ *     [--refresh <upload-summary.json>] [--snapshot-sql <listings|media>]
+ * `--refresh` refetches the source of every object an upload reported as failed, so its key
+ * follows the new bytes; everything else replays from the cache.
  */
 
 export const MIGRATION_ID = '2026-10-06-legacy-media'
 /** Listings per manifest: each stays one D1 batch of a few thousand statements. */
 export const LISTINGS_PER_MANIFEST = 500
-/** The smallest site icon accepted as a replacement logo (a 32 px favicon, scaled up). */
-export const MIN_ICON_PIXELS = 32
+/** The smallest site icon accepted as a replacement logo (owner decision, #95). */
+export const MIN_ICON_PIXELS = 64
 /** The smallest social image accepted as a replacement featured image. */
 export const MIN_SOCIAL_IMAGE_PIXELS = 120
 const USER_AGENT = 'Mozilla/5.0 (compatible; best.serp.co-media/1.0; +https://best.serp.co/about/)'
 const PRODUCT_MEDIA_ORIGIN = 'https://apps.serp.co'
+/**
+ * SERP's own app pages: a SERP app listing's page on apps.serp.co is its own, and its social
+ * image is the app's curated screenshot (serpcompany/store-new). Its icon is SERP Apps', not the
+ * app's, so it is never a replacement logo. Any other serp.co page is SERP's, not the listing's.
+ */
+const SERP_APP_HOST = 'apps.serp.co'
+const SHORTENER_HOSTS = new Set(['serp.ly'])
 const publicDirectory = resolve(project.appDirectory, 'public')
 
-/** Why a known import reference cannot be restored (#89), for the report. */
+/**
+ * Images that are not the product's own, by SHA-256: treated as missing wherever they appear,
+ * an imported row or a replacement candidate (#98 review S1, S3; owner decision on #95).
+ */
+export const DEFAULT_ASSETS: Readonly<Record<string, string>> = {
+  b912cda4106db3a6c5e28bdac631456446bfee7277493ca52b5c4040b888adaf:
+    'placeholder chevron (the logo of 387 imported listings)',
+  '2b8ad2d33455a8f736fc3a8ebf8f0bdea8848ad4c0db48a2833bd0f9cd775932':
+    'create-next-app default favicon (Next.js template)',
+  '9ab2ec2457bc5585b2fccedd5194b9f42bb5a563e57ba5bb932f5a447e2d1825':
+    'Lovable default Open Graph image',
+  '9998c60ab0994aed9006a441a9d16af2f554efecea71afdf309bc0f96b445401':
+    'Spaceship for-sale page favicon',
+  f8fef5fc814f7b9aa077aee362033a10e27197ef7aadefc29cecff49504b9e1a:
+    'Snagged domain marketplace icon'
+}
+
+/** Imported references known never to have existed (#89), for the report. */
 const KNOWN_DEAD: Readonly<Record<string, string>> = {
   '/media/products/dr.serp.co/logo.png':
     'never created: no dr.serp.co logo exists (json-directory-template#114 named the path only)',
@@ -68,17 +108,201 @@ const KNOWN_DEAD: Readonly<Record<string, string>> = {
     'a duplicate of the listing’s first image (serpapps/onlyfans-downloader screenshots/onlyfans-downloader-1.jpg), never published at this path'
 }
 
-interface ListingRow {
+/** Domain parking and marketplace hosts: a page, icon, or image from one is not the product's. */
+const PARKING_HOSTS =
+  /(?:^|\.)(?:spaceship(?:-cdn)?\.com|snagged\.com|sedo(?:parking)?\.com|dan\.com|afternic\.com|godaddy\.com|secureserver\.net|parkingcrew\.net|bodis\.com|above\.com|hugedomains\.com|undeveloped\.com|atom\.com|squadhelp\.com|namecheap\.com|parklogic\.com|sav\.com|domainmarket\.com|buydomains\.com|efty\.com|uniregistry\.com)$/u
+/** For-sale and parking wording on a page. */
+const PARKING_TEXT =
+  /\b(?:(?:this|the) domain(?: name)? (?:is|may be|might be) (?:for sale|available|parked)|domain (?:is )?for sale|buy this domain|make an offer|parked (?:free|domain|by)|domain parking|is parked|hugedomains|sedoparking|snagged|spaceship\.com|afternic|dan\.com)\b/iu
+const word = (terms: string) =>
+  new RegExp(`(?<![\\p{L}\\p{N}])(?:${terms})(?![\\p{L}\\p{N}])`, 'giu')
+/**
+ * Gambling and spam wording, in the languages of the hijacked pages found in review (#98 B1):
+ * English, Indonesian, Vietnamese. A strong term is gambling on any page; a weak one only adds
+ * up (a pricing page says "bonus", an app says "deposit"). Bare "slot" is neither: a scheduling
+ * or UI library page says it often.
+ */
+const STRONG_SPAM = word(
+  'togel|gacor|judi|sbobet|maxwin|casinos?|kasino|baccarat|sportsbook|8xbet|1xbet|bet365|nh[aà] c[aá]i|c[aá] c[uư][oợ]c|x[oổ] s[oố]|pokies|link alternatif|situs slot|slot online|slot ?88|slot ?777|rtp live|bandar togel|viagra|cialis'
+)
+const WEAK_SPAM = word(
+  'bonus|deposit|withdrawal|jackpot|scatter|permainan|bermain|daftar|toto|betting|poker|roulette'
+)
+/** A gambling brand in a title: letters then two or three digits (`Vegas123`, `CM88`, `OKTA333`). */
+const SPAM_BRAND = /(?<![\p{L}\p{N}])\p{L}{2,}\d{2,3}(?![\p{L}\p{N}])/u
+
+/** The page's text without markup, scripts, or styles. */
+function pageText(html: string): string {
+  return html
+    .replace(/<(script|style|noscript)\b[\s\S]*?<\/\1\s*>/giu, ' ')
+    .replace(/<[^>]+>/gu, ' ')
+    .replace(/&[a-z]+;|&#\d+;/giu, ' ')
+}
+
+/**
+ * A gambling or spam verdict, or null: a strong term in the page's title or description; two
+ * strong terms in its text, or one with enough weak ones (strong 3 each, weak 1 each, weak
+ * terms in the title or description 3 each, 9 in all); or gaming wording in the title or
+ * description backed by the text (two weak terms there, or a `Vegas123` brand and one, with
+ * three in the text). Weak terms alone never decide it: a pricing page says "bonus" often.
+ * Returns the most frequent term.
+ */
+export function spamSignal(head: string, text: string): string | null {
+  const strongHead = head.match(STRONG_SPAM)
+  if (strongHead?.[0]) return strongHead[0].toLowerCase()
+  const strong = text.match(STRONG_SPAM) ?? []
+  const weak = text.match(WEAK_SPAM) ?? []
+  const weakHead = head.match(WEAK_SPAM) ?? []
+  const score = strong.length * 3 + weak.length + weakHead.length * 3
+  const spam =
+    strong.length >= 2 ||
+    (strong.length === 1 && score >= 9) ||
+    (weakHead.length >= 2 && weak.length >= 3) ||
+    (SPAM_BRAND.test(head) && weakHead.length >= 1 && weak.length >= 3)
+  if (!spam) return null
+  const counts = new Map<string, number>()
+  for (const term of [...strong, ...strong, ...strong, ...weak, ...weakHead]) {
+    counts.set(term.toLowerCase(), (counts.get(term.toLowerCase()) ?? 0) + 1)
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+}
+
+/** A page's verdict: the reasons a replacement from it is refused, or none. */
+export function pageFlags(page: { html: string; url: string }): string[] {
+  const flags: string[] = []
+  const host = new URL(page.url).hostname
+  if (PARKING_HOSTS.test(host)) flags.push(`parking host ${host}`)
+  const metadata = parseSiteMetadata(page.html, page.url)
+  const head = [
+    metadata.title,
+    metadata.description?.value,
+    metadata.ogSiteName,
+    metadata.applicationName
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const text = pageText(page.html)
+  // A small parking page states it in its body; a large page is read by its head only.
+  const parking = PARKING_TEXT.exec(`${head} ${page.html.length < 60_000 ? text : ''}`)?.[0]
+  if (parking) flags.push(`for sale or parked ("${parking.toLowerCase()}")`)
+  const assets = [metadata.socialImage, ...metadata.icons.map(icon => icon.href)].filter(
+    (value): value is string => Boolean(value)
+  )
+  const parkedAsset = assets.find(asset => PARKING_HOSTS.test(new URL(asset).hostname))
+  if (parkedAsset) flags.push(`parking asset ${new URL(parkedAsset).hostname}`)
+  const spam = spamSignal(head, text)
+  if (spam) flags.push(`gambling or spam ("${spam}")`)
+  return flags
+}
+
+/** The registrable domain (eTLD+1) of a URL's host, or the host itself. */
+export function registrableDomain(url: string): string {
+  return urlKey(url).blockKey
+}
+
+/** The domains a listing owns: its website's (unless a shortener) and its slug's. */
+export function ownDomains(listing: { slug: string; website: string }): Set<string> {
+  const domains = new Set<string>()
+  try {
+    const website = new URL(listing.website)
+    if (!SHORTENER_HOSTS.has(website.hostname)) domains.add(registrableDomain(listing.website))
+  } catch {
+    // An unparsable website owns nothing.
+  }
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/u.test(listing.slug)) {
+    domains.add(registrableDomain(`https://${listing.slug}/`))
+  }
+  return domains
+}
+
+/** Code-point order, as SQLite's BINARY collation (`ORDER BY l.slug`) and on every machine. */
+export function codePointCompare(a: string, b: string): number {
+  return Buffer.compare(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'))
+}
+
+export interface CatalogListing {
+  adult: boolean
   id: string
   slug: string
   website: string
 }
 
-interface MediaRow {
+export interface CatalogMediaRow {
+  bytes: number | null
+  content_type: string | null
+  height: number | null
   kind: MediaKind
   listing_id: string
+  media_key: string | null
+  sha256: string | null
   sort_order: number
   url: string
+  width: number | null
+}
+
+/** The catalog a migration reads: its listings with media, and each listing's rows. */
+export interface CatalogSnapshot {
+  listings: CatalogListing[]
+  rows(listingId: string): CatalogMediaRow[]
+}
+
+/** Listings with a logo or image, and whether each is in the Adult category. */
+export const SNAPSHOT_LISTINGS_SQL = `SELECT l.id, l.slug, l.website,
+  EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
+    WHERE lc.listing_id = l.id AND c.slug = 'adult') AS adult
+FROM listings l
+WHERE EXISTS (SELECT 1 FROM listing_media m WHERE m.listing_id = l.id AND m.kind IN ('logo','image'))
+ORDER BY l.slug`
+
+/** Every logo and image row, with its hosted metadata when it has a key. */
+export const SNAPSHOT_MEDIA_SQL = `SELECT listing_id, kind, url, sort_order, media_key, sha256,
+  content_type, bytes, width, height
+FROM listing_media WHERE kind IN ('logo','image') ORDER BY listing_id, kind, sort_order`
+
+function snapshotFrom(listings: CatalogListing[], media: CatalogMediaRow[]): CatalogSnapshot {
+  const byListing = new Map<string, CatalogMediaRow[]>()
+  for (const row of media) {
+    const rows = byListing.get(row.listing_id) ?? []
+    rows.push(row)
+    byListing.set(row.listing_id, rows)
+  }
+  for (const rows of byListing.values()) {
+    rows.sort((a, b) => codePointCompare(a.kind, b.kind) || a.sort_order - b.sort_order)
+  }
+  return {
+    listings: [...listings]
+      .map(listing => ({ ...listing, adult: Boolean(Number(listing.adult)) }))
+      .sort((a, b) => codePointCompare(a.slug, b.slug)),
+    rows: listingId => byListing.get(listingId) ?? []
+  }
+}
+
+/** The committed import, as the migration was reviewed against. */
+export function importSnapshot(): CatalogSnapshot {
+  const database = new DatabaseSync(':memory:')
+  for (const migration of freshMigrationNames()) {
+    database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
+  }
+  database.exec(readReviewedImportSql(readParityReport()))
+  const snapshot = snapshotFrom(
+    database.prepare(SNAPSHOT_LISTINGS_SQL).all() as unknown as CatalogListing[],
+    database.prepare(SNAPSHOT_MEDIA_SQL).all() as unknown as CatalogMediaRow[]
+  )
+  database.close()
+  return snapshot
+}
+
+/**
+ * An environment's current catalog from two read-only exports (`listings.json`, `media.json`):
+ * the `--json` output of `wrangler d1 execute` for `SNAPSHOT_LISTINGS_SQL` and
+ * `SNAPSHOT_MEDIA_SQL` (docs/MEDIA.md#recovering-a-refused-media-manifest).
+ */
+export function currentSnapshot(directory: string): CatalogSnapshot {
+  const read = (file: string) => parseWranglerRows(readFileSync(resolve(directory, file), 'utf8'))
+  return snapshotFrom(
+    read('listings.json') as unknown as CatalogListing[],
+    read('media.json') as unknown as CatalogMediaRow[]
+  )
 }
 
 export interface HostedEntry {
@@ -100,12 +324,29 @@ type SourceClass =
   | 'repo'
   | 'serp.ai'
 
-type Resolution = { image: FetchedImage; ok: true; source: string } | { ok: false; reason: string }
+type Resolved = { image: FetchedImage; ok: true; source: string }
+type Resolution = Resolved | { ok: false; reason: string }
 
-interface ListingOutcome {
-  images: { dropped: number; hosted: number; replaced: boolean }
-  logo: 'dropped' | 'hosted' | 'none' | 'replaced'
-  logoReason?: string
+type LogoOutcome =
+  | { kind: 'hosted'; source: SourceClass | 'already hosted' }
+  | { kind: 'replaced'; pixels: number; source: string }
+  | { kind: 'tile'; reason: string }
+  | { kind: 'none' }
+
+type ImageOutcome =
+  | { kind: 'kept'; sources: Array<SourceClass | 'already hosted'> }
+  | { kind: 'replaced'; from: 'serp-app' | 'site'; source: string }
+  | { kind: 'dropped'; reason: string }
+  | { kind: 'none' }
+
+export interface ListingOutcome {
+  adult: boolean
+  /** Imported rows treated as missing because their bytes are a known default asset. */
+  defaults: string[]
+  images: ImageOutcome
+  logo: LogoOutcome
+  /** Why a replacement from the listing's site was refused, for the owner's sign-off. */
+  refused?: { page: string; reasons: string[] }
   slug: string
 }
 
@@ -138,12 +379,15 @@ interface CachedResponse {
 
 /**
  * A `fetch` that caches every GET answer (redirects and errors too) on disk, so a rerun replays
- * the same bytes. `--retry-errors` refetches cached network errors, 429, and 5xx answers.
+ * the same bytes. A miss goes through the DNS-checked Node fetcher (`nodeFetch`), so no hop
+ * reaches a private address. `--retry-errors` refetches cached network errors, 429, and 5xx
+ * answers.
  */
 export function cachingFetch(
   cacheDirectory: string,
   retryErrors: boolean,
-  refresh: ReadonlySet<string> = new Set()
+  refresh: ReadonlySet<string> = new Set(),
+  network: typeof fetch = nodeFetch
 ): typeof fetch {
   mkdirSync(cacheDirectory, { recursive: true })
   const limit = limiter(4, 32)
@@ -160,7 +404,7 @@ export function cachingFetch(
     if (!cached) {
       cached = await limit(new URL(url).host, async () => {
         try {
-          const response = await fetch(url, init)
+          const response = await network(url, init)
           const headers: Record<string, string> = {}
           for (const name of ['content-type', 'location']) {
             const value = response.headers.get(name)
@@ -174,6 +418,8 @@ export function cachingFetch(
           }
         } catch (error) {
           const name = error instanceof Error ? error.name : ''
+          if (name === 'RestrictedAddressError')
+            return { error: 'restricted', headers: {}, status: 0 }
           return {
             error: name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'unreachable',
             headers: {},
@@ -185,7 +431,12 @@ export function cachingFetch(
     }
     if (cached.error) {
       throw Object.assign(new Error(cached.error), {
-        name: cached.error === 'timeout' ? 'TimeoutError' : 'TypeError'
+        name:
+          cached.error === 'timeout'
+            ? 'TimeoutError'
+            : cached.error === 'restricted'
+              ? 'RestrictedAddressError'
+              : 'TypeError'
       })
     }
     const body = cached.body ? Buffer.from(cached.body, 'base64') : null
@@ -246,11 +497,7 @@ function readRepoImage(source: string): Resolution {
   }
 }
 
-function hostedEntry(
-  resolution: Extract<Resolution, { ok: true }>,
-  kind: MediaKind,
-  slug: string
-): HostedEntry {
+function hostedEntry(resolution: Resolved, kind: MediaKind, slug: string): HostedEntry {
   const { image } = resolution
   return {
     bytes: image.body.byteLength,
@@ -263,6 +510,21 @@ function hostedEntry(
   }
 }
 
+/** A row that is already hosted, as the manifest repeats it (its object is in the bucket). */
+function alreadyHosted(row: CatalogMediaRow): HostedEntry | null {
+  if (!row.media_key || !isListingMediaKey(row.media_key)) return null
+  if (!row.sha256 || !row.content_type || !row.bytes || !row.width || !row.height) return null
+  return {
+    bytes: row.bytes,
+    contentType: row.content_type,
+    height: row.height,
+    key: row.media_key,
+    sha256: row.sha256,
+    source: row.url,
+    width: row.width
+  }
+}
+
 export interface MigrationResult {
   manifests: Array<{ file: string; text: string }>
   outcomes: ListingOutcome[]
@@ -270,36 +532,24 @@ export interface MigrationResult {
   report: string
 }
 
+interface SiteImages {
+  icon: Resolved | null
+  iconReason: string
+  page: string
+  refused: string[]
+  social: Resolved | null
+  socialReason: string
+}
+
 export async function migrateLegacyMedia(options: {
   fetcher: typeof fetch
   limit?: number
   listingsPerManifest?: number
+  snapshot?: CatalogSnapshot
 }): Promise<MigrationResult> {
   const perManifest = options.listingsPerManifest ?? LISTINGS_PER_MANIFEST
-  const database = new DatabaseSync(':memory:')
-  for (const migration of freshMigrationNames()) {
-    database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
-  }
-  database.exec(readReviewedImportSql(readParityReport()))
-  const state = database
-    .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
-    .get() as {
-    checksum: string
-    version: number
-  }
-  const listings = (
-    database
-      .prepare(
-        `SELECT DISTINCT l.id, l.slug, l.website FROM listings l
-         JOIN listing_media m ON m.listing_id = l.id AND m.kind IN ('logo','image')
-         ORDER BY l.slug`
-      )
-      .all() as unknown as ListingRow[]
-  ).slice(0, options.limit)
-  const rowsFor = database.prepare(
-    `SELECT listing_id, kind, url, sort_order FROM listing_media
-     WHERE listing_id = ? AND kind IN ('logo','image') ORDER BY kind, sort_order`
-  )
+  const snapshot = options.snapshot ?? importSnapshot()
+  const listings = snapshot.listings.slice(0, options.limit)
 
   const fetchOptions = { fetcher: options.fetcher, userAgent: USER_AGENT }
   const resolved = new Map<string, Promise<Resolution>>()
@@ -307,61 +557,91 @@ export async function migrateLegacyMedia(options: {
     const cacheKey = `${source}\0${minPixels ?? 0}`
     let pending = resolved.get(cacheKey)
     if (!pending) {
-      pending = source.startsWith('repo:')
-        ? Promise.resolve(readRepoImage(source))
-        : fetchImage(source, { ...fetchOptions, minPixels }).then(result =>
-            result.ok
-              ? { image: result, ok: true as const, source: result.url }
-              : { ok: false as const, reason: (result as MediaFailure).code }
-          )
+      pending = (
+        source.startsWith('repo:')
+          ? Promise.resolve(readRepoImage(source))
+          : fetchImage(source, { ...fetchOptions, minPixels }).then(result =>
+              result.ok
+                ? { image: result, ok: true as const, source: result.url }
+                : { ok: false as const, reason: (result as MediaFailure).code }
+            )
+      ).then(result =>
+        result.ok && DEFAULT_ASSETS[result.image.sha256]
+          ? { ok: false as const, reason: `default asset: ${DEFAULT_ASSETS[result.image.sha256]}` }
+          : result
+      )
       resolved.set(cacheKey, pending)
     }
     return pending
   }
 
+  const readPage = (url: string) =>
+    safeFetch(url, {
+      accept: type => type === 'text/html' || type === 'application/xhtml+xml',
+      acceptHeader: 'text/html,application/xhtml+xml',
+      fetcher: options.fetcher,
+      // Some product pages inline megabytes before </head>; the metadata is near the top.
+      maxBytes: 5_000_000,
+      userAgent: USER_AGENT,
+      webPortsOnly: true
+    })
+
   /** The product's own page: the listing website, past a shortener's meta refresh. */
-  const productPage = async (website: string, slug: string) => {
-    const read = (url: string) =>
-      safeFetch(url, {
-        accept: type => type === 'text/html' || type === 'application/xhtml+xml',
-        acceptHeader: 'text/html,application/xhtml+xml',
-        fetcher: options.fetcher,
-        // Some product pages inline megabytes before </head>; the metadata is near the top.
-        maxBytes: 5_000_000,
-        userAgent: USER_AGENT
-      })
-    let page = await read(website)
+  const productPage = async (listing: CatalogListing) => {
+    let page = await readPage(listing.website)
     for (let hop = 0; page.ok && hop < 2; hop += 1) {
       const target = metaRefreshUrl(new TextDecoder().decode(page.body), page.url)
       if (!target) break
-      page = await read(target)
+      page = await readPage(target)
     }
     // A shortener page is never the product's (its icon would be the shortener's), and a dead
     // short link may still have a live product: the slug is the product's domain.
-    const isDomain = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/u.test(slug)
-    const shortener = (url: string) => new URL(url).host === 'serp.ly'
-    if (isDomain && (page.ok ? shortener(page.url) : shortener(website))) {
-      page = await read(`https://${slug}/`)
+    const isDomain = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/u.test(listing.slug)
+    const shortener = (url: string) => SHORTENER_HOSTS.has(new URL(url).host)
+    if (isDomain && (page.ok ? shortener(page.url) : shortener(listing.website))) {
+      page = await readPage(`https://${listing.slug}/`)
     }
     return page
   }
 
-  /** The product site's icon and social image (submit v2's prefill logic), once per listing. */
-  const siteImages = async (website: string, slug: string) => {
-    const page = await productPage(website, slug)
-    if (!page.ok) return { icon: null, reason: `site ${page.code}`, social: null }
-    if (new URL(page.url).host === 'serp.ly') {
-      return { icon: null, reason: 'site is a serp.ly page', social: null }
-    }
-    const metadata = parseSiteMetadata(new TextDecoder().decode(page.body), page.url)
-    let icon: Extract<Resolution, { ok: true }> | null = null
+  /**
+   * The product site's icon and social image (submit v2's prefill logic), once per listing, only
+   * from a page the listing owns and that is not parked, for sale, gambling, or spam.
+   */
+  const siteImages = async (listing: CatalogListing): Promise<SiteImages> => {
+    const none = (page: string, reason: string, refused: string[] = []): SiteImages => ({
+      icon: null,
+      iconReason: reason,
+      page,
+      refused,
+      social: null,
+      socialReason: reason
+    })
+    const page = await productPage(listing)
+    if (!page.ok) return none('', `site ${page.code}`)
+    if (SHORTENER_HOSTS.has(new URL(page.url).host)) return none(page.url, 'site is a short link')
+    const html = new TextDecoder().decode(page.body)
+    const refused = pageFlags({ html, url: page.url })
+    const domain = registrableDomain(page.url)
+    const serpApp = new URL(page.url).hostname === SERP_APP_HOST
+    if (!serpApp && !ownDomains(listing).has(domain)) refused.unshift(`off-domain page ${domain}`)
+    if (refused.length > 0) return none(page.url, 'site refused', refused)
+
+    const metadata = parseSiteMetadata(html, page.url)
     // Only https sources, as at submit v2's intake: the upload fetches them again.
     const secure = (url: string) => url.startsWith('https://')
-    for (const candidate of iconCandidates(metadata, page.url, {
-      fallbacks: ['/apple-touch-icon.png', '/favicon.ico'],
-      minPixels: MIN_ICON_PIXELS,
-      vector: false
-    })
+    let icon: Resolved | null = null
+    let iconReason = serpApp
+      ? 'SERP app page: its icon is SERP Apps’, not the app’s'
+      : 'site has no hostable icon of 64 px or more'
+    for (const candidate of (serpApp
+      ? []
+      : iconCandidates(metadata, page.url, {
+          fallbacks: ['/apple-touch-icon.png', '/favicon.ico'],
+          minPixels: MIN_ICON_PIXELS,
+          vector: false
+        })
+    )
       .filter(secure)
       .slice(0, 5)) {
       const result = await resolveSource(candidate, MIN_ICON_PIXELS)
@@ -369,90 +649,154 @@ export async function migrateLegacyMedia(options: {
         icon = result
         break
       }
+      if (result.reason.startsWith('default asset')) iconReason = `site icon is a ${result.reason}`
     }
-    const social =
-      metadata.socialImage && secure(metadata.socialImage)
-        ? await resolveSource(metadata.socialImage, MIN_SOCIAL_IMAGE_PIXELS)
-        : null
-    return {
-      icon,
-      reason: icon ? '' : 'site has no hostable icon',
-      social: social?.ok ? social : null
+    let social: Resolved | null = null
+    let socialReason = 'site has no hostable social image'
+    if (metadata.socialImage && secure(metadata.socialImage)) {
+      // Adult listings take only SERP's own curated screenshot (apps.serp.co, store-new).
+      const curated = serpApp && new URL(metadata.socialImage).host === SERP_APP_HOST
+      if (listing.adult && !curated) {
+        socialReason = 'adult listing: only a SERP-curated screenshot is used'
+      } else {
+        const result = await resolveSource(metadata.socialImage, MIN_SOCIAL_IMAGE_PIXELS)
+        if (result.ok) social = result
+        else socialReason = `social image ${result.reason}`
+      }
+    } else if (listing.adult) {
+      socialReason = 'adult listing: only a SERP-curated screenshot is used'
     }
+    return { icon, iconReason, page: page.url, refused: [], social, socialReason }
   }
 
-  const sourceCounts = new Map<string, { failed: number; hosted: number; rows: number }>()
-  const count = (source: SourceClass, ok: boolean) => {
-    const entry = sourceCounts.get(source) ?? { failed: 0, hosted: 0, rows: 0 }
-    entry.rows += 1
-    if (ok) entry.hosted += 1
-    else entry.failed += 1
-    sourceCounts.set(source, entry)
-  }
-  const failureReasons = new Map<string, number>()
   const objects = new Map<string, HostedEntry>()
-  const operations: Array<Record<string, unknown>> = []
+  const operations: Array<Record<string, unknown> & { slug: string }> = []
   const outcomes: ListingOutcome[] = []
+  const rowSources = new Map<string, { failed: number; hosted: number; rows: number }>()
+  const rowReasons = new Map<string, number>()
+  const tally = <K>(map: Map<K, number>, key: K) => map.set(key, (map.get(key) ?? 0) + 1)
 
-  const work = async (listing: ListingRow) => {
-    const rows = rowsFor.all(listing.id) as unknown as MediaRow[]
-    const results = await Promise.all(rows.map(row => resolveSource(sourceFor(row.url))))
+  const work = async (listing: CatalogListing) => {
+    const rows = snapshot.rows(listing.id)
+    const results = await Promise.all(
+      rows.map(async (row): Promise<Resolution | { hosted: HostedEntry; ok: true }> => {
+        const hosted = alreadyHosted(row)
+        if (hosted) return { hosted, ok: true }
+        return resolveSource(sourceFor(row.url))
+      })
+    )
+    const outcome: ListingOutcome = {
+      adult: listing.adult,
+      defaults: [],
+      images: { kind: 'none' },
+      logo: { kind: 'none' },
+      slug: listing.slug
+    }
     rows.forEach((row, index) => {
       const result = results[index]
-      count(classifySource(row.url), Boolean(result?.ok))
+      if (result && 'hosted' in result) return
+      const source = classifySource(row.url)
+      const entry = rowSources.get(source) ?? { failed: 0, hosted: 0, rows: 0 }
+      entry.rows += 1
+      if (result?.ok) entry.hosted += 1
+      else entry.failed += 1
+      rowSources.set(source, entry)
       if (result && !result.ok) {
-        failureReasons.set(result.reason, (failureReasons.get(result.reason) ?? 0) + 1)
+        tally(rowReasons, result.reason.startsWith('default asset') ? result.reason : result.reason)
+        if (result.reason.startsWith('default asset')) outcome.defaults.push(row.kind)
       }
     })
     const logoIndex = rows.findIndex(row => row.kind === 'logo')
     const imageIndexes = rows.flatMap((row, index) => (row.kind === 'image' ? [index] : []))
-    let logo = logoIndex >= 0 ? results[logoIndex] : undefined
-    let images = imageIndexes
-      .map(index => results[index])
-      .filter((result): result is Extract<Resolution, { ok: true }> => Boolean(result?.ok))
-    const outcome: ListingOutcome = {
-      images: { dropped: imageIndexes.length - images.length, hosted: 0, replaced: false },
-      logo: logoIndex < 0 ? 'none' : logo?.ok ? 'hosted' : 'dropped',
-      slug: listing.slug
+    const logoResult = logoIndex >= 0 ? results[logoIndex] : undefined
+    const imageResults = imageIndexes.map(index => ({ result: results[index], row: rows[index] }))
+
+    const media: { images?: HostedEntry[]; logo?: HostedEntry } = {}
+    if (logoResult?.ok) {
+      const row = rows[logoIndex]
+      media.logo =
+        'hosted' in logoResult
+          ? logoResult.hosted
+          : hostedEntry(logoResult as Resolved, 'logo', listing.slug)
+      outcome.logo = {
+        kind: 'hosted',
+        source: 'hosted' in logoResult ? 'already hosted' : classifySource(row?.url ?? '')
+      }
     }
-    const needsLogo = logoIndex >= 0 && !logo?.ok
-    const needsImage = imageIndexes.length > 0 && images.length === 0
-    if (needsLogo || needsImage) {
-      const site = await siteImages(listing.website, listing.slug)
-      if (needsLogo) {
-        const deadUrl = rows[logoIndex]?.url ?? ''
-        if (site.icon) {
-          logo = site.icon
-          outcome.logo = 'replaced'
-        } else {
-          outcome.logoReason =
-            KNOWN_DEAD[deadUrl] ?? `${(logo as { reason?: string })?.reason}; ${site.reason}`
+    const keptImages: HostedEntry[] = []
+    const keptSources: Array<SourceClass | 'already hosted'> = []
+    for (const { result, row } of imageResults) {
+      if (!result?.ok) continue
+      keptImages.push(
+        'hosted' in result ? result.hosted : hostedEntry(result as Resolved, 'image', listing.slug)
+      )
+      keptSources.push('hosted' in result ? 'already hosted' : classifySource(row?.url ?? ''))
+    }
+
+    const needsLogo = logoIndex >= 0 && !logoResult?.ok
+    const needsImage = imageIndexes.length > 0 && keptImages.length === 0
+    let site: SiteImages | null = null
+    if (needsLogo || needsImage) site = await siteImages(listing)
+    if (site && site.refused.length > 0)
+      outcome.refused = { page: site.page, reasons: site.refused }
+
+    if (needsLogo) {
+      const deadUrl = rows[logoIndex]?.url ?? ''
+      const importReason = (logoResult as { reason?: string } | undefined)?.reason ?? 'dead'
+      if (site?.icon) {
+        media.logo = hostedEntry(site.icon, 'logo', listing.slug)
+        outcome.logo = {
+          kind: 'replaced',
+          pixels: Math.min(site.icon.image.width, site.icon.image.height),
+          source: new URL(site.icon.source).host
+        }
+      } else {
+        outcome.logo = {
+          kind: 'tile',
+          reason:
+            KNOWN_DEAD[deadUrl] ??
+            `${importReason}; ${site?.refused.length ? `site refused: ${site.refused.join('; ')}` : (site?.iconReason ?? 'no site')}`
         }
       }
-      if (needsImage && site.social) {
-        images = [site.social]
-        outcome.images.replaced = true
+    }
+    if (keptImages.length > 0) {
+      outcome.images = { kind: 'kept', sources: keptSources }
+    } else if (needsImage) {
+      if (site?.social) {
+        keptImages.push(hostedEntry(site.social, 'image', listing.slug))
+        outcome.images = {
+          from: new URL(site.page).hostname === SERP_APP_HOST ? 'serp-app' : 'site',
+          kind: 'replaced',
+          source: new URL(site.social.source).host
+        }
+      } else {
+        outcome.images = {
+          kind: 'dropped',
+          reason: site?.refused.length ? 'site refused' : (site?.socialReason ?? 'no site')
+        }
       }
     }
-    const media: { images?: HostedEntry[]; logo?: HostedEntry } = {}
-    if (logo?.ok) media.logo = hostedEntry(logo, 'logo', listing.slug)
     const hostedImages = new Map<string, HostedEntry>()
-    for (const image of images) {
-      const entry = hostedEntry(image, 'image', listing.slug)
+    for (const entry of keptImages)
       if (!hostedImages.has(entry.key)) hostedImages.set(entry.key, entry)
-    }
     if (hostedImages.size) media.images = [...hostedImages.values()]
-    outcome.images.hosted = hostedImages.size
+    // Rows already hosted are in the bucket; only new objects go into the upload plan.
+    const alreadyInBucket = new Set(rows.flatMap(row => (row.media_key ? [row.media_key] : [])))
     for (const entry of [media.logo, ...(media.images ?? [])]) {
-      if (entry) objects.set(entry.key, entry)
+      if (entry && !alreadyInBucket.has(entry.key)) objects.set(entry.key, entry)
     }
-    operations.push({
-      action: 'listing-media-update',
-      id: listing.id,
-      slug: listing.slug,
-      expected: rows.map(row => ({ kind: row.kind, url: row.url })),
-      media
-    })
+    const unchanged =
+      rows.every(row => alreadyHosted(row)) &&
+      rows.length === (media.logo ? 1 : 0) + (media.images?.length ?? 0)
+    if (!unchanged) {
+      operations.push({
+        action: 'listing-media-update',
+        id: listing.id,
+        slug: listing.slug,
+        expected: rows.map(row => ({ kind: row.kind, url: row.url, key: row.media_key ?? null })),
+        media
+      })
+    }
     outcomes.push(outcome)
   }
 
@@ -467,47 +811,37 @@ export async function migrateLegacyMedia(options: {
       }
     })
   )
-  operations.sort((a, b) => String(a.slug).localeCompare(String(b.slug)))
-  outcomes.sort((a, b) => a.slug.localeCompare(b.slug))
+  operations.sort((a, b) => codePointCompare(a.slug, b.slug))
+  outcomes.sort((a, b) => codePointCompare(a.slug, b.slug))
 
-  // Chained manifests: each one's base is the state the previous one publishes.
+  // Row-level manifests: each applies on any environment whose listing rows still match.
   const manifests: Array<{ file: string; text: string }> = []
-  let version = state.version
-  let checksum = state.checksum
   const chunks = Math.ceil(operations.length / perManifest)
   for (let index = 0; index < chunks; index += 1) {
     const id = `${MIGRATION_ID}-${String(index + 1).padStart(2, '0')}`
     const header = [
       `# serpcompany/best.serp.co#95, part ${index + 1} of ${chunks}: repoint listing logos and images to`,
       `# hosted copies (scripts/migration/legacy-media.ts). Upload d1/media/${MIGRATION_ID}.json to the`,
-      '# environment first; the publisher refuses keys its media host does not serve. Apply in order,',
-      '# staging first: Publish D1 Catalog (staging), then Publish D1 Catalog after promotion.',
+      '# environment first: the publisher refuses keys its bucket does not hold. Each part checks its',
+      "# listings' rows, not a base version, so the parts apply in any order, staging first.",
       ''
     ].join('\n')
     const body = stringify(
       {
         version: 1,
         id,
-        basePublicationVersion: version,
-        provenance: {
-          actor: 'devinschumacher',
-          workflow: 'github/publish-d1',
-          beforeChecksum: checksum
-        },
+        concurrency: 'rows',
+        provenance: { actor: 'devinschumacher', workflow: 'github/publish-d1' },
         operations: operations.slice(index * perManifest, (index + 1) * perManifest)
       },
       { lineWidth: 0 }
     )
-    const text = `${header}${body}`
-    const inputChecksum = createHash('sha256').update(text).digest('hex')
-    checksum = createHash('sha256').update(`${checksum}\0${inputChecksum}`).digest('hex')
-    version += 1
-    manifests.push({ file: `d1/publications/${id}.yaml`, text })
+    manifests.push({ file: `d1/publications/${id}.yaml`, text: `${header}${body}` })
   }
 
   const plan = {
     id: MIGRATION_ID,
-    objects: [...objects.values()].sort((a, b) => a.key.localeCompare(b.key)),
+    objects: [...objects.values()].sort((a, b) => codePointCompare(a.key, b.key)),
     site: 'best.serp.co',
     version: 1 as const
   }
@@ -515,62 +849,213 @@ export async function migrateLegacyMedia(options: {
     manifests,
     outcomes,
     plan,
-    report: renderReport(outcomes, sourceCounts, failureReasons, plan, manifests.length)
+    report: renderReport({
+      manifests: manifests.length,
+      operations: operations.length,
+      outcomes,
+      plan,
+      rowReasons,
+      rowSources
+    })
   }
 }
 
-function renderReport(
-  outcomes: ListingOutcome[],
-  sources: Map<string, { failed: number; hosted: number; rows: number }>,
-  reasons: Map<string, number>,
-  plan: MigrationResult['plan'],
-  manifestCount: number
-): string {
+function table(header: [string, string], rows: Array<[string, number]>): string[] {
+  return [
+    `| ${header[0]} | ${header[1]} |`,
+    '| --- | --- |',
+    ...rows.map(([a, b]) => `| ${a} | ${b} |`)
+  ]
+}
+
+function counted(values: string[]): Array<[string, number]> {
+  const counts = new Map<string, number>()
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1)
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || codePointCompare(a[0], b[0]))
+}
+
+/** A reason without the per-listing detail, so the report can count it. */
+function reasonClass(reason: string): string {
+  return reason
+    .replace(/off-domain page [^\s;]+/gu, 'off-domain page')
+    .replace(/parking (host|asset) [^\s;]+/gu, 'parking $1')
+    .replace(/\("[^"]*"\)/gu, '')
+    .replace(
+      /site (http_\d+|fetch_timeout|site_unreachable|invalid_target|too_many_redirects|response_too_large|unexpected_type|read_failed|invalid_redirect)/gu,
+      'site unreachable ($1)'
+    )
+    .replace(/\s+/gu, ' ')
+    .replace(/ ;/gu, ';')
+    .trim()
+}
+
+function renderReport(input: {
+  manifests: number
+  operations: number
+  outcomes: ListingOutcome[]
+  plan: MigrationResult['plan']
+  rowReasons: Map<string, number>
+  rowSources: Map<string, { failed: number; hosted: number; rows: number }>
+}): string {
+  const { outcomes, plan } = input
+  const mib = (plan.objects.reduce((total, object) => total + object.bytes, 0) / 1_048_576).toFixed(
+    1
+  )
+  const logos = outcomes.map(outcome => outcome.logo)
+  const replacedLogos = logos.flatMap(logo => (logo.kind === 'replaced' ? [logo] : []))
+  const sizeBand = (pixels: number) =>
+    pixels >= 512
+      ? '512 px or more'
+      : pixels >= 256
+        ? '256–511 px'
+        : pixels >= 128
+          ? '128–255 px'
+          : '64–127 px'
+  const refused = outcomes.filter(outcome => outcome.refused)
+  const curatedReplaced = outcomes.filter(
+    outcome => outcome.images.kind === 'replaced' && outcome.images.from === 'serp-app'
+  )
+  const adultFromSites = outcomes.filter(
+    outcome =>
+      outcome.adult && outcome.images.kind === 'replaced' && outcome.images.from !== 'serp-app'
+  ).length
   const lines = [
     `# Legacy media migration (${MIGRATION_ID})`,
     '',
-    'Generated by `scripts/migration/legacy-media.ts` for serpcompany/best.serp.co#95.',
+    'Generated by `scripts/migration/legacy-media.ts` for serpcompany/best.serp.co#95. Every count',
+    'below is computed from the committed plan and manifests.',
     '',
-    `- Listings with a logo or image in the import: ${outcomes.length}`,
-    `- Objects to upload: ${plan.objects.length} (${(plan.objects.reduce((total, object) => total + object.bytes, 0) / 1_048_576).toFixed(1)} MiB)`,
-    `- Manifests: ${manifestCount} (listing-media-update, chained, ${LISTINGS_PER_MANIFEST} listings each)`,
+    `- Listings with a logo or image: ${outcomes.length}`,
+    `- Listings repointed (operations): ${input.operations}`,
+    `- Objects to upload: ${plan.objects.length} (${mib} MiB)`,
+    `- Manifests: ${input.manifests} (listing-media-update, row-level, ${LISTINGS_PER_MANIFEST} listings each)`,
+    '',
+    '## Objects by format',
+    '',
+    ...table(['Format', 'Objects'], counted(plan.objects.map(object => object.contentType))),
     '',
     '## Imported rows by source',
     '',
-    '| Source | Rows | Fetched and hostable | Dead or unusable |',
+    '| Source | Rows | Fetched and hostable | Dead, unusable, or a default asset |',
     '| --- | --- | --- | --- |',
-    ...[...sources.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
+    ...[...input.rowSources.entries()]
+      .sort(([a], [b]) => codePointCompare(a, b))
       .map(
         ([source, value]) => `| ${source} | ${value.rows} | ${value.hosted} | ${value.failed} |`
       ),
     '',
-    '## Why rows were dead or unusable',
+    '## Why imported rows were dead or unusable',
     '',
-    '| Reason | Rows |',
-    '| --- | --- |',
-    ...[...reasons.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([reason, rows]) => `| ${reason} | ${rows} |`),
-    '',
-    '## Listings after the migration',
-    '',
-    '| Logo | Listings |',
-    '| --- | --- |',
-    ...(['hosted', 'replaced', 'dropped', 'none'] as const).map(
-      kind =>
-        `| ${kind === 'replaced' ? 'replaced from the site icon' : kind === 'dropped' ? 'dropped (fallback tile)' : kind === 'none' ? 'none in the import' : 'hosted from its source'} | ${outcomes.filter(outcome => outcome.logo === kind).length} |`
+    ...table(
+      ['Reason', 'Rows'],
+      [...input.rowReasons.entries()].sort((a, b) => b[1] - a[1] || codePointCompare(a[0], b[0]))
     ),
     '',
-    `- Listings whose featured image came from the site's social image: ${outcomes.filter(outcome => outcome.images.replaced).length}`,
-    `- Listings that had images and keep none: ${outcomes.filter(outcome => outcome.images.hosted === 0 && (outcome.images.dropped > 0 || outcome.images.replaced)).length}`,
-    `- Image rows dropped: ${outcomes.reduce((total, outcome) => total + outcome.images.dropped, 0)}`,
+    '## Logos by source',
     '',
-    '## Logos dropped (fallback tile)',
+    ...table(
+      ['Logo', 'Listings'],
+      counted(
+        logos.map(logo =>
+          logo.kind === 'hosted'
+            ? `hosted from its imported source (${logo.source})`
+            : logo.kind === 'replaced'
+              ? 'replaced from the site icon'
+              : logo.kind === 'tile'
+                ? 'fallback tile'
+                : 'none in the catalog'
+        )
+      )
+    ),
     '',
-    ...outcomes
-      .filter(outcome => outcome.logo === 'dropped')
-      .map(outcome => `- \`${outcome.slug}\`: ${outcome.logoReason ?? 'unknown'}`),
+    `Replacement logos by shorter side (minimum ${MIN_ICON_PIXELS} px):`,
+    '',
+    ...table(['Size', 'Logos'], counted(replacedLogos.map(logo => sizeBand(logo.pixels)))),
+    '',
+    '## Fallback tiles by reason',
+    '',
+    ...table(
+      ['Reason', 'Listings'],
+      counted(
+        logos.flatMap(logo =>
+          logo.kind === 'tile'
+            ? [reasonClass(logo.reason.split('; ').slice(1).join('; ') || logo.reason)]
+            : []
+        )
+      )
+    ),
+    '',
+    '## Featured images by source',
+    '',
+    ...table(
+      ['Featured image', 'Listings'],
+      counted(
+        outcomes.map(outcome => {
+          const images = outcome.images
+          if (images.kind === 'kept') return `kept from the catalog (${images.sources[0]})`
+          if (images.kind === 'replaced') {
+            return images.from === 'serp-app'
+              ? 'replaced from SERP’s curated screenshot (apps.serp.co)'
+              : "replaced from the site's social image"
+          }
+          if (images.kind === 'dropped') return `none left (${reasonClass(images.reason)})`
+          return 'none in the catalog'
+        })
+      )
+    ),
+    '',
+    '## Owner sign-off',
+    '',
+    '### Replacements refused: off-domain, parked, for sale, gambling, or spam',
+    '',
+    `${refused.length} listings. Their dead images were not replaced; they keep the fallback tile`,
+    '(and no featured image) until the owner decides. Listing content is unchanged; #100 covers',
+    'unpublishing hijacked listings.',
+    '',
+    '| Listing | Final page | Why |',
+    '| --- | --- | --- |',
+    ...refused.map(
+      outcome =>
+        `| \`${outcome.slug}\` | ${outcome.refused?.page.replace(/\|/gu, '%7C')} | ${outcome.refused?.reasons.join('; ').replace(/\|/gu, '/')} |`
+    ),
+    '',
+    '### Featured images from SERP’s curated screenshots',
+    '',
+    `${curatedReplaced.length} SERP app listings get the screenshot their apps.serp.co page names`,
+    '(serpcompany/store-new) as their featured image; listings in the Adult category are marked.',
+    `Adult listings with a featured image from any other site: ${adultFromSites} (none is allowed).`,
+    '',
+    ...curatedReplaced.map(outcome => {
+      const object = plan.objects.find(entry =>
+        entry.key.startsWith(`best.serp.co/listings/${outcome.slug}/image/`)
+      )
+      return `- \`${outcome.slug}\`${outcome.adult ? ' (Adult)' : ''}: ${object?.source ?? 'unknown'}`
+    }),
+    '',
+    '### Default assets treated as missing',
+    '',
+    'Wherever they appear: an imported row, or a site icon or social image offered as a',
+    'replacement (the listing then keeps the tile, or no featured image).',
+    '',
+    '| Asset | Imported rows | Replacements refused |',
+    '| --- | --- | --- |',
+    ...Object.entries(DEFAULT_ASSETS).map(([sha, name]) => {
+      const marker = `default asset: ${name}`
+      // A tile's reason is "<imported row>; <site>": only the site part is a refused replacement.
+      const refusedReplacements = outcomes.filter(
+        outcome =>
+          (outcome.logo.kind === 'tile' &&
+            outcome.logo.reason.split('; ').slice(1).join('; ').includes(marker)) ||
+          (outcome.images.kind === 'dropped' && outcome.images.reason.includes(marker))
+      ).length
+      return `| ${name} (\`${sha.slice(0, 12)}\`) | ${input.rowReasons.get(marker) ?? 0} | ${refusedReplacements} |`
+    }),
+    '',
+    '## Logos on the fallback tile',
+    '',
+    ...logos.flatMap((logo, index) =>
+      logo.kind === 'tile' ? [`- \`${outcomes[index]?.slug}\`: ${logo.reason}`] : []
+    ),
     ''
   ]
   return `${lines.join('\n')}\n`
@@ -578,13 +1063,24 @@ function renderReport(
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter(value => value !== '--')
-  const limitIndex = args.indexOf('--limit')
-  const limit = limitIndex >= 0 ? Number(args[limitIndex + 1]) : undefined
-  // `--refresh <upload summary>`: refetch the sources of objects an upload found changed.
-  const refreshIndex = args.indexOf('--refresh')
+  const option = (name: string) => {
+    const index = args.indexOf(name)
+    return index >= 0 ? args[index + 1] : undefined
+  }
+  // `--snapshot-sql <listings|media>`: the read-only query for a `--current` export.
+  const sql = option('--snapshot-sql')
+  if (sql) {
+    if (sql !== 'listings' && sql !== 'media') throw new Error('--snapshot-sql listings|media')
+    console.log(sql === 'listings' ? SNAPSHOT_LISTINGS_SQL : SNAPSHOT_MEDIA_SQL)
+    return
+  }
+  const limit = option('--limit') ? Number(option('--limit')) : undefined
+  const current = option('--current')
+  // `--refresh <upload summary>`: refetch the source of every object an upload reported failed.
   const refresh = new Set<string>()
-  if (refreshIndex >= 0) {
-    const summary = JSON.parse(readFileSync(resolve(args[refreshIndex + 1] ?? ''), 'utf8')) as {
+  const summaryPath = option('--refresh')
+  if (summaryPath) {
+    const summary = JSON.parse(readFileSync(resolve(summaryPath), 'utf8')) as {
       failed: Array<{ key: string }>
     }
     const plan = JSON.parse(readFileSync(resolve(`d1/media/${MIGRATION_ID}.json`), 'utf8')) as {
@@ -601,16 +1097,23 @@ async function main(): Promise<void> {
     args.includes('--retry-errors'),
     refresh
   )
-
-  const result = await migrateLegacyMedia({ fetcher, limit })
+  const result = await migrateLegacyMedia({
+    fetcher,
+    limit,
+    snapshot: current ? currentSnapshot(current) : undefined
+  })
   mkdirSync(resolve('d1/media'), { recursive: true })
   writeFileSync(
     resolve(`d1/media/${MIGRATION_ID}.json`),
     `${JSON.stringify(result.plan, null, 1)}\n`
   )
   writeFileSync(resolve(`d1/media/${MIGRATION_ID}.report.md`), result.report)
+  // A regeneration replaces every part: stale parts from an earlier, larger run are removed.
+  for (const file of readdirSync(resolve('d1/publications'))) {
+    if (file.startsWith(`${MIGRATION_ID}-`)) rmSync(resolve('d1/publications', file))
+  }
   for (const manifest of result.manifests) writeFileSync(resolve(manifest.file), manifest.text)
-  console.log(result.report)
+  console.log(result.report.split('## Owner sign-off')[0])
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
