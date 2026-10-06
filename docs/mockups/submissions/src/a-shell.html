@@ -1,0 +1,313 @@
+<title>Native Submissions Mockups</title>
+<meta name="description" content="Clickable mockups of every screen and email for best.serp.co native submissions (issue #70).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: review console. Screen index rail on the left, the selected screen in a device frame on a quiet stage, review notes under it. */
+:root {
+  --ui-bg: #eef0f3;
+  --ui-panel: #ffffff;
+  --ui-fg: #15171c;
+  --ui-muted: #5b606e;
+  --ui-line: #d9dce3;
+  --ui-accent: #2450c8;
+  --ui-accent-fg: #ffffff;
+  --ui-accent-soft: #e2e8fb;
+  --ui-stage: #e3e6eb;
+  --ui-chrome: #f6f7f9;
+  --ui-chrome-line: #dfe2e8;
+  --ui-pill: #ffffff;
+  --ui-warn: #8a5a00;
+  --font-ui: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ui-bg: #0e0f12;
+    --ui-panel: #16181d;
+    --ui-fg: #ececf0;
+    --ui-muted: #9a9fac;
+    --ui-line: #2a2d35;
+    --ui-accent: #7ea3ff;
+    --ui-accent-fg: #0b1020;
+    --ui-accent-soft: #1c2440;
+    --ui-stage: #090a0c;
+    --ui-chrome: #1b1d22;
+    --ui-chrome-line: #2b2e36;
+    --ui-pill: #23262d;
+    --ui-warn: #f0c060;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ui-bg: #0e0f12;
+  --ui-panel: #16181d;
+  --ui-fg: #ececf0;
+  --ui-muted: #9a9fac;
+  --ui-line: #2a2d35;
+  --ui-accent: #7ea3ff;
+  --ui-accent-fg: #0b1020;
+  --ui-accent-soft: #1c2440;
+  --ui-stage: #090a0c;
+  --ui-chrome: #1b1d22;
+  --ui-chrome-line: #2b2e36;
+  --ui-pill: #23262d;
+  --ui-warn: #f0c060;
+  color-scheme: dark;
+}
+html, body { background: var(--ui-bg); color: var(--ui-fg); }
+body { font-family: var(--font-ui); font-size: 14px; -webkit-font-smoothing: antialiased; }
+
+/* best.serp.co tokens, copied from packages/design-system/styles/globals.css, scoped to the mockup frame */
+.site {
+  --background: 0 0% 99%; --foreground: 240 10% 4%;
+  --card: 0 0% 100%; --card-foreground: 240 10% 4%;
+  --popover: 0 0% 100%; --popover-foreground: 240 10% 4%;
+  --primary: 240 6% 10%; --primary-foreground: 0 0% 98%;
+  --secondary: 240 5% 96%; --secondary-foreground: 240 6% 10%;
+  --muted: 240 5% 96%; --muted-foreground: 240 4% 46%;
+  --accent: 240 5% 94%; --accent-foreground: 240 6% 10%;
+  --destructive: 0 84% 60%; --destructive-foreground: 0 0% 98%;
+  --border: 240 6% 90%; --input: 240 6% 90%; --ring: 240 6% 10%;
+  --radius: 0.5rem;
+  --sidebar-background: 240 5% 98%; --sidebar-foreground: 240 5% 26%;
+  --sidebar-primary: 240 6% 10%; --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 240 5% 95%; --sidebar-accent-foreground: 240 6% 10%;
+  --sidebar-border: 240 6% 90%; --sidebar-ring: 240 6% 10%;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.5;
+  position: relative;
+  overflow: hidden;
+}
+.site.dark {
+  --background: 0 0% 3.9%; --foreground: 0 0% 98%;
+  --card: 0 0% 3.9%; --card-foreground: 0 0% 98%;
+  --popover: 0 0% 3.9%; --popover-foreground: 0 0% 98%;
+  --primary: 0 0% 98%; --primary-foreground: 0 0% 9%;
+  --secondary: 0 0% 14.9%; --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 14.9%; --muted-foreground: 0 0% 63.9%;
+  --accent: 0 0% 14.9%; --accent-foreground: 0 0% 98%;
+  --destructive: 0 72% 50%; --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 14.9%; --input: 0 0% 14.9%; --ring: 0 0% 83.1%;
+  --sidebar-background: 240 5.9% 10%; --sidebar-foreground: 240 4.8% 95.9%;
+  --sidebar-primary: 224.3 76.3% 48%; --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 240 3.7% 15.9%; --sidebar-accent-foreground: 240 4.8% 95.9%;
+  --sidebar-border: 240 3.7% 15.9%; --sidebar-ring: 217.2 91.2% 59.8%;
+  color-scheme: dark;
+}
+.site { container-type: inline-size; }
+/* scoped preflight (Tailwind's preflight is off so it cannot touch the review console) */
+.site *, .site ::before, .site ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: hsl(var(--border)); }
+.site h1, .site h2, .site h3, .site h4, .site h5, .site p, .site ul, .site ol, .site figure, .site blockquote, .site pre, .site dl, .site dd { margin: 0; }
+.site h1, .site h2, .site h3, .site h4, .site h5 { font-size: inherit; font-weight: inherit; }
+.site ul, .site ol { list-style: none; padding: 0; }
+.site button, .site input, .site select, .site textarea { font: inherit; color: inherit; margin: 0; background: transparent; letter-spacing: inherit; }
+.site button, .site [role="button"] { cursor: pointer; padding: 0; }
+.site a { color: inherit; text-decoration: inherit; }
+.site img, .site svg, .site video { display: block; vertical-align: middle; }
+.site img { max-width: 100%; height: auto; }
+.site table { border-collapse: collapse; text-indent: 0; border-color: inherit; }
+.site textarea { resize: vertical; }
+.site input::placeholder, .site textarea::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }
+.site hr { height: 0; color: inherit; border-top-width: 1px; margin: 0; }
+.site fieldset { margin: 0; padding: 0; min-width: 0; }
+.site legend { padding: 0; }
+.site summary { list-style-position: inside; }
+.site small { font-size: 80%; }
+.site b, .site strong { font-weight: 700; }
+.site .font-mono, .site code, .site pre, .site kbd { font-family: var(--font-mono); }
+.site .grid-bg { background-image: linear-gradient(to right, #8080800a 1px, transparent 1px), linear-gradient(to bottom, #8080800a 1px, transparent 1px); background-size: 32px 32px; }
+.site .caret { animation: caret-blink 1.25s ease-out infinite; }
+@keyframes caret-blink { 0%, 70%, 100% { opacity: 1 } 20%, 50% { opacity: 0 } }
+@media (prefers-reduced-motion: reduce) { .site .caret, .site .animate-spin, .site .animate-pulse { animation: none !important; } }
+.site a { cursor: pointer; }
+.site pre.code { background: #0a0a0a; color: #e5e5e5; }
+
+/* ---------- review console ---------- */
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 30;
+  display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap;
+  padding: 10px 20px; background: color-mix(in srgb, var(--ui-panel) 92%, transparent);
+  backdrop-filter: blur(10px); border-bottom: 1px solid var(--ui-line);
+}
+.brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; margin-right: auto; }
+.brand b { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
+.brand span { font: 500 12px/1 var(--font-mono); color: var(--ui-muted); white-space: nowrap; }
+.ctrls { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.ctrl { display: flex; align-items: center; gap: 8px; }
+.ctrl > label, .ctrl > .lbl { font: 600 11px/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ui-muted); }
+.seg { display: inline-flex; border: 1px solid var(--ui-line); border-radius: 8px; padding: 2px; background: var(--ui-bg); }
+.seg button { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 6px; font: 500 13px/1.2 var(--font-ui); color: var(--ui-muted); }
+.seg button svg { width: 15px; height: 15px; }
+.seg button[aria-pressed="true"] { background: var(--ui-panel); color: var(--ui-fg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+.seg button:focus-visible, .chipbtn:focus-visible, .rail a:focus-visible, .navbtn:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.check { display: inline-flex; align-items: center; gap: 6px; font: 500 13px/1 var(--font-ui); color: var(--ui-muted); cursor: pointer; }
+.check input { accent-color: var(--ui-accent); width: 15px; height: 15px; }
+
+.layout { display: grid; grid-template-columns: 272px minmax(0, 1fr); min-height: calc(100vh - 56px); }
+.rail { border-right: 1px solid var(--ui-line); background: var(--ui-panel); padding: 18px 12px 40px; position: sticky; top: 56px; align-self: start; max-height: calc(100vh - 56px); overflow-y: auto; }
+.rail h2 { font: 600 11px/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em; color: var(--ui-muted); margin: 18px 10px 8px; }
+.rail h2:first-child { margin-top: 4px; }
+.rail a { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 2px 8px; padding: 7px 10px; border-radius: 8px; color: var(--ui-fg); text-decoration: none; }
+.rail a:hover { background: var(--ui-bg); }
+.rail a[aria-current="true"] { background: var(--ui-accent-soft); }
+.rail a[aria-current="true"] .num { background: var(--ui-accent); color: var(--ui-accent-fg); border-color: var(--ui-accent); }
+.rail .num { grid-row: span 2; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--ui-line); font: 600 12px/1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ui-muted); }
+.rail .t { font-weight: 600; font-size: 13.5px; line-height: 1.25; }
+.rail .r { font: 400 11.5px/1.3 var(--font-mono); color: var(--ui-muted); grid-column: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail .cnt { grid-row: 1 / span 2; grid-column: 3; font: 500 11px/1 var(--font-mono); color: var(--ui-muted); }
+.rail .new, .eyebrow .new { display: inline-block; margin-left: 6px; padding: 2px 6px; border-radius: 999px; background: var(--ui-accent); color: var(--ui-accent-fg); font: 600 10px/1.2 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
+.rail .foot { margin: 22px 10px 0; padding-top: 14px; border-top: 1px solid var(--ui-line); font-size: 12px; line-height: 1.5; color: var(--ui-muted); }
+.rail .foot kbd { font: 500 11px/1 var(--font-mono); border: 1px solid var(--ui-line); border-bottom-width: 2px; border-radius: 4px; padding: 2px 5px; background: var(--ui-bg); color: var(--ui-fg); }
+
+.main { min-width: 0; padding: 22px 28px 64px; display: flex; flex-direction: column; gap: 16px; }
+.shead { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 18px; }
+.shead .ttl { min-width: 0; margin-right: auto; }
+.eyebrow { font: 600 11px/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em; color: var(--ui-muted); }
+.shead h1 { margin: 6px 0 0; font-size: 24px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; text-wrap: balance; }
+.shead h1 code { font: 500 0.72em/1 var(--font-mono); color: var(--ui-muted); margin-left: 8px; letter-spacing: 0; }
+.navbtns { display: flex; gap: 6px; }
+.navbtn { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--ui-line); border-radius: 8px; background: var(--ui-panel); font: 500 13px/1.2 var(--font-ui); color: var(--ui-fg); }
+.navbtn svg { width: 15px; height: 15px; }
+.navbtn[disabled] { opacity: 0.4; cursor: default; }
+.mobile-pick { display: none; width: 100%; }
+.mobile-pick select { width: 100%; font: 500 14px/1.2 var(--font-ui); padding: 9px 10px; border-radius: 8px; border: 1px solid var(--ui-line); background: var(--ui-panel); color: var(--ui-fg); }
+
+.states { display: flex; flex-wrap: wrap; gap: 6px; }
+.chipbtn { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--ui-line); background: var(--ui-panel); font: 500 13px/1.2 var(--font-ui); color: var(--ui-fg); }
+.chipbtn .k { font: 600 11px/1 var(--font-mono); color: var(--ui-muted); }
+.chipbtn[aria-pressed="true"] { background: var(--ui-fg); color: var(--ui-bg); border-color: var(--ui-fg); }
+.chipbtn[aria-pressed="true"] .k { color: inherit; opacity: 0.7; }
+.chipbtn.extra { border-style: dashed; }
+.chipbtn.r4 { border-color: var(--ui-warn); }
+.chipbtn .r4tag { font: 600 10px/1.2 var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 999px; background: var(--ui-warn); color: var(--ui-panel); }
+.rail .new.r4 { background: var(--ui-warn); color: var(--ui-panel); }
+
+.stage { background: var(--ui-stage); border: 1px solid var(--ui-line); border-radius: 14px; padding: 24px; display: flex; justify-content: center; overflow: hidden; }
+.device { flex: none; background: var(--ui-chrome); border: 1px solid var(--ui-chrome-line); box-shadow: 0 18px 50px -24px rgb(0 0 0 / 0.35), 0 2px 6px rgb(0 0 0 / 0.06); }
+.device.desktop { border-radius: 12px; overflow: hidden; }
+.device.mobile { border-radius: 34px; padding: 10px; background: #111214; border-color: #2a2b2f; overflow: hidden; }
+.device.mobile .chrome { border-radius: 24px 24px 0 0; }
+.device.mobile .viewport { border-radius: 0 0 24px 24px; overflow: hidden; }
+.chrome { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: var(--ui-chrome); border-bottom: 1px solid var(--ui-chrome-line); }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 11px; height: 11px; border-radius: 50%; background: var(--ui-line); display: block; }
+.url { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 7px; background: var(--ui-pill); border: 1px solid var(--ui-chrome-line); font: 400 12.5px/1.2 var(--font-mono); color: var(--ui-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.url b { color: var(--ui-fg); font-weight: 500; }
+.url svg { width: 12px; height: 12px; flex: none; }
+.device.mobile .dots { display: none; }
+.device.mobile .chrome { padding: 8px 10px; }
+
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.note { background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+.note h3 { margin: 0 0 10px; font: 600 11px/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.1em; color: var(--ui-muted); }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; line-height: 1.5; font-size: 13.5px; }
+.note p { margin: 0; line-height: 1.55; font-size: 13.5px; }
+.note code { font: 500 12px/1 var(--font-mono); background: var(--ui-bg); border: 1px solid var(--ui-line); border-radius: 4px; padding: 1px 5px; }
+.note .q { color: var(--ui-warn); font-weight: 600; }
+.note.approve { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.note.approve p { flex: 1 1 320px; }
+.note.approve code { font-size: 12.5px; }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .rail { display: none; }
+  .mobile-pick { display: block; }
+  .main { padding: 16px 16px 48px; }
+  .topbar { padding: 10px 16px; }
+  .stage { padding: 12px; border-radius: 10px; }
+}
+</style>
+
+<script src="https://cdn.tailwindcss.com/3.4.16?plugins=container-queries"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  important: '.site',
+  corePlugins: { preflight: false },
+  theme: {
+    containers: { sm: '640px', md: '768px', lg: '1024px', xl: '1280px' },
+    extend: {
+      colors: {
+        border: 'hsl(var(--border) / <alpha-value>)',
+        input: 'hsl(var(--input) / <alpha-value>)',
+        ring: 'hsl(var(--ring) / <alpha-value>)',
+        background: 'hsl(var(--background) / <alpha-value>)',
+        foreground: 'hsl(var(--foreground) / <alpha-value>)',
+        primary: { DEFAULT: 'hsl(var(--primary) / <alpha-value>)', foreground: 'hsl(var(--primary-foreground) / <alpha-value>)' },
+        secondary: { DEFAULT: 'hsl(var(--secondary) / <alpha-value>)', foreground: 'hsl(var(--secondary-foreground) / <alpha-value>)' },
+        destructive: { DEFAULT: 'hsl(var(--destructive) / <alpha-value>)', foreground: 'hsl(var(--destructive-foreground) / <alpha-value>)' },
+        muted: { DEFAULT: 'hsl(var(--muted) / <alpha-value>)', foreground: 'hsl(var(--muted-foreground) / <alpha-value>)' },
+        accent: { DEFAULT: 'hsl(var(--accent) / <alpha-value>)', foreground: 'hsl(var(--accent-foreground) / <alpha-value>)' },
+        card: { DEFAULT: 'hsl(var(--card) / <alpha-value>)', foreground: 'hsl(var(--card-foreground) / <alpha-value>)' },
+        popover: { DEFAULT: 'hsl(var(--popover) / <alpha-value>)', foreground: 'hsl(var(--popover-foreground) / <alpha-value>)' },
+        sidebar: {
+          DEFAULT: 'hsl(var(--sidebar-background) / <alpha-value>)',
+          foreground: 'hsl(var(--sidebar-foreground) / <alpha-value>)',
+          primary: 'hsl(var(--sidebar-primary) / <alpha-value>)',
+          'primary-foreground': 'hsl(var(--sidebar-primary-foreground) / <alpha-value>)',
+          accent: 'hsl(var(--sidebar-accent) / <alpha-value>)',
+          'accent-foreground': 'hsl(var(--sidebar-accent-foreground) / <alpha-value>)',
+          border: 'hsl(var(--sidebar-border) / <alpha-value>)',
+          ring: 'hsl(var(--sidebar-ring) / <alpha-value>)'
+        }
+      },
+      boxShadow: { xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)' },
+      borderRadius: { xs: '2px', lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)', xl: 'calc(var(--radius) + 4px)' },
+      fontFamily: {
+        sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace']
+      }
+    }
+  }
+}
+</script>
+
+<div class="topbar">
+  <div class="brand"><b>Native submissions · mockups</b><span>#70 · revision 5 · draft copy</span></div>
+  <div class="ctrls">
+    <div class="ctrl"><span class="lbl" id="vpLbl">Width</span>
+      <div class="seg" role="group" aria-labelledby="vpLbl" id="vpSeg">
+        <button type="button" data-vp="desktop" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>Desktop</button>
+        <button type="button" data-vp="mobile" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>Mobile</button>
+      </div>
+    </div>
+    <div class="ctrl"><span class="lbl" id="thLbl">Site theme</span>
+      <div class="seg" role="group" aria-labelledby="thLbl" id="thSeg">
+        <button type="button" data-th="auto" aria-pressed="true">Auto</button>
+        <button type="button" data-th="light" aria-pressed="false">Light</button>
+        <button type="button" data-th="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="footerToggle"> Site footer</label>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="rail" id="rail" aria-label="Screen index"></nav>
+  <div class="main">
+    <div class="mobile-pick"><label class="eyebrow" for="screenSelect" style="display:block;margin-bottom:6px">Screen</label><select id="screenSelect"></select></div>
+    <div class="shead">
+      <div class="ttl">
+        <div class="eyebrow" id="sEyebrow">Screen 1 of 15</div>
+        <h1 id="sTitle">Sign in</h1>
+      </div>
+      <div class="navbtns">
+        <button type="button" class="navbtn" id="prevBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Prev</button>
+        <button type="button" class="navbtn" id="nextBtn">Next<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+      </div>
+    </div>
+    <div class="states" id="states" role="group" aria-label="States"></div>
+    <div class="stage" id="stage">
+      <div class="device desktop" id="device">
+        <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url" id="url"></div></div>
+        <div class="viewport"><div class="site @container" id="frame"></div></div>
+      </div>
+    </div>
+    <section class="notes" id="notes" aria-label="Review notes"></section>
+  </div>
+</div>
