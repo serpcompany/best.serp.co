@@ -3,7 +3,8 @@
  * the badge check reads the same characters Chromium shows. The WHATWG encoding sniffing
  * algorithm, without the parts that need a renderer:
  * 1. a byte order mark (UTF-8, UTF-16BE, UTF-16LE);
- * 2. the `charset` of the `Content-Type` header;
+ * 2. the `charset` of the `Content-Type` header, read as Fetch's "extract a MIME type" reads
+ *    it (`extractMimeType`);
  * 3. a `<meta charset>` or `<meta http-equiv="content-type">` in the first 1024 bytes (the
  *    prescan), where UTF-16 means UTF-8 and `x-user-defined` means windows-1252;
  * 4. otherwise UTF-8.
@@ -11,6 +12,10 @@
  * encoding's `TextDecoder` (workerd and Node support every WHATWG encoding). A page whose
  * encoding is `replacement` (ISO-2022-KR, ISO-2022-CN, HZ-GB-2312), which a browser shows as
  * a single U+FFFD, or one this runtime can't decode, returns null: the caller fails closed.
+ *
+ * Chromium's own `<meta>` scan goes on past 1024 bytes while it is in `<head>`, and skips text
+ * in `<script>` or `<title>` (round 4), so the badge checker also reads every declaration
+ * (`declaredEncodings`) and fails closed when they disagree (`badge-verifier.ts`).
  */
 
 /** WHATWG Encoding: each encoding's name and its labels (encoding.spec.whatwg.org). */
@@ -106,24 +111,139 @@ function bomEncoding(bytes: Uint8Array): string | null {
   return null
 }
 
-/** The encoding of a `Content-Type` header's first `charset` parameter, when it names one. */
-export function contentTypeEncoding(contentType: string | null | undefined): string | null {
-  const parameters = (contentType ?? '').split(';').slice(1).join(';')
-  const pattern =
-    /(?:^|;)[\t\n\r ]*([^=;\t\n\r ]+)[\t\n\r ]*=[\t\n\r ]*("(?:[^"\\]|\\.)*"?|[^;]*)/gu
-  for (const match of parameters.matchAll(pattern)) {
-    if (match[1]?.toLowerCase() !== 'charset') continue
-    const raw = match[2] ?? ''
-    const value = raw.startsWith('"')
-      ? raw.replace(/^"|"$/gu, '').replace(/\\(.)/gu, '$1')
-      : raw.trimEnd()
-    return encodingForLabel(value)
+const TOKEN = /^[!#$%&'*+.^_`|~0-9a-z-]+$/iu
+const HTTP_SPACE = /[\t\n\r ]/u
+
+/**
+ * Fetch's "collect an HTTP quoted string" from `text` at `start` (a `"`): the position after
+ * it, and its value unescaped when `extract` is set, or else as written.
+ */
+function quotedString(text: string, start: number, extract: boolean): [number, string] {
+  let position = start + 1
+  let value = ''
+  while (position < text.length) {
+    const char = text[position] as string
+    position += 1
+    if (char === '"') break
+    if (char === '\\') {
+      if (position >= text.length) {
+        value += '\\'
+        break
+      }
+      value += text[position]
+      position += 1
+      continue
+    }
+    value += char
   }
-  return null
+  return [position, extract ? value : text.slice(start, position)]
+}
+
+/** Fetch's "split" of a header value on commas outside quoted strings. */
+export function splitHeaderValue(value: string): string[] {
+  const values: string[] = []
+  let position = 0
+  let current = ''
+  for (;;) {
+    while (position < value.length && value[position] !== '"' && value[position] !== ',') {
+      current += value[position]
+      position += 1
+    }
+    if (position < value.length && value[position] === '"') {
+      const [next, quoted] = quotedString(value, position, false)
+      current += quoted
+      position = next
+      if (position < value.length) continue
+    }
+    values.push(current.replace(/^[\t ]+|[\t ]+$/gu, ''))
+    current = ''
+    if (position >= value.length) return values
+    position += 1
+  }
+}
+
+export interface MimeType {
+  essence: string
+  parameters: Map<string, string>
+}
+
+/** WHATWG "parse a MIME type", or null for a value that isn't one. */
+export function parseMimeType(input: string): MimeType | null {
+  const text = input.replace(/^[\t\n\r ]+|[\t\n\r ]+$/gu, '')
+  const slash = text.indexOf('/')
+  const type = text.slice(0, Math.max(slash, 0))
+  if (slash === -1 || !TOKEN.test(type)) return null
+  let position = text.indexOf(';', slash)
+  if (position === -1) position = text.length
+  const subtype = text.slice(slash + 1, position).replace(/[\t\n\r ]+$/u, '')
+  if (!TOKEN.test(subtype)) return null
+  const parameters = new Map<string, string>()
+  while (position < text.length) {
+    position += 1
+    while (HTTP_SPACE.test(text[position] ?? '')) position += 1
+    let nameEnd = position
+    while (nameEnd < text.length && text[nameEnd] !== ';' && text[nameEnd] !== '=') nameEnd += 1
+    const name = text.slice(position, nameEnd).toLowerCase()
+    position = nameEnd
+    if (position >= text.length) break
+    if (text[position] === ';') continue
+    position += 1
+    if (position >= text.length) break
+    let value: string
+    if (text[position] === '"') {
+      ;[position, value] = quotedString(text, position, true)
+      while (position < text.length && text[position] !== ';') position += 1
+    } else {
+      const valueEnd =
+        text.indexOf(';', position) === -1 ? text.length : text.indexOf(';', position)
+      value = text.slice(position, valueEnd).replace(/[\t\n\r ]+$/u, '')
+      position = valueEnd
+      if (value === '') continue
+    }
+    if (
+      TOKEN.test(name) &&
+      /^[\t\u0020-\u007e\u0080-\u00ff]*$/u.test(value) &&
+      !parameters.has(name)
+    ) {
+      parameters.set(name, value)
+    }
+  }
+  return { essence: `${type}/${subtype}`.toLowerCase(), parameters }
+}
+
+/**
+ * Fetch's "extract a MIME type" from a `Content-Type` value, as a fetch hands it over (repeated
+ * headers joined with commas): the last valid MIME type, with the charset carried over from
+ * earlier values of the same type. Null when there is none, and, failing closed (round 4),
+ * when the values name different MIME types or different charsets, which honest sites don't.
+ */
+export function extractMimeType(
+  value: string | null | undefined
+): { charset: string | null; essence: string } | null {
+  if (value === null || value === undefined) return null
+  let charset: string | null = null
+  let essence: string | null = null
+  let result: { charset: string | null; essence: string } | null = null
+  const charsets = new Set<string>()
+  const essences = new Set<string>()
+  for (const part of splitHeaderValue(value)) {
+    const mime = parseMimeType(part)
+    if (!mime || mime.essence === '*/*') continue
+    const own = mime.parameters.get('charset') ?? null
+    essences.add(mime.essence)
+    if (own !== null) charsets.add(encodingForLabel(own) ?? own.toLowerCase())
+    if (mime.essence !== essence) {
+      charset = own
+      essence = mime.essence
+    }
+    result = { charset: own ?? charset, essence: mime.essence }
+  }
+  if (essences.size > 1 || charsets.size > 1) return null
+  return result
 }
 
 /** "The algorithm for extracting a character encoding from a meta element", on `content`. */
-function metaContentEncoding(content: string): string | null {
+export function metaContentEncoding(content: string): string | null {
   let position = 0
   for (;;) {
     const found = content.indexOf('charset', position)
@@ -146,9 +266,18 @@ function metaContentEncoding(content: string): string | null {
 
 class EndOfPrescan extends Error {}
 
-/** The WHATWG prescan of the first 1024 bytes for a `<meta>` encoding declaration. */
-export function prescanEncoding(input: Uint8Array): string | null {
-  const bytes = input.subarray(0, PRESCAN_BYTES)
+/** A meta declaration's encoding as a page's encoding: UTF-16 means UTF-8 (prescan rules). */
+export function metaEncoding(encoding: string): string {
+  if (encoding === 'utf-16be' || encoding === 'utf-16le') return 'utf-8'
+  if (encoding === 'x-user-defined') return 'windows-1252'
+  return encoding
+}
+
+/**
+ * Every `<meta>` encoding declaration in `bytes`, in order, by the WHATWG prescan's rules
+ * (comments skipped, unknown labels ignored). The prescan uses the first in 1024 bytes.
+ */
+function* metaDeclarations(bytes: Uint8Array): Generator<string> {
   let position = 0
   const at = (index: number): number => {
     const byte = bytes[index]
@@ -216,12 +345,19 @@ export function prescanEncoding(input: Uint8Array): string | null {
 
   try {
     while (position < bytes.length) {
+      if (bytes[position] !== 0x3c) {
+        position += 1
+        continue
+      }
+      // The prescan's cases, by the byte after `<`: `<!--`, `<meta`, a tag, or `<!`, `</`, `<?`.
+      const next = bytes[position + 1]
       if (startsWith('<!--')) {
         // The first `>` after two `-`, which may be the two in `<!--`.
         let end = position + 4
         while (!(at(end) === 0x3e && at(end - 1) === 0x2d && at(end - 2) === 0x2d)) end += 1
         position = end
       } else if (
+        (next === 0x4d || next === 0x6d) &&
         startsWith('<meta', true) &&
         (SPACE.has(at(position + 5)) || at(position + 5) === 0x2f)
       ) {
@@ -247,20 +383,14 @@ export function prescanEncoding(input: Uint8Array): string | null {
           }
         }
         if (needPragma !== null && (!needPragma || gotPragma) && charset) {
-          if (charset === 'utf-16be' || charset === 'utf-16le') return 'utf-8'
-          if (charset === 'x-user-defined') return 'windows-1252'
-          return charset
+          yield metaEncoding(charset)
         }
-      } else if (
-        at(position) === 0x3c &&
-        (isLetter(bytes[position + 1]) ||
-          (bytes[position + 1] === 0x2f && isLetter(bytes[position + 2])))
-      ) {
+      } else if (isLetter(next) || (next === 0x2f && isLetter(bytes[position + 2]))) {
         while (!SPACE.has(at(position)) && at(position) !== 0x3e) position += 1
         while (attribute()) {
           // Skip the tag's attributes.
         }
-      } else if (startsWith('<!') || startsWith('</') || startsWith('<?')) {
+      } else if (next === 0x21 || next === 0x2f || next === 0x3f) {
         while (at(position) !== 0x3e) position += 1
       }
       position += 1
@@ -268,27 +398,52 @@ export function prescanEncoding(input: Uint8Array): string | null {
   } catch (error) {
     if (!(error instanceof EndOfPrescan)) throw error
   }
+}
+
+/** The WHATWG prescan of the first 1024 bytes for a `<meta>` encoding declaration. */
+export function prescanEncoding(input: Uint8Array): string | null {
+  for (const encoding of metaDeclarations(input.subarray(0, PRESCAN_BYTES))) return encoding
   return null
+}
+
+/** The encodings every `<meta>` in the whole page declares, wherever it is. */
+export function declaredEncodings(bytes: Uint8Array): Set<string> {
+  return new Set(metaDeclarations(bytes))
 }
 
 export interface DecodedHtml {
   encoding: string
   html: string
+  /** Where the encoding came from; a browser ignores `<meta>` after a BOM or a header. */
+  source: 'bom' | 'default' | 'header' | 'meta'
 }
 
-/**
- * The page's text, decoded as a browser would, or null when a browser would not show its
- * markup (the `replacement` encoding) or this runtime can't decode its encoding.
- */
-export function decodeHtml(bytes: Uint8Array, contentType: string | null): DecodedHtml | null {
-  const encoding =
-    bomEncoding(bytes) ?? contentTypeEncoding(contentType) ?? prescanEncoding(bytes) ?? 'utf-8'
+/** `bytes` decoded with `encoding`, or null for `replacement` or one the runtime lacks. */
+export function decodeWith(bytes: Uint8Array, encoding: string): string | null {
   if (encoding === 'replacement') return null
-  let decoder: TextDecoder
   try {
-    decoder = new TextDecoder(encoding)
+    return new TextDecoder(encoding).decode(bytes)
   } catch {
     return null
   }
-  return { encoding, html: decoder.decode(bytes) }
+}
+
+/**
+ * The page's text, decoded as a browser would, given the `Content-Type` charset label (from
+ * `extractMimeType`), or null when a browser would not show its markup (the `replacement`
+ * encoding) or this runtime can't decode its encoding.
+ */
+export function decodeHtml(bytes: Uint8Array, charset: string | null): DecodedHtml | null {
+  const bom = bomEncoding(bytes)
+  const header = charset === null ? null : encodingForLabel(charset)
+  const meta = bom || header ? null : prescanEncoding(bytes)
+  const [encoding, source]: [string, DecodedHtml['source']] = bom
+    ? [bom, 'bom']
+    : header
+      ? [header, 'header']
+      : meta
+        ? [meta, 'meta']
+        : ['utf-8', 'default']
+  const html = decodeWith(bytes, encoding)
+  return html === null ? null : { encoding, html, source }
 }

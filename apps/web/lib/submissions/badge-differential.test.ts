@@ -101,7 +101,7 @@ describe('badge scanner against Chromium', () => {
  */
 describe('badge checker against Chromium on encodings', () => {
   const ascii = (text: string) => [...text].map(char => char.charCodeAt(0))
-  const check = (bytes: number[], headers: Record<string, string>) =>
+  const check = (bytes: number[], headers: HeadersInit) =>
     verifyFeaturedBadge(
       'https://example.com/',
       expected,
@@ -141,7 +141,12 @@ describe('badge checker against Chromium on encodings', () => {
       ...ascii(ENCODED_SNIPPET)
     ]
     await expect(check(shiftJis, { 'Content-Type': 'text/html' })).resolves.toEqual({ ok: true })
-    for (const disposition of ['inline', 'inline; filename="badge.html"', 'filename=badge.html']) {
+    for (const disposition of [
+      'inline',
+      'inline; filename="badge.html"',
+      'inline; filename="badge, light.html"',
+      'filename=badge.html'
+    ]) {
       await expect(
         check(ascii(ENCODED_SNIPPET), {
           'Content-Disposition': disposition,
@@ -150,5 +155,38 @@ describe('badge checker against Chromium on encodings', () => {
         disposition
       ).resolves.toEqual({ ok: true })
     }
+  })
+
+  // PR #84 review round 4: honest pages whose declarations agree still pass.
+  it('reads honest pages with late, repeated, or agreeing declarations', async () => {
+    const links = '<link rel="stylesheet" href="/assets/site.css">'.repeat(24)
+    const honest = [
+      // A late <meta> in <head>, as Chromium reads it: the page is decoded again with it.
+      `${links}<meta charset="windows-1252">`,
+      // UTF-8 declared twice, and in a script that writes a page.
+      '<meta charset="utf-8"><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">',
+      `<meta charset="utf-8"><script>w.document.write('<meta charset="utf-8">')</script>`,
+      // UTF-8 declared only in <body>: the default anyway.
+      `<p>Hi</p><meta charset="utf-8">`
+    ]
+    for (const page of honest) {
+      await expect(
+        check(ascii(page + ENCODED_SNIPPET), [['Content-Type', 'text/html']]),
+        page
+      ).resolves.toEqual({ ok: true })
+    }
+    // A header charset decides; the page's <meta> doesn't count, as in a browser.
+    await expect(
+      check(ascii(`<meta charset="iso-2022-kr">${ENCODED_SNIPPET}`), [
+        ['Content-Type', 'text/html; charset=utf-8']
+      ])
+    ).resolves.toEqual({ ok: true })
+    // Repeated headers that agree.
+    await expect(
+      check(ascii(ENCODED_SNIPPET), [
+        ['Content-Type', 'text/html; charset=utf-8'],
+        ['Content-Type', 'text/html; charset=UTF-8']
+      ])
+    ).resolves.toEqual({ ok: true })
   })
 })

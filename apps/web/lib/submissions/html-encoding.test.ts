@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { contentTypeEncoding, decodeHtml, encodingForLabel, prescanEncoding } from './html-encoding'
+import {
+  declaredEncodings,
+  decodeHtml,
+  encodingForLabel,
+  extractMimeType,
+  parseMimeType,
+  prescanEncoding,
+  splitHeaderValue
+} from './html-encoding'
 
 const bytes = (text: string) => new TextEncoder().encode(text)
 
@@ -16,14 +24,58 @@ describe('encoding labels', () => {
   })
 })
 
-describe('Content-Type charset', () => {
-  it('reads the first charset parameter, quoted or not', () => {
-    expect(contentTypeEncoding('text/html; charset=UTF-16LE')).toBe('utf-16le')
-    expect(contentTypeEncoding('text/html;charset="ISO-8859-1"')).toBe('windows-1252')
-    expect(contentTypeEncoding('text/html; q="a;b"; charset=euc-kr; charset=utf-8')).toBe('euc-kr')
-    expect(contentTypeEncoding('text/html; charset=bogus')).toBeNull()
-    expect(contentTypeEncoding('text/html')).toBeNull()
-    expect(contentTypeEncoding(null)).toBeNull()
+describe('Content-Type, as Fetch reads it', () => {
+  it('parses a MIME type and its first charset parameter, quoted or not', () => {
+    const charset = (value: string) => parseMimeType(value)?.parameters.get('charset')
+    expect(parseMimeType(' Text/HTML ; Charset=UTF-16LE ')?.essence).toBe('text/html')
+    expect(charset('text/html; charset=UTF-16LE')).toBe('UTF-16LE')
+    expect(charset('text/html;charset="ISO-8859-1"')).toBe('ISO-8859-1')
+    expect(charset('text/html; q="a;b"; charset=euc-kr; charset=utf-8')).toBe('euc-kr')
+    expect(charset('text/html; charset="a\\"b"')).toBe('a"b')
+    expect(parseMimeType('text')).toBeNull()
+    expect(parseMimeType('text/')).toBeNull()
+    expect(parseMimeType('te xt/html')).toBeNull()
+  })
+
+  it('splits joined header values on commas outside quoted strings', () => {
+    expect(splitHeaderValue('text/html; charset=utf-16le, text/html')).toEqual([
+      'text/html; charset=utf-16le',
+      'text/html'
+    ])
+    expect(splitHeaderValue('inline; filename="a,b.html"')).toEqual(['inline; filename="a,b.html"'])
+  })
+
+  it('extracts the last MIME type, carrying a charset over within one type', () => {
+    expect(extractMimeType('text/html; charset=UTF-16LE')).toEqual({
+      charset: 'UTF-16LE',
+      essence: 'text/html'
+    })
+    // Two headers, `text/html; charset=utf-16le` and `text/html`: Chromium decodes UTF-16LE.
+    expect(extractMimeType('text/html; charset=utf-16le, text/html')).toEqual({
+      charset: 'utf-16le',
+      essence: 'text/html'
+    })
+    expect(extractMimeType('text/html, */*, bogus')).toEqual({
+      charset: null,
+      essence: 'text/html'
+    })
+    expect(extractMimeType('text/html; charset=bogus')).toEqual({
+      charset: 'bogus',
+      essence: 'text/html'
+    })
+    expect(extractMimeType(null)).toBeNull()
+    expect(extractMimeType('bogus')).toBeNull()
+  })
+
+  it('fails closed when joined values disagree on the type or the charset (round 4)', () => {
+    expect(extractMimeType('text/html; charset=utf-8, text/plain')).toBeNull()
+    expect(extractMimeType('text/plain, text/html')).toBeNull()
+    expect(extractMimeType('text/html; charset=utf-8, text/html; charset=utf-16le')).toBeNull()
+    // The same charset twice, by any label, agrees.
+    expect(extractMimeType('text/html; charset=latin1, text/html; charset=ISO-8859-1')).toEqual({
+      charset: 'ISO-8859-1',
+      essence: 'text/html'
+    })
   })
 })
 
@@ -58,27 +110,34 @@ describe('meta prescan', () => {
   ])('finds nothing in %s', html => {
     expect(prescanEncoding(bytes(html))).toBeNull()
   })
+
+  it('lists every declaration in the page, past 1024 bytes and in raw text', () => {
+    const page = `<script>'<meta charset="utf-8">'</script>${'<link rel=a href=b>'.repeat(60)}<meta charset="iso-2022-kr"><!-- <meta charset="gbk"> --><p><meta charset=latin1>`
+    expect([...declaredEncodings(bytes(page))]).toEqual(['utf-8', 'replacement', 'windows-1252'])
+    expect(declaredEncodings(bytes('<p>No declaration</p>')).size).toBe(0)
+  })
 })
 
 describe('decodeHtml', () => {
   it('applies the BOM, then the header, then the prescan, then UTF-8', () => {
     const meta = bytes('<meta charset="windows-1251">é')
-    expect(decodeHtml(meta, 'text/html')?.encoding).toBe('windows-1251')
-    expect(decodeHtml(meta, 'text/html; charset=koi8-r')?.encoding).toBe('koi8-r')
-    expect(
-      decodeHtml(new Uint8Array([0xef, 0xbb, 0xbf, ...meta]), 'text/html; charset=koi8-r')
-    ).toEqual({
+    expect(decodeHtml(meta, null)).toMatchObject({ encoding: 'windows-1251', source: 'meta' })
+    expect(decodeHtml(meta, 'koi8-r')).toMatchObject({ encoding: 'koi8-r', source: 'header' })
+    expect(decodeHtml(meta, 'bogus')).toMatchObject({ encoding: 'windows-1251', source: 'meta' })
+    expect(decodeHtml(new Uint8Array([0xef, 0xbb, 0xbf, ...meta]), 'koi8-r')).toEqual({
       encoding: 'utf-8',
-      html: '<meta charset="windows-1251">é'
+      html: '<meta charset="windows-1251">é',
+      source: 'bom'
     })
-    expect(decodeHtml(bytes('<p>é</p>'), 'text/html')).toEqual({
+    expect(decodeHtml(bytes('<p>é</p>'), null)).toEqual({
       encoding: 'utf-8',
-      html: '<p>é</p>'
+      html: '<p>é</p>',
+      source: 'default'
     })
   })
 
   it('refuses the replacement encoding', () => {
-    expect(decodeHtml(bytes('<a href="x">'), 'text/html; charset=iso-2022-kr')).toBeNull()
-    expect(decodeHtml(bytes('<meta charset="hz-gb-2312"><a>'), 'text/html')).toBeNull()
+    expect(decodeHtml(bytes('<a href="x">'), 'iso-2022-kr')).toBeNull()
+    expect(decodeHtml(bytes('<meta charset="hz-gb-2312"><a>'), null)).toBeNull()
   })
 })

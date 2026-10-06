@@ -1,6 +1,15 @@
 import type { DefaultTreeAdapterMap } from 'parse5'
 import { parseBoundedHtml } from './bounded-html'
-import { decodeHtml } from './html-encoding'
+import {
+  declaredEncodings,
+  decodeHtml,
+  decodeWith,
+  encodingForLabel,
+  extractMimeType,
+  metaContentEncoding,
+  metaEncoding,
+  splitHeaderValue
+} from './html-encoding'
 import { safeFetch } from './safe-fetch'
 
 /**
@@ -23,7 +32,10 @@ import { safeFetch } from './safe-fetch'
  * The page is decoded as a browser decodes it (`./html-encoding.ts`: byte order mark, then the
  * `Content-Type` charset, then a `<meta>` declaration, then UTF-8), and a page a browser
  * would download (`Content-Disposition` other than `inline`) or can't show (the
- * `replacement` encoding) fails as `not_html` (PR #84 review round 3, finding 1).
+ * `replacement` encoding) fails as `not_html` (PR #84 review round 3, finding 1). Wherever
+ * the page's type or encoding is ambiguous, it fails closed as `not_html` too (round 4):
+ * `Content-Type` or `Content-Disposition` values that disagree, and `<meta>` declarations
+ * that disagree or that no `<meta>` in `<head>` confirms (`settleMetaEncoding`).
  *
  * Only the static HTML is read: a badge added by JavaScript fails, and a badge hidden with CSS
  * (`display:none`) passes, because detecting it would need rendering. That is accepted.
@@ -167,6 +179,79 @@ function documentBase(document: ParentNode, pageUrl: string | undefined): string
   }
 }
 
+type Template = DefaultTreeAdapterMap['template']
+
+/** The encoding a `<meta>` element declares, by the prescan's rules, or null. */
+function metaElementEncoding(meta: Element): string | null {
+  const charset = attribute(meta, 'charset')
+  if (charset !== undefined) {
+    const encoding = encodingForLabel(charset)
+    return encoding && metaEncoding(encoding)
+  }
+  if (attribute(meta, 'http-equiv')?.trim().toLowerCase() !== 'content-type') return null
+  const encoding = metaContentEncoding((attribute(meta, 'content') ?? '').toLowerCase())
+  return encoding && metaEncoding(encoding)
+}
+
+/**
+ * The encodings the page's `<meta>` elements declare: the first one the parser placed in
+ * `<head>` (what Chromium's head-bounded scan finds), and all of them, in `<template>`
+ * contents and `<body>` too.
+ */
+function treeMetaEncodings(document: ParentNode): { all: Set<string>; head: string | null } {
+  const all = new Set<string>()
+  const htmlElement = childElements(document).find(element => isHtml(element, 'html'))
+  const headElement =
+    htmlElement && childElements(htmlElement).find(element => isHtml(element, 'head'))
+  let head: string | null = null
+  for (const element of headElement ? childElements(headElement) : []) {
+    head = isHtml(element, 'meta') ? metaElementEncoding(element) : null
+    if (head) break
+  }
+  const stack: ParentNode[] = [document]
+  while (stack.length > 0) {
+    for (const element of childElements(stack.pop() as ParentNode)) {
+      const encoding = isHtml(element, 'meta') ? metaElementEncoding(element) : null
+      if (encoding) all.add(encoding)
+      stack.push(element)
+      if (isHtml(element, 'template')) stack.push((element as Template).content)
+    }
+  }
+  return { all, head }
+}
+
+/**
+ * For a page whose encoding came from a `<meta>` in its first 1024 bytes or the UTF-8 default
+ * (not a BOM or the header), the parsed document to scan, or null to fail closed (PR #84
+ * review round 4). Chromium keeps looking for a `<meta>` past 1024 bytes while it is in
+ * `<head>`, and skips text in `<script>`, `<style>`, `<title>` or `<textarea>`. So every
+ * declaration in the page (`declaredEncodings` over the bytes, and every `<meta>` element the
+ * parser built) must name one encoding, and the first `<meta>` in `<head>` must name it too,
+ * unless it is UTF-8, the default either way. If it isn't the one decoded with, the page is
+ * decoded with it once and parsed again, and must then say the same.
+ */
+function settleMetaEncoding(
+  bytes: Uint8Array,
+  decodedWith: string,
+  document: ParentNode
+): ParentNode | null {
+  const tree = treeMetaEncodings(document)
+  const declared = new Set([...declaredEncodings(bytes), ...tree.all])
+  if (declared.size === 0) return decodedWith === 'utf-8' ? document : null
+  const [encoding] = declared
+  if (declared.size > 1 || encoding === undefined) return null
+  if (tree.head !== encoding && encoding !== 'utf-8') return null
+  if (encoding === decodedWith) return document
+  const html = decodeWith(bytes, encoding)
+  if (html === null) return null
+  const again = parseBoundedHtml(html).document
+  const check = treeMetaEncodings(again)
+  if ((check.head ?? 'utf-8') !== encoding || [...check.all].some(item => item !== encoding)) {
+    return null
+  }
+  return again
+}
+
 export interface BadgeTargets {
   badgeUrls: readonly string[]
   /** Earlier listing URLs that now redirect to `listingUrl` and still count as correct. */
@@ -187,13 +272,20 @@ export function scanFeaturedBadge(
   expected: BadgeTargets,
   pageUrl?: string
 ): ScanResult {
+  return scanDocument(parseBoundedHtml(html).document, expected, pageUrl)
+}
+
+function scanDocument(
+  document: ParentNode,
+  expected: BadgeTargets,
+  pageUrl: string | undefined
+): ScanResult {
   const expectedBadges = new Set(expected.badgeUrls.map(url => canonical(url, undefined)))
   const expectedListings = new Set(
     [expected.listingUrl, ...(expected.legacyListingUrls ?? [])].map(url =>
       canonical(url, undefined)
     )
   )
-  const { document } = parseBoundedHtml(html)
   const base = documentBase(document, pageUrl)
   const resolve = (value: string | undefined): string | null => {
     if (value === undefined) return null
@@ -269,12 +361,16 @@ export function scanFeaturedBadge(
 }
 
 /**
- * True when a browser would download the response instead of showing it: a
+ * True when a browser would download the response instead of showing it, or might: a
  * `Content-Disposition` whose type is a token other than `inline` (Chromium treats an unknown
- * type as `attachment`, and a header that starts with a parameter as `inline`).
+ * type as `attachment`, and a header that starts with a parameter as `inline`), or several
+ * values (a comma outside a quoted string: repeated headers arrive joined, and Chromium
+ * refuses a response whose values differ).
  */
 export function isDownload(contentDisposition: string | null | undefined): boolean {
-  const type = (contentDisposition ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
+  if (contentDisposition === null || contentDisposition === undefined) return false
+  if (splitHeaderValue(contentDisposition).length > 1) return true
+  const type = contentDisposition.split(';')[0]?.trim().toLowerCase() ?? ''
   return /^[!#$%&'*+.^_`|~0-9a-z-]+$/u.test(type) && type !== 'inline'
 }
 
@@ -295,11 +391,18 @@ export async function verifyFeaturedBadge(
     return { ok: false, code: page.code }
   }
   if (isDownload(page.headers.get('content-disposition'))) return { ok: false, code: 'not_html' }
-  const decoded = decodeHtml(page.body, page.headers.get('content-type'))
+  const mime = extractMimeType(page.headers.get('content-type'))
+  if (mime?.essence !== 'text/html') return { ok: false, code: 'not_html' }
+  const decoded = decodeHtml(page.body, mime.charset)
   if (!decoded) return { ok: false, code: 'not_html' }
   let result: ScanResult
   try {
-    result = scanFeaturedBadge(decoded.html, expected, page.url)
+    let document: ParentNode | null = parseBoundedHtml(decoded.html).document
+    if (decoded.source === 'meta' || decoded.source === 'default') {
+      document = settleMetaEncoding(page.body, decoded.encoding, document)
+    }
+    if (!document) return { ok: false, code: 'not_html' }
+    result = scanDocument(document, expected, page.url)
   } catch {
     return { ok: false, code: 'verification_service_error' }
   }

@@ -377,60 +377,172 @@ export const DIFFERENTIAL_CASES: ReadonlyArray<{
  */
 export const ENCODED_SNIPPET = `<a href="${L}"><img src="${B}"></a>`
 
+const HTML: ReadonlyArray<readonly [string, string]> = [['Content-Type', 'text/html']]
+
+/** About 1.1 KB of `<link>`s, so what follows is past the 1024-byte prescan. */
+const LINKS_1100 = '<link rel="stylesheet" href="/assets/site.css">'.repeat(24)
+
+function ascii(text: string): number[] {
+  return [...text].map(char => char.charCodeAt(0))
+}
+
 export const ENCODING_CASES: ReadonlyArray<{
   chromium: { characterSet: string; link: boolean }
-  headers: Record<string, string>
+  headers: ReadonlyArray<readonly [string, string]>
   name: string
   /** Bytes before the ASCII snippet. */
   prefix: readonly number[]
 }> = [
   {
     chromium: { characterSet: 'UTF-16LE', link: false },
-    headers: { 'Content-Type': 'text/html' },
+    headers: [['Content-Type', 'text/html']],
     name: 'utf16leBom',
     prefix: [0xff, 0xfe]
   },
   {
     chromium: { characterSet: 'UTF-16BE', link: false },
-    headers: { 'Content-Type': 'text/html' },
+    headers: [['Content-Type', 'text/html']],
     name: 'utf16beBom',
     prefix: [0xfe, 0xff]
   },
   {
     chromium: { characterSet: 'UTF-16LE', link: false },
-    headers: { 'Content-Type': 'text/html; charset=utf-16le' },
+    headers: [['Content-Type', 'text/html; charset=utf-16le']],
     name: 'utf16leHeader',
     prefix: []
   },
   {
     chromium: { characterSet: 'replacement', link: false },
-    headers: { 'Content-Type': 'text/html; charset=iso-2022-kr' },
+    headers: [['Content-Type', 'text/html; charset=iso-2022-kr']],
     name: 'iso2022krHeader',
     prefix: []
   },
   {
     chromium: { characterSet: 'replacement', link: false },
-    headers: { 'Content-Type': 'text/html' },
+    headers: [['Content-Type', 'text/html']],
     name: 'iso2022krMeta',
     prefix: [...'<meta charset="iso-2022-kr">'].map(char => char.charCodeAt(0))
   },
   {
     chromium: { characterSet: 'ISO-2022-JP', link: false },
-    headers: { 'Content-Type': 'text/html' },
+    headers: [['Content-Type', 'text/html']],
     name: 'iso2022jpMetaEscape',
     prefix: [...'<meta charset="iso-2022-jp">\u001b$B'].map(char => char.charCodeAt(0))
   },
   {
     // Chromium downloads it instead of showing it.
     chromium: { characterSet: 'none', link: false },
-    headers: { 'Content-Disposition': 'attachment', 'Content-Type': 'text/html' },
+    headers: [
+      ['Content-Disposition', 'attachment'],
+      ['Content-Type', 'text/html']
+    ],
     name: 'attachment',
     prefix: []
   },
   {
     chromium: { characterSet: 'UTF-8', link: true },
-    headers: { 'Content-Type': 'text/html' },
+    headers: [['Content-Type', 'text/html']],
     name: 'utf8Control',
+    prefix: []
+  },
+  // PR #84 review round 4: a later `<meta>` Chromium still reads in `<head>`, past 1024 bytes
+  // or after a decoy in raw text, and header values joined with commas.
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: HTML,
+    name: 'linksThenLateMeta',
+    prefix: ascii(`${LINKS_1100}<meta charset="iso-2022-kr">`)
+  },
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: HTML,
+    name: 'scriptDecoyMeta',
+    prefix: ascii(`<script>var s = '<meta charset="utf-8">'</script><meta charset="iso-2022-kr">`)
+  },
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: HTML,
+    name: 'titleDecoyMeta',
+    prefix: ascii('<title><meta charset="utf-8"></title><meta charset="iso-2022-kr">')
+  },
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: HTML,
+    name: 'styleDecoyMeta',
+    prefix: ascii('<style>/* <meta charset="utf-8"> */</style><meta charset="iso-2022-kr">')
+  },
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: HTML,
+    name: 'textareaDecoyMeta',
+    prefix: ascii('<textarea><meta charset="utf-8"></textarea><meta charset="iso-2022-kr">')
+  },
+  {
+    chromium: { characterSet: 'ISO-2022-JP', link: false },
+    headers: HTML,
+    name: 'lateIso2022jpEscape',
+    prefix: ascii(`${LINKS_1100}<meta charset="iso-2022-jp">\u001b$B`)
+  },
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: HTML,
+    name: 'lateMetaAfter60kOfHead',
+    prefix: ascii(
+      `${'<link rel="preload" href="/a.js" as="script">'.repeat(1400)}<meta charset="iso-2022-kr">`
+    )
+  },
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: HTML,
+    name: 'lateMetaAfterScript',
+    prefix: ascii(`<script>${'x'.repeat(1100)}</script><meta charset="iso-2022-kr">`)
+  },
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: HTML,
+    name: 'lateMetaAfterComment',
+    prefix: ascii(`<!--${'x'.repeat(1100)}--><meta charset="iso-2022-kr">`)
+  },
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: HTML,
+    name: 'lateMetaAfterTitle',
+    prefix: ascii(`<title>${'x'.repeat(1100)}</title><meta charset="iso-2022-kr">`)
+  },
+  {
+    chromium: { characterSet: 'UTF-16LE', link: false },
+    headers: [
+      ['Content-Type', 'text/html; charset=utf-16le'],
+      ['Content-Type', 'text/html']
+    ],
+    name: 'twoContentTypesUtf16',
+    prefix: []
+  },
+  {
+    chromium: { characterSet: 'UTF-16LE', link: false },
+    headers: [['Content-Type', 'text/html; charset=utf-16le, text/html']],
+    name: 'contentTypeWithComma',
+    prefix: []
+  },
+  {
+    // Chromium shows it as plain text.
+    chromium: { characterSet: 'UTF-8', link: false },
+    headers: [
+      ['Content-Type', 'text/html; charset=utf-8'],
+      ['Content-Type', 'text/plain']
+    ],
+    name: 'htmlThenPlainText',
+    prefix: []
+  },
+  {
+    // ERR_RESPONSE_HEADERS_MULTIPLE_CONTENT_DISPOSITION
+    chromium: { characterSet: 'none', link: false },
+    headers: [
+      ['Content-Type', 'text/html'],
+      ['Content-Disposition', 'inline'],
+      ['Content-Disposition', 'attachment']
+    ],
+    name: 'inlineAndAttachment',
     prefix: []
   }
 ]
