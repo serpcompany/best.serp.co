@@ -307,11 +307,11 @@ export async function startSubmissionCheckout(
     if (!chosen) return { ok: true, redirect: account }
   }
   return openCheckout(deps, input, {
-    cancelPath: `/submit/${submission.id}/choose/`,
+    cancelPath: `/submit/${submission.id}/checkout/cancelled/`,
     description: `Paid listing: ${submission.name}`,
     purpose: 'submission',
     submissionId: submission.id,
-    successPath: orderId => `/submit/${submission.id}/checkout/success/?order=${orderId}`,
+    successPath: orderId => `/submit/${submission.id}/checkout/return/?order=${orderId}`,
     targetKey: orderTargetKey({ purpose: 'submission', submissionId: submission.id })
   })
 }
@@ -572,11 +572,12 @@ async function applied(
   deps: BillingDependencies,
   order: OrderRecord,
   plans: StatementPlan[],
-  outcome: OrderOutcome
+  outcome: OrderOutcome,
+  checkProblem: string | null = null
 ): Promise<boolean> {
   return deps.operations.apply([
     ...plans,
-    ...buildMarkOrderAppliedPlans({ now: nowIso(deps), orderId: order.id, outcome })
+    ...buildMarkOrderAppliedPlans({ checkProblem, now: nowIso(deps), orderId: order.id, outcome })
   ])
 }
 
@@ -637,7 +638,8 @@ async function applySubmissionPayment(
       outcome: 'hold',
       submissionId: submission.id
     }),
-    'held'
+    'held',
+    checks.code
   )
   if (!done) return 'retry'
   log('billing_order_applied', { check: checks.code, order: order.id, outcome: 'held' })
@@ -780,6 +782,7 @@ async function claimRefund(
     actor: string
     badgeCheckId?: number | null
     listingAction?: OrderRefundListingAction | null
+    note?: string | null
     reason: OrderRefundReason
   },
   extra: StatementPlan[] = []
@@ -1003,20 +1006,125 @@ export type RefundOrderResult =
   | { listing: RefundListing; ok: true; replayed: boolean }
   | BillingFailure
 
+/** What an admin's refund of an order will do, decided before anything is refunded. */
+export type RefundDecision =
+  | {
+      /** The badge check at refund that decided it (keep free, or unpublish). */
+      badgeCheckId: number | null
+      kind: 'refund'
+      listingAction: OrderRefundListingAction
+      /** The listing now: whether it is live, and on the paid plan. */
+      listingNow: { live: boolean; paid: boolean } | null
+    }
+  /** A paid submission rejected as `other`: its rejection's refund. */
+  | { kind: 'rejection'; submissionId: string }
+
+const REFUND_CHECK_MAX_AGE_MS = 60 * 60 * 1000
+
 /**
- * The admin "Refund" on an order (#70 screen 13; #59 amendment 2). The decision is made and
- * recorded first: a paid listing (a paid submission, an upgrade, or a relist) that is live has
- * its badge checked once, right now (`checkBadgeAtRefund`): a pass keeps it live as a free
- * listing, a miss or a result that can't tell unpublishes it. One already down is refunded as it
- * is. The order is then claimed with that decision, refunded at the provider, and finalized. A
- * retry after a lost write finishes the recorded decision without checking the badge again. A
- * submission still in review is rejected instead (its rejection refunds it), and a prohibited
- * rejection is never refunded. A payment that was never applied, or a claim, is refunded from
- * the order alone.
+ * Decides an admin's refund of a paid order (#70 screen 13; #59 amendment 2). A live paid
+ * listing (a paid submission, an upgrade, or a relist) has its badge checked once, at refund
+ * (`checkBadgeAtRefund`): a pass keeps it live as a free listing, a miss or a result that can't
+ * tell unpublishes it. The dialog runs this first and shows the result; the refund then passes
+ * the same check (`badgeCheckId`), which must still be this listing's and recent, so the admin
+ * confirms exactly what happens. One already down is refunded as it is. A submission still in
+ * review is rejected instead (its rejection refunds it), and a prohibited rejection is never
+ * refunded. A payment that was never applied, or a claim, is refunded from the order alone.
+ */
+async function decideRefund(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  badgeCheckId?: number | null
+): Promise<RefundDecision | BillingFailure> {
+  const none = (listingNow: { live: boolean; paid: boolean } | null = null): RefundDecision => ({
+    badgeCheckId: null,
+    kind: 'refund',
+    listingAction: 'none',
+    listingNow
+  })
+  const listingOrder =
+    order.purpose !== 'claim' && order.appliedAt !== null && order.outcome !== 'unapplied'
+  const submission =
+    listingOrder && order.submissionId
+      ? await deps.operations.checkoutSubmission(order.submissionId)
+      : null
+  if (!submission || submission.refundedAt !== null) return none()
+  if (submission.status === 'rejected') {
+    if ((await deps.operations.rejection(submission.id))?.category === 'prohibited') {
+      return failure(409, 'prohibited', 'A rejection for prohibited content isn’t refunded.')
+    }
+    return { kind: 'rejection', submissionId: submission.id }
+  }
+  if (submission.status !== 'approved') {
+    return failure(
+      409,
+      'submission_in_review',
+      'This submission is still in review. Reject it from the review page instead.'
+    )
+  }
+  const paid = submission.plan === 'paid' && submission.paidAt !== null
+  const live = await deps.operations.listingLive(submission.listingId)
+  if (!paid) return none({ live, paid })
+  if (!live || !submission.listingId) {
+    return {
+      badgeCheckId: null,
+      kind: 'refund',
+      listingAction: 'already_unpublished',
+      listingNow: { live, paid }
+    }
+  }
+  let check: RefundBadgeResult | null = null
+  if (badgeCheckId) {
+    const shown = await deps.operations.refundBadgeCheck(badgeCheckId)
+    if (
+      shown &&
+      shown.listingId === submission.listingId &&
+      deps.now().getTime() - Date.parse(shown.checkedAt) < REFUND_CHECK_MAX_AGE_MS
+    ) {
+      check = { checkId: shown.id, keepFree: shown.outcome === 'pass' }
+    }
+  }
+  check ??= await deps.badgeAtRefund(submission.listingId)
+  return {
+    badgeCheckId: check.checkId,
+    kind: 'refund',
+    listingAction: check.keepFree ? 'keep_free' : 'unpublish',
+    listingNow: { live, paid }
+  }
+}
+
+/** The refund dialog's preview: the decision, with the badge checked once, right now. */
+export async function previewRefund(
+  deps: BillingDependencies,
+  input: { orderId: string }
+): Promise<({ ok: true } & RefundDecision) | BillingFailure> {
+  const order = await deps.operations.order(input.orderId)
+  if (!order) return failure(404, 'not_found', 'That order doesn’t exist.')
+  if (order.status === 'refunding' && order.refundReason === 'admin') {
+    // A refund a failure left: finishing it repeats the recorded decision.
+    return {
+      badgeCheckId: order.refundBadgeCheckId,
+      kind: 'refund',
+      listingAction: order.refundListingAction ?? 'none',
+      listingNow: null,
+      ok: true
+    }
+  }
+  if (order.status !== 'paid') {
+    return failure(409, 'not_refundable', 'Only a paid order can be refunded.')
+  }
+  const decision = await decideRefund(deps, order)
+  return 'kind' in decision ? { ok: true, ...decision } : decision
+}
+
+/**
+ * The admin "Refund" on an order. The decision (above) is recorded with the claim, then the
+ * order is refunded at the provider and finalized. A retry after a lost write finishes the
+ * recorded decision without checking the badge again.
  */
 export async function refundOrder(
   deps: BillingDependencies,
-  input: { actor: string; orderId: string }
+  input: { actor: string; badgeCheckId?: number | null; note?: string | null; orderId: string }
 ): Promise<RefundOrderResult> {
   const order = await deps.operations.order(input.orderId)
   if (!order) return failure(404, 'not_found', 'That order doesn’t exist.')
@@ -1029,43 +1137,20 @@ export async function refundOrder(
   if (order.status !== 'paid') {
     return failure(409, 'not_refundable', 'Only a paid order can be refunded.')
   }
-  let listingAction: OrderRefundListingAction = 'none'
-  let badgeCheckId: number | null = null
-  const listingOrder =
-    order.purpose !== 'claim' && order.appliedAt !== null && order.outcome !== 'unapplied'
-  const submission =
-    listingOrder && order.submissionId
-      ? await deps.operations.checkoutSubmission(order.submissionId)
-      : null
-  if (submission && submission.refundedAt === null) {
-    if (submission.status === 'rejected') {
-      if ((await deps.operations.rejection(submission.id))?.category === 'prohibited') {
-        return failure(409, 'prohibited', 'A rejection for prohibited content isn’t refunded.')
-      }
-      await refundRejectedSubmission(deps, { actor: input.actor, submissionId: submission.id })
-      return { listing: 'unchanged', ok: true, replayed: false }
-    }
-    if (submission.status !== 'approved') {
-      return failure(
-        409,
-        'submission_in_review',
-        'This submission is still in review. Reject it from the review page instead.'
-      )
-    }
-    if (submission.plan === 'paid' && submission.paidAt !== null) {
-      if (submission.listingId && (await deps.operations.listingLive(submission.listingId))) {
-        const check = await deps.badgeAtRefund(submission.listingId)
-        listingAction = check.keepFree ? 'keep_free' : 'unpublish'
-        badgeCheckId = check.checkId
-      } else {
-        listingAction = 'already_unpublished'
-      }
-    }
+  const decision = await decideRefund(deps, order, input.badgeCheckId)
+  if (!('kind' in decision)) return decision
+  if (decision.kind === 'rejection') {
+    await refundRejectedSubmission(deps, {
+      actor: input.actor,
+      submissionId: decision.submissionId
+    })
+    return { listing: 'unchanged', ok: true, replayed: false }
   }
   const claimed = await claimRefund(deps, order, {
     actor: input.actor,
-    badgeCheckId,
-    listingAction,
+    badgeCheckId: decision.badgeCheckId,
+    listingAction: decision.listingAction,
+    note: input.note,
     reason: 'admin'
   })
   if (!claimed) {

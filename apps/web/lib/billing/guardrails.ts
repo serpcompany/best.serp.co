@@ -62,3 +62,12 @@ export async function runGuardrails(input: {
   })
   return page.ok ? { ok: true } : fail(page.code)
 }
+
+/**
+ * The checkout page's parenthetical for the same failures (#70 screen 4e: "Our checks couldn't
+ * load <website> (no response within 8 seconds)."). Only the timeout has approved page copy;
+ * the others reuse the email's wording.
+ */
+export function checkoutPageProblem(code: string | null): string {
+  return code === 'fetch_timeout' ? 'no response within 8 seconds' : guardrailProblem(code ?? '')
+}

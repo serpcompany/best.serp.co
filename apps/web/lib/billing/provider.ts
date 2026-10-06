@@ -68,6 +68,8 @@ export interface BillingProvider {
   /** Stored in `orders.provider` and `billing_events.provider`. */
   readonly name: string
   createCheckout(request: CheckoutRequest): Promise<CheckoutSession>
+  /** The provider's dashboard page for a payment or checkout id, for the admin Orders menu. */
+  dashboardUrl(reference: string): string | null
   /** Stops a checkout from accepting payment (a superseded one). A closed one is a no-op. */
   expireCheckout(checkoutId: string): Promise<void>
   getCheckout(checkoutId: string): Promise<CheckoutState>

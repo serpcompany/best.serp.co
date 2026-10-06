@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f4eac24f-9b33-4c24-ad6b-ce0c4430647d",
+  "id": "e5cb94e3-9db0-4ed1-8c20-6744febba24b",
   "prevId": "876f34c4-6293-4c68-be1b-a5b7bf95fb3f",
   "tables": {
     "accounts": {
@@ -3052,6 +3052,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "number": {
+          "name": "number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "user_id": {
           "name": "user_id",
           "type": "text",
@@ -3200,6 +3207,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "check_problem": {
+          "name": "check_problem",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "refund_reason": {
           "name": "refund_reason",
           "type": "text",
@@ -3230,6 +3244,13 @@
         },
         "refund_requested_at": {
           "name": "refund_requested_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "refund_note": {
+          "name": "refund_note",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -3279,6 +3300,11 @@
         }
       },
       "indexes": {
+        "orders_number_idx": {
+          "name": "orders_number_idx",
+          "columns": ["number"],
+          "isUnique": true
+        },
         "orders_open_target_idx": {
           "name": "orders_open_target_idx",
           "columns": ["target_key"],

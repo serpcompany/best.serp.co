@@ -22,7 +22,8 @@ means a `lago.ts` implementing `BillingProvider` and a change in `worker-billing
 
 ## Data
 
-`orders` (`0008_billing_orders`) is the ledger of record for every charge and refund: the buyer,
+`orders` (`0009_billing_orders`; `0008` is #67's) is the ledger of record for every charge and refund: its
+number (`ORD-1001` on), the buyer,
 `kind` (`paid_listing` | `paid_claim`), `purpose` (`submission`, `upgrade`, `relist`, `claim`),
 the target (submission, listing, or claim), amount and currency, provider and its references
 (checkout, payment, refund), what was actually charged, `status` (`pending` → `paid` →
@@ -43,8 +44,13 @@ asked of Stripe, then finalized (`refunded`), so a racing fulfilment can never a
 payment nor a refund undo an applied one. Provider calls carry idempotency keys
 (`checkout:<order>`, `refund:<order>`).
 
-- **Checkout.** `GET /submit/<id>/checkout/` (the choose and badge steps' "$49" links, and the
-  draft reminder's "Complete checkout") and `GET /account/listings/<slug>/checkout/` ("Upgrade:
+- **Screens** (#70 screen 4, copy from `docs/mockups/submissions/COPY.md`): the handoff
+  `/submit/<id>/checkout/` (4a; the choose and badge steps' "$49" links and the draft reminder's
+  "Complete checkout" open it, and it moves on to the checkout by itself); the return
+  `/submit/<id>/checkout/return/?order=<id>` (4c confirming, refreshing until settled; 4d live
+  and in review; 4e waiting for review after a failed check; 4g failed); and
+  `/submit/<id>/checkout/cancelled/` (4f).
+- **Checkout.** `GET /submit/<id>/checkout/start/` and `GET /account/listings/<slug>/checkout/` ("Upgrade:
   $49 one-off" in the badge panel of a live free listing, "Relist for $49" on a listing the badge
   program unlisted) open or reuse a one-hour, card-only Checkout Session and redirect to it. A
   superseded session is expired at Stripe, and one the ledger failed to record is expired and
@@ -52,9 +58,9 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   before any checkout. A draft with no plan chooses paid first. The account shows "Upgrade"
   and "Relist" only when the checkout would accept them (never after a refund). A submission or listing that can't be paid for goes to
   its account page. Next.js router requests never open one, and the links are plain anchors.
-- **Return.** Stripe returns to `/submit/<id>/checkout/success/?order=<id>` (or the account
-  listing's): the route asks Stripe about the session and applies a paid one, then opens the
-  account page. Cancelling returns to `/submit/<id>/choose/` (or the account listing).
+- **Return.** Stripe returns to the return page (or, for an upgrade or relist, the account
+  listing's success route): it asks Stripe about the order's own session and applies a paid one
+  if the webhook hasn't. Cancelling returns to the cancelled page (or the account listing).
 - **Webhook.** `POST /api/billing/webhook/` verifies the raw body's `Stripe-Signature` within 300
   seconds, records the event, acts, and marks it processed; a processed event answers
   `replayed: true`. A failure answers 500 and the retry runs it again. An event of the other
@@ -81,8 +87,11 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
 - **Rejection refund.** Rejecting a paid submission as `other` refunds its order through the admin
   panel's `AdminRefunds` hook and sends `submission-rejected-refunded`; `prohibited` never
   refunds. The hook runs after the rejection, on every replay, and from the sweep.
-- **Refund from Orders.** `/admin/orders/` lists orders; Refund (`POST
-  /api/admin/orders/<id>/refund`) on a live paid listing runs `checkBadgeAtRefund` once (#66):
+- **Refund from Orders.** `/admin/orders/` (#70 screen 13) lists orders. "Refund…" first asks
+  `POST /api/admin/orders/<id>/refund-preview`, which decides the refund and, for a live paid
+  listing, runs `checkBadgeAtRefund` once (#66), so the dialog shows 13c (keeps a passing badge)
+  or 13b (unpublish); `POST /api/admin/orders/<id>/refund` then sends that check's id and the
+  reason for the activity log (`refund_note`), and the refund applies that same check:
   a pass keeps it live as free, a miss or an inconclusive check unpublishes it (410). One already
   down is refunded as is. A submission still in review is rejected instead (409), a prohibited
   rejection is never refunded, and an unapplied or claim order is refunded from the order alone.

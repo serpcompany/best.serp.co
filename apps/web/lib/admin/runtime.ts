@@ -15,7 +15,7 @@ import { type AdminOrderRow, createBillingOperations } from '@serpdirectory/data
 import { createDatabase, type Database } from '@serpdirectory/data-ops/client'
 import { cache } from 'react'
 import { billing } from '../billing/runtime'
-import { refundOrder, refundRejectedSubmission } from '../billing/service'
+import { previewRefund, refundOrder, refundRejectedSubmission } from '../billing/service'
 import { emailEventKey, enqueueEmail } from '../email/server'
 import { createMediaHost } from '../media/worker-media'
 import type { AdminContext } from './decisions'
@@ -75,7 +75,10 @@ export async function adminDecisionContext(actor: string): Promise<AdminContext>
     notify: enqueueEmail,
     ...(deps
       ? {
-          billing: { refundOrder: input => refundOrder(deps, input) },
+          billing: {
+            previewRefund: input => previewRefund(deps, input),
+            refundOrder: input => refundOrder(deps, input)
+          },
           refunds: { refundRejectedSubmission: input => refundRejectedSubmission(deps, input) }
         }
       : {})

@@ -1356,6 +1356,8 @@ export const orders = sqliteTable(
   'orders',
   {
     id: text('id').primaryKey(),
+    /** The order number people see (`ORD-<number>`), assigned in order from 1001. */
+    number: integer('number').notNull(),
     userId: text('user_id')
       .notNull()
       .references(() => users.id),
@@ -1382,11 +1384,15 @@ export const orders = sqliteTable(
     status: text('status', { enum: orderStatuses }).notNull().default('pending'),
     outcome: text('outcome', { enum: orderOutcomes }),
     failureReason: text('failure_reason'),
+    /** The guardrail check that held a paid submission for review (`held`), e.g. `fetch_timeout`. */
+    checkProblem: text('check_problem'),
     refundReason: text('refund_reason', { enum: orderRefundReasons }),
     refundedBy: text('refunded_by'),
     refundListingAction: text('refund_listing_action', { enum: orderRefundListingActions }),
     refundBadgeCheckId: integer('refund_badge_check_id'),
     refundRequestedAt: text('refund_requested_at'),
+    /** The admin's reason for the activity log (#70 screen 13). */
+    refundNote: text('refund_note'),
     paidAt: text('paid_at'),
     appliedAt: text('applied_at'),
     refundedAt: text('refunded_at'),
@@ -1451,6 +1457,7 @@ export const orders = sqliteTable(
       'orders_failed_recorded',
       sql`(${table.status} = 'failed') = (${table.failedAt} IS NOT NULL)`
     ),
+    uniqueIndex('orders_number_idx').on(table.number),
     uniqueIndex('orders_open_target_idx')
       .on(table.targetKey)
       .where(sql`${table.status} = 'pending'`),

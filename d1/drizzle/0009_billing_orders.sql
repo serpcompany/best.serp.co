@@ -13,6 +13,7 @@ CREATE TABLE `billing_events` (
 CREATE INDEX `billing_events_order_idx` ON `billing_events` (`order_id`);--> statement-breakpoint
 CREATE TABLE `orders` (
 	`id` text PRIMARY KEY NOT NULL,
+	`number` integer NOT NULL,
 	`user_id` text NOT NULL,
 	`kind` text NOT NULL,
 	`purpose` text NOT NULL,
@@ -34,11 +35,13 @@ CREATE TABLE `orders` (
 	`status` text DEFAULT 'pending' NOT NULL,
 	`outcome` text,
 	`failure_reason` text,
+	`check_problem` text,
 	`refund_reason` text,
 	`refunded_by` text,
 	`refund_listing_action` text,
 	`refund_badge_check_id` integer,
 	`refund_requested_at` text,
+	`refund_note` text,
 	`paid_at` text,
 	`applied_at` text,
 	`refunded_at` text,
@@ -79,6 +82,7 @@ CREATE TABLE `orders` (
 	CONSTRAINT "orders_failed_recorded" CHECK(("orders"."status" = 'failed') = ("orders"."failed_at" IS NOT NULL))
 ) STRICT;
 --> statement-breakpoint
+CREATE UNIQUE INDEX `orders_number_idx` ON `orders` (`number`);--> statement-breakpoint
 CREATE UNIQUE INDEX `orders_open_target_idx` ON `orders` (`target_key`) WHERE "orders"."status" = 'pending';--> statement-breakpoint
 CREATE UNIQUE INDEX `orders_provider_checkout_idx` ON `orders` (`provider`,`provider_checkout_id`) WHERE "orders"."provider_checkout_id" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX `orders_status_created_idx` ON `orders` (`status`,`created_at`);--> statement-breakpoint

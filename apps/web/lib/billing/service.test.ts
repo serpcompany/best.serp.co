@@ -26,6 +26,7 @@ import {
   type BillingDependencies,
   confirmReturn,
   handleWebhook,
+  previewRefund,
   refundOrder,
   refundRejectedSubmission,
   runBillingSweep,
@@ -63,6 +64,7 @@ function fakeProvider() {
         url: `https://pay.example/${checkoutId}`
       }
     },
+    dashboardUrl: reference => `https://pay.example/dashboard/${reference}`,
     async expireCheckout(checkoutId) {
       expired.push(checkoutId)
       const session = sessions.get(checkoutId)
@@ -557,6 +559,37 @@ describe('races and mismatches (#111 review round 1)', () => {
     expect(f.row('SELECT status, attention FROM orders')).toEqual({
       attention: 'listing_update_failed',
       status: 'refunded'
+    })
+  })
+})
+
+describe('refund dialog', () => {
+  it('previews the refund with the badge checked once, and refunds with that check', async () => {
+    const f = fixture({ badge: 'pass' })
+    f.submission('s1', 'draft', null)
+    await webhook(f, paidEvent(f, await checkout(f, 's1')))
+    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+    const order = f.row<{ id: string }>('SELECT id FROM orders')
+    const preview = await previewRefund(f.deps, { orderId: order.id })
+    expect(preview).toMatchObject({
+      kind: 'refund',
+      listingAction: 'keep_free',
+      listingNow: { live: true, paid: true },
+      ok: true
+    })
+    const badgeCheckId = 'badgeCheckId' in preview ? preview.badgeCheckId : null
+    await expect(
+      refundOrder(f.deps, {
+        actor: 'devin@serp.co',
+        badgeCheckId,
+        note: 'Duplicate charge.',
+        orderId: order.id
+      })
+    ).resolves.toEqual({ listing: 'kept_free', ok: true, replayed: false })
+    expect(f.badgeChecks.count).toBe(1)
+    expect(f.row('SELECT refund_note, refund_badge_check_id FROM orders')).toEqual({
+      refund_badge_check_id: badgeCheckId,
+      refund_note: 'Duplicate charge.'
     })
   })
 })

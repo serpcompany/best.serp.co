@@ -36,6 +36,8 @@ export interface OrderRecord {
   attention: OrderAttention | null
   chargedCents: number | null
   chargedCurrency: string | null
+  /** The guardrail check that held a paid submission for review. */
+  checkProblem: string | null
   checkoutExpiresAt: string | null
   checkoutUrl: string | null
   claimId: string | null
@@ -45,6 +47,8 @@ export interface OrderRecord {
   id: string
   kind: OrderKind
   listingId: string | null
+  /** The number people see: `ORD-<number>`. */
+  number: number
   outcome: OrderOutcome | null
   paidAt: string | null
   provider: string
@@ -54,6 +58,7 @@ export interface OrderRecord {
   purpose: OrderPurpose
   refundBadgeCheckId: number | null
   refundListingAction: OrderRefundListingAction | null
+  refundNote: string | null
   refundReason: OrderRefundReason | null
   refundRequestedAt: string | null
   refundedAt: string | null
@@ -67,7 +72,7 @@ export interface OrderRecord {
 
 type Row = Record<string, unknown>
 
-const ORDER_COLUMNS = `o.id,o.user_id,o.kind,o.purpose,o.target_key,o.submission_id,o.listing_id,
+const ORDER_COLUMNS = `o.id,o.number,o.check_problem,o.refund_note,o.user_id,o.kind,o.purpose,o.target_key,o.submission_id,o.listing_id,
   o.claim_id,o.amount_cents,o.currency,o.provider,o.provider_checkout_id,o.checkout_url,
   o.checkout_expires_at,o.provider_payment_id,o.provider_refund_id,o.status,o.outcome,
   o.failure_reason,o.refund_reason,o.refunded_by,o.paid_at,o.applied_at,o.refunded_at,
@@ -88,6 +93,7 @@ function toOrder(row: Row): OrderRecord {
         ? null
         : Number(row.charged_cents),
     chargedCurrency: optional(row.charged_currency),
+    checkProblem: optional(row.check_problem),
     checkoutExpiresAt: optional(row.checkout_expires_at),
     checkoutUrl: optional(row.checkout_url),
     claimId: optional(row.claim_id),
@@ -97,6 +103,7 @@ function toOrder(row: Row): OrderRecord {
     id: String(row.id),
     kind: row.kind as OrderKind,
     listingId: optional(row.listing_id),
+    number: Number(row.number),
     outcome: optional(row.outcome) as OrderOutcome | null,
     paidAt: optional(row.paid_at),
     provider: String(row.provider),
@@ -109,6 +116,7 @@ function toOrder(row: Row): OrderRecord {
         ? null
         : Number(row.refund_badge_check_id),
     refundListingAction: optional(row.refund_listing_action) as OrderRefundListingAction | null,
+    refundNote: optional(row.refund_note),
     refundReason: optional(row.refund_reason) as OrderRefundReason | null,
     refundRequestedAt: optional(row.refund_requested_at),
     refundedAt: optional(row.refunded_at),
@@ -162,9 +170,10 @@ export function buildCreateOrderPlans(input: NewOrder): StatementPlan[] {
   const targetKey = newOrderTargetKey(input)
   return [
     {
-      sql: `INSERT INTO orders (id,user_id,kind,purpose,target_key,submission_id,listing_id,
-          claim_id,amount_cents,currency,provider,status,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)`,
+      // Order numbers run from 1001; the unique index refuses a number two inserts raced for.
+      sql: `INSERT INTO orders (id,number,user_id,kind,purpose,target_key,submission_id,
+          listing_id,claim_id,amount_cents,currency,provider,status,created_at,updated_at)
+        SELECT ?,COALESCE((SELECT MAX(number) FROM orders),1000)+1,?,?,?,?,?,?,?,?,?,?,'pending',?,?`,
       params: [
         input.id,
         input.userId,
@@ -240,15 +249,17 @@ export function buildMarkOrderPaidPlans(input: {
  * applied it (the submission's payment, the upgrade, the relist), so both happen or neither.
  */
 export function buildMarkOrderAppliedPlans(input: {
+  /** The guardrail check that held the submission (`held` only). */
+  checkProblem?: string | null
   now: string
   orderId: string
   outcome: OrderOutcome
 }): StatementPlan[] {
   return [
     {
-      sql: `UPDATE orders SET outcome=?,applied_at=?,updated_at=?
+      sql: `UPDATE orders SET outcome=?,check_problem=?,applied_at=?,updated_at=?
         WHERE id=? AND status='paid' AND applied_at IS NULL`,
-      params: [input.outcome, input.now, input.now, input.orderId]
+      params: [input.outcome, input.checkProblem ?? null, input.now, input.now, input.orderId]
     },
     assertPreviousStatementChangedOne('order_applied')
   ]
@@ -283,6 +294,8 @@ export function buildClaimRefundPlans(
     actor: string
     badgeCheckId?: number | null
     listingAction?: OrderRefundListingAction | null
+    /** The admin's reason for the activity log. */
+    note?: string | null
     now: string
     orderId: string
     reason: OrderRefundReason
@@ -295,7 +308,7 @@ export function buildClaimRefundPlans(
   return [
     {
       sql: `UPDATE orders SET status='refunding',refund_reason=?,refunded_by=?,refund_requested_at=?,
-          refund_listing_action=?,refund_badge_check_id=?,
+          refund_listing_action=?,refund_badge_check_id=?,refund_note=?,
           ${unapplied ? "outcome='unapplied',applied_at=?," : ''}updated_at=?
         WHERE id=? AND status='paid'
           AND ${unapplied ? 'applied_at IS NULL' : 'applied_at IS NOT NULL AND outcome=?'}`,
@@ -305,6 +318,7 @@ export function buildClaimRefundPlans(
         input.now,
         input.listingAction ?? null,
         input.badgeCheckId ?? null,
+        input.note?.trim() || null,
         ...(unapplied ? [input.now] : []),
         input.now,
         input.orderId,
@@ -567,6 +581,12 @@ export function buildFinishBillingEventPlans(input: {
 
 export interface AdminOrderRow extends OrderRecord {
   buyerEmail: string | null
+  /** The listing's latest badge check (any kind), for "Badge passing". */
+  latestBadgeOutcome: 'fail' | 'pass' | null
+  /** The listing's hosted logo key, or null for the fallback tile. */
+  logoKey: string | null
+  rejectionCategory: RejectionCategory | null
+  submissionPlan: SubmissionPlan | null
   /** Whether the target listing is live now. */
   listingLive: boolean
   listingSlug: string | null
@@ -583,7 +603,11 @@ export function selectAdminOrdersPlan(): StatementPlan {
         COALESCE(l.name,s.name) AS product_name,COALESCE(l.slug,sl.slug) AS listing_slug,
         COALESCE(l.website,s.website) AS website,s.status AS submission_status,
         CASE WHEN ${listingIsLiveGuard('COALESCE(o.listing_id,s.listing_id)')} THEN 1 ELSE 0 END
-          AS listing_live
+          AS listing_live,s.plan AS submission_plan,s.rejection_category,
+        (SELECT m.media_key FROM listing_media m WHERE m.listing_id=COALESCE(o.listing_id,s.listing_id)
+          AND m.kind='logo' AND m.media_key IS NOT NULL ORDER BY m.sort_order LIMIT 1) AS logo_key,
+        (SELECT b.outcome FROM badge_checks b WHERE b.listing_id=COALESCE(o.listing_id,s.listing_id)
+          ORDER BY b.checked_at DESC,b.id DESC LIMIT 1) AS latest_badge_outcome
       FROM orders o
         LEFT JOIN users u ON u.id=o.user_id
         LEFT JOIN listing_submissions s ON s.id=o.submission_id
@@ -598,6 +622,10 @@ function toAdminOrder(row: Row): AdminOrderRow {
   return {
     ...toOrder(row),
     buyerEmail: optional(row.buyer_email),
+    latestBadgeOutcome: optional(row.latest_badge_outcome) as 'fail' | 'pass' | null,
+    logoKey: optional(row.logo_key),
+    rejectionCategory: optional(row.rejection_category) as RejectionCategory | null,
+    submissionPlan: optional(row.submission_plan) as SubmissionPlan | null,
     listingLive: Number(row.listing_live) === 1,
     listingSlug: optional(row.listing_slug),
     productName: optional(row.product_name),
@@ -643,6 +671,10 @@ export interface BillingOperations {
     failedSince: string
     limit: number
   }): Promise<OrderRecord[]>
+  /** A badge check at refund (`kind = 'refund'`), to confirm the one an admin's dialog showed. */
+  refundBadgeCheck(
+    checkId: number
+  ): Promise<{ checkedAt: string; id: number; listingId: string; outcome: 'fail' | 'pass' } | null>
   /** Paid submissions rejected as `other` whose refund isn't recorded yet, oldest first. */
   refundPendingSubmissions(limit: number): Promise<string[]>
   /** A rejected submission's category and reason. */
@@ -691,7 +723,11 @@ export function createBillingOperations(config: { client: Database }): BillingOp
       return row.processed_at === null ? 'process' : 'processed'
     },
     async createOrder(input) {
-      const created = await apply(buildCreateOrderPlans(input))
+      let created = await apply(buildCreateOrderPlans(input))
+      // Lost only the race for the next order number (no open order took the target): again.
+      if (!created && !(await first(selectOpenOrderPlan(newOrderTargetKey(input)), toOrder))) {
+        created = await apply(buildCreateOrderPlans(input))
+      }
       const order = created
         ? await first(selectOrderPlan(input.id), toOrder)
         : await first(selectOpenOrderPlan(newOrderTargetKey(input)), toOrder)
@@ -715,6 +751,20 @@ export function createBillingOperations(config: { client: Database }): BillingOp
       first(selectOrderByCheckoutPlan(provider, checkoutId), toOrder),
     async ordersToReconcile(input) {
       return (await queryPlan<Row>(client, selectOrdersToReconcilePlan(input))).map(toOrder)
+    },
+    async refundBadgeCheck(checkId) {
+      const [row] = await queryPlan<Row>(client, {
+        sql: `SELECT id,listing_id,checked_at,outcome FROM badge_checks WHERE id=? AND kind='refund'`,
+        params: [checkId]
+      })
+      return row
+        ? {
+            checkedAt: String(row.checked_at),
+            id: Number(row.id),
+            listingId: String(row.listing_id),
+            outcome: row.outcome === 'pass' ? 'pass' : 'fail'
+          }
+        : null
     },
     async refundPendingSubmissions(limit) {
       const rows = await queryPlan<{ id: string }>(

@@ -180,7 +180,8 @@ describe('fresh Drizzle D1 history', () => {
       '0005_admin_panel.sql',
       '0006_badge_program.sql',
       '0007_hosted_media.sql',
-      '0008_billing_orders.sql'
+      // 0008 is #67's `0008_listing_claims` (PR #108), which merges first.
+      '0009_billing_orders.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.

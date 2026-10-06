@@ -19,7 +19,6 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
     path,
     async ({ deps, origin }) =>
       checkoutResponse(
-        request,
         await startListingCheckout(deps, { email: user.email, origin, slug, userId: user.id })
       ),
     user

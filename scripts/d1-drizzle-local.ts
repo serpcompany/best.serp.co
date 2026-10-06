@@ -57,6 +57,7 @@ export const requiredIndexNames = [
   'listing_revision_resource_links_revision_order_unique',
   'badge_checks_listing_time_idx',
   'listing_events_listing_idx',
+  'orders_number_idx',
   'orders_open_target_idx',
   'orders_provider_checkout_idx',
   'orders_status_created_idx',

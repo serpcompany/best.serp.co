@@ -40,6 +40,19 @@ const STATUS = {
   ],
   miss_warn: ['Missing, recheck pending', <TriangleAlert key="i" className="text-amber-500" />],
   na: ['Not required', <CircleMinus key="i" className="text-muted-foreground" />],
+  not_paid: ['Not paid', <CircleMinus key="i" className="text-muted-foreground" />],
+  // Orders (#68, #70 screens 4 and 13).
+  o_failed: [
+    'Failed',
+    <CircleX key="i" className="fill-red-500 text-background dark:fill-red-400" />
+  ],
+  o_paid: [
+    'Paid',
+    <CircleCheck key="i" className="fill-emerald-500 text-background dark:fill-emerald-400" />
+  ],
+  o_pending: ['Pending', <Clock key="i" className="text-amber-500" />],
+  o_refunded: ['Refunded', <Undo2 key="i" className="text-muted-foreground" />],
+  o_refunding: ['Refunding', <Undo2 key="i" className="text-amber-500" />],
   paid_wait: ['Paid, waiting for review', <Clock key="i" className="text-amber-500" />],
   pass: [
     'Pass',

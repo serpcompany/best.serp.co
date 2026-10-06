@@ -107,8 +107,23 @@ export type OrderRefundListing = 'kept_free' | 'pending' | 'unchanged' | 'unpubl
  * check at refund, the provider refund, and the D1 batch. Absent while orders are off.
  */
 export interface AdminBilling {
+  /** The refund dialog's decision, with the badge checked once, right then. */
+  previewRefund(input: { orderId: string }): Promise<
+    | ({ ok: true } & (
+        | {
+            badgeCheckId: number | null
+            kind: 'refund'
+            listingAction: 'already_unpublished' | 'keep_free' | 'none' | 'unpublish'
+            listingNow: { live: boolean; paid: boolean } | null
+          }
+        | { kind: 'rejection'; submissionId: string }
+      ))
+    | DecisionFailure
+  >
   refundOrder(input: {
     actor: string
+    badgeCheckId?: number | null
+    note?: string | null
     orderId: string
   }): Promise<{ listing: OrderRefundListing; ok: true; replayed: boolean } | DecisionFailure>
 }
@@ -1385,10 +1400,39 @@ export async function removeAdmin(
  */
 export async function refundOrder(
   context: AdminContext,
-  input: { orderId: string }
+  input: { badgeCheckId?: number | null; note?: string | null; orderId: string }
 ): Promise<Decision<{ listing: OrderRefundListing }>> {
   if (!context.billing) return notFound('order')
-  const result = await context.billing.refundOrder({ actor: context.actor, orderId: input.orderId })
+  const result = await context.billing.refundOrder({ ...input, actor: context.actor })
   log(context, 'refund_order', input.orderId, result.ok ? result.listing : result.error)
   return result
+}
+
+/**
+ * The refund dialog's preview (#70 screen 13): what the refund will do to the listing, with the
+ * badge checked at refund, so the dialog shows "keeps a passing badge" or "has no passing
+ * badge" and the refund then applies that same check. Writes only the badge check.
+ */
+export async function previewOrderRefund(
+  context: AdminContext,
+  input: { orderId: string }
+): Promise<
+  Decision<{
+    badgeCheckId: number | null
+    kind: 'refund' | 'rejection'
+    listingAction: string | null
+    listingNow: { live: boolean; paid: boolean } | null
+  }>
+> {
+  if (!context.billing) return notFound('order')
+  const preview = await context.billing.previewRefund(input)
+  if (!preview.ok) return preview
+  return {
+    badgeCheckId: preview.kind === 'refund' ? preview.badgeCheckId : null,
+    kind: preview.kind,
+    listingAction: preview.kind === 'refund' ? preview.listingAction : null,
+    listingNow: preview.kind === 'refund' ? preview.listingNow : null,
+    ok: true,
+    replayed: false
+  }
 }

@@ -41,6 +41,13 @@ test.use({ baseURL: billingOrigin(), channel: 'chromium' })
 let stripe: StripeMock
 let site: FixtureSite
 
+/** `BILLING_SCREENSHOT_DIRECTORY` captures each screen for review (desktop width, light). */
+const screenshots = process.env.BILLING_SCREENSHOT_DIRECTORY
+async function capture(page: Page, name: string): Promise<void> {
+  if (!screenshots) return
+  await page.screenshot({ fullPage: true, path: `${screenshots}/${name}.png` })
+}
+
 test.beforeAll(async () => {
   stripe = await startStripeMock()
   site = await startFixtureSite()
@@ -171,10 +178,24 @@ async function openCheckout(request: APIRequestContext, path: string): Promise<s
 test('checkout success: paid at Stripe, live at once and in the review queue', async ({ page }) => {
   const submitter = await signInSubmitter(page, 'success')
   const draft = seedDraft(submitter.id, 'success')
+  if (screenshots) {
+    // 4a stays on screen while the start route is held back.
+    // A 204 keeps the browser on 4a.
+    await page.route('**/checkout/start/', route => route.fulfill({ status: 204 }))
+    await page.goto(`/submit/${draft.id}/checkout/`)
+    await expect(page.getByText('Taking you to Stripe')).toBeVisible()
+    await capture(page, '4a-handoff')
+    await page.unroute('**/checkout/start/')
+  }
+  // The handoff (4a) sends the browser on to Stripe by itself.
   await page.goto(`/submit/${draft.id}/checkout/`)
   await expect(page).toHaveURL(/127\.0\.0\.1:\d+\/pay\/cs_test_/u)
   await page.getByRole('button', { name: 'Pay' }).click()
-  await expect(page).toHaveURL(new RegExp(`/account/submissions/${draft.id}/$`, 'u'))
+  await expect(page).toHaveURL(new RegExp(`/submit/${draft.id}/checkout/return/\\?order=`, 'u'))
+  await expect(page.getByRole('heading', { name: /is live on SERP$/u })).toBeVisible()
+  await expect(page.getByText('Payment received', { exact: true })).toBeVisible()
+  await expect(page.getByText(/^ORD-\d+$/u)).toBeVisible()
+  await capture(page, '4d-live')
 
   expect(
     billingD1(`SELECT status, plan FROM listing_submissions WHERE id = ${q(draft.id)}`)
@@ -201,6 +222,44 @@ test('checkout success: paid at Stripe, live at once and in the review queue', a
   expect(order(`id = ${q(paid.id)}`)).toMatchObject({ outcome: 'published', status: 'paid' })
 })
 
+test('checks failed: paid, then held for review instead of going live', async ({ page }) => {
+  const submitter = await signInSubmitter(page, 'held')
+  const draft = seedDraft(submitter.id, 'held')
+  site.update(draft.key, { status: 503 })
+  await page.goto(`/submit/${draft.id}/checkout/`)
+  await expect(page).toHaveURL(/\/pay\/cs_test_/u)
+  await page.getByRole('button', { name: 'Pay' }).click()
+  await expect(page.getByRole('heading', { name: /goes live after review$/u })).toBeVisible()
+  await expect(page.getByText('Payment received, waiting for review')).toBeVisible()
+  await capture(page, '4e-held')
+  expect(
+    billingD1(`SELECT status, plan, listing_id FROM listing_submissions WHERE id = ${q(draft.id)}`)
+  ).toEqual([{ listing_id: null, plan: 'paid', status: 'verified' }])
+  expect(order(`submission_id = ${q(draft.id)}`)).toMatchObject({ outcome: 'held', status: 'paid' })
+  await expect
+    .poll(() => emailSubjects(page.request, submitter.email))
+    .toContainEqual(expect.stringMatching(/^Payment received: .* is in review$/u))
+})
+
+test('confirming, then failed: the return waits for the payment and offers to try again', async ({
+  page
+}) => {
+  const submitter = await signInSubmitter(page, 'failed')
+  const draft = seedDraft(submitter.id, 'failed')
+  await openCheckout(page.request, `/submit/${draft.id}/checkout/start/`)
+  const pending = order(`submission_id = ${q(draft.id)}`)
+  await page.goto(`/submit/${draft.id}/checkout/return/?order=${pending.id}`)
+  await expect(page.getByText('Confirming your payment…')).toBeVisible()
+  await capture(page, '4c-confirming')
+  billingD1(`UPDATE orders SET status = 'failed', failure_reason = 'payment_failed',
+    failed_at = ${q(new Date().toISOString())} WHERE id = ${q(pending.id)}`)
+  await expect(page.getByRole('heading', { name: 'Try the payment again' })).toBeVisible()
+  await expect(page.getByText('Payment didn’t go through')).toBeVisible()
+  await capture(page, '4g-failed')
+  await page.getByRole('link', { name: 'Try again' }).click()
+  await expect(page).toHaveURL(/\/pay\/cs_test_/u)
+})
+
 test('checkout cancel: back to the plan choice, the draft kept, the checkout reused', async ({
   page
 }) => {
@@ -210,15 +269,17 @@ test('checkout cancel: back to the plan choice, the draft kept, the checkout reu
   await expect(page).toHaveURL(/\/pay\/cs_test_/u)
   const first = page.url().split('/').pop()
   await page.getByRole('link', { name: 'Cancel' }).click()
-  await expect(page).toHaveURL(new RegExp(`/submit/${draft.id}/choose/$`, 'u'))
-  await expect(page.getByRole('heading', { name: 'Choose how to get listed' })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/submit/${draft.id}/checkout/cancelled/$`, 'u'))
+  await expect(page.getByRole('heading', { name: 'Checkout cancelled' })).toBeVisible()
+  await expect(page.getByText('Not paid')).toBeVisible()
+  await capture(page, '4f-cancelled')
   expect(
     billingD1(`SELECT status, plan, paid_at FROM listing_submissions WHERE id = ${q(draft.id)}`)
   ).toEqual([{ paid_at: null, plan: 'paid', status: 'draft' }])
   expect(order(`submission_id = ${q(draft.id)}`)).toMatchObject({ status: 'pending' })
 
-  // Paying again reuses the open checkout instead of opening a second payment.
-  await page.goto(`/submit/${draft.id}/checkout/`)
+  // "Return to checkout" reuses the open checkout instead of opening a second payment.
+  await page.getByRole('link', { name: 'Return to checkout' }).click()
   await expect(page).toHaveURL(/\/pay\/cs_test_/u)
   expect(page.url().split('/').pop()).toBe(first)
   expect(
@@ -231,7 +292,7 @@ test('webhook replay: verified events are processed once; forged and stale ones 
 }) => {
   const submitter = await signInSubmitter(page, 'replay')
   const draft = seedDraft(submitter.id, 'replay')
-  const sessionId = await openCheckout(page.request, `/submit/${draft.id}/checkout/`)
+  const sessionId = await openCheckout(page.request, `/submit/${draft.id}/checkout/start/`)
   const body = completedEvent(sessionId)
 
   const forged = await postEvent(page.request, body, stripeSignatureHeader(`${body} `))
@@ -295,16 +356,28 @@ test('upgrade: a live free listing becomes a paid listing', async ({ page }) => 
   }
 })
 
-async function refundFromOrders(page: Page, orderId: string, toast: RegExp): Promise<void> {
+async function refundFromOrders(
+  page: Page,
+  orderId: string,
+  dialog: { button: string; screenshot: string; title: RegExp },
+  toast: RegExp
+): Promise<void> {
   await page.goto('/admin/orders/')
+  await capture(page, '13-orders')
   await page
     .locator(`tr[data-order="${orderId}"]`)
-    .getByRole('button', { name: 'Open menu for this order' })
+    .getByRole('button', { name: /^Open menu for ORD-/u })
     .click()
-  await page.getByRole('menuitem', { name: 'Refund' }).click()
-  await expect(page.getByRole('alertdialog')).toContainText('We check the badge')
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Refund' }).click()
+  await capture(page, '13a-row-menu')
+  await page.getByRole('menuitem', { name: 'Refund…' }).click()
+  const confirm = page.getByRole('alertdialog')
+  await expect(confirm.getByRole('heading', { name: dialog.title })).toBeVisible()
+  await confirm.getByLabel('Reason for the activity log').fill('Customer asked for a refund.')
+  await capture(page, dialog.screenshot)
+  await confirm.getByRole('button', { name: dialog.button }).click()
+  await expect(page.getByText(/^Refunded \$49\.00 for ORD-\d+$/u)).toBeVisible()
   await expect(page.getByText(toast)).toBeVisible()
+  await capture(page, `${dialog.screenshot}-done`)
 }
 
 async function asAdmin(page: Page): Promise<string> {
@@ -321,7 +394,12 @@ test('refund with a badge pass: the listing stays live as a free listing', async
     await refundFromOrders(
       page,
       paid.id,
-      /^Refunded \$49\.00\. .* stays live as a free listing\.$/u
+      {
+        button: 'Refund, keep live as free',
+        screenshot: '13c-refund-badge-pass',
+        title: /^Refund \$49\.00 for .*\?$/u
+      },
+      /stays live as a free listing\. Logged under e2e-billing-admin-/u
     )
     expect(order(`id = ${q(paid.id)}`)).toMatchObject({
       refund_reason: 'admin',
@@ -348,7 +426,16 @@ test('refund with a badge miss: the listing is unpublished (410)', async ({ page
   const admin = await asAdmin(page)
   try {
     const paid = order(`listing_id = ${q(listing.listingId)}`)
-    await refundFromOrders(page, paid.id, /^Refunded \$49\.00\. .* was unpublished\.$/u)
+    await refundFromOrders(
+      page,
+      paid.id,
+      {
+        button: 'Refund and unpublish',
+        screenshot: '13b-refund-no-badge',
+        title: /^Refund \$49\.00 and unpublish .*\?$/u
+      },
+      /was unpublished \(no passing badge\)\. Logged under e2e-billing-admin-/u
+    )
     expect(order(`id = ${q(paid.id)}`)).toMatchObject({ status: 'refunded' })
     expect(billingD1(`SELECT is_active FROM listings WHERE id = ${q(listing.listingId)}`)).toEqual([
       { is_active: 0 }
@@ -367,7 +454,7 @@ test('refund with a badge miss: the listing is unpublished (410)', async ({ page
 test('a paid submission rejected as other is refunded automatically', async ({ page }) => {
   const submitter = await signInSubmitter(page, 'reject')
   const draft = seedDraft(submitter.id, 'reject')
-  const sessionId = await openCheckout(page.request, `/submit/${draft.id}/checkout/`)
+  const sessionId = await openCheckout(page.request, `/submit/${draft.id}/checkout/start/`)
   expect((await postEvent(page.request, completedEvent(sessionId))).status()).toBe(200)
   const paid = order(`submission_id = ${q(draft.id)}`)
   expect(paid).toMatchObject({ outcome: 'published', status: 'paid' })

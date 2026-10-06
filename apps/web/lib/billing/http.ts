@@ -73,7 +73,7 @@ export async function withCheckout(
 }
 
 /** Sends the buyer to the provider, or to where things stand, or answers the failure. */
-export function checkoutResponse(request: Request, start: CheckoutStart): Response {
+export function checkoutResponse(start: CheckoutStart): Response {
   if (!start.ok) return noStore(start.status, start.message)
   return redirectTo('url' in start ? start.url : start.redirect)
 }

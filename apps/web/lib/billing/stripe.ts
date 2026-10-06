@@ -208,6 +208,8 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
           'metadata[order_id]': request.orderId,
           mode: 'payment',
           'payment_intent_data[metadata][order_id]': request.orderId,
+          // Stripe emails the receipt (#70 screen 4: "Emailed to … by Stripe").
+          'payment_intent_data[receipt_email]': request.customerEmail,
           // Cards only: a paid listing goes live at payment, so no delayed payment methods.
           'payment_method_types[0]': 'card',
           success_url: request.successUrl
@@ -236,6 +238,17 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
         throw new BillingProviderError('The session is from the other mode.', 'mode_mismatch', 409)
       }
       return stripeCheckoutState(session)
+    },
+
+    dashboardUrl(reference) {
+      const mode = config.live ? '' : '/test'
+      if (/^pi_[A-Za-z0-9_]+$/u.test(reference)) {
+        return `https://dashboard.stripe.com${mode}/payments/${reference}`
+      }
+      if (/^cs_[A-Za-z0-9_]+$/u.test(reference)) {
+        return `https://dashboard.stripe.com${mode}/checkout/sessions/${reference}`
+      }
+      return null
     },
 
     async expireCheckout(checkoutId) {

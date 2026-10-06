@@ -205,7 +205,7 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   (existing rows become `weekly`; nothing references it). It is outside the catalog: writing it
   never changes the catalog epoch.
 
-- `orders` and `billing_events` (`0008_billing_orders`): the billing ledger and the provider's
+- `orders` and `billing_events` (`0009_billing_orders`): the billing ledger and the provider's
   webhook events, written only by `packages/data-ops/src/billing.ts`.
 
 These tables are empty in the initial import, so bootstrap parity compares them like the
