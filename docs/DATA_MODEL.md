@@ -74,10 +74,7 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 - `listings` stores public product fields, status, publication time, and stable IDs
   (unique `slug`), plus `source` and `link_rel` (see [Listings](#listings-source-link-and-unpublishing)).
 - `listing_categories` stores ordered category membership with one primary category.
-- `listing_media`, `listing_resource_links`, and `listing_faqs` store detail content. Details
-  carry the FAQs in order (`faqs`, #105), which the listing page shows in its FAQs section
-  ([Catalog hygiene](./CATALOG_HYGIENE.md#listing-faqs-105) moves the import's copies out of the
-  long descriptions).
+- `listing_media`, `listing_resource_links`, and `listing_faqs` store detail content.
 - `publication_state` is a single row (`id = 1`) with the current version and checksum.
 - `migration_runs` and `publication_runs` record imports and applied manifests.
 - `listing_slug_redirects` maps retired slugs to their listing.
@@ -283,8 +280,9 @@ sending one batch. `publish-d1-staging.yml` applies a manifest to staging first,
 `publish-d1.yml` to production ([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)),
 each after recording a D1 Time Travel bookmark (no export). A row-level manifest
 (`concurrency: rows`: `listing-media-update` repoints hosted media, `listing-categories-add`
-adds a secondary category) checks each listing's rows, not a base version ([media](./MEDIA.md)). Verification, rejection, and approval batches assert
-`changes() = 1` after every compare-and-swap step, so stale decisions roll back.
+adds a secondary category, `listing-content-remove-suffix` trims a description) checks each
+listing's rows, not a base version ([media](./MEDIA.md)). Verification, rejection, and approval
+batches assert `changes() = 1` after every compare-and-swap step, so stale decisions roll back.
 
 ## Initial import
 

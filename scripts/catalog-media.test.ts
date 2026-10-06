@@ -150,9 +150,13 @@ describe('hosted catalog media (#95)', () => {
   }, 120_000)
 
   it('changes only listing logos and images when the manifests are applied', () => {
-    // The other reviewed manifests (#100's unpublications) are the baseline: the row-level
-    // media and category manifests may change nothing else on top of them.
-    const before = publishedDatabase(manifest => manifest.concurrency !== 'rows')
+    // The other reviewed manifests (#100's unpublications, #105's FAQ move) are the baseline:
+    // the media and category manifests may change nothing else on top of them.
+    const mediaOrCategories = (manifest: ReturnType<typeof parseManifest>) =>
+      manifest.operations.every(
+        op => op.action === 'listing-media-update' || op.action === 'listing-categories-add'
+      )
+    const before = publishedDatabase(manifest => !mediaOrCategories(manifest))
     const after = publishedDatabase()
     try {
       for (const sql of [

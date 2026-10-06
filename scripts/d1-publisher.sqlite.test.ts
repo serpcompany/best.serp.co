@@ -901,6 +901,44 @@ describe('listing-content-remove-suffix (#105: imported FAQ blocks move to the F
     })
   })
 
+  it('applies row-level at whatever version each environment is, still guarded by the row', () => {
+    const rows = manifestSchema.parse({
+      version: 1,
+      id: 'rows-faqs',
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations: [
+        {
+          action: 'listing-content-remove-suffix',
+          id: 'lst_sqlite_test',
+          slug: 'old-slug',
+          reason: '#105 FAQs show in the FAQs section',
+          expected: { contentLength: [...content].length },
+          suffix
+        }
+      ]
+    })
+    for (const version of [4, 17]) {
+      const db = seeded()
+      db.prepare('UPDATE publication_state SET version=?').run(version)
+      const live = { checksum: beforeChecksum, version }
+      executeInTestTransaction(db, buildPublicationPlan(rows, 'rows faqs', now, live))
+      expect(row(db).content).toBe(body)
+      expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({
+        version: version + 1
+      })
+    }
+    const edited = seeded()
+    edited
+      .prepare("UPDATE listings SET content=? WHERE id='lst_sqlite_test'")
+      .run(`${body}!${suffix}`)
+    const live = { checksum: beforeChecksum, version: 4 }
+    expect(() =>
+      executeInTestTransaction(edited, buildPublicationPlan(rows, 'rows faqs', now, live))
+    ).toThrow()
+    expect(row(edited).content).toBe(`${body}!${suffix}`)
+  })
+
   it('refuses a suffix as long as the description, and a missing reason', () => {
     expect(() => remove({ expected: { contentLength: [...suffix].length } })).toThrow(
       /shorter than the description/u

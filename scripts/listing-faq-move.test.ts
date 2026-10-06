@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { assertD1StatementLimits } from '@serpdirectory/data-ops/sql-limits'
@@ -13,16 +13,16 @@ import {
   type FaqListing,
   faqBlockSuffix,
   manifestPath,
-  PREVIOUS_MANIFEST_PATH,
-  reviewedImportFaqListings,
-  stateAfter
+  reviewedImportFaqListings
 } from './listing-faq-move'
 
 /**
  * #105: the imported FAQs leave the long descriptions for the FAQs section. The generator removes
  * only each description's closing FAQ block, and the committed manifest is exactly what it writes
- * from the reviewed import, applied after #100's manifest.
+ * from the reviewed import. It is row-level, so it applies whatever was published before it.
  */
+const publications = 'd1/publications'
+const HIJACKED_DOMAINS_PATH = `${publications}/2026-10-06-hijacked-domains.yaml`
 
 const faqs = [
   { answer: 'Yes, in your browser.', question: 'Is it free?' },
@@ -60,22 +60,25 @@ describe('the committed FAQ manifest', () => {
   const source = readFileSync(resolve(FAQ_MANIFEST_PATH), 'utf8')
   const manifest = parseManifest(source)
 
-  it('is exactly what the generator writes, based on the state #100’s manifest leaves', () => {
-    const previous = stateAfter(PREVIOUS_MANIFEST_PATH)
-    expect(manifest.basePublicationVersion).toBe(previous.version)
-    expect(manifest.provenance.beforeChecksum).toBe(previous.checksum)
-    expect(source).toBe(
-      buildFaqMoveManifest(listings, {
-        baseChecksum: previous.checksum,
-        baseVersion: previous.version,
-        id: FAQ_MANIFEST_ID
-      })
-    )
+  it('is exactly what the generator writes, row-level with no base', () => {
+    expect(manifest.concurrency).toBe('rows')
+    expect(manifest.basePublicationVersion).toBeUndefined()
+    expect(manifest.provenance.beforeChecksum).toBeUndefined()
+    expect(source).toBe(buildFaqMoveManifest(listings, { id: FAQ_MANIFEST_ID }))
     expect(listings).toHaveLength(335)
     expect(listings.reduce((total, item) => total + item.faqs.length, 0)).toBe(2254)
   })
 
-  it('applies after #100’s to the reviewed catalog, removing only the FAQ blocks', () => {
+  it.each([
+    ['after #100’s', [HIJACKED_DOMAINS_PATH]],
+    [
+      'after #100’s and #98’s',
+      readdirSync(resolve(publications))
+        .filter(file => file.endsWith('.yaml') && !file.includes('listing-faqs'))
+        .sort()
+        .map(file => `${publications}/${file}`)
+    ]
+  ])('applies %s to the reviewed catalog, removing only the FAQ blocks', (_name, previous) => {
     const database = new DatabaseSync(':memory:')
     for (const migration of freshMigrationNames())
       database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
@@ -99,7 +102,15 @@ describe('the committed FAQ manifest', () => {
         .all()
     const apply = (path: string) => {
       const text = readFileSync(resolve(path), 'utf8')
-      const plan = buildPublicationPlan(parseManifest(text), text, '2026-10-06T00:00:00.000Z')
+      const parsed = parseManifest(text)
+      const live =
+        parsed.concurrency === 'rows'
+          ? (database.prepare('SELECT version, checksum FROM publication_state').get() as {
+              checksum: string
+              version: number
+            })
+          : undefined
+      const plan = buildPublicationPlan(parsed, text, '2026-10-06T00:00:00.000Z', live)
       database.exec('DROP TABLE IF EXISTS publication_guard; BEGIN')
       for (const item of plan.statements) {
         assertD1StatementLimits(item.query, item.bindings)
@@ -113,9 +124,12 @@ describe('the committed FAQ manifest', () => {
       }
       database.exec('COMMIT')
     }
-    apply(PREVIOUS_MANIFEST_PATH)
+    for (const path of previous) apply(path)
     const before = contents()
     const faqsBefore = faqRows()
+    const versionBefore = (
+      database.prepare('SELECT version FROM publication_state').get() as { version: number }
+    ).version
     apply(FAQ_MANIFEST_PATH)
     const after = contents()
     const moved = new Map(
@@ -142,11 +156,13 @@ describe('the committed FAQ manifest', () => {
     // The FAQs themselves stay, for the FAQs section.
     expect(faqRows()).toEqual(faqsBefore)
     expect(database.prepare('SELECT version FROM publication_state').get()).toEqual({
-      version: manifest.basePublicationVersion + 1
+      version: versionBefore + 1
     })
     expect(
       database
-        .prepare("SELECT COUNT(*) AS count FROM listing_events WHERE event_type='edited'")
+        .prepare(
+          "SELECT COUNT(*) AS count FROM listing_events WHERE event_type='edited' AND detail LIKE '%#105%'"
+        )
         .get()
     ).toEqual({ count: 335 })
     database.close()
@@ -158,31 +174,21 @@ describe('regenerating for an environment that has moved on', () => {
     { ...listing(`Intro.\n\n${block}`), id: 'lst_aaaaaaaaaa', slug: 'a.example' },
     { ...listing(`Other.\n\n${block}`), id: 'lst_bbbbbbbbbb', slug: 'b.example' }
   ]
-  const options = {
-    baseChecksum: 'f'.repeat(64),
-    baseVersion: 9,
-    id: '2026-10-07-listing-faqs-staging'
-  }
+  const options = { id: '2026-10-07-listing-faqs-staging' }
 
   it('writes each manifest id to its own file, keeping the reviewed one', () => {
     expect(manifestPath(options.id)).toBe('d1/publications/2026-10-07-listing-faqs-staging.yaml')
     expect(manifestPath(FAQ_MANIFEST_ID)).toBe(FAQ_MANIFEST_PATH)
   })
 
-  it('states the base it was given, and leaves out skipped listings', () => {
-    const source = buildFaqMoveManifest(listings, {
-      ...options,
-      baseOverride: true,
-      skip: ['b.example']
-    })
+  it('leaves out skipped listings, and says so', () => {
+    const source = buildFaqMoveManifest(listings, { ...options, skip: ['b.example'] })
     const manifest = parseManifest(source)
-    expect(manifest).toMatchObject({ basePublicationVersion: 9, id: options.id })
+    expect(manifest).toMatchObject({ concurrency: 'rows', id: options.id })
     expect(
       manifest.operations.map(operation => ('slug' in operation ? operation.slug : ''))
     ).toEqual(['a.example'])
-    expect(source).toContain('# publication version 9 (checksum ffffffffffff…)')
     expect(source).toContain('# Left out (their description drifted there): b.example.')
-    expect(source).not.toContain("#100's\n# manifest")
   })
 
   it('refuses to skip a listing it doesn’t know', () => {

@@ -95,20 +95,15 @@ pnpm catalog:faqs -- manifest      # write the manifest from the reviewed import
   before it is stale), and logs an `edited` event. The generator refuses a listing whose block
   isn't the last section or doesn't say exactly its FAQs, and a test applies the manifest to the
   reviewed import and checks every description byte by byte.
-- **Order:** it is based on the state #100's manifest leaves (publication version 2). Publish
-  #100's, then this one, then #98's media manifests (row-level, any version). Staging first
-  (#97's staging path), then production after promotion.
-- **An environment that has moved on** (staging has: approvals and badge-program unpublishes
-  advance its version). Read its state with the read-only
-  `pnpm tsx scripts/cloudflare-release.ts check-database <staging|production>` (its
-  `publication.version` and `publication.checksum`; it needs the Cloudflare credentials, so the
-  owner or a workflow runs it), then regenerate under a new id:
-  `pnpm catalog:faqs -- manifest --base-version N --base-checksum <sha256> --manifest-id
-  2026-10-07-listing-faqs-staging`. The id names the file (`d1/publications/<id>.yaml`), so the
-  reviewed version-2 manifest stays, and the header records the base. A listing whose
-  description changed there (an approved revision, an admin edit) would make the publisher
-  refuse the whole batch; leave it out with `--skip <slug>` (repeatable or comma-separated) and
-  fix it by hand, as its FAQs already show in the section.
+- **Order:** the manifest is row-level (`concurrency: rows`, as #97 introduced): it names no
+  base version, so it publishes in any order relative to #100's and #98's manifests and fits
+  staging and production whatever else each published. Staging first (#97's staging path), then
+  production after promotion.
+- **A description that changed** on an environment (an approved revision, an admin edit) makes
+  the publisher refuse the whole batch. Leave such listings out of a new manifest with
+  `pnpm catalog:faqs -- manifest --skip <slug> --manifest-id 2026-10-07-listing-faqs-staging`
+  (`--skip` is repeatable or comma-separated; the id names the file, `d1/publications/<id>.yaml`,
+  so the reviewed manifest stays) and fix them by hand, as their FAQs already show in the section.
 - **Until it is published**, the FAQs section leaves out an FAQ whose exact `### <question>`
   heading line the description still holds after its last `## FAQ` line (`faqsToShow`), so
   imported FAQs never show twice.

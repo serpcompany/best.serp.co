@@ -238,11 +238,20 @@ const provenance = z
  * - `publication` (the default): it applies only at `basePublicationVersion` and
  *   `provenance.beforeChecksum`, the catalog it was written against.
  * - `rows`: every operation carries its own row-level compare-and-swap
- *   (`listing-media-update`'s `expected`), so one manifest fits staging and production whatever
+ *   (`rowLevelActions`), so one manifest fits staging and production whatever
  *   else each environment published. It names no base; the publisher plans it against the
  *   publication state it reads at publish time and still advances the version.
  */
 export const manifestConcurrency = ['publication', 'rows'] as const
+/**
+ * Operations that carry their own row-level compare-and-swap, so a `rows` manifest may hold them:
+ * media rows (`expected`), categories (`expected`), and a description's length and ending (#105).
+ */
+const rowLevelActions = new Set<string>([
+  'listing-media-update',
+  'listing-categories-add',
+  'listing-content-remove-suffix'
+])
 export const manifestSchema = z
   .object({
     version: z.literal(1),
@@ -267,11 +276,11 @@ export const manifestSchema = z
         })
       }
       value.operations.forEach((op, index) => {
-        if (op.action !== 'listing-media-update' && op.action !== 'listing-categories-add') {
+        if (!rowLevelActions.has(op.action)) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update and listing-categories-add operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add, and listing-content-remove-suffix operations.',
             path: ['operations', index, 'action']
           })
         }
