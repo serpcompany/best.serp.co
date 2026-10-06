@@ -7,6 +7,7 @@ export const site: SiteDefinition = {
   badges: {
     featuredOn: {
       dark: 'badge/featured-on-serp.co-dark.svg',
+      displayName: 'SERP Best',
       light: 'badge/featured-on-serp.co-light.svg'
     }
   },
