@@ -131,7 +131,11 @@ Hence the order:
    ```
 
 2. **Restore D1** to the release run's bookmark, from its first attempt (see above), with
-   [Restore](#restore) steps 1 to 3. Skip step 4: no redeploy.
+   [Restore](#restore) steps 1 to 3. Skip step 4's redeploy, but not its warning: the rollback
+   gives the HTML cache a different Worker version, while the data cache is keyed by the catalog
+   epoch only. Publications made between the release and the restore created epochs that the
+   next publications reuse, so data cached from the discarded writes can show for up to 24
+   hours.
 3. **Don't release `main` again until the fix is promoted.** The restore removed the migration
    from the `d1_migrations` ledger, but `main` still has its file, so `plan-release` finds it
    pending: any Deploy Production of `main` (a push, a re-run, or a dispatch) plans

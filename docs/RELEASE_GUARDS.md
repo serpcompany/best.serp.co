@@ -159,12 +159,15 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
 
 `scripts/deploy-workflows.test.ts` enforces it:
 
-- **Changes are found by credential, not by script name.** Every step that gets
-  `CLOUDFLARE_API_TOKEN` counts as a D1 change unless it only checks that the secret exists or
-  runs a read-only `cloudflare-release.ts` command (`bookmark`, `plan-release`,
-  `list-migrations`, `check-database`, `verify-import`) or the Worker `deploy`. A new
-  `wrangler d1 execute`, D1 query API call, publisher run, or composite action with the token is
-  therefore checked too, and so is #97's staging publish once it lands.
+- **Changes are found by credential, and the check fails closed.** Every step that gets
+  `CLOUDFLARE_API_TOKEN` (from its own `env` or `with`, or the job's or workflow's `env`) counts
+  as a D1 change, except steps whose whole `run` is one of a short reviewed list: the two
+  credential checks, a read-only `cloudflare-release.ts` command (`bookmark`, `plan-release`,
+  `list-migrations`, `check-database`, `verify-import`), the Worker `deploy`, and Deploy
+  Production's plan step. Any other launcher (`npm`, a path such as `./node_modules/.bin/wrangler`,
+  a script, an action) is a change, and so is #97's staging publish once it lands.
+- **No handoff.** A step holding the token, other than that list, may not write `GITHUB_ENV`,
+  `GITHUB_PATH`, `GITHUB_OUTPUT`, or `GITHUB_STATE`, so it cannot pass the token to a later step.
 - **A change runs only after a successful bookmark.** Its bookmark is the step right before it in
   the same job, for the job's environment, with the same `if:`. Neither step may use
   `continue-on-error` or a status function (`always()`, `failure()`, `cancelled()`,
@@ -175,14 +178,18 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
 - **Nothing leaves as a file.** Only the reviewed uploads and caches are allowed (the Playwright
   reports, the staging smoke evidence, and the install action's dependency caches), matched by
   action, name, and path. No workflow runs `d1 export` or `cloudflare-release.ts backup`, and no
-  script under `scripts/` passes `export` to Wrangler. A job holding the Cloudflare token uses
-  only reviewed actions and runs no `gh release`, `gh gist`, or `curl`/`wget` upload.
+  script under `scripts/` passes `export` to Wrangler. In every job where any step holds the
+  token (six today, all checked), each step uses only reviewed actions and runs no `gh gist`,
+  `gh release upload|create`, `gh api` file field, `curl` upload (`-T`, `--upload-file`, `-F`,
+  `--form`, `-d @`, `--data-binary @`), or `wget` upload. Commands are read one at a time, split
+  at `|`, `;`, `&`, and newlines.
 
 These checks read workflow and script text, not data. An allowlisted upload path, a log line or
-job summary, a remote reusable workflow, or a script that writes rows to its output could still
-carry data, and a pull request can edit the checks themselves. Review of every workflow and
-script change stays the control; the per-environment token split (decision b) limits what a
-leaked token reaches.
+job summary, a remote reusable workflow, a program called by another name or from inside a
+script (a reviewed `pnpm` command that itself uploads), or a file written in one step and sent
+from a token-less job could still carry data, and a pull request can edit the checks
+themselves. Review of every workflow and script change stays the control; the per-environment
+token split (decision b) limits what a leaked token reaches.
 
 ## Security boundary
 
