@@ -107,14 +107,18 @@ Where it runs:
   stays until the new one lands. While it waits, the form shows the queued source, the preview
   the current logo, and the note says "New logo pending"; saving the current logo's URL again
   cancels the queued replacement.
-- **Approvals** (`adoptStagedLogoPlans`, `adoptSubmissionImagePlans`): a listing logo row whose
-  source is the staged logo is kept, hosted or not (so a revision or claim keeps an unchanged
-  imported logo, relative and repo paths too); otherwise the submission's hosted logo is queued
-  for a copy into the listing's path, or its source is queued. The featured image is adopted
-  only as the reviewer saw it: the review screen and both previews show the hosted image (or why
-  there is none), the approval sends that key back, and the batch is refused if the image
-  changed since; a waiting or failed image, or a paid listing going live before review, adopts
-  none. The approval then hosts the listing's queue after its response (`settle`).
+- **Approvals** (`adoptStagedLogoPlans`, `adoptSubmissionImagePlans`) publish only what the
+  reviewer saw. The review screen and both previews show the hosted logo and featured image (or
+  why there is none); the approval sends those keys back and is refused if either changed since.
+  A listing logo row of the staged source is kept when it holds those bytes, or is an imported
+  row (relative and repo paths too); otherwise the reviewed copy is queued for a copy into the
+  listing's path. A logo or image that was not hosted at review is never fetched later: the
+  listing shows the fallback tile until an admin sets one. A paid listing going live at payment
+  copies only what is hosted then. The approval copies right after its response (`settle`).
+- **Reviewed copies only.** A slot copied from a submission is filled only with the reviewed
+  bytes: an R2 error retries the copy; if the reviewed object is gone, a refetch is accepted only
+  when its content hash is the reviewed key's, and otherwise the slot fails
+  (`reviewed_copy_changed`, `reviewed_copy_missing`), which the admin listing page shows.
 - **Worker cron** (`*/15`, the `listing-media` job in `apps/web/lib/worker/scheduled.ts`): retries
   due slots, ten per run, each claimed with a ten-minute lease, then deletes finished
   submissions' images. Retryable failures (timeouts, unreachable hosts, 408, 429, 5xx, a failed
@@ -150,8 +154,8 @@ Done on 2026-10-06: the `cdn-staging` bucket and both custom domains exist, and 
 
 - **Lifecycle rule for submission images.** The cron deletes a finished submission's images, but
   a submission row deleted outright (its queue rows cascade) leaves its objects behind. An R2
-  lifecycle rule on each bucket, prefix `best.serp.co/submissions/`, deleting objects after 90
-  days, catches those. Never put a rule on `best.serp.co/listings/` or on the bucket root (the
+  lifecycle rule on each bucket, prefix `best.serp.co/submissions/`, deleting objects after 365
+  days, catches those; it must outlast any review, though approval copies within minutes. Never put a rule on `best.serp.co/listings/` or on the bucket root (the
   `cdn` bucket is shared with serp.co).
 - **`nosniff` on the media hosts.** R2 custom domains do not send `X-Content-Type-Options`.
   Every object is stored with its sniffed `Content-Type` and SVG is never stored, so this is
