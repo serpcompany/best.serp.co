@@ -223,15 +223,21 @@ refused replacements, and each logo left on the tile are in `d1/media/2026-10-06
 - **Sources.** Cloudflare Images (most IDs were never uploaded), raw.githubusercontent.com, the
   `/media/products` originals on apps.serp.co (#89), the repository's logos, apps.serp.co, serp.ai.
 - **Default assets are missing.** `DEFAULT_ASSETS` lists by SHA-256 the placeholder chevron of
-  387 imported logos, the create-next-app favicon, Lovable's default Open Graph image, and the
-  Spaceship and Snagged for-sale icons. They are treated as missing wherever they appear.
+  387 imported logos, both create-next-app favicons, the create-react-app favicon and React logos,
+  Lovable's default Open Graph image, and the Spaceship and Snagged for-sale icons. They are
+  treated as missing wherever they appear.
 - **Replacements come only from the listing's own page** (owner decisions on #95):
   - the final page, after redirects and the short link's meta refresh, is on the listing's
-    registrable domain (its website's or its slug's), or is the SERP app's apps.serp.co page;
+    registrable domain (its website's or its slug's), or is the SERP app's apps.serp.co page; a
+    dead short link that ends on serp.co's catch-all falls back to the slug's domain;
+  - an off-domain page with the same brand is listed as a "likely rebrand"; the owner approves
+    one with a line in `scripts/migration/legacy-media-allowed-domains.json` (`"<slug>":
+    "<domain>"`) or `--allow-domain <slug>=<domain>`, and the next regeneration takes it;
   - it is not a parking, for-sale, gambling, or spam page (`pageFlags`).
   - The logo is the site icon, at least 64 px; the featured image is the social image.
-- **Adult listings** never take another site's Open Graph image: only SERP's curated screenshot
-  from apps.serp.co (serpcompany/store-new). Their site icons are fine.
+- **Adult listings**, by the Adult category or by an adult platform's name (`ADULT_TERMS`; the
+  report lists those missing the category), never take another site's Open Graph image: only
+  SERP's curated screenshot from apps.serp.co (serpcompany/store-new). Their site icons are fine.
 - **Owner sign-off.** A refused replacement leaves the tile and is listed in the report with its
   final page and reason; listing content never changes here (#100 covers hijacked listings).
 - `scripts/catalog-media.test.ts` applies the manifests to the import and checks that every logo
@@ -241,7 +247,8 @@ refused replacements, and each logo left on the tile are in `d1/media/2026-10-06
   logos and `media/products/launchbuzz.io/` (the fallback tile stays).
 
 Fetches are cached under `.runtime/legacy-media-cache`, through the DNS-checked Node fetcher, so
-a rerun reproduces the outputs byte for byte. `-- --retry-errors` refetches cached network errors,
+a rerun reproduces the outputs byte for byte. `--part-size <n>` sets the listings per manifest,
+and `--manifest-id <id>` names a regeneration. `-- --retry-errors` refetches cached network errors,
 429s, and 5xx answers. `-- --refresh <upload summary JSON>` refetches the source of every object
 the upload reported as failed, whatever the reason (a drifted source usually fails on its byte
 count, before its digest), so those keys follow the new bytes.
