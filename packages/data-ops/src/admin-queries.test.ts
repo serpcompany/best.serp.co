@@ -84,6 +84,13 @@ function fixture() {
       VALUES ('lst_brief', '2026-10-05T09:00:00.000Z', 'pass', NULL, 1),
         ('lst_brief', '2026-09-21T09:00:00.000Z', 'fail', 'missing', 1);
   `)
+  // Zeta's logo waits for the media cron after a failed attempt (#95).
+  db.exec(`
+    INSERT INTO media_ingestions (listing_id,kind,sort_order,source_url,status,attempts,
+      next_attempt_at,last_error)
+    VALUES ('lst_other','logo',0,'https://zeta.example/logo.png','pending',1,
+      '2026-10-06T12:15:00.000Z','http_503');
+  `)
   return createAdminReadOperations({ client: createDatabase(d1.asD1Database()) })
 }
 
@@ -246,6 +253,17 @@ describe('admin listing reads', () => {
         submitterEmail: 'maya@example.com'
       }
     })
+    expect(await reads.getAdminListing('zeta.example')).toMatchObject({
+      logoQueue: {
+        attempts: 1,
+        lastError: 'http_503',
+        nextAttemptAt: '2026-10-06T12:15:00.000Z',
+        sourceUrl: 'https://zeta.example/logo.png',
+        status: 'pending'
+      },
+      logoUrl: 'https://zeta.example/logo.png'
+    })
+    expect(await reads.getAdminListing('brieflow.ai')).toMatchObject({ logoQueue: null })
     expect(await reads.getAdminListing('missing.example')).toBeNull()
     expect(await reads.listActiveCategories()).toEqual([
       { name: 'Tools', slug: 'tools' },

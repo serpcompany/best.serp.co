@@ -6,6 +6,8 @@
  * Fails closed: an unknown environment or a missing `DB` or `MEDIA` binding refuses to ingest.
  */
 
+import type { ListingLogoIngestion } from '@serpdirectory/data-ops/listing-plans'
+import { ingestImage, scopedMediaBucket } from '@serpdirectory/data-ops/media-ingest'
 import {
   isMediaKey,
   LOCAL_MEDIA_PATH,
@@ -37,6 +39,36 @@ export function createWorkerMediaOperations(env: MediaWorkerEnv): MediaOperation
   if (!env.DB) throw new Error('D1 binding DB is required for listing media.')
   if (!env.MEDIA) throw new Error('R2 binding MEDIA is required for listing media.')
   return createMediaOperations({ bucket: env.MEDIA, db: env.DB, observe: log })
+}
+
+export interface MediaHost {
+  host(input: {
+    kind: 'image' | 'logo'
+    slug: string
+    sourceUrl: string
+  }): Promise<ListingLogoIngestion>
+}
+
+/**
+ * Copies one image into the bucket without touching D1, for a caller whose own batch records the
+ * result (the admin listing edit, #85). Undefined without a `MEDIA` binding.
+ */
+export function createMediaHost(env: MediaWorkerEnv): MediaHost | undefined {
+  const bucket = env.MEDIA
+  if (!bucket) return undefined
+  return {
+    async host(input) {
+      const result = await ingestImage({ ...input, bucket: scopedMediaBucket(bucket) })
+      log({
+        event: 'media_ingest',
+        outcome: result.ok ? 'hosted' : result.code,
+        target: 'admin-edit'
+      })
+      return result.ok
+        ? { hosted: result.media }
+        : { failure: { code: result.code, retryable: result.retryable } }
+    }
+  }
 }
 
 /** The cron (`triggers.crons` in wrangler.jsonc): retry the media slots that are due. */

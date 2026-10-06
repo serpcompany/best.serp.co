@@ -8,6 +8,7 @@ import {
 } from '@/components/admin/format'
 import type { ListingDetailView } from '@/components/admin/listing-detail'
 import { verifiedViaLabel } from './listing-labels'
+import { logoNote } from './logo-note'
 
 /**
  * Maps the admin listing read to what the listing screen renders (#64 screen 12), including the
@@ -152,6 +153,7 @@ export function listingDetailView(listing: AdminListingDetail): ListingDetailVie
     id: listing.id,
     linkRel: listing.linkRel,
     logoUrl: listing.logoUrl,
+    logoNote: logoNote(listing.logoQueue),
     meta,
     name: listing.name,
     owner: listing.owner

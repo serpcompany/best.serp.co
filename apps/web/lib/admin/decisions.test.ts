@@ -728,19 +728,99 @@ describe('listing decisions', () => {
         status: 422
       })
     }
+    // Without a media bucket the new logo is queued for the media cron, never hotlinked (#95).
     expect(
       await edit('lst_bare', 'bare.example', {
         logoUrl: 'https://assets.example/bare.png',
         name: 'Bare'
       })
-    ).toEqual({ fields: ['logo'], ok: true, replayed: false })
-    expect(logos('lst_bare')).toEqual([{ url: 'https://assets.example/bare.png' }])
+    ).toEqual({ fields: ['logo'], logo: 'pending', ok: true, replayed: false })
+    expect(logos('lst_bare')).toEqual([])
+    expect(
+      row("SELECT source_url,status FROM media_ingestions WHERE listing_id='lst_bare'")
+    ).toEqual({ source_url: 'https://assets.example/bare.png', status: 'pending' })
     expect(await edit('lst_local', 'local.example', { logoUrl: '', name: 'Local' })).toEqual({
       fields: ['logo'],
       ok: true,
       replayed: false
     })
     expect(logos('lst_local')).toEqual([])
+  })
+
+  it('hosts a changed logo before the edit, or queues it with the failure the admin sees', async () => {
+    const { context, db, row } = fixture()
+    const sha256 = 'a'.repeat(64)
+    const hosted = {
+      bytes: 512,
+      contentType: 'image/png',
+      height: 256,
+      key: `best.serp.co/listings/brieflow.ai/logo/${sha256.slice(0, 16)}.png`,
+      sha256,
+      sourceUrl: 'https://assets.example/new.png',
+      width: 256
+    }
+    const host = vi.fn(async (input: { sourceUrl: string }) =>
+      input.sourceUrl === hosted.sourceUrl
+        ? { hosted }
+        : { failure: { code: 'svg', retryable: false } }
+    )
+    const editLogo = (logoUrl: string) =>
+      updateListingDetails(context({ media: { host } }), {
+        details: {
+          categorySlug: String(
+            row(
+              "SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id='lst_brief' AND lc.is_primary=1"
+            )?.slug
+          ),
+          description: String(
+            row("SELECT description FROM listings WHERE id='lst_brief'")?.description
+          ),
+          logoUrl,
+          name: String(row("SELECT name FROM listings WHERE id='lst_brief'")?.name),
+          website: String(row("SELECT website FROM listings WHERE id='lst_brief'")?.website)
+        },
+        expectedChecksum: String(
+          row("SELECT checksum FROM listings WHERE id='lst_brief'")?.checksum
+        ),
+        listingId: 'lst_brief'
+      })
+    expect(await editLogo('https://assets.example/new.png')).toEqual({
+      fields: ['logo'],
+      logo: 'hosted',
+      ok: true,
+      replayed: false
+    })
+    expect(host).toHaveBeenCalledWith({
+      kind: 'logo',
+      slug: 'brieflow.ai',
+      sourceUrl: 'https://assets.example/new.png'
+    })
+    expect(
+      db
+        .prepare(
+          "SELECT url,media_key FROM listing_media WHERE listing_id='lst_brief' AND kind='logo'"
+        )
+        .all()
+    ).toEqual([{ media_key: hosted.key, url: hosted.sourceUrl }])
+    expect(await editLogo('https://assets.example/vector.svg')).toEqual({
+      fields: ['logo'],
+      logo: 'failed',
+      ok: true,
+      replayed: false
+    })
+    expect(
+      db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM listing_media WHERE listing_id='lst_brief' AND kind='logo'"
+        )
+        .get()
+    ).toEqual({ count: 0 })
+    expect(
+      row("SELECT status,last_error FROM media_ingestions WHERE listing_id='lst_brief'")
+    ).toEqual({
+      last_error: 'svg',
+      status: 'failed'
+    })
   })
 
   it('transfers to an account that exists, then removes the owner', async () => {

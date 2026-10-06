@@ -99,6 +99,8 @@ export interface ListingDetailView {
   description: string
   id: string
   linkRel: LinkRel
+  /** Set while the logo is not hosted yet (#95). */
+  logoNote: { text: string; tone: 'err' | 'warn' } | null
   logoUrl: string | null
   meta: string
   name: string
@@ -459,7 +461,17 @@ export function ListingDetail({
                 onChange={event => setDetails({ ...details, logoUrl: event.target.value })}
               />
             </div>
-            <FieldDescription>A square image URL (PNG, JPG, SVG or WebP).</FieldDescription>
+            <FieldDescription>
+              A square image URL (PNG, JPG, WebP, GIF, AVIF or ICO). It is copied to our media host;
+              an SVG can't be hosted.
+            </FieldDescription>
+            {view.logoNote ? (
+              view.logoNote.tone === 'err' ? (
+                <FieldError>{view.logoNote.text}</FieldError>
+              ) : (
+                <FieldDescription>{view.logoNote.text}</FieldDescription>
+              )
+            ) : null}
           </Field>
           {detailsError ? <FieldError>{detailsError}</FieldError> : null}
         </FieldGroup>

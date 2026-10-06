@@ -1,4 +1,6 @@
 import { urlKey, websiteSpellings } from '@serpdirectory/utils/url-key'
+import { type HostedMedia, isMediaKey } from './media-keys'
+import { buildQueueMediaPlans, buildRecordMediaFailurePlans } from './media-plans'
 import {
   assertPreviousStatementChangedOne,
   beginCatalogPublicationPlans,
@@ -402,6 +404,68 @@ export interface ListingDetailsEdit {
 export type ListingDetailsField = 'category' | 'description' | 'logo' | 'name' | 'website'
 
 /**
+ * What became of a changed logo's source before the edit's batch (#95): hosted (its key and
+ * metadata), or a failed first attempt (queued for the media cron, or failed for good). Without
+ * an outcome (no media binding) the source is queued untried. The logo row is never the URL.
+ */
+export type ListingLogoIngestion =
+  | { hosted: HostedMedia }
+  | { failure: { code: string; retryable: boolean } }
+
+/** The changed logo's statements: hosted row, or a queued or failed slot behind the tile. */
+function changedLogoPlans(input: {
+  ingestion?: ListingLogoIngestion
+  listingId: string
+  logoUrl: string
+  now: string
+}): StatementPlan[] {
+  const { listingId, logoUrl } = input
+  const cleared: StatementPlan[] = [
+    { sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'`, params: [listingId] },
+    { sql: `DELETE FROM media_ingestions WHERE listing_id=? AND kind='logo'`, params: [listingId] }
+  ]
+  if (!logoUrl) return cleared
+  const ingestion = input.ingestion
+  if (ingestion && 'hosted' in ingestion) {
+    const media = ingestion.hosted
+    if (media.sourceUrl !== logoUrl || !isMediaKey(media.key) || !media.key.includes('/logo/')) {
+      throw new Error('The hosted logo must be a logo key for the edited source.')
+    }
+    return [
+      ...cleared,
+      {
+        sql: `INSERT INTO listing_media
+          (listing_id,kind,url,sort_order,media_key,sha256,content_type,bytes,width,height)
+          VALUES (?,'logo',?,0,?,?,?,?,?,?)`,
+        params: [
+          listingId,
+          logoUrl,
+          media.key,
+          media.sha256,
+          media.contentType,
+          media.bytes,
+          media.width,
+          media.height
+        ]
+      }
+    ]
+  }
+  const slot = { kind: 'logo' as const, sortOrder: 0, sourceUrl: logoUrl, target: { listingId } }
+  return [
+    ...cleared,
+    ...(ingestion
+      ? buildRecordMediaFailurePlans({
+          ...slot,
+          attempts: 1,
+          code: ingestion.failure.code,
+          now: input.now,
+          retryable: ingestion.failure.retryable
+        })
+      : buildQueueMediaPlans({ ...slot, now: input.now }))
+  ]
+}
+
+/**
  * An admin's edit of a listing's details: name, short description, website, primary category,
  * and logo. It compares and swaps on the checksum the admin saw, so a concurrent change is never
  * overwritten, and writes the publication's checksum. Refused while the listing's own submission
@@ -413,13 +477,16 @@ export type ListingDetailsField = 'category' | 'description' | 'logo' | 'name' |
  * The website and logo are validated and written only when `fields` names them (#64 review):
  * an imported listing keeps the website, site-relative logo, or missing logo it was imported
  * with through any other edit. A changed website or logo follows the submission intake's URL
- * rule, and an emptied logo removes the logo row.
+ * rule, and an emptied logo removes the logo row. A changed logo is written as its hosted copy,
+ * or queued for the media cron behind the fallback tile; never as a hotlink (#95).
  */
 export function buildUpdateListingDetailsPlans(input: {
   details: ListingDetailsEdit
   expectedChecksum: string
   fields: readonly ListingDetailsField[]
   listingId: string
+  /** The changed logo's ingestion outcome (`ListingLogoIngestion`); ignored without a logo change. */
+  logoIngestion?: ListingLogoIngestion
   publication: CatalogPublication
 }): StatementPlan[] {
   const { details, listingId } = input
@@ -487,22 +554,14 @@ export function buildUpdateListingDetailsPlans(input: {
       params: [listingId, details.categorySlug]
     },
     assertPreviousStatementChangedOne('listing_primary_category_set'),
+    // A changed logo is hosted or queued, never stored as a hotlink (#95).
     ...(changesLogo
-      ? [
-          {
-            sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='logo'`,
-            params: [listingId]
-          },
-          ...(logoUrl
-            ? [
-                {
-                  sql: `INSERT INTO listing_media (listing_id,kind,url,sort_order)
-                    VALUES (?,'logo',?,0)`,
-                  params: [listingId, logoUrl]
-                }
-              ]
-            : [])
-        ]
+      ? changedLogoPlans({
+          ingestion: input.logoIngestion,
+          listingId,
+          logoUrl,
+          now: input.publication.now
+        })
       : []),
     {
       sql: `UPDATE listings SET status='approved' WHERE id=? AND status='draft'`,

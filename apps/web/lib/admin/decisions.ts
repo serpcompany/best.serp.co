@@ -40,6 +40,7 @@ import {
   buildUpdateListingDetailsPlans,
   type ListingDetailsEdit,
   type ListingDetailsField,
+  type ListingLogoIngestion,
   selectListingForPublicationPlan
 } from '@serpdirectory/data-ops/listing-plans'
 import { executePlans, isPlanConflict, queryPlan } from '@serpdirectory/data-ops/plan-runner'
@@ -93,10 +94,24 @@ export interface AdminRefunds {
   refundRejectedSubmission(input: { actor: string; submissionId: string }): Promise<void>
 }
 
+/**
+ * Copies a listing image into the environment's media bucket (#95): `createMediaHost` in
+ * `lib/media/worker-media.ts`. Absent without a `MEDIA` binding; a changed logo is then queued
+ * for the media cron instead.
+ */
+export interface AdminMediaHost {
+  host(input: {
+    kind: 'image' | 'logo'
+    slug: string
+    sourceUrl: string
+  }): Promise<ListingLogoIngestion>
+}
+
 export interface AdminContext {
   /** The admin's verified email: the actor recorded on every decision. */
   actor: string
   client: Database
+  media?: AdminMediaHost
   /** Builds an email event key (`emailEventKey` in production). */
   eventKey: (event: string, ...ids: string[]) => string
   notify: AdminNotify
@@ -944,17 +959,20 @@ async function websiteConflict(
   return null
 }
 
+/** What became of a changed logo: hosted now, or queued (`pending`) or `failed` behind the tile. */
+export type LogoOutcome = 'failed' | 'hosted' | 'pending'
+
 export function updateListingDetails(
   context: AdminContext,
   input: Parameters<typeof updateListingDetailsOnce>[1]
-): Promise<Decision<{ fields: string[] }>> {
+): Promise<Decision<{ fields: string[]; logo?: LogoOutcome }>> {
   return retryPublicationRace(() => updateListingDetailsOnce(context, input))
 }
 
 async function updateListingDetailsOnce(
   context: AdminContext,
   input: { details: ListingDetailsEdit; expectedChecksum: string; listingId: string }
-): Promise<Decision<{ fields: string[] }>> {
+): Promise<Decision<{ fields: string[]; logo?: LogoOutcome }>> {
   const snapshot = await listingSnapshot(context, input.listingId)
   if (!snapshot) return notFound('listing')
   const reads = createAdminReadOperations({ client: context.client })
@@ -1000,6 +1018,21 @@ async function updateListingDetailsOnce(
     const conflict = await websiteConflict(context, input.listingId, details.website)
     if (conflict) return conflict
   }
+  // A new logo is copied into the media bucket before the batch, never stored as a hotlink (#95).
+  const logoIngestion =
+    fields.includes('logo') && details.logoUrl && context.media
+      ? await context.media.host({ kind: 'logo', slug: snapshot.slug, sourceUrl: details.logoUrl })
+      : undefined
+  const logo: LogoOutcome | undefined =
+    !fields.includes('logo') || !details.logoUrl
+      ? undefined
+      : !logoIngestion
+        ? 'pending'
+        : 'hosted' in logoIngestion
+          ? 'hosted'
+          : logoIngestion.failure.retryable
+            ? 'pending'
+            : 'failed'
   const decision = await commit(
     context,
     buildUpdateListingDetailsPlans({
@@ -1007,10 +1040,11 @@ async function updateListingDetailsOnce(
       expectedChecksum: input.expectedChecksum,
       fields,
       listingId: input.listingId,
+      logoIngestion,
       publication: await listingPublication(context, snapshot, 'listing-edit', nowIso(context))
     }),
     async () => false,
-    { fields },
+    logo ? { fields, logo } : { fields },
     listingRead(context, snapshot)
   )
   log(context, 'edit_listing', input.listingId, decision.ok ? fields.join(',') : decision.error)

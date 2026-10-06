@@ -340,7 +340,7 @@ test.describe('listings', () => {
     }
   })
 
-  test('edits imported listings with no logo or a site-relative logo; a new logo is checked', async ({
+  test('edits imported listings with no logo or a site-relative logo; a new logo is checked and hosted', async ({
     baseURL,
     page
   }) => {
@@ -374,6 +374,23 @@ test.describe('listings', () => {
           page.getByText('The logo needs a public http or https image URL.').first()
         ).toBeVisible()
         expect(logos(listing.id)).toEqual([{ url: logo }])
+        // A valid new logo is copied to the media host first, never stored as a hotlink (#95).
+        // This source cannot be fetched, so the logo waits for the media cron behind the tile.
+        const unreachable = 'https://unreachable.best-serp-co.test/new-logo.png'
+        await page.reload()
+        await page.getByLabel('Logo', { exact: true }).fill(unreachable)
+        await page.getByRole('button', { name: 'Save changes' }).click()
+        await expect(page.getByText('Saved.')).toBeVisible()
+        expect(logos(listing.id)).toEqual([])
+        expect(
+          localD1<{ attempts: number; source_url: string; status: string }>(
+            `SELECT source_url, status, attempts FROM media_ingestions
+              WHERE listing_id = ${q(listing.id)} AND kind = 'logo'`
+          )
+        ).toEqual([{ attempts: 1, source_url: unreachable, status: 'pending' }])
+        await page.reload()
+        await expect(page.getByLabel('Logo', { exact: true })).toHaveValue(unreachable)
+        await expect(page.getByText(/^Waiting to be hosted after 1 failed attempt/u)).toBeVisible()
       }
     }
   })

@@ -344,6 +344,10 @@ export function selectAdminListingPlans(slug: string): StatementPlan[] {
           CASE WHEN EXISTS (SELECT 1 FROM listing_submissions q WHERE q.listing_id=l.id
             AND q.status IN ('paid_pending_review','changes_requested')) THEN 1 ELSE 0 END
             AS submission_queued,
+          (SELECT json_object('attempts',j.attempts,'lastError',j.last_error,
+              'nextAttemptAt',j.next_attempt_at,'sourceUrl',j.source_url,'status',j.status)
+            FROM media_ingestions j WHERE j.listing_id=l.id AND j.kind='logo' AND j.sort_order=0)
+            AS logo_queue,
           s.id AS submission_id,s.status AS submission_status,s.paid_at AS submission_paid_at,
           s.refunded_at AS submission_refunded_at,s.rejection_reason,s.rejection_category,
           s.reviewed_by AS submission_reviewed_by,s.reviewed_at AS submission_reviewed_at,
@@ -649,6 +653,17 @@ export interface AdminListingDetail extends AdminListingRow {
   categorySlug: string | null
   checksum: string
   description: string
+  /**
+   * The logo when it is not hosted yet (#95): queued for the media cron (`pending`) or given up
+   * (`failed`, with the reason). The page shows the fallback tile meanwhile.
+   */
+  logoQueue: {
+    attempts: number
+    lastError: string | null
+    nextAttemptAt: string | null
+    sourceUrl: string
+    status: 'failed' | 'pending'
+  } | null
   owner: {
     email: string
     userId: string
@@ -684,6 +699,19 @@ export interface CategoryOption {
 }
 
 type Row = Record<string, unknown>
+
+function parseLogoQueue(value: unknown): AdminListingDetail['logoQueue'] {
+  if (typeof value !== 'string' || !value) return null
+  const queue = JSON.parse(value) as Record<string, unknown>
+  if (queue.status !== 'pending' && queue.status !== 'failed') return null
+  return {
+    attempts: Number(queue.attempts),
+    lastError: optionalText(queue.lastError),
+    nextAttemptAt: optionalText(queue.nextAttemptAt),
+    sourceUrl: text(queue.sourceUrl),
+    status: queue.status
+  }
+}
 
 function events(rows: Row[], fallback: ActivityEvent['source']): ActivityEvent[] {
   return rows.map(row => ({
@@ -785,8 +813,13 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
       if (!row) return null
       const ownerEmail = optionalText(row.owner_email)
       const submissionId = optionalText(row.submission_id)
+      const logoQueue = parseLogoQueue(row.logo_queue)
+      const listing = listingRow(row)
       return {
-        ...listingRow(row),
+        ...listing,
+        // A queued logo is still the logo the admin set: the form shows its source.
+        logoUrl: listing.logoUrl ?? logoQueue?.sourceUrl ?? null,
+        logoQueue,
         activity: events(activity ?? [], 'listing'),
         badgeChecks: badgeChecks(checks ?? []),
         block: block(row),
