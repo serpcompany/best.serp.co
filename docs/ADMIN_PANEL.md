@@ -81,7 +81,8 @@ below), and otherwise sends the reviewed statement plans as one D1 batch:
 - **A new website must not collide** (`listingWebsiteConflicts`, the intake's rule). It is
   refused when another listing's slug is its host (`urlKey`), when another listing's stored
   website is one of its spellings (`websiteSpellings`: http or https, with or without `www.`,
-  with or without a trailing slash), when its host is a submission in flight, or when an active
+  with or without a trailing slash, and with any query or fragment ignored on either side,
+  `listingWebsiteMatch`), when its host is a submission in flight, or when an active
   prohibited-URL block covers its host. The decision answers 409 with which one, and the edit's
   batch refuses the same collisions. The slug never changes. Other listings' websites are
   compared as URLs, not hosts: most imported slugs aren't their host, so a listing at

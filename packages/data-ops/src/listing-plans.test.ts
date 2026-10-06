@@ -9,6 +9,7 @@ import {
   buildUnpublishListingPlans,
   buildUpdateListingDetailsPlans,
   type ListingDetailsField,
+  listingWebsiteMatch,
   selectListingForPublicationPlan
 } from './listing-plans'
 import { prepareCatalogPublication } from './plan-support'
@@ -605,13 +606,19 @@ describe('listing activity log and admin edits (#64)', () => {
     const listed = database()
     seedLiveListing(listed, 'lst_other', { slug: 'other.example' })
     expectRefused(listed, move(listed, 'https://www.other.example/pricing'))
-    // Another listing's stored website in another spelling (scheme, www., trailing slash).
-    const spelled = database()
-    seedLiveListing(spelled, 'lst_beta', { slug: 'beta-tool' })
-    spelled
-      .prepare("UPDATE listings SET website='https://www.new.example' WHERE id='lst_beta'")
-      .run()
-    expectRefused(spelled, move(spelled, 'http://new.example/'))
+    // Another listing's stored website in another spelling (scheme, www., trailing slash), or
+    // with a query or fragment on either side.
+    for (const [stored, website] of [
+      ['https://www.new.example', 'http://new.example/'],
+      ['https://www.new.example', 'https://new.example/?ref=abc'],
+      ['https://new.example/?ref=abc', 'https://new.example/'],
+      ['https://new.example/#top', 'https://www.new.example']
+    ] as const) {
+      const spelled = database()
+      seedLiveListing(spelled, 'lst_beta', { slug: 'beta-tool' })
+      spelled.prepare("UPDATE listings SET website=? WHERE id='lst_beta'").run(stored)
+      expectRefused(spelled, move(spelled, website))
+    }
     // A submission in flight for the host.
     const inFlight = database()
     inFlight
@@ -650,6 +657,46 @@ describe('listing activity log and admin edits (#64)', () => {
       .run()
     execute(legacy, move(legacy, 'https://lst_live.example/home', ['name']))
     expect(listing(legacy)).toMatchObject({ name: 'Renamed' })
+  })
+
+  it('matches another listing by host slug, or by stored website with its query or fragment ignored', () => {
+    const db = database()
+    seedLiveListing(db, 'lst_beta', { slug: 'beta-tool' })
+    const listed = (website: string, exceptListingId = listingId) => {
+      const match = listingWebsiteMatch({ exceptListingId, website })
+      return (
+        db.prepare(`SELECT ${match.sql} AS listed`).get(...(match.params as string[])) as {
+          listed: number
+        }
+      ).listed
+    }
+    const matches = (stored: string, website: string) => {
+      db.prepare("UPDATE listings SET website=? WHERE id='lst_beta'").run(stored)
+      return listed(website)
+    }
+    // Both directions: a query or fragment on the stored or the new URL doesn't matter.
+    for (const [stored, website] of [
+      ['https://x.example/', 'https://x.example/?ref=abc'],
+      ['https://x.example/', 'https://x.example/#top'],
+      ['https://x.example/?ref=abc', 'https://x.example/'],
+      ['https://x.example/#top', 'https://x.example/'],
+      ['https://www.x.example?ref=abc', 'http://x.example/#top'],
+      ['https://x.example/tool?ref=abc', 'https://www.x.example/tool/'],
+      ['https://x.example/?ref=abc', 'https://x.example/?ref=other']
+    ] as const) {
+      expect(matches(stored, website), `${stored} ${website}`).toBe(1)
+    }
+    // Another page on the host, or a path that only starts the same, is another website.
+    for (const [stored, website] of [
+      ['https://x.example/tool?ref=abc', 'https://x.example/'],
+      ['https://x.example/tool-pro?ref=abc', 'https://x.example/tool'],
+      ['https://x.example/?ref=abc', 'https://x.example/tool']
+    ] as const) {
+      expect(matches(stored, website), `${stored} ${website}`).toBe(0)
+    }
+    // A listing never matches itself; another listing's slug that is the host does.
+    expect(listed('https://lst_live.example/?ref=abc')).toBe(0)
+    expect(listed('https://lst_live.example/?ref=abc', 'lst_beta')).toBe(1)
   })
 
   it('validates and writes the website and logo only when the edit changes them', () => {

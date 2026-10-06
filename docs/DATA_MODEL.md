@@ -158,8 +158,10 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   `www.` are removed. The host is the slug and the duplicate key: a website is already listed
   when a listing's slug is its host, or a listing's stored website is one of its spellings
   (`websiteSpellings()`: http or https, with or without `www.`, with or without a trailing
-  slash). Intake and the admin website edit share that rule; comparing stored websites by host
-  needs a stored key (#94), because most imported slugs aren't hosts. `block_key` is the host's
+  slash, any query or fragment ignored on either side). Intake and the admin website edit share
+  that rule (`listingWebsiteMatch`), and the stored website stays as entered. Comparing stored
+  websites by host needs a stored key (#94), because most imported slugs aren't hosts.
+  `block_key` is the host's
   registrable domain per the Public Suffix List, private section included (`tldts` 7.4.16,
   128 KB minified, 46 KB gzipped, no Node APIs), so `user.github.io` is its own site. The app
   computes it at intake and stores it with its scope (`block_covers_subdomains`), because SQLite

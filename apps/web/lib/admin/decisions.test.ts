@@ -636,7 +636,21 @@ describe('listing decisions', () => {
         expectedChecksum: String(row('SELECT checksum FROM listings WHERE id=?', id)?.checksum),
         listingId: id
       })
-    for (const website of ['https://new.example/', 'https://new.example', 'http://new.example']) {
+    for (const website of [
+      'https://new.example/',
+      'https://new.example',
+      'http://new.example',
+      'https://new.example/?ref=abc',
+      'https://new.example/#top'
+    ]) {
+      expect(await moveTo('lst_brief', website), website).toMatchObject({
+        error: 'website_listed',
+        status: 409
+      })
+    }
+    // The other direction: another listing stores its website with a query or fragment.
+    db.exec("UPDATE listings SET website = 'https://query.example/?ref=abc' WHERE id = 'lst_beta'")
+    for (const website of ['https://query.example/', 'https://www.query.example#top']) {
       expect(await moveTo('lst_brief', website), website).toMatchObject({
         error: 'website_listed',
         status: 409

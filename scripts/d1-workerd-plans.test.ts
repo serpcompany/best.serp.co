@@ -758,6 +758,31 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         })
       )
     ).toEqual([{ blocked: 0, listing: 0, submission: 0 }])
+    // Stored websites match with a query or fragment on either side (json_each and the
+    // `listings_website_idx` ranges run on D1 too). The slug isn't the host here.
+    await db
+      .prepare("UPDATE listings SET website='https://moved.example/?ref=abc' WHERE id='lst-keep'")
+      .run()
+    for (const website of ['https://moved.example/', 'https://www.moved.example/#top']) {
+      expect(
+        await all(Q.selectListingWebsiteConflictPlan({ listingId: 'lst-free', website })),
+        website
+      ).toEqual([{ blocked: 0, listing: 1, submission: 0 }])
+    }
+    await db
+      .prepare("UPDATE listings SET website='https://moved.example' WHERE id='lst-keep'")
+      .run()
+    expect(
+      await all(
+        Q.selectListingWebsiteConflictPlan({
+          listingId: 'lst-free',
+          website: 'https://moved.example/?ref=producthunt'
+        })
+      )
+    ).toEqual([{ blocked: 0, listing: 1, submission: 0 }])
+    await db
+      .prepare("UPDATE listings SET website='https://keep.example/' WHERE id='lst-keep'")
+      .run()
     const reads = createAdminReadOperations({ client: createDatabase(db) })
     expect(await reads.getAdminListing('free-tool.example')).toMatchObject({
       adminStatus: 'unlisted',

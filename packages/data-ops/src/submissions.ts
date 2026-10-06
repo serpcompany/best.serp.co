@@ -1,9 +1,10 @@
 import { isValidAssetReference } from '@serpdirectory/utils/asset-reference'
 import { hasFileExtension } from '@serpdirectory/utils/file-extensions'
-import { type UrlKey, urlKey, websiteSpellings } from '@serpdirectory/utils/url-key'
-import { and, eq, inArray, or, sql } from 'drizzle-orm'
+import { type UrlKey, urlKey } from '@serpdirectory/utils/url-key'
+import { and, eq, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
+import { listingWebsiteMatch } from './listing-plans'
 import { assertStagedChildLimits } from './plan-support'
 import { validatePublicHttpUrl } from './public-url'
 import {
@@ -14,7 +15,6 @@ import {
   listingSubmissionRateLimits,
   listingSubmissionResourceLinks,
   listingSubmissions,
-  listings,
   type SubmissionStatus
 } from './schema'
 import { assertPreviousStatementChangedOne } from './submission-plans'
@@ -330,19 +330,17 @@ export function createSubmissionOperations(config: {
             .where(and(eq(categories.slug, input.category), eq(categories.isActive, true)))
             .limit(1)
         ),
-        queryFirst(
-          client.database
-            .select({ id: listings.id })
-            .from(listings)
-            // The admin website edit matches listings the same way (`listingWebsiteConflicts`).
-            .where(
-              or(
-                eq(listings.slug, slug),
-                inArray(listings.website, websiteSpellings(input.website))
-              )
-            )
-            .limit(1)
-        ),
+        // The admin website edit matches listings with the same rule (`listingWebsiteConflicts`).
+        (async () => {
+          const match = listingWebsiteMatch({ website: input.website })
+          return (
+            (await prepareRaw(
+              client,
+              `SELECT 1 AS listed WHERE ${match.sql}`,
+              match.params
+            ).first()) ?? null
+          )
+        })(),
         // A prohibited rejection blocks the registrable domain and its subdomains until an admin
         // lifts it (DATA_MODEL.md); the insert trigger enforces the same rule.
         (async () => {

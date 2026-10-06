@@ -236,8 +236,20 @@ describe('shared submission data operations', () => {
     for (const website of [
       'https://new.example/',
       'http://new.example',
-      'https://www.new.example/'
+      'https://www.new.example/',
+      'https://new.example/?ref=producthunt',
+      'https://new.example/#top'
     ]) {
+      await expect(
+        operations().createSubmission({ ...input, website }),
+        website
+      ).rejects.toMatchObject({ code: 'listing_exists', status: 409 })
+    }
+    // The other direction: a stored website with a query or fragment.
+    sqlite.database
+      .prepare("UPDATE listings SET website='https://new.example/?ref=abc#top' WHERE id='lst_beta'")
+      .run()
+    for (const website of ['https://new.example/', 'https://www.new.example#pricing']) {
       await expect(
         operations().createSubmission({ ...input, website }),
         website

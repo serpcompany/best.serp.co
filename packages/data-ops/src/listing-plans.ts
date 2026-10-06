@@ -54,12 +54,41 @@ function listingEvent(
 }
 
 /**
+ * Whether a listing already has `website` (#64 review): the one rule submission intake
+ * (`createSubmission`) and the admin website edit (`listingWebsiteConflicts`) share. A listing
+ * matches when its slug is the website's host (`urlKey`), or its stored website (kept as
+ * entered) is the URL as given or one of its spellings (`websiteSpellings`), with or without a
+ * query or fragment after it. So `https://x.example/?ref=abc`, `https://x.example/#top` and
+ * `https://x.example/` collide whichever is stored. Both halves use `listings_website_idx`: an IN
+ * list, and one range per spelling (`spelling#` up to `spelling@`, then `?` or `#` next).
+ */
+export function listingWebsiteMatch(input: {
+  exceptListingId?: string
+  website: string
+}): PlanGuard {
+  const website = input.website.trim()
+  const host = urlKey(website).hostKey
+  const spellings = websiteSpellings(website)
+  const exact = [...new Set([website, ...spellings])]
+  const except = input.exceptListingId === undefined ? [] : [input.exceptListingId]
+  return {
+    sql: `(EXISTS (SELECT 1 FROM listings WHERE ${except.length ? 'id<>? AND ' : ''}(slug=?
+        OR website IN (${exact.map(() => '?').join(',')})))
+      OR EXISTS (SELECT 1 FROM json_each(?) spelling JOIN listings suffixed
+        ON suffixed.website >= spelling.value || '#' AND suffixed.website < spelling.value || '@'
+        AND substr(suffixed.website, length(spelling.value) + 1, 1) IN ('?', '#')
+        ${except.length ? 'WHERE suffixed.id<>?' : ''}))`,
+    params: [...except, host, ...exact, JSON.stringify(spellings), ...except]
+  }
+}
+
+/**
  * What stops a listing from moving to another website (#64 review), with the submission
  * intake's rules (`createSubmission`): the website must pass `validatePublicHttpUrl`; no other
- * listing may have its host (`urlKey`) as its slug or one of its spellings (`websiteSpellings`)
- * as its website; its host must not be the slug of a submission in flight (other than this
- * listing's own); and no active prohibited-URL block may cover it (the
- * `listing_submissions_refuse_blocked_url` trigger's rule). Throws for an invalid website.
+ * listing may already have it (`listingWebsiteMatch`); its host must not be the slug of a
+ * submission in flight (other than this listing's own); and no active prohibited-URL block may
+ * cover it (the `listing_submissions_refuse_blocked_url` trigger's rule). Throws for an invalid
+ * website.
  */
 export function listingWebsiteConflicts(input: { listingId: string; website: string }): {
   block: PlanGuard
@@ -69,7 +98,6 @@ export function listingWebsiteConflicts(input: { listingId: string; website: str
   const website = input.website.trim()
   if (!validatePublicHttpUrl(website).ok) throw new Error('A website must be a public HTTP(S) URL.')
   const host = urlKey(website).hostKey
-  const spellings = websiteSpellings(website)
   const statuses = activeSubmissionStatuses.map(() => '?').join(',')
   return {
     block: {
@@ -77,11 +105,7 @@ export function listingWebsiteConflicts(input: { listingId: string; website: str
         AND (url_key=? OR (covers_subdomains=1 AND substr(?, -1 - length(url_key))='.' || url_key)))`,
       params: [host, host]
     },
-    listing: {
-      sql: `EXISTS (SELECT 1 FROM listings WHERE id<>? AND (slug=?
-        OR website IN (${spellings.map(() => '?').join(',')})))`,
-      params: [input.listingId, host, ...spellings]
-    },
+    listing: listingWebsiteMatch({ exceptListingId: input.listingId, website }),
     submission: {
       sql: `EXISTS (SELECT 1 FROM listing_submissions WHERE slug=? AND status IN (${statuses})
         AND (listing_id IS NULL OR listing_id<>?))`,

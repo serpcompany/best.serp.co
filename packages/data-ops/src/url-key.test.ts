@@ -98,20 +98,24 @@ describe('urlKey (shared website normalization, #62 review finding 4)', () => {
       ])
     )
     expect(root).toHaveLength(8)
-    // Every spelling of the same website gives the same set.
+    // Every spelling of the same website gives the same set, without its query or fragment.
     for (const website of [
       'https://new.example',
       'http://WWW.New.Example/',
-      'https://new.example./'
+      'https://new.example./',
+      'https://new.example/?ref=abc',
+      'https://www.new.example#top',
+      'http://new.example/?ref=abc#top'
     ]) {
-      expect(new Set(websiteSpellings(website)), website).toEqual(new Set([...root, website]))
+      expect(new Set(websiteSpellings(website)), website).toEqual(new Set(root))
     }
-    // A path keeps its own spellings, with its query; another path is another website.
+    // A path keeps its own spellings; another path is another website.
     const path = websiteSpellings('https://www.serp.ly/tool/?ref=1')
     expect(path).toEqual(
-      expect.arrayContaining(['https://serp.ly/tool?ref=1', 'http://www.serp.ly/tool/?ref=1'])
+      expect.arrayContaining(['https://serp.ly/tool', 'http://www.serp.ly/tool/'])
     )
-    expect(path).not.toContain('https://serp.ly/?ref=1')
+    expect(path.some(spelling => /[?#]/u.test(spelling))).toBe(false)
+    expect(path).not.toContain('https://serp.ly/')
     expect(websiteSpellings('https://serp.ly/other')).not.toContain('https://serp.ly/tool')
     expect(websiteSpellings('https://example.com:8443/')).toContain('https://www.example.com:8443')
   })
