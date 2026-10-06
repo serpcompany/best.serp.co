@@ -1134,6 +1134,104 @@ export const listingEvents = sqliteTable(
   ]
 )
 
+/**
+ * How a claim (#67) proves ownership after the domain email: the badge on the site (free), or a
+ * payment (#68).
+ */
+export const listingClaimMethods = ['badge', 'paid'] as const
+export type ListingClaimMethod = (typeof listingClaimMethods)[number]
+
+/**
+ * A claim's progress: a code was sent to the domain address (`code_sent`), the address was
+ * confirmed (`email_verified`, waiting for the badge or the payment), ownership was granted
+ * (`completed`), or it ended without ownership (`cancelled`: someone else's claim completed, the
+ * listing left the catalog, or the claimer started over).
+ */
+export const listingClaimStatuses = [
+  'code_sent',
+  'email_verified',
+  'completed',
+  'cancelled'
+] as const
+export type ListingClaimStatus = (typeof listingClaimStatuses)[number]
+
+/** A claim that can still complete. A user has at most one per listing. */
+export const openListingClaimStatuses = [
+  'code_sent',
+  'email_verified'
+] as const satisfies readonly ListingClaimStatus[]
+
+/**
+ * Claims of existing listings (#67): a signed-in user proves an address on the listing's
+ * domain with a single-use code, then the badge or a payment, and becomes its owner
+ * (`listing_owners`, `verified_via` `badge_claim` or `paid_claim`). The code is stored only as a
+ * keyed hash (`code_hash`, HMAC under a key derived from the auth secret) and cleared once used.
+ * `attempts` counts wrong codes for the current code; the fifth locks the claim until
+ * `locked_until`. Instants are ISO strings (CHECKs) so they compare as text.
+ */
+export const listingClaims = sqliteTable(
+  'listing_claims',
+  {
+    id: text('id').primaryKey(),
+    listingId: text('listing_id')
+      .notNull()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    method: text('method', { enum: listingClaimMethods }).notNull(),
+    status: text('status', { enum: listingClaimStatuses }).notNull().default('code_sent'),
+    /** The domain address the code went to (lowercase). */
+    email: text('email').notNull(),
+    /** Its registrable domain, equal to the listing website's. */
+    emailDomain: text('email_domain').notNull(),
+    codeHash: text('code_hash'),
+    codeSentAt: text('code_sent_at').notNull(),
+    codeExpiresAt: text('code_expires_at').notNull(),
+    codesSent: integer('codes_sent').notNull().default(1),
+    attempts: integer('attempts').notNull().default(0),
+    lockedUntil: text('locked_until'),
+    emailVerifiedAt: text('email_verified_at'),
+    badgeCheckedAt: text('badge_checked_at'),
+    completedAt: text('completed_at'),
+    createdAt: text('created_at').notNull().default(currentTimestamp),
+    updatedAt: text('updated_at').notNull().default(currentTimestamp)
+  },
+  table => [
+    check('listing_claims_method_valid', sql`${table.method} IN (${sqlList(listingClaimMethods)})`),
+    check(
+      'listing_claims_status_valid',
+      sql`${table.status} IN (${sqlList(listingClaimStatuses)})`
+    ),
+    check('listing_claims_attempts_range', sql`${table.attempts} BETWEEN 0 AND 5`),
+    check('listing_claims_codes_sent_positive', sql`${table.codesSent} >= 1`),
+    check('listing_claims_code_sent_at_iso', isoInstantCheck(table.codeSentAt)),
+    check('listing_claims_code_expires_at_iso', isoInstantCheck(table.codeExpiresAt)),
+    check('listing_claims_locked_until_iso', isoInstantCheck(table.lockedUntil)),
+    check('listing_claims_email_verified_at_iso', isoInstantCheck(table.emailVerifiedAt)),
+    check('listing_claims_badge_checked_at_iso', isoInstantCheck(table.badgeCheckedAt)),
+    check('listing_claims_completed_at_iso', isoInstantCheck(table.completedAt)),
+    // A code is pending only before the address is confirmed; a confirmed claim has the time.
+    check(
+      'listing_claims_code_while_sent',
+      sql`${table.codeHash} IS NULL OR ${table.status} = 'code_sent'`
+    ),
+    check(
+      'listing_claims_verified_complete',
+      sql`${table.status} NOT IN ('email_verified', 'completed') OR ${table.emailVerifiedAt} IS NOT NULL`
+    ),
+    check(
+      'listing_claims_completed_complete',
+      sql`(${table.status} = 'completed') = (${table.completedAt} IS NOT NULL)`
+    ),
+    uniqueIndex('listing_claims_open_idx')
+      .on(table.listingId, table.userId)
+      .where(sql`${table.status} IN (${sqlList(openListingClaimStatuses)})`),
+    index('listing_claims_listing_idx').on(table.listingId),
+    index('listing_claims_user_idx').on(table.userId, table.createdAt)
+  ]
+)
+
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   listingOwnerships: many(listingOwners),
@@ -1296,6 +1394,11 @@ export const listingRevisionEventsRelations = relations(listingRevisionEvents, (
 
 export const badgeChecksRelations = relations(badgeChecks, ({ one }) => ({
   listing: one(listings, { fields: [badgeChecks.listingId], references: [listings.id] })
+}))
+
+export const listingClaimsRelations = relations(listingClaims, ({ one }) => ({
+  listing: one(listings, { fields: [listingClaims.listingId], references: [listings.id] }),
+  user: one(users, { fields: [listingClaims.userId], references: [users.id] })
 }))
 
 export const listingEventsRelations = relations(listingEvents, ({ one }) => ({

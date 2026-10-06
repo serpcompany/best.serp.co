@@ -209,6 +209,14 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   from the one-off check at refund (#68). `0006_badge_program` rebuilds the table to add `kind`
   (existing rows become `weekly`; nothing references it). It is outside the catalog: writing it
   never changes the catalog epoch.
+- `listing_claims` (#67, `0007_listing_claims`) holds claims of existing listings: the claimer,
+  the method (`badge` | `paid`), the status (`code_sent` → `email_verified` → `completed`, or
+  `cancelled`), the domain address and its registrable domain, the current code as an HMAC
+  (`code_hash`, cleared once used or burned), its expiry, the codes sent, the wrong `attempts`
+  (0 to 5) and `locked_until`. A user has at most one open claim per listing
+  (`listing_claims_open_idx`). Completing a claim writes the `listing_owners` row
+  (`badge_claim` or `paid_claim`) and cancels the listing's other open claims in one batch
+  ([Claims](./CLAIMS.md)).
 
 These tables are empty in the initial import, so bootstrap parity compares them like the
 submission tables (`scripts/d1-table-inventory.ts`).

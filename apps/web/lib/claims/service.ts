@@ -1,0 +1,390 @@
+import {
+  CLAIM_BADGE_COOLDOWN_SECONDS,
+  CLAIM_CODE_MAX_ATTEMPTS,
+  CLAIM_LOCK_MINUTES,
+  CLAIM_RESEND_COOLDOWN_SECONDS,
+  CLAIM_VERIFIED_TTL_HOURS,
+  type ClaimListing,
+  type ClaimOperations,
+  type ListingClaim
+} from '@serpdirectory/data-ops/claims'
+import type { ListingClaimMethod } from '@serpdirectory/data-ops/schema'
+import { CLAIM_CODE_LENGTH, CLAIM_CODE_TTL_SECONDS } from '../email/emails/codes'
+import type { BadgeVerificationResult } from '../submissions/badge-verifier'
+import { checkClaimAddress, claimBlockKeys } from './address'
+
+/**
+ * The claim flow (serpcompany/best.serp.co#59, #67; #70 screen 8's order: method → work email →
+ * code → badge check or payment → done, so nobody pays before proving the address):
+ *
+ * 1. `startClaim`: a live, ownerless, unblocked listing; an address on its registrable domain,
+ *    not webmail; then a single-use 6-digit code by email (`claim-code`, through the email
+ *    ledger), valid `CLAIM_CODE_TTL_SECONDS`. Asking again sends a new code, at most one per
+ *    `CLAIM_RESEND_COOLDOWN_SECONDS`.
+ * 2. `confirmClaimEmail`: the code, in time. Each wrong code uses one of
+ *    `CLAIM_CODE_MAX_ATTEMPTS`; the last burns it and locks the claim for `CLAIM_LOCK_MINUTES`.
+ * 3. `checkClaimBadge` (free): the badge on the website, as the submit flow checks it (#63);
+ *    a pass makes the claimer the owner (`badge_claim`), and the weekly badge program (#66) then
+ *    checks the listing, removing the owner if the badge is confirmed missing.
+ *    `completePaidClaim` (#68): a recorded payment makes the claimer the owner (`paid_claim`);
+ *    the badge is then optional and never checked.
+ *
+ * A listing with an owner refuses every step (`already_owned`, with the contact path). Codes are
+ * kept only as an HMAC under a key derived from the auth secret, bound to the claim.
+ */
+
+export interface ClaimDependencies {
+  /** HMAC key for codes (derived from the auth secret). */
+  codeKey: string
+  /** Where someone who believes they own an owned listing gets in touch. */
+  contactPath: string
+  now: () => Date
+  operations: ClaimOperations
+  /** Whether paid claims (#68) are on. */
+  paidClaims: boolean
+  /** Sends the code; resolves once queued. `codesSent` keys the email ledger. */
+  sendCode(input: {
+    claimId: string
+    code: string
+    codesSent: number
+    listingName: string
+    to: string
+  }): Promise<void>
+}
+
+export interface ClaimView {
+  /** Wrong codes still allowed for the current code. */
+  attemptsLeft: number
+  codeExpiresAt: string
+  /** The address the code went to. */
+  email: string
+  id: string
+  listing: { name: string; slug: string }
+  lockedUntil: string | null
+  method: ListingClaimMethod
+  /** When another code can be asked for. */
+  resendAvailableAt: string
+  status: ListingClaim['status']
+}
+
+export type ClaimFailureCode =
+  | 'already_owned'
+  | 'blocked'
+  | 'changed'
+  | 'code_expired'
+  | 'confirmation_expired'
+  | 'cooldown'
+  | 'domain_mismatch'
+  | 'invalid_code'
+  | 'invalid_email'
+  | 'invalid_method'
+  | 'not_confirmed'
+  | 'not_found'
+  | 'too_many_attempts'
+  | 'webmail'
+
+export interface ClaimFailure {
+  attemptsLeft?: number
+  code: ClaimFailureCode
+  /** Set for `already_owned`. */
+  contactPath?: string
+  ok: false
+  retryAfterSeconds?: number
+  status: 404 | 409 | 410 | 422 | 429
+}
+
+export type ClaimResult<T> = ClaimFailure | ({ ok: true } & T)
+
+const SECOND = 1000
+const MINUTE = 60 * SECOND
+
+function fail(
+  status: ClaimFailure['status'],
+  code: ClaimFailureCode,
+  extra: Partial<ClaimFailure> = {}
+): ClaimFailure {
+  return { code, ok: false, status, ...extra }
+}
+
+function secondsUntil(instant: string | Date, now: Date): number {
+  const time = typeof instant === 'string' ? Date.parse(instant) : instant.getTime()
+  return Math.max(1, Math.ceil((time - now.getTime()) / SECOND))
+}
+
+function view(claim: ListingClaim, listing: { name: string; slug: string }): ClaimView {
+  return {
+    attemptsLeft: Math.max(0, CLAIM_CODE_MAX_ATTEMPTS - claim.attempts),
+    codeExpiresAt: claim.codeExpiresAt,
+    email: claim.email,
+    id: claim.id,
+    listing: { name: listing.name, slug: listing.slug },
+    lockedUntil: claim.lockedUntil,
+    method: claim.method,
+    resendAvailableAt: new Date(
+      Date.parse(claim.codeSentAt) + CLAIM_RESEND_COOLDOWN_SECONDS * SECOND
+    ).toISOString(),
+    status: claim.status
+  }
+}
+
+/** A uniformly random 6-digit code. */
+export function generateClaimCode(): string {
+  const limit = 10 ** CLAIM_CODE_LENGTH
+  // Rejection sampling keeps every code equally likely.
+  const ceiling = Math.floor(0x1_0000_0000 / limit) * limit
+  const value = new Uint32Array(1)
+  do crypto.getRandomValues(value)
+  while ((value[0] as number) >= ceiling)
+  return String((value[0] as number) % limit).padStart(CLAIM_CODE_LENGTH, '0')
+}
+
+/** HMAC-SHA256 of the code bound to its claim, as hex. */
+export async function hashClaimCode(key: string, claimId: string, code: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(key),
+    { hash: 'SHA-256', name: 'HMAC' },
+    false,
+    ['sign']
+  )
+  const digest = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(`${claimId}:${code}`))
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function owned(deps: ClaimDependencies): ClaimFailure {
+  return fail(409, 'already_owned', { contactPath: deps.contactPath })
+}
+
+/** The listing a claim may target, or why not. */
+async function claimableListing(
+  deps: ClaimDependencies,
+  by: { id: string } | { slug: string }
+): Promise<ClaimResult<{ listing: ClaimListing }>> {
+  const listing = await deps.operations.listing(by)
+  if (!listing?.live) return fail(404, 'not_found')
+  if (listing.ownerUserId) return owned(deps)
+  const keys = claimBlockKeys(listing.website)
+  if (keys.length > 0 && (await deps.operations.blocked(keys))) return fail(409, 'blocked')
+  return { listing, ok: true }
+}
+
+export async function startClaim(
+  deps: ClaimDependencies,
+  input: { email: string; listingSlug: string; method: string; userId: string }
+): Promise<ClaimResult<{ claim: ClaimView }>> {
+  const method = input.method
+  if (method !== 'badge' && !(method === 'paid' && deps.paidClaims)) {
+    return fail(422, 'invalid_method')
+  }
+  const target = await claimableListing(deps, { slug: input.listingSlug })
+  if (!target.ok) return target
+  const { listing } = target
+  const address = checkClaimAddress(input.email, listing.website)
+  if (!address.ok) return fail(422, address.problem)
+
+  const now = deps.now()
+  const at = now.toISOString()
+  const existing = await deps.operations.openClaim({ listingId: listing.id, userId: input.userId })
+  if (existing?.lockedUntil && Date.parse(existing.lockedUntil) > now.getTime()) {
+    return fail(429, 'too_many_attempts', {
+      retryAfterSeconds: secondsUntil(existing.lockedUntil, now)
+    })
+  }
+  const resendAt = existing
+    ? Date.parse(existing.codeSentAt) + CLAIM_RESEND_COOLDOWN_SECONDS * SECOND
+    : 0
+  if (existing && resendAt > now.getTime()) {
+    return fail(429, 'cooldown', { retryAfterSeconds: secondsUntil(new Date(resendAt), now) })
+  }
+
+  const claimId = existing?.id ?? crypto.randomUUID()
+  const code = generateClaimCode()
+  const codeInput = {
+    codeExpiresAt: new Date(now.getTime() + CLAIM_CODE_TTL_SECONDS * SECOND).toISOString(),
+    codeHash: await hashClaimCode(deps.codeKey, claimId, code),
+    email: address.address,
+    emailDomain: address.domain,
+    method,
+    now: at
+  } as const
+  const written = existing
+    ? await deps.operations.resend({ ...codeInput, claimId, userId: input.userId })
+    : await deps.operations.start({
+        ...codeInput,
+        claimId,
+        listingId: listing.id,
+        userId: input.userId
+      })
+  if (!written) {
+    const current = await deps.operations.listing({ id: listing.id })
+    if (current?.ownerUserId) return owned(deps)
+    return fail(409, 'changed')
+  }
+  const claim = await deps.operations.claim({ claimId, userId: input.userId })
+  if (!claim) return fail(409, 'changed')
+  await deps.sendCode({
+    claimId,
+    code,
+    codesSent: claim.codesSent,
+    listingName: listing.name,
+    to: address.address
+  })
+  return { claim: view(claim, listing), ok: true }
+}
+
+/** The claimer's claim and its listing, or why it can't go on. */
+async function ownClaim(
+  deps: ClaimDependencies,
+  input: { claimId: string; userId: string }
+): Promise<ClaimResult<{ claim: ListingClaim; listing: ClaimListing }>> {
+  const claim = await deps.operations.claim(input)
+  if (!claim) return fail(404, 'not_found')
+  const listing = await deps.operations.listing({ id: claim.listingId })
+  if (!listing) return fail(404, 'not_found')
+  if (claim.status === 'cancelled') {
+    return listing.ownerUserId ? owned(deps) : fail(409, 'changed')
+  }
+  return { claim, listing, ok: true }
+}
+
+export async function confirmClaimEmail(
+  deps: ClaimDependencies,
+  input: { claimId: string; code: string; userId: string }
+): Promise<ClaimResult<{ claim: ClaimView }>> {
+  const found = await ownClaim(deps, input)
+  if (!found.ok) return found
+  const { claim, listing } = found
+  // Confirmed already (a repeated request): nothing to spend.
+  if (claim.status !== 'code_sent') return { claim: view(claim, listing), ok: true }
+  if (listing.ownerUserId) return owned(deps)
+  const now = deps.now()
+  if (claim.lockedUntil && Date.parse(claim.lockedUntil) > now.getTime()) {
+    return fail(429, 'too_many_attempts', {
+      retryAfterSeconds: secondsUntil(claim.lockedUntil, now)
+    })
+  }
+  if (!claim.codePending || Date.parse(claim.codeExpiresAt) <= now.getTime()) {
+    return fail(410, 'code_expired')
+  }
+  const code = input.code.replace(/\s+/gu, '')
+  const at = now.toISOString()
+  if (/^\d{6}$/u.test(code)) {
+    const confirmed = await deps.operations.confirmEmail({
+      claimId: claim.id,
+      codeHash: await hashClaimCode(deps.codeKey, claim.id, code),
+      now: at,
+      userId: input.userId
+    })
+    if (confirmed) {
+      const updated = await deps.operations.claim(input)
+      return updated ? { claim: view(updated, listing), ok: true } : fail(409, 'changed')
+    }
+  }
+  const lockedUntil = new Date(now.getTime() + CLAIM_LOCK_MINUTES * MINUTE).toISOString()
+  await deps.operations.recordWrongCode({
+    claimId: claim.id,
+    lockedUntil,
+    now: at,
+    userId: input.userId
+  })
+  const after = await deps.operations.claim(input)
+  if (after?.lockedUntil && Date.parse(after.lockedUntil) > now.getTime()) {
+    return fail(429, 'too_many_attempts', {
+      retryAfterSeconds: secondsUntil(after.lockedUntil, now)
+    })
+  }
+  if (after && !after.codePending) return fail(410, 'code_expired')
+  return fail(422, 'invalid_code', {
+    attemptsLeft: Math.max(
+      0,
+      CLAIM_CODE_MAX_ATTEMPTS - (after?.attempts ?? CLAIM_CODE_MAX_ATTEMPTS)
+    )
+  })
+}
+
+function confirmationExpired(claim: ListingClaim, now: Date): boolean {
+  return (
+    !claim.emailVerifiedAt ||
+    Date.parse(claim.emailVerifiedAt) < now.getTime() - CLAIM_VERIFIED_TTL_HOURS * 60 * MINUTE
+  )
+}
+
+export async function checkClaimBadge(
+  deps: ClaimDependencies & {
+    /** Counts one check against the outbound budget; null when allowed. */
+    budget(claimId: string): Promise<{ retryAfterSeconds: number } | null>
+    verifyBadge(listing: ClaimListing): Promise<BadgeVerificationResult>
+  },
+  input: { actor: string; claimId: string; userId: string }
+): Promise<ClaimResult<{ claim: ClaimView; result: BadgeVerificationResult }>> {
+  const found = await ownClaim(deps, input)
+  if (!found.ok) return found
+  const { claim, listing } = found
+  if (claim.status === 'completed') {
+    return { claim: view(claim, listing), ok: true, result: { ok: true } }
+  }
+  if (claim.method !== 'badge') return fail(422, 'invalid_method')
+  if (claim.status !== 'email_verified') return fail(409, 'not_confirmed')
+  if (listing.ownerUserId) return owned(deps)
+  const now = deps.now()
+  if (confirmationExpired(claim, now)) return fail(410, 'confirmation_expired')
+  const started = await deps.operations.claimBadgeCheck({
+    claimId: claim.id,
+    now: now.toISOString(),
+    userId: input.userId
+  })
+  if (!started) {
+    const current = await deps.operations.listing({ id: listing.id })
+    if (current?.ownerUserId) return owned(deps)
+    if (!current?.live) return fail(404, 'not_found')
+    const checked = claim.badgeCheckedAt ? Date.parse(claim.badgeCheckedAt) : now.getTime()
+    return fail(429, 'cooldown', {
+      retryAfterSeconds: secondsUntil(
+        new Date(checked + CLAIM_BADGE_COOLDOWN_SECONDS * SECOND),
+        now
+      )
+    })
+  }
+  const limited = await deps.budget(claim.id)
+  if (limited) return fail(429, 'cooldown', { retryAfterSeconds: limited.retryAfterSeconds })
+  let result: BadgeVerificationResult
+  try {
+    result = await deps.verifyBadge(listing)
+  } catch {
+    result = { code: 'verification_service_error', ok: false }
+  }
+  if (!result.ok) {
+    const current = await deps.operations.claim(input)
+    return { claim: view(current ?? claim, listing), ok: true, result }
+  }
+  const done = await deps.operations.complete({ actor: input.actor, claim, now: now.toISOString() })
+  if (!done) {
+    const current = await deps.operations.listing({ id: listing.id })
+    return current?.ownerUserId ? owned(deps) : fail(409, 'changed')
+  }
+  const completed = await deps.operations.claim(input)
+  return { claim: view(completed ?? claim, listing), ok: true, result }
+}
+
+/**
+ * Completes a confirmed paid claim once its payment is recorded (#68's webhook calls this;
+ * nothing does while `features.orders` is off). The claimer becomes the owner (`paid_claim`).
+ */
+export async function completePaidClaim(
+  deps: Pick<ClaimDependencies, 'now' | 'operations' | 'paidClaims'>,
+  input: { actor: string; claimId: string; userId: string }
+): Promise<ClaimResult<{ completed: boolean }>> {
+  if (!deps.paidClaims) return fail(404, 'not_found')
+  const claim = await deps.operations.claim(input)
+  if (!claim) return fail(404, 'not_found')
+  if (claim.status === 'completed') return { completed: true, ok: true }
+  if (claim.method !== 'paid') return fail(422, 'invalid_method')
+  if (claim.status !== 'email_verified') return fail(409, 'not_confirmed')
+  const now = deps.now()
+  if (confirmationExpired(claim, now)) return fail(410, 'confirmation_expired')
+  const done = await deps.operations.complete({ actor: input.actor, claim, now: now.toISOString() })
+  if (done) return { completed: true, ok: true }
+  const listing = await deps.operations.listing({ id: claim.listingId })
+  return listing?.ownerUserId ? fail(409, 'already_owned') : fail(409, 'changed')
+}

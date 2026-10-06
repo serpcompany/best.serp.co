@@ -220,6 +220,26 @@ export const applicationColumnInventory = {
   listing_revision_faqs: ['id', 'revision_id', 'question', 'answer', 'sort_order'],
   listing_revision_events: ['id', 'revision_id', 'event_type', 'detail', 'actor', 'created_at'],
   badge_checks: ['id', 'listing_id', 'checked_at', 'outcome', 'reason', 'conclusive', 'kind'],
+  listing_claims: [
+    'id',
+    'listing_id',
+    'user_id',
+    'method',
+    'status',
+    'email',
+    'email_domain',
+    'code_hash',
+    'code_sent_at',
+    'code_expires_at',
+    'codes_sent',
+    'attempts',
+    'locked_until',
+    'email_verified_at',
+    'badge_checked_at',
+    'completed_at',
+    'created_at',
+    'updated_at'
+  ],
   listing_events: ['id', 'listing_id', 'event_type', 'detail', 'actor', 'created_at']
 } as const
 
@@ -283,6 +303,7 @@ export const importOrder: ApplicationTableName[] = [
   'listing_revision_faqs',
   'listing_revision_events',
   'badge_checks',
+  'listing_claims',
   'listing_events'
 ]
 
