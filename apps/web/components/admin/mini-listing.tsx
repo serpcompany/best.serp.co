@@ -1,4 +1,5 @@
 import type { ListingDetail } from '@serpdirectory/data-ops/contracts'
+import { ListingImage } from '@serpdirectory/web-core/ui/listing-image'
 import { WebsiteContentSectionRoute } from '@serpdirectory/web-core/website/website-content-section-route'
 import { ProductLogo } from './product-cell'
 
@@ -35,11 +36,9 @@ export function MiniListing({
       </div>
       {listing.media?.images?.[0] ? (
         // The hosted featured image approval would publish (#96 round 2 B1).
-        <img
-          alt={`${listing.name}, featured`}
-          className="max-h-72 w-full border-b object-cover"
-          src={listing.media.images[0]}
-        />
+        <div className="max-w-xl border-b">
+          <ListingImage kind="image" name={listing.name} src={listing.media.images[0]} />
+        </div>
       ) : null}
       <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1fr)_200px]">
         <div className="min-w-0 text-sm leading-7 [&_.animate-fade-in-up]:opacity-100">

@@ -224,11 +224,15 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
   that sets `CLOUDFLARE_D1_DATABASE_ID` must name its environment's database.
 - **The scheduled notifier is the one exception:** it only records review notifications, every
   15 minutes, with a D1-only token. Time Travel still covers it by timestamp.
+- **The weekly media health check changes nothing** (#122): its exact
+  `pnpm media:health -- production --report …` command is a token step without changes (one D1
+  `SELECT`, R2 list, CDN `HEAD`s), and the issue step after it holds no Cloudflare credential
+  ([media health](./MEDIA_HEALTH.md#weekly-workflow)).
 - **Nothing leaves as a file.** Only the reviewed uploads and caches are allowed (the Playwright
   reports, the staging smoke evidence, and the install action's dependency caches), matched by
   action, name, and path. No workflow runs `d1 export` or `cloudflare-release.ts backup`, and no
   script under `scripts/` passes `export` to Wrangler. In every job where any step holds the
-  token (nine today, all checked), each step uses only reviewed actions and runs no `gh gist`,
+  token (ten today, all checked), each step uses only reviewed actions and runs no `gh gist`,
   `gh release upload|create`, `gh api` file field, `curl` upload (`-T`, `--upload-file`, `-F`,
   `--form`, `-d @`, `--data-binary @`), or `wget` upload. Commands are read one at a time, split
   at `|`, `;`, `&`, and newlines.

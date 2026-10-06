@@ -917,7 +917,8 @@ export function parseReleaseArguments(argv: string[]): ReleaseArguments {
   return parsed
 }
 
-const processRunner: ProcessRunner = {
+/** Runs Wrangler from the repository root; shared with the read-only media health check (#122). */
+export const processRunner: ProcessRunner = {
   run(command, args, { capture }) {
     try {
       return (

@@ -7,7 +7,7 @@ import { EmptyState } from './empty-state'
 import { useAnalyticsEvents } from './root-shell-client'
 import { siteCopy } from './site-copy'
 import { Card } from './ui/card'
-import { FaviconWithFallback } from './ui/favicon-with-fallback'
+import { ListingImage } from './ui/listing-image'
 import { WebsitesListWithSort as SharedWebsitesListWithSort } from './websites-list-with-sort'
 
 interface WebsitesListWithSortRouteProps {
@@ -33,7 +33,7 @@ export function WebsitesListWithSortRoute({
         Badge,
         EmptyState,
         Card,
-        FaviconWithFallback,
+        ListingImage,
         ToggleGroup,
         ToggleGroupItem
       }}
