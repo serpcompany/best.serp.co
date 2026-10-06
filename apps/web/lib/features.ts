@@ -12,11 +12,20 @@ export interface SiteFeatures {
    */
   readonly accountDashboard: boolean
   /**
-   * #66: the badge program, which checks every verified badge each week and emails the owner
-   * when it goes missing. Off: the submit pages don't promise weekly checks
-   * (`lib/feature-copy.ts`).
+   * #66: the badge program (`lib/badge-program/`), which checks each free submitted or
+   * badge-claimed listing every week, emails the owner when the badge goes missing, and
+   * unpublishes the listing (or removes the claimer's ownership) when a recheck about 24 hours
+   * later confirms it. Off: its Cron Trigger runs do nothing, and the submit pages and the
+   * approval email don't promise weekly checks (`lib/feature-copy.ts`). The owner turns it on at
+   * launch. Its emails link to #65's `/account/listings/<slug>/` (`email/emails/links.test.ts`),
+   * and offer paid listings and claims only while `orders` and `claims` are on.
    */
   readonly badgeProgram: boolean
+  /**
+   * #67: claiming an existing listing with the badge or a payment. Off: emails don't offer to
+   * claim a listing (again), as the draft reminder leaves out the paid plan while #68 is off.
+   */
+  readonly claims: boolean
   /**
    * #105: listing FAQs on the public listing page. On since #105 renders them; off, the
    * account's FAQ fields say FAQs will appear on the listing page soon.
@@ -29,7 +38,8 @@ export interface SiteFeatures {
   readonly messages: boolean
   /**
    * #68: orders (admin screen 13), with Stripe. Off: the admin sidebar hides Orders and
-   * `/admin/orders/` stays a 404 (the admin catch-all).
+   * `/admin/orders/` stays a 404 (the admin catch-all), and the badge program's emails leave out
+   * the paid upgrade and "Relist" offers.
    */
   readonly orders: boolean
 }
@@ -37,6 +47,7 @@ export interface SiteFeatures {
 export const features: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: false,
+  claims: false,
   listingFaqs: true,
   messages: false,
   orders: false

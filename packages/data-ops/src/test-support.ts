@@ -48,6 +48,7 @@ export { findSelfComparison } from './sql-limits'
 export class SqliteD1 {
   readonly database: DatabaseSync
   readonly statements: RecordedStatement[] = []
+  private batches: Promise<unknown> = Promise.resolve()
 
   constructor(path = ':memory:') {
     this.database = new DatabaseSync(path)
@@ -109,17 +110,24 @@ export class SqliteD1 {
           }
         } as unknown as D1PreparedStatement
       },
-      async batch<T>(statements: D1PreparedStatement[]) {
-        owner.database.exec('BEGIN')
-        try {
-          const results: D1Result<T>[] = []
-          for (const statement of statements) results.push(await statement.run<T>())
-          owner.database.exec('COMMIT')
-          return results
-        } catch (error) {
-          owner.database.exec('ROLLBACK')
-          throw error
+      // D1 runs one batch at a time, so overlapping callers (the badge program checks several
+      // sites at once) queue here instead of opening a transaction inside another.
+      batch<T>(statements: D1PreparedStatement[]) {
+        const run = async () => {
+          owner.database.exec('BEGIN')
+          try {
+            const results: D1Result<T>[] = []
+            for (const statement of statements) results.push(await statement.run<T>())
+            owner.database.exec('COMMIT')
+            return results
+          } catch (error) {
+            owner.database.exec('ROLLBACK')
+            throw error
+          }
         }
+        const result = owner.batches.then(run, run)
+        owner.batches = result.catch(() => undefined)
+        return result
       }
     }
     return binding as unknown as D1Database

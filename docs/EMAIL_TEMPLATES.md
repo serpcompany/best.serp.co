@@ -62,7 +62,18 @@ it on (owner decision on #64):
   edit and resubmit and link to `/account/submissions/<id>/` (`submissionPath`).
 - `features.badgeProgram` (#66, weekly badge checks). Off, `listing-approved` says only "Keep
   the badge on <website>." (without "We check it every week, and a free listing whose badge
-  goes missing is removed.") and the submit pages leave out the weekly-check promises.
+  goes missing is removed.") and the submit pages leave out the weekly-check promises. It also
+  switches the badge program itself, the only sender of `badge-missing`, `listing-unlisted`, and
+  `ownership-removed`; `links.test.ts` counts those as sent only while it is on
+  (`FLAGGED_SENDERS`), and must then link only to pages that exist.
+- `features.orders` (#68). Off, `badge-missing` leaves out "Rather not keep the badge? Upgrade
+  to a paid listing…", `listing-unlisted` leaves out "To bring it back, relist it as a paid
+  listing…" and its "Relist for $49" button, and `ownership-removed` says only "The listing
+  stays on SERP." without the claim offer or its button.
+- `features.claims` (#67). Off, `ownership-removed` leaves out the claim offer too (it needs
+  both flags, since it offers the badge or a payment). The audit's `orders` and `claims`
+  patterns ($ amounts, "paid listing", "relist", "claim … again") catch either offer while its
+  flag is off.
 - `features.messages` (#73). Off, `changes-requested` ends "Questions? Contact us at
   <`/contact/` link>" and the prohibited rejection's "Message us" opens `/contact/`. On, they
   point to the dashboard conversation (`messageUsPath`).
