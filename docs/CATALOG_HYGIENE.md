@@ -36,7 +36,9 @@ redirect pages to the page a visitor lands on:
   is followed for up to 36 hops; one that runs out is `unreachable`, never judged by where it
   stopped.
 - **The listing's own domain** is fetched directly as well when the slug is a domain and the
-  link never reached it (it points at another domain, or failed on the way).
+  link never reached it (it points at another domain, or failed on the way). It can only add the
+  gambling or parking class, and only when the link reaches no page: if the link lands on a
+  live, unflagged site (an acquisition), the listing goes to the owner list instead.
 - **Classifying** (`scripts/listing-domain-classifier.ts`) compares the final page's registrable
   domain (eTLD+1) with the listing's: the slug when it is a domain, otherwise the first hop past
   `serp.ly` and affiliate networks. `www`, `http`/`https`, SERP's own sites, and store pages

@@ -296,6 +296,31 @@ describe('listing domain classifier', () => {
       reason: 'own domain: parked or for sale (title or heading)',
       source: 'own-domain'
     })
+    // banterai.business: the old domain serves gambling, but the link lands on the live company
+    // that acquired it. The own domain is the only signal, so the owner decides.
+    const acquired = observed(
+      viaSerpLy(
+        { url: 'https://acme.app/', status: 308, location: 'https://www.0-holdings.com/' },
+        { url: 'https://www.0-holdings.com/', status: 200 }
+      ),
+      html('0 Holdings', '<p>A holding company.</p>')
+    )
+    const ownGambling = observed(
+      [
+        { url: 'https://acme.ai/', status: 301, location: 'https://modify.net.nz/' },
+        { url: 'https://modify.net.nz/', status: 200 }
+      ],
+      html('Best online casino bonus', '<p>Gates of Olympus by Pragmatic Play.</p>')
+    )
+    const decided = classifyListing(listing(), acquired, ownGambling)
+    expect(decided).toMatchObject({ class: 'off-domain', source: 'own-domain' })
+    expect(decided.reason).toContain('link lands on a live site: owner review')
+    // When the link reaches no page at all, the own domain decides.
+    const deadLink = observed(viaSerpLy({ url: 'https://acme.app/', error: 'ENOTFOUND' }), null)
+    expect(classifyListing(listing(), deadLink, ownGambling)).toMatchObject({
+      class: 'gambling-spam',
+      source: 'own-domain'
+    })
     expect(ownDomainUrl(listing(), forSale)).toBe('https://acme.ai/')
     expect(
       ownDomainUrl(listing(), observed(viaSerpLy({ url: 'https://acme.ai/', status: 200 }), ''))

@@ -510,9 +510,17 @@ export function classifyListing(
   const link = classifyTrace(listing, observation)
   if (link.class === 'gambling-spam' || link.class === 'parking' || !own) return link
   const direct = classifyTrace(listing, own)
-  if (direct.class === 'gambling-spam' || direct.class === 'parking')
-    return { ...direct, reason: `own domain: ${direct.reason}`, source: 'own-domain' }
-  return link
+  if (direct.class !== 'gambling-spam' && direct.class !== 'parking') return link
+  // The own domain is the only signal. If the link still lands on a live, unflagged site (an
+  // acquisition: banterai.business → 0-holdings.com), the listing may have moved: owner review.
+  if (observation.result === 'page')
+    return {
+      class: 'off-domain',
+      reason: `own domain is ${direct.class === 'parking' ? 'parked or for sale' : 'gambling or spam'}, but the link lands on a live site: owner review`,
+      marker: direct.marker,
+      source: 'own-domain'
+    }
+  return { ...direct, reason: `own domain: ${direct.reason}`, source: 'own-domain' }
 }
 
 function classifyTrace(listing: CheckedListing, observation: SiteObservation): Classification {

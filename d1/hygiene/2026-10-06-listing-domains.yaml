@@ -3,12 +3,12 @@
 # 2026-10-06), the operations of the matching d1/publications manifest. ownerReview: listings
 # that end on another company's domain or are unreachable; the owner decides each, nothing is
 # unpublished automatically. Listings classified ok are counted only.
-generatedAt: 2026-10-06T08:38:46.294Z
+generatedAt: 2026-10-06T08:59:30.627Z
 source: reviewed import 669f264f028a (publication 1), 3422 live listings
 counts:
-  gambling-spam: 33
+  gambling-spam: 32
   parking: 63
-  off-domain: 265
+  off-domain: 266
   unreachable: 391
   ok: 2670
 unpublish:
@@ -28,14 +28,6 @@ unpublish:
     status: 200
     reason: gambling or spam terms in title or heading
     marker: slot gacor
-  - slug: banterai.business
-    id: lst_b37f8e7f660409b59c4cad74
-    website: https://serp.ly/banterai
-    class: gambling-spam
-    finalUrl: https://modify.net.nz/
-    status: 200
-    reason: "own domain: gambling or spam terms in the visible content of an off-domain page"
-    marker: gates of olympus, pragmatic play, casino bonus
   - slug: bashsenpai.com
     id: lst_093b390c4dfcdc5e3073342d
     website: https://serp.ly/bashsenpai
@@ -860,6 +852,14 @@ ownerReview:
     finalUrl: https://babylonhealth.com/
     status: ENOTFOUND
     reason: site_unreachable (ENOTFOUND)
+  - slug: banterai.business
+    id: lst_b37f8e7f660409b59c4cad74
+    website: https://serp.ly/banterai
+    class: off-domain
+    finalUrl: https://modify.net.nz/
+    status: 200
+    reason: "own domain is gambling or spam, but the link lands on a live site: owner review"
+    marker: gates of olympus, pragmatic play, casino bonus
   - slug: baseplate.ai
     id: lst_c55f2d9870d1d0ea046e1e05
     website: https://serp.ly/baseplate

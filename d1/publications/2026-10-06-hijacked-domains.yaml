@@ -1,4 +1,4 @@
-# serpcompany/best.serp.co#100: unpublish 96 listings whose domain is hijacked (gambling, betting,
+# serpcompany/best.serp.co#100: unpublish 95 listings whose domain is hijacked (gambling, betting,
 # or spam), parked, or for sale, as the owner decided on 2026-10-06. Their pages answer 410 Gone and
 # leave the sitemap, search, and RSS; the rows stay (Republish in /admin brings one back).
 # Evidence: d1/hygiene/2026-10-06-listing-domains.yaml.
@@ -28,14 +28,6 @@ operations:
     reason: "#100 hijacked domain, gambling, betting, or spam: slot gacor"
     expected:
       website: https://serp.ly/autotextgenie-ai
-  - action: listing-unpublish
-    id: lst_b37f8e7f660409b59c4cad74
-    slug: banterai.business
-    categories:
-      - other
-    reason: "#100 hijacked domain, gambling, betting, or spam: gates of olympus, pragmatic play, casino bonus"
-    expected:
-      website: https://serp.ly/banterai
   - action: listing-unpublish
     id: lst_093b390c4dfcdc5e3073342d
     slug: bashsenpai.com
