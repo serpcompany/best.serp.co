@@ -62,7 +62,11 @@ it on (owner decision on #64):
   edit and resubmit and link to `/account/submissions/<id>/` (`submissionPath`).
 - `features.badgeProgram` (#66, weekly badge checks). Off, `listing-approved` says only "Keep
   the badge on <website>." (without "We check it every week, and a free listing whose badge
-  goes missing is removed.") and the submit pages leave out the weekly-check promises.
+  goes missing is removed.") and the submit pages leave out the weekly-check promises. It also
+  switches the badge program itself, the only sender of `badge-missing`, `listing-unlisted`, and
+  `ownership-removed`; `links.test.ts` counts those as sent only while it is on
+  (`FLAGGED_SENDERS`), so turning it on fails the audit until `/account/listings/<slug>/` exists
+  and `features.accountDashboard` is on (#65: `badge-missing` says "from your dashboard").
 - `features.messages` (#73). Off, `changes-requested` ends "Questions? Contact us at
   <`/contact/` link>" and the prohibited rejection's "Message us" opens `/contact/`. On, they
   point to the dashboard conversation (`messageUsPath`).

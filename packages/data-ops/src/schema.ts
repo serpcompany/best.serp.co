@@ -150,6 +150,13 @@ export type ListingEventType = (typeof listingEventTypes)[number]
 
 export const badgeCheckOutcomes = ['pass', 'fail'] as const
 export type BadgeCheckOutcome = (typeof badgeCheckOutcomes)[number]
+/**
+ * Which pass of the badge program (#66) made a check: the `weekly` check, or the `confirmation`
+ * recheck about 24 hours after a weekly conclusive miss. Only a weekly conclusive miss opens a
+ * warning; a confirmation miss is recorded in the same batch as its unpublish or revocation.
+ */
+export const badgeCheckKinds = ['weekly', 'confirmation'] as const
+export type BadgeCheckKind = (typeof badgeCheckKinds)[number]
 
 export const categories = sqliteTable(
   'categories',
@@ -1077,10 +1084,12 @@ export const badgeChecks = sqliteTable(
     checkedAt: text('checked_at').notNull(),
     outcome: text('outcome', { enum: badgeCheckOutcomes }).notNull(),
     reason: text('reason'),
-    conclusive: integer('conclusive', { mode: 'boolean' }).notNull()
+    conclusive: integer('conclusive', { mode: 'boolean' }).notNull(),
+    kind: text('kind', { enum: badgeCheckKinds }).notNull().default('weekly')
   },
   table => [
     check('badge_checks_outcome_valid', sql`${table.outcome} IN (${sqlList(badgeCheckOutcomes)})`),
+    check('badge_checks_kind_valid', sql`${table.kind} IN (${sqlList(badgeCheckKinds)})`),
     check('badge_checks_conclusive_boolean', booleanCheck(table.conclusive)),
     // ISO instants compare as text: the keep-free refund window reads `checked_at`.
     check('badge_checks_checked_at_iso', isoInstantCheck(table.checkedAt)),

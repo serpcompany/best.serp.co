@@ -16,7 +16,7 @@
     "binding": "CF_VERSION_METADATA"
   },
   "triggers": {
-    "crons": ["0 * * * *"]
+    "crons": ["0 * * * *", "15 3 * * 1", "45 3 * * *"]
   },
   "d1_databases": [
     {
@@ -50,7 +50,7 @@
         "binding": "CF_VERSION_METADATA"
       },
       "triggers": {
-        "crons": ["0 * * * *"]
+        "crons": ["0 * * * *", "15 3 * * 1", "45 3 * * *"]
       },
       "d1_databases": [
         {
@@ -83,7 +83,7 @@
         "binding": "CF_VERSION_METADATA"
       },
       "triggers": {
-        "crons": ["0 * * * *"]
+        "crons": ["0 * * * *", "15 3 * * 1", "45 3 * * *"]
       },
       "d1_databases": [
         {

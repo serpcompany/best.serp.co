@@ -12,9 +12,12 @@ export interface SiteFeatures {
    */
   readonly accountDashboard: boolean
   /**
-   * #66: the badge program, which checks every verified badge each week and emails the owner
-   * when it goes missing. Off: the submit pages don't promise weekly checks
-   * (`lib/feature-copy.ts`).
+   * #66: the badge program (`lib/badge-program/`), which checks each free submitted or
+   * badge-claimed listing every week, emails the owner when the badge goes missing, and
+   * unpublishes the listing (or removes the claimer's ownership) when a recheck about 24 hours
+   * later confirms it. Off: its Cron Trigger runs do nothing, and the submit pages and the
+   * approval email don't promise weekly checks (`lib/feature-copy.ts`). The owner turns it on at
+   * launch, once #65's `/account/listings/<slug>/` pages are live (`email/emails/links.test.ts`).
    */
   readonly badgeProgram: boolean
   /**

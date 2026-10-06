@@ -3,20 +3,28 @@
  * `apps/web/wrangler.jsonc`). `apps/web/worker.ts` only wires `scheduled()` to
  * `handleScheduled`; the jobs live here so they are type-checked and unit-tested.
  *
- * Each cron expression maps to the jobs it runs. Today one hourly trigger runs the draft
- * reminders and expiry (#63), so the +12h reminder goes out within the hour it falls due. The weekly badge program (#66) adds its own expression and job
- * to `scheduledJobs` and to `triggers.crons`; a trigger with no jobs here is logged and ignored.
+ * Each cron expression maps to the jobs it runs. The hourly trigger runs the draft reminders
+ * and expiry (#63), so the +12h reminder goes out within the hour it falls due, and continues
+ * the badge program (#66) in batches; the badge program's weekly trigger opens its cycle and
+ * its daily trigger its confirmation rechecks (`lib/badge-program/schedule.ts`). A trigger
+ * with no jobs here is logged and ignored.
  *
  * Like the request path, it fails closed: without a valid `DB` binding and `D1_RUNTIME_ENV`,
  * a job throws instead of guessing. Emails go through the same email module as requests
  * (`createWorkerEmailService`), which disables itself when delivery is not configured.
  */
+import { createBadgeProgramOperations } from '@serpdirectory/data-ops/badge-program'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import { createDraftJobOperations } from '@serpdirectory/data-ops/draft-jobs'
 import { site } from '@serpdirectory/site-config'
+import { runBadgeProgram } from '../badge-program/program'
+import { BADGE_DAILY_CRON, BADGE_WEEKLY_CRON } from '../badge-program/schedule'
 import { appEmailTemplates } from '../email/registry'
 import { createWorkerEmailService, type EmailWorkerEnv } from '../email/runtime'
+import { type SiteFeatures, features as siteFeatures } from '../features'
+import { verifyFeaturedBadge } from '../submissions/badge-verifier'
 import { runDraftJobs } from '../submissions/draft-jobs'
+import { submissionBadgeVerificationTargets } from '../submissions/presentation'
 
 /** Hourly, on the hour: each draft reminder goes out within an hour of falling due. */
 export const DRAFT_JOBS_CRON = '0 * * * *'
@@ -26,6 +34,13 @@ const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 export interface ScheduledEnv extends EmailWorkerEnv {
   D1_RUNTIME_ENV?: string
   DB?: D1Database
+  /**
+   * `on` runs the badge program on a local Worker while `features.badgeProgram` is off, for the
+   * end-to-end suite (`LOCAL_PREVIEW_VARS`). Ignored unless `SITE_ENVIRONMENT` and
+   * `D1_RUNTIME_ENV` are both `local`.
+   */
+  LOCAL_BADGE_PROGRAM?: string
+  SITE_ENVIRONMENT?: string
 }
 
 export interface ScheduledEvent {
@@ -49,6 +64,47 @@ export interface ScheduledJob {
   run(input: ScheduledJobInput): Promise<Record<string, unknown>>
 }
 
+/**
+ * The badge program runs only while `features.badgeProgram` is on (the owner turns it on at
+ * launch), or on a local Worker that asks for it.
+ */
+export function badgeProgramEnabled(
+  env: ScheduledEnv,
+  features: SiteFeatures = siteFeatures
+): boolean {
+  if (features.badgeProgram) return true
+  return (
+    env.LOCAL_BADGE_PROGRAM === 'on' &&
+    env.SITE_ENVIRONMENT === 'local' &&
+    env.D1_RUNTIME_ENV === 'local'
+  )
+}
+
+/**
+ * A worker email service whose sends the job can await one at a time: the service delivers
+ * through `waitUntil`, and collecting each delivery lets the job wait for it instead of firing a
+ * whole batch at once.
+ */
+function sequentialEmail(context: ScheduledContext, env: ScheduledEnv) {
+  const deliveries: Promise<unknown>[] = []
+  const email = createWorkerEmailService({
+    context: {
+      waitUntil(promise) {
+        deliveries.push(promise)
+        context.waitUntil(promise)
+      }
+    },
+    env,
+    templates: appEmailTemplates
+  })
+  return {
+    async send(...args: Parameters<typeof email.enqueue>): Promise<void> {
+      email.enqueue(...args)
+      await Promise.allSettled(deliveries.splice(0))
+    }
+  }
+}
+
 function database(env: ScheduledEnv): D1Database {
   if (!env.DB) throw new Error('D1 binding DB is required for scheduled jobs.')
   if (!runtimeEnvironments.has(env.D1_RUNTIME_ENV ?? '')) {
@@ -61,35 +117,48 @@ export const draftJobs: ScheduledJob = {
   name: 'draft-reminders-and-expiry',
   async run({ context, env, now }) {
     const jobs = createDraftJobOperations({ client: createDatabase(database(env)) })
-    // The email service delivers through `waitUntil`; collecting each delivery lets the job
-    // await it, so the run sends one email at a time instead of firing a whole batch.
-    const deliveries: Promise<unknown>[] = []
-    const email = createWorkerEmailService({
-      context: {
-        waitUntil(promise) {
-          deliveries.push(promise)
-          context.waitUntil(promise)
-        }
-      },
-      env,
-      templates: appEmailTemplates
-    })
+    const email = sequentialEmail(context, env)
     const result = await runDraftJobs({
       jobs,
       now,
       paidListings: site.features.showPaidListings,
       priceCents: site.submissions.paidListingPriceCents,
-      async send(templateId, request) {
-        email.enqueue(templateId, request)
-        await Promise.allSettled(deliveries.splice(0))
-      }
+      send: (templateId, request) => email.send(templateId, request)
     })
     return { ...result }
   }
 }
 
+/**
+ * The badge program (#66): the same bounded run on its weekly, daily, and hourly triggers
+ * (`lib/badge-program/program.ts`). While it is off it reads nothing and checks nothing.
+ */
+export function createBadgeProgramJob(features: SiteFeatures = siteFeatures): ScheduledJob {
+  return {
+    name: 'badge-program',
+    async run({ context, env, now }) {
+      if (!badgeProgramEnabled(env, features)) return { enabled: false }
+      const operations = createBadgeProgramOperations({ client: createDatabase(database(env)) })
+      const email = sequentialEmail(context, env)
+      const result = await runBadgeProgram({
+        now,
+        operations,
+        priceCents: site.submissions.paidListingPriceCents,
+        send: (templateId, request) => email.send(templateId, request),
+        verify: listing =>
+          verifyFeaturedBadge(listing.website, submissionBadgeVerificationTargets(listing.slug))
+      })
+      return { enabled: true, ...result }
+    }
+  }
+}
+
+export const badgeProgramJob = createBadgeProgramJob()
+
 export const scheduledJobs: Readonly<Record<string, readonly ScheduledJob[]>> = {
-  [DRAFT_JOBS_CRON]: [draftJobs]
+  [DRAFT_JOBS_CRON]: [draftJobs, badgeProgramJob],
+  [BADGE_WEEKLY_CRON]: [badgeProgramJob],
+  [BADGE_DAILY_CRON]: [badgeProgramJob]
 }
 
 function log(level: 'error' | 'info' | 'warn', entry: Record<string, unknown>): void {

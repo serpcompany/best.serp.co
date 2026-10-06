@@ -8,6 +8,10 @@ import * as adminPlansModule from '@serpdirectory/data-ops/admin-plans'
 import * as adminQueriesModule from '@serpdirectory/data-ops/admin-queries'
 import { createAdminReadOperations } from '@serpdirectory/data-ops/admin-queries'
 import { createAuthOperations } from '@serpdirectory/data-ops/auth'
+import {
+  badgeProgramEmailKey,
+  createBadgeProgramOperations
+} from '@serpdirectory/data-ops/badge-program'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import * as draftPlansModule from '@serpdirectory/data-ops/draft-plans'
 import * as listingPlansModule from '@serpdirectory/data-ops/listing-plans'
@@ -1002,5 +1006,123 @@ describe('admin allowlist on Wrangler-local D1 (workerd, #78)', () => {
     })
     expect((await operations.getAdminStatus('auth_second'))?.allowlisted).toBe(true)
     expect(await operations.syncUserRole('auth_owner')).toBe('user')
+  })
+})
+
+describe('badge program on Wrangler-local D1 (workerd, #66)', () => {
+  it('warns, rechecks, unpublishes or revokes, and finds failed emails to send again', async () => {
+    const operations = createBadgeProgramOperations({ client: createDatabase(db) })
+    await db.batch([
+      db.prepare(
+        `INSERT INTO users (id, name, email, email_verified) VALUES
+          ('badge_free', 'Free', 'free@badge.example', 1),
+          ('badge_claim', 'Claim', 'claim@badge.example', 1)`
+      ),
+      db.prepare(
+        `INSERT INTO listings (id, slug, name, description, website, status, source_kind,
+          source_identity, checksum, source) VALUES
+          ('lst-badge-free', 'badge-free.example', 'Badge free', 'd', 'https://badge-free.example/',
+            'draft', 'fixture', 'lst-badge-free', 'c', 'submission'),
+          ('lst-badge-claim', 'badge-claim.example', 'Badge claim', 'd',
+            'https://badge-claim.example/', 'draft', 'fixture', 'lst-badge-claim', 'c', 'admin')`
+      ),
+      db.prepare(
+        `INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+          SELECT id, (SELECT id FROM categories WHERE slug = 'tools'), 0, 1 FROM listings
+          WHERE id IN ('lst-badge-free', 'lst-badge-claim')`
+      ),
+      db.prepare(
+        `UPDATE listings SET status = 'approved', published_at = '2026-05-16'
+          WHERE id IN ('lst-badge-free', 'lst-badge-claim')`
+      ),
+      db.prepare(
+        `INSERT INTO listing_submissions (id, slug, name, description, website, content,
+          category_slug, logo_url, status, plan, listing_id, owner_user_id)
+        VALUES ('sub-badge-free', 'badge-free.example', 'Badge free', 'd',
+          'https://badge-free.example/', 'c', 'tools', 'l', 'approved', 'free', 'lst-badge-free',
+          'badge_free')`
+      ),
+      db.prepare(
+        `INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at) VALUES
+          ('lst-badge-free', 'badge_free', 'submission', '2026-09-01T00:00:00.000Z'),
+          ('lst-badge-claim', 'badge_claim', 'badge_claim', '2026-09-01T00:00:00.000Z')`
+      )
+    ])
+    const cycleStart = '2026-10-12T03:15:00.000Z'
+    const weeklyAt = '2026-10-12T03:15:00.000Z'
+    const due = (await operations.weeklyDue({ cycleStart, limit: 50, now: weeklyAt })).filter(
+      item => item.id.startsWith('lst-badge-')
+    )
+    expect(due.map(item => [item.id, item.branch])).toEqual([
+      ['lst-badge-claim', 'revoke'],
+      ['lst-badge-free', 'unpublish']
+    ])
+    const miss = { conclusive: true, outcome: 'fail', reason: 'badge_missing' } as const
+    for (const item of due) {
+      await expect(
+        operations.recordWeekly({ cycleStart, listing: item, now: weeklyAt, result: miss })
+      ).resolves.toMatchObject({ email: { template: 'badge-missing' }, recorded: true })
+      // A second run loses the compare-and-swap on D1 as well.
+      await expect(
+        operations.recordWeekly({ cycleStart, listing: item, now: weeklyAt, result: miss })
+      ).resolves.toEqual({ recorded: false })
+    }
+    const window = '2026-10-13T03:45:00.000Z'
+    const pending = await operations.confirmationsDue({
+      attemptSince: window,
+      dueBefore: '2026-10-12T07:45:00.000Z',
+      limit: 50,
+      now: window
+    })
+    expect(pending.map(item => item.id)).toEqual(['lst-badge-claim', 'lst-badge-free'])
+    const before = await first<{ version: number }>('SELECT version FROM publication_state')
+    const results = []
+    for (const item of pending) {
+      results.push(
+        await operations.recordConfirmation({
+          attemptSince: window,
+          listing: item,
+          now: window,
+          result: miss
+        })
+      )
+    }
+    expect(results.map(result => result.recorded && result.action)).toEqual([
+      'revoked',
+      'unpublished'
+    ])
+    expect(await first('SELECT version FROM publication_state')).toEqual({
+      version: Number(before?.version) + 2
+    })
+    expect(await first("SELECT is_active FROM listings WHERE id = 'lst-badge-free'")).toEqual({
+      is_active: 0
+    })
+    expect(
+      await first("SELECT revoked_reason FROM listing_owners WHERE listing_id = 'lst-badge-claim'")
+    ).toEqual({ revoked_reason: 'badge_removed' })
+
+    const [revoked, unlisted] = results
+    if (!revoked?.recorded || !unlisted?.recorded) throw new Error('not recorded')
+    await db.batch(
+      [
+        ['ownership-removed', revoked.id],
+        ['listing-unlisted', unlisted.id]
+      ].map(([template, id]) =>
+        db
+          .prepare(
+            `INSERT INTO email_deliveries (template_id, event_key, provider, status, attempts)
+              VALUES (?, ?, 'test', 'failed', 1)`
+          )
+          .bind(
+            template,
+            badgeProgramEmailKey(template as 'listing-unlisted' | 'ownership-removed', Number(id))
+          )
+      )
+    )
+    const retries = await operations.retryableEmails({ limit: 10, maxAttempts: 5, now: window })
+    expect(retries.map(email => [email.template, email.to])).toEqual([
+      ['listing-unlisted', 'free@badge.example'],
+      ['ownership-removed', 'claim@badge.example']
+    ])
   })
 })

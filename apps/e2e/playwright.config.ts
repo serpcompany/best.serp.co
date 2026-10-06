@@ -10,6 +10,7 @@ import {
   adminServerCommand,
   adminSuiteEnabled
 } from './tests/admin-fixture'
+import { badgeOrigin, badgeServerCommand, badgeSuiteEnabled } from './tests/badge-program-fixture'
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`
@@ -137,6 +138,18 @@ export default defineConfig({
               timeout: 180000,
               env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
             }))
+          : []),
+        // The badge program suite's own Worker and D1, with the program on (#66).
+        ...(badgeSuiteEnabled
+          ? [
+              {
+                command: badgeServerCommand(),
+                url: `${badgeOrigin()}/robots.txt`,
+                reuseExistingServer: !process.env.CI,
+                timeout: 180000,
+                env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
+              }
+            ]
           : [])
       ]
 })

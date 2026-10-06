@@ -8,6 +8,7 @@
     "./admin-plans": "./src/admin-plans.ts",
     "./admin-queries": "./src/admin-queries.ts",
     "./auth": "./src/auth.ts",
+    "./badge-program": "./src/badge-program.ts",
     "./cache": "./src/cache.ts",
     "./catalog": "./src/catalog.ts",
     "./catalog-epoch": "./src/catalog-epoch.ts",
@@ -29,7 +30,7 @@
   },
   "scripts": {
     "benchmark": "vitest run src/benchmark.test.ts",
-    "test": "vitest run src/account.test.ts src/admin-plans.test.ts src/admin-queries.test.ts src/auth.test.ts src/test-support.test.ts src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/draft-plans.test.ts src/draft-jobs.test.ts src/listing-plans.test.ts src/revision-plans.test.ts src/schema-invariants.test.ts src/url-key.test.ts src/benchmark.test.ts",
+    "test": "vitest run src/account.test.ts src/admin-plans.test.ts src/admin-queries.test.ts src/auth.test.ts src/test-support.test.ts src/cache.test.ts src/catalog.test.ts src/client.test.ts src/email-deliveries.test.ts src/public-url.test.ts src/submissions.test.ts src/submission-plans.test.ts src/draft-plans.test.ts src/draft-jobs.test.ts src/badge-program.test.ts src/listing-plans.test.ts src/revision-plans.test.ts src/schema-invariants.test.ts src/url-key.test.ts src/benchmark.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {

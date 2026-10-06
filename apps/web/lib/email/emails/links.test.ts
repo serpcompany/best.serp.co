@@ -69,9 +69,23 @@ const APPROVED_INTERIM_COPY: Partial<Record<TemplateId, RegExp[]>> = {
 /** Templates sent through a constant rather than a literal id. */
 const SENT_THROUGH_CONSTANTS: TemplateId[] = [SIGN_IN_CODE_TEMPLATE]
 
-/** App source outside the email module (tests excluded). */
-function senderSources(): string[] {
-  const sources: string[] = []
+/**
+ * Templates that only a flagged job sends, by the flag that switches the job on and the one
+ * source directory that names them. The badge program (#66) sends its emails only while
+ * `features.badgeProgram` is on (`lib/worker/scheduled.ts`), so they count as sent from then on,
+ * and must then link only to pages that exist and promise nothing that is still off.
+ */
+const FLAGGED_SENDERS: Partial<
+  Record<TemplateId, { directory: string; feature: keyof SiteFeatures }>
+> = {
+  'badge-missing': { directory: 'lib/badge-program', feature: 'badgeProgram' },
+  'listing-unlisted': { directory: 'lib/badge-program', feature: 'badgeProgram' },
+  'ownership-removed': { directory: 'lib/badge-program', feature: 'badgeProgram' }
+}
+
+/** App source outside the email module (tests excluded), by path from `apps/web`. */
+function senderSources(): Array<{ code: string; path: string }> {
+  const sources: Array<{ code: string; path: string }> = []
   const visit = (directory: string) => {
     for (const name of readdirSync(directory)) {
       const path = join(directory, name)
@@ -80,7 +94,7 @@ function senderSources(): string[] {
         continue
       }
       if (/\.tsx?$/u.test(name) && !/\.test\.tsx?$/u.test(name)) {
-        sources.push(readFileSync(path, 'utf8'))
+        sources.push({ code: readFileSync(path, 'utf8'), path: relative(WEB_DIRECTORY, path) })
       }
     }
   }
@@ -88,13 +102,20 @@ function senderSources(): string[] {
   return sources
 }
 
-/** The emails the app sends today: every template whose id app code names. */
-function sentTemplates(): Set<TemplateId> {
+/**
+ * The emails the app sends today: every template whose id app code names, except those only a
+ * flagged job sends while its flag is off.
+ */
+function sentTemplates(siteFeatures: SiteFeatures = features): Set<TemplateId> {
   const sources = senderSources()
   const ids = Object.keys(appEmailTemplates) as TemplateId[]
   return new Set([
     ...SENT_THROUGH_CONSTANTS,
-    ...ids.filter(id => sources.some(code => code.includes(`'${id}'`)))
+    ...ids.filter(id => {
+      const flagged = FLAGGED_SENDERS[id]
+      if (flagged && !siteFeatures[flagged.feature]) return false
+      return sources.some(source => source.code.includes(`'${id}'`))
+    })
   ])
 }
 
@@ -247,6 +268,20 @@ describe('email links', () => {
 
   it('sends nothing that links to a page still to be built', () => {
     for (const id of sent) expect(DEFERRED[id], id).toBeUndefined()
+  })
+
+  it('names flagged templates only in their job, and counts them as sent once the flag is on', () => {
+    for (const [id, flagged] of Object.entries(FLAGGED_SENDERS) as Array<
+      [TemplateId, { directory: string; feature: keyof SiteFeatures }]
+    >) {
+      const naming = senderSources()
+        .filter(source => source.code.includes(`'${id}'`))
+        .map(source => source.path)
+      expect(naming.length, id).toBeGreaterThan(0)
+      for (const path of naming) expect(path.startsWith(`${flagged.directory}/`), path).toBe(true)
+      expect(sentTemplates({ ...features, [flagged.feature]: true }).has(id), id).toBe(true)
+      expect(sentTemplates({ ...features, [flagged.feature]: false }).has(id), id).toBe(false)
+    }
   })
 })
 
