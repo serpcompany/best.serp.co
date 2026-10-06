@@ -3,10 +3,10 @@
 # - dr.serp.co: /media/products/dr.serp.co/logo.png was never created; the page falls back to
 #   the #86 "no logo" tile and its JSON-LD omits primaryImageOfPage.
 # - onlyfans-downloader: drops its 7th image, /media/products/onlyfans-downloader/onlyfans-downloader-1.jpg.
-# Every other field is the committed import's value (production D1 matched it on 2026-10-06);
-# publishedAt is the imported date as an ISO instant, which the publisher requires.
-# scripts/catalog-media-assets.test.ts applies this manifest to the import and checks that only
-# these media rows change. Apply only through Publish D1 Catalog (publish-d1.yml) from main.
+# Every other field, publishedAt included, is the committed import's value (production D1
+# matched it on 2026-10-06). scripts/catalog-media-assets.test.ts applies this manifest to the
+# import and checks that only these media rows change and that the publication order is kept.
+# Apply only through Publish D1 Catalog (publish-d1.yml) from main.
 version: 1
 id: 2026-10-06-missing-product-images
 basePublicationVersion: 1
@@ -30,7 +30,7 @@ operations:
         DR by SERP is a free domain rating / domain authority checker tool. Enter any domain and instantly see its authority score. Part of the SERP network.
       isUnofficial: false
       featured: false
-      publishedAt: 2026-05-16T00:00:00.000Z
+      publishedAt: 2026-05-16
       categories:
         - seo
       resources:
@@ -205,7 +205,7 @@ operations:
         - Protect your privacy by using a reputable VPN for IP protection before initiating downloads — this is the VPN we recommend & use.
       isUnofficial: false
       featured: true
-      publishedAt: 2026-05-16T00:00:00.000Z
+      publishedAt: 2026-05-16
       categories:
         - video-downloaders
         - fansite-downloaders

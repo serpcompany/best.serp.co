@@ -180,6 +180,26 @@ function catalogProjection(database: DatabaseSync): Map<string, Record<string, u
   return listings
 }
 
+/**
+ * Public slugs in publication order (`PUBLICATION_ORDER` in packages/data-ops/src/catalog.ts),
+ * all listings and featured ones. `published_at` is compared as text, so a manifest that rewrote
+ * an imported `2026-05-16` as an ISO instant would move that listing to the top.
+ */
+function publicationOrder(database: DatabaseSync): { all: string[]; featured: string[] } {
+  const slugs = (featuredOnly: boolean) =>
+    (
+      database
+        .prepare(
+          `SELECT slug FROM listings
+           WHERE status = 'approved' AND is_active = 1 AND published_at IS NOT NULL
+             AND (? = 0 OR is_featured = 1)
+           ORDER BY published_at DESC, display_order ASC, slug ASC`
+        )
+        .all(featuredOnly ? 1 : 0) as Array<{ slug: string }>
+    ).map(row => row.slug)
+  return { all: slugs(false), featured: slugs(true) }
+}
+
 /** D1 binds JavaScript booleans as integers; node:sqlite requires the conversion explicitly. */
 function d1Binding(value: unknown): SQLInputValue {
   if (typeof value === 'boolean') return value ? 1 : 0
@@ -193,7 +213,7 @@ describe('catalog media assets (#89)', () => {
       const listings = publishedMedia(database, reviewedPublications())
       const rootRelative = [...listings.values()].flatMap(({ urls }) => urls.filter(isRootRelative))
 
-      // 78 /listing-logos logos and 51 /media/products files after #89.
+      // 78 /listing-logos logos and 51 /media/products references after #89.
       expect(rootRelative.length).toBeGreaterThan(120)
       expect(
         missingStaticAssets(listings),
@@ -205,8 +225,8 @@ describe('catalog media assets (#89)', () => {
   }, 60_000)
 
   it('finds exactly the two never-created files in the import, which the #89 manifest drops', () => {
-    // Local and staging D1 are seeded from the import, and only production receives manifests,
-    // so those two references still 404 there until a reseed.
+    // Local and staging D1 are seeded from the import and never receive manifests (only
+    // production does), so those two references keep answering 404 there.
     const database = importedDatabase()
     try {
       expect(missingStaticAssets(publishedMedia(database, []))).toEqual(
@@ -223,6 +243,7 @@ describe('catalog media assets (#89)', () => {
     const database = importedDatabase()
     try {
       const before = catalogProjection(database)
+      const orderBefore = publicationOrder(database)
       const categoriesBefore = database.prepare('SELECT * FROM categories ORDER BY id').all()
       const plan = buildPublicationPlan(manifest, source, '2026-10-06T00:00:00.000Z')
 
@@ -238,15 +259,14 @@ describe('catalog media assets (#89)', () => {
         const [id, listing] = [...before].find(([, value]) => value.slug === slug) ?? []
         expect(listing, slug).toBeTruthy()
         if (!id || !listing) continue
-        expect(listing.published_at).toBe('2026-05-16')
         expected.set(id, {
           ...listing,
-          media: (listing.media as string[]).filter(entry => !entry.endsWith(` ${url}`)),
-          // The publisher takes an ISO instant: the imported date at UTC midnight.
-          published_at: '2026-05-16T00:00:00.000Z'
+          media: (listing.media as string[]).filter(entry => !entry.endsWith(` ${url}`))
         })
       }
       expect(catalogProjection(database)).toEqual(expected)
+      // Lists, Featured, Recently added, RSS, and previous/next keep their order.
+      expect(publicationOrder(database)).toEqual(orderBefore)
       expect(database.prepare('SELECT * FROM categories ORDER BY id').all()).toEqual(
         categoriesBefore
       )

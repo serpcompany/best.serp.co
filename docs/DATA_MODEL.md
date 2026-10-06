@@ -244,10 +244,15 @@ sending one batch; `publish-d1.yml` applies a manifest to production after a D1 
 
 A manifest's root-relative media path must name a file checked in under `apps/web/public`;
 `pnpm test:d1` (also run by `publish-d1.yml` before publishing) checks every manifest
-([Architecture](./ARCHITECTURE.md#url-canonicalization), "Listing images"). Manifests reach production only: local
-and staging D1 are seeded from the import, so a manifest's change shows there only after a
-reseed. For example, `2026-10-06-missing-product-images.yaml` (#89) drops two image references
-whose files never existed, and those two still 404 on local and staging.
+([Architecture](./ARCHITECTURE.md#url-canonicalization), "Listing images"). Manifests reach
+production only: local and staging D1 are seeded from the import and never receive them. For
+example, `2026-10-06-missing-product-images.yaml` (#89) drops two image references whose files
+never existed, and those two still 404 on local and staging.
+
+A manifest's `publishedAt` is an ISO instant or a calendar date. Imported listings store the
+date (`2026-05-16`), and lists sort by `published_at` as text, so a `listing-update` of an
+imported listing keeps its date unchanged; the same day as an ISO instant would sort it above
+every listing published that day.
 
 ## Initial import
 

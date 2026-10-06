@@ -70,7 +70,10 @@ const listing = z
     priority: z.enum(['high', 'medium', 'low']).optional(),
     isUnofficial: z.boolean().default(false),
     featured: z.boolean().default(false),
-    publishedAt: z.string().datetime(),
+    // An ISO instant, or a calendar date as every imported listing stores it. Listings sort by
+    // `published_at` text, so rewriting an imported `2026-05-16` as `2026-05-16T00:00:00.000Z`
+    // would move that listing above every other listing published that day (#89).
+    publishedAt: z.union([z.string().datetime(), z.string().date()]),
     categories: z
       .array(categorySlug)
       .min(1)
