@@ -91,11 +91,14 @@ export function hasExtrasErrors(errors: ExtrasErrors): boolean {
 
 export function ExtrasEditor({
   errors,
+  faqsHint,
   onChange,
   value
 }: {
   /** Shown after a submit attempt. */
   errors: ExtrasErrors | null
+  /** Under "FAQs": where they show (`featureCopy().faqsHint`, flagged until #105). */
+  faqsHint: string
   onChange: (value: ExtrasValue) => void
   value: ExtrasValue
 }) {
@@ -115,7 +118,7 @@ export function ExtrasEditor({
       <FieldSet className="gap-4">
         <div>
           <FieldLegend className="mb-1 text-base">FAQs</FieldLegend>
-          <FieldDescription>Shown on your listing page.</FieldDescription>
+          <FieldDescription>{faqsHint}</FieldDescription>
         </div>
         {value.faqs.map((faq, index) => {
           const error = errors?.faqs[faq.key]

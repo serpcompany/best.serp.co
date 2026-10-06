@@ -11,6 +11,7 @@ import { ACCOUNT_ID } from '@/lib/account/requests'
 import { accountOperations } from '@/lib/account/runtime'
 import { accountStatusOf, categoryChoices, isWithdrawable } from '@/lib/account/view'
 import { getActiveCategories } from '@/lib/catalog/repository'
+import { featureCopy } from '@/lib/feature-copy'
 import { features } from '@/lib/features'
 
 export const metadata: Metadata = generateBaseMetadata({
@@ -58,6 +59,7 @@ export default async function AccountSubmissionPage({
           slug: submission.categorySlug
         })}
         email={user.email}
+        faqsHint={featureCopy().faqsHint ?? ''}
         history={submissionHistory(submission)}
         messagesNote={features.messages}
         view={{

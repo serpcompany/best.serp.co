@@ -294,6 +294,8 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await page.goto(`/account/listings/${slug}/edit/`)
   await expect(page.getByRole('heading', { name: `Edit ${name}` })).toBeVisible()
   await expect(page.getByLabel('Name')).toBeDisabled()
+  // Listing pages don't show FAQs until #105 (features.listingFaqs).
+  await expect(page.getByText('FAQs will appear on your listing page soon.')).toBeVisible()
   await capture(page, '07-edit')
   const revised = 'Sorts expenses from your bank feed and prepares quarterly tax worksheets.'
   await page.getByLabel('Short description').fill(revised)

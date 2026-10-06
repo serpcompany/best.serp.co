@@ -18,6 +18,11 @@ export interface SiteFeatures {
    */
   readonly badgeProgram: boolean
   /**
+   * #105: listing FAQs on the public listing page. Off: the account's FAQ fields say FAQs will
+   * appear on the listing page soon, instead of "Shown on your listing page."
+   */
+  readonly listingFaqs: boolean
+  /**
    * #73: conversations with the SERP team (`/account/messages/`, `/admin/inbox/`). Off: emails
    * point to `/contact/` instead.
    */
@@ -32,6 +37,7 @@ export interface SiteFeatures {
 export const features: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: false,
+  listingFaqs: false,
   messages: false,
   orders: false
 }

@@ -186,12 +186,14 @@ function promisesIn(email: Rendered, id: TemplateId): Array<keyof SiteFeatures> 
 const ALL_OFF: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
+  listingFaqs: false,
   messages: false,
   orders: false
 }
 const ALL_ON: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: true,
+  listingFaqs: true,
   messages: true,
   orders: true
 }

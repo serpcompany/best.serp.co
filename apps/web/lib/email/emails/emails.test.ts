@@ -28,6 +28,7 @@ function render(
 const BEFORE: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
+  listingFaqs: false,
   messages: false,
   orders: false
 }
@@ -35,6 +36,7 @@ const BEFORE: SiteFeatures = {
 const AFTER: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: true,
+  listingFaqs: true,
   messages: true,
   orders: false
 }

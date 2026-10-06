@@ -224,9 +224,11 @@ function Changes({
 
 export function ListingEdit({
   categories,
+  faqsHint,
   view
 }: {
   categories: readonly CategoryChoice[]
+  faqsHint: string
   view: ListingEditView
 }) {
   const router = useRouter()
@@ -431,7 +433,12 @@ export function ListingEdit({
               value={value}
             />
             <Separator />
-            <ExtrasEditor errors={extrasProblems} onChange={setExtras} value={extras} />
+            <ExtrasEditor
+              errors={extrasProblems}
+              faqsHint={faqsHint}
+              onChange={setExtras}
+              value={extras}
+            />
           </FieldGroup>
         </CardContent>
         <CardFooter className="border-t pt-6">

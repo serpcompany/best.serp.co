@@ -9,6 +9,7 @@ import { requireAccountUser } from '@/lib/account/pages'
 import { accountOperations } from '@/lib/account/runtime'
 import { categoryChoices } from '@/lib/account/view'
 import { getActiveCategories } from '@/lib/catalog/repository'
+import { featureCopy } from '@/lib/feature-copy'
 
 export const metadata: Metadata = generateBaseMetadata({
   title: 'Edit listing',
@@ -57,6 +58,7 @@ export default async function AccountListingEditPage({
           name: revision?.categoryName ?? listing.categoryName,
           slug: revision?.categorySlug ?? listing.categorySlug
         })}
+        faqsHint={featureCopy().faqsHint ?? ''}
         view={{
           categoryName: listing.categoryName,
           categorySlug: listing.categorySlug ?? '',

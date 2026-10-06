@@ -130,7 +130,7 @@ function ReadOnlyCard({ view }: { view: SubmissionDetailView }) {
 }
 
 /** FAQs and links while the submission waits for review: "Add them now…" (screen 6). */
-function ExtrasCard({ view }: { view: SubmissionDetailView }) {
+function ExtrasCard({ faqsHint, view }: { faqsHint: string; view: SubmissionDetailView }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState<ExtrasValue>(() => extrasValue(view))
@@ -167,7 +167,7 @@ function ExtrasCard({ view }: { view: SubmissionDetailView }) {
         </CardHeader>
         <CardContent>
           <FieldGroup>
-            <ExtrasEditor errors={errors} onChange={setValue} value={value} />
+            <ExtrasEditor errors={errors} faqsHint={faqsHint} onChange={setValue} value={value} />
           </FieldGroup>
         </CardContent>
         <CardFooter className="flex-col gap-2 border-t pt-6 @sm/main:flex-row">
@@ -317,12 +317,15 @@ function ResubmitCard({
 export function SubmissionDetail({
   categories,
   email,
+  faqsHint,
   history,
   messagesNote,
   view
 }: {
   categories: readonly CategoryChoice[]
   email: string
+  /** Under "FAQs" (`featureCopy().faqsHint`). */
+  faqsHint: string
   history: readonly HistoryItem[]
   /** "The reason is also in your Messages…", once #73 ships Messages. */
   messagesNote: boolean
@@ -374,7 +377,7 @@ export function SubmissionDetail({
           </ToneAlert>
         )}
         <ReadOnlyCard view={view} />
-        <ExtrasCard view={view} />
+        <ExtrasCard faqsHint={faqsHint} view={view} />
       </>
     )
   } else if (view.status === 'withdrawn') {

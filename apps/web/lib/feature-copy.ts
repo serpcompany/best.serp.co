@@ -31,6 +31,15 @@ export function featureCopy(features: SiteFeatures = siteFeatures) {
       failingTitle: features.badgeProgram ? 'Fix the badge before the recheck' : 'Fix the badge',
       programCheckBy: features.badgeProgram ? 'Weekly' : 'SERP'
     },
+    /**
+     * The FAQ fields' hint in the account (#65, #70 screen 7): the public listing page shows
+     * FAQs once #105 ships (owner decision on #102).
+     */
+    faqsHint: !features.accountDashboard
+      ? null
+      : features.listingFaqs
+        ? 'Shown on your listing page.'
+        : 'FAQs will appear on your listing page soon.',
     /** The submit form's long-description hint (#70 screen 2). */
     contentHint: features.accountDashboard
       ? 'Shown on your listing page. FAQs and links can be added from your account later.'

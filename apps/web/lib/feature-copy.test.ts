@@ -28,6 +28,8 @@ const SCANNED = [
 const PAGE_PROMISES: ReadonlyArray<{
   feature: keyof SiteFeatures
   issue: string
+  /** Only sources under these paths make the promise (default: every scanned source). */
+  paths?: RegExp
   pattern: RegExp
 }> = [
   {
@@ -39,6 +41,14 @@ const PAGE_PROMISES: ReadonlyArray<{
     feature: 'badgeProgram',
     issue: '#66',
     pattern: /\bevery week\b|\bweekly\b|\bcheck again about 24 hours\b/iu
+  },
+  {
+    // The account's FAQ fields (#65): the listing page shows FAQs once #105 ships. The same
+    // words describe the long description elsewhere, so only the account's pages are checked.
+    feature: 'listingFaqs',
+    issue: '#105',
+    paths: /^components\/account\//u,
+    pattern: /\bshown on your listing page\b/iu
   }
 ]
 
@@ -51,12 +61,14 @@ const APPROVED_INTERIM_COPY: Record<string, RegExp[]> = {}
 const ALL_OFF: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
+  listingFaqs: false,
   messages: false,
   orders: false
 }
 const ALL_ON: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: true,
+  listingFaqs: true,
   messages: true,
   orders: true
 }
@@ -107,6 +119,7 @@ describe('page copy', () => {
   it('promises no site area whose flag is off outside feature-copy.ts', () => {
     const problems = pageSources().flatMap(({ code, path }) =>
       PAGE_PROMISES.filter(promise => !features[promise.feature])
+        .filter(promise => !promise.paths || promise.paths.test(path))
         .filter(promise => promise.pattern.test(code))
         .map(promise => `${path}: promises ${promise.feature} (${promise.issue}) while it is off`)
     )
@@ -115,7 +128,8 @@ describe('page copy', () => {
 
   it('leaves each promise out while its flag is off and brings the approved copy back on', () => {
     const off = JSON.stringify(featureCopy(ALL_OFF))
-    expect(PAGE_PROMISES.filter(promise => promise.pattern.test(off))).toEqual([])
+    const copyPromises = PAGE_PROMISES.filter(promise => !promise.paths)
+    expect(copyPromises.filter(promise => promise.pattern.test(off))).toEqual([])
     expect(featureCopy(ALL_OFF)).toEqual({
       addFaqsAndLinks: null,
       badgePanel: {
@@ -127,6 +141,7 @@ describe('page copy', () => {
         programCheckBy: 'SERP'
       },
       contentHint: 'Shown on your listing page.',
+      faqsHint: null,
       freePlanBadgeCheck: null,
       keepTheBadgeUp: null
     })
@@ -147,6 +162,7 @@ describe('page copy', () => {
       },
       contentHint:
         'Shown on your listing page. FAQs and links can be added from your account later.',
+      faqsHint: 'Shown on your listing page.',
       freePlanBadgeCheck: 'Keep the badge up: we check it every week',
       keepTheBadgeUp: {
         description:
@@ -154,10 +170,14 @@ describe('page copy', () => {
         title: 'Keep the badge up'
       }
     })
+    // Until #105 shows FAQs on listing pages, the account says they will appear soon.
+    expect(featureCopy({ ...ALL_ON, listingFaqs: false }).faqsHint).toBe(
+      'FAQs will appear on your listing page soon.'
+    )
     for (const feature of ['accountDashboard', 'badgeProgram'] as const) {
       const one = JSON.stringify(featureCopy({ ...ALL_OFF, [feature]: true }))
       expect(
-        PAGE_PROMISES.filter(promise => promise.pattern.test(one)).map(promise => promise.feature)
+        copyPromises.filter(promise => promise.pattern.test(one)).map(promise => promise.feature)
       ).toEqual([feature])
     }
   })
