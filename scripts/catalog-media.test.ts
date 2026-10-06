@@ -53,14 +53,18 @@ function d1Binding(value: unknown): SQLInputValue {
 }
 
 /**
- * Applies every reviewed manifest in file-name order, each as one transaction: a row-level
- * manifest at the version the previous ones left, as the publisher plans it.
+ * Applies every reviewed manifest (or those `include` keeps) in file-name order, each as one
+ * transaction: a row-level manifest at the version the previous ones left, as the publisher
+ * plans it.
  */
-function publishedDatabase(): DatabaseSync {
+function publishedDatabase(
+  include: (manifest: ReturnType<typeof parseManifest>) => boolean = () => true
+): DatabaseSync {
   const database = importedDatabase()
   for (const file of files(publicationsDirectory, /\.ya?ml$/u)) {
     const source = readFileSync(resolve(publicationsDirectory, file), 'utf8')
     const manifest = parseManifest(source)
+    if (!include(manifest)) continue
     // A row-level manifest applies at whatever version the environment is at (#97 review B3).
     const live =
       manifest.concurrency === 'rows'
@@ -146,7 +150,9 @@ describe('hosted catalog media (#95)', () => {
   }, 120_000)
 
   it('changes only listing logos and images when the manifests are applied', () => {
-    const before = importedDatabase()
+    // The other reviewed manifests (#100's unpublications) are the baseline: the row-level
+    // media and category manifests may change nothing else on top of them.
+    const before = publishedDatabase(manifest => manifest.concurrency !== 'rows')
     const after = publishedDatabase()
     try {
       for (const sql of [
