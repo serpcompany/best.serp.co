@@ -9,7 +9,13 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
 import { readParityReport, readReviewedImportSql } from './d1-import-artifact'
 import { buildPublicationPlan, parseManifest } from './d1-publisher.ts'
-import { mediaPlanSchema } from './media-upload'
+import {
+  ARCHIVED_REPO_MEDIA_COMMIT,
+  hasRepoMediaArchive,
+  isArchivedRepoMedia,
+  readArchivedRepoMedia
+} from './media-repo-archive'
+import { type MediaPlanObject, mediaPlanSchema } from './media-upload'
 
 /**
  * The guard for hosted listing media (serpcompany/best.serp.co#95): in the catalog production and
@@ -93,6 +99,30 @@ function publishedDatabase(
   return database
 }
 
+/** Every `repo:` source of every reviewed upload plan, with its repository-relative path. */
+function repoSources(): Array<{ object: MediaPlanObject; path: string }> {
+  return files(mediaDirectory, /\.json$/u).flatMap(file =>
+    mediaPlanSchema
+      .parse(JSON.parse(readFileSync(resolve(mediaDirectory, file), 'utf8')))
+      .objects.filter(object => object.source.startsWith('repo:'))
+      .map(object => ({ object, path: object.source.slice('repo:'.length) }))
+  )
+}
+
+function trackedPublicFiles(): Set<string> {
+  return new Set(
+    execFileSync('git', ['ls-files', '-z', '--', 'apps/web/public'], { encoding: 'utf8' })
+      .split('\0')
+      .filter(Boolean)
+  )
+}
+
+function expectPlannedBytes(path: string, bytes: Uint8Array, object: MediaPlanObject): void {
+  expect(bytes.byteLength, path).toBe(object.bytes)
+  expect(createHash('sha256').update(bytes).digest('hex'), path).toBe(object.sha256)
+  expect(createHash('md5').update(bytes).digest('hex'), path).toBe(object.md5)
+}
+
 interface MediaRow {
   bytes: number | null
   content_type: string | null
@@ -151,31 +181,38 @@ describe('hosted catalog media (#95)', () => {
     }
   }, 120_000)
 
-  it('checks in every repo: source, holding exactly the planned bytes (#95 release blocker 5)', () => {
+  it('checks in every live repo: source, holding exactly the planned bytes (#95 release blocker 5)', () => {
     // A seed a global ignore (`*.so`) kept out of Git failed Upload Listing Media with
     // `repo_file_missing` (run 37495034303): every repo: file must be tracked, not just on disk.
-    const tracked = new Set(
-      execFileSync('git', ['ls-files', '-z', '--', 'apps/web/public'], { encoding: 'utf8' })
-        .split('\0')
-        .filter(Boolean)
-    )
-    let checked = 0
-    for (const file of files(mediaDirectory, /\.json$/u)) {
-      const plan = mediaPlanSchema.parse(
-        JSON.parse(readFileSync(resolve(mediaDirectory, file), 'utf8'))
-      )
-      for (const object of plan.objects.filter(entry => entry.source.startsWith('repo:'))) {
-        const path = object.source.slice('repo:'.length)
-        expect(tracked.has(path), `${path} is tracked`).toBe(true)
-        const bytes = readFileSync(resolve(path))
-        expect(bytes.byteLength, path).toBe(object.bytes)
-        expect(createHash('sha256').update(bytes).digest('hex'), path).toBe(object.sha256)
-        expect(createHash('md5').update(bytes).digest('hex'), path).toBe(object.md5)
-        checked += 1
+    // Files deleted after the production publish (#124) stay out of the tree.
+    const tracked = trackedPublicFiles()
+    for (const { object, path } of repoSources()) {
+      if (isArchivedRepoMedia(path)) continue
+      expect(tracked.has(path), `${path} is tracked`).toBe(true)
+      expectPlannedBytes(path, readFileSync(resolve(path)), object)
+    }
+    expect(
+      [...tracked].filter(isArchivedRepoMedia),
+      'Nothing is checked in again under a directory deleted in #124.'
+    ).toEqual([])
+  })
+
+  // The committed plan stays the record of what was uploaded: a file it names that was deleted
+  // after the production publish keeps its reviewed bytes in Git (docs/MEDIA.md, "Legacy
+  // migration"). Publish D1 Catalog and the deploys check out one commit, so PR Review (full
+  // history) checks this.
+  it.skipIf(!hasRepoMediaArchive())(
+    'keeps every deleted repo: source in Git history at exactly the planned bytes (#124)',
+    () => {
+      const archived = repoSources().filter(({ path }) => isArchivedRepoMedia(path))
+      expect(archived.length).toBeGreaterThan(0)
+      for (const { object, path } of archived) {
+        const bytes = readArchivedRepoMedia(path)
+        expect(bytes, `${path} at ${ARCHIVED_REPO_MEDIA_COMMIT}`).not.toBeNull()
+        expectPlannedBytes(path, bytes ?? new Uint8Array(), object)
       }
     }
-    expect(checked).toBeGreaterThan(0)
-  })
+  )
 
   it('changes only listing logos and images when the manifests are applied', () => {
     // The other reviewed manifests (#100's unpublications, #105's FAQ move) are the baseline:

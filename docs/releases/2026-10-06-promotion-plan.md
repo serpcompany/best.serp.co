@@ -6,6 +6,11 @@ against Cloudflare. Procedures: [Release guards](../RELEASE_GUARDS.md),
 [Deploy runbook](../DEPLOY_RUNBOOK.md), [Listing media](../MEDIA.md),
 [Catalog hygiene](../CATALOG_HYGIENE.md), [D1 recovery](../D1_RECOVERY.md).
 
+**Status: done.** Promotion #121 (`main` `a91842a375`) went live on 2026-10-07 with every
+catalog step in section 6 published on production (publication v11); see the
+[release summary](https://github.com/serpcompany/best.serp.co/issues/59#issuecomment-6022835775).
+The post-publish cleanup (section 7e) is #124.
+
 ## Blockers before the catalog steps
 
 Neither stops the code promotion itself. Both gate the catalog steps, and each has a PR into
@@ -224,5 +229,6 @@ shows no FAQs (it has no FAQ section).
   merge, any restore or rollback, and the owner checks in section 5.
 - **Agents, with the owner's go-ahead:** the blocker PRs (#110, #113), read-only
   queries and dry runs, the S3 and P6 acceptance checks, and the post-publish cleanup PR
-  (delete `apps/web/public/listing-logos/serpdownloaders.com/` and `media/products/launchbuzz.io/`,
-  MEDIA.md "Legacy migration").
+  (#124: deleted `apps/web/public/listing-logos/serpdownloaders.com/`, `listing-media-seed/`, and
+  `media/products/launchbuzz.io/` after read-only queries found every production and staging
+  row hosted; MEDIA.md [Legacy migration](../MEDIA.md#legacy-migration)).
