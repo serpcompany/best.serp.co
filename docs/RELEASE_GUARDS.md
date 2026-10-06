@@ -159,13 +159,20 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
 
 `scripts/deploy-workflows.test.ts` enforces it:
 
-- **Changes are found by credential, and the check fails closed.** Every step that gets
-  `CLOUDFLARE_API_TOKEN` (from its own `env` or `with`, or the job's or workflow's `env`) counts
-  as a D1 change, except steps whose whole `run` is one of a short reviewed list: the two
-  credential checks, a read-only `cloudflare-release.ts` command (`bookmark`, `plan-release`,
-  `list-migrations`, `check-database`, `verify-import`), the Worker `deploy`, and Deploy
-  Production's plan step. Any other launcher (`npm`, a path such as `./node_modules/.bin/wrangler`,
-  a script, an action) is a change, and so is #97's staging publish once it lands.
+- **Changes are found by credential, and the check fails closed.** A step holds a credential
+  when its own `env` or `with`, or the job's or workflow's `env`, names a Wrangler credential
+  variable in any case (`CLOUDFLARE_API_TOKEN`, the deprecated `CF_API_TOKEN`, the global
+  `*_API_KEY` and `*_EMAIL`), or uses any secret in an expression other than an exact
+  `secrets.<name>` from a reviewed list (`GITHUB_TOKEN` and the Search Console secrets), so
+  `secrets.cloudflare_api_token`, `secrets[...]` and `toJSON(secrets)` all count. Every such
+  step is a D1 change except a step whose whole `run` is one of a short reviewed list (the two
+  credential checks, a read-only `cloudflare-release.ts` command, the Worker `deploy`, and Deploy
+  Production's plan step) **and** that has nothing else to change what runs: only the keys
+  `name`, `id`, `if`, `env`, and `run`; only reviewed `env` entries with their exact values (no
+  `NODE_OPTIONS`, `BASH_ENV`, or `LD_PRELOAD`); no `shell` or `working-directory`; and no
+  `defaults` or other `env` on the job or workflow. Any other launcher (`npm`, a path such as
+  `./node_modules/.bin/wrangler`, a script, an action) is a change, and so is #97's staging
+  publish once it lands. A bookmark step must meet the same rules.
 - **No handoff.** A step holding the token, other than that list, may not write `GITHUB_ENV`,
   `GITHUB_PATH`, `GITHUB_OUTPUT`, or `GITHUB_STATE`, so it cannot pass the token to a later step.
 - **A change runs only after a successful bookmark.** Its bookmark is the step right before it in
@@ -192,12 +199,20 @@ example) gets its exact `run` in `tokenStepsWithoutChanges` with the reason; and
 artifacts go in `credentialedJobActions` or `allowedUploads`. Each entry is reviewed with the
 workflow.
 
-These checks read workflow and script text, not data. An allowlisted upload path, a log line or
-job summary, a remote reusable workflow, a program called by another name or from inside a
-script (a reviewed `pnpm` command that itself uploads), or a file written in one step and sent
-from a token-less job could still carry data, and a pull request can edit the checks
-themselves. Review of every workflow and script change stays the control; the per-environment
-token split (decision b) limits what a leaked token reaches.
+These checks read workflow and script text, not data, and they are not a sandbox. Known
+limits:
+
+- A reviewed `pnpm` command runs repository code: a change to `cloudflare-release.ts` or a
+  package script can do anything with the token, and only code review catches it.
+- An upload by a program the parser does not name (`node -e "fetch(url, {method: 'POST'})"`,
+  `python -c ...`, `nc`, or a renamed copy of `curl`) is not caught, and neither is a file written in a
+  credentialed job and sent from a job without the token.
+- An allowlisted artifact or cache path, a log line, or a job summary could still carry data.
+- A remote reusable workflow or action is judged by its reference, not its content.
+- A pull request can edit the checks themselves.
+
+Review of every workflow and script change stays the control; the per-environment token split
+(decision b) limits what a leaked token reaches.
 
 ## Security boundary
 

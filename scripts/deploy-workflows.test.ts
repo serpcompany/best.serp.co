@@ -10,6 +10,8 @@ import { stagingWorkflow } from './staging-verification'
 
 interface WorkflowStep {
   'continue-on-error'?: boolean | string
+  shell?: string
+  'working-directory'?: string
   env?: Record<string, string>
   id?: string
   if?: string
@@ -21,6 +23,7 @@ interface WorkflowStep {
 
 interface WorkflowJob {
   concurrency?: { 'cancel-in-progress'?: boolean; group?: string }
+  defaults?: unknown
   env?: Record<string, string>
   environment?: string | { name: string; url?: string }
   if?: string
@@ -659,8 +662,38 @@ describe('D1 data stays in Cloudflare', () => {
       )
     }
   ]
-  const tokenStepWithoutChanges = (step: WorkflowStep) =>
-    !step.uses && tokenStepsWithoutChanges.find(known => known.run.test(step.run ?? ''))?.id
+  /**
+   * What an exempt step may carry besides its `run`: anything else (an `env` such as
+   * `NODE_OPTIONS` or `BASH_ENV`, a `shell`, a `working-directory`, or `defaults.run` on the job
+   * or workflow) can make a reviewed command do something else, so the step is not exempt.
+   */
+  const exemptStepKeys = new Set(['env', 'id', 'if', 'name', 'run'])
+  const exemptEnvironment: Readonly<Record<string, string>> = {
+    CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
+    CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN'),
+    GITHUB_TOKEN: expression('github.token'),
+    RELEASE_CONFIRM: expression('inputs.confirmation'),
+    // Deploy Staging's job env, and where the Worker deploy records its version.
+    STAGING_ORIGIN: project.remote.staging.origin,
+    WRANGLER_OUTPUT_FILE_PATH: `${expression('runner.temp')}/wrangler-output.ndjson`
+  }
+  const onlyExemptEnvironment = (env: unknown) =>
+    env === undefined ||
+    (typeof env === 'object' &&
+      env !== null &&
+      Object.entries(env).every(([key, value]) => exemptEnvironment[key] === value))
+  const tokenStepWithoutChanges = (
+    workflow: WorkflowDefinition,
+    job: WorkflowJob,
+    step: WorkflowStep
+  ) =>
+    Object.keys(step).every(key => exemptStepKeys.has(key)) &&
+    onlyExemptEnvironment(step.env) &&
+    onlyExemptEnvironment(job.env) &&
+    onlyExemptEnvironment((workflow as { env?: unknown }).env) &&
+    job.defaults === undefined &&
+    (workflow as { defaults?: unknown }).defaults === undefined &&
+    tokenStepsWithoutChanges.find(known => known.run.test(step.run ?? ''))?.id
   /** Files that hand values to later steps: a token step outside the list may not write them. */
   const workflowCommandFiles = /\bGITHUB_(?:ENV|PATH|OUTPUT|STATE)\b/u
   /**
@@ -748,7 +781,33 @@ describe('D1 data stays in Cloudflare', () => {
     return allowed ? problems : [...problems, `${step.uses} ${values.join(' ')} is not allowlisted`]
   }
 
-  const tokenIn = (value: unknown) => JSON.stringify(value ?? {}).includes('CLOUDFLARE_API_TOKEN')
+  /** Secrets that are not Cloudflare credentials, by exact name. Every other secret counts as one. */
+  const nonCloudflareSecrets = new Set([
+    'GITHUB_TOKEN',
+    'GSC_OAUTH_CLIENT_ID',
+    'GSC_OAUTH_CLIENT_SECRET',
+    'GSC_OAUTH_REFRESH_TOKEN',
+    'GSC_QUOTA_PROJECT',
+    'GSC_SERVICE_ACCOUNT_JSON'
+  ])
+  /** The variables Wrangler reads a Cloudflare credential from, deprecated names included. */
+  const cloudflareCredentialName = /(?:CLOUDFLARE|CF)_(?:API_TOKEN|API_KEY|EMAIL)/iu
+  /**
+   * True when `value` (a step, a job, or an `env`) can carry a Cloudflare credential: a
+   * Wrangler credential name anywhere (any case), or a `secrets` reference in an expression
+   * other than an exact `secrets.<name>` from `nonCloudflareSecrets` (so `secrets[...]`,
+   * `toJSON(secrets)`, and `secrets.cloudflare_api_token` all count).
+   */
+  function tokenIn(value: unknown): boolean {
+    const text = JSON.stringify(value ?? {})
+    if (cloudflareCredentialName.test(text)) return true
+    for (const [, body = ''] of text.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)) {
+      for (const match of body.matchAll(/\bsecrets\b(?:\s*\.\s*([A-Za-z0-9_-]+))?/giu)) {
+        if (!match[1] || !nonCloudflareSecrets.has(match[1])) return true
+      }
+    }
+    return false
+  }
   /** The step gets the token: from the workflow's or job's `env`, or its own `env` or `with`. */
   const stepHoldsToken = (workflow: WorkflowDefinition, job: WorkflowJob, step: WorkflowStep) =>
     tokenIn((workflow as { env?: unknown }).env) || tokenIn(job.env) || tokenIn(step)
@@ -789,7 +848,7 @@ describe('D1 data stays in Cloudflare', () => {
         steps.forEach((step, index) => {
           if (!stepHoldsToken(workflow, job, step)) return
           const label = `${file}:${name}:${step.run?.trim() ?? step.uses}`
-          if (tokenStepWithoutChanges(step)) return
+          if (tokenStepWithoutChanges(workflow, job, step)) return
           // No handoff: a later step without `env` could otherwise get the token.
           if (workflowCommandFiles.test(step.run ?? ''))
             violations.push(
@@ -804,8 +863,11 @@ describe('D1 data stays in Cloudflare', () => {
             return
           }
           const bookmark = steps[index - 1]
-          if (bookmark?.run !== bookmarkCommand(environment))
-            problem(`must directly follow \`${bookmarkCommand(environment)}\``)
+          if (
+            bookmark?.run !== bookmarkCommand(environment) ||
+            !tokenStepWithoutChanges(workflow, job, bookmark)
+          )
+            problem(`must directly follow a plain \`${bookmarkCommand(environment)}\` step`)
           if (bookmark?.if !== step.if) problem('must share its bookmark step’s condition')
           for (const checked of [bookmark, step]) {
             if (checked && statusFunction.test(String(checked.if ?? '')))
@@ -1043,6 +1105,121 @@ describe('D1 data stays in Cloudflare', () => {
       ]
     ])
     expect(reads).toEqual({ changes: [], violations: [] })
+  })
+
+  it('exempts a reviewed command only when nothing else can change what it runs (#101 round 3)', () => {
+    const publish = loadWorkflow('publish-d1.yml')
+    const job = publish.jobs.publish as WorkflowJob
+    const token = {
+      CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
+      CLOUDFLARE_API_TOKEN: secret('CLOUDFLARE_API_TOKEN')
+    }
+    const exempt = 'pnpm tsx scripts/cloudflare-release.ts check-database production'
+    const appended = (step: WorkflowStep, jobOverrides: Partial<WorkflowJob> = {}) =>
+      d1ChangeAudit([
+        [
+          'publish-d1.yml',
+          {
+            ...publish,
+            jobs: { publish: { ...job, ...jobOverrides, steps: [...stepsOf(job), step] } }
+          }
+        ]
+      ])
+    // Without anything else, the reviewed read-only command stays exempt.
+    expect(appended({ env: token, run: exempt })).toEqual({
+      changes: [...bookmarkedChanges].filter(change => change.startsWith('publish-d1.yml')),
+      violations: []
+    })
+    // The reviewer's probes: each turns the exempt command into a change without a bookmark.
+    for (const [label, step, jobOverrides] of [
+      [
+        'NODE_OPTIONS',
+        {
+          env: {
+            ...token,
+            NODE_OPTIONS:
+              "--import=data:text/javascript,import('node:child_process').then(c=>c.execSync('npx wrangler d1 execute best-serp-co-production --remote --command \"DELETE FROM listings\"'))"
+          },
+          run: exempt
+        },
+        {}
+      ],
+      [
+        'shell',
+        {
+          env: token,
+          run: exempt,
+          shell:
+            'bash -c \'pnpm exec wrangler d1 execute best-serp-co-production --remote --command "DELETE FROM listings"; bash {0}\''
+        },
+        {}
+      ],
+      ['BASH_ENV', { env: { ...token, BASH_ENV: 'scripts/evil.sh' }, run: exempt }, {}],
+      ['working-directory', { env: token, run: exempt, 'working-directory': 'evil' }, {}],
+      ['job defaults', { env: token, run: exempt }, { defaults: { run: { shell: 'evil {0}' } } }],
+      ['job env', { env: token, run: exempt }, { env: { LD_PRELOAD: '/tmp/evil.so' } }]
+    ] as Array<[string, WorkflowStep, Partial<WorkflowJob>]>) {
+      const audit = appended(step, jobOverrides)
+      expect(audit.changes, label).toContain('publish-d1.yml:publish:production')
+      expect(audit.violations.join('\n'), label).toContain('must directly follow')
+    }
+    // A bookmark step with an extra env is not a bookmark.
+    const at = stepIndex(job, 'db:publish:production')
+    const steps = structuredClone(stepsOf(job))
+    const bookmark = steps[at - 1]
+    if (bookmark?.env) bookmark.env.NODE_OPTIONS = '--require ./evil.js'
+    expect(
+      d1ChangeAudit([
+        ['publish-d1.yml', { ...publish, jobs: { publish: { ...job, steps } } }]
+      ]).violations.join('\n')
+    ).toContain('must directly follow a plain')
+  })
+
+  it('treats any secret but the reviewed ones, in any spelling, as a credential (#101 round 3)', () => {
+    const workflow = (step: WorkflowStep, env?: Record<string, string>): WorkflowDefinition => ({
+      ...(env ? { env } : {}),
+      jobs: { cleanup: { environment: 'production', 'runs-on': 'ubuntu-latest', steps: [step] } },
+      on: { workflow_dispatch: null }
+    })
+    const destroy =
+      'pnpm exec wrangler d1 execute best-serp-co-production --remote --env production --command "DELETE FROM listings"'
+    for (const [label, definition] of [
+      [
+        'CF_API_TOKEN and a lower-case secret name',
+        workflow({
+          env: {
+            CF_API_TOKEN: expression('secrets.cloudflare_api_token'),
+            CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID')
+          },
+          run: destroy
+        })
+      ],
+      [
+        'toJSON(secrets)',
+        workflow({
+          env: { ALL: expression('toJSON(secrets)') },
+          run: `CLOUDFLARE_API_TOKEN="$(jq -r '.["CLOUDFLARE_" + "API_TOKEN"]' <<<"$ALL")" ${destroy}`
+        })
+      ],
+      ['secrets[...]', workflow({ env: { T: expression("secrets['DEPLOY']") }, run: destroy })],
+      ['an unknown secret', workflow({ env: { T: secret('DEPLOY_KEY') }, run: destroy })],
+      ['a workflow-level secret', workflow({ run: destroy }, { T: secret('DEPLOY_KEY') })],
+      [
+        'a global API key',
+        workflow({ env: { cf_api_key: secret('GSC_QUOTA_PROJECT') }, run: destroy })
+      ]
+    ] as Array<[string, WorkflowDefinition]>) {
+      const audit = d1ChangeAudit([['cleanup.yml', definition]])
+      expect(audit.changes, label).toEqual(['cleanup.yml:cleanup:production'])
+      expect(audit.violations.join('\n'), label).toContain('must directly follow')
+    }
+    // GitHub's own token and the reviewed Search Console secrets are not Cloudflare credentials.
+    for (const env of [
+      { T: expression('secrets.GITHUB_TOKEN') },
+      { T: secret('GSC_QUOTA_PROJECT') }
+    ]) {
+      expect(d1ChangeAudit([['ok.yml', workflow({ env, run: 'node x.mjs' })]]).changes).toEqual([])
+    }
   })
 
   it('refuses to hand the token to a later step (#101 round 2)', () => {
