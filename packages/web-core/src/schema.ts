@@ -1,8 +1,5 @@
 import { getCategoryDisplayName } from './category-display'
-import {
-  getListingLogoFallbackPath,
-  shouldUseProvidedListingLogo
-} from './listing-logo-presentation'
+import { shouldUseProvidedListingLogo } from './listing-logo-presentation'
 import { getCanonicalListingListRoute, getRoute } from './routes'
 import { SITE_LOGO_URL, SITE_NAME, SITE_PUBLIC_URL, SITE_URL } from './seo-config'
 import { siteCopy } from './site-copy'
@@ -136,10 +133,9 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
         isPartOf: {
           '@id': `${SITE_URL}/#website`
         },
-        primaryImageOfPage: {
-          '@type': 'ImageObject',
-          url: primaryImageUrl
-        },
+        ...(primaryImageUrl
+          ? { primaryImageOfPage: { '@type': 'ImageObject', url: primaryImageUrl } }
+          : {}),
         datePublished: website.publishedAt,
         dateModified: website.publishedAt,
         breadcrumb: {
@@ -262,15 +258,18 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
   }
 }
 
-function resolveSchemaImageUrl(website: WebsiteMetadataLike): string {
+/**
+ * The listing's own logo as an absolute URL, or undefined when it has none. The generic
+ * "no logo" fallback tile is a UI affordance, never structured data: it would tell search
+ * engines that every logo-less listing shares one image, and the site logo would misattribute
+ * the listing to SERP (the TechArticle publisher already carries that).
+ */
+function resolveSchemaImageUrl(website: WebsiteMetadataLike): string | undefined {
   const logo = website.media?.logo
 
-  if (shouldUseProvidedListingLogo(logo) && logo) {
-    if (logo.startsWith('/')) return `${SITE_PUBLIC_URL}${logo}`
-    return logo
-  }
-
-  return `${SITE_PUBLIC_URL}${getListingLogoFallbackPath()}`
+  if (!shouldUseProvidedListingLogo(logo) || !logo) return undefined
+  if (logo.startsWith('/')) return `${SITE_PUBLIC_URL}${logo}`
+  return logo
 }
 
 export function generateCollectionSchema(websites: WebsiteMetadataLike[]): CollectionPageSchema {
