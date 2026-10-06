@@ -17,6 +17,7 @@ import type {
   CatalogQueryShape,
   CatalogShellStats,
   ListingDetail,
+  ListingFaq,
   ListingLinkRel,
   ListingNamePage,
   ListingNamePageQuery,
@@ -29,8 +30,8 @@ import type {
 } from './contracts'
 import { listingSlugRedirects, listings } from './schema'
 
-/** v4: listing details carry `linkRel` and `verifiedOwner` (#62). */
-const CACHE_SCHEMA = 'v4'
+/** v4: listing details carry `linkRel` and `verifiedOwner` (#62); v5: `faqs` (#105). */
+const CACHE_SCHEMA = 'v5'
 /**
  * Keys include the catalog epoch (publication version plus the latest public
  * `published_at`), so an entry can never outlive the content it was built from; the TTL
@@ -105,6 +106,7 @@ interface DetailRow extends SummaryRow {
   entity_type: string | null
   images: string
   link_rel: string
+  faqs: string
   priority: string | null
   resource_links: string
   verified_owner: number
@@ -279,6 +281,14 @@ function mapDetail(
       url: requireString(resource.url, `resource ${index + 1} URL`)
     }
   })
+  const faqs: ListingFaq[] = parseJsonArray(row.faqs, 'listing FAQs').map((value, index) => {
+    if (!value || typeof value !== 'object') throw new Error(`Invalid D1 FAQ ${index + 1}.`)
+    const faq = value as Record<string, unknown>
+    return {
+      answer: requireString(faq.answer, `FAQ ${index + 1} answer`),
+      question: requireString(faq.question, `FAQ ${index + 1} question`)
+    }
+  })
   const priority =
     typeof row.priority === 'string' && runtimePriorities.has(row.priority)
       ? (row.priority as 'high' | 'low' | 'medium')
@@ -292,6 +302,7 @@ function mapDetail(
     ...summary,
     content: row.content || undefined,
     entityType: row.entity_type || undefined,
+    faqs: faqs.length ? faqs : undefined,
     linkRel: row.link_rel as ListingLinkRel,
     media:
       logo || video || images.length
@@ -433,6 +444,16 @@ function isListingDetail(value: unknown): value is ListingDetail {
     (candidate.nextWebsite === null || isNavigation(candidate.nextWebsite)) &&
     (candidate.previousWebsite === null || isNavigation(candidate.previousWebsite)) &&
     (candidate.priority === undefined || runtimePriorities.has(candidate.priority)) &&
+    (candidate.faqs === undefined ||
+      (Array.isArray(candidate.faqs) &&
+        candidate.faqs.every(
+          faq =>
+            faq &&
+            typeof faq.question === 'string' &&
+            faq.question.length > 0 &&
+            typeof faq.answer === 'string' &&
+            faq.answer.length > 0
+        ))) &&
     Array.isArray(candidate.relatedWebsites) &&
     candidate.relatedWebsites.every(isRelatedListing) &&
     (candidate.resourceLinks === undefined ||
@@ -874,7 +895,15 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
             WHERE r.listing_id = l.id
             ORDER BY r.sort_order ASC
           ) ordered
-        ), '[]') AS resource_links
+        ), '[]') AS resource_links,
+        COALESCE((
+          SELECT json_group_array(json_object('question', ordered.question, 'answer', ordered.answer))
+          FROM (
+            SELECT f.question, f.answer FROM listing_faqs f
+            WHERE f.listing_id = l.id
+            ORDER BY f.sort_order ASC
+          ) ordered
+        ), '[]') AS faqs
       FROM listings l
       WHERE ${publicEligibilitySql()} AND l.slug = ?
       LIMIT 1`,

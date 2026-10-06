@@ -4,6 +4,7 @@ import { getRoute } from '@serpdirectory/web-core/routes'
 import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@serpdirectory/web-core/sections/external-resources-section-route'
 import { WebsiteContentSectionRoute as WebsiteContentSection } from '@serpdirectory/web-core/website/website-content-section-route'
 import { WebsiteDetailSidebar } from '@serpdirectory/web-core/website/website-detail-sidebar'
+import { WebsiteFaqsSection } from '@serpdirectory/web-core/website/website-faqs-section'
 import { WebsiteHeroRoute as WebsiteHero } from '@serpdirectory/web-core/website/website-hero-route'
 import { WebsiteRelatedProjectsRoute as WebsiteRelatedProjects } from '@serpdirectory/web-core/website/website-related-projects-route'
 import { WebsiteResourcesSectionRoute as WebsiteResourcesSection } from '@serpdirectory/web-core/website/website-resources-section-route'
@@ -81,6 +82,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         ProjectNavigation,
         WebsiteContentSection,
         WebsiteDetailSidebar,
+        WebsiteFaqsSection,
         WebsiteHero,
         WebsiteRelatedProjects,
         WebsiteResourcesSection

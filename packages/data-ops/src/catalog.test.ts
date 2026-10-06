@@ -85,6 +85,10 @@ describe('shared catalog data operations', () => {
     expect(detail?.resourceLinks).toEqual([
       { label: 'Documentation', url: 'https://docs.example/serp-charlie' }
     ])
+    // The listing's FAQs, in order (#105).
+    expect(detail?.faqs).toEqual([
+      { answer: 'Answer for serp-charlie', question: 'Question for serp-charlie' }
+    ])
     expect(detail?.media?.images).toEqual(['https://assets.example/serp-charlie-image.png'])
     expect(detail?.relatedWebsites.map(item => item.slug)).toEqual([
       'alpha',
@@ -193,7 +197,7 @@ describe('shared catalog data operations', () => {
     expect(after.listingCount).toBe(6)
     expect(after.publicationVersion).toBe(before.publicationVersion)
     expect((await later.getListingNamePage()).items.map(item => item.slug)).toContain('future')
-    expect([...cache.values.keys()]).toContain('catalog-shell:v4:1.2027-01-01T00:00:00.000Z')
+    expect([...cache.values.keys()]).toContain('catalog-shell:v5:1.2027-01-01T00:00:00.000Z')
   })
 
   it('reads the catalog epoch for the Worker edge cache with query telemetry', async () => {
@@ -430,14 +434,14 @@ describe('shared catalog data operations', () => {
       )
     ).toHaveLength(1)
     expect([...cache.values.keys()].sort()).toEqual([
-      `catalog-shell:v4:${epoch(1)}`,
-      `catalog-shell:v4:${epoch(2)}`
+      `catalog-shell:v5:${epoch(1)}`,
+      `catalog-shell:v5:${epoch(2)}`
     ])
   })
 
   it('falls back to live D1 when cached shell data is corrupt or unavailable', async () => {
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-shell:v4:${epoch(1)}`, { featuredCount: 'wrong' })
+    corrupt.values.set(`catalog-shell:v5:${epoch(1)}`, { featuredCount: 'wrong' })
     const corruptCatalog = operations(corrupt)
     expect((await corruptCatalog.operations.getShellStats()).featuredCount).toBe(2)
     expect(corruptCatalog.events).toContainEqual({
@@ -543,8 +547,8 @@ describe('shared catalog data operations', () => {
     ).toHaveLength(2)
 
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-published:v4:${epoch(2)}`, { items: 'wrong' })
-    corrupt.values.set(`catalog-detail:v4:${epoch(2)}:charlie`, { detail: 'wrong' })
+    corrupt.values.set(`catalog-published:v5:${epoch(2)}`, { items: 'wrong' })
+    corrupt.values.set(`catalog-detail:v5:${epoch(2)}:charlie`, { detail: 'wrong' })
     const recovered = operations(corrupt)
     expect(await recovered.operations.getPublishedListings()).toHaveLength(5)
     expect((await recovered.operations.getListingBySlug('charlie'))?.slug).toBe('charlie')

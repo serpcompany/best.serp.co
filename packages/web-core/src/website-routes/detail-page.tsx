@@ -55,6 +55,10 @@ type WebsiteResourcesSectionProps = {
   website: WebsiteResourcesSectionWebsite
 }
 
+type WebsiteFaqsSectionProps = {
+  website: Pick<WebsiteDetailMetadata, 'faqs'>
+}
+
 type WebsiteRelatedProjectsProps = {
   websites: WebsiteRelatedCardMetadata[]
 }
@@ -75,6 +79,7 @@ type WebsiteDetailRouteSlots = {
   ProjectNavigation: ComponentType<ProjectNavigationProps>
   WebsiteContentSection: ComponentType<WebsiteContentSectionProps>
   WebsiteDetailSidebar: ComponentType<WebsiteDetailSidebarProps>
+  WebsiteFaqsSection: ComponentType<WebsiteFaqsSectionProps>
   WebsiteHero: ComponentType<WebsiteHeroProps>
   WebsiteRelatedProjects: ComponentType<WebsiteRelatedProjectsProps>
   WebsiteResourcesSection: ComponentType<WebsiteResourcesSectionProps>
@@ -139,6 +144,7 @@ export function WebsiteDetailRoutePage({
     ProjectNavigation,
     WebsiteContentSection,
     WebsiteDetailSidebar,
+    WebsiteFaqsSection,
     WebsiteHero,
     WebsiteRelatedProjects,
     WebsiteResourcesSection
@@ -206,6 +212,8 @@ export function WebsiteDetailRoutePage({
               )}
 
               <WebsiteResourcesSection website={resourcesWebsite} />
+
+              <WebsiteFaqsSection website={{ faqs: project.faqs }} />
             </div>
 
             <div className="lg:col-span-4">

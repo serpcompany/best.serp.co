@@ -91,6 +91,12 @@ export interface ListingResourceLink {
   url: string
 }
 
+/** An approved question and answer on a listing (`listing_faqs`, #105). */
+export interface ListingFaq {
+  answer: string
+  question: string
+}
+
 export interface ListingSummary {
   categories?: string[]
   category: string
@@ -126,6 +132,8 @@ export type ListingLinkRel = 'follow' | 'nofollow' | 'sponsored'
 export interface ListingDetail extends ListingSummary {
   content?: string
   entityType?: string
+  /** The listing's FAQs in order (#105); absent when it has none. */
+  faqs?: ListingFaq[]
   /** Rendered on the outbound "Visit Site" link; imported and admin listings are `follow`. */
   linkRel: ListingLinkRel
   media?: ListingMedia
