@@ -28,8 +28,6 @@ const APP_DIRECTORY = join(WEB_DIRECTORY, 'app')
 /** Links to pages other issues build, by template (each email that links there). */
 const DEFERRED: Partial<Record<TemplateId, Array<{ issue: string; path: RegExp }>>> = {
   'admin-new-message': [{ issue: '#73', path: /^\/admin\/inbox\/[^/]+\/$/u }],
-  'badge-missing': [{ issue: '#65', path: /^\/account\/listings\/[^/]+\/$/u }],
-  'listing-unlisted': [{ issue: '#65', path: /^\/account\/listings\/[^/]+\/$/u }],
   'new-message': [{ issue: '#73', path: /^\/account\/messages\/[^/]+\/$/u }]
 }
 
@@ -188,12 +186,14 @@ function promisesIn(email: Rendered, id: TemplateId): Array<keyof SiteFeatures> 
 const ALL_OFF: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
+  listingFaqs: false,
   messages: false,
   orders: false
 }
 const ALL_ON: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: true,
+  listingFaqs: true,
   messages: true,
   orders: true
 }

@@ -8,6 +8,7 @@
 | [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review |
 | [Email](./EMAIL.md) | Transactional email, environments, owner prerequisites |
 | [Email templates](./EMAIL_TEMPLATES.md) | Every email, its trigger, recipient, and link |
+| [Submitter dashboard](./ACCOUNT_DASHBOARD.md) | `/account`: statuses, edits, revisions, the badge panel |
 | [Accounts](./ACCOUNTS.md) | Better Auth sign-in codes, admins, Cloudflare Access |
 | [Admin panel](./ADMIN_PANEL.md) | `/admin` screens, decisions, the production-write exception |
 | [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, release flow, cutover checklist |

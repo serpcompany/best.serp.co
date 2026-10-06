@@ -18,12 +18,15 @@ import {
 export type ReviewPlan =
   | { badgeVerifiedAt: Date | string; kind: 'free' }
   | { kind: 'paid'; live: boolean }
+  /** A listing with no plan: its owner was assigned by an admin (a revision, #65). */
+  | { kind: 'none' }
 
 export interface AdminReviewReadyInput {
   category: string
   plan: ReviewPlan
   /** A new submission, or a revision of a live listing. */
   source: 'revision' | 'submission'
+  /** The submission's id, or the revision's (the button opens its review page). */
   submissionId: string
   submissionName: string
   /** The submitter's address, shown to the admin. */
@@ -42,6 +45,9 @@ function planLabels(plan: ReviewPlan): { row: string; subject: string } {
     return plan.live
       ? { row: 'Paid. Live now', subject: 'paid, live now' }
       : { row: 'Paid. Waiting for review', subject: 'paid, waiting for review' }
+  }
+  if (plan.kind === 'none') {
+    return { row: 'None. An admin assigned the owner', subject: 'owner edit' }
   }
   throw new EmailTemplateError('Unknown review plan.')
 }
@@ -69,7 +75,14 @@ export const adminReviewReadyEmail = defineEmailTemplate<AdminReviewReadyInput>(
         ],
         cta: {
           label: 'Review submission',
-          url: context.links.url(sitePath('admin', 'submissions', input.submissionId))
+          // A revision is reviewed on its own page (#64); `submissionId` is then its id.
+          url: context.links.url(
+            sitePath(
+              'admin',
+              input.source === 'revision' ? 'revisions' : 'submissions',
+              input.submissionId
+            )
+          )
         },
         heading: `${name} is ready for review`,
         preheader: `${category} · submitted by ${submittedBy}`,

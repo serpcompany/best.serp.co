@@ -8,7 +8,7 @@
 export interface SiteFeatures {
   /**
    * #65: the account dashboard's submission and listing pages (`/account/submissions/<id>/`),
-   * where a submitter edits and resubmits. Off: emails send people to `/submit/` instead.
+   * where a submitter edits and resubmits, and adds FAQs and links. On since #65 built them.
    */
   readonly accountDashboard: boolean
   /**
@@ -17,6 +17,11 @@ export interface SiteFeatures {
    * (`lib/feature-copy.ts`).
    */
   readonly badgeProgram: boolean
+  /**
+   * #105: listing FAQs on the public listing page. Off: the account's FAQ fields say FAQs will
+   * appear on the listing page soon, instead of "Shown on your listing page."
+   */
+  readonly listingFaqs: boolean
   /**
    * #73: conversations with the SERP team (`/account/messages/`, `/admin/inbox/`). Off: emails
    * point to `/contact/` instead.
@@ -30,8 +35,9 @@ export interface SiteFeatures {
 }
 
 export const features: SiteFeatures = {
-  accountDashboard: false,
+  accountDashboard: true,
   badgeProgram: false,
+  listingFaqs: false,
   messages: false,
   orders: false
 }

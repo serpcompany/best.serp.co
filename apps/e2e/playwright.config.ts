@@ -4,7 +4,12 @@ import {
   accessLockServerCommand,
   accessLockServersEnabled
 } from './tests/access-lock-fixture'
-import { adminOrigin, adminServerCommand, adminSuiteEnabled } from './tests/admin-fixture'
+import {
+  accountServer,
+  adminOrigin,
+  adminServerCommand,
+  adminSuiteEnabled
+} from './tests/admin-fixture'
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`
@@ -122,17 +127,16 @@ export default defineConfig({
               env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
             }))
           : []),
-        // The admin panel suite's own Worker and D1 (tests/admin-fixture.ts).
+        // The admin panel and account dashboard suites' own Workers and D1s
+        // (tests/admin-fixture.ts): both publish listings and add admins.
         ...(adminSuiteEnabled
-          ? [
-              {
-                command: adminServerCommand(),
-                url: `${adminOrigin()}/robots.txt`,
-                reuseExistingServer: !process.env.CI,
-                timeout: 180000,
-                env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
-              }
-            ]
+          ? [undefined, accountServer].map(server => ({
+              command: adminServerCommand(server),
+              url: `${adminOrigin(server)}/robots.txt`,
+              reuseExistingServer: !process.env.CI,
+              timeout: 180000,
+              env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
+            }))
           : [])
       ]
 })

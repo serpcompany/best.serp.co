@@ -9,8 +9,8 @@ import { features, type SiteFeatures } from './features'
  * (`email/emails/links.test.ts`) does for emails: submitter-facing copy that needs a later site
  * area lives in `feature-copy.ts` behind that area's flag, and no page or component says it
  * anywhere else while the flag is off. Scanned: `app/`, `components/`, `lib/submissions/` (its
- * messages reach the submitter), and `packages/site-config` (site copy, including the About
- * page). The admin panel is left out: its copy describes listing states to the team, not what
+ * messages reach the submitter), `lib/account/` (the dashboard's, #65), and
+ * `packages/site-config` (site copy, including the About page). The admin panel is left out: its copy describes listing states to the team, not what
  * a submitter can do.
  */
 
@@ -20,6 +20,7 @@ const SCANNED = [
   join(WEB_DIRECTORY, 'app'),
   join(WEB_DIRECTORY, 'components'),
   join(WEB_DIRECTORY, 'lib', 'submissions'),
+  join(WEB_DIRECTORY, 'lib', 'account'),
   join(SITE_CONFIG_DIRECTORY, 'src'),
   join(SITE_CONFIG_DIRECTORY, 'content')
 ]
@@ -27,6 +28,8 @@ const SCANNED = [
 const PAGE_PROMISES: ReadonlyArray<{
   feature: keyof SiteFeatures
   issue: string
+  /** Only sources under these paths make the promise (default: every scanned source). */
+  paths?: RegExp
   pattern: RegExp
 }> = [
   {
@@ -38,6 +41,14 @@ const PAGE_PROMISES: ReadonlyArray<{
     feature: 'badgeProgram',
     issue: '#66',
     pattern: /\bevery week\b|\bweekly\b|\bcheck again about 24 hours\b/iu
+  },
+  {
+    // The account's FAQ fields (#65): the listing page shows FAQs once #105 ships. The same
+    // words describe the long description elsewhere, so only the account's pages are checked.
+    feature: 'listingFaqs',
+    issue: '#105',
+    paths: /^components\/account\//u,
+    pattern: /\bshown on your listing page\b/iu
   }
 ]
 
@@ -45,21 +56,19 @@ const PAGE_PROMISES: ReadonlyArray<{
  * Copy the owner approved while its area is still off, by file, exempt word for word (as
  * `APPROVED_INTERIM_COPY` in the email audit).
  */
-const APPROVED_INTERIM_COPY: Record<string, RegExp[]> = {
-  // Owner decision on #64 (2026-10-06): a changes-requested submission is fixed and resubmitted
-  // from the account area, whose editing #65 builds; the email says the same.
-  'components/account/submissions-table.tsx': [/'Fix and resubmit'/gu]
-}
+const APPROVED_INTERIM_COPY: Record<string, RegExp[]> = {}
 
 const ALL_OFF: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
+  listingFaqs: false,
   messages: false,
   orders: false
 }
 const ALL_ON: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: true,
+  listingFaqs: true,
   messages: true,
   orders: true
 }
@@ -110,6 +119,7 @@ describe('page copy', () => {
   it('promises no site area whose flag is off outside feature-copy.ts', () => {
     const problems = pageSources().flatMap(({ code, path }) =>
       PAGE_PROMISES.filter(promise => !features[promise.feature])
+        .filter(promise => !promise.paths || promise.paths.test(path))
         .filter(promise => promise.pattern.test(code))
         .map(promise => `${path}: promises ${promise.feature} (${promise.issue}) while it is off`)
     )
@@ -118,10 +128,20 @@ describe('page copy', () => {
 
   it('leaves each promise out while its flag is off and brings the approved copy back on', () => {
     const off = JSON.stringify(featureCopy(ALL_OFF))
-    expect(PAGE_PROMISES.filter(promise => promise.pattern.test(off))).toEqual([])
+    const copyPromises = PAGE_PROMISES.filter(promise => !promise.paths)
+    expect(copyPromises.filter(promise => promise.pattern.test(off))).toEqual([])
     expect(featureCopy(ALL_OFF)).toEqual({
       addFaqsAndLinks: null,
+      badgePanel: {
+        cadence: null,
+        cardNote: 'Free listings keep the badge on their site',
+        description: 'Free listing',
+        failingNote: null,
+        failingTitle: 'Fix the badge',
+        programCheckBy: 'SERP'
+      },
       contentHint: 'Shown on your listing page.',
+      faqsHint: null,
       freePlanBadgeCheck: null,
       keepTheBadgeUp: null
     })
@@ -131,8 +151,18 @@ describe('page copy', () => {
         description: 'From your account while the listing is in review.',
         title: 'Add FAQs and links'
       },
+      badgePanel: {
+        cadence: 'Weekly',
+        cardNote: 'Free listings are checked weekly',
+        description: 'Free listing · checked weekly',
+        failingNote:
+          'If it’s still failing at the recheck about 24 hours later, the listing is unlisted.',
+        failingTitle: 'Fix the badge before the recheck',
+        programCheckBy: 'Weekly'
+      },
       contentHint:
         'Shown on your listing page. FAQs and links can be added from your account later.',
+      faqsHint: 'Shown on your listing page.',
       freePlanBadgeCheck: 'Keep the badge up: we check it every week',
       keepTheBadgeUp: {
         description:
@@ -140,10 +170,14 @@ describe('page copy', () => {
         title: 'Keep the badge up'
       }
     })
+    // Until #105 shows FAQs on listing pages, the account says they will appear soon.
+    expect(featureCopy({ ...ALL_ON, listingFaqs: false }).faqsHint).toBe(
+      'FAQs will appear on your listing page soon.'
+    )
     for (const feature of ['accountDashboard', 'badgeProgram'] as const) {
       const one = JSON.stringify(featureCopy({ ...ALL_OFF, [feature]: true }))
       expect(
-        PAGE_PROMISES.filter(promise => promise.pattern.test(one)).map(promise => promise.feature)
+        copyPromises.filter(promise => promise.pattern.test(one)).map(promise => promise.feature)
       ).toEqual([feature])
     }
   })

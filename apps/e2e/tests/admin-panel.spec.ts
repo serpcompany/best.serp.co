@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, type Page, request as playwrightRequest, test } from '@playwright/test'
 import {
+  ADMIN_EMAIL_PREFIXES,
   activeCategory,
   adminOrigin,
   adminSuiteEnabled,
@@ -9,6 +10,7 @@ import {
   localD1,
   q,
   removeAdmin,
+  removeLeftoverAdmins,
   seedAdminCatalog,
   seedImportedListing,
   seedVerifiedSubmission,
@@ -51,15 +53,24 @@ function submissionRow(id: string) {
   )[0]
 }
 
-function publicationVersion(): number {
-  return Number(localD1<{ version: number }>('SELECT version FROM publication_state')[0]?.version)
+/**
+ * Publications this listing's decisions recorded. The suite shares its D1 with the account
+ * dashboard suite, which publishes too, so the global version can move between two reads
+ * (#102 review round 2); the runs for this listing's route cannot.
+ */
+function publicationsFor(slug: string): number {
+  return Number(
+    localD1<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM publication_runs WHERE affected_routes = ${q(`/products/${slug}/`)}`
+    )[0]?.count
+  )
 }
 
 const admins: string[] = []
 test.beforeAll(() => {
   seedAdminCatalog()
   // Admins a run that was interrupted left behind (its own local D1 only).
-  localD1("DELETE FROM admin_allowlist WHERE email LIKE 'e2e-%@example.com'")
+  removeLeftoverAdmins([ADMIN_EMAIL_PREFIXES.adminPanel, ADMIN_EMAIL_PREFIXES.adminPanelAdded])
 })
 test.afterAll(() => {
   for (const email of admins) removeAdmin(email)
@@ -109,7 +120,7 @@ test.describe('admin gate', () => {
 
   test('requires this site’s Origin on every admin write', async ({ baseURL, request }) => {
     const admin = client(request, baseURL)
-    admins.push(await signInAsNewAdmin(admin))
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
     for (const origin of ['https://other.serp.co', undefined]) {
       const response = await request.post('/api/admin/admins', {
         data: { email: 'nobody@example.com' },
@@ -132,7 +143,7 @@ test.describe('review decisions', () => {
     test.setTimeout(180_000)
     const submission = seedVerifiedSubmission('approve', activeCategory())
     const admin = client(page.request, baseURL)
-    admins.push(await signInAsNewAdmin(admin))
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
 
     await page.goto('/admin/submissions/')
     await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible()
@@ -149,7 +160,7 @@ test.describe('review decisions', () => {
     await expect(page.getByText('1 field edited.', { exact: false })).toBeVisible()
     await capture(page, '11-review-edit')
     await page.getByRole('radio', { name: 'follow', exact: true }).click()
-    const before = publicationVersion()
+    expect(publicationsFor(submission.slug)).toBe(0)
     await page.getByRole('button', { name: 'Approve with edits' }).click()
     const dialog = page.getByRole('alertdialog')
     await expect(dialog.getByText(`Approve and publish ${submission.name}?`)).toBeVisible()
@@ -161,7 +172,7 @@ test.describe('review decisions', () => {
       listing_id: `submission_${submission.id}`,
       status: 'approved'
     })
-    expect(publicationVersion()).toBe(before + 1)
+    expect(publicationsFor(submission.slug)).toBe(1)
     expect(
       localD1(
         `SELECT link_rel, description FROM listings WHERE id = ${q(`submission_${submission.id}`)}`
@@ -175,7 +186,7 @@ test.describe('review decisions', () => {
     })
     expect(replay.status()).toBe(200)
     expect(await replay.json()).toMatchObject({ ok: true, replayed: true })
-    expect(publicationVersion()).toBe(before + 1)
+    expect(publicationsFor(submission.slug)).toBe(1)
 
     // Public: the listing page now answers, and the sitemap lists it once the epoch turns over.
     const visitor = await playwrightRequest.newContext({ baseURL })
@@ -205,7 +216,7 @@ test.describe('review decisions', () => {
     const changes = seedVerifiedSubmission('changes', category)
     const prohibited = seedVerifiedSubmission('prohibited', category)
     const admin = client(page.request, baseURL)
-    const adminEmail = await signInAsNewAdmin(admin)
+    const adminEmail = await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel)
     admins.push(adminEmail)
 
     await page.goto(`/admin/submissions/${changes.id}/`)
@@ -270,7 +281,7 @@ test.describe('listings', () => {
     test.setTimeout(240_000)
     const submission = seedVerifiedSubmission('unpublish', activeCategory())
     const admin = client(page.request, baseURL)
-    admins.push(await signInAsNewAdmin(admin))
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
     const approve = await page.request.post(`/api/admin/submissions/${submission.id}/approve`, {
       data: { expectedContentVersion: 1 },
       headers: admin.headers
@@ -334,7 +345,7 @@ test.describe('listings', () => {
     page
   }) => {
     const admin = client(page.request, baseURL)
-    admins.push(await signInAsNewAdmin(admin))
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
     const logos = (id: string) =>
       localD1<{ url: string }>(
         `SELECT url FROM listing_media WHERE listing_id = ${q(id)} AND kind = 'logo'`
@@ -369,8 +380,8 @@ test.describe('listings', () => {
 
   test('the allowlist adds an admin once and removes it', async ({ baseURL, page }) => {
     const admin = client(page.request, baseURL)
-    admins.push(await signInAsNewAdmin(admin))
-    const added = `e2e-added-${unique()}@example.com`
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
+    const added = `${ADMIN_EMAIL_PREFIXES.adminPanelAdded}-${unique()}@example.com`
     admins.push(added)
     await page.goto('/admin/admins/')
     await expect(page.getByRole('heading', { name: 'Admins' })).toBeVisible()

@@ -217,6 +217,21 @@ describe('revision status transitions (compare-and-swap with changes() assertion
       expect(() => execute(db, plans)).toThrow(/malformed JSON/u)
     }
     expect(revision(db)?.status).toBe('changes_requested')
+
+    // The author's edit compares and swaps on the version their form loaded (#102 round 1).
+    const versioned = database()
+    seedRevision(versioned, 'pending_review')
+    const edit = (expectedContentVersion: number, name: string) =>
+      buildReplaceRevisionContentPlans({
+        authorUserId: 'user_owner',
+        content: { ...content, name },
+        expectedContentVersion,
+        now: NOW,
+        revisionId
+      })
+    execute(versioned, edit(1, 'First tab'))
+    expect(() => execute(versioned, edit(1, 'Stale tab'))).toThrow(/malformed JSON/u)
+    expect(revision(versioned)).toMatchObject({ content_version: 2, name: 'First tab' })
   })
 
   it('rejects an open revision with a reason and leaves the listing as it was', () => {

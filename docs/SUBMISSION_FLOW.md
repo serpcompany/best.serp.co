@@ -37,6 +37,8 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
 | reject | `pending_badge`, `verified`, `paid_pending_review`, `changes_requested` | `rejected` |
 | edit (owner) | `draft`, `pending_badge`, `changes_requested` | unchanged (`edited`, `content_version` + 1) |
 | edit (reviewer) | any non-final status | unchanged (`edited`, `content_version` + 1) |
+| FAQs and links (owner, #65) | `verified`, `paid_pending_review` | unchanged (`edited`, `content_version` + 1) |
+| badge check of the live free listing (owner, #65) | `approved` | unchanged (`last_verification_at`, an event) |
 
 - Drafts never enter the review queue, are never badge-checked, and trigger no badge or review
   email. Like every non-final status, a draft holds its URL key against duplicates (the
@@ -85,7 +87,8 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
   `rejected`, `withdrawn`, `expired`, `refunded`, `unpublished`.
 - Owners edit a live listing through a revision (`listing_revisions`): `pending_review`,
   `changes_requested`, then `approved` (applied atomically to the listing), `rejected`, or
-  `withdrawn` (`revision-plans.ts`).
+  `withdrawn` (`revision-plans.ts`). The owner's side of every transition here is the
+  [Submitter dashboard](./ACCOUNT_DASHBOARD.md) (#65).
 
 ## Review in the admin panel (#64)
 

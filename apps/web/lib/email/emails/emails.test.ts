@@ -24,10 +24,11 @@ function render(
   return renderAppEmail(id, sample.input as never, { environment, to: sample.to })
 }
 
-/** Today's site: no account dashboard pages (#65), no conversations (#73). */
+/** The site before #65 and #73: no account dashboard pages, no conversations. */
 const BEFORE: SiteFeatures = {
   accountDashboard: false,
   badgeProgram: false,
+  listingFaqs: false,
   messages: false,
   orders: false
 }
@@ -35,6 +36,7 @@ const BEFORE: SiteFeatures = {
 const AFTER: SiteFeatures = {
   accountDashboard: true,
   badgeProgram: true,
+  listingFaqs: true,
   messages: true,
   orders: false
 }
@@ -544,6 +546,19 @@ You're getting this because devin@serp.co receives review alerts for best.serp.c
     const waiting = subject({ kind: 'paid', live: false }, 'revision')
     expect(waiting.subject).toBe('Ready for review: Quillmate (paid, waiting for review)')
     expect(waiting.text).toContain('Source: Revision')
+    // A revision opens its own review page (#65 sends these for owner edits of live listings).
+    expect(waiting.text).toContain(
+      'Review submission: https://best.serp.co/admin/revisions/s_4f9k2c/'
+    )
+    expect(linksTo(waiting.html, 'https://best.serp.co/admin/revisions/s_4f9k2c/')).toBe(true)
+    // A revision of a listing whose owner an admin assigned has no plan, and still alerts.
+    const unplanned = renderAppEmail(
+      'admin-review-ready',
+      { ...sample.input, plan: { kind: 'none' }, source: 'revision' },
+      { environment: 'production', to: sample.to }
+    )
+    expect(unplanned.subject).toBe('Ready for review: Quillmate (owner edit)')
+    expect(unplanned.text).toContain('Plan: None. An admin assigned the owner')
   })
 })
 
@@ -731,7 +746,7 @@ Thanks for your payment of $49.00.
 Our automatic checks couldn't load https://kiddotutor.com/ (the connection timed out), so Kiddo Tutor isn't live yet. A reviewer will look at it before it's published. You don't need to do anything.
 If it's rejected for anything other than prohibited content, you get a full refund automatically.
 
-View submission: https://best.serp.co/account/
+View submission: https://best.serp.co/account/submissions/s_7tq20z/
 
 --
 SERP Directory · https://best.serp.co
