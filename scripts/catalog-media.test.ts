@@ -153,13 +153,27 @@ describe('hosted catalog media (#95)', () => {
         `SELECT id, slug, name, description, website, content, status, is_active, published_at,
            display_order, is_featured, checksum FROM listings ORDER BY id`,
         'SELECT * FROM categories ORDER BY id',
-        'SELECT listing_id, category_id, sort_order, is_primary FROM listing_categories ORDER BY listing_id, category_id',
         'SELECT listing_id, label, url, sort_order FROM listing_resource_links ORDER BY listing_id, sort_order',
         'SELECT listing_id, question, answer, sort_order FROM listing_faqs ORDER BY listing_id, sort_order',
         "SELECT listing_id, url, sort_order FROM listing_media WHERE kind = 'video' ORDER BY listing_id"
       ]) {
         expect(after.prepare(sql).all(), sql).toEqual(before.prepare(sql).all())
       }
+      // Category changes are only the Adult category added, never primary (#98 owner decision).
+      const memberships = (db: DatabaseSync) =>
+        db
+          .prepare(
+            `SELECT lc.listing_id, c.slug, lc.is_primary FROM listing_categories lc
+             JOIN categories c ON c.id = lc.category_id ORDER BY lc.listing_id, c.slug`
+          )
+          .all() as Array<{ is_primary: number; listing_id: string; slug: string }>
+      const key = (row: { listing_id: string; slug: string }) => `${row.listing_id} ${row.slug}`
+      const existing = new Set(memberships(before).map(key))
+      const added = memberships(after).filter(row => !existing.has(key(row)))
+      expect(added.every(row => row.slug === 'adult' && row.is_primary === 0)).toBe(true)
+      expect(added.length).toBeLessThanOrEqual(20)
+      const kept = new Set(memberships(after).map(key))
+      expect(memberships(before).filter(row => !kept.has(key(row)))).toEqual([])
     } finally {
       before.close()
       after.close()
