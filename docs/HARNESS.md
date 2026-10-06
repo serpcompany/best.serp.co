@@ -104,7 +104,7 @@ gh variable delete CI_RUNNER_LABELS  # rollback: runs that start later use ubunt
 
 Routed jobs hold no secret beyond their own `GITHUB_TOKEN` and need no browser, `sudo`, or
 `apt`. Jobs with Cloudflare or Google credentials, a protected environment, or a deploy stay on
-ephemeral VMs, so no secret, D1 backup, or Wrangler session lands on a persistent host.
+ephemeral VMs, so no secret, D1 data, or Wrangler session lands on a persistent host.
 [`scripts/ci-runners.ts`](../scripts/ci-runners.ts) holds the expression and the routed jobs;
 `scripts/ci-runner-workflows.test.ts` fails any other `runs-on` and any hardcoded `self-hosted`.
 

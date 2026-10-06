@@ -7,7 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import {
   assertDatabaseReady,
   authorizeRelease,
-  backupDatabase,
+  bookmarkSummary,
   checkDatabase,
   type D1Row,
   type D1Target,
@@ -16,14 +16,17 @@ import {
   inlineIntegerParameters,
   type ProcessRunner,
   parseReleaseArguments,
+  parseTimeTravelBookmark,
   parseWranglerRows,
   type ReleaseCommand,
   readMigrationLedger,
   readOnlyCommands,
+  recordTimeTravelBookmark,
   releaseAuthorizations,
   releaseCommands,
   requireVerifiedStaging,
   runRelease,
+  timeTravelRestoreCommand,
   validateRemoteConfig,
   verifyImportedCatalog,
   wranglerD1
@@ -82,7 +85,6 @@ function fixtureReport(overrides: Partial<ParityReport['target']> = {}): ParityR
 
 /** A D1 target backed by in-memory SQLite that records the operations Wrangler would run. */
 function sqliteD1(database = new DatabaseSync(':memory:')) {
-  const exports: string[] = []
   const target: D1Target = {
     applyMigrations() {
       database.exec(
@@ -103,15 +105,11 @@ function sqliteD1(database = new DatabaseSync(':memory:')) {
     executeFile(path) {
       database.exec(readFileSync(path, 'utf8'))
     },
-    exportTo(path) {
-      exports.push(path)
-      writeFileSync(path, '-- exported\n')
-    },
     async query(sql) {
       return database.prepare(sql).all() as D1Row[]
     }
   }
-  return { database, exports, target }
+  return { database, target }
 }
 
 const sha = '0123456789abcdef0123456789abcdef01234567'
@@ -217,6 +215,7 @@ describe('release authorization', () => {
       throw new Error('read-only commands never inspect the checkout')
     }
     expect([...readOnlyCommands].sort()).toEqual([
+      'bookmark',
       'check-database',
       'list-migrations',
       'plan-release',
@@ -268,10 +267,8 @@ describe('release authorization', () => {
       ([, authorization]) => authorization.environment === 'production'
     )
     expect(production.map(([workflow]) => workflow).sort()).toEqual([
-      'approve-d1-submission.yml',
       'bootstrap-production-d1.yml',
-      'deploy-production.yml',
-      'publish-d1.yml'
+      'deploy-production.yml'
     ])
     for (const [, authorization] of production) {
       expect(authorization.confirmation).toMatch(/-production$/u)
@@ -303,8 +300,11 @@ describe('release authorization', () => {
         .map(([workflow]) => workflow)
     ).toEqual(['bootstrap-production-d1.yml'])
     expect(releaseAuthorizations['bootstrap-production-d1.yml']?.commands).toEqual(['import'])
-    expect(releaseAuthorizations['publish-d1.yml']?.commands).toEqual(['backup'])
-    expect(releaseAuthorizations['approve-d1-submission.yml']?.commands).toEqual(['backup'])
+    expect(releaseAuthorizations['deploy-production.yml']?.commands).toEqual(['migrate', 'deploy'])
+    // Publication and submission review mutate D1 through their own guarded scripts; they need
+    // no release command, because the bookmark they record first is read-only.
+    expect(releaseAuthorizations['publish-d1.yml']).toBeUndefined()
+    expect(releaseAuthorizations['approve-d1-submission.yml']).toBeUndefined()
   })
 
   it('refuses other repositories, branches, workflows, refs, and unreviewed checkouts', () => {
@@ -378,7 +378,7 @@ describe('release authorization', () => {
   })
 
   it('needs no typed confirmation on a push, and runs only on each workflow’s own events', () => {
-    for (const command of ['backup', 'migrate', 'deploy'] as const) {
+    for (const command of ['migrate', 'deploy'] as const) {
       expect(() =>
         authorizeRelease(
           command,
@@ -405,19 +405,15 @@ describe('release authorization', () => {
 
   it('accepts the hotfix confirmation only on a deploy-production.yml dispatch', () => {
     const hotfix = workflowEnv('deploy-production.yml', project.confirmation.hotfix)
-    for (const command of ['backup', 'migrate', 'deploy'] as const) {
+    for (const command of ['migrate', 'deploy'] as const) {
       expect(() => authorizeRelease(command, 'production', hotfix, cleanGit)).not.toThrow()
     }
-    for (const workflow of [
-      'bootstrap-production-d1.yml',
-      'publish-d1.yml',
-      'approve-d1-submission.yml'
-    ]) {
+    for (const workflow of ['bootstrap-production-d1.yml']) {
       const authorization = releaseAuthorizations[workflow]
       expect(
         () =>
           authorizeRelease(
-            authorization?.commands[0] ?? 'backup',
+            authorization?.commands[0] ?? 'import',
             'production',
             workflowEnv(workflow, project.confirmation.hotfix),
             cleanGit
@@ -521,7 +517,7 @@ describe('staging before production', () => {
     await expect(requireVerifiedStaging('migrate', hotfix, api.fetch)).rejects.toThrow(
       'may only deploy the Worker, never migrate'
     )
-    await expect(requireVerifiedStaging('backup', hotfix, api.fetch)).resolves.toBeNull()
+    await expect(requireVerifiedStaging('bookmark', hotfix, api.fetch)).resolves.toBeNull()
     // The confirmation alone is not enough: main's head must be a hotfix-* merge.
     for (const pulls of [
       [],
@@ -665,15 +661,11 @@ describe('release entry point', () => {
   ]
 
   it('refuses every remote mutation outside its protected workflow before any runner call', async () => {
-    const argv = (command: string, environment: string) =>
-      command === 'backup'
-        ? [command, environment, '--output', join(fixtureDirectory, 'refused.sql')]
-        : [command, environment]
     for (const command of mutatingCommands) {
       for (const environment of ['staging', 'production']) {
         const run = harness(true)
         await expect(
-          runRelease(argv(command, environment), {}, dependencies(run)),
+          runRelease([command, environment], {}, dependencies(run)),
           `${command} ${environment}`
         ).rejects.toThrow('runs only inside a protected GitHub Actions workflow')
         expect(run.events, `${command} ${environment}`).toEqual([])
@@ -730,10 +722,10 @@ describe('release entry point', () => {
         ])
       }
     }
-    // Deploying and exporting always reach Cloudflare, so neither can be rehearsed.
+    // Deploying and Time Travel always reach Cloudflare, so neither can be rehearsed.
     for (const argv of [
       ['deploy', 'production', '--rehearse', rehearsal],
-      ['backup', 'production', '--output', '/tmp/b.sql', '--rehearse', rehearsal]
+      ['bookmark', 'production', '--rehearse', rehearsal]
     ]) {
       const run = harness(true)
       await expect(runRelease(argv, {}, dependencies(run))).rejects.toThrow('cannot be rehearsed')
@@ -859,7 +851,7 @@ describe('release entry point', () => {
     ).rejects.toThrow('does not contain (9999_future.sql)')
   })
 
-  it('refuses a stale release at the plan, before any backup or D1 call', async () => {
+  it('refuses a stale release at the plan, before the bookmark or any D1 call', async () => {
     const pending = freshMigrationNames().slice(-1)
     for (const event of ['push', 'workflow_dispatch']) {
       const stale = harness(false, { mainHead: newerSha, pending })
@@ -891,7 +883,7 @@ describe('release entry point', () => {
     expect(maintainer.events.filter(entry => entry.startsWith('fetch '))).toEqual([])
   })
 
-  it('refuses a hotfix with pending migrations at the plan, before any backup', async () => {
+  it('refuses a hotfix with pending migrations at the plan, before the bookmark', async () => {
     const pending = freshMigrationNames().slice(-1)
     const hotfix = productionEnv('deploy-production.yml', project.confirmation.hotfix)
     const run = harness(false, { pending })
@@ -1061,7 +1053,6 @@ describe('Wrangler invocation', () => {
     await expect(d1.query('SELECT 1')).resolves.toEqual([{ name: 'x' }])
     d1.applyMigrations()
     d1.executeFile('/tmp/import.sql')
-    d1.exportTo('/tmp/backup.sql')
     const pinned = [
       'best-serp-co-production',
       '--remote',
@@ -1073,28 +1064,7 @@ describe('Wrangler invocation', () => {
     expect(calls.map(call => [call.command, ...call.args])).toEqual([
       ['pnpm', 'exec', 'wrangler', 'd1', 'execute', ...pinned, '--command', 'SELECT 1', '--json'],
       ['pnpm', 'exec', 'wrangler', 'd1', 'migrations', 'apply', ...pinned],
-      [
-        'pnpm',
-        'exec',
-        'wrangler',
-        'd1',
-        'execute',
-        ...pinned,
-        '--file',
-        '/tmp/import.sql',
-        '--yes'
-      ],
-      [
-        'pnpm',
-        'exec',
-        'wrangler',
-        'd1',
-        'export',
-        ...pinned,
-        '--output',
-        '/tmp/backup.sql',
-        '--skip-confirmation'
-      ]
+      ['pnpm', 'exec', 'wrangler', 'd1', 'execute', ...pinned, '--file', '/tmp/import.sql', '--yes']
     ])
   })
 
@@ -1298,28 +1268,163 @@ describe('one-time catalog bootstrap', () => {
   })
 })
 
-describe('backup and deploy', () => {
-  it('records an empty database explicitly and exports a populated one', async () => {
-    const empty = sqliteD1()
-    const emptyBackup = await backupDatabase(
-      empty.target,
-      'production',
-      join(fixtureDirectory, 'backups', 'empty.sql')
-    )
-    expect(emptyBackup.empty).toBe(true)
-    expect(empty.exports).toEqual([])
-    expect(readFileSync(emptyBackup.output, 'utf8')).toContain(
-      'best-serp-co-production had no tables'
-    )
+describe('Time Travel bookmark', () => {
+  const bookmark = '00000085-0000024c-00004c6d-8e61117bf38d7adb71b934ebbf891683'
+  const recordedAt = new Date('2026-10-06T12:00:00.000Z')
 
-    const populated = sqliteD1()
-    populated.target.applyMigrations()
-    const output = join(fixtureDirectory, 'backups', 'populated.sql')
-    const backup = await backupDatabase(populated.target, 'production', output)
-    expect(populated.exports).toEqual([output])
-    expect(backup).toMatchObject({ empty: false, output, sha256: sha256('-- exported\n') })
+  function bookmarkRunner(output: string | Error) {
+    const calls: Array<{ args: string[]; capture: boolean; command: string }> = []
+    const runner: ProcessRunner = {
+      run(command, args, { capture }) {
+        calls.push({ args, capture, command })
+        if (output instanceof Error) throw output
+        return output
+      }
+    }
+    return { calls, runner }
+  }
+
+  it('reads only one well-formed bookmark from wrangler d1 time-travel info --json', () => {
+    expect(parseTimeTravelBookmark(JSON.stringify({ bookmark }))).toBe(bookmark)
+    expect(parseTimeTravelBookmark(`${JSON.stringify({ bookmark }, null, 2)}\n`)).toBe(bookmark)
+    for (const output of [
+      '',
+      'not json',
+      '{}',
+      '[]',
+      JSON.stringify({ bookmark: '' }),
+      JSON.stringify({ bookmark: 42 }),
+      JSON.stringify({ result: { bookmark } }),
+      // The bookmark lands in a shell command and Markdown, so nothing but hex segments passes.
+      JSON.stringify({ bookmark: `${bookmark}; rm -rf /` }),
+      JSON.stringify({ bookmark: `${bookmark}\n\`\`\`` }),
+      JSON.stringify({ bookmark: '$(id)' }),
+      JSON.stringify({ bookmark: 'deadbeef' })
+    ]) {
+      expect(() => parseTimeTravelBookmark(output), output).toThrow('no valid bookmark')
+    }
   })
 
+  it('asks Wrangler for the environment database by its reviewed config, without --remote', () => {
+    for (const environment of ['staging', 'production'] as const) {
+      const { calls, runner } = bookmarkRunner(JSON.stringify({ bookmark }))
+      const record = recordTimeTravelBookmark(environment, runner, {}, recordedAt)
+      const database = project.remote[environment].databaseName
+      expect(calls).toEqual([
+        {
+          args: [
+            'exec',
+            'wrangler',
+            'd1',
+            'time-travel',
+            'info',
+            database,
+            '--env',
+            environment,
+            '--config',
+            'apps/web/wrangler.jsonc',
+            '--json'
+          ],
+          capture: true,
+          command: 'pnpm'
+        }
+      ])
+      expect(record).toEqual({
+        bookmark,
+        database,
+        environment,
+        recordedAt: '2026-10-06T12:00:00.000Z',
+        restore: `pnpm exec wrangler d1 time-travel restore ${database} --env ${environment} --config apps/web/wrangler.jsonc --bookmark ${bookmark}`
+      })
+      expect(timeTravelRestoreCommand(environment, bookmark)).toBe(record.restore)
+    }
+  })
+
+  it('writes the bookmark and its restore command to the step summary inside Actions', () => {
+    const summary = join(fixtureDirectory, 'step-summary.md')
+    writeFileSync(summary, '# Earlier step\n')
+    const env = { ...workflowEnv('publish-d1.yml'), GITHUB_STEP_SUMMARY: summary }
+    const { runner } = bookmarkRunner(JSON.stringify({ bookmark }))
+    const record = recordTimeTravelBookmark('production', runner, env, recordedAt)
+    const written = readFileSync(summary, 'utf8')
+    expect(written).toBe(`# Earlier step\n${bookmarkSummary(record)}`)
+    expect(written).toContain(`Bookmark \`${bookmark}\`, recorded at 2026-10-06T12:00:00.000Z`)
+    expect(written).toContain(`\`\`\`bash\n${record.restore}\n\`\`\``)
+    expect(written).toContain('docs/D1_RECOVERY.md#restore-a-workflow-bookmark')
+    // Inside Actions a missing summary file is a failure, never a silent skip.
+    expect(() =>
+      recordTimeTravelBookmark(
+        'production',
+        bookmarkRunner(JSON.stringify({ bookmark })).runner,
+        { ...env, GITHUB_STEP_SUMMARY: '' },
+        recordedAt
+      )
+    ).toThrow('GITHUB_STEP_SUMMARY')
+  })
+
+  it('fails closed, writing nothing, when Cloudflare returns no bookmark', () => {
+    const summary = join(fixtureDirectory, 'failed-summary.md')
+    writeFileSync(summary, '')
+    const env = { ...workflowEnv('deploy-production.yml'), GITHUB_STEP_SUMMARY: summary }
+    for (const output of [
+      new Error('Authentication error [code: 10000]'),
+      JSON.stringify({ bookmark: null })
+    ]) {
+      expect(() =>
+        recordTimeTravelBookmark('production', bookmarkRunner(output).runner, env, recordedAt)
+      ).toThrow(
+        'Could not record a D1 Time Travel bookmark of best-serp-co-production; refusing to change it without a restore point. The Cloudflare token needs Account → D1 → Edit'
+      )
+    }
+    expect(
+      () =>
+        recordTimeTravelBookmark(
+          'production',
+          bookmarkRunner(new Error('Authentication error [code: 10000]')).runner,
+          env
+        ),
+      'keeps Wrangler’s reason'
+    ).toThrow('Authentication error [code: 10000]')
+    expect(readFileSync(summary, 'utf8')).toBe('')
+  })
+
+  it('runs as a read-only command: no checkout or GitHub check, one Wrangler call', async () => {
+    for (const env of [{}, workflowEnv('publish-d1.yml'), workflowEnv('deploy-staging.yml')]) {
+      const events: string[] = []
+      const { calls, runner } = bookmarkRunner(JSON.stringify({ bookmark }))
+      const result = await runRelease(['bookmark', 'production'], env, {
+        fetch: async url => {
+          events.push(`fetch ${url}`)
+          throw new Error('bookmark never calls GitHub')
+        },
+        git: args => {
+          events.push(`git ${args.join(' ')}`)
+          return ''
+        },
+        runner
+      }).catch(error => error)
+      // Inside Actions the summary path is required; outside, the record is only printed.
+      if (env.GITHUB_ACTIONS === 'true') {
+        expect(result).toBeInstanceOf(Error)
+        expect(String(result)).toContain('GITHUB_STEP_SUMMARY')
+      } else {
+        expect(result).toMatchObject({ bookmark, environment: 'production' })
+      }
+      expect(events).toEqual([])
+      expect(calls).toHaveLength(1)
+    }
+  })
+
+  it('documents the same restore command the run summary prints', () => {
+    const recovery = readFileSync(resolve('docs/D1_RECOVERY.md'), 'utf8').replace(
+      /\s*\\\n\s*/gu,
+      ' '
+    )
+    expect(recovery).toContain(timeTravelRestoreCommand('production', '<bookmark>'))
+  })
+})
+
+describe('deploy', () => {
   it('deploys the built Worker only onto a ready database', async () => {
     const entrypoint = join(fixtureDirectory, 'worker.js')
     const calls: string[][] = []
@@ -1353,10 +1458,9 @@ describe('release arguments', () => {
       command: 'migrate',
       environment: 'staging'
     })
-    expect(parseReleaseArguments(['backup', 'production', '--output', '/tmp/b.sql'])).toEqual({
-      command: 'backup',
-      environment: 'production',
-      output: '/tmp/b.sql'
+    expect(parseReleaseArguments(['bookmark', 'production'])).toEqual({
+      command: 'bookmark',
+      environment: 'production'
     })
     expect(parseReleaseArguments(['import', 'production', '--rehearse', '/tmp/r'])).toMatchObject({
       rehearse: '/tmp/r'
@@ -1367,15 +1471,19 @@ describe('release arguments', () => {
     })
     expect(() => parseReleaseArguments(['publish', 'production'])).toThrow('command must be')
     expect(() => parseReleaseArguments(['migrate', 'preview'])).toThrow('staging or production')
-    expect(() => parseReleaseArguments(['backup', 'production'])).toThrow('--output')
+    // The export command is gone: no release command writes a database to a file (#99).
+    expect(() => parseReleaseArguments(['backup', 'production'])).toThrow('command must be')
+    expect(() =>
+      parseReleaseArguments(['migrate', 'production', '--output', '/tmp/b.sql'])
+    ).toThrow('Usage')
     expect(() => parseReleaseArguments(['migrate', 'staging', '--site', 'x'])).toThrow('Usage')
     expect(() => parseReleaseArguments(['import', 'production', '--rehearse', 'rel'])).toThrow(
       'absolute'
     )
-    for (const command of ['deploy', 'backup']) {
-      expect(() =>
-        parseReleaseArguments([command, 'staging', '--output', '/tmp/o', '--rehearse', '/tmp/r'])
-      ).toThrow('cannot be rehearsed')
+    for (const command of ['deploy', 'bookmark']) {
+      expect(() => parseReleaseArguments([command, 'staging', '--rehearse', '/tmp/r'])).toThrow(
+        'cannot be rehearsed'
+      )
     }
   })
 })

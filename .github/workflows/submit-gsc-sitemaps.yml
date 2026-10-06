@@ -46,7 +46,7 @@ jobs:
 
           {
             echo "Missing Search Console credentials."
-            echo "Set either GSC_SERVICE_ACCOUNT_JSON or all OAuth secrets:"
+            echo "Set either GSC_SERVICE_ACCOUNT_JSON or all of these OAuth values:"
             echo "GSC_OAUTH_CLIENT_ID, GSC_OAUTH_CLIENT_SECRET, GSC_OAUTH_REFRESH_TOKEN,"
             echo "and GSC_QUOTA_PROJECT."
           } >&2

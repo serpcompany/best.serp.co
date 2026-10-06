@@ -4,11 +4,12 @@ name: Deploy Production
 # manual dispatch from main re-runs a release with a typed confirmation. Only source that
 # Deploy Staging verified on the staging branch is released: the same commit (fast-forward) or
 # the same tree (a promotion merge commit). The production environment's required reviewers
-# approve every release job. The release backs up and migrates production D1 only when
-# migrations are pending, and otherwise deploys the Worker only. A hotfix-* pull request merged
-# into main stops at the staging check; dispatching with the hotfix confirmation replaces that
-# check with proof that main's head is that merge, for a Worker-only release. Every release is
-# refused once main has moved on. See docs/DEPLOY_RUNBOOK.md and docs/RELEASE_GUARDS.md.
+# approve every release job. The release records a D1 Time Travel bookmark and migrates
+# production D1 only when migrations are pending, and otherwise deploys the Worker only. A
+# hotfix-* pull request merged into main stops at the staging check; dispatching with the hotfix
+# confirmation replaces that check with proof that main's head is that merge, for a Worker-only
+# release. Every release is refused once main has moved on. See docs/DEPLOY_RUNBOOK.md and
+# docs/RELEASE_GUARDS.md.
 on:
   push:
     branches: ['main']
@@ -72,7 +73,7 @@ jobs:
         run: pnpm tsx scripts/staging-verification.ts --hotfix
 
   release:
-    name: Validate, back up, migrate & deploy production
+    name: Validate, bookmark, migrate & deploy production
     needs: [authorize]
     # Job-level, so a run refused by authorize never joins the group and never replaces a
     # valid queued production job. Shared with every production D1 workflow.
@@ -113,7 +114,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           # A stale release, or a hotfix dispatch with pending migrations, is refused here,
-          # before any backup.
+          # before the bookmark and any migration.
           GITHUB_TOKEN: ${{ github.token }}
           RELEASE_CONFIRM: ${{ inputs.confirmation }}
         run: |
@@ -130,22 +131,14 @@ jobs:
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "Release mode: $mode (pending migrations: $(jq -r '.pendingMigrations | join(", ")' <<<"$plan"))" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Back up production D1
+      - name: Record production D1 Time Travel bookmark
         if: steps.plan.outputs.mode == 'database-and-worker'
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          RELEASE_CONFIRM: ${{ inputs.confirmation }}
-        run: pnpm tsx scripts/cloudflare-release.ts backup production --output "$RUNNER_TEMP/d1-backup/best-serp-co-production-$GITHUB_SHA-$GITHUB_RUN_ID.sql"
-
-      - name: Retain production D1 backup
-        if: steps.plan.outputs.mode == 'database-and-worker'
-        uses: actions/upload-artifact@v7
-        with:
-          name: best-serp-co-production-d1-pre-deploy-${{ github.run_id }}
-          path: ${{ runner.temp }}/d1-backup/
-          if-no-files-found: error
-          retention-days: 30
+        # Writes the bookmark and its restore command to the run summary, and fails (so nothing
+        # below runs) without one. D1 data never leaves Cloudflare: no export, no artifact.
+        run: pnpm tsx scripts/cloudflare-release.ts bookmark production
 
       - name: Apply production D1 migrations
         if: steps.plan.outputs.mode == 'database-and-worker'

@@ -97,7 +97,7 @@ The check runs twice, and both use the workflow's `GITHUB_TOKEN` with `actions: 
 
 **A release must still be current.** Every push to `main` queues its own release, so
 `cloudflare-release.ts` also refuses a release once `main` points at a commit with a
-different tree: first in `plan-release`, before any backup export, then again before those
+different tree: first in `plan-release`, before the D1 bookmark, then again before those
 commands. An older run approved late, or re-run, never overwrites a newer Worker. Reject a release you don't intend to ship rather than leaving it waiting; a job
 waiting for review stays queued for up to 30 days. Roll back with Cloudflare, not by
 re-running an older release.
@@ -137,7 +137,7 @@ staging check because staging never verified that tree. To release it anyway:
    skipped staging check in the run summary. The `production` reviewers still approve.
 2. `cloudflare-release.ts` repeats that proof, then lets the dispatch run `deploy production`
    without the staging check. `plan-release` refuses a hotfix with pending migrations before
-   any backup; a hotfix that needs a migration goes through staging.
+   the bookmark; a hotfix that needs a migration goes through staging.
 3. Merge `main` into `staging` immediately: a pull request from `main` into `staging`, merged
    with **Create a merge commit**, the only merge commit `staging` takes. A squash would leave
    the hotfix out of `staging`'s history, so the promotion's merge base stays before it, and
@@ -145,6 +145,79 @@ staging check because staging never verified that tree. To release it anyway:
    conflict, with no way to resolve it through a pull request. With a merge commit, Deploy
    Staging verifies the merged tree and the next promotion carries it. GitHub remembers the
    last merge method, so switch the button back to **Squash and merge** for the next PR.
+
+## D1 data stays in Cloudflare
+
+No workflow exports a D1 database (#99). The repository is public, so any signed-in GitHub user
+can download its workflow artifacts, and once accounts exist an export would hold session and
+OAuth tokens, verification values, and submitter emails. Instead, each workflow step that can
+change D1 directly follows a step running `cloudflare-release.ts bookmark <env>`. That read-only
+command reads the Time Travel bookmark (`wrangler d1 time-travel info --json`), writes it and the
+exact `wrangler d1 time-travel restore … --bookmark` command to the run summary, and fails when
+it cannot. The endpoint accepts D1 Read, which the deploy token's D1 → Edit includes. Only the
+owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
+
+`scripts/deploy-workflows.test.ts` enforces it:
+
+- **Changes are found by credential, and the check fails closed.** A step holds a credential
+  when its own `env` or `with`, or the job's or workflow's `env`, names a Wrangler credential
+  variable in any case (`CLOUDFLARE_API_TOKEN`, the deprecated `CF_API_TOKEN`, the global
+  `*_API_KEY` and `*_EMAIL`), or contains the word `secrets` anywhere, in any case, other than
+  an exact `secrets.<name>` from a reviewed list (`GITHUB_TOKEN` and the Search Console secrets).
+  The text is not parsed as expressions, so `secrets.cloudflare_api_token`, `secrets[...]`,
+  `toJSON(secrets)`, and a `}}` inside a string literal all count. The job's `container` and
+  `services` are read too. Every such
+  step is a D1 change except a step whose whole `run` is one of a short reviewed list (the two
+  credential checks, a read-only `cloudflare-release.ts` command, the Worker `deploy`, and Deploy
+  Production's plan step) **and** that has nothing else to change what runs: only the keys
+  `name`, `id`, `if`, `env`, and `run`; only reviewed `env` entries with their exact values (no
+  `NODE_OPTIONS`, `BASH_ENV`, or `LD_PRELOAD`); no `shell` or `working-directory`; and no
+  `defaults` or other `env` on the job or workflow. Any other launcher (`npm`, a path such as
+  `./node_modules/.bin/wrangler`, a script, an action) is a change, and so is #97's staging
+  publish once it lands. A bookmark step must meet the same rules.
+- **No handoff.** A step holding the token, other than that list, may not write `GITHUB_ENV`,
+  `GITHUB_PATH`, `GITHUB_OUTPUT`, or `GITHUB_STATE`, so it cannot pass the token to a later step.
+  In a job holding the token, no `run` step may write `GITHUB_ENV` or `GITHUB_PATH` (only the
+  reviewed install action, a `uses`, sets its own), and the job may not set `container` or
+  `services`, so nothing outside a step changes what an exempt command runs.
+- **A change runs only after a successful bookmark.** Its bookmark is the step right before it in
+  the same job, for the job's environment, with the same `if:`. Neither step may use
+  `continue-on-error` or a status function (`always()`, `failure()`, `cancelled()`,
+  `success()`), so the implicit `success()` skips the change when the bookmark fails. A change
+  that sets `CLOUDFLARE_D1_DATABASE_ID` must name its environment's database.
+- **The scheduled notifier is the one exception:** it only records review notifications, every
+  15 minutes, with a D1-only token. Time Travel still covers it by timestamp.
+- **Nothing leaves as a file.** Only the reviewed uploads and caches are allowed (the Playwright
+  reports, the staging smoke evidence, and the install action's dependency caches), matched by
+  action, name, and path. No workflow runs `d1 export` or `cloudflare-release.ts backup`, and no
+  script under `scripts/` passes `export` to Wrangler. In every job where any step holds the
+  token (six today, all checked), each step uses only reviewed actions and runs no `gh gist`,
+  `gh release upload|create`, `gh api` file field, `curl` upload (`-T`, `--upload-file`, `-F`,
+  `--form`, `-d @`, `--data-binary @`), or `wget` upload. Commands are read one at a time, split
+  at `|`, `;`, `&`, and newlines.
+
+**Adding a credentialed job.** A workflow change that gives a job `CLOUDFLARE_API_TOKEN` fails
+these tests until the lists at the top of the "D1 data stays in Cloudflare" tests say what it
+does: the job goes in `credentialedJobs`; each step that can change D1 follows its bookmark and
+goes in `bookmarkedChanges`; a token step that cannot change D1 (an R2-only upload, for
+example) gets its exact `run` in `tokenStepsWithoutChanges` with the reason; and new actions or
+artifacts go in `credentialedJobActions` or `allowedUploads`. Each entry is reviewed with the
+workflow.
+
+These checks read workflow and script text, not data, and they are not a sandbox. Known
+limits:
+
+- A reviewed `pnpm` command runs repository code: a change to `cloudflare-release.ts` or a
+  package script can do anything with the token, and only code review catches it.
+- An upload by a program the parser does not name (`node -e "fetch(url, {method: 'POST'})"`,
+  `python -c ...`, `nc`, or a renamed copy of `curl`) is not caught, and neither is a file written in a
+  credentialed job and sent from a job without the token.
+- An allowlisted artifact or cache path, a log line, or a job summary could still carry data.
+- A remote reusable workflow or action is judged by its reference, not its content.
+- A pull request can edit the checks themselves.
+
+Review of every workflow and script change stays the control; the per-environment token split
+(decision b) limits what a leaked token reaches.
 
 ## Security boundary
 
