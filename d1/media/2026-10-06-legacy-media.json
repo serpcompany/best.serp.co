@@ -1712,6 +1712,15 @@
    "width": 800
   },
   {
+   "bytes": 4382,
+   "contentType": "image/webp",
+   "height": 180,
+   "key": "best.serp.co/listings/brightlocal.com/logo/5ed45de26009584c.webp",
+   "sha256": "5ed45de26009584cb9282148f4a625975303f48e850adf8b0e59c5962578efea",
+   "source": "https://www.brightlocal.com/apple-touch-icon.png",
+   "width": 180
+  },
+  {
    "bytes": 2118,
    "contentType": "image/webp",
    "height": 192,
@@ -12933,15 +12942,6 @@
    "sha256": "f84f409d58872c30baa73a503ec8bac7220e19955ed52ec0d44111e5f0fa3560",
    "source": "https://www.kayak.com/news/wp-content/plugins/r9-components/assets/favicons/kayak/favicon_512.png",
    "width": 512
-  },
-  {
-   "bytes": 5347,
-   "contentType": "image/png",
-   "height": 192,
-   "key": "best.serp.co/listings/kazanseo.com/logo/c386396ec70db360.png",
-   "sha256": "c386396ec70db3608075b5fbfaac4ab1ccaa86ba05a68ab393ec551eb66c3e00",
-   "source": "https://kazanseo.com/logo192.png",
-   "width": 192
   },
   {
    "bytes": 231372,

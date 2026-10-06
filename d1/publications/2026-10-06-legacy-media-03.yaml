@@ -5695,15 +5695,7 @@ operations:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/kazan-seo/public
         key: null
-    media:
-      logo:
-        bytes: 5347
-        contentType: image/png
-        height: 192
-        key: best.serp.co/listings/kazanseo.com/logo/c386396ec70db360.png
-        sha256: c386396ec70db3608075b5fbfaac4ab1ccaa86ba05a68ab393ec551eb66c3e00
-        source: https://kazanseo.com/logo192.png
-        width: 192
+    media: {}
   - action: listing-media-update
     id: lst_df7d336085d2ded16f38a7c4
     slug: keeper.ai

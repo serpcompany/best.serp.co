@@ -3325,7 +3325,15 @@ operations:
       - kind: logo
         url: https://imagedelivery.net/lnCkkCGRx34u0qGwzZrUBQ/f364fd53-6e3b-4156-1c32-2d1540384f00/public
         key: null
-    media: {}
+    media:
+      logo:
+        bytes: 4382
+        contentType: image/webp
+        height: 180
+        key: best.serp.co/listings/brightlocal.com/logo/5ed45de26009584c.webp
+        sha256: 5ed45de26009584cb9282148f4a625975303f48e850adf8b0e59c5962578efea
+        source: https://www.brightlocal.com/apple-touch-icon.png
+        width: 180
   - action: listing-media-update
     id: lst_6b122b2f0bf7741d5ea5f8f8
     slug: brightpearl.com

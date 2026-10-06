@@ -12,10 +12,10 @@ below is computed from the committed plan and manifests.
 
 | Format | Objects |
 | --- | --- |
-| image/png | 1879 |
+| image/png | 1878 |
 | image/avif | 1080 |
 | image/jpeg | 392 |
-| image/webp | 278 |
+| image/webp | 279 |
 | image/x-icon | 89 |
 | image/gif | 38 |
 
@@ -63,8 +63,9 @@ Replacement logos by shorter side (minimum 64 px):
 | --- | --- |
 | site has no hostable icon of 64 px or more | 588 |
 | site unreachable (site_unreachable) | 181 |
-| site refused: off-domain page | 158 |
+| site refused: off-domain page | 117 |
 | site unreachable (http_403) | 92 |
+| site refused: likely rebrand | 40 |
 | site unreachable (http_404) | 40 |
 | site unreachable (fetch_timeout) | 23 |
 | site refused: gambling or spam | 21 |
@@ -82,6 +83,7 @@ Replacement logos by shorter side (minimum 64 px):
 | site unreachable (http_525) | 3 |
 | site unreachable (http_451) | 2 |
 | never created: no dr.serp.co logo exists (json-directory-template#114 named the path only) | 1 |
+| site icon is a default asset: create-react-app default logo192.png (the React logo) | 1 |
 | site refused: off-domain page; parking host; for sale or parked | 1 |
 | site refused: off-domain page; parking host; for sale or parked; parking asset | 1 |
 | site unreachable (http_401) | 1 |
@@ -138,31 +140,74 @@ Replacement logos by shorter side (minimum 64 px):
 
 ## Owner sign-off
 
+### Likely rebrands
+
+40 listings whose page moved to a domain with the same brand. Approving one is a
+line in `scripts/migration/legacy-media-allowed-domains.json` (`"<slug>": "<domain>"`); the next regeneration then takes
+its replacement. Approved so far: 0.
+
+| Listing | Final page | Why |
+| --- | --- | --- |
+| `babbl.dev` | https://www.babbl-labs.com/ | likely rebrand to babbl-labs.com |
+| `bloks.app` | https://www.bloks.ai/ | likely rebrand to bloks.ai |
+| `branchbob.ai` | https://www.branchbob.com/ | likely rebrand to branchbob.com |
+| `buzzli.in` | https://buzzli.io/ | likely rebrand to buzzli.io |
+| `capeprivacy.com` | https://cape.ai/ | likely rebrand to cape.ai |
+| `connectyai.com` | https://connecty.ai/ | likely rebrand to connecty.ai |
+| `emdash.ai` | https://emdash.com/ | likely rebrand to emdash.com |
+| `epique.cloud` | https://epique.ai/ | likely rebrand to epique.ai |
+| `essaywriters.ai` | https://essaywriter.com/ | likely rebrand to essaywriter.com |
+| `evabot.com` | https://evabot.net/ | likely rebrand to evabot.net |
+| `fathom.video` | https://usefathom.com/ref/ZKBXHI | likely rebrand to usefathom.com |
+| `fibery.io` | https://fibery.com/ | likely rebrand to fibery.com |
+| `gerwin.io` | https://gerwin.ai/ | likely rebrand to gerwin.ai |
+| `getactyvphysio.com` | https://getactyv.com/ | likely rebrand to getactyv.com |
+| `getvoiceline.com` | https://voiceline.ai/ | likely rebrand to voiceline.ai |
+| `headlessui.dev` | https://headlessui.com/ | likely rebrand to headlessui.com |
+| `hebbia.ai` | https://www.hebbia.com/ | likely rebrand to hebbia.com |
+| `hubble.team` | https://www.usehubble.io/ | likely rebrand to usehubble.io |
+| `icon.me` | https://icon.com/ | likely rebrand to icon.com |
+| `lambdalabs.com` | https://lambda.ai/ | likely rebrand to lambda.ai |
+| `latitude.so` | https://www.latitude.sh/accelerate?utm_source=devin-s&utm_medium=referral&utm_campaign=latitude-accelerate-general | likely rebrand to latitude.sh |
+| `listener.fm` | https://listener.com/ | likely rebrand to listener.com |
+| `livekit.io` | https://livekit.com/blog/meet-kitt | likely rebrand to livekit.com |
+| `monarchmoney.com` | https://www.monarch.com/ | likely rebrand to monarch.com |
+| `nameverse.org` | https://nameverse.app/ | likely rebrand to nameverse.app |
+| `notion.ai` | https://www.notion.com/product/ai | likely rebrand to notion.com |
+| `peppercontent.io` | https://www.pepper.inc/ | likely rebrand to pepper.inc |
+| `playtext.app` | https://www.playtext.com/ | likely rebrand to playtext.com |
+| `pragma.ai` | https://www.pragmaworld.net/ | likely rebrand to pragmaworld.net |
+| `rapidscale.net` | https://rapidscale.com/ | likely rebrand to rapidscale.com |
+| `replicant.ai` | https://www.replicant.com/ | likely rebrand to replicant.com |
+| `riverside.fm` | https://riverside.com/ | likely rebrand to riverside.com |
+| `runway.ml` | https://runway.com/ | likely rebrand to runway.com |
+| `scribehow.com` | https://scribe.com/ | likely rebrand to scribe.com |
+| `stack-ai.com` | https://www.stackai.com/ | likely rebrand to stackai.com |
+| `superdashhq.com` | https://superdash.ai/ | likely rebrand to superdash.ai |
+| `timelyapp.com` | https://www.timely.com/ | likely rebrand to timely.com |
+| `topaz.ai` | https://www.topazlabs.com/ | likely rebrand to topazlabs.com |
+| `ttcareforpet.com` | https://ttcare.ai/ | likely rebrand to ttcare.ai |
+| `usesuperflow.com` | https://usesuperflow.ai/ | likely rebrand to usesuperflow.ai |
+
 ### Replacements refused: off-domain, parked, for sale, gambling, or spam
 
-204 listings. Their dead images were not replaced; they keep the fallback tile
-(and no featured image) until the owner decides. Listing content is unchanged; #100 covers
-unpublishing hijacked listings.
+163 listings. Their dead images were not replaced; they keep the fallback
+tile (and no featured image) until the owner decides. Listing content is unchanged; #100
+covers unpublishing hijacked listings.
 
 | Listing | Final page | Why |
 | --- | --- | --- |
 | `autotextgenie.com` | https://allentownpc.com/ | off-domain page allentownpc.com; gambling or spam ("gacor") |
 | `autowrite.app` | https://apps.ee/autowrite/?ref=devinschumacher | off-domain page apps.ee |
 | `avatarize.club` | https://avatarize.club/ | gambling or spam ("casinos") |
-| `babbl.dev` | https://www.babbl-labs.com/ | off-domain page babbl-labs.com |
 | `banterai.business` | https://www.0-holdings.com/ | off-domain page 0-holdings.com |
 | `bashsenpai.com` | https://kaskuspay.com/ | off-domain page kaskuspay.com; gambling or spam ("link alternatif") |
 | `blockbot.ai` | https://www.blockbot.ai/ | for sale or parked ("spaceship.com"); parking asset forsale.spaceship-cdn.com |
-| `bloks.app` | https://www.bloks.ai/ | off-domain page bloks.ai |
 | `botx.cloud` | https://synthreo.ai/ | off-domain page synthreo.ai |
-| `branchbob.ai` | https://www.branchbob.com/ | off-domain page branchbob.com |
 | `brandfort.co` | https://situsduniabola.com/ | off-domain page situsduniabola.com; gambling or spam ("daftar") |
-| `brightlocal.com` | https://serp.co/?utm_source=serp.ly&utm_medium=referral&utm_campaign=serp.ly-catchall-redirect | off-domain page serp.co |
 | `buddygpt.ai` | https://www.heypat.ai/ | off-domain page heypat.ai |
-| `buzzli.in` | https://buzzli.io/ | off-domain page buzzli.io |
 | `byrdhouseapp.com` | https://langfinity.ai/ | off-domain page langfinity.ai |
 | `byterat.io` | https://www.ohm.ai/ | off-domain page ohm.ai |
-| `capeprivacy.com` | https://cape.ai/ | off-domain page cape.ai |
 | `careerpen.org` | https://bagustoto.mx/ | off-domain page bagustoto.mx; gambling or spam ("bandar togel") |
 | `catalysttg.com` | https://acrisurecyber.com/ | off-domain page acrisurecyber.com |
 | `channeladvisor.com` | https://www.rithum.com/ | off-domain page rithum.com |
@@ -186,7 +231,6 @@ unpublishing hijacked listings.
 | `collegetools.io` | https://www.mindko.com/ | off-domain page mindko.com |
 | `command.ai` | https://amplitude.com/guides-and-surveys | off-domain page amplitude.com |
 | `commentsanalytics.com` | https://icebuddha.com/ | off-domain page icebuddha.com |
-| `connectyai.com` | https://connecty.ai/ | off-domain page connecty.ai |
 | `copycraftai.com` | https://copycraftai.com/ | gambling or spam ("gacor") |
 | `courseau.co` | https://createupon.ai/ | off-domain page createupon.ai |
 | `cpumade.com` | https://www.cpumade.com/ | gambling or spam ("link alternatif") |
@@ -197,29 +241,20 @@ unpublishing hijacked listings.
 | `doodletale.me` | https://doodletale.me/ | gambling or spam ("togel") |
 | `dreamtapp.uk` | https://dreamtapp.uk/ | gambling or spam ("casino") |
 | `drippi.ai` | https://drippi.ai/ | for sale or parked ("make an offer") |
-| `emdash.ai` | https://emdash.com/ | off-domain page emdash.com |
-| `epique.cloud` | https://epique.ai/ | off-domain page epique.ai |
-| `essaywriters.ai` | https://essaywriter.com/ | off-domain page essaywriter.com |
-| `evabot.com` | https://evabot.net/ | off-domain page evabot.net |
 | `eyeq.photos` | https://perfectlyclear.ai/ | off-domain page perfectlyclear.ai |
 | `fable-studio.com` | https://www.showrunnerstudio.com/ | off-domain page showrunnerstudio.com |
 | `faithforward.app` | https://faithforward.app/ | gambling or spam ("nhà cái") |
 | `fama.one` | https://fama.one/ | for sale or parked ("spaceship.com"); parking asset forsale.spaceship-cdn.com |
-| `fathom.video` | https://usefathom.com/ref/ZKBXHI | off-domain page usefathom.com |
-| `fibery.io` | https://fibery.com/ | off-domain page fibery.com |
 | `fiction.com` | https://www.pagelines.com/ | off-domain page pagelines.com |
 | `fictiongpt.xyz` | https://fictiongpt.xyz/ | for sale or parked ("this domain may be for sale") |
 | `flapper.ai` | https://flapper.ai/ | for sale or parked ("spaceship.com"); parking asset forsale.spaceship-cdn.com |
 | `flexos.work` | https://www.leadwithai.co/tool/ai-action-plan-generator | off-domain page leadwithai.co |
 | `flowrite.com` | https://www.maestrolabs.com/flowrite | off-domain page maestrolabs.com |
 | `framedrop.ai` | https://www.sloode.com/ | off-domain page sloode.com |
-| `gerwin.io` | https://gerwin.ai/ | off-domain page gerwin.ai |
-| `getactyvphysio.com` | https://getactyv.com/ | off-domain page getactyv.com |
 | `getmumu.com` | https://jnetoto.win/ | off-domain page jnetoto.win; gambling or spam ("togel") |
 | `getoptimal.ai` | https://tara.ai/ | off-domain page tara.ai |
 | `getquizwizard.com` | https://www.wooclap.com/fr/quiz-wizard/ | off-domain page wooclap.com |
 | `getsmartgpt.com` | https://smartprompt.pro/ | off-domain page smartprompt.pro |
-| `getvoiceline.com` | https://voiceline.ai/ | off-domain page voiceline.ai |
 | `goloti.com` | https://www.lotiai.com/ | off-domain page lotiai.com |
 | `goodsnooze.gumroad.com` | https://www.macwhisper.com/ | off-domain page macwhisper.com |
 | `gptservice.app` | https://8xbet.com.es/ | off-domain page 8xbet.com.es; gambling or spam ("8xbet") |
@@ -228,14 +263,10 @@ unpublishing hijacked listings.
 | `greenlite.ai` | https://www2.bretton.com/ | off-domain page bretton.com |
 | `gretel.ai` | https://www.nvidia.com/en-us/use-cases/synthetic-data-generation-for-agentic-ai/ | off-domain page nvidia.com |
 | `growthbarseo.com` | https://www.seoptimer.com/growthbar/ | off-domain page seoptimer.com |
-| `headlessui.dev` | https://headlessui.com/ | off-domain page headlessui.com |
-| `hebbia.ai` | https://www.hebbia.com/ | off-domain page hebbia.com |
 | `heykona.com` | https://www.15five.com/ | off-domain page 15five.com |
 | `hollyhires.ai` | https://www.hiringagents.ai/ | off-domain page hiringagents.ai |
 | `hub.plexo.app` | https://acentoenlao.com/ | off-domain page acentoenlao.com |
-| `hubble.team` | https://www.usehubble.io/ | off-domain page usehubble.io |
 | `hypercontext.com` | https://www.spinach.ai/features/performance-reviews | off-domain page spinach.ai |
-| `icon.me` | https://icon.com/ | off-domain page icon.com |
 | `instantanswers.xyz` | https://retrobezel.com/?utm_source=instantanswers&utm_medium=redirect | off-domain page retrobezel.com |
 | `intercom.com` | https://fin.ai/ | off-domain page fin.ai |
 | `itagpt.it` | https://itagpt.it/ | for sale or parked ("domain for sale") |
@@ -243,16 +274,12 @@ unpublishing hijacked listings.
 | `ival-mbzuai.com` | https://www.ival-mbzuai.com/video-chatgpt/ | gambling or spam ("situs slot") |
 | `jit.dev` | https://jit.codes/ | off-domain page jit.codes |
 | `junilearning.com` | https://acely.com/ | off-domain page acely.com |
-| `lambdalabs.com` | https://lambda.ai/ | off-domain page lambda.ai |
-| `latitude.so` | https://www.latitude.sh/accelerate?utm_source=devin-s&utm_medium=referral&utm_campaign=latitude-accelerate-general | off-domain page latitude.sh |
 | `leanbe.ai` | https://productmix.com/ | off-domain page productmix.com |
 | `lifecastvr.com` | https://holovolo.tv/ | off-domain page holovolo.tv |
 | `lifetimely.io` | https://useamp.com/products/analytics/ | off-domain page useamp.com |
 | `lilybankai.com` | https://lilybankai.com/ | gambling or spam ("casino") |
 | `lionbrowser.app` | https://lionfamily.org/ | off-domain page lionfamily.org |
 | `liquidweb.com` | https://www.atlantic.net/ | off-domain page atlantic.net |
-| `listener.fm` | https://listener.com/ | off-domain page listener.com |
-| `livekit.io` | https://livekit.com/blog/meet-kitt | off-domain page livekit.com |
 | `lovelacestudio.com` | https://lovelacestudio.com/ | gambling or spam ("1xbet") |
 | `magicsalesbot.com` | https://www.rpdoyle.com/ | off-domain page rpdoyle.com |
 | `maketafi.com` | https://www.daz3d.com/ai-training-data | off-domain page daz3d.com |
@@ -260,14 +287,11 @@ unpublishing hijacked listings.
 | `meetassembly.com` | https://www.tryordinal.com/ | off-domain page tryordinal.com |
 | `mindos.com` | https://second.me/ | off-domain page second.me |
 | `mirrorthink.ai` | https://vicena.ai/ | off-domain page vicena.ai |
-| `monarchmoney.com` | https://www.monarch.com/ | off-domain page monarch.com |
 | `movmi.co` | https://movmi.co/ | gambling or spam ("casino") |
 | `multion.ai` | https://theagi.company/ | off-domain page theagi.company |
 | `muzaic.studio` | https://www.whileload.com/?_x=aHR0cDovL21pdGVtc3VyLmNvbS9tYXRjaC05NTI1LzkyMDkxLzM5MDc1NDM0NC8xNzkxMjU4NTA0L21mX2ExNWI4ZDgyLTA5OWEtNGQ1Yi04OWYxLTQ5Y2JlOTA5YWY0Yi9ZWEJwZURBM0xXMTFlbUZwWXk1emRIVmthVzk4U0UxWk5GTlBSMU5hUWpaSFRqZGFRekZhTWpOVE5VaFFmREl3T1E9PQ%3D%3D&_ns=1 | off-domain page whileload.com |
-| `nameverse.org` | https://nameverse.app/ | off-domain page nameverse.app |
 | `narrative.bi` | https://cube.dev/blog/building-the-future-of-agentic-analytics-narrative-bi-team-joins-cube | off-domain page cube.dev |
 | `nat.dev` | https://nat.org/ | off-domain page nat.org |
-| `notion.ai` | https://www.notion.com/product/ai | off-domain page notion.com |
 | `octavia.one` | https://renatus.ai/ | off-domain page renatus.ai |
 | `oneai.com` | https://harmony.ai/?ref=oneai | off-domain page harmony.ai |
 | `orbplugins.com` | https://www.landr.com/plugins/landr-composer | off-domain page landr.com |
@@ -276,13 +300,10 @@ unpublishing hijacked listings.
 | `outline.ai` | https://www.snagged.com/domains/outline-ai | off-domain page snagged.com; parking host www.snagged.com; for sale or parked ("snagged") |
 | `penparrot.com` | https://penparrot.com/ | gambling or spam ("casino") |
 | `people.ai` | https://www.backstory.ai/ | off-domain page backstory.ai |
-| `peppercontent.io` | https://www.pepper.inc/ | off-domain page pepper.inc |
 | `phrasee.co` | https://www.jacquard.com/ | off-domain page jacquard.com |
 | `pi.exchange` | https://www.mentana.ai/ | off-domain page mentana.ai |
 | `pipl.ai` | https://plusvibe.ai/ | off-domain page plusvibe.ai |
-| `playtext.app` | https://www.playtext.com/ | off-domain page playtext.com |
 | `plusdocs.com` | https://plusai.com/use-cases/market-research-report/ | off-domain page plusai.com |
-| `pragma.ai` | https://www.pragmaworld.net/ | off-domain page pragmaworld.net |
 | `profitwell.com` | https://www.paddle.com/ | off-domain page paddle.com |
 | `promoterkit.com` | https://toolerbox.com/ | off-domain page toolerbox.com |
 | `protestgpt.com` | https://www.outcryai.com/protest | off-domain page outcryai.com |
@@ -290,19 +311,14 @@ unpublishing hijacked listings.
 | `quadency.com` | https://quadterminal.com/ | off-domain page quadterminal.com |
 | `quantplus.io` | https://quantplus.io/ | gambling or spam ("casinos") |
 | `radionewsai.com` | https://audio.co/ | off-domain page audio.co |
-| `rapidscale.net` | https://rapidscale.com/ | off-domain page rapidscale.com |
 | `readtrellis.com` | https://timnas4dking.net/ | off-domain page timnas4dking.net; gambling or spam ("bandar togel") |
 | `reflect.run` | https://smartbear.com/product/reflect/ | off-domain page smartbear.com |
-| `replicant.ai` | https://www.replicant.com/ | off-domain page replicant.com |
-| `riverside.fm` | https://riverside.com/ | off-domain page riverside.com |
 | `roboweb.app` | https://roboweb.app/ | gambling or spam ("daftar") |
-| `runway.ml` | https://runway.com/ | off-domain page runway.com |
 | `salee.pro` | https://www.uselinxa.com/?source=salee_website | off-domain page uselinxa.com |
 | `salespitch.pro` | https://airbuy.africa/payments/ | off-domain page airbuy.africa; gambling or spam ("gacor") |
 | `scaleserp.com` | https://trajectdata.com/serp/scale-serp-api/ | off-domain page trajectdata.com |
 | `scrap.so` | https://adkit.so/ | off-domain page adkit.so |
 | `scribblediffusion.com` | https://xoilaczbh.tv/ | off-domain page xoilaczbh.tv; gambling or spam ("nhà cái") |
-| `scribehow.com` | https://scribe.com/ | off-domain page scribe.com |
 | `seanceai.com` | https://www.ae.studio/seanceai | off-domain page ae.studio |
 | `searchadsoptimization.com` | https://appstance.com/ | off-domain page appstance.com |
 | `seospark.io` | https://www.hypersuggest.com/ | off-domain page hypersuggest.com |
@@ -314,13 +330,11 @@ unpublishing hijacked listings.
 | `spiritme.tech` | https://xoilaclivettbdma.tv/ | off-domain page xoilaclivettbdma.tv |
 | `spoke.app` | https://www.meetingbaas.com/en | off-domain page meetingbaas.com |
 | `sportsprediction.ai` | https://copascore.ai/ | off-domain page copascore.ai |
-| `stack-ai.com` | https://www.stackai.com/ | off-domain page stackai.com |
 | `staircase.ai` | https://www.gainsight.com/staircase-ai/?gsfrom=staircase | off-domain page gainsight.com |
 | `starsky.pro` | https://starsky.pro/ | for sale or parked ("this domain is for sale") |
 | `stellarapp.io` | https://www.emotion-research.net/ | off-domain page emotion-research.net; gambling or spam ("casino") |
 | `story-world.app` | https://www.storyzone.app/ | off-domain page storyzone.app |
 | `subjectlinegenerator.com` | https://subjectlinegenerator.com/ | gambling or spam ("daftar") |
-| `superdashhq.com` | https://superdash.ai/ | off-domain page superdash.ai |
 | `supermanage.ai` | https://supermanage.ai/ | gambling or spam ("casino") |
 | `supertone.ai` | https://antinodeaudio.com/ | off-domain page antinodeaudio.com |
 | `supportagent.ai` | https://www.helpscout.com/ | off-domain page helpscout.com |
@@ -328,16 +342,13 @@ unpublishing hijacked listings.
 | `takomo.ai` | https://verda.com/ | off-domain page verda.com |
 | `teamsmart.ai` | https://askai.free/team-ai | off-domain page askai.free |
 | `texti.app` | https://texti.app/ | for sale or parked ("domain is for sale") |
-| `timelyapp.com` | https://www.timely.com/ | off-domain page timely.com |
 | `timeos.ai` | https://www.timeless.day/en | off-domain page timeless.day |
-| `topaz.ai` | https://www.topazlabs.com/ | off-domain page topazlabs.com |
 | `topseokit.com` | https://intothumbnail.com/ | off-domain page intothumbnail.com |
 | `transcribeme.app` | https://transcribego.com/en | off-domain page transcribego.com |
 | `travelgpt.art` | https://balloonbar.ae/ | off-domain page balloonbar.ae; gambling or spam ("bonus") |
 | `travelplan-ai.com` | https://www.guidego.app/ | off-domain page guidego.app |
 | `trypika.com` | https://www.hugedomains.com/domain_profile.cfm?d=trypika.com | off-domain page hugedomains.com; parking host www.hugedomains.com; for sale or parked ("hugedomains"); parking asset static.hugedomains.com |
 | `trysidekick.io` | https://www.attendancebot.com/ | off-domain page attendancebot.com |
-| `ttcareforpet.com` | https://ttcare.ai/ | off-domain page ttcare.ai |
 | `turbotax.com` | https://turbotax.intuit.com/ | off-domain page intuit.com |
 | `unicheck.com` | https://www.turnitin.com/products/unicheck/ | off-domain page turnitin.com |
 | `unriddle.ai` | https://anara.com/?via=devin | off-domain page anara.com |
@@ -345,16 +356,22 @@ unpublishing hijacked listings.
 | `urbansportsnetwork.com` | https://rmjasabundo.com/ | off-domain page rmjasabundo.com; gambling or spam ("judi") |
 | `usechat.ai` | https://www.88agents.co/ | off-domain page 88agents.co |
 | `usestyle.ai` | https://conversion.ai/ | off-domain page conversion.ai |
-| `usesuperflow.com` | https://usesuperflow.ai/ | off-domain page usesuperflow.ai |
 | `veedo.ai` | https://www.alfie-ten.app/ | off-domain page alfie-ten.app |
 | `verbiai.com` | https://pluginuseful.com/ | off-domain page pluginuseful.com |
 | `whatdoesthiscodedo.com` | https://whatdoesthiscodedo.com/ | gambling or spam ("casino") |
 | `whimsyapp.com` | https://www.whimsyaudio.com/ | off-domain page whimsyaudio.com |
 
+### Adult by name, not in the Adult category
+
+14 listings are treated as adult (only SERP's curated screenshots) by
+their platform name. Their category is a catalog data issue the owner may want to fix:
+
+`alphaporno-downloader`, `beeg-downloader`, `eporner-downloader`, `livejasmin-downloader`, `onlyfans-bulk-downloader`, `onlyfans-downloader`, `pornhub-downloader`, `redtube-downloader`, `spankbang-downloader`, `stripchat-downloader`, `tnaflix-downloader`, `xhamster-downloader`, `xnxx-downloader`, `youporn-downloader`
+
 ### Featured images from SERP’s curated screenshots
 
 9 SERP app listings get the screenshot their apps.serp.co page names
-(serpcompany/store-new) as their featured image; listings in the Adult category are marked.
+(serpcompany/store-new) as their featured image; adult listings are marked.
 Adult listings with a featured image from any other site: 0 (none is allowed).
 
 - `cam4-downloader` (Adult): https://apps.serp.co/media/optimized-products/cam4-video-downloader-homescreen-95ec446fca.webp
@@ -363,7 +380,7 @@ Adult listings with a featured image from any other site: 0 (none is allowed).
 - `dreamcam-vr-downloader` (Adult): https://apps.serp.co/media/optimized-products/dreamcam-vr-video-downloader-homescreen-f205bee097.webp
 - `fansly-live-downloader` (Adult): https://apps.serp.co/media/optimized-products/fansly-live-downloader-homescreen-d640dedca3.webp
 - `linkedin-downloader`: https://apps.serp.co/media/optimized-products/linkedin-downloader-ready-state-0fd1ecf229.webp
-- `livejasmin-downloader`: https://apps.serp.co/media/optimized-products/livejasmin-downloader-homescreen-2cf89cc27c.webp
+- `livejasmin-downloader` (Adult): https://apps.serp.co/media/optimized-products/livejasmin-downloader-homescreen-2cf89cc27c.webp
 - `mindvalley-downloader`: https://apps.serp.co/media/optimized-products/mindvalley-downloader-homescreen-64cf83cec8.webp
 - `sexchathu-downloader` (Adult): https://apps.serp.co/media/optimized-products/sexchathu-video-downloader-homescreen-f66e208e27.webp
 
@@ -379,6 +396,10 @@ replacement (the listing then keeps the tile, or no featured image).
 | Lovable default Open Graph image (`9ab2ec2457bc`) | 0 | 2 |
 | Spaceship for-sale page favicon (`9998c60ab099`) | 0 | 0 |
 | Snagged domain marketplace icon (`f8fef5fc814f`) | 0 | 0 |
+| create-next-app default favicon (current template) (`c28fdd2a4f31`) | 0 | 0 |
+| create-react-app default favicon (`3d10f7da6c60`) | 0 | 0 |
+| create-react-app default logo192.png (the React logo) (`c386396ec70d`) | 0 | 1 |
+| create-react-app default logo512.png (the React logo) (`9ea4f4da7050`) | 0 | 0 |
 
 ## Logos on the fallback tile
 
@@ -396,7 +417,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `avian.io`: http_404; site has no hostable icon of 64 px or more
 - `ayanza.com`: http_404; site has no hostable icon of 64 px or more
 - `aylien.com`: http_404; site site_unreachable
-- `babbl.dev`: http_404; site refused: off-domain page babbl-labs.com
+- `babbl.dev`: http_404; site refused: likely rebrand to babbl-labs.com
 - `babble-ai.com`: http_404; site fetch_timeout
 - `babylonhealth.com`: default asset: placeholder chevron (the logo of 387 imported listings); site site_unreachable
 - `babylontraffic.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
@@ -432,7 +453,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `blogassistant.co`: http_404; site site_unreachable
 - `blogcast.host`: http_404; site has no hostable icon of 64 px or more
 - `blogsmith.io`: http_404; site http_403
-- `bloks.app`: http_404; site refused: off-domain page bloks.ai
+- `bloks.app`: http_404; site refused: likely rebrand to bloks.ai
 - `bloop.ai`: http_404; site fetch_timeout
 - `bluecheck.me`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `boba-ai.com`: http_404; site has no hostable icon of 64 px or more
@@ -446,18 +467,17 @@ replacement (the listing then keeps the tile, or no featured image).
 - `botto.com`: http_404; site has no hostable icon of 64 px or more
 - `botx.cloud`: http_404; site refused: off-domain page synthreo.ai
 - `brainfishai.com`: http_404; site http_429
-- `branchbob.ai`: http_404; site refused: off-domain page branchbob.com
+- `branchbob.ai`: http_404; site refused: likely rebrand to branchbob.com
 - `brandfort.co`: http_404; site refused: off-domain page situsduniabola.com; gambling or spam ("daftar")
 - `branition.com`: http_404; site has no hostable icon of 64 px or more
 - `brevity.sh`: http_404; site has no hostable icon of 64 px or more
-- `brightlocal.com`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page serp.co
 - `browsegpt.ai`: http_404; site has no hostable icon of 64 px or more
 - `browserbase.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `buddygpt.ai`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page heypat.ai
 - `builtin.com`: http_404; site has no hostable icon of 64 px or more
 - `bunni.ai`: http_404; site has no hostable icon of 64 px or more
 - `businessinsider.in`: http_404; site site_unreachable
-- `buzzli.in`: http_404; site refused: off-domain page buzzli.io
+- `buzzli.in`: http_404; site refused: likely rebrand to buzzli.io
 - `buzzy.buzz`: http_404; site has no hostable icon of 64 px or more
 - `bypeers.ai`: http_404; site site_unreachable
 - `byrdhouseapp.com`: http_404; site refused: off-domain page langfinity.ai
@@ -465,7 +485,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `byterat.io`: http_404; site refused: off-domain page ohm.ai
 - `byword.ai`: http_404; site has no hostable icon of 64 px or more
 - `candideai.com`: http_404; site http_404
-- `capeprivacy.com`: http_404; site refused: off-domain page cape.ai
+- `capeprivacy.com`: http_404; site refused: likely rebrand to cape.ai
 - `captionit.ai`: http_404; site site_unreachable
 - `cardinalapp.io`: http_404; site site_unreachable
 - `careered.ai`: http_404; site has no hostable icon of 64 px or more
@@ -542,7 +562,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `communion.so`: http_404; site site_unreachable
 - `compilatio.net`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `composer.trade`: http_404; site has no hostable icon of 64 px or more
-- `connectyai.com`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page connecty.ai
+- `connectyai.com`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: likely rebrand to connecty.ai
 - `connexun.com`: http_404; site has no hostable icon of 64 px or more
 - `contentedge.com`: http_404; site icon is a default asset: create-next-app default favicon (Next.js template)
 - `contentgeni.com`: http_404; site site_unreachable
@@ -645,23 +665,23 @@ replacement (the listing then keeps the tile, or no featured image).
 - `emailcomposer.ai`: http_404; site fetch_timeout
 - `emailmagic.ai`: http_404; site site_unreachable
 - `embolden.co`: http_404; site http_403
-- `emdash.ai`: http_404; site refused: off-domain page emdash.com
+- `emdash.ai`: http_404; site refused: likely rebrand to emdash.com
 - `emogpt.com`: http_404; site has no hostable icon of 64 px or more
 - `emojis.sh`: default asset: placeholder chevron (the logo of 387 imported listings); site http_403
 - `emvoiceapp.com`: http_404; site has no hostable icon of 64 px or more
 - `encharge.io`: http_404; site http_403
 - `enhancedocs.com`: http_404; site has no hostable icon of 64 px or more
 - `epicurusapp.com`: http_404; site has no hostable icon of 64 px or more
-- `epique.cloud`: http_404; site refused: off-domain page epique.ai
+- `epique.cloud`: http_404; site refused: likely rebrand to epique.ai
 - `eplant.bio`: http_404; site site_unreachable
 - `erase.bg`: http_404; site has no hostable icon of 64 px or more
 - `ess.ai`: http_404; site has no hostable icon of 64 px or more
 - `essay-builder.ai`: http_404; site has no hostable icon of 64 px or more
-- `essaywriters.ai`: http_404; site refused: off-domain page essaywriter.com
+- `essaywriters.ai`: http_404; site refused: likely rebrand to essaywriter.com
 - `essense.io`: http_404; site site_unreachable
 - `essentially.net`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `esyblog.com`: http_404; site has no hostable icon of 64 px or more
-- `evabot.com`: http_404; site refused: off-domain page evabot.net
+- `evabot.com`: http_404; site refused: likely rebrand to evabot.net
 - `evebyte.com`: http_404; site http_403
 - `eversql.com`: http_404; site has no hostable icon of 64 px or more
 - `everyprompt.com`: http_404; site http_402
@@ -681,11 +701,11 @@ replacement (the listing then keeps the tile, or no featured image).
 - `faithforward.app`: http_404; site refused: gambling or spam ("nhà cái")
 - `fama.one`: http_404; site refused: for sale or parked ("spaceship.com"); parking asset forsale.spaceship-cdn.com
 - `fast.ai`: http_404; site has no hostable icon of 64 px or more
-- `fathom.video`: http_404; site refused: off-domain page usefathom.com
+- `fathom.video`: http_404; site refused: likely rebrand to usefathom.com
 - `fatjoe.com`: default asset: placeholder chevron (the logo of 387 imported listings); site http_429
 - `feyn.ai`: http_404; site http_403
 - `fgeneds.com`: http_404; site has no hostable icon of 64 px or more
-- `fibery.io`: http_404; site refused: off-domain page fibery.com
+- `fibery.io`: http_404; site refused: likely rebrand to fibery.com
 - `fiction.com`: http_404; site refused: off-domain page pagelines.com
 - `fictiongpt.xyz`: http_404; site refused: for sale or parked ("this domain may be for sale")
 - `fieldwire.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
@@ -730,9 +750,9 @@ replacement (the listing then keeps the tile, or no featured image).
 - `genforge.ai`: http_404; site icon is a default asset: create-next-app default favicon (Next.js template)
 - `geniussheets.us`: http_404; site has no hostable icon of 64 px or more
 - `genly.ai`: http_404; site http_502
-- `gerwin.io`: http_404; site refused: off-domain page gerwin.ai
+- `gerwin.io`: http_404; site refused: likely rebrand to gerwin.ai
 - `gestualy.com`: http_404; site has no hostable icon of 64 px or more
-- `getactyvphysio.com`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page getactyv.com
+- `getactyvphysio.com`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: likely rebrand to getactyv.com
 - `getallwrite.com`: http_404; site http_403
 - `getbeam.ai`: http_404; site has no hostable icon of 64 px or more
 - `getbotz.io`: http_404; site has no hostable icon of 64 px or more
@@ -749,7 +769,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `getquizwizard.com`: http_404; site refused: off-domain page wooclap.com
 - `getslate.ai`: http_404; site has no hostable icon of 64 px or more
 - `getsmartgpt.com`: http_404; site refused: off-domain page smartprompt.pro
-- `getvoiceline.com`: http_404; site refused: off-domain page voiceline.ai
+- `getvoiceline.com`: http_404; site refused: likely rebrand to voiceline.ai
 - `getwiz.xyz`: http_404; site has no hostable icon of 64 px or more
 - `getzuro.com`: http_404; site has no hostable icon of 64 px or more
 - `gitfluence.com`: http_404; site has no hostable icon of 64 px or more
@@ -793,11 +813,11 @@ replacement (the listing then keeps the tile, or no featured image).
 - `hal9.com`: http_404; site has no hostable icon of 64 px or more
 - `halist.ai`: http_404; site http_530
 - `happyaccidents.ai`: http_404; site site_unreachable
-- `headlessui.dev`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page headlessui.com
+- `headlessui.dev`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: likely rebrand to headlessui.com
 - `headshotpro.com`: http_404; site has no hostable icon of 64 px or more
 - `healthcareblocks.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `hearbitz.app`: http_404; site site_unreachable
-- `hebbia.ai`: http_404; site refused: off-domain page hebbia.com
+- `hebbia.ai`: http_404; site refused: likely rebrand to hebbia.com
 - `heficed.com`: default asset: placeholder chevron (the logo of 387 imported listings); site site_unreachable
 - `hellorep.ai`: http_404; site has no hostable icon of 64 px or more
 - `helper.email`: http_404; site site_unreachable
@@ -823,7 +843,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `howtoleverageai.com`: http_404; site has no hostable icon of 64 px or more
 - `hrmwage.com`: http_404; site has no hostable icon of 64 px or more
 - `hub.plexo.app`: http_404; site refused: off-domain page acentoenlao.com
-- `hubble.team`: http_404; site refused: off-domain page usehubble.io
+- `hubble.team`: http_404; site refused: likely rebrand to usehubble.io
 - `humanloop.com`: http_404; site has no hostable icon of 64 px or more
 - `hume.ai`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `hustleseo.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
@@ -833,7 +853,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `iamdave.ai`: http_404; site has no hostable icon of 64 px or more
 - `iatextos.com`: http_404; site fetch_timeout
 - `ichatwithgpt.com`: http_404; site has no hostable icon of 64 px or more
-- `icon.me`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page icon.com
+- `icon.me`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: likely rebrand to icon.com
 - `icons8.com`: http_404; site http_403
 - `ideacadabra.com`: http_404; site http_451
 - `idoubt.news`: http_404; site has no hostable icon of 64 px or more
@@ -899,6 +919,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `kalendar.ai`: http_404; site http_403
 - `kartiv.com`: http_404; site has no hostable icon of 64 px or more
 - `kaya.chat`: http_404; site has no hostable icon of 64 px or more
+- `kazanseo.com`: http_404; site icon is a default asset: create-react-app default logo192.png (the React logo)
 - `keywordinsights.ai`: http_404; site has no hostable icon of 64 px or more
 - `keywordsearch.com`: http_404; site has no hostable icon of 64 px or more
 - `khanacademy.org`: http_404; site has no hostable icon of 64 px or more
@@ -918,11 +939,11 @@ replacement (the listing then keeps the tile, or no featured image).
 - `kumaran.com`: http_404; site has no hostable icon of 64 px or more
 - `kvants.ai`: http_404; site has no hostable icon of 64 px or more
 - `lablab.ai`: http_404; site has no hostable icon of 64 px or more
-- `lambdalabs.com`: http_404; site refused: off-domain page lambda.ai
+- `lambdalabs.com`: http_404; site refused: likely rebrand to lambda.ai
 - `lamini.ai`: http_404; site site_unreachable
 - `lancey.ai`: http_404; site has no hostable icon of 64 px or more
 - `langchats.com`: http_404; site icon is a default asset: create-next-app default favicon (Next.js template)
-- `latitude.so`: http_404; site refused: off-domain page latitude.sh
+- `latitude.so`: http_404; site refused: likely rebrand to latitude.sh
 - `lavo.ai`: http_404; site fetch_timeout
 - `lazyapply.com`: http_404; site has no hostable icon of 64 px or more
 - `leanbe.ai`: http_404; site refused: off-domain page productmix.com
@@ -950,11 +971,11 @@ replacement (the listing then keeps the tile, or no featured image).
 - `lintrule.com`: http_404; site http_402
 - `lionbrowser.app`: http_404; site refused: off-domain page lionfamily.org
 - `liquidweb.com`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page atlantic.net
-- `listener.fm`: http_404; site refused: off-domain page listener.com
+- `listener.fm`: http_404; site refused: likely rebrand to listener.com
 - `listingcopy.ai`: http_404; site has no hostable icon of 64 px or more
 - `live-captions.com`: http_404; site site_unreachable
 - `livehealthily.com`: default asset: placeholder chevron (the logo of 387 imported listings); site http_404
-- `livekit.io`: http_404; site refused: off-domain page livekit.com
+- `livekit.io`: http_404; site refused: likely rebrand to livekit.com
 - `liveperson.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `lmql.ai`: http_404; site has no hostable icon of 64 px or more
 - `localo.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
@@ -1028,7 +1049,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `mirakl.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `mirrorthink.ai`: http_404; site refused: off-domain page vicena.ai
 - `moly.ai`: default asset: placeholder chevron (the logo of 387 imported listings); site site_unreachable
-- `monarchmoney.com`: http_404; site refused: off-domain page monarch.com
+- `monarchmoney.com`: http_404; site refused: likely rebrand to monarch.com
 - `monica.im`: http_404; site has no hostable icon of 64 px or more
 - `moodys.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `motionit.ai`: http_404; site has no hostable icon of 64 px or more
@@ -1046,7 +1067,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `myvocal.ai`: http_404; site icon is a default asset: create-next-app default favicon (Next.js template)
 - `nack.ai`: http_404; site http_403
 - `namelyai.com`: http_404; site has no hostable icon of 64 px or more
-- `nameverse.org`: http_404; site refused: off-domain page nameverse.app
+- `nameverse.org`: http_404; site refused: likely rebrand to nameverse.app
 - `narrative.bi`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page cube.dev
 - `nat.dev`: http_404; site refused: off-domain page nat.org
 - `naturalreaders.com`: http_404; site has no hostable icon of 64 px or more
@@ -1070,7 +1091,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `notably.ai`: http_404; site site_unreachable
 - `notepd.com`: http_404; site has no hostable icon of 64 px or more
 - `notey.ai`: http_404; site http_403
-- `notion.ai`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page notion.com
+- `notion.ai`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: likely rebrand to notion.com
 - `novacene.ai`: http_404; site has no hostable icon of 64 px or more
 - `novel.sh`: http_404; site has no hostable icon of 64 px or more
 - `nubrain.ai`: http_404; site has no hostable icon of 64 px or more
@@ -1116,7 +1137,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `pdftranslator.dk`: http_404; site has no hostable icon of 64 px or more
 - `penparrot.com`: http_404; site refused: gambling or spam ("casino")
 - `people.ai`: http_404; site refused: off-domain page backstory.ai
-- `peppercontent.io`: http_404; site refused: off-domain page pepper.inc
+- `peppercontent.io`: http_404; site refused: likely rebrand to pepper.inc
 - `perceptif.ai`: http_404; site too_many_redirects
 - `perfectessaywriter.ai`: http_404; site has no hostable icon of 64 px or more
 - `permar.ai`: http_404; site site_unreachable
@@ -1152,7 +1173,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `plagtracker.com`: default asset: placeholder chevron (the logo of 387 imported listings); site site_unreachable
 - `plantrips.net`: http_404; site has no hostable icon of 64 px or more
 - `play.ht`: http_404; site site_unreachable
-- `playtext.app`: http_404; site refused: off-domain page playtext.com
+- `playtext.app`: http_404; site refused: likely rebrand to playtext.com
 - `plumy.app`: http_404; site http_503
 - `plusdocs.com`: http_404; site refused: off-domain page plusai.com
 - `pluto.fi`: http_404; site site_unreachable
@@ -1169,7 +1190,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `ppcadeditor.com`: http_404; site http_429
 - `ppspy.com`: http_404; site has no hostable icon of 64 px or more
 - `practicetalking.net`: http_404; site has no hostable icon of 64 px or more
-- `pragma.ai`: http_404; site refused: off-domain page pragmaworld.net
+- `pragma.ai`: http_404; site refused: likely rebrand to pragmaworld.net
 - `predibase.com`: http_404; site http_403
 - `prepsup.com`: http_404; site has no hostable icon of 64 px or more
 - `presshook.com`: http_404; site has no hostable icon of 64 px or more
@@ -1216,7 +1237,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `ramanlabs.in`: http_404; site has no hostable icon of 64 px or more
 - `ranklightning.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `rapideditor.org`: http_404; site has no hostable icon of 64 px or more
-- `rapidscale.net`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page rapidscale.com
+- `rapidscale.net`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: likely rebrand to rapidscale.com
 - `raregenie.com`: http_404; site has no hostable icon of 64 px or more
 - `rawshorts.com`: http_404; site has no hostable icon of 64 px or more
 - `reachout.ai`: http_404; site has no hostable icon of 64 px or more
@@ -1235,7 +1256,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `reiwaseda.com`: http_404; site has no hostable icon of 64 px or more
 - `rejuve.ai`: http_404; site has no hostable icon of 64 px or more
 - `releasesnotes.dev`: http_404; site too_many_redirects
-- `replicant.ai`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page replicant.com
+- `replicant.ai`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: likely rebrand to replicant.com
 - `replix.ai`: http_404; site has no hostable icon of 64 px or more
 - `reply.io`: http_404; site http_403
 - `reprompt.dev`: http_404; site site_unreachable
@@ -1253,7 +1274,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `rewritewise.com`: http_404; site http_502
 - `rimbaud.ai`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `riogpt.com`: http_404; site has no hostable icon of 64 px or more
-- `riverside.fm`: http_404; site refused: off-domain page riverside.com
+- `riverside.fm`: http_404; site refused: likely rebrand to riverside.com
 - `rize.io`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `roamaround.io`: default asset: placeholder chevron (the logo of 387 imported listings); site http_429
 - `roboweb.app`: http_404; site refused: gambling or spam ("daftar")
@@ -1262,7 +1283,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `roomgpt.io`: http_404; site has no hostable icon of 64 px or more
 - `roost.ai`: http_404; site has no hostable icon of 64 px or more
 - `runday.ai`: http_404; site has no hostable icon of 64 px or more
-- `runway.ml`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page runway.com
+- `runway.ml`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: likely rebrand to runway.com
 - `salam.chat`: http_404; site has no hostable icon of 64 px or more
 - `salee.pro`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page uselinxa.com
 - `salesforce.com`: http_404; site has no hostable icon of 64 px or more
@@ -1276,7 +1297,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `screenapp.io`: http_404; site has no hostable icon of 64 px or more
 - `scribblediffusion.com`: http_404; site refused: off-domain page xoilaczbh.tv; gambling or spam ("nhà cái")
 - `scribbr.com`: default asset: placeholder chevron (the logo of 387 imported listings); site http_403
-- `scribehow.com`: http_404; site refused: off-domain page scribe.com
+- `scribehow.com`: http_404; site refused: likely rebrand to scribe.com
 - `scribewave.com`: http_404; site has no hostable icon of 64 px or more
 - `scrupp.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `seanceai.com`: http_404; site refused: off-domain page ae.studio
@@ -1356,7 +1377,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `sqlpad.io`: http_404; site has no hostable icon of 64 px or more
 - `squareup.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
 - `squirrelai.com`: default asset: placeholder chevron (the logo of 387 imported listings); site has no hostable icon of 64 px or more
-- `stack-ai.com`: http_404; site refused: off-domain page stackai.com
+- `stack-ai.com`: http_404; site refused: likely rebrand to stackai.com
 - `staircase.ai`: http_404; site refused: off-domain page gainsight.com
 - `stamped.io`: default asset: placeholder chevron (the logo of 387 imported listings); site http_403
 - `starsky.pro`: http_404; site refused: for sale or parked ("this domain is for sale")
@@ -1377,7 +1398,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `supares.com`: http_404; site has no hostable icon of 64 px or more
 - `superagent.sh`: http_404; site has no hostable icon of 64 px or more
 - `superagi.com`: http_404; site has no hostable icon of 64 px or more
-- `superdashhq.com`: http_404; site refused: off-domain page superdash.ai
+- `superdashhq.com`: http_404; site refused: likely rebrand to superdash.ai
 - `supermanage.ai`: http_404; site refused: gambling or spam ("casino")
 - `superpowered.me`: http_404; site has no hostable icon of 64 px or more
 - `supertone.ai`: http_404; site refused: off-domain page antinodeaudio.com
@@ -1420,7 +1441,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `therocketbrew.com`: http_404; site http_404
 - `theselyricsdonotexist.com`: http_404; site has no hostable icon of 64 px or more
 - `tiipe.ai`: http_404; site site_unreachable
-- `timelyapp.com`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page timely.com
+- `timelyapp.com`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: likely rebrand to timely.com
 - `timeos.ai`: http_404; site refused: off-domain page timeless.day
 - `timworks.com`: http_404; site http_404
 - `tinymagic.app`: http_404; site has no hostable icon of 64 px or more
@@ -1429,7 +1450,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `tokee.ai`: http_404; site fetch_timeout
 - `tome.app`: default asset: placeholder chevron (the logo of 387 imported listings); site http_404
 - `toolbuilder.ai`: http_404; site http_403
-- `topaz.ai`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page topazlabs.com
+- `topaz.ai`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: likely rebrand to topazlabs.com
 - `topseokit.com`: http_404; site refused: off-domain page intothumbnail.com
 - `toptal.com`: http_404; site http_403
 - `towords.io`: http_404; site http_525
@@ -1467,7 +1488,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `trypromptly.com`: http_404; site site_unreachable
 - `trysalient.com`: http_404; site icon is a default asset: create-next-app default favicon (Next.js template)
 - `trysidekick.io`: http_404; site refused: off-domain page attendancebot.com
-- `ttcareforpet.com`: http_404; site refused: off-domain page ttcare.ai
+- `ttcareforpet.com`: http_404; site refused: likely rebrand to ttcare.ai
 - `ttsmaker.com`: http_404; site http_403
 - `turbohire.co`: http_404; site http_403
 - `turbotax.com`: default asset: placeholder chevron (the logo of 387 imported listings); site refused: off-domain page intuit.com
@@ -1497,7 +1518,7 @@ replacement (the listing then keeps the tile, or no featured image).
 - `userevaluation.com`: http_404; site has no hostable icon of 64 px or more
 - `useskillflow.com`: http_404; site http_404
 - `usestyle.ai`: http_404; site refused: off-domain page conversion.ai
-- `usesuperflow.com`: http_404; site refused: off-domain page usesuperflow.ai
+- `usesuperflow.com`: http_404; site refused: likely rebrand to usesuperflow.ai
 - `usp.ai`: http_404; site has no hostable icon of 64 px or more
 - `vahan.co`: http_404; site has no hostable icon of 64 px or more
 - `valispace.com`: http_404; site has no hostable icon of 64 px or more
