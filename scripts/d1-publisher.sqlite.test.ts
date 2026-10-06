@@ -946,3 +946,85 @@ describe('listing-content-remove-suffix (#105: imported FAQ blocks move to the F
     expect(() => remove({ reason: ' ' })).toThrow()
   })
 })
+
+describe('listing-claim-hold-add and -clear (#67: holds for the owner’s review)', () => {
+  let live = { checksum: beforeChecksum, version: 4 }
+  const rowsPlan = (operations: unknown[], version = 4) =>
+    buildPublicationPlan(
+      manifestSchema.parse({
+        version: 1,
+        id: `rows-holds-${version}`,
+        concurrency: 'rows',
+        provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+        operations
+      }),
+      'rows holds',
+      now,
+      { ...live, version }
+    )
+  const add = {
+    action: 'listing-claim-hold-add',
+    id: 'lst_sqlite_test',
+    slug: 'old-slug',
+    reason: 'off_domain',
+    note: 'ends on other.example, not example.com',
+    expected: { website: 'https://example.com' }
+  }
+  const clear = {
+    action: 'listing-claim-hold-clear',
+    id: 'lst_sqlite_test',
+    slug: 'old-slug',
+    note: 'owner checked: the product moved'
+  }
+  const holds = (db: DatabaseSync) =>
+    db.prepare('SELECT reason,source,cleared_at,cleared_by FROM listing_claim_holds').all()
+
+  it('places a hold row-level, leaves an active one as it is, and clears it', () => {
+    const db = database()
+    const sync = () => {
+      live = db
+        .prepare('SELECT version,checksum FROM publication_state WHERE id=1')
+        .get() as typeof live
+    }
+    executeInTestTransaction(db, rowsPlan([add]))
+    expect(holds(db)).toEqual([
+      {
+        cleared_at: null,
+        cleared_by: null,
+        reason: 'off_domain',
+        source: 'manifest rows-holds-4: ends on other.example, not example.com'
+      }
+    ])
+    // Again at the next version (an environment that already has it): no change, still held.
+    sync()
+    executeInTestTransaction(db, rowsPlan([add], 5))
+    expect(holds(db)).toHaveLength(1)
+    sync()
+    executeInTestTransaction(db, rowsPlan([clear], 6))
+    expect(holds(db)).toEqual([
+      expect.objectContaining({
+        cleared_at: now,
+        cleared_by: 'test@example.com (manifest rows-holds-6: owner checked: the product moved)'
+      })
+    ])
+    // Clearing twice is refused; adding again places a new hold.
+    sync()
+    expect(() => executeInTestTransaction(db, rowsPlan([clear], 7))).toThrow()
+    executeInTestTransaction(db, rowsPlan([add], 7))
+    expect(holds(db)).toEqual([expect.objectContaining({ cleared_at: null, cleared_by: null })])
+  })
+
+  it('refuses a listing whose slug or website changed since the report', () => {
+    live = { checksum: beforeChecksum, version: 4 }
+    for (const change of [
+      "UPDATE listings SET website='https://moved.example/' WHERE id='lst_sqlite_test'",
+      "UPDATE listings SET slug='renamed' WHERE id='lst_sqlite_test'"
+    ]) {
+      const db = database()
+      db.exec(change)
+      expect(() => executeInTestTransaction(db, rowsPlan([add])), change).toThrow()
+      expect(holds(db)).toEqual([])
+      expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 4 })
+    }
+  })
+})

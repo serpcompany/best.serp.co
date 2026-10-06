@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, describe, expect, it } from 'vitest'
+import { claimHoldsManifest } from './claim-holds-manifest'
 import {
   applicationTableNames,
   canonicalLocalConfig,
@@ -15,6 +16,7 @@ import {
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { canonicalPreviewCommand, localPreviewVarArgs } from './d1-local-preview'
 import { resolveFreshD1StateRoot } from './d1-local-state'
+import { parseManifest } from './d1-publisher'
 import { applicationColumnInventory, importOrder, parityTableNames } from './d1-table-inventory'
 import { project } from './project'
 
@@ -479,50 +481,25 @@ describe('fresh Drizzle D1 history', () => {
     database.close()
   })
 
-  it("holds instant claims of #100's owner-review listings (#67)", () => {
-    // The seed is exactly the reviewed report's ownerReview set, by class.
-    const report = readFileSync(resolve('d1/hygiene/2026-10-06-listing-domains.yaml'), 'utf8')
-    const review = report.slice(report.indexOf('\nownerReview:'))
-    const expected = { off_domain: [] as string[], unreachable: [] as string[] }
-    for (const entry of review.split('\n  - slug: ').slice(1)) {
-      const id = /\n {4}id: (\S+)/u.exec(entry)?.[1]
-      const kind = /\n {4}class: (\S+)/u.exec(entry)?.[1]
-      if (!id || !kind) throw new Error('unreadable ownerReview entry')
-      expected[kind === 'off-domain' ? 'off_domain' : 'unreachable'].push(id)
-    }
-    expect([expected.off_domain.length, expected.unreachable.length]).toEqual([266, 391])
+  it("holds instant claims of #100's owner-review listings through a reviewed manifest (#67)", () => {
+    // The migration is schema only; the holds are the reviewed manifest generated from the report.
     const migration = readFileSync(
       resolve(freshMigrationsDirectory, '0008_listing_claims.sql'),
       'utf8'
     )
-    for (const [reason, ids] of Object.entries(expected)) {
-      const statement = migration
-        .split('--> statement-breakpoint')
-        .find(part => part.includes('INSERT INTO') && part.includes(`'${reason}'`))
-      const seeded = [...(statement ?? '').matchAll(/'(lst_[0-9a-f]{24})'/gu)].map(
-        match => match[1]
-      )
-      expect(seeded.sort(), reason).toEqual([...ids].sort())
-    }
-
-    // On a populated database the seed holds the listings that exist; a fresh one holds none.
-    const database = new DatabaseSync(':memory:')
-    const names = freshMigrationNames()
-    const claims = '0008_listing_claims.sql'
-    for (const migration of names.slice(0, names.indexOf(claims))) {
-      database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
-    }
-    database.exec(`INSERT INTO listings (id, slug, name, description, website, status, source_kind,
-        source_identity, checksum)
-      VALUES ('${expected.unreachable[0]}', 'held.example', 'Held', 'd', 'https://serp.ly/held',
-        'draft', 'legacy-json-migration-v1', 'held', 'c')`)
-    database.exec('BEGIN')
-    database.exec(readFileSync(resolve(freshMigrationsDirectory, claims), 'utf8'))
-    database.exec('COMMIT')
-    expect(
-      database.prepare('SELECT listing_id, reason, cleared_at FROM listing_claim_holds').all()
-    ).toEqual([{ cleared_at: null, listing_id: expected.unreachable[0], reason: 'unreachable' }])
-    database.close()
+    expect(migration).not.toMatch(/INSERT INTO/u)
+    const report = readFileSync(resolve('d1/hygiene/2026-10-06-listing-domains.yaml'), 'utf8')
+    const source = readFileSync(
+      resolve('d1/publications/2026-10-06-listing-claim-holds.yaml'),
+      'utf8'
+    )
+    expect(source).toBe(claimHoldsManifest(report, '2026-10-06-listing-claim-holds'))
+    const reasons = parseManifest(source).operations.map(op =>
+      op.action === 'listing-claim-hold-add' ? op.reason : op.action
+    )
+    expect(reasons.filter(reason => reason === 'off_domain')).toHaveLength(266)
+    expect(reasons.filter(reason => reason === 'unreachable')).toHaveLength(391)
+    expect(reasons).toHaveLength(657)
   })
 
   it('migrates empty canonical local state and verifies the exact fresh schema', () => {
