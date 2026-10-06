@@ -192,6 +192,20 @@ const operation = z.discriminatedUnion('action', [
         .strict()
     })
     .strict(),
+  /**
+   * Adds categories to a listing as secondary (never primary) memberships, compared and swapped
+   * on the listing's slug and its current categories (`expected`, slugs in sort order), so it is
+   * row-level like `listing-media-update` (#98: the Adult category for adult downloaders).
+   */
+  z
+    .object({
+      action: z.literal('listing-categories-add'),
+      id: listingId,
+      slug: existingSlug,
+      expected: z.array(categorySlug).min(1),
+      add: categories
+    })
+    .strict(),
   z.object({ action: z.literal('category-create'), category }).strict(),
   z.object({ action: z.literal('category-update'), category }).strict(),
   z.object({ action: z.literal('category-unpublish'), slug: categorySlug }).strict()
@@ -237,10 +251,11 @@ export const manifestSchema = z
         })
       }
       value.operations.forEach((op, index) => {
-        if (op.action !== 'listing-media-update') {
+        if (op.action !== 'listing-media-update' && op.action !== 'listing-categories-add') {
           context.addIssue({
             code: z.ZodIssueCode.custom,
-            message: 'A row-level manifest holds only listing-media-update operations.',
+            message:
+              'A row-level manifest holds only listing-media-update and listing-categories-add operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -256,6 +271,17 @@ export const manifestSchema = z
       })
     }
     value.operations.forEach((op, index) => {
+      if (op.action === 'listing-categories-add') {
+        for (const slug of op.add) {
+          if (op.expected.includes(slug)) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `The listing already has category ${slug}.`,
+              path: ['operations', index, 'add']
+            })
+          }
+        }
+      }
       if (op.action === 'listing-media-update') {
         const keyed = [
           ...(op.media.logo ? [['logo', op.media.logo.key] as const] : []),
@@ -637,6 +663,30 @@ export function buildPublicationPlan(
       )
       routes.add(listingRoute(op.slug))
       addCategories(op.categories)
+    }
+    if (op.action === 'listing-categories-add') {
+      statements.push(
+        statement(
+          `INSERT INTO publication_guard SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND (SELECT json_group_array(slug) FROM (SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? ORDER BY lc.sort_order, c.slug))=? THEN 1 ELSE 0 END`,
+          op.id,
+          op.slug,
+          op.id,
+          JSON.stringify(op.expected)
+        ),
+        ...op.add.flatMap(categorySlugToAdd => [
+          statement(
+            'INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) SELECT ?,id,(SELECT COALESCE(MAX(sort_order),-1)+1 FROM listing_categories WHERE listing_id=?),0 FROM categories WHERE slug=? AND is_active=1',
+            op.id,
+            op.id,
+            categorySlugToAdd
+          ),
+          statement(
+            'INSERT INTO publication_guard VALUES (CASE WHEN changes()=1 THEN 1 ELSE 0 END)'
+          )
+        ])
+      )
+      routes.add(listingRoute(op.slug))
+      addCategories([...op.expected, ...op.add])
     }
     if (op.action === 'listing-media-update') {
       const expected = expectedMediaJson(op.expected)

@@ -527,3 +527,91 @@ describe("a revision's logo (#96 review round 4, S1)", () => {
     ).rejects.toThrow(/Revision not found/u)
   })
 })
+
+describe('a pending image replaced before review (#96 review round 5, S1)', () => {
+  const first = 'https://ops.example/first.png'
+  const second = 'https://ops.example/second.png'
+  const same = 'https://ops.example/same-bytes.png'
+  const broken = 'https://ops.example/broken.png'
+
+  it('deletes the superseded submission object once the new one is hosted', async () => {
+    const a = pngBytes(100, 100)
+    const b = pngBytes(110, 110)
+    const { bucket, operations, rows } = fixture({
+      [broken]: () => new Response('gone', { status: 404 }),
+      [first]: () => imageResponse(a),
+      [same]: () => imageResponse(a),
+      [second]: () => imageResponse(b)
+    })
+    const host = (sourceUrl: string) =>
+      operations.hostSubmissionMedia({ kind: 'logo', sortOrder: 0, sourceUrl, submissionId })
+    const keyA = ((await host(first)) as { key: string }).key
+    expect(bucket.objects.has(keyA)).toBe(true)
+    // The same bytes from another URL keep the same key: nothing is deleted.
+    expect(await host(same)).toEqual({ key: keyA, status: 'hosted' })
+    expect(bucket.objects.has(keyA)).toBe(true)
+    // Another image: the never-reviewed first one leaves the bucket after the new row is written.
+    const keyB = ((await host(second)) as { key: string }).key
+    expect(keyB).not.toBe(keyA)
+    expect(bucket.objects.has(keyA)).toBe(false)
+    expect(bucket.objects.has(keyB)).toBe(true)
+    expect(rows('SELECT media_key FROM media_ingestions')).toEqual([{ media_key: keyB }])
+    // A replacement that cannot be hosted still drops the superseded object (the slot names none).
+    expect(await host(broken)).toEqual({ code: 'http_404', status: 'failed' })
+    expect(bucket.objects.has(keyB)).toBe(false)
+  })
+
+  it('keeps an object a listing slot still waits to copy', async () => {
+    const { bucket, operations, sqlite } = fixture({
+      [first]: () => imageResponse(pngBytes(100, 100)),
+      [second]: () => imageResponse(pngBytes(120, 120))
+    })
+    const host = (sourceUrl: string) =>
+      operations.hostSubmissionMedia({ kind: 'logo', sortOrder: 0, sourceUrl, submissionId })
+    const keyA = ((await host(first)) as { key: string }).key
+    await queueMedia(sqlite.asD1Database(), {
+      copyFromKey: keyA,
+      kind: 'logo',
+      now: '2026-10-06T12:00:00.000Z',
+      sortOrder: 0,
+      sourceUrl: first,
+      target: { listingId }
+    })
+    await host(second)
+    expect(bucket.objects.has(keyA)).toBe(true)
+  })
+
+  it("deletes a revision's superseded logo, also when it falls back to the listing's", async () => {
+    const revisionId = 'rev_swap'
+    const { bucket, operations, rows, sqlite } = fixture({
+      [first]: () => imageResponse(pngBytes(100, 100)),
+      [logo]: () => imageResponse(pngBytes(90, 90))
+    })
+    sqlite.database.exec(`
+      INSERT INTO users(id,name,email,email_verified) VALUES ('user_owner','','o@example.com',1);
+      INSERT INTO listing_revisions
+        (id,listing_id,author_user_id,status,base_checksum,name,description,category_slug,logo_url)
+      VALUES ('${revisionId}','${listingId}','user_owner','pending_review','c','Ops','d','tools',
+        '${first}');
+    `)
+    await operations.hostListingMedia({
+      actor: 'admin@example.com',
+      kind: 'logo',
+      listingId,
+      sortOrder: 0,
+      sourceUrl: logo,
+      workflow: 'app/admin'
+    })
+    const pending = (await operations.hostRevisionMedia({
+      kind: 'logo',
+      revisionId,
+      sortOrder: 0,
+      sourceUrl: first
+    })) as { key: string }
+    expect(pending.key).toMatch(/^best\.serp\.co\/revisions\/rev_swap\//u)
+    // The owner goes back to the listing's own logo: the revision's copy is no longer named.
+    await operations.hostRevisionMedia({ kind: 'logo', revisionId, sortOrder: 0, sourceUrl: logo })
+    expect(bucket.objects.has(pending.key)).toBe(false)
+    expect(rows('SELECT COUNT(*) AS count FROM media_ingestions')).toEqual([{ count: 0 }])
+  })
+})

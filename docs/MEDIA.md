@@ -102,8 +102,9 @@ Where it runs:
 - **Submit v2** (#84): saving a submission hosts its logo under `submissions/<id>/` after the
   response (`hostSubmissionImages` in `apps/web/lib/media/server.ts`), and its featured image:
   the social image the server's own prefill finds on the submitted website, never a URL the
-  client sends. A changed logo replaces the copy. Intake refuses SVG logos and prefill skips SVG
-  icons. Nothing here can fail the save.
+  client sends. A changed logo or image replaces the copy, and the superseded, never-reviewed
+  object is deleted unless a slot still names it (submissions and revisions alike). Intake
+  refuses SVG logos and prefill skips SVG icons. Nothing here can fail the save.
 - **Admin listing edit** (#64): `updateListingDetails` hosts a changed logo before its batch
   (`createMediaHost`). A logo that can never be hosted (SVG, not an image, 404, too large) is
   refused with a 422 that names the reason, and nothing is saved. A retryable failure saves, the
@@ -164,7 +165,7 @@ object locally and writes nothing. The owner then runs, in order:
 1. **Upload Listing Media (staging)** from `staging`, typing `upload-media-best.serp.co-staging`.
    Every object is fetched again and uploaded only if its bytes still match the plan.
 2. **Publish D1 Catalog (staging)** from `staging` with `publish-best.serp.co-staging`, once per
-   manifest, and check staging.
+   manifest (#100's `hijacked-domains` first: its base version is 1), and check staging.
 3. After the `staging` → `main` promotion: **Upload Listing Media** with
    `upload-media-best.serp.co-production`, then **Publish D1 Catalog** with
    `publish-best.serp.co-production` for the same manifests.
@@ -200,9 +201,9 @@ Some listing's logo or images changed on that environment after generation (an a
 approval, or the cron hosting a queued slot). A row-level manifest fits only the rows it was
 generated from, so recovery keeps staging first:
 
-1. Regenerate the plan and manifests from **staging's** current rows (the migration script reads
-   `expected` from them), with **new manifest ids**: an id that already succeeded is refused as
-   "already used by different content". Review the diff.
+1. Regenerate the plan and manifests from **staging's** current rows (`--current`, see
+   [Legacy migration](#legacy-migration)) with **new manifest ids** (`--manifest-id`): an id that
+   already succeeded is refused as "already used by different content". Review the diff.
 2. Upload the new plan to staging and publish the new manifests on staging, then, after the
    promotion, upload and publish them on production.
 
@@ -212,6 +213,60 @@ until its rows match staging's again, and is never repointed without the staging
 
 Agents prepare and review these files; they never run the uploads or publications
 ([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)).
+
+## Legacy migration
+
+`pnpm migration:legacy-media` (`scripts/migration/legacy-media.ts`) resolves every logo and image
+of the catalog into `d1/media/2026-10-06-legacy-media.json` and seven row-level manifests
+`d1/publications/2026-10-06-legacy-media-01…07.yaml` (500 listings each). Every count, the
+refused replacements, and each logo left on the tile are in `d1/media/2026-10-06-legacy-media.report.md`.
+
+- **Sources.** Cloudflare Images (most IDs were never uploaded), raw.githubusercontent.com, the
+  `/media/products` originals on apps.serp.co (#89), the repository's logos, apps.serp.co, serp.ai.
+- **Default assets are missing.** `DEFAULT_ASSETS` lists by SHA-256 the placeholder chevron of
+  387 imported logos, both create-next-app favicons, the create-react-app favicon and React logos,
+  Lovable's default Open Graph image, and the Spaceship and Snagged for-sale icons. They are
+  treated as missing wherever they appear.
+- **Replacements come only from the listing's own page** (owner decisions on #95):
+  - the final page, after redirects and the short link's meta refresh, is on the listing's
+    registrable domain (its website's or its slug's), or is the SERP app's apps.serp.co page; a
+    dead short link that ends on serp.co's catch-all falls back to the slug's domain;
+  - an off-domain page with the same brand is listed as a "likely rebrand"; the owner approves
+    one with a line in `scripts/migration/legacy-media-allowed-domains.json` (`"<slug>":
+    "<domain>"`) or `--allow-domain <slug>=<domain>`, and the next regeneration takes it;
+  - it is not a parking, for-sale, gambling, or spam page (`pageFlags`).
+  - The logo is the site icon, at least 64 px; the featured image is the social image.
+- **Adult listings**, by the Adult category or by an adult platform's name (`ADULT_TERMS`, a
+  backstop), never take another site's Open Graph image: only SERP's curated screenshot from
+  apps.serp.co (serpcompany/store-new). Their site icons are fine. The 14 adult downloaders that
+  lacked the category get it from `2026-10-06-legacy-media-adult-category.yaml`, a separate
+  row-level manifest of `listing-categories-add` (secondary, never primary).
+- **Owner sign-off.** A refused replacement leaves the tile and is listed in the report with its
+  final page and reason; listing content never changes here (#100 covers hijacked listings).
+- `scripts/catalog-media.test.ts` applies the manifests to the import and checks that every logo
+  and image is then a hosted key with a matching object in the plan, and that nothing else
+  changes.
+- After the production publish, delete `apps/web/public/listing-logos/serpdownloaders.com/` and
+  `media/products/launchbuzz.io/` (the fallback tile stays).
+
+Fetches are cached under `.runtime/legacy-media-cache`, through the DNS-checked Node fetcher, so
+a rerun reproduces the outputs byte for byte. `--part-size <n>` sets the listings per manifest,
+and `--manifest-id <id>` names a regeneration. `-- --retry-errors` refetches cached network errors,
+429s, and 5xx answers. `-- --refresh <upload summary JSON>` refetches the source of every object
+the upload reported as failed, whatever the reason (a drifted source usually fails on its byte
+count, before its digest), so those keys follow the new bytes.
+
+To regenerate from an environment's current rows instead of the import (after a refused
+publication), the owner exports them read-only into a directory and passes `-- --current <dir>`.
+Rows already hosted are kept as they are; only the rest is resolved:
+
+```bash
+for table in listings media; do
+  pnpm exec wrangler d1 execute best-serp-co-staging --env staging --remote --json \
+    --config apps/web/wrangler.jsonc \
+    --command "$(pnpm -s migration:legacy-media -- --snapshot-sql "$table")" > "<dir>/$table.json"
+done
+```
 
 ## Owner setup
 

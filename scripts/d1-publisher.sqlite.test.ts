@@ -606,6 +606,61 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
       ).toThrow(/needs basePublicationVersion/u)
     })
 
+    it('adds a secondary category row-level, refusing a listing whose categories changed (#98)', () => {
+      const db = database()
+      db.exec("INSERT INTO categories (id,slug,name,is_active) VALUES (2,'adult','Adult',1)")
+      const manifest = (expected: string[], add: string[]) =>
+        manifestSchema.parse({
+          version: 1,
+          id: 'adult-category',
+          concurrency: 'rows',
+          provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+          operations: [
+            {
+              action: 'listing-categories-add',
+              id: 'lst_sqlite_test',
+              slug: 'old-slug',
+              expected,
+              add
+            }
+          ]
+        })
+      const live = { checksum: beforeChecksum, version: 4 }
+      const publication = buildPublicationPlan(
+        manifest(['seo'], ['adult']),
+        'adult manifest',
+        now,
+        live
+      )
+      executeInTestTransaction(db, publication)
+      expect(
+        db
+          .prepare(
+            `SELECT c.slug, lc.is_primary, lc.sort_order FROM listing_categories lc
+             JOIN categories c ON c.id = lc.category_id WHERE lc.listing_id='lst_sqlite_test'
+             ORDER BY lc.sort_order`
+          )
+          .all()
+      ).toEqual([
+        { is_primary: 1, slug: 'seo', sort_order: 0 },
+        { is_primary: 0, slug: 'adult', sort_order: 1 }
+      ])
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining(['/products/old-slug/', '/products/categories/adult/'])
+      )
+      // The rows no longer match: the same operation is refused, nothing written.
+      expect(() =>
+        executeInTestTransaction(
+          db,
+          buildPublicationPlan(manifest(['seo'], ['adult']), 'adult manifest again', now, {
+            checksum: publication.afterChecksum,
+            version: 5
+          })
+        )
+      ).toThrow()
+      expect(() => manifest(['seo', 'adult'], ['adult'])).toThrow(/already has category adult/u)
+    })
+
     it("refuses another listing's key, a key of the wrong kind, and a forged digest", () => {
       const refused = (operation: Record<string, unknown>) => () =>
         manifestSchema.parse({
