@@ -235,9 +235,11 @@ refused replacements, and each logo left on the tile are in `d1/media/2026-10-06
     "<domain>"`) or `--allow-domain <slug>=<domain>`, and the next regeneration takes it;
   - it is not a parking, for-sale, gambling, or spam page (`pageFlags`).
   - The logo is the site icon, at least 64 px; the featured image is the social image.
-- **Adult listings**, by the Adult category or by an adult platform's name (`ADULT_TERMS`; the
-  report lists those missing the category), never take another site's Open Graph image: only
-  SERP's curated screenshot from apps.serp.co (serpcompany/store-new). Their site icons are fine.
+- **Adult listings**, by the Adult category or by an adult platform's name (`ADULT_TERMS`, a
+  backstop), never take another site's Open Graph image: only SERP's curated screenshot from
+  apps.serp.co (serpcompany/store-new). Their site icons are fine. The 14 adult downloaders that
+  lacked the category get it from `2026-10-06-legacy-media-adult-category.yaml`, a separate
+  row-level manifest of `listing-categories-add` (secondary, never primary).
 - **Owner sign-off.** A refused replacement leaves the tile and is listed in the report with its
   final page and reason; listing content never changes here (#100 covers hijacked listings).
 - `scripts/catalog-media.test.ts` applies the manifests to the import and checks that every logo
