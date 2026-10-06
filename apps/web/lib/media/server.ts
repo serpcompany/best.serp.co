@@ -23,13 +23,17 @@ function log(event: Record<string, unknown>): void {
   console.info(JSON.stringify(event))
 }
 
-/** A source worth trying: a public https URL (http too on a local Worker, for its fixtures). */
+/**
+ * A source worth trying: a public https URL (http too on a local Worker, for its fixtures),
+ * kept exactly as stored, since review and approval match a hosted slot on its source.
+ */
 function hostableSource(value: string | null | undefined, local: boolean): string | null {
-  if (!value) return null
-  const checked = validatePublicHttpUrl(value.trim())
+  const source = value?.trim()
+  if (!source) return null
+  const checked = validatePublicHttpUrl(source)
   if (!checked.ok) return null
   if (checked.url.protocol !== 'https:' && !local) return null
-  return checked.url.toString()
+  return source
 }
 
 async function backgroundMedia(event: string): Promise<{

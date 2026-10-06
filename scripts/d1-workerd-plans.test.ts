@@ -986,7 +986,8 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         content: 'Owner revision',
         description: 'Edited from the account',
         faqs: [],
-        logoUrl: owned?.logoUrl ?? '',
+        // Approval adopted no unhosted logo (#96), so the owner names a new one.
+        logoUrl: 'https://dash.example/revised-logo.png',
         resourceLinks: []
       },
       listingId: 'lst-dash',
@@ -1002,7 +1003,34 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         })
       ])
     )
+    // The revision's new logo is hosted under its own prefix when saved (#96 review round 4).
+    const revisionLogo = {
+      bytes: 512,
+      contentType: 'image/png',
+      height: 128,
+      key: `best.serp.co/revisions/rev-dash/logo/${'9'.repeat(16)}.png`,
+      sha256: '9'.repeat(64),
+      sourceUrl: 'https://dash.example/revised-logo.png',
+      width: 128
+    }
+    await run(
+      M.buildRecordPendingMediaPlans({
+        kind: 'logo',
+        media: revisionLogo,
+        now: NOW,
+        owner: { revisionId: 'rev-dash' },
+        sortOrder: 0
+      })
+    )
     await account.discardRevision({ listingId: 'lst-dash', userId: 'user_owner' })
+    // A withdrawn revision's logo is forgotten.
+    const [withdrawn] = await all<{ id: number; media_key: string | null }>(
+      M.selectFinishedPendingMediaPlan(50)
+    )
+    expect(withdrawn).toMatchObject({ media_key: revisionLogo.key })
+    if (!withdrawn) throw new Error('No finished revision media.')
+    await run(M.buildForgetPendingMediaPlans({ id: withdrawn.id, mediaKey: withdrawn.media_key }))
+    expect(await all(M.selectFinishedPendingMediaPlan(50))).toEqual([])
   })
 
   it('queues, retries, claims, and hosts listing and submission media (#95)', async () => {
