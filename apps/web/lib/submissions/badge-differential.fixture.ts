@@ -367,3 +367,70 @@ export const DIFFERENTIAL_CASES: ReadonlyArray<{
   { chromium: 'ok', html: `<a href="${L}"><form><img src="${B}"></form></a>`, name: 'formInA' },
   { chromium: 'ok', html: `<ul><li><a href="${L}"><li><img src="${B}"></ul>`, name: 'liClosesA' }
 ]
+
+/**
+ * The PR #84 round-3 encoding cases: the badge snippet as ASCII bytes, served with a byte
+ * order mark, a `Content-Type` charset, a `<meta>` declaration, or `Content-Disposition`, and
+ * what Chromium 147 made of each (`document.characterSet`, and whether the badge link was in
+ * its DOM), from the reviewer's harness. Chromium found no link on any but the control, so
+ * the checker must fail them.
+ */
+export const ENCODED_SNIPPET = `<a href="${L}"><img src="${B}"></a>`
+
+export const ENCODING_CASES: ReadonlyArray<{
+  chromium: { characterSet: string; link: boolean }
+  headers: Record<string, string>
+  name: string
+  /** Bytes before the ASCII snippet. */
+  prefix: readonly number[]
+}> = [
+  {
+    chromium: { characterSet: 'UTF-16LE', link: false },
+    headers: { 'Content-Type': 'text/html' },
+    name: 'utf16leBom',
+    prefix: [0xff, 0xfe]
+  },
+  {
+    chromium: { characterSet: 'UTF-16BE', link: false },
+    headers: { 'Content-Type': 'text/html' },
+    name: 'utf16beBom',
+    prefix: [0xfe, 0xff]
+  },
+  {
+    chromium: { characterSet: 'UTF-16LE', link: false },
+    headers: { 'Content-Type': 'text/html; charset=utf-16le' },
+    name: 'utf16leHeader',
+    prefix: []
+  },
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: { 'Content-Type': 'text/html; charset=iso-2022-kr' },
+    name: 'iso2022krHeader',
+    prefix: []
+  },
+  {
+    chromium: { characterSet: 'replacement', link: false },
+    headers: { 'Content-Type': 'text/html' },
+    name: 'iso2022krMeta',
+    prefix: [...'<meta charset="iso-2022-kr">'].map(char => char.charCodeAt(0))
+  },
+  {
+    chromium: { characterSet: 'ISO-2022-JP', link: false },
+    headers: { 'Content-Type': 'text/html' },
+    name: 'iso2022jpMetaEscape',
+    prefix: [...'<meta charset="iso-2022-jp">\u001b$B'].map(char => char.charCodeAt(0))
+  },
+  {
+    // Chromium downloads it instead of showing it.
+    chromium: { characterSet: 'none', link: false },
+    headers: { 'Content-Disposition': 'attachment', 'Content-Type': 'text/html' },
+    name: 'attachment',
+    prefix: []
+  },
+  {
+    chromium: { characterSet: 'UTF-8', link: true },
+    headers: { 'Content-Type': 'text/html' },
+    name: 'utf8Control',
+    prefix: []
+  }
+]

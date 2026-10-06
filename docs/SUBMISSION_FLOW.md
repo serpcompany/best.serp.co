@@ -151,7 +151,10 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    while it runs and through any wait the server asks for, behind its countdown. It then counts
    the fetch against an outbound budget whatever its result (20 an hour per submission, 60 per
    account, and 120 per client address, which accounts behind it share; 429 `check_budget`
-   with `retryAfterSeconds`), fetches the website, and parses it as a browser would
+   with `retryAfterSeconds`), fetches the website, decodes it as a browser would
+   (`html-encoding.ts`: byte order mark, then the `Content-Type` charset, then a `<meta>` in
+   the first 1024 bytes, else UTF-8; a `replacement`-encoded page, or one served as a download
+   with a `Content-Disposition` other than `inline`, fails as `not_html`), and parses it
    (`parse5`, the WHATWG parser, scripting on: comments, raw text such as `script` or
    `noscript`, `template` contents and SVG or MathML content never count, and only an
    element's own attributes do).

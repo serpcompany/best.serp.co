@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { B, DIFFERENTIAL_CASES, L, PAGE } from './badge-differential.fixture'
-import { scanFeaturedBadge } from './badge-verifier'
+import {
+  B,
+  DIFFERENTIAL_CASES,
+  ENCODED_SNIPPET,
+  ENCODING_CASES,
+  L,
+  PAGE
+} from './badge-differential.fixture'
+import { scanFeaturedBadge, verifyFeaturedBadge } from './badge-verifier'
 
 /**
  * The scanner against Chromium's parser on the PR #84 round-2 differential cases. The scanner
@@ -84,6 +91,64 @@ describe('badge scanner against Chromium', () => {
       const item = DIFFERENTIAL_CASES.find(entry => entry.name === name)
       const verdict = scan(item?.html ?? '')
       expect(verdict.ok ? 'ok' : verdict.code, name).toBe(item?.chromium)
+    }
+  })
+})
+
+/**
+ * PR #84 review round 3, finding 1: the checker decodes a page as Chromium does, so a page
+ * whose ASCII snippet a browser reads as other characters (or downloads) never passes.
+ */
+describe('badge checker against Chromium on encodings', () => {
+  const ascii = (text: string) => [...text].map(char => char.charCodeAt(0))
+  const check = (bytes: number[], headers: Record<string, string>) =>
+    verifyFeaturedBadge(
+      'https://example.com/',
+      expected,
+      async () => new Response(new Uint8Array(bytes), { headers, status: 200 })
+    )
+
+  it.each(ENCODING_CASES.map(item => [item.name, item] as const))('%s', async (_name, item) => {
+    const verdict = await check([...item.prefix, ...ascii(ENCODED_SNIPPET)], item.headers)
+    expect(verdict.ok).toBe(item.chromium.link)
+    if (!item.chromium.link) {
+      // Text a browser shows has no badge; a page it can't show or downloads is not HTML.
+      const shown = ['UTF-16LE', 'UTF-16BE', 'ISO-2022-JP'].includes(item.chromium.characterSet)
+      expect(verdict).toEqual({ code: shown ? 'badge_missing' : 'not_html', ok: false })
+    }
+  })
+
+  it('reads honestly encoded badges', async () => {
+    const utf16le = [0xff, 0xfe, ...[...ENCODED_SNIPPET].flatMap(char => [char.charCodeAt(0), 0])]
+    await expect(check(utf16le, { 'Content-Type': 'text/html' })).resolves.toEqual({ ok: true })
+    const utf16be = [...ENCODED_SNIPPET].flatMap(char => [0, char.charCodeAt(0)])
+    await expect(
+      check(utf16be, { 'Content-Type': 'text/html; charset="UTF-16BE"' })
+    ).resolves.toEqual({ ok: true })
+    // Shift_JIS text (「バッジ」) around the badge, declared in a <meta>.
+    const shiftJis = [
+      ...ascii('<meta http-equiv="Content-Type" content="text/html; charset=Shift_JIS">'),
+      0x81,
+      0x75,
+      0x83,
+      0x6f,
+      0x83,
+      0x62,
+      0x83,
+      0x57,
+      0x81,
+      0x76,
+      ...ascii(ENCODED_SNIPPET)
+    ]
+    await expect(check(shiftJis, { 'Content-Type': 'text/html' })).resolves.toEqual({ ok: true })
+    for (const disposition of ['inline', 'inline; filename="badge.html"', 'filename=badge.html']) {
+      await expect(
+        check(ascii(ENCODED_SNIPPET), {
+          'Content-Disposition': disposition,
+          'Content-Type': 'text/html'
+        }),
+        disposition
+      ).resolves.toEqual({ ok: true })
     }
   })
 })

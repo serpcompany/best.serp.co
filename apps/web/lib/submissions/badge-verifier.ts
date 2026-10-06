@@ -1,5 +1,6 @@
 import type { DefaultTreeAdapterMap } from 'parse5'
 import { parseBoundedHtml } from './bounded-html'
+import { decodeHtml } from './html-encoding'
 import { safeFetch } from './safe-fetch'
 
 /**
@@ -18,6 +19,11 @@ import { safeFetch } from './safe-fetch'
  * (finding 2); a page past them fails as `verification_service_error`, which does not use up
  * a check. Relative URLs resolve against the page URL, or the first HTML `<base href>` the
  * parser placed in `<head>`.
+ *
+ * The page is decoded as a browser decodes it (`./html-encoding.ts`: byte order mark, then the
+ * `Content-Type` charset, then a `<meta>` declaration, then UTF-8), and a page a browser
+ * would download (`Content-Disposition` other than `inline`) or can't show (the
+ * `replacement` encoding) fails as `not_html` (PR #84 review round 3, finding 1).
  *
  * Only the static HTML is read: a badge added by JavaScript fails, and a badge hidden with CSS
  * (`display:none`) passes, because detecting it would need rendering. That is accepted.
@@ -259,6 +265,16 @@ export function scanFeaturedBadge(
   return { ok: false, code: 'badge_missing' }
 }
 
+/**
+ * True when a browser would download the response instead of showing it: a
+ * `Content-Disposition` whose type is a token other than `inline` (Chromium treats an unknown
+ * type as `attachment`, and a header that starts with a parameter as `inline`).
+ */
+export function isDownload(contentDisposition: string | null | undefined): boolean {
+  const type = (contentDisposition ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
+  return /^[!#$%&'*+.^_`|~0-9a-z-]+$/u.test(type) && type !== 'inline'
+}
+
 export async function verifyFeaturedBadge(
   website: string,
   expected: BadgeTargets,
@@ -275,9 +291,12 @@ export async function verifyFeaturedBadge(
     if (page.code === 'read_failed') return { ok: false, code: 'verification_service_error' }
     return { ok: false, code: page.code }
   }
+  if (isDownload(page.headers.get('content-disposition'))) return { ok: false, code: 'not_html' }
+  const decoded = decodeHtml(page.body, page.headers.get('content-type'))
+  if (!decoded) return { ok: false, code: 'not_html' }
   let result: ScanResult
   try {
-    result = scanFeaturedBadge(new TextDecoder().decode(page.body), expected, page.url)
+    result = scanFeaturedBadge(decoded.html, expected, page.url)
   } catch {
     return { ok: false, code: 'verification_service_error' }
   }
