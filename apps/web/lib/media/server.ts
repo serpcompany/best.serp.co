@@ -2,15 +2,74 @@ import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { MediaOperations } from '@serpdirectory/data-ops/media-operations'
+import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
 import { createWorkerMediaOperations } from './worker-media'
 
 /**
- * Listing media for route handlers (serpcompany/best.serp.co#95). Submit v2 (#84) calls
- * `hostSubmissionMedia` when a submission names its logo or social image; the admin listing
- * editor (#85) calls `hostListingMedia` when an admin changes one, and reads `submissionMedia`
- * / `listingMediaQueue` to show failures on the review screen.
+ * Listing media for route handlers (serpcompany/best.serp.co#95). Submit v2 (#84) hosts a
+ * saved submission's logo and social image under `best.serp.co/submissions/<id>/` through
+ * `hostSubmissionImages`; approval later copies them into the listing's path. The admin
+ * listing editor hosts a changed logo through `createMediaHost` (`worker-media.ts`).
  */
 export async function mediaOperations(): Promise<MediaOperations> {
   const { env } = await getCloudflareContext({ async: true })
   return createWorkerMediaOperations(env as CloudflareEnv)
+}
+
+function log(event: Record<string, unknown>): void {
+  console.info(JSON.stringify(event))
+}
+
+/** A source worth trying: a public https URL (http too on a local Worker, for its fixtures). */
+function hostableSource(value: string | null | undefined, local: boolean): string | null {
+  if (!value) return null
+  const checked = validatePublicHttpUrl(value.trim())
+  if (!checked.ok) return null
+  if (checked.url.protocol !== 'https:' && !local) return null
+  return checked.url.toString()
+}
+
+/**
+ * Copies a saved submission's logo and social image into the media bucket after the response
+ * (`waitUntil`), under the submission's own prefix. Never fails the save: a slot that cannot be
+ * hosted now is recorded and retried by the media cron (or fails with its reason, which the
+ * reviewer sees). Without a `MEDIA` binding it logs and does nothing.
+ */
+export async function hostSubmissionImages(input: {
+  logoUrl?: string | null
+  socialImageUrl?: string | null
+  submissionId: string
+}): Promise<void> {
+  const { ctx, env } = await getCloudflareContext({ async: true })
+  const workerEnv = env as CloudflareEnv
+  const local = workerEnv.D1_RUNTIME_ENV === 'local' && workerEnv.SITE_ENVIRONMENT === 'local'
+  let operations: MediaOperations
+  try {
+    operations = createWorkerMediaOperations(workerEnv)
+  } catch (error) {
+    log({
+      event: 'submission_media_disabled',
+      message: error instanceof Error ? error.message : String(error)
+    })
+    return
+  }
+  const slots = [
+    { kind: 'logo' as const, sourceUrl: hostableSource(input.logoUrl, local) },
+    { kind: 'image' as const, sourceUrl: hostableSource(input.socialImageUrl, local) }
+  ]
+  for (const slot of slots) {
+    if (!slot.sourceUrl) continue
+    const { kind, sourceUrl } = slot
+    ctx.waitUntil(
+      operations
+        .hostSubmissionMedia({ kind, sortOrder: 0, sourceUrl, submissionId: input.submissionId })
+        .catch(error => {
+          log({
+            event: 'submission_media_error',
+            kind,
+            message: error instanceof Error ? error.message : String(error)
+          })
+        })
+    )
+  }
 }

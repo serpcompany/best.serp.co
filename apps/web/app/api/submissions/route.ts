@@ -1,4 +1,5 @@
 import { authorizeUserRequest } from '@/lib/auth/server'
+import { hostSubmissionImages } from '@/lib/media/server'
 import {
   fieldErrors,
   LOGO_MESSAGES,
@@ -59,7 +60,14 @@ export async function POST(request: Request) {
         fields: { logoUrl: LOGO_MESSAGES[logo.code] }
       })
     }
-    const draft = await createDraft(owner, parsed.data)
+    const { socialImageUrl, ...draftInput } = parsed.data
+    const draft = await createDraft(owner, draftInput)
+    // Copied to the media host under the submission after the response (#95); never fails the save.
+    await hostSubmissionImages({
+      logoUrl: draft.logoUrl,
+      socialImageUrl,
+      submissionId: draft.id
+    }).catch(() => undefined)
     return json({ next: `/submit/${draft.id}/choose/?saved=1`, submission: toSummary(draft) }, 201)
   } catch (error) {
     return submissionFailure(error, 'Unable to save the draft.')

@@ -132,7 +132,7 @@ const FIELD_ORDER: SubmissionField[] = [
   'content'
 ]
 
-const LOGO_SPEC = 'PNG, JPG, SVG or WebP, at least 128 × 128 px, up to 1 MB'
+const LOGO_SPEC = 'PNG, JPG or WebP, at least 128 × 128 px, up to 1 MB'
 const SIGN_IN_PATH = `/login/?callbackUrl=${encodeURIComponent('/submit/')}`
 
 function sourceTag(source: string | undefined): string | null {
@@ -430,7 +430,12 @@ export function SubmitForm({
           ...fields,
           expectedContentVersion: editing.contentVersion
         })
-      : await createDraft({ ...fields, website: normalizeWebsiteInput(website) })
+      : await createDraft({
+          ...fields,
+          // Hosted as the submission's featured image (#95); only what prefill found.
+          socialImageUrl: socialImage,
+          website: normalizeWebsiteInput(website)
+        })
     if (response.ok) {
       saved.current = true
       if (!editing) clearLocalDraft(signedInUserId)
