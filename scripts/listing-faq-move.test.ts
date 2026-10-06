@@ -111,7 +111,7 @@ describe('the committed FAQ manifest', () => {
             })
           : undefined
       const plan = buildPublicationPlan(parsed, text, '2026-10-06T00:00:00.000Z', live)
-      database.exec('DROP TABLE IF EXISTS publication_guard; BEGIN')
+      database.exec('BEGIN')
       for (const item of plan.statements) {
         assertD1StatementLimits(item.query, item.bindings)
         database

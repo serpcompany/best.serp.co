@@ -49,6 +49,18 @@ export async function getR2Object(
   return body
 }
 
+/**
+ * A fetch failure with its cause: Node's fetch throws `TypeError: fetch failed` and keeps the
+ * reason (`UND_ERR_*`, `ECONNRESET`, `ENOTFOUND`, ...) in `cause`, which a summary must show.
+ */
+export function describeFetchError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error)
+  const cause = (error as Error & { cause?: unknown }).cause
+  if (!(cause instanceof Error)) return error.message
+  const code = (cause as Error & { code?: unknown }).code
+  return `${error.message}: ${typeof code === 'string' ? `${code} ` : ''}${cause.message}`
+}
+
 /** Writes one object with its type and the immutable cache policy; null on success. */
 export async function putR2Object(
   object: { bytes: number; contentType: string; key: string },
@@ -65,7 +77,9 @@ export async function putR2Object(
     headers: {
       Authorization: `Bearer ${apiToken}`,
       'Cache-Control': cacheControl,
-      'Content-Length': String(object.bytes),
+      // No Content-Length: fetch sets it from the body, and undici refuses one set by hand
+      // ("invalid content-length header", thrown as `fetch failed`), which failed every object
+      // of Upload Listing Media (staging) run 37471183304.
       'Content-Type': object.contentType
     },
     method: 'PUT',

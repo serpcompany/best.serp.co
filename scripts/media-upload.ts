@@ -16,7 +16,7 @@ import { safeFetch } from '@serpdirectory/data-ops/safe-fetch'
 import { nodeFetch } from '@serpdirectory/data-ops/safe-fetch-node'
 import { z } from 'zod'
 import { project } from './project'
-import { getR2Object, putR2Object } from './r2-objects'
+import { describeFetchError, getR2Object, putR2Object } from './r2-objects'
 
 /**
  * Uploads a reviewed listing media plan (`d1/media/<id>.json`, serpcompany/best.serp.co#95) into
@@ -270,7 +270,7 @@ export async function uploadMediaPlan(
       try {
         outcomes.push(await handle(object))
       } catch (error) {
-        const reason = error instanceof Error ? error.message.slice(0, 200) : 'error'
+        const reason = describeFetchError(error).slice(0, 200)
         outcomes.push({ key: object.key, reason, status: 'failed' })
       }
     }
