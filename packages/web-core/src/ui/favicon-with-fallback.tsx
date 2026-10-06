@@ -16,7 +16,7 @@ interface FaviconWithFallbackProps {
 }
 
 /**
- * Displays a listing logo with a checked-in SERP fallback for missing or weak assets.
+ * Displays a listing logo with a checked-in neutral "no logo" tile for missing or weak assets.
  * @param props - The component props
  * @returns React component that handles favicon loading and errors
  */

@@ -182,6 +182,13 @@ extensions (`chart.js`), and a test checks the committed import.
   noindex `*.workers.dev` hosts. This is deliberate: the e2e suite and the HTTP gates then
   verify on staging exactly the URLs production publishes, and those hosts are never
   indexed.
+- **Listing images.** A listing without a usable logo renders the checked-in "no logo" tile
+  `apps/web/public/listing-logos/favicon-fallback-512x512.png` (source and render notes in
+  `scripts/assets/listing-logo-fallback.svg`). The tile is UI only: listing JSON-LD names
+  the listing's own logo as `primaryImageOfPage` and omits the property when there is none,
+  rather than give every logo-less listing the same image or the SERP logo
+  (`packages/web-core/src/schema.ts`). `apps/e2e/tests/listing-logo-assets.spec.ts` checks
+  that the Worker serves the tile and that sample pages reference no missing same-origin file.
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other
   host serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)).
   The index lists the URL-set files
