@@ -1,0 +1,486 @@
+# serpcompany/best.serp.co#95, part 1 of 1: repoint listing logos and images to
+# hosted copies (scripts/migration/legacy-media.ts). Upload d1/media/2026-10-07-legacy-media-rebrands.json to the
+# environment first: the publisher refuses keys its bucket does not hold. Each part checks its
+# listings' rows, not a base version, so the parts apply in any order, staging first.
+version: 1
+id: 2026-10-07-legacy-media-rebrands-01
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-media-update
+    id: lst_72bccfc04c64acf8a148306f
+    slug: bloks.app
+    expected: []
+    media:
+      logo:
+        bytes: 1865
+        contentType: image/avif
+        height: 192
+        key: best.serp.co/listings/bloks.app/logo/3fbc654f24adc1e2.avif
+        sha256: 3fbc654f24adc1e2cdf04a2df6eab5ab66d95682c70d6a36dd6f79c8a8e266fc
+        source: https://framerusercontent.com/images/SjnqbfYyRmARE9qH1amnjEe1A.png
+        width: 192
+      images:
+        - bytes: 31276
+          contentType: image/avif
+          height: 630
+          key: best.serp.co/listings/bloks.app/image/2a2c093db53fefce.avif
+          sha256: 2a2c093db53fefce9615ce1a0f268baa99f854d5817b3e96427572e542d33d92
+          source: https://framerusercontent.com/images/teNx3Vhgx863cInoR6s3J506bQ.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_ce4cb6e8bc05d1b3dd88dafc
+    slug: buzzli.in
+    expected: []
+    media:
+      logo:
+        bytes: 4533
+        contentType: image/x-icon
+        height: 256
+        key: best.serp.co/listings/buzzli.in/logo/c285ecb333ae53cb.ico
+        sha256: c285ecb333ae53cb8802ce5fe42f7de4dd45f6ea7e278aebce5eaa16b73c5ed9
+        source: https://buzzli.io/favicon.ico
+        width: 256
+      images:
+        - bytes: 147298
+          contentType: image/jpeg
+          height: 855
+          key: best.serp.co/listings/buzzli.in/image/23710496e58a6350.jpg
+          sha256: 23710496e58a63501d94237759b4571ad37a3b1b4a33ee9cc8c211dc31b71b45
+          source: https://buzzli.io/lovable-uploads/ca6831a8-c10e-48d4-baa5-177f72e6a772.png
+          width: 1602
+  - action: listing-media-update
+    id: lst_09278e43d6a3ec01d5abf19c
+    slug: fibery.io
+    expected: []
+    media:
+      logo:
+        bytes: 4237
+        contentType: image/png
+        height: 120
+        key: best.serp.co/listings/fibery.io/logo/a9e19faf03b92746.png
+        sha256: a9e19faf03b92746f78c34b7969c442b5aa6ae685ba85f1852d284492250e60a
+        source: https://fibery.com/favicon.png
+        width: 120
+      images:
+        - bytes: 917257
+          contentType: image/png
+          height: 1260
+          key: best.serp.co/listings/fibery.io/image/96d1b1c0981ccb3e.png
+          sha256: 96d1b1c0981ccb3eba17492a338ea46df6f2ab1cf38602b3434db70b2602b791
+          source: https://images-temp.fibery.io/website-static/sharing/fibery-main-share.png
+          width: 2400
+  - action: listing-media-update
+    id: lst_fc890dfd4c7efbc0fcacb4bb
+    slug: gerwin.io
+    expected: []
+    media:
+      images:
+        - bytes: 1179417
+          contentType: image/png
+          height: 2046
+          key: best.serp.co/listings/gerwin.io/image/f9fbb3465f07a827.png
+          sha256: f9fbb3465f07a827e238aab1c4aedf7520f0d97da748a400268ac211f94124a9
+          source: https://b46be1c1bb76-website.s3.ru1.storage.beget.cloud/media/landing/beta-v3/hero-poster/f9fbb3465f07a827/original.png
+          width: 3580
+  - action: listing-media-update
+    id: lst_592c70a595cc6b027928f68a
+    slug: getvoiceline.com
+    expected: []
+    media:
+      logo:
+        bytes: 1086
+        contentType: image/avif
+        height: 180
+        key: best.serp.co/listings/getvoiceline.com/logo/b98e514da7104925.avif
+        sha256: b98e514da710492562c7a83010dcaa9a5649aa27ca1e9059e52aeaba43bf199c
+        source: https://framerusercontent.com/images/25MfMUKiVqqXOMmCD33HkTdVAY.png
+        width: 180
+      images:
+        - bytes: 59914
+          contentType: image/webp
+          height: 631
+          key: best.serp.co/listings/getvoiceline.com/image/049b76c041373e8c.webp
+          sha256: 049b76c041373e8c0fd8a14b9b074b7354c0ce5b5b708c630e2fc1c1d15f610d
+          source: https://framerusercontent.com/images/EZbgpRHE86bHfECZfin6OpcOu3I.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_04c885ac61283075b47e7bd8
+    slug: headlessui.dev
+    expected: []
+    media:
+      logo:
+        bytes: 30873
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/headlessui.dev/logo/4d4590de53e3cf92.png
+        sha256: 4d4590de53e3cf92942e40ee2927475c0a15467b5593795e02559f96fceca3c3
+        source: https://headlessui.com/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 352217
+          contentType: image/jpeg
+          height: 768
+          key: best.serp.co/listings/headlessui.dev/image/65e90fe52bba717d.jpg
+          sha256: 65e90fe52bba717d9961e71006a5365d27a0055ab63a907befcb2a1347f64892
+          source: https://headlessui.com/_next/static/media/social-card.46834755.jpg
+          width: 1536
+  - action: listing-media-update
+    id: lst_8888a722aec6e36276ba79d9
+    slug: hebbia.ai
+    expected: []
+    media:
+      logo:
+        bytes: 2101
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/hebbia.ai/logo/d4a59b9683d0469b.png
+        sha256: d4a59b9683d0469b64ad5e46ee3bfe15a4ac42455ea0b202bbd8881e401644ab
+        source: https://www.hebbia.com/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 585167
+          contentType: image/jpeg
+          height: 1260
+          key: best.serp.co/listings/hebbia.ai/image/e7251c064ae7c8e4.jpg
+          sha256: e7251c064ae7c8e469c3dda5cccf6829a06746935f65281755c87f0fbb84275c
+          source: https://www.hebbia.com/static/img/og-fallback.jpg?w=1200&h=628&fit=fill&q=80&fm=jpg&fl=progressive
+          width: 2400
+  - action: listing-media-update
+    id: lst_8fc64c1da93c227304ea3a0a
+    slug: hubble.team
+    expected: []
+    media:
+      logo:
+        bytes: 2722
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/hubble.team/logo/cd4584bb9f50ca91.png
+        sha256: cd4584bb9f50ca916431116b19b131a60e1a7a77094dd6685e706a8668916c30
+        source: https://cdn.prod.website-files.com/631a5987aadcff05694aeeac/6324ef8866a22da16471fa86_256.png
+        width: 256
+      images:
+        - bytes: 58110
+          contentType: image/png
+          height: 437
+          key: best.serp.co/listings/hubble.team/image/c13a45d5bb8af999.png
+          sha256: c13a45d5bb8af9997dcba614385987f5e73bba1fbd3a6db9715dfacfe1c34382
+          source: https://cdn.prod.website-files.com/631a5987aadcff05694aeeac/6a4acdae0b17a51efec57a0b_Frame%206314628.png
+          width: 640
+  - action: listing-media-update
+    id: lst_125869b72bec8380b6e03430
+    slug: lambdalabs.com
+    expected: []
+    media:
+      logo:
+        bytes: 904
+        contentType: image/webp
+        height: 180
+        key: best.serp.co/listings/lambdalabs.com/logo/4d104dd27ad8154a.webp
+        sha256: 4d104dd27ad8154ad92352613f02179bfb8f6d349ef2bc70f01f596615203e8d
+        source: https://lambda.ai/hubfs/raw_assets/33/public/@projects/Lambda%20Marketing%20Website/lambda-theme/assets/static/img/apple-touch-icon-180x180.png
+        width: 180
+      images:
+        - bytes: 63838
+          contentType: image/webp
+          height: 630
+          key: best.serp.co/listings/lambdalabs.com/image/05b00243897ff797.webp
+          sha256: 05b00243897ff7975d3b2dcadcb83f8768155a57046363ac09b4ca353496aa31
+          source: https://lambda.ai/hubfs/OPENGRAPH%20-%20Main-1.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_fba8f8c4b45e258bb7536c19
+    slug: livekit.io
+    expected: []
+    media:
+      logo:
+        bytes: 11722
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/livekit.io/logo/84303057c0418291.png
+        sha256: 84303057c04182915e5465adeaac5b89df5d38fc1693a4ea724fb4b08f7acafe
+        source: https://livekit.com/images/livekit-apple-touch.png
+        width: 180
+      images:
+        - bytes: 246307
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/livekit.io/image/0c8e0b796a5279d8.png
+          sha256: 0c8e0b796a5279d816b128540344657840a362e9006e1969d41e5442fc49dea6
+          source: https://livekit.com/blog/content/images/2023/04/kitt-social-1.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_37a131285dafa5df7b445d1f
+    slug: monarchmoney.com
+    expected: []
+    media:
+      logo:
+        bytes: 34021
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/monarchmoney.com/logo/e85cda4b93663dd1.png
+        sha256: e85cda4b93663dd12b200821d57cfb4704198fc8a85a07af760380736511e365
+        source: https://www.monarch.com/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 21512
+          contentType: image/avif
+          height: 627
+          key: best.serp.co/listings/monarchmoney.com/image/bc9eb007a715cad4.avif
+          sha256: bc9eb007a715cad4251729f93dac68edc5db291496ffcec8cbb55a618464865c
+          source: https://cdn.sanity.io/images/mdewiujj/production/42e4e4b2c48f8120fd3102146cfb6cd334b3fd8a-1200x630.jpg?rect=0,2,1200,627&w=1200&h=627&fit=crop&auto=format
+          width: 1200
+  - action: listing-media-update
+    id: lst_4b1393df1ad560e42c9b76e6
+    slug: notion.ai
+    expected: []
+    media:
+      logo:
+        bytes: 8078
+        contentType: image/png
+        height: 512
+        key: best.serp.co/listings/notion.ai/logo/483846a85e43e228.png
+        sha256: 483846a85e43e22879445047b83b22033e70fcc25ab34809ebadb7f856507ee0
+        source: https://www.notion.com/front-static/logo-ios.png
+        width: 512
+      images:
+        - bytes: 170752
+          contentType: image/png
+          height: 635
+          key: best.serp.co/listings/notion.ai/image/619aa80ce6ded905.png
+          sha256: 619aa80ce6ded905528d185ce03d13fcba86575252be50f233a51b5486e2531b
+          source: https://www.notion.com/front-static/meta/global-evergreen-01.png
+          width: 1220
+  - action: listing-media-update
+    id: lst_aa017d8d4d0eb6fbf392edf1
+    slug: peppercontent.io
+    expected: []
+    media:
+      logo:
+        bytes: 7882
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/peppercontent.io/logo/235edd57f33177f5.png
+        sha256: 235edd57f33177f55aa3705c837530c2ed42c8dcfbacc65300d2b68a45eb646a
+        source: https://www.pepper.inc/apple-touch-icon.png
+        width: 180
+      images:
+        - bytes: 240331
+          contentType: image/jpeg
+          height: 630
+          key: best.serp.co/listings/peppercontent.io/image/3996a597d1b18031.jpg
+          sha256: 3996a597d1b1803129ff3a8126888406120480ca415f57535cd4eefbed742052
+          source: https://www.pepper.inc/assets/homePage/images/pepper-og.jpeg
+          width: 1200
+  - action: listing-media-update
+    id: lst_7002bcbc9a912bb93eed1755
+    slug: playtext.app
+    expected: []
+    media:
+      logo:
+        bytes: 1891
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/playtext.app/logo/7800ff61fcda3f47.png
+        sha256: 7800ff61fcda3f47b7f2ddf43ca799f197e5ec966b5e37e2f4f9173a5cb7c7fb
+        source: https://www.playtext.com/favicon/android-icon-192x192.png
+        width: 192
+      images:
+        - bytes: 4321
+          contentType: image/png
+          height: 512
+          key: best.serp.co/listings/playtext.app/image/df696c771eaf474a.png
+          sha256: df696c771eaf474ae6b56fff8b8a5cdccfb6c9ecf982f8bee9c5b91651cf2a5b
+          source: https://www.playtext.com/logo.png
+          width: 512
+  - action: listing-media-update
+    id: lst_f38b0ca931f1b49abbd846be
+    slug: rapidscale.net
+    expected: []
+    media:
+      logo:
+        bytes: 16890
+        contentType: image/webp
+        height: 1050
+        key: best.serp.co/listings/rapidscale.net/logo/babe864f228ef5a2.webp
+        sha256: babe864f228ef5a2e0c1926c3bf76a503d7cab9c9420c510dbb44636bff029ac
+        source: https://rapidscale.com/hubfs/Screenshot%202024-01-12%20at%202.54.56%20PM.png
+        width: 1038
+      images:
+        - bytes: 30038
+          contentType: image/webp
+          height: 630
+          key: best.serp.co/listings/rapidscale.net/image/d4ccb5f296732231.webp
+          sha256: d4ccb5f2967322319a58a9f5d9a4c671297a49120adbf761f0ec30cbfe6c0482
+          source: https://rapidscale.com/hubfs/1%20-%20website-2026/images/images%20general/URL_preview_standard.webp
+          width: 1200
+  - action: listing-media-update
+    id: lst_adc3b807e1a4757c617731cf
+    slug: replicant.ai
+    expected: []
+    media:
+      logo:
+        bytes: 10276
+        contentType: image/png
+        height: 512
+        key: best.serp.co/listings/replicant.ai/logo/255a88f3be9d5e68.png
+        sha256: 255a88f3be9d5e68064551a8764548df0a195b0940b204b03f3484ab8cb8208a
+        source: https://cdn.prod.website-files.com/6a861551c2053660d65d2208/6aa0960ef621f3422c2aa9fc_Webclip.png
+        width: 512
+      images:
+        - bytes: 1520110
+          contentType: image/png
+          height: 1260
+          key: best.serp.co/listings/replicant.ai/image/e71d49e4f8bb0aac.png
+          sha256: e71d49e4f8bb0aaca278bf8618fa097f0400ede12f494d0b8dcb2122ca7c9e58
+          source: https://cdn.prod.website-files.com/6a861551c2053660d65d2208/6ac3cfaa0047f522b9f10a37_replicant-home-opengraph.png
+          width: 2400
+  - action: listing-media-update
+    id: lst_00700d96f8d85e30213dc9ef
+    slug: riverside.fm
+    expected: []
+    media:
+      logo:
+        bytes: 8908
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/riverside.fm/logo/9dfe43ecfec98613.png
+        sha256: 9dfe43ecfec98613587108cf9af176d6f32ee354145b4b2b1e6bc80b89772aa0
+        source: https://cdn.prod.website-files.com/685be7dcd32275d3830651d3/685be7dcd32275d383065e48_RS_favicon.png
+        width: 256
+      images:
+        - bytes: 261359
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/riverside.fm/image/d2cbede2c8980b09.png
+          sha256: d2cbede2c8980b0936fcf4c804f25e574905fb093e0be297862da77ab32f696e
+          source: https://cdn.prod.website-files.com/685be7dcd32275d3830651d3/6a7c495ae57069880eb7e25b_og-image.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_86235ed58f16a48ccf93e016
+    slug: runway.ml
+    expected: []
+    media:
+      logo:
+        bytes: 4846
+        contentType: image/png
+        height: 320
+        key: best.serp.co/listings/runway.ml/logo/f545e0e706d0c6be.png
+        sha256: f545e0e706d0c6be0e8602a8e8d685d4f43ab72880bd5e6a234916e765ff2b70
+        source: https://runway.com/icon.png?icon.35ps9bmugbe1e.png
+        width: 320
+      images:
+        - bytes: 27308
+          contentType: image/webp
+          height: 630
+          key: best.serp.co/listings/runway.ml/image/8963cc83c7798479.webp
+          sha256: 8963cc83c77984797077d8067671a53d1a58db546faaef1d1acfd5f49d96df53
+          source: https://d3phaj0sisr2ct.cloudfront.net/site/assets/homepage-og-card-v3.webp
+          width: 1200
+  - action: listing-media-update
+    id: lst_717610716b6f5d002e715c69
+    slug: scribehow.com
+    expected: []
+    media:
+      logo:
+        bytes: 47040
+        contentType: image/png
+        height: 512
+        key: best.serp.co/listings/scribehow.com/logo/b98d0c7c4a719ef5.png
+        sha256: b98d0c7c4a719ef54f83be577a13031829f53b6c6a50e296f5d3d3c8681893d3
+        source: https://cdn.prod.website-files.com/6a0c94b351f88b926e7c69db/6a34111a3401be1be75d3060_favicon.png
+        width: 512
+      images:
+        - bytes: 137798
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/scribehow.com/image/5bb07c175ed9f631.png
+          sha256: 5bb07c175ed9f631fa87fc01ad6536ba5dffd9ceb938b9a61ee2af0b6d32f676
+          source: https://cdn.prod.website-files.com/6a0c94b351f88b926e7c69db/6a31950a9cec0ea91a93a396_Homepage.png
+          width: 1200
+  - action: listing-media-update
+    id: lst_6f12137a460c02055f08dd9a
+    slug: stack-ai.com
+    expected: []
+    media:
+      logo:
+        bytes: 2219
+        contentType: image/avif
+        height: 256
+        key: best.serp.co/listings/stack-ai.com/logo/268eef4a99831ac5.avif
+        sha256: 268eef4a99831ac531026d8f831f1ab8e93c22961a704b57866cd172bcf9c99b
+        source: https://framerusercontent.com/images/V6q3uNO6whySwl1EXE4Yv0Krf8.png
+        width: 256
+      images:
+        - bytes: 89482
+          contentType: image/avif
+          height: 1260
+          key: best.serp.co/listings/stack-ai.com/image/3941c14bc32a5d02.avif
+          sha256: 3941c14bc32a5d02dc2fbe848198b1cdb743596ff102eb31faf2d863e1ec30b6
+          source: https://framerusercontent.com/images/URFWRwFFnfMongXgt62be3qCgA.png
+          width: 2560
+  - action: listing-media-update
+    id: lst_07bc2165413fbae535846dcb
+    slug: timelyapp.com
+    expected: []
+    media:
+      logo:
+        bytes: 1891
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/timelyapp.com/logo/faccb8af8f6d04e6.png
+        sha256: faccb8af8f6d04e6c5f50349bfef597362d4c9c6e43eeffd00891786dc50de0c
+        source: https://www.timely.com/apple-touch-icon.png?v=2
+        width: 180
+      images:
+        - bytes: 41161
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/timelyapp.com/image/021599f5bfce521d.png
+          sha256: 021599f5bfce521dbe9ea3e4b4f46b825c5b40207d4c29ba7a9f322363f4cfea
+          source: https://www.timely.com/cdn/665734560acfe09755fa0223_opne.png
+          width: 1280
+  - action: listing-media-update
+    id: lst_b9856976c3c0384d249226a7
+    slug: topaz.ai
+    expected: []
+    media:
+      logo:
+        bytes: 1066
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/topaz.ai/logo/3581778748092b97.png
+        sha256: 3581778748092b978d1946f28b55a8a7a1a09bb21e5da4c6ee3356f9e65dc08c
+        source: https://cdn.prod.website-files.com/6005fac27a49a9cd477afb63/66207d48d19641ced6ae4796_tnb-favicon-256.png
+        width: 256
+      images:
+        - bytes: 99666
+          contentType: image/jpeg
+          height: 1260
+          key: best.serp.co/listings/topaz.ai/image/32c8cb05aea0554e.jpg
+          sha256: 32c8cb05aea0554e8606af6318272cdc64eee870e0cf6e322f7f5d486e400ff7
+          source: https://cdn.prod.website-files.com/6005fac27a49a9cd477afb63/68ca92ea67ef60d728ed80d0_opengraph-topazlabs-r.jpg
+          width: 2400
+  - action: listing-media-update
+    id: lst_a0e0a2f9600893ed402e20c2
+    slug: usesuperflow.com
+    expected: []
+    media:
+      logo:
+        bytes: 8584
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/usesuperflow.com/logo/12ed9082a7518924.png
+        sha256: 12ed9082a7518924b833446a7f155fc9bca94ef5e5508539acd994e97e689f85
+        source: https://usesuperflow.ai/apple-icon.png?apple-icon.021d4t44_90t6.png?dpl=dpl_DbX2cQdPVvYw6CSGkVT7t6DxADny
+        width: 180
+      images:
+        - bytes: 456685
+          contentType: image/png
+          height: 630
+          key: best.serp.co/listings/usesuperflow.com/image/d3ed90a414f1441f.png
+          sha256: d3ed90a414f1441f186251c9b5f8cb34a081969ec90748699670debc63a75aef
+          source: https://usesuperflow.ai/opengraph-image.png
+          width: 1200
