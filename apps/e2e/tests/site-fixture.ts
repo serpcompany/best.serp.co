@@ -12,10 +12,11 @@ export const site = {
    */
   listingCount: 3422,
   /**
-   * The fewest live listings a deployed environment may show: the import less #100's 95
-   * unpublishes, less headroom for admin unpublishes. A lost catalog still fails.
+   * The fewest live listings a deployed environment may show: the import less #100's 95 and
+   * #148's 244 unpublishes (2,962 live on 2026-10-07), less headroom for admin unpublishes.
+   * A lost catalog still fails.
    */
-  minimumDeployedListingCount: 3200,
+  minimumDeployedListingCount: 2800,
   name: 'SERP',
   publicUrl: 'https://best.serp.co',
   title: 'SERP Directory of Products and Resources'
