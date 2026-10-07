@@ -1,0 +1,1234 @@
+# serpcompany/best.serp.co#104: the owner's cleanup of the #100 owner list (decision of 2026-10-07: remove
+# the providers that are gone or trash). Each entry is unpublished by
+# d1/publications/2026-10-07-owner-list-cleanup.yaml (`pnpm catalog:domains -- decisions-manifest`).
+#   gone:  unreachable on 2026-10-06 and again on 2026-10-07 (link), with the product's homepage failing too,
+#          checked with the domain check's fetcher and with curl as a browser.
+#   trash: the link and the listing's own domain land on something other than the listed product (another
+#          company or a personal site, a casino or piracy page, a for-sale page, a discontinued product), or
+#          the homepage itself is a casino, a default server page, or for sale.
+# Kept on the owner list: rebrands and acquisitions that still offer the product, broken links whose own
+# domain still serves the product (the link needs fixing), bot protection, and latitude.so (owner's call).
+decidedAt: '2026-10-07'
+evidence:
+- d1/hygiene/2026-10-06-listing-domains.yaml
+unpublish:
+- slug: autoslide.ai
+  id: lst_7b1a45c0619fb97c7c304e7e
+  website: https://serp.ly/autoslide
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage autoslide.ai HTTP 503 (curl: HTTP 503)'
+- slug: avanz.ai
+  id: lst_acfb4bdefeb78908ee851cce
+  website: https://serp.ly/avanzai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage avanz.ai HTTP 404 (curl: HTTP 404)'
+- slug: avatarize.club
+  id: lst_47f858aa9db42c693c80275d
+  website: https://serp.ly/proface
+  class: trash
+  reason: the homepage is now an Australian casino site
+- slug: babbl.dev
+  id: lst_9acb5ffb4584099383f51123
+  website: https://serp.ly/babbl-ai
+  class: trash
+  reason: 'not the listed product: the link lands on www.babbl-labs.com (Babbl Labs: Launch Your Next YouTube Creator Program Today); its own domain on www.babbl-labs.com (Babbl Labs: Launch Your Next YouTube Creator Program Today)'
+- slug: babble-ai.com
+  id: lst_0583310ad20a39ca29071981
+  website: https://serp.ly/babble
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage babble-ai.com ABORT_ERR (curl: no response)'
+- slug: banterai.business
+  id: lst_b37f8e7f660409b59c4cad74
+  website: https://serp.ly/banterai
+  class: trash
+  reason: 'not the listed product: the link lands on www.0-holdings.com (0 Holdings); its own domain on sportscentre.org.nz (Instant Payout Pokies Australia 2026: Fast Cashouts, PayID a)'
+- slug: baseplate.ai
+  id: lst_c55f2d9870d1d0ea046e1e05
+  website: https://serp.ly/baseplate
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_525; 2026-10-07 link http_525, homepage baseplate.ai HTTP 525 (curl: HTTP 525)'
+- slug: beam.io
+  id: lst_3034fcacfd304ceb73dd0cdf
+  website: https://serp.ly/beam.io
+  class: trash
+  reason: 'not the listed product: the link lands on bend.eco (401); its own domain on bend.eco (Password Protected)'
+- slug: bec-ai.com
+  id: lst_f08f8b2a824c9e7d5d746ee8
+  website: https://serp.ly/bec
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_502; 2026-10-07 link http_502, homepage bec-ai.com HTTP 502 (curl: HTTP 502)'
+- slug: bettertravel.ai
+  id: lst_896f24b6e5753f1d006ba2f7
+  website: https://serp.ly/bettertravel
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage bettertravel.ai HTTP 503 (curl: HTTP 503)'
+- slug: bgrem.ai
+  id: lst_88beb484a3ff756cce46b6e0
+  website: https://serp.ly/bgrem
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage bgrem.ai HTTP 503 (curl: HTTP 503)'
+- slug: bigspeak.ai
+  id: lst_46959dbbf8193771fccb3277
+  website: https://serp.ly/big-speak
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage bigspeak.ai ABORT_ERR (curl: no response)'
+- slug: bizway.io
+  id: lst_6a6146c4c5e60e26dc7a5d33
+  website: https://serp.ly/bizway
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage bizway.io HTTP 404 (curl: HTTP 404)'
+- slug: bladerunner.ai
+  id: lst_402b78b74295830d56113487
+  website: https://serp.ly/bladerunner
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage bladerunner.ai HTTP 404 (curl: HTTP 404)'
+- slug: blinkn.shop
+  id: lst_44c6bab698e83c48df3762ec
+  website: https://serp.ly/blinkn-shop
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage blinkn.shop ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: blobr.io
+  id: lst_4422b878e6cabe614c60f822
+  website: https://serp.ly/blobr
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage blobr.io HTTP 404 (curl: HTTP 404)'
+- slug: blogassistant.co
+  id: lst_27ceaa3989fe1fc5b1cb3396
+  website: https://serp.ly/blog-assistant
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage blogassistant.co EPROTO (curl: no response)'
+- slug: bloop.ai
+  id: lst_4f8f6ba79ad5451a7a77bb98
+  website: https://serp.ly/bloop
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage bloop.ai ABORT_ERR (curl: no response)'
+- slug: boolv.tech
+  id: lst_075635fbfe38949b40f9310d
+  website: https://serp.ly/boolpic
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage boolv.tech CERT_HAS_EXPIRED (curl: no response)'
+- slug: byautomata.io
+  id: lst_c4379c44b78e925dd45d274b
+  website: https://serp.ly/automata
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage byautomata.io EPROTO (curl: no response)'
+- slug: candideai.com
+  id: lst_a4f3aa19e80c4761171cd51d
+  website: https://serp.ly/candideai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage candideai.com HTTP 404 (curl: HTTP 404)'
+- slug: capeprivacy.com
+  id: lst_25c7b91c4016c39983c3a683
+  website: https://serp.ly/capeprivacy
+  class: trash
+  reason: 'not the listed product: the link lands on cape.ai (Agentic AI for Business Process Operations); its own domain on cape.ai (Agentic AI for Business Process Operations | Cape AI)'
+- slug: captionit.ai
+  id: lst_fe37a8a5cbddbbc1e2f1a64c
+  website: https://serp.ly/captionit
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage captionit.ai EPROTO (curl: no response)'
+- slug: casper.so
+  id: lst_a44353f4e0ee7e21ca21950f
+  website: https://serp.ly/explainthis
+  class: trash
+  reason: 'not the listed product: the link lands on explainthis.ai (CERT_HAS_EXPIRED); its own domain on no response'
+- slug: catverse.app
+  id: lst_44e52d7e604bee603f938c80
+  website: https://serp.ly/catverse.app
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage catverse.app HTTP 404 (curl: HTTP 404)'
+- slug: censius.ai
+  id: lst_4c3768427a691fe543bd911a
+  website: https://serp.ly/censius
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage censius.ai EPROTO (curl: no response)'
+- slug: cfrexplorer.com
+  id: lst_e43313cc85b8834b970876bf
+  website: https://serp.ly/cfrexplorer
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNRESET); 2026-10-07 link site_unreachable (ECONNRESET), homepage cfrexplorer.com ECONNRESET (curl: no response)'
+- slug: characterlingo.com
+  id: lst_dddd3f5c762101ec77ecb2e7
+  website: https://serp.ly/character-lingo
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_502; 2026-10-07 link http_502, homepage characterlingo.com HTTP 502 (curl: HTTP 502)'
+- slug: chatness.ai
+  id: lst_956c408ddce3d58a646633c8
+  website: https://serp.ly/chatness
+  class: trash
+  reason: 'not the listed product: the link lands on stewan.io (Stewan Silva); its own domain on stewan.io (Stewan Silva)'
+- slug: clickable.so
+  id: lst_8be0318eeea23d21fd5f7f9a
+  website: https://serp.ly/clickable
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_526; 2026-10-07 link http_526, homepage clickable.so HTTP 404 (curl: HTTP 404)'
+- slug: codedamn.com
+  id: lst_8df3a77bd639d01014b0b291
+  website: https://serp.ly/debugcode
+  class: trash
+  reason: 'not the listed product: the link lands on forsale.godaddy.com (403); its own domain on codedamn.com (Learn To Code For Free — Interactive Courses And Practice Pr)'
+- slug: cognitivemill.com
+  id: lst_0e61e0fdbe71c1673d84878f
+  website: https://serp.ly/cognitivemill
+  class: trash
+  reason: 'not the listed product: the link lands on www.linque.com (Home - Linque Industrial Intelligence); its own domain on www.linque.com (Home - Linque Industrial Intelligence)'
+- slug: cognosys.ai
+  id: lst_006e7c97dc13ee5b03b30dad
+  website: https://serp.ly/cognosys-5-01
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_402; 2026-10-07 link http_402, homepage cognosys.ai HTTP 402 (curl: HTTP 402)'
+- slug: commentsanalytics.com
+  id: lst_55d6d0fc3a5ea5493eb09360
+  website: https://serp.ly/comments-analytics
+  class: trash
+  reason: 'not the listed product: the link lands on icebuddha.com (Ice Buddha); its own domain on icebuddha.com (Ice Buddha)'
+- slug: connectyai.com
+  id: lst_b8438df285dbd5844f06ce0d
+  website: https://serp.ly/connectyai.com
+  class: trash
+  reason: 'not the listed product: the link lands on connecty.ai (AI Video & Image Ad Analysis); its own domain on connecty.ai (AI Video & Image Ad Analysis | Connecty)'
+- slug: contenda.co
+  id: lst_e60ef7de89143fdf088f3850
+  website: https://serp.ly/contenda
+  class: trash
+  reason: 'not the listed product: the link lands on fsh.org (FSH Technologies); its own domain on fsh.org (FSH Technologies)'
+- slug: contlo.ai
+  id: lst_93044c21671c460d22248c33
+  website: https://serp.ly/contlo-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage contlo.ai ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: copernicai.com
+  id: lst_2d31bf3f2631a4c8ce8b25ba
+  website: https://serp.ly/copernic
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage copernicai.com ABORT_ERR (curl: no response)'
+- slug: coqui.ai
+  id: lst_f121062e501253580ad061fb
+  website: https://serp.ly/coqui
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage coqui.ai HTTP 404 (curl: HTTP 404)'
+- slug: coverquick.co
+  id: lst_01f35ba4e215a1fc56430576
+  website: https://serp.ly/coverquick
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage coverquick.co HTTP 404 (curl: HTTP 404)'
+- slug: crear.ai
+  id: lst_d2ca31e07c1b99a2e847388c
+  website: https://serp.ly/crear-ai-5-01
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage crear.ai ENOTFOUND (curl: no response)'
+- slug: creativai.io
+  id: lst_4b2cf1006605c53c95815a8f
+  website: https://serp.ly/creativai
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage creativai.io ABORT_ERR (curl: no response)'
+- slug: crossplag.com
+  id: lst_93de9a61df97ac8ef3c6b2e1
+  website: https://serp.ly/crossplag
+  class: trash
+  reason: 'not the listed product: the link lands on inspera.com (404); its own domain on inspera.com (Inspera | Transition to Online Assessment & Online Proctorin)'
+- slug: crowdprisma.com
+  id: lst_3fe2f42294fd7d08c00b73d4
+  website: https://serp.ly/crowd-prisma
+  class: trash
+  reason: 'not the listed product: the link lands on buildsherpa.ai (503); its own domain on buildsherpa.ai (BuildSherpa)'
+- slug: datachat.ai
+  id: lst_e5f6fa43dcb206688e9ad933
+  website: https://serp.ly/datachat
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage datachat.ai ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: dearflow.ai
+  id: lst_70cf4c6f0a9abde29505b38c
+  website: https://serp.ly/dearflow
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage dearflow.ai HTTP 404 (curl: HTTP 404)'
+- slug: deflekt.ai
+  id: lst_65bf3a45aa8d73f4623a8b9c
+  website: https://serp.ly/deflekt
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage deflekt.ai ABORT_ERR (curl: no response)'
+- slug: delineate.co
+  id: lst_b06828d7f5df6b18a4141f51
+  website: https://serp.ly/delineate
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage delineate.co EPROTO (curl: no response)'
+- slug: designsparks.io
+  id: lst_cec8a8d863c8a886e789bc60
+  website: https://serp.ly/design-sparks
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (DEPTH_ZERO_SELF_SIGNED_CERT); 2026-10-07 link site_unreachable (DEPTH_ZERO_SELF_SIGNED_CERT), homepage designsparks.io DEPTH_ZERO_SELF_SIGNED_CERT (curl: no response)'
+- slug: devassistant.ai
+  id: lst_168d3bb288518bd21d9a70f2
+  website: https://serp.ly/devassistant
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage devassistant.ai ABORT_ERR (curl: no response)'
+- slug: devoid.pics
+  id: lst_9c78edc9a1146f69544e8009
+  website: https://serp.ly/devoid-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_500; 2026-10-07 link http_500, homepage devoid.pics HTTP 500 (curl: HTTP 500)'
+- slug: dialoqai.com
+  id: lst_df10908c6b83e11bd93f7668
+  website: https://serp.ly/dialoq
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNREFUSED); 2026-10-07 link site_unreachable (ECONNREFUSED), homepage dialoqai.com ECONNREFUSED (curl: no response)'
+- slug: docsai.app
+  id: lst_38cdc15cde1ea0ef02f348c1
+  website: https://serp.ly/docsai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage docsai.app HTTP 404 (curl: HTTP 404)'
+- slug: docudo.xyz
+  id: lst_87ea89956788621ff9d499c6
+  website: https://serp.ly/docudo
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage docudo.xyz HTTP 404 (curl: HTTP 404)'
+- slug: domainwoohoo.com
+  id: lst_53aac9c1a92ae2d405973aaf
+  website: https://serp.ly/domainwoohoo
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_530; 2026-10-07 link http_530, homepage domainwoohoo.com HTTP 404 (curl: HTTP 404)'
+- slug: drafthorseai.com
+  id: lst_f6104fe4186e8b7f81a55d08
+  website: https://serp.ly/drafthorse-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage drafthorseai.com HTTP 503 (curl: HTTP 503)'
+- slug: ecommerceprompts.com
+  id: lst_b7ef70fe32504c64bc6a273c
+  website: https://serp.ly/ecommerce-chatgpt-prompts
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage ecommerceprompts.com EPROTO (curl: no response)'
+- slug: edward.ai
+  id: lst_80970ad26957ab787d90fa53
+  website: https://serp.ly/edward
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage edward.ai EPROTO (curl: no response)'
+- slug: elaborate.ai
+  id: lst_b30de71bdf407dee20295863
+  website: https://serp.ly/elaborate
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage elaborate.ai HTTP 404 (curl: HTTP 404)'
+- slug: emailcomposer.ai
+  id: lst_ad1c22670c856720f5f78838
+  website: https://serp.ly/emailcomposer
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage emailcomposer.ai ABORT_ERR (curl: no response)'
+- slug: emailmagic.ai
+  id: lst_1a9a8ff7eb75a9e7f0160da7
+  website: https://serp.ly/emailmagic-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage emailmagic.ai EPROTO (curl: no response)'
+- slug: embra.ai
+  id: lst_22ee062cf2eb619218df1adc
+  website: https://serp.ly/embra
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_525; 2026-10-07 link http_525, homepage embra.ai HTTP 525 (curl: HTTP 525)'
+- slug: emdash.ai
+  id: lst_5160dfb6ec27c2bd986c46d5
+  website: https://serp.ly/emdash-4-33
+  class: trash
+  reason: 'not the listed product: the link lands on emdash.com (Emdash — Open-Source Agentic Development Environment); its own domain on emdash.com (Emdash — Open-Source Agentic Development Environment)'
+- slug: enzyme.so
+  id: lst_6f2d81b9cc89c541205041d2
+  website: https://serp.ly/enzyme
+  class: trash
+  reason: 'not the listed product: the link lands on nocode.inc (NoCode, Inc — We build what comes next); its own domain on nocode.inc (NoCode, Inc — We build what comes next)'
+- slug: eplant.bio
+  id: lst_f6d1e4b00195fb8069ad07b2
+  website: https://serp.ly/eplant-treetag
+  class: trash
+  reason: 'not the listed product: the link lands on www.eplant.com (EPROTO); its own domain on no response'
+- slug: essense.io
+  id: lst_c3ce851285cb8b8ad8cdb870
+  website: https://serp.ly/essense
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage essense.io EPROTO (curl: no response)'
+- slug: evabot.com
+  id: lst_26e0e512951586ad40533352
+  website: https://serp.ly/rapportai
+  class: trash
+  reason: 'not the listed product: the link lands on evabot.net (Employee Gifting Platform); its own domain on evabot.net (Employee Gifting Platform | Evabot)'
+- slug: everyprompt.com
+  id: lst_09dd5efa1cc3399980504be3
+  website: https://serp.ly/everyprompt
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_402; 2026-10-07 link http_402, homepage everyprompt.com HTTP 402 (curl: HTTP 402)'
+- slug: excelly-ai.io
+  id: lst_78a6e67fd446a834c9e690fc
+  website: https://serp.ly/excelly
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage excelly-ai.io CERT_HAS_EXPIRED (curl: no response)'
+- slug: ferret.ai
+  id: lst_9a23188064d3326269f37915
+  website: https://serp.ly/ferret
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage ferret.ai EPROTO (curl: no response)'
+- slug: fiction.com
+  id: lst_159a57154c70db211a3af18c
+  website: https://serp.ly/fiction
+  class: trash
+  reason: 'not the listed product: the link lands on www.pagelines.com (Personal AI Agents for Work); its own domain on www.pagelines.com (Personal AI Agents for Work | PageLines Work Intelligence Pl)'
+- slug: fig.io
+  id: lst_8e367a32497a19e742504912
+  website: https://serp.ly/fig-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage fig.io HTTP 503 (curl: HTTP 503)'
+- slug: framedrop.ai
+  id: lst_d86e06fa8095493f899fd07a
+  website: https://serp.ly/framedrop
+  class: trash
+  reason: 'not the listed product: the link lands on www.sloode.com (Home); its own domain on no response'
+- slug: furwee.ai
+  id: lst_f124b0c88fdc8c8733fd0806
+  website: https://serp.ly/furwee
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage furwee.ai ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: fuups.ai
+  id: lst_b83edbd83db9a52194c8d7f6
+  website: https://serp.ly/fuups
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_521; 2026-10-07 link http_521, homepage fuups.ai HTTP 521 (curl: HTTP 521)'
+- slug: galactica.org
+  id: lst_b4aefee35c84fc247bc2be0a
+  website: https://serp.ly/galactica
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_530; 2026-10-07 link http_530, homepage galactica.org HTTP 530 (curl: HTTP 530)'
+- slug: genesiscloud.com
+  id: lst_46c2ed90144159f47d99bb41
+  website: https://serp.ly/genesiscloud.com
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_522; 2026-10-07 link http_522, homepage genesiscloud.com HTTP 522 (curl: HTTP 522)'
+- slug: genly.ai
+  id: lst_7e131eb9c0cd98a3edf844ec
+  website: https://serp.ly/genly
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_502; 2026-10-07 link http_502, homepage genly.ai HTTP 502 (curl: HTTP 502)'
+- slug: getessential.app
+  id: lst_67e6c3b47240c94b97c73e29
+  website: https://serp.ly/essential
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage getessential.app HTTP 404 (curl: HTTP 404)'
+- slug: getliner.com
+  id: lst_e2753dcdd67e8205881f18b1
+  website: https://serp.ly/liner
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_410; 2026-10-07 link http_410, homepage getliner.com HTTP 410 (curl: HTTP 410)'
+- slug: gpt6.ai
+  id: lst_bbd1f45bfd751ae712e0d851
+  website: https://serp.ly/gpt6-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage gpt6.ai ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: gpthotline.com
+  id: lst_b24e6cb550aa3886bbf133cb
+  website: https://serp.ly/gpthotline
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage gpthotline.com HTTP 404 (curl: HTTP 404)'
+- slug: gptprompttuner.com
+  id: lst_cf00305198a37d130ac08871
+  website: https://serp.ly/gpt-prompt-tuner
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage gptprompttuner.com ABORT_ERR (curl: no response)'
+- slug: greatheadlines.ai
+  id: lst_890b59b8cf69365204147f91
+  website: https://serp.ly/great-headlines
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_402; 2026-10-07 link http_402, homepage greatheadlines.ai HTTP 402 (curl: HTTP 402)'
+- slug: growparabolic.com
+  id: lst_18a541a887f23a4a64e747ae
+  website: https://serp.ly/growparabolic
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage growparabolic.com EPROTO (curl: no response)'
+- slug: habitdriven.ai
+  id: lst_8f06365bb4d83ae20c9b3e71
+  website: https://serp.ly/habit-driven
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage habitdriven.ai ABORT_ERR (curl: no response)'
+- slug: halist.ai
+  id: lst_1bd27901ed18f411531a8c32
+  website: https://serp.ly/halist-browser-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_530; 2026-10-07 link http_530, homepage halist.ai HTTP 530 (curl: HTTP 530)'
+- slug: heficed.com
+  id: lst_03bb860846d52976dfd0877a
+  website: https://serp.ly/heficed.com
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage heficed.com CERT_HAS_EXPIRED (curl: no response)'
+- slug: henchman.io
+  id: lst_998248d9d2fd7d5c81f8ec73
+  website: https://serp.ly/henchman
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (DEPTH_ZERO_SELF_SIGNED_CERT); 2026-10-07 link site_unreachable (DEPTH_ZERO_SELF_SIGNED_CERT), homepage henchman.io DEPTH_ZERO_SELF_SIGNED_CERT (curl: no response)'
+- slug: hereafter.ai
+  id: lst_745c724331f5fb84115a10f7
+  website: https://hereafter.ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage hereafter.ai HTTP 404 (curl: HTTP 404)'
+- slug: heykona.com
+  id: lst_ab40cc57e762bc07f55c7058
+  website: https://serp.ly/ai-powered-coaching-by-kona
+  class: trash
+  reason: 'not the listed product: the link lands on www.15five.com (Continuous Performance Management Software); its own domain on www.15five.com (Continuous Performance Management Software | 15Five)'
+- slug: hirematch.app
+  id: lst_5d817efe264f489481157c2c
+  website: https://serp.ly/hirematch
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage hirematch.app ABORT_ERR (curl: no response)'
+- slug: hotball.ai
+  id: lst_a78794cff206ef513559a7f8
+  website: https://serp.ly/hotball
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage hotball.ai HTTP 404 (curl: HTTP 404)'
+- slug: hourone.ai
+  id: lst_c1ec0d557b71682742eb128e
+  website: https://serp.ly/hourone
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNREFUSED); 2026-10-07 link site_unreachable (ECONNREFUSED), homepage hourone.ai ECONNREFUSED (curl: no response)'
+- slug: hub.plexo.app
+  id: lst_a3310c30ac31a2739b605ecd
+  website: https://serp.ly/plexo
+  class: trash
+  reason: 'not the listed product: the link lands on acentoenlao.com (AnimePlay - Nonton Anime Sub Indo Tanpa Daftar, Tanpa Bayar); its own domain on acentoenlao.com (AnimePlay - Nonton Anime Sub Indo Tanpa Daftar, Tanpa Bayar)'
+- slug: i18ncore.com
+  id: lst_9b6151659060212f04e6d3a2
+  website: https://serp.ly/i18ncore
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNREFUSED); 2026-10-07 link site_unreachable (ECONNREFUSED), homepage i18ncore.com ECONNREFUSED (curl: no response)'
+- slug: iatextos.com
+  id: lst_02ac9f14834df7f7fd690c6a
+  website: https://serp.ly/iatextos
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage iatextos.com ABORT_ERR (curl: no response)'
+- slug: icon.me
+  id: lst_541b58169b6d9a4cab1523a7
+  website: https://serp.ly/icon.me
+  class: trash
+  reason: 'not the listed product: the link lands on icon.com (The Agency); its own domain on icon.com (The Agency | Icon)'
+- slug: imaginary.dev
+  id: lst_429d519616cbc28340ddd0ae
+  website: https://serp.ly/imaginary-programming
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage imaginary.dev ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: infomail.ai
+  id: lst_9f4a8b061b65d3fdae0c2b90
+  website: https://serp.ly/infomail-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage infomail.ai EPROTO (curl: no response)'
+- slug: ingestai.io
+  id: lst_2b6e8391f24f8f569156bffc
+  website: https://serp.ly/ingestai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNREFUSED); 2026-10-07 link site_unreachable (ECONNREFUSED), homepage ingestai.io ECONNREFUSED (curl: no response)'
+- slug: inkforall.com
+  id: lst_58759c538769da1b110511b6
+  website: https://serp.ly/ink
+  class: trash
+  reason: 'not the listed product: the link lands on smythos.com (500); its own domain on smythos.com (Database Error)'
+- slug: insightbase.ai
+  id: lst_cc182d2e6c6b9b5f823a37be
+  website: https://serp.ly/insightbase
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage insightbase.ai EPROTO (curl: no response)'
+- slug: insightful.page
+  id: lst_cf244bd28b39e1ca309d430e
+  website: https://serp.ly/insightful
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage insightful.page HTTP 404 (curl: HTTP 404)'
+- slug: instantanswers.xyz
+  id: lst_a220842dfe0d2c474acab48d
+  website: https://serp.ly/instantanswers
+  class: trash
+  reason: 'not the listed product: the link lands on retrobezel.com (Bezel – Retro game launcher with an AI companion); its own domain on retrobezel.com (Bezel – Retro game launcher with an AI companion)'
+- slug: invictai.io
+  id: lst_544a1b144e3768f5418db7a5
+  website: https://serp.ly/invictaai-5-01
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_402; 2026-10-07 link http_402, homepage invictai.io HTTP 402 (curl: HTTP 402)'
+- slug: ipso.ai
+  id: lst_7709eb6c5836f52d130c19ba
+  website: https://serp.ly/ipso-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage ipso.ai HTTP 404 (curl: HTTP 404)'
+- slug: jaqnjil.ai
+  id: lst_f08aae1aa7b64bbced2df5ca
+  website: https://serp.ly/jaqnjil
+  class: trash
+  reason: 'not the listed product: the link lands on jaqnjil.com (ECONNRESET); its own domain on no response'
+- slug: jarvis-lyrics.com
+  id: lst_a8e1e91be492de548786692f
+  website: https://serp.ly/jarvis-lyrics
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage jarvis-lyrics.com HTTP 503 (curl: HTTP 503)'
+- slug: jibewith.com
+  id: lst_416dd15af21618986adfda76
+  website: https://serp.ly/jibewith
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage jibewith.com HTTP 404 (curl: HTTP 404)'
+- slug: jobtitlesai.com
+  id: lst_6fd27d15e7ab15d2f94db7c1
+  website: https://serp.ly/jobtitlesai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage jobtitlesai.com HTTP 404 (curl: HTTP 400)'
+- slug: joinmilo.com
+  id: lst_d01278b663069eb4dd118da8
+  website: https://serp.ly/milo
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_402; 2026-10-07 link http_402, homepage joinmilo.com HTTP 402 (curl: HTTP 402)'
+- slug: jokelub.com
+  id: lst_b529ba1aae074baac7b9e905
+  website: https://serp.ly/jokelub
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_526; 2026-10-07 link http_526, homepage jokelub.com HTTP 526 (curl: HTTP 526)'
+- slug: junilearning.com
+  id: lst_74c7a0c98676f6cfaa89d6fa
+  website: https://serp.ly/juni-learning
+  class: trash
+  reason: 'not the listed product: the link lands on acely.com (Acely: Personalized SAT and ACT Test Prep, Free Practice Tes); its own domain on acely.com (Acely: Personalized SAT and ACT Test Prep, Free Practice Tes)'
+- slug: komandi.app
+  id: lst_2247bd0f206ec5d4d6e9785c
+  website: https://serp.ly/komandi
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_526; 2026-10-07 link http_526, homepage komandi.app HTTP 526 (curl: HTTP 526)'
+- slug: kreateable.com
+  id: lst_399e2ceef4848a59f232241d
+  website: https://serp.ly/kreateable
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage kreateable.com ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: lamini.ai
+  id: lst_482e352ad4b23b4214fca020
+  website: https://serp.ly/lamini
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage lamini.ai EPROTO (curl: no response)'
+- slug: lavo.ai
+  id: lst_3982f291783854f823ce7f0e
+  website: https://serp.ly/lavo-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage lavo.ai ABORT_ERR (curl: no response)'
+- slug: lifecastvr.com
+  id: lst_bf14c5e714c577d4b48299bf
+  website: https://serp.ly/holovolo
+  class: trash
+  reason: 'not the listed product: the link lands on holovolo.tv (HOME - hhtoonennl); its own domain on github.com (GitHub - fbriggs/lifecast_public: Open source software from )'
+- slug: lintrule.com
+  id: lst_d43fa8b27a7e42275c51faa4
+  website: https://serp.ly/lintrule
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_402; 2026-10-07 link http_402, homepage lintrule.com HTTP 402 (curl: HTTP 402)'
+- slug: livehealthily.com
+  id: lst_2d5cc113fdd2a79b04dc0cb3
+  website: https://serp.ly/livehealthily.com
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage livehealthily.com HTTP 404 (curl: HTTP 404)'
+- slug: localio.io
+  id: lst_35a530e88738613e879e0f01
+  website: https://serp.ly/localio
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage localio.io ABORT_ERR (curl: HTTP 522)'
+- slug: lovo.ai
+  id: lst_691d6cc2d8bd8b9313213334
+  website: https://serp.ly/lovo
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_402; 2026-10-07 link http_402, homepage lovo.ai HTTP 402 (curl: HTTP 402)'
+- slug: loyae.com
+  id: lst_ee77468d45e0a25afe9ea8e7
+  website: https://serp.ly/loyae
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage loyae.com ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: maax.ai
+  id: lst_852c46c7f5100de388722ee2
+  website: https://serp.ly/maax-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage maax.ai EPROTO (curl: no response)'
+- slug: magicsalesbot.com
+  id: lst_409efac80cc8a38d4fb4e42e
+  website: https://serp.ly/magic-sales-bot
+  class: trash
+  reason: 'not the listed product: the link lands on www.rpdoyle.com (Ryan Doyle - Sales Guy Turned Builder); its own domain on www.rpdoyle.com (Ryan Doyle - Sales Guy Turned Builder | 100+ Projects Launch)'
+- slug: maketafi.com
+  id: lst_455f49805c60ee0cc8bf35e7
+  website: https://serp.ly/tafi
+  class: trash
+  reason: 'not the listed product: the link lands on www.daz3d.com (Daz 3D); its own domain on www.daz3d.com (Daz 3D)'
+- slug: makeyourwp.com
+  id: lst_b5273f3c9cb3a203b52450d0
+  website: https://serp.ly/makeyourwp
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_500; 2026-10-07 link http_500, homepage makeyourwp.com HTTP 500 (curl: HTTP 500)'
+- slug: marcusaurelius.ai
+  id: lst_8a0c74d783730a931d20c13f
+  website: https://serp.ly/marcus-aurelius-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (DEPTH_ZERO_SELF_SIGNED_CERT); 2026-10-07 link site_unreachable (DEPTH_ZERO_SELF_SIGNED_CERT), homepage marcusaurelius.ai DEPTH_ZERO_SELF_SIGNED_CERT (curl: no response)'
+- slug: masterpiecestudio.com
+  id: lst_9e59fd25a7911b88d115020c
+  website: https://serp.ly/masterpiece-studio-
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage masterpiecestudio.com HTTP 404 (curl: HTTP 404)'
+- slug: maths.ai
+  id: lst_077f15553b9a44aea7cd59f9
+  website: https://serp.ly/maths-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage maths.ai HTTP 503 (curl: HTTP 503)'
+- slug: mightygpt.com
+  id: lst_f74379e9d00329dbdb62d408
+  website: https://serp.ly/mightygpt
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNREFUSED); 2026-10-07 link site_unreachable (ECONNREFUSED), homepage mightygpt.com ECONNREFUSED (curl: no response)'
+- slug: mindsum.org
+  id: lst_975c152109791249d78f5162
+  website: https://serp.ly/mindsum
+  class: trash
+  reason: 'not the listed product: the link lands on forsale.godaddy.com (403); its own domain on no response'
+- slug: moly.ai
+  id: lst_2414db042fdc86610bd0d962
+  website: https://serp.ly/moly
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage moly.ai ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: multilings.com
+  id: lst_304ab0565f4ce4ff8de4efad
+  website: https://serp.ly/multilings
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage multilings.com HTTP 503 (curl: HTTP 503)'
+- slug: nameverse.org
+  id: lst_ac34a2f708ed9695bad3990f
+  website: https://serp.ly/nameverse-ai
+  class: trash
+  reason: 'not the listed product: the link lands on nameverse.app (NameVerse — Custom Birthday Songs Written from Real Memories); its own domain on biblenamefinder.com (Bible Name Finder — Discover the Meaning of Biblical Names)'
+- slug: narrative.bi
+  id: lst_10a7e90670ed2036134fd7ec
+  website: https://serp.ly/narrative.bi
+  class: trash
+  reason: 'not the listed product: the link lands on cube.dev (Building the future of agentic analytics: Narrative BI team ); its own domain on cube.dev (Building the future of agentic analytics: Narrative BI team )'
+- slug: nat.dev
+  id: lst_b1633a2d3f4c546d83981b5e
+  website: https://serp.ly/openplayground
+  class: trash
+  reason: 'not the listed product: the link lands on nat.org (Nat Friedman); its own domain on nat.org (Nat Friedman)'
+- slug: neuralblender.com
+  id: lst_8533141d6b146dc62d1f557f
+  website: https://serp.ly/neuralblender
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage neuralblender.com ABORT_ERR (curl: no response)'
+- slug: neuronmake.com
+  id: lst_3b448f479539b802d266f08f
+  website: https://serp.ly/neuron-make
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EBLOCKED); 2026-10-07 link site_unreachable (EBLOCKED), homepage neuronmake.com EBLOCKED (curl: no response)'
+- slug: notably.ai
+  id: lst_538b79eeed1c2679d92d7509
+  website: https://serp.ly/notably
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage notably.ai EPROTO (curl: no response)'
+- slug: nutshellapp.com
+  id: lst_7bf94eaad07e1d335820c592
+  website: https://serp.ly/nutshell-summaries
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNREFUSED); 2026-10-07 link site_unreachable (ECONNREFUSED), homepage nutshellapp.com ECONNREFUSED (curl: no response)'
+- slug: obfuscat.com
+  id: lst_945cfc5069e6e23d44f086ce
+  website: https://serp.ly/obfuscat
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_526; 2026-10-07 link http_526, homepage obfuscat.com HTTP 526 (curl: HTTP 526)'
+- slug: octavia.one
+  id: lst_dfe24122b77fa797428f55b8
+  website: https://serp.ly/octavia-ai
+  class: trash
+  reason: 'not the listed product: the link lands on renatus.ai (Renatus - Launching Soon); its own domain on renatus.ai (Renatus - Launching Soon)'
+- slug: opinio.ai
+  id: lst_274a11fa0b9355614da0ca3c
+  website: https://serp.ly/opinioai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage opinio.ai EPROTO (curl: no response)'
+- slug: opnbx.ai
+  id: lst_df80ae7b17ba9316e346f388
+  website: https://serp.ly/opnbx-ai
+  class: trash
+  reason: 'not the listed product: the link lands on www.customerbase.ai (ENOTFOUND); its own domain on www.customerbase.ai (HTTP 301)'
+- slug: ouriginal.com
+  id: lst_00184c55b9d319adf8d4608d
+  website: https://serp.ly/ouriginal.com
+  class: trash
+  reason: 'not the listed product: the link lands on www.turnitin.com (Ouriginal: Turnitin''s latest product overview); its own domain on www.turnitin.com (Ouriginal: Turnitin''s latest product overview)'
+- slug: outboundly.app
+  id: lst_e3d0d89cb7a9fef11e63eaee
+  website: https://serp.ly/outboundly
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage outboundly.app ABORT_ERR (curl: no response)'
+- slug: paperrater.com
+  id: lst_92e80b1221bcb5c770819262
+  website: https://serp.ly/paperrater.com
+  class: trash
+  reason: 'not the listed product: the link lands on www.scribbr.com (Scribbr - Your path to academic success); its own domain on scribbr.com (Just a moment...)'
+- slug: pawmenow.com
+  id: lst_a645e25da37f96825b96fef2
+  website: https://serp.ly/pawmenow
+  class: trash
+  reason: the homepage is a default web server page
+- slug: paxo.ai
+  id: lst_af0304a8344dc594b86cecc5
+  website: https://serp.ly/paxo
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage paxo.ai EPROTO (curl: no response)'
+- slug: permar.ai
+  id: lst_2e6e104c59354330cb61ad1c
+  website: https://serp.ly/permar-ai
+  class: trash
+  reason: 'not the listed product: the link lands on permar.xyz (Sweeps Casinos - Fastest Payout Sweepstakes Casino Sites); its own domain on no response'
+- slug: pezzo.ai
+  id: lst_b1d4a1ee80fda782ef0e3781
+  website: https://serp.ly/pezzo-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage pezzo.ai HTTP 404 (curl: HTTP 404)'
+- slug: phind.com
+  id: lst_f85fb1cfc33e09bc79317046
+  website: https://serp.ly/phind
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage phind.com HTTP 404 (curl: HTTP 403)'
+- slug: pictodream.com
+  id: lst_53177942e4a0fe40432862c5
+  website: https://serp.ly/pictodream
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNRESET); 2026-10-07 link site_unreachable (ECONNRESET), homepage pictodream.com ECONNRESET (curl: no response)'
+- slug: pixelpet.io
+  id: lst_7a18def41fb4c64840652dc7
+  website: https://serp.ly/pixelpet
+  class: trash
+  reason: 'not the listed product: the link lands on brain.pet (ECONNREFUSED); its own domain on no response'
+- slug: plumy.app
+  id: lst_a90c59c8f06369ed4a61cb92
+  website: https://serp.ly/plumy
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage plumy.app HTTP 503 (curl: HTTP 503)'
+- slug: pollwatcher.ai
+  id: lst_40d6d831ea85ad2235fdb28c
+  website: https://serp.ly/revisor
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNRESET); 2026-10-07 link site_unreachable (ECONNRESET), homepage pollwatcher.ai ECONNRESET (curl: no response)'
+- slug: postaga.com
+  id: lst_efa8281a586b66e06d2e569c
+  website: https://serp.ly/postaga
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage postaga.com HTTP 404 (curl: HTTP 404)'
+- slug: posterstudio.ai
+  id: lst_013d6d610d70fa50ea8c2ac9
+  website: https://posterstudio.ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage posterstudio.ai ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: pragma.ai
+  id: lst_c34236f407c5b2f8b6a61aa4
+  website: https://serp.ly/pragma
+  class: trash
+  reason: 'not the listed product: the link lands on www.pragmaworld.net (Enterprise Asset Management Software & Consulting); its own domain on www.pragmaworld.net (Enterprise Asset Management Software & Consulting | Pragma)'
+- slug: predibase.com
+  id: lst_0bc5ef415475fa89251810ad
+  website: https://serp.ly/predibase
+  class: trash
+  reason: 'not the listed product: the link lands on www.rubrik.com (403); its own domain on www.rubrik.com (<TITLE>Access Denied)'
+- slug: profilepro.ai
+  id: lst_dc9c30f5f546f6c5592ede8c
+  website: https://profilepro.ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage profilepro.ai HTTP 503 (curl: HTTP 503)'
+- slug: profitwell.com
+  id: lst_6fe81a5e8814178ec7e1e174
+  website: https://serp.ly/profitwell.com
+  class: trash
+  reason: 'not the listed product: the link lands on www.paddle.com; its own domain on www.paddle.com (Paddle - Subscriptions, Payments & Tax Compliance for SaaS &)'
+- slug: projectelectricsheep.com
+  id: lst_0014567943df417a5def4e5d
+  website: https://projectelectricsheep.com
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage projectelectricsheep.com HTTP 404 (curl: HTTP 404)'
+- slug: promptvibes.com
+  id: lst_803b1a0f1bae12d07b616288
+  website: https://promptvibes.com
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_402; 2026-10-07 link http_402, homepage promptvibes.com HTTP 402 (curl: HTTP 402)'
+- slug: pyqai.com
+  id: lst_a23a74b78fe32c6b36e69c0b
+  website: https://serp.ly/image-generator-by-pyq
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage pyqai.com EPROTO (curl: no response)'
+- slug: qatalog.com
+  id: lst_8e5d9a68164b67fc48cae1b0
+  website: https://serp.ly/qatalog
+  class: trash
+  reason: 'not the listed product: the link lands on clickup.com (ClickUp Acquires Qatalog); its own domain on clickup.com (ClickUp Acquires Qatalog)'
+- slug: quench.ai
+  id: lst_30b69c0e88f6c71716a8ae6d
+  website: https://serp.ly/quench
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage quench.ai EPROTO (curl: no response)'
+- slug: quest.ai
+  id: lst_4364ab47cee1f1c570a02617
+  website: https://serp.ly/quest-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage quest.ai CERT_HAS_EXPIRED (curl: no response)'
+- slug: quillnow.ai
+  id: lst_c15f89f39c1ec790a80cf38e
+  website: https://serp.ly/quillnow
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNRESET); 2026-10-07 link site_unreachable (ECONNRESET), homepage quillnow.ai ECONNRESET (curl: no response)'
+- slug: recolorai.com
+  id: lst_0cd46714784eb4ee0cc3bb88
+  website: https://serp.ly/recolorai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_502; 2026-10-07 link http_502, homepage recolorai.com HTTP 502 (curl: HTTP 502)'
+- slug: reinforz.ai
+  id: lst_b0745c0d33c16107fac6085d
+  website: https://serp.ly/reinforz
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNRESET); 2026-10-07 link site_unreachable (ECONNRESET), homepage reinforz.ai ECONNRESET (curl: no response)'
+- slug: rewritewise.com
+  id: lst_c3c7d5bf1019553574b4fa8a
+  website: https://serp.ly/rewritewise
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_502; 2026-10-07 link http_502, homepage rewritewise.com HTTP 502 (curl: HTTP 502)'
+- slug: save.day
+  id: lst_758ad5b10cbef4b022de956e
+  website: https://serp.ly/saveday
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage save.day HTTP 404 (curl: HTTP 404)'
+- slug: scrap.so
+  id: lst_d728f0a993cf9357683f529c
+  website: https://serp.ly/scrap-so
+  class: trash
+  reason: 'not the listed product: the link lands on adkit.so (AdKit - The Ads Toolbox for Marketers & AI Agents); its own domain on adkit.so (AdKit - The Ads Toolbox for Marketers & AI Agents)'
+- slug: seek.ai
+  id: lst_eb3cebc4f3d68193a8f53cbb
+  website: https://serp.ly/seek
+  class: gone
+  reason: 'site does not work: 2026-10-06 too_many_redirects (38 hops, stopped on seek.ai); 2026-10-07 link too_many_redirects (38 hops, stopped on seek.ai), homepage seek.ai ABORT_ERR (curl: HTTP 522)'
+- slug: seekwell.io
+  id: lst_5773633b81f037817110be3b
+  website: https://serp.ly/seekwell
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage seekwell.io HTTP 404 (curl: HTTP 404)'
+- slug: shakespearetoolbar.com
+  id: lst_3f963634ced0f0f81e6aa342
+  website: https://serp.ly/shakespeare-ai-toolbar
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage shakespearetoolbar.com HTTP 404 (curl: HTTP 404)'
+- slug: sharefable.com
+  id: lst_5ec82f5f0d13224d7a5f6711
+  website: https://serp.ly/sharefable.com
+  class: trash
+  reason: 'not the listed product: the link lands on 172.235.245.66 (WOE! SSL Jangan Lupa Di-install!); its own domain on 172.235.245.66 (WOE! SSL Jangan Lupa Di-install!)'
+- slug: sibylia.io
+  id: lst_3cf167d5f6adfd0823e33f5e
+  website: https://serp.ly/sibylia
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage sibylia.io ABORT_ERR (curl: no response)'
+- slug: siddharthverma.in
+  id: lst_6e135bc447fca1273d50cdc7
+  website: https://serp.ly/linkedin-posts-generator
+  class: trash
+  reason: 'not the listed product: the link lands on expireddomains.com (sid.black · budget-friendly .black listing); its own domain on siddharthverma.in (Siddharth Verma a Fractional CTO & AI Consultant for SaaS Co)'
+- slug: silatus.com
+  id: lst_26221bba8143c0bfbdd8702f
+  website: https://serp.ly/silatus
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage silatus.com HTTP 404 (curl: HTTP 404)'
+- slug: skyglass.com
+  id: lst_8316854914caf6868f7a07d2
+  website: https://serp.ly/skyglass
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage skyglass.com EPROTO (curl: no response)'
+- slug: slait.school
+  id: lst_5131d33a02588707dcedba93
+  website: https://serp.ly/slait-school
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNRESET); 2026-10-07 link site_unreachable (ECONNRESET), homepage slait.school ECONNRESET (curl: no response)'
+- slug: slideas.ai
+  id: lst_3354e993ed89fd3538e734ec
+  website: https://serp.ly/slideas
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage slideas.ai HTTP 404 (curl: HTTP 404)'
+- slug: smartdreams.ai
+  id: lst_d2391bfe138f0232bcfc59e7
+  website: https://serp.ly/smartdreams
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ECONNRESET); 2026-10-07 link site_unreachable (ECONNRESET), homepage smartdreams.ai ECONNRESET (curl: no response)'
+- slug: socialiteai.com
+  id: lst_a6f0e9211a6316b867e1d7fc
+  website: https://serp.ly/socialiteai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage socialiteai.com ENOTFOUND (curl: no response)'
+- slug: socratic.org
+  id: lst_4c95fae1842aa606b5eda28f
+  website: https://serp.ly/socratic-by-google
+  class: trash
+  reason: 'not the listed product: the link lands on search.google (Lens); its own domain on search.google (HTTP 200)'
+- slug: solidgrids.com
+  id: lst_e0ace061284db0a453534683
+  website: https://serp.ly/solidgrids
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage solidgrids.com HTTP 404 (curl: HTTP 404)'
+- slug: sonara.ai
+  id: lst_a7df8d2ac3018f4d2486469b
+  website: https://serp.ly/sonara-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage sonara.ai ABORT_ERR (curl: no response)'
+- slug: soundbite.ai
+  id: lst_66851137f4215ab525897a34
+  website: https://serp.ly/soundbite
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage soundbite.ai HTTP 404 (curl: HTTP 404)'
+- slug: sourceai.dev
+  id: lst_6960092252aa169084f85865
+  website: https://serp.ly/sourceai
+  class: trash
+  reason: 'not the listed product: the link lands on www.akinciborg.com (Web & API Pentest); its own domain on www.akinciborg.com (Web & API Pentest | Ethical Hacker - Akinciborg)'
+- slug: sparkbase.ai
+  id: lst_cf1a7e887bbd8714f0c51d17
+  website: https://serp.ly/webtastic
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage sparkbase.ai HTTP 404 (curl: HTTP 404)'
+- slug: speechllect.com
+  id: lst_8caea8063fae12d846addd72
+  website: https://serp.ly/speechllect
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage speechllect.com ABORT_ERR (curl: no response)'
+- slug: spoke.app
+  id: lst_ccc2d470b78a5af8e929df2a
+  website: https://serp.ly/spoke-app
+  class: trash
+  reason: 'not the listed product: the link lands on www.meetingbaas.com (Meeting Bot API for Zoom, Google Meet & Teams); its own domain on www.meetingbaas.com (Meeting Bot API for Zoom, Google Meet & Teams)'
+- slug: spreadsheet.com
+  id: lst_2980339a19852f3bf6ff8754
+  website: https://serp.ly/openai-in-spreadsheet
+  class: gone
+  reason: 'site does not work: 2026-10-06 fetch_timeout (ABORT_ERR); 2026-10-07 link fetch_timeout (ABORT_ERR), homepage spreadsheet.com ENOTFOUND (curl: no response)'
+- slug: stellaris-ai.com
+  id: lst_d6a1a608675d099c6f80003f
+  website: https://serp.ly/stellaris
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage stellaris-ai.com HTTP 404 (curl: HTTP 404)'
+- slug: storytell.ai
+  id: lst_8e97b32a40019c6a99ff523d
+  website: https://serp.ly/storytell-ai
+  class: trash
+  reason: 'not the listed product: the link lands on chief.bot (Chief); its own domain on chief.bot (Chief)'
+- slug: summarize.tech
+  id: lst_c78e7064e088ec199e997ec7
+  website: https://serp.ly/summarize-tech
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_503; 2026-10-07 link http_503, homepage summarize.tech HTTP 503 (curl: HTTP 503)'
+- slug: supertranslate.ai
+  id: lst_c1395a38ea9a9945770203db
+  website: https://serp.ly/supertranslate
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_402; 2026-10-07 link http_402, homepage supertranslate.ai HTTP 402 (curl: HTTP 402)'
+- slug: supportagent.ai
+  id: lst_5da218a318b8915945de9776
+  website: https://serp.ly/supportagent
+  class: trash
+  reason: 'not the listed product: the link lands on www.helpscout.com; its own domain on www.helpscout.com (Help Scout: The AI-driven support platform for customer-firs)'
+- slug: symbl.ai
+  id: lst_c0f13998300d957e2a683ea0
+  website: https://serp.ly/symbl-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_500; 2026-10-07 link http_500, homepage symbl.ai HTTP 500 (curl: HTTP 500)'
+- slug: tangoagreements.com
+  id: lst_66e8ac9a383c828a7e70feab
+  website: https://serp.ly/tango
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage tangoagreements.com EPROTO (curl: no response)'
+- slug: thegigabrain.com
+  id: lst_fedefdc09e0c332841fd285a
+  website: https://serp.ly/giga-brain
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage thegigabrain.com ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: therocketbrew.com
+  id: lst_3585160212177e3fdb3238b5
+  website: https://serp.ly/jeeves
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage therocketbrew.com HTTP 404 (curl: HTTP 404)'
+- slug: timworks.com
+  id: lst_40a10209584d6e57aed0988f
+  website: https://serp.ly/ariana-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage timworks.com HTTP 404 (curl: HTTP 404)'
+- slug: tome.app
+  id: lst_a04a1c4192a539fcb159c39d
+  website: https://serp.ly/tome.app
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage tome.app HTTP 404 (curl: HTTP 404)'
+- slug: toolbuilder.ai
+  id: lst_c896efc454d989e6b4789139
+  website: https://serp.ly/toolbuilder
+  class: trash
+  reason: 'not the listed product: the link lands on www.telefono.do (403); its own domain on www.telefono.do (Just a moment...)'
+- slug: topseokit.com
+  id: lst_817dae924e0cfd20bf75c38b
+  website: https://serp.ly/topseokit
+  class: trash
+  reason: 'not the listed product: the link lands on intothumbnail.com (YouTube Thumbnail Tester - Free AI-Powered Thumbnail Analyze); its own domain on intothumbnail.com (YouTube Thumbnail Tester - Free AI-Powered Thumbnail Analyze)'
+- slug: towords.io
+  id: lst_6bd308870a06c69246f46ea6
+  website: https://serp.ly/towords
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_525; 2026-10-07 link http_525, homepage towords.io HTTP 525 (curl: HTTP 525)'
+- slug: tractatus.ai
+  id: lst_cf95737bab3c69a6accae12b
+  website: https://serp.ly/tractatus
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage tractatus.ai ABORT_ERR (curl: no response)'
+- slug: translateaudio.com
+  id: lst_6d56449fb4caec53edf0b053
+  website: https://serp.ly/translateaudio
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_526; 2026-10-07 link http_526, homepage translateaudio.com HTTP 526 (curl: HTTP 526)'
+- slug: travelgpt.art
+  id: lst_5095f842122776192d850fee
+  website: https://serp.ly/travelgpt
+  class: trash
+  reason: 'not the listed product: the link lands on balloonbar.ae (404); its own domain on balloonbar.ae (Vegas123 | Promo Member Baru & Bonus Harian)'
+- slug: trendmate.xyz
+  id: lst_a03c54fa16df3954eb5001a8
+  website: https://serp.ly/trendmate
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage trendmate.xyz EPROTO (curl: no response)'
+- slug: tryastral.com
+  id: lst_e20903258bb816edc882e2d9
+  website: https://serp.ly/astral
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage tryastral.com HTTP 404 (curl: HTTP 404)'
+- slug: trynara.com
+  id: lst_7531566226542229d982ef53
+  website: https://serp.ly/nara
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage trynara.com HTTP 404 (curl: HTTP 404)'
+- slug: trypika.com
+  id: lst_8c9dd0252c7802d45a0a02c1
+  website: https://serp.ly/pika
+  class: trash
+  reason: the domain is for sale (redirects to HugeDomains)
+- slug: trypromptly.com
+  id: lst_34aee839994bd339855f11a8
+  website: https://serp.ly/trypromptly
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage trypromptly.com ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: trysidekick.io
+  id: lst_6a01336469852cd77967246a
+  website: https://serp.ly/ai-sidekick
+  class: trash
+  reason: 'not the listed product: the link lands on www.attendancebot.com (AttendanceBot - Attendance and Time Tracking); its own domain on www.attendancebot.com (AttendanceBot - Attendance and Time Tracking)'
+- slug: unicheck.com
+  id: lst_c1b9c18446b51b486c3e4711
+  website: https://serp.ly/unicheck.com
+  class: trash
+  reason: 'not the listed product: the link lands on www.turnitin.com (Unicheck: Turnitin''s latest product overview); its own domain on www.turnitin.com (Unicheck: Turnitin''s latest product overview)'
+- slug: unrealme.io
+  id: lst_68b2b84e8c8cc975d53c98de
+  website: https://serp.ly/unrealme
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage unrealme.io CERT_HAS_EXPIRED (curl: no response)'
+- slug: useclarity.com
+  id: lst_3f08ab7d1460d22c8ead75ae
+  website: https://serp.ly/clarity
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_402; 2026-10-07 link http_402, homepage useclarity.com HTTP 402 (curl: HTTP 402)'
+- slug: usemeru.com
+  id: lst_654f5db4eea3cc7ac92ef593
+  website: https://usemeru.com
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage usemeru.com EPROTO (curl: no response)'
+- slug: useskillflow.com
+  id: lst_5df7eb72a68a572062a87a58
+  website: https://serp.ly/skillflow
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage useskillflow.com HTTP 404 (curl: HTTP 404)'
+- slug: usestyle.ai
+  id: lst_f188582b639947fc362be011
+  website: https://serp.ly/style-ai
+  class: trash
+  reason: 'not the listed product: the link lands on conversion.ai (Conversion); its own domain on conversion.ai (Conversion | AI-Native B2B Marketing Automation Platform)'
+- slug: veedo.ai
+  id: lst_1dd1c2caf22ec4abaa87e21c
+  website: https://serp.ly/veedoai
+  class: trash
+  reason: 'not the listed product: the link lands on www.alfie-ten.app (Let''s help you land your dream job); its own domain on www.alfie-ten.app (Let''s help you land your dream job)'
+- slug: vidds.co
+  id: lst_4e244b3e7d897231917d44d4
+  website: https://serp.ly/video-editor-by-vidds
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID); 2026-10-07 link site_unreachable (ERR_TLS_CERT_ALTNAME_INVALID), homepage vidds.co ERR_TLS_CERT_ALTNAME_INVALID (curl: no response)'
+- slug: voicetype.io
+  id: lst_73525b9b7adffd68ba28df8e
+  website: https://serp.ly/voicetype
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_526; 2026-10-07 link http_526, homepage voicetype.io HTTP 526 (curl: HTTP 526)'
+- slug: voxqube.com
+  id: lst_11983b4daf385802e59d6cee
+  website: https://serp.ly/voxqube
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage voxqube.com HTTP 404 (curl: HTTP 404)'
+- slug: warmest.ai
+  id: lst_5def671957f327721d4f3256
+  website: https://serp.ly/warmest
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage warmest.ai EPROTO (curl: no response)'
+- slug: wavechat.ai
+  id: lst_490518aeab0ddadd095a74cb
+  website: https://serp.ly/wavechat
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage wavechat.ai HTTP 404 (curl: HTTP 404)'
+- slug: wepik.com
+  id: lst_0a1fc475d2ebe069d05208ab
+  website: https://serp.ly/wepik
+  class: trash
+  reason: 'not the listed product: the link lands on www.magnific.com (403); its own domain on www.magnific.com (That request didn''t go through. Our security filter flagged )'
+- slug: windsor.io
+  id: lst_8dfc2f075c5c449ff71f3cf8
+  website: https://serp.ly/windsor
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage windsor.io EPROTO (curl: no response)'
+- slug: workflos.ai
+  id: lst_c27f8f835f9b56489c2ad2e5
+  website: https://serp.ly/workflos
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_404; 2026-10-07 link http_404, homepage workflos.ai HTTP 404 (curl: HTTP 404)'
+- slug: writemyessays.ai
+  id: lst_b9fa8b0d8b223ebfafd0fc62
+  website: https://serp.ly/writemyessays
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (CERT_HAS_EXPIRED); 2026-10-07 link site_unreachable (CERT_HAS_EXPIRED), homepage writemyessays.ai CERT_HAS_EXPIRED (curl: no response)'
+- slug: writewithlaika.com
+  id: lst_d1ae82761b5249172ad98b3d
+  website: https://serp.ly/writewithlaika
+  class: trash
+  reason: 'not the listed product: the link lands on cleverhumanizer.ai (Clever AI Humanizer - Humanize AI 100% Free, Unlimited words); its own domain on cleverhumanizer.ai (Clever AI Humanizer - Humanize AI 100% Free, Unlimited words)'
+- slug: ycombinator.com
+  id: lst_7ab3ac3b9f6ac281166a386e
+  website: https://serp.ly/usebracket
+  class: trash
+  reason: 'not the listed product: the link lands on usebracket.com (EPROTO); its own domain on www.ycombinator.com (Y Combinator)'
+- slug: zaplingo.com
+  id: lst_ec10fdd6092272db3d0bbd54
+  website: https://serp.ly/zaplingo
+  class: trash
+  reason: 'not the listed product: the link lands on zaplingo.webflow.io (404); its own domain on zaplingo.webflow.io (404 - Page not found)'
+- slug: zeda.io
+  id: lst_ecf00a4d870d8936abaa6894
+  website: https://serp.ly/zeda
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage zeda.io EPROTO (curl: no response)'
+- slug: zeg.ai
+  id: lst_e03306b36233640f6adeb0a0
+  website: https://serp.ly/zeg-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_526; 2026-10-07 link http_526, homepage zeg.ai HTTP 526 (curl: HTTP 526)'
+- slug: zenen.ai
+  id: lst_3430b862ec915b0c2756ae7d
+  website: https://serp.ly/zenen-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_526; 2026-10-07 link http_526, homepage zenen.ai HTTP 526 (curl: HTTP 526)'
+- slug: zerogptdetector.com
+  id: lst_f9f73e086b1bd76e2ced88a1
+  website: https://serp.ly/zerogpt-detector
+  class: gone
+  reason: 'site does not work: 2026-10-06 http_502; 2026-10-07 link http_502, homepage zerogptdetector.com HTTP 502 (curl: HTTP 502)'
+- slug: zevi.ai
+  id: lst_851e3fa18c1e78bcd8040106
+  website: https://serp.ly/zevi-ai
+  class: gone
+  reason: 'site does not work: 2026-10-06 site_unreachable (EPROTO); 2026-10-07 link site_unreachable (EPROTO), homepage zevi.ai EPROTO (curl: no response)'

@@ -9,11 +9,14 @@ import { readParityReport, readReviewedImportSql } from './d1-import-artifact'
 import { buildPublicationPlan, parseManifest } from './d1-publisher'
 import {
   buildDeadDomainManifest,
+  buildDecisionsManifest,
   buildReport,
   buildUnpublishManifest,
   type CatalogListing,
   type DomainReport,
   deadDomainEntries,
+  decisionsPathFor,
+  type OwnerListDecisions,
   parseArguments,
   recheckPathFor,
   reviewedImportListings
@@ -948,4 +951,91 @@ describe('listing domain report and manifest', () => {
       ).toBe(false)
     }
   })
+
+  it('unpublishes the owner’s decisions, each with its class and reason (#104)', () => {
+    const decisions: OwnerListDecisions = {
+      decidedAt: '2026-10-07',
+      evidence: [],
+      unpublish: [
+        {
+          class: 'gone',
+          id: 'lst_fixture00002',
+          reason: 'site does not work',
+          slug: 'bravo.io',
+          website: 'https://serp.ly/bravo'
+        }
+      ]
+    }
+    const source = buildDecisionsManifest(decisions, catalog, {
+      decisionsPath: 'd.yaml',
+      id: '2026-10-07-owner-list-cleanup'
+    })
+    expect(parseManifest(source).operations).toEqual([
+      {
+        action: 'listing-unpublish',
+        categories: ['seo', 'ai-writing'],
+        expected: { website: 'https://serp.ly/bravo' },
+        id: 'lst_fixture00002',
+        reason: '#104 gone: site does not work',
+        slug: 'bravo.io'
+      }
+    ])
+    const wrongClass = {
+      ...decisions,
+      unpublish: [{ ...decisions.unpublish[0], class: 'meh' }]
+    } as unknown as OwnerListDecisions
+    expect(() =>
+      buildDecisionsManifest(wrongClass, catalog, { decisionsPath: 'd', id: 'x' })
+    ).toThrow('gone or trash')
+  })
+
+  it('keeps each committed owner-list cleanup identical to its decisions, and disjoint from other unpublications', () => {
+    const publications = readdirSync(resolve('d1/publications'))
+    const unpublished = new Map<string, string>()
+    for (const file of publications) {
+      if (file.endsWith('-owner-list-cleanup.yaml')) continue
+      const manifest = parseManifest(readFileSync(resolve('d1/publications', file), 'utf8'))
+      for (const operation of manifest.operations)
+        if (operation.action === 'listing-unpublish') unpublished.set(operation.id, file)
+    }
+    const listings = reviewedImportListings()
+    for (const file of publications.filter(name => name.endsWith('-owner-list-cleanup.yaml'))) {
+      const source = readFileSync(resolve('d1/publications', file), 'utf8')
+      const manifest = parseManifest(source)
+      const decisionsPath = decisionsPathFor(file.slice(0, 10))
+      const decisions = parse(readFileSync(resolve(decisionsPath), 'utf8')) as OwnerListDecisions
+      expect(source, file).toBe(
+        buildDecisionsManifest(decisions, listings, { decisionsPath, id: manifest.id })
+      )
+      // Another manifest's unpublish would leave the listing not live, and this one refuses whole.
+      for (const operation of manifest.operations)
+        expect(unpublished.get(operation.id), operation.slug).toBeUndefined()
+      const database = new DatabaseSync(':memory:')
+      for (const migration of freshMigrationNames())
+        database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
+      database.exec(readReviewedImportSql(readParityReport()))
+      const live = database
+        .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
+        .get() as { checksum: string; version: number }
+      const plan = buildPublicationPlan(manifest, source, '2026-10-07T00:00:00.000Z', live)
+      database.exec('BEGIN')
+      for (const item of plan.statements) {
+        assertD1StatementLimits(item.query, item.bindings)
+        database
+          .prepare(item.query)
+          .run(
+            ...(item.bindings.map(value =>
+              typeof value === 'boolean' ? Number(value) : value
+            ) as SQLInputValue[])
+          )
+      }
+      database.exec('COMMIT')
+      expect(
+        database
+          .prepare(`SELECT COUNT(*) AS count FROM listings WHERE status='approved' AND is_active=0`)
+          .get()
+      ).toEqual({ count: manifest.operations.length })
+      database.close()
+    }
+  }, 60_000)
 })
