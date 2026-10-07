@@ -318,6 +318,23 @@ test.describe('submit v2', () => {
       'href',
       '/products/frase.io/#claim'
     )
+    await expect(page.getByRole('button', { name: 'Sign in and continue' })).toBeDisabled()
+    const listed = await owner.request.post('/api/submissions', {
+      data: {
+        categorySlug: 'video-downloaders',
+        content: '',
+        description: 'Listed.',
+        logoUrl: `${fixture.website(iconLabel)}icon.png`,
+        name: 'Listed',
+        website: 'https://frase.io/pricing'
+      },
+      headers: { origin }
+    })
+    expect(listed.status()).toBe(409)
+    expect(await listed.json()).toMatchObject({
+      availability: { kind: 'listed' },
+      code: 'listing_exists'
+    })
 
     // A prohibited block covers the registrable domain and its subdomains.
     executeLocalD1(
