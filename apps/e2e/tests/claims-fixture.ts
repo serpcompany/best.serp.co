@@ -4,9 +4,10 @@ import { adminSuiteEnabled, localD1, type SuiteServer } from './admin-fixture'
 
 /**
  * The claims suite (serpcompany/best.serp.co#67) runs on its own local Worker with its own D1,
- * started from the already-built Worker with `LOCAL_CLAIMS=on` (claims run while
- * `features.claims` is off, on a local Worker only), `LOCAL_BADGE_PROGRAM=on` (the badge program
- * removes a badge claimer, #66), and `--test-scheduled`. Never used against a deployed Worker.
+ * started from the already-built Worker with `--test-scheduled` and the site's flags (#130):
+ * claims and the badge program (which removes a badge claimer, #66) on, with no local switch,
+ * and orders (#68) off, so the claim dialog offers only the badge. Never used against a deployed
+ * Worker.
  */
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
@@ -30,7 +31,7 @@ export function claimsServerCommand(): string {
     `rm -rf "${state}"`,
     `mkdir -p "${state}"`,
     `HARNESS_D1_STATE_DIRECTORY="${state}" pnpm db:migrate:local`,
-    `HARNESS_D1_STATE_DIRECTORY="${state}" LOCAL_PREVIEW_VARS=LOCAL_CLAIMS=on,LOCAL_BADGE_PROGRAM=on PORT=${claimsServer.port} pnpm tsx scripts/d1-local-preview.ts`
+    `HARNESS_D1_STATE_DIRECTORY="${state}" PORT=${claimsServer.port} pnpm tsx scripts/d1-local-preview.ts`
   ].join(' && ')
 }
 

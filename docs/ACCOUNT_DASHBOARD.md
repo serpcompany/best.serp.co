@@ -83,10 +83,14 @@ is disabled while a check runs and through the cooldown (the owner decision for 
 with no "too many checks" copy. The owner's checks are recorded on the submission
 (`last_verification_at` and `badge_verified` / `verification_failed` events), never in `badge_checks`, which stays the
 badge program's (#66) history, so a manual miss can't start #66's recheck or count toward the
-refund window. The history merges both, marked "You" or the program's label. Until
-`features.badgeProgram` is on, nothing promises weekly checks (`feature-copy.ts`), and the
-"Upgrade: $49 one-off" entry point (in the badge panel) and an unlisted listing's "Relist for
-$49" show only while orders are on ([Billing](./BILLING.md)).
+refund window. The history merges both, marked "You" or the program's label. With
+`features.badgeProgram` on (#130), the panel says "Free listing · checked weekly", a failing
+badge reads "Fix the badge before the recheck" with "If it’s still failing at the recheck about
+24 hours later, the listing is unlisted.", the program's checks are labelled "Weekly", and the
+overview's "Badge checks" card says "Free listings are checked weekly" (`feature-copy.ts`; off,
+none of it promises weekly checks). The "Upgrade: $49 one-off" entry point (in the badge panel)
+and an unlisted listing's "Relist for $49" show only while orders are on
+([Billing](./BILLING.md)).
 
 ## Logos
 

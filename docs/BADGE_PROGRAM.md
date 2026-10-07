@@ -7,16 +7,30 @@ anything happens (`apps/web/lib/badge-program/`, D1 side in
 
 ## Switching it on
 
-It runs only while `features.badgeProgram` (`apps/web/lib/features.ts`) is on. While it is off,
-each trigger's job returns `{ enabled: false }` without reading D1 or fetching any site. The
-owner turns it on at launch. Its emails link to #65's `/account/listings/<slug>/`, and offer
-what later issues build only while their flags are on: the paid upgrade and "Relist" (#68) with
-`features.orders`, and claiming again (#67, by badge or payment) with `features.claims` and
-`features.orders`. The email audit (`links.test.ts`) fails if a badge email offers either while
-its flag is off. A local Worker can run it with the flag off
-(`LOCAL_PREVIEW_VARS=LOCAL_BADGE_PROGRAM=on`; ignored unless `SITE_ENVIRONMENT` and
-`D1_RUNTIME_ENV` are both `local`), which `apps/e2e/tests/badge-program.spec.ts` uses with
-`/__scheduled?cron=<expression>` against fixture sites.
+It runs only while `features.badgeProgram` (`apps/web/lib/features.ts`) is on. **It is on**
+since #130 (the owner's launch decision, 2026-10-07): each trigger's job reads D1 and checks
+sites, and logs its counts instead of `{ enabled: false }`. The approved wording that promises
+weekly checks shows with it (`apps/web/lib/feature-copy.ts`): the free plan's "Keep the badge
+up: we check it every week", the badge step's "Keep the badge up" card, the account's "Badge
+checks" card ("Free listings are checked weekly") and badge panel ("Free listing · checked
+weekly", "Fix the badge before the recheck"), the claim dialog's badge card and "Keep the badge"
+alert, and the `listing-approved` email ("We check it every week, and a free listing whose
+badge goes missing is removed."). The program's own emails (`badge-missing`, `listing-unlisted`,
+`ownership-removed`) are now sent.
+
+Its emails link to #65's `/account/listings/<slug>/`, and offer what later issues build only
+while their flags are on: the paid upgrade and "Relist" (#68) with `features.orders`, and
+claiming again (#67, by badge or payment) with `features.claims` and `features.orders`. Orders
+are still off, so none of these offers is sent yet. The email audit (`links.test.ts`) fails if
+a badge email offers either while its flag is off. The account's "unlisted" status says
+"Removed from best.serp.co." until orders are on too.
+
+Turning the flag off again makes each job return `{ enabled: false }` without reading D1 or
+fetching any site, and takes the weekly-check copy out. A local Worker can still run the
+program with the flag off (`LOCAL_PREVIEW_VARS=LOCAL_BADGE_PROGRAM=on`; ignored unless
+`SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` are both `local`). No suite needs it while the flag is
+on: `apps/e2e/tests/badge-program.spec.ts` runs `/__scheduled?cron=<expression>` against
+fixture sites on the site's flags.
 
 ## How it works
 
@@ -101,9 +115,9 @@ The admin Orders refund calls it ([Billing](./BILLING.md)).
 ## Checking it on staging
 
 After a deploy, the Worker's Settings → Triggers list `0 * * * *`, `15 3 * * 1`, and
-`45 3 * * *`. Each run logs `scheduled_job_finished` with `job: "badge-program"` and either
-`enabled: false` or its counts (`weekly`, `warned`, `confirmations`, `unpublished`, `revoked`,
-`inconclusive`, `skipped`, `more`). A listing with `source = 'admin'` and no badge claim never
+`45 3 * * *`. Each run logs `scheduled_job_finished` with `job: "badge-program"`,
+`enabled: true` (`false` only if the flag is turned off), and its counts (`weekly`, `warned`,
+`confirmations`, `unpublished`, `revoked`, `inconclusive`, `skipped`, `more`). A listing with `source = 'admin'` and no badge claim never
 gets a weekly or confirmation check (expect 0), and the second query counts the live free
 submitted listings outside the program because nobody can be warned (no current owner with an
 address, and no submitter fallback):

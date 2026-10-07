@@ -153,7 +153,7 @@ wouldn't match its order. Then set `features.orders` to `true`.
 `apps/web/lib/billing/{service,providers/stripe}.test.ts` (node:sqlite and a fake provider),
 `scripts/d1-drizzle-local.test.ts` (the migration), and `apps/e2e/tests/billing.spec.ts`
 (Playwright on the admin panel suite's Worker and D1, `PLAYWRIGHT_PORT` + 3, started with orders
-and claims on through `LOCAL_ORDERS` and `LOCAL_CLAIMS`, because a ninth preview Worker exhausted
+on through `LOCAL_ORDERS` (claims are on since #130), because a ninth preview Worker exhausted
 the CI runner's memory; the mocked Stripe API listens on `PLAYWRIGHT_PORT` + 8). It covers checkout success,
 checks failed, confirming then failed, and cancel; webhook replay; upgrade; refunds with a badge
 pass and a miss; the `other` rejection refund; and a paid claim.

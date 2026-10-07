@@ -95,10 +95,14 @@ media part; hijacked-domains, FAQs, and Adult do not depend on the upload and go
 |---|---|---|
 | `accountDashboard` | `true` (code constant) | `/login`, `/account` (submissions, listings, edit, revisions), submit v2 drafts; emails link there |
 | `listingFaqs` | `true` (#107) | FAQ section on listing pages; account says "Shown on your listing page." |
-| `badgeProgram` | `false` | Crons run but return `{enabled:false}`; no page or email promises weekly checks |
-| `claims` | `false` | No claim offers in emails |
-| `orders` | `false` | `/admin/orders/` 404, no paid upgrade or Relist offers |
-| `messages` | `false` | Emails point to `/contact/` (200) |
+| `badgeProgram` | `false`; **`true` since #130** | At promotion: crons ran but returned `{enabled:false}`, and no page or email promised weekly checks. Since #130: the crons check badges ([Badge program](../BADGE_PROGRAM.md)), and the weekly-check copy shows |
+| `claims` | `false`; **`true` since #130** | At promotion: no claim link, and no claim offers in emails. Since #130: "Claim this listing" on every listing without an owner, by the badge only while `orders` is off ([Claims](../CLAIMS.md)) |
+| `orders` | `false` | `/admin/orders/` 404, no paid upgrade, Relist, paid claim, or claim-again offers |
+| `messages` | `false` | Emails and the claim dialog point to `/contact/` (200) |
+
+#130 turns `badgeProgram` and `claims` on after this promotion (owner decision, 2026-10-07),
+for production with the next promotion; the rows above keep what this one shipped and say what
+changed.
 
 `site.features.showPaidListings` is `false` (`packages/site-config/src/site.ts:54`), so submit
 offers only the free plan. Nothing promises an unbuilt feature (`feature-copy.test.ts`,
@@ -114,8 +118,8 @@ never show FAQs twice. The manifest removes those blocks; the net is then a no-o
 
 | Cron | Jobs (`apps/web/lib/worker/scheduled.ts:176-181`) | With flags as shipped |
 |---|---|---|
-| `0 * * * *` | draft reminders and expiry; badge program | Drafts: always on (no drafts yet; later sends real reminder emails, free-plan copy). Badge: `{enabled:false}`, reads nothing |
-| `15 3 * * 1`, `45 3 * * *` | badge program weekly cycle, daily rechecks | `{enabled:false}` |
+| `0 * * * *` | draft reminders and expiry; badge program | Drafts: always on (no drafts yet; later sends real reminder emails, free-plan copy). Badge: `{enabled:false}`, reads nothing (since #130: continues the weekly cycle and rechecks in batches) |
+| `15 3 * * 1`, `45 3 * * *` | badge program weekly cycle, daily rechecks | `{enabled:false}` (since #130: runs, `{enabled:true}` with its counts) |
 | `*/15 * * * *` | listing media: due slots, ten per run; deletes finished submission images | Queue empty after `0007`; hosts admin logo edits and approvals into `cdn` under `best.serp.co/` |
 
 ## 5. Production prerequisites

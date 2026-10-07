@@ -3,6 +3,7 @@ import { createClaimOperations } from '@serpdirectory/data-ops/claims'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { SqliteD1 } from '../../../../packages/data-ops/src/test-support'
+import { features } from '../features'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'
 import { checkClaimAddress } from './address'
 import { claimFlags } from './flags'
@@ -101,6 +102,14 @@ describe('claim flags', () => {
       enabled: true,
       paid: true
     })
+  })
+
+  it('are on as the site ships (#130): the badge method only, and the contact page', () => {
+    for (const environment of ['staging', 'production']) {
+      expect(
+        claimFlags({ D1_RUNTIME_ENV: environment, SITE_ENVIRONMENT: environment }, features)
+      ).toEqual({ contactPath: '/contact/', enabled: true, paid: false })
+    }
   })
 })
 

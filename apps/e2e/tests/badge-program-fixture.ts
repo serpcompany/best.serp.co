@@ -6,11 +6,11 @@ import { adminSuiteEnabled, localD1, type SuiteServer } from './admin-fixture'
  * The badge program suite (serpcompany/best.serp.co#66) runs on its own local Worker with its
  * own D1, which `playwright.config.ts` starts from the already-built Worker: the suite
  * unpublishes listings and removes owners, and its scheduled runs check every listing in the
- * program, so it shares a D1 with no other suite. The Worker is started with
- * `LOCAL_BADGE_PROGRAM=on` (the program runs while `features.badgeProgram` is off, on a local
- * Worker only) and `--test-scheduled` (`scripts/d1-local-preview.ts`), so the suite runs
- * `scheduled()` through `/__scheduled?cron=…`, as Wrangler's `wrangler dev --test-scheduled`
- * does. Never used against a deployed Worker.
+ * program, so it shares a D1 with no other suite. The program runs because
+ * `features.badgeProgram` is on (#130), with no local switch, and the Worker is started with
+ * `--test-scheduled` (`scripts/d1-local-preview.ts`), so the suite runs `scheduled()` through
+ * `/__scheduled?cron=…`, as Wrangler's `wrangler dev --test-scheduled` does. Never used against
+ * a deployed Worker.
  */
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
@@ -28,7 +28,7 @@ export function badgeOrigin(): string {
   return `http://127.0.0.1:${badgeServer.port}`
 }
 
-/** Serves the built Worker on a fresh, migrated D1 of its own, with the badge program on. */
+/** Serves the built Worker on a fresh, migrated D1 of its own, with the site's flags. */
 export function badgeServerCommand(): string {
   const state = badgeServer.stateDirectory
   return [
@@ -36,7 +36,7 @@ export function badgeServerCommand(): string {
     `rm -rf "${state}"`,
     `mkdir -p "${state}"`,
     `HARNESS_D1_STATE_DIRECTORY="${state}" pnpm db:migrate:local`,
-    `HARNESS_D1_STATE_DIRECTORY="${state}" LOCAL_PREVIEW_VARS=LOCAL_BADGE_PROGRAM=on PORT=${badgeServer.port} pnpm tsx scripts/d1-local-preview.ts`
+    `HARNESS_D1_STATE_DIRECTORY="${state}" PORT=${badgeServer.port} pnpm tsx scripts/d1-local-preview.ts`
   ].join(' && ')
 }
 

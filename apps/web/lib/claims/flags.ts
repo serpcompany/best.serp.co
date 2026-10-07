@@ -2,11 +2,11 @@ import { ordersEnabledFor } from '../billing/flags'
 import type { SiteFeatures } from '../features'
 
 /**
- * Claims (#67) run only while `features.claims` is on, or on a local Worker started with
- * `LOCAL_CLAIMS=on` (`LOCAL_PREVIEW_VARS`, for the end-to-end suite; ignored unless
- * `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` are both `local`). While off, every claim endpoint
- * answers 404. Paid claims also need `features.orders` (#68): with it off, only the badge
- * method exists (a local Worker started with `LOCAL_ORDERS=on` counts, as billing does).
+ * Claims (#67) run only while `features.claims` is on (it is, since #130), or on a local Worker
+ * started with `LOCAL_CLAIMS=on` (`LOCAL_PREVIEW_VARS`, for testing with the flag off; ignored
+ * unless `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` are both `local`). While off, every claim
+ * endpoint answers 404. Paid claims also need `features.orders` (#68): with it off, only the
+ * badge method exists (a local Worker started with `LOCAL_ORDERS=on` counts, as billing does).
  */
 export interface ClaimFlags {
   /** Where an "already owned" answer sends someone: a claim conversation (#73) or /contact/. */

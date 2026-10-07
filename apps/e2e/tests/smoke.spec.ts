@@ -144,7 +144,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     expect(await expectCanonicalStructuredData(page)).toContain(site.publicUrl)
   })
 
-  test('renders a listing detail page at its canonical URL', async ({ page }) => {
+  test('renders a listing detail page at its canonical URL', async ({ baseURL, page }) => {
     const response = await page.goto(detailListing.path, { waitUntil: 'networkidle' })
     expect(response?.status()).toBe(200)
     await expect(
@@ -152,6 +152,14 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     ).toBeVisible()
     await expect(page).toHaveTitle(new RegExp(`${escapeRegExp(detailListing.name)}.*\\| SERP$`))
     await expectCanonical(page, detailListing.path)
+    // Claims are on (#67, #130): a listing without an owner offers the claim link. The import
+    // has no owners; on a deployed Worker someone may have claimed it since.
+    const claimLink = page.getByRole('button', { name: 'Claim this listing' })
+    await expect(
+      isLocalOrigin(baseURL)
+        ? claimLink
+        : claimLink.or(page.getByText('Verified owner', { exact: true })).first()
+    ).toBeVisible()
 
     const linkedUrls = await expectCanonicalStructuredData(page)
     expect(linkedUrls).toContain(absoluteUrl(detailListing.path))

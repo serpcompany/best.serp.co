@@ -295,11 +295,14 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await page.goto('/account/')
   await expect(row(page, name).getByText('Live', { exact: true })).toBeVisible()
   await expect(row(page, name).getByText(/Badge passing · checked/u)).toBeVisible()
+  // The badge program (#66) is on (#130): the "Badge checks" card promises weekly checks.
+  await expect(page.getByText('Free listings are checked weekly')).toBeVisible()
 
   // The badge panel: the last check, the code, the history, and Re-verify now.
   await row(page, name).getByRole('button', { name: 'Badge' }).click()
   const panel = page.getByRole('dialog')
   await expect(panel.getByText(`${name} badge`)).toBeVisible()
+  await expect(panel.getByText('Free listing · checked weekly')).toBeVisible()
   await expect(panel.getByText('Badge found, dofollow')).toBeVisible()
   // The panel's own budget (10 a day); the badge step's check doesn't count.
   await expect(panel.getByText('10 of 10')).toBeVisible()
@@ -312,10 +315,14 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await panel.getByRole('button', { name: 'Re-verify now' }).click()
   await expect(panel.getByRole('button', { name: /Check again in 0:/u })).toBeDisabled()
   await expect(panel.getByText('Link is nofollow')).toBeVisible()
-  await expect(panel.getByText('Fix the badge')).toBeVisible()
+  // With the badge program on, a failing badge is fixed before the program's recheck.
+  await expect(panel.getByText('Fix the badge before the recheck', { exact: true })).toBeVisible()
+  await expect(
+    panel.getByText(
+      'If it’s still failing at the recheck about 24 hours later, the listing is unlisted.'
+    )
+  ).toBeVisible()
   await expect(panel.getByText('9 of 10')).toBeVisible()
-  // No weekly checks are promised while the badge program (#66) is off.
-  await expect(panel.getByText(/weekly/iu)).toHaveCount(0)
   await capture(page, '05-badge-failing')
   await panel.getByRole('button', { name: 'Close' }).click()
   fixture.update(label, { badge: 'valid' })

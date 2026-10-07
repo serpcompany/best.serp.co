@@ -15,16 +15,20 @@ export interface SiteFeatures {
    * #66: the badge program (`lib/badge-program/`), which checks each free submitted or
    * badge-claimed listing every week, emails the owner when the badge goes missing, and
    * unpublishes the listing (or removes the claimer's ownership) when a recheck about 24 hours
-   * later confirms it. Off: its Cron Trigger runs do nothing, and the submit pages and the
-   * approval email don't promise weekly checks (`lib/feature-copy.ts`). The owner turns it on at
-   * launch. Its emails link to #65's `/account/listings/<slug>/` (`email/emails/links.test.ts`),
-   * and offer paid listings and claims only while `orders` and `claims` are on.
+   * later confirms it. On since #130 (the owner's launch decision): its Cron Triggers run, and
+   * the submit pages, the account's badge panel, the claim dialog and the approval email promise
+   * weekly checks (`lib/feature-copy.ts`). Off, its runs would do nothing and that copy would be
+   * left out. Its emails link to #65's `/account/listings/<slug>/` (`email/emails/links.test.ts`),
+   * and offer a paid listing only while `orders` is on, and claiming again (by the badge or a
+   * payment) only while `claims` and `orders` both are.
    */
   readonly badgeProgram: boolean
   /**
-   * #67: claiming an existing listing with the badge or a payment (`lib/claims/`). Off: every
-   * claim endpoint answers 404, and emails don't offer to claim a listing (again). It stays off
-   * until the claim dialog (#70 screen 8) is built; see docs/CLAIMS.md.
+   * #67: claiming an existing listing with the badge or a payment (`lib/claims/`), from the
+   * listing page's "Claim this listing" link and dialog (#70 screens 8 and 9). On since #130:
+   * the badge method only, since a paid claim also needs `orders`. Off, every claim endpoint
+   * would answer 404, the listing page would show no claim link, and emails wouldn't offer to
+   * claim a listing (again). See docs/CLAIMS.md.
    */
   readonly claims: boolean
   /**
@@ -34,21 +38,21 @@ export interface SiteFeatures {
   readonly listingFaqs: boolean
   /**
    * #73: conversations with the SERP team (`/account/messages/`, `/admin/inbox/`). Off: emails
-   * point to `/contact/` instead.
+   * and the claim dialog's contact path point to `/contact/` instead.
    */
   readonly messages: boolean
   /**
    * #68: orders (admin screen 13), through the billing provider. Off: the admin sidebar hides Orders and
-   * `/admin/orders/` stays a 404 (the admin catch-all), and the badge program's emails leave out
-   * the paid upgrade and "Relist" offers.
+   * `/admin/orders/` stays a 404 (the admin catch-all), the claim dialog offers only the badge,
+   * and the badge program's emails leave out the paid upgrade, "Relist", and claiming again.
    */
   readonly orders: boolean
 }
 
 export const features: SiteFeatures = {
   accountDashboard: true,
-  badgeProgram: false,
-  claims: false,
+  badgeProgram: true,
+  claims: true,
   listingFaqs: true,
   messages: false,
   orders: false

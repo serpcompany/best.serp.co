@@ -48,12 +48,13 @@ export function adminOrigin(server: SuiteServer = adminServer): string {
 
 /**
  * Serves the built Worker on a fresh, migrated D1 of its own (seeded by the suite). The admin
- * Worker also has orders and claims on: the orders suite (`billing.spec.ts`, #68) shares it
- * (`orders-worker.ts`) rather than starting another preview Worker on the CI runner.
+ * Worker also has orders on (claims are on everywhere, #130): the orders suite
+ * (`billing.spec.ts`, #68) shares it (`orders-worker.ts`) rather than starting another preview
+ * Worker on the CI runner.
  */
 export function adminServerCommand(server: SuiteServer = adminServer): string {
   const state = server.stateDirectory
-  const vars = server === adminServer ? ['LOCAL_CLAIMS=on', ...ORDERS_PREVIEW_VARS] : []
+  const vars = server === adminServer ? ORDERS_PREVIEW_VARS : []
   const previewVars = vars.length > 0 ? `LOCAL_PREVIEW_VARS=${vars.join(',')} ` : ''
   return [
     'cd ../..',
