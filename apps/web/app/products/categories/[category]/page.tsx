@@ -114,7 +114,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       JsonLd,
       breadcrumb: (
         <Breadcrumb
-          items={[{ name: category.name, href: categoryPath }]}
+          items={[
+            { name: 'Categories', href: getRoute('category.index') },
+            { name: category.name, href: categoryPath }
+          ]}
           baseUrl={SITE_PUBLIC_URL}
         />
       )

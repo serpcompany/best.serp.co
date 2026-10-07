@@ -1,12 +1,15 @@
 import { getRoute } from '@serpdirectory/web-core/routes'
+import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import { siteConfig } from '@serpdirectory/web-core/site-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateBaseMetadata({
   title: `${siteConfig.name} Pricing`,
-  description: 'Choose a plan to list, feature, and promote a product or resource on SERP.'
-}
+  description:
+    'Choose a plan to list, feature, and promote a product or resource on SERP: submit a directory listing for review, or sponsor SERP to reach its audience.',
+  path: '/pricing/'
+})
 
 export default function PricingPage() {
   return (
