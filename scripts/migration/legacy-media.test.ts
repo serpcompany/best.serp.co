@@ -20,6 +20,7 @@ import {
   migrateLegacyMedia,
   ownDomains,
   pageFlags,
+  snapshotListingsSql,
   sourceFor,
   spamSignal
 } from './legacy-media'
@@ -236,6 +237,32 @@ describe('legacy media migration (#95)', () => {
     ])
     expect(approved.plan.id).toBe('legacy-media-regenerated')
     expect(isLikelyRebrand(new Set(['hijacked.test']), 'casino.example')).toBe(false)
+
+    // An approved rebrand whose refused replacement removed its dead rows (it shows the tile) has
+    // no rows on the environment: it still takes its site's icon, from no expected rows. A listing
+    // with no rows that is not approved stays as it is.
+    const noRows: CatalogSnapshot = { listings, rows: () => [] }
+    expect(snapshotListingsSql(['notion.test', "o'brien.test"])).toContain(
+      "OR l.slug IN ('notion.test','o''brien.test')"
+    )
+    expect(snapshotListingsSql()).not.toContain('l.slug IN')
+    const restored = await migrateLegacyMedia({
+      allowedDomains: { 'notion.test': 'notion.example' },
+      fetcher,
+      migrationId: 'legacy-media-rebrands',
+      snapshot: noRows
+    })
+    expect(bySlug(restored, 'notion.test')?.logo).toMatchObject({ kind: 'replaced' })
+    expect(bySlug(restored, 'lambdalabs.test')?.logo.kind).toBe('none')
+    expect(bySlug(restored, 'brightlocal.test')?.logo.kind).toBe('none')
+    const [part] = restored.manifests
+    expect(restored.manifests).toHaveLength(1)
+    expect(part?.text).toContain('slug: notion.test')
+    expect(part?.text).toContain('expected: []')
+    expect(part?.text).not.toContain('lambdalabs.test')
+    expect(restored.plan.objects.map(object => object.key)).toEqual([
+      expect.stringMatching(/^best\.serp\.co\/listings\/notion\.test\/logo\//u)
+    ])
   }, 120_000)
 
   it('treats adult platforms as adult by name, whatever their category (#98 r2 S2)', async () => {

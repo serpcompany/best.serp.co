@@ -236,7 +236,12 @@ refused replacements, and each logo left on the tile are in `d1/media/2026-10-06
     dead short link that ends on serp.co's catch-all falls back to the slug's domain;
   - an off-domain page with the same brand is listed as a "likely rebrand"; the owner approves
     one with a line in `scripts/migration/legacy-media-allowed-domains.json` (`"<slug>":
-    "<domain>"`) or `--allow-domain <slug>=<domain>`, and the next regeneration takes it;
+    "<domain>"`) or `--allow-domain <slug>=<domain>`, and the next regeneration takes it. A
+    refused rebrand's dead rows were removed (it shows the tile), so the `--current` export's
+    listings query adds every approved slug, and an approved listing with no logo or image row
+    takes its site's icon and social image from no expected rows. The 26 approved on 2026-10-07
+    (each listing compared with the page it lands on; the other 14 are a different company, a
+    for-sale or coming-soon page, or unclear) are in `2026-10-07-legacy-media-rebrands`;
   - it is not a parking, for-sale, gambling, or spam page (`pageFlags`).
   - The logo is the site icon, at least 64 px; the featured image is the social image.
 - **Adult listings**, by the Adult category or by an adult platform's name (`ADULT_TERMS`, a
