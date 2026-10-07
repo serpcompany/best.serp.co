@@ -1,9 +1,12 @@
+import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateBaseMetadata({
   title: 'Sponsor SERP',
-  description: 'Sponsorship options for reaching the SERP audience.'
-}
+  description:
+    'Sponsorship options for reaching the SERP audience: people researching software, AI tools, resources, and SERP network projects.',
+  path: '/sponsor/'
+})
 
 export default function SponsorPage() {
   return (

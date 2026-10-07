@@ -1,10 +1,13 @@
+import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import { siteConfig } from '@serpdirectory/web-core/site-config'
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateBaseMetadata({
   title: `Contact ${siteConfig.name}`,
-  description: 'Get in touch with the SERP team.'
-}
+  description:
+    'Contact the SERP team for listing, partnership, and support questions about the SERP directory of products and resources.',
+  path: '/contact/'
+})
 
 export default function ContactPage() {
   return (

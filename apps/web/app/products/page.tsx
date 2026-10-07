@@ -11,21 +11,21 @@ import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@serpdirect
 import { FeaturedProjectsSectionRoute as FeaturedProjectsSection } from '@serpdirectory/web-core/sections/featured-projects-section-route'
 import { RecentlyAddedSectionRoute as RecentlyAddedSection } from '@serpdirectory/web-core/sections/recently-added-section-route'
 import { StaticWebsitesListRoute as StaticWebsitesList } from '@serpdirectory/web-core/sections/static-websites-list-route'
-import { SITE_NAME, SITE_PUBLIC_URL } from '@serpdirectory/web-core/seo-config'
+import { generateBaseMetadata, SITE_NAME } from '@serpdirectory/web-core/seo-config'
+import { siteCopy } from '@serpdirectory/web-core/site-copy'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getHomePageData } from '@/actions/get-home-page-data'
 
 const productsPath = getRoute('listing.list')
 
-const productsMetadata: Metadata = {
-  title: `Products - ${SITE_NAME}`,
+// The root layout's title template adds ` | SERP`.
+const productsMetadata: Metadata = generateBaseMetadata({
+  title: `All ${siteCopy.listingName.pluralTitle} in the ${SITE_NAME} Directory`,
   description:
-    'Discover a curated list of SERP products, software, AI tools, companies, and resources.',
-  alternates: {
-    canonical: `${SITE_PUBLIC_URL}${productsPath}`
-  }
-}
+    'Discover a curated list of SERP products, software, AI tools, companies, and resources, and browse every listing in the directory page by page.',
+  path: productsPath
+})
 
 interface ProductsPageProps {
   searchParams: Promise<{ page?: string | string[] }>
