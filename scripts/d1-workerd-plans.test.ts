@@ -351,7 +351,8 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         submissionId: 'sub-free'
       })
     )
-    // Badge verification is the legacy capability operation; set its result directly.
+    // Badge verification is a submission operation (claim, then finish), not a plan; set its
+    // result directly.
     await db
       .prepare(
         "UPDATE listing_submissions SET status='verified', badge_verified_at=? WHERE id='sub-free'"
@@ -1049,10 +1050,10 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         .bind(NOW, listingId),
       db.prepare(
         `INSERT INTO listing_submissions (id,slug,block_key,block_covers_subdomains,name,
-          description,website,content,category_slug,logo_url,status,access_token_hash)
+          description,website,content,category_slug,logo_url,status)
         VALUES ('sub-media','media-sub.example','media-sub.example',1,'S','d',
           'https://media-sub.example/','c','tools','https://media-sub.example/logo.png',
-          'pending_badge','hash')`
+          'pending_badge')`
       )
     ])
     const sha = (digit: string) => digit.repeat(64)

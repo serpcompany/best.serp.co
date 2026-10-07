@@ -1,0 +1,21 @@
+# serpcompany/best.serp.co#98: unpublish fathom.video ("Fathom 2.0"), as the owner decided on
+# 2026-10-07. Its link (serp.ly/fathom-2-0) lands on a Fathom Analytics referral page, a different
+# company. Its page answers 410 Gone and leaves the sitemap, search, and RSS; the row stays
+# (Republish in /admin brings it back). Row-level: the operation refuses the listing if its website
+# or categories changed, or it is no longer live. Apply staging first, then production after
+# promotion.
+version: 1
+id: 2026-10-07-unpublish-fathom-video
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-unpublish
+    id: lst_f9d6c0ea1f127a79dbb09d50
+    slug: fathom.video
+    categories:
+      - other
+    reason: "#98 owner decision: the link lands on a different company (Fathom Analytics)"
+    expected:
+      website: https://serp.ly/fathom-2-0

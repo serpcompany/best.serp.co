@@ -76,12 +76,11 @@ describe('native submission intake', () => {
     expect(
       sqlite.database
         .prepare(
-          `SELECT status,plan,owner_user_id,draft_saved_at,block_key,block_covers_subdomains,
-            access_token_hash FROM listing_submissions`
+          `SELECT status,plan,owner_user_id,draft_saved_at,block_key,block_covers_subdomains
+            FROM listing_submissions`
         )
         .get()
     ).toEqual({
-      access_token_hash: null,
       block_covers_subdomains: 1,
       block_key: 'example.com',
       draft_saved_at: SAVED_AT,

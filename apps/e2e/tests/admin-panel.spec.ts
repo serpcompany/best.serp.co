@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, type Page, request as playwrightRequest, test } from '@playwright/test'
 import {
@@ -23,7 +23,9 @@ import {
  * The admin panel (serpcompany/best.serp.co#64) against the local Worker and local D1: the
  * gate, approving (the listing page and the sitemap after the epoch bump), requesting changes,
  * rejecting, allowing resubmission, unpublishing (410, out of the sitemap and search) and
- * republishing, and the allowlist. Every decision is replayed once to prove it is a no-op.
+ * republishing, and the allowlist. Each decision (approve, request changes, reject, allow
+ * resubmission, unpublish, republish, add and remove an admin) is replayed once to prove it is a
+ * no-op. The gate is probed on every admin page and API action.
  *
  * Set ADMIN_SCREENSHOT_DIRECTORY to save the screens compared against the #70 mockups.
  */
@@ -76,28 +78,108 @@ test.afterAll(() => {
   for (const email of admins) removeAdmin(email)
 })
 
+/** Every admin page (dynamic segments filled with ids that do not exist) and the catch-all. */
+const ADMIN_PAGES = [
+  '/admin/',
+  '/admin/admins/',
+  '/admin/listings/',
+  '/admin/listings/e2e-missing/',
+  '/admin/orders/',
+  '/admin/revisions/e2e-missing/',
+  '/admin/submissions/',
+  '/admin/submissions/e2e-missing/',
+  '/admin/not-a-page/'
+]
+/** Every admin API action, by method; the authorization runs before any action dispatch. */
+const ADMIN_ACTIONS: Array<['DELETE' | 'POST', string]> = [
+  ['POST', '/api/admin/admins'],
+  ['DELETE', '/api/admin/admins'],
+  ['POST', '/api/admin/not-an-action'],
+  ...[
+    'allow-resubmission',
+    'details',
+    'link-rel',
+    'remove-owner',
+    'republish',
+    'transfer-owner',
+    'unpublish'
+  ].map((action): ['POST', string] => ['POST', `/api/admin/listings/lst_missing/${action}`]),
+  ...['refund', 'refund-preview'].map((action): ['POST', string] => [
+    'POST',
+    `/api/admin/orders/ord_missing/${action}`
+  ]),
+  ...['approve', 'reject', 'request-changes'].map((action): ['POST', string] => [
+    'POST',
+    `/api/admin/revisions/rev_missing/${action}`
+  ]),
+  ...['allow-resubmission', 'approve', 'reject', 'request-changes'].map(
+    (action): ['POST', string] => ['POST', `/api/admin/submissions/e2e-missing/${action}`]
+  )
+]
+
+/** Every `page.tsx` and `route.ts` under `dir`, relative to the app directory. */
+function appFiles(dir: string, name: string): string[] {
+  const app = resolve(__dirname, '../../web/app')
+  return readdirSync(resolve(app, dir), { encoding: 'utf8', recursive: true })
+    .filter(file => file === name || file.endsWith(`/${name}`))
+    .map(file => `/${dir}/${file.slice(0, -name.length)}`)
+}
+
+/** A route file's path as a pattern: `[id]` matches one segment, `[...path]` one or more. */
+function routePattern(route: string): RegExp {
+  const pattern = route
+    .replace(/\[\[\.\.\.[^\]]+\]\]\/$/u, '(?:.+/)?')
+    .replace(/\[\.\.\.[^\]]+\]/gu, '.+')
+    .replace(/\[[^\]]+\]/gu, '[^/]+')
+  return new RegExp(`^${pattern}$`, 'u')
+}
+
 test.describe('admin gate', () => {
+  test('lists every admin page, API route, and action', () => {
+    for (const page of appFiles('admin', 'page.tsx')) {
+      expect(
+        ADMIN_PAGES.some(path => routePattern(page).test(path)),
+        page
+      ).toBe(true)
+    }
+    const app = resolve(__dirname, '../../web/app')
+    for (const route of appFiles('api/admin', 'route.ts')) {
+      const paths = ADMIN_ACTIONS.map(([, path]) => `${path}/`)
+      expect(
+        paths.some(path => routePattern(route).test(path)),
+        route
+      ).toBe(true)
+      if (!route.endsWith('/[action]/')) continue
+      // Each action the route dispatches on (`case 'x'`, `action === 'x'`) is probed.
+      const source = readFileSync(resolve(app, `.${route}route.ts`), 'utf8')
+      for (const [, action] of source.matchAll(/(?:case|action [!=]==) '([a-z-]+)'/gu)) {
+        const path = route.replace('[id]', '[^/]+').replace('[action]', action as string)
+        expect(
+          paths.some(probed => new RegExp(`^${path}$`, 'u').test(probed)),
+          path
+        ).toBe(true)
+      }
+    }
+  })
+
   test('blocks anonymous visitors and signed-in users who are not admins', async ({
     baseURL,
     request
   }) => {
-    const pages = ['/admin/', '/admin/submissions/', '/admin/listings/', '/admin/admins/']
-    const writes = [
-      '/api/admin/submissions/e2e-missing/approve',
-      '/api/admin/listings/lst_missing/unpublish',
-      '/api/admin/admins'
-    ]
+    test.setTimeout(120_000)
+    const origin = new URL(baseURL ?? '').origin
     const anonymous = await playwrightRequest.newContext({ baseURL })
     try {
-      for (const path of pages) {
+      for (const path of ADMIN_PAGES) {
         expect((await anonymous.get(path, { maxRedirects: 0 })).status(), path).toBe(401)
       }
-      for (const path of writes) {
-        const response = await anonymous.post(path, {
+      for (const [method, path] of ADMIN_ACTIONS) {
+        const response = await anonymous.fetch(path, {
           data: { expectedContentVersion: 1 },
-          headers: { origin: new URL(baseURL ?? '').origin }
+          headers: { origin },
+          method
         })
-        expect(response.status(), path).toBe(401)
+        expect(response.status(), `${method} ${path}`).toBe(401)
       }
     } finally {
       await anonymous.dispose()
@@ -105,15 +187,16 @@ test.describe('admin gate', () => {
 
     const member = client(request, baseURL)
     await signIn(member, `e2e-member-${unique()}@example.com`)
-    for (const path of pages) {
+    for (const path of ADMIN_PAGES) {
       expect((await request.get(path, { maxRedirects: 0 })).status(), path).toBe(403)
     }
-    for (const path of writes) {
-      const response = await request.post(path, {
+    for (const [method, path] of ADMIN_ACTIONS) {
+      const response = await request.fetch(path, {
         data: { expectedContentVersion: 1 },
-        headers: member.headers
+        headers: member.headers,
+        method
       })
-      expect(response.status(), path).toBe(403)
+      expect(response.status(), `${method} ${path}`).toBe(403)
       expect(await response.json()).toMatchObject({ error: 'admin_required' })
     }
   })
@@ -270,6 +353,16 @@ test.describe('review decisions', () => {
         `SELECT lifted_by FROM listing_submission_url_blocks WHERE url_key = ${q(prohibited.slug)}`
       )
     ).toEqual([{ lifted_by: adminEmail }])
+    const allowReplay = await page.request.post(
+      `/api/admin/submissions/${prohibited.id}/allow-resubmission`,
+      { data: {}, headers: admin.headers }
+    )
+    expect(await allowReplay.json()).toMatchObject({ ok: true, replayed: true })
+    expect(
+      localD1(
+        `SELECT lifted_by FROM listing_submission_url_blocks WHERE url_key = ${q(prohibited.slug)}`
+      )
+    ).toEqual([{ lifted_by: adminEmail }])
   })
 })
 
@@ -335,6 +428,13 @@ test.describe('listings', () => {
       await expect(async () => {
         expect((await visitor.get(`/products/${submission.slug}/`)).status()).toBe(200)
       }).toPass({ intervals: [1_000, 2_000, 5_000], timeout: 90_000 })
+      const published = publicationsFor(submission.slug)
+      const republishReplay = await page.request.post(
+        `/api/admin/listings/submission_${submission.id}/republish`,
+        { data: {}, headers: admin.headers }
+      )
+      expect(await republishReplay.json()).toMatchObject({ ok: true, replayed: true })
+      expect(publicationsFor(submission.slug)).toBe(published)
     } finally {
       await visitor.dispose()
     }
@@ -423,5 +523,10 @@ test.describe('listings', () => {
     await page.getByRole('alertdialog').getByRole('button', { name: 'Remove admin' }).click()
     await expect(page.getByText(`${added} is no longer an admin.`)).toBeVisible()
     expect(localD1(`SELECT email FROM admin_allowlist WHERE email = ${q(added)}`)).toEqual([])
+    const removeReplay = await page.request.delete('/api/admin/admins', {
+      data: { email: added },
+      headers: admin.headers
+    })
+    expect(await removeReplay.json()).toMatchObject({ ok: true, replayed: true })
   })
 })

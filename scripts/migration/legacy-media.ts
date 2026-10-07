@@ -304,16 +304,27 @@ export interface CatalogSnapshot {
   rows(listingId: string): CatalogMediaRow[]
 }
 
-/** Listings with a logo or image, and whether each is in the Adult category. */
-export const SNAPSHOT_LISTINGS_SQL = `SELECT l.id, l.slug, l.website,
+/**
+ * Listings with a logo or image, and whether each is in the Adult category. `include` adds
+ * listings by slug whatever their rows: an approved rebrand whose refused replacement removed its
+ * dead rows (it shows the tile) has none left, and still needs its site's icon and image.
+ */
+export function snapshotListingsSql(include: readonly string[] = []): string {
+  const slugs = include.map(slug => `'${slug.replaceAll("'", "''")}'`).join(',')
+  return `SELECT l.id, l.slug, l.website,
   EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
     WHERE lc.listing_id = l.id AND c.slug = 'adult') AS adult,
   (SELECT json_group_array(slug) FROM (SELECT c.slug FROM listing_categories lc
     JOIN categories c ON c.id = lc.category_id WHERE lc.listing_id = l.id
     ORDER BY lc.sort_order, c.slug)) AS categories
 FROM listings l
-WHERE EXISTS (SELECT 1 FROM listing_media m WHERE m.listing_id = l.id AND m.kind IN ('logo','image'))
+WHERE EXISTS (SELECT 1 FROM listing_media m WHERE m.listing_id = l.id AND m.kind IN ('logo','image'))${
+    slugs ? `\n  OR l.slug IN (${slugs})` : ''
+  }
 ORDER BY l.slug`
+}
+
+export const SNAPSHOT_LISTINGS_SQL = snapshotListingsSql()
 
 /** Every logo and image row, with its hosted metadata when it has a key. */
 export const SNAPSHOT_MEDIA_SQL = `SELECT listing_id, kind, url, sort_order, media_key, sha256,
@@ -851,8 +862,11 @@ export async function migrateLegacyMedia(options: {
       keptSources.push('hosted' in result ? 'already hosted' : classifySource(row?.url ?? ''))
     }
 
-    const needsLogo = logoIndex >= 0 && !logoResult?.ok
-    const needsImage = imageIndexes.length > 0 && keptImages.length === 0
+    // An approved rebrand with no row left (a refused replacement removed its dead ones) takes its
+    // site's icon and social image like a listing whose rows are dead.
+    const approved = Object.hasOwn(allowedDomains, listing.slug)
+    const needsLogo = logoIndex >= 0 ? !logoResult?.ok : approved
+    const needsImage = imageIndexes.length > 0 ? keptImages.length === 0 : approved
     let site: SiteImages | null = null
     if (needsLogo || needsImage) site = await siteImages(listing)
     if (site && site.refused.length > 0)
@@ -860,7 +874,10 @@ export async function migrateLegacyMedia(options: {
 
     if (needsLogo) {
       const deadUrl = rows[logoIndex]?.url ?? ''
-      const importReason = (logoResult as { reason?: string } | undefined)?.reason ?? 'dead'
+      const importReason =
+        logoIndex < 0
+          ? 'no logo'
+          : ((logoResult as { reason?: string } | undefined)?.reason ?? 'dead')
       if (site?.icon) {
         media.logo = hostedEntry(site.icon, 'logo', listing.slug)
         outcome.logo = {
@@ -1261,19 +1278,6 @@ async function main(): Promise<void> {
     const index = args.indexOf(name)
     return index >= 0 ? args[index + 1] : undefined
   }
-  // `--snapshot-sql <listings|media>`: the read-only query for a `--current` export.
-  const sql = option('--snapshot-sql')
-  if (sql) {
-    if (sql !== 'listings' && sql !== 'media') throw new Error('--snapshot-sql listings|media')
-    console.log(sql === 'listings' ? SNAPSHOT_LISTINGS_SQL : SNAPSHOT_MEDIA_SQL)
-    return
-  }
-  const limit = option('--limit') ? Number(option('--limit')) : undefined
-  const current = option('--current')
-  // `--part-size <n>`: listings per manifest (smaller parts if staging refuses a batch).
-  const partSize = option('--part-size') ? Number(option('--part-size')) : undefined
-  // `--manifest-id <id>`: new ids for a regeneration (an id that succeeded is never reused).
-  const migrationId = option('--manifest-id') ?? MIGRATION_ID
   // Owner-approved rebrands: the checked-in file, plus `--allow-domain <slug>=<domain>` flags.
   const allowedDomains: Record<string, string> = existsSync(resolve(ALLOWED_DOMAINS_FILE))
     ? (JSON.parse(readFileSync(resolve(ALLOWED_DOMAINS_FILE), 'utf8')) as Record<string, string>)
@@ -1284,6 +1288,22 @@ async function main(): Promise<void> {
     if (!slug || !domain) throw new Error('--allow-domain <slug>=<domain>')
     allowedDomains[slug] = domain
   })
+  // `--snapshot-sql <listings|media>`: the read-only query for a `--current` export. The listings
+  // query includes every approved rebrand, even one with no rows left.
+  const sql = option('--snapshot-sql')
+  if (sql) {
+    if (sql !== 'listings' && sql !== 'media') throw new Error('--snapshot-sql listings|media')
+    console.log(
+      sql === 'listings' ? snapshotListingsSql(Object.keys(allowedDomains)) : SNAPSHOT_MEDIA_SQL
+    )
+    return
+  }
+  const limit = option('--limit') ? Number(option('--limit')) : undefined
+  const current = option('--current')
+  // `--part-size <n>`: listings per manifest (smaller parts if staging refuses a batch).
+  const partSize = option('--part-size') ? Number(option('--part-size')) : undefined
+  // `--manifest-id <id>`: new ids for a regeneration (an id that succeeded is never reused).
+  const migrationId = option('--manifest-id') ?? MIGRATION_ID
   // `--refresh <upload summary>`: refetch the source of every object an upload reported failed.
   const refresh = new Set<string>()
   const summaryPath = option('--refresh')

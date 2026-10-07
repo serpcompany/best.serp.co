@@ -125,10 +125,6 @@
     "./websites-search-controls": "./src/websites-search-controls.tsx",
     "./websites-list-with-sort": "./src/websites-list-with-sort.tsx",
     "./websites-list-with-sort-route": "./src/websites-list-with-sort-route.tsx",
-    "./verify/badge-preview": "./src/verify/badge-preview.tsx",
-    "./verify/copy-snippet": "./src/verify/copy-snippet.tsx",
-    "./verify/submit-verify-page": "./src/verify/submit-verify-page.tsx",
-    "./verify/verify-button": "./src/verify/verify-button.tsx",
     "./website-schema": "./src/website-schema.ts",
     "./workspace-path": "./src/workspace-path.ts"
   },

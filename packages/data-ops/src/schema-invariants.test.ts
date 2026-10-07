@@ -61,11 +61,11 @@ describe('listing columns', () => {
 describe('submission status, plan, and decision invariants', () => {
   it('keeps a pre-#62 insert valid: it defaults to the legacy free flow, never a draft', () => {
     const db = database()
-    // Exactly the columns the Worker deployed before this migration writes.
+    // The columns the Worker deployed before #62 wrote, less the since-dropped token digest.
     db.prepare(
-      `INSERT INTO listing_submissions (access_token_hash,category_slug,content,description,id,
+      `INSERT INTO listing_submissions (category_slug,content,description,id,
         logo_url,name,slug,video_url,website)
-      VALUES ('digest','tools','c','d',?,'https://example.com/l.png','Example','example.com',NULL,
+      VALUES ('tools','c','d',?,'https://example.com/l.png','Example','example.com',NULL,
         'https://example.com/')`
     ).run(crypto.randomUUID())
     expect(
