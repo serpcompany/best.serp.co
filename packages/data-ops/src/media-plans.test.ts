@@ -67,9 +67,9 @@ function seedSubmission(db: DatabaseSync, logoUrl = 'https://example.com/logo.pn
   db.prepare(
     `INSERT INTO listing_submissions
       (id,slug,block_key,block_covers_subdomains,name,description,website,content,category_slug,
-       logo_url,status,access_token_hash,badge_verified_at,owner_user_id,plan)
+       logo_url,status,badge_verified_at,owner_user_id,plan)
      VALUES (?,'example.com','example.com',1,'Example','Description','https://example.com/',
-       'Content','tools',?,'verified','hash','2026-08-01T00:00:00.000Z','user_owner','free')`
+       'Content','tools',?,'verified','2026-08-01T00:00:00.000Z','user_owner','free')`
   ).run(submissionId, logoUrl)
 }
 

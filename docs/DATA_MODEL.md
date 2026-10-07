@@ -69,6 +69,10 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   foreign keys of `listing_owners`, `listing_revisions`, and `listing_submission_url_blocks`
   (their partial indexes cannot serve SQLite's foreign-key checks). It drops two indexes that
   duplicated a unique index and two no query used.
+- `0010_drop_retired_submission_data.sql` (#138) drops `listing_submission_notifications` (the
+  GitHub review notifier's ledger, retired by #69) and `listing_submissions.access_token_hash`
+  (retired by #63) with its unique index. It runs only after a Worker that reads neither is
+  live, because deploys migrate before they deploy.
 
 - `categories` stores taxonomy rows and display order (unique `slug`).
 - `listings` stores public product fields, status, publication time, and stable IDs
@@ -79,10 +83,7 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 - `migration_runs` and `publication_runs` record imports and applied manifests.
 - `listing_slug_redirects` maps retired slugs to their listing.
 - `listing_submissions` and its resource, FAQ, event, and rate-limit tables hold private
-  intake, owned by the signed-in submitter (#63). `access_token_hash` and
-  `listing_submission_notifications` (the GitHub review notifier's ledger, #69) are retired:
-  nothing reads or writes them, and a follow-up migration drops them once no live Worker
-  uses them.
+  intake, owned by the signed-in submitter (#63).
   `listing_submission_url_blocks` holds prohibited-URL blocks.
 - `listing_owners`, `listing_revisions` (with resource, FAQ, and event tables), and
   `badge_checks` hold ownership, owner edits, and badge program history (#62, below).
