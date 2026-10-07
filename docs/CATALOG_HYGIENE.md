@@ -13,6 +13,12 @@ Some listings' product domains now serve gambling or betting pages, are parked, 
 - **Dead domains** (owner decision of 2026-10-07, #104): an owner-list listing whose domain does
   not exist (DNS NXDOMAIN for its link, and for its own domain when that differs) in two checks
   a day or more apart is unpublished too. An HTTP error, a timeout, or a TLS failure is not.
+- **Gone or trash** (owner decision of 2026-10-07, #104): the rest of the owner list was reviewed
+  listing by listing into `d1/hygiene/2026-10-07-owner-list-decisions.yaml`. *Gone*: still
+  unreachable a day later, with the product's homepage failing too (the check's fetcher and curl).
+  *Trash*: the link and the listing's own domain land on something other than the listed product.
+  Rebrands, acquisitions that still offer the product, and broken links whose own domain still
+  serves the product stay live.
 
 ## The check
 
@@ -25,6 +31,8 @@ pnpm catalog:domains -- --only <the earlier report's NXDOMAIN slugs> \
   > d1/hygiene/<date>-dead-domains.recheck.yaml   # the second check, a day or more later
 pnpm catalog:domains -- dead-manifest --since <earlier date>
                                     # write d1/publications/<date>-dead-domains.yaml
+pnpm catalog:domains -- decisions-manifest   # d1/hygiene/<date>-owner-list-decisions.yaml →
+                                    # d1/publications/<date>-owner-list-cleanup.yaml
 pnpm catalog:claim-holds -- d1/hygiene/<date>-listing-domains.yaml <date>-listing-claim-holds
                                     # hold instant claims of the owner list (#67)
 ```
