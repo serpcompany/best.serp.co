@@ -8,6 +8,10 @@
  *                                        interrupted run; reclassifies without the network)
  *   pnpm catalog:domains -- manifest     write the reviewed publication manifest that unpublishes
  *                                        the report's `unpublish` list
+ *   pnpm catalog:domains -- dead-manifest --since <date>
+ *                                        write the manifest that unpublishes listings whose domain
+ *                                        does not exist in the --since report and in
+ *                                        d1/hygiene/<date>-dead-domains.recheck.yaml
  *
  * Listings come from the reviewed import (`d1/artifacts`), the catalog both environments were
  * bootstrapped from. Each manifest operation carries the website it was checked against, so the
@@ -160,31 +164,35 @@ export interface ManifestOptions {
   reportPath: string
 }
 
-/** The publication manifest that unpublishes a report's `unpublish` list. */
-export function buildUnpublishManifest(
-  report: DomainReport,
+/** One row-level `listing-unpublish` per entry, guarded by the website it was checked against. */
+function unpublishOperations(
+  entries: readonly ReportEntry[],
   listings: readonly CatalogListing[],
-  options: ManifestOptions
-): string {
+  reason: (entry: ReportEntry) => string
+) {
   const byId = new Map(listings.map(listing => [listing.id, listing]))
-  const operations = report.unpublish.map(entry => {
+  const operations = entries.map(entry => {
     const listing = byId.get(entry.id)
     if (!listing || listing.slug !== entry.slug || listing.website !== entry.website)
       throw new Error(`${entry.slug} no longer matches the reviewed catalog; rerun the check.`)
-    const label = entry.class === 'parking' ? 'parked or for sale' : 'gambling, betting, or spam'
     return {
       action: 'listing-unpublish',
       id: listing.id,
       slug: listing.slug,
       categories: listing.categories,
-      reason: `#100 hijacked domain, ${label}: ${entry.marker ?? entry.reason}`.slice(0, 200),
+      reason: reason(entry).slice(0, 200),
       expected: { website: listing.website }
     }
   })
   if (operations.length === 0) throw new Error('The report lists nothing to unpublish.')
+  return operations
+}
+
+/** A row-level manifest the publisher accepts (planned at the import's state), or an error. */
+function manifestSource(header: string, id: string, operations: unknown[]): string {
   const manifest = {
     version: 1,
-    id: options.id,
+    id,
     concurrency: 'rows',
     provenance: {
       actor: 'devinschumacher',
@@ -192,6 +200,24 @@ export function buildUnpublishManifest(
     },
     operations
   }
+  const source = `${header}${stringify(manifest, { lineWidth: 0 })}`
+  buildPublicationPlan(parseManifest(source), source, new Date().toISOString(), {
+    checksum: 'a'.repeat(64),
+    version: 1
+  })
+  return source
+}
+
+/** The publication manifest that unpublishes a report's `unpublish` list. */
+export function buildUnpublishManifest(
+  report: DomainReport,
+  listings: readonly CatalogListing[],
+  options: ManifestOptions
+): string {
+  const operations = unpublishOperations(report.unpublish, listings, entry => {
+    const label = entry.class === 'parking' ? 'parked or for sale' : 'gambling, betting, or spam'
+    return `#100 hijacked domain, ${label}: ${entry.marker ?? entry.reason}`
+  })
   const header = `# serpcompany/best.serp.co#100: unpublish ${operations.length} listings whose domain is hijacked (gambling, betting,
 # or spam), parked, or for sale, as the owner decided on 2026-10-06. Their pages answer 410 Gone and
 # leave the sitemap, search, and RSS; the rows stay (Republish in /admin brings one back).
@@ -201,13 +227,52 @@ export function buildUnpublishManifest(
 # review, and it names no base version, so it publishes in any order relative to #98's and #105's
 # manifests. Apply staging first, then production after promotion.
 `
-  const source = `${header}${stringify(manifest, { lineWidth: 0 })}`
-  // Refuse to write a manifest the publisher would not accept (planned at the import's state).
-  buildPublicationPlan(parseManifest(source), source, new Date().toISOString(), {
-    checksum: 'a'.repeat(64),
-    version: 1
+  return manifestSource(header, options.id, operations)
+}
+
+const deadDomain = (entry: ReportEntry) =>
+  entry.class === 'unreachable' && entry.status === 'ENOTFOUND'
+
+/**
+ * Owner-list listings whose host does not exist (DNS NXDOMAIN, for the link and, when it differs,
+ * the listing's own domain) in both reports, with the same website: the owner decided on
+ * 2026-10-07 (#104) that a domain gone in two checks a day or more apart is a dead product.
+ * Every other unreachable listing (an HTTP error, a timeout, TLS) stays on the owner list.
+ */
+export function deadDomainEntries(earlier: DomainReport, recheck: DomainReport): ReportEntry[] {
+  const before = new Map(earlier.ownerReview.filter(deadDomain).map(entry => [entry.id, entry]))
+  return recheck.ownerReview.filter(
+    entry => deadDomain(entry) && before.get(entry.id)?.website === entry.website
+  )
+}
+
+export interface DeadDomainManifestOptions {
+  id: string
+  earlierPath: string
+  recheckPath: string
+}
+
+/** The publication manifest that unpublishes listings whose domain no longer exists. */
+export function buildDeadDomainManifest(
+  earlier: DomainReport,
+  recheck: DomainReport,
+  listings: readonly CatalogListing[],
+  options: DeadDomainManifestOptions
+): string {
+  const since = earlier.generatedAt.slice(0, 10)
+  const until = recheck.generatedAt.slice(0, 10)
+  const operations = unpublishOperations(deadDomainEntries(earlier, recheck), listings, entry => {
+    const host = entry.finalUrl.replace(/^https?:\/\//u, '').split('/')[0]
+    return `#104 dead domain: ${host} does not exist (DNS), checked ${since} and ${until}`
   })
-  return source
+  const header = `# serpcompany/best.serp.co#104: unpublish ${operations.length} listings whose domain no longer exists (DNS
+# NXDOMAIN in both checks, as the owner decided on 2026-10-07). Their pages answer 410 Gone and leave
+# the sitemap, search, and RSS; the rows stay (Republish in /admin brings one back).
+# Evidence: ${options.earlierPath} and ${options.recheckPath}.
+# Generated by \`pnpm catalog:domains -- dead-manifest\`. Row-level, like the hijacked-domains
+# manifest. Apply staging first, then production after promotion.
+`
+  return manifestSource(header, options.id, operations)
 }
 
 async function pool<T, R>(
@@ -230,11 +295,12 @@ async function pool<T, R>(
 }
 
 interface Arguments {
-  command: 'manifest' | 'scan'
+  command: 'dead-manifest' | 'manifest' | 'scan'
   concurrency: number
   date: string
   only: Set<string> | null
   reuse: boolean
+  since: string | null
 }
 
 export function parseArguments(argv: readonly string[]): Arguments {
@@ -244,7 +310,8 @@ export function parseArguments(argv: readonly string[]): Arguments {
     concurrency: 8,
     date: new Date().toISOString().slice(0, 10),
     only: null,
-    reuse: false
+    reuse: false,
+    since: null
   }
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index]
@@ -255,6 +322,8 @@ export function parseArguments(argv: readonly string[]): Arguments {
       return next
     }
     if (flag === 'manifest' && index === 0) parsed.command = 'manifest'
+    else if (flag === 'dead-manifest' && index === 0) parsed.command = 'dead-manifest'
+    else if (flag === '--since') parsed.since = value()
     else if (flag === '--reuse') parsed.reuse = true
     else if (flag === '--date') parsed.date = value()
     else if (flag === '--concurrency') parsed.concurrency = Number(value())
@@ -262,6 +331,8 @@ export function parseArguments(argv: readonly string[]): Arguments {
     else throw new Error(`Unknown argument ${flag}. See scripts/listing-domain-check.ts.`)
   }
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(parsed.date)) throw new Error('--date must be YYYY-MM-DD.')
+  if (parsed.command === 'dead-manifest' && !/^\d{4}-\d{2}-\d{2}$/u.test(parsed.since ?? ''))
+    throw new Error('dead-manifest needs --since YYYY-MM-DD.')
   if (!Number.isInteger(parsed.concurrency) || parsed.concurrency < 1 || parsed.concurrency > 32)
     throw new Error('--concurrency must be 1 to 32.')
   return parsed
@@ -294,11 +365,26 @@ function readCache(): Map<string, SiteObservation & { id: string }> {
   return cache
 }
 const reportPathFor = (date: string) => `d1/hygiene/${date}-listing-domains.yaml`
+export const recheckPathFor = (date: string) => `d1/hygiene/${date}-dead-domains.recheck.yaml`
 
 async function main(): Promise<void> {
   const args = parseArguments(process.argv.slice(2))
   const report = readParityReport()
   const listings = reviewedImportListings()
+  if (args.command === 'dead-manifest') {
+    const earlierPath = reportPathFor(args.since ?? '')
+    const recheckPath = recheckPathFor(args.date)
+    const read = (path: string) => parse(readFileSync(resolve(path), 'utf8')) as DomainReport
+    const id = `${args.date}-dead-domains`
+    const manifest = buildDeadDomainManifest(read(earlierPath), read(recheckPath), listings, {
+      earlierPath,
+      id,
+      recheckPath
+    })
+    writeFileSync(resolve(`d1/publications/${id}.yaml`), manifest)
+    console.log(`Wrote d1/publications/${id}.yaml`)
+    return
+  }
   if (args.command === 'manifest') {
     const reportPath = reportPathFor(args.date)
     const id = `${args.date}-hijacked-domains`

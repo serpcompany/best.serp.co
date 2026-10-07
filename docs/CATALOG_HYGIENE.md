@@ -10,6 +10,9 @@ Some listings' product domains now serve gambling or betting pages, are parked, 
 - **Owner list only:** listings that end on another company's site (an acquisition such as
   `gretel.ai` → NVIDIA, or a rebrand) or are unreachable. They may be legitimate moves or
   outages, so nothing unpublishes them automatically.
+- **Dead domains** (owner decision of 2026-10-07, #104): an owner-list listing whose domain does
+  not exist (DNS NXDOMAIN for its link, and for its own domain when that differs) in two checks
+  a day or more apart is unpublished too. An HTTP error, a timeout, or a TLS failure is not.
 
 ## The check
 
@@ -18,6 +21,10 @@ pnpm catalog:domains                # fetch and classify; writes d1/hygiene/<dat
 pnpm catalog:domains -- --reuse     # reuse .runtime/listing-domains/, fetch only what is missing
 pnpm catalog:domains -- --only a.ai,b.io   # print the classification of a few listings
 pnpm catalog:domains -- manifest    # write d1/publications/<date>-hijacked-domains.yaml
+pnpm catalog:domains -- --only <the earlier report's NXDOMAIN slugs> \
+  > d1/hygiene/<date>-dead-domains.recheck.yaml   # the second check, a day or more later
+pnpm catalog:domains -- dead-manifest --since <earlier date>
+                                    # write d1/publications/<date>-dead-domains.yaml
 pnpm catalog:claim-holds -- d1/hygiene/<date>-listing-domains.yaml <date>-listing-claim-holds
                                     # hold instant claims of the owner list (#67)
 ```

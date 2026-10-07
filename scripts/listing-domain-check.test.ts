@@ -8,11 +8,14 @@ import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-loca
 import { readParityReport, readReviewedImportSql } from './d1-import-artifact'
 import { buildPublicationPlan, parseManifest } from './d1-publisher'
 import {
+  buildDeadDomainManifest,
   buildReport,
   buildUnpublishManifest,
   type CatalogListing,
   type DomainReport,
+  deadDomainEntries,
   parseArguments,
+  recheckPathFor,
   reviewedImportListings
 } from './listing-domain-check'
 import {
@@ -779,7 +782,110 @@ describe('listing domain report and manifest', () => {
     expect(() => parseArguments(['--date', '6/10/2026'])).toThrow('YYYY-MM-DD')
     expect(() => parseArguments(['--concurrency', '0'])).toThrow('1 to 32')
     expect(() => parseArguments(['--site', 'x'])).toThrow('Unknown argument')
+    expect(
+      parseArguments(['dead-manifest', '--date', '2026-10-07', '--since', '2026-10-06'])
+    ).toMatchObject({ command: 'dead-manifest', date: '2026-10-07', since: '2026-10-06' })
+    expect(() => parseArguments(['dead-manifest', '--date', '2026-10-07'])).toThrow('--since')
   })
+
+  it('unpublishes a domain only when it does not exist in both checks (#104)', () => {
+    const cartaFailing = (error: string) => ({
+      listing: catalog[2] as CatalogListing,
+      observation: observed(viaSerpLy({ url: 'https://carta.app/', error }), null)
+    })
+    // bravo.io does not exist in either check: dead. carta.app did not exist, then answered with a
+    // reset (an outage, or a different failure): never dead.
+    const earlier = buildReport(
+      [checked[1], cartaFailing('ENOTFOUND')] as Parameters<typeof buildReport>[0],
+      '2026-10-06T00:00:00.000Z',
+      'fixture'
+    )
+    const later = buildReport(
+      [checked[1], cartaFailing('ECONNRESET')] as Parameters<typeof buildReport>[0],
+      '2026-10-07T00:00:00.000Z',
+      'fixture'
+    )
+    expect(deadDomainEntries(earlier, later).map(entry => entry.slug)).toEqual(['bravo.io'])
+    // A website changed between the checks is a different listing: never dead.
+    const moved = {
+      ...later,
+      ownerReview: later.ownerReview.map(entry => ({ ...entry, website: 'https://bravo.io/' }))
+    }
+    expect(deadDomainEntries(earlier, moved)).toEqual([])
+    const source = buildDeadDomainManifest(earlier, later, catalog, {
+      earlierPath: 'a.yaml',
+      id: '2026-10-07-dead-domains',
+      recheckPath: 'b.yaml'
+    })
+    expect(parseManifest(source)).toMatchObject({ concurrency: 'rows' })
+    expect(parseManifest(source).operations).toEqual([
+      {
+        action: 'listing-unpublish',
+        categories: ['seo', 'ai-writing'],
+        expected: { website: 'https://serp.ly/bravo' },
+        id: 'lst_fixture00002',
+        reason:
+          '#104 dead domain: bravo.io does not exist (DNS), checked 2026-10-06 and 2026-10-07',
+        slug: 'bravo.io'
+      }
+    ])
+    expect(() =>
+      buildDeadDomainManifest(earlier, moved, catalog, {
+        earlierPath: 'a',
+        id: 'x-dead-domains',
+        recheckPath: 'b'
+      })
+    ).toThrow('nothing to unpublish')
+  })
+
+  it('keeps each committed dead-domain manifest identical to its two committed checks', () => {
+    const manifests = readdirSync(resolve('d1/publications')).filter(file =>
+      file.endsWith('-dead-domains.yaml')
+    )
+    const listings = reviewedImportListings()
+    for (const file of manifests) {
+      const source = readFileSync(resolve('d1/publications', file), 'utf8')
+      const manifest = parseManifest(source)
+      const [, earlierPath, recheckPath] = source.match(/^# Evidence: (\S+) and (\S+)\.$/mu) ?? []
+      expect(recheckPath, file).toBe(recheckPathFor(file.slice(0, 10)))
+      const read = (path: string) =>
+        parse(readFileSync(resolve(path as string), 'utf8')) as DomainReport
+      expect(source, file).toBe(
+        buildDeadDomainManifest(read(earlierPath), read(recheckPath), listings, {
+          earlierPath: earlierPath as string,
+          id: manifest.id,
+          recheckPath: recheckPath as string
+        })
+      )
+      // It applies, whole, to the reviewed catalog both environments started from.
+      const database = new DatabaseSync(':memory:')
+      for (const migration of freshMigrationNames())
+        database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
+      database.exec(readReviewedImportSql(readParityReport()))
+      const live = database
+        .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
+        .get() as { checksum: string; version: number }
+      const plan = buildPublicationPlan(manifest, source, '2026-10-07T00:00:00.000Z', live)
+      database.exec('BEGIN')
+      for (const item of plan.statements) {
+        assertD1StatementLimits(item.query, item.bindings)
+        database
+          .prepare(item.query)
+          .run(
+            ...(item.bindings.map(value =>
+              typeof value === 'boolean' ? Number(value) : value
+            ) as SQLInputValue[])
+          )
+      }
+      database.exec('COMMIT')
+      expect(
+        database
+          .prepare(`SELECT COUNT(*) AS count FROM listings WHERE status='approved' AND is_active=0`)
+          .get()
+      ).toEqual({ count: manifest.operations.length })
+      database.close()
+    }
+  }, 60_000)
 
   it('keeps the committed manifest identical to the committed report and the reviewed catalog', () => {
     const reports = existsSync(resolve('d1/hygiene'))

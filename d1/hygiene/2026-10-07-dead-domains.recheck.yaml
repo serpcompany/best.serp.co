@@ -1,0 +1,856 @@
+# serpcompany/best.serp.co#100: what each live listing's website shows (scripts/listing-domain-check.ts).
+# unpublish: gambling, betting, or spam pages, and parked or for-sale domains (owner decision of
+# 2026-10-06), the operations of the matching d1/publications manifest. ownerReview: listings
+# that end on another company's domain or are unreachable; the owner decides each, nothing is
+# unpublished automatically. Listings classified ok are counted only.
+generatedAt: 2026-10-07T03:51:08.104Z
+source: reviewed import 669f264f028a (publication 1), 120 live listings
+counts:
+  gambling-spam: 0
+  parking: 0
+  off-domain: 0
+  unreachable: 120
+  ok: 0
+unpublish: []
+ownerReview:
+  - slug: aylien.com
+    id: lst_b2793b388b2e79618604847a
+    website: https://serp.ly/aylien
+    class: unreachable
+    finalUrl: https://aylien.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: babylonhealth.com
+    id: lst_6429d2ac7680c27bbd76e732
+    website: https://serp.ly/babylonhealth.com
+    class: unreachable
+    finalUrl: https://babylonhealth.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: businessinsider.in
+    id: lst_2f5b449253e96531bd433a2c
+    website: https://serp.ly/content-generation-engine-by-dentsu
+    class: unreachable
+    finalUrl: https://www.businessinsider.in/advertising/ad-agencies/article/dentsu-apacs-data-sciences-division-launches-gpt-3-pow...
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: bypeers.ai
+    id: lst_0cc022677b43293dee135c2c
+    website: https://serp.ly/bypeers
+    class: unreachable
+    finalUrl: https://bypeers.ai/find-and-close-b2b-clients-on-auto-pilot/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: cardinalapp.io
+    id: lst_b2dfe48f7723467fb584e1a2
+    website: https://serp.ly/cardinal
+    class: unreachable
+    finalUrl: https://cardinalapp.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: casehopper.com
+    id: lst_36bdf307aeed50e30dcbe22e
+    website: https://serp.ly/casehopper
+    class: unreachable
+    finalUrl: https://www.casehopper.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: certainly.io
+    id: lst_4af8f2cf23b138fb3b804d3d
+    website: https://serp.ly/certainly
+    class: unreachable
+    finalUrl: https://certainly.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: chatable.cc
+    id: lst_0f568e9c69a528f6c714c271
+    website: https://serp.ly/chatable
+    class: unreachable
+    finalUrl: https://www.chatable.cc/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: chatgptdemo.net
+    id: lst_14404f2d302aecdc516ceb6c
+    website: https://serp.ly/chat-gpt-demo
+    class: unreachable
+    finalUrl: https://chatgptdemo.net/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: chattysurvey.com
+    id: lst_4f261be6ec6df080a926f331
+    website: https://serp.ly/chattysurvey
+    class: unreachable
+    finalUrl: https://chattysurvey.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: cheapnft.art
+    id: lst_f6aa21ced31302f1c43cd7ba
+    website: https://serp.ly/cheapnft-art
+    class: unreachable
+    finalUrl: https://cheapnft.art/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: clarifyze.ai
+    id: lst_178a3c394c6236db94434258
+    website: https://serp.ly/clarifyze
+    class: unreachable
+    finalUrl: https://clarifyze.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: codementorgpt.com
+    id: lst_993bfdf2dbd4a86e1b4641a7
+    website: https://serp.ly/codementorgpt
+    class: unreachable
+    finalUrl: https://codementorgpt.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: codesquire.ai
+    id: lst_af2c99a6351eff7b07920c4c
+    website: https://serp.ly/codesquire
+    class: unreachable
+    finalUrl: https://codesquire.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: cognifystudio.com
+    id: lst_77c359ae60f8ad556d597774
+    website: https://serp.ly/cognify-studio
+    class: unreachable
+    finalUrl: https://cognifystudio.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: communion.so
+    id: lst_5abe381d7f1a48f616ada6f9
+    website: https://serp.ly/communion
+    class: unreachable
+    finalUrl: https://www.communion.so/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: cosonify.com
+    id: lst_b21f84e0b5754fca097ac19a
+    website: https://serp.ly/cosonify
+    class: unreachable
+    finalUrl: https://cosonify.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: crito.design
+    id: lst_90084d48cc93b960683a0522
+    website: https://serp.ly/crito-design
+    class: unreachable
+    finalUrl: https://crito.design/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: csm.ai
+    id: lst_baa50fff382b770bf487fe95
+    website: https://serp.ly/csm
+    class: unreachable
+    finalUrl: https://csm.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: databorg.ai
+    id: lst_931a3af89ec9d5fb91b64bef
+    website: https://serp.ly/databorg
+    class: unreachable
+    finalUrl: https://databorg.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: datagpt.com
+    id: lst_74eb47c60441ad7038b18a4a
+    website: https://serp.ly/datagpt.com
+    class: unreachable
+    finalUrl: https://datagpt.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: dbsensei.com
+    id: lst_3c5798a201e7eca5fe67325d
+    website: https://serp.ly/dbsensei
+    class: unreachable
+    finalUrl: https://dbsensei.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: deskflow.ai
+    id: lst_cee32e6d888d9d00b58e84ad
+    website: https://serp.ly/deskflow
+    class: unreachable
+    finalUrl: https://www.deskflow.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: desksense.com
+    id: lst_9d231c88ef2d39c873914cee
+    website: https://serp.ly/desksense
+    class: unreachable
+    finalUrl: https://desksense.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: dipsway.com
+    id: lst_4d446d21cff900b1433b4d6d
+    website: https://serp.ly/dipsway
+    class: unreachable
+    finalUrl: https://dipsway.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: doctrina.ai
+    id: lst_1896b8cec3e5c64c4967949b
+    website: https://serp.ly/doctrina-ai
+    class: unreachable
+    finalUrl: https://www.doctrina.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: dora.run
+    id: lst_fc60f89139942e4c334f9ea3
+    website: https://serp.ly/dora-ai
+    class: unreachable
+    finalUrl: https://www.dora.run/ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: dreamcard.ai
+    id: lst_548ed1a5e46884de448cd05f
+    website: https://dreamcard.ai
+    class: unreachable
+    finalUrl: https://dreamcard.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: easymessage.ai
+    id: lst_8cecc6c21d87398db1bb68b0
+    website: https://serp.ly/easymessage
+    class: unreachable
+    finalUrl: https://easymessage.ai/ai-generated-messages/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: elusidate.app
+    id: lst_45441cbd45221ad435eece82
+    website: https://serp.ly/elusidateai
+    class: unreachable
+    finalUrl: https://www.elusidate.app/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: exactbuyer.com
+    id: lst_ae30026ca891ce121ba35f4f
+    website: https://serp.ly/exactbuyer-search
+    class: unreachable
+    finalUrl: https://www.exactbuyer.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: eyen.fr
+    id: lst_32ccc0dc12737d78beedeb74
+    website: https://serp.ly/taskheat-ai-assistant
+    class: unreachable
+    finalUrl: https://eyen.fr/taskheat/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: ezdubs.ai
+    id: lst_0ba6a13adca811dd78848807
+    website: https://serp.ly/ezdubs
+    class: unreachable
+    finalUrl: https://www.ezdubs.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: ezmail.ai
+    id: lst_05e87195e41d161404f69125
+    website: https://serp.ly/ezmail
+    class: unreachable
+    finalUrl: https://www.ezmail.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: finiite.com
+    id: lst_3499f325b71461901b35703d
+    website: https://serp.ly/finiite
+    class: unreachable
+    finalUrl: https://www.finiite.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: functime.ai
+    id: lst_96d1a2e8b7b2417ea6f98d03
+    website: https://serp.ly/functime
+    class: unreachable
+    finalUrl: https://www.functime.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: getcovey.com
+    id: lst_76aaa6afd92a52806eadf5e3
+    website: https://serp.ly/covey-scout
+    class: unreachable
+    finalUrl: https://getcovey.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: getflux.io
+    id: lst_e67371d8bd0bec2641634b9c
+    website: https://serp.ly/flux
+    class: unreachable
+    finalUrl: https://getflux.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: gocharlie.ai
+    id: lst_9e643bd841e746886c644f24
+    website: https://serp.ly/go-charlie
+    class: unreachable
+    finalUrl: https://gocharlie.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: gpdf.cloud
+    id: lst_8b3696d628bde41140e145c9
+    website: https://serp.ly/genius-pdf
+    class: unreachable
+    finalUrl: https://gpdf.cloud/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: happyaccidents.ai
+    id: lst_279b3daf42dc43a4a4a0f585
+    website: https://serp.ly/happyaccidents
+    class: unreachable
+    finalUrl: https://www.happyaccidents.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: hearbitz.app
+    id: lst_3702cabfbcca8af5f2589f1c
+    website: https://serp.ly/hearbitz
+    class: unreachable
+    finalUrl: https://www.hearbitz.app/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: hello.podium.page
+    id: lst_8bec07a278ff084b0f64333f
+    website: https://serp.ly/podium
+    class: unreachable
+    finalUrl: https://podium.page/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: helper.email
+    id: lst_1a03eb839a8195714aa2170c
+    website: https://serp.ly/helper-email
+    class: unreachable
+    finalUrl: https://helper.email/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: hirable.fyi
+    id: lst_e3e9c3b636cce031afdbe4f2
+    website: https://serp.ly/hirable-2-01
+    class: unreachable
+    finalUrl: https://hirable.fyi/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: how2terminal.com
+    id: lst_0f26e05aba0eac670c715936
+    website: https://serp.ly/how2
+    class: unreachable
+    finalUrl: https://how2terminal.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: imageai.app
+    id: lst_e928e30db511e3a3797a3828
+    website: https://serp.ly/image-ai-app
+    class: unreachable
+    finalUrl: https://imageai.app/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: intellecs.ai
+    id: lst_572895c0da43b89e7dedfc6b
+    website: https://serp.ly/intellecs
+    class: unreachable
+    finalUrl: https://www.intellecs.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: ironiq.app
+    id: lst_f7a176ab183e35c921768be3
+    website: https://serp.ly/ironiq
+    class: unreachable
+    finalUrl: https://ironiq.app/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: jarvis.tel
+    id: lst_77080cb7da380d1f98fe4d6e
+    website: https://serp.ly/jarvis-tel
+    class: unreachable
+    finalUrl: https://jarvis.tel/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: juji.io
+    id: lst_fa3cdc3d3d74bba85e9a8f27
+    website: https://serp.ly/juji
+    class: unreachable
+    finalUrl: https://juji.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: kalendar.ai
+    id: lst_f76673ea8c725e0eb4503a6c
+    website: https://serp.ly/kalendar-ai
+    class: unreachable
+    finalUrl: https://www.kalendar.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: kleverkreatorai.com
+    id: lst_c2a068963d670410f03a5d07
+    website: https://serp.ly/kleverkreator
+    class: unreachable
+    finalUrl: https://kleverkreatorai.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: leaselens.ai
+    id: lst_0fbbbc99277b058084af7223
+    website: https://serp.ly/leaselens
+    class: unreachable
+    finalUrl: https://leaselens.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: lettergram.net
+    id: lst_338c141ed6c9432a9f3db504
+    website: https://serp.ly/lettergram
+    class: unreachable
+    finalUrl: https://lettergram.net/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: lodown.io
+    id: lst_3699f4ebc79c871760d96f94
+    website: https://serp.ly/lodown
+    class: unreachable
+    finalUrl: https://lodown.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: logicloop.com
+    id: lst_127af197ad2f3d3a264ef70b
+    website: https://serp.ly/logic-loop
+    class: unreachable
+    finalUrl: https://www.logicloop.com/ai-sql-query-generator/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: lunabrain.com
+    id: lst_7c5419a2cd06520d8931f1fa
+    website: https://serp.ly/lunabrain
+    class: unreachable
+    finalUrl: https://lunabrain.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: madisonai.org
+    id: lst_41ea06e3925556dee0c4dbde
+    website: https://serp.ly/madison-ai
+    class: unreachable
+    finalUrl: https://madisonai.org/ai-tools/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: maimovie.com
+    id: lst_2b0efadd844d1c6c5dae69a6
+    website: https://serp.ly/maimovie
+    class: unreachable
+    finalUrl: https://maimovie.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: maker.ai
+    id: lst_74335d94c606bda7f2f8296b
+    website: https://serp.ly/maker-ai
+    class: unreachable
+    finalUrl: https://maker.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: mangatv.shop
+    id: lst_0667e9795987cbef0f0d6773
+    website: https://serp.ly/manga-tv-5-01
+    class: unreachable
+    finalUrl: https://mangatv.shop/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: meddipop.com
+    id: lst_13fe96f6ea0474bab9548eed
+    website: https://serp.ly/meddipop
+    class: unreachable
+    finalUrl: https://meddipop.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: medoo.life
+    id: lst_0f4e09a8bbca94f66fc3e136
+    website: https://serp.ly/medoo
+    class: unreachable
+    finalUrl: https://medoo.life/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: meetz.ai
+    id: lst_a8fd0b466766f98445ad8131
+    website: https://serp.ly/meetz
+    class: unreachable
+    finalUrl: https://www.meetz.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: mgrworkbench.ai
+    id: lst_e52bef682d1fe105b158f585
+    website: https://serp.ly/mgrworkbench-ai
+    class: unreachable
+    finalUrl: https://www.mgrworkbench.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: muze.one
+    id: lst_8fb482da1a9ab293ca378183
+    website: https://serp.ly/muze-one-5-01
+    class: unreachable
+    finalUrl: https://muze.one/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: neus.ai
+    id: lst_6b377f5ca088805efb90e58c
+    website: https://serp.ly/neus-ai
+    class: unreachable
+    finalUrl: https://neus.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: opinionate.io
+    id: lst_78198934430b9fb1eac7b110
+    website: https://serp.ly/opinionate
+    class: unreachable
+    finalUrl: https://opinionate.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: paintbytext.chat
+    id: lst_fbfd68be2c1aa97141fb6ba9
+    website: https://paintbytext.chat
+    class: unreachable
+    finalUrl: https://paintbytext.chat/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: pandarocket.ai
+    id: lst_f9b04093641d4291b911e6ae
+    website: https://serp.ly/pandarocket
+    class: unreachable
+    finalUrl: https://www.pandarocket.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: parrot.ai
+    id: lst_abcb2561bdd315d6cbb379cf
+    website: https://serp.ly/parrot-ai
+    class: unreachable
+    finalUrl: https://parrot.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: peech-ai.com
+    id: lst_3f8cb71465044b0d86902e42
+    website: https://serp.ly/peech
+    class: unreachable
+    finalUrl: https://www.peech-ai.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: phenaki.video
+    id: lst_14ffff39dcd2c38369ed6ca9
+    website: https://serp.ly/phenaki
+    class: unreachable
+    finalUrl: https://phenaki.video/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: phosus.com
+    id: lst_ec93fef07beac7f3af4941a4
+    website: https://serp.ly/phosus
+    class: unreachable
+    finalUrl: https://phosus.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: picaii.com
+    id: lst_e4ab51b7971d4853fdcd9c81
+    website: https://serp.ly/picaii
+    class: unreachable
+    finalUrl: https://picaii.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: picsenhancer.com
+    id: lst_7569ec4d1abd3bec7a0cacb5
+    website: https://serp.ly/pics-enhancer
+    class: unreachable
+    finalUrl: https://picsenhancer.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: plagscan.com
+    id: lst_915bcfff602f33950aa0ebdb
+    website: https://serp.ly/plagscan.com
+    class: unreachable
+    finalUrl: https://plagscan.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: plagtracker.com
+    id: lst_cc6e20ad26c323e501745a77
+    website: https://serp.ly/plagtracker.com
+    class: unreachable
+    finalUrl: https://plagtracker.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: play.ht
+    id: lst_0453d1e00c6b00c9d562ff18
+    website: https://serp.ly/play-ht
+    class: unreachable
+    finalUrl: https://www.play.ht/?via=devin
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: pluto.fi
+    id: lst_26ce79d3d706ef45daf273f2
+    website: https://serp.ly/pluto
+    class: unreachable
+    finalUrl: https://www.pluto.fi/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: podcast.ai
+    id: lst_c92adb8aea803052609ddf3f
+    website: https://serp.ly/podcast
+    class: unreachable
+    finalUrl: https://podcast.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: printnanny.ai
+    id: lst_0b96948a4efc1d9ecf2b9eef
+    website: https://serp.ly/printnanny
+    class: unreachable
+    finalUrl: https://printnanny.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: quinv.io
+    id: lst_32e4e05fb000fad62e01233a
+    website: https://serp.ly/quinvio-ai
+    class: unreachable
+    finalUrl: https://www.quinv.io/ai
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: readyplayer.me
+    id: lst_3c87e0fc81e8d20b6c0da417
+    website: https://serp.ly/ready-player-me
+    class: unreachable
+    finalUrl: https://readyplayer.me/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: rebuff.ai
+    id: lst_c45d7f1024a317219b4eaf0d
+    website: https://serp.ly/rebuff
+    class: unreachable
+    finalUrl: https://rebuff.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: replicastudios.com
+    id: lst_3a91b52697350d7e952e7c0a
+    website: https://serp.ly/replicastudios
+    class: unreachable
+    finalUrl: https://www.replicastudios.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: reprompt.dev
+    id: lst_1724c43ac224ca7eaf788ee5
+    website: https://serp.ly/reprompt
+    class: unreachable
+    finalUrl: https://reprompt.dev/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: resume-ai.me
+    id: lst_2eb53f3ae9f07260c9449eaa
+    website: https://serp.ly/resume-ai
+    class: unreachable
+    finalUrl: https://resume-ai.me/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: scholarturbo.com
+    id: lst_2a73fc2a60565d8cf9b52707
+    website: https://serp.ly/scholarturbo
+    class: unreachable
+    finalUrl: https://scholarturbo.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: semiform.ai
+    id: lst_74cc218f97e6206419d19a4c
+    website: https://serp.ly/semiform
+    class: unreachable
+    finalUrl: https://www.semiform.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: seo.app
+    id: lst_8423ce602d5591eedcaefb66
+    website: https://serp.ly/seo-app
+    class: unreachable
+    finalUrl: https://seo.app/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: simulai.co
+    id: lst_23a4e3fc8ba41711c57e48de
+    website: https://serp.ly/simulai
+    class: unreachable
+    finalUrl: https://www.simulai.co/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: skufetch.com
+    id: lst_39868285f71f7bc5842152fc
+    website: https://serp.ly/sku-fetch
+    class: unreachable
+    finalUrl: https://skufetch.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: smartflowai.com
+    id: lst_113360cefffd65a04905ccff
+    website: https://serp.ly/smartflowai
+    class: unreachable
+    finalUrl: https://smartflowai.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: socraticworks.com
+    id: lst_972c1b643563be16f60513e7
+    website: https://serp.ly/socratic
+    class: unreachable
+    finalUrl: https://socraticworks.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: staypia.com
+    id: lst_03eaadfc4ae45549332ba611
+    website: https://serp.ly/staypia
+    class: unreachable
+    finalUrl: https://www.staypia.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: storypear.com
+    id: lst_12b213bd138e9d1441f80a3f
+    website: https://serp.ly/storypear
+    class: unreachable
+    finalUrl: https://storypear.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: sweephy.com
+    id: lst_79f243a39d59441d48ba65c2
+    website: https://serp.ly/sweephy
+    class: unreachable
+    finalUrl: https://www.sweephy.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: tappy.ai
+    id: lst_c428844a08efea064ef3c821
+    website: https://serp.ly/tappy
+    class: unreachable
+    finalUrl: https://www.tappy.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: tiipe.ai
+    id: lst_7be76ee4ec7d5f6dd091e9a2
+    website: https://serp.ly/tiipe
+    class: unreachable
+    finalUrl: https://tiipe.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: todobot.ai
+    id: lst_9c3a11b6ada2e4775d03d9c8
+    website: https://serp.ly/todobot
+    class: unreachable
+    finalUrl: https://todobot.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: tribescaler.com
+    id: lst_94a83fb050540f134708e27f
+    website: https://serp.ly/tribescaler
+    class: unreachable
+    finalUrl: https://tribescaler.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: variart.ai
+    id: lst_5c755ae5f9164a9bc44c2af2
+    website: https://serp.ly/variart
+    class: unreachable
+    finalUrl: https://variart.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: versational.ai
+    id: lst_0204078c4430f48f1973cb0f
+    website: https://serp.ly/versational
+    class: unreachable
+    finalUrl: https://www.versational.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: viralviews.co
+    id: lst_df9e80be6fcaf19bdcf8b6e1
+    website: https://serp.ly/viralviews
+    class: unreachable
+    finalUrl: https://www.viralviews.co/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: vivid.lol
+    id: lst_21742cfea1edc78d758ea6a0
+    website: https://serp.ly/vivid
+    class: unreachable
+    finalUrl: https://www.vivid.lol/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: voicera.co
+    id: lst_27998b235e3242ad6b8d8e92
+    website: https://serp.ly/voicera
+    class: unreachable
+    finalUrl: https://www.voicera.co/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: web3summary.com
+    id: lst_8ea2ca6b8649197bf41b40a8
+    website: https://serp.ly/web3-summary
+    class: unreachable
+    finalUrl: https://www.web3summary.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: websitesummaryai.com
+    id: lst_e1d34b529f25aa6f6f36e330
+    website: https://serp.ly/website-summary-ai
+    class: unreachable
+    finalUrl: https://www.websitesummaryai.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: whismer.com
+    id: lst_31fc8260d3de2ad7fde6c8a8
+    website: https://serp.ly/whismer
+    class: unreachable
+    finalUrl: https://whismer.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: wiseone.io
+    id: lst_8239d45c25698bb1c685baf2
+    website: https://serp.ly/wiseone
+    class: unreachable
+    finalUrl: https://wiseone.io/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: wordmax.ai
+    id: lst_99077d31ddd7ec11836404e6
+    website: https://serp.ly/wordmax
+    class: unreachable
+    finalUrl: https://wordmax.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: wraithscribe.com
+    id: lst_b8db35e93561cddc19cf794e
+    website: https://serp.ly/wraithscribe
+    class: unreachable
+    finalUrl: https://www.wraithscribe.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: writegpt.ai
+    id: lst_4223e6f7ae54e5bb5b8da773
+    website: https://serp.ly/writegpt
+    class: unreachable
+    finalUrl: https://writegpt.ai/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: writio.com
+    id: lst_e5f1c8bcc2917c532d67fbc1
+    website: https://serp.ly/writio
+    class: unreachable
+    finalUrl: https://writio.com/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: xprt.is
+    id: lst_9c561f47fa97d1e6ec8d83e2
+    website: https://serp.ly/xprt
+    class: unreachable
+    finalUrl: https://xprt.is/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: yack.fyi
+    id: lst_bf575d032abd5da5db64737c
+    website: https://serp.ly/yack
+    class: unreachable
+    finalUrl: https://www.yack.fyi/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: yobulk.dev
+    id: lst_bd4610b61e9280e3788a61ca
+    website: https://serp.ly/yobulk
+    class: unreachable
+    finalUrl: https://yobulk.dev/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+  - slug: yoursidekick.xyz
+    id: lst_26e4f1e4a0c00db3f6a3b5d6
+    website: https://serp.ly/sidekick-ai
+    class: unreachable
+    finalUrl: https://yoursidekick.xyz/
+    status: ENOTFOUND
+    reason: site_unreachable (ENOTFOUND)
+
