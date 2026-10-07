@@ -627,6 +627,24 @@ describe('ownership removed', () => {
   })
 })
 
+describe('badge program emails with the site’s flags (#130)', () => {
+  it('promise weekly checks, and offer no payment or claiming again while orders are off', () => {
+    // `render` uses `lib/features.ts`: the badge program and claims on, orders off.
+    expect(bodyText(render('listing-approved'))).toContain(
+      'Keep the badge on https://quillmate.app/. We check it every week, and a free listing whose badge goes missing is removed.'
+    )
+    const missing = render('badge-missing')
+    expect(bodyText(missing)).toContain('Our weekly check loaded https://ledgerly.app/')
+    const removed = render('ownership-removed')
+    expect(bodyText(removed)).toContain(
+      'so you no longer manage the Brieflow listing.\nThe listing stays on SERP.'
+    )
+    for (const email of [missing, render('listing-unlisted'), removed]) {
+      expect(bodyText(email)).not.toMatch(/\$49|paid listing|upgrade|relist|claim .*again/iu)
+    }
+  })
+})
+
 describe('new message', () => {
   it('links to the conversation without the message', () => {
     const email = render('new-message')

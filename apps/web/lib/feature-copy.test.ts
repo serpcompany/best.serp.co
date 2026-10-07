@@ -190,4 +190,15 @@ describe('page copy', () => {
       ).toEqual([feature])
     }
   })
+
+  it('shows the approved badge program wording with the site’s flags (#130)', () => {
+    // The owner turned the badge program (#66) and claims (#67) on; orders (#68) stay off.
+    expect(features).toMatchObject({ badgeProgram: true, claims: true, orders: false })
+    const shipped = featureCopy()
+    const approved = featureCopy(ALL_ON)
+    expect(shipped.badgePanel).toEqual(approved.badgePanel)
+    expect(shipped.claim).toEqual(approved.claim)
+    expect(shipped.freePlanBadgeCheck).toBe('Keep the badge up: we check it every week')
+    expect(shipped.keepTheBadgeUp).toEqual(approved.keepTheBadgeUp)
+  })
 })

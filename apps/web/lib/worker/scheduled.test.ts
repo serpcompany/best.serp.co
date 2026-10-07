@@ -281,11 +281,11 @@ describe('scheduled badge program', () => {
     vi.restoreAllMocks()
   })
 
+  // No `LOCAL_BADGE_PROGRAM`: the site's flag runs the program (#130).
   function env(overrides: Record<string, string> = {}) {
     return {
       D1_RUNTIME_ENV: 'local',
       DB: sqlite.asD1Database(),
-      LOCAL_BADGE_PROGRAM: 'on',
       SITE_ENVIRONMENT: 'local',
       ...overrides
     }
@@ -313,19 +313,21 @@ describe('scheduled badge program', () => {
       messages: false,
       orders: false
     }
+    const local = { LOCAL_BADGE_PROGRAM: 'on' }
+    expect(badgeProgramEnabled(env(), off)).toBe(false)
     expect(badgeProgramEnabled(env({ LOCAL_BADGE_PROGRAM: '' }), off)).toBe(false)
-    expect(badgeProgramEnabled(env(), off)).toBe(true)
+    expect(badgeProgramEnabled(env(local), off)).toBe(true)
     expect(badgeProgramEnabled(env(), { ...off, badgeProgram: true })).toBe(true)
     // The local switch never applies outside a local Worker.
     for (const environment of ['staging', 'production']) {
       expect(
         badgeProgramEnabled(
-          env({ D1_RUNTIME_ENV: environment, SITE_ENVIRONMENT: environment }),
+          env({ ...local, D1_RUNTIME_ENV: environment, SITE_ENVIRONMENT: environment }),
           off
         )
       ).toBe(false)
     }
-    expect(badgeProgramEnabled(env({ SITE_ENVIRONMENT: 'production' }), off)).toBe(false)
+    expect(badgeProgramEnabled(env({ ...local, SITE_ENVIRONMENT: 'production' }), off)).toBe(false)
 
     const job = createBadgeProgramJob(off)
     await handleScheduled(
@@ -343,6 +345,27 @@ describe('scheduled badge program', () => {
     ).resolves.toEqual({ enabled: false })
     expect(fetches).toEqual([])
     expect(rows('SELECT * FROM badge_checks')).toEqual([])
+  })
+
+  it('runs with the site’s flag (#130) in every environment, without the local switch', async () => {
+    for (const environment of ['local', 'staging', 'production']) {
+      expect(
+        badgeProgramEnabled({ D1_RUNTIME_ENV: environment, SITE_ENVIRONMENT: environment }),
+        environment
+      ).toBe(true)
+    }
+    // Production has no email delivery configured here, so the email service logs and skips.
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const result = await badgeProgramJob.run({
+      context: { waitUntil: promise => pending.push(promise) },
+      env: env({ D1_RUNTIME_ENV: 'production', SITE_ENVIRONMENT: 'production' }),
+      now: new Date(WEEKLY_AT)
+    })
+    await Promise.all(pending.splice(0))
+    // It checks the free submitted and badge-claimed listings, never the curated one.
+    expect(result).toMatchObject({ enabled: true, weekly: 2 })
+    expect([...fetches].sort()).toEqual(['claim.example', 'free.example'])
   })
 
   it('warns on the weekly miss, then unpublishes or revokes on the confirmed miss, once', async () => {
