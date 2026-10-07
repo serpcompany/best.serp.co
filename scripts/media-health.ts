@@ -6,11 +6,12 @@ import { MEDIA_CACHE_CONTROL, MEDIA_SITE, parseMediaKey } from '@serpdirectory/d
 import { type D1Row, processRunner, validateRemoteConfig, wranglerD1 } from './cloudflare-release'
 import { project, type RemoteEnvironment } from './project'
 import {
+  describeFetchError,
   type ListedObject,
   listR2Objects,
   type R2CallOptions,
   RateLimiter,
-  r2Request
+  systemClock
 } from './r2-objects'
 
 /**
@@ -25,7 +26,12 @@ import {
  * - `missing`: no object under the key, so the page shows the #86 tile;
  * - `bytes_mismatch`, `content_type_mismatch`, `not_an_image`, `cache_control_mismatch`,
  *   `md5_mismatch`: the object is not the one D1 (or its reviewed `d1/media` plan) recorded;
- * - `cdn_<status>`, `cdn_content_type`, `cdn_bytes`: the media host answers differently.
+ * - `cdn_404`, `cdn_not_an_image`, `cdn_content_type`, `cdn_bytes`: the media host says the
+ *   object is gone, or serves something other than what D1 recorded.
+ *
+ * A HEAD the media host would not answer for this client (a 403 or 429, usually Cloudflare's bot
+ * protection challenging the CI runner, any other status, or no answer) is `unverifiable`: listed
+ * in the summary, never a finding, since the bucket check already proved the object (#134).
  *
  * It writes nothing: no D1 statement but the SELECT, no R2 call but list, no HTTP method but HEAD
  * (`scripts/deploy-workflows.test.ts` holds it to that). `media-health.yml` runs it weekly for
@@ -45,6 +51,11 @@ ORDER BY l.slug, m.kind, m.sort_order`
 export const LISTING_MEDIA_PREFIX = `${MEDIA_SITE}/listings/`
 /** Media-host HEADs per run: a sample, rotated weekly, not the whole catalog. */
 export const DEFAULT_CDN_SAMPLE = 50
+/** Names the check to the media host's logs and bot rules. */
+export const MEDIA_HEALTH_USER_AGENT =
+  'best-serp-co-media-health/1.0 (+https://github.com/serpcompany/best.serp.co; read-only weekly listing media check)'
+/** At this share of unverifiable HEADs, the summary says the CDN sample proved little. */
+export const UNVERIFIABLE_WARNING_SHARE = 0.2
 const imageContentTypes = new Set(Object.values(IMAGE_CONTENT_TYPES))
 
 export interface MediaRow {
@@ -66,9 +77,19 @@ export interface MediaFinding {
   slug: string
 }
 
+/** A HEAD the media host would not answer for this client: informational, never a finding. */
+export interface UnverifiableHead {
+  /** What answered instead: the status, `cf-mitigated`, a Cloudflare HTML page, or the error. */
+  detail: string
+  key: string
+  kind: string
+  slug: string
+}
+
 export interface MediaHealthReport {
   bucket: string
   cdnSampled: number
+  cdnUnverifiable: UnverifiableHead[]
   checkedAt: string
   environment: RemoteEnvironment
   findings: MediaFinding[]
@@ -187,29 +208,85 @@ function isoWeek(date: Date): number {
   return Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000))
 }
 
-/** HEADs one key on the media host; a problem name or null. */
+export type HeadResult =
+  | { status: 'ok' }
+  | { detail?: string; problem: string; status: 'finding' }
+  | { detail: string; status: 'unverifiable' }
+
+/** What a response that is not about the object says about itself: status and block signals. */
+function blockDetail(response: Response): string {
+  const mitigated = response.headers.get('cf-mitigated')
+  const html = /^text\/html\b/iu.test(response.headers.get('content-type') ?? '')
+  return [
+    String(response.status),
+    mitigated ? `cf-mitigated: ${mitigated}` : null,
+    html && /cloudflare/iu.test(response.headers.get('server') ?? '')
+      ? 'Cloudflare HTML page'
+      : null
+  ]
+    .filter(Boolean)
+    .join(', ')
+}
+
+/**
+ * HEADs one key on the media host. Only an answer about the object is a finding: a 404, a type
+ * that is not an image, or a type or size other than D1's. A block (403, 429, a challenge), any
+ * other status, or no answer after three tries is unverifiable (#134).
+ */
 export async function headFinding(
   url: string,
   row: Pick<MediaRow, 'bytes' | 'contentType'>,
   fetcher: typeof fetch,
   options: R2CallOptions
-): Promise<{ detail?: string; problem: string } | null> {
-  const response = await r2Request(
-    fetcher,
-    url,
-    () => ({ method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(20_000) }),
-    { ...options, attempts: options.attempts ?? 3 }
-  )
-  if (response.status !== 200) return { problem: `cdn_${response.status}` }
-  const type = response.headers.get('content-type')?.split(';')[0]?.trim() ?? null
+): Promise<HeadResult> {
+  const limiter = options.limiter ?? new RateLimiter(60, 60_000, 4)
+  const clock = options.clock ?? systemClock
+  let response: Response | null = null
+  let failure = ''
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    await limiter.acquire()
+    try {
+      response = await fetcher(url, {
+        headers: {
+          Accept: 'image/avif,image/webp,image/*;q=0.9,*/*;q=0.5',
+          'User-Agent': MEDIA_HEALTH_USER_AGENT
+        },
+        method: 'HEAD',
+        redirect: 'manual',
+        signal: AbortSignal.timeout(20_000)
+      })
+    } catch (error) {
+      response = null
+      failure = describeFetchError(error)
+    }
+    // Only a server error or no answer is worth another try; a block is not.
+    if (response && response.status < 500) break
+    if (attempt < 3) await clock.sleep(2000 * attempt)
+  }
+  if (!response) return { detail: `no answer: ${failure}`, status: 'unverifiable' }
+
+  // A challenge (`cf-mitigated`) is never the object's answer, whatever its status.
+  const challenged = response.headers.has('cf-mitigated')
+  if (response.status === 404 && !challenged) return { problem: 'cdn_404', status: 'finding' }
+  if (response.status !== 200 || challenged) {
+    return { detail: blockDetail(response), status: 'unverifiable' }
+  }
+  const type = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() ?? null
+  if (!type || !imageContentTypes.has(type)) {
+    return { detail: type ?? 'no content type', problem: 'cdn_not_an_image', status: 'finding' }
+  }
   if (row.contentType && type !== row.contentType) {
-    return { detail: `${type} != ${row.contentType}`, problem: 'cdn_content_type' }
+    return {
+      detail: `${type} != ${row.contentType}`,
+      problem: 'cdn_content_type',
+      status: 'finding'
+    }
   }
   const length = response.headers.get('content-length')
   if (length !== null && row.bytes !== null && Number(length) !== row.bytes) {
-    return { detail: `${length} != ${row.bytes}`, problem: 'cdn_bytes' }
+    return { detail: `${length} != ${row.bytes}`, problem: 'cdn_bytes', status: 'finding' }
   }
-  return null
+  return { status: 'ok' }
 }
 
 export interface MediaHealthDependencies {
@@ -251,18 +328,29 @@ export async function checkMediaHealth(
     ...dependencies.r2,
     limiter: dependencies.r2?.limiter ?? new RateLimiter(60, 60_000, 4)
   }
+  const cdnUnverifiable: UnverifiableHead[] = []
   for (const key of sampled) {
     const row = byKey.get(key)
     if (!row) continue
     const result = await headFinding(`${baseUrl}/${key}`, row, fetcher, cdnOptions)
-    if (result) {
-      findings.push({ ...result, key, kind: row.kind, live: row.live, slug: row.slug })
+    if (result.status === 'finding') {
+      findings.push({
+        ...(result.detail ? { detail: result.detail } : {}),
+        key,
+        kind: row.kind,
+        live: row.live,
+        problem: result.problem,
+        slug: row.slug
+      })
+    } else if (result.status === 'unverifiable') {
+      cdnUnverifiable.push({ detail: result.detail, key, kind: row.kind, slug: row.slug })
     }
   }
 
   return {
     bucket,
     cdnSampled: sampled.length,
+    cdnUnverifiable,
     checkedAt: now.toISOString(),
     environment,
     findings: findings.sort((a, b) =>
@@ -280,6 +368,37 @@ export function mediaHealthMarker(environment: RemoteEnvironment): string {
   return `<!-- best-serp-co-media-health:${environment} -->`
 }
 
+/** True when so many HEADs went unanswered that the CDN sample proves little this run. */
+export function unverifiableIsHigh(report: MediaHealthReport): boolean {
+  return (
+    report.cdnSampled > 0 &&
+    report.cdnUnverifiable.length / report.cdnSampled >= UNVERIFIABLE_WARNING_SHARE
+  )
+}
+
+/** The informational note on HEADs the media host would not answer: never a finding. */
+function unverifiableLines(report: MediaHealthReport): string[] {
+  const unverifiable = report.cdnUnverifiable
+  if (unverifiable.length === 0) return []
+  const reasons = new Map<string, number>()
+  for (const head of unverifiable) reasons.set(head.detail, (reasons.get(head.detail) ?? 0) + 1)
+  return [
+    `${unverifiable.length} of ${report.cdnSampled} HEADs were unverifiable (the media host blocked or did not answer this client: ${[
+      ...reasons
+    ]
+      .sort()
+      .map(([reason, count]) => `${reason} ×${count}`)
+      .join(', ')}). Informational only: the bucket check covers those objects.`,
+    ...(unverifiableIsHigh(report)
+      ? [
+          '',
+          `**Warning:** ${Math.round((unverifiable.length / report.cdnSampled) * 100)}% of the CDN sample was unverifiable, so this run says little about ${report.mediaBaseUrl} itself.`
+        ]
+      : []),
+    ''
+  ]
+}
+
 /** Findings rows shown in a summary or issue; GitHub caps an issue body at 65,536 characters. */
 const MAX_FINDING_ROWS = 300
 
@@ -293,7 +412,8 @@ export function mediaHealthMarkdown(report: MediaHealthReport): string {
     `## Listing media health: ${report.environment}`,
     '',
     `Checked ${report.checkedAt} by \`pnpm media:health -- ${report.environment}\` (docs/MEDIA_HEALTH.md): ${report.rows} logo and image rows, ${report.hostedKeys} hosted keys, ${report.listedObjects} objects in \`${report.bucket}\`, ${report.cdnSampled} HEADs on ${report.mediaBaseUrl}.`,
-    ''
+    '',
+    ...unverifiableLines(report)
   ]
   if (report.findings.length === 0) {
     lines.push('No missing or mismatched objects.')
@@ -355,8 +475,20 @@ async function main(): Promise<void> {
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, mediaHealthMarkdown(report))
   }
-  const { findings, ...summary } = report
-  console.log(JSON.stringify({ ...summary, findings: findings.length }, null, 2))
+  const { cdnUnverifiable, findings, ...summary } = report
+  console.log(
+    JSON.stringify(
+      { ...summary, cdnUnverifiable: cdnUnverifiable.length, findings: findings.length },
+      null,
+      2
+    )
+  )
+  if (unverifiableIsHigh(report)) {
+    // A warning, never a failure: the bucket check is the evidence (#134).
+    console.log(
+      `::warning title=CDN sample unverifiable::${cdnUnverifiable.length} of ${report.cdnSampled} HEADs on ${report.mediaBaseUrl} were blocked or unanswered; see the job summary.`
+    )
+  }
   for (const finding of findings.slice(0, 50)) {
     console.error(`${finding.problem} ${finding.slug} ${finding.kind} ${finding.key ?? ''}`)
   }

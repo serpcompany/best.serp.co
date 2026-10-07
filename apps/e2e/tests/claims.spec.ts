@@ -19,9 +19,9 @@ import { type FixtureSite, startFixtureSite } from './submit-fixture'
 
 /**
  * Claims of existing listings (serpcompany/best.serp.co#67) end to end, through the claim API on
- * a local Worker with the site's flags (#130: claims and the badge program on, orders off): the
- * free claim (domain-email code, then the badge on a fixture website), the refusals (webmail,
- * another domain, the paid method while orders are off, a wrong, expired, or over-attempt code,
+ * a local Worker with the site's flags (claims, the badge program, and orders on; #130, #133):
+ * the free claim (domain-email code, then the badge on a fixture website), the refusals (webmail,
+ * another domain, an unknown method, a wrong, expired, or over-attempt code,
  * an existing owner, a held listing, no session, a foreign origin), ownership in the account
  * dashboard and the admin panel, and the weekly badge program removing a badge claimer whose
  * badge is confirmed missing (#66). The dialog that calls this API is
@@ -103,7 +103,8 @@ test('claims a listing with the badge and a domain-email code; the badge program
   const owner = await account(`claimer-${key}@example.com`)
   const domainAddress = `jo@${listing.slug}`
 
-  // Refused: webmail, another domain, an unknown listing, and the paid method while #68 is off.
+  // Refused: webmail, another domain, an unknown listing, and an unknown method. (Orders are on,
+  // #133, so the paid method starts a claim too; `billing.spec.ts` pays for one.)
   for (const [email, code] of [
     ['jo@gmail.com', 'webmail'],
     ['jo@example.org', 'domain_mismatch']
@@ -115,11 +116,13 @@ test('claims a listing with the badge and a domain-email code; the badge program
   expect(
     (await claim(owner.client, { email: domainAddress, listing: 'nope', method: 'badge' })).status()
   ).toBe(404)
-  expect(
-    (
-      await claim(owner.client, { email: domainAddress, listing: listing.slug, method: 'paid' })
-    ).status()
-  ).toBe(422)
+  const unknown = await claim(owner.client, {
+    email: domainAddress,
+    listing: listing.slug,
+    method: 'gift'
+  })
+  expect(unknown.status()).toBe(422)
+  expect(await unknown.json()).toMatchObject({ code: 'invalid_method' })
 
   // The code goes to the domain address, in the subject.
   const started = await claim(owner.client, {

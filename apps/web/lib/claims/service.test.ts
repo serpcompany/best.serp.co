@@ -104,11 +104,11 @@ describe('claim flags', () => {
     })
   })
 
-  it('are on as the site ships (#130): the badge method only, and the contact page', () => {
+  it('are on as the site ships (#130, #133): the badge or a payment, and the contact page', () => {
     for (const environment of ['staging', 'production']) {
       expect(
         claimFlags({ D1_RUNTIME_ENV: environment, SITE_ENVIRONMENT: environment }, features)
-      ).toEqual({ contactPath: '/contact/', enabled: true, paid: false })
+      ).toEqual({ contactPath: '/contact/', enabled: true, paid: true })
     }
   })
 })

@@ -261,16 +261,16 @@ describe('email links', () => {
     }
   })
 
-  it('counts the badge program’s emails as sent now that it is on, and billing’s as not (#130)', () => {
-    for (const id of ['badge-missing', 'listing-unlisted', 'ownership-removed'] as const) {
-      expect(sent.has(id), id).toBe(true)
-    }
+  it('counts the badge program’s (#130) and billing’s (#133) emails as sent now they are on', () => {
     for (const id of [
+      'badge-missing',
       'listing-live-paid',
+      'listing-unlisted',
+      'ownership-removed',
       'payment-received-in-review',
       'submission-rejected-refunded'
     ] as const) {
-      expect(sent.has(id), id).toBe(false)
+      expect(sent.has(id), id).toBe(true)
     }
   })
 
@@ -358,10 +358,9 @@ describe('email copy', () => {
       renderAll(siteFeatures)
         .filter(({ id }) => badgeEmails.includes(id))
         .map(({ email, id }) => [id, promisesIn(email, id)] as const)
-    // Claiming again offers the badge or a payment, so it waits for orders even with claims on,
-    // as the site ships (#130).
+    // Claiming again offers the badge or a payment, so it waits for orders even with claims on
+    // (as #130 shipped).
     for (const launching of [
-      features,
       { ...ALL_ON, orders: false },
       { ...ALL_ON, claims: false, orders: false }
     ]) {
@@ -370,12 +369,15 @@ describe('email copy', () => {
         expect(offered, id).not.toContain('claims')
       }
     }
-    // The approved offers come back with their flags, and the audit sees them.
-    expect(Object.fromEntries(promised(ALL_ON))).toMatchObject({
-      'badge-missing': expect.arrayContaining(['orders']),
-      'listing-unlisted': expect.arrayContaining(['orders']),
-      'ownership-removed': expect.arrayContaining(['claims', 'orders'])
-    })
+    // The approved offers come back with their flags, and the audit sees them: on the site's
+    // flags too, now that orders are on (#133).
+    for (const launched of [ALL_ON, features]) {
+      expect(Object.fromEntries(promised(launched))).toMatchObject({
+        'badge-missing': expect.arrayContaining(['orders']),
+        'listing-unlisted': expect.arrayContaining(['orders']),
+        'ownership-removed': expect.arrayContaining(['claims', 'orders'])
+      })
+    }
   })
 
   it('exempts only the owner-approved interim copy, and only where it is used', () => {

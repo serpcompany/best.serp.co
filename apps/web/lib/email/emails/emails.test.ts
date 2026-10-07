@@ -627,21 +627,27 @@ describe('ownership removed', () => {
   })
 })
 
-describe('badge program emails with the site’s flags (#130)', () => {
-  it('promise weekly checks, and offer no payment or claiming again while orders are off', () => {
-    // `render` uses `lib/features.ts`: the badge program and claims on, orders off.
+describe('badge program emails with the site’s flags (#130, #133)', () => {
+  it('promise weekly checks, and offer the paid upgrade, relisting, and claiming again', () => {
+    // `render` uses `lib/features.ts`: the badge program, claims, and orders on.
     expect(bodyText(render('listing-approved'))).toContain(
       'Keep the badge on https://quillmate.app/. We check it every week, and a free listing whose badge goes missing is removed.'
     )
     const missing = render('badge-missing')
     expect(bodyText(missing)).toContain('Our weekly check loaded https://ledgerly.app/')
+    expect(missing.text).toContain(
+      'Rather not keep the badge? Upgrade to a paid listing for $49 one-off and the badge becomes optional.'
+    )
+    expect(render('listing-unlisted').text).toContain(
+      'Relist for $49: https://best.serp.co/account/listings/scrapebird.dev/'
+    )
     const removed = render('ownership-removed')
     expect(bodyText(removed)).toContain(
-      'so you no longer manage the Brieflow listing.\nThe listing stays on SERP.'
+      'The listing stays on SERP. To manage it again, claim it again with the badge or a $49 one-off payment.'
     )
-    for (const email of [missing, render('listing-unlisted'), removed]) {
-      expect(bodyText(email)).not.toMatch(/\$49|paid listing|upgrade|relist|claim .*again/iu)
-    }
+    expect(removed.text).toContain(
+      'Claim Brieflow again: https://best.serp.co/products/brieflow.ai/'
+    )
   })
 })
 

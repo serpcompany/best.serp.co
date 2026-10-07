@@ -1,6 +1,7 @@
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { adminSuiteEnabled, localD1, type SuiteServer } from './admin-fixture'
+import { BILLING_PREVIEW_VARS } from './orders-worker'
 
 /**
  * The badge program suite (serpcompany/best.serp.co#66) runs on its own local Worker with its
@@ -28,7 +29,11 @@ export function badgeOrigin(): string {
   return `http://127.0.0.1:${badgeServer.port}`
 }
 
-/** Serves the built Worker on a fresh, migrated D1 of its own, with the site's flags. */
+/**
+ * Serves the built Worker on a fresh, migrated D1 of its own, with the site's flags. The hourly
+ * trigger also runs the billing sweep (orders are on, #133), which needs the provider's secrets:
+ * the mocked provider's (`orders-worker.ts`), though with no orders it calls nothing.
+ */
 export function badgeServerCommand(): string {
   const state = badgeServer.stateDirectory
   return [
@@ -36,7 +41,7 @@ export function badgeServerCommand(): string {
     `rm -rf "${state}"`,
     `mkdir -p "${state}"`,
     `HARNESS_D1_STATE_DIRECTORY="${state}" pnpm db:migrate:local`,
-    `HARNESS_D1_STATE_DIRECTORY="${state}" PORT=${badgeServer.port} pnpm tsx scripts/d1-local-preview.ts`
+    `HARNESS_D1_STATE_DIRECTORY="${state}" LOCAL_PREVIEW_VARS=${BILLING_PREVIEW_VARS.join(',')} PORT=${badgeServer.port} pnpm tsx scripts/d1-local-preview.ts`
   ].join(' && ')
 }
 

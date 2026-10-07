@@ -25,8 +25,8 @@ export interface DraftReminderInput {
   /** The +21d reminder says it is the last one. */
   lastReminder: boolean
   /**
-   * Whether the site offers the paid listing (`features.showPaidListings`, #68). Off, the email
-   * offers the free badge listing only: no price, and a draft left in `complete_checkout`
+   * Whether the site offers the paid listing (`features.orders`, #68; on since #133). Off, the
+   * email offers the free badge listing only: no price, and a draft left in `complete_checkout`
    * gets the "choose a plan" email.
    */
   paidListings: boolean

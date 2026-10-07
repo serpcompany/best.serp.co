@@ -18,10 +18,13 @@ disagree still show the link, and the dialog answers "This URL can’t be claime
 success alert say the badge is checked weekly because the [badge program](./BADGE_PROGRAM.md)
 is on too.
 
-Paid claims also need `features.orders` (#68), which is still off: the dialog offers only the
-badge method, `POST /api/claims` refuses `method: 'paid'` (`422 invalid_method`), and
-`/claims/<id>/checkout/` answers 404. The `ownership-removed` email offers to claim again only
-while both flags are on, since it offers the badge or a payment.
+Paid claims also need `features.orders` (#68), which is on since #133: the dialog offers
+"Install the badge (free)" (chosen) and "Skip the badge: $49 one-off", and "Continue to payment"
+opens `/claims/<id>/checkout/` ([Billing](./BILLING.md)). The `ownership-removed` email offers to
+claim again ("claim it again with the badge or a $49 one-off payment", "Claim <name> again") only
+while both flags are on, so it does now. With orders off, the dialog offers only the badge,
+`POST /api/claims` refuses `method: 'paid'` (`422 invalid_method`), and the checkout answers
+404.
 
 Turning the flag off again makes every claim endpoint answer 404, removes the claim link, and
 leaves claims in progress where they are. A local Worker can still run claims with the flag off

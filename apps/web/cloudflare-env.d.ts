@@ -71,8 +71,8 @@ interface CloudflareEnv {
   /** The media host pages build image URLs on (`https://cdn.serp.co`, …; `/_media` locally). */
   MEDIA_BASE_URL?: string
   /**
-   * `on` turns orders (#68) on for a local Worker while `features.orders` is off: the end-to-end
-   * suite's mocked Stripe (`lib/billing/flags.ts`). Ignored anywhere but local.
+   * `on` turns orders (#68) on for a local Worker while `features.orders` is off
+   * (`lib/billing/flags.ts`; unused since #133 turned the flag on). Ignored anywhere but local.
    */
   LOCAL_ORDERS?: string
   /** A local Worker only: the port of the end-to-end suite's mocked Stripe API on 127.0.0.1. */

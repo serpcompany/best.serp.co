@@ -304,6 +304,11 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await expect(panel.getByText(`${name} badge`)).toBeVisible()
   await expect(panel.getByText('Free listing · checked weekly')).toBeVisible()
   await expect(panel.getByText('Badge found, dofollow')).toBeVisible()
+  // Orders are on (#68, #133): a live free listing can be upgraded to the paid plan.
+  await expect(panel.getByRole('link', { name: 'Upgrade: $49 one-off' })).toHaveAttribute(
+    'href',
+    `/account/listings/${slug}/checkout/`
+  )
   // The panel's own budget (10 a day); the badge step's check doesn't count.
   await expect(panel.getByText('10 of 10')).toBeVisible()
   await capture(page, '05-badge-passing')
