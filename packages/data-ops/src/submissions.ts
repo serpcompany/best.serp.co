@@ -10,7 +10,6 @@ import { validatePublicHttpUrl } from './public-url'
 import {
   categories,
   listingSubmissionRateLimits,
-  listingSubmissions,
   type SubmissionPlan,
   type SubmissionStatus
 } from './schema'

@@ -36,7 +36,6 @@ export interface SubmissionApprovalSnapshot {
   version: number
 }
 
-
 /**
  * How old the refund's own badge check (`badge_checks.kind = 'refund'`, #66) may be when the
  * refund is recorded: the owner decided the badge is checked once, right at refund (2026-10-06),
