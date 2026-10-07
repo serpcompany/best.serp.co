@@ -830,6 +830,11 @@ export const listingSubmissionRateLimits = sqliteTable(
   ]
 )
 
+/**
+ * Retired with the GitHub review notifier and its private preview links (#69): nothing reads or
+ * writes it. It stays until a Worker without them is live, like `access_token_hash`; a follow-up
+ * migration then drops it.
+ */
 export const listingSubmissionNotifications = sqliteTable(
   'listing_submission_notifications',
   {

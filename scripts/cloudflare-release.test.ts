@@ -301,10 +301,9 @@ describe('release authorization', () => {
     ).toEqual(['bootstrap-production-d1.yml'])
     expect(releaseAuthorizations['bootstrap-production-d1.yml']?.commands).toEqual(['import'])
     expect(releaseAuthorizations['deploy-production.yml']?.commands).toEqual(['migrate', 'deploy'])
-    // Publication and submission review mutate D1 through their own guarded scripts; they need
-    // no release command, because the bookmark they record first is read-only.
+    // Publication mutates D1 through its own guarded script; it needs no release command,
+    // because the bookmark it records first is read-only.
     expect(releaseAuthorizations['publish-d1.yml']).toBeUndefined()
-    expect(releaseAuthorizations['approve-d1-submission.yml']).toBeUndefined()
   })
 
   it('refuses other repositories, branches, workflows, refs, and unreviewed checkouts', () => {

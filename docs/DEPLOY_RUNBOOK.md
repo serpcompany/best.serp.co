@@ -48,7 +48,7 @@ account permissions:
 
 | Account permission | Used by |
 |---|---|
-| D1 → Edit | `wrangler d1 migrations apply`, `d1 execute` (bootstrap import, read-only checks), `d1 time-travel info` bookmarks, and the D1 query API used by the publisher, approver, and notifier |
+| D1 → Edit | `wrangler d1 migrations apply`, `d1 execute` (bootstrap import, read-only checks), `d1 time-travel info` bookmarks, and the D1 query API used by the publisher |
 | Workers Scripts → Edit | `opennextjs-cloudflare deploy`: Worker upload, static assets, the workers.dev setting, observability |
 | Account Settings → Read | Wrangler account lookups during deploy |
 | Workers R2 Storage → Edit | the `MEDIA` bucket binding and listing media uploads (#95) |
@@ -78,26 +78,12 @@ Each holds two environment secrets:
 
 The planned fix is #42 decision b, scheduled right after cutover. It gives each environment
 its own token, scoped to its Worker, D1 database, and R2 bucket (production's also reads
-`cdn-staging`, the upload's copy source), plus a D1-only token for `production-notifier`,
-each proven in its workflow before the account-wide token goes. Until then, a leak reaches both.
+`cdn-staging`, the upload's copy source), each proven in its workflow before the
+account-wide token goes. Until then, a leak reaches both.
 
 Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "Staging deploy
 skipped" notice. After they exist, the next push to `staging` deploys staging. The
 `BETTER_AUTH_SECRET` secret and the `/admin` Access app: [Accounts](./ACCOUNTS.md).
-
-### Submission notifier (after the production bootstrap)
-
-The scheduled notifier cannot use `production`, because a schedule cannot pass reviewer
-approval. GitHub runs schedules on the default branch; while that is `staging`, a relay job
-re-dispatches the notifier on `main`. When production accepts submissions:
-
-1. Create the environment `production-notifier`: deployment branches `main` only, no
-   required reviewers. Add `CLOUDFLARE_ACCOUNT_ID` and a `CLOUDFLARE_API_TOKEN` that has only
-   Account → D1 → Edit.
-2. Add the **repository** variable `SUBMISSION_REVIEWER_GITHUB_LOGIN` (Settings → Secrets
-   and variables → Actions → Variables) set to the reviewer's GitHub login. It must be a
-   repository variable: the job-level `if` that switches the notifier on is evaluated before
-   environment variables load. Until it is set, every scheduled run is skipped at no cost.
 
 ## Workflows
 
@@ -108,14 +94,12 @@ re-dispatches the notifier on `main`. When production accepts submissions:
 | `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → D1 bookmark → initial catalog import into an empty production D1 → parity verification |
 | `publish-d1.yml`, `publish-d1-staging.yml` (#95) | manual, `main` / `staging` | `production` / `staging` | `publish-best.serp.co-<env>` | D1 bookmark → apply one reviewed manifest, staging first |
 | `upload-media.yml`, `upload-media-staging.yml` | manual, `main` / `staging` | `production` / `staging` | `upload-media-best.serp.co-<env>` | Upload one reviewed `d1/media/` plan to R2, no D1 change ([media](./MEDIA.md)) |
-| `approve-d1-submission.yml` | manual, `main` | `production` | `approve-best.serp.co-submission-production` | D1 bookmark → approve or reject one submission → close its review issue |
-| `notify-d1-submissions.yml` | every 15 minutes, manual | `production-notifier` | none | Open an assigned review issue per badge-verified submission |
 | `media-health.yml` | weekly | `production-media-health` | none | [Health](./MEDIA_HEALTH.md) |
 
 Guards, in order:
 
 1. An `authorize` job with no secrets checks the workflow's branch and, on a dispatch, the typed
-   confirmation (and the manifest or plan path, or submission UUID), so a mistyped dispatch never
+   confirmation (and the manifest or plan path), so a mistyped dispatch never
    requests reviewer approval. Deploy Production and Bootstrap Production D1 also require
    Deploy Staging to have verified the commit's tree (see
    [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
@@ -126,14 +110,14 @@ Guards, in order:
    with the confirmation in `RELEASE_CONFIRM` on a dispatch. Production `migrate`, `deploy`,
    and `import` also require the verified Deploy Staging run (a hotfix dispatch of a merged
    `hotfix-*` PR may only `deploy` without it) and a `main` that still points at the release.
-   The publisher, approver, notifier, and `media-upload.ts` apply their own guards.
+   The publisher and `media-upload.ts` apply their own guards.
 4. `plan-release` refuses a database with migrations this commit lacks. `deploy` first proves
    that every `d1/drizzle` migration is applied and that a catalog publication exists.
 
 The HTTP gates: [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts).
 
 Concurrency sits on the privileged job, after its guards: production jobs share
-`deploy-best-serp-co-production`, staging uses `deploy-best-serp-co-staging`, the notifier and
+`deploy-best-serp-co-production`, staging uses `deploy-best-serp-co-staging`, media health and
 media uploads their own groups, and none cancels a running job. A run refused by `authorize`
 or skipped by a branch `if` never joins a group, so it cannot replace a valid queued run.
 

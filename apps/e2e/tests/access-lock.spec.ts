@@ -23,7 +23,7 @@ import {
 const ADMIN_PATHS = [
   '/admin/',
   '/admin/not-a-page/',
-  '/admin/submissions/x/preview/y/',
+  '/admin/submissions/x/',
   '/api/admin',
   '/api/admin/listings'
 ]

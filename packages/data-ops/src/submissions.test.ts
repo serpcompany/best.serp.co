@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createDatabase } from './client'
-import { createSubmissionOperations, type NewDraftInput } from './submissions'
+import {
+  buildSubmissionReviewPreview,
+  createSubmissionOperations,
+  type NewDraftInput
+} from './submissions'
 import { insertPublishedListing, SqliteD1 } from './test-support'
 
 const OWNER = 'user_owner'
@@ -556,36 +560,28 @@ describe('native submission intake', () => {
     now = new Date(now.getTime() + 60 * 60 * 1000)
     await expect(operations().consumeRateLimit(`user:${OWNER}`)).resolves.toBeUndefined()
   })
+})
 
-  async function verifiedWithPreview(token: string) {
-    const saved = await pendingBadge()
-    await check(saved.id, { ok: true })
-    sqlite.database
-      .prepare(
-        `INSERT INTO listing_submission_resource_links (submission_id,label,url,sort_order)
-        VALUES (?,'Docs','https://example.com/docs',0),(?,'Support','https://example.com/support',1)`
-      )
-      .run(saved.id, saved.id)
-    sqlite.database
-      .prepare(
-        `INSERT INTO listing_submission_notifications
-        (submission_id,channel,external_id,external_url,recipient,preview_token_hash)
-        VALUES (?,'github_issue','42','https://github.com/example/issues/42','reviewer',?)`
-      )
-      .run(saved.id, await hash(token))
-    return saved
+describe('submission review preview', () => {
+  const row = {
+    category_slug: 'tools',
+    content: input.content,
+    created_at: '2026-08-01 00:00:00',
+    description: input.description,
+    id: '11111111-1111-4111-8111-111111111111',
+    logo_url: input.logoUrl,
+    name: input.name,
+    slug: 'example.com',
+    video_url: null,
+    website: input.website
   }
+  const resources = [
+    { label: 'Docs', sort_order: 0, url: 'https://example.com/docs' },
+    { label: 'Support', sort_order: 1, url: 'https://example.com/support' }
+  ]
 
-  it('gates private previews by digest and verified status and revokes them after decision', async () => {
-    const previewToken = 'a'.repeat(43)
-    const saved = await verifiedWithPreview(previewToken)
-
-    await expect(
-      operations().getReviewPreview({ id: saved.id, token: 'b'.repeat(43) })
-    ).resolves.toBeNull()
-    await expect(
-      operations().getReviewPreview({ id: saved.id, token: previewToken })
-    ).resolves.toMatchObject({
+  it('maps the staged row and its resource links, with an optional long description', () => {
+    expect(buildSubmissionReviewPreview(row, resources)).toMatchObject({
       category: 'tools',
       content: input.content,
       resourceLinks: [
@@ -594,83 +590,39 @@ describe('native submission intake', () => {
       ],
       slug: 'example.com'
     })
-    // The long description is optional.
-    sqlite.database.prepare("UPDATE listing_submissions SET content='' WHERE id=?").run(saved.id)
-    await expect(
-      operations().getReviewPreview({ id: saved.id, token: previewToken })
-    ).resolves.toMatchObject({ content: '' })
-
-    sqlite.database
-      .prepare("UPDATE listing_submissions SET status='rejected' WHERE id=?")
-      .run(saved.id)
-    await expect(
-      operations().getReviewPreview({ id: saved.id, token: previewToken })
-    ).resolves.toBeNull()
+    expect(buildSubmissionReviewPreview({ ...row, content: '' }, resources)).toMatchObject({
+      content: ''
+    })
   })
 
-  it('fails closed when a verified preview row contains malformed fields', async () => {
-    const previewToken = 'c'.repeat(43)
-    const saved = await verifiedWithPreview(previewToken)
-    const update =
-      (assignment: string, ...params: Array<string | null>) =>
-      () =>
-        sqlite.database
-          .prepare(`UPDATE listing_submissions SET ${assignment} WHERE id=?`)
-          .run(...params, saved.id)
-    const updateLink = (assignment: string) => () =>
-      sqlite.database
-        .prepare(
-          `UPDATE listing_submission_resource_links SET ${assignment} WHERE submission_id=? AND sort_order=0`
-        )
-        .run(saved.id)
-    const corruptions = [
-      { corrupt: update("category_slug=''"), restore: update("category_slug='tools'") },
-      { corrupt: update("description=' '"), restore: update('description=?', input.description) },
-      { corrupt: update("name=' '"), restore: update('name=?', input.name) },
-      {
-        // The block key must match the slug (a CHECK), so the corruption clears it too.
-        corrupt: update("slug=' ', block_key=NULL, block_covers_subdomains=NULL"),
-        restore: update("slug='example.com', block_key='example.com', block_covers_subdomains=1")
-      },
-      { corrupt: update("website='not a URL'"), restore: update('website=?', input.website) },
-      {
-        corrupt: update("website='javascript:alert(1)'"),
-        restore: update('website=?', input.website)
-      },
-      {
-        corrupt: update("website='http://127.0.0.1/private'"),
-        restore: update('website=?', input.website)
-      },
-      { corrupt: update("logo_url='not an asset'"), restore: update('logo_url=?', input.logoUrl) },
-      { corrupt: update("video_url='not an asset'"), restore: update('video_url=NULL') },
-      {
-        corrupt: update("created_at='invalid'"),
-        restore: update("created_at='2026-08-01 00:00:00'")
-      },
-      { corrupt: updateLink("label=' '"), restore: updateLink("label='Docs'") },
-      {
-        corrupt: updateLink("url='not a URL'"),
-        restore: updateLink("url='https://example.com/docs'")
-      },
-      {
-        corrupt: updateLink("url='file:///tmp/private'"),
-        restore: updateLink("url='https://example.com/docs'")
-      },
-      {
-        corrupt: updateLink("url='http://169.254.169.254/latest'"),
-        restore: updateLink("url='https://example.com/docs'")
-      }
+  it('fails closed when the staged row contains malformed fields', () => {
+    const rows = [
+      { category_slug: '' },
+      { description: ' ' },
+      { name: ' ' },
+      { slug: ' ' },
+      { website: 'not a URL' },
+      { website: 'javascript:alert(1)' },
+      { website: 'http://127.0.0.1/private' },
+      { logo_url: 'not an asset' },
+      { video_url: 'not an asset' },
+      { created_at: 'invalid' }
     ]
-
-    for (const corruption of corruptions) {
-      corruption.corrupt()
-      await expect(
-        operations().getReviewPreview({ id: saved.id, token: previewToken })
-      ).rejects.toThrow(/Invalid D1 submission preview/u)
-      corruption.restore()
+    for (const corruption of rows) {
+      expect(() => buildSubmissionReviewPreview({ ...row, ...corruption }, resources)).toThrow(
+        /Invalid D1 submission preview/u
+      )
     }
-    await expect(
-      operations().getReviewPreview({ id: saved.id, token: previewToken })
-    ).resolves.toMatchObject({ slug: 'example.com' })
+    const links = [
+      { label: ' ' },
+      { url: 'not a URL' },
+      { url: 'file:///tmp/private' },
+      { url: 'http://169.254.169.254/latest' }
+    ]
+    for (const corruption of links) {
+      expect(() =>
+        buildSubmissionReviewPreview(row, [{ ...resources[0], ...corruption }, resources[1]])
+      ).toThrow(/Invalid D1 submission preview/u)
+    }
   })
 })

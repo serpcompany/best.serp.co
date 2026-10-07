@@ -76,9 +76,9 @@ change runs in a protected workflow.
   It receives the database, clock, cache, and observer explicitly.
 - `d1/drizzle/` owns the migration history applied by Wrangler.
 - `d1/publications/` owns reviewed catalog mutations.
-- `scripts/d1-submission-approver.ts`, `scripts/d1-submission-notifier.ts`, and the
-  publishers consume credential-free statement plans from `packages/data-ops/`; they
-  are the only layer that acquires credentials or calls remote APIs.
+- The publishers in `scripts/` consume credential-free statement plans from
+  `packages/data-ops/`; they are the only layer that acquires credentials or calls remote
+  APIs.
 - `scripts/migration/` holds the one-time JSON import and page comparison tooling. It
   is never imported by runtime or build code.
 
@@ -158,8 +158,8 @@ segment ends in a known file extension (`FILE_EXTENSIONS` in
 `packages/utils/file-extensions.ts`), not any dot: most listing slugs are domain names
 (`autoenhance.ai`), and their pages keep the slash. Never add an extension that is also a
 top-level domain. The data side holds the invariant: submission intake
-(`packages/data-ops/src/submissions.ts`), the submission approver, and the publication
-manifest schema (`scripts/d1-publisher.ts`) refuse a listing slug that ends in one of these
+(`packages/data-ops/src/submissions.ts`), the admin panel's approval
+(`apps/web/lib/admin/decisions.ts`), and the publication manifest schema (`scripts/d1-publisher.ts`) refuse a listing slug that ends in one of these
 extensions (`chart.js`), and a test checks the committed import.
 
 - **Redirects.** The Worker entry answers a non-canonical request with one 308 before the

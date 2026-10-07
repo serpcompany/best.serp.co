@@ -21,7 +21,7 @@ ambiguous `db:migrate`.
 | `pnpm db:migrations:list:production` | production D1 | Read-only: applied, pending, and unknown migrations |
 | `pnpm db:migrate:production` | production D1 | `cloudflare-release.ts migrate production`; runs only in `deploy-production.yml` on `main` when `plan-release` finds pending migrations, after Deploy Staging verified the commit's tree |
 | `pnpm db:publish:staging` | staging D1 | Apply a reviewed manifest; runs only in `publish-d1-staging.yml` on `staging` |
-| `pnpm db:publish:production`, `pnpm db:approve:production`, `pnpm db:notify:production` | production D1 | Data operations; each runs only in its own workflow |
+| `pnpm db:publish:production` | production D1 | Apply a reviewed manifest; runs only in `publish-d1.yml` on `main` |
 | `pnpm media:upload:<staging\|production>` | media bucket | Upload a reviewed `d1/media/` plan; runs only in `upload-media-staging.yml` on `staging` or `upload-media.yml` on `main` |
 | `pnpm media:upload:dry-run -- <plan>` | none | Fetch and verify every object of a plan; writes nothing |
 
@@ -147,7 +147,7 @@ bucket to bucket through the R2 API, before the manifest that names its keys is 
   overwrites, an object the bucket already holds.
 - The publisher refuses a media manifest until the target's own bucket holds every object it
   names, byte for byte.
-- The publisher, approver, and notifier refuse any statement D1's remote API would reject
+- The publisher refuses any statement D1's remote API would reject
   (`scripts/d1-compat.ts`: no `PRAGMA`, temporary table, transaction control, or `ATTACH`). A
   publication guard fails its batch with `malformed JSON`, as the Worker's plans do.
 - An upload failure names its cause (`fetch failed: <code> <message>`). `NETWORK_SMOKE=1` runs a
@@ -222,8 +222,6 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
   `continue-on-error` or a status function (`always()`, `failure()`, `cancelled()`,
   `success()`), so the implicit `success()` skips the change when the bookmark fails. A change
   that sets `CLOUDFLARE_D1_DATABASE_ID` must name its environment's database.
-- **The scheduled notifier is the one exception:** it only records review notifications, every
-  15 minutes, with a D1-only token. Time Travel still covers it by timestamp.
 - **The weekly media health check changes nothing** (#122): its exact
   `pnpm media:health -- production --report …` command is a token step without changes (one D1
   `SELECT`, R2 list, CDN `HEAD`s), and the issue step after it holds no Cloudflare credential
@@ -232,7 +230,7 @@ owner restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
   reports, the staging smoke evidence, and the install action's dependency caches), matched by
   action, name, and path. No workflow runs `d1 export` or `cloudflare-release.ts backup`, and no
   script under `scripts/` passes `export` to Wrangler. In every job where any step holds the
-  token (ten today, all checked), each step uses only reviewed actions and runs no `gh gist`,
+  token (eight today, all checked), each step uses only reviewed actions and runs no `gh gist`,
   `gh release upload|create`, `gh api` file field, `curl` upload (`-T`, `--upload-file`, `-F`,
   `--form`, `-d @`, `--data-binary @`), or `wget` upload. Commands are read one at a time, split
   at `|`, `;`, `&`, and newlines.

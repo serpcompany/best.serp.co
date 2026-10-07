@@ -343,14 +343,15 @@ describe('single-site D1-only repository architecture', () => {
   })
 
   it('keeps Submission SQL and conditional mutation plans in the shared data package', () => {
-    for (const file of ['repository.ts', 'review-preview-repository.ts']) {
-      const adapter = readFileSync(resolve(project.appDirectory, 'lib/submissions', file), 'utf8')
-      expect(adapter).toContain('@serpdirectory/data-ops/submissions')
-      expect(adapter).toContain('createDatabase(workerEnv.DB)')
-      expect(adapter).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE|WITH)\b/u)
-      expect(adapter).not.toContain('.prepare(')
-      expect(adapter).not.toContain('.batch(')
-    }
+    const adapter = readFileSync(
+      resolve(project.appDirectory, 'lib/submissions/repository.ts'),
+      'utf8'
+    )
+    expect(adapter).toContain('@serpdirectory/data-ops/submissions')
+    expect(adapter).toContain('createDatabase(workerEnv.DB)')
+    expect(adapter).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE|WITH)\b/u)
+    expect(adapter).not.toContain('.prepare(')
+    expect(adapter).not.toContain('.batch(')
 
     const operations = readFileSync(resolve('packages/data-ops/src/submissions.ts'), 'utf8')
     // Statement plans (#62): submissions, listings, revisions, and their shared support.
@@ -373,13 +374,6 @@ describe('single-site D1-only repository architecture', () => {
     expect(`${operations}\n${plans}`).not.toMatch(
       /getCloudflareContext|process\.env|CLOUDFLARE_API_TOKEN|GITHUB_TOKEN|api\.cloudflare\.com/u
     )
-
-    const approver = readFileSync(resolve('scripts/d1-submission-approver.ts'), 'utf8')
-    const notifier = readFileSync(resolve('scripts/d1-submission-notifier.ts'), 'utf8')
-    expect(approver).toContain('@serpdirectory/data-ops/submission-plans')
-    expect(notifier).toContain('@serpdirectory/data-ops/submission-plans')
-    expect(approver).toContain('validateApprovalContext')
-    expect(notifier).toContain('validateNotificationContext')
 
     expect(existsSync(resolve(project.appDirectory, 'lib/url-safety.ts'))).toBe(false)
     // Every fetch of a submitter's URL (badge checks, prefill, logos) and of listing media goes
