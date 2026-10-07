@@ -43,12 +43,22 @@ Every listing image carries `data-listing-image="logo|image"`. Guards:
    target (`cloudflare-release.ts`, `query` only).
 2. The environment's bucket listed under `best.serp.co/listings/` with the R2 list API, 1,000
    objects a call on the uploader's shared rate limiter (`scripts/r2-objects.ts`).
-3. `HEAD` requests for a sample of the keys (50 by default, rotated weekly) on the media host.
+3. `HEAD` requests for a sample of the keys (50 by default, rotated weekly) on the media host, sent
+   as `best-serp-co-media-health/1.0` (`MEDIA_HEALTH_USER_AGENT`) with an image `Accept`.
 
 It reports `not_hosted` (a row with no key), `foreign_key`, `missing`, `bytes_mismatch`,
 `content_type_mismatch`, `not_an_image`, `cache_control_mismatch`, `md5_mismatch` (against the
-reviewed `d1/media` plan), and `cdn_<status>`, `cdn_content_type`, or `cdn_bytes`, writes the JSON
-report and the job summary, and exits 1 when anything is found. It needs `CLOUDFLARE_ACCOUNT_ID`
+reviewed `d1/media` plan), and, from the media host, `cdn_404`, `cdn_not_an_image`,
+`cdn_content_type`, or `cdn_bytes`. It writes the JSON report and the job summary, and exits 1
+when anything is found.
+
+A HEAD the media host does not answer about the object is **unverifiable**, never a finding: a
+403 or 429 (the first production run, #134, met Cloudflare's bot protection on 11 of 50 HEADs
+from the GitHub runner while each object answered 200 to a normal client), a `cf-mitigated`
+challenge, any other status, or no answer after three tries. The summary lists them by reason, and
+warns, without failing the job, when they reach 20% of the sample: the R2 listing already proved
+those objects. Since 2026-10-07 a Cloudflare cache rule makes the `/best.serp.co/` paths on
+`cdn.serp.co` and `cdn-staging.serp.co` edge-cacheable (before, every response was `DYNAMIC`). It needs `CLOUDFLARE_ACCOUNT_ID`
 and a `CLOUDFLARE_API_TOKEN` with D1 → Read and Workers R2 Storage → Read.
 
 A listing with a missing object shows the tile until it is re-hosted: a new logo URL in the admin
