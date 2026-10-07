@@ -10,7 +10,7 @@ import type {
 import { resolveListingDetailTemplate } from '../listing-detail-template'
 import { getCanonicalListingListRoute, getRoute } from '../routes'
 import { generateWebsiteDetailSchema } from '../schema'
-import { generateDynamicMetadata } from '../seo-config'
+import { composeMetaDescription, generateDynamicMetadata } from '../seo-config'
 import { siteConfig } from '../site-config'
 import { siteCopy } from '../site-copy'
 import { faqsToShow } from '../website/website-faqs-section'
@@ -91,11 +91,14 @@ export async function generateWebsiteDetailRouteMetadata(
 ): Promise<Metadata> {
   const categoryFormatted = project.category ? getCategoryDisplayName(project.category) : null
 
-  const seoDescription = `${project.description} Explore ${project.name} in the ${
-    siteConfig.name
-  } directory, with resource links, category details, and related entries.${
-    categoryFormatted ? ` Category: ${categoryFormatted}.` : ''
-  }`
+  // Short descriptions are padded with directory context, long ones truncated (#151).
+  const seoDescription = composeMetaDescription(project.description, [
+    [
+      `Explore ${project.name} in the ${siteConfig.name} directory, with resource links, category details, and related entries.`,
+      `Explore ${project.name} in the ${siteConfig.name} directory.`
+    ],
+    categoryFormatted ? [`Category: ${categoryFormatted}.`] : []
+  ])
 
   const keywords = [
     project.name,
@@ -111,7 +114,7 @@ export async function generateWebsiteDetailRouteMetadata(
   return generateDynamicMetadata({
     type: 'listing',
     name: project.name,
-    description: seoDescription.length > 160 ? project.description : seoDescription,
+    description: seoDescription,
     slug: project.slug,
     additionalKeywords: keywords,
     publishedAt: project.publishedAt

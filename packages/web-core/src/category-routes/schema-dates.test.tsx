@@ -122,7 +122,20 @@ describe('collection page schema dates', () => {
 
     expect(data.datePublished).toBe('2026-01-01')
     expect(data.dateModified).toBe('2026-01-03')
-    expect(data.numberOfItems).toBe(2)
+    // CollectionPage carries no list properties; the count and listings are its ItemList.
+    expect(data.numberOfItems).toBeUndefined()
+    expect(data.itemListElement).toBeUndefined()
+    expect(data.mainEntity).toMatchObject({ '@type': 'ItemList', numberOfItems: 2 })
+    expect(
+      (data.mainEntity as { itemListElement: Array<Record<string, unknown>> }).itemListElement
+    ).toEqual(
+      alphaListings.map((listing, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: `https://best.serp.co/products/${listing.slug}/`,
+        name: listing.name
+      }))
+    )
     expect(JSON.stringify(data)).not.toContain('2099-01-01')
   })
 

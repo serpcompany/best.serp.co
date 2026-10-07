@@ -18,8 +18,8 @@ export function generateMetadata(): Metadata {
   }
 
   return generateBaseMetadata({
-    title: siteCopy.brandsLabel,
-    description: `Browse sites and products in the ${siteConfig.name} network.`,
+    title: `${siteCopy.brandsLabel} in the ${siteConfig.name} Network`,
+    description: `Browse sites and products in the ${siteConfig.name} network, from directories to tools and resources, with a link to visit each one.`,
     path: getRoute('brands'),
     keywords: ['brands', 'network', siteConfig.name]
   })

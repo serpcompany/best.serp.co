@@ -127,13 +127,15 @@ export function generateBaseMetadata(options: {
       creator: SITE_TWITTER_HANDLE || undefined,
       images: [image.url]
     },
+    // Noindex pages still pass their links (header, footer, breadcrumbs) to the indexed
+    // pages; `nofollow` there made every page's incoming links mixed (#151).
     robots: noindex
       ? {
           index: false,
-          follow: false,
+          follow: true,
           googleBot: {
             index: false,
-            follow: false
+            follow: true
           }
         }
       : ROBOTS_CONFIG,
@@ -145,6 +147,15 @@ export function generateBaseMetadata(options: {
       }
     }
   }
+}
+
+/** Search results show about 60 characters of a title; past that the type suffix is dropped. */
+const LISTING_TITLE_MAX_LENGTH = 60
+
+/** `<name> - Product`, or the bare name when the suffixed title (with ` | SITE`) runs long. */
+export function listingTitle(name: string): string {
+  const suffixed = `${name} - ${siteCopy.listingName.singularTitle}`
+  return `${suffixed} | ${SITE_NAME}`.length > LISTING_TITLE_MAX_LENGTH ? name : suffixed
 }
 
 export function generateDynamicMetadata(options: {
@@ -175,7 +186,7 @@ export function generateDynamicMetadata(options: {
     case 'website':
     case 'listing':
       path = getRoute('listing.detail', { slug })
-      title = `${name} - ${siteCopy.listingName.singularTitle}`
+      title = listingTitle(name)
       break
     case 'category':
       path = getRoute('category.page', { category: slug })
@@ -294,4 +305,9 @@ export function generateCollectionSchema(options: {
   }
 }
 
-export { formatPageTitle, generateAltText, optimizeMetaDescription } from './seo-helpers'
+export {
+  composeMetaDescription,
+  formatPageTitle,
+  generateAltText,
+  optimizeMetaDescription
+} from './seo-helpers'

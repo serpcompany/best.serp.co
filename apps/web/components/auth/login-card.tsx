@@ -319,8 +319,8 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
     return (
       <LoginLayout>
         <CardHeader>
-          <CardTitle role="heading" aria-level={1} className="text-xl">
-            You’re signed in
+          <CardTitle className="text-xl">
+            <h1>You’re signed in</h1>
           </CardTitle>
           <CardDescription>
             Signed in as <b className="font-medium text-foreground">{step.email}</b>.{' '}
@@ -372,8 +372,8 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
     return (
       <LoginLayout>
         <CardHeader>
-          <CardTitle role="heading" aria-level={1} className="text-xl">
-            Check your email
+          <CardTitle className="text-xl">
+            <h1>Check your email</h1>
           </CardTitle>
           <CardDescription>
             If <b className="font-medium text-foreground">{email}</b> is a valid address, a{' '}
@@ -532,8 +532,8 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
   return (
     <LoginLayout>
       <CardHeader>
-        <CardTitle role="heading" aria-level={1} className="text-xl">
-          Sign up or sign in
+        <CardTitle className="text-xl">
+          <h1>Sign up or sign in</h1>
         </CardTitle>
         <CardDescription>
           Enter your email and we’ll send you a {CODE_LENGTH}-digit code. New to SERP? The same code

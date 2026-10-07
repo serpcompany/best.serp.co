@@ -12,8 +12,8 @@ import { AppSidebar } from '../layout/app-sidebar'
 import { getRoute } from '../routes'
 import { NewsletterSection } from '../sections/newsletter-section'
 import {
+  composeMetaDescription,
   generateDynamicMetadata,
-  optimizeMetaDescription,
   SITE_LOGO_URL,
   SITE_NAME,
   SITE_PUBLIC_URL
@@ -80,7 +80,12 @@ export async function generateCategoryRouteMetadata({
   return generateDynamicMetadata({
     type: 'category',
     name: title,
-    description: optimizeMetaDescription(description),
+    description: composeMetaDescription(description, [
+      [
+        `Each ${siteCopy.listingName.singular} has its own ${SITE_NAME} listing with links and details.`,
+        `Each ${siteCopy.listingName.singular} has its own ${SITE_NAME} listing.`
+      ]
+    ]),
     slug: category.slug,
     additionalKeywords: seoContent.keywords
   })
@@ -160,19 +165,18 @@ export function CategoryRoutePage({
                 {
                   '@type': 'ListItem',
                   position: 2,
+                  name: 'Categories',
+                  item: `${SITE_PUBLIC_URL}${getRoute('category.index')}`
+                },
+                {
+                  '@type': 'ListItem',
+                  position: 3,
                   name: categoryDisplayName,
                   item: categoryUrl
                 }
               ]
             },
-            numberOfItems: categoryCount,
-            itemListElement: leadingProjects.slice(0, 10).map((project, index) => ({
-              '@type': 'ListItem',
-              position: index + 1,
-              url: project.website,
-              name: project.name,
-              description: project.description
-            })),
+            // CollectionPage takes no list properties; the listings are its ItemList (#151).
             mainEntity: {
               '@type': 'ItemList',
               name: `${categoryDisplayName} ${siteCopy.listingName.pluralTitle}`,
@@ -180,9 +184,9 @@ export function CategoryRoutePage({
               numberOfItems: categoryCount,
               itemListOrder: 'https://schema.org/ItemListOrderAscending',
               itemListElement: leadingProjects.slice(0, 20).map((project, index) => ({
-                '@type': 'Thing',
+                '@type': 'ListItem',
                 position: index + 1,
-                url: project.website,
+                url: `${SITE_PUBLIC_URL}${getRoute('listing.detail', { slug: project.slug })}`,
                 name: project.name
               }))
             },

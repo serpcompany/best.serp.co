@@ -1,6 +1,10 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
 import { getRoute } from '@serpdirectory/web-core/routes'
-import { SITE_NAME, SITE_PUBLIC_URL } from '@serpdirectory/web-core/seo-config'
+import {
+  generateBaseMetadata,
+  SITE_NAME,
+  SITE_PUBLIC_URL
+} from '@serpdirectory/web-core/seo-config'
 import { siteCopy } from '@serpdirectory/web-core/site-copy'
 import type { Metadata } from 'next'
 import Link from 'next/link'
@@ -8,13 +12,12 @@ import { getActiveCategories } from '@/lib/catalog/repository'
 
 const categoriesPath = getRoute('category.index')
 
-export const metadata: Metadata = {
-  title: `${siteCopy.listingName.pluralTitle} by Category | ${SITE_NAME}`,
-  description: `Browse every ${SITE_NAME} ${siteCopy.listingName.singular} category.`,
-  alternates: {
-    canonical: `${SITE_PUBLIC_URL}${categoriesPath}`
-  }
-}
+// The root layout's title template adds ` | SERP`.
+export const metadata: Metadata = generateBaseMetadata({
+  title: `${siteCopy.listingName.pluralTitle} by Category`,
+  description: `Browse every ${SITE_NAME} ${siteCopy.listingName.singular} category to find curated software, AI tools, companies, and resources listed in each one.`,
+  path: categoriesPath
+})
 
 export default async function CategoriesPage() {
   const categories = (await getActiveCategories())

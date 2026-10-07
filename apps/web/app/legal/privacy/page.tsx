@@ -1,5 +1,6 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
 import { components } from '@serpdirectory/web-core/mdx-components'
+import { getRoute } from '@serpdirectory/web-core/routes'
 import {
   generateLegalPageMetadata,
   LegalStaticPage
@@ -11,7 +12,7 @@ export const metadata: Metadata = generateLegalPageMetadata({
   title: 'Privacy Policy',
   description:
     'Privacy policy for {{SITE_NAME}}. Learn how we collect, use, and protect your information.',
-  path: '/legal/privacy'
+  path: getRoute('privacy')
 })
 
 export default async function PrivacyPolicyPage() {
@@ -21,7 +22,7 @@ export default async function PrivacyPolicyPage() {
     <LegalStaticPage
       content={content}
       mdxComponents={components}
-      path="/legal/privacy"
+      path={getRoute('privacy')}
       slots={{ Breadcrumb }}
       title="Privacy Policy"
     />

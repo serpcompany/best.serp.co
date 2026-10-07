@@ -1,11 +1,14 @@
 import { getRoute } from '@serpdirectory/web-core/routes'
+import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateBaseMetadata({
   title: 'SERP Legal',
-  description: 'Legal policies and terms for SERP.'
-}
+  description:
+    'Legal policies and terms for SERP: the privacy policy and the terms and conditions that apply to using the SERP directory.',
+  path: '/legal/'
+})
 
 export default function LegalPage() {
   return (

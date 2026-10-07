@@ -1,5 +1,6 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
 import { components } from '@serpdirectory/web-core/mdx-components'
+import { getRoute } from '@serpdirectory/web-core/routes'
 import {
   generateLegalPageMetadata,
   LegalStaticPage
@@ -11,7 +12,7 @@ export const metadata: Metadata = generateLegalPageMetadata({
   title: 'Terms of Service',
   description:
     'Terms of service for {{SITE_NAME}}. Read our terms and conditions for using this service.',
-  path: '/legal/terms'
+  path: getRoute('terms')
 })
 
 export default async function TermsOfServicePage() {
@@ -21,7 +22,7 @@ export default async function TermsOfServicePage() {
     <LegalStaticPage
       content={content}
       mdxComponents={components}
-      path="/legal/terms"
+      path={getRoute('terms')}
       slots={{ Breadcrumb }}
       title="Terms of Service"
     />
