@@ -244,34 +244,6 @@ triggers (the dashboard lists them under the Worker's Settings → Triggers), an
 `--test-scheduled`, so `/__scheduled?cron=<expression>` runs `scheduled()` on demand; the job's
 behavior is covered by `scheduled.test.ts` and `draft-jobs.test.ts` against SQLite.
 
-## Legacy review (until #69)
-
-The admin panel replaces the protected approver below for decisions; the notifier and the
-private preview keep working until #69 retires them.
-
-A notifier (`scripts/d1-submission-notifier.ts`) reads verified rows with no
-notification entry, opens an assigned issue in this private repository, and stores its
-number, URL, and a digest of a one-time draft-preview capability. The reviewer opens
-the private preview link (`/admin/submissions/<id>/preview/<token>/`, uncached and
-noindex; like every `/admin` page it also needs an admin session and, in production,
-Cloudflare Access: [Accounts](./ACCOUNTS.md)) and then approves or rejects with
-`scripts/d1-submission-approver.ts` from a protected workflow. Approval atomically promotes the staged data into the catalog and
-advances the publication version; either decision revokes the preview link.
-
-Both steps run against production D1 only:
-
-- `notify-d1-submissions.yml` runs `pnpm db:notify:production` every 15 minutes in the
-  `production-notifier` environment. It stays off until the repository variable
-  `SUBMISSION_REVIEWER_GITHUB_LOGIN` names the reviewer, and it skips until that environment
-  holds `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
-- `approve-d1-submission.yml` ("Review D1 Submission") is dispatched from `main` with the
-  submission UUID, `approve` or `reject`, and the confirmation
-  `approve-best.serp.co-submission-production`. After reviewer approval of the `production`
-  environment, it records a D1 Time Travel bookmark in the run summary, runs
-  `pnpm db:approve:production`, and comments on and closes the review issue.
-
-Setup and guards are in [the deploy runbook](./DEPLOY_RUNBOOK.md#workflows).
-
 Code: `apps/web/app/submit/`, `apps/web/components/submit/`, `apps/web/app/api/submissions/`,
 `apps/web/lib/submissions/`, `packages/data-ops/src/submissions.ts`, and
 `packages/data-ops/src/submission-plans.ts`.

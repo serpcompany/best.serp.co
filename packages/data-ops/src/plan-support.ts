@@ -85,7 +85,7 @@ export interface CatalogPublication {
 /**
  * Builds the publication inputs for one catalog write from the current publication state.
  * The manifest and run ids carry the next version, so they are unique per publication, and
- * the next checksum chains from the current one exactly as the protected approver does.
+ * the next checksum chains from the current one.
  */
 export async function prepareCatalogPublication(input: {
   action: string

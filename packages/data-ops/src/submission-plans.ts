@@ -36,8 +36,6 @@ export interface SubmissionApprovalSnapshot {
   version: number
 }
 
-const CHANNEL = 'github_issue'
-const LEGACY_APPROVAL_WORKFLOW = 'github/approve-d1-submission'
 
 /**
  * How old the refund's own badge check (`badge_checks.kind = 'refund'`, #66) may be when the
@@ -258,8 +256,8 @@ export function buildApproveSubmissionPlans(input: {
   beforeChecksum: string
   expectedContentVersion: number
   /**
-   * The hosted featured image key the reviewer saw (null for none). Absent for a caller that
-   * shows no images (the legacy approval workflow): then no featured image is adopted.
+   * The hosted featured image key the reviewer saw (null for none). Absent: no featured image
+   * is adopted.
    */
   expectedImageKey?: string | null
   /** The hosted logo key the reviewer saw (null for the tile), like `expectedImageKey`. */
@@ -272,7 +270,7 @@ export function buildApproveSubmissionPlans(input: {
   runId: string
   submissionId: string
   version: number
-  workflow?: string
+  workflow: string
 }): StatementPlan[] {
   const reviewed = contentVersion(input.expectedContentVersion)
   const publication: CatalogPublication = {
@@ -284,7 +282,7 @@ export function buildApproveSubmissionPlans(input: {
     now: input.now,
     runId: input.runId,
     version: input.version,
-    workflow: input.workflow ?? LEGACY_APPROVAL_WORKFLOW
+    workflow: input.workflow
   }
   const current = { sql: `status='verified' AND content_version=?`, params: [reviewed] }
   return [
@@ -1128,73 +1126,5 @@ export function selectRefundPendingSubmissionsPlan(limit: number): StatementPlan
         AND paid_at IS NOT NULL AND refunded_at IS NULL
       ORDER BY reviewed_at,id LIMIT ?`,
     params: [limit]
-  }
-}
-
-export function selectVerifiedSubmissionNotificationPlans(limit: number): StatementPlan[] {
-  const pending = `SELECT candidate.id FROM listing_submissions candidate
-    LEFT JOIN listing_submission_notifications notification
-      ON notification.submission_id=candidate.id AND notification.channel=?
-    WHERE candidate.status='verified'
-      AND (notification.submission_id IS NULL OR notification.preview_token_hash IS NULL)
-    ORDER BY candidate.badge_verified_at,candidate.created_at LIMIT ?`
-  const params = [CHANNEL, limit]
-  return [
-    {
-      sql: `SELECT s.id,s.slug,s.name,s.description,s.website,s.content,s.category_slug,
-          s.logo_url,s.video_url,s.verification_attempts,s.badge_verified_at,s.created_at
-        FROM listing_submissions s
-        WHERE s.id IN (${pending})
-        ORDER BY s.badge_verified_at,s.created_at`,
-      params
-    },
-    {
-      sql: `WITH pending AS (${pending})
-        SELECT r.submission_id,r.label,r.url,r.sort_order
-        FROM listing_submission_resource_links r
-        JOIN pending ON pending.id=r.submission_id
-        ORDER BY r.submission_id,r.sort_order`,
-      params
-    },
-    {
-      sql: `WITH pending AS (${pending})
-        SELECT f.submission_id,f.question,f.answer,f.sort_order
-        FROM listing_submission_faqs f
-        JOIN pending ON pending.id=f.submission_id
-        ORDER BY f.submission_id,f.sort_order`,
-      params
-    }
-  ]
-}
-
-export function recordSubmissionNotificationPlan(input: {
-  externalId: string
-  externalUrl: string
-  previewTokenHash: string
-  recipient: string
-  submissionId: string
-}): StatementPlan {
-  return {
-    sql: `INSERT INTO listing_submission_notifications
-        (submission_id,channel,external_id,external_url,recipient,preview_token_hash)
-      SELECT ?,?,?,?,?,? FROM listing_submissions
-      WHERE id=? AND status='verified'
-      ON CONFLICT(submission_id,channel) DO UPDATE SET
-        external_id=excluded.external_id,
-        external_url=excluded.external_url,
-        recipient=excluded.recipient,
-        preview_token_hash=excluded.preview_token_hash,
-        updated_at=CURRENT_TIMESTAMP
-      WHERE EXISTS (SELECT 1 FROM listing_submissions
-        WHERE id=excluded.submission_id AND status='verified')`,
-    params: [
-      input.submissionId,
-      CHANNEL,
-      input.externalId,
-      input.externalUrl,
-      input.recipient,
-      input.previewTokenHash,
-      input.submissionId
-    ]
   }
 }

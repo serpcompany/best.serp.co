@@ -33,10 +33,8 @@ import {
   buildWithdrawSubmissionPlans,
   LISTING_BADGE_CHECK_ACTOR,
   type ListingBadgeCheckClaim,
-  recordSubmissionNotificationPlan,
   selectRefundPendingSubmissionsPlan,
   selectSubmissionForDecisionPlan,
-  selectVerifiedSubmissionNotificationPlans,
   submissionTransitions
 } from './submission-plans'
 
@@ -153,7 +151,8 @@ function approvalPlans(expectedContentVersion = 1) {
     reviewer: 'reviewer',
     runId: `submission_publish_${submissionId}`,
     submissionId,
-    version: 1
+    version: 1,
+    workflow: 'app/admin'
   })
 }
 
@@ -348,7 +347,8 @@ describe('submission status transitions (compare-and-swap with changes() asserti
         reviewer: 'r',
         runId: 'r',
         submissionId,
-        version: 1
+        version: 1,
+        workflow: 'app/admin'
       })
     ).toThrow(/follow, nofollow, or sponsored/u)
   })
@@ -529,9 +529,8 @@ describe('submission status transitions (compare-and-swap with changes() asserti
     expect(submission(db)).toMatchObject({ plan: 'free', status: 'pending_badge' })
   })
 
-  it('keeps drafts out of the review queue while they hold the URL against duplicates', () => {
+  it('holds a draft’s URL against duplicates until it is withdrawn', () => {
     const db = database('draft')
-    expect(query(db, selectVerifiedSubmissionNotificationPlans(10)[0] as StatementPlan)).toEqual([])
     expect(() =>
       db
         .prepare(
@@ -1443,7 +1442,7 @@ describe('protected submission statement plans', () => {
     ).toEqual({
       affected_routes: '/products/example.com/',
       outcome: 'succeeded',
-      workflow: 'github/approve-d1-submission'
+      workflow: 'app/admin'
     })
     expect(events(db, 'approved')).toBe(1)
   })
@@ -1490,38 +1489,6 @@ describe('protected submission statement plans', () => {
     })
     expect(events(db, 'rejected')).toBe(0)
     expect(count(db, 'SELECT COUNT(*) AS count FROM listing_submission_url_blocks')).toBe(0)
-  })
-
-  it('records the notification ledger only for verified submissions', () => {
-    const db = database('verified')
-    const pending = selectVerifiedSubmissionNotificationPlans(10)
-    expect(query(db, pending[0] as StatementPlan)).toMatchObject([{ id: submissionId }])
-
-    const notification = {
-      externalId: '42',
-      externalUrl: 'https://github.com/example/issues/42',
-      previewTokenHash: 'a'.repeat(64),
-      recipient: 'reviewer',
-      submissionId
-    }
-    execute(db, [recordSubmissionNotificationPlan(notification)])
-    execute(db, [recordSubmissionNotificationPlan({ ...notification, externalId: '43' })])
-    expect(
-      db
-        .prepare(
-          'SELECT channel,external_id,preview_token_hash FROM listing_submission_notifications'
-        )
-        .all()
-    ).toEqual([{ channel: 'github_issue', external_id: '43', preview_token_hash: 'a'.repeat(64) }])
-    expect(query(db, pending[0] as StatementPlan)).toEqual([])
-
-    db.prepare(
-      "UPDATE listing_submissions SET status='rejected',rejection_reason='x',rejection_category='other' WHERE id=?"
-    ).run(submissionId)
-    execute(db, [recordSubmissionNotificationPlan({ ...notification, externalId: '44' })])
-    expect(db.prepare('SELECT external_id FROM listing_submission_notifications').all()).toEqual([
-      { external_id: '43' }
-    ])
   })
 
   it('guards decision mutations with single-row assertions and no Site scoping', () => {

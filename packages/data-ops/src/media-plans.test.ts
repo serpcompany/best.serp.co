@@ -97,7 +97,8 @@ function approve(db: DatabaseSync, expectedImageKey?: string | null): void {
       reviewer: 'reviewer',
       runId: `submission_publish_${submissionId}`,
       submissionId,
-      version: 1
+      version: 1,
+      workflow: 'app/admin'
     })
   )
 }
@@ -434,7 +435,7 @@ describe('submission media and approval', () => {
     const none = withImage(null, null)
     none.approveNow()
     expect(imageSlots(none.db)).toBe(0)
-    // A caller that shows no images (the legacy approval workflow) never adopts one.
+    // A caller that passes no image key never adopts one.
     const legacy = withImage(undefined, image)
     legacy.approveNow()
     expect(imageSlots(legacy.db)).toBe(0)
@@ -499,7 +500,8 @@ describe('submission media and approval', () => {
         reviewer: 'reviewer',
         runId: `submission_publish_${submissionId}`,
         submissionId,
-        version: 1
+        version: 1,
+        workflow: 'app/admin'
       })
     )
     expect(listingSlots(stale)).toEqual([])
@@ -520,7 +522,8 @@ describe('submission media and approval', () => {
           reviewer: 'reviewer',
           runId: `submission_publish_${submissionId}`,
           submissionId,
-          version: 1
+          version: 1,
+          workflow: 'app/admin'
         })
       )
     approveWith(reviewed, logo.key)

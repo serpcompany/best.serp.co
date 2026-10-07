@@ -209,7 +209,7 @@ test.describe('accounts', () => {
 })
 
 test.describe('admin gate', () => {
-  const adminPages = ['/admin/', '/admin/not-a-page/', '/admin/submissions/x/preview/y/']
+  const adminPages = ['/admin/', '/admin/not-a-page/', '/admin/submissions/x/']
   const adminApi = ['/api/admin', '/api/admin/listings']
 
   test('answers 401 to anonymous visitors', async ({ request }) => {

@@ -9,9 +9,7 @@ import { isMediaKey, mediaUrl } from './media-keys'
 import { validatePublicHttpUrl } from './public-url'
 import {
   categories,
-  listingSubmissionNotifications,
   listingSubmissionRateLimits,
-  listingSubmissionResourceLinks,
   listingSubmissions,
   type SubmissionPlan,
   type SubmissionStatus
@@ -45,7 +43,6 @@ export const SUBMISSION_LIMITS = {
   name: 120
 } as const
 
-const REVIEW_CHANNEL = 'github_issue'
 /**
  * Check results that read the page and found a problem; each uses up one of the ten checks.
  * `nofollow` is the code stored before `link_not_followed` (#84).
@@ -171,7 +168,6 @@ export interface SubmissionOperations {
     result: SubmissionVerificationResult
   ): Promise<OwnSubmission>
   getOwnSubmission(id: string, ownerUserId: string): Promise<OwnSubmission | null>
-  getReviewPreview(access: { id: string; token: string }): Promise<ListingDetail | null>
   listOwnSubmissions(ownerUserId: string, limit?: number): Promise<OwnSubmission[]>
   updateDraft(input: {
     content: DraftContent
@@ -844,63 +840,6 @@ export function createSubmissionOperations(config: {
         )
       }
       return requireOwnSubmission(id, ownerUserId)
-    },
-
-    async getReviewPreview(access) {
-      const tokenHash = await sha256(access.token)
-      const submission = await queryFirst<SubmissionReviewPreviewRow>(
-        client.database
-          .select({
-            category_slug: listingSubmissions.categorySlug,
-            content: listingSubmissions.content,
-            created_at: listingSubmissions.createdAt,
-            description: listingSubmissions.description,
-            id: listingSubmissions.id,
-            image_key: sql<string | null>`(SELECT j.media_key FROM media_ingestions j
-              WHERE j.submission_id=${listingSubmissions.id} AND j.kind='image'
-                AND j.sort_order=0 AND j.status='hosted')`,
-            logo_key: sql<string | null>`(SELECT j.media_key FROM media_ingestions j
-              WHERE j.submission_id=${listingSubmissions.id} AND j.kind='logo'
-                AND j.sort_order=0 AND j.status='hosted'
-                AND j.source_url=${listingSubmissions.logoUrl})`,
-            logo_url: listingSubmissions.logoUrl,
-            name: listingSubmissions.name,
-            slug: listingSubmissions.slug,
-            video_url: listingSubmissions.videoUrl,
-            website: listingSubmissions.website
-          })
-          .from(listingSubmissions)
-          .innerJoin(
-            listingSubmissionNotifications,
-            and(
-              eq(listingSubmissionNotifications.submissionId, listingSubmissions.id),
-              eq(listingSubmissionNotifications.channel, REVIEW_CHANNEL)
-            )
-          )
-          .where(
-            and(
-              eq(listingSubmissions.id, access.id),
-              eq(listingSubmissions.status, 'verified'),
-              eq(listingSubmissionNotifications.previewTokenHash, tokenHash)
-            )
-          )
-          .limit(1)
-      )
-      if (!submission) return null
-      const resourceResult = await prepare(
-        client,
-        client.database
-          .select({
-            label: listingSubmissionResourceLinks.label,
-            sort_order: listingSubmissionResourceLinks.sortOrder,
-            url: listingSubmissionResourceLinks.url
-          })
-          .from(listingSubmissionResourceLinks)
-          .where(eq(listingSubmissionResourceLinks.submissionId, submission.id))
-          .orderBy(listingSubmissionResourceLinks.sortOrder, listingSubmissionResourceLinks.id)
-      ).all<SubmissionReviewPreviewResourceRow>()
-      if (!resourceResult.success) throw new Error('D1 submission review preview query failed.')
-      return buildSubmissionReviewPreview(submission, resourceResult.results)
     }
   }
 }

@@ -221,7 +221,7 @@ describe('admin gate', () => {
   }
 
   it('answers 503 in production until the Access vars are configured', async () => {
-    for (const path of ['/admin/', '/api/admin/listings', '/admin/submissions/1/preview/x/']) {
+    for (const path of ['/admin/', '/api/admin/listings', '/admin/submissions/1/']) {
       const { response, serve } = await gate(`${production}${path}`, productionEnv, {
         ...session,
         [ACCESS_JWT_HEADER]: 'VALID_JWT'

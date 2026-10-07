@@ -23,8 +23,7 @@ export const project = {
     mediaUploadStaging: 'upload-media-best.serp.co-staging',
     publish: 'publish-best.serp.co-production',
     /** A reviewed manifest applied to staging first (#95): every catalog change is checked there. */
-    publishStaging: 'publish-best.serp.co-staging',
-    submission: 'approve-best.serp.co-submission-production'
+    publishStaging: 'publish-best.serp.co-staging'
   },
   domain: 'best.serp.co',
   /**
