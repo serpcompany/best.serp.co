@@ -351,7 +351,8 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
         submissionId: 'sub-free'
       })
     )
-    // Badge verification is the legacy capability operation; set its result directly.
+    // Badge verification is a submission operation (claim, then finish), not a plan; set its
+    // result directly.
     await db
       .prepare(
         "UPDATE listing_submissions SET status='verified', badge_verified_at=? WHERE id='sub-free'"
