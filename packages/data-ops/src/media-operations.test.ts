@@ -35,9 +35,9 @@ function fixture(routes: Parameters<typeof routedFetch>[0], start = '2026-10-06T
   sqlite.database.exec(`
     INSERT INTO listing_submissions
       (id,slug,block_key,block_covers_subdomains,name,description,website,content,category_slug,
-       logo_url,status,access_token_hash)
+       logo_url,status)
     VALUES ('${submissionId}','sub.example','sub.example',1,'Sub','d','https://sub.example/','c',
-      'tools','${logo}','pending_badge','hash');
+      'tools','${logo}','pending_badge');
   `)
   let now = new Date(start)
   const bucket = memoryBucket()

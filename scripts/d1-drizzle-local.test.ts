@@ -183,7 +183,8 @@ describe('fresh Drizzle D1 history', () => {
       '0006_badge_program.sql',
       '0007_hosted_media.sql',
       '0008_listing_claims.sql',
-      '0009_billing_orders.sql'
+      '0009_billing_orders.sql',
+      '0010_drop_retired_submission_data.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
@@ -213,9 +214,17 @@ describe('fresh Drizzle D1 history', () => {
       .join('\n')
     const created = [...history.matchAll(/^CREATE TABLE `([^`]+)`/gmu)].map(match => match[1])
     const rebuilt = created.filter(name => name?.startsWith('__new_'))
-    expect(created.filter(name => !name?.startsWith('__new_')).sort()).toEqual(
-      [...applicationTableNames].sort()
-    )
+    // The tables left after replaying every create, drop, and rename (a retired table is dropped
+    // for good: #138).
+    const live = new Set<string>()
+    for (const [, made, dropped, renamed] of history.matchAll(
+      /^(?:CREATE TABLE `([^`]+)`|DROP TABLE `([^`]+)`|ALTER TABLE `[^`]+` RENAME TO `([^`]+)`)/gmu
+    )) {
+      if (made && !made.startsWith('__new_')) live.add(made)
+      if (dropped) live.delete(dropped)
+      if (renamed) live.add(renamed)
+    }
+    expect([...live].sort()).toEqual([...applicationTableNames].sort())
     expect(history.match(/^\) STRICT;/gmu)).toHaveLength(created.length)
     for (const name of rebuilt) {
       expect(history).toContain(`ALTER TABLE \`${name}\` RENAME TO \`${name?.slice(6)}\`;`)
@@ -479,6 +488,54 @@ describe('fresh Drizzle D1 history', () => {
     expect(database.prepare('SELECT COUNT(*) AS count FROM badge_checks').get()).toEqual({
       count: 0
     })
+    database.close()
+  })
+
+  it('drops the retired notifier ledger and token digest without touching submissions (#138)', () => {
+    // Dropping a child table and an unindexed column rebuilds nothing, so no foreign key cascades
+    // and the submission, its children, and its trigger stay.
+    const database = new DatabaseSync(':memory:')
+    const names = freshMigrationNames()
+    const retired = '0010_drop_retired_submission_data.sql'
+    for (const migration of names.slice(0, names.indexOf(retired))) {
+      database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
+    }
+    database.exec(`
+      INSERT INTO categories (slug, name) VALUES ('tools', 'Tools');
+      INSERT INTO listing_submissions (id, slug, name, description, website, content,
+        category_slug, logo_url, access_token_hash)
+      VALUES ('sub', 'sub.example', 'Sub', 'd', 'https://sub.example/', 'c', 'tools',
+        'https://sub.example/logo.png', 'digest');
+      INSERT INTO listing_submission_faqs (submission_id, question, answer) VALUES ('sub', 'Q', 'A');
+      INSERT INTO listing_submission_notifications (submission_id, channel, external_id,
+        external_url, recipient) VALUES ('sub', 'github_issue', '1', 'https://example.com/1', 'r');
+    `)
+    expect(database.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 })
+    database.exec('BEGIN')
+    database.exec(readFileSync(resolve(freshMigrationsDirectory, retired), 'utf8'))
+    database.exec('COMMIT')
+
+    const objects = (type: string) =>
+      database
+        .prepare('SELECT name FROM sqlite_master WHERE type = ? ORDER BY name')
+        .all(type)
+        .map(row => row.name)
+    expect(objects('table')).not.toContain('listing_submission_notifications')
+    expect(objects('index')).not.toContain('listing_submissions_token_unique')
+    expect(objects('trigger')).toContain('listing_submissions_refuse_blocked_url')
+    expect(
+      database
+        .prepare('PRAGMA table_info(listing_submissions)')
+        .all()
+        .map(column => column.name)
+    ).not.toContain('access_token_hash')
+    expect(database.prepare('SELECT id, slug, status FROM listing_submissions').all()).toEqual([
+      { id: 'sub', slug: 'sub.example', status: 'pending_badge' }
+    ])
+    expect(database.prepare('SELECT COUNT(*) AS count FROM listing_submission_faqs').get()).toEqual(
+      { count: 1 }
+    )
+    expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([])
     database.close()
   })
 
