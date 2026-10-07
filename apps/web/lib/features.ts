@@ -25,10 +25,10 @@ export interface SiteFeatures {
   readonly badgeProgram: boolean
   /**
    * #67: claiming an existing listing with the badge or a payment (`lib/claims/`), from the
-   * listing page's "Claim this listing" link and dialog (#70 screens 8 and 9). On since #130:
-   * the badge method only, since a paid claim also needs `orders`. Off, every claim endpoint
-   * would answer 404, the listing page would show no claim link, and emails wouldn't offer to
-   * claim a listing (again). See docs/CLAIMS.md.
+   * listing page's "Claim this listing" link and dialog (#70 screens 8 and 9). On since #130;
+   * the payment method too since `orders` is on (#133). Off, every claim endpoint would answer
+   * 404, the listing page would show no claim link, and emails wouldn't offer to claim a
+   * listing (again). See docs/CLAIMS.md.
    */
   readonly claims: boolean
   /**
@@ -42,9 +42,13 @@ export interface SiteFeatures {
    */
   readonly messages: boolean
   /**
-   * #68: orders (admin screen 13), through the billing provider. Off: the admin sidebar hides Orders and
-   * `/admin/orders/` stays a 404 (the admin catch-all), the claim dialog offers only the badge,
-   * and the badge program's emails leave out the paid upgrade, "Relist", and claiming again.
+   * #68: paid listings ($49 one-off) and orders (admin screen 13), through the billing provider
+   * (`lib/billing/`). On since #133 (the owner's decision, with the provider's secrets set on
+   * staging and production): the submit flow offers the paid plan, the account offers "Upgrade"
+   * and "Relist", the claim dialog offers a payment, the admin sidebar shows Orders, the draft
+   * reminder and the badge program's emails make their paid offers, and the hourly billing sweep
+   * runs (it fails the trigger without the secrets). Off, all of that is hidden, every checkout
+   * route and the webhook answer 404, and `/admin/orders/` is a 404 (the admin catch-all).
    */
   readonly orders: boolean
 }
@@ -55,5 +59,5 @@ export const features: SiteFeatures = {
   claims: true,
   listingFaqs: true,
   messages: false,
-  orders: false
+  orders: true
 }

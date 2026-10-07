@@ -89,8 +89,8 @@ badge reads "Fix the badge before the recheck" with "If it’s still failing at 
 24 hours later, the listing is unlisted.", the program's checks are labelled "Weekly", and the
 overview's "Badge checks" card says "Free listings are checked weekly" (`feature-copy.ts`; off,
 none of it promises weekly checks). The "Upgrade: $49 one-off" entry point (in the badge panel)
-and an unlisted listing's "Relist for $49" show only while orders are on
-([Billing](./BILLING.md)).
+and an unlisted listing's "Relist for $49" show only while orders are on, as they are since #133
+([Billing](./BILLING.md)), and a draft's next step reads "Choose free or paid".
 
 ## Logos
 

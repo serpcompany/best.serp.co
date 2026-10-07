@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { type APIRequestContext, expect } from '@playwright/test'
-import { ORDERS_PREVIEW_VARS } from './orders-worker'
+import { BILLING_PREVIEW_VARS } from './orders-worker'
 
 /**
  * The admin panel suite (serpcompany/best.serp.co#64) runs on its own local Worker with its own
@@ -48,13 +48,13 @@ export function adminOrigin(server: SuiteServer = adminServer): string {
 
 /**
  * Serves the built Worker on a fresh, migrated D1 of its own (seeded by the suite). The admin
- * Worker also has orders on (claims are on everywhere, #130): the orders suite
- * (`billing.spec.ts`, #68) shares it (`orders-worker.ts`) rather than starting another preview
- * Worker on the CI runner.
+ * Worker also has billing configured with the mocked provider (orders and claims are on
+ * everywhere, #130 and #133): the orders suite (`billing.spec.ts`, #68) shares it
+ * (`orders-worker.ts`) rather than starting another preview Worker on the CI runner.
  */
 export function adminServerCommand(server: SuiteServer = adminServer): string {
   const state = server.stateDirectory
-  const vars = server === adminServer ? ORDERS_PREVIEW_VARS : []
+  const vars = server === adminServer ? BILLING_PREVIEW_VARS : []
   const previewVars = vars.length > 0 ? `LOCAL_PREVIEW_VARS=${vars.join(',')} ` : ''
   return [
     'cd ../..',

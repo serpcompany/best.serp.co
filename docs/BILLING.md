@@ -2,8 +2,15 @@
 
 Paid listings (serpcompany/best.serp.co#68): **$49 USD, one-off and permanent**
 (`site.submissions.paidListingPriceCents`), sold through Stripe Checkout behind a
-provider-agnostic billing module, so SERP's self-hosted Lago can replace Stripe later. Everything
-here is off while `features.orders` (`apps/web/lib/features.ts`) is off, which is the default.
+provider-agnostic billing module, so SERP's self-hosted Lago can replace Stripe later. It runs
+while `features.orders` (`apps/web/lib/features.ts`) is on, which it is since #133 (the
+owner's decision, with the provider's secrets and webhooks set up; see
+[Configuration](#configuration-owner)). The submit flow then offers the paid plan ("Skip the
+badge: $49 one-off", "Pay $49 and go live"), the account offers "Upgrade: $49 one-off" and
+"Relist for $49", the claim dialog offers "Skip the badge: $49 one-off" ([Claims](./CLAIMS.md)),
+the admin sidebar shows Orders, the draft reminder and the badge program's emails make their
+paid offers, and the hourly sweep runs. Turned off, all of that is hidden, every checkout route
+and the webhook answer 404, `/admin/orders/` is a 404, and the sweep does nothing.
 
 ## Module
 
@@ -146,14 +153,26 @@ included; Stripe does not follow redirects):
 Events: `checkout.session.completed`, `checkout.session.expired`,
 `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`. No Stripe
 Tax: billing refuses to start while `site.submissions.automaticTax` is on, since a taxed charge
-wouldn't match its order. Then set `features.orders` to `true`.
+wouldn't match its order.
+
+`features.orders` is `true` since #133: the staging Worker has its test-mode secrets and
+webhook. **Production needs its live secrets before the promotion that ships #133.** A Worker
+with orders on but without them still shows the paid options, but every checkout answers 503,
+the webhook 503, admin refunds are unavailable, and the hourly trigger fails on the billing
+sweep (logged as `scheduled_job_failed`, `job: "billing-sweep"`) after the draft and badge jobs
+ran. A local Worker is the same unless you pass test-mode values through `LOCAL_PREVIEW_VARS`
+(`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `LOCAL_STRIPE_MOCK_PORT` for a mocked API),
+as the end-to-end suite does. `LOCAL_ORDERS=on` still turns orders on for a local Worker with
+the flag off; nothing uses it while the flag is on.
 
 ## Tests
 
 `apps/web/lib/billing/{service,providers/stripe}.test.ts` (node:sqlite and a fake provider),
 `scripts/d1-drizzle-local.test.ts` (the migration), and `apps/e2e/tests/billing.spec.ts`
-(Playwright on the admin panel suite's Worker and D1, `PLAYWRIGHT_PORT` + 3, started with orders
-on through `LOCAL_ORDERS` (claims are on since #130), because a ninth preview Worker exhausted
-the CI runner's memory; the mocked Stripe API listens on `PLAYWRIGHT_PORT` + 8). It covers checkout success,
+(Playwright on the admin panel suite's Worker and D1, `PLAYWRIGHT_PORT` + 3, started with the
+mocked provider's test values (`BILLING_PREVIEW_VARS` in `apps/e2e/tests/orders-worker.ts`;
+orders and claims are on since #133 and #130), because a ninth preview Worker exhausted the CI
+runner's memory; the mocked Stripe API listens on `PLAYWRIGHT_PORT` + 8. The badge program
+suite's Worker takes the same values for its hourly trigger's sweep). It covers checkout success,
 checks failed, confirming then failed, and cancel; webhook replay; upgrade; refunds with a badge
 pass and a miss; the `other` rejection refund; and a paid claim.

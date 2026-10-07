@@ -67,15 +67,16 @@ it on (owner decision on #64):
   `listing-unlisted`, and `ownership-removed`; `links.test.ts` counts those as sent only while
   it is on (`FLAGGED_SENDERS`, so they are sent now), and they must link only to pages that
   exist.
-- `features.orders` (#68). Off, `badge-missing` leaves out "Rather not keep the badge? Upgrade
-  to a paid listing…", `listing-unlisted` leaves out "To bring it back, relist it as a paid
-  listing…" and its "Relist for $49" button, and `ownership-removed` says only "The listing
-  stays on SERP." without the claim offer or its button.
+- `features.orders` (#68, on since #133). On, `badge-missing` adds "Rather not keep the badge?
+  Upgrade to a paid listing…", `listing-unlisted` adds "To bring it back, relist it as a paid
+  listing…" and its "Relist for $49" button, `ownership-removed` offers to claim it again (with
+  claims on), the draft reminder offers both plans with the price and sends a draft left in
+  checkout to "Complete checkout", and billing sends its own emails. Off, all of that is left
+  out and `ownership-removed` says only "The listing stays on SERP.".
 - `features.claims` (#67, on since #130). Off, `ownership-removed` leaves out the claim offer
-  too: it needs both flags, since it offers the badge or a payment, so with orders still off it
-  says only "The listing stays on SERP.". The audit's `orders` and `claims` patterns ($
-  amounts, "paid listing", "relist", "claim … again") catch either offer while its flag is
-  off.
+  too: it needs both flags, since it offers the badge or a payment. The audit's `orders` and
+  `claims` patterns ($ amounts, "paid listing", "relist", "claim … again") catch either offer
+  while its flag is off.
 - `features.messages` (#73). Off, `changes-requested` ends "Questions? Contact us at
   <`/contact/` link>" and the prohibited rejection's "Message us" opens `/contact/`. On, they
   point to the dashboard conversation (`messageUsPath`).
@@ -95,7 +96,7 @@ panel (#65). The draft reminder, which the hourly job sends (#63), renders
 with `features.orders` as the job passes it, and its "Complete checkout" link opens
 `/submit/<id>/checkout/` ([Billing](./BILLING.md)). The billing module alone sends
 `listing-live-paid`, `payment-received-in-review`, and `submission-rejected-refunded`, only
-while orders are on (`FLAGGED_SENDERS`).
+while orders are on (`FLAGGED_SENDERS`, so they are sent now).
 
 ## Recipients and footers
 

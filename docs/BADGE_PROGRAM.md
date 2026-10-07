@@ -21,9 +21,12 @@ badge goes missing is removed."). The program's own emails (`badge-missing`, `li
 Its emails link to #65's `/account/listings/<slug>/`, and offer what later issues build only
 while their flags are on: the paid upgrade and "Relist" (#68) with `features.orders`, and
 claiming again (#67, by badge or payment) with `features.claims` and `features.orders`. Orders
-are still off, so none of these offers is sent yet. The email audit (`links.test.ts`) fails if
-a badge email offers either while its flag is off. The account's "unlisted" status says
-"Removed from best.serp.co." until orders are on too.
+are on since #133, so all of these offers are sent: `badge-missing` adds "Rather not keep the
+badge? Upgrade to a paid listing for $49 one-off…", `listing-unlisted` offers "Relist for $49",
+and `ownership-removed` offers to claim it again. The email audit (`links.test.ts`) fails if a
+badge email offers either while its flag is off. The account's "unlisted" status says "Removed
+after a confirmed badge miss. Relisting is paid." (with orders off, "Removed from
+best.serp.co.").
 
 Turning the flag off again makes each job return `{ enabled: false }` without reading D1 or
 fetching any site, and takes the weekly-check copy out. A local Worker can still run the

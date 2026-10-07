@@ -13,11 +13,11 @@ import { project } from './project'
  * Worker while `features.badgeProgram` or `features.claims` is off (both flags are on since
  * #130, so no suite sets them; `lib/worker/scheduled.ts` and `lib/claims/flags.ts` ignore them
  * anywhere but local), and the
- * orders suite's switches (apps/e2e/tests/billing.spec.ts, #68): `LOCAL_ORDERS` turns orders on
- * while `features.orders` is off, `LOCAL_STRIPE_MOCK_PORT` points billing at the suite's mocked
- * Stripe API, and `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` take the suite's own test values
- * (`lib/billing/` ignores the first two anywhere but local, and refuses a live key outside
- * production). Identity and environment vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`) can never be
+ * billing's (apps/e2e/tests/orders-worker.ts, #68): `LOCAL_ORDERS` turns orders on while
+ * `features.orders` is off (on since #133, so no suite sets it), `LOCAL_STRIPE_MOCK_PORT` points
+ * billing at the suite's mocked Stripe API, and `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`
+ * take the suite's own test values (`lib/billing/` ignores the first two anywhere but local,
+ * and refuses a live key outside production). Identity and environment vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`) can never be
  * overridden here.
  */
 export const LOCAL_PREVIEW_OVERRIDABLE_VARS = [

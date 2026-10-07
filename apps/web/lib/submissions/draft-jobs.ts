@@ -57,7 +57,7 @@ export async function runDraftJobs(input: {
   jobs: DraftJobOperations
   limit?: number
   now: Date
-  /** `features.showPaidListings`: the reminder copy follows the site's paid flag. */
+  /** `features.orders` (`ordersEnabledFor`): the reminder copy follows the site's paid flag. */
   paidListings: boolean
   priceCents: number
   send: SendDraftEmail

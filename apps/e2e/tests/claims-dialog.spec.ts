@@ -7,11 +7,12 @@ import { type FixtureSite, startFixtureSite } from './submit-fixture'
 
 /**
  * The claim dialog (serpcompany/best.serp.co#67, #70 screens 8 and 9) in the browser, on the
- * claims suite's Worker with the site's flags (#130: claims and the badge program on, orders
- * off): the sidebar's claim link, sign-in first for visitors, the four steps with their approved
- * errors (webmail, another domain, a wrong, expired, or over-attempt code), the badge check and
- * the badge program's weekly-check copy, success, the "Verified owner" badge, the already-owned
- * dialog, and the contact path for a held listing or one whose slug and website disagree.
+ * claims suite's Worker with the site's flags (claims, the badge program, and orders on; #130,
+ * #133): the sidebar's claim link, sign-in first for visitors, the method step's badge and
+ * payment options, the four steps with their approved errors (webmail, another domain, a wrong,
+ * expired, or over-attempt code), the badge check and the badge program's weekly-check copy,
+ * success, the "Verified owner" badge, the already-owned dialog, and the contact path for a held
+ * listing or one whose slug and website disagree. Paying for a claim is `billing.spec.ts`'s.
  * Desktop uses the dialog; a phone gets the drawer.
  *
  * Set CLAIM_SCREENSHOT_DIRECTORY to save each state (desktop and mobile, in the color scheme the
@@ -130,7 +131,7 @@ test('claims a listing with the badge through every step and its errors', async 
   await page.goto(`/products/${listing.slug}/`)
   await page.getByRole('button', { name: 'Claim this listing' }).click()
 
-  // Step 1: the method. The paid method stays hidden while orders (#68) are off.
+  // Step 1: the method: the badge (chosen) or, with orders on (#68, #133), a payment.
   await expect(dialog(page).getByRole('heading', { name: 'Claim Dialog product' })).toBeVisible()
   await expect(
     dialog(page).getByText('Prove you work at Dialog product to manage this listing.')
@@ -143,7 +144,11 @@ test('claims a listing with the badge through every step and its errors', async 
       'We check it weekly. If it’s removed, you lose ownership and the listing stays up.'
     )
   ).toBeVisible()
-  await expect(dialog(page).getByText(/Skip the badge/u)).toHaveCount(0)
+  await expect(dialog(page).getByText('Skip the badge: $49 one-off')).toBeVisible()
+  await expect(
+    dialog(page).getByText('No badge needed, and ownership doesn’t depend on one.')
+  ).toBeVisible()
+  await expect(dialog(page).locator('#claim-method-badge')).toBeChecked()
   await expect(
     dialog(page).getByText('Either way, you’ll confirm an email address at')
   ).toBeVisible()

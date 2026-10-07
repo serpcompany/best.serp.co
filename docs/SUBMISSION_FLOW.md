@@ -141,9 +141,10 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    for the badge; the website never changes, and edits never reset the draft clock. Request
    bodies are capped at 32 KB as they stream in, with or without `Content-Length`.
 5. **`/submit/<id>/choose/`** (screen 2b): "Get the badge code" chooses free
-   (`POST /api/submissions/<id>/plan`, `draft` → `pending_badge`). The paid card and every $49
-   link stay hidden while `features.orders` is off; with it on, "Pay $49 and go live" opens
-   the checkout ([Billing](./BILLING.md)). "Decide later" leaves
+   (`POST /api/submissions/<id>/plan`, `draft` → `pending_badge`). With `features.orders` on
+   (since #133) the paid card, "Skip the badge: $49 one-off", shows beside it, and "Pay $49 and
+   go live" opens the checkout ([Billing](./BILLING.md)); with it off, the paid card and every
+   $49 link are hidden. "Decide later" leaves
    the draft in the account (`/account/` lists it with "Expires in N days" and Continue).
 6. **`/submit/<id>/badge/`** (screen 3): the light and dark snippets link to the future listing.
    `POST /api/submissions/<id>/verify` first claims the check in one compare-and-swap
@@ -233,7 +234,8 @@ attempts left, for a draft still in the state the email describes), then withdra
 days old as `expired` and sends `draft-expired`, then claims and sends the latest due
 `draft-reminder` of each remaining draft, so a reminder goes out within the hour it falls due.
 Emails go out one at a time, and a D1 failure other than a lost claim fails the run. The
-reminder copy follows `features.orders`: while it is off it offers the free badge
+reminder copy follows `features.orders` (on since #133): it offers both plans with the price,
+and asks a draft left in checkout to complete it; with orders off it offers the free badge
 listing only, with no price, and sends a draft left in checkout to the plan choice. A run
 handles at most 100 of each and logs whether more remain. The same hourly trigger then continues
 the [badge program](./BADGE_PROGRAM.md). The deploy that ships the Worker registers the
