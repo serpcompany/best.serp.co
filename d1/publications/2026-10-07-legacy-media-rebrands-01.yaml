@@ -99,11 +99,11 @@ operations:
         source: https://framerusercontent.com/images/25MfMUKiVqqXOMmCD33HkTdVAY.png
         width: 180
       images:
-        - bytes: 59914
-          contentType: image/webp
+        - bytes: 44704
+          contentType: image/avif
           height: 631
-          key: best.serp.co/listings/getvoiceline.com/image/049b76c041373e8c.webp
-          sha256: 049b76c041373e8c0fd8a14b9b074b7354c0ce5b5b708c630e2fc1c1d15f610d
+          key: best.serp.co/listings/getvoiceline.com/image/0d076e679f63b7e1.avif
+          sha256: 0d076e679f63b7e1c2014d24ec2d96b98a98e9ee7ffe55525f7ff0b00d0a258f
           source: https://framerusercontent.com/images/EZbgpRHE86bHfECZfin6OpcOu3I.png
           width: 1200
   - action: listing-media-update
