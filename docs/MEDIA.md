@@ -285,7 +285,7 @@ Done on 2026-10-06: the `cdn-staging` bucket and both custom domains exist, and 
   can dispatch workflows could run the staging publication or upload. A `staging-data`
   environment (deployments from `staging` only, the owner as required reviewer, the same two
   secrets) used by `publish-d1-staging.yml` and `upload-media-staging.yml` would enforce what
-  AGENTS.md states, as `production-notifier` does for the notifier. Not created here.
+  AGENTS.md states, as `production` does for production. Not created here.
 
 - **Lifecycle rules for pending images.** The cron deletes finished submissions' and revisions'
   images, but a row deleted outright (its queue rows cascade) leaves its objects behind. R2

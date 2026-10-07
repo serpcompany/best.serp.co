@@ -9,8 +9,7 @@ import { featuredImageView } from './featured-image'
 
 /**
  * Maps the admin reads to what the review screen renders (#64 screen 11), and builds the
- * listing preview with the submission review preview (`review-preview.ts`), the same builder
- * the legacy private preview uses.
+ * listing preview with the submission review preview builder (`review-preview.ts`).
  */
 
 function queuedAt(review: SubmissionReview): string | null {

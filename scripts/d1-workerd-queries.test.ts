@@ -327,7 +327,6 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
         ok: false
       })
     ).toMatchObject({ verificationAttempts: 1 })
-    expect(await submissions.getReviewPreview({ id: draft.id, token: 't'.repeat(43) })).toBeNull()
 
     // The daily draft job (#63): a reminder at +13 hours, expiry after 30 days.
     const waiting = await submissions.createDraft({

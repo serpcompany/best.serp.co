@@ -211,7 +211,7 @@ describe('admin path matching', () => {
     for (const path of [
       '/admin',
       '/admin/',
-      '/admin/submissions/1/preview/x/',
+      '/admin/submissions/1/',
       '/api/admin',
       '/api/admin/listings',
       '/ADMIN/',

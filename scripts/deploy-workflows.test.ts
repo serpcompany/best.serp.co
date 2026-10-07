@@ -4,7 +4,6 @@ import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 import { githubHostedRunner } from './ci-runners'
 import { type ReleaseCommand, readOnlyCommands, releaseAuthorizations } from './cloudflare-release'
-import { buildReviewIssue } from './d1-submission-notifier'
 import { MEDIA_HEALTH_SQL } from './media-health'
 import { project } from './project'
 import { stagingWorkflow } from './staging-verification'
@@ -98,7 +97,6 @@ const expression = (value: string) => `\${{ ${value} }}`
 const secret = (name: string) => expression(`secrets.${name}`)
 const credentialsGate = "steps.credentials.outputs.configured == 'true'"
 const productionDispatchWorkflows = [
-  'approve-d1-submission.yml',
   'bootstrap-production-d1.yml',
   'deploy-production.yml',
   'publish-d1.yml'
@@ -114,7 +112,6 @@ const newWorkflows = [
   ...productionDispatchWorkflows,
   'deploy-staging.yml',
   mediaHealthWorkflow,
-  'notify-d1-submissions.yml',
   'publish-d1-staging.yml',
   ...Object.keys(mediaUploadWorkflows)
 ]
@@ -394,8 +391,6 @@ describe('version-pinned HTTP gates', () => {
 describe('recreated D1 operation workflows', () => {
   it('names the exact workflow files the script guards require', () => {
     const guards: Array<[string, string]> = [
-      ['scripts/d1-submission-approver.ts', 'approve-d1-submission.yml'],
-      ['scripts/d1-submission-notifier.ts', 'notify-d1-submissions.yml'],
       ['scripts/d1-remote-publisher.ts', 'publish-d1.yml'],
       ['scripts/d1-remote-publisher.ts', 'publish-d1-staging.yml'],
       ['scripts/media-upload.ts', 'upload-media.yml'],
@@ -412,18 +407,6 @@ describe('recreated D1 operation workflows', () => {
 
   it('satisfies each script environment contract against production D1 only', () => {
     const contracts: Array<[string, string, string, string]> = [
-      [
-        'approve-d1-submission.yml',
-        'review',
-        'pnpm db:approve:production',
-        'scripts/d1-submission-approver.ts'
-      ],
-      [
-        'notify-d1-submissions.yml',
-        'notify',
-        'pnpm db:notify:production',
-        'scripts/d1-submission-notifier.ts'
-      ],
       ['publish-d1.yml', 'publish', 'pnpm db:publish:production', 'scripts/d1-remote-publisher.ts']
     ]
     for (const [file, jobName, command, script] of contracts) {
@@ -444,23 +427,10 @@ describe('recreated D1 operation workflows', () => {
     expect(stepRunning(publish, 'db:publish:production').run).toBe(
       'pnpm db:publish:production -- "$MANIFEST_PATH"'
     )
-    const review = loadWorkflow('approve-d1-submission.yml').jobs.review as WorkflowJob
-    expect(stepRunning(review, 'db:approve:production').env?.D1_SUBMISSION_APPROVAL_CONFIRM).toBe(
-      expression('inputs.confirmation')
-    )
-    expect(stepRunning(review, 'db:approve:production').run).toBe(
-      'pnpm db:approve:production -- "$SUBMISSION_ID" "$DECISION"'
-    )
   })
 
-  it('requires the script confirmations and bookmarks D1 before approval or publication', () => {
+  it('requires the script confirmation and bookmarks D1 before publication', () => {
     const cases: Array<[string, string, string, string]> = [
-      [
-        'approve-d1-submission.yml',
-        'review',
-        project.confirmation.submission,
-        'db:approve:production'
-      ],
       ['publish-d1.yml', 'publish', project.confirmation.publish, 'db:publish:production']
     ]
     for (const [file, jobName, confirmation, command] of cases) {
@@ -477,83 +447,6 @@ describe('recreated D1 operation workflows', () => {
     }
     const publishAuthorize = runs(loadWorkflow('publish-d1.yml').jobs.authorize as WorkflowJob)
     expect(publishAuthorize.join('\n')).toContain('^d1/publications/[A-Za-z0-9._-]+\\.ya?ml$')
-    const approveAuthorize = runs(
-      loadWorkflow('approve-d1-submission.yml').jobs.authorize as WorkflowJob
-    )
-    expect(approveAuthorize.join('\n')).toContain('^[0-9a-fA-F-]{36}$')
-  })
-
-  it('closes the exact review issue the notifier opened', () => {
-    const submissionId = '123e4567-e89b-12d3-a456-426614174000'
-    const { body } = buildReviewIssue({
-      faqs: [],
-      previewUrl: `${project.publicUrl}/admin/submissions/${submissionId}/preview/x/`,
-      resources: [],
-      submission: {
-        badge_verified_at: '2026-01-01T00:00:00.000Z',
-        category_slug: 'video-downloaders',
-        content: 'Content',
-        created_at: '2026-01-01T00:00:00.000Z',
-        description: 'Description',
-        id: submissionId,
-        logo_url: 'https://example.com/logo.png',
-        name: 'Example',
-        slug: 'example',
-        verification_attempts: 1,
-        video_url: null,
-        website: 'https://example.com/'
-      }
-    })
-    const review = loadWorkflow('approve-d1-submission.yml').jobs.review as WorkflowJob
-    expect(review.permissions).toEqual({ contents: 'read', issues: 'write' })
-    const script = String(
-      review.steps?.find(step => step.uses === 'actions/github-script@v9')?.with?.script
-    )
-    const marker = script.match(/const marker = `([^`]+)`/u)?.[1]
-    expect(marker).toBeDefined()
-    expect(body).toContain(marker?.replace(/\$\{process\.env\.SUBMISSION_ID\}/u, submissionId))
-  })
-
-  it('notifies on a 15-minute schedule and skips until configured', () => {
-    const workflow = loadWorkflow('notify-d1-submissions.yml')
-    const notify = workflow.jobs.notify as WorkflowJob
-    expect(Object.keys(workflow.on).sort()).toEqual(['schedule', 'workflow_dispatch'])
-    expect(workflow.on.schedule).toEqual([{ cron: '*/15 * * * *' }])
-    expect(notify.if).toBe(
-      "github.ref == 'refs/heads/main' && vars.SUBMISSION_REVIEWER_GITHUB_LOGIN != ''"
-    )
-    // The production environment requires reviewer approval, which a schedule cannot give.
-    expect(environmentName(notify)).toBe('production-notifier')
-    expect(workflow.concurrency).toBeUndefined()
-    expect(notify.concurrency).toEqual({
-      group: 'best-serp-co-production-notifier',
-      'cancel-in-progress': false
-    })
-    expect(notify.permissions).toEqual({ contents: 'read', issues: 'write' })
-    const [check, ...rest] = notify.steps ?? []
-    expect(check?.id).toBe('credentials')
-    expect(check?.run).not.toMatch(/exit 1/u)
-    for (const step of rest) expect(step.if, step.name).toBe(credentialsGate)
-    expect(stepRunning(notify, 'db:notify:production').env).toMatchObject({
-      GITHUB_TOKEN: expression('github.token'),
-      SUBMISSION_REVIEWER_GITHUB_LOGIN: expression('vars.SUBMISSION_REVIEWER_GITHUB_LOGIN')
-    })
-  })
-
-  it('relays a schedule on another default branch to main, so only main touches production', () => {
-    const workflow = loadWorkflow('notify-d1-submissions.yml')
-    const relay = workflow.jobs.relay as WorkflowJob
-    expect(Object.keys(workflow.jobs)).toEqual(['relay', 'notify'])
-    expect(relay.if).toBe(
-      "github.event_name == 'schedule' && github.ref != 'refs/heads/main' && vars.SUBMISSION_REVIEWER_GITHUB_LOGIN != ''"
-    )
-    expect(relay.environment).toBeUndefined()
-    expect(relay.permissions).toEqual({ actions: 'write' })
-    expect(relay.steps).toHaveLength(1)
-    expect(runs(relay)).toEqual([
-      'gh workflow run notify-d1-submissions.yml --ref main --repo "$GITHUB_REPOSITORY"'
-    ])
-    expect(relay.steps?.[0]?.env).toEqual({ GH_TOKEN: expression('github.token') })
   })
 })
 
@@ -574,12 +467,10 @@ describe('D1 data stays in Cloudflare', () => {
 
   /** Every job where some step gets the Cloudflare token: the upload checks cover each one. */
   const credentialedJobs = [
-    'approve-d1-submission.yml:review',
     'bootstrap-production-d1.yml:bootstrap',
     'deploy-production.yml:release',
     'deploy-staging.yml:deploy',
     'media-health.yml:check',
-    'notify-d1-submissions.yml:notify',
     'publish-d1-staging.yml:publish',
     'publish-d1.yml:publish',
     'upload-media-staging.yml:upload',
@@ -587,7 +478,6 @@ describe('D1 data stays in Cloudflare', () => {
   ]
   /** Every step that can change D1, as `<file>:<job>:<environment>`; each follows a bookmark. */
   const bookmarkedChanges = [
-    'approve-d1-submission.yml:review:production',
     'bootstrap-production-d1.yml:bootstrap:production',
     'deploy-production.yml:release:production',
     'deploy-staging.yml:deploy:staging',
@@ -770,10 +660,6 @@ describe('D1 data stays in Cloudflare', () => {
   }
   /** A status function replaces `if`'s implicit `success()`, so a failed bookmark stops nothing. */
   const statusFunction = /\b(?:always|failure|cancelled|success)\s*\(/u
-  /** D1 writers without a bookmark, each justified in RELEASE_GUARDS. */
-  const unbookmarkedWriters = new Set([
-    'notify-d1-submissions.yml:notify:pnpm db:notify:production'
-  ])
 
   const stepsOf = (job: WorkflowJob) => job.steps ?? []
 
@@ -909,7 +795,6 @@ describe('D1 data stays in Cloudflare', () => {
             violations.push(
               `${label}: a step holding the token may not write GITHUB_ENV, GITHUB_PATH, GITHUB_OUTPUT, or GITHUB_STATE`
             )
-          if (unbookmarkedWriters.has(label)) return
           const environment = environmentName(job)
           changes.push(`${file}:${name}:${environment}`)
           const problem = (message: string) => violations.push(`${label}: ${message}`)
@@ -1681,8 +1566,8 @@ describe('protected deployment boundaries', () => {
       expect(Object.keys(workflow.on).sort(), file).toEqual(
         file === 'deploy-production.yml' ? ['push', 'workflow_dispatch'] : ['workflow_dispatch']
       )
-      // Publication and review use no release command (their bookmark is read-only); their
-      // scripts and the authorize job below hold them to main.
+      // Publication uses no release command (its bookmark is read-only); its script and the
+      // authorize job below hold it to main.
       expect(releaseAuthorizations[file]?.branch ?? 'main', file).toBe('main')
       const authorize = workflow.jobs.authorize as WorkflowJob
       expect(authorize.environment, file).toBeUndefined()
@@ -1706,7 +1591,6 @@ describe('protected deployment boundaries', () => {
     // the whole workflow let a mistyped dispatch replace a valid queued run before `authorize`
     // refused it. A job skipped by a failed `needs` or a false `if` never joins its group.
     const expected: Record<string, Record<string, unknown>> = {
-      'approve-d1-submission.yml': { review: productionGroup },
       'bootstrap-production-d1.yml': { bootstrap: productionGroup },
       'deploy-production.yml': { release: productionGroup },
       'deploy-staging.yml': {
@@ -1714,9 +1598,6 @@ describe('protected deployment boundaries', () => {
       },
       'media-health.yml': {
         check: { group: 'media-health-best-serp-co-production', 'cancel-in-progress': false }
-      },
-      'notify-d1-submissions.yml': {
-        notify: { group: 'best-serp-co-production-notifier', 'cancel-in-progress': false }
       },
       'publish-d1.yml': { publish: productionGroup },
       'publish-d1-staging.yml': {
@@ -1751,7 +1632,7 @@ describe('protected deployment boundaries', () => {
 
   it('mutates production automatically only on a push to main, behind the production reviewers', () => {
     const productionMutation =
-      /cloudflare-release\.ts (?:migrate|import|deploy) production|db:(?:migrate|approve|publish|notify):production|opennextjs-cloudflare deploy/u
+      /cloudflare-release\.ts (?:migrate|import|deploy) production|db:(?:migrate|publish):production|opennextjs-cloudflare deploy/u
     const automaticMutations: string[] = []
     for (const [file, workflow] of allWorkflows()) {
       const triggers = Object.keys(workflow.on)
@@ -1766,25 +1647,17 @@ describe('protected deployment boundaries', () => {
           expect(triggers.sort()).toEqual(['push', 'workflow_dispatch'])
           expect(job.needs).toEqual(['authorize'])
           expect(environmentName(job)).toBe('production')
-        } else if (file === mediaHealthWorkflow) {
+        } else {
           // The weekly media health check reads production, in its own environment (#122).
           expect(`${file}:${name}`).toBe('media-health.yml:check')
           expect(environmentName(job)).toBe('production-media-health')
           expect(mutation).toBeNull()
-        } else {
-          // The scheduled notifier only records review notifications, in its own environment.
-          expect(`${file}:${name}`).toBe('notify-d1-submissions.yml:notify')
-          expect(environmentName(job)).toBe('production-notifier')
-          expect(runs(job).join('\n').match(new RegExp(productionMutation, 'gu'))).toEqual([
-            'db:notify:production'
-          ])
         }
       }
     }
     expect(automaticMutations.sort()).toEqual([
       'deploy-production.yml:release',
-      'media-health.yml:check',
-      'notify-d1-submissions.yml:notify'
+      'media-health.yml:check'
     ])
   })
 
@@ -1858,9 +1731,7 @@ describe('protected deployment boundaries', () => {
     ).toEqual([
       'pnpm tsx scripts/cloudflare-release.ts',
       'pnpm tsx scripts/cloudflare-release.ts',
-      'pnpm tsx scripts/d1-remote-publisher.ts',
-      'pnpm tsx scripts/d1-submission-approver.ts',
-      'pnpm tsx scripts/d1-submission-notifier.ts'
+      'pnpm tsx scripts/d1-remote-publisher.ts'
     ])
   })
 

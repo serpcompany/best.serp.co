@@ -358,18 +358,6 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       )
       .bind(NOW)
       .run()
-    const [pending] = S.selectVerifiedSubmissionNotificationPlans(10)
-    if (!pending) throw new Error('No notification plan.')
-    expect((await all<{ id: string }>(pending)).map(row => row.id)).toEqual(['sub-free'])
-    await run([
-      S.recordSubmissionNotificationPlan({
-        externalId: '1',
-        externalUrl: 'https://example.com/review/1',
-        previewTokenHash: 'a'.repeat(64),
-        recipient: 'reviewer',
-        submissionId: 'sub-free'
-      })
-    ])
     await run(
       S.buildRequestSubmissionChangesPlans({
         note: 'Clarify pricing.',

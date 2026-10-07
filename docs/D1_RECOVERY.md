@@ -88,9 +88,8 @@ Which procedure:
 
 ## Restore
 
-1. Pause the scheduled notifier, so it does not act on rows the restore is about to change
-   (`gh workflow disable notify-d1-submissions.yml`), and write down the current bookmark
-   (`time-travel info` without `--timestamp`), so the restore itself can be undone.
+1. Write down the current bookmark (`time-travel info` without `--timestamp`), so the
+   restore itself can be undone.
 2. Restore (to a workflow bookmark, use `--bookmark <bookmark>` instead of `--timestamp`):
 
    ```bash
@@ -153,19 +152,14 @@ Hence the order:
 
 ## After a restore
 
-A restore rewinds D1 only (the notifier was paused in [Restore](#restore) step 1). Then:
+A restore rewinds D1 only. Then:
 
-- **Review issues the notifier opened after the bookmark.** Their submissions may no longer
-  exist: close those issues as not planned. For a submission that still exists, the notifier's
-  own record rolled back too, so it notifies again; it finds the issue by its marker and
-  updates it instead of opening a second one, but a closed issue stays closed.
-- **Review issues that Review D1 Submission closed after the bookmark.** The approval or
-  rejection is undone, and the submission is back in its state at the bookmark (usually
-  badge-verified). Reopen the issue and decide again, or tell the submitter.
+- **Admin decisions after the bookmark.** An approval or rejection is undone, and the
+  submission is back in its state at the bookmark (usually badge-verified, so it is in the
+  review queue again). Decide again in the admin panel, or tell the submitter.
 - **Emails already sent stay sent.** The `email_deliveries` ledger forgot them, so a repeated
   decision emails again. Tell submitters whose submissions or edits were lost to submit again.
 - **Accounts and sign-ins after the bookmark are gone.** Those users sign in again.
-- Re-enable the notifier: `gh workflow enable notify-d1-submissions.yml`.
 
 ## Staging
 

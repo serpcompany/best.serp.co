@@ -99,11 +99,11 @@ describe('next.config.ts headers()', () => {
       ).toEqual([])
   })
 
-  it('keeps every workers.dev host and the admin preview noindex', () => {
+  it('keeps every workers.dev host and the admin submission pages noindex', () => {
     for (const host of PLATFORM_HOSTS)
       for (const path of PUBLIC_PATHS)
         expect(configRobotsTags(host, path), `${host}${path}`).toContain('noindex, nofollow')
-    expect(configRobotsTags('best.serp.co', '/admin/submissions/1/preview/token/')).toEqual([
+    expect(configRobotsTags('best.serp.co', '/admin/submissions/1/')).toEqual([
       'noindex, nofollow, noarchive'
     ])
   })
