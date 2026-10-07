@@ -105,7 +105,6 @@ export const applicationColumnInventory = {
     'logo_url',
     'video_url',
     'status',
-    'access_token_hash',
     'verification_attempts',
     'last_verification_at',
     'last_verification_error',
@@ -135,16 +134,6 @@ export const applicationColumnInventory = {
   listing_submission_faqs: ['id', 'submission_id', 'question', 'answer', 'sort_order'],
   listing_submission_events: ['id', 'submission_id', 'event_type', 'detail', 'actor', 'created_at'],
   listing_submission_rate_limits: ['fingerprint_hash', 'window_started_at', 'request_count'],
-  listing_submission_notifications: [
-    'submission_id',
-    'channel',
-    'external_id',
-    'external_url',
-    'recipient',
-    'created_at',
-    'updated_at',
-    'preview_token_hash'
-  ],
   email_deliveries: [
     'template_id',
     'event_key',
@@ -385,7 +374,6 @@ export const importOrder: ApplicationTableName[] = [
   'listing_submission_faqs',
   'listing_submission_events',
   'listing_submission_rate_limits',
-  'listing_submission_notifications',
   'email_deliveries',
   'listing_submission_url_blocks',
   'listing_owners',

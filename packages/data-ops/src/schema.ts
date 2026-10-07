@@ -586,12 +586,6 @@ export const listingSubmissions = sqliteTable(
      * keeps inserting valid rows between migrate and deploy. Native intake (#63) writes `draft`.
      */
     status: text('status', { enum: submissionStatuses }).notNull().default('pending_badge'),
-    /**
-     * Retired with the anonymous capability flow (#63): nothing reads or writes it. It stays
-     * until a Worker without that flow is live, because a migration must keep the live Worker
-     * working while it applies (DEPLOY_RUNBOOK.md); a follow-up migration then drops it.
-     */
-    accessTokenHash: text('access_token_hash'),
     verificationAttempts: integer('verification_attempts').notNull().default(0),
     lastVerificationAt: text('last_verification_at'),
     lastVerificationError: text('last_verification_error'),
@@ -633,7 +627,6 @@ export const listingSubmissions = sqliteTable(
     contentVersion: integer('content_version').notNull().default(1)
   },
   table => [
-    unique('listing_submissions_token_unique').on(table.accessTokenHash),
     check(
       'listing_submissions_status_valid',
       sql`${table.status} IN (${sqlList(submissionStatuses)})`
@@ -827,46 +820,6 @@ export const listingSubmissionRateLimits = sqliteTable(
       'listing_submission_rate_limits_request_count_nonnegative',
       sql`${table.requestCount} >= 0`
     )
-  ]
-)
-
-/**
- * Retired with the GitHub review notifier and its private preview links (#69): nothing reads or
- * writes it. It stays until a Worker without them is live, like `access_token_hash`; a follow-up
- * migration then drops it.
- */
-export const listingSubmissionNotifications = sqliteTable(
-  'listing_submission_notifications',
-  {
-    submissionId: text('submission_id')
-      .notNull()
-      .references(() => listingSubmissions.id, { onDelete: 'cascade' }),
-    channel: text('channel', { enum: ['github_issue'] }).notNull(),
-    externalId: text('external_id').notNull(),
-    externalUrl: text('external_url').notNull(),
-    recipient: text('recipient').notNull(),
-    createdAt: text('created_at').notNull().default(currentTimestamp),
-    updatedAt: text('updated_at').notNull().default(currentTimestamp),
-    previewTokenHash: text('preview_token_hash')
-  },
-  table => [
-    primaryKey({ columns: [table.submissionId, table.channel] }),
-    unique('listing_submission_notifications_channel_external_unique').on(
-      table.channel,
-      table.externalId
-    ),
-    check(
-      'listing_submission_notifications_channel_valid',
-      sql`${table.channel} IN ('github_issue')`
-    ),
-    index('listing_submission_notifications_recipient_idx').on(
-      table.channel,
-      table.recipient,
-      table.createdAt
-    ),
-    uniqueIndex('listing_submission_notifications_preview_token_idx')
-      .on(table.previewTokenHash)
-      .where(sql`${table.previewTokenHash} IS NOT NULL`)
   ]
 )
 
@@ -1727,7 +1680,6 @@ export const listingSubmissionsRelations = relations(listingSubmissions, ({ many
     fields: [listingSubmissions.listingId],
     references: [listings.id]
   }),
-  notifications: many(listingSubmissionNotifications),
   owner: one(users, { fields: [listingSubmissions.ownerUserId], references: [users.id] }),
   resourceLinks: many(listingSubmissionResourceLinks),
   urlBlocks: many(listingSubmissionUrlBlocks)
@@ -1756,16 +1708,6 @@ export const listingSubmissionEventsRelations = relations(listingSubmissionEvent
     references: [listingSubmissions.id]
   })
 }))
-
-export const listingSubmissionNotificationsRelations = relations(
-  listingSubmissionNotifications,
-  ({ one }) => ({
-    submission: one(listingSubmissions, {
-      fields: [listingSubmissionNotifications.submissionId],
-      references: [listingSubmissions.id]
-    })
-  })
-)
 
 export const listingSubmissionUrlBlocksRelations = relations(
   listingSubmissionUrlBlocks,
