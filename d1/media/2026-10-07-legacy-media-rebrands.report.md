@@ -13,9 +13,9 @@ below is computed from the committed plan and manifests.
 | Format | Objects |
 | --- | --- |
 | image/png | 27 |
-| image/avif | 6 |
-| image/webp | 6 |
+| image/avif | 7 |
 | image/jpeg | 5 |
+| image/webp | 5 |
 | image/x-icon | 1 |
 
 ## Imported rows by source
