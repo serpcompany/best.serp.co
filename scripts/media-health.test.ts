@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   bucketFindings,
   checkMediaHealth,
+  headFinding,
+  MEDIA_HEALTH_USER_AGENT,
   type MediaHealthReport,
   type MediaRow,
   mediaHealthMarkdown,
@@ -110,6 +112,12 @@ describe('media health (#122)', () => {
               http_metadata: { cacheControl: MEDIA_CACHE_CONTROL, contentType: 'image/png' },
               key: key('beta'),
               size: 100
+            },
+            {
+              etag: '"x"',
+              http_metadata: { cacheControl: MEDIA_CACHE_CONTROL, contentType: 'image/png' },
+              key: key('delta'),
+              size: 100
             }
           ],
           result_info: { is_truncated: false },
@@ -117,6 +125,10 @@ describe('media health (#122)', () => {
         })
       }
       if (url.endsWith(key('beta'))) return new Response(null, { status: 404 })
+      // Bot protection on the runner (#134): the object is in the bucket, the HEAD is refused.
+      if (url.endsWith(key('delta'))) {
+        return new Response(null, { headers: { 'cf-mitigated': 'challenge' }, status: 403 })
+      }
       return new Response(null, {
         headers: { 'content-length': '100', 'content-type': 'image/png' },
         status: 200
@@ -155,6 +167,15 @@ describe('media health (#122)', () => {
               bytes: 100,
               content_type: 'image/png',
               kind: 'logo',
+              live: 1,
+              media_key: key('delta'),
+              slug: 'delta',
+              url: 'x'
+            },
+            {
+              bytes: 100,
+              content_type: 'image/png',
+              kind: 'logo',
               live: 0,
               media_key: key('gamma'),
               slug: 'gamma',
@@ -170,14 +191,18 @@ describe('media health (#122)', () => {
     expect(calls).toEqual([
       'GET https://api.cloudflare.com/client/v4/accounts/account/r2/buckets/cdn/objects',
       `HEAD https://cdn.serp.co/${key('alpha')}`,
-      `HEAD https://cdn.serp.co/${key('beta')}`
+      `HEAD https://cdn.serp.co/${key('beta')}`,
+      `HEAD https://cdn.serp.co/${key('delta')}`
     ])
     expect(report).toMatchObject({
       bucket: 'cdn',
-      cdnSampled: 2,
-      hostedKeys: 3,
-      listedObjects: 2,
-      rows: 3
+      cdnSampled: 3,
+      cdnUnverifiable: [
+        { detail: '403, cf-mitigated: challenge', key: key('delta'), kind: 'logo', slug: 'delta' }
+      ],
+      hostedKeys: 4,
+      listedObjects: 3,
+      rows: 4
     })
     expect(report.findings.map(finding => `${finding.slug} ${finding.problem}`)).toEqual([
       'beta cdn_404',
@@ -187,6 +212,100 @@ describe('media health (#122)', () => {
     expect(markdown.startsWith(mediaHealthMarker('production'))).toBe(true)
     expect(markdown).toContain('`cdn_404` 1, `missing` 1')
     expect(markdown).toContain(`| \`gamma\` | no | logo | \`missing\` | ${key('gamma')} |`)
+    expect(markdown).not.toContain('`delta`')
+    expect(markdown).toContain('1 of 3 HEADs were unverifiable')
+  })
+
+  it('counts only answers about the object; a blocked HEAD is unverifiable (#134)', async () => {
+    const row = { bytes: 100, contentType: 'image/avif' }
+    const answer = (status: number, headers: Record<string, string> = {}) =>
+      headFinding(
+        'https://cdn.serp.co/x',
+        row,
+        (async (_url: string | URL | Request, init?: RequestInit) => {
+          expect(init?.method).toBe('HEAD')
+          expect(new Headers(init?.headers).get('user-agent')).toBe(MEDIA_HEALTH_USER_AGENT)
+          return new Response(null, { headers, status })
+        }) as typeof fetch,
+        fast
+      )
+    const image = { 'content-length': '100', 'content-type': 'image/avif' }
+    expect(await answer(200, image)).toEqual({ status: 'ok' })
+    // The first production run (#134): Cloudflare challenged the runner on 11 of 50 HEADs.
+    expect(
+      await answer(403, {
+        'cf-mitigated': 'challenge',
+        'content-type': 'text/html',
+        server: 'cloudflare'
+      })
+    ).toEqual({
+      detail: '403, cf-mitigated: challenge, Cloudflare HTML page',
+      status: 'unverifiable'
+    })
+    expect(await answer(403)).toEqual({ detail: '403', status: 'unverifiable' })
+    expect(await answer(429, { 'retry-after': '3600' })).toEqual({
+      detail: '429',
+      status: 'unverifiable'
+    })
+    expect(await answer(200, { ...image, 'cf-mitigated': 'challenge' })).toMatchObject({
+      status: 'unverifiable'
+    })
+    expect(await answer(503)).toEqual({ detail: '503', status: 'unverifiable' })
+    // Findings: gone, not an image, or not what D1 recorded.
+    expect(await answer(404)).toEqual({ problem: 'cdn_404', status: 'finding' })
+    expect(await answer(200, { 'content-type': 'text/html' })).toEqual({
+      detail: 'text/html',
+      problem: 'cdn_not_an_image',
+      status: 'finding'
+    })
+    expect(await answer(200, { ...image, 'content-type': 'image/png' })).toMatchObject({
+      problem: 'cdn_content_type'
+    })
+    expect(await answer(200, { ...image, 'content-length': '99' })).toMatchObject({
+      problem: 'cdn_bytes'
+    })
+    // No answer after three tries is unverifiable, not a failed run.
+    let calls = 0
+    const down = await headFinding(
+      'https://cdn.serp.co/x',
+      row,
+      (async () => {
+        calls += 1
+        throw new TypeError('fetch failed')
+      }) as typeof fetch,
+      fast
+    )
+    expect(calls).toBe(3)
+    expect(down).toEqual({ detail: 'no answer: fetch failed', status: 'unverifiable' })
+  })
+
+  it('reports unverifiable HEADs in the summary only, and warns when they are many', () => {
+    const base: MediaHealthReport = {
+      bucket: 'cdn',
+      cdnSampled: 50,
+      cdnUnverifiable: Array.from({ length: 11 }, (_, index) => ({
+        detail: '403, cf-mitigated: challenge',
+        key: key(`s${index}`),
+        kind: 'logo',
+        slug: `s${index}`
+      })),
+      checkedAt: '2026-10-12T06:17:00.000Z',
+      environment: 'production',
+      findings: [],
+      hostedKeys: 3747,
+      listedObjects: 3747,
+      mediaBaseUrl: 'https://cdn.serp.co',
+      rows: 3747
+    }
+    const markdown = mediaHealthMarkdown(base)
+    expect(markdown).toContain('11 of 50 HEADs were unverifiable')
+    expect(markdown).toContain('403, cf-mitigated: challenge ×11')
+    expect(markdown).toContain('**Warning:** 22% of the CDN sample was unverifiable')
+    expect(markdown).toContain('No missing or mismatched objects.')
+    const few = mediaHealthMarkdown({ ...base, cdnUnverifiable: base.cdnUnverifiable.slice(0, 2) })
+    expect(few).toContain('2 of 50 HEADs were unverifiable')
+    expect(few).not.toContain('**Warning:**')
+    expect(mediaHealthMarkdown({ ...base, cdnUnverifiable: [] })).not.toContain('unverifiable')
   })
 
   it('accepts exactly an environment, a report path, and a sample size', () => {
@@ -208,6 +327,7 @@ describe('media health issue (#122)', () => {
   const report = (findings: MediaHealthReport['findings']): MediaHealthReport => ({
     bucket: 'cdn',
     cdnSampled: 1,
+    cdnUnverifiable: [],
     checkedAt: '2026-10-12T06:17:00.000Z',
     environment: 'production',
     findings,
