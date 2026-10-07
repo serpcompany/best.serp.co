@@ -150,13 +150,17 @@ test.describe('submit v2', () => {
     await expect(page.getByText('Sign in when you’re ready')).toHaveCount(0)
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    // 2b: the draft is saved (no plan yet); paid stays hidden until #68.
+    // 2b: the draft is saved (no plan yet), with both plans: orders are on (#68, #133).
     await page.waitForURL(/\/submit\/[0-9a-f-]{36}\/choose\/\?saved=1$/u)
     const submissionId = new URL(page.url()).pathname.split('/')[2] as string
     await expect(page.getByText('Details saved')).toBeVisible()
     await expect(page.getByText(`Signed in as ${email}.`)).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Choose how to get listed' })).toBeVisible()
-    await expect(page.getByText('$49')).toHaveCount(0)
+    await expect(page.getByText('Skip the badge: $49 one-off')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Pay $49 and go live' })).toHaveAttribute(
+      'href',
+      `/submit/${submissionId}/checkout/`
+    )
 
     // The account lists the draft, which can be continued from there.
     await page.goto('/account/')

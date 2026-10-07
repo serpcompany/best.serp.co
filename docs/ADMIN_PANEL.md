@@ -19,8 +19,8 @@ the account area shares (`@serpdirectory/web-core/dashboard/*`); pages set their
 
 The reads are statement plans in `packages/data-ops/src/admin-queries.ts`; `apps/web/lib/admin/`
 holds no SQL (the architecture guard checks it). Orders (screen 13, [Billing](./BILLING.md)) are
-shown while orders are on (`features.orders`); otherwise the entry is hidden and `/admin/orders/`
-is a 404. The Inbox and the conversation panels on screens 11 and 12 are #73's.
+shown while orders are on (`features.orders`, on since #133); otherwise the entry is hidden and
+`/admin/orders/` is a 404. The Inbox and the conversation panels on screens 11 and 12 are #73's.
 
 ## Requests
 

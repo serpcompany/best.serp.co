@@ -849,12 +849,15 @@ describe('paid claims (#67)', () => {
   })
 
   it('offers no paid claim unless claims are on as well as orders', async () => {
-    // Claims are on (#130) and orders off, as the site ships: the badge is the only method.
-    const ordersOff = claimFixture({ ...localBoth, LOCAL_ORDERS: 'off' })
-    // Orders on (a local Worker) while claims are off.
+    // Claims on and orders off (as #130 shipped): the badge is the only method.
+    const ordersOff = claimFixture(
+      { ...localBoth, LOCAL_ORDERS: 'off' },
+      { ...features, claims: true, orders: false }
+    )
+    // Orders on while claims are off.
     const claimsOff = claimFixture(
       { ...localBoth, LOCAL_CLAIMS: 'off' },
-      { ...features, claims: false }
+      { ...features, claims: false, orders: true }
     )
     for (const f of [ordersOff, claimsOff]) {
       expect(f.deps.paidClaims).toBeUndefined()

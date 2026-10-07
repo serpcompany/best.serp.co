@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SqliteD1 } from '../../../../packages/data-ops/src/test-support'
 import { BADGE_DAILY_CRON, BADGE_WEEKLY_CRON } from '../badge-program/schedule'
+import { MISSING_PROVIDER_SECRETS, TEST_PROVIDER_SECRETS } from '../billing/providers/test-support'
 import { clearDevEmailOutbox, readDevEmailOutbox } from '../email/senders'
 import type { SiteFeatures } from '../features'
 import { submissionBadgeVerificationTargets } from '../submissions/presentation'
@@ -18,6 +19,9 @@ import {
   type ScheduledJob,
   scheduledJobs
 } from './scheduled'
+
+/** The provider's test-mode secrets, for the billing sweep (#68) on the hourly trigger. */
+const BILLING_SECRETS = TEST_PROVIDER_SECRETS
 
 const SAVED = '2026-09-01T00:00:00.000Z'
 const HOUR = 60 * 60 * 1000
@@ -58,12 +62,19 @@ describe('scheduled handler', () => {
     vi.restoreAllMocks()
   })
 
-  function env() {
-    return { D1_RUNTIME_ENV: 'local', DB: sqlite.asD1Database(), SITE_ENVIRONMENT: 'local' }
+  // Orders are on (#133), so the hourly billing sweep needs the provider's secrets, as staging
+  // and production have them. With no orders it calls no provider.
+  function env(billing: Record<string, string> = BILLING_SECRETS) {
+    return {
+      D1_RUNTIME_ENV: 'local',
+      DB: sqlite.asD1Database(),
+      SITE_ENVIRONMENT: 'local',
+      ...billing
+    }
   }
 
-  async function run(hours: number) {
-    await handleScheduled({ cron: DRAFT_JOBS_CRON, scheduledTime: atHour(hours) }, env(), {
+  async function run(hours: number, billing?: Record<string, string>) {
+    await handleScheduled({ cron: DRAFT_JOBS_CRON, scheduledTime: atHour(hours) }, env(billing), {
       waitUntil: promise => pending.push(promise)
     })
     await Promise.all(pending.splice(0))
@@ -126,16 +137,16 @@ describe('scheduled handler', () => {
       'Finish your submission: Waiting',
       'Your Old draft expired'
     ])
-    // The paid listing is off (`features.orders`): no price, and a draft left in
-    // checkout is sent to the plan choice.
+    // The paid listing is on (`features.orders`, #133): a draft left in checkout is asked to
+    // complete it, and the plan choice names both options with the price.
     const checkout = readDevEmailOutbox(OWNER).find(message => message.subject.endsWith('Checkout'))
-    expect(checkout?.text).toContain('/submit/checkout/choose/')
-    for (const message of readDevEmailOutbox(OWNER)) {
-      expect(message.text, message.subject).not.toMatch(/\$49|one-off|Complete checkout/u)
-    }
+    expect(checkout?.text).toContain('Complete checkout: ')
+    expect(checkout?.text).toContain('/submit/checkout/checkout/')
+    expect(checkout?.text).toContain('$49 one-off payment')
     const waiting = readDevEmailOutbox(OWNER).find(message => message.subject.endsWith('Waiting'))
     expect(waiting?.text).toContain('/submit/waiting/choose/')
     expect(waiting?.text).toContain('expires in 30 days')
+    expect(waiting?.text).toContain('free with our badge, or $49 one-off without it')
 
     // The same run again (an overlapping or retried trigger) claims and sends nothing new.
     await run(12)
@@ -154,6 +165,21 @@ describe('scheduled handler', () => {
     expect(
       readDevEmailOutbox(OWNER).filter(message => message.subject === 'Your Waiting draft expired')
     ).toHaveLength(1)
+  })
+
+  it('fails the hourly trigger without the provider’s secrets, after the other jobs ran (#133)', async () => {
+    // Orders are on, so a Worker without the provider's secrets shows the failed sweep on its
+    // Cron Trigger every hour instead of skipping billing quietly; the other jobs run first.
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await expect(run(12, {})).rejects.toThrow(AggregateError)
+    expect(status('waiting')).toMatchObject({ draft_reminders_sent: 1, status: 'draft' })
+    expect(errors.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
+      expect.objectContaining({
+        event: 'scheduled_job_failed',
+        job: 'billing-sweep',
+        message: MISSING_PROVIDER_SECRETS
+      })
+    ])
   })
 
   it('ignores an unknown trigger and fails closed without a database', async () => {
@@ -281,12 +307,14 @@ describe('scheduled badge program', () => {
     vi.restoreAllMocks()
   })
 
-  // No `LOCAL_BADGE_PROGRAM`: the site's flag runs the program (#130).
+  // No `LOCAL_BADGE_PROGRAM`: the site's flag runs the program (#130). The hourly trigger also
+  // runs the billing sweep (#133), which needs the provider's secrets.
   function env(overrides: Record<string, string> = {}) {
     return {
       D1_RUNTIME_ENV: 'local',
       DB: sqlite.asD1Database(),
       SITE_ENVIRONMENT: 'local',
+      ...BILLING_SECRETS,
       ...overrides
     }
   }

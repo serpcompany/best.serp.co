@@ -5,8 +5,9 @@ import { E2E_STRIPE_SECRET_KEY, E2E_STRIPE_WEBHOOK_SECRET, stripeMockPort } from
 
 /**
  * The orders suite (serpcompany/best.serp.co#68) runs on the admin panel suite's local Worker and
- * D1 (`admin-fixture.ts`), which `playwright.config.ts` starts with orders and claims on
- * (`orders-worker.ts`): a Worker of its own would be one too many for the CI runner's memory.
+ * D1 (`admin-fixture.ts`), which `playwright.config.ts` starts with billing configured for the
+ * mocked provider (`orders-worker.ts`; orders and claims are on everywhere): a Worker of its own
+ * would be one too many for the CI runner's memory.
  * The suite's seeds use their own keys, users, and category, so the two suites share the D1
  * without counting each other's rows. Nothing reaches Stripe: the mock below answers the
  * Checkout Session and refund calls the Worker makes, and serves the provider's page the buyer

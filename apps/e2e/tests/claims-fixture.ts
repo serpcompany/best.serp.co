@@ -4,10 +4,11 @@ import { adminSuiteEnabled, localD1, type SuiteServer } from './admin-fixture'
 
 /**
  * The claims suite (serpcompany/best.serp.co#67) runs on its own local Worker with its own D1,
- * started from the already-built Worker with `--test-scheduled` and the site's flags (#130):
- * claims and the badge program (which removes a badge claimer, #66) on, with no local switch,
- * and orders (#68) off, so the claim dialog offers only the badge. Never used against a deployed
- * Worker.
+ * started from the already-built Worker with `--test-scheduled` and the site's flags: claims,
+ * the badge program (which removes a badge claimer, #66), and orders (#68) on, with no local
+ * switch (#130, #133). Billing isn't configured here, so the dialog offers a payment but its
+ * checkout answers 503; `billing.spec.ts` pays for a claim on the admin Worker. Never used
+ * against a deployed Worker.
  */
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
