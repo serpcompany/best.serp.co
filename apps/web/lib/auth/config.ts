@@ -30,6 +30,7 @@ import { betterAuth } from 'better-auth/minimal'
 import { emailOTP } from 'better-auth/plugins/email-otp'
 import type { BetterAuthPlugin } from 'better-auth/types'
 import { signInCodeDigits } from '../email/sign-in-code'
+import { isLocalRequestHost } from '../environment/local-host'
 import {
   type BoundCode,
   clearCodeBindingSetCookie,
@@ -116,12 +117,18 @@ export interface Auth {
   readonly routes: readonly { methods: readonly string[]; path: string }[]
 }
 
-/** Local only: returns the latest code the dev sender delivered, for HTTP tests. */
+/**
+ * Local only: returns the latest code the dev sender delivered, for HTTP tests. Registered
+ * only with the dev sender, and it also answers 404 to a request for a non-local host (#164).
+ */
 function devOtpOutboxPlugin() {
   return {
     id: 'dev-otp-outbox',
     endpoints: {
       devOtpOutbox: createAuthEndpoint(DEV_OTP_OUTBOX_PATH, { method: 'GET' }, async ctx => {
+        if (!isLocalRequestHost(ctx.request?.url ?? '')) {
+          return ctx.json({ error: 'not_found' }, { status: 404 })
+        }
         const email = typeof ctx.query?.email === 'string' ? ctx.query.email : ''
         const entry = email ? readDevOtpOutbox(email) : null
         return ctx.json({ otp: entry?.otp ?? null, sentAt: entry?.sentAt ?? null })
