@@ -9,7 +9,8 @@ name: Web
 #   request already tested finds the receipt and skips the suite.
 # - A pull request that touches only documentation runs the documentation check and the tests
 #   and skips the build and E2E; every job still reports success. A push always runs the checks.
-# - Draft pull requests skip `e2e` until they are marked ready for review.
+# - On a draft pull request `e2e` fails until it is marked ready for review; it never skips,
+#   because a skipped required job reports success.
 # Production releases from deploy-production.yml, only a tree this workflow's staging deploy
 # verified (docs/RELEASE_GUARDS.md).
 on:
@@ -123,10 +124,21 @@ jobs:
   e2e:
     name: e2e
     needs: [changes]
-    if: "!cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)"
+    # A skipped required job reports success, so a draft fails below instead of skipping here.
+    if: '!cancelled()'
     # Installs Playwright browsers, so it never leaves GitHub-hosted runners.
     runs-on: ubuntu-latest
     steps:
+      # Reads the event, not the live pull request: a re-run reuses its event, so a run that
+      # started on a draft fails again until a new push or ready_for_review starts a new run.
+      # The concurrency group can cancel the ready_for_review run (#246), and failing here keeps
+      # the surviving draft run from passing.
+      - name: Require a pull request ready for review
+        if: github.event.pull_request.draft == true
+        run: |
+          echo "::error title=Draft pull request::draft: mark ready to run e2e. If it is already ready, this run started while it was a draft and a re-run reuses that event: push a commit, or convert it to draft and mark it ready again."
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@v7
 
@@ -166,7 +178,7 @@ jobs:
         run: pnpm test:e2e
 
       - name: Upload test results
-        if: always() && steps.receipt.outputs.skip != 'true'
+        if: always() && steps.receipt.outcome == 'success' && steps.receipt.outputs.skip != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
