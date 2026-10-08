@@ -134,11 +134,17 @@ describe('staging deploy job', () => {
     // the group.
     expect(job.concurrency).toEqual({
       group: 'deploy-best-serp-co-staging',
-      'cancel-in-progress': false
+      'cancel-in-progress': false,
+      // Nothing joining the group cancels a waiting deploy or publication.
+      queue: 'max'
     })
-    expect(Object.keys(workflow.jobs)).toEqual(['changes', 'check', 'e2e', 'deploy-staging'])
-    expect(job.needs).toEqual(['check', 'e2e'])
-    expect(job.if).toBe("github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'")
+    expect(Object.keys(workflow.jobs)).toEqual(['changes', 'check', 'e2e', 'tip', 'deploy-staging'])
+    expect(job.needs).toEqual(['check', 'e2e', 'tip'])
+    // Only the staging tip starts it (the tip job); a partial re-run that reuses an old `tip`
+    // output waits in the queue, and the in-job tip guard skips it.
+    expect(job.if).toBe(
+      "github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'"
+    )
     expect(job.environment).toEqual({ name: 'staging', url: project.remote.staging.origin })
     expect(job.env).toEqual({ STAGING_ORIGIN: project.remote.staging.origin })
     expect(JSON.stringify(job)).not.toMatch(/production/u)
@@ -1624,21 +1630,26 @@ describe('protected deployment boundaries', () => {
   })
 
   it('serializes privileged jobs only after their guards, so a refused run evicts nothing', () => {
-    // GitHub keeps one pending run per concurrency group and cancels the older one. A group on
+    // By default GitHub keeps one pending run per concurrency group and cancels the older one
+    // (the staging group queues instead, `queue: max`). A group on
     // the whole workflow let a mistyped dispatch replace a valid queued run before `authorize`
     // refused it. A job skipped by a failed `needs` or a false `if` never joins its group.
     const expected: Record<string, Record<string, unknown>> = {
       'bootstrap-production-d1.yml': { bootstrap: productionGroup },
       'deploy-production.yml': { release: productionGroup },
       'web.yml': {
-        'deploy-staging': { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
+        'deploy-staging': {
+          group: 'deploy-best-serp-co-staging',
+          'cancel-in-progress': false,
+          queue: 'max'
+        }
       },
       'media-health.yml': {
         check: { group: 'media-health-best-serp-co-production', 'cancel-in-progress': false }
       },
       'publish-d1.yml': { publish: productionGroup },
       'publish-d1-staging.yml': {
-        publish: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
+        publish: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false, queue: 'max' }
       },
       // Uploads hold their own groups, never the deploy groups (#97 review S5).
       'upload-media.yml': {

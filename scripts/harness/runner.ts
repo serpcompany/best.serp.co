@@ -94,22 +94,31 @@ export function stepsForProfile(
     : full
 }
 
+/**
+ * The environment each step runs in. HARNESS_SKIP_BUILD picks the steps (above); the steps' own
+ * tests must not see it, or a test that checks the step list would run with the build skipped.
+ */
+export function stepEnvironment<Env extends Partial<NodeJS.ProcessEnv>>(env: Env): Env {
+  // Node leaves a variable set to undefined out of the child's environment.
+  return {
+    ...env,
+    CI: env.CI || '1',
+    FORCE_COLOR: env.FORCE_COLOR || '0',
+    HARNESS_SKIP_BUILD: undefined
+  }
+}
+
 export function runHarness(profile: 'fast' | 'full'): void {
   const startedAt = Date.now()
   const steps = stepsForProfile(profile)
   console.log(`Harness ${profile}: ${steps.length} deterministic checks`)
 
-  // HARNESS_SKIP_BUILD picks the steps above; the steps' own tests must not see it.
-  const { HARNESS_SKIP_BUILD: _skipBuild, ...inherited } = process.env
+  const env = stepEnvironment(process.env)
   for (const [index, step] of steps.entries()) {
     console.log(`\n[${index + 1}/${steps.length}] ${step.name}`)
     const result = spawnSync(step.command, step.args, {
       cwd: resolve('.'),
-      env: {
-        ...inherited,
-        CI: process.env.CI || '1',
-        FORCE_COLOR: process.env.FORCE_COLOR || '0'
-      },
+      env,
       stdio: 'inherit'
     })
     if (result.status !== 0) {

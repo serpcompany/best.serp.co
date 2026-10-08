@@ -121,8 +121,8 @@ outage), start a new run on it, wait for it to pass, then re-run the production 
 gh workflow run web.yml --ref staging
 ```
 
-Re-running the commit's own failed run also works. Don't re-run an older commit's run: it
-would deploy that older Worker to staging.
+Re-running the commit's own failed run also works. Re-running an older commit's run deploys
+nothing (its tip guards), so it can't verify that commit.
 
 To check a commit from a maintainer machine:
 
