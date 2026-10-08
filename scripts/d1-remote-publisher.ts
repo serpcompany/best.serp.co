@@ -31,7 +31,7 @@ interface D1ApiResponse {
 
 type FetchImplementation = typeof fetch
 
-function requireEnvironment(env: NodeJS.ProcessEnv, name: string): string {
+function requireEnvironment(env: Partial<NodeJS.ProcessEnv>, name: string): string {
   const value = env[name]
   if (!value) throw new Error(`Missing required environment value ${name}.`)
   return value
@@ -66,7 +66,7 @@ export const publicationTargets: Readonly<
 
 function validatePublicationContext(
   manifestPath: string,
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   target: PublicationTarget
 ): string {
   const { branch, confirmation, workflow, workflowRef } = publicationTargets[target]
@@ -94,7 +94,7 @@ function validatePublicationContext(
 
 async function queryD1(
   statements: PlannedStatement[],
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   fetchImplementation: FetchImplementation
 ): Promise<D1ApiResult[]> {
   const accountId = requireEnvironment(env, 'CLOUDFLARE_ACCOUNT_ID')
@@ -144,7 +144,7 @@ async function queryD1(
  * the other way round, whatever its workflow sets.
  */
 export async function verifyTargetDatabase(
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   target: PublicationTarget,
   fetchImplementation: FetchImplementation,
   configPath: string = project.wranglerConfigPath
@@ -206,7 +206,7 @@ export function reviewedPlanObjects(directory = resolve('d1/media')): Map<string
 export async function assertHostedMediaServed(
   manifest: PublicationManifest,
   target: PublicationTarget,
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   fetchImplementation: FetchImplementation,
   plans: Map<string, MediaPlanObject> = reviewedPlanObjects()
 ): Promise<void> {
@@ -263,7 +263,7 @@ export interface MediaDrift {
  */
 export async function mediaDrift(
   manifest: PublicationManifest,
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   fetchImplementation: FetchImplementation
 ): Promise<MediaDrift[]> {
   const updates = mediaUpdates(manifest)
@@ -294,7 +294,7 @@ export async function mediaDrift(
 }
 
 async function readPublicationState(
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   fetchImplementation: FetchImplementation
 ): Promise<PublicationBase> {
   const [result] = await queryD1(
@@ -312,7 +312,7 @@ const ROW_LEVEL_ATTEMPTS = 3
 
 export async function publishRemoteManifest(
   manifestPath: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: Partial<NodeJS.ProcessEnv> = process.env,
   fetchImplementation: FetchImplementation = fetch,
   target: PublicationTarget = 'production'
 ): Promise<{ afterChecksum: string; idempotent: boolean }> {

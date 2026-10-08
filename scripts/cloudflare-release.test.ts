@@ -120,7 +120,7 @@ function workflowEnv(
   workflow: string,
   confirmation?: string | null,
   event = 'workflow_dispatch'
-): NodeJS.ProcessEnv {
+): Partial<NodeJS.ProcessEnv> {
   const branch = releaseAuthorizations[workflow]?.branch ?? 'main'
   return {
     CI: 'true',
@@ -308,7 +308,7 @@ describe('release authorization', () => {
 
   it('refuses other repositories, branches, workflows, refs, and unreviewed checkouts', () => {
     const env = workflowEnv('deploy-production.yml', project.confirmation.deploy)
-    const refuse = (overrides: NodeJS.ProcessEnv, git = cleanGit) =>
+    const refuse = (overrides: Partial<NodeJS.ProcessEnv>, git = cleanGit) =>
       expect(() => authorizeRelease('deploy', 'production', { ...env, ...overrides }, git))
     refuse({
       GITHUB_WORKFLOW_REF: 'someone/fork/.github/workflows/deploy-production.yml@refs/heads/main'
@@ -426,7 +426,7 @@ describe('release authorization', () => {
 describe('staging before production', () => {
   /** A promotion merge commit's second parent: a different commit with the released tree. */
   const stagingSha = '1'.repeat(40)
-  const withToken = (env: NodeJS.ProcessEnv) => ({ ...env, GITHUB_TOKEN: 'ghs_test' })
+  const withToken = (env: Partial<NodeJS.ProcessEnv>) => ({ ...env, GITHUB_TOKEN: 'ghs_test' })
 
   it('requires a verified staging run for every production migration, import, and deploy', async () => {
     expect(
@@ -548,7 +548,7 @@ describe('staging before production', () => {
   })
 
   it('refuses a stale release once main has moved on to different source', async () => {
-    const releases: Array<[string, NodeJS.ProcessEnv, ReleaseCommand]> = [
+    const releases: Array<[string, Partial<NodeJS.ProcessEnv>, ReleaseCommand]> = [
       ['deploy', withToken(workflowEnv('deploy-production.yml', null, 'push')), 'deploy'],
       ['migrate', withToken(workflowEnv('deploy-production.yml', null, 'push')), 'migrate'],
       [

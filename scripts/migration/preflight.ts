@@ -121,7 +121,11 @@ function parseTrialProductsAdapter(path: string, issues: string[]): TrialProduct
     true,
     ts.ScriptKind.TS
   )
-  if (sourceFile.parseDiagnostics.length > 0) {
+  // parseDiagnostics is internal to the compiler API; it holds the syntax errors.
+  const { parseDiagnostics } = sourceFile as ts.SourceFile & {
+    parseDiagnostics: readonly ts.Diagnostic[]
+  }
+  if (parseDiagnostics.length > 0) {
     issues.push('site config contains TypeScript syntax errors and cannot be inspected safely.')
     return null
   }

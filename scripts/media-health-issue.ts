@@ -35,7 +35,7 @@ export function isReportIssue(issue: GitHubIssue, marker: string): boolean {
 
 type Request = <T>(path: string, init?: RequestInit) => Promise<T>
 
-function githubClient(env: NodeJS.ProcessEnv, fetcher: typeof fetch): Request {
+function githubClient(env: Partial<NodeJS.ProcessEnv>, fetcher: typeof fetch): Request {
   const token = env.GITHUB_TOKEN
   if (!token) throw new Error('Missing required environment value GITHUB_TOKEN.')
   return async <T>(path: string, init: RequestInit = {}) => {
@@ -72,7 +72,7 @@ export type IssueAction = 'closed' | 'created' | 'none' | 'updated'
 
 export async function fileMediaHealthIssue(
   report: MediaHealthReport,
-  env: NodeJS.ProcessEnv = process.env,
+  env: Partial<NodeJS.ProcessEnv> = process.env,
   fetcher: typeof fetch = fetch
 ): Promise<{ action: IssueAction; number?: number }> {
   const request = githubClient(env, fetcher)

@@ -38,6 +38,7 @@ const NOW = new Date('2026-10-06T12:00:00.000Z')
  */
 const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   'canonical-redirect': 10,
+  'legacy-root-target': 10, // worker-entry slug seek; not run by this suite
   'category-summaries': 2_000,
   'featured-summaries': 2_500, // 100 featured: 2,076 (walks the publication index)
   'latest-summaries': 1_500, // 100 latest: 837
@@ -53,7 +54,8 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   'related-single-category-seek': 200,
   'search-summaries': 17_000, // worst: a term that matches category names only
   'shell-stats': 20_000, // 15,242, cached per epoch
-  'unpublished-listing': 10
+  'unpublished-listing': 10,
+  'unpublished-listing-status': 10 // worker-entry slug seek; not run by this suite
 }
 
 let stateDirectory: string
@@ -230,7 +232,7 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
     const ly = await ops.searchListings('ly', 100)
     expect(ly).toHaveLength(MAX_SEARCH_LIMIT)
     for (const listing of ly) {
-      const text = [listing.name, listing.description, listing.slug, ...listing.categories]
+      const text = [listing.name, listing.description, listing.slug, ...(listing.categories ?? [])]
         .join(' ')
         .replace(/[A-Z]+/gu, letters => letters.toLowerCase())
       expect(text, listing.slug).toContain('ly')

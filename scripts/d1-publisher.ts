@@ -453,7 +453,7 @@ interface BatchStatement {
 }
 export interface PublicationDatabase {
   prepare(query: string): BatchStatement
-  batch<T = unknown>(statements: BatchStatement[]): Promise<T[]>
+  batch(statements: BatchStatement[]): Promise<unknown[]>
 }
 
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex')

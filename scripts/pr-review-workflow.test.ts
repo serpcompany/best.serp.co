@@ -120,6 +120,7 @@ describe('pr-review workflow', () => {
           HEAD_REPOSITORY: headRepository,
           LS_OUTPUT: output,
           LS_STATUS: String(status),
+          NODE_ENV: 'test',
           PATH: process.env.PATH
         }
       })

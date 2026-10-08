@@ -13,7 +13,7 @@ import { MAX_MEDIA_BYTES } from '../apps/web/src/db/media-keys'
  * whole token, and the first staging uploads spent it on verification GETs and stalled.
  */
 
-function requireEnvironment(env: NodeJS.ProcessEnv, name: string): string {
+function requireEnvironment(env: Partial<NodeJS.ProcessEnv>, name: string): string {
   const value = env[name]
   if (!value) throw new Error(`Missing required environment value ${name}.`)
   return value
@@ -152,7 +152,7 @@ export async function r2Request(
 export async function getR2Object(
   bucket: string,
   key: string,
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   fetcher: typeof fetch,
   options: R2CallOptions = {}
 ): Promise<Uint8Array | null> {
@@ -197,7 +197,7 @@ export interface ListedObject {
 export async function listR2Objects(
   bucket: string,
   prefix: string,
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   fetcher: typeof fetch,
   options: R2CallOptions = {}
 ): Promise<Map<string, ListedObject>> {
@@ -304,7 +304,7 @@ export async function putR2Object(
   body: Uint8Array,
   bucket: string,
   cacheControl: string,
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   fetcher: typeof fetch,
   options: R2CallOptions = {}
 ): Promise<string | null> {

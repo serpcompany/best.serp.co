@@ -148,7 +148,7 @@ export interface UploadSummary {
   verified: number
 }
 
-function requireEnvironment(env: NodeJS.ProcessEnv, name: string): string {
+function requireEnvironment(env: Partial<NodeJS.ProcessEnv>, name: string): string {
   const value = env[name]
   if (!value) throw new Error(`Missing required environment value ${name}.`)
   return value
@@ -171,7 +171,7 @@ export function resolvePlanPath(planPath: string, planDirectory = 'd1/media'): s
   return resolvedPath
 }
 
-export function validateUploadContext(env: NodeJS.ProcessEnv, target: UploadTarget): void {
+export function validateUploadContext(env: Partial<NodeJS.ProcessEnv>, target: UploadTarget): void {
   const { branch, confirmation, workflowRef } = uploadTargets[target]
   if (env.CI !== 'true' || env.GITHUB_ACTIONS !== 'true') {
     throw new Error('A media upload requires GitHub Actions (use --dry-run locally).')
@@ -244,7 +244,7 @@ export interface UploadOptions {
   /** The rate limiter and retry clock for every R2 call (tests pass fakes). */
   r2?: R2CallOptions
   dryRun?: boolean
-  env?: NodeJS.ProcessEnv
+  env?: Partial<NodeJS.ProcessEnv>
   fetcher?: typeof fetch
   /** The directory plans must sit directly under; d1/media unless a test passes its own. */
   planDirectory?: string

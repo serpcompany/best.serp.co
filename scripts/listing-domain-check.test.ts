@@ -1013,8 +1013,11 @@ describe('listing domain report and manifest', () => {
         buildDecisionsManifest(decisions, listings, { decisionsPath, id: manifest.id })
       )
       // Another manifest's unpublish would leave the listing not live, and this one refuses whole.
-      for (const operation of manifest.operations)
+      for (const operation of manifest.operations) {
+        if (operation.action !== 'listing-unpublish')
+          throw new Error(`${file}: ${operation.action}`)
         expect(unpublished.get(operation.id), operation.slug).toBeUndefined()
+      }
       const database = new DatabaseSync(':memory:')
       for (const migration of freshMigrationNames())
         database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))

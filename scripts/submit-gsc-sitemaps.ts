@@ -111,7 +111,7 @@ function parseDeleteSitemapUrls(value: string | undefined): string[] {
     .filter(Boolean)
 }
 
-function loadServiceAccount(env: NodeJS.ProcessEnv): ServiceAccount | undefined {
+function loadServiceAccount(env: Partial<NodeJS.ProcessEnv>): ServiceAccount | undefined {
   if (env.GSC_SERVICE_ACCOUNT_JSON) {
     return JSON.parse(env.GSC_SERVICE_ACCOUNT_JSON) as ServiceAccount
   }
@@ -124,7 +124,7 @@ function loadServiceAccount(env: NodeJS.ProcessEnv): ServiceAccount | undefined 
 }
 
 async function getOauthRefreshTokenAccessToken(
-  env: NodeJS.ProcessEnv
+  env: Partial<NodeJS.ProcessEnv>
 ): Promise<string | undefined> {
   const clientId = env.GSC_OAUTH_CLIENT_ID
   const clientSecret = env.GSC_OAUTH_CLIENT_SECRET
@@ -164,7 +164,7 @@ async function getOauthRefreshTokenAccessToken(
   return body.access_token
 }
 
-function siteUrlFor(domain: string, env: NodeJS.ProcessEnv): string {
+function siteUrlFor(domain: string, env: Partial<NodeJS.ProcessEnv>): string {
   const siteUrlMap = env.GSC_SITE_URL_MAP
     ? (JSON.parse(env.GSC_SITE_URL_MAP) as Record<string, string>)
     : {}
@@ -172,7 +172,7 @@ function siteUrlFor(domain: string, env: NodeJS.ProcessEnv): string {
   return siteUrlMap[domain] ?? `https://${domain}/`
 }
 
-async function getAccessToken(env: NodeJS.ProcessEnv): Promise<string> {
+async function getAccessToken(env: Partial<NodeJS.ProcessEnv>): Promise<string> {
   if (env.GSC_ACCESS_TOKEN) {
     return env.GSC_ACCESS_TOKEN
   }
@@ -227,7 +227,10 @@ async function getAccessToken(env: NodeJS.ProcessEnv): Promise<string> {
   return body.access_token
 }
 
-function authorizationHeaders(accessToken: string, env: NodeJS.ProcessEnv): Record<string, string> {
+function authorizationHeaders(
+  accessToken: string,
+  env: Partial<NodeJS.ProcessEnv>
+): Record<string, string> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`
   }
@@ -241,7 +244,7 @@ function authorizationHeaders(accessToken: string, env: NodeJS.ProcessEnv): Reco
 
 async function verifyCredentialAuthority(
   accessToken: string,
-  env: NodeJS.ProcessEnv
+  env: Partial<NodeJS.ProcessEnv>
 ): Promise<void> {
   const response = await fetch('https://www.googleapis.com/webmasters/v3/sites', {
     headers: authorizationHeaders(accessToken, env)
@@ -258,7 +261,7 @@ async function submitSitemap(
   accessToken: string,
   siteUrl: string,
   sitemapUrl: string,
-  env: NodeJS.ProcessEnv
+  env: Partial<NodeJS.ProcessEnv>
 ): Promise<void> {
   const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
     siteUrl
@@ -278,7 +281,7 @@ async function submitSitemap(
 async function listSitemaps(
   accessToken: string,
   siteUrl: string,
-  env: NodeJS.ProcessEnv
+  env: Partial<NodeJS.ProcessEnv>
 ): Promise<void> {
   const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
     siteUrl
@@ -319,7 +322,7 @@ async function deleteSitemap(
   accessToken: string,
   siteUrl: string,
   sitemapUrl: string,
-  env: NodeJS.ProcessEnv
+  env: Partial<NodeJS.ProcessEnv>
 ): Promise<void> {
   const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
     siteUrl
@@ -353,7 +356,7 @@ function deleteTargetsForSitemapUrls(sitemapUrls: string[]): SitemapTarget[] {
 
 export async function runSubmitGscSitemaps(
   argv = process.argv.slice(2),
-  env: NodeJS.ProcessEnv = process.env
+  env: Partial<NodeJS.ProcessEnv> = process.env
 ): Promise<void> {
   const args = parseArgs(argv)
   const deleteSitemapUrls = [
