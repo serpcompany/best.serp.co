@@ -14,9 +14,9 @@
  * serpcompany/best.serp.co#70.
  */
 import { isEmailTemplateId } from '@serpdirectory/data-ops/email-deliveries'
-import { absoluteUrl } from '@/lib/seo/canonical-url'
 import type { SiteEnvironment } from '../environment/site-environment'
 import type { SiteFeatures } from '../features'
+import { absoluteUrl } from '../seo/canonical-url'
 
 export class EmailTemplateError extends Error {
   override name = 'EmailTemplateError'

@@ -1,22 +1,50 @@
+import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { withContentCollections } from '@content-collections/next'
+import withBundleAnalyzer from '@next/bundle-analyzer'
 import withMDX from '@next/mdx'
 import { withSentryConfig } from '@sentry/nextjs/config'
-import { baseConfig, withAnalyzer } from '@serpdirectory/config-next'
-import { site } from '@serpdirectory/site-config'
 import type { NextConfig } from 'next'
 import { movedUrlRedirects } from './src/lib/routing/redirects'
+import { site } from './src/lib/site/site'
 import { sentryRelease } from './src/lib/telemetry/sentry'
 
-export const INTERNAL_PACKAGES = [
-  '@serpdirectory/design-system',
-  '@serpdirectory/config-next',
-  '@serpdirectory/config-typescript',
-  '@serpdirectory/content',
-  '@serpdirectory/logging',
-  '@serpdirectory/site-config',
-  '@serpdirectory/utils'
-]
+export const INTERNAL_PACKAGES = ['@serpdirectory/design-system', '@serpdirectory/utils']
+
+const BUILD_ID_HASH_LENGTH = 20
+
+function readGitHead(): string | null {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim()
+  } catch {
+    return null
+  }
+}
+
+/** One build ID per site and source revision, so every build of a commit agrees. */
+export function resolveDeterministicBuildId(siteId = 'best.serp.co'): string {
+  const sourceRevision =
+    process.env.NEXT_BUILD_ID ||
+    process.env.GITHUB_SHA ||
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    readGitHead() ||
+    'local'
+
+  return createHash('sha256')
+    .update(`${siteId}:${sourceRevision}`)
+    .digest('hex')
+    .slice(0, BUILD_ID_HASH_LENGTH)
+}
+
+export const baseConfig: NextConfig = {
+  generateBuildId: async () => resolveDeterministicBuildId(),
+  reactStrictMode: true,
+  skipTrailingSlashRedirect: true
+}
 
 function normalizeBasePath(basePath: string): string {
   return basePath.replace(/^\/+|\/+$/g, '')
@@ -108,8 +136,8 @@ let nextConfig: NextConfig = {
     ]
   },
 
-  // Pages are written with a trailing slash. `skipTrailingSlashRedirect` (from
-  // `@serpdirectory/config-next`) turns off the framework's own slash redirect, which differs
+  // Pages are written with a trailing slash. `skipTrailingSlashRedirect` (in `baseConfig`)
+  // turns off the framework's own slash redirect, which differs
   // between Next.js and OpenNext and has no /api exception; the Worker entry enforces the
   // URL trailing-slash standard instead (`src/lib/routing/trailing-slash.ts`).
   trailingSlash: true,
@@ -150,7 +178,7 @@ let nextConfig: NextConfig = {
 nextConfig = withMDX()(nextConfig)
 
 if (process.env.ANALYZE === 'true') {
-  nextConfig = withAnalyzer(nextConfig)
+  nextConfig = withBundleAnalyzer()(nextConfig)
 }
 
 // Sentry (#48): uploads source maps and creates the release only when the deploy build has the

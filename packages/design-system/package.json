@@ -99,7 +99,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@serpdirectory/config-typescript": "workspace:*",
     "@serpdirectory/utils": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

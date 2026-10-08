@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { site } from '@serpdirectory/site-config'
 import { afterEach, describe, expect, it } from 'vitest'
+import { site } from '../apps/web/src/lib/site'
 import { auditArtifactSitemaps, parseSitemapLocs } from './audit-sitemaps.ts'
 
 const tempDirs: string[] = []

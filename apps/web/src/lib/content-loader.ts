@@ -69,7 +69,7 @@ try {
 }
 
 function readLegalContentFromFileSystem(key: string): string {
-  const legalFilePath = path.join(resolveFromRoot('packages/content/data/legal'), `${key}.mdx`)
+  const legalFilePath = path.join(resolveFromRoot('apps/web/content/legal'), `${key}.mdx`)
 
   if (!fs.existsSync(legalFilePath)) {
     return ''

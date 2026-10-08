@@ -4,7 +4,7 @@ import type {
   AccountOverview,
   AccountSubmission
 } from '@serpdirectory/data-ops/account'
-import { site } from '@serpdirectory/site-config'
+import { site } from '@/lib/site'
 import {
   draftExpiresInDays,
   hostOf,

@@ -85,7 +85,7 @@ Submitter-facing pages follow the same rule: copy that needs a later area comes 
 `apps/web/src/lib/feature-copy.ts` behind its flag (the badge step's "Add FAQs and links" and
 "Keep the badge up" cards, the form's FAQs hint, the free plan's weekly check), and
 `feature-copy.test.ts` fails when another page, component, `lib/submissions` message, or
-`packages/site-config` copy (or `lib/account`, the dashboard's) says it while the flag is off.
+`apps/web/src/lib/site` copy (or `lib/account`, the dashboard's) says it while the flag is off.
 
 `links.test.ts` also fails when an email the app sends (any template whose id app code names) asks
 for a dashboard action whose flag is off, apart from the owner-approved interim copy it lists
@@ -101,7 +101,7 @@ while orders are on (`FLAGGED_SENDERS`, so they are sent now).
 ## Recipients and footers
 
 - **Admin alerts** go to `EMAIL_ADMIN_RECIPIENT`, which is `email.adminRecipient` in
-  `packages/site-config` (`devin@serp.co`, per #59). It is not derived from the admin
+  `apps/web/src/lib/site` (`devin@serp.co`, per #59). It is not derived from the admin
   allowlist (#60): that list decides who may sign in to `/admin`, not who gets mail. Adding an
   admin should not silently add a mail recipient. Callers pass it as `to`; no template holds
   an address.

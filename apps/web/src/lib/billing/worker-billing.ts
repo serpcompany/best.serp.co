@@ -1,7 +1,7 @@
 import { createBadgeProgramOperations } from '@serpdirectory/data-ops/badge-program'
 import { createBillingOperations } from '@serpdirectory/data-ops/billing'
 import { createDatabase } from '@serpdirectory/data-ops/client'
-import { site } from '@serpdirectory/site-config'
+import { site } from '@/lib/site'
 import { checkBadgeAtRefund } from '../badge-program/refund'
 import { EMAIL_ADMIN_RECIPIENT } from '../email/config'
 import { emailEventKey } from '../email/service'

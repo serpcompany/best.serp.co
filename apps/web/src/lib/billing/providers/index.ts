@@ -1,4 +1,4 @@
-import { site } from '@serpdirectory/site-config'
+import { site } from '@/lib/site'
 import { isLocalWorker, type OrdersEnv } from '../flags'
 import type { BillingProvider } from '../provider'
 import { createStripeProvider } from './stripe'

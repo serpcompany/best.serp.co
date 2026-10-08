@@ -3,8 +3,8 @@
 import { useRouter } from 'next/navigation'
 import type React from 'react'
 import { useCallback, useState } from 'react'
-import { useDebounce } from '../../../../packages/hooks/src/use-debounce'
 import { getRoute } from '../lib/routing/routes'
+import { useDebounce } from './use-debounce'
 
 /**
  * Hook that manages search query state and navigation to search results

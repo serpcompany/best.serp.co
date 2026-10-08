@@ -26,7 +26,7 @@ describe('repository harness contract', () => {
           'docs/README.md': lines(121),
           'docs/HARNESS.md': lines(300),
           'docs/DEPLOY_RUNBOOK.md': lines(301),
-          'packages/content/data/legal/terms.mdx': lines(500),
+          'apps/web/content/legal/terms.mdx': lines(500),
           'SECURITY.md': lines(500)
         },
         {}

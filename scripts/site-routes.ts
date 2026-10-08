@@ -1,4 +1,4 @@
-import { SITEMAP_INDEX_PATH, site, sitemapPaths } from '@serpdirectory/site-config'
+import { SITEMAP_INDEX_PATH, site, sitemapPaths } from '../apps/web/src/lib/site'
 
 /**
  * Public route shapes of best.serp.co, derived from the checked-in site config the

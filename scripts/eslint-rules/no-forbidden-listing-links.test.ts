@@ -77,7 +77,7 @@ describe('no-forbidden-listing-links', () => {
   it('reports help.serp.co/en links in checked-in site configuration and content', () => {
     const messages = lintText(
       'export const supportUrl = "https://help.serp.co/en/"\n',
-      'packages/site-config/src/site.ts'
+      'apps/web/src/lib/site/site.ts'
     )
 
     expect(messages).toHaveLength(1)

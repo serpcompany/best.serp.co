@@ -1,5 +1,5 @@
-import { type SiteRoute, siteRoutes } from '@serpdirectory/site-config'
 import type { Metadata } from 'next'
+import { type SiteRoute, siteRoutes } from '@/lib/site'
 import { getRoute } from '../routing/routes'
 import {
   getConfiguredSocialLinks,

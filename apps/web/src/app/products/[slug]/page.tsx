@@ -1,4 +1,3 @@
-import { site } from '@serpdirectory/site-config'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
@@ -24,6 +23,7 @@ import { getWebsiteBySlug, getWebsiteCanonicalRedirect } from '@/lib/content-loa
 import { getFeaturedOnBadgePreviewPathFromKey } from '@/lib/directory/featured-on-badge-url'
 import { GONE_RENDER_HEADER } from '@/lib/routing/gone-listing'
 import { getRoute } from '@/lib/routing/routes'
+import { site } from '@/lib/site'
 import { siteConfig } from '@/lib/site/site-config'
 import { submissionBadgeTargets } from '@/lib/submissions/presentation'
 

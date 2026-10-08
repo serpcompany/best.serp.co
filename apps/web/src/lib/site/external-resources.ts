@@ -1,6 +1,6 @@
-import type { SiteExternalResourceIcon } from '@serpdirectory/site-config/types'
 import type { LucideIcon } from 'lucide-react'
 import { Chrome, Code2, Command, GitBranch, Terminal } from 'lucide-react'
+import type { SiteExternalResourceIcon } from '@/lib/site/types'
 import { siteContent } from './site-content'
 
 export interface ExternalResource {

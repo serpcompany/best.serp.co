@@ -2,7 +2,7 @@ import { createSign } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { site } from '@serpdirectory/site-config'
+import { site } from '../apps/web/src/lib/site'
 
 type ServiceAccount = {
   client_email: string

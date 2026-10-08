@@ -19,7 +19,7 @@ This application is the best.serp.co Cloudflare Worker, not a filesystem-backed 
 - Write page URLs with a trailing slash and file URLs without one; build absolute URLs
   with `siteUrl` / `absoluteUrl` so the homepage is the bare origin. The Worker entry
   redirects everything else (see the URL canonicalization section of the architecture doc).
-- Site identity, copy, and route layout come from `packages/site-config`; do not add
+- Site identity, copy, and route layout come from `src/lib/site`; do not add
   environment-based site selection.
 - Validate Worker compatibility with `pnpm worker:build`.
 

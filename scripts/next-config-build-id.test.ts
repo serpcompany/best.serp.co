@@ -1,5 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { baseConfig, resolveDeterministicBuildId } from '../configs/next'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { baseConfig, resolveDeterministicBuildId } from '../apps/web/next.config'
+
+// Build-time wrappers next.config.ts applies; the build ID does not depend on them.
+vi.mock('@content-collections/next', () => ({
+  withContentCollections: (config: unknown) => config
+}))
+vi.mock('@next/mdx', () => ({ default: () => (config: unknown) => config }))
 
 const managedEnvKeys = [
   'GITHUB_SHA',

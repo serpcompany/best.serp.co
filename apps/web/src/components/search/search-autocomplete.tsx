@@ -4,10 +4,10 @@ import {
   DirectoryCommand,
   type DirectoryCommandItem
 } from '@serpdirectory/design-system/shadcnblocks/directory-command'
-import { logger } from '@serpdirectory/logging'
 import { ArrowRight, Clock, Search, TrendingUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { logger } from '@/lib/logging'
 import { resolveCategories } from '../../lib/directory/categories'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import { SEARCH_API_PATH, searchResponseSchema } from '../../lib/directory/search-contract'

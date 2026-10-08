@@ -8,8 +8,12 @@
  * second, parameterless rule because OpenNext cannot fill an empty parameter: `/website`
  * would otherwise redirect to the literal `/products/:path*`.
  */
-import { SITEMAP_INDEX_PATH, site, sitemapPaths } from '@serpdirectory/site-config'
+
 import type { Redirect } from 'next/dist/lib/load-custom-routes'
+// Relative module paths: next.config.ts loads this file, and its loader resolves neither `@/`
+// nor directory imports.
+import { site } from '../site/site'
+import { SITEMAP_INDEX_PATH, sitemapPaths } from '../site/site-routes'
 
 /** The canonical legal pages; `getRoute('privacy')` and `getRoute('terms')` name the same. */
 export const LEGAL_CANONICAL = {

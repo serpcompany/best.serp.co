@@ -6,7 +6,7 @@ Scripts are repository boundaries and must fail with remediation-oriented messag
 - Default inspection and planning commands to read-only behavior.
 - Separate mutating commands from checks and name them explicitly.
 - Read the single deployment target from `project.ts` and the public site shape from
-  `@serpdirectory/site-config`; never reintroduce `--site` arguments or site IDs.
+  `apps/web/src/lib/site`; never reintroduce `--site` arguments or site IDs.
 - Pin local D1 commands to the local Wrangler identity and isolated state path.
 - Never add a local route to staging or production D1.
 - Export pure functions where a deterministic unit test can exercise the contract.

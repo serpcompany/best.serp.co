@@ -1,6 +1,6 @@
 /**
  * best.serp.co facts the E2E suite asserts against. These values are intentionally hard-coded
- * (instead of imported from `@serpdirectory/site-config`) so a config or catalog regression
+ * (instead of imported from `apps/web/src/lib/site`) so a config or catalog regression
  * fails the suite rather than silently moving the expectation with it.
  */
 export const site = {

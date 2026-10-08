@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { site } from '@serpdirectory/site-config'
 import { describe, expect, it } from 'vitest'
+import { site } from '../apps/web/src/lib/site'
 import { project } from './project'
 
 const variants = ['light', 'dark'] as const

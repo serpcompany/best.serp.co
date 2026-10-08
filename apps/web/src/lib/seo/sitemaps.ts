@@ -1,6 +1,6 @@
 /**
  * The XML sitemaps and robots.txt, all read from the route registry
- * (`@serpdirectory/site-config` `siteRoutes`, #167). `/sitemap-index.xml` lists the three
+ * (`@/lib/site` `siteRoutes`, #167). `/sitemap-index.xml` lists the three
  * root-level child sitemaps (serp websites/features/xml-sitemaps.md): `/sitemap-pages.xml` (the
  * registry's indexable static pages), `/sitemap-products.xml` (every public listing), and
  * `/sitemap-categories.xml` (every category with a public listing).
@@ -9,6 +9,8 @@
  * `published_at`), a category's newest listing, the catalog pages' newest listing, and each
  * index entry's newest child. A static page whose content lives in code carries none.
  */
+
+import type { MetadataRoute } from 'next'
 import {
   disallowedPaths,
   SITEMAP_INDEX_PATH,
@@ -16,8 +18,7 @@ import {
   sitemapGroups,
   sitemapPaths,
   sitemapRoutePaths
-} from '@serpdirectory/site-config'
-import type { MetadataRoute } from 'next'
+} from '@/lib/site'
 import { getActiveCategories } from '../directory/category-navigation'
 import { getRoute } from '../routing/routes'
 import { siteConfig } from '../site/site-config'

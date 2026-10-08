@@ -32,7 +32,7 @@ emails, in the admin panel, in error lines, in the legal pages, or in the item n
 provider's own checkout page. Copy says "secure checkout", "our payment provider", or "payment".
 An architecture guard fails on the name in any string or JSX text outside
 `lib/billing/providers/` (the app, the UI packages, `packages/data-ops/src`, and
-`packages/content/data/`), pins the provider page's item name to the order's neutral
+`apps/web/content/`), pins the provider page's item name to the order's neutral
 description, and the end-to-end suite checks every screen it visits.
 
 ## Data

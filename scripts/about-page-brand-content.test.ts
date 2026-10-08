@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { site } from '@serpdirectory/site-config'
 import { describe, expect, it } from 'vitest'
+import { site } from '../apps/web/src/lib/site'
 
-const aboutPath = resolve(process.cwd(), 'packages/site-config/content/about/about.mdx')
+const aboutPath = resolve(process.cwd(), 'apps/web/content/about/about.mdx')
 
 const bannedDomainPhrases = [
   'directory starter',
@@ -94,8 +94,7 @@ describe('best.serp.co About page brand content', () => {
   it('points the web app at the site-owned About collection', () => {
     const source = readFileSync(resolve(process.cwd(), 'apps/web/content-collections.ts'), 'utf8')
 
-    expect(source).toContain("const aboutPath = '../../packages/site-config/content/about'")
-    expect(source).not.toContain("const aboutPath = '../../packages/content/data/about'")
+    expect(source).toContain("const aboutPath = './content/about'")
   })
 
   it('renders About with the shared content loader', () => {

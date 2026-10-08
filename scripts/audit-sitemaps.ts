@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { type SiteDefinition, site, sitemapPaths, siteRoutes } from '@serpdirectory/site-config'
+import { type SiteDefinition, site, sitemapPaths, siteRoutes } from '../apps/web/src/lib/site'
 import { project } from './project'
 
 type AuditScope = 'artifact' | 'live'
