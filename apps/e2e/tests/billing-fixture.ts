@@ -190,7 +190,7 @@ export async function startStripeMock(): Promise<StripeMock> {
     response
       .writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
       .end(
-        `<!doctype html><title>Mock checkout</title><p>${session.amount_total} ${session.currency}</p>` +
+        `<!doctype html><link rel="icon" href="data:,"><title>Mock checkout</title><p>${session.amount_total} ${session.currency}</p>` +
           `<form method="post" action="/pay/${session.id}/complete"><button type="submit">Pay</button></form>` +
           `<a href="${session.cancel_url}">Cancel</a>`
       )

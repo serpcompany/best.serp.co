@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test'
+import { expect } from '@playwright/test'
+import { test } from './test'
 
 /**
  * `/api/search` against the real Worker and D1 (serpcompany/best.serp.co#77). Queries over D1's

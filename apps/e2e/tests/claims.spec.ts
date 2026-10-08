@@ -1,9 +1,4 @@
-import {
-  type APIRequestContext,
-  expect,
-  request as playwrightRequest,
-  test
-} from '@playwright/test'
+import { type APIRequestContext, expect, request as playwrightRequest } from '@playwright/test'
 import {
   ADMIN_EMAIL_PREFIXES,
   type Client,
@@ -16,6 +11,7 @@ import {
 } from './admin-fixture'
 import { claimsD1, claimsOrigin, claimsServer, claimsSuiteEnabled } from './claims-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
+import { test } from './test'
 
 /**
  * Claims of existing listings (serpcompany/best.serp.co#67) end to end, through the claim API on

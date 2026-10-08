@@ -1,6 +1,13 @@
-import { expect, test } from '@playwright/test'
-
+import { expect } from '@playwright/test'
 import { site } from './site-fixture'
+import { expectedResponse, test } from './test'
+
+test.use({
+  allowedConsoleErrors: {
+    because: 'the not-found journey requests a missing page',
+    patterns: [expectedResponse(404, /\/this-does-not-exist-404-page\//u)]
+  }
+})
 
 // Minimal tests that should always pass
 test.describe('Minimal Tests', () => {
