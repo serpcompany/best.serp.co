@@ -32,7 +32,7 @@ Turning the flag off again makes each job return `{ enabled: false }` without re
 fetching any site, and takes the weekly-check copy out. A local Worker can still run the
 program with the flag off (`LOCAL_PREVIEW_VARS=LOCAL_BADGE_PROGRAM=on`; ignored unless
 `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` are both `local`). No suite needs it while the flag is
-on: `apps/e2e/tests/badge-program.spec.ts` runs `/__scheduled?cron=<expression>` against
+on: `apps/web/e2e/badge-program.spec.ts` runs `/__scheduled?cron=<expression>` against
 fixture sites on the site's flags.
 
 ## How it works

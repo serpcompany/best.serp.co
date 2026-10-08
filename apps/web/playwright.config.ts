@@ -3,16 +3,16 @@ import {
   accessLockOrigin,
   accessLockServerCommand,
   accessLockServersEnabled
-} from './tests/access-lock-fixture'
+} from './e2e/access-lock-fixture'
 import {
   accountServer,
   adminOrigin,
   adminServerCommand,
   adminSuiteEnabled
-} from './tests/admin-fixture'
-import { badgeOrigin, badgeServerCommand, badgeSuiteEnabled } from './tests/badge-program-fixture'
-import { claimsOrigin, claimsServerCommand, claimsSuiteEnabled } from './tests/claims-fixture'
-import { mediaOrigin, mediaServerCommand, mediaServerEnabled } from './tests/media-fixture'
+} from './e2e/admin-fixture'
+import { badgeOrigin, badgeServerCommand, badgeSuiteEnabled } from './e2e/badge-program-fixture'
+import { claimsOrigin, claimsServerCommand, claimsSuiteEnabled } from './e2e/claims-fixture'
+import { mediaOrigin, mediaServerCommand, mediaServerEnabled } from './e2e/media-fixture'
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`
@@ -27,7 +27,7 @@ const ignoredTests = [
 ]
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './e2e',
   testIgnore: ignoredTests,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -99,8 +99,8 @@ export default defineConfig({
     // }
   ],
   // Web servers start in order: the first builds the Worker, the Access-lock servers
-  // (tests/access-lock-fixture.ts) then serve that build with CF_ACCESS_REQUIRED=on, and the
-  // media server (tests/media-fixture.ts) serves it on a seeded local D1 and R2.
+  // (e2e/access-lock-fixture.ts) then serve that build with CF_ACCESS_REQUIRED=on, and the
+  // media server (e2e/media-fixture.ts) serves it on a seeded local D1 and R2.
   webServer: useExternalServer
     ? undefined
     : [
@@ -129,7 +129,7 @@ export default defineConfig({
             }))
           : []),
         // The admin panel and account dashboard suites' own Workers and D1s
-        // (tests/admin-fixture.ts): both publish listings and add admins.
+        // (e2e/admin-fixture.ts): both publish listings and add admins.
         ...(adminSuiteEnabled
           ? [undefined, accountServer].map(server => ({
               command: adminServerCommand(server),
@@ -151,7 +151,7 @@ export default defineConfig({
               }
             ]
           : []),
-        // Hosted listing media on a seeded local D1 and R2 (tests/media-fixture.ts).
+        // Hosted listing media on a seeded local D1 and R2 (e2e/media-fixture.ts).
         ...(mediaServerEnabled
           ? [
               {

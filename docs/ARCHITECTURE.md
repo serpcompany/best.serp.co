@@ -201,7 +201,7 @@ and a test checks the committed import.
   `scripts/assets/listing-logo-fallback.svg`). The tile is UI only: listing JSON-LD names
   the listing's own logo as `primaryImageOfPage` and omits the property when there is none,
   rather than give every logo-less listing the same image or the SERP logo
-  (`apps/web/src/lib/seo/schema.ts`). `apps/e2e/tests/listing-logo-assets.spec.ts` checks
+  (`apps/web/src/lib/seo/schema.ts`). `apps/web/e2e/listing-logo-assets.spec.ts` checks
   that the Worker serves the tile and that sample pages reference no missing same-origin file.
 - **Listing offers.** D1 holds no product pricing, so listing JSON-LD has no `offers`
   (`generateWebsiteDetailSchema` emits one only for known `pricing`; the submission `plan` is

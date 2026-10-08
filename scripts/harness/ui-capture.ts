@@ -48,11 +48,11 @@ async function main(): Promise<void> {
     'pnpm',
     [
       '--filter',
-      'e2e',
+      'web',
       'exec',
       'playwright',
       'test',
-      'tests/agent-capture.spec.ts',
+      'e2e/agent-capture.spec.ts',
       '--project=chromium'
     ],
     {

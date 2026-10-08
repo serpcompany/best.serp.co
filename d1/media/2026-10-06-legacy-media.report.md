@@ -1771,5 +1771,5 @@ plan's 145 `repo:` files (3,510,910 bytes) were deleted:
   the plan wherever the history is present (PR Review; Publish D1 Catalog and the deploys check
   out one commit and skip it), and that nothing is checked in under those directories again.
 - **Local D1** is still the raw import, where those 80 rows are site-relative paths, so locally
-  those images do not load. `apps/e2e/tests/listing-logo-assets.spec.ts` allows exactly those
+  those images do not load. `apps/web/e2e/listing-logo-assets.spec.ts` allows exactly those
   paths to be missing, and only on a local Worker.

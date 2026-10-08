@@ -29,7 +29,7 @@ while both flags are on, so it does now. With orders off, the dialog offers only
 Turning the flag off again makes every claim endpoint answer 404, removes the claim link, and
 leaves claims in progress where they are. A local Worker can still run claims with the flag off
 (`LOCAL_PREVIEW_VARS=LOCAL_CLAIMS=on`; ignored unless `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` are
-both `local`). No suite needs it while the flag is on: `apps/e2e/tests/claims.spec.ts` and
+both `local`). No suite needs it while the flag is on: `apps/web/e2e/claims.spec.ts` and
 `claims-dialog.spec.ts` run on the site's flags.
 
 ## The flow

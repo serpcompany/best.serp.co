@@ -7,8 +7,8 @@ import { test } from './test'
  * environment's media host or the fallback tile, and every listing image there answers 200.
  *
  *   MEDIA_ACCEPTANCE=1 PLAYWRIGHT_BASE_URL=https://best-serp-co-staging.serpcompany.workers.dev \
- *     PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm --filter e2e exec playwright test \
- *     tests/listing-media-acceptance.spec.ts --project=chromium
+ *     PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm --filter web exec playwright test \
+ *     e2e/listing-media-acceptance.spec.ts --project=chromium
  *
  * The media host follows the base URL (`MEDIA_HOST` overrides it). It never runs in CI or
  * locally, where the catalog is the unmigrated import.

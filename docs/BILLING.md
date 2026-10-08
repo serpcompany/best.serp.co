@@ -168,9 +168,9 @@ the flag off; nothing uses it while the flag is on.
 ## Tests
 
 `apps/web/src/lib/billing/{service,providers/stripe}.test.ts` (node:sqlite and a fake provider),
-`scripts/d1-drizzle-local.test.ts` (the migration), and `apps/e2e/tests/billing.spec.ts`
+`scripts/d1-drizzle-local.test.ts` (the migration), and `apps/web/e2e/billing.spec.ts`
 (Playwright on the admin panel suite's Worker and D1, `PLAYWRIGHT_PORT` + 3, started with the
-mocked provider's test values (`BILLING_PREVIEW_VARS` in `apps/e2e/tests/orders-worker.ts`;
+mocked provider's test values (`BILLING_PREVIEW_VARS` in `apps/web/e2e/orders-worker.ts`;
 orders and claims are on since #133 and #130), because a ninth preview Worker exhausted the CI
 runner's memory; the mocked Stripe API listens on `PLAYWRIGHT_PORT` + 8. The badge program
 suite's Worker takes the same values for its hourly trigger's sweep). It covers checkout success,

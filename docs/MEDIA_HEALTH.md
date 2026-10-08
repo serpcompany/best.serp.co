@@ -28,7 +28,7 @@ Every listing image carries `data-listing-image="logo|image"`. Guards:
   `<img>`, `next/image`, avatar image, `<picture>`, or HTML string. The few non-listing images
   (badges, guide covers, the email logo) are listed with a reason and may not take listing media.
   It also names every file that renders `ListingImage`.
-- `apps/e2e/tests/listing-image-fallback.spec.ts` answers every image request but the tile with
+- `apps/web/e2e/listing-image-fallback.spec.ts` answers every image request but the tile with
   404 and requires every listing image on the home and detail pages to end as the loaded tile;
   with JavaScript off, it requires the `::after` tile on each broken image.
 - `scripts/catalog-media.test.ts` requires every published logo and image to be its own listing's

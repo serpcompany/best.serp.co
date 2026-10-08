@@ -189,7 +189,7 @@ describe('pr-review workflow', () => {
     const e2eJob = workflow.jobs.e2e
     const stepRuns = e2eJob.steps?.map(step => step.run).filter(Boolean)
 
-    expect(stepRuns).toContain('pnpm --filter e2e test:install')
+    expect(stepRuns).toContain('pnpm --filter web test:install')
     expect(stepRuns).toContain('pnpm test:e2e')
     expect(stepRuns).not.toContain('npx playwright install --with-deps')
   })

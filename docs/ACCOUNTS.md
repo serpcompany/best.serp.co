@@ -173,7 +173,7 @@ the request carries a session cookie, so anonymous pages never load Better Auth 
   from the path; the collapsed off-canvas sidebar is `inert`; and the mobile Sheet returns
   focus to the sidebar trigger when it closes (a local addition to the stock Sidebar in `components/ui/sidebar.tsx`).
 
-Both pages are noindex and bypass the edge cache. `apps/e2e/tests/login.spec.ts` covers them
+Both pages are noindex and bypass the edge cache. `apps/web/e2e/login.spec.ts` covers them
 in a browser.
 
 ## Admin gate
@@ -199,7 +199,7 @@ writes are `/api/admin` route handlers). Access is required in
 production (and whenever `SITE_ENVIRONMENT` is not exactly `local` or `staging`); locally and
 on staging only with `CF_ACCESS_REQUIRED=on`.
 
-Coverage: `apps/e2e/tests/access-lock.spec.ts` runs the built Worker twice more with
+Coverage: `apps/web/e2e/access-lock.spec.ts` runs the built Worker twice more with
 `CF_ACCESS_REQUIRED=on` (`LOCAL_PREVIEW_VARS`): without the team domain and AUD tag every admin
 path answers 503, and with test values it answers 403 to a missing or malformed JWT, both even
 for the signed-in owner; an RS256 token with a `kid` makes the Worker fetch the test team's
