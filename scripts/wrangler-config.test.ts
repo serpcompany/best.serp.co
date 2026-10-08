@@ -28,6 +28,17 @@ describe('Worker configuration (serp web-stack/nextjs-on-workers.md)', () => {
     )
   })
 
+  // The Web Analytics site token is production's alone (#170), and a pasted value must be a
+  // token: the root layout renders no beacon for anything else, silently.
+  it('sets CF_WEB_ANALYTICS_TOKEN only in production, and only as a site token', () => {
+    for (const [name, config] of environments.slice(0, 2)) {
+      expect(config.vars.CF_WEB_ANALYTICS_TOKEN, name).toBeUndefined()
+    }
+    const token = resolved('production').vars.CF_WEB_ANALYTICS_TOKEN
+    // The same pattern `analyticsForRequest` accepts (apps/web/lib/environment).
+    if (token !== undefined) expect(token).toMatch(/^[0-9a-f]{32}$/u)
+  })
+
   it.each(environments)('uploads source maps in %s', (_name, config) => {
     expect(config.upload_source_maps).toBe(true)
   })

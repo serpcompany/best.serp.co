@@ -456,6 +456,24 @@ describe('environment-specific crawl policy gates', () => {
       )
   })
 
+  it('rejects the Cloudflare Web Analytics beacon on workers.dev (#170)', async () => {
+    const beacon =
+      '<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{}"></script>'
+    stubCrawlPolicy((url, response) =>
+      url.pathname === '/'
+        ? new Response(`<html><head></head><body>ok${beacon}</body></html>`, {
+            headers: response.headers
+          })
+        : response
+    )
+    await expect(gates('staging', stagingOrigin)).rejects.toThrow(
+      'staging route / loads the Cloudflare Web Analytics beacon'
+    )
+    await expect(gates('production', origin)).rejects.toThrow(
+      'production route / loads the Cloudflare Web Analytics beacon'
+    )
+  })
+
   it.each([
     ['production', origin, 'staging', 'production'],
     ['production', origin, null, 'production'],

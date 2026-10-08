@@ -94,11 +94,11 @@ host alone. A test (`apps/web/lib/environment/site-environment.test.ts`) pins th
 | `CANONICAL_HOST_REDIRECT` | unset | unset | `on` since the cutover (`off` before it) |
 
 - **Public production** is `SITE_ENVIRONMENT=production` on the canonical host
-  `best.serp.co`: indexable, `robots.txt` lists the sitemap index, and Google Tag Manager
-  loads. Everything else is non-production: local, staging, the production Worker's
+  `best.serp.co`: indexable, `robots.txt` lists the sitemap index, and analytics load. Everything
+  else is non-production: local, staging, the production Worker's
   `*.workers.dev` host, and a missing or misspelled var. There the Worker entry sends
   `X-Robots-Tag: noindex, nofollow` on every response it answers and answers `/robots.txt`
-  with `Disallow: /` for every crawler, and the root layout leaves Google Tag Manager out
+  with `Disallow: /` for every crawler, and the root layout leaves analytics out
   (`apps/web/lib/environment/`). Static files are served before the Worker runs, so
   `apps/web/public/_headers` keeps them `noindex` on every `*.workers.dev` host, and
   `next.config.ts` keeps its `*.workers.dev` `noindex` rule as defense in depth.

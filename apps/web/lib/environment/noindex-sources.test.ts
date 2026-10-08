@@ -50,7 +50,7 @@ vi.mock('@/lib/submissions/repository', () => ({
   insecureLogosAllowed: () => false
 }))
 vi.mock('@/lib/environment/request-environment', () => ({
-  googleTagManagerIdForRequest: async () => undefined
+  analyticsForRequest: async () => ({})
 }))
 vi.mock('@/actions/get-home-page-data', () => ({ getHomePageData: async () => null }))
 
