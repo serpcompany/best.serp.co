@@ -27,8 +27,7 @@ const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
     'the "Featured on" badge preview in the claim flow',
   'apps/web/src/components/submit/badge-step.tsx': 'the "Featured on" badge preview',
   'apps/web/src/lib/email/emails/layout.ts': 'the site logo in email HTML',
-  'apps/web/src/components/ui/avatar.tsx':
-    'the avatar primitive (people, not listings)',
+  'apps/web/src/components/ui/avatar.tsx': 'the avatar primitive (people, not listings)',
   'apps/web/src/components/layout/footer.tsx': 'network badges in the footer',
   'apps/web/src/components/content/mdx-components.tsx':
     'Markdown images in site content; listing content holds none (scripts/catalog-media.test.ts)',

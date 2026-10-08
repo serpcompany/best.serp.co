@@ -1,10 +1,10 @@
 'use client'
 
 import { captureException } from '@sentry/nextjs'
-import { Button } from '@/components/ui/button'
-import { fonts } from '@/lib/fonts'
 import type NextError from 'next/error'
 import { useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { fonts } from '@/lib/fonts'
 
 type GlobalErrorProperties = {
   readonly error: NextError & { digest?: string }

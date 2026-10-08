@@ -1,3 +1,5 @@
+import type { Metadata } from 'next'
+import type { ReactElement } from 'react'
 import {
   Pagination,
   PaginationContent,
@@ -7,8 +9,6 @@ import {
   PaginationNext,
   PaginationPrevious
 } from '@/components/ui/pagination'
-import type { Metadata } from 'next'
-import type { ReactElement } from 'react'
 import { SITE_PUBLIC_URL } from '../../lib/seo/seo-config'
 
 /**

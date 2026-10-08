@@ -1,6 +1,5 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import { Box, CircleUser, ExternalLink, Inbox, Receipt, Users } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
@@ -12,6 +11,7 @@ import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
 import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
 import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
 import { ModeToggle } from '@/components/layout/mode-toggle'
+import { Button } from '@/components/ui/button'
 
 /**
  * The admin shell (#64): shadcn sidebar-07 (`collapsible="icon"` with a rail, the logo tile,

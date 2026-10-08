@@ -1,8 +1,8 @@
-import { Button } from '@/components/ui/button'
-import { DirectoryCtaBand } from './directory-home-section'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 import { getRoute } from '../../lib/routing/routes'
 import { siteCopy } from '../../lib/site/site-copy'
+import { DirectoryCtaBand } from './directory-home-section'
 
 export function NewsletterSection() {
   return (

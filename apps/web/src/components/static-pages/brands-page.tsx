@@ -1,6 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { Card, CardContent } from '@/components/directory/card'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { getRoute } from '../../lib/routing/routes'
 import { generateBaseMetadata, SITE_PUBLIC_URL, SITE_WEBSITE_ID } from '../../lib/seo/seo-config'
@@ -9,7 +10,6 @@ import { getNetworkBrandsForGroup } from '../../lib/site/network-brands'
 import { generateDisabledRouteMetadata } from '../../lib/site/route-feature-gates'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
-import { Card, CardContent } from '@/components/directory/card'
 
 export const dynamic = 'force-static'
 

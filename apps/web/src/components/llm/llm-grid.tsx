@@ -1,7 +1,7 @@
 'use client'
 
-import { cn } from '@/lib/utils'
 import { DirectoryProductList } from '@/components/directory/directory-product-list'
+import { cn } from '@/lib/utils'
 import type { WebsiteRelatedCardMetadata } from '../../lib/directory/content-query'
 import { CompactListingCard, ListingCard } from './listing-card'
 

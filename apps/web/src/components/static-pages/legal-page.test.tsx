@@ -1,7 +1,7 @@
-import { Breadcrumb } from '@/components/layout/breadcrumb'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Breadcrumb } from '@/components/layout/breadcrumb'
 import { LegalStaticPage } from './legal-page'
 
 function breadcrumbItems(markup: string): unknown[] {

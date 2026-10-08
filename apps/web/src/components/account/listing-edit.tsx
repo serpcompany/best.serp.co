@@ -1,5 +1,11 @@
 'use client'
 
+import { ExternalLink, MessageSquare, Pencil, Trash2 } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { type ReactNode, useState } from 'react'
+import { toast } from 'sonner'
+import { ProductLogo, ToneAlert } from '@/components/submit/submit-ui'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,22 +17,10 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { FieldGroup } from '@/components/ui/field'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
-import { ExternalLink, MessageSquare, Pencil, Trash2 } from 'lucide-react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { type ReactNode, useState } from 'react'
-import { toast } from 'sonner'
-import { ProductLogo, ToneAlert } from '@/components/submit/submit-ui'
 import { formatDay, formatStamp } from '@/lib/account/format'
 import { hostOf } from '@/lib/submissions/contract'
 import { discardRevision, saveRevision } from './account-api'

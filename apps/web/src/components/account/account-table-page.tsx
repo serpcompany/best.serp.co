@@ -1,4 +1,8 @@
 import type { AccountOverview } from '@serpdirectory/data-ops/account'
+import { Inbox, Plus, Search } from 'lucide-react'
+import Link from 'next/link'
+import type { ReactElement } from 'react'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -9,10 +13,6 @@ import {
   EmptyMedia,
   EmptyTitle
 } from '@/components/ui/empty'
-import { Inbox, Plus, Search } from 'lucide-react'
-import Link from 'next/link'
-import type { ReactElement } from 'react'
-import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { accountBadgeTarget, badgePanelCopy, badgeSiteName } from '@/lib/account/presentation'
 import { type AccountRow, accountCards, accountRows } from '@/lib/account/view'
 import { ordersEnabled } from '@/lib/billing/runtime'

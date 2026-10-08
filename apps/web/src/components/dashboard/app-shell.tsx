@@ -1,6 +1,6 @@
 'use client'
 
-import { cn } from '@/lib/utils'
+import React, { type CSSProperties, type ReactNode } from 'react'
 import {
   Sidebar,
   SidebarContent,
@@ -11,7 +11,7 @@ import {
   SidebarRail,
   useSidebar
 } from '@/components/ui/sidebar'
-import React, { type CSSProperties, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 
 /**
  * The signed-in dashboard frame shared by `/account` (shadcn dashboard-01: `variant="inset"`,

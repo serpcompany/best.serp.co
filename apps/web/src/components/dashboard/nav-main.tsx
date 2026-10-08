@@ -1,6 +1,9 @@
 'use client'
 
-import { cn } from '@/lib/utils'
+import type { LucideIcon } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import React, { type ComponentProps, type ReactNode } from 'react'
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -11,10 +14,7 @@ import {
   SidebarMenuItem,
   useSidebar
 } from '@/components/ui/sidebar'
-import type { LucideIcon } from 'lucide-react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import React, { type ComponentProps, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 
 export interface DashboardNavItem {
   title: string

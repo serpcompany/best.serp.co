@@ -1,5 +1,3 @@
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
 import {
   Ban,
   CircleAlert,
@@ -14,6 +12,8 @@ import {
   Undo2
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 /**
  * Status badges from the #70 mockups: dashboard-01's pattern, an outline Badge with a colored

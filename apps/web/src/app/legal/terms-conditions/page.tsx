@@ -1,6 +1,6 @@
-import { Breadcrumb } from '@/components/layout/breadcrumb'
 import type { Metadata } from 'next'
 import { components } from '@/components/content/mdx-components'
+import { Breadcrumb } from '@/components/layout/breadcrumb'
 import { generateLegalPageMetadata, LegalStaticPage } from '@/components/static-pages/legal-page'
 import { getLegalContent } from '@/lib/content-loader'
 import { getRoute } from '@/lib/routing/routes'

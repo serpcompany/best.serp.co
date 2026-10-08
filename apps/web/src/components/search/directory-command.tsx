@@ -1,8 +1,14 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList
+} from '@/components/ui/command'
 import { cn } from '@/lib/utils'
-import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command'
 
 // Source reference: adapted from ShadcnBlocks command-command-standard-5 and command-command-popover-5.
 interface DirectoryCommandItem {

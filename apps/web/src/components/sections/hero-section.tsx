@@ -1,14 +1,11 @@
-import { Button } from '@/components/ui/button'
-import {
-  DirectoryHero,
-  DirectoryHeroContainer
-} from './directory-home-section'
 import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
 import { AnimatedBackground } from '../ui/animated-background'
+import { DirectoryHero, DirectoryHeroContainer } from './directory-home-section'
 
 interface HeroSectionProps {
   websiteCount: number

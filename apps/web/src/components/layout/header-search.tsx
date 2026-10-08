@@ -1,13 +1,13 @@
 'use client'
+import { useRef } from 'react'
+import { siteCopy } from '../../lib/site/site-copy'
+import { SearchAutocomplete } from '../search/search-autocomplete'
+import { SearchInput } from '../search/search-input'
 import {
   DirectoryApplicationMobileSearchBackdrop,
   DirectoryApplicationMobileSearchPanel,
   DirectoryApplicationSearchColumn
 } from './directory-application-shell'
-import { useRef } from 'react'
-import { siteCopy } from '../../lib/site/site-copy'
-import { SearchAutocomplete } from '../search/search-autocomplete'
-import { SearchInput } from '../search/search-input'
 
 interface DesktopSearchFormProps {
   availableCategorySlugs: string[]

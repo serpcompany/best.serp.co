@@ -1,6 +1,6 @@
-import { cn } from '@/lib/utils'
 import type { MDXComponents } from 'mdx/types'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import { withDubVia } from '../../lib/analytics/dub-via'
 
 export const components: MDXComponents = {

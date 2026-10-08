@@ -1,5 +1,12 @@
 'use client'
 
+import { ArrowRight, BadgeCheck, Copy, MessageSquare, ShieldCheck } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { formatWait } from '@/components/auth/sign-in-api'
+import { type BadgeOutcome, badgeCheckResultAlert } from '@/components/submit/badge-step'
+import { call } from '@/components/submit/submit-api'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,32 +34,14 @@ import {
   FieldTitle
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot
-} from '@/components/ui/input-otp'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemTitle
-} from '@/components/ui/item'
+import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from '@/components/ui/input-otp'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item'
 import { Progress } from '@/components/ui/progress'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useIsMobile } from '@/hooks/use-mobile'
-import { ArrowRight, BadgeCheck, Copy, MessageSquare, ShieldCheck } from 'lucide-react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
-import { formatWait } from '@/components/auth/sign-in-api'
-import { type BadgeOutcome, badgeCheckResultAlert } from '@/components/submit/badge-step'
-import { call } from '@/components/submit/submit-api'
 import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 /**
  * Claiming a listing (serpcompany/best.serp.co#67, #70 screens 8 and 9a): the sidebar's "Claim

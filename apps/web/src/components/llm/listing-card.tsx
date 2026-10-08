@@ -1,12 +1,12 @@
 'use client'
 
-import { cn } from '@/lib/utils'
+import Link from 'next/link'
 import {
   DirectoryProductBadge,
   DirectoryProductCard,
   DirectoryProductRow
 } from '@/components/directory/directory-product-list'
-import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import type { WebsiteRelatedCardMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import { FavoriteButton } from '../ui/favorite-button'

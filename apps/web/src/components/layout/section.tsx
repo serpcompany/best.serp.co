@@ -1,4 +1,6 @@
-import { Button } from '@/components/ui/button'
+import { ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+import type { ReactNode } from 'react'
 import {
   DirectoryPageSection,
   DirectorySectionAction,
@@ -6,9 +8,7 @@ import {
   DirectorySectionHeader,
   DirectorySectionTitle
 } from '@/components/sections/directory-home-section'
-import { ArrowRight } from 'lucide-react'
-import Link from 'next/link'
-import type { ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
 
 export type SectionProps = {
   title: string

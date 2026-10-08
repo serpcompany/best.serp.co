@@ -1,5 +1,9 @@
 'use client'
 
+import { ArrowRight, Check, Info, Lock, Pencil } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,14 +23,10 @@ import {
   ItemMedia,
   ItemTitle
 } from '@/components/ui/item'
-import { cn } from '@/lib/utils'
 import { Spinner } from '@/components/ui/spinner'
-import { ArrowRight, Check, Info, Lock, Pencil } from 'lucide-react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
 import { featureCopy } from '@/lib/feature-copy'
 import { hostOf, type SubmissionSummary } from '@/lib/submissions/contract'
+import { cn } from '@/lib/utils'
 import { chooseFreePlan } from './submit-api'
 import { ProductLogo, StepProgress, SubmissionStatusBadge, ToneAlert } from './submit-ui'
 

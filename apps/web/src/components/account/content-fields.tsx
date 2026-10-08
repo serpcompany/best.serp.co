@@ -1,5 +1,7 @@
 'use client'
 
+import { ImageIcon } from 'lucide-react'
+import { ProductLogo } from '@/components/submit/submit-ui'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import {
@@ -10,8 +12,6 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ImageIcon } from 'lucide-react'
-import { ProductLogo } from '@/components/submit/submit-ui'
 import { SUBMISSION_FIELD_LIMITS } from '@/lib/submissions/contract'
 
 /**

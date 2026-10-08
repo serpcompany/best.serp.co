@@ -1,13 +1,8 @@
 'use client'
 
-import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  DirectoryNavigationItem,
-  DirectoryNavigationSection,
-  directoryNavigationInteractiveClassName
-} from './directory-navigation'
 import { ExternalLink } from 'lucide-react'
 import Link from 'next/link'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { resolveCategories } from '../../lib/directory/categories'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
@@ -15,6 +10,11 @@ import { getRoute } from '../../lib/routing/routes'
 import { externalResources } from '../../lib/site/external-resources'
 import { siteConfig } from '../../lib/site/site-config'
 import { FavoritesLink } from '../ui/favorites-link'
+import {
+  DirectoryNavigationItem,
+  DirectoryNavigationSection,
+  directoryNavigationInteractiveClassName
+} from './directory-navigation'
 
 export interface AppSidebarProps {
   availableCategorySlugs?: string[]

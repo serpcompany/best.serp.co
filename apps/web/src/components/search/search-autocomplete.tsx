@@ -1,9 +1,5 @@
 'use client'
 
-import {
-  DirectoryCommand,
-  type DirectoryCommandItem
-} from './directory-command'
 import { ArrowRight, Clock, Search, TrendingUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -13,6 +9,7 @@ import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import { SEARCH_API_PATH, searchResponseSchema } from '../../lib/directory/search-contract'
 import { getRoute } from '../../lib/routing/routes'
 import { useAnalyticsEvents } from '../layout/root-shell-client'
+import { DirectoryCommand, type DirectoryCommandItem } from './directory-command'
 import { Favicon } from './favicon'
 
 interface SearchSuggestion {

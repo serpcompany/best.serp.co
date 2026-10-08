@@ -1,5 +1,15 @@
 'use client'
 
+import { flexRender, type Table as TanstackTable } from '@tanstack/react-table'
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  PlusCircle
+} from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,7 +21,6 @@ import {
   CommandList,
   CommandSeparator
 } from '@/components/ui/command'
-import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
@@ -29,16 +38,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table'
-import { flexRender, type Table as TanstackTable } from '@tanstack/react-table'
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  PlusCircle
-} from 'lucide-react'
-import type { ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 
 /**
  * The data-table pieces of the #70 admin mockups (shadcn data-table and dashboard-01): a

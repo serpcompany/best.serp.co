@@ -1,9 +1,5 @@
 'use client'
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
-import { Progress } from '@/components/ui/progress'
 import {
   CircleAlert,
   CircleCheck,
@@ -17,8 +13,12 @@ import {
   Undo2
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { ListingImage } from '@/components/ui/listing-image'
+import { Progress } from '@/components/ui/progress'
 import type { SubmissionStatusName } from '@/lib/submissions/contract'
+import { cn } from '@/lib/utils'
 
 /**
  * Building blocks shared by the submit pages (#70 screens 2, 2b, 3) and the account table:

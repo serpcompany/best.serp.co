@@ -1,8 +1,3 @@
-import {
-  DirectoryFeatureGrid,
-  DirectoryLinkList,
-  DirectoryLinkListItem
-} from './directory-home-section'
 import { ExternalLink } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -10,6 +5,11 @@ import type { ComponentType, ReactNode } from 'react'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { externalResources } from '../../lib/site/external-resources'
 import { Section } from '../layout/section'
+import {
+  DirectoryFeatureGrid,
+  DirectoryLinkList,
+  DirectoryLinkListItem
+} from './directory-home-section'
 
 export interface ExternalResourcesSectionProps {
   layout?: 'default' | 'compact'

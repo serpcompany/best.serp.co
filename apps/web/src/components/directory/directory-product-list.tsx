@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
-import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 // Source reference: adapted from ShadcnBlocks product-list3 and product-list5.
 interface DirectoryProductCardProps {

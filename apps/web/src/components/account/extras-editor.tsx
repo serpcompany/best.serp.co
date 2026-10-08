@@ -1,18 +1,13 @@
 'use client'
 
+import { Plus, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  FieldDescription,
-  FieldError,
-  FieldLegend,
-  FieldSet
-} from '@/components/ui/field'
+import { FieldDescription, FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, X } from 'lucide-react'
 import { ACCOUNT_EXTRAS_LIMITS, type ExtrasInput, linkUrlProblem } from '@/lib/account/contract'
+import { cn } from '@/lib/utils'
 
 /**
  * The FAQs and Links fieldsets of #70 screen 7 (FieldSet with Item rows): each FAQ is a question

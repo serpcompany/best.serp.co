@@ -1,11 +1,12 @@
 'use client'
 
+import { ChevronsUpDown, Copy, RefreshCw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { ToneAlert } from '@/components/submit/submit-ui'
 import { Button } from '@/components/ui/button'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from '@/components/ui/collapsible'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   Drawer,
   DrawerContent,
@@ -24,13 +25,8 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table'
-import { useIsMobile } from '@/hooks/use-mobile'
-import { ChevronsUpDown, Copy, RefreshCw } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
-import { ToneAlert } from '@/components/submit/submit-ui'
 import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { formatFull, formatWhen } from '@/lib/account/format'
 import { type AccountRow, badgeResultLabel } from '@/lib/account/view'
 import { hostOf, VERIFICATION_COOLDOWN_SECONDS } from '@/lib/submissions/contract'

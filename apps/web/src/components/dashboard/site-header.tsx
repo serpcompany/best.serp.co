@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+import React, { Fragment, type ReactNode } from 'react'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -10,8 +12,6 @@ import {
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-import Link from 'next/link'
-import React, { Fragment, type ReactNode } from 'react'
 
 export interface DashboardCrumb {
   label: string

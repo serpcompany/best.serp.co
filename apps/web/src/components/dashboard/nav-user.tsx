@@ -1,5 +1,8 @@
 'use client'
 
+import { EllipsisVertical, LogOut, type LucideIcon } from 'lucide-react'
+import Link from 'next/link'
+import React from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -16,9 +19,6 @@ import {
   SidebarMenuItem,
   useSidebar
 } from '@/components/ui/sidebar'
-import { EllipsisVertical, LogOut, type LucideIcon } from 'lucide-react'
-import Link from 'next/link'
-import React from 'react'
 
 export interface DashboardUser {
   email: string

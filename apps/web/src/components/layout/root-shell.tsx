@@ -1,4 +1,3 @@
-import { DesignSystemProvider } from './design-system-provider'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import {
@@ -9,6 +8,7 @@ import {
   SITE_TAGLINE,
   SITE_URL
 } from '../../lib/seo/seo-config'
+import { DesignSystemProvider } from './design-system-provider'
 import {
   AnalyticsTracker,
   BackToTop,

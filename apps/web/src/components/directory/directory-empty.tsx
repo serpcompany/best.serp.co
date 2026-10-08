@@ -1,5 +1,4 @@
 import type { ComponentType, ReactNode, SVGProps } from 'react'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   Empty,
@@ -9,6 +8,7 @@ import {
   EmptyMedia,
   EmptyTitle
 } from '@/components/ui/empty'
+import { cn } from '@/lib/utils'
 
 // Source reference: adapted from ShadcnBlocks empty-empty-search-5 and empty-empty-actions-1.
 interface DirectoryEmptyAction {

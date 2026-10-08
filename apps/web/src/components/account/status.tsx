@@ -1,5 +1,3 @@
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
 import {
   CircleCheck,
   CircleMinus,
@@ -12,7 +10,9 @@ import {
   Undo2
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Badge } from '@/components/ui/badge'
 import type { AccountStatus } from '@/lib/account/view'
+import { cn } from '@/lib/utils'
 
 /**
  * The dashboard's status chips (#70 screen 5 and its legend): dashboard-01's outline Badge with

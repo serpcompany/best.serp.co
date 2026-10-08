@@ -1,5 +1,7 @@
 'use client'
 
+import { Filter, X } from 'lucide-react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -7,8 +9,6 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { Filter, X } from 'lucide-react'
-import { useState } from 'react'
 import { getCategoryBySlug, resolveCategories } from '../../lib/directory/categories'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 

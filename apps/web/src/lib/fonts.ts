@@ -1,6 +1,6 @@
-import { cn } from './utils'
 import { GeistMono } from 'geist/font/mono'
 import { GeistSans } from 'geist/font/sans'
+import { cn } from './utils'
 
 export const fontSans = GeistSans
 export const fontMono = GeistMono
