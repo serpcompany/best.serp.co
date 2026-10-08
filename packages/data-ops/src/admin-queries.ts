@@ -1,5 +1,6 @@
 import { selectAdminAllowlistPlan } from './admin-plans'
 import type { Database } from './client'
+import { toInstant } from './instants'
 import { listingWebsiteConflicts } from './listing-plans'
 import type { StatementPlan } from './plan-support'
 import type {
@@ -470,24 +471,7 @@ export function selectActiveCategoriesPlan(): StatementPlan {
 // ---------------------------------------------------------------------------------------------
 // DTOs and the read operations
 
-/**
- * D1 rows hold two time formats: `CURRENT_TIMESTAMP` defaults (`YYYY-MM-DD HH:MM:SS`, UTC) and
- * ISO instants written by plans; Better Auth writes epoch milliseconds. All become ISO instants.
- */
-export function toInstant(value: unknown): string | null {
-  if (value === null || value === undefined || value === '') return null
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? new Date(value).toISOString() : null
-  }
-  const text = String(value)
-  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/u.test(text)
-    ? `${text.replace(' ', 'T')}Z`
-    : /^\d{4}-\d{2}-\d{2}$/u.test(text)
-      ? `${text}T00:00:00Z`
-      : text
-  const time = Date.parse(normalized)
-  return Number.isNaN(time) ? null : new Date(time).toISOString()
-}
+export { toInstant }
 
 function text(value: unknown): string {
   return value === null || value === undefined ? '' : String(value)

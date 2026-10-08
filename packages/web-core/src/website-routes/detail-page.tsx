@@ -117,7 +117,9 @@ export async function generateWebsiteDetailRouteMetadata(
     description: seoDescription,
     slug: project.slug,
     additionalKeywords: keywords,
-    publishedAt: project.publishedAt
+    publishedAt: project.publishedAt,
+    // Open Graph `modifiedTime`, the same value as JSON-LD `dateModified` (#218).
+    updatedAt: project.modifiedAt
   })
 }
 

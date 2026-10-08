@@ -459,6 +459,9 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       expect(await robots.text()).toContain(`Sitemap: ${absoluteUrl('/sitemap-index.xml')}`)
     else expect(await robots.text()).toBe('User-agent: *\nDisallow: /\n')
 
+    // Every index entry carries its newest child's lastmod, from D1 (#218).
+    const index = await (await request.get('/sitemap-index.xml')).text()
+    expect(index.match(/<lastmod>\d{4}-\d{2}-\d{2}T[\d:.]+Z<\/lastmod>/gu)).toHaveLength(3)
     // Root-level child sitemaps (#167); the old URLs and /sitemap.xml answer one 308.
     expect(await getSitemap(request, '/sitemap-index.xml')).toEqual([
       absoluteUrl('/sitemap-pages.xml'),

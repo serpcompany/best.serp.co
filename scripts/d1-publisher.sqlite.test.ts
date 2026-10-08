@@ -513,6 +513,10 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
       })
       expect(publication.affectedRoutes.split('\n')).toContain('/products/old-slug/')
       expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 5 })
+      // Re-hosting media leaves the page as it was, so its lastmod stays (#218).
+      expect(
+        db.prepare("SELECT updated_at FROM listings WHERE id='lst_sqlite_test'").get()
+      ).not.toEqual({ updated_at: now })
     })
 
     it('drops every image of a listing that has none left, and rolls back when media changed', () => {
@@ -648,6 +652,9 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
       expect(publication.affectedRoutes.split('\n')).toEqual(
         expect.arrayContaining(['/products/old-slug/', '/products/categories/adult/'])
       )
+      expect(
+        db.prepare("SELECT updated_at FROM listings WHERE id='lst_sqlite_test'").get()
+      ).toEqual({ updated_at: now })
       // The rows no longer match: the same operation is refused, nothing written.
       expect(() =>
         executeInTestTransaction(

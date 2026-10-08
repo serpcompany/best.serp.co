@@ -25,7 +25,10 @@ export function categoryRoute(slug: string): string {
   return joinRoute(site.sitemap.categoryBasePath ?? 'categories', slug)
 }
 
-/** Sitemap files whose content changes when listings or categories change. */
+/**
+ * Sitemap files whose content changes when listings or categories change; the pages sitemap
+ * too, since its catalog pages carry the newest listing's lastmod (#218).
+ */
 export function catalogSitemapRoutes(): string[] {
-  return [SITEMAP_INDEX_PATH, sitemapPaths.products, sitemapPaths.categories]
+  return [SITEMAP_INDEX_PATH, sitemapPaths.pages, sitemapPaths.products, sitemapPaths.categories]
 }

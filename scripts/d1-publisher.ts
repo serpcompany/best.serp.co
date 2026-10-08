@@ -835,7 +835,10 @@ export function buildPublicationPlan(
             categorySlugToAdd
           ),
           statement(CHANGED_ONE_GUARD)
-        ])
+        ]),
+        // The page shows its categories, so it changed: sitemap lastmod and dateModified (#218).
+        statement('UPDATE listings SET updated_at=? WHERE id=?', now, op.id),
+        statement(CHANGED_ONE_GUARD)
       )
       routes.add(listingRoute(op.slug))
       addCategories([...op.expected, ...op.add])
@@ -876,6 +879,8 @@ export function buildPublicationPlan(
             image.height
           )
         )
+        // No `updated_at` (#218): these manifests re-host the same logo and images, as the media
+        // cron does, so the page looks the same and its lastmod should not move.
       )
       routes.add(listingRoute(op.slug))
     }

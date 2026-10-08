@@ -111,6 +111,11 @@ export interface ListingSummary {
   featured?: boolean
   isUnofficial?: boolean
   media?: ListingLogoMedia
+  /**
+   * When the public listing last changed: the later of `published_at` and `updated_at`, as an
+   * ISO instant. Sitemap `lastmod` and JSON-LD `dateModified` (#218).
+   */
+  modifiedAt: string
   name: string
   publishedAt: string
   slug: string
@@ -168,12 +173,14 @@ export interface UnpublishedListing {
 
 /**
  * One page of listings in directory (name) order, optionally within one category.
- * `firstPublishedAt` / `lastPublishedAt` span the whole collection, not just the page.
+ * `firstPublishedAt` / `lastPublishedAt` / `lastModifiedAt` span the whole collection, not just
+ * the page; `lastModifiedAt` is the newest `modifiedAt` among its listings (#218).
  */
 export interface ListingNamePage {
   category: string | null
   firstPublishedAt: string | null
   items: ListingSummary[]
+  lastModifiedAt: string | null
   lastPublishedAt: string | null
   page: number
   pageCount: number

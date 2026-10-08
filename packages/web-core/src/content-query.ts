@@ -25,6 +25,8 @@ export interface WebsiteMetadata {
   category: string
   categories?: string[]
   publishedAt: string
+  /** When the listing last changed, an ISO instant (D1 `updated_at` or `published_at`, #218). */
+  modifiedAt?: string
   entityType?: string
   isUnofficial?: boolean
   featured?: boolean

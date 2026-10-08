@@ -10,10 +10,24 @@ import {
 
 const origin = 'https://best.serp.co'
 const websites = [
-  { category: 'video-downloaders', publishedAt: '2026-05-16', slug: 'autoenhance.ai' },
+  {
+    category: 'video-downloaders',
+    modifiedAt: '2026-09-30T12:00:00.000Z',
+    publishedAt: '2026-05-16',
+    slug: 'autoenhance.ai'
+  },
   // The catch-all category is a page like any other, so its sitemap lists it.
-  { category: 'other', publishedAt: '2026-05-17', slug: 'example-product' }
+  { category: 'other', publishedAt: '2026-05-17', slug: 'example-product' },
+  // A secondary category counts too: it moves `other`'s lastmod.
+  {
+    categories: ['video-downloaders', 'other'],
+    category: 'video-downloaders',
+    modifiedAt: '2026-08-01T00:00:00.000Z',
+    publishedAt: '2026-05-01',
+    slug: 'both-categories'
+  }
 ]
+const loaders = { getWebsites: () => websites }
 
 function locations(xml: string): string[] {
   return [...xml.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(match => match[1] ?? '')
@@ -21,7 +35,7 @@ function locations(xml: string): string[] {
 
 describe('sitemaps and absolute URLs', () => {
   it('lists the homepage as the bare origin and every other page with a slash', async () => {
-    const pages = locations(await createPagesSitemapResponse().text())
+    const pages = locations(await (await createPagesSitemapResponse(loaders)).text())
     expect(pages[0]).toBe(origin)
     expect(pages).not.toContain(`${origin}/`)
     for (const location of pages.slice(1)) {
@@ -37,7 +51,8 @@ describe('sitemaps and absolute URLs', () => {
     )
     expect(listings).toEqual([
       `${origin}/products/autoenhance.ai/`,
-      `${origin}/products/example-product/`
+      `${origin}/products/example-product/`,
+      `${origin}/products/both-categories/`
     ])
     const categories = locations(
       await (await createTaxonomiesSitemapResponse({ getWebsites: () => websites })).text()
@@ -50,24 +65,43 @@ describe('sitemaps and absolute URLs', () => {
 
   it('points robots.txt and the index at the root-level sitemap files (#167)', async () => {
     expect(createCanonicalRobots().sitemap).toBe(`${origin}/sitemap-index.xml`)
-    expect(locations(await createSitemapIndexResponse().text())).toEqual([
+    expect(locations(await (await createSitemapIndexResponse(loaders)).text())).toEqual([
       `${origin}/sitemap-pages.xml`,
       `${origin}/sitemap-products.xml`,
       `${origin}/sitemap-categories.xml`
     ])
   })
 
-  it('writes no lastmod it cannot back with data', async () => {
-    const pages = await createPagesSitemapResponse().text()
-    const index = await createSitemapIndexResponse().text()
-    const categories = await (
-      await createTaxonomiesSitemapResponse({ getWebsites: () => websites })
-    ).text()
-    for (const xml of [pages, index, categories]) expect(xml).not.toContain('<lastmod>')
-    const listings = await (
-      await createListingsSitemapResponse({ getWebsites: () => websites })
-    ).text()
-    expect(listings).toContain('<lastmod>2026-05-16T00:00:00.000Z</lastmod>')
+  it('takes lastmod from D1, and writes none for a page whose content is code (#218)', async () => {
+    const entries = (xml: string) =>
+      Object.fromEntries(
+        [...xml.matchAll(/<loc>([^<]+)<\/loc>(?:<lastmod>([^<]+)<\/lastmod>)?/gu)].map(match => [
+          match[1],
+          match[2]
+        ])
+      )
+    // A listing's modifiedAt, or its publication date when it never changed.
+    expect(entries(await (await createListingsSitemapResponse(loaders)).text())).toEqual({
+      [`${origin}/products/autoenhance.ai/`]: '2026-09-30T12:00:00.000Z',
+      [`${origin}/products/both-categories/`]: '2026-08-01T00:00:00.000Z',
+      [`${origin}/products/example-product/`]: '2026-05-17T00:00:00.000Z'
+    })
+    // A category's newest listing, its secondary listings included.
+    expect(entries(await (await createTaxonomiesSitemapResponse(loaders)).text())).toEqual({
+      [`${origin}/products/categories/other/`]: '2026-08-01T00:00:00.000Z',
+      [`${origin}/products/categories/video-downloaders/`]: '2026-09-30T12:00:00.000Z'
+    })
+    // The catalog pages carry the newest listing; the others none.
+    const pages = entries(await (await createPagesSitemapResponse(loaders)).text())
+    expect(pages[origin]).toBe('2026-09-30T12:00:00.000Z')
+    expect(pages[`${origin}/products/categories/`]).toBe('2026-09-30T12:00:00.000Z')
+    expect(pages[`${origin}/about/`]).toBeUndefined()
+    // Each index entry carries its newest child.
+    expect(entries(await (await createSitemapIndexResponse(loaders)).text())).toEqual({
+      [`${origin}/sitemap-categories.xml`]: '2026-09-30T12:00:00.000Z',
+      [`${origin}/sitemap-pages.xml`]: '2026-09-30T12:00:00.000Z',
+      [`${origin}/sitemap-products.xml`]: '2026-09-30T12:00:00.000Z'
+    })
   })
 
   it('writes the homepage as the bare origin in structured data', () => {

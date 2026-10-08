@@ -141,3 +141,24 @@ describe('listing detail JSON-LD offer', () => {
     expect(softwareNode(schema)).not.toHaveProperty('offers')
   })
 })
+
+describe('listing detail JSON-LD dates (#218)', () => {
+  it('writes dateModified as when the listing last changed, the sitemap lastmod', () => {
+    const schema = generateWebsiteDetailSchema({
+      ...listing,
+      modifiedAt: '2026-09-30T12:00:00.000Z'
+    })
+    for (const type of ['WebPage', 'TechArticle']) {
+      expect(graphNode(schema, type)).toMatchObject({
+        dateModified: '2026-09-30T12:00:00.000Z',
+        datePublished: '2026-05-16'
+      })
+    }
+  })
+
+  it('falls back to the publication date for a listing that never changed', () => {
+    expect(graphNode(generateWebsiteDetailSchema(listing), 'WebPage').dateModified).toBe(
+      '2026-05-16'
+    )
+  })
+})

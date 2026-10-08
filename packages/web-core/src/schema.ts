@@ -23,6 +23,8 @@ export interface WebsiteMetadataLike {
   description: string
   name: string
   publishedAt: string
+  /** When the listing last changed (#218); `dateModified` falls back to `publishedAt`. */
+  modifiedAt?: string
   media?: {
     images?: string[]
     logo?: string
@@ -147,7 +149,7 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
           ? { primaryImageOfPage: { '@type': 'ImageObject', url: primaryImageUrl } }
           : {}),
         datePublished: website.publishedAt,
-        dateModified: website.publishedAt,
+        dateModified: website.modifiedAt ?? website.publishedAt,
         breadcrumb: {
           '@id': `${pageUrl}#breadcrumb`
         }
@@ -197,7 +199,7 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
         headline: `${website.name} Overview`,
         description: `${website.description} Explore ${website.name}'s ${listingLabel}, resource links, and related context.`,
         datePublished: website.publishedAt,
-        dateModified: website.publishedAt,
+        dateModified: website.modifiedAt ?? website.publishedAt,
         author: {
           '@type': 'Organization',
           name: SITE_NAME,

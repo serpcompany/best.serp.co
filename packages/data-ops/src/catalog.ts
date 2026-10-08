@@ -28,14 +28,16 @@ import type {
   RelatedListing,
   UnpublishedListing
 } from './contracts'
+import { latestInstant } from './instants'
 import { listingSlugRedirects, listings } from './schema'
 
 /**
- * v6: listing details carry `faqs` (#105); v5: a hosted logo or image is its media key (#95),
+ * v7: listing summaries carry `modifiedAt`, and directory pages `lastModifiedAt` (#218); v6:
+ * listing details carry `faqs` (#105); v5: a hosted logo or image is its media key (#95),
  * which the web adapter turns into a URL on the environment's media host; v4 added `linkRel`
  * and `verifiedOwner` (#62).
  */
-const CACHE_SCHEMA = 'v6'
+const CACHE_SCHEMA = 'v7'
 /**
  * Keys include the catalog epoch (publication version plus the latest public
  * `published_at`), so an entry can never outlive the content it was built from; the TTL
@@ -102,6 +104,7 @@ interface SummaryRow {
   name: string
   published_at: string
   slug: string
+  updated_at: string | null
   website: string
 }
 
@@ -145,6 +148,7 @@ interface NameOrderRow {
   id: string
   name: string
   published_at: string
+  updated_at: string | null
 }
 
 interface ShellRow {
@@ -192,6 +196,7 @@ const summaryColumns = `
   l.is_unofficial,
   l.is_featured,
   l.published_at,
+  l.updated_at,
   (
     SELECT c.slug
     FROM listing_categories lc
@@ -237,6 +242,8 @@ function parseJsonArray(value: string, field: string): unknown[] {
 
 function mapSummary(row: SummaryRow): ListingSummary {
   const category = requireString(row.category, 'primary category')
+  const modifiedAt = latestInstant(row.published_at, row.updated_at)
+  if (!modifiedAt) throw new Error(`Invalid D1 listing ${row.slug}: publication date.`)
   const categories = (row.categories || '')
     .split(String.fromCharCode(31))
     .filter(Boolean)
@@ -251,6 +258,7 @@ function mapSummary(row: SummaryRow): ListingSummary {
     featured: row.is_featured === 1 || undefined,
     isUnofficial: row.is_unofficial === 1 || undefined,
     media: row.logo ? { logo: requireString(row.logo, 'listing logo') } : undefined,
+    modifiedAt,
     name: requireString(row.name, 'listing name'),
     publishedAt: requireString(row.published_at, 'publication date').slice(0, 10),
     slug: requireString(row.slug, 'listing slug'),
@@ -382,6 +390,8 @@ function isListingSummary(value: unknown): value is ListingSummary {
     isOptionalBoolean(candidate.featured) &&
     isOptionalBoolean(candidate.isUnofficial) &&
     isLogoMedia(candidate.media) &&
+    typeof candidate.modifiedAt === 'string' &&
+    candidate.modifiedAt.length > 0 &&
     typeof candidate.name === 'string' &&
     candidate.name.length > 0 &&
     typeof candidate.publishedAt === 'string' &&
@@ -498,6 +508,7 @@ function isDetailCacheEntry(value: unknown, publicationVersion: number): value i
 interface NameOrderEntry {
   firstPublishedAt: string | null
   ids: string[]
+  lastModifiedAt: string | null
   lastPublishedAt: string | null
   publicationVersion: number
 }
@@ -519,6 +530,7 @@ function isNameOrderEntry(value: unknown, publicationVersion: number): value is 
     Array.isArray(candidate.ids) &&
     candidate.ids.every(id => typeof id === 'string' && id.length > 0) &&
     isNullableString(candidate.firstPublishedAt) &&
+    isNullableString(candidate.lastModifiedAt) &&
     isNullableString(candidate.lastPublishedAt)
   )
 }
@@ -533,6 +545,7 @@ function isNamePageEntry(value: unknown, publicationVersion: number): value is N
     typeof page === 'object' &&
     (page.category === null || (typeof page.category === 'string' && page.category.length > 0)) &&
     isNullableString(page.firstPublishedAt) &&
+    isNullableString(page.lastModifiedAt) &&
     isNullableString(page.lastPublishedAt) &&
     Array.isArray(page.items) &&
     page.items.every(isListingSummary) &&
@@ -1157,14 +1170,14 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       'listing-name-order',
       category === null
         ? parameterizedQuery<NameOrderRow>(
-            `SELECT l.id, l.name, l.published_at
+            `SELECT l.id, l.name, l.published_at, l.updated_at
             FROM listings l
             WHERE ${publicEligibilitySql()}
             ORDER BY ${PUBLICATION_ORDER}`,
             [asOf]
           )
         : parameterizedQuery<NameOrderRow>(
-            `SELECT l.id, l.name, l.published_at
+            `SELECT l.id, l.name, l.published_at, l.updated_at
             FROM categories c
             CROSS JOIN listing_categories lc INDEXED BY listing_categories_category_idx
               ON lc.category_id = c.id
@@ -1177,14 +1190,17 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     const ordered = rows
       .map(orderRow => ({
         id: requireString(orderRow.id, 'listing id'),
+        modifiedAt: latestInstant(orderRow.published_at, orderRow.updated_at),
         name: requireString(orderRow.name, 'listing name'),
         publishedAt: requireString(orderRow.published_at, 'publication date').slice(0, 10)
       }))
       .sort((left, right) => nameCollator.compare(left.name, right.name))
     const dates = ordered.map(entry => entry.publishedAt).sort()
+    const modified = ordered.flatMap(entry => (entry.modifiedAt ? [entry.modifiedAt] : [])).sort()
     const entry: NameOrderEntry = {
       firstPublishedAt: dates[0] ?? null,
       ids: ordered.map(orderEntry => orderEntry.id),
+      lastModifiedAt: modified.at(-1) ?? null,
       lastPublishedAt: dates.at(-1) ?? null,
       publicationVersion
     }
@@ -1229,6 +1245,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         const item = byId.get(id)
         return item ? [item] : []
       }),
+      lastModifiedAt: order.lastModifiedAt,
       lastPublishedAt: order.lastPublishedAt,
       page,
       pageCount: Math.max(1, Math.ceil(order.ids.length / pageSize)),
