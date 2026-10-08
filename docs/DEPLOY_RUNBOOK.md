@@ -84,21 +84,8 @@ account-wide token goes. Until then, a leak reaches both.
 Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "Staging deploy
 skipped" notice. After they exist, the next push to `staging` deploys staging. The
 `BETTER_AUTH_SECRET` secret and the `/admin` Access app: [Accounts](./ACCOUNTS.md).
-
-### Cloudflare Web Analytics
-
-Production loads the Cloudflare Web Analytics beacon next to Google Tag Manager once it has a
-site token (#170). Until then it renders no beacon.
-
-1. In the Cloudflare dashboard, open Web Analytics and add the site `best.serp.co`. Pick the
-   JavaScript snippet setup. Leave automatic injection off: the Worker renders the beacon
-   itself, so injection would add a second one.
-2. Copy the `token` from the snippet (32 hex characters; public, not a secret) into
-   `env.production.vars.CF_WEB_ANALYTICS_TOKEN` in `apps/web/wrangler.jsonc`, through a pull
-   request. Staging and local never set it.
-3. After the production deploy, best.serp.co's HTML ends with a
-   `static.cloudflareinsights.com/beacon.min.js` script; the workers.dev host and staging have
-   none (`analyticsForRequest`, [Architecture](./ARCHITECTURE.md#environments-and-hosts)).
+Error reporting (Sentry) and analytics (GTM, Cloudflare Web Analytics):
+[Telemetry](./TELEMETRY.md).
 
 ## Workflows
 
@@ -142,18 +129,6 @@ through `workflow_run`. A `workflow_run` job receives the default branch head as
 GITHUB_SHA` check, and a slow validation of an older commit could deploy after a newer one.
 PR Review already gates every merge, and Main Validation re-runs the full loop on the same
 `staging` or `main` commit in parallel.
-
-## Error reporting (Sentry)
-
-Sentry reports errors from the Worker (`apps/web/instrumentation.ts`, server rendering and
-route handlers) and the browser (`instrumentation-client.ts`), with the settings and the
-scrubber in `apps/web/lib/telemetry/sentry.ts`: errors only, with no PII, query strings,
-cookies, headers, console output, logger data, sessions, tracing, or replay. Both deploy
-builds bake in `NEXT_PUBLIC_SENTRY_DSN` (repo variable `SENTRY_DSN`) and the commit as the
-release; with no DSN, Sentry stays off (E2E sets none). `SENTRY_AUTH_TOKEN` (repo secret,
-project releases scope) and the `SENTRY_PROJECT` variable only upload source maps. The owner
-creates the project and sets all three, then checks that the first staging error's stack
-frames resolve. Worker-entry and cron errors are #210.
 
 ## Production release
 
