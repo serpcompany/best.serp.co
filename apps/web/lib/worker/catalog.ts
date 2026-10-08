@@ -1,6 +1,7 @@
 import {
   catalogEpochToken,
   isUnpublishedListingSlug,
+  legacyRootTarget,
   readCatalogEpoch,
   shareCatalogEpochToken
 } from '@serpdirectory/data-ops/catalog-epoch'
@@ -92,4 +93,23 @@ export function catalogRenderer(
   return goneListingRenderer(render, slug =>
     isUnpublishedListingSlug({ client: createDatabase(database), observe, slug })
   )
+}
+
+/**
+ * Where an old root-level URL moved (`lib/routing/legacy-root.ts`, #168), or undefined without
+ * a valid binding, when the catalog pages fail closed too.
+ */
+export function catalogLegacyRootLookup(
+  env: CatalogWorkerEnv,
+  observe: Observe
+): ((slug: string) => Promise<'category' | 'listing' | null>) | undefined {
+  const database = catalogDatabase(env)
+  if (!database) return undefined
+  return slug =>
+    legacyRootTarget({
+      asOf: new Date().toISOString(),
+      client: createDatabase(database),
+      observe,
+      slug
+    })
 }

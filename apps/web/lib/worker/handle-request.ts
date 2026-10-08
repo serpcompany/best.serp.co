@@ -7,14 +7,15 @@
  *    `*.workers.dev` request without the smoke-test header gets one 308 to best.serp.co
  *    (`lib/routing/canonical-host.ts`).
  * 2. Retired URLs without a replacement (`/news`) answer 410 Gone (`lib/routing/retired-paths.ts`).
- * 3. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
- * 4. Outside public production, `/robots.txt` disallows every crawler.
- * 5. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
+ * 3. An old root-level listing or category URL: one 308 to its page (`lib/routing/legacy-root.ts`).
+ * 4. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
+ * 5. Outside public production, `/robots.txt` disallows every crawler.
+ * 6. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
  *    503, 403, or 401 (`lib/auth/admin-gate.ts`); pages and handlers then require an admin.
- * 6. The local dev endpoints (`/api/dev/*`, `/api/auth/dev/*`) answer 404 unless the Worker was
+ * 7. The local dev endpoints (`/api/dev/*`, `/api/auth/dev/*`) answer 404 unless the Worker was
  *    reached on a local host (#164). This uses the Worker's own URL: inside OpenNext a client's
  *    `X-Forwarded-Host` becomes `Host`, so a check there alone could be talked past.
- * 7. Everything else is served through the edge HTML cache and OpenNext (`serve`).
+ * 8. Everything else is served through the edge HTML cache and OpenNext (`serve`).
  *
  * Every response then carries the configured environment, the Worker version and, outside
  * public production, `X-Robots-Tag: noindex, nofollow` (`lib/environment/site-environment.ts`). These headers are
@@ -42,6 +43,8 @@ export interface WorkerRequestPipeline {
   access?: VerifyAccessOptions
   /** Patterns of the `next.config.ts` moved-URL redirects (from the routes manifest). */
   configRedirects: readonly RegExp[]
+  /** One 308 for an old root-level listing or category URL (`lib/routing/legacy-root.ts`). */
+  legacyRoot?: (request: Request) => Promise<Response | null>
   /** Serves a request through the edge HTML cache and OpenNext. */
   serve: (request: Request) => Promise<Response>
 }
@@ -55,6 +58,7 @@ export async function handleWorkerRequest(
   const response =
     canonicalHostRedirect(request, env, pipeline.configRedirects) ??
     retiredPathResponse(request) ??
+    (await pipeline.legacyRoot?.(request)) ??
     trailingSlashRedirect(request, pipeline.configRedirects) ??
     (publicProduction ? null : nonProductionRobotsTxt(request)) ??
     (await adminGate(request, env, pipeline.access)) ??

@@ -148,12 +148,10 @@ function appRoutes(): RegExp[] {
       const segments = relative(APP_DIRECTORY, directory)
         .split(/[\\/]/u)
         .filter(segment => segment && !/^\(.+\)$/u.test(segment))
-      // Catch-alls answer 404 for unknown paths, and the root `[slug]` page only redirects
-      // legacy listing URLs, so neither makes a link valid.
+      // Catch-alls answer 404 for unknown paths, so they never make a link valid.
       if (segments.some(segment => segment.startsWith('[...') || segment.startsWith('[[...'))) {
         continue
       }
-      if (segments.length === 1 && segments[0] === '[slug]') continue
       const pattern = segments
         .map(segment => (/^\[.+\]$/u.test(segment) ? '[^/]+' : segment.replace(/\./gu, '\\.')))
         .join('/')
