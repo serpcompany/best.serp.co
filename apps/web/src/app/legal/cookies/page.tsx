@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { components } from '@/components/content/mdx-components'
-import { Breadcrumb } from '@/components/layout/breadcrumb'
+import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
 import { generateLegalPageMetadata, LegalStaticPage } from '@/components/static-pages/legal-page'
 import { getLegalContent } from '@/lib/content-loader'
 
@@ -19,7 +19,7 @@ export default async function CookiePolicyPage() {
       content={content}
       mdxComponents={components}
       path="/legal/cookies"
-      slots={{ Breadcrumb }}
+      slots={{ Breadcrumb: SiteBreadcrumb }}
       title="Cookie Policy"
     />
   )

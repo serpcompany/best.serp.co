@@ -10,7 +10,7 @@ import {
   paginatedMetadata,
   parseListingPageParam
 } from '@/components/directory/listing-pagination'
-import { Breadcrumb } from '@/components/layout/breadcrumb'
+import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
 import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@/components/sections/external-resources-section-route'
 import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@/components/sections/featured-guides-section-route'
 import { JsonLd } from '@/components/seo/json-ld'
@@ -114,7 +114,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       FeaturedGuidesSection,
       JsonLd,
       breadcrumb: (
-        <Breadcrumb
+        <SiteBreadcrumb
           items={[
             { name: 'Categories', href: getRoute('category.index') },
             { name: category.name, href: categoryPath }

@@ -9,19 +9,19 @@ import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import { getRoute } from '../../lib/routing/routes'
 import { externalResources } from '../../lib/site/external-resources'
 import { siteConfig } from '../../lib/site/site-config'
-import { FavoritesLink } from '../ui/favorites-link'
+import { FavoritesLink } from '../favorites/favorites-link'
 import {
   DirectoryNavigationItem,
   DirectoryNavigationSection,
   directoryNavigationInteractiveClassName
 } from './directory-navigation'
 
-export interface AppSidebarProps {
+export interface CategoryNavProps {
   availableCategorySlugs?: string[]
   currentCategory?: string
 }
 
-export function AppSidebar({ availableCategorySlugs, currentCategory }: AppSidebarProps) {
+export function CategoryNav({ availableCategorySlugs, currentCategory }: CategoryNavProps) {
   const showExternalResources =
     siteConfig.features.showExternalResources && externalResources.length > 0
   const availableCategories = resolveCategories(availableCategorySlugs || [])

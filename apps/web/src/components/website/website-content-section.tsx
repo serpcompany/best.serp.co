@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import type { WebsiteMetadata } from '../../lib/directory/content-query'
 import { siteCopy } from '../../lib/site/site-copy'
-import { ListingImage } from '../ui/listing-image'
+import { ListingImage } from '../listing/listing-image'
 
 export interface WebsiteContentSectionProps {
   mdxComponents: MDXComponents

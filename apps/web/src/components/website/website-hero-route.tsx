@@ -1,8 +1,8 @@
 import type { ComponentProps } from 'react'
-import { Breadcrumb } from '@/components/layout/breadcrumb'
+import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
 import { Badge } from '@/components/ui/badge'
-import { FavoriteButton } from '../ui/favorite-button'
-import { ListingImage } from '../ui/listing-image'
+import { FavoriteButton } from '../favorites/favorite-button'
+import { ListingImage } from '../listing/listing-image'
 import { VerifiedOwnerBadge } from './verified-owner-badge'
 import {
   WebsiteHero as SharedWebsiteHero,
@@ -20,8 +20,8 @@ export function WebsiteHeroRoute({
   breadcrumbItems,
   structuredData = true
 }: WebsiteHeroRouteProps) {
-  const BreadcrumbSlot = (props: ComponentProps<typeof Breadcrumb>) => (
-    <Breadcrumb {...props} structuredData={structuredData} />
+  const BreadcrumbSlot = (props: ComponentProps<typeof SiteBreadcrumb>) => (
+    <SiteBreadcrumb {...props} structuredData={structuredData} />
   )
 
   return (

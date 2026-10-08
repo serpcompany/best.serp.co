@@ -13,9 +13,9 @@ import {
   Undo2
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { ListingImage } from '@/components/listing/listing-image'
 import { StatusChip, type StatusTone } from '@/components/status/status-chip'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { ListingImage } from '@/components/ui/listing-image'
 import { Progress } from '@/components/ui/progress'
 import type { SubmissionStatusName } from '@/lib/submissions/contract'
 import { cn } from '@/lib/utils'

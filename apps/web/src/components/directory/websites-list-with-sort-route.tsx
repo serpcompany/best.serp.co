@@ -5,9 +5,9 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { siteCopy } from '../../lib/site/site-copy'
 import { useAnalyticsEvents } from '../layout/root-shell-client'
-import { ListingImage } from '../ui/listing-image'
-import { Card } from './card'
+import { ListingImage } from '../listing/listing-image'
 import { EmptyState } from './empty-state'
+import { SiteCard } from './site-card'
 import { WebsitesListWithSort as SharedWebsitesListWithSort } from './websites-list-with-sort'
 
 interface WebsitesListWithSortRouteProps {
@@ -32,7 +32,7 @@ export function WebsitesListWithSortRoute({
       slots={{
         Badge,
         EmptyState,
-        Card,
+        Card: SiteCard,
         ListingImage,
         ToggleGroup,
         ToggleGroupItem

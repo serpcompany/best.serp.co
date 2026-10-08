@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/directory/card'
+import { SiteCard, SiteCardHeader } from '@/components/directory/site-card'
 import { AboutStaticPage, generateAboutPageMetadata } from '@/components/static-pages/about-page'
 import { Button } from '@/components/ui/button'
+import { CardContent, CardTitle } from '@/components/ui/card'
 import { getAboutPage } from '@/lib/content-loader'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -19,7 +20,7 @@ export default async function AboutPage() {
   return (
     <AboutStaticPage
       aboutPage={aboutPage}
-      slots={{ Button, Card, CardContent, CardHeader, CardTitle }}
+      slots={{ Button, Card: SiteCard, CardContent, CardHeader: SiteCardHeader, CardTitle }}
     />
   )
 }

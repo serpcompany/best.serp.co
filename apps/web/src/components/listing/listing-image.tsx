@@ -6,7 +6,7 @@ import {
   LISTING_LOGO_FALLBACK_PATH,
   shouldUseProvidedListingLogo
 } from '../../lib/directory/listing-logo-presentation'
-import { AspectRatio } from './aspect-ratio'
+import { AspectRatio } from '../ui/aspect-ratio'
 
 /**
  * The one way a listing image renders (serpcompany/best.serp.co#122): cards, the detail page's

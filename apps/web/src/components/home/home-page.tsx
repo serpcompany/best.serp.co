@@ -16,7 +16,7 @@ import {
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
 import { type ListingPageInfo, ListingPagination } from '../directory/listing-pagination'
-import { AppSidebar } from '../layout/app-sidebar'
+import { CategoryNav } from '../layout/category-nav'
 import { HeroSection } from '../sections/hero-section'
 import { NewsletterSection } from '../sections/newsletter-section'
 
@@ -186,7 +186,7 @@ export function HomePageRoute({ data, slots }: HomePageRouteProps): ReactElement
       </div>
       <div className="border-t">
         <div className="relative flex h-full w-full max-w-full flex-row flex-nowrap">
-          <AppSidebar availableCategorySlugs={activeCategorySlugs} />
+          <CategoryNav availableCategorySlugs={activeCategorySlugs} />
 
           <div className="relative flex h-full w-full flex-col px-6 pt-6 pb-16 space-y-8">
             <section>

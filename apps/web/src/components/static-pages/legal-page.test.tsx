@@ -1,7 +1,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Breadcrumb } from '@/components/layout/breadcrumb'
+import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
 import { LegalStaticPage } from './legal-page'
 
 function breadcrumbItems(markup: string): unknown[] {
@@ -25,7 +25,7 @@ describe('legal page breadcrumb', () => {
         content="Policy text."
         mdxComponents={{}}
         path="/legal/privacy"
-        slots={{ Breadcrumb }}
+        slots={{ Breadcrumb: SiteBreadcrumb }}
         title="Privacy Policy"
       />
     )

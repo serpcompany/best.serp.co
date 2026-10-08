@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
-import { AnimatedBackground } from '../ui/animated-background'
+import { AnimatedBackground } from './animated-background'
 import { DirectoryHero, DirectoryHeroContainer } from './directory-home-section'
 
 interface HeroSectionProps {
