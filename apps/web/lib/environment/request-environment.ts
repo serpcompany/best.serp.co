@@ -36,11 +36,6 @@ async function publicProductionEnv(): Promise<Partial<CloudflareEnv> | null> {
   }
 }
 
-/** Whether the current request is served as the public production site. */
-export async function isPublicProductionRequest(): Promise<boolean> {
-  return (await publicProductionEnv()) !== null
-}
-
 /** A Cloudflare Web Analytics site token: 32 hex characters, public, not a secret. */
 const WEB_ANALYTICS_TOKEN = /^[0-9a-f]{32}$/u
 

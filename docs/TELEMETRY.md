@@ -20,9 +20,10 @@ Worker's workers.dev host render neither tag, and `public-policy.test.tsx` holds
 
 Until the token is set, production renders no beacon.
 
-1. In the Cloudflare dashboard, open Web Analytics and add the site `best.serp.co`. Pick the
-   JavaScript snippet setup. Leave automatic injection off: the Worker renders the beacon
-   itself, so injection would add a second one.
+1. In the Cloudflare dashboard, open Web Analytics and add the site `best.serp.co`. Cloudflare
+   turns on automatic setup for a hostname it proxies; switch it to the JS snippet (Manage
+   site → Enable with JS Snippet installation). The Worker renders the beacon itself, so
+   automatic injection would add a second one.
 2. Copy the `token` from the snippet (32 hex characters; public, not a secret) into
    `env.production.vars.CF_WEB_ANALYTICS_TOKEN` in `apps/web/wrangler.jsonc`, through a pull
    request. Staging and local never set it.
