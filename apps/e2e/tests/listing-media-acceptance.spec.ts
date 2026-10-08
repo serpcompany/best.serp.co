@@ -1,4 +1,5 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+import { test } from './test'
 
 /**
  * The #95 acceptance check, run by hand against a deployed Worker after its catalog was

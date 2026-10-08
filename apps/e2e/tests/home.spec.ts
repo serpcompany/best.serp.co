@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test'
-
+import { expect } from '@playwright/test'
 import { site } from './site-fixture'
+import { test } from './test'
 
 test.describe('Homepage', () => {
   test('should load successfully', async ({ page }) => {

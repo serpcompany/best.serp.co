@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import {
   hostedMediaListing,
   mediaOrigin,
@@ -6,6 +6,7 @@ import {
   queuedMediaListing
 } from './media-fixture'
 import { listingPath, site } from './site-fixture'
+import { test } from './test'
 
 /**
  * Hosted listing media against local R2 (serpcompany/best.serp.co#95), on the seeded media

@@ -1,7 +1,7 @@
-import { expect, type Page, test } from '@playwright/test'
-
+import { expect, type Page } from '@playwright/test'
 import { detailListing } from './listing-fixture'
 import { categoryPath, sampleCategory } from './site-fixture'
+import { test } from './test'
 
 type ViewportName = 'desktop' | 'tablet' | 'mobile'
 

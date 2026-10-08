@@ -1,7 +1,7 @@
-import { expect, test } from '@playwright/test'
-
+import { expect } from '@playwright/test'
 import { detailListing } from './listing-fixture'
 import { listingPath } from './site-fixture'
+import { test } from './test'
 
 /**
  * The D1 catalog records no product pricing (serpcompany/best.serp.co#88), so a listing's

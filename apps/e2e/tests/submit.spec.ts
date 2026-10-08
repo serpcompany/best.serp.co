@@ -1,12 +1,19 @@
-import {
-  type APIRequestContext,
-  type BrowserContext,
-  expect,
-  type Page,
-  test
-} from '@playwright/test'
+import { type APIRequestContext, type BrowserContext, expect, type Page } from '@playwright/test'
 import { listingPath, site } from './site-fixture'
 import { executeLocalD1, type FixtureSite, startFixtureSite } from './submit-fixture'
+import { expectedResponse, test } from './test'
+
+test.use({
+  allowedConsoleErrors: {
+    because:
+      "the badge step checks the cooldown, a repeated check, and a stranger's submission page",
+    patterns: [
+      expectedResponse(409, /\/api\/submissions\/[^/]+\/verify/u),
+      expectedResponse(429, /\/api\/submissions\/[^/]+\/verify/u),
+      expectedResponse(404, /\/submit\/[^/]+\/badge\//u)
+    ]
+  }
+})
 
 /**
  * Submit v2 in a browser against the local Worker (serpcompany/best.serp.co#63, #70 screens

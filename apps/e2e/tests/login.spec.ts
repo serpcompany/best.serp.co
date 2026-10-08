@@ -1,4 +1,13 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+import { expectedResponse, test } from './test'
+
+test.use({
+  allowedConsoleErrors: {
+    because:
+      'the sign-in journeys exercise bad and blocked codes, the send caps, and email being off',
+    patterns: [400, 403, 429, 503].map(status => expectedResponse(status, /\/api\/auth\//u))
+  }
+})
 
 /**
  * The sign-in screens in a browser against the local Worker (serpcompany/best.serp.co#60, the
