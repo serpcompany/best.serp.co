@@ -18,11 +18,19 @@ const patterns: ReadonlyArray<readonly [string, RegExp]> = [
   ],
   // `bg-(--color-red-500)` and `var(--color-amber-600)` name the palette through its variable.
   ['palette variable', new RegExp(`--color-${PALETTE}(?:-\\d{2,3})?(?![\\w-])`, 'gu')],
-  // A hex with a letter is a color wherever it stands. One of digits only is a color only where
-  // a value starts (`'#000'`, `: #000`, `_#000]`, `,#000`): copy names issues that way (`(#68)`).
+  // A hex with a letter is a color wherever it stands. Copy names issues with digits (`(#68)`),
+  // so a hex of 3 or 4 digits only counts where a value starts (`'#000'`, `: #000`, `_#000]`,
+  // `, #000`); one of 6 or 8 digits, which no issue number has, counts after a space or `(` too.
   [
     'hex color',
-    new RegExp(`(?<![\\w&#])(?=#\\d*[a-fA-F])${HEX}|(?:(?<=['"\`[=:]\\s?)|(?<=[_,]))${HEX}`, 'gu')
+    new RegExp(
+      [
+        `(?<![\\w&#])(?=#\\d*[a-fA-F])${HEX}`,
+        `(?:(?<=['"\`[=:,]\\s?)|(?<=_))${HEX}`,
+        '(?<=[\\s(])#(?:\\d{8}|\\d{6})(?![\\w-])'
+      ].join('|'),
+      'gu'
+    )
   ],
   ['color function', /(?<![\w-])(?:rgba?|hsla?|oklch|oklab)\(/gu]
 ]
@@ -61,9 +69,10 @@ function withoutComments(source: string, fileName: string): string {
   )
   const trivia: Array<{ end: number; pos: number }> = []
   const visit = (node: ts.Node) => {
-    // JSX text is copy, whitespace included. A JSDoc block is already its node's trivia.
+    // JSX text is copy, whitespace included. A JSDoc block is already in a token's trivia (the
+    // end-of-file token's, at the end of a file), so a token is a node with no other children.
     if (node.kind === ts.SyntaxKind.JsxText || ts.isJSDoc(node)) return
-    const children = node.getChildren(file)
+    const children = node.getChildren(file).filter(child => !ts.isJSDoc(child))
     if (children.length === 0) trivia.push({ end: node.getStart(file), pos: node.pos })
     for (const child of children) visit(child)
   }

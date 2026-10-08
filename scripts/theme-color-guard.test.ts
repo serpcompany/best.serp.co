@@ -120,7 +120,8 @@ describe('theme colors only (#183)', () => {
           'style={{ color: hsl(240 5% 92%) }}',
           '<p className="shadow-[0_0_0_1px_#000] bg-[linear-gradient(90deg,#fff,#000)]" />',
           '<p className="inset-shadow-sky-500 drop-shadow-black/50 text-shadow-white" />',
-          '<p className="bg-(--color-red-500) text-[var(--color-amber-600)]" />'
+          '<p className="bg-(--color-red-500) text-[var(--color-amber-600)]" />',
+          "const line = { border: '1px solid #000000', background: 'linear-gradient(#fff, #000)' }"
         ].join('\n'),
         'probe.tsx'
       )
@@ -141,7 +142,10 @@ describe('theme colors only (#183)', () => {
       '6: palette class drop-shadow-black/50',
       '6: palette class text-shadow-white',
       '7: palette variable --color-red-500',
-      '7: palette variable --color-amber-600'
+      '7: palette variable --color-amber-600',
+      '8: hex color #000000',
+      '8: hex color #fff',
+      '8: hex color #000'
     ])
     expect(literalColors('a {\n  /* #fff */\n  border: 1px solid #ccc;\n}', 'probe.css')).toEqual([
       '3: hex color #ccc'
@@ -179,7 +183,8 @@ describe('theme colors only (#183)', () => {
           '',
           '// a comment',
           "const white = 'text-white'",
-          '/* the end */'
+          '/* the end */',
+          '/** bg-red-500 #fff */'
         ].join('\n'),
         'probe.tsx'
       )
