@@ -4,15 +4,11 @@
   "private": true,
   "exports": {
     "./asset-reference": "./asset-reference.ts",
-    "./content-paths": "./content-paths.ts",
-    "./cookies": "./cookies.ts",
     "./environment": "./constants/environment.ts",
     "./file-extensions": "./file-extensions.ts",
-    "./get-base-url": "./get-base-url.ts",
     "./url-key": "./url-key.ts"
   },
   "dependencies": {
-    "path": "^0.12.7",
     "tldts": "7.4.16"
   }
 }
