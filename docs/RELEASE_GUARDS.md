@@ -17,7 +17,7 @@ ambiguous `db:migrate`.
 | `pnpm db:import:local`, `pnpm db:verify:local` | local D1 | Seed the reviewed initial catalog and prove exact parity |
 | `pnpm db:publish:local -- <manifest>` | local D1 | Apply a `d1/publications/` manifest |
 | `pnpm db:migrations:list:staging` | staging D1 | Read-only: applied, pending, and unknown migrations |
-| `pnpm db:migrate:staging` | staging D1 | `cloudflare-release.ts migrate staging`; runs only in `deploy-staging.yml` on `staging` |
+| `pnpm db:migrate:staging` | staging D1 | `cloudflare-release.ts migrate staging`; runs only in `web.yml`'s `deploy-staging` job on `staging` |
 | `pnpm db:migrations:list:production` | production D1 | Read-only: applied, pending, and unknown migrations |
 | `pnpm db:migrate:production` | production D1 | `cloudflare-release.ts migrate production`; runs only in `deploy-production.yml` on `main` when `plan-release` finds pending migrations, after Deploy Staging verified the commit's tree |
 | `pnpm db:publish:staging` | staging D1 | Apply a reviewed manifest; runs only in `publish-d1-staging.yml` on `staging` |
@@ -53,8 +53,8 @@ The repository follows the serp git-workflow standard for repositories with Stag
   waits for the reviewers.
 - **Only the owner releases.** Agents never dispatch a production workflow, never type a
   production confirmation, and never approve a deployment.
-- **PR Review catches mis-targeted pull requests.** Once `staging` exists, `Validate Site &
-  Policy` fails a pull request into `main` unless its head is a `hotfix-*` branch of this
+- **CI catches mis-targeted pull requests.** Once `staging` exists, `web.yml`'s `check` fails
+  a pull request into `main` unless its head is a `hotfix-*` branch of this
   repository (rulesets cannot restrict a head branch). It is an accident guard, not the
   control: a pull request runs its own copy of the check and could edit it. The control is
   the release-time tree check below.
@@ -68,7 +68,7 @@ commit, never forced. Agents never run it.
 
 Deploy Production and Bootstrap Production D1 release only source that Deploy Staging has
 verified on `staging`. Deploy Staging verified a commit when **any attempt** of a push or
-dispatch run of `deploy-staging.yml` on `staging` completed all four steps successfully:
+dispatch run of `web.yml` on `staging` completed all four `deploy-staging` steps successfully:
 
 - **Apply staging D1 migrations**
 - **Deploy staging Worker**
@@ -118,7 +118,7 @@ only the last one is verified. If Deploy Staging is still running, wait for it. 
 outage), start a new run on it, wait for it to pass, then re-run the production run:
 
 ```bash
-gh workflow run deploy-staging.yml --ref staging
+gh workflow run web.yml --ref staging
 ```
 
 Re-running the commit's own failed run also works. Don't re-run an older commit's run: it

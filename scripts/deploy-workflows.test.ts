@@ -111,7 +111,7 @@ const mediaUploadWorkflows = {
 const mediaHealthWorkflow = 'media-health.yml'
 const newWorkflows = [
   ...productionDispatchWorkflows,
-  'deploy-staging.yml',
+  'web.yml',
   mediaHealthWorkflow,
   'publish-d1-staging.yml',
   ...Object.keys(mediaUploadWorkflows)
@@ -119,32 +119,33 @@ const newWorkflows = [
 
 const productionGroup = { group: 'deploy-best-serp-co-production', 'cancel-in-progress': false }
 
-describe('staging deploy workflow', () => {
-  const workflow = loadWorkflow('deploy-staging.yml')
-  const job = workflow.jobs.deploy as WorkflowJob
+describe('staging deploy job', () => {
+  const workflow = loadWorkflow('web.yml')
+  const job = workflow.jobs['deploy-staging'] as WorkflowJob
+  const tipGate = "steps.tip.outputs.deploy == 'true'"
 
-  it('deploys every reviewed staging push (and on demand) to staging only, one run at a time', () => {
-    expect(Object.keys(workflow.on).sort()).toEqual(['push', 'workflow_dispatch'])
-    expect(workflow.on.push).toEqual({ branches: ['staging'] })
+  it('deploys every staging push (and a dispatch on staging) once the checks pass, one at a time', () => {
+    expect(Object.keys(workflow.on).sort()).toEqual(['pull_request', 'push', 'workflow_dispatch'])
+    expect(workflow.on.push).toEqual({ branches: ['staging', 'main'] })
     expect(stagingWorkflow.branch).toBe('staging')
-    expect(releaseAuthorizations['deploy-staging.yml']?.branch).toBe('staging')
-    expect(workflow.permissions).toEqual({ contents: 'read' })
-    // Job-level: a dispatch from another branch is skipped by `if` and never joins the group.
-    expect(workflow.concurrency).toBeUndefined()
+    expect(releaseAuthorizations['web.yml']?.branch).toBe('staging')
+    expect(workflow.permissions).toEqual({ actions: 'read', contents: 'read' })
+    // Job-level: a pull request or a run on another branch is skipped by `if` and never joins
+    // the group.
     expect(job.concurrency).toEqual({
       group: 'deploy-best-serp-co-staging',
       'cancel-in-progress': false
     })
-    expect(Object.keys(workflow.jobs)).toEqual(['deploy'])
-    expect(job.if).toBe("github.ref == 'refs/heads/staging'")
+    expect(Object.keys(workflow.jobs)).toEqual(['changes', 'check', 'e2e', 'deploy-staging'])
+    expect(job.needs).toEqual(['check', 'e2e'])
+    expect(job.if).toBe("github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'")
     expect(job.environment).toEqual({ name: 'staging', url: project.remote.staging.origin })
     expect(job.env).toEqual({ STAGING_ORIGIN: project.remote.staging.origin })
-    expect(JSON.stringify(workflow)).not.toMatch(/production/u)
+    expect(JSON.stringify(job)).not.toMatch(/production/u)
   })
 
-  it('validates, migrates, deploys, then gates and smoke-tests the deployed Worker', () => {
+  it('builds, then deploys only the staging tip: bookmark, migrate, deploy, gates, smoke', () => {
     const commands = [
-      'pnpm harness:fast',
       'pnpm worker:build',
       'pnpm tsx scripts/cloudflare-release.ts bookmark staging',
       'pnpm tsx scripts/cloudflare-release.ts migrate staging',
@@ -153,19 +154,33 @@ describe('staging deploy workflow', () => {
       'pnpm --filter web test:install',
       'pnpm --filter web test:e2e:smoke'
     ]
-    expect(runs(job).slice(1)).toEqual(commands)
+    const tip = job.steps?.find(step => step.id === 'tip')
+    expect(tip?.run).toContain('git ls-remote origin refs/heads/staging')
+    expect(tip?.run).toContain('if [ "$tip" = "$GITHUB_SHA" ]')
+    expect(
+      runs(job)
+        .filter(run => run !== tip?.run)
+        .slice(1)
+    ).toEqual(commands)
+    // The tip is compared after the build and before anything changes staging.
+    const names = (job.steps ?? []).map(step => step.name)
+    expect(names.indexOf('Deploy only the staging tip')).toBe(
+      names.indexOf('Build OpenNext Worker') + 1
+    )
+    expect(names.indexOf('Record staging D1 Time Travel bookmark')).toBe(
+      names.indexOf('Deploy only the staging tip') + 1
+    )
     expect(stepRunning(job, 'test:e2e:smoke').env).toEqual({
       PLAYWRIGHT_BASE_URL: expression('env.STAGING_ORIGIN'),
       PLAYWRIGHT_EXTERNAL_SERVER: '1'
     })
     const evidence = job.steps?.find(step => step.uses === 'actions/upload-artifact@v7')
-    expect(evidence?.if).toBe(`always() && ${credentialsGate}`)
+    expect(evidence?.if).toBe(`always() && ${tipGate}`)
     expect(String(evidence?.with?.path)).toContain('apps/web/playwright-report/')
   })
 
   it('names the steps production requires as proof that staging verified a commit', () => {
-    expect(workflow.name).toBe(stagingWorkflow.name)
-    expect(stagingWorkflow.file).toBe('deploy-staging.yml')
+    expect(stagingWorkflow.file).toBe('web.yml')
     const proof: Record<(typeof stagingWorkflow.requiredSteps)[number], string> = {
       'Apply staging D1 migrations': 'pnpm tsx scripts/cloudflare-release.ts migrate staging',
       'Deploy staging Worker': 'pnpm tsx scripts/cloudflare-release.ts deploy staging',
@@ -173,10 +188,21 @@ describe('staging deploy workflow', () => {
       'Run Playwright smoke against staging': 'pnpm --filter web test:e2e:smoke'
     }
     expect(Object.keys(proof)).toEqual([...stagingWorkflow.requiredSteps])
+    // Only this job may carry those steps: verification looks at every job of a web.yml run.
+    for (const [id, other] of Object.entries(workflow.jobs)) {
+      if (id === 'deploy-staging') continue
+      for (const name of stagingWorkflow.requiredSteps) {
+        expect(
+          (other as WorkflowJob).steps?.some(step => step.name === name),
+          `${id}: ${name}`
+        ).toBe(false)
+      }
+    }
     for (const [name, command] of Object.entries(proof)) {
       const steps = (job.steps ?? []).filter(step => step.name === name)
       expect(steps, name).toHaveLength(1)
       expect(steps[0]?.run, name).toContain(command)
+      expect(steps[0]?.if, name).toBe(tipGate)
     }
   })
 
@@ -186,16 +212,18 @@ describe('staging deploy workflow', () => {
     )
   })
 
-  it('skips cleanly, without failing main, until Cloudflare credentials exist', () => {
+  it('skips cleanly, without failing staging, until Cloudflare credentials exist', () => {
     const [check, ...rest] = job.steps ?? []
     expect(check?.id).toBe('credentials')
     expect(check?.if).toBeUndefined()
     expect(check?.run).toContain('echo "configured=false" >> "$GITHUB_OUTPUT"')
     expect(check?.run).toContain('::notice title=Staging deploy skipped::')
     expect(check?.run).not.toMatch(/exit 1/u)
+    // Every later step runs only with credentials; the tip step runs only after them.
     for (const step of rest) {
-      expect(step.if, step.name).toContain(credentialsGate)
+      expect([credentialsGate, tipGate, `always() && ${tipGate}`], step.name).toContain(step.if)
     }
+    expect(job.steps?.find(step => step.id === 'tip')?.if).toBe(credentialsGate)
   })
 })
 
@@ -367,7 +395,7 @@ describe('version-pinned HTTP gates', () => {
     // Outside the checkout (runner.temp), because the release script refuses an unclean tree.
     const wranglerOutput = `${expression('runner.temp')}/wrangler-output.ndjson`
     const cases: Array<[string, string, string]> = [
-      ['deploy-staging.yml', 'deploy', 'staging'],
+      ['web.yml', 'deploy-staging', 'staging'],
       ['deploy-production.yml', 'release', 'production']
     ]
     for (const [file, jobName, environment] of cases) {
@@ -470,7 +498,7 @@ describe('D1 data stays in Cloudflare', () => {
   const credentialedJobs = [
     'bootstrap-production-d1.yml:bootstrap',
     'deploy-production.yml:release',
-    'deploy-staging.yml:deploy',
+    'web.yml:deploy-staging',
     'media-health.yml:check',
     'publish-d1-staging.yml:publish',
     'publish-d1.yml:publish',
@@ -481,7 +509,7 @@ describe('D1 data stays in Cloudflare', () => {
   const bookmarkedChanges = [
     'bootstrap-production-d1.yml:bootstrap:production',
     'deploy-production.yml:release:production',
-    'deploy-staging.yml:deploy:staging',
+    'web.yml:deploy-staging:staging',
     'publish-d1-staging.yml:publish:staging',
     'publish-d1.yml:publish:production'
   ]
@@ -497,6 +525,12 @@ describe('D1 data stays in Cloudflare', () => {
       action: /^actions\/upload-artifact@/u,
       name: /^playwright-report$/u,
       paths: ['apps/web/playwright-report/']
+    },
+    {
+      // An E2E receipt (web.yml): the tested tree's hash, nothing else.
+      action: /^actions\/upload-artifact@/u,
+      name: /^passed-e2e-\$\{\{ steps\.receipt\.outputs\.tree \}\}$/u,
+      paths: [`${expression('runner.temp')}/receipt.txt`]
     },
     {
       action: /^actions\/upload-artifact@/u,
@@ -1596,8 +1630,8 @@ describe('protected deployment boundaries', () => {
     const expected: Record<string, Record<string, unknown>> = {
       'bootstrap-production-d1.yml': { bootstrap: productionGroup },
       'deploy-production.yml': { release: productionGroup },
-      'deploy-staging.yml': {
-        deploy: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
+      'web.yml': {
+        'deploy-staging': { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
       },
       'media-health.yml': {
         check: { group: 'media-health-best-serp-co-production', 'cancel-in-progress': false }
@@ -1617,7 +1651,18 @@ describe('protected deployment boundaries', () => {
     expect(Object.keys(expected).sort()).toEqual([...newWorkflows].sort())
     for (const file of newWorkflows) {
       const workflow = loadWorkflow(file)
-      expect(workflow.concurrency, file).toBeUndefined()
+      // web.yml's workflow group cancels only a superseded pull-request run; a push or dispatch
+      // gets a group of its own run id, so it never evicts a queued deploy.
+      expect(workflow.concurrency, file).toEqual(
+        file === 'web.yml'
+          ? {
+              group: expression(
+                "github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id"
+              ),
+              'cancel-in-progress': expression("github.event_name == 'pull_request'")
+            }
+          : undefined
+      )
       const grouped = Object.fromEntries(
         Object.entries(workflow.jobs)
           .filter(([, job]) => job.concurrency)
@@ -1668,7 +1713,17 @@ describe('protected deployment boundaries', () => {
     for (const [file, workflow] of allWorkflows()) {
       const source = readFileSync(resolve(workflowDirectory, file), 'utf8')
       if (Object.keys(workflow.on).some(trigger => trigger.startsWith('pull_request'))) {
-        expect(source, file).not.toContain('CLOUDFLARE')
+        // web.yml checks pull requests and deploys staging pushes. Its Cloudflare secrets are
+        // the staging environment's, and that environment deploys only the staging branch, so a
+        // pull request's run, even one that edits this file, cannot read them. The job that
+        // names them never runs on a pull request either.
+        for (const [name, job] of Object.entries(workflow.jobs)) {
+          if (!JSON.stringify(job).includes('CLOUDFLARE')) continue
+          expect(`${file}:${name}`).toBe('web.yml:deploy-staging')
+          expect(environmentName(job)).toBe('staging')
+          expect(job.if).toContain("github.event_name != 'pull_request'")
+        }
+        if (file !== 'web.yml') expect(source, file).not.toContain('CLOUDFLARE')
       }
     }
     for (const file of newWorkflows) {
@@ -1677,7 +1732,10 @@ describe('protected deployment boundaries', () => {
       // only the one with a hotfix confirmation reads pull requests.
       expect(workflow.permissions, file).toEqual({
         contents: 'read',
-        ...(releaseAuthorizations[file]?.requireVerifiedStaging.length ? { actions: 'read' } : {}),
+        // web.yml reads Actions artifacts to find E2E receipts.
+        ...(releaseAuthorizations[file]?.requireVerifiedStaging.length || file === 'web.yml'
+          ? { actions: 'read' }
+          : {}),
         ...(releaseAuthorizations[file]?.hotfixConfirmation ? { 'pull-requests': 'read' } : {})
       })
       for (const job of Object.values(workflow.jobs)) {
@@ -1692,9 +1750,11 @@ describe('protected deployment boundaries', () => {
 
   it('runs every credentialed or deploying job on an ephemeral GitHub-hosted runner', () => {
     // CI_RUNNER_LABELS never moves these, so no secret, D1 data, or Wrangler session lands on a
-    // persistent host (docs/HARNESS.md#ci-runners).
+    // persistent host (docs/CI.md#runners).
     for (const file of [...newWorkflows, 'submit-gsc-sitemaps.yml']) {
       for (const [name, job] of Object.entries(loadWorkflow(file).jobs)) {
+        // web.yml's check holds no secret and deploys nothing (scripts/ci-runners.ts routes it).
+        if (`${file}:${name}` === 'web.yml:check') continue
         expect(job['runs-on'], `${file}:${name}`).toBe(githubHostedRunner)
       }
     }

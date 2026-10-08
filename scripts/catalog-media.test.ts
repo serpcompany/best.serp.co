@@ -267,8 +267,8 @@ describe('hosted catalog media (#95)', () => {
 
   // The committed plan stays the record of what was uploaded: a file it names that was deleted
   // after the production publish keeps its reviewed bytes in Git (docs/MEDIA.md, "Legacy
-  // migration"). Publish D1 Catalog and the deploys check out one commit, so PR Review (full
-  // history) checks this.
+  // migration"). Publish D1 Catalog and the deploys check out one commit, so CI's `check` job
+  // (full history) checks this.
   it.skipIf(!hasRepoMediaArchive())(
     'keeps every deleted repo: source in Git history at exactly the planned bytes (#124)',
     () => {

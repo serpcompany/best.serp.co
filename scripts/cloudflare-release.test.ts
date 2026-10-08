@@ -179,7 +179,7 @@ function stagingApi(
             head_sha: stagingSha,
             html_url: 'https://github.com/run/1',
             id: 1,
-            path: '.github/workflows/deploy-staging.yml',
+            path: '.github/workflows/web.yml',
             run_attempt: 1,
             status: 'completed'
           }
@@ -275,7 +275,7 @@ describe('release authorization', () => {
       // main is production: every production mutation runs from main.
       expect(authorization.branch).toBe('main')
     }
-    expect(releaseAuthorizations['deploy-staging.yml']).toEqual({
+    expect(releaseAuthorizations['web.yml']).toEqual({
       branch: 'staging',
       commands: ['migrate', 'deploy'],
       confirmation: null,
@@ -288,7 +288,7 @@ describe('release authorization', () => {
       Object.entries(releaseAuthorizations)
         .filter(([, authorization]) => authorization.events.includes('push'))
         .map(([workflow]) => workflow)
-    ).toEqual(['deploy-staging.yml', 'deploy-production.yml'])
+    ).toEqual(['web.yml', 'deploy-production.yml'])
     expect(
       Object.entries(releaseAuthorizations)
         .filter(([, authorization]) => authorization.hotfixConfirmation)
@@ -332,7 +332,7 @@ describe('release authorization', () => {
   })
 
   it('runs staging releases only from staging and production releases only from main', () => {
-    const staging = workflowEnv('deploy-staging.yml', null, 'push')
+    const staging = workflowEnv('web.yml', null, 'push')
     expect(staging.GITHUB_REF).toBe('refs/heads/staging')
     expect(() => authorizeRelease('migrate', 'staging', staging, cleanGit)).not.toThrow()
     // The staging workflow loaded from main (the old flow) or a feature branch is not protected.
@@ -344,7 +344,7 @@ describe('release authorization', () => {
           {
             ...staging,
             GITHUB_REF: `refs/heads/${branch}`,
-            GITHUB_WORKFLOW_REF: `${project.repository}/.github/workflows/deploy-staging.yml@refs/heads/${branch}`
+            GITHUB_WORKFLOW_REF: `${project.repository}/.github/workflows/web.yml@refs/heads/${branch}`
           },
           cleanGit
         )
@@ -909,7 +909,7 @@ describe('release entry point', () => {
     const staging = harness(false)
     await runRelease(
       ['deploy', 'staging'],
-      workflowEnv('deploy-staging.yml', null, 'push'),
+      workflowEnv('web.yml', null, 'push'),
       dependencies(staging)
     )
     expect(staging.events.filter(event => event.startsWith('fetch '))).toEqual([])
@@ -1409,7 +1409,7 @@ describe('Time Travel bookmark', () => {
   })
 
   it('runs as a read-only command: no checkout or GitHub check, one Wrangler call', async () => {
-    for (const env of [{}, workflowEnv('publish-d1.yml'), workflowEnv('deploy-staging.yml')]) {
+    for (const env of [{}, workflowEnv('publish-d1.yml'), workflowEnv('web.yml')]) {
       const events: string[] = []
       const { calls, runner } = bookmarkRunner(JSON.stringify({ bookmark }))
       const result = await runRelease(['bookmark', 'production'], env, {

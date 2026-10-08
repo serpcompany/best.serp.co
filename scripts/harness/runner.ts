@@ -81,8 +81,17 @@ const fullOnlySteps: HarnessStep[] = [
   }
 ]
 
-export function stepsForProfile(profile: 'fast' | 'full'): HarnessStep[] {
-  return profile === 'fast' ? sharedSteps : [...sharedSteps, ...fullOnlySteps]
+export function stepsForProfile(
+  profile: 'fast' | 'full',
+  env: Partial<NodeJS.ProcessEnv> = process.env
+): HarnessStep[] {
+  if (profile === 'fast') return sharedSteps
+  // On a push, CI's deploy job builds the commit, so the check there leaves the build to it
+  // (.github/workflows/web.yml): each commit is built once.
+  const full = [...sharedSteps, ...fullOnlySteps]
+  return env.HARNESS_SKIP_BUILD === '1'
+    ? full.filter(step => step.name !== 'OpenNext Worker build')
+    : full
 }
 
 export function runHarness(profile: 'fast' | 'full'): void {

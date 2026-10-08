@@ -116,7 +116,7 @@ describe('repository harness contract', () => {
   })
 
   it('keeps documentation and D1 contracts visible in pull-request validation', () => {
-    const workflow = readFileSync(resolve('.github/workflows/pr-review.yml'), 'utf8')
+    const workflow = readFileSync(resolve('.github/workflows/web.yml'), 'utf8')
     // pnpm check runs documentation health and both Vitest projects (scripts/harness/runner.ts).
     expect(workflow).toContain('run: pnpm check')
   })
