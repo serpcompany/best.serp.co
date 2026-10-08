@@ -5,14 +5,15 @@
  * target can't accept is refunded; upgrades and relists apply to the listing; and refunds follow
  * the rejection or the badge check at refund.
  */
-import { createBadgeProgramOperations } from '@serpdirectory/data-ops/badge-program'
-import { createBillingOperations } from '@serpdirectory/data-ops/billing'
-import { createDatabase } from '@serpdirectory/data-ops/client'
-import { executePlans } from '@serpdirectory/data-ops/plan-runner'
-import { prepareCatalogPublication } from '@serpdirectory/data-ops/plan-support'
-import { buildRejectSubmissionPlans } from '@serpdirectory/data-ops/submission-plans'
-import { insertPublishedListing, SqliteD1 } from '@serpdirectory/data-ops/test-support'
+
 import { describe, expect, it } from 'vitest'
+import { createBadgeProgramOperations } from '@/db/badge-program'
+import { createBillingOperations } from '@/db/billing'
+import { createDatabase } from '@/db/client'
+import { executePlans } from '@/db/plan-runner'
+import { prepareCatalogPublication } from '@/db/plan-support'
+import { buildRejectSubmissionPlans } from '@/db/submission-plans'
+import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
 import { checkBadgeAtRefund } from '../badge-program/refund'
 import { features, type SiteFeatures } from '../features'
 import type { GuardrailResult } from './guardrails'

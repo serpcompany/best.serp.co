@@ -1,4 +1,4 @@
-import type { AdminListingDetail } from '@serpdirectory/data-ops/admin-queries'
+import type { AdminListingDetail } from '@/db/admin-queries'
 import { formatDateTime } from '../../components/admin/format'
 
 const failureText: Record<string, string> = {

@@ -14,10 +14,10 @@
  * Next.js.
  */
 
-import { FILE_EXTENSIONS, hasFileExtension } from '@serpdirectory/utils/file-extensions'
+import { FILE_EXTENSIONS, hasFileExtension } from '../file-extensions'
 
 /**
- * Extensions that make a path a file (`@serpdirectory/utils/file-extensions`). Listing slugs
+ * Extensions that make a path a file (`@/lib/file-extensions`). Listing slugs
  * are domain names (`autoenhance.ai`), so a dot alone never makes a file, and slug
  * validation rejects a slug ending in one of these.
  */

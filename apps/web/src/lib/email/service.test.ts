@@ -1,11 +1,11 @@
-import { createDatabase } from '@serpdirectory/data-ops/client'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createDatabase } from '@/db/client'
 import {
   createEmailDeliveryLedger,
   EMAIL_DELIVERY_MAX_ATTEMPTS,
   type EmailDeliveryLedger
-} from '@serpdirectory/data-ops/email-deliveries'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SqliteD1 } from '../../../../../packages/data-ops/src/test-support'
+} from '@/db/email-deliveries'
+import { SqliteD1 } from '@/db/test-support'
 import { type EmailEnvironmentVars, resolveEmailPolicy } from './config'
 import { createWorkerEmailService, isEmailDeliveryConfigured } from './runtime'
 import { createCapturingEmailSender } from './senders'

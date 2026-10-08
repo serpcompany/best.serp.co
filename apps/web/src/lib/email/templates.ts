@@ -13,7 +13,7 @@
  * `html`). The real templates and their copy follow the mockups approved in
  * serpcompany/best.serp.co#70.
  */
-import { isEmailTemplateId } from '@serpdirectory/data-ops/email-deliveries'
+import { isEmailTemplateId } from '../../db/email-deliveries'
 import type { SiteEnvironment } from '../environment/site-environment'
 import type { SiteFeatures } from '../features'
 import { absoluteUrl } from '../seo/canonical-url'

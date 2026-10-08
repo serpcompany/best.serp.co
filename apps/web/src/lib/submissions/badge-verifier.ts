@@ -1,5 +1,5 @@
-import { safeFetch } from '@serpdirectory/data-ops/safe-fetch'
 import type { DefaultTreeAdapterMap } from 'parse5'
+import { safeFetch } from '@/db/safe-fetch'
 import { HtmlBudget, parseBoundedHtml } from './bounded-html'
 import {
   declaredEncodings,
@@ -16,7 +16,7 @@ import {
 
 /**
  * Badge verification (serpcompany/best.serp.co#59): load the submitted website through the
- * safe fetcher (`@serpdirectory/data-ops/safe-fetch`, which applies the shared public-URL policy to every hop),
+ * safe fetcher (`@/db/safe-fetch`, which applies the shared public-URL policy to every hop),
  * parse it with `parse5` (the WHATWG HTML tokenizer and tree builder, as a browser does, with
  * scripting on as for Googlebot), and look in the resulting tree for the Featured badge: an
  * HTML `<img>` of one of the badge URLs whose nearest link ancestor is an HTML `<a>` whose

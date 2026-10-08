@@ -1,4 +1,4 @@
-import { isMediaKey, mediaUrl } from '@serpdirectory/data-ops/media-keys'
+import { isMediaKey, mediaUrl } from '@/db/media-keys'
 
 /**
  * The image an admin or preview screen may render for a logo (#96 review S9): the hosted copy on

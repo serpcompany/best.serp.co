@@ -11,7 +11,7 @@ ambiguous `db:migrate`.
 
 | Command | Target | Does |
 |---|---|---|
-| `pnpm db:generate` | none | `drizzle-kit generate` into `d1/drizzle/` |
+| `pnpm db:generate` | none | `drizzle-kit generate` into `apps/web/drizzle/` |
 | `pnpm db:migrations:list:local` | local D1 | `wrangler d1 migrations list --local`: migrations not applied yet |
 | `pnpm db:migrate:local` | local D1 | `wrangler d1 migrations apply --local` |
 | `pnpm db:import:local`, `pnpm db:verify:local` | local D1 | Seed the reviewed initial catalog and prove exact parity |
@@ -31,7 +31,7 @@ call `wrangler d1 migrations list`, because Wrangler's list first runs
 `CREATE TABLE IF NOT EXISTS` on the ledger table. They work from a maintainer machine after
 `wrangler login`.
 
-Every D1 binding in `apps/web/wrangler.jsonc` declares `migrations_dir: "../../d1/drizzle"`
+Every D1 binding in `apps/web/wrangler.jsonc` declares `migrations_dir: "drizzle"`
 and `migrations_table: "d1_migrations"`. `pnpm worker:config:validate` and every
 `cloudflare-release.ts` command refuse a binding that drifts.
 
@@ -157,7 +157,7 @@ bucket to bucket through the R2 API, before the manifest that names its keys is 
   (`scripts/d1-compat.ts`: no `PRAGMA`, temporary table, transaction control, or `ATTACH`). A
   publication guard fails its batch with `malformed JSON`, as the Worker's plans do.
 - An upload failure names its cause (`fetch failed: <code> <message>`). `NETWORK_SMOKE=1` runs a
-  real HTTPS fetch through the pinned Node fetcher (`packages/data-ops/src/safe-fetch-node.test.ts`).
+  real HTTPS fetch through the pinned Node fetcher (`apps/web/src/db/safe-fetch-node.test.ts`).
 - Media, category, FAQ, and unpublish manifests are row-level (`concurrency: rows`): each fits
   both environments whatever else each published, and a listing that changed since generation
   refuses it with nothing written. Any other manifest still names the base version both

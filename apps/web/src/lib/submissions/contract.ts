@@ -7,7 +7,7 @@ import { z } from 'zod'
  * are derived on the server only, by `urlKey()`.
  */
 
-/** Field limits; `@serpdirectory/data-ops/submissions` enforces the same (`SUBMISSION_LIMITS`). */
+/** Field limits; `@/db/submissions` enforces the same (`SUBMISSION_LIMITS`). */
 export const SUBMISSION_FIELD_LIMITS = { content: 5000, description: 160, name: 120 } as const
 export const VERIFICATION_ATTEMPT_LIMIT = 10
 export const VERIFICATION_COOLDOWN_SECONDS = 30

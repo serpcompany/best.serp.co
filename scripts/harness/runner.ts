@@ -25,7 +25,7 @@ const sharedSteps: HarnessStep[] = [
   {
     name: 'catalog data operations',
     command: 'pnpm',
-    args: ['--filter', '@serpdirectory/data-ops', 'test'],
+    args: ['--filter', 'web', 'test'],
     remediation:
       'Fix the shared catalog contract, isolation, projection, cache, telemetry, or benchmark failure. See docs/DATA_MODEL.md.'
   },

@@ -20,8 +20,7 @@ This repository uses a single-context layout:
 │   └── adr/
 │       ├── 0001-example-decision.md
 │       └── 0002-example-decision.md
-├── apps/
-└── packages/
+└── apps/
 ```
 
 Do not add `CONTEXT-MAP.md` or package-local context glossaries unless the domain is deliberately split into independently named contexts.

@@ -4,16 +4,13 @@ import 'server-only'
  * Server-only admin adapter (serpcompany/best.serp.co#64): acquires and validates the `DB`
  * binding and builds the admin reads and the decision context for one request. The caller has
  * already authorized an admin (`requireAdmin()` or `authorizeAdminRequest()`); the admin's email
- * is the actor recorded on every decision. All SQL lives in `@serpdirectory/data-ops`.
+ * is the actor recorded on every decision. All SQL lives in `@/db`.
  */
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import {
-  type AdminReadOperations,
-  createAdminReadOperations
-} from '@serpdirectory/data-ops/admin-queries'
-import { type AdminOrderRow, createBillingOperations } from '@serpdirectory/data-ops/billing'
-import { createDatabase, type Database } from '@serpdirectory/data-ops/client'
 import { cache } from 'react'
+import { type AdminReadOperations, createAdminReadOperations } from '@/db/admin-queries'
+import { type AdminOrderRow, createBillingOperations } from '@/db/billing'
+import { createDatabase, type Database } from '@/db/client'
 import { billing } from '../billing/runtime'
 import { previewRefund, refundOrder, refundRejectedSubmission } from '../billing/service'
 import { emailEventKey, enqueueEmail } from '../email/server'

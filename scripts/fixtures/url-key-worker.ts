@@ -1,4 +1,4 @@
-import { urlKey } from '@serpdirectory/utils/url-key'
+import { urlKey } from '../../apps/web/src/lib/url-key'
 
 /**
  * Test fixture for `scripts/d1-workerd-plans.test.ts`: runs `urlKey()` (and so the Public Suffix

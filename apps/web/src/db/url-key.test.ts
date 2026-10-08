@@ -1,5 +1,5 @@
-import { isHostBlocked, urlKey, websiteSpellings } from '@serpdirectory/utils/url-key'
 import { describe, expect, it } from 'vitest'
+import { isHostBlocked, urlKey, websiteSpellings } from '@/lib/url-key'
 
 describe('urlKey (shared website normalization, #62 review finding 4)', () => {
   it('reaches one host for case, trailing dots, percent-encoding, www, and IDN variants', () => {

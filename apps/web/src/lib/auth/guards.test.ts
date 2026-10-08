@@ -1,5 +1,5 @@
-import type { AdminStatus } from '@serpdirectory/data-ops/auth'
 import { describe, expect, it, vi } from 'vitest'
+import type { AdminStatus } from '@/db/auth'
 import {
   authorizationErrorResponse,
   authorizeAdmin,

@@ -4,10 +4,11 @@
  * uniform answers of per-email limits; the attempt cap and the code binding; roles from the
  * allowlist; and the fail-closed staging and production behavior.
  */
-import { createAuthOperations } from '@serpdirectory/data-ops/auth'
-import { createDatabase } from '@serpdirectory/data-ops/client'
-import { SqliteD1 } from '@serpdirectory/data-ops/test-support'
+
 import { beforeEach, describe, expect, it } from 'vitest'
+import { createAuthOperations } from '@/db/auth'
+import { createDatabase } from '@/db/client'
+import { SqliteD1 } from '@/db/test-support'
 import {
   ALLOWED_AUTH_ENDPOINTS,
   type Auth,

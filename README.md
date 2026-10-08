@@ -5,7 +5,7 @@ directory. It is a Next.js app deployed as a Cloudflare Worker (OpenNext) with i
 catalog in Cloudflare D1.
 
 - Runtime listings, categories, search, RSS, and sitemaps read from the `DB` binding.
-- The schema lives in `packages/data-ops/src/schema.ts`; migrations live in `d1/drizzle/`.
+- The schema lives in `apps/web/src/db/schema.ts`; migrations live in `apps/web/drizzle/`.
 - Reviewed catalog changes live in `d1/publications/`; public submissions are staged
   in D1 and approved by a maintainer (see [Submission flow](./docs/SUBMISSION_FLOW.md)).
 

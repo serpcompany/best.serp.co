@@ -114,7 +114,7 @@ Guards, in order:
    `hotfix-*` PR may only `deploy` without it) and a `main` that still points at the release.
    The publisher and `media-upload.ts` apply their own guards.
 4. `plan-release` refuses a database with migrations this commit lacks. `deploy` first proves
-   that every `d1/drizzle` migration is applied and that a catalog publication exists.
+   that every `apps/web/drizzle` migration is applied and that a catalog publication exists.
 
 The HTTP gates: [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts).
 
@@ -156,7 +156,7 @@ PR Review already gates every merge, and Main Validation re-runs the full loop o
    fast-forwards `main` to that verified commit ([Promotion](./RELEASE_GUARDS.md#promotion)).
 3. The push to `main` runs Deploy Production: the staging check finds that commit's own run,
    the `production` reviewers approve, and the release bookmarks and migrates D1 first only
-   when `d1/drizzle` migrations are pending.
+   when `apps/web/drizzle` migrations are pending.
 
 Migrations are forward-only and applied before the new Worker deploys, so each must stay
 compatible with the live Worker while it applies. A `deploy-best.serp.co-production` dispatch

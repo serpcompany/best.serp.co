@@ -21,9 +21,9 @@ and the webhook answer 404, `/admin/orders/` is a 404, and the sweep does nothin
 | Service | `apps/web/src/lib/billing/service.ts` | Checkout, webhook, fulfilment, refunds, the sweep |
 | Guardrails | `apps/web/src/lib/billing/guardrails.ts` | Checks before a paid submission goes live |
 | Runtime | `apps/web/src/lib/billing/{runtime,worker-billing,flags,http}.ts` | Bindings, the flag, route helpers |
-| Ledger | `packages/data-ops/src/billing.ts` | `orders` and `billing_events` statement plans and reads |
+| Ledger | `apps/web/src/db/billing.ts` | `orders` and `billing_events` statement plans and reads |
 
-The architecture guard keeps billing SQL in `packages/data-ops` and every Stripe specific (API
+The architecture guard keeps billing SQL in `apps/web/src/db` and every Stripe specific (API
 host, signature header, event names, secret names) in `lib/billing/providers/`. Swapping in Lago
 means a `providers/lago.ts` implementing `BillingProvider` and a change in `providers/index.ts`.
 
@@ -31,7 +31,7 @@ means a `providers/lago.ts` implementing `BillingProvider` and a change in `prov
 emails, in the admin panel, in error lines, in the legal pages, or in the item names sent to the
 provider's own checkout page. Copy says "secure checkout", "our payment provider", or "payment".
 An architecture guard fails on the name in any string or JSX text outside
-`lib/billing/providers/` (the app, the UI packages, `packages/data-ops/src`, and
+`lib/billing/providers/` (the app, the UI packages, `apps/web/src/db/src`, and
 `apps/web/content/`), pins the provider page's item name to the order's neutral
 description, and the end-to-end suite checks every screen it visits.
 

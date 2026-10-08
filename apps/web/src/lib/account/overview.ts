@@ -1,7 +1,7 @@
 import 'server-only'
 
-import type { AccountOverview } from '@serpdirectory/data-ops/account'
 import { cache } from 'react'
+import type { AccountOverview } from '@/db/account'
 import { accountOperations } from './runtime'
 
 /** The user's submissions and listings, read once per request (the layout and the page share it). */

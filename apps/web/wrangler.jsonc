@@ -32,8 +32,8 @@
     {
       "binding": "DB",
       "database_name": "best-serp-co-local",
-      "database_id": "00000000-0000-0000-0000-000000000001",
-      "migrations_dir": "../../d1/drizzle",
+      "database_id": "local-only-do-not-deploy",
+      "migrations_dir": "drizzle",
       "migrations_table": "d1_migrations"
     }
   ],
@@ -72,7 +72,7 @@
           "binding": "DB",
           "database_name": "best-serp-co-staging",
           "database_id": "8e6b67e5-9c58-4fa9-aca1-25b0020c0833",
-          "migrations_dir": "../../d1/drizzle",
+          "migrations_dir": "drizzle",
           "migrations_table": "d1_migrations"
         }
       ],
@@ -116,7 +116,7 @@
           "binding": "DB",
           "database_name": "best-serp-co-production",
           "database_id": "404ec437-53a2-4fbc-8b5f-b5e69065708e",
-          "migrations_dir": "../../d1/drizzle",
+          "migrations_dir": "drizzle",
           "migrations_table": "d1_migrations"
         }
       ],

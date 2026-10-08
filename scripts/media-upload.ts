@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto'
 import { readFileSync, realpathSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { IMAGE_CONTENT_TYPES, sniffImage } from '@serpdirectory/data-ops/media-format'
+import { z } from 'zod'
+import { IMAGE_CONTENT_TYPES, sniffImage } from '../apps/web/src/db/media-format'
 import {
   contentTypeForKey,
   isListingMediaKey,
@@ -11,10 +12,9 @@ import {
   MEDIA_HASH_LENGTH,
   MEDIA_SITE,
   parseMediaKey
-} from '@serpdirectory/data-ops/media-keys'
-import { safeFetch } from '@serpdirectory/data-ops/safe-fetch'
-import { nodeFetch } from '@serpdirectory/data-ops/safe-fetch-node'
-import { z } from 'zod'
+} from '../apps/web/src/db/media-keys'
+import { safeFetch } from '../apps/web/src/db/safe-fetch'
+import { nodeFetch } from '../apps/web/src/db/safe-fetch-node'
 import { project } from './project'
 import {
   describeFetchError,

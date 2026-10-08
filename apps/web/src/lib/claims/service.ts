@@ -8,10 +8,10 @@ import {
   type ClaimListing,
   type ClaimOperations,
   type ListingClaim
-} from '@serpdirectory/data-ops/claims'
-import type { StatementPlan } from '@serpdirectory/data-ops/plan-support'
-import type { ListingClaimMethod } from '@serpdirectory/data-ops/schema'
-import { CONCLUSIVE_VERIFICATION_FAILURES } from '@serpdirectory/data-ops/submissions'
+} from '@/db/claims'
+import type { StatementPlan } from '@/db/plan-support'
+import type { ListingClaimMethod } from '@/db/schema'
+import { CONCLUSIVE_VERIFICATION_FAILURES } from '@/db/submissions'
 import { CLAIM_CODE_LENGTH, CLAIM_CODE_TTL_SECONDS } from '../email/emails/codes'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'
 import { checkClaimAddress, claimBlockKeys, screenClaimAddress } from './address'

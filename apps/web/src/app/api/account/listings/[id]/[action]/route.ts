@@ -1,4 +1,4 @@
-import { validateExtras } from '@serpdirectory/data-ops/account'
+import { validateExtras } from '@/db/account'
 import { revisionRequestSchema } from '@/lib/account/contract'
 import { sendRevisionReadyAlert } from '@/lib/account/emails'
 import {

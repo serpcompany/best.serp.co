@@ -207,7 +207,8 @@ export function runDrizzleLocalCommand(args: string[]): void {
     )
   }
   if (command === 'generate') {
-    execFileSync('pnpm', ['exec', 'drizzle-kit', 'generate', '--config', 'drizzle.config.ts'], {
+    execFileSync('pnpm', ['exec', 'drizzle-kit', 'generate'], {
+      cwd: resolve('apps/web'),
       env: process.env,
       stdio: 'inherit'
     })

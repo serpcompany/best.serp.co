@@ -1,10 +1,10 @@
-import { type SafeFetchFailure, safeFetch } from '@serpdirectory/data-ops/safe-fetch'
+import { type SafeFetchFailure, safeFetch } from '../../db/safe-fetch'
 import {
   iconCandidates,
   type ProposedText,
   parseSiteMetadata,
   type SiteMetadata
-} from '@serpdirectory/data-ops/site-metadata'
+} from '../../db/site-metadata'
 
 // The page parser is shared with media ingestion (#95); the form-specific proposals stay here.
 export {
@@ -14,7 +14,7 @@ export {
   type ProposedText,
   parseSiteMetadata,
   type SiteMetadata
-} from '@serpdirectory/data-ops/site-metadata'
+} from '../../db/site-metadata'
 
 /**
  * URL prefill for `/submit` (serpcompany/best.serp.co#59, #63), without AI: read the submitted

@@ -1,5 +1,5 @@
-import { safeFetch } from '@serpdirectory/data-ops/safe-fetch'
-import { urlKey } from '@serpdirectory/utils/url-key'
+import { safeFetch } from '@/db/safe-fetch'
+import { urlKey } from '@/lib/url-key'
 
 /**
  * The product's own site, which a claim proves (serpcompany/best.serp.co#67, #108 review round

@@ -1,4 +1,3 @@
-import type { ActivityEvent, AdminListingDetail } from '@serpdirectory/data-ops/admin-queries'
 import {
   formatDateTime,
   formatDay,
@@ -7,6 +6,7 @@ import {
   PAID_LISTING_PRICE_CENTS
 } from '@/components/admin/format'
 import type { ListingDetailView } from '@/components/admin/listing-detail'
+import type { ActivityEvent, AdminListingDetail } from '@/db/admin-queries'
 import { renderableImage } from '../media/renderable-image'
 import { verifiedViaLabel } from './listing-labels'
 import { logoNote } from './logo-note'

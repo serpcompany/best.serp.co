@@ -103,7 +103,7 @@ describe('email module boundary', () => {
     expect(resolved).toBeGreaterThan(binding)
     expect(database).toBeGreaterThan(resolved)
     expect(runtime.match(/createDatabase\(/gu)).toHaveLength(1)
-    expect(runtime).toContain('@serpdirectory/data-ops/email-deliveries')
+    expect(runtime).toContain('@/db/email-deliveries')
 
     for (const file of readdirSync(emailDirectory).filter(name => name.endsWith('.ts'))) {
       if (file.endsWith('.test.ts')) continue

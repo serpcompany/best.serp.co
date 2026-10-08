@@ -1,4 +1,4 @@
-import { urlKey, websiteSpellings } from '@serpdirectory/utils/url-key'
+import { urlKey, websiteSpellings } from '@/lib/url-key'
 import { type HostedMedia, isListingMediaKey } from './media-keys'
 import { buildQueueMediaPlans, buildRecordMediaFailurePlans } from './media-plans'
 import {

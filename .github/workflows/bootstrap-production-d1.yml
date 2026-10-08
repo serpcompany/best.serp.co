@@ -2,7 +2,7 @@ name: Bootstrap Production D1
 
 # Initial catalog import into an EMPTY production D1 (first run: 36800330629). After recording a
 # D1 Time Travel bookmark in the run summary, the import refuses any existing publication or
-# catalog rows before changing anything, applies the d1/drizzle migrations, imports
+# catalog rows before changing anything, applies the apps/web/drizzle migrations, imports
 # d1/artifacts/best-serp-co-v1.sql.br only if its sha256 matches the parity report, then proves
 # exact parity with the report. Because it applies every migration at this commit, it runs only
 # for a commit whose tree Deploy Staging verified on the staging branch (staging before

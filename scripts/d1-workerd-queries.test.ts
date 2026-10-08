@@ -2,21 +2,21 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { createAuthOperations } from '@serpdirectory/data-ops/auth'
-import { noCatalogDataCache } from '@serpdirectory/data-ops/cache'
-import { createCatalogOperations, MAX_SEARCH_LIMIT } from '@serpdirectory/data-ops/catalog'
-import { createDatabase } from '@serpdirectory/data-ops/client'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { getPlatformProxy } from 'wrangler'
+import { createAuthOperations } from '../apps/web/src/db/auth'
+import { noCatalogDataCache } from '../apps/web/src/db/cache'
+import { createCatalogOperations, MAX_SEARCH_LIMIT } from '../apps/web/src/db/catalog'
+import { createDatabase } from '../apps/web/src/db/client'
 import type {
   CatalogCacheEvent,
   CatalogQueryEvent,
   CatalogQueryShape
-} from '@serpdirectory/data-ops/contracts'
-import { createDraftJobOperations } from '@serpdirectory/data-ops/draft-jobs'
-import { createEmailDeliveryLedger } from '@serpdirectory/data-ops/email-deliveries'
-import { assertD1StatementLimits } from '@serpdirectory/data-ops/sql-limits'
-import { createSubmissionOperations } from '@serpdirectory/data-ops/submissions'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { getPlatformProxy } from 'wrangler'
+} from '../apps/web/src/db/contracts'
+import { createDraftJobOperations } from '../apps/web/src/db/draft-jobs'
+import { createEmailDeliveryLedger } from '../apps/web/src/db/email-deliveries'
+import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
+import { createSubmissionOperations } from '../apps/web/src/db/submissions'
 import { project } from './project'
 
 vi.mock('server-only', () => ({}))

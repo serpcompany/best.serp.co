@@ -1,4 +1,4 @@
-import { urlKey } from '@serpdirectory/utils/url-key'
+import { urlKey } from '@/lib/url-key'
 import { isForeignDomain } from './product'
 
 /**

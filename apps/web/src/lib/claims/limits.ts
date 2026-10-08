@@ -1,4 +1,4 @@
-import type { AuthRateLimitRule } from '@serpdirectory/data-ops/auth'
+import type { AuthRateLimitRule } from '@/db/auth'
 
 const HOUR = 60 * 60_000
 

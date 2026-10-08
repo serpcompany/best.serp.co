@@ -27,7 +27,9 @@ reproduce the committed parity report exactly.
 
 State lives under `.wrangler/drizzle-state/best-serp-co/` and uses the synthetic
 local database in `apps/web/wrangler.jsonc`. Repeating `migrate` or `import` after a
-successful import is a no-op.
+successful import is a no-op. Wrangler names the SQLite file after the local `database_id`, so
+when the id changes (#176 set it to `local-only-do-not-deploy`), delete that directory first;
+otherwise `db:verify:local` finds two databases.
 
 ## Run the Worker
 
@@ -58,7 +60,7 @@ seeded admin. Cloudflare Access is off locally and on staging; to exercise it, s
 
 ## Schema changes
 
-Edit `packages/data-ops/src/schema.ts`, then generate and apply a migration locally:
+Edit `apps/web/src/db/schema.ts`, then generate and apply a migration locally:
 
 ```bash
 pnpm db:generate

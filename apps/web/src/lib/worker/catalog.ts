@@ -4,8 +4,8 @@ import {
   legacyRootTarget,
   readCatalogEpoch,
   shareCatalogEpochToken
-} from '@serpdirectory/data-ops/catalog-epoch'
-import { createDatabase } from '@serpdirectory/data-ops/client'
+} from '@/db/catalog-epoch'
+import { createDatabase } from '@/db/client'
 import { type EdgeCacheContext, EpochMemo, loadSharedEpoch } from '../edge-cache/html-cache'
 import { goneListingRenderer } from '../routing/gone-listing'
 

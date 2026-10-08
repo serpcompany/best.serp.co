@@ -1,5 +1,5 @@
-import { validateExtras } from '@serpdirectory/data-ops/account'
-import { validateDraftContent } from '@serpdirectory/data-ops/submissions'
+import { validateExtras } from '@/db/account'
+import { validateDraftContent } from '@/db/submissions'
 import { extrasRequestSchema, resubmitRequestSchema } from '@/lib/account/contract'
 import { sendResubmittedAlert } from '@/lib/account/emails'
 import {

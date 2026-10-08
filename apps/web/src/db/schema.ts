@@ -613,7 +613,7 @@ export const listingSubmissions = sqliteTable(
     draftLastReminderAt: text('draft_last_reminder_at'),
     withdrawalReason: text('withdrawal_reason', { enum: withdrawalReasons }),
     /**
-     * What a prohibited rejection blocks (`urlKey()` in `@serpdirectory/utils/url-key`): the
+     * What a prohibited rejection blocks (`urlKey()` in `@/lib/url-key`): the
      * registrable domain of `slug`, covering its subdomains, or the host itself when it has no
      * registrable domain (a public suffix such as `github.io`, or an IP address). Null only on
      * rows written before #62 (or by a pre-#62 Worker), which block their exact host.
@@ -857,7 +857,7 @@ export const emailDeliveries = sqliteTable(
  * Better Auth tables (serpcompany/best.serp.co#60). Property names are Better Auth's field
  * names, which its Drizzle adapter reads; columns are snake_case like the rest of the schema.
  * Timestamps are epoch milliseconds (`timestamp_ms`), as Better Auth's own SQLite schema
- * generator writes them. `packages/data-ops/src/auth.ts` passes exactly these tables to the
+ * generator writes them. `apps/web/src/db/auth.ts` passes exactly these tables to the
  * adapter and `auth.test.ts` checks them against Better Auth's expected schema.
  */
 const epochMillisecondsNow = sql`(cast(unixepoch('subsecond') * 1000 as integer))`
@@ -977,7 +977,7 @@ export const adminAllowlist = sqliteTable(
 )
 
 /**
- * Sliding-window log behind the sign-in code limits (`packages/data-ops/src/auth.ts`). A row
+ * Sliding-window log behind the sign-in code limits (`apps/web/src/db/auth.ts`). A row
  * records one allowed request for a bucket: an HMAC-SHA256 digest, under a key the app derives
  * from `BETTER_AUTH_SECRET`, of a scope and a normalized key (an email, an IP address or IPv6 /64,
  * or both), never the key itself. Rows are pseudonymous: without the secret they cannot be

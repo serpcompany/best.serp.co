@@ -1,7 +1,4 @@
-import type {
-  BadgeCheckRecord,
-  BadgeProgramOperations
-} from '@serpdirectory/data-ops/badge-program'
+import type { BadgeCheckRecord, BadgeProgramOperations } from '@/db/badge-program'
 import { badgeCheckRecord, type VerifyListingBadge } from './program'
 
 /**

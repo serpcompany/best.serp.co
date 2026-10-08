@@ -3,7 +3,7 @@
  * sitemaps), applied by the Worker entry (`apps/web/worker.ts`) in front of OpenNext.
  *
  * Public content only changes when the catalog epoch changes (a publication, an approval,
- * or a scheduled listing becoming due; see `@serpdirectory/data-ops/catalog-epoch`), and
+ * or a scheduled listing becoming due; see `@/db/catalog-epoch`), and
  * rendered markup only changes with a deployment. Both are part of every cache key, so a
  * hit never needs D1 or the Next.js server and nothing has to be purged: new keys simply
  * stop matching old entries, which then expire.

@@ -6,7 +6,7 @@ its own D1 database bound as `DB`.
 
 Server components and route handlers call the server-only catalog adapter. The adapter
 validates the binding and `D1_RUNTIME_ENV`, then constructs the shared
-`@serpdirectory/data-ops` operations, which run prepared SQL and map rows into summary
+`@/db` operations, which run prepared SQL and map rows into summary
 and detail DTOs. There is no filesystem fallback.
 
 ```text
@@ -15,13 +15,13 @@ Browser
      trailing-slash redirects, the crawl policy, then the epoch-keyed edge HTML cache
   -> OpenNext / Next.js routes (apps/web), on a cache miss
      -> server-only catalog adapter (apps/web/src/lib/catalog)
-        -> catalog operations (packages/data-ops) -> D1 (DB) public catalog tables
+        -> catalog operations (apps/web/src/db) -> D1 (DB) public catalog tables
      -> server-only submission adapter (apps/web/src/lib/submissions)
-        -> submission operations (packages/data-ops) -> D1 (DB) private intake tables
+        -> submission operations (apps/web/src/db) -> D1 (DB) private intake tables
      -> server-only account adapter (apps/web/src/lib/auth): Better Auth, requireUser/requireAdmin
-        -> account operations (packages/data-ops/auth) -> D1 (DB) users, sessions, allowlist
+        -> account operations (apps/web/src/db/auth) -> D1 (DB) users, sessions, allowlist
      -> server-only admin adapter (apps/web/src/lib/admin), /admin and /api/admin only
-        -> admin reads and statement plans (packages/data-ops) -> D1 (DB), production included
+        -> admin reads and statement plans (apps/web/src/db) -> D1 (DB), production included
 ```
 
 `/admin` and `/api/admin` pass the Worker entry's Cloudflare Access and session-cookie gate
@@ -47,7 +47,7 @@ change runs in a protected workflow.
   delegates to the generated `.open-next/worker.js`. It reads only the catalog epoch, where an
   unrouted `/<slug>` moved (`lib/routing/legacy-root.ts`), and, after a listing page rendered
   404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is rendered
-  again as the 410 gone page), all through `packages/data-ops/`.
+  again as the 410 gone page), all through `apps/web/src/db/`.
   Its `scheduled()` handler runs `lib/worker/scheduled.ts`, which maps each Cron Trigger to its
   jobs: [draft reminders](./SUBMISSION_FLOW.md#draft-reminders-and-expiry) and the
   [billing sweep](./BILLING.md) (hourly), and the [badge program](./BADGE_PROGRAM.md).
@@ -55,30 +55,30 @@ change runs in a protected workflow.
   and deduplicates reads per request. It contains no SQL.
 - `apps/web/src/lib/submissions/` validates the binding, fetches submitters' pages and images
   only through its bounded safe fetcher (badge checks, URL prefill, logo checks), and
-  delegates every submission read and write to `packages/data-ops/`, scoped to the owner.
+  delegates every submission read and write to `apps/web/src/db/`, scoped to the owner.
   `apps/web/src/lib/claims/` does the same for [claims](./CLAIMS.md) (#67).
 - `apps/web/src/lib/email/` sends transactional email through the useSend API after the
   response, claims each template and event key in the `email_deliveries` ledger
-  (`packages/data-ops/`) so it never sends twice, and only logs locally
+  (`apps/web/src/db/`) so it never sends twice, and only logs locally
   ([Email](./EMAIL.md)).
 - `apps/web/src/lib/admin/` validates the binding for the admin panel, parses `/api/admin/*`
-  bodies, and runs each decision as reviewed plans from `packages/data-ops/` (no SQL here).
+  bodies, and runs each decision as reviewed plans from `apps/web/src/db/` (no SQL here).
 - `apps/web/src/lib/auth/` configures Better Auth (email sign-in codes) on the `DB` binding,
   serves `/api/auth/*`, guards admin routes, and verifies Cloudflare Access JWTs; account SQL
-  lives in `packages/data-ops/src/auth.ts` ([Accounts](./ACCOUNTS.md)).
+  lives in `apps/web/src/db/auth.ts` ([Accounts](./ACCOUNTS.md)).
 - `apps/web/src/lib/site/` is the checked-in site definition (name, domain, copy, routes,
   badges, feature flags, the route registry); `apps/web/content/` holds the MDX content.
 - `src/components/`, `src/hooks/`, and `src/lib/{seo,site,directory,analytics,routing}/`
   hold the page and view building blocks (from `packages/web-core`, #174); they read the site
   definition through `siteConfig` and never obtain a database binding.
-- `packages/data-ops/` owns the Drizzle schema, the injected D1 client, catalog DTOs,
+- `apps/web/src/db/` owns the Drizzle schema, the injected D1 client, catalog DTOs,
   eligibility SQL, pagination, redirects, related ranking, adjacency, the catalog
   epoch and the epoch-keyed data cache, query telemetry, and all submission operations.
   It receives the database, clock, cache, and observer explicitly.
-- `d1/drizzle/` owns the migration history applied by Wrangler.
+- `apps/web/drizzle/` owns the migration history applied by Wrangler.
 - `d1/publications/` owns reviewed catalog mutations.
 - The publishers in `scripts/` consume credential-free statement plans from
-  `packages/data-ops/`; they are the only layer that acquires credentials or calls remote
+  `apps/web/src/db/`; they are the only layer that acquires credentials or calls remote
   APIs.
 - `scripts/migration/` holds the one-time JSON import and page comparison tooling. It
   is never imported by runtime or build code.
@@ -155,10 +155,10 @@ Every URL has one canonical form, per the SERP URL trailing-slash and sitemap st
 | `/api`, `/api/*`, `/.well-known/*`, `/_next/*` | served exactly as requested | never redirected |
 
 `apps/web/src/lib/seo/canonical-url.ts` defines the rule. A file is a path whose last segment ends
-in a known file extension (`FILE_EXTENSIONS` in `packages/utils/file-extensions.ts`), not any dot:
+in a known file extension (`FILE_EXTENSIONS` in `apps/web/src/lib/file-extensions.ts`), not any dot:
 most listing slugs are domain names (`autoenhance.ai`), and their pages keep the slash. Never add an
 extension that is also a top-level domain. The data side holds the invariant: submission intake
-(`packages/data-ops/src/submissions.ts`), the admin panel's approval
+(`apps/web/src/db/submissions.ts`), the admin panel's approval
 (`apps/web/src/lib/admin/decisions.ts`), and the publication manifest schema
 (`scripts/d1-publisher.ts`) refuse a listing slug that ends in one of these extensions (`chart.js`),
 and a test checks the committed import.
@@ -228,7 +228,7 @@ canonical is `/`. Page 1 is the bare URL; pages 2+ are linked with plain `<a hre
 canonicalize to themselves, carry `noindex, follow` and a "- Page N" title, and a page
 past the end is a 404. Category JSON-LD describes the whole category on every page.
 `apps/web/src/components/directory/listing-pagination.tsx` owns the parameter, links, and metadata;
-`getListingNamePage` in `packages/data-ops` reads one page (ids in name order are cached
+`getListingNamePage` in `apps/web/src/db` reads one page (ids in name order are cached
 per epoch, then only that page's summaries are read). Routes never load the full catalog
 for display; only the sitemaps and the JSON feed read every listing.
 
@@ -236,7 +236,7 @@ for display; only the sitemaps and the JSON feed read every listing.
 
 Public content changes only with the **catalog epoch**: `publication_state.version` plus
 the newest `published_at` that is already public (so a listing scheduled for the future
-appears when it becomes due, without a publication). `packages/data-ops/src/catalog-epoch.ts`
+appears when it becomes due, without a publication). `apps/web/src/db/catalog-epoch.ts`
 reads it with one statement (two index seeks). Four layers, from the edge inward:
 
 1. **Edge HTML cache** (`apps/web/worker.ts`, logic in `apps/web/src/lib/edge-cache/`). The
@@ -260,7 +260,7 @@ reads it with one statement (two index seeks). Four layers, from the edge inward
    purged: old keys stop matching and expire. The entry shares the epoch with the renders in
    its isolate (`shareCatalogEpochToken`, a global, never a request header), so a render
    reuses it for up to 30 seconds instead of reading it again.
-3. **Data cache** (Workers Cache API, `packages/data-ops/src/cache.ts`). Shell counts,
+3. **Data cache** (Workers Cache API, `apps/web/src/db/cache.ts`). Shell counts,
    name order, name pages, featured/latest heads, details, search results (per normalized
    query and limit), and the full summary list (for sitemaps and the feed) are cached under
    epoch-scoped keys for 24 hours, with live D1 fallback when the cache fails.
@@ -295,5 +295,5 @@ Conditional badge verification, rejection, and approval plans place a `changes()
 assertion after every compare-and-swap transition in the same batch, so a stale
 status, publication version, or checksum rolls the whole batch back.
 
-`drizzle.config.ts` is credential-free: it generates reviewable SQL in `d1/drizzle/`;
+`apps/web/drizzle.config.ts` is credential-free: it generates reviewable SQL in `apps/web/drizzle/`;
 Wrangler owns migration application and the `d1_migrations` ledger.

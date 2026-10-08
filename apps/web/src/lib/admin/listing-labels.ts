@@ -1,4 +1,4 @@
-import type { AdminListingRow } from '@serpdirectory/data-ops/admin-queries'
+import type { AdminListingRow } from '@/db/admin-queries'
 
 /** Labels the listing screens share (#64 screen 12). */
 

@@ -3,7 +3,7 @@ import type {
   AccountListing,
   AccountOverview,
   AccountSubmission
-} from '@serpdirectory/data-ops/account'
+} from '@/db/account'
 import { site } from '@/lib/site'
 import {
   draftExpiresInDays,

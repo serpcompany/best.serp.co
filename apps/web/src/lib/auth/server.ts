@@ -13,16 +13,12 @@ import 'server-only'
  * route answers 503 and the guards never grant access.
  */
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import {
-  type AuthRateLimitDecision,
-  type AuthRateLimitRule,
-  createAuthOperations
-} from '@serpdirectory/data-ops/auth'
-import { createDatabase } from '@serpdirectory/data-ops/client'
-import { pruneEmailDeliveries } from '@serpdirectory/data-ops/email-deliveries'
 import { headers } from 'next/headers'
 import { forbidden, unauthorized } from 'next/navigation'
 import { cache } from 'react'
+import { type AuthRateLimitDecision, type AuthRateLimitRule, createAuthOperations } from '@/db/auth'
+import { createDatabase } from '@/db/client'
+import { pruneEmailDeliveries } from '@/db/email-deliveries'
 import { type Auth, createAuth } from './config'
 import {
   type Authorization,
@@ -264,7 +260,7 @@ export async function getRequestUser(request: Request): Promise<SessionUser | nu
 
 /**
  * Counts one request against `rules` in D1 (the sliding-window limits sign-in uses,
- * `consumeRateLimit` in `@serpdirectory/data-ops/auth`), keyed with the Worker's rate-limit key.
+ * `consumeRateLimit` in `@/db/auth`), keyed with the Worker's rate-limit key.
  */
 export async function consumeRequestRateLimit(
   rules: readonly AuthRateLimitRule[]

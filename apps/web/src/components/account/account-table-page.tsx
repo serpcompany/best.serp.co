@@ -1,4 +1,3 @@
-import type { AccountOverview } from '@serpdirectory/data-ops/account'
 import { Inbox, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactElement } from 'react'
@@ -13,6 +12,7 @@ import {
   EmptyMedia,
   EmptyTitle
 } from '@/components/ui/empty'
+import type { AccountOverview } from '@/db/account'
 import { accountBadgeTarget, badgePanelCopy, badgeSiteName } from '@/lib/account/presentation'
 import { type AccountRow, accountCards, accountRows } from '@/lib/account/view'
 import { ordersEnabled } from '@/lib/billing/runtime'

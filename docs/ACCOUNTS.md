@@ -20,7 +20,7 @@ email is #61.
 
 | Piece | Where |
 |---|---|
-| Schema, adapter, allowlist, role sync, rate limiter | `packages/data-ops/src/{schema,auth}.ts` |
+| Schema, adapter, allowlist, role sync, rate limiter | `apps/web/src/db/{schema,auth}.ts` |
 | Better Auth configuration | `apps/web/src/lib/auth/config.ts` |
 | Settings per environment (vars, secret) | `apps/web/src/lib/auth/settings.ts` |
 | Code delivery (`OtpSender`) | `apps/web/src/lib/auth/{otp-sender,sign-in-code-email}.ts` |
@@ -193,7 +193,7 @@ Requests that pass reach pages and handlers, which call `requireAdmin()` (Next.j
 trusted origins, since every `*.serp.co` site is same-site). `/admin/` redirects admins to
 the review queue ([Admin panel](./ADMIN_PANEL.md)). Unknown admin paths are caught by `app/admin/[...path]`
 and `app/api/admin/[[...path]]`. `scripts/architecture-guard.test.ts` fails any admin page or
-route that does not call the guard, and any Server Action anywhere in `apps/web` or `packages/`
+route that does not call the guard, and any Server Action anywhere in `apps/web`
 (actions are reachable by id from any path, so no path gate sees them; #64 decided that admin
 writes are `/api/admin` route handlers). Access is required in
 production (and whenever `SITE_ENVIRONMENT` is not exactly `local` or `staging`); locally and

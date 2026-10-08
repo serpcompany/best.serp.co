@@ -18,7 +18,7 @@
  * (`declaredEncodings`) and fails closed when they disagree (`badge-verifier.ts`).
  */
 
-import { type ExtractedMimeType, extractMimeTypes } from '@serpdirectory/data-ops/mime-type'
+import { type ExtractedMimeType, extractMimeTypes } from '../../db/mime-type'
 
 /** WHATWG Encoding: each encoding's name and its labels (encoding.spec.whatwg.org). */
 const ENCODINGS: ReadonlyArray<readonly [string, string]> = [
@@ -114,7 +114,7 @@ function bomEncoding(bytes: Uint8Array): string | null {
 }
 
 /**
- * Fetch's MIME parsing lives in `@serpdirectory/data-ops/mime-type`, shared with `safeFetch`;
+ * Fetch's MIME parsing lives in `@/db/mime-type`, shared with `safeFetch`;
  * it is re-exported here for the encoding sniffing below and its tests.
  */
 export {
@@ -122,7 +122,7 @@ export {
   type MimeType,
   parseMimeType,
   splitHeaderValue
-} from '@serpdirectory/data-ops/mime-type'
+} from '../../db/mime-type'
 
 /**
  * `fetchMimeType`, failing closed (round 4): also null when the values name different MIME

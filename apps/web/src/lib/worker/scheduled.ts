@@ -15,9 +15,9 @@
  * a job throws instead of guessing. Emails go through the same email module as requests
  * (`createWorkerEmailService`), which disables itself when delivery is not configured.
  */
-import { createBadgeProgramOperations } from '@serpdirectory/data-ops/badge-program'
-import { createDatabase } from '@serpdirectory/data-ops/client'
-import { createDraftJobOperations } from '@serpdirectory/data-ops/draft-jobs'
+import { createBadgeProgramOperations } from '@/db/badge-program'
+import { createDatabase } from '@/db/client'
+import { createDraftJobOperations } from '@/db/draft-jobs'
 import { site } from '@/lib/site'
 import { runBadgeProgram } from '../badge-program/program'
 import { BADGE_DAILY_CRON, BADGE_WEEKLY_CRON } from '../badge-program/schedule'

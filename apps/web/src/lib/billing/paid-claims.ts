@@ -1,5 +1,5 @@
-import { CLAIM_VERIFIED_TTL_HOURS, createClaimOperations } from '@serpdirectory/data-ops/claims'
-import type { Database } from '@serpdirectory/data-ops/client'
+import { CLAIM_VERIFIED_TTL_HOURS, createClaimOperations } from '@/db/claims'
+import type { Database } from '@/db/client'
 import { claimFlags } from '../claims/flags'
 import { safeResolveLanding } from '../claims/product'
 import { completePaidClaim } from '../claims/service'

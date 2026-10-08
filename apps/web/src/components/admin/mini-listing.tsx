@@ -1,6 +1,6 @@
-import type { ListingDetail } from '@serpdirectory/data-ops/contracts'
 import { ListingImage } from '@/components/ui/listing-image'
 import { WebsiteContentSectionRoute } from '@/components/website/website-content-section-route'
+import type { ListingDetail } from '@/db/contracts'
 import { ProductLogo } from './product-cell'
 
 /**

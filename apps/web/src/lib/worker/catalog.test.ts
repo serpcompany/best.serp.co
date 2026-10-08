@@ -8,13 +8,13 @@ const epoch = vi.hoisted(() => ({
   shareCatalogEpochToken: vi.fn()
 }))
 
-vi.mock('@serpdirectory/data-ops/catalog-epoch', () => ({
+vi.mock('@/db/catalog-epoch', () => ({
   catalogEpochToken: (value: { database: string }) => `epoch-of-${value.database}`,
   isUnpublishedListingSlug: epoch.isUnpublishedListingSlug,
   readCatalogEpoch: epoch.readCatalogEpoch,
   shareCatalogEpochToken: epoch.shareCatalogEpochToken
 }))
-vi.mock('@serpdirectory/data-ops/client', () => ({
+vi.mock('@/db/client', () => ({
   createDatabase: (database: { name: string }) => ({ database: database.name })
 }))
 

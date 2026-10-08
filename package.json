@@ -30,7 +30,7 @@
     "migration:preflight": "pnpm tsx scripts/migration/preflight.ts",
     "migration:legacy-media": "pnpm tsx scripts/migration/legacy-media.ts",
     "migration:generate": "pnpm tsx scripts/migration/generate-initial-artifact.ts",
-    "db:generate": "pnpm exec drizzle-kit generate --config drizzle.config.ts",
+    "db:generate": "cd apps/web && drizzle-kit generate",
     "db:migrations:list:local": "pnpm tsx scripts/d1-local-guard.ts list",
     "db:migrate:local": "pnpm tsx scripts/d1-local-guard.ts migrate",
     "db:import:local": "pnpm tsx scripts/d1-local-guard.ts import",
@@ -82,8 +82,6 @@
   "devDependencies": {
     "@biomejs/biome": "2.2.2",
     "@manypkg/cli": "^0.23.0",
-    "@serpdirectory/data-ops": "workspace:*",
-    "@serpdirectory/utils": "workspace:*",
     "@types/js-yaml": "^4.0.9",
     "cross-env": "^7.0.3",
     "drizzle-kit": "0.31.11",

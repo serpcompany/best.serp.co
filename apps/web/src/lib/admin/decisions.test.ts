@@ -5,9 +5,10 @@
  * refund pending as the category requires, listing actions log, and the allowlist never loses
  * its last admin.
  */
-import { createDatabase } from '@serpdirectory/data-ops/client'
-import { insertPublishedListing, SqliteD1 } from '@serpdirectory/data-ops/test-support'
+
 import { describe, expect, it, vi } from 'vitest'
+import { createDatabase } from '@/db/client'
+import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
 import {
   type AdminContext,
   addAdmin,

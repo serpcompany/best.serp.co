@@ -1,15 +1,15 @@
 import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { type AccountOperations, createAccountOperations } from '@serpdirectory/data-ops/account'
-import { createDatabase } from '@serpdirectory/data-ops/client'
 import { cache } from 'react'
+import { type AccountOperations, createAccountOperations } from '@/db/account'
+import { createDatabase } from '@/db/client'
 
 /**
  * Server-only adapter for the submitter dashboard (serpcompany/best.serp.co#65): it validates
  * the Worker's `DB` binding and `D1_RUNTIME_ENV` and hands back the account operations, which
  * scope every read and write to the signed-in user in SQL. All SQL lives in
- * `@serpdirectory/data-ops/account`.
+ * `@/db/account`.
  */
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])

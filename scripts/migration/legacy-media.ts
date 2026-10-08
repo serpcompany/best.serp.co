@@ -3,22 +3,22 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
-import { IMAGE_CONTENT_TYPES, sniffImage } from '@serpdirectory/data-ops/media-format'
+import { stringify } from 'yaml'
+import { IMAGE_CONTENT_TYPES, sniffImage } from '../../apps/web/src/db/media-format'
 import {
   type FetchedImage,
   fetchImage,
   type MediaFailure
-} from '@serpdirectory/data-ops/media-ingest'
-import { isListingMediaKey, type MediaKind, mediaKey } from '@serpdirectory/data-ops/media-keys'
-import { safeFetch } from '@serpdirectory/data-ops/safe-fetch'
-import { nodeFetch } from '@serpdirectory/data-ops/safe-fetch-node'
+} from '../../apps/web/src/db/media-ingest'
+import { isListingMediaKey, type MediaKind, mediaKey } from '../../apps/web/src/db/media-keys'
+import { safeFetch } from '../../apps/web/src/db/safe-fetch'
+import { nodeFetch } from '../../apps/web/src/db/safe-fetch-node'
 import {
   iconCandidates,
   metaRefreshUrl,
   parseSiteMetadata
-} from '@serpdirectory/data-ops/site-metadata'
-import { urlKey } from '@serpdirectory/utils/url-key'
-import { stringify } from 'yaml'
+} from '../../apps/web/src/db/site-metadata'
+import { urlKey } from '../../apps/web/src/lib/url-key'
 import { parseWranglerRows } from '../cloudflare-release'
 import { freshMigrationNames, freshMigrationsDirectory } from '../d1-drizzle-local'
 import { readParityReport, readReviewedImportSql } from '../d1-import-artifact'

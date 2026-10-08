@@ -9,7 +9,7 @@
  *                   (`pnpm db:migrations:list:<env>`)
  *   plan-release    read-only: `database-and-worker` when migrations are pending, otherwise
  *                   `worker-only`; refuses a database with migrations this commit lacks
- *   check-database  read-only: every d1/drizzle migration is applied and a publication exists
+ *   check-database  read-only: every apps/web/drizzle migration is applied and a publication exists
  *   verify-import   read-only: exact catalog-table parity with the reviewed import and parity report
  *   bookmark        read-only: the current D1 Time Travel bookmark and its restore command, also
  *                   written to the GitHub step summary; fails when no bookmark can be read
@@ -228,9 +228,9 @@ export function validateRemoteConfig(
     problems.push(`the DB binding must be ${expected.databaseName} (${expected.databaseId})`)
   if (
     !binding?.migrations_dir ||
-    resolve(dirname(resolve(configPath)), binding.migrations_dir) !== resolve('d1/drizzle')
+    resolve(dirname(resolve(configPath)), binding.migrations_dir) !== resolve('apps/web/drizzle')
   )
-    problems.push('the DB binding must apply d1/drizzle migrations')
+    problems.push('the DB binding must apply apps/web/drizzle migrations')
   if (binding?.migrations_table !== project.migrationsTable)
     problems.push(`the DB binding must declare migrations_table ${project.migrationsTable}`)
   const media = block?.r2_buckets?.find(candidate => candidate.binding === 'MEDIA')
@@ -469,7 +469,7 @@ export interface MigrationLedger {
   unknownMigrations: string[]
 }
 
-/** Compares the D1 migration ledger with d1/drizzle using SELECTs only. */
+/** Compares the D1 migration ledger with apps/web/drizzle using SELECTs only. */
 export async function readMigrationLedger(
   d1: D1Target,
   tables?: Set<string>
@@ -716,7 +716,7 @@ export async function catalogOccupancy(
 
 /**
  * Imports the reviewed initial catalog into an empty D1: refuses any existing publication or
- * catalog rows before changing anything, applies the d1/drizzle migrations, re-checks, then
+ * catalog rows before changing anything, applies the apps/web/drizzle migrations, re-checks, then
  * executes the checksum-verified SQL. A database that already carries the reviewed publication
  * checksum is a no-op.
  */
@@ -747,7 +747,7 @@ export async function importReviewedCatalog(
   const readiness = await checkDatabase(d1)
   if (readiness.missingMigrations.length > 0 || readiness.unknownMigrations.length > 0) {
     throw new Error(
-      `${environment} D1 must have exactly the d1/drizzle migrations applied before the import.`
+      `${environment} D1 must have exactly the apps/web/drizzle migrations applied before the import.`
     )
   }
   refuseOccupied(await catalogOccupancy(d1))

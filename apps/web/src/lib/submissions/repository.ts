@@ -1,8 +1,8 @@
 import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { createDatabase } from '@serpdirectory/data-ops/client'
-import { validateMediaBaseUrl } from '@serpdirectory/data-ops/media-keys'
+import { createDatabase } from '@/db/client'
+import { validateMediaBaseUrl } from '@/db/media-keys'
 import {
   createSubmissionOperations,
   type DraftContent,
@@ -12,12 +12,12 @@ import {
   SubmissionError,
   type SubmissionVerificationResult,
   type UrlAvailability
-} from '@serpdirectory/data-ops/submissions'
+} from '@/db/submissions'
 
 /**
  * Server-only adapter for native submissions (serpcompany/best.serp.co#63): it validates the
  * Worker's `DB` binding and `D1_RUNTIME_ENV` and delegates every read and write to
- * `@serpdirectory/data-ops/submissions`, scoped to the signed-in owner.
+ * `@/db/submissions`, scoped to the signed-in owner.
  */
 
 export { isSubmissionError, SubmissionError }

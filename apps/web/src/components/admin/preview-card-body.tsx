@@ -1,6 +1,6 @@
-import type { ListingDetail } from '@serpdirectory/data-ops/contracts'
 import { TriangleAlert } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import type { ListingDetail } from '@/db/contracts'
 import { MiniListing } from './mini-listing'
 
 /** The preview card's body: the mini listing, or why the staged content cannot be shown. */

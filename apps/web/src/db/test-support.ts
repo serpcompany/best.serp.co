@@ -4,7 +4,7 @@ import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import type { CatalogDataCache } from './contracts'
 import { assertD1StatementLimits } from './sql-limits'
 
-const MIGRATIONS_DIRECTORY = resolve(import.meta.dirname, '../../../d1/drizzle')
+const MIGRATIONS_DIRECTORY = resolve(import.meta.dirname, '../../drizzle')
 
 export class MemoryCatalogCache implements CatalogDataCache {
   readonly ttlSeconds = new Map<string, number>()
@@ -59,7 +59,7 @@ export class SqliteD1 {
     const owner = this
     const binding = {
       prepare(sql: string) {
-        // Every data-ops and app test that runs SQL through this binding gets the D1 limit
+        // Every db and app test that runs SQL through this binding gets the D1 limit
         // and self-comparison checks (`sql-limits.ts`, #77 and #78).
         assertD1StatementLimits(sql)
         let bindings: unknown[] = []
@@ -117,7 +117,8 @@ export class SqliteD1 {
           owner.database.exec('BEGIN')
           try {
             const results: D1Result<T>[] = []
-            for (const statement of statements) results.push(await statement.run<T>())
+            // The app's generated Worker types make run() non-generic; the rows are T here.
+            for (const statement of statements) results.push((await statement.run()) as D1Result<T>)
             owner.database.exec('COMMIT')
             return results
           } catch (error) {

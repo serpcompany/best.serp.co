@@ -12,17 +12,13 @@ import {
   listingCheckoutPurpose,
   type OrderRecord,
   orderTargetKey
-} from '@serpdirectory/data-ops/billing'
+} from '@/db/billing'
 import {
   type CatalogPublication,
   prepareCatalogPublication,
   type StatementPlan
-} from '@serpdirectory/data-ops/plan-support'
-import type {
-  OrderOutcome,
-  OrderRefundListingAction,
-  OrderRefundReason
-} from '@serpdirectory/data-ops/schema'
+} from '@/db/plan-support'
+import type { OrderOutcome, OrderRefundListingAction, OrderRefundReason } from '@/db/schema'
 import {
   buildChooseSubmissionPlanPlans,
   buildRecordSubmissionPaymentPlans,
@@ -30,7 +26,7 @@ import {
   buildRefundSubmissionPlans,
   buildRelistListingToPaidPlans,
   buildUpgradeListingToPaidPlans
-} from '@serpdirectory/data-ops/submission-plans'
+} from '@/db/submission-plans'
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
@@ -46,7 +42,7 @@ import {
 /**
  * The billing service (serpcompany/best.serp.co#68): checkout, the webhook, fulfilment, and
  * refunds, on the provider interface (`provider.ts`) and the D1 ledger
- * (`@serpdirectory/data-ops/billing`). It holds no SQL and no provider specifics; the runtime
+ * (`@/db/billing`). It holds no SQL and no provider specifics; the runtime
  * (`worker-billing.ts`) wires D1, the provider, email, and the badge check.
  *
  * Every step is idempotent, because a payment reaches it up to three ways: the webhook (and its

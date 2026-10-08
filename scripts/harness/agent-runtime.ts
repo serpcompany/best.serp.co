@@ -54,7 +54,8 @@ function doctor(root: string): void {
   if (manifest) violations.push(...runtimeViolations(root, manifest))
   if (!existsSync(resolve(root, project.wranglerConfigPath)))
     violations.push(`${project.wranglerConfigPath} is missing.`)
-  if (!existsSync(resolve(root, 'd1/drizzle'))) violations.push('d1/drizzle is missing.')
+  if (!existsSync(resolve(root, 'apps/web/drizzle')))
+    violations.push('apps/web/drizzle is missing.')
   if (violations.length > 0) {
     throw new Error(`${violations.join('\n')}\nSee docs/HARNESS.md#runtime-legibility.`)
   }

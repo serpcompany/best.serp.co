@@ -7,8 +7,8 @@
  * a missing or invalid `USESEND_BASE_URL` var or `USESEND_API_KEY` secret yields a service that
  * sends nothing and logs `email_disabled` on every enqueue. Local never sends, even with a key.
  */
-import { createDatabase } from '@serpdirectory/data-ops/client'
-import { createEmailDeliveryLedger } from '@serpdirectory/data-ops/email-deliveries'
+import { createDatabase } from '@/db/client'
+import { createEmailDeliveryLedger } from '@/db/email-deliveries'
 import {
   EmailConfigError,
   type EmailEnvironmentVars,

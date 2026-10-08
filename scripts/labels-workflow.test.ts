@@ -90,7 +90,7 @@ describe('labels workflow', () => {
 
     expect(globs).toEqual(
       expect.arrayContaining([
-        'd1/drizzle/**',
+        'apps/web/drizzle/**',
         'apps/web/src/lib/submissions/**',
         'd1/publications/**'
       ])
