@@ -5,7 +5,7 @@ import type { NetworkBrandEntry } from '../network-brands'
 import { getNetworkBrandsForGroup } from '../network-brands'
 import { generateDisabledRouteMetadata } from '../route-feature-gates'
 import { getRoute } from '../routes'
-import { generateBaseMetadata, SITE_PUBLIC_URL } from '../seo-config'
+import { generateBaseMetadata, SITE_PUBLIC_URL, SITE_WEBSITE_ID } from '../seo-config'
 import { siteConfig } from '../site-config'
 import { siteCopy } from '../site-copy'
 import { Card, CardContent } from '../ui/card'
@@ -35,6 +35,7 @@ function BrandsJsonLd({ brands }: { brands: NetworkBrandEntry[] }) {
     url: brandsUrl,
     isPartOf: {
       '@type': 'WebSite',
+      '@id': SITE_WEBSITE_ID,
       name: siteConfig.name,
       url: SITE_PUBLIC_URL
     },

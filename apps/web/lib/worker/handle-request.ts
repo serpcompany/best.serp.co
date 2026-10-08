@@ -6,11 +6,12 @@
  * 1. Canonical host: on the production Worker with `CANONICAL_HOST_REDIRECT=on`, a
  *    `*.workers.dev` request without the smoke-test header gets one 308 to best.serp.co
  *    (`lib/routing/canonical-host.ts`).
- * 2. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
- * 3. Outside public production, `/robots.txt` disallows every crawler.
- * 4. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
+ * 2. Retired URLs without a replacement (`/news`) answer 410 Gone (`lib/routing/retired-paths.ts`).
+ * 3. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
+ * 4. Outside public production, `/robots.txt` disallows every crawler.
+ * 5. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
  *    503, 403, or 401 (`lib/auth/admin-gate.ts`); pages and handlers then require an admin.
- * 5. Everything else is served through the edge HTML cache and OpenNext (`serve`).
+ * 6. Everything else is served through the edge HTML cache and OpenNext (`serve`).
  *
  * Every response then carries the configured environment, the Worker version and, outside
  * public production, `X-Robots-Tag: noindex, nofollow` (`lib/environment/site-environment.ts`). These headers are
