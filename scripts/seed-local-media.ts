@@ -10,7 +10,7 @@ import { project } from './project'
 
 /**
  * Seeds hosted listing media into a throwaway local Wrangler state for the e2e media server
- * (`apps/e2e/tests/media-fixture.ts`, serpcompany/best.serp.co#95). It runs the real ingestion
+ * (`apps/web/e2e/media-fixture.ts`, serpcompany/best.serp.co#95). It runs the real ingestion
  * path (byte sniffing, content-addressed key, R2 write with its cache policy, D1 plan with a
  * catalog publication) against local D1 and R2; only the source fetch is answered from memory,
  * with tiny generated PNGs. Local state only: the config check refuses anything else.

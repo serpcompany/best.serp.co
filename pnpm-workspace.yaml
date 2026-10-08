@@ -18,4 +18,4 @@ catalog:
   zod: ^3.25.76
 
 packages:
-  - 'apps/*'
+  - 'apps/web'

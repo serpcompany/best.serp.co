@@ -151,8 +151,8 @@ The local Worker serves its bucket at `/_media/<key>` (GET and HEAD, this site's
 on staging or in production). Locally, media fetches may use any port, for the e2e fixture sites
 on `*.localtest.me:<port>`. `curl localhost:8787/cdn-cgi/handler/scheduled` runs the cron once.
 `pnpm tsx scripts/seed-local-media.ts` hosts sample media through the real ingestion path, as the
-e2e media server (`apps/e2e/tests/media-fixture.ts`) does on throwaway state;
-`apps/e2e/tests/listing-media.spec.ts` checks the rendered media against local R2.
+e2e media server (`apps/web/e2e/media-fixture.ts`) does on throwaway state;
+`apps/web/e2e/listing-media.spec.ts` checks the rendered media against local R2.
 
 ## Uploading and publishing
 

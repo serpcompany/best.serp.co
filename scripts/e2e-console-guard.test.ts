@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const testsDirectory = resolve('apps/e2e/tests')
+const testsDirectory = resolve('apps/web/e2e')
 // Agent capture records console output as evidence for a run; it must not fail on it.
 const exempt = new Set(['agent-capture.spec.ts'])
 

@@ -149,8 +149,8 @@ describe('staging deploy workflow', () => {
       'pnpm tsx scripts/cloudflare-release.ts migrate staging',
       'pnpm tsx scripts/cloudflare-release.ts deploy staging',
       'pnpm tsx scripts/d1-preview-http-gates.ts staging "$STAGING_ORIGIN"',
-      'pnpm --filter e2e test:install',
-      'pnpm --filter e2e test:e2e:smoke'
+      'pnpm --filter web test:install',
+      'pnpm --filter web test:e2e:smoke'
     ]
     expect(runs(job).slice(1)).toEqual(commands)
     expect(stepRunning(job, 'test:e2e:smoke').env).toEqual({
@@ -159,7 +159,7 @@ describe('staging deploy workflow', () => {
     })
     const evidence = job.steps?.find(step => step.uses === 'actions/upload-artifact@v7')
     expect(evidence?.if).toBe(`always() && ${credentialsGate}`)
-    expect(String(evidence?.with?.path)).toContain('apps/e2e/playwright-report/')
+    expect(String(evidence?.with?.path)).toContain('apps/web/playwright-report/')
   })
 
   it('names the steps production requires as proof that staging verified a commit', () => {
@@ -169,7 +169,7 @@ describe('staging deploy workflow', () => {
       'Apply staging D1 migrations': 'pnpm tsx scripts/cloudflare-release.ts migrate staging',
       'Deploy staging Worker': 'pnpm tsx scripts/cloudflare-release.ts deploy staging',
       'Run staging HTTP gates': 'pnpm tsx scripts/d1-preview-http-gates.ts staging',
-      'Run Playwright smoke against staging': 'pnpm --filter e2e test:e2e:smoke'
+      'Run Playwright smoke against staging': 'pnpm --filter web test:e2e:smoke'
     }
     expect(Object.keys(proof)).toEqual([...stagingWorkflow.requiredSteps])
     for (const [name, command] of Object.entries(proof)) {
@@ -495,12 +495,12 @@ describe('D1 data stays in Cloudflare', () => {
     {
       action: /^actions\/upload-artifact@/u,
       name: /^playwright-report$/u,
-      paths: ['apps/e2e/playwright-report/']
+      paths: ['apps/web/playwright-report/']
     },
     {
       action: /^actions\/upload-artifact@/u,
       name: /^staging-smoke-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}$/u,
-      paths: ['apps/e2e/playwright-report/', 'apps/e2e/test-results/']
+      paths: ['apps/web/playwright-report/', 'apps/web/test-results/']
     },
     {
       // The install action's dependency and Next.js build caches.
@@ -845,7 +845,7 @@ describe('D1 data stays in Cloudflare', () => {
     expect(
       uploadViolations({
         uses: 'actions/upload-artifact@v7',
-        with: { name: 'playwright-report', path: 'apps/e2e/playwright-report/' }
+        with: { name: 'playwright-report', path: 'apps/web/playwright-report/' }
       })
     ).toEqual([])
   })

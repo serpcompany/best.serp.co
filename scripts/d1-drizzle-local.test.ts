@@ -798,7 +798,7 @@ describe('fresh Drizzle D1 history', () => {
         expect(() => localPreviewVarArgs(refused), refused).toThrow(/LOCAL_PREVIEW_VARS/u)
       }
 
-      const playwright = readFileSync(resolve('apps/e2e/playwright.config.ts'), 'utf8')
+      const playwright = readFileSync(resolve('apps/web/playwright.config.ts'), 'utf8')
       expect(playwright).toContain('pnpm db:migrate:local')
       expect(playwright).toContain('pnpm db:import:local')
       expect(playwright).toContain('pnpm db:verify:local')

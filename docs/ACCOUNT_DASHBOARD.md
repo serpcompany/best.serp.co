@@ -103,7 +103,7 @@ lands, a revision's changed logo should be hosted on save the way #96 hosts a su
 
 `apps/web/src/db/account.test.ts` (node:sqlite), the plan tests in `submission-plans.test.ts`,
 `scripts/d1-workerd-plans.test.ts` (every plan and read on Wrangler-local D1),
-`apps/web/src/lib/account/*.test.ts`, and `apps/e2e/tests/account-dashboard.spec.ts` (Playwright on
+`apps/web/src/lib/account/*.test.ts`, and `apps/web/e2e/account-dashboard.spec.ts` (Playwright on
 its own local Worker and empty D1, `PLAYWRIGHT_PORT` + 5, like the admin suite's +3, since both
 publish listings and add admins: the statuses, FAQs in review, edit and resubmit, approval, the
 badge panel, a revision an admin approves, withdraw, and ownership). Set

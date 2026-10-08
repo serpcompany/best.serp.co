@@ -162,7 +162,7 @@ describe('single-site D1-only repository architecture', () => {
       .filter(entry => entry.isDirectory())
       .map(entry => entry.name)
       .sort()
-    expect(appDirectories).toEqual(['e2e', 'web'])
+    expect(appDirectories).toEqual(['web'])
     expect(project.appDirectory).toBe('apps/web')
     // Next.js prefers apps/web/app over src/app: a leftover folder would build with no routes.
     for (const folder of ['app', 'components', 'lib', 'actions', 'hooks']) {
@@ -538,6 +538,9 @@ describe('single-site D1-only repository architecture', () => {
       file =>
         /\.(?:ts|tsx)$/u.test(file) &&
         file.startsWith(`${project.appDirectory}/`) &&
+        // The E2E suite's Stripe mock (e2e/billing-fixture.ts) speaks the provider's API and
+        // holds its test secrets; both checks cover the app's own code.
+        !file.startsWith(`${project.appDirectory}/e2e/`) &&
         !file.startsWith(`${project.sourceDirectory}/lib/billing/providers/`) &&
         existsSync(resolve(file)) &&
         providerSpecific.test(readFileSync(resolve(file), 'utf8'))
@@ -548,6 +551,7 @@ describe('single-site D1-only repository architecture', () => {
       file =>
         /\.(?:ts|tsx)$/u.test(file) &&
         file.startsWith(`${project.appDirectory}/`) &&
+        !file.startsWith(`${project.appDirectory}/e2e/`) &&
         !file.endsWith('.d.ts') &&
         !file.startsWith(`${project.sourceDirectory}/lib/billing/providers/`) &&
         existsSync(resolve(file)) &&
@@ -685,7 +689,7 @@ describe('single-site D1-only repository architecture', () => {
         /\.(?:ts|tsx)$/u.test(file) &&
         !/\.test\.tsx?$/u.test(file) &&
         !file.startsWith('apps/web/src/db/test-support') &&
-        !file.startsWith('apps/e2e/') &&
+        !file.startsWith('apps/web/e2e/') &&
         writesBadgeChecks(readFileSync(resolve(file), 'utf8'))
     )
     expect(writers).toEqual(['apps/web/src/db/badge-program.ts'])

@@ -21,7 +21,7 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
   admin panel's decisions.
 - `apps/web/src/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
   the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/ACCOUNTS.md)).
-- `apps/e2e/`: Playwright suites that run against the local or deployed Worker.
+- `apps/web/e2e/`: Playwright suites that run against the local or deployed Worker.
 - `apps/web/src/lib/site/`: the checked-in site definition (routes, copy, badges, the route
   registry); `apps/web/content/` holds the MDX content (legal pages, the About page).
 - `apps/web/src/db/`: Drizzle schema, catalog and submission queries, caching.

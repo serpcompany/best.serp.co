@@ -24,7 +24,7 @@ export const STRIPE_WEBHOOK_SECRET_SECRET = 'STRIPE_WEBHOOK_SECRET'
 export interface ProviderEnv extends OrdersEnv {
   /**
    * A local Worker only: the port of the end-to-end suite's mocked Stripe API on 127.0.0.1
-   * (`apps/e2e/tests/billing-fixture.ts`), so the suite never reaches Stripe.
+   * (`apps/web/e2e/billing-fixture.ts`), so the suite never reaches Stripe.
    */
   LOCAL_STRIPE_MOCK_PORT?: string
   STRIPE_SECRET_KEY?: string

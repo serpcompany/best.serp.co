@@ -161,7 +161,7 @@ the app writes production data, and agents never use the production admin panel.
 
 `apps/web/src/db/{admin-plans,admin-queries,listing-plans}.test.ts` and
 `apps/web/src/lib/admin/decisions.test.ts` (node:sqlite), `scripts/d1-workerd-plans.test.ts` (every
-plan builder and read on Wrangler-local D1), and `apps/e2e/tests/admin-panel.spec.ts`
+plan builder and read on Wrangler-local D1), and `apps/web/e2e/admin-panel.spec.ts`
 (Playwright: the gate, approve, request changes, reject, allow resubmission, unpublish with 410
 and republish, the allowlist, and a replay of each decision). The suite runs on its own local
 Worker and empty D1 (`PLAYWRIGHT_PORT` + 3, started by `playwright.config.ts` from the same

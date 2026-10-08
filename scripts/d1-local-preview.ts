@@ -8,12 +8,12 @@ import { project } from './project'
 /**
  * Vars a local preview may override, as `NAME=value` pairs separated by commas in
  * `LOCAL_PREVIEW_VARS`: the Cloudflare Access switches, so Playwright can run the built Worker
- * with the production Access lock (apps/e2e/tests/access-lock.spec.ts),
+ * with the production Access lock (apps/web/e2e/access-lock.spec.ts),
  * `LOCAL_BADGE_PROGRAM` and `LOCAL_CLAIMS`, which run the badge program and claims on a local
  * Worker while `features.badgeProgram` or `features.claims` is off (both flags are on since
  * #130, so no suite sets them; `lib/worker/scheduled.ts` and `lib/claims/flags.ts` ignore them
  * anywhere but local), and the
- * billing's (apps/e2e/tests/orders-worker.ts, #68): `LOCAL_ORDERS` turns orders on while
+ * billing's (apps/web/e2e/orders-worker.ts, #68): `LOCAL_ORDERS` turns orders on while
  * `features.orders` is off (on since #133, so no suite sets it), `LOCAL_STRIPE_MOCK_PORT` points
  * billing at the suite's mocked Stripe API, and `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`
  * take the suite's own test values (`lib/billing/` ignores the first two anywhere but local,
