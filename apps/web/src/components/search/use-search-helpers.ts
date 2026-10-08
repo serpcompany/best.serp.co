@@ -1,4 +1,4 @@
-import { logger } from '@serpdirectory/logging'
+import { logger } from '@/lib/logging'
 import type { SearchResult } from '../../lib/directory/search-contract'
 import type { SearchWebsiteMetadata } from './search-utils'
 import {

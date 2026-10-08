@@ -10,19 +10,18 @@ import { features, type SiteFeatures } from './features'
  * area lives in `feature-copy.ts` behind that area's flag, and no page or component says it
  * anywhere else while the flag is off. Scanned: `app/`, `components/`, `lib/submissions/` (its
  * messages reach the submitter), `lib/account/` (the dashboard's, #65), and
- * `packages/site-config` (site copy, including the About page). The admin panel is left out: its copy describes listing states to the team, not what
+ * `lib/site` and `content/about` (site copy, including the About page). The admin panel is left out: its copy describes listing states to the team, not what
  * a submitter can do.
  */
 
 const WEB_DIRECTORY = resolve(__dirname, '..')
-const SITE_CONFIG_DIRECTORY = resolve(WEB_DIRECTORY, '../../../packages/site-config')
 const SCANNED = [
   join(WEB_DIRECTORY, 'app'),
   join(WEB_DIRECTORY, 'components'),
   join(WEB_DIRECTORY, 'lib', 'submissions'),
   join(WEB_DIRECTORY, 'lib', 'account'),
-  join(SITE_CONFIG_DIRECTORY, 'src'),
-  join(SITE_CONFIG_DIRECTORY, 'content')
+  join(WEB_DIRECTORY, 'lib', 'site'),
+  join(WEB_DIRECTORY, '..', 'content', 'about')
 ]
 
 const PAGE_PROMISES: ReadonlyArray<{
@@ -113,8 +112,8 @@ describe('page copy', () => {
     expect(paths).toContain('components/submit/badge-step.tsx')
     expect(paths).toContain('components/submit/submit-form.tsx')
     expect(paths).toContain('lib/submissions/contract.ts')
-    expect(paths).toContain('../../../packages/site-config/src/site.ts')
-    expect(paths).toContain('../../../packages/site-config/content/about/about.mdx')
+    expect(paths).toContain('../../../apps/web/src/lib/site/site.ts')
+    expect(paths).toContain('../../../apps/web/content/about/about.mdx')
     expect(paths.some(path => path.includes('admin'))).toBe(false)
   })
 

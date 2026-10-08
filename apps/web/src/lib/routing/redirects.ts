@@ -8,7 +8,7 @@
  * second, parameterless rule because OpenNext cannot fill an empty parameter: `/website`
  * would otherwise redirect to the literal `/products/:path*`.
  */
-import { SITEMAP_INDEX_PATH, site, sitemapPaths } from '@serpdirectory/site-config'
+import { SITEMAP_INDEX_PATH, site, sitemapPaths } from '@/lib/site'
 import type { Redirect } from 'next/dist/lib/load-custom-routes'
 
 /** The canonical legal pages; `getRoute('privacy')` and `getRoute('terms')` name the same. */

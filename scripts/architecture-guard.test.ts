@@ -132,7 +132,6 @@ const forbiddenExactCatalogPaths = [
 
 const guardedSourceRoots = [
   `${project.appDirectory}/`,
-  'packages/site-config/',
   '.github/workflows/'
 ]
 
@@ -178,14 +177,15 @@ describe('single-site D1-only repository architecture', () => {
       readFileSync(resolve(project.appDirectory, 'package.json'), 'utf8')
     ) as { dependencies?: Record<string, string>; name?: string }
     expect(appManifest.name).toBe(project.appPackageName)
-    expect(appManifest.dependencies?.['@serpdirectory/site-config']).toBe('workspace:*')
+    // The site definition lives in the app (#173), not a package.
+    expect(appManifest.dependencies?.['@serpdirectory/site-config']).toBeUndefined()
     expect(appManifest.dependencies?.['@serpdirectory/site-contract']).toBeUndefined()
 
-    expect(existsSync(resolve('packages/site-config/src/site.ts'))).toBe(true)
+    expect(existsSync(resolve('apps/web/src/lib/site/site.ts'))).toBe(true)
     for (const retired of ['packages/site-contract', 'sites', 'configs/wrangler']) {
       expect(existsSync(resolve(retired)), `${retired} must stay retired`).toBe(false)
     }
-    const siteConfig = readFileSync(resolve('packages/site-config/src/site.ts'), 'utf8')
+    const siteConfig = readFileSync(resolve('apps/web/src/lib/site/site.ts'), 'utf8')
     expect(siteConfig).toContain(`id: '${project.domain}'`)
     expect(siteConfig).not.toMatch(/listingSource|appPackageName|artifactDir/u)
   })
@@ -615,7 +615,7 @@ describe('single-site D1-only repository architecture', () => {
           file.startsWith(`${project.sourceDirectory}/${dir}`)
         ) ||
           [
-            'packages/site-config/src/',
+            'apps/web/src/lib/site/',
             'packages/design-system/',
             // Validation and error messages the data layer returns to pages (#111 round 4).
             'packages/data-ops/src/'
@@ -644,7 +644,7 @@ describe('single-site D1-only repository architecture', () => {
     expect(provider).not.toMatch(/custom_text|submit_type|statement_descriptor/u)
     // The legal pages and the site's other written content.
     for (const file of trackedFiles().filter(
-      name => name.startsWith('packages/content/data/') && existsSync(resolve(name))
+      name => name.startsWith('apps/web/content/') && existsSync(resolve(name))
     )) {
       if (named.test(readFileSync(resolve(file), 'utf8'))) shown.push(file)
     }
@@ -829,8 +829,8 @@ describe('single-site D1-only repository architecture', () => {
   })
 
   it('keeps retired public static repositories out of live application links', () => {
-    const siteConfig = readFileSync(resolve('packages/site-config/src/site.ts'), 'utf8')
-    const cookiePolicy = readFileSync(resolve('packages/content/data/legal/cookies.mdx'), 'utf8')
+    const siteConfig = readFileSync(resolve('apps/web/src/lib/site/site.ts'), 'utf8')
+    const cookiePolicy = readFileSync(resolve('apps/web/content/legal/cookies.mdx'), 'utf8')
 
     expect(siteConfig).toContain('githubIssueOwner: null')
     expect(siteConfig).toContain('githubIssueRepo: null')

@@ -18,7 +18,7 @@
 import { createBadgeProgramOperations } from '@serpdirectory/data-ops/badge-program'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import { createDraftJobOperations } from '@serpdirectory/data-ops/draft-jobs'
-import { site } from '@serpdirectory/site-config'
+import { site } from '@/lib/site'
 import { runBadgeProgram } from '../badge-program/program'
 import { BADGE_DAILY_CRON, BADGE_WEEKLY_CRON } from '../badge-program/schedule'
 import { ordersEnabledFor } from '../billing/flags'

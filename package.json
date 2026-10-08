@@ -83,7 +83,6 @@
     "@biomejs/biome": "2.2.2",
     "@manypkg/cli": "^0.23.0",
     "@serpdirectory/data-ops": "workspace:*",
-    "@serpdirectory/site-config": "workspace:*",
     "@serpdirectory/utils": "workspace:*",
     "@types/js-yaml": "^4.0.9",
     "cross-env": "^7.0.3",

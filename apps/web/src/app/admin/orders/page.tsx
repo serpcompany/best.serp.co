@@ -1,5 +1,5 @@
 import type { AdminOrderRow } from '@serpdirectory/data-ops/billing'
-import { site } from '@serpdirectory/site-config'
+import { site } from '@/lib/site'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { AdminCrumbs } from '@/components/admin/admin-shell'

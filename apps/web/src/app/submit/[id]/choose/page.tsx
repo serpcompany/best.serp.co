@@ -1,4 +1,4 @@
-import { site } from '@serpdirectory/site-config'
+import { site } from '@/lib/site'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { ChoosePlan } from '@/components/submit/choose-plan'

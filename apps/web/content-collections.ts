@@ -1,12 +1,12 @@
 import { defineCollection, defineConfig } from '@content-collections/core'
 
 // Paths will resolve from the project root
-const guidesPath = '../../packages/content/data/guides'
-const resourcesPath = '../../packages/content/data/resources'
-const legalPath = '../../packages/content/data/legal'
-const docsPath = '../../packages/content/data/docs'
-const aboutPath = '../../packages/site-config/content/about'
-const extensionUpdatesPath = '../../packages/content/data/extension-updates'
+const guidesPath = '../../apps/web/content/guides'
+const resourcesPath = '../../apps/web/content/resources'
+const legalPath = '../../apps/web/content/legal'
+const docsPath = '../../apps/web/content/docs'
+const aboutPath = '../../apps/web/content/about'
+const extensionUpdatesPath = '../../apps/web/content/extension-updates'
 
 const guides = defineCollection({
   name: 'Guide',

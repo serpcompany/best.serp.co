@@ -20,4 +20,3 @@ catalog:
 packages:
   - 'apps/*'
   - 'packages/*'
-  - 'configs/*'

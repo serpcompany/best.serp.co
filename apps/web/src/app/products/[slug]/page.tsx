@@ -1,4 +1,4 @@
-import { site } from '@serpdirectory/site-config'
+import { site } from '@/lib/site'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'

@@ -33,7 +33,7 @@ Worker handler outside Next.js.
 
 The idempotency ledger lives in `packages/data-ops/src/email-deliveries.ts` (table
 `email_deliveries`), like every other SQL statement. The sender and the dashboard paths come
-from `packages/site-config` (`email.from`, `email.dashboardPath`, `email.adminDashboardPath`).
+from `apps/web/src/lib/site` (`email.from`, `email.dashboardPath`, `email.adminDashboardPath`).
 
 ## Environments
 

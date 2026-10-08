@@ -147,7 +147,7 @@ through Better Auth, the email module, and the D1 ledger with a fake `fetch`.
 
 ## Screens
 
-`showAuth` is on (`packages/site-config/src/site.ts`). Signed out, the header offers "Sign up /
+`showAuth` is on (`apps/web/src/lib/site/site.ts`). Signed out, the header offers "Sign up /
 Sign in"; signed in, "Account" and "Sign out" (desktop) or the mobile menu's Account and Sign
 out. Sign-out posts to `/api/auth/sign-out` and reloads. The header reads a session only when
 the request carries a session cookie, so anonymous pages never load Better Auth or read D1.

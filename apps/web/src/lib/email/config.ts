@@ -12,7 +12,7 @@
  * (fail closed). This module has no Next.js or `server-only` imports, so the Worker entry (a
  * future cron handler) can use it as well as route handlers.
  */
-import { site } from '@serpdirectory/site-config'
+import { site } from '@/lib/site'
 import {
   CANONICAL_ORIGIN,
   parseSiteEnvironment,

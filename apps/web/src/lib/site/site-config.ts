@@ -1,11 +1,11 @@
-import { site } from '@serpdirectory/site-config'
+import { site } from '@/lib/site'
 import type {
   AssetSource,
   SiteBadgesConfig,
   SiteCopyConfig,
   SiteFeatureFlags,
   SiteSitemapConfig
-} from '@serpdirectory/site-config/types'
+} from '@/lib/site/types'
 
 type SiteBrandingConfig = {
   appleTouchIconUrl?: string

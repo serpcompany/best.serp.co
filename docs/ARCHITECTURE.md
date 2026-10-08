@@ -66,8 +66,8 @@ change runs in a protected workflow.
 - `apps/web/src/lib/auth/` configures Better Auth (email sign-in codes) on the `DB` binding,
   serves `/api/auth/*`, guards admin routes, and verifies Cloudflare Access JWTs; account SQL
   lives in `packages/data-ops/src/auth.ts` ([Accounts](./ACCOUNTS.md)).
-- `packages/site-config/` is the checked-in site definition (name, domain, copy,
-  routes, sitemap layout, badges, feature flags) and site-owned content.
+- `apps/web/src/lib/site/` is the checked-in site definition (name, domain, copy, routes,
+  badges, feature flags, the route registry); `apps/web/content/` holds the MDX content.
 - `src/components/`, `src/hooks/`, and `src/lib/{seo,site,directory,analytics,routing}/`
   hold the page and view building blocks (from `packages/web-core`, #174); they read the site
   definition through `siteConfig` and never obtain a database binding.
@@ -166,7 +166,7 @@ and a test checks the committed import.
 - **Redirects.** The Worker entry answers a non-canonical request with one 308 before the
   edge cache and before OpenNext (`apps/web/src/lib/routing/trailing-slash.ts`), so slash
   variants are never rendered or cached. The `Location` is relative and keeps the query
-  string byte for byte. `skipTrailingSlashRedirect` (in `configs/next`) keeps the framework's
+  string byte for byte. `skipTrailingSlashRedirect` (in `next.config.ts`) keeps the framework's
   own slash redirect off: it differs between Next.js and OpenNext and has no `/api`
   exception. OpenNext Node middleware is not used (it is experimental on Cloudflare).
 - **Moved URLs.** `apps/web/src/lib/routing/redirects.ts` lists them and `next.config.ts`
@@ -192,7 +192,7 @@ and a test checks the committed import.
   JSON-LD node identifiers keep their fragment form (`https://best.serp.co/#website`); they name
   a graph node, not the page.
 - **Origin.** Sitemaps, canonical tags, and structured data always use the production
-  origin from `packages/site-config` (`https://best.serp.co`), also locally and on the
+  origin from `src/lib/site` (`https://best.serp.co`), also locally and on the
   noindex `*.workers.dev` hosts. This is deliberate: the e2e suite and the HTTP gates then
   verify on staging exactly the URLs production publishes, and those hosts are never
   indexed.
@@ -210,7 +210,7 @@ and a test checks the committed import.
   serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)). The
   index lists the root-level `/sitemap-{pages,products,categories}.xml`; `/sitemap.xml` and the
   old `/sitemaps/*/1.xml` answer one 308. The route registry
-  (`packages/site-config/src/site-routes.ts`, #167) sets each static page's indexability and
+  (`apps/web/src/lib/site/site-routes.ts`, #167) sets each static page's indexability and
   sitemap for the sitemaps, robots.txt, page metadata, and footer (`site-routes.test.tsx`).
   `lastmod` (#218): a listing's later `updated_at`/`published_at`, else the newest child.
 

@@ -6,7 +6,7 @@
  * must stay indexable; noindex must apply exactly where intended. Only the build-time wrappers
  * and the data and runtime modules these files import are stubbed.
  */
-import { siteRoutes } from '@serpdirectory/site-config'
+import { siteRoutes } from '@/lib/site'
 import { buildCustomRoute } from 'next/dist/lib/build-custom-route'
 import loadCustomRoutes from 'next/dist/lib/load-custom-routes'
 import { resolveRobots } from 'next/dist/lib/metadata/resolvers/resolve-basics'

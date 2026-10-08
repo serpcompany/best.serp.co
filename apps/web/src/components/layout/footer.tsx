@@ -9,7 +9,7 @@ import {
   SiX,
   SiYoutube
 } from '@icons-pack/react-simple-icons'
-import { siteRoutes } from '@serpdirectory/site-config'
+import { siteRoutes } from '@/lib/site'
 import { Linkedin } from 'lucide-react'
 import Link from 'next/link'
 import type { ComponentType } from 'react'

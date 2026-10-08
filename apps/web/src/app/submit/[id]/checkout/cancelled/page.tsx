@@ -1,4 +1,4 @@
-import { site } from '@serpdirectory/site-config'
+import { site } from '@/lib/site'
 import type { Metadata } from 'next'
 import { CheckoutCancelled } from '@/components/submit/checkout-screens'
 import { checkoutPage, checkoutPayable, toAccount } from '@/lib/billing/pages'

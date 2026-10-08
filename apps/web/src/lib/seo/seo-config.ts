@@ -1,4 +1,4 @@
-import { type SiteRoute, siteRoutes } from '@serpdirectory/site-config'
+import { type SiteRoute, siteRoutes } from '@/lib/site'
 import type { Metadata } from 'next'
 import { getRoute } from '../routing/routes'
 import {

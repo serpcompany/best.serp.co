@@ -44,8 +44,7 @@ function hasProtectedExtension(filename) {
 export const DEFAULT_LINK_LINT_PATTERNS = [
   'apps/*/src/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
   'apps/*/public/**/*.{html,json,js,txt,xml}',
-  'packages/site-config/**/*.{js,jsx,json,jsonc,md,mdx,mjs,ts,tsx}',
-  'packages/content/data/**/*.{json,jsonc,md,mdx}'
+  'apps/web/content/**/*.{json,jsonc,md,mdx}'
 ]
 
 export function isProtectedListingSurface(filename) {
@@ -57,8 +56,7 @@ export function isProtectedListingSurface(filename) {
 
   return (
     path.startsWith('apps/') ||
-    path.startsWith('packages/site-config/') ||
-    path.startsWith('packages/content/data/')
+    path.startsWith('apps/web/content/')
   )
 }
 

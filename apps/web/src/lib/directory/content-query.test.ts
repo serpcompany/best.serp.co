@@ -278,7 +278,7 @@ describe('applyLegalContentBranding', () => {
   })
 
   const legalDirectory = fileURLToPath(
-    new URL('../../../../../packages/content/data/legal/', import.meta.url)
+    new URL('../../../../../apps/web/content/legal/', import.meta.url)
   )
   const legalFiles = readdirSync(legalDirectory).filter(file => file.endsWith('.mdx'))
   // /legal/cookies/ still names placeholder example.com addresses, as best.serp.co does today

@@ -12,7 +12,7 @@ Analytics load only on public production: `SITE_ENVIRONMENT=production` on best.
 Worker's workers.dev host render neither tag, and `public-policy.test.tsx` holds that line.
 
 - **Google Tag Manager:** the container in `site.analytics.gtmId`
-  (`packages/site-config/src/site.ts`).
+  (`apps/web/src/lib/site/site.ts`).
 - **Cloudflare Web Analytics** (#170): the beacon at the end of `<body>`, once
   `CF_WEB_ANALYTICS_TOKEN` holds the site token.
 

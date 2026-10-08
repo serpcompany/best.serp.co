@@ -22,8 +22,8 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `apps/web/src/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
   the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/ACCOUNTS.md)).
 - `apps/e2e/`: Playwright suites that run against the local or deployed Worker.
-- `packages/site-config/`: the checked-in site definition (routes, copy, badges,
-  sitemap layout) and site-owned content such as the About page.
+- `apps/web/src/lib/site/`: the checked-in site definition (routes, copy, badges, the route
+  registry); `apps/web/content/` holds the MDX content (legal pages, the About page).
 - `packages/data-ops/`: Drizzle schema, catalog and submission queries, caching.
 - `packages/design-system/`: UI primitives.
 - `d1/drizzle/`: forward-only migration history applied by Wrangler.

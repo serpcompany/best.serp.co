@@ -4,7 +4,7 @@ import {
   DirectoryCommand,
   type DirectoryCommandItem
 } from '@serpdirectory/design-system/shadcnblocks/directory-command'
-import { logger } from '@serpdirectory/logging'
+import { logger } from '@/lib/logging'
 import { ArrowRight, Clock, Search, TrendingUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

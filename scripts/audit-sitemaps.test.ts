@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { site } from '@serpdirectory/site-config'
+import { site } from '../apps/web/src/lib/site'
 import { afterEach, describe, expect, it } from 'vitest'
 import { auditArtifactSitemaps, parseSitemapLocs } from './audit-sitemaps.ts'
 

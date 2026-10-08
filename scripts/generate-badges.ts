@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { deflateSync, inflateSync } from 'node:zlib'
-import { site } from '@serpdirectory/site-config'
+import { site } from '../apps/web/src/lib/site'
 import { project } from './project'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
