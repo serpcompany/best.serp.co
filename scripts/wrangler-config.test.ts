@@ -9,7 +9,7 @@ type WranglerConfig = WorkerConfig & { env: Record<'production' | 'staging', Wor
 const config = JSON.parse(
   readFileSync(resolve(project.wranglerConfigPath), 'utf8')
 ) as WranglerConfig
-// Named environments inherit nothing they don't repeat, so every check covers all three.
+// Every environment is checked: keep_names is inheritable, but an environment can override it.
 const environments: Array<[string, WorkerConfig]> = [
   ['local (top level)', config],
   ['staging', config.env.staging],
