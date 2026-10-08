@@ -502,9 +502,10 @@ test.describe('best.serp.co D1 Worker smoke', () => {
   })
 
   test('tags every serp.ly link with the Dub partner ID', async ({ page }) => {
-    // The footer's social links on every page, and a listing's "Visit Site" button and
-    // resource links (#169). The listing goes last for the "Visit Site" check below.
-    for (const path of ['/', '/brands/', detailListing.path]) {
+    // The footer's social links on every page; links in a listing's body text (321tube's
+    // "Start here" link); a listing's "Visit Site" button and resource links (#169). The
+    // listing with the button goes last for the check below.
+    for (const path of ['/', '/brands/', listingPath('321tube-downloader'), detailListing.path]) {
       await page.goto(path, { waitUntil: 'domcontentloaded' })
       const hrefs = await page
         .locator('a[href]')

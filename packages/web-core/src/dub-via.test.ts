@@ -7,7 +7,10 @@ describe('withDubVia (#169)', () => {
     ['https://serp.ly/vimeo-downloader', 'https://serp.ly/vimeo-downloader?via=best.serp.co'],
     ['https://serp.ly/@serp/youtube', 'https://serp.ly/@serp/youtube?via=best.serp.co'],
     ['https://SERP.ly/x?utm_source=a#top', 'https://serp.ly/x?utm_source=a&via=best.serp.co#top'],
-    ['http://serp.ly/x', 'http://serp.ly/x?via=best.serp.co']
+    ['http://serp.ly/x', 'http://serp.ly/x?via=best.serp.co'],
+    // An existing query keeps its exact encoding.
+    ['https://serp.ly/x?q=a%20b~c', 'https://serp.ly/x?q=a%20b~c&via=best.serp.co'],
+    ['https://serp.ly/x?', 'https://serp.ly/x?via=best.serp.co']
   ])('adds the partner ID to %s', (url, expected) => {
     expect(withDubVia(url, 'best.serp.co')).toBe(expected)
   })

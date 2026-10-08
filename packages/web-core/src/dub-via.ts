@@ -29,6 +29,7 @@ export function withDubVia(
   ) {
     return url
   }
-  parsed.searchParams.set('via', via)
-  return parsed.toString()
+  // Appended, so an existing query keeps its exact encoding.
+  const query = `${parsed.search}${parsed.search ? '&' : '?'}via=${encodeURIComponent(via)}`
+  return `${parsed.origin}${parsed.pathname}${query}${parsed.hash}`
 }
