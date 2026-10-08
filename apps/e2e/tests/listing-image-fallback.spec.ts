@@ -5,7 +5,7 @@ import { test } from './test'
 test.use({
   allowedConsoleErrors: {
     because: 'breakListingImages answers every image but the tile with 404',
-    patterns: [/status of 404 \(Not Found\) \((?!.*favicon-fallback-512x512\.png)/u]
+    patterns: [/status of 404 \(Not Found\) \((?!.*favicon-fallback-512x512\.png)(?!.*\/_next\/)/u]
   }
 })
 

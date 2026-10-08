@@ -28,7 +28,8 @@ import { expectedResponse, test } from './test'
 
 test.use({
   allowedConsoleErrors: {
-    because: 'three tabs save the version they loaded at once: one wins, the others get 409',
+    because:
+      'three tabs save the revision they loaded at once, so two of the revision saves get 409',
     patterns: [expectedResponse(409, /\/api\/account\/listings\/[^/]+\/revision/u)]
   }
 })
