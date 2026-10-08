@@ -77,7 +77,7 @@ interface CloudflareEnv {
   MEDIA_BASE_URL?: string
   /**
    * `on` turns orders (#68) on for a local Worker while `features.orders` is off
-   * (`lib/billing/flags.ts`; unused since #133 turned the flag on). Ignored anywhere but local.
+   * (`src/lib/billing/flags.ts`; unused since #133 turned the flag on). Ignored anywhere but local.
    */
   LOCAL_ORDERS?: string
   /** A local Worker only: the port of the end-to-end suite's mocked Stripe API on 127.0.0.1. */
@@ -86,7 +86,7 @@ interface CloudflareEnv {
   STRIPE_SECRET_KEY?: string
   /** Worker secret (#68): the signing secret of the `/api/billing/webhook/` endpoint. */
   STRIPE_WEBHOOK_SECRET?: string
-  /** Staging only: comma-separated recipients email may go to (`lib/email/config.ts`). */
+  /** Staging only: comma-separated recipients email may go to (`src/lib/email/config.ts`). */
   EMAIL_STAGING_ALLOWLIST?: string
   /** Crawl and analytics policy; anything but `production` is non-production. */
   SITE_ENVIRONMENT?: 'local' | 'staging' | 'production'
