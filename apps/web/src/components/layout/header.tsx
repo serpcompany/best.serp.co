@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from 'react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import type { HeaderAuthState } from '@/lib/auth/header-auth-state'
+import { cn } from '@/lib/utils'
 import { useSearch } from '../../hooks/use-search'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
@@ -189,10 +190,10 @@ export function Header({
               href={getRoute('submit')}
               aria-label={siteCopy.submitLabel}
               title={siteCopy.submitLabel}
-              className={buttonVariants({
-                className:
-                  'inline-flex items-center justify-center text-sm font-bold h-9 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all duration-200 press-effect shadow-none'
-              })}
+              className={cn(
+                buttonVariants(),
+                'inline-flex items-center justify-center text-sm font-bold h-9 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all duration-200 press-effect shadow-none'
+              )}
             >
               <Plus className="h-4 w-4 sm:hidden" />
               <span className="hidden sm:inline">{siteCopy.submitLabel}</span>
@@ -202,11 +203,10 @@ export function Header({
               <>
                 <Link
                   href={getRoute('account')}
-                  className={buttonVariants({
-                    variant: 'outline',
-                    className:
-                      'hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none'
-                  })}
+                  className={cn(
+                    buttonVariants({ variant: 'outline' }),
+                    'hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none'
+                  )}
                 >
                   Account
                 </Link>
@@ -215,11 +215,10 @@ export function Header({
             ) : siteConfig.features.showAuth && isAuthConfigured ? (
               <Link
                 href={getRoute('login')}
-                className={buttonVariants({
-                  variant: 'outline',
-                  className:
-                    'hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none'
-                })}
+                className={cn(
+                  buttonVariants({ variant: 'outline' }),
+                  'hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none'
+                )}
               >
                 Sign up / Sign in
               </Link>

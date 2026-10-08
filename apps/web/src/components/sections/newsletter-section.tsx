@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { getRoute } from '../../lib/routing/routes'
 import { siteCopy } from '../../lib/site/site-copy'
 import { DirectoryCtaBand } from './directory-home-section'
@@ -23,10 +24,10 @@ export function NewsletterSection() {
         <div className="pt-2">
           <Link
             href={getRoute('submit')}
-            className={buttonVariants({
-              className:
-                'h-auto bg-foreground px-5 py-2.5 text-sm font-bold text-background shadow-none transition-colors hover:bg-foreground/90'
-            })}
+            className={cn(
+              buttonVariants(),
+              'h-auto bg-foreground px-5 py-2.5 text-sm font-bold text-background shadow-none transition-colors hover:bg-foreground/90'
+            )}
           >
             {siteCopy.submitLabel}
           </Link>

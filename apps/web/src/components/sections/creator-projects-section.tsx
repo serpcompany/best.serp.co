@@ -2,6 +2,7 @@
 
 import { ExternalLink, Github, Star } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { cn } from '../../lib/utils'
 import type { buttonVariants as buttonVariantsType } from '../ui/button'
 
 interface Project {
@@ -148,10 +149,7 @@ export function CreatorProjectsSection({ onProjectClick, slots }: CreatorProject
                     onClick={() => {
                       onProjectClick?.(project.name, project.url, 'visit-site')
                     }}
-                    className={buttonVariants({
-                      size: 'sm',
-                      className: 'flex items-center gap-1.5'
-                    })}
+                    className={cn(buttonVariants({ size: 'sm' }), 'flex items-center gap-1.5')}
                   >
                     <ExternalLink className="h-3 w-3" />
                     Visit Site
@@ -164,11 +162,10 @@ export function CreatorProjectsSection({ onProjectClick, slots }: CreatorProject
                       onClick={() => {
                         onProjectClick?.(project.name, project.githubUrl as string, 'github')
                       }}
-                      className={buttonVariants({
-                        variant: 'outline',
-                        size: 'sm',
-                        className: 'flex items-center gap-1.5'
-                      })}
+                      className={cn(
+                        buttonVariants({ variant: 'outline', size: 'sm' }),
+                        'flex items-center gap-1.5'
+                      )}
                     >
                       <Github className="h-3 w-3" />
                       GitHub
@@ -196,7 +193,7 @@ export function CreatorProjectsSection({ onProjectClick, slots }: CreatorProject
                 'follow-cta'
               )
             }}
-            className={buttonVariants({ variant: 'outline', className: 'flex items-center gap-2' })}
+            className={cn(buttonVariants({ variant: 'outline' }), 'flex items-center gap-2')}
           >
             <Github className="h-4 w-4" />
             Follow on GitHub

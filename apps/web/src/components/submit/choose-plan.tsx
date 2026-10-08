@@ -246,7 +246,7 @@ export function ChoosePlan({
                 <div className="flex w-full flex-col gap-2">
                   <a
                     href={`/submit/${submission.id}/checkout/`}
-                    className={buttonVariants({ className: 'w-full' })}
+                    className={cn(buttonVariants(), 'w-full')}
                   >
                     Pay {price} and go live
                     <ArrowRight />

@@ -4,6 +4,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { hasConfiguredGitHubIssueTarget, siteConfig } from '@/lib/site/site-config'
+import { cn } from '@/lib/utils'
 
 export const notFoundMetadata: Metadata = generateBaseMetadata({
   title: 'Page Not Found',
@@ -41,7 +42,7 @@ export function NotFoundContent() {
               'Try the homepage or one of the starter listings instead.'
             )}
           </p>
-          <Link href={getRoute('home')} className={buttonVariants({ className: 'mt-8' })}>
+          <Link href={getRoute('home')} className={cn(buttonVariants(), 'mt-8')}>
             Back to homepage
           </Link>
         </div>

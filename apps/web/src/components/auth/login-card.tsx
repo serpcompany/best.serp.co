@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { callbackDestination } from '@/lib/auth/callback-url'
 import { getRoute } from '@/lib/routing/routes'
 import { hostOf } from '@/lib/submissions/contract'
+import { cn } from '@/lib/utils'
 import {
   CODE_ATTEMPTS,
   CODE_LENGTH,
@@ -319,7 +320,7 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
               Redirecting…
             </div>
             <Field>
-              <Link href={callbackPath} className={buttonVariants({ className: 'w-full' })}>
+              <Link href={callbackPath} className={cn(buttonVariants(), 'w-full')}>
                 {destination.button}
                 <ArrowRight />
               </Link>

@@ -180,4 +180,16 @@ test.describe('public parity interactions', () => {
     await gotoPublicPage(page, detailListing.path)
     await expectExternalLink(page.getByRole('link', { name: /install browser extension/i }).first())
   })
+
+  // Links styled with buttonVariants keep their own classes through cn (#186): the header's
+  // sign-in link is `hidden sm:inline-flex`, so it waits for the menu on phones.
+  test('desktop-only header links stay hidden on phones', async ({ page }) => {
+    await page.setViewportSize({ height: 844, width: 390 })
+    await gotoPublicPage(page, '/')
+    const header = page.getByRole('banner')
+    await expect(header.getByRole('link', { name: 'Sign up / Sign in' })).toBeHidden()
+    await expect(header.getByRole('button', { name: /open menu/i })).toBeVisible()
+    await page.setViewportSize({ height: 900, width: 1440 })
+    await expect(header.getByRole('link', { name: 'Sign up / Sign in' })).toBeVisible()
+  })
 })

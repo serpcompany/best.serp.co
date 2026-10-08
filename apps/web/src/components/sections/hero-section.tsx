@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
@@ -45,10 +46,10 @@ export function HeroSection({ websiteCount }: HeroSectionProps) {
         <div className="animate-fade-in-up opacity-0 stagger-4 flex flex-col justify-center gap-3 pt-2 sm:flex-row md:gap-4">
           <Link
             href={getRoute('submit')}
-            className={buttonVariants({
-              className:
-                'group h-auto bg-foreground px-6 py-3 text-sm font-bold text-background shadow-none transition-all duration-300 hover:gap-3 hover:bg-foreground/90 press-effect has-[>svg]:px-6 md:px-8 md:py-4 md:text-base md:has-[>svg]:px-8'
-            })}
+            className={cn(
+              buttonVariants(),
+              'group h-auto bg-foreground px-6 py-3 text-sm font-bold text-background shadow-none transition-all duration-300 hover:gap-3 hover:bg-foreground/90 press-effect has-[>svg]:px-6 md:px-8 md:py-4 md:text-base md:has-[>svg]:px-8'
+            )}
           >
             {siteCopy.submitLabel}
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />

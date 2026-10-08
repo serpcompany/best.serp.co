@@ -36,6 +36,7 @@ import {
   VERIFICATION_COOLDOWN_SECONDS,
   verificationInstant
 } from '@/lib/submissions/contract'
+import { cn } from '@/lib/utils'
 import { verifyBadge } from './submit-api'
 import { ProductLogo, StepProgress, ToneAlert } from './submit-ui'
 
@@ -539,7 +540,7 @@ export function BadgeStep({
               Rather not add a badge?{' '}
               <a
                 href={`/submit/${submission.id}/checkout/`}
-                className={buttonVariants({ variant: 'link', className: 'h-auto p-0' })}
+                className={cn(buttonVariants({ variant: 'link' }), 'h-auto p-0')}
               >
                 Skip the badge: $49 one-off
               </a>

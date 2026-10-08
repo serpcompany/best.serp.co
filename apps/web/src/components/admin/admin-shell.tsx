@@ -12,6 +12,7 @@ import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
 import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
 import { ModeToggle } from '@/components/layout/mode-toggle'
 import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 /**
  * The admin shell (#64): shadcn sidebar-07 (`collapsible="icon"` with a rail, the logo tile,
@@ -57,11 +58,7 @@ function AdminHeader() {
         <>
           <a
             href="/"
-            className={buttonVariants({
-              variant: 'ghost',
-              size: 'sm',
-              className: 'hidden sm:flex'
-            })}
+            className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'hidden sm:flex')}
           >
             View site
             <ExternalLink />

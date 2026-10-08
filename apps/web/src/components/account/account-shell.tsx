@@ -22,6 +22,7 @@ import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-hea
 import { ModeToggle } from '@/components/layout/mode-toggle'
 import { buttonVariants } from '@/components/ui/button'
 import { getRoute } from '@/lib/routing/routes'
+import { cn } from '@/lib/utils'
 
 /**
  * The account dashboard shell from the #70 mockups (screens 5 to 7): shadcn dashboard-01, built
@@ -68,11 +69,7 @@ function AccountHeader() {
         <>
           <Link
             href={getRoute('home')}
-            className={buttonVariants({
-              variant: 'ghost',
-              size: 'sm',
-              className: 'hidden sm:flex'
-            })}
+            className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'hidden sm:flex')}
           >
             View site
             <ExternalLink />
