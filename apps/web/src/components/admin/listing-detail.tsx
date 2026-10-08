@@ -17,7 +17,7 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -105,11 +105,11 @@ function Timeline({ items }: { items: ListingDetailView['activity'] }) {
             className={cn(
               'mt-1.5 size-2 shrink-0 rounded-full',
               item.tone === 'ok'
-                ? 'bg-emerald-500'
+                ? 'bg-success'
                 : item.tone === 'warn'
-                  ? 'bg-orange-500'
+                  ? 'bg-warning'
                   : item.tone === 'err'
-                    ? 'bg-red-500'
+                    ? 'bg-destructive'
                     : 'bg-muted-foreground/40'
             )}
           />
@@ -693,7 +693,7 @@ export function ListingDetail({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className={buttonVariants({ variant: 'destructive' })}
               disabled={busy}
               onClick={event => {
                 event.preventDefault()
@@ -719,7 +719,7 @@ export function ListingDetail({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className={buttonVariants({ variant: 'destructive' })}
               disabled={busy}
               onClick={event => {
                 event.preventDefault()

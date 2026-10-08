@@ -516,12 +516,12 @@ export function SubmitForm({
                         </InputGroupText>
                       ) : prefill.kind === 'found' && prefill.count > 0 ? (
                         <InputGroupText>
-                          <Check className="text-emerald-600" />
+                          <Check className="text-success" />
                           <span className="text-xs">Details found</span>
                         </InputGroupText>
                       ) : prefill.kind === 'failed' ? (
                         <InputGroupText>
-                          <TriangleAlert className="text-amber-600" />
+                          <TriangleAlert className="text-warning" />
                           <span className="text-xs">Couldn’t read page</span>
                         </InputGroupText>
                       ) : null}

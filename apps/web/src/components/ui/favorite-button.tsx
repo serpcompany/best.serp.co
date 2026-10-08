@@ -55,8 +55,8 @@ export function FavoriteButton({
     },
     variant === 'default' &&
       (favorited
-        ? 'border-red-500 hover:border-red-600 dark:border-red-400 dark:hover:border-red-500'
-        : 'border-border hover:border-red-200 dark:hover:border-red-800'),
+        ? 'border-destructive hover:border-destructive/80'
+        : 'border-border hover:border-destructive/30'),
     className
   )
 
@@ -73,8 +73,8 @@ export function FavoriteButton({
           'transition-all duration-200 antialiased',
           iconSizeClasses[size],
           favorited
-            ? 'fill-red-500 text-red-500 dark:fill-red-400 dark:text-red-400'
-            : 'text-muted-foreground group-hover/favorite:text-red-400 dark:group-hover/favorite:text-red-500',
+            ? 'fill-destructive text-destructive'
+            : 'text-muted-foreground group-hover/favorite:text-destructive/80',
           isAnimating && 'scale-125'
         )}
         style={{

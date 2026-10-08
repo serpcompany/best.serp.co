@@ -170,7 +170,7 @@ function SectionCards({
         <SectionCard
           badge={
             <Badge variant="outline">
-              <TriangleAlert className="text-amber-500" />
+              <TriangleAlert className="text-warning" />
               Fix needed
             </Badge>
           }
@@ -324,9 +324,7 @@ export function AccountDashboard({
         cell: ({ row }) => (
           <span
             className={cn(
-              row.original.next.tone === 'warning'
-                ? 'text-amber-700 dark:text-amber-400'
-                : 'text-muted-foreground'
+              row.original.next.tone === 'warning' ? 'text-warning' : 'text-muted-foreground'
             )}
           >
             {row.original.next.text}

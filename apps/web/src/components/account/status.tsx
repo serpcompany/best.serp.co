@@ -5,39 +5,30 @@ import {
   Clock,
   EyeOff,
   Loader,
+  type LucideIcon,
   MessageSquare,
   Pencil,
   Undo2
 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { StatusChip, type StatusTone } from '@/components/status/status-chip'
 import { Badge } from '@/components/ui/badge'
 import type { AccountStatus } from '@/lib/account/view'
-import { cn } from '@/lib/utils'
 
 /**
- * The dashboard's status chips (#70 screen 5 and its legend): dashboard-01's outline Badge with
- * a colored lucide icon, filled circles for live and final states, as the admin panel shows them.
+ * The dashboard's status chips (#70 screen 5 and its legend), as the admin panel shows them:
+ * each entry is its label, icon, tone, and whether the circle is filled (live and final states).
  */
-const STATUS: Record<AccountStatus | 'revision', [string, ReactNode]> = {
-  changes: ['Changes requested', <MessageSquare key="i" className="text-orange-500" />],
-  in_review: ['In review', <Loader key="i" className="text-sky-500" />],
-  live: [
-    'Live',
-    <CircleCheck key="i" className="fill-emerald-500 text-background dark:fill-emerald-400" />
-  ],
-  live_paid: [
-    'Live (paid, in review)',
-    <CircleCheck key="i" className="fill-teal-500 text-background dark:fill-teal-400" />
-  ],
-  pending_badge: ['Pending badge', <Clock key="i" className="text-amber-500" />],
-  plan_draft: ['Draft – choose a plan', <Pencil key="i" className="text-muted-foreground" />],
-  rejected: [
-    'Rejected',
-    <CircleX key="i" className="fill-red-500 text-background dark:fill-red-400" />
-  ],
-  revision: ['Edits in review', <Loader key="i" className="text-sky-500" />],
-  unlisted: ['Unlisted', <EyeOff key="i" className="text-muted-foreground" />],
-  withdrawn: ['Withdrawn', <Undo2 key="i" className="text-muted-foreground" />]
+const STATUS: Record<AccountStatus | 'revision', [string, LucideIcon, StatusTone, true?]> = {
+  changes: ['Changes requested', MessageSquare, 'warning'],
+  in_review: ['In review', Loader, 'info'],
+  live: ['Live', CircleCheck, 'success', true],
+  live_paid: ['Live (paid, in review)', CircleCheck, 'success', true],
+  pending_badge: ['Pending badge', Clock, 'warning'],
+  plan_draft: ['Draft – choose a plan', Pencil, 'muted'],
+  rejected: ['Rejected', CircleX, 'destructive', true],
+  revision: ['Edits in review', Loader, 'info'],
+  unlisted: ['Unlisted', EyeOff, 'muted'],
+  withdrawn: ['Withdrawn', Undo2, 'muted']
 }
 
 export function AccountStatusBadge({
@@ -49,12 +40,11 @@ export function AccountStatusBadge({
   label?: string
   status: AccountStatus | 'revision'
 }) {
-  const [text, icon] = STATUS[status]
+  const [text, icon, tone, filled] = STATUS[status]
   return (
-    <Badge variant="outline" className={cn('px-1.5 text-muted-foreground', className)}>
-      {icon}
+    <StatusChip className={className} filled={filled} icon={icon} tone={tone}>
       {label ?? text}
-    </Badge>
+    </StatusChip>
   )
 }
 
@@ -78,19 +68,16 @@ export function CheckResultBadge({
   label: string
   outcome: 'fail' | 'pass'
 }) {
-  const icon =
-    outcome === 'pass' ? (
-      <CircleCheck className="fill-emerald-500 text-background dark:fill-emerald-400" />
-    ) : conclusive ? (
-      <CircleX className="fill-red-500 text-background dark:fill-red-400" />
-    ) : (
-      <CircleMinus className="text-muted-foreground" />
-    )
+  const [icon, tone]: [LucideIcon, StatusTone] =
+    outcome === 'pass'
+      ? [CircleCheck, 'success']
+      : conclusive
+        ? [CircleX, 'destructive']
+        : [CircleMinus, 'muted']
   return (
-    <Badge variant="outline" className="px-1.5 text-muted-foreground">
-      {icon}
+    <StatusChip filled={tone !== 'muted'} icon={icon} tone={tone}>
       {label}
-    </Badge>
+    </StatusChip>
   )
 }
 

@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -430,7 +430,7 @@ function RefundDialog({
             ]}
           />
           {unpublish ? (
-            <Alert className="border-amber-500/40 text-amber-700 dark:text-amber-400">
+            <Alert className="border-warning/40 text-warning">
               <TriangleAlert />
               <AlertTitle>{name} has no passing badge</AlertTitle>
               <AlertDescription>
@@ -440,7 +440,7 @@ function RefundDialog({
             </Alert>
           ) : null}
           {keepFree ? (
-            <Alert className="border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
+            <Alert className="border-success/40 text-success">
               <CircleCheck />
               <AlertTitle>{name} keeps a passing badge</AlertTitle>
               <AlertDescription>
@@ -462,7 +462,7 @@ function RefundDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive text-white hover:bg-destructive/90"
+            className={buttonVariants({ variant: 'destructive' })}
             disabled={busy}
             onClick={event => {
               event.preventDefault()

@@ -127,13 +127,7 @@ function DirectoryProductBadge({
   className?: string
 }) {
   return (
-    <Badge
-      variant="outline"
-      className={cn(
-        'border-yellow-500/20 bg-yellow-500/10 text-xs text-yellow-700 transition-colors hover:bg-yellow-500/20 dark:border-yellow-400/30 dark:bg-yellow-400/10 dark:text-yellow-300 dark:hover:bg-yellow-400/20',
-        className
-      )}
-    >
+    <Badge variant="outline" className={cn('border-warning/30 text-xs text-warning', className)}>
       {children}
     </Badge>
   )

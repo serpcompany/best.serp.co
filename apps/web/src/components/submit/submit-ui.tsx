@@ -13,8 +13,8 @@ import {
   Undo2
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { StatusChip, type StatusTone } from '@/components/status/status-chip'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { ListingImage } from '@/components/ui/listing-image'
 import { Progress } from '@/components/ui/progress'
 import type { SubmissionStatusName } from '@/lib/submissions/contract'
@@ -56,9 +56,9 @@ export type AlertTone = 'default' | 'destructive' | 'info' | 'success' | 'warnin
 const TONE_CLASSES: Record<AlertTone, string> = {
   default: 'bg-card text-card-foreground',
   destructive: '',
-  info: 'border-sky-500/40 bg-card text-sky-700 dark:text-sky-400',
-  success: 'border-emerald-500/40 bg-card text-emerald-700 dark:text-emerald-400',
-  warning: 'border-amber-500/40 bg-card text-amber-700 dark:text-amber-400'
+  info: 'border-info/40 bg-card text-info',
+  success: 'border-success/40 bg-card text-success',
+  warning: 'border-warning/40 bg-card text-warning'
 }
 
 const TONE_ICONS: Record<AlertTone, LucideIcon> = {
@@ -106,34 +106,24 @@ export function ToneAlert({
   )
 }
 
-const STATUS: Record<SubmissionStatusName, { icon: LucideIcon; iconClass: string; label: string }> =
-  {
-    approved: { icon: CircleCheck, iconClass: 'text-emerald-500', label: 'Live' },
-    changes_requested: {
-      icon: CircleAlert,
-      iconClass: 'text-orange-500',
-      label: 'Changes requested'
-    },
-    draft: { icon: Pencil, iconClass: 'text-muted-foreground', label: 'Draft – choose a plan' },
-    paid_pending_review: {
-      icon: CircleCheck,
-      iconClass: 'text-teal-500',
-      label: 'Live (paid, in review)'
-    },
-    pending_badge: { icon: Clock, iconClass: 'text-amber-500', label: 'Pending badge' },
-    rejected: { icon: CircleX, iconClass: 'text-red-500', label: 'Rejected' },
-    verified: { icon: Loader, iconClass: 'text-sky-500', label: 'In review' },
-    withdrawn: { icon: Undo2, iconClass: 'text-muted-foreground', label: 'Withdrawn' }
-  }
+const STATUS: Record<SubmissionStatusName, [string, LucideIcon, StatusTone]> = {
+  approved: ['Live', CircleCheck, 'success'],
+  changes_requested: ['Changes requested', CircleAlert, 'warning'],
+  draft: ['Draft – choose a plan', Pencil, 'muted'],
+  paid_pending_review: ['Live (paid, in review)', CircleCheck, 'success'],
+  pending_badge: ['Pending badge', Clock, 'warning'],
+  rejected: ['Rejected', CircleX, 'destructive'],
+  verified: ['In review', Loader, 'info'],
+  withdrawn: ['Withdrawn', Undo2, 'muted']
+}
 
-/** dashboard-01's status badge: an outline Badge with a colored lucide icon. */
+/** dashboard-01's status badge: an outline Badge with a toned lucide icon. */
 export function SubmissionStatusBadge({ status }: { status: SubmissionStatusName }) {
-  const { icon: Icon, iconClass, label } = STATUS[status]
+  const [label, icon, tone] = STATUS[status]
   return (
-    <Badge variant="outline" className="px-1.5 text-muted-foreground">
-      <Icon className={iconClass} aria-hidden="true" />
+    <StatusChip icon={icon} tone={tone}>
       {label}
-    </Badge>
+    </StatusChip>
   )
 }
 
