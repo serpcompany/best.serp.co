@@ -50,7 +50,9 @@ export function WebsiteFaqsSection({ website }: WebsiteFaqsSectionProps) {
           <Accordion type="multiple">
             {faqs.map((faq, index) => (
               <AccordionItem
-                key={faq.question}
+                // Questions may repeat within a listing; the list is static and ordered.
+                // biome-ignore lint/suspicious/noArrayIndexKey: see above
+                key={`${index}-${faq.question}`}
                 value={`faq-${index}`}
                 // `forceMount` keeps a closed answer rendered, so it's hidden here instead.
                 className="[&_[data-slot=accordion-content][data-state=closed]]:hidden"

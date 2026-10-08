@@ -87,12 +87,16 @@
               "options": {
                 "patterns": [
                   {
+                    // Anchored on @/ and relative paths, so npm subpaths such as
+                    // next/dist/client/components/... stay allowed.
                     "group": [
                       "@/components",
                       "@/components/**",
-                      "**/components/**",
                       "@/app/**",
-                      "**/app/**"
+                      "./**/components/**",
+                      "../**/components/**",
+                      "./**/app/**",
+                      "../**/app/**"
                     ],
                     "message": "src/lib and src/db never import components or routes; move the shared piece into src/lib."
                   }
@@ -113,7 +117,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["@/app/**", "**/app/**"],
+                    "group": ["@/app/**", "./**/app/**", "../**/app/**"],
                     "message": "Components never import routes; move the shared piece into src/lib or src/components."
                   }
                 ]
