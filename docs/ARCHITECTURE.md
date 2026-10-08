@@ -11,8 +11,8 @@ and detail DTOs. There is no filesystem fallback.
 
 ```text
 Browser
-  -> Cloudflare Worker entry (apps/web/worker.ts): canonical-host and trailing-slash
-     redirects, the environment's crawl policy, then the epoch-keyed edge HTML cache
+  -> Cloudflare Worker entry (apps/web/worker.ts): canonical-host, old root-level URL, and
+     trailing-slash redirects, the crawl policy, then the epoch-keyed edge HTML cache
   -> OpenNext / Next.js routes (apps/web), on a cache miss
      -> server-only catalog adapter (apps/web/lib/catalog)
         -> catalog operations (packages/data-ops) -> D1 (DB) public catalog tables
@@ -35,19 +35,19 @@ change runs in a protected workflow.
   `/products/<slug>/` (detail), `/products/categories/` (index),
   `/products/categories/<category>/` (category), `/products/`, `/brands/`, `/search/`,
   `/submit/`, `/legal/*`, `/rss.xml`, `/sitemap-index.xml`,
-  `/sitemaps/{pages,directory,categories}/1.xml`. The pre-D1 scheme
+  `/sitemaps/{pages,directory,categories}/1.xml`. The static site's root-level `/<slug>` URLs
+  get one 308 from the Worker (`apps/web/lib/routing/legacy-root.ts`); the pre-D1 scheme
   (`/products/<slug>/reviews/`, `/products/best/<category>/`, `/categories/<x>/`) redirects
   permanently through `apps/web/next.config.ts` (rules in `apps/web/lib/routing/redirects.ts`).
-  "Featured" is a listing flag used for placements (the homepage section), not a public
-  category page.
-- `apps/web/worker.ts` is the Worker entry. It wires the build output into the request
-  pipeline (`apps/web/lib/worker/handle-request.ts`), which redirects non-canonical hosts
-  and URLs (`apps/web/lib/routing/`), applies the environment's crawl policy
-  (`apps/web/lib/environment/`), serves anonymous pages from the edge HTML cache
-  (`apps/web/lib/edge-cache/`), and otherwise delegates to the generated
-  `.open-next/worker.js`. It reads only the catalog epoch and, after a listing page
-  rendered 404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is
-  rendered again as the 410 gone page), both through `packages/data-ops/`.
+  "Featured" is a listing flag for placements (the homepage section), not a category page.
+- `apps/web/worker.ts` is the Worker entry. It wires the build output into the request pipeline
+  (`apps/web/lib/worker/handle-request.ts`), which redirects non-canonical hosts and URLs
+  (`apps/web/lib/routing/`), applies the crawl policy (`apps/web/lib/environment/`), serves
+  anonymous pages from the edge HTML cache (`apps/web/lib/edge-cache/`), and otherwise
+  delegates to the generated `.open-next/worker.js`. It reads only the catalog epoch, where an
+  unrouted `/<slug>` moved (`lib/routing/legacy-root.ts`), and, after a listing page rendered
+  404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is rendered
+  again as the 410 gone page), all through `packages/data-ops/`.
   Its `scheduled()` handler runs `lib/worker/scheduled.ts`, which maps each Cron Trigger to its
   jobs: [draft reminders](./SUBMISSION_FLOW.md#draft-reminders-and-expiry) and the
   [billing sweep](./BILLING.md) (hourly), and the [badge program](./BADGE_PROGRAM.md).
@@ -174,14 +174,14 @@ extensions (`chart.js`), and a test checks the committed import.
   reads the same compiled patterns from `.next/routes-manifest.json`), and the request
   reaches its page in one hop. Add static moved URLs there (not as a page that calls
   `permanentRedirect()`); `redirects.test.ts` checks that each destination is canonical and
-  each source is matched in both slash forms. Redirects that need D1 (renamed listing
-  slugs) stay in their pages and must write a canonical destination (`getRoute`). The Worker
-  validates the manifest at startup and refuses to start if its shape is unexpected (no
-  `redirects` array, a rule without a string `regex`, a pattern that does not compile or
-  matches every path), so a framework upgrade cannot silently turn the slash rule off.
-  OpenNext re-serializes the query string of config redirects from decoded values, so a
-  query that contains an encoded `&`, `=`, `#`, or `+` is not preserved exactly; the pre-D1
-  URLs never carried one.
+  each source is matched in both slash forms. Redirects that need D1 run in their pages
+  (renamed listing slugs) or in the Worker (root-level `/<slug>`, before the slash rule) and
+  write a canonical destination (`getRoute`). The Worker validates the manifest at startup
+  and refuses to start if its shape is unexpected (no `redirects` array or route list, a rule
+  without a string `regex`, a pattern that does not compile or matches every path), so a
+  framework upgrade cannot silently turn either rule off. OpenNext re-serializes the query
+  string of config redirects from decoded values, so a query that contains an encoded `&`,
+  `=`, `#`, or `+` is not preserved exactly; the pre-D1 URLs never carried one.
 - **Written URLs.** Canonical tags, `og:url`, sitemaps, `robots.txt`, and JSON-LD build
   absolute URLs with `absoluteUrl` (`siteUrl` in `seo-config.ts`), which writes the homepage
   as the bare origin. With `trailingSlash`, the Next.js metadata API appends `/` to every
