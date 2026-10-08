@@ -8,15 +8,18 @@ deploy, the rulesets, and the runners. Release-time guards are in
 One workflow, `web.yml` (#182), checks pull requests into `staging` (the base branch) and `main`
 (`hotfix-*` branches only), checks every push to them, and deploys staging:
 
-- `changes` finds whether anything but `docs/` and Markdown changed. A documentation-only change
-  runs `pnpm docs:check` and skips the rest, and every job still reports success.
+- `changes` finds whether a pull request changed anything but `docs/` and Markdown. A
+  documentation-only pull request runs `pnpm docs:check` and the tests (they read docs too) and
+  skips the build and E2E. A push always runs the full checks on the tree it deploys, and if
+  `changes` fails, `check` and `e2e` still run everything, since a skipped required job passes.
 - `check` runs `pnpm check`. On a push the staging deploy (or Deploy Production) builds the
   Worker, so `check` skips its build there (`HARNESS_SKIP_BUILD=1`): each commit builds once.
 - `e2e` runs Playwright and uploads a `passed-e2e-<tree>` receipt. A push whose tree a pull
   request already tested finds the receipt and skips the suite; a lookup error runs it. Draft
   pull requests skip `e2e` until they are marked ready for review.
 - `deploy-staging` runs on a push to `staging` once `check` and `e2e` pass: build, a tip guard
-  (a re-run of an older commit never deploys over newer code), then the staging release steps
+  (a re-run of an older commit never deploys over newer code; a failed lookup fails the job),
+  then the staging release steps
   ([deploy runbook](./DEPLOY_RUNBOOK.md#workflows)).
 
 The repository rulesets `staging` and `main` (id 24391799) apply these rules:

@@ -100,26 +100,29 @@ describe('web workflow', () => {
     expect(workflow.jobs.e2e?.name).toBe('e2e')
     expect(workflow.jobs.check?.needs).toEqual(['changes'])
     expect(workflow.jobs.e2e?.needs).toEqual(['changes'])
-    // Skipping a required job reports success, so only a draft skips e2e, and check never skips.
-    expect(workflow.jobs.check?.if).toBeUndefined()
+    // Skipping a required job reports success: check and e2e run even when `changes` failed
+    // (then they run everything), and only a draft skips e2e.
+    expect(workflow.jobs.check?.if).toBe('!cancelled()')
     // Full history, so the media plan test can read deleted sources from Git (#124).
     expect(step('check', 'Checkout').with).toEqual({ 'fetch-depth': 0 })
     expect(workflow.jobs.changes?.if).toBeUndefined()
     expect(workflow.jobs.e2e?.if).toBe(
-      "github.event_name != 'pull_request' || github.event.pull_request.draft == false"
+      "!cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)"
     )
   })
 
   it('runs pnpm check, without its build on a push, and only the documentation check for docs', () => {
     const gate = step('check', 'Run the finish gate')
     expect(gate.run).toBe('pnpm check')
-    expect(gate.if).toBe("needs.changes.outputs.code == 'true'")
+    // Anything but an explicit `false` (a failed changes job included) runs the full check.
+    expect(gate.if).toBe("needs.changes.outputs.code != 'false'")
     expect(gate.env).toEqual({
       HARNESS_SKIP_BUILD: expression("github.event_name != 'pull_request' && '1' || ''")
     })
     const docs = step('check', 'Check the documentation')
-    expect(docs.run).toBe('pnpm docs:check')
-    expect(docs.if).toBe("needs.changes.outputs.code != 'true'")
+    // The tests read documentation too, so a docs-only change still runs them.
+    expect(docs.run).toBe('pnpm docs:check && pnpm test')
+    expect(docs.if).toBe("needs.changes.outputs.code == 'false'")
     const names = (env: Record<string, string>) =>
       stepsForProfile('full', env).map(harness => harness.name)
     expect(names({})).toContain('OpenNext Worker build')
@@ -131,18 +134,14 @@ describe('web workflow', () => {
 
   it('treats a change as documentation only when every file is under docs/ or Markdown', () => {
     const find = step('changes', 'Find code changes')
-    expect(find.env).toEqual({
-      BASE: expression(
-        "github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before"
-      )
-    })
+    expect(find.env).toEqual({ BASE: expression('github.event.pull_request.base.sha') })
     const classify = (files: string[], env: Record<string, string> = {}) =>
       runStep(
         String(find.run),
         `git() { if [ "$1" = cat-file ]; then return "\${CAT_STATUS:-0}"; fi; printf '%s\\n' ${files
           .map(file => `'${file}'`)
           .join(' ')}; }`,
-        { BASE: 'abc', GITHUB_EVENT_NAME: 'push', GITHUB_SHA: 'def', ...env }
+        { BASE: 'abc', GITHUB_EVENT_NAME: 'pull_request', GITHUB_SHA: 'def', ...env }
       ).outputs.code
     expect(classify(['docs/HARNESS.md'])).toBe('false')
     expect(classify(['docs/HARNESS.md', 'AGENTS.md', 'apps/web/e2e/README.md'])).toBe('false')
@@ -151,7 +150,9 @@ describe('web workflow', () => {
     // MDX is site content.
     expect(classify(['apps/web/content/legal/terms-conditions.mdx'])).toBe('true')
     expect(classify(['.github/workflows/web.yml'])).toBe('true')
-    // Unknown bases run everything: a dispatch, a new branch, a base the clone lacks.
+    // A push deploys, so it checks the tree it deploys whatever changed; unknown bases run
+    // everything.
+    expect(classify(['docs/HARNESS.md'], { GITHUB_EVENT_NAME: 'push' })).toBe('true')
     expect(classify(['docs/HARNESS.md'], { GITHUB_EVENT_NAME: 'workflow_dispatch' })).toBe('true')
     expect(classify(['docs/HARNESS.md'], { BASE: '' })).toBe('true')
     expect(classify(['docs/HARNESS.md'], { CAT_STATUS: '128' })).toBe('true')
@@ -177,6 +178,10 @@ describe('web workflow', () => {
     expect(decide({}, 'return 1')).toEqual({ tree: 'tree123' })
     // A pull request always runs the suite and records its receipt.
     expect(decide({ GITHUB_EVENT_NAME: 'pull_request' }, 'echo 1')).toEqual({ tree: 'tree123' })
+    // With no answer from a failed changes job, the suite runs.
+    expect(decide({ CODE: '', GITHUB_EVENT_NAME: 'pull_request' }, 'echo 0')).toEqual({
+      tree: 'tree123'
+    })
     expect(decide({ CODE: 'false', GITHUB_EVENT_NAME: 'pull_request' }, 'echo 0')).toEqual({
       skip: 'true',
       tree: 'tree123'
@@ -215,6 +220,23 @@ describe('web workflow', () => {
     expect(names.indexOf('Record the receipt')).toBeGreaterThan(
       names.indexOf('Run Playwright tests')
     )
+  })
+
+  it('deploys only the staging tip, and fails when the tip cannot be read', () => {
+    const tip = workflow.jobs['deploy-staging']?.steps?.find(candidate => candidate.id === 'tip')
+    const guard = (status: number, output: string) =>
+      runStep(String(tip?.run), `git() { printf '%s' "$LS_OUTPUT"; return "$LS_STATUS"; }`, {
+        GITHUB_SHA: 'abc123',
+        LS_OUTPUT: output,
+        LS_STATUS: String(status)
+      })
+    expect(guard(0, 'abc123\trefs/heads/staging\n')).toEqual({
+      outputs: { deploy: 'true' },
+      status: 0
+    })
+    expect(guard(0, 'def456\trefs/heads/staging\n')).toEqual({ outputs: {}, status: 0 })
+    expect(guard(128, '').status).not.toBe(0)
+    expect(guard(2, '').status).not.toBe(0)
   })
 
   it('accepts pull requests into main only from a hotfix branch of this repository', () => {

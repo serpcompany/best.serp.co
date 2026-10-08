@@ -7,8 +7,8 @@ name: Web
 #   build and each commit is built once.
 # - `e2e` runs Playwright and records a `passed-e2e-<tree>` receipt. A push whose tree a pull
 #   request already tested finds the receipt and skips the suite.
-# - A change that touches only documentation runs the documentation check and skips the rest,
-#   and every job still reports success.
+# - A pull request that touches only documentation runs the documentation check and the tests
+#   and skips the build and E2E; every job still reports success. A push always runs the checks.
 # - Draft pull requests skip `e2e` until they are marked ready for review.
 # Production releases from deploy-production.yml, only a tree this workflow's staging deploy
 # verified (docs/RELEASE_GUARDS.md).
@@ -44,10 +44,11 @@ jobs:
       - name: Find code changes
         id: diff
         env:
-          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          # Fails toward running everything: a dispatch, a new branch or an unknown base is code.
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ -z "$BASE" ] \
+          # Only a pull request may be documentation-only: a push deploys, so it always runs the
+          # checks on the tree it deploys. An unknown base fails toward running everything.
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ] || [ -z "$BASE" ] \
             || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -57,12 +58,15 @@ jobs:
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
-            echo "Documentation only: the checks below run the documentation check alone." >> "$GITHUB_STEP_SUMMARY"
+            echo "Documentation only: check runs the documentation check and the tests; e2e is skipped." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   check:
     name: check
     needs: [changes]
+    # A skipped required job reports success, so a failed `changes` must not skip this one:
+    # with no output, it runs everything.
+    if: '!cancelled()'
     # CI_RUNNER_LABELS picks the runner; a fork's pull request always runs on ubuntu-latest
     # (docs/CI.md#runners).
     runs-on: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER_LABELS || '"ubuntu-latest"') }}
@@ -104,20 +108,21 @@ jobs:
         uses: ./.github/actions/install
 
       - name: Run the finish gate
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code != 'false'
         env:
           # A push deploys, and the deploy job's build is this commit's build.
           HARNESS_SKIP_BUILD: ${{ github.event_name != 'pull_request' && '1' || '' }}
         run: pnpm check
 
       - name: Check the documentation
-        if: needs.changes.outputs.code != 'true'
-        run: pnpm docs:check
+        if: needs.changes.outputs.code == 'false'
+        # The tests read documentation too (the D1 restore command, the AGENTS map).
+        run: pnpm docs:check && pnpm test
 
   e2e:
     name: e2e
     needs: [changes]
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: "!cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)"
     # Installs Playwright browsers, so it never leaves GitHub-hosted runners.
     runs-on: ubuntu-latest
     steps:
@@ -133,7 +138,7 @@ jobs:
         run: |
           tree="$(git rev-parse 'HEAD^{tree}')"
           echo "tree=$tree" >> "$GITHUB_OUTPUT"
-          if [ "$CODE" != "true" ]; then
+          if [ "$CODE" = "false" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Documentation only: E2E skipped." >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -247,7 +252,9 @@ jobs:
         # Deploys enter the group in the order their checks finish, and a re-run of an older
         # commit's check would otherwise deploy older code over newer.
         run: |
-          tip="$(git ls-remote origin refs/heads/staging | cut -f1)"
+          # A failed lookup fails the job rather than passing without a deploy.
+          line="$(git ls-remote --exit-code origin refs/heads/staging)"
+          tip="${line%%[[:space:]]*}"
           if [ "$tip" = "$GITHUB_SHA" ]; then
             echo "deploy=true" >> "$GITHUB_OUTPUT"
             exit 0

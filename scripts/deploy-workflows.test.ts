@@ -155,7 +155,7 @@ describe('staging deploy job', () => {
       'pnpm --filter web test:e2e:smoke'
     ]
     const tip = job.steps?.find(step => step.id === 'tip')
-    expect(tip?.run).toContain('git ls-remote origin refs/heads/staging')
+    expect(tip?.run).toContain('git ls-remote --exit-code origin refs/heads/staging')
     expect(tip?.run).toContain('if [ "$tip" = "$GITHUB_SHA" ]')
     expect(
       runs(job)

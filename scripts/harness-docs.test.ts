@@ -86,8 +86,8 @@ describe('repository harness contract', () => {
   })
 
   it('makes the full loop a strict superset of the fast loop', () => {
-    const fast = stepsForProfile('fast').map(step => step.name)
-    const full = stepsForProfile('full').map(step => step.name)
+    const fast = stepsForProfile('fast', {}).map(step => step.name)
+    const full = stepsForProfile('full', {}).map(step => step.name)
     expect(fast).toEqual([
       'documentation health',
       'D1 architecture guard',

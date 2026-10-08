@@ -99,12 +99,14 @@ export function runHarness(profile: 'fast' | 'full'): void {
   const steps = stepsForProfile(profile)
   console.log(`Harness ${profile}: ${steps.length} deterministic checks`)
 
+  // HARNESS_SKIP_BUILD picks the steps above; the steps' own tests must not see it.
+  const { HARNESS_SKIP_BUILD: _skipBuild, ...inherited } = process.env
   for (const [index, step] of steps.entries()) {
     console.log(`\n[${index + 1}/${steps.length}] ${step.name}`)
     const result = spawnSync(step.command, step.args, {
       cwd: resolve('.'),
       env: {
-        ...process.env,
+        ...inherited,
         CI: process.env.CI || '1',
         FORCE_COLOR: process.env.FORCE_COLOR || '0'
       },
