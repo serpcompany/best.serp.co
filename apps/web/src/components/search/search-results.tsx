@@ -73,12 +73,12 @@ export function SearchResults({ error, loading, query, results, slots }: SearchR
   if (error) {
     return (
       <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4">
-        <h2 className="text-lg font-semibold text-destructive">Something went wrong</h2>
-        <p className="mt-1 text-destructive">{error}</p>
+        <h2 className="text-lg font-semibold">Something went wrong</h2>
+        <p className="mt-1">{error}</p>
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="mt-3 rounded-md bg-destructive/15 px-4 py-2 text-destructive transition-colors hover:bg-destructive/25"
+          className="mt-3 rounded-md bg-destructive/15 px-4 py-2 transition-colors hover:bg-destructive/25"
         >
           Refresh Page
         </button>

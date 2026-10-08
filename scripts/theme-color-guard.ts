@@ -9,7 +9,8 @@ const PREFIX =
   '(?:bg|text|border(?:-[xytrblse])?|ring(?:-offset)?|inset-ring|inset-shadow|drop-shadow|text-shadow|fill|stroke|from|via|to|outline|divide|shadow|decoration|caret|accent|placeholder)'
 const PALETTE =
   '(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)'
-const HEX = '#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\\w-])'
+// `_` is Tailwind's space inside brackets (`#8080800a_1px`), so it can end a hex.
+const HEX = '#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![0-9a-zA-Z-])'
 
 const patterns: ReadonlyArray<readonly [string, RegExp]> = [
   [
@@ -28,7 +29,7 @@ const patterns: ReadonlyArray<readonly [string, RegExp]> = [
       [
         `(?<![\\w&#])(?=#\\d*[a-fA-F])${HEX}`,
         `(?:(?<=['"\`[=:]\\s?)|(?<=[_,]))${HEX}`,
-        '(?<=[\\s(])#(?:\\d{8}|\\d{6})(?![\\w-])'
+        '(?<=[\\s(])#(?:\\d{8}|\\d{6})(?![0-9a-zA-Z-])'
       ].join('|'),
       'gu'
     )

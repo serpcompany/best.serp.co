@@ -64,7 +64,7 @@ export function WebsiteHero({
   return (
     <section className="relative overflow-hidden border-b border-border/50 bg-gradient-to-b from-muted/30 via-background to-background">
       <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:32px_32px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,color-mix(in_oklab,var(--color-muted-foreground)_4%,transparent)_1px,transparent_1px),linear-gradient(to_bottom,color-mix(in_oklab,var(--color-muted-foreground)_4%,transparent)_1px,transparent_1px)] bg-[size:32px_32px]" />
         <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-full bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 blur-[100px]" />
       </div>
 
@@ -96,10 +96,7 @@ export function WebsiteHero({
                       {website.name}
                     </h1>
                     {website.isUnofficial && (
-                      <Badge
-                        variant="outline"
-                        className="text-xs border-warning/30 bg-warning/10 text-warning"
-                      >
+                      <Badge variant="outline" className="text-xs border-warning/30 text-warning">
                         Unofficial
                       </Badge>
                     )}

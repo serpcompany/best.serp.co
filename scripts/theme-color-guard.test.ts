@@ -10,7 +10,7 @@ import { compareWithBaseline, literalColors } from './theme-color-guard'
  *
  * Each file's count is a ratchet: `COLOR_BASELINE` holds it, and it may only go down. A change
  * that adds a palette class fails; a change that removes some must lower the file's number (or
- * delete the entry at zero), so the count never creeps back up. Since #184 every file is at zero.
+ * delete the entry at zero), so the count never creeps back up.
  */
 
 /** Files that may use literal colors, each with why. */
@@ -19,12 +19,6 @@ const ALLOWED: Readonly<Record<string, string>> = {
   'apps/web/src/lib/email/emails/layout.ts':
     'email clients ignore CSS variables, so the email palette is literal hex',
   'apps/web/src/components/ui/animated-background.tsx': 'draws on a canvas with rgba()'
-}
-
-/** Classes stock shadcn uses, allowed in any file, each with why. */
-const ALLOWED_CLASSES: Readonly<Record<string, string>> = {
-  'bg-black/50':
-    'the stock overlay behind Dialog, Sheet and AlertDialog; #187 moves the hand-built mobile drawer and search overlays onto those components'
 }
 
 /** Stock shadcn components (#175): they stay as the registry ships them (#186 replaces them). */
@@ -71,8 +65,15 @@ const STOCK_UI = [
   'tooltip'
 ].map(name => `apps/web/src/components/ui/${name}.tsx`)
 
-/** Each file's literal-color count, which may only go down. Empty since #184 (all at zero). */
-const COLOR_BASELINE: Readonly<Record<string, number>> = {}
+/**
+ * Each file's literal-color count, which may only go down. Since #184 only the hand-built
+ * overlays are left, with stock shadcn's overlay color `bg-black/50`; #187 moves them onto Sheet
+ * and Dialog, and their entries go.
+ */
+const COLOR_BASELINE: Readonly<Record<string, number>> = {
+  'apps/web/src/components/layout/header-search.tsx': 1,
+  'apps/web/src/components/layout/mobile-drawer.tsx': 1
+}
 
 function sourceFiles(): string[] {
   return execFileSync(
@@ -97,7 +98,8 @@ describe('theme colors only (#183)', () => {
           '<p className="shadow-[0_0_0_1px_#000] bg-[linear-gradient(90deg,#fff,#000)]" />',
           '<p className="inset-shadow-sky-500 drop-shadow-black/50 text-shadow-white" />',
           '<p className="bg-(--color-red-500) text-[var(--color-amber-600)]" />',
-          "const line = { border: '1px solid #000000', background: 'linear-gradient(#fff, #000)' }"
+          "const line = { border: '1px solid #000000', background: 'linear-gradient(#fff, #000)' }",
+          '<p className="bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px)] shadow-[0_0_0_1px_#fff_inset]" />'
         ].join('\n'),
         'probe.tsx'
       )
@@ -120,7 +122,9 @@ describe('theme colors only (#183)', () => {
       '7: palette variable --color-red-500',
       '7: palette variable --color-amber-600',
       '8: hex color #000000',
-      '8: hex color #fff'
+      '8: hex color #fff',
+      '9: hex color #8080800a',
+      '9: hex color #fff'
     ])
     expect(literalColors('a {\n  /* #fff */\n  border: 1px solid #ccc;\n}', 'probe.css')).toEqual([
       '3: hex color #ccc'
@@ -196,9 +200,7 @@ describe('theme colors only (#183)', () => {
     const uses: Record<string, string[]> = {}
     for (const file of sourceFiles()) {
       if (allowed.has(file)) continue
-      const found = literalColors(readFileSync(file, 'utf8'), file).filter(
-        use => ALLOWED_CLASSES[use.slice(use.lastIndexOf(' ') + 1)] === undefined
-      )
+      const found = literalColors(readFileSync(file, 'utf8'), file)
       if (found.length > 0) uses[file] = found
     }
     const { over, stale } = compareWithBaseline(uses, COLOR_BASELINE)
@@ -216,7 +218,7 @@ describe('theme colors only (#183)', () => {
     for (const file of [...Object.keys(ALLOWED), ...STOCK_UI, ...Object.keys(COLOR_BASELINE)]) {
       expect(existsSync(file), file).toBe(true)
     }
-    for (const [name, reason] of Object.entries({ ...ALLOWED, ...ALLOWED_CLASSES }))
-      expect(reason.length, name).toBeGreaterThan(10)
+    for (const [file, reason] of Object.entries(ALLOWED))
+      expect(reason.length, file).toBeGreaterThan(10)
   })
 })
