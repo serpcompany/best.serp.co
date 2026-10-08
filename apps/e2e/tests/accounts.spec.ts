@@ -1,9 +1,5 @@
-import {
-  type APIRequestContext,
-  expect,
-  request as playwrightRequest,
-  test
-} from '@playwright/test'
+import { type APIRequestContext, expect, request as playwrightRequest } from '@playwright/test'
+import { test } from './test'
 
 /**
  * Accounts over HTTP against the local Worker (serpcompany/best.serp.co#60): the email code

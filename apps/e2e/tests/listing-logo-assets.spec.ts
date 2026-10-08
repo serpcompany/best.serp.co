@@ -1,5 +1,4 @@
-import { type APIRequestContext, expect, type Page, test } from '@playwright/test'
-
+import { type APIRequestContext, expect, type Page } from '@playwright/test'
 import { detailListing } from './listing-fixture'
 import {
   categoriesIndexPath,
@@ -8,6 +7,7 @@ import {
   sampleCategory,
   site
 } from './site-fixture'
+import { test } from './test'
 
 /** The checked-in "no logo" tile (serpcompany/best.serp.co#86). */
 const fallbackLogoPath = '/listing-logos/favicon-fallback-512x512.png'

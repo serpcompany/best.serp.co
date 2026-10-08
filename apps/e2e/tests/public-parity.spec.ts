@@ -1,7 +1,7 @@
-import { expect, type Locator, type Page, test } from '@playwright/test'
-
+import { expect, type Locator, type Page } from '@playwright/test'
 import { detailListing } from './listing-fixture'
 import { categoryPath, escapeRegExp, sampleCategory } from './site-fixture'
+import { test } from './test'
 
 async function gotoPublicPage(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded' })

@@ -1,4 +1,4 @@
-import { type APIRequestContext, expect, type Page, test } from '@playwright/test'
+import { type APIRequestContext, expect, type Page } from '@playwright/test'
 import {
   ADMIN_EMAIL_PREFIXES,
   type Client,
@@ -20,6 +20,7 @@ import {
   stripeSignatureHeader
 } from './billing-fixture'
 import { type FixtureProduct, type FixtureSite, startFixtureSite } from './submit-fixture'
+import { test } from './test'
 
 /**
  * Paid listings (serpcompany/best.serp.co#68) end to end, against a mocked Stripe on a local

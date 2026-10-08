@@ -1,6 +1,6 @@
 import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { expect, type Page, request as playwrightRequest, test } from '@playwright/test'
+import { expect, type Page, request as playwrightRequest } from '@playwright/test'
 import {
   ADMIN_EMAIL_PREFIXES,
   activeCategory,
@@ -18,6 +18,14 @@ import {
   signInAsNewAdmin,
   unique
 } from './admin-fixture'
+import { expectedResponse, test } from './test'
+
+test.use({
+  allowedConsoleErrors: {
+    because: 'unpublishing a listing makes its page answer 410',
+    patterns: [expectedResponse(410, /\/products\//u)]
+  }
+})
 
 /**
  * The admin panel (serpcompany/best.serp.co#64) against the local Worker and local D1: the

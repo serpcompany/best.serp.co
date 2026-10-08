@@ -1,6 +1,13 @@
-import { type BrowserContext, expect, type Page, test } from '@playwright/test'
-
+import { type BrowserContext, expect, type Page } from '@playwright/test'
 import { detailListing } from './listing-fixture'
+import { test } from './test'
+
+test.use({
+  allowedConsoleErrors: {
+    because: 'breakListingImages answers every image but the tile with 404',
+    patterns: [/status of 404 \(Not Found\)/u]
+  }
+})
 
 /**
  * A listing image never renders as a broken image (serpcompany/best.serp.co#122): every image

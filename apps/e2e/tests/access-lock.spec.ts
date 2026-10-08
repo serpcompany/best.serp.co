@@ -1,16 +1,12 @@
 import { generateKeyPairSync, sign } from 'node:crypto'
-import {
-  type APIRequestContext,
-  expect,
-  request as playwrightRequest,
-  test
-} from '@playwright/test'
+import { type APIRequestContext, expect, request as playwrightRequest } from '@playwright/test'
 import {
   ACCESS_TEST_AUD,
   ACCESS_TEST_TEAM_DOMAIN,
   accessLockOrigin,
   accessLockServersEnabled
 } from './access-lock-fixture'
+import { test } from './test'
 
 /**
  * The production Cloudflare Access lock in the built OpenNext Worker (serpcompany/best.serp.co#60;
