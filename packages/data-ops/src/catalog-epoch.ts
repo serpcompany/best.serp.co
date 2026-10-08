@@ -151,8 +151,11 @@ export async function legacyRootTarget(input: {
   slug: string
 }): Promise<'category' | 'listing' | null> {
   const startedAt = performance.now()
+  let rowsRead: number | null = null
+  let d1DurationMs: number | null = null
   let success = false
   let resultRows = 0
+  let errorCode: string | undefined
   try {
     const result = await runQuery<{ kind: 'category' | 'listing' }>(
       input.client,
@@ -167,17 +170,25 @@ export async function legacyRootTarget(input: {
         ORDER BY rank
         LIMIT 1`
     )
+    const meta = result.meta as { duration?: number; rows_read?: number } | undefined
+    rowsRead = typeof meta?.rows_read === 'number' ? meta.rows_read : null
+    d1DurationMs = typeof meta?.duration === 'number' ? meta.duration : null
     success = result.success
     resultRows = result.results.length
+    if (!result.success) throw new Error('D1 legacy root-level URL query failed.')
     return result.results[0]?.kind ?? null
+  } catch (error) {
+    errorCode = d1ErrorCode(error)
+    throw error
   } finally {
     input.observe?.({
-      d1DurationMs: null,
+      d1DurationMs,
+      ...(errorCode ? { errorCode } : {}),
       event: 'd1_query',
       operation: 'legacy-root-target',
       queryShape: 'legacy-root-target',
       resultRows,
-      rowsRead: null,
+      rowsRead,
       rowsWritten: 0,
       success,
       wallDurationMs: performance.now() - startedAt
