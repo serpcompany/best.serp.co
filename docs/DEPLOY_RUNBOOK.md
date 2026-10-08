@@ -175,6 +175,13 @@ one you won't ship instead of leaving it waiting. Hotfixes follow
   ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)). Time Travel keeps 30 days.
 - Worker rollback: dashboard → Workers → `best-serp-co-production` → Deployments → Rollback,
   or `wrangler rollback --env production`. A rollback does not undo a migration.
+- Emergency deploy (the owner only, when the workflows cannot run): `pnpm deploy:staging` or
+  `pnpm deploy:production` builds the Worker and runs `opennextjs-cloudflare deploy --env`. It
+  skips every release guard: the staging verification, the authorization, and the migration
+  check. Use it only when `pnpm db:migrations:list:<env>` shows nothing pending (migrations
+  apply only in the workflows); otherwise roll back. Export `NEXT_PUBLIC_SENTRY_DSN` and
+  `NEXT_PUBLIC_SENTRY_RELEASE` (the commit) first, or the build ships with Sentry off. Agents
+  never run it.
 
 ## Rehearsals and read-only checks
 

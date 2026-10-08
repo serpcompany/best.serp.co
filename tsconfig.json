@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "lib": ["es2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "paths": { "@/*": ["./apps/web/src/*"] },
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "types": ["node"]
+  },
+  "include": ["scripts/**/*.ts", "vitest.config.ts", "apps/web/cloudflare-env.d.ts"],
+  // The ESLint rule and its test go with ESLint in #180.
+  "exclude": ["scripts/eslint-rules"]
+}

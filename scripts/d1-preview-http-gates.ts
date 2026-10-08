@@ -386,7 +386,9 @@ export function deployedWorkerVersion(ndjson: string, source = 'Wrangler output'
 }
 
 /** The expected Worker version from the environment, or undefined when none is configured. */
-export function expectedWorkerVersionFromEnvironment(env: NodeJS.ProcessEnv): string | undefined {
+export function expectedWorkerVersionFromEnvironment(
+  env: Partial<NodeJS.ProcessEnv>
+): string | undefined {
   const explicit = env.EXPECTED_WORKER_VERSION?.trim()
   if (explicit) {
     if (!workerVersionPattern.test(explicit))

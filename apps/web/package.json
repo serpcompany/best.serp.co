@@ -9,8 +9,6 @@
     "clean": "git clean -xdf .cache .turbo .next coverage node_modules",
     "dev": "next dev --webpack --port ${PORT:-3005}",
     "dev:inspect": "NODE_OPTIONS='--inspect' next dev --webpack --port ${PORT:-3005}",
-    "lint": "biome lint .",
-    "lint:fix": "biome check --write .",
     "preview:worker": "pnpm --dir=../.. tsx scripts/d1-local-preview.ts",
     "report": "playwright show-report",
     "start": "next start",
@@ -22,7 +20,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:visual": "E2E_VISUAL=1 playwright test e2e/visual.spec.ts --project=chromium",
     "test:install": "playwright install chromium",
-    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@content-collections/core": "^0.8.2",

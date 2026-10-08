@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 import { githubHostedRunner, routedRunsOn } from './ci-runners'
+import { stepsForProfile } from './harness/runner'
 import { project } from './project'
 import { hotfixBranch } from './staging-verification'
 
@@ -120,6 +121,7 @@ describe('pr-review workflow', () => {
           HEAD_REPOSITORY: headRepository,
           LS_OUTPUT: output,
           LS_STATUS: String(status),
+          NODE_ENV: 'test',
           PATH: process.env.PATH
         }
       })
@@ -141,22 +143,22 @@ describe('pr-review workflow', () => {
 
     expect(validateJob['runs-on']).toBe(routedRunsOn)
     expect(checkoutStep?.with?.['fetch-depth']).toBe(0)
-    expect(stepRuns).toContain('pnpm worker:config:validate')
-    expect(stepRuns).toContain('pnpm test:repo')
-    expect(stepRuns).toContain('pnpm test:d1')
-    expect(stepRuns).toContain('pnpm lint:forbidden-links')
-    const biomeStep = stepRuns?.find(run => run?.includes('pnpm exec biome check'))
-    // Against the pull request's own base: staging for changes, main for hotfixes.
-    expect(biomeStep).toContain(
-      'git diff --name-only --diff-filter=ACMR -z "origin/$GITHUB_BASE_REF...HEAD"'
+    // The finish gate (#179): the harness's full profile, so CI and a local run agree.
+    expect(stepRuns).toContain('pnpm check')
+    const scripts = JSON.parse(readFileSync(resolve('package.json'), 'utf8')).scripts
+    expect(scripts.check).toBe('pnpm tsx scripts/harness/runner.ts full')
+    expect(scripts.lint).toBe('biome check . && pnpm lint:forbidden-links')
+    expect(stepsForProfile('full').map(step => step.name)).toEqual(
+      expect.arrayContaining([
+        'documentation health',
+        'D1 contracts',
+        'lint',
+        'repository tests',
+        'Cloudflare configuration'
+      ])
     )
-    expect(biomeStep).toContain(
-      `pnpm exec biome check --no-errors-on-unmatched "\${changed_files[@]}"`
-    )
-    expect(biomeStep).toContain(`if ((\${#changed_files[@]} == 0)); then`)
-    expect(biomeStep).toContain('No Biome-supported files changed; skipping.')
     expect(stepRuns).not.toContain('pnpm db:migrate:local')
-    expect(stepRuns).not.toContain('pnpm worker:deploy:production')
+    expect(stepRuns).not.toContain('pnpm deploy:production')
     expect(stepRuns).not.toContain('pnpm typecheck')
     expect(stepRuns).not.toContain('pnpm test')
   })

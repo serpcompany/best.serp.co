@@ -60,7 +60,7 @@ in this order:
    install and confirm generated output and CI behavior are unchanged.
 
 For each batch, update the lockfile with a frozen reinstall check, run focused tests,
-run `pnpm harness:check`, and inspect `pnpm security:audit:production`. Use Preview
+run `pnpm check`, and inspect `pnpm security:audit:production`. Use Preview
 for runtime-affecting batches and preserve the protected Production release gates.
 Remove resolved baseline entries in the same batch; never add a new entry merely to
 make CI green.

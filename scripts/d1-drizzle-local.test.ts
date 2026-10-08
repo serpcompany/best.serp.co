@@ -802,7 +802,7 @@ describe('fresh Drizzle D1 history', () => {
       expect(playwright).toContain('pnpm db:migrate:local')
       expect(playwright).toContain('pnpm db:import:local')
       expect(playwright).toContain('pnpm db:verify:local')
-      expect(playwright).toContain('pnpm worker:preview')
+      expect(playwright).toContain('pnpm preview')
       expect(playwright).not.toContain('pornvideodownloaders')
     } finally {
       if (previous === undefined) delete process.env.HARNESS_D1_STATE_DIRECTORY

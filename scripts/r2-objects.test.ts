@@ -52,7 +52,10 @@ beforeAll(async () => {
 })
 afterAll(() => new Promise<void>(resolve => server.close(() => resolve())))
 
-const env = { CLOUDFLARE_ACCOUNT_ID: 'account', CLOUDFLARE_API_TOKEN: 'token' } as NodeJS.ProcessEnv
+const env = {
+  CLOUDFLARE_ACCOUNT_ID: 'account',
+  CLOUDFLARE_API_TOKEN: 'token'
+} as Partial<NodeJS.ProcessEnv>
 /** Node's own fetch, pointed at the local server instead of api.cloudflare.com. */
 const local: typeof fetch = (input, init) =>
   fetch(String(input).replace('https://api.cloudflare.com', origin), init)

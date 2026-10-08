@@ -24,6 +24,7 @@ ambiguous `db:migrate`.
 | `pnpm db:publish:production` | production D1 | Apply a reviewed manifest; runs only in `publish-d1.yml` on `main` |
 | `pnpm media:upload:<staging\|production>` | media bucket | Upload a reviewed `d1/media/` plan; runs only in `upload-media-staging.yml` on `staging` or `upload-media.yml` on `main` |
 | `pnpm media:upload:dry-run -- <plan>` | none | Fetch and verify every object of a plan; writes nothing |
+| `pnpm deploy:<env>` | Worker | Owner-only emergency deploy that skips every guard here ([runbook](./DEPLOY_RUNBOOK.md)) |
 
 The remote `migrations:list` commands run `cloudflare-release.ts list-migrations <env>`, which
 reads the ledger with `wrangler d1 execute --remote --env <env>` and a `SELECT`. They do not

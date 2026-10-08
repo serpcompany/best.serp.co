@@ -22,10 +22,10 @@ pnpm install
 pnpm db:migrate:local
 pnpm db:import:local
 pnpm db:verify:local
-pnpm dev
+pnpm preview
 ```
 
-`pnpm dev` builds the Worker and serves it on http://localhost:8787 against the local
+`pnpm preview` builds the Worker and serves it on http://localhost:8787 against the local
 D1 database. It cannot reach staging or production resources.
 
 ## Verification

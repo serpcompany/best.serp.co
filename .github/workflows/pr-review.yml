@@ -56,32 +56,9 @@ jobs:
       - name: Install
         uses: ./.github/actions/install
 
-      - name: Validate repository documentation
-        run: pnpm docs:check
-
-      - name: Validate Worker configuration contracts
-        run: pnpm worker:config:validate
-
-      - name: Run Biome Check
-        run: |
-          mapfile -d '' changed_files < <(
-            git diff --name-only --diff-filter=ACMR -z "origin/$GITHUB_BASE_REF...HEAD" -- \
-              '*.js' '*.jsx' '*.ts' '*.tsx' '*.json' '*.jsonc' '*.css'
-          )
-          if ((${#changed_files[@]} == 0)); then
-            echo "No Biome-supported files changed; skipping."
-            exit 0
-          fi
-          pnpm exec biome check --no-errors-on-unmatched "${changed_files[@]}"
-
-      - name: Run forbidden listing link guard
-        run: pnpm lint:forbidden-links
-
-      - name: Run repository policy tests
-        run: pnpm test:repo
-
-      - name: Run D1 contract tests
-        run: pnpm test:d1
+      - name: Run the finish gate
+        # pnpm check: documentation, guards, lint, typecheck, migrations, tests, Worker build.
+        run: pnpm check
 
   typecheck:
     name: Type Check

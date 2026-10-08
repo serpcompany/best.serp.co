@@ -23,7 +23,7 @@ export const HOSTED_MEDIA_LISTING = '123movies-downloader'
 export const QUEUED_MEDIA_LISTING = 'autoenhance.ai'
 export const QUEUED_LOGO_SOURCE = 'https://unreachable.best-serp-co.test/logo.png'
 
-export const mediaFixtures = {
+export const mediaFixtures: Record<string, Uint8Array> = {
   [`${MEDIA_FIXTURE_ORIGIN}/logo.png`]: solidPng(512, 512, [16, 185, 129]),
   [`${MEDIA_FIXTURE_ORIGIN}/featured.png`]: solidPng(1200, 630, [59, 130, 246])
 }

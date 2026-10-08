@@ -35,10 +35,6 @@ function loadWorkflow(): WorkflowDefinition {
   return yaml.load(readFileSync(workflowPath, 'utf8')) as WorkflowDefinition
 }
 
-function githubExpression(value: string): string {
-  return `\${{ ${value} }}`
-}
-
 describe('main validation workflow', () => {
   it('validates every pushed staging and main revision without deployment authority', () => {
     const workflow = loadWorkflow()
@@ -54,14 +50,8 @@ describe('main validation workflow', () => {
     // No browsers, sudo, apt, or credentials: it follows CI_RUNNER_LABELS.
     expect(job['runs-on']).toBe(routedRunsOn)
     expect(job.environment).toBeUndefined()
-    // A push that creates the branch (staging, once) has an all-zero `before`; it compares the
-    // already validated head with itself instead of linting the whole repository.
-    expect(job.env).toEqual({
-      HARNESS_DIFF_BASE: githubExpression(
-        'github.event.created && github.sha || github.event.before'
-      ),
-      HARNESS_DIFF_HEAD: githubExpression('github.sha')
-    })
+    // pnpm check lints the whole repository, so the job needs no diff range.
+    expect(job.env).toBeUndefined()
     expect(checkout?.with?.['fetch-depth']).toBe(0)
     expect(job.steps?.map(step => step.uses).filter(Boolean)).toEqual([
       'actions/checkout@v7',

@@ -197,9 +197,10 @@ export function checkDocumentation(root = resolve('.')): string[] {
     const manifest = JSON.parse(readFileSync(resolve(root, file), 'utf8')) as {
       scripts?: Record<string, string>
     }
-    const lint = manifest.scripts?.lint
-    if (lint?.includes('--write')) {
-      violations.push(`${file}: lint must be read-only; move --write behavior to lint:fix`)
+    for (const name of ['lint', 'check']) {
+      if (manifest.scripts?.[name]?.includes('--write')) {
+        violations.push(`${file}: ${name} must be read-only; move --write behavior to lint:fix`)
+      }
     }
   }
 
@@ -207,11 +208,22 @@ export function checkDocumentation(root = resolve('.')): string[] {
     scripts?: Record<string, string>
   }
   for (const script of [
+    // The web stack standard's script names (#179); `check` is the finish gate.
+    'lint',
+    'format',
+    'typecheck',
+    'test',
+    'test:e2e',
+    'db:generate',
+    'db:check',
+    'check',
+    'preview',
+    'deploy:staging',
+    'deploy:production',
     'docs:check',
     'docs:garden',
     'harness:fast',
     'harness:check',
-    'validate',
     'agent:manifest',
     'agent:doctor',
     'agent:ui:capture',

@@ -268,7 +268,7 @@ function protectedWorkflow(
 /** An owner-approved hotfix: a dispatch carrying the workflow's hotfix confirmation. */
 export function isHotfixRelease(
   authorization: ReleaseAuthorization,
-  env: NodeJS.ProcessEnv
+  env: Partial<NodeJS.ProcessEnv>
 ): boolean {
   return (
     authorization.hotfixConfirmation !== undefined &&
@@ -287,7 +287,7 @@ export function isHotfixRelease(
  */
 export async function requireVerifiedStaging(
   command: ReleaseCommand,
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   fetch?: FetchLike
 ): Promise<StagingVerification | 'hotfix' | null> {
   if (readOnlyCommands.has(command)) return null
@@ -325,7 +325,7 @@ export async function requireVerifiedStaging(
 export function authorizeRelease(
   command: ReleaseCommand,
   environment: RemoteEnvironment,
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   git: (args: string[]) => string
 ): void {
   if (readOnlyCommands.has(command)) return
@@ -636,7 +636,7 @@ export function bookmarkSummary(record: TimeTravelRecord): string {
 export function recordTimeTravelBookmark(
   environment: RemoteEnvironment,
   runner: ProcessRunner,
-  env: NodeJS.ProcessEnv,
+  env: Partial<NodeJS.ProcessEnv>,
   now: Date = new Date()
 ): TimeTravelRecord {
   const database = project.remote[environment].databaseName
@@ -964,7 +964,7 @@ export interface ReleaseDependencies {
  */
 export async function runRelease(
   argv: string[],
-  env: NodeJS.ProcessEnv = process.env,
+  env: Partial<NodeJS.ProcessEnv> = process.env,
   dependencies: ReleaseDependencies = {}
 ): Promise<unknown> {
   const runner = dependencies.runner ?? processRunner

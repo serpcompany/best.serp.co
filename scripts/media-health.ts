@@ -302,7 +302,7 @@ export interface MediaHealthDependencies {
 
 export async function checkMediaHealth(
   environment: RemoteEnvironment,
-  env: NodeJS.ProcessEnv = process.env,
+  env: Partial<NodeJS.ProcessEnv> = process.env,
   dependencies: MediaHealthDependencies = {}
 ): Promise<MediaHealthReport> {
   const fetcher = dependencies.fetch ?? fetch

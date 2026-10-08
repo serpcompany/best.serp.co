@@ -17,7 +17,7 @@ title, so it is the changelog line. See serpcompany/serp docs/engineering/standa
 Report each level separately; a lower level never proves a higher one.
 
 - Build:
-- Automated tests (`pnpm harness:check`, CI run):
+- Automated tests (`pnpm check`, CI run):
 - UI / browser (Playwright, screenshots):
 - Deployed (staging run, live-route checks, `pnpm migration:compare`):
 - Owner acceptance:
