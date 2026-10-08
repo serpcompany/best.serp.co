@@ -385,7 +385,7 @@ async function refundFromOrders(
   await expect(page.getByText(toast)).toBeVisible()
   // The toast is a filled card: stock Sonner reads its colors from the theme (#241), and a
   // theme that hands it bare HSL numbers leaves it transparent.
-  const shown = page.locator('[data-sonner-toast]').filter({ hasText: toast })
+  const shown = page.locator('[data-sonner-toast]').filter({ has: page.getByText(toast) })
   const fill = await shown.evaluate(element => getComputedStyle(element).backgroundColor)
   expect(fill).not.toBe('rgba(0, 0, 0, 0)')
   expect(fill).not.toBe('transparent')
