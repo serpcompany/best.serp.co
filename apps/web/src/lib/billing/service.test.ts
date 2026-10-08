@@ -1087,6 +1087,10 @@ describe('refunds', () => {
       refund_reason: 'rejected',
       status: 'refunded'
     })
+    // The plain rejection: there was no payment to announce a refund of.
+    const sent = f.emails.map(email => email.template)
+    expect(sent).toContain('submission-rejected')
+    expect(sent).not.toContain('submission-rejected-refunded')
   })
 
   it('sends a refund of a submission in review to its rejection instead', async () => {

@@ -274,6 +274,10 @@ test('promotion codes: a discounted and a 100%-off checkout both go live; a chan
     billingD1(`SELECT charged_cents, provider_payment_id FROM orders WHERE id = ${q(freeOrder.id)}`)
   ).toEqual([{ charged_cents: 0, provider_payment_id: freeSession }])
   expect((await page.request.get(`/products/${free.slug}/`)).status()).toBe(200)
+  // Nothing was charged, so the return page promises no receipt.
+  await page.goto(`/submit/${free.id}/checkout/return/?order=${freeOrder.id}`)
+  await expect(page.getByText('$0.00 USD, one-off')).toBeVisible()
+  await expect(page.getByText('Receipt', { exact: true })).toHaveCount(0)
 
   // A catalog price that isn't the site's $49: no checkout opens, and the session is expired.
   stripe.prices.set(TEST_LISTING_PRICE, { amount: 9900, currency: 'usd' })

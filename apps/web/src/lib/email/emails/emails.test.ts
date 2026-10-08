@@ -933,3 +933,26 @@ describe('Outlook', () => {
     expect(email.html).toContain('<!--[if mso]></td></tr></table><![endif]-->')
   })
 })
+
+describe('a 100%-off promotion code (#250)', () => {
+  const free = (id: 'listing-live-paid' | 'payment-received-in-review') => {
+    const sample = EMAIL_SAMPLES[id][0]
+    if (!sample) throw new Error(`no sample ${id}`)
+    return renderAppEmail(id, { ...(sample.input as object), paidCents: 0 } as never, {
+      environment: 'production',
+      to: sample.to
+    })
+  }
+
+  it('thanks for no payment and promises no refund when nothing was paid', () => {
+    for (const id of ['listing-live-paid', 'payment-received-in-review'] as const) {
+      const { text } = free(id)
+      expect(text, id).toContain('Your promotion code covered the full price.')
+      expect(text, id).not.toContain('$0.00')
+      expect(text, id).not.toContain('refund')
+    }
+    // A paid one still thanks for the payment and promises the refund.
+    expect(render('listing-live-paid').text).toContain('Thanks for your payment of $49.00.')
+    expect(render('listing-live-paid').text).toContain('full refund automatically')
+  })
+})

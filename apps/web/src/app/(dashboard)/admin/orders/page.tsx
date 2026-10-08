@@ -55,10 +55,15 @@ export default async function OrdersPage() {
   const deps = await billingOrNull()
   const media = await mediaBaseUrl()
   const orders: OrderRow[] = (await getAdminOrders()).map(order => {
-    const paymentRef = order.providerPaymentId ?? order.providerCheckoutId
+    const charged = order.chargedCents ?? order.amountCents
+    // A promotion code's discount (#250) is on the checkout, so a discounted order links there.
+    const paymentRef =
+      (charged < order.amountCents ? order.providerCheckoutId : order.providerPaymentId) ??
+      order.providerPaymentId ??
+      order.providerCheckoutId
     return {
       // What was charged (and what a refund sends back): less after a promotion code (#250).
-      amountCents: order.chargedCents ?? order.amountCents,
+      amountCents: charged,
       createdAt: order.createdAt,
       customer: order.buyerEmail,
       id: order.id,
@@ -70,6 +75,7 @@ export default async function OrdersPage() {
           }
         : null,
       kind: order.kind === 'paid_claim' ? 'Paid claim' : 'Paid listing',
+      priceCents: order.amountCents,
       listingHref: order.listingSlug
         ? `/admin/listings/${encodeURIComponent(order.listingSlug)}/`
         : null,

@@ -58,6 +58,7 @@ import { PlanBadge, StatusBadge } from './status-badge'
  */
 
 export interface OrderRow {
+  /** What was charged: the price less a promotion code's discount (#250). */
   amountCents: number
   createdAt: string
   customer: string | null
@@ -68,6 +69,8 @@ export interface OrderRow {
   /** The line under the status (the mockup's notes). */
   note: string | null
   number: number
+  /** The order's price before any discount. */
+  priceCents: number
   refundable: boolean
   status: 'failed' | 'paid' | 'pending' | 'refunded' | 'refunding'
   paymentRef: string | null
@@ -166,7 +169,12 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
     }
     const name = order.item?.name ?? orderLabel(order)
     const logged = `Logged under ${actor}.`
-    toast.success(`Refunded ${formatUsd(order.amountCents)} for ${orderLabel(order)}`, {
+    // A 100%-off order charged nothing (#250): it closes with nothing sent back.
+    const done =
+      order.amountCents === 0
+        ? `Closed ${orderLabel(order)}: nothing was charged`
+        : `Refunded ${formatUsd(order.amountCents)} for ${orderLabel(order)}`
+    toast.success(done, {
       description:
         result.listing === 'unpublished'
           ? `${name} was unpublished (no passing badge). ${logged}`
@@ -260,7 +268,15 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
                     )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatUsd(order.amountCents)}
+                    <div className="flex flex-col items-end">
+                      {formatUsd(order.amountCents)}
+                      {order.amountCents < order.priceCents && order.status !== 'pending' ? (
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatUsd(order.priceCents - order.amountCents)} off with a promotion
+                          code
+                        </span>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col items-start gap-1">
@@ -377,6 +393,8 @@ function RefundDialog({
 }) {
   const name = order.item?.name ?? orderLabel(order)
   const amount = formatUsd(order.amountCents)
+  // A 100%-off order (#250) charged nothing: closing it sends nothing back.
+  const free = order.amountCents === 0
   const unpublish = preview.listingAction === 'unpublish'
   const keepFree = preview.listingAction === 'keep_free'
   const now = preview.listingNow
@@ -390,13 +408,18 @@ function RefundDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {unpublish
-              ? `Refund ${amount} and unpublish ${name}?`
-              : `Refund ${amount} for ${name}?`}
+            {free
+              ? unpublish
+                ? `Close the order and unpublish ${name}?`
+                : `Close the order for ${name}?`
+              : unpublish
+                ? `Refund ${amount} and unpublish ${name}?`
+                : `Refund ${amount} for ${name}?`}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            Refunds the full amount to {order.customer ?? 'the customer'} through our payment
-            provider. This can’t be undone.
+            {free
+              ? 'A promotion code covered the full price, so nothing goes back. This can’t be undone.'
+              : `Refunds the full amount to ${order.customer ?? 'the customer'} through our payment provider. This can’t be undone.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <FieldGroup className="gap-5">

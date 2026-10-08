@@ -91,7 +91,15 @@ function OrderDetails({ order }: { order: CheckoutOrder }) {
         ['Order', <span key="order" className="font-mono">{`ORD-${order.number}`}</span>],
         ['Amount', `${formatUsd(order.amountCents)} USD, one-off`],
         ['Status', <StatusBadge key="status" kind="o_paid" />],
-        ['Receipt', `Emailed to ${order.email} by our payment provider`]
+        // A 100%-off promotion code (#250) charged nothing, so no receipt is sent.
+        ...(order.amountCents === 0
+          ? []
+          : [
+              ['Receipt', `Emailed to ${order.email} by our payment provider`] as [
+                string,
+                ReactNode
+              ]
+            ])
       ]}
     />
   )

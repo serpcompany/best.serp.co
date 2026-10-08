@@ -1090,16 +1090,24 @@ export async function refundRejectedSubmission(
     )
   }
   if (submission.ownerEmail) {
-    await deps.notify('submission-rejected-refunded', {
-      eventKey: deps.eventKey('submission-rejected', input.submissionId),
-      input: {
-        reason: review.reason,
-        refundedCents: order.chargedCents ?? order.amountCents,
-        submissionId: input.submissionId,
-        submissionName: submission.name
-      },
-      to: submission.ownerEmail
-    })
+    const refundedCents = order.chargedCents ?? order.amountCents
+    const rejected = {
+      reason: review.reason,
+      submissionId: input.submissionId,
+      submissionName: submission.name
+    }
+    // A 100%-off order charged nothing (#250): the plain rejection, no refund to announce.
+    await (refundedCents === 0
+      ? deps.notify('submission-rejected', {
+          eventKey: deps.eventKey('submission-rejected', input.submissionId),
+          input: rejected,
+          to: submission.ownerEmail
+        })
+      : deps.notify('submission-rejected-refunded', {
+          eventKey: deps.eventKey('submission-rejected', input.submissionId),
+          input: { ...rejected, refundedCents },
+          to: submission.ownerEmail
+        }))
   }
 }
 

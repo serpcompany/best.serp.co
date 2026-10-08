@@ -96,13 +96,22 @@ export const paymentReceivedInReviewEmail = defineEmailTemplate<PaymentReceivedI
     return composeEmail(
       {
         body: [
-          paragraph(`Thanks for your payment of ${formatUsd(input.paidCents, { cents: true })}.`),
+          // A 100%-off promotion code (#250) paid nothing: no payment to thank for or refund.
+          paragraph(
+            input.paidCents === 0
+              ? 'Your promotion code covered the full price.'
+              : `Thanks for your payment of ${formatUsd(input.paidCents, { cents: true })}.`
+          ),
           paragraph(
             `Our automatic checks couldn’t load ${required(input.website, 'a website')} (${required(input.checkProblem, 'the check problem')}), so ${name} isn’t live yet. A reviewer will look at it before it’s published. You don’t need to do anything.`
           ),
-          paragraph(
-            'If it’s rejected for anything other than prohibited content, you get a full refund automatically.'
-          )
+          ...(input.paidCents === 0
+            ? []
+            : [
+                paragraph(
+                  'If it’s rejected for anything other than prohibited content, you get a full refund automatically.'
+                )
+              ])
         ],
         cta: {
           label: 'View submission',
