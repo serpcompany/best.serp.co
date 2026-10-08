@@ -55,8 +55,8 @@ in this order:
 3. **Product libraries:** UI, forms, validation, parsing, image, feed, and other
    runtime libraries. Validate targeted package tests, full harness, browser smoke,
    sitemap/RSS output, and submission behavior.
-4. **Build and developer tooling:** TypeScript, Turbo, Vitest, Playwright, Biome,
-   ESLint, generators, and test-only packages. Validate the full harness from a clean
+4. **Build and developer tooling:** TypeScript, Vitest, Playwright, Biome, drizzle-kit,
+   generators, and test-only packages. Validate the full harness from a clean
    install and confirm generated output and CI behavior are unchanged.
 
 For each batch, update the lockfile with a frozen reinstall check, run focused tests,
