@@ -8,7 +8,7 @@ This application is the best.serp.co Cloudflare Worker, not a filesystem-backed 
   email, and media SQL and DTOs in `apps/web/src/db/`.
 - Listing images are hosted, never hotlinked: render media URLs the catalog adapter resolved on
   `MEDIA_BASE_URL`, and send new images through `src/lib/media/server.ts` (#95).
-- Every page and route under `src/app/admin/` and `src/app/api/admin/` calls `requireAdmin()` or
+- Every page and route under `src/app/(dashboard)/admin/` and `src/app/api/admin/` calls `requireAdmin()` or
   `authorizeAdminRequest()` (`src/lib/auth/server.ts`); the architecture guard enforces it.
 - Client Components may consume serialized results or `/api/search`; they may not
   import D1 bindings, repositories, or Wrangler configuration.

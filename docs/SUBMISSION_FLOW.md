@@ -244,7 +244,7 @@ triggers (the dashboard lists them under the Worker's Settings → Triggers), an
 `--test-scheduled`, so `/__scheduled?cron=<expression>` runs `scheduled()` on demand; the job's
 behavior is covered by `scheduled.test.ts` and `draft-jobs.test.ts` against SQLite.
 
-Code: `apps/web/src/app/submit/`, `apps/web/src/components/submit/`,
+Code: `apps/web/src/app/(site)/submit/`, `apps/web/src/components/submit/`,
 `apps/web/src/app/api/submissions/`, `apps/web/src/lib/submissions/`,
 `apps/web/src/db/submissions.ts`, and `apps/web/src/db/submission-plans.ts`.
 

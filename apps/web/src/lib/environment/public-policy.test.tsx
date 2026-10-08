@@ -70,9 +70,7 @@ function worker(env: WorkerRequestEnv) {
               <RootAppShell
                 cloudflareWebAnalyticsToken={analytics.cloudflareWebAnalyticsToken}
                 feedTitle="SERP"
-                footer={null}
                 gtmId={analytics.gtmId}
-                header={null}
               >
                 <h1>SERP</h1>
               </RootAppShell>

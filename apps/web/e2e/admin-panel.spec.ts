@@ -131,12 +131,16 @@ const ADMIN_ACTIONS: Array<['DELETE' | 'POST', string]> = [
   )
 ]
 
-/** Every `page.tsx` and `route.ts` under `dir`, relative to the app directory. */
-function appFiles(dir: string, name: string): string[] {
+/**
+ * Every `name` file whose URL path starts with `/<prefix>/`. Route groups such as `(dashboard)`
+ * drop out first, so a file is found by its URL in any group or none.
+ */
+function appFiles(prefix: string, name: string): string[] {
   const app = resolve(__dirname, '../src/app')
-  return readdirSync(resolve(app, dir), { encoding: 'utf8', recursive: true })
+  return readdirSync(app, { encoding: 'utf8', recursive: true })
     .filter(file => file === name || file.endsWith(`/${name}`))
-    .map(file => `/${dir}/${file.slice(0, -name.length)}`)
+    .map(file => `/${file.slice(0, -name.length)}`.replace(/\/\([^/)]+\)/gu, ''))
+    .filter(path => path.startsWith(`/${prefix}/`))
 }
 
 /** A route file's path as a pattern: `[id]` matches one segment, `[...path]` one or more. */

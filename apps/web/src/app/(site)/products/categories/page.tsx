@@ -21,7 +21,7 @@ export default async function CategoriesPage() {
     .sort((left, right) => left.name.localeCompare(right.name))
 
   return (
-    <main className="container mx-auto max-w-6xl px-6 py-12">
+    <div className="container mx-auto max-w-6xl px-6 py-12">
       <SiteBreadcrumb
         items={[{ name: 'Categories', href: categoriesPath }]}
         baseUrl={SITE_PUBLIC_URL}
@@ -47,6 +47,6 @@ export default async function CategoriesPage() {
           </li>
         ))}
       </ul>
-    </main>
+    </div>
   )
 }

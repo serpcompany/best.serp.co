@@ -75,7 +75,7 @@ export default function BrandsPage() {
   const brands = getNetworkBrandsForGroup(siteConfig.networkBrandGroup)
 
   return (
-    <main className="container mx-auto py-8">
+    <div className="container mx-auto py-8">
       <BrandsJsonLd brands={brands} />
       <div className="space-y-10">
         <section className="space-y-3">
@@ -117,6 +117,6 @@ export default function BrandsPage() {
           ))}
         </section>
       </div>
-    </main>
+    </div>
   )
 }

@@ -35,7 +35,7 @@ describe('forbidden listing links', () => {
   it('checks app sources, content, public assets and built pages, not tests outside apps/', () => {
     for (const path of [
       'apps/web/src/lib/catalog/repository.ts',
-      'apps/web/src/app/products/[slug]/page.tsx',
+      'apps/web/src/app/(site)/products/[slug]/page.tsx',
       'apps/web/src/lib/site/site.ts',
       'apps/web/content/legal/terms-conditions.mdx',
       'apps/web/public/support.txt',

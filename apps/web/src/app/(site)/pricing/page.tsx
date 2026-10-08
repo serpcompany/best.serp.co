@@ -13,7 +13,7 @@ export const metadata: Metadata = generateBaseMetadata({
 
 export default function PricingPage() {
   return (
-    <main className="container mx-auto max-w-4xl px-6 py-16">
+    <div className="container mx-auto max-w-4xl px-6 py-16">
       <div className="space-y-8">
         <div className="space-y-3">
           <h1 className="text-4xl font-bold tracking-tight">SERP Pricing</h1>
@@ -42,6 +42,6 @@ export default function PricingPage() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   )
 }

@@ -2,12 +2,8 @@
 
 import { ErrorContent, type ErrorProps } from '@/components/layout/error-content'
 
-/** Errors outside the public site's layout (the dashboards, or the layout itself). */
+/** Errors in a public page: shown inside the public chrome. */
 // biome-ignore lint/suspicious/noShadowRestrictedNames: Next.js requires this component to be named Error
 export default function Error(props: ErrorProps) {
-  return (
-    <main className="flex min-h-screen flex-col">
-      <ErrorContent {...props} />
-    </main>
-  )
+  return <ErrorContent {...props} />
 }

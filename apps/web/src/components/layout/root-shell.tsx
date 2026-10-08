@@ -51,9 +51,7 @@ interface RootAppShellProps {
   /** The Cloudflare Web Analytics site token; no beacon without it. */
   cloudflareWebAnalyticsToken?: string
   feedTitle: string
-  footer: ReactNode
   gtmId?: string
-  header: ReactNode
 }
 
 export function RootAppShell({
@@ -61,9 +59,7 @@ export function RootAppShell({
   children,
   cloudflareWebAnalyticsToken,
   feedTitle,
-  footer,
-  gtmId,
-  header
+  gtmId
 }: RootAppShellProps) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -77,11 +73,7 @@ export function RootAppShell({
         <DesignSystemProvider>
           <FavoritesProvider>
             <AnalyticsTracker />
-            <div className="flex min-h-screen flex-col">
-              {header}
-              <main className="flex flex-1 flex-col">{children}</main>
-              {footer}
-            </div>
+            {children}
             <BackToTop />
           </FavoritesProvider>
         </DesignSystemProvider>

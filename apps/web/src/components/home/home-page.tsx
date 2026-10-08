@@ -104,12 +104,14 @@ export interface HomePageSlots {
 /** The homepage URL is the bare origin, `https://best.serp.co`, never `https://best.serp.co/`. */
 const HOME_URL = siteUrl('/')
 
+const HOME_TITLE = `${siteConfig.name} Directory of ${siteCopy.listingName.pluralTitle} and Resources`
+
 const {
   alternates: _homeAlternates,
   openGraph: homeOpenGraph,
   ...homeMetadata
 } = generateBaseMetadata({
-  title: `${siteConfig.name} Directory of ${siteCopy.listingName.pluralTitle} and Resources`,
+  title: HOME_TITLE,
   description: `${siteConfig.tagline}. Browse curated ${siteCopy.listingName.plural}, resources, and documentation links in one searchable directory.`,
   keywords: [
     ...KEYWORDS.homepage,
@@ -131,6 +133,9 @@ const {
  */
 export const homePageMetadata: Metadata = {
   ...homeMetadata,
+  // The homepage sits in `(site)`, below the root layout, so its title template would add
+  // ` | SERP`; the homepage title is already the full name.
+  title: { absolute: HOME_TITLE },
   openGraph: { ...homeOpenGraph, url: undefined }
 }
 

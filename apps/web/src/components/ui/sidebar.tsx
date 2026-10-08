@@ -315,13 +315,9 @@ function SidebarRail({ className, ...props }: React.ComponentProps<'button'>) {
   )
 }
 
-/**
- * Site exception (#239) until #185 part 3: a `div`, not stock's `main`, because the root layout
- * still wraps every page in `<main>`, and landmarks must not nest.
- */
-function SidebarInset({ className, ...props }: React.ComponentProps<'div'>) {
+function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
   return (
-    <div
+    <main
       data-slot="sidebar-inset"
       className={cn(
         'relative flex w-full flex-1 flex-col bg-background',
