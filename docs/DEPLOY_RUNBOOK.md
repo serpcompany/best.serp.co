@@ -132,11 +132,13 @@ PR Review already gates every merge, and Main Validation re-runs the full loop o
 
 Sentry reports errors from the Worker (`apps/web/instrumentation.ts`, server rendering and
 route handlers) and the browser (`instrumentation-client.ts`), with the settings and the
-scrubber in `apps/web/lib/telemetry/sentry.ts`: no PII, query strings, cookies, headers,
-console output, tracing, or replay. Both deploy builds bake in `NEXT_PUBLIC_SENTRY_DSN` (repo
-variable `SENTRY_DSN`) and the commit as the release; with no DSN, Sentry stays off.
-`SENTRY_AUTH_TOKEN` (repo secret, project releases scope) and the `SENTRY_PROJECT` variable
-only upload source maps. The owner creates the project and sets all three.
+scrubber in `apps/web/lib/telemetry/sentry.ts`: errors only, with no PII, query strings,
+cookies, headers, console output, logger data, sessions, tracing, or replay. Both deploy
+builds bake in `NEXT_PUBLIC_SENTRY_DSN` (repo variable `SENTRY_DSN`) and the commit as the
+release; with no DSN, Sentry stays off (E2E sets none). `SENTRY_AUTH_TOKEN` (repo secret,
+project releases scope) and the `SENTRY_PROJECT` variable only upload source maps. The owner
+creates the project and sets all three, then checks that the first staging error's stack
+frames resolve. Worker-entry and cron errors are #210.
 
 ## Production release
 

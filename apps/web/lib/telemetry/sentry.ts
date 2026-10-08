@@ -9,16 +9,37 @@
  * local runs or before the project exists, Sentry stays off: telemetry never breaks the site.
  */
 
+type StackFrame = { abs_path?: unknown; filename?: unknown; [key: string]: unknown }
+
 type ScrubbableEvent = {
   breadcrumbs?: Array<{ category?: string; data?: Record<string, unknown>; [key: string]: unknown }>
   contexts?: Record<string, unknown>
   environment?: string
+  exception?: { values?: Array<{ stacktrace?: { frames?: StackFrame[] } }> }
   extra?: unknown
   request?: { method?: string; url?: string; [key: string]: unknown }
+  tags?: Record<string, unknown>
   transaction?: unknown
   user?: unknown
   [key: string]: unknown
 }
+
+/**
+ * Contexts the SDK adds about the runtime. Anything else, such as the shared logger's `data`
+ * (which can hold a visitor's search), never leaves.
+ */
+const ALLOWED_CONTEXTS = new Set([
+  'app',
+  'browser',
+  'device',
+  'nextjs',
+  'os',
+  'react',
+  'runtime',
+  'trace'
+])
+/** Tags the SDK adds; the logger's own tags are dropped like its data. */
+const ALLOWED_TAGS = new Set(['runtime', 'turbopack'])
 
 export type SiteEnvironment = 'local' | 'production' | 'staging'
 
@@ -37,12 +58,25 @@ export function scrubEvent<E>(input: E): E {
   }
   if (typeof event.transaction === 'string') event.transaction = stripQuery(event.transaction)
   if (event.contexts) {
-    delete event.contexts.cloud_resource
-    delete event.contexts.culture
+    for (const key of Object.keys(event.contexts)) {
+      if (!ALLOWED_CONTEXTS.has(key)) delete event.contexts[key]
+    }
     // Next.js reports the requested path with its query string.
     const nextjs = event.contexts.nextjs as { request_path?: unknown } | undefined
     if (typeof nextjs?.request_path === 'string')
       nextjs.request_path = stripQuery(nextjs.request_path)
+  }
+  if (event.tags) {
+    for (const key of Object.keys(event.tags)) {
+      if (!ALLOWED_TAGS.has(key)) delete event.tags[key]
+    }
+  }
+  // The browser names a frame after the page URL, query string included.
+  for (const exception of event.exception?.values ?? []) {
+    for (const frame of exception.stacktrace?.frames ?? []) {
+      if (typeof frame.filename === 'string') frame.filename = stripQuery(frame.filename)
+      if (typeof frame.abs_path === 'string') frame.abs_path = stripQuery(frame.abs_path)
+    }
   }
   if (event.breadcrumbs) {
     event.breadcrumbs = event.breadcrumbs
@@ -79,15 +113,18 @@ export function sentryOptions(environment: () => SiteEnvironment) {
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN || undefined
   return {
     beforeSend<E extends { environment?: string }>(event: E): E {
-      // Resolved per event: on the Worker, vars reach process.env with the first request.
+      // Resolved per event too: on the Worker, vars reach process.env with the first request.
       event.environment = environment()
       return scrubEvent(event)
     },
     dsn,
     enabled: Boolean(dsn),
+    environment: environment(),
     maxBreadcrumbs: 30,
     release: sentryRelease(process.env.NEXT_PUBLIC_SENTRY_RELEASE),
     sendDefaultPii: false,
-    tracesSampleRate: 0
+    // Tracing stays off: no `tracesSampleRate` at all (0 would still make spans), and no trace
+    // headers on the site's own requests.
+    tracePropagationTargets: []
   }
 }

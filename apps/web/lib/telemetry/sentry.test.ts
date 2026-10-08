@@ -26,8 +26,7 @@ describe('Sentry settings (#48)', () => {
       dsn: 'https://public@o1.ingest.sentry.io/2',
       enabled: true,
       release: 'best-serp-co@abc1234',
-      sendDefaultPii: false,
-      tracesSampleRate: 0
+      sendDefaultPii: false
     })
     expect(Object.keys(options)).not.toContain('replaysSessionSampleRate')
   })
@@ -74,6 +73,51 @@ describe('Sentry settings (#48)', () => {
       request: { method: 'GET', url: 'https://best.serp.co/claims/1/checkout/success/' },
       transaction: 'GET /api/x/'
     })
+  })
+
+  it('keeps only runtime contexts and SDK tags, so logger data never leaves', () => {
+    const event = scrubEvent({
+      contexts: {
+        browser: { name: 'Chrome' },
+        data: { type: 'object', value: { query: 'private search' } },
+        trace: { trace_id: 't' }
+      },
+      tags: { query: 'private search', runtime: 'node', turbopack: true }
+    })
+    expect(event).toEqual({
+      contexts: { browser: { name: 'Chrome' }, trace: { trace_id: 't' } },
+      tags: { runtime: 'node', turbopack: true }
+    })
+  })
+
+  it('strips query strings from stack frames', () => {
+    const event = scrubEvent({
+      exception: {
+        values: [
+          {
+            stacktrace: {
+              frames: [
+                {
+                  abs_path: 'app:///products/?q=private&token=secret',
+                  filename: 'app:///products/?q=private'
+                },
+                { filename: 'app:///_next/static/chunks/a.js', function: 'f' }
+              ]
+            }
+          }
+        ]
+      }
+    })
+    expect(event.exception.values[0].stacktrace.frames).toEqual([
+      { abs_path: 'app:///products/', filename: 'app:///products/' },
+      { filename: 'app:///_next/static/chunks/a.js', function: 'f' }
+    ])
+  })
+
+  it('leaves tracing off and sets the environment at init too', () => {
+    const options = sentryOptions(() => 'staging')
+    expect(options).not.toHaveProperty('tracesSampleRate')
+    expect(options).toMatchObject({ environment: 'staging', tracePropagationTargets: [] })
   })
 
   it('names the release after a commit only', () => {

@@ -170,6 +170,9 @@ nextConfig = withSentryConfig(nextConfig, {
   telemetry: false,
   widenClientFileUpload: true
 })
+// withSentryConfig always adds `sentry-trace` and `baggage` meta tags for pageload tracing.
+// Tracing is off, and behind the edge HTML cache every visitor would share one trace id.
+if (nextConfig.experimental) delete nextConfig.experimental.clientTraceMetadata
 
 // withContentCollections must be the outermost wrapper
 export default withContentCollections(nextConfig)
