@@ -85,7 +85,7 @@ describe('web workflow', () => {
   it('checks pull requests into staging and main, every push to them, and a dispatch', () => {
     expect(workflow.on.pull_request).toEqual({
       branches: ['staging', 'main'],
-      // Without ready_for_review, a draft's skipped e2e would stand when the PR is marked ready.
+      // Without ready_for_review, a draft's failed e2e would stand when the PR is marked ready.
       types: ['opened', 'synchronize', 'reopened', 'ready_for_review']
     })
     expect(workflow.on.push).toEqual({ branches: ['staging', 'main'] })
@@ -101,14 +101,30 @@ describe('web workflow', () => {
     expect(workflow.jobs.check?.needs).toEqual(['changes'])
     expect(workflow.jobs.e2e?.needs).toEqual(['changes'])
     // Skipping a required job reports success: check and e2e run even when `changes` failed
-    // (then they run everything), and only a draft skips e2e.
+    // (then they run everything), and a draft runs e2e too, where it fails.
     expect(workflow.jobs.check?.if).toBe('!cancelled()')
     // Full history, so the media plan test can read deleted sources from Git (#124).
     expect(step('check', 'Checkout').with).toEqual({ 'fetch-depth': 0 })
     expect(workflow.jobs.changes?.if).toBeUndefined()
-    expect(workflow.jobs.e2e?.if).toBe(
-      "!cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)"
-    )
+    expect(workflow.jobs.e2e?.if).toBe('!cancelled()')
+  })
+
+  it('fails e2e on a draft pull request instead of skipping it (#246)', () => {
+    const steps = workflow.jobs.e2e?.steps ?? []
+    const draft = step('e2e', 'Require a pull request ready for review')
+    // First, so nothing installs or runs, and nothing later in the job can turn it green.
+    expect(steps.indexOf(draft)).toBe(0)
+    expect(draft.if).toBe('github.event.pull_request.draft == true')
+    expect(runStep(String(draft.run), '', {}).status).toBe(1)
+    expect(draft.run).toContain('draft: mark ready to run e2e')
+    // continue-on-error would let the failed step leave the job green.
+    expect(source).not.toContain('continue-on-error')
+    // Every later step either needs the earlier ones to succeed or checks the receipt step ran.
+    for (const later of steps.slice(1)) {
+      if (/always\(\)|failure\(\)|cancelled\(\)/u.test(later.if ?? '')) {
+        expect(later.if, later.name).toContain("steps.receipt.outcome == 'success'")
+      }
+    }
   })
 
   it('runs pnpm check, without its build on a push, and only the documentation check for docs', () => {
