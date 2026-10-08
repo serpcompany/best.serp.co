@@ -1,6 +1,11 @@
 import { Download, ExternalLink, Hash } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import {
+  getFeaturedOnBadgeListingUrl,
+  getFeaturedOnBadgePreviewPathFromKey,
+  getFeaturedOnBadgePublicUrlFromKey
+} from '@/lib/directory/featured-on-badge-url'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import type { WebsiteLinkRel } from '../../lib/directory/content-query'
@@ -8,11 +13,6 @@ import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteContent } from '../../lib/site/site-content'
 import { FeaturedOnBadgeEmbedPanel } from './featured-on-badge-embed-panel'
-import {
-  getFeaturedOnBadgeListingUrl,
-  getFeaturedOnBadgePreviewPathFromKey,
-  getFeaturedOnBadgePublicUrlFromKey
-} from './featured-on-badge-url'
 
 type WebsiteSidebarMetadata = {
   category?: string

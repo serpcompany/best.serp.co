@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildFeaturedOnBadgeEmbedHtml } from './featured-on-badge-embed-panel'
 import {
   getFeaturedOnBadgeListingUrl,
   getFeaturedOnBadgePreviewPathFromKey,
   getFeaturedOnBadgePublicUrlFromKey
-} from './featured-on-badge-url'
+} from '@/lib/directory/featured-on-badge-url'
+import { buildFeaturedOnBadgeEmbedHtml } from './featured-on-badge-embed-panel'
 
 describe('featured-on badge URL helpers', () => {
   it('builds local preview and public paths from relative badge keys', () => {

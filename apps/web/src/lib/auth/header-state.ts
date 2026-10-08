@@ -1,9 +1,9 @@
 import 'server-only'
 
 import { headers } from 'next/headers'
-import type { HeaderAuthState } from '@/components/layout/header-auth-state'
 import { siteConfig } from '@/lib/site/site-config'
 import { hasSessionCookie } from './cookies'
+import type { HeaderAuthState } from './header-auth-state'
 
 /**
  * The header's signed-in state for the root layout. Without a Better Auth session cookie the

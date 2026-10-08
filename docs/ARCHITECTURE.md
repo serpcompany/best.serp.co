@@ -68,8 +68,8 @@ change runs in a protected workflow.
   lives in `packages/data-ops/src/auth.ts` ([Accounts](./ACCOUNTS.md)).
 - `packages/site-config/` is the checked-in site definition (name, domain, copy,
   routes, sitemap layout, badges, feature flags) and site-owned content.
-- `apps/web/src/components/` and `apps/web/src/lib/{seo,site,directory,analytics}/` hold the
-  page and view building blocks (folded in from `packages/web-core`, #174); they read the site
+- `src/components/`, `src/hooks/`, and `src/lib/{seo,site,directory,analytics,routing}/`
+  hold the page and view building blocks (from `packages/web-core`, #174); they read the site
   definition through `siteConfig` and never obtain a database binding.
 - `packages/data-ops/` owns the Drizzle schema, the injected D1 client, catalog DTOs,
   eligibility SQL, pagination, redirects, related ranking, adjacency, the catalog
