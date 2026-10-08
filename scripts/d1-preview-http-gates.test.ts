@@ -1192,11 +1192,11 @@ describe('Better Auth smoke gates', () => {
     [{ session: new Response('error', { status: 500 }) }, /get-session returned 500, not 200/u],
     [
       { badSignIn: new Response(null, { status: 302, headers: { location: '/login/' } }) },
-      /empty email returned 302 , not 400 INVALID_EMAIL/u
+      /empty email returned 302, not 400 INVALID_EMAIL/u
     ],
     [
       { badSignIn: new Response('{"success":true}', { status: 200 }) },
-      /empty email returned 200 , not 400 INVALID_EMAIL/u
+      /empty email returned 200, not 400 INVALID_EMAIL/u
     ],
     // A CSRF refusal, a missing route, or the rate limit is a 4xx, but not the validation check.
     [
@@ -1205,7 +1205,7 @@ describe('Better Auth smoke gates', () => {
     ],
     [
       { badSignIn: new Response('Not found', { status: 404 }) },
-      /empty email returned 404 , not 400 INVALID_EMAIL/u
+      /empty email returned 404, not 400 INVALID_EMAIL/u
     ],
     [
       { badSignIn: new Response('{"code":"cooldown"}', { status: 429 }) },
@@ -1213,7 +1213,7 @@ describe('Better Auth smoke gates', () => {
     ],
     [
       { badSignIn: new Response('error', { status: 500 }) },
-      /empty email returned 500 , not 400 INVALID_EMAIL/u
+      /empty email returned 500, not 400 INVALID_EMAIL/u
     ]
   ])('fails when Better Auth answers %o', async (answers, message) => {
     installAuthFetch(answers)

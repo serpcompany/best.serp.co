@@ -494,8 +494,8 @@ async function expectAdminLock(target: GateTarget, statuses: AdminLockStatuses):
  * Verification): the session endpoint answers 200 without a redirect, and a sign-in request
  * with bad input answers 4xx, never 3xx. The bad input is an empty email: the site's
  * send-code hook returns before its rate limits for it, so every run gets Better Auth's own
- * 400 `INVALID_EMAIL` (a fixed invalid address would hit the per-address limit from the
- * second run on and be answered 200), and no code is ever sent. Exactly that answer is
+ * 400 `INVALID_EMAIL` (a fixed invalid address would be answered 200 once repeated runs use up
+ * its per-address limit), and no code is ever sent. Exactly that answer is
  * required, so a CSRF 403, a 404, or a 429 can't pass for validation.
  */
 async function expectAuthEndpoints(target: GateTarget): Promise<void> {
@@ -519,7 +519,7 @@ async function expectAuthEndpoints(target: GateTarget): Promise<void> {
       }
       if (response.status !== 400 || code !== 'INVALID_EMAIL')
         throw new Error(
-          `${mode} sign-in POST with an empty email returned ${response.status} ${String(code ?? '')}, not 400 INVALID_EMAIL.`
+          `${mode} sign-in POST with an empty email returned ${[response.status, code].filter(Boolean).join(' ')}, not 400 INVALID_EMAIL.`
         )
     },
     true,
