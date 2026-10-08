@@ -27,8 +27,10 @@ export function generateLegalPageMetadata(options: {
   return generateBaseMetadata({
     title: options.title,
     description: options.description.replace(/\{\{SITE_NAME\}\}/g, SITE_NAME),
-    // Noindex, as the route registry lists every legal page.
-    path: options.path
+    path: options.path,
+    // The route registry lists every legal page as noindex too; a new one stays noindex
+    // until it is registered.
+    noindex: true
   })
 }
 

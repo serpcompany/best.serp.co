@@ -59,15 +59,6 @@ export const siteRoutes = [
   { disallow: true, indexable: false, path: '/submit/', sitemapGroup: null }
 ] as const satisfies readonly SiteRoute[]
 
-export type SiteRoutePath = (typeof siteRoutes)[number]['path']
-
-/** The registered route at `path`; throws for an unregistered one, so a typo fails loudly. */
-export function siteRoute(path: SiteRoutePath): SiteRoute {
-  const route = siteRoutes.find(entry => entry.path === path)
-  if (!route) throw new Error(`No registered route ${path}.`)
-  return route
-}
-
 /** The static routes a child sitemap lists, in registry order. */
 export function sitemapRoutePaths(group: SitemapGroup): string[] {
   return siteRoutes

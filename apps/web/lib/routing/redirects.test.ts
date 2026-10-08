@@ -105,6 +105,20 @@ describe('moved-URL redirects', () => {
     })
   })
 
+  it('send the old sitemap URLs to the root-level files (#167)', () => {
+    for (const [source, destination] of [
+      ['/sitemap.xml', '/sitemap-index.xml'],
+      ['/sitemaps/pages/1.xml', '/sitemap-pages.xml'],
+      ['/sitemaps/directory/1.xml', '/sitemap-products.xml'],
+      ['/sitemaps/categories/1.xml', '/sitemap-categories.xml']
+    ]) {
+      expect(
+        rules.find(rule => rule.source === source),
+        source
+      ).toMatchObject({ destination, permanent: true })
+    }
+  })
+
   it('no longer redirects the retired /news (the Worker answers it 410)', () => {
     expect(rules.find(rule => rule.source === '/news')).toBeUndefined()
   })
