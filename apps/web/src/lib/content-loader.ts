@@ -53,13 +53,16 @@ let allDocs: DocEntry[] = []
 let allAboutPages: AboutPageEntry[] = []
 
 try {
-  const collections = require('@/.content-collections/generated')
+  const collections = require('content-collections')
   allGuides = (collections.allGuides || []) as GuideEntry[]
   allLegals = (collections.allLegals || []) as LegalEntry[]
   allResources = (collections.allResources || []) as Resource[]
   allDocs = (collections.allDocs || []) as DocEntry[]
   allAboutPages = (collections.allAboutPages || []) as AboutPageEntry[]
-} catch {
+} catch (error) {
+  // A built site without its content would answer 404 and 500 for the about and legal pages
+  // (#172 review); only tests run without the generated collections.
+  if (process.env.NODE_ENV === 'production') throw error
   if (process.env.NODE_ENV !== 'test') {
     console.warn('Content collections not available, using empty arrays')
   }

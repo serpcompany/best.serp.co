@@ -95,7 +95,7 @@ export type SiteDefinition = {
     opengraphImage?: AssetSource
   }
   copy: SiteCopyConfig
-  /** Transactional email identity (`apps/web/lib/email/`). */
+  /** Transactional email identity (`apps/web/src/lib/email/`). */
   email: {
     /** Root-relative path of the admin dashboard that admin email footers link to. */
     adminDashboardPath: string

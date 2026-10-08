@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SqliteD1 } from '../../../../packages/data-ops/src/test-support'
+import { SqliteD1 } from '../../../../../packages/data-ops/src/test-support'
 
 const { getCloudflareContext } = vi.hoisted(() => ({ getCloudflareContext: vi.fn() }))
 

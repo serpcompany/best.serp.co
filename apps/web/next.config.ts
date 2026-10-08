@@ -5,8 +5,8 @@ import { withSentryConfig } from '@sentry/nextjs/config'
 import { baseConfig, withAnalyzer } from '@serpdirectory/config-next'
 import { site } from '@serpdirectory/site-config'
 import type { NextConfig } from 'next'
-import { movedUrlRedirects } from './lib/routing/redirects'
-import { sentryRelease } from './lib/telemetry/sentry'
+import { movedUrlRedirects } from './src/lib/routing/redirects'
+import { sentryRelease } from './src/lib/telemetry/sentry'
 
 export const INTERNAL_PACKAGES = [
   '@serpdirectory/design-system',
@@ -53,7 +53,7 @@ let nextConfig: NextConfig = {
   transpilePackages: INTERNAL_PACKAGES,
 
   // `unauthorized()` / `forbidden()` give admin pages real 401 and 403 responses
-  // (`requireAdmin()` in lib/auth/server.ts; docs/ACCOUNTS.md).
+  // (`requireAdmin()` in src/lib/auth/server.ts; docs/ACCOUNTS.md).
   experimental: {
     authInterrupts: true
   },
@@ -112,7 +112,7 @@ let nextConfig: NextConfig = {
   // Pages are written with a trailing slash. `skipTrailingSlashRedirect` (from
   // `@serpdirectory/config-next`) turns off the framework's own slash redirect, which differs
   // between Next.js and OpenNext and has no /api exception; the Worker entry enforces the
-  // URL trailing-slash standard instead (`lib/routing/trailing-slash.ts`).
+  // URL trailing-slash standard instead (`src/lib/routing/trailing-slash.ts`).
   trailingSlash: true,
 
   headers: async () => [
@@ -143,7 +143,7 @@ let nextConfig: NextConfig = {
     ]
   }),
 
-  // Moved URLs (legacy routes and aliases): see lib/routing/redirects.ts.
+  // Moved URLs (legacy routes and aliases): see src/lib/routing/redirects.ts.
   redirects: async () => movedUrlRedirects()
 }
 

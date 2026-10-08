@@ -133,7 +133,7 @@ const ADMIN_ACTIONS: Array<['DELETE' | 'POST', string]> = [
 
 /** Every `page.tsx` and `route.ts` under `dir`, relative to the app directory. */
 function appFiles(dir: string, name: string): string[] {
-  const app = resolve(__dirname, '../../web/app')
+  const app = resolve(__dirname, '../../web/src/app')
   return readdirSync(resolve(app, dir), { encoding: 'utf8', recursive: true })
     .filter(file => file === name || file.endsWith(`/${name}`))
     .map(file => `/${dir}/${file.slice(0, -name.length)}`)
@@ -156,7 +156,7 @@ test.describe('admin gate', () => {
         page
       ).toBe(true)
     }
-    const app = resolve(__dirname, '../../web/app')
+    const app = resolve(__dirname, '../../web/src/app')
     for (const route of appFiles('api/admin', 'route.ts')) {
       const paths = ADMIN_ACTIONS.map(([, path]) => `${path}/`)
       expect(

@@ -3,7 +3,7 @@ import type { CompiledQuery, Database } from './client'
 import { emailDeliveries } from './schema'
 
 /**
- * The idempotency ledger behind transactional email (`apps/web/lib/email/`).
+ * The idempotency ledger behind transactional email (`apps/web/src/lib/email/`).
  *
  * Every send names a template and an event key (for example `submission-received` and
  * `submission-created:<submission id>`). Before sending, the caller claims that pair with one

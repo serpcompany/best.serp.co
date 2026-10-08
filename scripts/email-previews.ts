@@ -1,5 +1,5 @@
 /**
- * Renders every registered email (apps/web/lib/email/registry.ts) with the mockup sample data
+ * Renders every registered email (apps/web/src/lib/email/registry.ts) with the mockup sample data
  * to a directory, for review against serpcompany/best.serp.co#70 screen 15. Read-only: it never
  * sends anything and touches no database.
  *
@@ -9,8 +9,8 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { EMAIL_SAMPLES, renderAppEmail } from '../apps/web/lib/email/emails/samples'
-import { parseSiteEnvironment } from '../apps/web/lib/environment/site-environment'
+import { EMAIL_SAMPLES, renderAppEmail } from '../apps/web/src/lib/email/emails/samples'
+import { parseSiteEnvironment } from '../apps/web/src/lib/environment/site-environment'
 
 function escapeText(value: string): string {
   return value.replace(/[&<>"]/gu, character => `&#${character.charCodeAt(0)};`)

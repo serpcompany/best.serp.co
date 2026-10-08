@@ -66,7 +66,7 @@ export function parseCatalogEpochToken(token: string): CatalogEpoch | null {
 
 /**
  * How long a render may reuse the epoch the Worker entry read. It matches the entry's own
- * freshness (`EPOCH_FRESH_MS` in `apps/web/lib/edge-cache/html-cache.ts`), so a render never
+ * freshness (`EPOCH_FRESH_MS` in `apps/web/src/lib/edge-cache/html-cache.ts`), so a render never
  * keys the data cache with an older epoch than the edge cache it is rendered for.
  */
 export const SHARED_EPOCH_MAX_AGE_MS = 30_000

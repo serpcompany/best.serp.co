@@ -169,6 +169,11 @@ describe('single-site D1-only repository architecture', () => {
       .sort()
     expect(appDirectories).toEqual(['e2e', 'web'])
     expect(project.appDirectory).toBe('apps/web')
+    // Next.js prefers apps/web/app over src/app: a leftover folder would build with no routes.
+    for (const folder of ['app', 'components', 'lib', 'actions', 'hooks']) {
+      expect(existsSync(resolve(project.appDirectory, folder)), folder).toBe(false)
+    }
+    expect(project.sourceDirectory).toBe('apps/web/src')
 
     const appManifest = JSON.parse(
       readFileSync(resolve(project.appDirectory, 'package.json'), 'utf8')
@@ -235,7 +240,7 @@ describe('single-site D1-only repository architecture', () => {
 
   it('keeps catalog access server-only and bound to D1', () => {
     const repository = readFileSync(
-      resolve(project.appDirectory, 'lib/catalog/repository.ts'),
+      resolve(project.sourceDirectory, 'lib/catalog/repository.ts'),
       'utf8'
     )
 
@@ -289,7 +294,7 @@ describe('single-site D1-only repository architecture', () => {
       return readFileSync(resolve(file), 'utf8').includes('drizzle-orm')
     })
 
-    expect(schemaOrClientFiles).not.toContain(`${project.appDirectory}/lib/catalog/schema.ts`)
+    expect(schemaOrClientFiles).not.toContain(`${project.sourceDirectory}/lib/catalog/schema.ts`)
     expect(drizzleSources.every(file => file.startsWith('packages/data-ops/'))).toBe(true)
     expect(files).toContain('packages/data-ops/src/schema.ts')
     expect(files).toContain('packages/data-ops/src/client.ts')
@@ -316,7 +321,7 @@ describe('single-site D1-only repository architecture', () => {
   })
 
   it('keeps email delivery SQL in the shared data package behind a fail-closed adapter', () => {
-    const runtime = readFileSync(resolve(project.appDirectory, 'lib/email/runtime.ts'), 'utf8')
+    const runtime = readFileSync(resolve(project.sourceDirectory, 'lib/email/runtime.ts'), 'utf8')
     // The environment policy, then the DB binding check, then the only database client.
     const policy = runtime.indexOf('resolveEmailPolicy(env)')
     const binding = runtime.indexOf('if (!env.DB) throw')
@@ -328,7 +333,7 @@ describe('single-site D1-only repository architecture', () => {
     expect(runtime).toContain("from '@serpdirectory/data-ops/email-deliveries'")
     expect(runtime).toContain('createDisabledEmailService')
 
-    const emailDirectory = resolve(project.appDirectory, 'lib/email')
+    const emailDirectory = resolve(project.sourceDirectory, 'lib/email')
     for (const file of readdirSync(emailDirectory).filter(name => /\.tsx?$/u.test(name))) {
       const code = readFileSync(resolve(emailDirectory, file), 'utf8')
       if (file.endsWith('.test.ts')) continue
@@ -344,7 +349,7 @@ describe('single-site D1-only repository architecture', () => {
 
   it('keeps Submission SQL and conditional mutation plans in the shared data package', () => {
     const adapter = readFileSync(
-      resolve(project.appDirectory, 'lib/submissions/repository.ts'),
+      resolve(project.sourceDirectory, 'lib/submissions/repository.ts'),
       'utf8'
     )
     expect(adapter).toContain('@serpdirectory/data-ops/submissions')
@@ -375,17 +380,19 @@ describe('single-site D1-only repository architecture', () => {
       /getCloudflareContext|process\.env|CLOUDFLARE_API_TOKEN|GITHUB_TOKEN|api\.cloudflare\.com/u
     )
 
-    expect(existsSync(resolve(project.appDirectory, 'lib/url-safety.ts'))).toBe(false)
+    expect(existsSync(resolve(project.sourceDirectory, 'lib/url-safety.ts'))).toBe(false)
     // Every fetch of a submitter's URL (badge checks, prefill, logos) and of listing media goes
     // through the one shared safe fetcher, which validates each hop with the public-URL policy
     // (#95 moved submit v2's copy into data-ops).
-    expect(existsSync(resolve(project.appDirectory, 'lib/submissions/safe-fetch.ts'))).toBe(false)
+    expect(existsSync(resolve(project.sourceDirectory, 'lib/submissions/safe-fetch.ts'))).toBe(
+      false
+    )
     const safeFetch = readFileSync(resolve('packages/data-ops/src/safe-fetch.ts'), 'utf8')
     expect(safeFetch).toContain("from './public-url'")
     expect(safeFetch).toContain("from './mime-type'")
     expect(safeFetch).toContain("redirect: 'manual'")
     for (const file of ['badge-verifier.ts', 'prefill.ts']) {
-      const source = readFileSync(resolve(project.appDirectory, 'lib/submissions', file), 'utf8')
+      const source = readFileSync(resolve(project.sourceDirectory, 'lib/submissions', file), 'utf8')
       expect(source, file).toContain("from '@serpdirectory/data-ops/safe-fetch'")
       expect(source, file).not.toMatch(/\bfetcher\(|\bawait fetch\(/u)
     }
@@ -394,7 +401,7 @@ describe('single-site D1-only repository architecture', () => {
     expect(ingest).not.toMatch(/\bfetcher\(|\bawait fetch\(/u)
     // The site parser has one copy, in data-ops; prefill re-exports it.
     expect(
-      readFileSync(resolve(project.appDirectory, 'lib/submissions/prefill.ts'), 'utf8')
+      readFileSync(resolve(project.sourceDirectory, 'lib/submissions/prefill.ts'), 'utf8')
     ).not.toMatch(/function parseSiteMetadata|const NAMED_ENTITIES/u)
     // Only the media adapter touches the R2 binding; everything else goes through it.
     const mediaBindingUsers = trackedFiles().filter(
@@ -405,7 +412,7 @@ describe('single-site D1-only repository architecture', () => {
         existsSync(resolve(file)) &&
         /\benv\.MEDIA\b|\.MEDIA\??\./u.test(readFileSync(resolve(file), 'utf8'))
     )
-    expect(mediaBindingUsers).toEqual(['apps/web/lib/media/worker-media.ts'])
+    expect(mediaBindingUsers).toEqual(['apps/web/src/lib/media/worker-media.ts'])
     const publicUrl = readFileSync(resolve('packages/data-ops/src/public-url.ts'), 'utf8')
     expect(publicUrl).toContain('validatePublicHttpUrl')
     expect(publicUrl).not.toMatch(/getCloudflareContext|process\.env|node:net/u)
@@ -432,7 +439,7 @@ describe('single-site D1-only repository architecture', () => {
     })
     expect(authJs).toEqual([])
 
-    const authDirectory = resolve(project.appDirectory, 'lib/auth')
+    const authDirectory = resolve(project.sourceDirectory, 'lib/auth')
     for (const file of readdirSync(authDirectory).filter(name => !name.includes('.test.'))) {
       const source = readFileSync(resolve(authDirectory, file), 'utf8')
       expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
@@ -448,17 +455,17 @@ describe('single-site D1-only repository architecture', () => {
   it('makes every admin page and admin API route require an admin', () => {
     const adminRoutes = trackedFiles().filter(
       file =>
-        (file.startsWith(`${project.appDirectory}/app/admin/`) ||
-          file.startsWith(`${project.appDirectory}/app/api/admin/`)) &&
+        (file.startsWith(`${project.sourceDirectory}/app/admin/`) ||
+          file.startsWith(`${project.sourceDirectory}/app/api/admin/`)) &&
         /(?:^|\/)(?:page|route|layout)\.tsx?$/u.test(file) &&
         existsSync(resolve(file))
     )
     expect(adminRoutes).toEqual(
       expect.arrayContaining([
-        `${project.appDirectory}/app/admin/layout.tsx`,
-        `${project.appDirectory}/app/admin/page.tsx`,
-        `${project.appDirectory}/app/admin/[...path]/page.tsx`,
-        `${project.appDirectory}/app/api/admin/[[...path]]/route.ts`
+        `${project.sourceDirectory}/app/admin/layout.tsx`,
+        `${project.sourceDirectory}/app/admin/page.tsx`,
+        `${project.sourceDirectory}/app/admin/[...path]/page.tsx`,
+        `${project.sourceDirectory}/app/api/admin/[[...path]]/route.ts`
       ])
     )
     for (const file of adminRoutes) {
@@ -474,18 +481,18 @@ describe('single-site D1-only repository architecture', () => {
   it('makes every account page and account API route require the signed-in user (#65)', () => {
     const accountRoutes = trackedFiles().filter(
       file =>
-        (file.startsWith(`${project.appDirectory}/app/account/`) ||
-          file.startsWith(`${project.appDirectory}/app/api/account/`)) &&
+        (file.startsWith(`${project.sourceDirectory}/app/account/`) ||
+          file.startsWith(`${project.sourceDirectory}/app/api/account/`)) &&
         /(?:^|\/)(?:page|route)\.tsx?$/u.test(file) &&
         existsSync(resolve(file))
     )
     expect(accountRoutes).toEqual(
       expect.arrayContaining([
-        `${project.appDirectory}/app/account/page.tsx`,
-        `${project.appDirectory}/app/account/submissions/[id]/page.tsx`,
-        `${project.appDirectory}/app/account/listings/[slug]/edit/page.tsx`,
-        `${project.appDirectory}/app/api/account/submissions/[id]/[action]/route.ts`,
-        `${project.appDirectory}/app/api/account/listings/[id]/[action]/route.ts`
+        `${project.sourceDirectory}/app/account/page.tsx`,
+        `${project.sourceDirectory}/app/account/submissions/[id]/page.tsx`,
+        `${project.sourceDirectory}/app/account/listings/[slug]/edit/page.tsx`,
+        `${project.sourceDirectory}/app/api/account/submissions/[id]/[action]/route.ts`,
+        `${project.sourceDirectory}/app/api/account/listings/[id]/[action]/route.ts`
       ])
     )
     for (const file of accountRoutes) {
@@ -494,7 +501,7 @@ describe('single-site D1-only repository architecture', () => {
         file.includes('/app/api/') ? /await authorizeUserRequest\(/u : /await requireAccountUser\(/u
       )
     }
-    const accountDirectory = resolve(project.appDirectory, 'lib/account')
+    const accountDirectory = resolve(project.sourceDirectory, 'lib/account')
     for (const file of readdirSync(accountDirectory).filter(name => !name.includes('.test.'))) {
       const source = readFileSync(resolve(accountDirectory, file), 'utf8')
       expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
@@ -507,7 +514,7 @@ describe('single-site D1-only repository architecture', () => {
   })
 
   it('keeps admin panel SQL in the shared data package (#64)', () => {
-    const adminDirectory = resolve(project.appDirectory, 'lib/admin')
+    const adminDirectory = resolve(project.sourceDirectory, 'lib/admin')
     for (const file of readdirSync(adminDirectory).filter(name => !name.includes('.test.'))) {
       const source = readFileSync(resolve(adminDirectory, file), 'utf8')
       expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
@@ -522,7 +529,7 @@ describe('single-site D1-only repository architecture', () => {
   // Billing (#68): the ledger's SQL lives in the shared data package, and everything specific to
   // the payment provider stays behind the billing module's interface, so Lago can replace Stripe.
   it('keeps billing SQL in the data package and the provider inside the billing module (#68)', () => {
-    const billingDirectory = resolve(project.appDirectory, 'lib/billing')
+    const billingDirectory = resolve(project.sourceDirectory, 'lib/billing')
     const billingFiles = [
       ...readdirSync(billingDirectory).filter(name => name.endsWith('.ts')),
       ...readdirSync(resolve(billingDirectory, 'providers')).map(name => `providers/${name}`)
@@ -539,7 +546,7 @@ describe('single-site D1-only repository architecture', () => {
       file =>
         /\.(?:ts|tsx)$/u.test(file) &&
         (file.startsWith(`${project.appDirectory}/`) || file.startsWith('packages/')) &&
-        !file.startsWith(`${project.appDirectory}/lib/billing/providers/`) &&
+        !file.startsWith(`${project.sourceDirectory}/lib/billing/providers/`) &&
         existsSync(resolve(file)) &&
         providerSpecific.test(readFileSync(resolve(file), 'utf8'))
     )
@@ -550,7 +557,7 @@ describe('single-site D1-only repository architecture', () => {
         /\.(?:ts|tsx)$/u.test(file) &&
         file.startsWith(`${project.appDirectory}/`) &&
         !file.endsWith('.d.ts') &&
-        !file.startsWith(`${project.appDirectory}/lib/billing/providers/`) &&
+        !file.startsWith(`${project.sourceDirectory}/lib/billing/providers/`) &&
         existsSync(resolve(file)) &&
         /STRIPE_(?:SECRET_KEY|WEBHOOK_SECRET)/u.test(readFileSync(resolve(file), 'utf8'))
     )
@@ -606,7 +613,7 @@ describe('single-site D1-only repository architecture', () => {
         !/\.(?:test|spec)\.tsx?$/u.test(file) &&
         !file.endsWith('.d.ts') &&
         (['app/', 'components/', 'lib/'].some(dir =>
-          file.startsWith(`${project.appDirectory}/${dir}`)
+          file.startsWith(`${project.sourceDirectory}/${dir}`)
         ) ||
           [
             'packages/site-config/src/',
@@ -615,7 +622,7 @@ describe('single-site D1-only repository architecture', () => {
             // Validation and error messages the data layer returns to pages (#111 round 4).
             'packages/data-ops/src/'
           ].some(dir => file.startsWith(dir))) &&
-        !file.startsWith(`${project.appDirectory}/lib/billing/providers/`) &&
+        !file.startsWith(`${project.sourceDirectory}/lib/billing/providers/`) &&
         existsSync(resolve(file))
     )
     expect(userFacing.length).toBeGreaterThan(100)
@@ -629,7 +636,7 @@ describe('single-site D1-only repository architecture', () => {
     // The provider's own folder names it in code, but what it shows on the provider's page comes
     // only from the order's neutral description (#111 round 4), checked above where it is built.
     const provider = readFileSync(
-      resolve(project.appDirectory, 'lib/billing/providers/stripe.ts'),
+      resolve(project.sourceDirectory, 'lib/billing/providers/stripe.ts'),
       'utf8'
     )
     expect(provider).toMatch(
@@ -647,7 +654,7 @@ describe('single-site D1-only repository architecture', () => {
   })
 
   it('keeps claim SQL in the shared data package (#67)', () => {
-    const claimsDirectory = resolve(project.appDirectory, 'lib/claims')
+    const claimsDirectory = resolve(project.sourceDirectory, 'lib/claims')
     for (const file of readdirSync(claimsDirectory).filter(name => !name.includes('.test.'))) {
       const source = readFileSync(resolve(claimsDirectory, file), 'utf8')
       expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)
@@ -692,7 +699,7 @@ describe('single-site D1-only repository architecture', () => {
         writesBadgeChecks(readFileSync(resolve(file), 'utf8'))
     )
     expect(writers).toEqual(['packages/data-ops/src/badge-program.ts'])
-    const programDirectory = resolve(project.appDirectory, 'lib/badge-program')
+    const programDirectory = resolve(project.sourceDirectory, 'lib/badge-program')
     for (const file of readdirSync(programDirectory).filter(name => !name.includes('.test.'))) {
       const source = readFileSync(resolve(programDirectory, file), 'utf8')
       expect(source, file).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b|\.prepare\(|\.batch\(/u)

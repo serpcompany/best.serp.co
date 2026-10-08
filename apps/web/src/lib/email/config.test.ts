@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { project } from '../../../../scripts/project'
+import { project } from '../../../../../scripts/project'
 import {
   EMAIL_DASHBOARD_PATH,
   EMAIL_LINK_ORIGINS,
@@ -186,7 +186,7 @@ interface WranglerBlock {
 
 describe('apps/web/wrangler.jsonc email bindings', () => {
   const config = JSON.parse(
-    readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8')
+    readFileSync(new URL('../../../wrangler.jsonc', import.meta.url), 'utf8')
   ) as WranglerBlock & { env: Record<'production' | 'staging', WranglerBlock> }
 
   it('points staging and production at hosted useSend, with no Cloudflare email binding', () => {

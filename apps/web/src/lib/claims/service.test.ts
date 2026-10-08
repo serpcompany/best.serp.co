@@ -2,7 +2,7 @@ import { createBadgeProgramOperations } from '@serpdirectory/data-ops/badge-prog
 import { createClaimOperations } from '@serpdirectory/data-ops/claims'
 import { createDatabase } from '@serpdirectory/data-ops/client'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { SqliteD1 } from '../../../../packages/data-ops/src/test-support'
+import { SqliteD1 } from '../../../../../packages/data-ops/src/test-support'
 import { features } from '../features'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'
 import { checkClaimAddress } from './address'

@@ -9,7 +9,7 @@
  *   as requested.
  *
  * The Worker entry redirects non-canonical requests with this module
- * (`apps/web/lib/routing/trailing-slash.ts`), and sitemaps, canonical tags, and structured
+ * (`apps/web/src/lib/routing/trailing-slash.ts`), and sitemaps, canonical tags, and structured
  * data write URLs with it. It has no framework imports so the Worker can load it before
  * Next.js.
  */

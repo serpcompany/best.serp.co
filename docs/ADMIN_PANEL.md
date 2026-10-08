@@ -3,7 +3,7 @@
 `/admin` (serpcompany/best.serp.co#64) is where admins review submissions and owner revisions,
 manage listings, and manage the admin allowlist. The screens follow the mockups approved in #70
 (screens 10 to 14 and the admin shell). The shell is shadcn sidebar-07 (`collapsible="icon"`
-with a rail), composed in `apps/web/components/admin/admin-shell.tsx` from the dashboard pieces
+with a rail), composed in `apps/web/src/components/admin/admin-shell.tsx` from the dashboard pieces
 the account area shares (`@serpdirectory/web-core/dashboard/*`); pages set their breadcrumb with
 `AdminCrumbs`.
 
@@ -17,7 +17,7 @@ the account area shares (`@serpdirectory/web-core/dashboard/*`); pages set their
 | Admins | `/admin/admins/` | `selectAdminAllowlistPlan` |
 | Orders (#68) | `/admin/orders/` | `selectAdminOrdersPlan` (`data-ops/billing.ts`) |
 
-The reads are statement plans in `packages/data-ops/src/admin-queries.ts`; `apps/web/lib/admin/`
+The reads are statement plans in `packages/data-ops/src/admin-queries.ts`; `apps/web/src/lib/admin/`
 holds no SQL (the architecture guard checks it). Orders (screen 13, [Billing](./BILLING.md)) are
 shown while orders are on (`features.orders`, on since #133); otherwise the entry is hidden and
 `/admin/orders/` is a 404. The Inbox and the conversation panels on screens 11 and 12 are #73's.
@@ -160,7 +160,7 @@ the app writes production data, and agents never use the production admin panel.
 ## Tests
 
 `packages/data-ops/src/{admin-plans,admin-queries,listing-plans}.test.ts` and
-`apps/web/lib/admin/decisions.test.ts` (node:sqlite), `scripts/d1-workerd-plans.test.ts` (every
+`apps/web/src/lib/admin/decisions.test.ts` (node:sqlite), `scripts/d1-workerd-plans.test.ts` (every
 plan builder and read on Wrangler-local D1), and `apps/e2e/tests/admin-panel.spec.ts`
 (Playwright: the gate, approve, request changes, reject, allow resubmission, unpublish with 410
 and republish, the allowlist, and a replay of each decision). The suite runs on its own local

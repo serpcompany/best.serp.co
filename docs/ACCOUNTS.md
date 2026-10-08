@@ -21,14 +21,14 @@ email is #61.
 | Piece | Where |
 |---|---|
 | Schema, adapter, allowlist, role sync, rate limiter | `packages/data-ops/src/{schema,auth}.ts` |
-| Better Auth configuration | `apps/web/lib/auth/config.ts` |
-| Settings per environment (vars, secret) | `apps/web/lib/auth/settings.ts` |
-| Code delivery (`OtpSender`) | `apps/web/lib/auth/{otp-sender,sign-in-code-email}.ts` |
-| Limits, code binding, known devices | `apps/web/lib/auth/{rate-limits,code-binding,known-device}.ts` |
-| `requireUser()` / `requireAdmin()` | `apps/web/lib/auth/{guards,server}.ts` |
-| Worker gate: Access JWT and session cookie | `apps/web/lib/auth/{admin-gate,cloudflare-access}.ts` |
-| Endpoints | `apps/web/app/api/auth/[...all]/route.ts` (`/api/auth/*`) |
-| `/login`, `/account`, header sign-out | `apps/web/app/{login,account}/page.tsx`, `apps/web/components/{auth,account}/` |
+| Better Auth configuration | `apps/web/src/lib/auth/config.ts` |
+| Settings per environment (vars, secret) | `apps/web/src/lib/auth/settings.ts` |
+| Code delivery (`OtpSender`) | `apps/web/src/lib/auth/{otp-sender,sign-in-code-email}.ts` |
+| Limits, code binding, known devices | `apps/web/src/lib/auth/{rate-limits,code-binding,known-device}.ts` |
+| `requireUser()` / `requireAdmin()` | `apps/web/src/lib/auth/{guards,server}.ts` |
+| Worker gate: Access JWT and session cookie | `apps/web/src/lib/auth/{admin-gate,cloudflare-access}.ts` |
+| Endpoints | `apps/web/src/app/api/auth/[...all]/route.ts` (`/api/auth/*`) |
+| `/login`, `/account`, header sign-out | `apps/web/src/app/{login,account}/page.tsx`, `apps/web/src/components/{auth,account}/` |
 
 ## Sign-in over HTTP
 
@@ -42,7 +42,7 @@ Requests that carry cookies must send an `Origin` in the trusted origins. A firs
 set a `name` (at most 80 characters) but never an `image`. A code must be entered in the
 browser that requested it.
 
-**Limits** (D1, `apps/web/lib/auth/rate-limits.ts`; never isolate memory). A client is its
+**Limits** (D1, `apps/web/src/lib/auth/rate-limits.ts`; never isolate memory). A client is its
 `cf-connecting-ip` address: an IPv4 address, or an IPv6 address's /64, so one host cannot
 rotate through its allocation. `cf-connecting-ipv6` counts only when `cf-connecting-ip` is a
 Class E (240.0.0.0/4) Pseudo IPv4 address, the one case where Cloudflare overwrote the header
@@ -111,7 +111,7 @@ runs, which is refused outside `local`, and the Worker answers it only on a loca
 `sign-in-code` email through `enqueueEmail` ([Email](./EMAIL.md)), keyed
 `emailEventKey('sign-in-code', crypto.randomUUID())`: every code is a new event, and no key
 derives from a code. Only `sign-in` codes are sent. The code's length and lifetime are
-defined once, in `apps/web/lib/email/sign-in-code.ts`; `rate-limits.ts` configures Better Auth
+defined once, in `apps/web/src/lib/email/sign-in-code.ts`; `rate-limits.ts` configures Better Auth
 with them, and the email states the lifetime it is given. The `enqueueEmail` call is typed
 against the registered template, so the build fails if its input changes shape. A code
 request answers 503 `OTP_DELIVERY_UNAVAILABLE`, and no code is created or logged, when no

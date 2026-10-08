@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { parseRobotsTxt, robotsTxtAllows } from '../../../../scripts/crawl-policy'
+import { parseRobotsTxt, robotsTxtAllows } from '../../../../../scripts/crawl-policy'
 import { canonicalHostRedirectEnabled } from '../routing/canonical-host'
 import {
   CANONICAL_HOST,
@@ -119,7 +119,7 @@ interface WranglerEnvironment {
 describe('apps/web/wrangler.jsonc environment flags', () => {
   // Release tooling reads this file with JSON.parse, so it stays comment-free.
   const config = JSON.parse(
-    readFileSync(new URL('../../wrangler.jsonc', import.meta.url), 'utf8')
+    readFileSync(new URL('../../../wrangler.jsonc', import.meta.url), 'utf8')
   ) as WranglerEnvironment & { env: Record<'production' | 'staging', WranglerEnvironment> }
 
   it('marks each environment explicitly, and only production as production', () => {

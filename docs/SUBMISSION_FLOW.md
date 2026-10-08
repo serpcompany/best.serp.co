@@ -227,8 +227,8 @@ Only the submitter's own form previews the URL they typed, through
 ### Draft reminders and expiry
 
 An hourly Cron Trigger (`0 * * * *`, `triggers.crons` in `apps/web/wrangler.jsonc`) runs the
-Worker's `scheduled()` handler (`apps/web/lib/worker/scheduled.ts`). Its draft job
-(`apps/web/lib/submissions/draft-jobs.ts`, D1 side in `packages/data-ops/src/draft-jobs.ts`)
+Worker's `scheduled()` handler (`apps/web/src/lib/worker/scheduled.ts`). Its draft job
+(`apps/web/src/lib/submissions/draft-jobs.ts`, D1 side in `packages/data-ops/src/draft-jobs.ts`)
 first sends again the draft emails whose last send failed (a `failed` email-ledger row with
 attempts left, for a draft still in the state the email describes), then withdraws drafts 30
 days old as `expired` and sends `draft-expired`, then claims and sends the latest due
@@ -244,9 +244,9 @@ triggers (the dashboard lists them under the Worker's Settings → Triggers), an
 `--test-scheduled`, so `/__scheduled?cron=<expression>` runs `scheduled()` on demand; the job's
 behavior is covered by `scheduled.test.ts` and `draft-jobs.test.ts` against SQLite.
 
-Code: `apps/web/app/submit/`, `apps/web/components/submit/`, `apps/web/app/api/submissions/`,
-`apps/web/lib/submissions/`, `packages/data-ops/src/submissions.ts`, and
-`packages/data-ops/src/submission-plans.ts`.
+Code: `apps/web/src/app/submit/`, `apps/web/src/components/submit/`,
+`apps/web/src/app/api/submissions/`, `apps/web/src/lib/submissions/`,
+`packages/data-ops/src/submissions.ts`, and `packages/data-ops/src/submission-plans.ts`.
 
 ## Listing media
 

@@ -824,7 +824,7 @@ export const listingSubmissionRateLimits = sqliteTable(
 )
 
 /**
- * The idempotency ledger for transactional email (`apps/web/lib/email/`): one row per template
+ * The idempotency ledger for transactional email (`apps/web/src/lib/email/`): one row per template
  * and event key, claimed atomically before a send so a retried event never sends the same
  * email twice. Rows hold no recipient, subject, or body; event keys may not contain an email
  * address. Timestamps use SQLite's `YYYY-MM-DD HH:MM:SS` (UTC).

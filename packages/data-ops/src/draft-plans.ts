@@ -8,7 +8,7 @@ import { assertPreviousStatementChangedOne, hoursBefore, type StatementPlan } fr
  * choosing free (the row leaves `draft`), withdrawal, or expiry. The clock is
  * `listing_submissions.draft_saved_at`; edits never reset it.
  *
- * The scheduled job (#63, `draft-jobs.ts` and `apps/web/lib/submissions/draft-jobs.ts`) reads
+ * The scheduled job (#63, `draft-jobs.ts` and `apps/web/src/lib/submissions/draft-jobs.ts`) reads
  * the due drafts, claims each reminder with `buildMarkDraftReminderSentPlans` (a
  * compare-and-swap, so two runs cannot both claim it), and only then sends the email through
  * the email ledger with the idempotency key `draftReminderEmailKey`, which absorbs a retried

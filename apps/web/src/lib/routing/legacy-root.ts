@@ -27,7 +27,7 @@ function invalidManifest(detail: string): Error {
   return new Error(
     `Invalid .next/routes-manifest.json: ${detail}. The Worker cannot tell which root-level ` +
       'paths a route serves, so it refuses to start rather than send old listing URLs to 404; ' +
-      'see apps/web/lib/routing/legacy-root.ts.'
+      'see apps/web/src/lib/routing/legacy-root.ts.'
   )
 }
 

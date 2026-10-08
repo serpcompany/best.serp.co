@@ -4,7 +4,10 @@ import { dirname, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const emailDirectory = import.meta.dirname
+/** `apps/web/src`, which `@/` names; paths below are relative to it. */
 const appDirectory = resolve(emailDirectory, '../..')
+/** `apps/web`, so the app-root files (`worker.ts`, configs) are scanned too (#172). */
+const webDirectory = resolve(appDirectory, '..')
 
 function source(file: string): string {
   return readFileSync(resolve(emailDirectory, file), 'utf8')
@@ -12,11 +15,12 @@ function source(file: string): string {
 
 function appFiles(): string[] {
   return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
-    cwd: appDirectory,
+    cwd: webDirectory,
     encoding: 'utf8'
   })
     .split('\n')
     .filter(file => /\.(?:ts|tsx|js|jsx|mjs)$/u.test(file))
+    .map(file => relative(appDirectory, resolve(webDirectory, file)))
 }
 
 /** Every module specifier a file imports or re-exports, statically or dynamically. */

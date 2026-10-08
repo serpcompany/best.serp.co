@@ -3,7 +3,7 @@
 Paid listings (serpcompany/best.serp.co#68): **$49 USD, one-off and permanent**
 (`site.submissions.paidListingPriceCents`), sold through Stripe Checkout behind a
 provider-agnostic billing module, so SERP's self-hosted Lago can replace Stripe later. It runs
-while `features.orders` (`apps/web/lib/features.ts`) is on, which it is since #133 (the
+while `features.orders` (`apps/web/src/lib/features.ts`) is on, which it is since #133 (the
 owner's decision, with the provider's secrets and webhooks set up; see
 [Configuration](#configuration-owner)). The submit flow then offers the paid plan ("Skip the
 badge: $49 one-off", "Pay $49 and go live"), the account offers "Upgrade: $49 one-off" and
@@ -16,11 +16,11 @@ and the webhook answer 404, `/admin/orders/` is a 404, and the sweep does nothin
 
 | Piece | Where | Does |
 |---|---|---|
-| Provider interface | `apps/web/lib/billing/provider.ts` | `createCheckout`, `getCheckout`, `verifyWebhook`, `refund` |
-| Provider | `apps/web/lib/billing/providers/{index,stripe}.ts` | The only Stripe code (secrets, key modes, API): `fetch` and Web Crypto, no Node SDK |
-| Service | `apps/web/lib/billing/service.ts` | Checkout, webhook, fulfilment, refunds, the sweep |
-| Guardrails | `apps/web/lib/billing/guardrails.ts` | Checks before a paid submission goes live |
-| Runtime | `apps/web/lib/billing/{runtime,worker-billing,flags,http}.ts` | Bindings, the flag, route helpers |
+| Provider interface | `apps/web/src/lib/billing/provider.ts` | `createCheckout`, `getCheckout`, `verifyWebhook`, `refund` |
+| Provider | `apps/web/src/lib/billing/providers/{index,stripe}.ts` | The only Stripe code (secrets, key modes, API): `fetch` and Web Crypto, no Node SDK |
+| Service | `apps/web/src/lib/billing/service.ts` | Checkout, webhook, fulfilment, refunds, the sweep |
+| Guardrails | `apps/web/src/lib/billing/guardrails.ts` | Checks before a paid submission goes live |
+| Runtime | `apps/web/src/lib/billing/{runtime,worker-billing,flags,http}.ts` | Bindings, the flag, route helpers |
 | Ledger | `packages/data-ops/src/billing.ts` | `orders` and `billing_events` statement plans and reads |
 
 The architecture guard keeps billing SQL in `packages/data-ops` and every Stripe specific (API
@@ -167,7 +167,7 @@ the flag off; nothing uses it while the flag is on.
 
 ## Tests
 
-`apps/web/lib/billing/{service,providers/stripe}.test.ts` (node:sqlite and a fake provider),
+`apps/web/src/lib/billing/{service,providers/stripe}.test.ts` (node:sqlite and a fake provider),
 `scripts/d1-drizzle-local.test.ts` (the migration), and `apps/e2e/tests/billing.spec.ts`
 (Playwright on the admin panel suite's Worker and D1, `PLAYWRIGHT_PORT` + 3, started with the
 mocked provider's test values (`BILLING_PREVIEW_VARS` in `apps/e2e/tests/orders-worker.ts`;

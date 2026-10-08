@@ -1,16 +1,9 @@
 import { existsSync, statSync } from 'node:fs'
 import { ESLint } from 'eslint'
-import { isProtectedListingSurface } from './eslint-rules/no-forbidden-listing-links.mjs'
-
-const DEFAULT_PATTERNS = [
-  'apps/*/app/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
-  'apps/*/components/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
-  'apps/*/lib/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
-  'apps/*/public/**/*.{html,json,js,txt,xml}',
-  'packages/site-config/**/*.{js,jsx,json,jsonc,md,mdx,mjs,ts,tsx}',
-  'packages/web-core/src/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
-  'packages/content/data/**/*.{json,jsonc,md,mdx}'
-]
+import {
+  DEFAULT_LINK_LINT_PATTERNS as DEFAULT_PATTERNS,
+  isProtectedListingSurface
+} from './eslint-rules/no-forbidden-listing-links.mjs'
 
 /** Pre-rendered OpenNext assets of the web app, linted with --generated after a Worker build. */
 const GENERATED_PATTERNS = ['apps/web/.open-next/assets/**/*.{html,json,js,txt,xml}']

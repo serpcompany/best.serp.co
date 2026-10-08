@@ -1,6 +1,6 @@
 /**
  * MIME types as Fetch and WHATWG MIME Sniffing read them (moved from submit v2's
- * `apps/web/lib/submissions/html-encoding.ts`, PR #84 review rounds 4 and 5): `safeFetch` checks
+ * `apps/web/src/lib/submissions/html-encoding.ts`, PR #84 review rounds 4 and 5): `safeFetch` checks
  * a response's type with `fetchMimeType`, so repeated `Content-Type` headers (joined with
  * commas) and quoted parameters are read the way a browser reads them. The badge verifier's
  * encoding sniffing builds on the same parser.

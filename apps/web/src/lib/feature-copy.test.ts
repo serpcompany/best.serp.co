@@ -15,7 +15,7 @@ import { features, type SiteFeatures } from './features'
  */
 
 const WEB_DIRECTORY = resolve(__dirname, '..')
-const SITE_CONFIG_DIRECTORY = resolve(WEB_DIRECTORY, '../../packages/site-config')
+const SITE_CONFIG_DIRECTORY = resolve(WEB_DIRECTORY, '../../../packages/site-config')
 const SCANNED = [
   join(WEB_DIRECTORY, 'app'),
   join(WEB_DIRECTORY, 'components'),
@@ -113,8 +113,8 @@ describe('page copy', () => {
     expect(paths).toContain('components/submit/badge-step.tsx')
     expect(paths).toContain('components/submit/submit-form.tsx')
     expect(paths).toContain('lib/submissions/contract.ts')
-    expect(paths).toContain('../../packages/site-config/src/site.ts')
-    expect(paths).toContain('../../packages/site-config/content/about/about.mdx')
+    expect(paths).toContain('../../../packages/site-config/src/site.ts')
+    expect(paths).toContain('../../../packages/site-config/content/about/about.mdx')
     expect(paths.some(path => path.includes('admin'))).toBe(false)
   })
 

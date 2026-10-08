@@ -67,13 +67,13 @@ a drifted binding or host. `next.config.ts` allows both hosts for `/best.serp.co
 ## Rendering
 
 The catalog reads `COALESCE(media_key, url)`, so DTOs and the data cache (`v5`) hold keys. The
-web adapter (`apps/web/lib/catalog/repository.ts`) turns keys into URLs on `MEDIA_BASE_URL` and
+web adapter (`apps/web/src/lib/catalog/repository.ts`) turns keys into URLs on `MEDIA_BASE_URL` and
 fails closed when the variable is missing or malformed. Listing JSON-LD names the hosted logo, so
 on staging and in production it names the media host rather than best.serp.co. A slot that is not
 hosted, or an image that fails to load, shows the #86 tile ([image safety](./MEDIA_HEALTH.md)).
 
 The admin screens and the review previews render the same way (#96 review S9,
-`apps/web/lib/media/renderable-image.ts`): the hosted copy, or an imported site-relative path on
+`apps/web/src/lib/media/renderable-image.ts`): the hosted copy, or an imported site-relative path on
 our own origin; a source on another host is shown as the fallback tile with a "Source image"
 link, never loaded as an image. The submit page's "already listed" card shows the listing's
 hosted logo. Only the submitter's own form previews the URL they typed.
@@ -100,7 +100,7 @@ private, loopback, link-local, ULA, IPv4-mapped, NAT64, and 6to4 addresses with 
 Where it runs:
 
 - **Submit v2** (#84): saving a submission hosts its logo under `submissions/<id>/` after the
-  response (`hostSubmissionImages` in `apps/web/lib/media/server.ts`), and its featured image:
+  response (`hostSubmissionImages` in `apps/web/src/lib/media/server.ts`), and its featured image:
   the social image the server's own prefill finds on the submitted website, never a URL the
   client sends. A changed logo or image replaces the copy, and the superseded, never-reviewed
   object is deleted unless a slot still names it (submissions and revisions alike). Intake
@@ -129,8 +129,8 @@ Where it runs:
   bytes: an R2 error retries the copy; if the reviewed object is gone, a refetch is accepted only
   when its content hash is the reviewed key's, and otherwise the slot fails
   (`reviewed_copy_changed`, `reviewed_copy_missing`, recorded on the slot and in the logs).
-- **Worker cron** (`*/15`, the `listing-media` job in `apps/web/lib/worker/scheduled.ts`): retries
-  due slots, ten per run, each claimed with a ten-minute lease, then deletes finished
+- **Worker cron** (`*/15`, the `listing-media` job in `apps/web/src/lib/worker/scheduled.ts`):
+  retries due slots, ten per run, each claimed with a ten-minute lease, then deletes finished
   submissions' images. Retryable failures (timeouts, unreachable hosts, 408, 429, 5xx, a failed
   write) back off 15 min, 1 h, 4 h, 12 h, 24 h, then 48 h; after the seventh attempt, or on any
   other failure (404, SVG, too large, not an image), the slot is `failed`.

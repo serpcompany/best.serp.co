@@ -2,5 +2,5 @@ area:content:
   - changed-files:
       - any-glob-to-any-file:
           - 'd1/drizzle/**'
-          - 'apps/web/lib/submissions/**'
+          - 'apps/web/src/lib/submissions/**'
           - 'd1/publications/**'

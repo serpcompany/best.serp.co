@@ -35,7 +35,7 @@ describe('Worker configuration (serp web-stack/nextjs-on-workers.md)', () => {
       expect(config.vars.CF_WEB_ANALYTICS_TOKEN, name).toBeUndefined()
     }
     const token = resolved('production').vars.CF_WEB_ANALYTICS_TOKEN
-    // The same pattern `analyticsForRequest` accepts (apps/web/lib/environment).
+    // The same pattern `analyticsForRequest` accepts (apps/web/src/lib/environment).
     if (token !== undefined) expect(token).toMatch(/^[0-9a-f]{32}$/u)
   })
 

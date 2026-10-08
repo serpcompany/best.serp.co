@@ -2,7 +2,7 @@
  * Account data operations for Better Auth (serpcompany/best.serp.co#60): the Drizzle adapter
  * over the `users`, `sessions`, `accounts`, and `verification` tables, the admin allowlist,
  * and the D1-backed sign-in code limits. Every statement is built here and binds its values;
- * the application layer (`apps/web/lib/auth/`) only composes these operations.
+ * the application layer (`apps/web/src/lib/auth/`) only composes these operations.
  */
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { and, eq, type SQL, sql } from 'drizzle-orm'
@@ -31,7 +31,7 @@ export const authSchema = { accounts, sessions, users, verification }
 
 /**
  * The schema-shaping part of the Better Auth options: model names and the `role` column, which
- * users can never set themselves (`input: false`). `apps/web/lib/auth/config.ts` spreads it into
+ * users can never set themselves (`input: false`). `apps/web/src/lib/auth/config.ts` spreads it into
  * the full options; `auth.test.ts` checks the tables against what Better Auth expects from it.
  */
 export const authSchemaOptions = {

@@ -36,6 +36,19 @@ function hasProtectedExtension(filename) {
   return PROTECTED_EXTENSIONS.has(filename.match(/\.[^.]+$/)?.[0] ?? '')
 }
 
+/**
+ * The files `pnpm lint:forbidden-links` checks by default. Each must match at least one file
+ * (`no-forbidden-listing-links.test.ts`): a pattern left behind by a move would otherwise pass
+ * on nothing (#172).
+ */
+export const DEFAULT_LINK_LINT_PATTERNS = [
+  'apps/*/src/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
+  'apps/*/public/**/*.{html,json,js,txt,xml}',
+  'packages/site-config/**/*.{js,jsx,json,jsonc,md,mdx,mjs,ts,tsx}',
+  'packages/web-core/src/**/*.{js,jsx,md,mdx,mjs,ts,tsx}',
+  'packages/content/data/**/*.{json,jsonc,md,mdx}'
+]
+
 export function isProtectedListingSurface(filename) {
   const path = normalizePath(filename)
 

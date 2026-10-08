@@ -1,6 +1,8 @@
+import { globSync } from 'node:fs'
 import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 import noForbiddenListingLinks, {
+  DEFAULT_LINK_LINT_PATTERNS,
   preserveTextLinesProcessor
 } from './no-forbidden-listing-links.mjs'
 
@@ -37,7 +39,7 @@ describe('no-forbidden-listing-links', () => {
   it('reports help.serp.co/en links in D1 repository code', () => {
     const messages = lintText(
       'const supportUrl = "https://help.serp.co/en/"\n',
-      'apps/web/lib/catalog/repository.ts'
+      'apps/web/src/lib/catalog/repository.ts'
     )
 
     expect(messages).toEqual([
@@ -56,7 +58,7 @@ describe('no-forbidden-listing-links', () => {
         '  return <a href="https://help.serp.co/en/">Help</a>',
         '}'
       ].join('\n'),
-      'apps/web/app/products/[slug]/page.tsx'
+      'apps/web/src/app/products/[slug]/page.tsx'
     )
 
     expect(messages).toHaveLength(1)
@@ -112,5 +114,12 @@ describe('no-forbidden-listing-links', () => {
     )
 
     expect(messages).toEqual([])
+  })
+})
+
+describe('lint:forbidden-links default patterns (#172)', () => {
+  it.each(DEFAULT_LINK_LINT_PATTERNS)('%s matches files', pattern => {
+    // A pattern a move left behind would lint nothing and pass.
+    expect(globSync(pattern, { exclude: ['**/node_modules/**'] }).length).toBeGreaterThan(0)
   })
 })

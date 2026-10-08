@@ -1,5 +1,5 @@
-@import "../../../packages/design-system/styles/globals.css";
-@import "../../../packages/design-system/styles/sidebar-theme.css";
+@import "../../../../packages/design-system/styles/globals.css";
+@import "../../../../packages/design-system/styles/sidebar-theme.css";
 /* The enter and exit animations shadcn's dialogs, sheets, menus, popovers, selects, and
    tooltips name (`animate-in`, `fade-in-0`, `zoom-in-95`, `slide-in-from-*`). */
 @import "tw-animate-css";

@@ -2,8 +2,8 @@
  * Site areas that later steps of #59 ship. Whatever depends on one of them (email copy and
  * links, admin navigation) reads its flag here instead of promising it early. The issue that
  * builds the area turns the flag on, and the approved wording and links come back on their own:
- * `apps/web/lib/email/emails/links.test.ts` then requires the pages they link to, and
- * `apps/web/lib/feature-copy.test.ts` keeps page copy from promising an area that is off.
+ * `apps/web/src/lib/email/emails/links.test.ts` then requires the pages they link to, and
+ * `apps/web/src/lib/feature-copy.test.ts` keeps page copy from promising an area that is off.
  */
 export interface SiteFeatures {
   /**

@@ -2,15 +2,15 @@
 
 The weekly badge program (serpcompany/best.serp.co#59, #66) checks every week that the listings
 which rely on the badge still show it, and confirms a missing badge about 24 hours later before
-anything happens (`apps/web/lib/badge-program/`, D1 side in
-`packages/data-ops/src/badge-program.ts`, run by `apps/web/lib/worker/scheduled.ts`).
+anything happens (`apps/web/src/lib/badge-program/`, D1 side in
+`packages/data-ops/src/badge-program.ts`, run by `apps/web/src/lib/worker/scheduled.ts`).
 
 ## Switching it on
 
-It runs only while `features.badgeProgram` (`apps/web/lib/features.ts`) is on. **It is on**
+It runs only while `features.badgeProgram` (`apps/web/src/lib/features.ts`) is on. **It is on**
 since #130 (the owner's launch decision, 2026-10-07): each trigger's job reads D1 and checks
 sites, and logs its counts instead of `{ enabled: false }`. The approved wording that promises
-weekly checks shows with it (`apps/web/lib/feature-copy.ts`): the free plan's "Keep the badge
+weekly checks shows with it (`apps/web/src/lib/feature-copy.ts`): the free plan's "Keep the badge
 up: we check it every week", the badge step's "Keep the badge up" card, the account's "Badge
 checks" card ("Free listings are checked weekly") and badge panel ("Free listing · checked
 weekly", "Fix the badge before the recheck"), the claim dialog's badge card and "Keep the badge"
@@ -65,7 +65,7 @@ fixture sites on the site's flags.
   <site>") instead of "loaded", and gives the submit page's advice for that result, "Make sure
   the page is public and that a firewall or bot protection isn’t blocking our checker.", instead
   of asking to put the badge back. 
-- **Triggers** (UTC, `apps/web/lib/badge-program/schedule.ts`): weekly
+- **Triggers** (UTC, `apps/web/src/lib/badge-program/schedule.ts`): weekly
   `15 3 * * 1` opens a cycle, daily `45 3 * * *` opens a confirmation window, and the hourly
   `0 * * * *` continues both. Each run sends again failed program emails that still apply, then
   rechecks due warnings, then checks listings due this cycle: at most 20 sites per run, 4 at a
@@ -102,7 +102,7 @@ fixture sites on the site's flags.
 
 When a paid listing is refunded, its badge is checked once, right then, and the refund decides on
 that check alone (owner decision, 2026-10-06; #106 review round 2): `checkBadgeAtRefund`
-(`apps/web/lib/badge-program/refund.ts`) checks the listing's website and records the result as
+(`apps/web/src/lib/badge-program/refund.ts`) checks the listing's website and records the result as
 `kind = 'refund'`, the only `badge_checks` write outside the weekly program. #68 passes its
 `checkId` to `buildRefundSubmissionPlans` within `REFUND_BADGE_CHECK_MAX_AGE_HOURS` (one hour; a
 retried refund checks again):
