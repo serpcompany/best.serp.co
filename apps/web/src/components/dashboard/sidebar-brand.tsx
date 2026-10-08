@@ -37,23 +37,22 @@ export function SidebarBrand({
     <SidebarMenu>
       <SidebarMenuItem>
         {subtitle ? (
-          <SidebarMenuButton size="lg" asChild>
-            <Link href={href} onClick={close}>
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                {logo ?? <SerpMark className="size-4" />}
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{title}</span>
-                <span className="truncate text-xs">{subtitle}</span>
-              </div>
-            </Link>
+          <SidebarMenuButton size="lg" render={<Link href={href} onClick={close} />}>
+            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              {logo ?? <SerpMark className="size-4" />}
+            </div>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-medium">{title}</span>
+              <span className="truncate text-xs">{subtitle}</span>
+            </div>
           </SidebarMenuButton>
         ) : (
-          <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
-            <Link href={href} onClick={close}>
-              {logo ?? <SerpMark className="!size-5" />}
-              <span className="text-base font-semibold">{title}</span>
-            </Link>
+          <SidebarMenuButton
+            className="data-[slot=sidebar-menu-button]:!p-1.5"
+            render={<Link href={href} onClick={close} />}
+          >
+            {logo ?? <SerpMark className="!size-5" />}
+            <span className="text-base font-semibold">{title}</span>
           </SidebarMenuButton>
         )}
       </SidebarMenuItem>

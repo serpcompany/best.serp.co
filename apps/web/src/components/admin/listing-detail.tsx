@@ -17,7 +17,7 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -189,12 +189,16 @@ export function ListingDetail({
     const actions: ReactNode[] = []
     if (view.adminStatus === 'live') {
       actions.push(
-        <Button key="live" variant="outline" size="sm" asChild>
-          <a href={listingPath(view.slug)} target="_blank" rel="noreferrer">
-            View live
-            <ExternalLink />
-          </a>
-        </Button>,
+        <a
+          key="live"
+          href={listingPath(view.slug)}
+          target="_blank"
+          rel="noreferrer"
+          className={buttonVariants({ variant: 'outline', size: 'sm' })}
+        >
+          View live
+          <ExternalLink />
+        </a>,
         <Button
           key="unpublish"
           variant="outline"
@@ -345,13 +349,16 @@ export function ListingDetail({
               <FieldLabel htmlFor="listing-category">Primary category</FieldLabel>
               <Select
                 disabled={!editable}
-                value={details.categorySlug}
-                onValueChange={value => setDetails({ ...details, categorySlug: value })}
+                value={details.categorySlug || null}
+                onValueChange={value => {
+                  if (value) setDetails({ ...details, categorySlug: value })
+                }}
+                items={categories.map(option => ({ label: option.name, value: option.slug }))}
               >
                 <SelectTrigger id="listing-category" className="w-full">
                   <SelectValue placeholder="Choose a category" />
                 </SelectTrigger>
-                <SelectContent position="popper">
+                <SelectContent alignItemWithTrigger={false}>
                   {categories.map(option => (
                     <SelectItem key={option.slug} value={option.slug}>
                       {option.name}
@@ -495,12 +502,11 @@ export function ListingDetail({
         </CardHeader>
         <CardContent>
           <ToggleGroup
-            type="single"
             variant="outline"
-            value={linkRel}
+            value={[linkRel]}
             disabled={busy}
             aria-label="Outbound link"
-            onValueChange={value => {
+            onValueChange={([value]: string[]) => {
               if (!value || value === linkRel) return
               const previous = linkRel
               setLinkRel(value as LinkRel)

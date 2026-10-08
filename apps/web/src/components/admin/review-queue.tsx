@@ -106,27 +106,27 @@ function RowMenu({ row }: { row: QueueRow }) {
   const publicUrl = `https://best.serp.co${listingPath(row.slug)}`
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-8 text-muted-foreground">
-          <EllipsisVertical />
-          <span className="sr-only">Open menu</span>
-        </Button>
+      <DropdownMenuTrigger
+        render={<Button variant="ghost" size="icon" className="size-8 text-muted-foreground" />}
+      >
+        <EllipsisVertical />
+        <span className="sr-only">Open menu</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem onSelect={() => router.push(row.href)}>
+        <DropdownMenuItem onClick={() => router.push(row.href)}>
           <Pencil />
           Open
         </DropdownMenuItem>
         {row.listingSlug ? (
-          <DropdownMenuItem asChild>
-            <a href={listingPath(row.listingSlug)} target="_blank" rel="noreferrer">
-              <ExternalLink />
-              View live
-            </a>
+          <DropdownMenuItem
+            render={<a href={listingPath(row.listingSlug)} target="_blank" rel="noreferrer" />}
+          >
+            <ExternalLink />
+            View live
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem
-          onSelect={() =>
+          onClick={() =>
             void navigator.clipboard
               ?.writeText(publicUrl)
               .then(() => toast.success('URL copied'))

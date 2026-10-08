@@ -138,14 +138,14 @@ test.describe('public parity interactions', () => {
 
     const browseSection = page.getByRole('heading', { name: /browse the directory/i })
     await browseSection.scrollIntoViewIfNeeded()
-    const nameSortButton = page.getByRole('radio', { name: /^name$/i }).last()
+    const nameSortButton = page.getByRole('button', { name: /^name$/i }).last()
     await nameSortButton.click()
     await expect(page.getByText(/showing \d+ of \d+ matching products/i)).toBeVisible()
 
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await expect(page.getByRole('radio', { name: /^name$/i }).last()).toHaveAttribute(
-      'data-state',
-      'on'
+    await expect(page.getByRole('button', { name: /^name$/i }).last()).toHaveAttribute(
+      'aria-pressed',
+      'true'
     )
     await expect(page.getByText(/showing \d+ of \d+ matching products/i)).toBeVisible()
   })
@@ -179,5 +179,17 @@ test.describe('public parity interactions', () => {
 
     await gotoPublicPage(page, detailListing.path)
     await expectExternalLink(page.getByRole('link', { name: /install browser extension/i }).first())
+  })
+
+  // Links styled with buttonVariants keep their own classes through cn (#186): the header's
+  // sign-in link is `hidden sm:inline-flex`, so it waits for the menu on phones.
+  test('desktop-only header links stay hidden on phones', async ({ page }) => {
+    await page.setViewportSize({ height: 844, width: 390 })
+    await gotoPublicPage(page, '/')
+    const header = page.getByRole('banner')
+    await expect(header.getByRole('link', { name: 'Sign up / Sign in' })).toBeHidden()
+    await expect(header.getByRole('button', { name: /open menu/i })).toBeVisible()
+    await page.setViewportSize({ height: 900, width: 1440 })
+    await expect(header.getByRole('link', { name: 'Sign up / Sign in' })).toBeVisible()
   })
 })

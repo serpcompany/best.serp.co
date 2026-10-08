@@ -84,11 +84,11 @@ async function emailsTo(request: APIRequestContext, to: string): Promise<OutboxM
 
 async function chooseCategory(page: Page, name: string) {
   await page.getByRole('combobox', { name: 'Primary category' }).click()
-  // The list opens below its trigger, capped at max-h-80 (320 px). Stock's item-aligned default
-  // ignores the cap and fills the viewport with the 140-odd categories (#241).
-  const list = page.getByRole('listbox')
-  await expect(list).toBeVisible()
-  const box = await list.boundingBox()
+  // The list opens below its trigger (alignItemWithTrigger off), and its popup, which scrolls
+  // the 140-odd categories, is capped at max-h-80 (320 px) (#241, #186).
+  await expect(page.getByRole('listbox')).toBeVisible()
+  const popup = page.locator('[data-slot="select-content"]')
+  const box = await popup.boundingBox()
   expect(box?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(320)
   await page.getByRole('option', { name, exact: true }).click()
 }
@@ -131,7 +131,10 @@ test.describe('submit v2', () => {
       'Turns rough product notes into on-brand landing pages, emails, and ads.'
     )
     await expect(page.getByText('From meta description')).toBeVisible()
-    await expect(page.getByRole('radio', { name: 'Site icon' })).toHaveAttribute('data-state', 'on')
+    await expect(page.getByRole('button', { name: 'Site icon' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
     await expect(page.getByText('Pick the closest match. We don’t fill this in.')).toBeVisible()
 
     // Every proposal stays editable.
@@ -158,7 +161,7 @@ test.describe('submit v2', () => {
     await expect(page.getByLabel('Website URL')).toHaveValue(fixture.website(label))
     await expect(page.getByLabel('Name')).toHaveValue(productName)
     await expect(page.getByLabel('Short description')).toHaveValue(description)
-    await expect(page.getByRole('combobox', { name: 'Primary category' })).toHaveText(CATEGORY)
+    await expect(page.getByRole('combobox', { name: 'Primary category' })).toContainText(CATEGORY)
     await expect(page.getByText('Sign in when you’re ready')).toHaveCount(0)
     await page.getByRole('button', { name: 'Continue' }).click()
 

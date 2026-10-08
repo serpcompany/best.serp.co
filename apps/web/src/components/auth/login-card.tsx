@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { readLocalDraft } from '@/components/submit/draft-storage'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { callbackDestination } from '@/lib/auth/callback-url'
 import { getRoute } from '@/lib/routing/routes'
 import { hostOf } from '@/lib/submissions/contract'
+import { cn } from '@/lib/utils'
 import {
   CODE_ATTEMPTS,
   CODE_LENGTH,
@@ -319,12 +320,10 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
               Redirecting…
             </div>
             <Field>
-              <Button asChild className="w-full">
-                <Link href={callbackPath}>
-                  {destination.button}
-                  <ArrowRight />
-                </Link>
-              </Button>
+              <Link href={callbackPath} className={cn(buttonVariants(), 'w-full')}>
+                {destination.button}
+                <ArrowRight />
+              </Link>
               <FieldDescription className="text-center">
                 Not you?{' '}
                 <button

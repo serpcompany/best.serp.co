@@ -1,5 +1,4 @@
 import { FolderOpen, type LucideIcon } from 'lucide-react'
-import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { DirectoryEmpty } from './directory-empty'
 
@@ -50,7 +49,7 @@ export function EmptyState({
     onAction && actionLabel
       ? { label: actionLabel, onClick: onAction }
       : actionHref && actionLabel
-        ? { label: actionLabel, slot: <Link href={actionHref}>{actionLabel}</Link> }
+        ? { label: actionLabel, path: actionHref }
         : undefined
 
   return (

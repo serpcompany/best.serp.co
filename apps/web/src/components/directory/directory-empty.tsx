@@ -1,5 +1,6 @@
+import Link from 'next/link'
 import type { ComponentType, ReactNode, SVGProps } from 'react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Empty,
   EmptyContent,
@@ -15,7 +16,8 @@ interface DirectoryEmptyAction {
   label: string
   onClick?: () => void
   href?: string
-  slot?: ReactNode
+  /** An in-site path, linked with Next `Link` (client navigation); `href` is a plain anchor. */
+  path?: string
   variant?: React.ComponentProps<typeof Button>['variant']
 }
 
@@ -36,19 +38,25 @@ function renderAction(
   action: DirectoryEmptyAction,
   fallbackVariant?: DirectoryEmptyAction['variant']
 ) {
-  if (action.slot) {
+  if (action.path) {
     return (
-      <Button asChild variant={action.variant ?? fallbackVariant}>
-        {action.slot}
-      </Button>
+      <Link
+        href={action.path}
+        className={buttonVariants({ variant: action.variant ?? fallbackVariant })}
+      >
+        {action.label}
+      </Link>
     )
   }
 
   if (action.href) {
     return (
-      <Button asChild variant={action.variant ?? fallbackVariant}>
-        <a href={action.href}>{action.label}</a>
-      </Button>
+      <a
+        href={action.href}
+        className={buttonVariants({ variant: action.variant ?? fallbackVariant })}
+      >
+        {action.label}
+      </a>
     )
   }
 

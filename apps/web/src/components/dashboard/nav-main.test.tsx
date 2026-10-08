@@ -137,7 +137,7 @@ describe('AppShell', () => {
     expect(html).toContain('>Admin</span>')
     expect(html).toContain('bg-primary text-primary-foreground')
     // Menu buttons carry their icon-mode tooltip trigger; the count badge hides in icon mode.
-    expect(menuButton(html, 'Review queue')).toContain('data-state="closed"')
+    expect(menuButton(html, 'Review queue')).toContain('data-base-ui-tooltip-trigger=""')
     expect(html).toMatch(
       /data-sidebar="menu-badge" class="[^"]*group-data-\[collapsible=icon\]:hidden/u
     )

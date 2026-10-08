@@ -61,27 +61,27 @@ function RowMenu({ row }: { row: ListingRowView }) {
   const detail = `/admin/listings/${encodeURIComponent(row.slug)}/`
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-8 text-muted-foreground">
-          <EllipsisVertical />
-          <span className="sr-only">Open menu</span>
-        </Button>
+      <DropdownMenuTrigger
+        render={<Button variant="ghost" size="icon" className="size-8 text-muted-foreground" />}
+      >
+        <EllipsisVertical />
+        <span className="sr-only">Open menu</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem onSelect={() => router.push(detail)}>
+        <DropdownMenuItem onClick={() => router.push(detail)}>
           <Pencil />
           Open
         </DropdownMenuItem>
         {row.adminStatus === 'live' ? (
-          <DropdownMenuItem asChild>
-            <a href={listingPath(row.slug)} target="_blank" rel="noreferrer">
-              <ExternalLink />
-              View live
-            </a>
+          <DropdownMenuItem
+            render={<a href={listingPath(row.slug)} target="_blank" rel="noreferrer" />}
+          >
+            <ExternalLink />
+            View live
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem
-          onSelect={() =>
+          onClick={() =>
             void navigator.clipboard
               ?.writeText(`https://best.serp.co${listingPath(row.slug)}`)
               .then(() => toast.success('URL copied'))
@@ -91,7 +91,7 @@ function RowMenu({ row }: { row: ListingRowView }) {
           <Copy />
           Copy URL
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => router.push(`${detail}?dialog=transfer`)}>
+        <DropdownMenuItem onClick={() => router.push(`${detail}?dialog=transfer`)}>
           <Users />
           Transfer owner…
         </DropdownMenuItem>
@@ -100,7 +100,7 @@ function RowMenu({ row }: { row: ListingRowView }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive [&_svg]:!text-destructive"
-              onSelect={() => router.push(`${detail}?dialog=unpublish`)}
+              onClick={() => router.push(`${detail}?dialog=unpublish`)}
             >
               <EyeOff />
               Unpublish…

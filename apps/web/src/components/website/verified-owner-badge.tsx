@@ -9,11 +9,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 export function VerifiedOwnerBadge() {
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Badge variant="secondary" tabIndex={0}>
-          <BadgeCheck aria-hidden="true" />
-          Verified owner
-        </Badge>
+      <TooltipTrigger render={<Badge variant="secondary" tabIndex={0} />}>
+        <BadgeCheck aria-hidden="true" />
+        Verified owner
       </TooltipTrigger>
       <TooltipContent>The maker verified ownership of this listing</TooltipContent>
     </Tooltip>

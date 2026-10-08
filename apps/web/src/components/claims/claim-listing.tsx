@@ -8,7 +8,7 @@ import { formatWait } from '@/components/auth/sign-in-api'
 import { type BadgeOutcome, badgeCheckResultAlert } from '@/components/submit/badge-step'
 import { call } from '@/components/submit/submit-api'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -652,11 +652,11 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         </div>
         <div className="flex items-center justify-between gap-2">
           <Tooltip open={copied}>
-            <TooltipTrigger asChild>
-              <Button variant="outline" size="sm" onClick={() => void copyEmbed()}>
-                <Copy />
-                Copy code
-              </Button>
+            <TooltipTrigger
+              render={<Button variant="outline" size="sm" onClick={() => void copyEmbed()} />}
+            >
+              <Copy />
+              Copy code
             </TooltipTrigger>
             <TooltipContent>Copied to clipboard</TooltipContent>
           </Tooltip>
@@ -716,12 +716,14 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         {back('method')}
         {/* The paid method only shows once orders are on (#68). A plain link: the route opens
             the payment provider's checkout and comes back to this dialog. */}
-        <Button asChild disabled={!claim}>
-          <a href={claim ? `/claims/${claim.id}/checkout/` : '#claim'}>
-            {`Continue to payment: ${usd(priceCents, false)}`}
-            <ArrowRight />
-          </a>
-        </Button>
+        <a
+          href={claim ? `/claims/${claim.id}/checkout/` : '#claim'}
+          aria-disabled={!claim}
+          className={buttonVariants()}
+        >
+          {`Continue to payment: ${usd(priceCents, false)}`}
+          <ArrowRight />
+        </a>
       </>
     )
   } else if (step === 'done' || step === 'mine') {
@@ -735,12 +737,15 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
       ) : null
     footer = (
       <>
-        <Button asChild variant="outline">
-          <Link href={`/account/listings/${listing.slug}/edit/`}>Edit listing</Link>
-        </Button>
-        <Button asChild>
-          <Link href="/account/">Open account</Link>
-        </Button>
+        <Link
+          href={`/account/listings/${listing.slug}/edit/`}
+          className={buttonVariants({ variant: 'outline' })}
+        >
+          Edit listing
+        </Link>
+        <Link href="/account/" className={buttonVariants()}>
+          Open account
+        </Link>
       </>
     )
   } else if (step === 'owned') {
@@ -755,12 +760,10 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         <Button variant="outline" onClick={() => changeOpen(false)}>
           Close
         </Button>
-        <Button asChild>
-          <Link href={contactPath}>
-            <MessageSquare />
-            Message us
-          </Link>
-        </Button>
+        <Link href={contactPath} className={buttonVariants()}>
+          <MessageSquare />
+          Message us
+        </Link>
       </>
     )
   } else {
@@ -770,12 +773,10 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         <Button variant="outline" onClick={() => changeOpen(false)}>
           Close
         </Button>
-        <Button asChild>
-          <Link href={contactPath}>
-            <MessageSquare />
-            Message us
-          </Link>
-        </Button>
+        <Link href={contactPath} className={buttonVariants()}>
+          <MessageSquare />
+          Message us
+        </Link>
       </>
     )
   }

@@ -62,8 +62,12 @@ describe('listing pagination', () => {
     const html = renderToStaticMarkup(
       <ListingPagination basePath="/products/categories/other/" page={2} pageCount={3} />
     )
-    expect(html).toContain('href="/products/categories/other/" rel="prev"')
-    expect(html).toContain('href="/products/categories/other/?page=3" rel="next"')
+    // Each anchor's markup up to its close; class names may hold `>` (`has-[>svg]`).
+    const anchors = html.split('<a ').slice(1)
+    const anchor = (href: string, rel: string) =>
+      anchors.some(tag => tag.includes(`href="${href}"`) && tag.includes(`rel="${rel}"`))
+    expect(anchor('/products/categories/other/', 'prev')).toBe(true)
+    expect(anchor('/products/categories/other/?page=3', 'next')).toBe(true)
     expect(html).toContain('aria-current="page"')
   })
 })

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -78,12 +78,13 @@ function SummaryItem({ edit, submission }: { edit: boolean; submission: Submissi
       </ItemContent>
       {edit ? (
         <ItemActions>
-          <Button asChild variant="ghost" size="sm">
-            <Link href={`/submit/?edit=${submission.id}`}>
-              <Pencil />
-              Edit details
-            </Link>
-          </Button>
+          <Link
+            href={`/submit/?edit=${submission.id}`}
+            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+          >
+            <Pencil />
+            Edit details
+          </Link>
         </ItemActions>
       ) : null}
     </Item>
@@ -148,9 +149,9 @@ export function ChoosePlan({
           </CardContent>
           <CardFooter>
             <div className="flex w-full flex-col gap-2 sm:flex-row">
-              <Button asChild>
-                <Link href="/account/">Go to my account</Link>
-              </Button>
+              <Link href="/account/" className={buttonVariants()}>
+                Go to my account
+              </Link>
               <Button variant="outline" onClick={() => setLater(false)}>
                 Choose now
               </Button>
@@ -243,13 +244,13 @@ export function ChoosePlan({
               </CardContent>
               <CardFooter className="mt-auto">
                 <div className="flex w-full flex-col gap-2">
-                  <Button asChild className="w-full">
-                    {/* A plain link: the checkout route opens a provider checkout (#68). */}
-                    <a href={`/submit/${submission.id}/checkout/`}>
-                      Pay {price} and go live
-                      <ArrowRight />
-                    </a>
-                  </Button>
+                  <a
+                    href={`/submit/${submission.id}/checkout/`}
+                    className={cn(buttonVariants(), 'w-full')}
+                  >
+                    Pay {price} and go live
+                    <ArrowRight />
+                  </a>
                   <p className="flex items-center justify-center gap-1.5 text-muted-foreground text-xs">
                     <Lock className="size-3" aria-hidden="true" /> Secure checkout
                   </p>

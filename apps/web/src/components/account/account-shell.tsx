@@ -20,8 +20,9 @@ import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
 import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
 import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
 import { ModeToggle } from '@/components/layout/mode-toggle'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { getRoute } from '@/lib/routing/routes'
+import { cn } from '@/lib/utils'
 
 /**
  * The account dashboard shell from the #70 mockups (screens 5 to 7): shadcn dashboard-01, built
@@ -66,12 +67,13 @@ function AccountHeader() {
       crumbs={context?.crumbs ?? defaultCrumbs(pathname.toLowerCase())}
       actions={
         <>
-          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
-            <Link href={getRoute('home')}>
-              View site
-              <ExternalLink />
-            </Link>
-          </Button>
+          <Link
+            href={getRoute('home')}
+            className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'hidden sm:flex')}
+          >
+            View site
+            <ExternalLink />
+          </Link>
           <ModeToggle />
         </>
       }

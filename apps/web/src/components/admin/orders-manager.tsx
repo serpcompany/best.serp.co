@@ -276,35 +276,37 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
                   <TableCell className="last:pr-4">
                     <div className="flex justify-end">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-muted-foreground"
-                          >
-                            <EllipsisVertical />
-                            <span className="sr-only">Open menu for {orderLabel(order)}</span>
-                          </Button>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-8 text-muted-foreground"
+                            />
+                          }
+                        >
+                          <EllipsisVertical />
+                          <span className="sr-only">Open menu for {orderLabel(order)}</span>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
                           {order.paymentUrl ? (
-                            <DropdownMenuItem asChild>
-                              <a href={order.paymentUrl} target="_blank" rel="noreferrer">
-                                <ExternalLink />
-                                View payment
-                              </a>
+                            <DropdownMenuItem
+                              render={
+                                <a href={order.paymentUrl} target="_blank" rel="noreferrer" />
+                              }
+                            >
+                              <ExternalLink />
+                              View payment
                             </DropdownMenuItem>
                           ) : null}
-                          <DropdownMenuItem onSelect={() => void copyId(order)}>
+                          <DropdownMenuItem onClick={() => void copyId(order)}>
                             <Copy />
                             Copy order ID
                           </DropdownMenuItem>
                           {order.listingHref ? (
-                            <DropdownMenuItem asChild>
-                              <a href={order.listingHref}>
-                                <Box />
-                                Open listing
-                              </a>
+                            <DropdownMenuItem render={<a href={order.listingHref} />}>
+                              <Box />
+                              Open listing
                             </DropdownMenuItem>
                           ) : null}
                           {order.refundable ? (
@@ -313,7 +315,7 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
                               <DropdownMenuItem
                                 disabled={busy}
                                 variant="destructive"
-                                onSelect={() => void openRefund(order)}
+                                onClick={() => void openRefund(order)}
                               >
                                 <Undo2 />
                                 Refund…

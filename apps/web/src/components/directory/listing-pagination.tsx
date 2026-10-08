@@ -1,14 +1,14 @@
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import type { Metadata } from 'next'
-import type { ReactElement } from 'react'
+import type { ComponentProps, ReactElement } from 'react'
+import { buttonVariants } from '@/components/ui/button'
 import {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
+  PaginationItem
 } from '@/components/ui/pagination'
+import { cn } from '@/lib/utils'
 import { SITE_PUBLIC_URL } from '../../lib/seo/seo-config'
 
 /**
@@ -65,6 +65,28 @@ export function paginationWindow(page: number, pageCount: number): Array<number 
   })
 }
 
+/**
+ * Stock `PaginationLink` renders Base UI's client `Button` around an anchor, which mismatches on
+ * hydration when a server component renders it (#186). This is the same plain anchor, styled
+ * with `buttonVariants`: outline for the current page, ghost otherwise.
+ */
+function PageLink({
+  active = false,
+  className,
+  size = 'icon',
+  ...props
+}: ComponentProps<'a'> & { active?: boolean; size?: 'default' | 'icon' }) {
+  return (
+    <a
+      aria-current={active ? 'page' : undefined}
+      data-slot="pagination-link"
+      data-active={active}
+      className={cn(buttonVariants({ size, variant: active ? 'outline' : 'ghost' }), className)}
+      {...props}
+    />
+  )
+}
+
 interface ListingPaginationProps extends ListingPageInfo {
   basePath: string
   /** Optional in-page anchor appended to page links (for example the directory list). */
@@ -87,7 +109,16 @@ export function ListingPagination({
       <PaginationContent className="flex-wrap justify-center">
         {page > 1 ? (
           <PaginationItem>
-            <PaginationPrevious href={href(page - 1)} rel="prev" />
+            <PageLink
+              aria-label="Go to previous page"
+              className="pl-1.5!"
+              href={href(page - 1)}
+              rel="prev"
+              size="default"
+            >
+              <ChevronLeftIcon data-icon="inline-start" />
+              <span className="hidden sm:block">Previous</span>
+            </PageLink>
           </PaginationItem>
         ) : null}
         {paginationWindow(page, pageCount).map((entry, index) =>
@@ -99,19 +130,24 @@ export function ListingPagination({
             </PaginationItem>
           ) : (
             <PaginationItem key={entry}>
-              <PaginationLink
-                aria-label={`Page ${entry}`}
-                href={href(entry)}
-                isActive={entry === page}
-              >
+              <PageLink active={entry === page} aria-label={`Page ${entry}`} href={href(entry)}>
                 {entry}
-              </PaginationLink>
+              </PageLink>
             </PaginationItem>
           )
         )}
         {page < pageCount ? (
           <PaginationItem>
-            <PaginationNext href={href(page + 1)} rel="next" />
+            <PageLink
+              aria-label="Go to next page"
+              className="pr-1.5!"
+              href={href(page + 1)}
+              rel="next"
+              size="default"
+            >
+              <span className="hidden sm:block">Next</span>
+              <ChevronRightIcon data-icon="inline-end" />
+            </PageLink>
           </PaginationItem>
         ) : null}
       </PaginationContent>

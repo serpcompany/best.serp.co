@@ -73,49 +73,46 @@ export function NavUser({
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <UserSummary user={user} />
-              <EllipsisVertical className="ml-auto size-4" />
-            </SidebarMenuButton>
+          <DropdownMenuTrigger
+            render={
+              <SidebarMenuButton
+                size="lg"
+                className="data-popup-open:bg-sidebar-accent data-popup-open:text-sidebar-accent-foreground"
+              />
+            }
+          >
+            <UserSummary user={user} />
+            <EllipsisVertical className="ml-auto size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+            className="w-(--anchor-width) min-w-56 rounded-lg"
             side={isMobile ? 'bottom' : 'right'}
             align="end"
             sideOffset={4}
           >
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <UserSummary user={user} />
-              </div>
-            </DropdownMenuLabel>
+            {/* Base UI requires a group label to sit in its group. */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="p-0 font-normal">
+                <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                  <UserSummary user={user} />
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             {links.length > 0 ? (
               <>
                 <DropdownMenuGroup>
                   {links.map(link => (
-                    <DropdownMenuItem key={link.title} asChild>
-                      <Link href={link.href}>
-                        <link.icon />
-                        {link.title}
-                      </Link>
+                    <DropdownMenuItem key={link.title} render={<Link href={link.href} />}>
+                      <link.icon />
+                      {link.title}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
               </>
             ) : null}
-            <DropdownMenuItem
-              disabled={signingOut}
-              onSelect={event => {
-                event.preventDefault()
-                onSignOut()
-              }}
-            >
+            <DropdownMenuItem disabled={signingOut} closeOnClick={false} onClick={onSignOut}>
               <LogOut />
               Sign out
             </DropdownMenuItem>

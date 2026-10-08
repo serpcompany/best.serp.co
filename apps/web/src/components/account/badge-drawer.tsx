@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ToneAlert } from '@/components/submit/submit-ui'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   Drawer,
@@ -155,13 +155,13 @@ export function BadgeDrawer({
   const last = badge.last
   return (
     <Drawer
-      direction={isMobile ? 'bottom' : 'right'}
+      swipeDirection={isMobile ? 'down' : 'right'}
       open
       onOpenChange={open => {
         if (!open) onOpenChange(false)
       }}
     >
-      <DrawerContent className="data-[vaul-drawer-direction=right]:sm:max-w-md">
+      <DrawerContent className="data-[swipe-axis=x]:sm:[--drawer-content-width:28rem]">
         <DrawerHeader>
           <DrawerTitle>{row.name} badge</DrawerTitle>
           <DrawerDescription>{copy.description}</DrawerDescription>
@@ -196,11 +196,11 @@ export function BadgeDrawer({
           {notice ? <ToneAlert title="We couldn’t check the badge">{notice}</ToneAlert> : null}
           <Separator />
           <Collapsible defaultOpen className="flex flex-col gap-2">
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="-mx-2 justify-between">
-                Badge code
-                <ChevronsUpDown />
-              </Button>
+            <CollapsibleTrigger
+              render={<Button variant="ghost" size="sm" className="-mx-2 justify-between" />}
+            >
+              Badge code
+              <ChevronsUpDown />
             </CollapsibleTrigger>
             <CollapsibleContent className="flex flex-col gap-2">
               <div className="w-full overflow-x-auto rounded-md border border-input px-3 py-2 font-mono text-[11px] leading-relaxed shadow-xs dark:bg-input/30">
@@ -283,10 +283,9 @@ export function BadgeDrawer({
             today · one every 30 seconds
           </p>
           {row?.upgrade ? (
-            <Button asChild variant="outline">
-              {/* A plain link: the checkout route opens a provider checkout (#68). */}
-              <a href={row.upgrade.href}>{row.upgrade.label}</a>
-            </Button>
+            <a href={row.upgrade.href} className={buttonVariants({ variant: 'outline' })}>
+              {row.upgrade.label}
+            </a>
           ) : null}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close

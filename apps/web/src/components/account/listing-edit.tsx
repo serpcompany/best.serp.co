@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { FieldGroup } from '@/components/ui/field'
 import { Separator } from '@/components/ui/separator'
@@ -86,12 +86,10 @@ export interface ListingEditView extends Extras {
 
 function MessageButton() {
   return (
-    <Button asChild variant="outline" size="sm">
-      <Link href="/contact/">
-        <MessageSquare />
-        Message the reviewers
-      </Link>
-    </Button>
+    <Link href="/contact/" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+      <MessageSquare />
+      Message the reviewers
+    </Link>
   )
 }
 
@@ -304,12 +302,15 @@ export function ListingEdit({
         <>
           <MessageButton />
           {view.live ? (
-            <Button asChild variant="outline" size="sm">
-              <a href={`/products/${view.slug}/`} target="_blank" rel="noreferrer">
-                View live listing
-                <ExternalLink />
-              </a>
-            </Button>
+            <a
+              href={`/products/${view.slug}/`}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              View live listing
+              <ExternalLink />
+            </a>
           ) : null}
         </>
       }

@@ -2,7 +2,7 @@ import { Inbox, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactElement } from 'react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   Empty,
@@ -109,19 +109,18 @@ export async function AccountTablePage({
               </EmptyHeader>
               <EmptyContent>
                 <div className="flex flex-wrap justify-center gap-2">
-                  <Button asChild>
-                    <Link href={getRoute('submit')}>
-                      <Plus />
-                      Submit a product
-                    </Link>
-                  </Button>
+                  <Link href={getRoute('submit')} className={buttonVariants()}>
+                    <Plus />
+                    Submit a product
+                  </Link>
                   {scope === 'overview' ? (
-                    <Button asChild variant="outline">
-                      <Link href={getRoute('search')}>
-                        <Search />
-                        Find your listing
-                      </Link>
-                    </Button>
+                    <Link
+                      href={getRoute('search')}
+                      className={buttonVariants({ variant: 'outline' })}
+                    >
+                      <Search />
+                      Find your listing
+                    </Link>
                   ) : null}
                 </div>
               </EmptyContent>

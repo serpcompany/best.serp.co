@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { hasConfiguredGitHubIssueTarget, siteConfig } from '@/lib/site/site-config'
+import { cn } from '@/lib/utils'
 
 export const notFoundMetadata: Metadata = generateBaseMetadata({
   title: 'Page Not Found',
@@ -41,9 +42,9 @@ export function NotFoundContent() {
               'Try the homepage or one of the starter listings instead.'
             )}
           </p>
-          <Button asChild className="mt-8">
-            <Link href={getRoute('home')}>Back to homepage</Link>
-          </Button>
+          <Link href={getRoute('home')} className={cn(buttonVariants(), 'mt-8')}>
+            Back to homepage
+          </Link>
         </div>
       </div>
     </div>

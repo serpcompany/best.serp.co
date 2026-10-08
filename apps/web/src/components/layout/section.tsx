@@ -8,7 +8,8 @@ import {
   DirectorySectionHeader,
   DirectorySectionTitle
 } from '@/components/sections/directory-home-section'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export type SectionProps = {
   title: string
@@ -42,16 +43,17 @@ export function Section({
         </div>
         {viewAllHref && (
           <DirectorySectionAction>
-            <Button
-              asChild
-              variant="ghost"
-              className="group h-auto gap-0 rounded-sm px-0 py-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:bg-transparent hover:text-foreground has-[>svg]:px-0 sm:text-base"
+            <Link
+              href={viewAllHref}
+              aria-label={viewAllText}
+              className={cn(
+                buttonVariants({ variant: 'ghost' }),
+                'group h-auto gap-0 rounded-sm px-0 py-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:bg-transparent hover:text-foreground has-[>svg]:px-0 sm:text-base'
+              )}
             >
-              <Link href={viewAllHref} aria-label={viewAllText}>
-                <span className="hidden sm:inline">{viewAllText}</span>
-                <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5 sm:ml-2 sm:size-4" />
-              </Link>
-            </Button>
+              <span className="hidden sm:inline">{viewAllText}</span>
+              <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5 sm:ml-2 sm:size-4" />
+            </Link>
           </DirectorySectionAction>
         )}
       </DirectorySectionHeader>

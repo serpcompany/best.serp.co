@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { SiteCard, SiteCardHeader } from '@/components/directory/site-card'
 import { AboutStaticPage, generateAboutPageMetadata } from '@/components/static-pages/about-page'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { CardContent, CardTitle } from '@/components/ui/card'
 import { getAboutPage } from '@/lib/content-loader'
 
@@ -20,7 +20,7 @@ export default async function AboutPage() {
   return (
     <AboutStaticPage
       aboutPage={aboutPage}
-      slots={{ Button, Card: SiteCard, CardContent, CardHeader: SiteCardHeader, CardTitle }}
+      slots={{ buttonVariants, Card: SiteCard, CardContent, CardHeader: SiteCardHeader, CardTitle }}
     />
   )
 }

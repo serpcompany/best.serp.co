@@ -26,7 +26,7 @@ import { type ReactNode, useMemo, useState } from 'react'
 import { DataTableView, PaginationFooter } from '@/components/admin/data-table'
 import { ProductLogo } from '@/components/submit/submit-ui'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -212,11 +212,9 @@ function StatusLegend({ legend }: { legend: ReadonlyArray<[AccountStatus, string
     <Collapsible defaultOpen className="rounded-lg border">
       <div className="flex items-center justify-between px-4 py-3">
         <p className="text-sm font-medium">What the statuses mean</p>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-8">
-            <ChevronsUpDown />
-            <span className="sr-only">Toggle</span>
-          </Button>
+        <CollapsibleTrigger render={<Button variant="ghost" size="icon" className="size-8" />}>
+          <ChevronsUpDown />
+          <span className="sr-only">Toggle</span>
         </CollapsibleTrigger>
       </div>
       <CollapsibleContent>
@@ -349,44 +347,54 @@ export function AccountDashboard({
                   Badge
                 </Button>
               ) : action ? (
-                <Button asChild size="sm" variant={action.variant}>
-                  {action.checkout ? (
-                    // A plain link: the checkout route opens a provider checkout (#68).
-                    <a href={action.href}>{action.label}</a>
-                  ) : (
-                    <Link href={action.href}>{action.label}</Link>
-                  )}
-                </Button>
+                action.checkout ? (
+                  // A plain link: the checkout route opens a provider checkout (#68).
+                  <a
+                    href={action.href}
+                    className={buttonVariants({ size: 'sm', variant: action.variant })}
+                  >
+                    {action.label}
+                  </a>
+                ) : (
+                  <Link
+                    href={action.href}
+                    className={buttonVariants({ size: 'sm', variant: action.variant })}
+                  >
+                    {action.label}
+                  </Link>
+                )
               ) : null}
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-8 text-muted-foreground">
-                    <EllipsisVertical />
-                    <span className="sr-only">Open menu for {item.name}</span>
-                  </Button>
+                <DropdownMenuTrigger
+                  render={
+                    <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" />
+                  }
+                >
+                  <EllipsisVertical />
+                  <span className="sr-only">Open menu for {item.name}</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem asChild>
-                    <Link href={item.href}>
-                      {item.kind === 'listing' ? 'Edit listing' : 'View details'}
-                    </Link>
+                  <DropdownMenuItem render={<Link href={item.href} />}>
+                    {item.kind === 'listing' ? 'Edit listing' : 'View details'}
                   </DropdownMenuItem>
                   {item.kind === 'listing' && item.status === 'live' ? (
-                    <DropdownMenuItem asChild>
-                      <a href={`/products/${item.slug}/`} target="_blank" rel="noreferrer">
-                        View live listing
-                      </a>
+                    <DropdownMenuItem
+                      render={
+                        <a href={`/products/${item.slug}/`} target="_blank" rel="noreferrer" />
+                      }
+                    >
+                      View live listing
                     </DropdownMenuItem>
                   ) : null}
                   {item.menu.withdraw || item.menu.messageUs ? <DropdownMenuSeparator /> : null}
                   {item.menu.withdraw ? (
-                    <DropdownMenuItem variant="destructive" onSelect={() => setWithdrawing(item)}>
+                    <DropdownMenuItem variant="destructive" onClick={() => setWithdrawing(item)}>
                       Withdraw
                     </DropdownMenuItem>
                   ) : null}
                   {item.menu.messageUs ? (
-                    <DropdownMenuItem asChild>
-                      <Link href="/contact/">Message us</Link>
+                    <DropdownMenuItem render={<Link href="/contact/" />}>
+                      Message us
                     </DropdownMenuItem>
                   ) : null}
                 </DropdownMenuContent>
@@ -413,7 +421,8 @@ export function AccountDashboard({
     state: { columnVisibility: visibility, pagination }
   })
 
-  const choose = (value: string) => {
+  const choose = (value: string | null) => {
+    if (!value) return
     setFilter(value as Filter)
     setPagination(current => ({ ...current, pageIndex: 0 }))
   }
@@ -426,11 +435,18 @@ export function AccountDashboard({
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-2">
           <div className="@3xl/main:hidden">
-            <Select value={filter} onValueChange={choose}>
+            <Select
+              value={filter}
+              onValueChange={choose}
+              items={FILTERS.map(([key, label]) => ({
+                label: `${label} (${counts[key]})`,
+                value: key
+              }))}
+            >
               <SelectTrigger size="sm" className="w-40" aria-label="Show">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent position="popper">
+              <SelectContent alignItemWithTrigger={false}>
                 {FILTERS.map(([key, label]) => (
                   <SelectItem key={key} value={key}>
                     {label} ({counts[key]})
@@ -453,12 +469,12 @@ export function AccountDashboard({
           </Tabs>
           <div className="flex items-center gap-2">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="hidden @xl/main:flex">
-                  <Columns3 />
-                  Columns
-                  <ChevronDown />
-                </Button>
+              <DropdownMenuTrigger
+                render={<Button variant="outline" size="sm" className="hidden @xl/main:flex" />}
+              >
+                <Columns3 />
+                Columns
+                <ChevronDown />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
                 {table
@@ -475,12 +491,10 @@ export function AccountDashboard({
                   ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button asChild variant="outline" size="sm">
-              <Link href={submitHref}>
-                <Plus />
-                Submit a product
-              </Link>
-            </Button>
+            <Link href={submitHref} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              <Plus />
+              Submit a product
+            </Link>
           </div>
         </div>
         <DataTableView table={table} emptyLabel="Nothing here." />

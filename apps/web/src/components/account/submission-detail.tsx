@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { type ReactNode, useState } from 'react'
 import { toast } from 'sonner'
 import { ProductLogo, ToneAlert } from '@/components/submit/submit-ui'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -89,12 +89,10 @@ function planLabel(view: SubmissionDetailView): string {
 
 function MessageButton({ label = 'Message the reviewers' }: { label?: string }) {
   return (
-    <Button asChild variant="outline" size="sm">
-      <Link href={CONTACT}>
-        <MessageSquare />
-        {label}
-      </Link>
-    </Button>
+    <Link href={CONTACT} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+      <MessageSquare />
+      {label}
+    </Link>
   )
 }
 
@@ -403,9 +401,9 @@ export function SubmissionDetail({
     actions = (
       <>
         <MessageButton />
-        <Button asChild size="sm">
-          <Link href={submitAgain}>Submit again</Link>
-        </Button>
+        <Link href={submitAgain} className={buttonVariants({ size: 'sm' })}>
+          Submit again
+        </Link>
       </>
     )
     const day = formatDay(view.updatedAt)
@@ -442,9 +440,9 @@ export function SubmissionDetail({
     ) : (
       <>
         <MessageButton />
-        <Button asChild size="sm">
-          <Link href={submitAgain}>Edit and resubmit</Link>
-        </Button>
+        <Link href={submitAgain} className={buttonVariants({ size: 'sm' })}>
+          Edit and resubmit
+        </Link>
       </>
     )
     const reason = view.rejection?.reason ?? 'It wasn’t approved.'

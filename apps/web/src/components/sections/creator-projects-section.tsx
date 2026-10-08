@@ -2,6 +2,8 @@
 
 import { ExternalLink, Github, Star } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { cn } from '../../lib/utils'
+import type { buttonVariants as buttonVariantsType } from '../ui/button'
 
 interface Project {
   description: string
@@ -19,12 +21,8 @@ interface SectionProps {
   titleId?: string
 }
 
-interface ButtonProps {
-  asChild?: boolean
-  children: ReactNode
-  size?: 'sm'
-  variant?: 'outline'
-}
+/** The stock `buttonVariants`: links styled as buttons keep their link role. */
+type ButtonVariants = typeof buttonVariantsType
 
 interface BadgeProps {
   children: ReactNode
@@ -51,7 +49,7 @@ interface CreatorProjectsSectionProps {
   ) => void
   slots: {
     Badge: React.ComponentType<BadgeProps>
-    Button: React.ComponentType<ButtonProps>
+    buttonVariants: ButtonVariants
     Card: React.ComponentType<CardProps>
     CardContent: React.ComponentType<CardSectionProps>
     CardDescription: React.ComponentType<CardSectionProps>
@@ -91,8 +89,16 @@ const projects: Project[] = [
 ]
 
 export function CreatorProjectsSection({ onProjectClick, slots }: CreatorProjectsSectionProps) {
-  const { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Section } =
-    slots
+  const {
+    Badge,
+    buttonVariants,
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+    Section
+  } = slots
 
   return (
     <Section
@@ -136,35 +142,34 @@ export function CreatorProjectsSection({ onProjectClick, slots }: CreatorProject
 
               <CardContent className="mt-auto pt-0">
                 <div className="flex items-center gap-2">
-                  <Button size="sm" asChild>
+                  <a
+                    href={project.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      onProjectClick?.(project.name, project.url, 'visit-site')
+                    }}
+                    className={cn(buttonVariants({ size: 'sm' }), 'flex items-center gap-1.5')}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Visit Site
+                  </a>
+                  {project.githubUrl ? (
                     <a
-                      href={project.url}
+                      href={project.githubUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5"
                       onClick={() => {
-                        onProjectClick?.(project.name, project.url, 'visit-site')
+                        onProjectClick?.(project.name, project.githubUrl as string, 'github')
                       }}
+                      className={cn(
+                        buttonVariants({ variant: 'outline', size: 'sm' }),
+                        'flex items-center gap-1.5'
+                      )}
                     >
-                      <ExternalLink className="h-3 w-3" />
-                      Visit Site
+                      <Github className="h-3 w-3" />
+                      GitHub
                     </a>
-                  </Button>
-                  {project.githubUrl ? (
-                    <Button size="sm" variant="outline" asChild>
-                      <a
-                        href={project.githubUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5"
-                        onClick={() => {
-                          onProjectClick?.(project.name, project.githubUrl as string, 'github')
-                        }}
-                      >
-                        <Github className="h-3 w-3" />
-                        GitHub
-                      </a>
-                    </Button>
                   ) : null}
                 </div>
               </CardContent>
@@ -176,25 +181,23 @@ export function CreatorProjectsSection({ onProjectClick, slots }: CreatorProject
           <p className="mb-3 text-sm text-muted-foreground">
             Like these projects? Check out David&apos;s GitHub for more open-source contributions.
           </p>
-          <Button variant="outline" asChild>
-            <a
-              href="https://github.com/thedaviddias"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2"
-              onClick={() => {
-                onProjectClick?.(
-                  'David Dias Profile',
-                  'https://github.com/thedaviddias',
-                  'github',
-                  'follow-cta'
-                )
-              }}
-            >
-              <Github className="h-4 w-4" />
-              Follow on GitHub
-            </a>
-          </Button>
+          <a
+            href="https://github.com/thedaviddias"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              onProjectClick?.(
+                'David Dias Profile',
+                'https://github.com/thedaviddias',
+                'github',
+                'follow-cta'
+              )
+            }}
+            className={cn(buttonVariants({ variant: 'outline' }), 'flex items-center gap-2')}
+          >
+            <Github className="h-4 w-4" />
+            Follow on GitHub
+          </a>
         </div>
       </div>
     </Section>

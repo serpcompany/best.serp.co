@@ -1,6 +1,6 @@
 import { ArrowRight, BadgeCheck, EyeOff } from 'lucide-react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import {
   Empty,
   EmptyContent,
@@ -48,12 +48,10 @@ export function GoneListing({ listing }: { listing: UnpublishedListing }) {
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button variant="outline" asChild>
-            <Link href={categoryHref}>
-              Browse {listing.categoryName ?? 'products'}
-              <ArrowRight />
-            </Link>
-          </Button>
+          <Link href={categoryHref} className={buttonVariants({ variant: 'outline' })}>
+            Browse {listing.categoryName ?? 'products'}
+            <ArrowRight />
+          </Link>
         </EmptyContent>
       </Empty>
       <Item variant="muted">
@@ -65,9 +63,9 @@ export function GoneListing({ listing }: { listing: UnpublishedListing }) {
           <ItemDescription>Sign in to relist it on SERP.</ItemDescription>
         </ItemContent>
         <ItemActions>
-          <Button size="sm" asChild>
-            <Link href={getRoute('submit')}>Relist it</Link>
-          </Button>
+          <Link href={getRoute('submit')} className={buttonVariants({ size: 'sm' })}>
+            Relist it
+          </Link>
         </ItemActions>
       </Item>
     </section>

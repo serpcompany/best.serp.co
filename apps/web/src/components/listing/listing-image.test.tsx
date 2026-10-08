@@ -51,7 +51,7 @@ describe('ListingImage (#122)', () => {
     const markup = renderToStaticMarkup(
       <ListingImage kind="image" name="Acme" src={hosted.replace('/logo/', '/image/')} />
     )
-    expect(markup).toMatch(/padding-bottom:52\.5%/u)
+    expect(markup).toContain(`--ratio:${1200 / 630}`)
     const img = image(markup)
     expect(img.alt).toBe('Acme featured image')
     expect(img['data-listing-image']).toBe('image')

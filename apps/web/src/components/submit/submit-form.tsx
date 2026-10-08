@@ -14,7 +14,7 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -619,10 +619,12 @@ export function SubmitForm({
                   <Field data-invalid={errors.categorySlug ? true : undefined}>
                     <FieldLabel htmlFor="submit-category">Primary category</FieldLabel>
                     <Select
-                      value={categorySlug}
+                      value={categorySlug || null}
+                      items={categories.map(category => ({
+                        label: category.label,
+                        value: category.slug
+                      }))}
                       onValueChange={value => {
-                        // Radix's hidden form select reports '' when a restored value is set
-                        // before its options mount; that is never a choice.
                         if (!value) return
                         setCategorySlug(value)
                         clearError('categorySlug')
@@ -635,7 +637,7 @@ export function SubmitForm({
                       >
                         <SelectValue placeholder="Choose a category" />
                       </SelectTrigger>
-                      <SelectContent position="popper" className="max-h-80">
+                      <SelectContent alignItemWithTrigger={false} className="max-h-80">
                         {categories.map(category => (
                           <SelectItem key={category.slug} value={category.slug}>
                             {category.label}
@@ -854,12 +856,11 @@ function LogoField({
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             {found ? (
               <ToggleGroup
-                type="single"
                 variant="outline"
-                value={choice ?? ''}
+                value={choice ? [choice] : []}
                 aria-label="Logo source"
                 className="w-fit"
-                onValueChange={value => {
+                onValueChange={([value]: string[]) => {
                   if (value) onChoice(value as LogoChoice)
                 }}
               >
@@ -915,18 +916,19 @@ function AvailabilityNotice({
         title={`${listing.name} is already listed on SERP`}
         actions={
           <>
-            <Button asChild size="sm">
-              <Link href={`${listing.path}#claim`}>
-                <BadgeCheck />
-                Claim this listing
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <a href={listing.path} target="_blank" rel="noopener">
-                View listing
-                <ExternalLink />
-              </a>
-            </Button>
+            <Link href={`${listing.path}#claim`} className={buttonVariants({ size: 'sm' })}>
+              <BadgeCheck />
+              Claim this listing
+            </Link>
+            <a
+              href={listing.path}
+              target="_blank"
+              rel="noopener"
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              View listing
+              <ExternalLink />
+            </a>
           </>
         }
       >
@@ -964,12 +966,10 @@ function AvailabilityNotice({
           tone="info"
           title={`You already submitted ${availability.slug}`}
           actions={
-            <Button asChild size="sm">
-              <Link href={availability.mine.nextPath}>
-                Open submission
-                <ArrowRight />
-              </Link>
-            </Button>
+            <Link href={availability.mine.nextPath} className={buttonVariants({ size: 'sm' })}>
+              Open submission
+              <ArrowRight />
+            </Link>
           }
         >
           <p>{waiting}</p>
@@ -981,12 +981,10 @@ function AvailabilityNotice({
         tone="warning"
         title={`${availability.slug} is already in review`}
         actions={
-          <Button asChild size="sm" variant="outline">
-            <Link href="/contact/">
-              <MessageSquare />
-              Message us
-            </Link>
-          </Button>
+          <Link href="/contact/" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            <MessageSquare />
+            Message us
+          </Link>
         }
       >
         <p>
@@ -1003,12 +1001,10 @@ function AvailabilityNotice({
         icon={Ban}
         title={`${availability.slug} can’t be submitted`}
         actions={
-          <Button asChild size="sm" variant="outline">
-            <Link href="/contact/">
-              <MessageSquare />
-              Message us
-            </Link>
-          </Button>
+          <Link href="/contact/" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            <MessageSquare />
+            Message us
+          </Link>
         }
       >
         <p>

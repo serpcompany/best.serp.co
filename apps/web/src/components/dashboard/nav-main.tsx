@@ -82,14 +82,12 @@ export function NavMain({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  asChild
                   tooltip={quickAction.title}
                   className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
+                  render={<Link href={quickAction.href} onClick={close} />}
                 >
-                  <Link href={quickAction.href} onClick={close}>
-                    {quickAction.icon ? <quickAction.icon /> : null}
-                    <span>{quickAction.title}</span>
-                  </Link>
+                  {quickAction.icon ? <quickAction.icon /> : null}
+                  <span>{quickAction.title}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -110,28 +108,30 @@ export function NavMain({
               return (
                 <SidebarMenuItem key={item.title}>
                   {item.href ? (
-                    <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
-                      <Link
-                        href={item.href}
-                        aria-current={active ? 'page' : undefined}
-                        onClick={close}
-                      >
-                        {item.icon ? <item.icon /> : null}
-                        <span>{item.title}</span>
-                      </Link>
+                    <SidebarMenuButton
+                      isActive={active}
+                      tooltip={item.title}
+                      render={
+                        <Link
+                          href={item.href}
+                          aria-current={active ? 'page' : undefined}
+                          onClick={close}
+                        />
+                      }
+                    >
+                      {item.icon ? <item.icon /> : null}
+                      <span>{item.title}</span>
                     </SidebarMenuButton>
                   ) : (
                     <SidebarMenuButton
-                      asChild
                       tooltip={`${item.title}: coming soon`}
                       className="cursor-default hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground"
+                      render={<span />}
                     >
+                      {item.icon ? <item.icon /> : null}
                       <span>
-                        {item.icon ? <item.icon /> : null}
-                        <span>
-                          {item.title}
-                          <span className="sr-only"> (coming soon)</span>
-                        </span>
+                        {item.title}
+                        <span className="sr-only"> (coming soon)</span>
                       </span>
                     </SidebarMenuButton>
                   )}
