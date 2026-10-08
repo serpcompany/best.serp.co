@@ -1,5 +1,5 @@
-import { createTaxonomiesSitemapResponse } from '@/lib/seo/sitemaps'
 import { getWebsites } from '@/lib/content-loader'
+import { createTaxonomiesSitemapResponse } from '@/lib/seo/sitemaps'
 
 export const dynamic = 'force-dynamic'
 

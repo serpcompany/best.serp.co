@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import type { WebsiteBrowseCardMetadata, WebsiteRelatedCardMetadata } from '../../lib/directory/content-query'
+import type {
+  WebsiteBrowseCardMetadata,
+  WebsiteRelatedCardMetadata
+} from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import { siteCopy } from '../../lib/site/site-copy'
 

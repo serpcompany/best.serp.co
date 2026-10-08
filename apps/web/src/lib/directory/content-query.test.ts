@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { siteConfig } from '../site/site-config'
 import {
   applyLegalContentBranding,
   buildWebsiteLookupIndex,
@@ -10,7 +11,6 @@ import {
   toWebsiteBrowseCardMetadata,
   type WebsiteMetadata
 } from './content-query'
-import { siteConfig } from '../site/site-config'
 
 const websites: WebsiteMetadata[] = [
   {
@@ -277,7 +277,9 @@ describe('applyLegalContentBranding', () => {
     ).toBe('Best SERP operates Best SERP.')
   })
 
-  const legalDirectory = fileURLToPath(new URL('../../../../../packages/content/data/legal/', import.meta.url))
+  const legalDirectory = fileURLToPath(
+    new URL('../../../../../packages/content/data/legal/', import.meta.url)
+  )
   const legalFiles = readdirSync(legalDirectory).filter(file => file.endsWith('.mdx'))
   // /legal/cookies/ still names placeholder example.com addresses, as best.serp.co does today
   // (serpcompany/best.serp.co#42, T-3). Nothing else may name an address off the legal domain.

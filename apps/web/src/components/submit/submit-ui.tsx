@@ -4,7 +4,6 @@ import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-syste
 import { Badge } from '@serpdirectory/design-system/badge'
 import { cn } from '@serpdirectory/design-system/lib/utils'
 import { Progress } from '@serpdirectory/design-system/progress'
-import { ListingImage } from '@/components/ui/listing-image'
 import {
   CircleAlert,
   CircleCheck,
@@ -18,6 +17,7 @@ import {
   Undo2
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { ListingImage } from '@/components/ui/listing-image'
 import type { SubmissionStatusName } from '@/lib/submissions/contract'
 
 /**

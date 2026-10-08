@@ -1,8 +1,8 @@
 import { getCategoryDisplayName } from '../directory/category-display'
 import { shouldUseProvidedListingLogo } from '../directory/listing-logo-presentation'
 import { getCanonicalListingListRoute, getRoute } from '../routing/routes'
-import { SITE_LOGO_URL, SITE_NAME, SITE_PUBLIC_URL, SITE_URL, SITE_WEBSITE_ID } from './seo-config'
 import { siteCopy } from '../site/site-copy'
+import { SITE_LOGO_URL, SITE_NAME, SITE_PUBLIC_URL, SITE_URL, SITE_WEBSITE_ID } from './seo-config'
 
 export interface SchemaOrg {
   '@context': 'https://schema.org'

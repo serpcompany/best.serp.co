@@ -7,17 +7,17 @@ import {
   DirectoryNavigationSection,
   directoryNavigationInteractiveClassName
 } from '@serpdirectory/design-system/shadcnblocks/directory-navigation'
-import { resolveCategories } from '../../lib/directory/categories'
-import { getCategoryDisplayName } from '../../lib/directory/category-display'
-import { externalResources } from '../../lib/site/external-resources'
-import { getRoute } from '../../lib/routing/routes'
-import { siteConfig } from '../../lib/site/site-config'
-import { siteCopy } from '../../lib/site/site-copy'
 import { ExternalLink, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { type ReactNode, useEffect, useRef } from 'react'
 import { withDubVia } from '../../lib/analytics/dub-via'
+import { resolveCategories } from '../../lib/directory/categories'
+import { getCategoryDisplayName } from '../../lib/directory/category-display'
+import { getRoute } from '../../lib/routing/routes'
+import { externalResources } from '../../lib/site/external-resources'
+import { siteConfig } from '../../lib/site/site-config'
+import { siteCopy } from '../../lib/site/site-copy'
 import { FavoritesLink } from '../ui/favorites-link'
 import type { HeaderAuthState } from './header-auth-state'
 

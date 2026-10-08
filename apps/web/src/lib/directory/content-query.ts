@@ -1,5 +1,5 @@
-import { getListingCategories } from './category-navigation'
 import type { WebsiteMedia, WebsitePriority, WebsiteResourceLink } from '../seo/website-schema'
+import { getListingCategories } from './category-navigation'
 
 export interface ContentMeta {
   filePath: string

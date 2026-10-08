@@ -1,7 +1,7 @@
-import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import type { Metadata } from 'next'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { AdminsManager } from '@/components/admin/admins-manager'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'
 

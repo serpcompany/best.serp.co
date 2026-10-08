@@ -1,8 +1,8 @@
-import { siteConfig } from '@/lib/site/site-config'
 import {
   getFeaturedOnBadgeListingUrl,
   getFeaturedOnBadgePublicUrlFromKey
 } from '@/components/website/featured-on-badge-url'
+import { siteConfig } from '@/lib/site/site-config'
 
 export function submissionBadgeTargets(slug: string) {
   const featuredOn = siteConfig.badges.featuredOn

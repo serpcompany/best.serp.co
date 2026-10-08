@@ -6,10 +6,10 @@
  * stubbed: the Cloudflare env and the request headers the layout reads.
  */
 import { readFileSync } from 'node:fs'
-import { RootAppShell } from '@/components/layout/root-shell'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { RootAppShell } from '@/components/layout/root-shell'
 import { EDGE_CACHE_HEADER, withEdgeCache } from '../edge-cache/html-cache'
 import { handleWorkerRequest, type WorkerRequestEnv } from '../worker/handle-request'
 import { analyticsForRequest } from './request-environment'

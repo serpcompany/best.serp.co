@@ -4,8 +4,8 @@ import {
   DirectoryApplicationMobileSearchPanel,
   DirectoryApplicationSearchColumn
 } from '@serpdirectory/design-system/shadcnblocks/directory-application-shell'
-import { siteCopy } from '../../lib/site/site-copy'
 import { useRef } from 'react'
+import { siteCopy } from '../../lib/site/site-copy'
 import { SearchAutocomplete } from '../search/search-autocomplete'
 import { SearchInput } from '../search/search-input'
 

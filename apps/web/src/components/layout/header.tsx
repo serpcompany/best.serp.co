@@ -7,18 +7,18 @@ import {
   DirectoryApplicationHeaderGroup,
   DirectoryApplicationNav
 } from '@serpdirectory/design-system/shadcnblocks/directory-application-shell'
-import { getRoute } from '../../lib/routing/routes'
-import { siteConfig } from '../../lib/site/site-config'
-import { siteCopy } from '../../lib/site/site-copy'
 import { Menu, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from 'react'
 import { useSearch } from '../../hooks/use-search'
-import { useAnalyticsEvents } from './root-shell-client'
+import { getRoute } from '../../lib/routing/routes'
+import { siteConfig } from '../../lib/site/site-config'
+import { siteCopy } from '../../lib/site/site-copy'
 import type { HeaderAuthState } from './header-auth-state'
 import { NavLink } from './header-nav-link'
 import { DesktopSearchForm, MobileSearchOverlay } from './header-search'
 import { MobileDrawer } from './mobile-drawer'
+import { useAnalyticsEvents } from './root-shell-client'
 
 /**
  * Main header component with navigation, search, and user actions

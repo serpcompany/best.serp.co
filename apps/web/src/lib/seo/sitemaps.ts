@@ -18,11 +18,11 @@ import {
   sitemapRoutePaths
 } from '@serpdirectory/site-config'
 import type { MetadataRoute } from 'next'
-import { absoluteUrl } from './canonical-url'
 import { getActiveCategories } from '../directory/category-navigation'
 import { getRoute } from '../routing/routes'
-import { SITE_PUBLIC_URL } from './seo-config'
 import { siteConfig } from '../site/site-config'
+import { absoluteUrl } from './canonical-url'
+import { SITE_PUBLIC_URL } from './seo-config'
 
 type WebsiteSitemapEntry = {
   categories?: string[]

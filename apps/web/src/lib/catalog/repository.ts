@@ -17,8 +17,8 @@ import {
   resolveListingMedia,
   validateMediaBaseUrl
 } from '@serpdirectory/data-ops/media-keys'
-import type { WebsiteDetailMetadata, WebsiteMetadata } from '@/lib/directory/content-query'
 import { cache } from 'react'
+import type { WebsiteDetailMetadata, WebsiteMetadata } from '@/lib/directory/content-query'
 
 export type { ListingNamePage, PublishedCategory, UnpublishedListing }
 /** Largest `limit` search and autocomplete honor (`/api/search` clamps to it). */

@@ -24,13 +24,13 @@ import {
   InputOTPSlot
 } from '@serpdirectory/design-system/input-otp'
 import { Spinner } from '@serpdirectory/design-system/spinner'
-import { getRoute } from '@/lib/routing/routes'
 import { ArrowRight, CircleX, Clock, Info } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { readLocalDraft } from '@/components/submit/draft-storage'
 import { callbackDestination } from '@/lib/auth/callback-url'
+import { getRoute } from '@/lib/routing/routes'
 import { hostOf } from '@/lib/submissions/contract'
 import {
   CODE_ATTEMPTS,

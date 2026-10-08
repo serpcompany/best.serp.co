@@ -1,18 +1,6 @@
 'use client'
 
 import { Button } from '@serpdirectory/design-system/button'
-import { AppShell } from '@/components/dashboard/app-shell'
-import {
-  type DashboardNavItem,
-  isNavItemActive,
-  NavMain
-} from '@/components/dashboard/nav-main'
-import { NavSecondary } from '@/components/dashboard/nav-secondary'
-import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
-import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
-import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
-import { ModeToggle } from '@/components/layout/mode-toggle'
-import { getRoute } from '@/lib/routing/routes'
 import {
   Box,
   ExternalLink,
@@ -26,6 +14,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { signOut } from '@/components/auth/sign-in-api'
+import { AppShell } from '@/components/dashboard/app-shell'
+import { type DashboardNavItem, isNavItemActive, NavMain } from '@/components/dashboard/nav-main'
+import { NavSecondary } from '@/components/dashboard/nav-secondary'
+import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
+import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
+import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
+import { ModeToggle } from '@/components/layout/mode-toggle'
+import { getRoute } from '@/lib/routing/routes'
 
 /**
  * The account dashboard shell from the #70 mockups (screens 5 to 7): shadcn dashboard-01, built

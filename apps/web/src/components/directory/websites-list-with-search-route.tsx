@@ -1,10 +1,10 @@
 'use client'
 
-import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
-import { EmptyState } from './empty-state'
 import { useFavoritesFilter } from '../../hooks/use-favorites-filter'
-import { LLMGrid } from '../llm/llm-grid'
+import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { useAnalyticsEvents } from '../layout/root-shell-client'
+import { LLMGrid } from '../llm/llm-grid'
+import { EmptyState } from './empty-state'
 import { WebsitesListWithSearch as SharedWebsitesListWithSearch } from './websites-list-with-search'
 import { WebsitesSearchControls } from './websites-search-controls'
 

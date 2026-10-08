@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { withDubVia } from './dub-via'
 import { siteConfig } from '../site/site-config'
+import { withDubVia } from './dub-via'
 
 describe('withDubVia (#169)', () => {
   it.each([

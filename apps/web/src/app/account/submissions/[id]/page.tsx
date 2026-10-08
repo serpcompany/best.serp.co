@@ -1,5 +1,3 @@
-import { getRoute } from '@/lib/routing/routes'
-import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import type { ReactElement } from 'react'
@@ -13,6 +11,8 @@ import { accountStatusOf, categoryChoices, isWithdrawable } from '@/lib/account/
 import { getActiveCategories } from '@/lib/catalog/repository'
 import { featureCopy } from '@/lib/feature-copy'
 import { features } from '@/lib/features'
+import { getRoute } from '@/lib/routing/routes'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
 export const metadata: Metadata = generateBaseMetadata({
   title: 'Submission',

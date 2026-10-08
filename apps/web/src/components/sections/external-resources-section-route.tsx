@@ -1,18 +1,10 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import {
-  ExternalResourcesSection as SharedExternalResourcesSection,
   type ExternalResourcesSectionProps,
+  ExternalResourcesSection as SharedExternalResourcesSection
 } from './external-resources-section'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '../ui/card'
 
-export function ExternalResourcesSectionRoute(
-  props: Omit<ExternalResourcesSectionProps, 'slots'>
-) {
+export function ExternalResourcesSectionRoute(props: Omit<ExternalResourcesSectionProps, 'slots'>) {
   return (
     <SharedExternalResourcesSection
       {...props}

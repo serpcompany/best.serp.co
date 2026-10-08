@@ -7,8 +7,8 @@ import { SITEMAP_INDEX_PATH, sitemapPaths, siteRoutes } from '@serpdirectory/sit
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { canonicalPathname } from './canonical-url'
 import { Footer } from '../../components/layout/footer'
+import { canonicalPathname } from './canonical-url'
 import { generateBaseMetadata, registeredRoute } from './seo-config'
 import {
   createCanonicalRobots,

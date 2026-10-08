@@ -1,8 +1,8 @@
 import 'server-only'
 
+import { headers } from 'next/headers'
 import type { HeaderAuthState } from '@/components/layout/header-auth-state'
 import { siteConfig } from '@/lib/site/site-config'
-import { headers } from 'next/headers'
 import { hasSessionCookie } from './cookies'
 
 /**

@@ -1,6 +1,6 @@
-import type { Category } from './categories'
 import { siteConfig } from '../site/site-config'
 import { siteCopy } from '../site/site-copy'
+import type { Category } from './categories'
 
 interface CategorySEOConfig {
   metaTitle: string

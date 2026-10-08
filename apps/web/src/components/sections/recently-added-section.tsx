@@ -1,5 +1,8 @@
 import type { ComponentType, ReactNode } from 'react'
-import type { WebsiteBrowseCardMetadata, WebsiteRelatedCardMetadata } from '../../lib/directory/content-query'
+import type {
+  WebsiteBrowseCardMetadata,
+  WebsiteRelatedCardMetadata
+} from '../../lib/directory/content-query'
 import { siteConfig } from '../../lib/site/site-config'
 
 type SectionProps = {

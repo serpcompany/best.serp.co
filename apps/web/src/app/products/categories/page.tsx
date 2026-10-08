@@ -1,14 +1,10 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
-import { getRoute } from '@/lib/routing/routes'
-import {
-  generateBaseMetadata,
-  SITE_NAME,
-  SITE_PUBLIC_URL
-} from '@/lib/seo/seo-config'
-import { siteCopy } from '@/lib/site/site-copy'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getActiveCategories } from '@/lib/catalog/repository'
+import { getRoute } from '@/lib/routing/routes'
+import { generateBaseMetadata, SITE_NAME, SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
+import { siteCopy } from '@/lib/site/site-copy'
 
 const categoriesPath = getRoute('category.index')
 

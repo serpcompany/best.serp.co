@@ -1,9 +1,9 @@
-import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import type { Metadata } from 'next'
 import type { ReactElement } from 'react'
 import { AccountTablePage, accountTableRows } from '@/components/account/account-table-page'
 import { getAccountOverview } from '@/lib/account/overview'
 import { requireAccountUser } from '@/lib/account/pages'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
 export const metadata: Metadata = generateBaseMetadata({
   title: 'Listings',

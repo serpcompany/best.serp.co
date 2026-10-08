@@ -1,8 +1,8 @@
+import type { Metadata } from 'next'
+import Link from 'next/link'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { siteConfig } from '@/lib/site/site-config'
-import type { Metadata } from 'next'
-import Link from 'next/link'
 
 export const metadata: Metadata = generateBaseMetadata({
   title: `${siteConfig.name} Pricing`,

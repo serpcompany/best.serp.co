@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { inflateSync } from 'node:zlib'
-import { DEFAULT_SITE_LISTING_LOGO_FALLBACK_PATH } from '../apps/web/src/lib/directory/listing-logo-presentation'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_SITE_LISTING_LOGO_FALLBACK_PATH } from '../apps/web/src/lib/directory/listing-logo-presentation'
 import { project } from './project'
 
 const PNG_SIGNATURE = '89504e470d0a1a0a'

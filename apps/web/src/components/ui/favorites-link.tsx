@@ -1,10 +1,10 @@
 'use client'
 
 import { cn } from '@serpdirectory/design-system/lib/utils'
-import { getRoute } from '../../lib/routing/routes'
 import { Heart } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { getRoute } from '../../lib/routing/routes'
 import { useFavorites } from '../layout/root-shell-client'
 
 interface FavoritesLinkProps {

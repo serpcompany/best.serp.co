@@ -1,21 +1,17 @@
 'use client'
 
 import { Button } from '@serpdirectory/design-system/button'
+import { Box, CircleUser, ExternalLink, Inbox, Receipt, Users } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
+import { signOut } from '@/components/auth/sign-in-api'
 import { AppShell } from '@/components/dashboard/app-shell'
-import {
-  type DashboardNavItem,
-  isNavItemActive,
-  NavMain
-} from '@/components/dashboard/nav-main'
+import { type DashboardNavItem, isNavItemActive, NavMain } from '@/components/dashboard/nav-main'
 import { NavSecondary } from '@/components/dashboard/nav-secondary'
 import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
 import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
 import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
 import { ModeToggle } from '@/components/layout/mode-toggle'
-import { Box, CircleUser, ExternalLink, Inbox, Receipt, Users } from 'lucide-react'
-import { usePathname } from 'next/navigation'
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
-import { signOut } from '@/components/auth/sign-in-api'
 
 /**
  * The admin shell (#64): shadcn sidebar-07 (`collapsible="icon"` with a rail, the logo tile,

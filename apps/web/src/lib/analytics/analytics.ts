@@ -119,9 +119,10 @@ interface EventProps {
 }
 
 function pushToDataLayer(event: string, props?: EventProps): void {
-  const windowWithDataLayer = window as Window & typeof globalThis & {
-    dataLayer?: DataLayerEvent[]
-  }
+  const windowWithDataLayer = window as Window &
+    typeof globalThis & {
+      dataLayer?: DataLayerEvent[]
+    }
   const payload: DataLayerEvent = { event }
 
   if (props) {

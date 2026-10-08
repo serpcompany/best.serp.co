@@ -45,7 +45,6 @@ import { RadioGroup, RadioGroupItem } from '@serpdirectory/design-system/radio-g
 import { Separator } from '@serpdirectory/design-system/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@serpdirectory/design-system/tooltip'
 import { useIsMobile } from '@serpdirectory/design-system/use-mobile'
-import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { ArrowRight, BadgeCheck, Copy, MessageSquare, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -53,6 +52,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { formatWait } from '@/components/auth/sign-in-api'
 import { type BadgeOutcome, badgeCheckResultAlert } from '@/components/submit/badge-step'
 import { call } from '@/components/submit/submit-api'
+import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 
 /**
  * Claiming a listing (serpcompany/best.serp.co#67, #70 screens 8 and 9a): the sidebar's "Claim

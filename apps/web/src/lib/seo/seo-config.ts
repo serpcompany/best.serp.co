@@ -1,6 +1,5 @@
 import { type SiteRoute, siteRoutes } from '@serpdirectory/site-config'
 import type { Metadata } from 'next'
-import { absoluteUrl, canonicalPathname } from './canonical-url'
 import { getRoute } from '../routing/routes'
 import {
   getConfiguredSocialLinks,
@@ -10,6 +9,7 @@ import {
 } from '../site/site-config'
 import { siteContent } from '../site/site-content'
 import { siteCopy } from '../site/site-copy'
+import { absoluteUrl, canonicalPathname } from './canonical-url'
 
 export const SITE_NAME = siteConfig.name
 export const SITE_TAGLINE = siteConfig.tagline

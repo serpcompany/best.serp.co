@@ -1,5 +1,5 @@
-import { CategoryWebsitesList as SharedCategoryWebsitesList } from './category-websites-list'
 import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
+import { CategoryWebsitesList as SharedCategoryWebsitesList } from './category-websites-list'
 import { WebsitesListWithSortRoute } from './websites-list-with-sort-route'
 
 interface CategoryWebsitesListRouteProps {

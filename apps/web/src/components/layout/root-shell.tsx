@@ -2,13 +2,6 @@ import { DesignSystemProvider } from '@serpdirectory/design-system/theme-provide
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import {
-  AnalyticsTracker,
-  BackToTop,
-  FavoritesProvider,
-  GoogleTagManagerNoScript,
-  GoogleTagManagerScript
-} from './root-shell-client'
-import {
   SITE_APPLE_TOUCH_ICON_URL,
   SITE_DESCRIPTION,
   SITE_FAVICON_URL,
@@ -16,6 +9,13 @@ import {
   SITE_TAGLINE,
   SITE_URL
 } from '../../lib/seo/seo-config'
+import {
+  AnalyticsTracker,
+  BackToTop,
+  FavoritesProvider,
+  GoogleTagManagerNoScript,
+  GoogleTagManagerScript
+} from './root-shell-client'
 
 export const rootLayoutMetadata: Metadata = {
   title: {

@@ -8,11 +8,11 @@ import {
 } from '@serpdirectory/design-system/shadcnblocks/directory-navigation'
 import { ExternalLink } from 'lucide-react'
 import Link from 'next/link'
+import { withDubVia } from '../../lib/analytics/dub-via'
 import { resolveCategories } from '../../lib/directory/categories'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
-import { withDubVia } from '../../lib/analytics/dub-via'
-import { externalResources } from '../../lib/site/external-resources'
 import { getRoute } from '../../lib/routing/routes'
+import { externalResources } from '../../lib/site/external-resources'
 import { siteConfig } from '../../lib/site/site-config'
 import { FavoritesLink } from '../ui/favorites-link'
 

@@ -10,16 +10,16 @@ import {
   SiYoutube
 } from '@icons-pack/react-simple-icons'
 import { siteRoutes } from '@serpdirectory/site-config'
-import { getRoute } from '../../lib/routing/routes'
-import { hasConfiguredPublicSocialLinks, siteConfig } from '../../lib/site/site-config'
-import { siteContent } from '../../lib/site/site-content'
-import { siteCopy } from '../../lib/site/site-copy'
 import { Linkedin } from 'lucide-react'
 import Link from 'next/link'
 import type { ComponentType } from 'react'
 import { withDubVia } from '../../lib/analytics/dub-via'
-import { ModeToggle } from './mode-toggle'
+import { getRoute } from '../../lib/routing/routes'
+import { hasConfiguredPublicSocialLinks, siteConfig } from '../../lib/site/site-config'
+import { siteContent } from '../../lib/site/site-content'
+import { siteCopy } from '../../lib/site/site-copy'
 import { resolveFooterBadgeConfigs } from './footer-badges'
+import { ModeToggle } from './mode-toggle'
 
 type FooterLink = {
   href: string

@@ -8,9 +8,7 @@ import {
   type WebsiteBrowseCardMetadata,
   type WebsiteMetadata
 } from '../../lib/directory/content-query'
-import { AppSidebar } from '../layout/app-sidebar'
 import { getRoute } from '../../lib/routing/routes'
-import { NewsletterSection } from '../sections/newsletter-section'
 import {
   composeMetaDescription,
   generateDynamicMetadata,
@@ -21,6 +19,8 @@ import {
 } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
+import { AppSidebar } from '../layout/app-sidebar'
+import { NewsletterSection } from '../sections/newsletter-section'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
 
 type JsonLdProps = {

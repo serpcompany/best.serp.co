@@ -25,12 +25,12 @@ import {
   TableRow
 } from '@serpdirectory/design-system/table'
 import { useIsMobile } from '@serpdirectory/design-system/use-mobile'
-import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { ChevronsUpDown, Copy, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ToneAlert } from '@/components/submit/submit-ui'
+import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { formatFull, formatWhen } from '@/lib/account/format'
 import { type AccountRow, badgeResultLabel } from '@/lib/account/view'
 import { hostOf, VERIFICATION_COOLDOWN_SECONDS } from '@/lib/submissions/contract'

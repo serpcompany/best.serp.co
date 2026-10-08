@@ -1,7 +1,7 @@
-import { canonicalPathname } from '@/lib/seo/canonical-url'
-import { getRoute } from '@/lib/routing/routes'
 import { buildCustomRoute } from 'next/dist/lib/build-custom-route'
 import { describe, expect, it } from 'vitest'
+import { getRoute } from '@/lib/routing/routes'
+import { canonicalPathname } from '@/lib/seo/canonical-url'
 import { LEGAL_CANONICAL, movedUrlRedirects } from './redirects'
 import { configRedirectPatterns, trailingSlashRedirect } from './trailing-slash'
 

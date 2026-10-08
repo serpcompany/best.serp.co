@@ -1,12 +1,9 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
-import { components } from '@/components/content/mdx-components'
-import { getRoute } from '@/lib/routing/routes'
-import {
-  generateLegalPageMetadata,
-  LegalStaticPage
-} from '@/components/static-pages/legal-page'
 import type { Metadata } from 'next'
+import { components } from '@/components/content/mdx-components'
+import { generateLegalPageMetadata, LegalStaticPage } from '@/components/static-pages/legal-page'
 import { getLegalContent } from '@/lib/content-loader'
+import { getRoute } from '@/lib/routing/routes'
 
 export const metadata: Metadata = generateLegalPageMetadata({
   title: 'Privacy Policy',

@@ -6,14 +6,19 @@ import {
   type WebsiteBrowseCardMetadata,
   type WebsiteMetadata
 } from '../../lib/directory/content-query'
-import { AppSidebar } from '../layout/app-sidebar'
-import { type ListingPageInfo, ListingPagination } from '../directory/listing-pagination'
 import { getRoute } from '../../lib/routing/routes'
-import { HeroSection } from '../sections/hero-section'
-import { NewsletterSection } from '../sections/newsletter-section'
-import { generateBaseMetadata, generateWebsiteSchema, KEYWORDS, siteUrl } from '../../lib/seo/seo-config'
+import {
+  generateBaseMetadata,
+  generateWebsiteSchema,
+  KEYWORDS,
+  siteUrl
+} from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
+import { type ListingPageInfo, ListingPagination } from '../directory/listing-pagination'
+import { AppSidebar } from '../layout/app-sidebar'
+import { HeroSection } from '../sections/hero-section'
+import { NewsletterSection } from '../sections/newsletter-section'
 
 /** One page of the directory, already in directory (name) order. */
 export interface DirectoryPage extends ListingPageInfo {

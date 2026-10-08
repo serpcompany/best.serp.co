@@ -1,22 +1,19 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
-import { getCategoryIcon } from '@/lib/directory/categories'
+import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import {
   CategoryRoutePage,
   generateCategoryRouteMetadata
 } from '@/components/category-routes/category-page'
 import { CategoryWebsitesListRoute as CategoryWebsitesList } from '@/components/directory/category-websites-list-route'
-import { JsonLd } from '@/components/seo/json-ld'
 import {
   ListingPagination,
   paginatedMetadata,
   parseListingPageParam
 } from '@/components/directory/listing-pagination'
-import { getRoute } from '@/lib/routing/routes'
 import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@/components/sections/external-resources-section-route'
 import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@/components/sections/featured-guides-section-route'
-import { SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
-import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
+import { JsonLd } from '@/components/seo/json-ld'
 import {
   getActiveCategories,
   getCategoryBySlug,
@@ -24,6 +21,9 @@ import {
   type PublishedCategory
 } from '@/lib/catalog/repository'
 import { getGuides } from '@/lib/content-loader'
+import { getCategoryIcon } from '@/lib/directory/categories'
+import { getRoute } from '@/lib/routing/routes'
+import { SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>

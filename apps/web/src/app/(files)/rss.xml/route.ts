@@ -1,3 +1,4 @@
+import { getWebsites, type WebsiteMetadata } from '@/lib/content-loader'
 import { getRoute } from '@/lib/routing/routes'
 import {
   SITE_APPLE_TOUCH_ICON_URL,
@@ -6,7 +7,6 @@ import {
   SITE_PUBLIC_URL
 } from '@/lib/seo/seo-config'
 import { siteCopy } from '@/lib/site/site-copy'
-import { getWebsites, type WebsiteMetadata } from '@/lib/content-loader'
 
 const baseUrl = SITE_PUBLIC_URL
 

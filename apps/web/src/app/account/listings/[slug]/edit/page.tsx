@@ -1,5 +1,3 @@
-import { getRoute } from '@/lib/routing/routes'
-import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import type { ReactElement } from 'react'
@@ -10,6 +8,8 @@ import { accountOperations } from '@/lib/account/runtime'
 import { categoryChoices } from '@/lib/account/view'
 import { getActiveCategories } from '@/lib/catalog/repository'
 import { featureCopy } from '@/lib/feature-copy'
+import { getRoute } from '@/lib/routing/routes'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
 export const metadata: Metadata = generateBaseMetadata({
   title: 'Edit listing',

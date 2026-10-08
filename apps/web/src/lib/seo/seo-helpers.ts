@@ -1,5 +1,5 @@
-import { SITE_NAME } from './seo-config'
 import { siteCopy } from '../site/site-copy'
+import { SITE_NAME } from './seo-config'
 
 export function generateAltText(
   type: 'favicon' | 'avatar' | 'logo' | 'website',

@@ -1,4 +1,3 @@
-import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import type { ReactElement } from 'react'
@@ -6,6 +5,7 @@ import { AccountTablePage, accountTableRows } from '@/components/account/account
 import { getAccountOverview } from '@/lib/account/overview'
 import { requireAccountUser } from '@/lib/account/pages'
 import { ACCOUNT_ID } from '@/lib/account/requests'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
 export const metadata: Metadata = generateBaseMetadata({
   title: 'Listing',
