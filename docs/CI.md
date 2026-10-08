@@ -15,8 +15,13 @@ One workflow, `web.yml` (#182), checks pull requests into `staging` (the base br
 - `check` runs `pnpm check`. On a push the staging deploy (or Deploy Production) builds the
   Worker, so `check` skips its build there (`HARNESS_SKIP_BUILD=1`): each commit builds once.
 - `e2e` runs Playwright and uploads a `passed-e2e-<tree>` receipt. A push whose tree a pull
-  request already tested finds the receipt and skips the suite; a lookup error runs it. Draft
-  pull requests skip `e2e` until they are marked ready for review.
+  request already tested finds the receipt and skips the suite; a lookup error runs it. On a
+  draft pull request `e2e` fails in its first step ("draft: mark ready to run e2e") rather than
+  skipping, since a skipped required job passes: a draft force-pushed and then marked ready
+  showed CLEAN with no E2E when the concurrency group cancelled the `ready_for_review` run and
+  the surviving `synchronize` run skipped it (#246). The step reads the run's event, so a re-run
+  of a run that started on a draft fails again; push a commit, or convert the pull request to
+  draft and mark it ready again.
 - `tip` runs on a push or dispatch on `staging` once `check` and `e2e` pass, and starts
   `deploy-staging` only if the commit is still the `staging` head, so an older commit (a re-run)
   doesn't build for nothing. A failed lookup fails the job.
