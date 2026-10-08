@@ -6,7 +6,9 @@ import { project } from './project'
 type WorkerConfig = { keep_names?: boolean; name?: string }
 type WranglerConfig = WorkerConfig & { env: Record<'production' | 'staging', WorkerConfig> }
 
-const config = JSON.parse(readFileSync(resolve(project.wranglerConfigPath), 'utf8')) as WranglerConfig
+const config = JSON.parse(
+  readFileSync(resolve(project.wranglerConfigPath), 'utf8')
+) as WranglerConfig
 // Named environments inherit nothing they don't repeat, so every check covers all three.
 const environments: Array<[string, WorkerConfig]> = [
   ['local (top level)', config],
