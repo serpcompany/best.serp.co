@@ -10,6 +10,7 @@ import { ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import { resolveCategories } from '../categories'
 import { getCategoryDisplayName } from '../category-display'
+import { withDubVia } from '../dub-via'
 import { externalResources } from '../external-resources'
 import { getRoute } from '../routes'
 import { siteConfig } from '../site-config'
@@ -64,7 +65,7 @@ export function AppSidebar({ availableCategorySlugs, currentCategory }: AppSideb
               {externalResources.map(resource => (
                 <Link
                   key={resource.slug}
-                  href={resource.url}
+                  href={withDubVia(resource.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={directoryNavigationInteractiveClassName}
