@@ -9,6 +9,7 @@ import {
   SiX,
   SiYoutube
 } from '@icons-pack/react-simple-icons'
+import { siteRoutes } from '@serpdirectory/site-config'
 import { getRoute } from '@serpdirectory/web-core/routes'
 import { hasConfiguredPublicSocialLinks, siteConfig } from '@serpdirectory/web-core/site-config'
 import { siteContent } from '@serpdirectory/web-core/site-content'
@@ -107,12 +108,11 @@ function getFooterSocialLinks(): SocialLink[] {
   return Array.from(socialLinks.values())
 }
 
+/** Whether the route registry has the page, so the footer links only pages that exist. */
 function hasStaticPagePath(path: string): boolean {
-  const normalizedPath = `/${path.replace(/^\/+|\/+$/g, '')}`
+  const normalizedPath = `/${path.replace(/^\/+|\/+$/g, '')}/`.replace(/^\/\/$/u, '/')
 
-  return (siteConfig.sitemap.staticPagePaths ?? []).some(
-    staticPath => `/${staticPath.replace(/^\/+|\/+$/g, '')}` === normalizedPath
-  )
+  return siteRoutes.some(route => route.path === normalizedPath)
 }
 
 /**

@@ -4,7 +4,7 @@
  *
  * - the homepage is written as the bare origin (`https://best.serp.co`);
  * - a page ends with a slash (`/about/`, `/products/autoenhance.ai/`);
- * - a file never does (`/robots.txt`, `/sitemaps/pages/1.xml`);
+ * - a file never does (`/robots.txt`, `/sitemap-pages.xml`);
  * - `/api`, `/api/*`, `/.well-known/*`, and framework paths (`/_next/*`) are served exactly
  *   as requested.
  *

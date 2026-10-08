@@ -80,7 +80,7 @@ describe('edge HTML cache', () => {
   it('bypasses personalized, private, mutable, and free-form requests', () => {
     expect(isCacheableRequest(page('/'))).toBe(true)
     expect(isCacheableRequest(page('/products/categories/other/?page=2'))).toBe(true)
-    expect(isCacheableRequest(page('/sitemaps/directory/1.xml'))).toBe(true)
+    expect(isCacheableRequest(page('/sitemap-products.xml'))).toBe(true)
     expect(isCacheableRequest(page('/accounting-tools/'))).toBe(true)
     for (const path of [
       '/api/search?q=x',

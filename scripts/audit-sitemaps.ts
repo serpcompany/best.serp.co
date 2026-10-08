@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { type SiteDefinition, site } from '@serpdirectory/site-config'
+import { type SiteDefinition, site, sitemapPaths } from '@serpdirectory/site-config'
 import { project } from './project'
 
 type AuditScope = 'artifact' | 'live'
@@ -56,6 +56,12 @@ const DEFAULT_TIMEOUT_MS = 10_000
 export const defaultArtifactDirectory = resolve(project.appDirectory, '.open-next')
 const SITEMAP_INDEX_PATH = '/sitemap-index.xml'
 const SITEMAP_COMPATIBILITY_PATH = '/sitemap.xml'
+/** The child sitemaps' URLs before #167; each must answer one permanent redirect to its file. */
+const MOVED_SITEMAP_PATHS = [
+  ['/sitemaps/pages/1.xml', sitemapPaths.pages],
+  ['/sitemaps/directory/1.xml', sitemapPaths.products],
+  ['/sitemaps/categories/1.xml', sitemapPaths.categories]
+] as const
 const LEGACY_GROUP_SITEMAP_PATHS = [
   '/pages-sitemap.xml',
   '/listings-sitemap.xml',
@@ -392,16 +398,9 @@ function validateSitemapLastmods(
   sitemapUrl: string,
   entries: ParsedSitemapEntry[]
 ): void {
+  // lastmod is optional: an entry without data to back it carries none (#167).
   for (const entry of entries) {
-    if (!entry.lastmod) {
-      addIssue(audit, 'error', 'Sitemap entry is missing lastmod.', {
-        sitemapUrl,
-        url: entry.loc
-      })
-      continue
-    }
-
-    if (!isValidW3CDateTime(entry.lastmod)) {
+    if (entry.lastmod && !isValidW3CDateTime(entry.lastmod)) {
       addIssue(audit, 'error', 'Sitemap entry lastmod is not W3C Datetime format.', {
         sitemapUrl,
         url: entry.loc
@@ -520,12 +519,8 @@ function validateArtifactCompatibilitySitemap(
   const compatibilityPath = resolve(audit.artifactDir ?? '', 'sitemap.xml')
   const indexPath = resolve(audit.artifactDir ?? '', 'sitemap-index.xml')
 
-  if (!existsSync(compatibilityPath)) {
-    addIssue(audit, 'error', 'Compatibility sitemap.xml is missing from artifact.', {
-      sitemapUrl: compatibilityUrl
-    })
-    return
-  }
+  // `/sitemap.xml` is a next.config.ts redirect to the index (#167), not a file.
+  if (!existsSync(compatibilityPath)) return
 
   const compatibilityXml = readFileSync(compatibilityPath, 'utf8')
   const compatibilityLocs = parseSitemapLocs(compatibilityXml)
@@ -926,6 +921,39 @@ async function validateLiveKnownUnreferencedSitemapFiles(
   }
 }
 
+/** Each moved sitemap URL answers one permanent redirect to its root-level file (#167). */
+async function validateLiveMovedSitemaps(
+  audit: SitemapSiteAudit,
+  siteConfig: SiteDefinition,
+  timeoutMs: number
+): Promise<void> {
+  for (const [from, to] of [['/sitemap.xml', SITEMAP_INDEX_PATH], ...MOVED_SITEMAP_PATHS]) {
+    const sitemapUrl = toAbsoluteUrl(siteConfig.site.publicUrl, from)
+    try {
+      const response = await fetch(sitemapUrl, {
+        headers: { connection: 'close' },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(timeoutMs)
+      })
+      await response.body?.cancel()
+      const location = response.headers.get('location') ?? ''
+      const target = location ? new URL(location, sitemapUrl).pathname : ''
+      if ((response.status !== 301 && response.status !== 308) || target !== to) {
+        addIssue(audit, 'error', `Moved sitemap must answer a permanent redirect to ${to}.`, {
+          sitemapUrl
+        })
+      }
+    } catch (error) {
+      addIssue(
+        audit,
+        'error',
+        `Failed to fetch moved sitemap: ${error instanceof Error ? error.message : String(error)}`,
+        { sitemapUrl }
+      )
+    }
+  }
+}
+
 export async function auditLiveSitemaps(
   siteConfig: SiteDefinition,
   timeoutMs = DEFAULT_TIMEOUT_MS
@@ -944,6 +972,7 @@ export async function auditLiveSitemaps(
 
   await validateLiveRobots(audit, siteConfig, timeoutMs)
   await validateLiveCompatibilitySitemap(audit, siteConfig, timeoutMs)
+  await validateLiveMovedSitemaps(audit, siteConfig, timeoutMs)
   await auditLiveSitemapFile(
     audit,
     siteConfig,

@@ -35,7 +35,7 @@ change runs in a protected workflow.
   `/products/<slug>/` (detail), `/products/categories/` (index),
   `/products/categories/<category>/` (category), `/products/`, `/brands/`, `/search/`,
   `/submit/`, `/legal/*`, `/rss.xml`, `/sitemap-index.xml`,
-  `/sitemaps/{pages,directory,categories}/1.xml`. The static site's root-level `/<slug>` URLs
+  `/sitemap-{pages,products,categories}.xml`. The static site's root-level `/<slug>` URLs
   get one 308 from the Worker (`apps/web/lib/routing/legacy-root.ts`); the pre-D1 scheme
   (`/products/<slug>/reviews/`, `/products/best/<category>/`, `/categories/<x>/`) redirects
   permanently through `apps/web/next.config.ts` (rules in `apps/web/lib/routing/redirects.ts`).
@@ -150,7 +150,7 @@ Every URL has one canonical form, per the SERP URL trailing-slash and sitemap st
 | --- | --- | --- |
 | Homepage | `https://best.serp.co` (written without a slash) | none: `/` is the only path |
 | Page | ends with `/`: `/about/`, `/products/autoenhance.ai/` | `/about` -> 308 `/about/` |
-| File | never ends with `/`: `/robots.txt`, `/sitemaps/pages/1.xml` | `/robots.txt/` -> 308 `/robots.txt` |
+| File | never ends with `/`: `/robots.txt`, `/sitemap-pages.xml` | `/robots.txt/` -> 308 `/robots.txt` |
 | `/api`, `/api/*`, `/.well-known/*`, `/_next/*` | served exactly as requested | never redirected |
 
 `packages/web-core/src/canonical-url.ts` defines the rule. A file is a path whose last
@@ -205,13 +205,13 @@ extensions (`chart.js`), and a test checks the committed import.
 - **Listing offers.** D1 holds no product pricing, so listing JSON-LD has no `offers`
   (`generateWebsiteDetailSchema` emits one only for known `pricing`; the submission `plan` is
   the listing fee). `listing-structured-data.spec.ts` checks it (serpcompany/best.serp.co#88).
-- **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other
-  host serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)).
-  The index lists the URL-set files
-  `/sitemaps/pages/1.xml`, `/sitemaps/directory/1.xml`, and `/sitemaps/categories/1.xml`
-  directly (no nested index). `/sitemap.xml` is a compatibility redirect to the index.
-  Listing entries carry `published_at` as `lastmod`; the static page and category sets carry
-  the generation time.
+- **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other host
+  serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)). The
+  index lists the root-level `/sitemap-{pages,products,categories}.xml`; `/sitemap.xml` and the
+  old `/sitemaps/*/1.xml` answer one 308. The route registry
+  (`packages/site-config/src/site-routes.ts`, #167) sets each static page's indexability and
+  sitemap for the sitemaps, robots.txt, page metadata, and footer (`site-routes.test.tsx`).
+  Listing entries carry `published_at` as `lastmod`; the others carry none.
 
 The Playwright smoke suite (staging) and `scripts/d1-preview-http-gates.ts` (staging and
 production) assert the redirects, the `/api` exemption, and the homepage form.
@@ -222,8 +222,8 @@ The directory (`/`, `/products/`) and category pages show 48 listings per page i
 directory order (publication order, then a stable locale sort by name, as the pages
 always rendered). Later pages use a `?page=N` query parameter on the existing URL:
 `/products/?page=2`, `/products/categories/other/?page=3`. The homepage shows page 1 and
-links into `/products/?page=N`. Page 1 is the bare URL, so URLs, canonicals, sitemaps,
-and structured data are unchanged; pages 2+ are linked with plain `<a href>` anchors,
+links into `/products/?page=N`. `/products/` itself renders the homepage's content, so its
+canonical is `/`. Page 1 is the bare URL; pages 2+ are linked with plain `<a href>` anchors,
 canonicalize to themselves, carry `noindex, follow` and a "- Page N" title, and a page
 past the end is a 404. Category JSON-LD describes the whole category on every page.
 `packages/web-core/src/listing-pagination.tsx` owns the parameter, links, and metadata;

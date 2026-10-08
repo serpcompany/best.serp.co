@@ -1,4 +1,4 @@
-import { HomePageRoute } from '@serpdirectory/web-core/home-page'
+import { HomePageCanonicalTags, HomePageRoute } from '@serpdirectory/web-core/home-page'
 import { JsonLd } from '@serpdirectory/web-core/json-ld'
 import {
   paginatedMetadata,
@@ -33,25 +33,34 @@ interface ProductsPageProps {
 
 export async function generateMetadata({ searchParams }: ProductsPageProps): Promise<Metadata> {
   const page = parseListingPageParam((await searchParams).page)
-  return paginatedMetadata(productsMetadata, { basePath: productsPath, page })
+  if (page > 1) return paginatedMetadata(productsMetadata, { basePath: productsPath, page })
+  // The first page renders the homepage's content, so its canonical is `/` (the route registry,
+  // #167). Next.js would write that as `https://best.serp.co/`, so the page renders
+  // `HomePageCanonicalTags` instead, as the homepage does.
+  const { alternates: _alternates, openGraph, ...metadata } = productsMetadata
+  return { ...metadata, openGraph: openGraph ? { ...openGraph, url: undefined } : undefined }
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
-  const data = await getHomePageData(parseListingPageParam((await searchParams).page))
+  const page = parseListingPageParam((await searchParams).page)
+  const data = await getHomePageData(page)
   if (!data) notFound()
 
   return (
-    <HomePageRoute
-      data={data}
-      slots={{
-        CreatorProjectsSection,
-        ExternalResourcesSection,
-        FeaturedGuidesSection,
-        FeaturedProjectsSection,
-        JsonLd,
-        RecentlyAddedSection,
-        StaticWebsitesList
-      }}
-    />
+    <>
+      {page <= 1 ? <HomePageCanonicalTags /> : null}
+      <HomePageRoute
+        data={data}
+        slots={{
+          CreatorProjectsSection,
+          ExternalResourcesSection,
+          FeaturedGuidesSection,
+          FeaturedProjectsSection,
+          JsonLd,
+          RecentlyAddedSection,
+          StaticWebsitesList
+        }}
+      />
+    </>
   )
 }

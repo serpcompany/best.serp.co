@@ -77,17 +77,13 @@ export type SiteFeatureFlags = {
   showProjects: boolean
 }
 
-export type SiteSitemapGroupKey = 'docs' | 'listings' | 'pages' | 'posts' | 'taxonomies'
-
+/**
+ * How catalog URLs are shaped. Which pages exist, are indexable, and are in which sitemap is the
+ * route registry's (`./site-routes.ts`).
+ */
 export type SiteSitemapConfig = {
-  additionalPathsByGroup?: Partial<Record<SiteSitemapGroupKey, string[]>>
-  artifactExcludedPaths?: string[]
   categoryBasePath?: string
-  excludedPaths?: string[]
-  indexGroupOrder?: SiteSitemapGroupKey[]
   listingDetailSuffix?: string
-  pathByGroup?: Partial<Record<SiteSitemapGroupKey, string>>
-  staticPagePaths?: string[]
 }
 
 export type SiteDefinition = {

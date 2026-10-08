@@ -1,4 +1,4 @@
-import { site } from '@serpdirectory/site-config'
+import { SITEMAP_INDEX_PATH, site, sitemapPaths } from '@serpdirectory/site-config'
 
 /**
  * Public route shapes of best.serp.co, derived from the checked-in site config the
@@ -27,9 +27,5 @@ export function categoryRoute(slug: string): string {
 
 /** Sitemap files whose content changes when listings or categories change. */
 export function catalogSitemapRoutes(): string[] {
-  return [
-    '/sitemap-index.xml',
-    site.sitemap.pathByGroup?.listings ?? '/listings-sitemap.xml',
-    site.sitemap.pathByGroup?.taxonomies ?? '/taxonomies-sitemap.xml'
-  ]
+  return [SITEMAP_INDEX_PATH, sitemapPaths.products, sitemapPaths.categories]
 }

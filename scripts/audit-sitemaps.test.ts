@@ -290,7 +290,7 @@ describe('auditArtifactSitemaps', () => {
     )
   })
 
-  it('reports sitemap entries that are missing lastmod', () => {
+  it('accepts entries without lastmod and reports a malformed one', () => {
     const artifactDir = makeTempArtifactDir()
 
     const sitemapIndex =
@@ -300,30 +300,22 @@ describe('auditArtifactSitemaps', () => {
       'Sitemap: https://example.com/sitemap-index.xml\n'
     )
     writeFile(resolve(artifactDir, 'sitemap-index.xml'), sitemapIndex)
-    writeFile(resolve(artifactDir, 'sitemap.xml'), sitemapIndex)
     writeFile(
       resolve(artifactDir, 'pages-sitemap.xml'),
-      '<urlset><url><loc>https://example.com/</loc></url></urlset>'
+      '<urlset><url><loc>https://example.com/</loc></url><url><loc>https://example.com/about/</loc><lastmod>yesterday</lastmod></url></urlset>'
     )
     writeFile(resolve(artifactDir, 'index.html'))
+    writeFile(resolve(artifactDir, 'about/index.html'))
 
-    const audit = auditArtifactSitemaps(makeSiteConfig(), artifactDir)
+    const issues = auditArtifactSitemaps(makeSiteConfig(), artifactDir).issues.filter(issue =>
+      issue.message.includes('lastmod')
+    )
 
-    expect(audit.issues).toContainEqual(
+    expect(issues).toEqual([
       expect.objectContaining({
-        message: 'Sitemap entry is missing lastmod.',
-        severity: 'error',
-        sitemapUrl: 'https://example.com/sitemap-index.xml',
-        url: 'https://example.com/pages-sitemap.xml'
+        message: 'Sitemap entry lastmod is not W3C Datetime format.',
+        url: 'https://example.com/about/'
       })
-    )
-    expect(audit.issues).toContainEqual(
-      expect.objectContaining({
-        message: 'Sitemap entry is missing lastmod.',
-        severity: 'error',
-        sitemapUrl: 'https://example.com/pages-sitemap.xml',
-        url: 'https://example.com/'
-      })
-    )
+    ])
   })
 })

@@ -1,5 +1,6 @@
+import { type SiteRoute, siteRoutes } from '@serpdirectory/site-config'
 import type { Metadata } from 'next'
-import { absoluteUrl } from './canonical-url'
+import { absoluteUrl, canonicalPathname } from './canonical-url'
 import { getRoute } from './routes'
 import {
   getConfiguredSocialLinks,
@@ -82,6 +83,18 @@ export const KEYWORDS = {
   }
 }
 
+/** The route registry's entry for a page path, if it lists one (`site-routes.ts`, #167). */
+export function registeredRoute(path: string): SiteRoute | undefined {
+  const pathname = canonicalPathname(path.split(/[?#]/u)[0] || '/')
+  return siteRoutes.find(route => route.path === pathname)
+}
+
+/**
+ * Metadata for a page at `path`. For a page the route registry lists, the registry sets its
+ * canonical URL and makes it noindex where it is not indexable, so the pages, the sitemaps, and
+ * robots.txt cannot disagree. `noindex` still makes any page noindex: unlisted pages (sign-in,
+ * account, submission steps), a feature-disabled route, the 404.
+ */
 export function generateBaseMetadata(options: {
   title: string
   description: string
@@ -95,11 +108,11 @@ export function generateBaseMetadata(options: {
     description,
     path = '',
     keywords = KEYWORDS.global,
-    image = DEFAULT_OG_IMAGE,
-    noindex = false
+    image = DEFAULT_OG_IMAGE
   } = options
-
-  const url = siteUrl(path)
+  const route = path ? registeredRoute(path) : undefined
+  const noindex = options.noindex === true || route?.indexable === false
+  const url = siteUrl(route?.canonicalPath ?? path)
 
   return {
     title,

@@ -1,5 +1,18 @@
+/**
+ * The XML sitemaps and robots.txt, all read from the route registry
+ * (`@serpdirectory/site-config` `siteRoutes`, #167). `/sitemap-index.xml` lists the three
+ * root-level child sitemaps (serp websites/features/xml-sitemaps.md): `/sitemap-pages.xml` (the
+ * registry's indexable static pages), `/sitemap-products.xml` (every public listing), and
+ * `/sitemap-categories.xml` (every category with a public listing).
+ */
+import {
+  disallowedPaths,
+  SITEMAP_INDEX_PATH,
+  sitemapGroups,
+  sitemapPaths,
+  sitemapRoutePaths
+} from '@serpdirectory/site-config'
 import type { MetadataRoute } from 'next'
-import { NextResponse } from 'next/server'
 import { absoluteUrl } from './canonical-url'
 import { getActiveCategories } from './category-navigation'
 import { getRoute } from './routes'
@@ -14,26 +27,14 @@ type WebsiteSitemapEntry = {
   slug: string
 }
 
-type DocSitemapEntry = {
-  slug: string
-}
-
-type GuideSitemapEntry = {
-  slug: string
-}
-
 type SitemapEntry = {
   loc: string
   lastmod?: string
 }
 
 type SitemapContentLoaders = {
-  getDocs?: () => DocSitemapEntry[]
-  getGuides?: () => GuideSitemapEntry[]
   getWebsites: () => Promise<WebsiteSitemapEntry[]> | WebsiteSitemapEntry[]
 }
-
-const CANONICAL_SITEMAP_INDEX_PATH = '/sitemap-index.xml'
 
 /**
  * Sitemap entries match the page canonical exactly: the homepage is the bare origin, pages
@@ -70,14 +71,16 @@ function escapeXml(value: string): string {
     .replaceAll("'", '&apos;')
 }
 
+function renderEntry(tag: 'sitemap' | 'url', entry: SitemapEntry): string {
+  const lastmod = entry.lastmod ? `<lastmod>${escapeXml(entry.lastmod)}</lastmod>` : ''
+  return `<${tag}><loc>${escapeXml(entry.loc)}</loc>${lastmod}</${tag}>`
+}
+
 function renderSitemap(entries: SitemapEntry[]): string {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ...entries.map(entry => {
-      const lastmod = entry.lastmod ? `<lastmod>${escapeXml(entry.lastmod)}</lastmod>` : ''
-      return `<url><loc>${escapeXml(entry.loc)}</loc>${lastmod}</url>`
-    }),
+    ...entries.map(entry => renderEntry('url', entry)),
     '</urlset>'
   ].join('')
 }
@@ -86,10 +89,7 @@ function renderSitemapIndex(entries: SitemapEntry[]): string {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ...entries.map(entry => {
-      const lastmod = entry.lastmod ? `<lastmod>${escapeXml(entry.lastmod)}</lastmod>` : ''
-      return `<sitemap><loc>${escapeXml(entry.loc)}</loc>${lastmod}</sitemap>`
-    }),
+    ...entries.map(entry => renderEntry('sitemap', entry)),
     '</sitemapindex>'
   ].join('')
 }
@@ -102,164 +102,32 @@ function toXmlResponse(xml: string): Response {
   })
 }
 
-function sortUniquePaths(paths: string[]): string[] {
-  return [...new Set(paths)].sort((left, right) => {
-    if (left === '/') {
-      return -1
-    }
-
-    if (right === '/') {
-      return 1
-    }
-
-    return left.localeCompare(right)
-  })
-}
-
-function normalizeComparablePath(path: string): string {
-  if (path === '/') {
-    return path
-  }
-
-  return `/${path.replace(/^\/+|\/+$/g, '')}`
-}
-
-function withoutConfiguredExcludedPaths(paths: string[]): string[] {
-  const excludedPaths = new Set(
-    (siteConfig.sitemap.excludedPaths ?? []).map(path => normalizeComparablePath(path))
-  )
-  return paths.filter(path => !excludedPaths.has(normalizeComparablePath(path)))
-}
-
-function getBuildDate(): string {
-  return new Date().toISOString()
-}
-
-function buildUrlEntries(paths: string[], baseUrl = SITE_PUBLIC_URL): SitemapEntry[] {
-  const buildDate = getBuildDate()
-
-  return sortUniquePaths(paths).map(path => ({
-    lastmod: buildDate,
-    loc: toAbsoluteUrl(path, baseUrl)
+/**
+ * The listing pages. `lastmod` is the publication date until the sitemaps read D1's
+ * `updated_at` (#167 follow-up); the static pages and categories carry none rather than a
+ * generation time that would claim every page changed on every request.
+ */
+async function getListingEntries(
+  getWebsites: SitemapContentLoaders['getWebsites']
+): Promise<SitemapEntry[]> {
+  return (await getWebsites()).map(website => ({
+    lastmod: new Date(website.publishedAt).toISOString(),
+    loc: toAbsoluteUrl(
+      appendPathSegment(
+        getRoute('listing.detail', { slug: website.slug }),
+        siteConfig.sitemap.listingDetailSuffix
+      )
+    )
   }))
 }
 
-function getStaticPagePaths(): string[] {
-  if (siteConfig.sitemap.staticPagePaths?.length) {
-    return withoutConfiguredExcludedPaths([
-      ...siteConfig.sitemap.staticPagePaths,
-      ...(siteConfig.sitemap.additionalPathsByGroup?.pages ?? [])
-    ])
-  }
-
-  return withoutConfiguredExcludedPaths([
-    '/',
-    getRoute('about'),
-    getRoute('affiliateDisclosure'),
-    getRoute('privacy'),
-    getRoute('cookies'),
-    getRoute('dmca'),
-    getRoute('terms'),
-    ...(siteConfig.features.showBrands ? [getRoute('brands')] : []),
-    ...(siteConfig.features.showProjects ? [getRoute('projects')] : []),
-    ...(siteConfig.sitemap.additionalPathsByGroup?.pages ?? [])
-  ])
-}
-
-function getDocsPaths(getDocs: (() => DocSitemapEntry[]) | undefined): string[] {
-  if (!siteConfig.features.showDocs || !getDocs) {
-    return []
-  }
-
-  return [getRoute('docs.list'), ...getDocs().map(doc => getRoute('docs.doc', { slug: doc.slug }))]
-}
-
-function getPostsPaths(getGuides: (() => GuideSitemapEntry[]) | undefined): string[] {
-  if (!siteConfig.features.showGuides || !getGuides) {
-    return []
-  }
-
-  return [
-    getRoute('guides.list'),
-    ...getGuides().map(guide => getRoute('guides.guide', { slug: guide.slug }))
-  ]
-}
-
-async function getListingPaths(
+async function getCategoryEntries(
   getWebsites: SitemapContentLoaders['getWebsites']
 ): Promise<SitemapEntry[]> {
-  return (await getWebsites())
-    .map(website => ({
-      lastmod: new Date(website.publishedAt).toISOString(),
-      loc: toAbsoluteUrl(
-        appendPathSegment(
-          getRoute('listing.detail', { slug: website.slug }),
-          siteConfig.sitemap.listingDetailSuffix
-        )
-      )
-    }))
-    .filter(entry => {
-      const excludedPaths = new Set(
-        (siteConfig.sitemap.excludedPaths ?? []).map(path => normalizeComparablePath(path))
-      )
-      return !excludedPaths.has(normalizeComparablePath(new URL(entry.loc).pathname))
-    })
-}
-
-async function getTaxonomyPaths(
-  getWebsites: SitemapContentLoaders['getWebsites']
-): Promise<string[]> {
-  const websites = await getWebsites()
-  const paths = siteConfig.sitemap.categoryBasePath ? [] : [getRoute('listing.list')]
-  const activeCategories = getActiveCategories(websites)
-
-  for (const category of activeCategories) {
-    if (siteConfig.sitemap.categoryBasePath) {
-      paths.push(`/${siteConfig.sitemap.categoryBasePath}/${category.slug}`)
-      continue
-    }
-
-    paths.push(getRoute('category.page', { category: category.slug }))
-  }
-
-  return withoutConfiguredExcludedPaths([
-    ...paths,
-    ...(siteConfig.sitemap.additionalPathsByGroup?.taxonomies ?? [])
-  ])
-}
-
-function getIndexEntries(loaders: SitemapContentLoaders): SitemapEntry[] {
-  const buildDate = getBuildDate()
-  const entries: SitemapEntry[] = [
-    {
-      lastmod: buildDate,
-      loc: toAbsoluteUrl(siteConfig.sitemap.pathByGroup?.pages || '/pages-sitemap.xml')
-    },
-    {
-      lastmod: buildDate,
-      loc: toAbsoluteUrl(siteConfig.sitemap.pathByGroup?.listings || '/listings-sitemap.xml')
-    },
-    {
-      lastmod: buildDate,
-      loc: toAbsoluteUrl(siteConfig.sitemap.pathByGroup?.taxonomies || '/taxonomies-sitemap.xml')
-    }
-  ]
-
-  if (getDocsPaths(loaders.getDocs).length > 0) {
-    entries.push({
-      lastmod: buildDate,
-      loc: toAbsoluteUrl(siteConfig.sitemap.pathByGroup?.docs || '/docs-sitemap.xml')
-    })
-  }
-
-  if (getPostsPaths(loaders.getGuides).length > 0) {
-    entries.push({
-      lastmod: buildDate,
-      loc: toAbsoluteUrl(siteConfig.sitemap.pathByGroup?.posts || '/posts-sitemap.xml')
-    })
-  }
-
-  return entries
+  return getActiveCategories(await getWebsites())
+    .map(category => toAbsoluteUrl(getRoute('category.page', { category: category.slug })))
+    .sort()
+    .map(loc => ({ loc }))
 }
 
 export function createCanonicalRobots(): MetadataRoute.Robots {
@@ -267,42 +135,32 @@ export function createCanonicalRobots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: ['/'],
-      disallow: ['/404', '/500', '/submit', '/search']
+      disallow: disallowedPaths()
     },
-    sitemap: toAbsoluteUrl(CANONICAL_SITEMAP_INDEX_PATH)
+    sitemap: toAbsoluteUrl(SITEMAP_INDEX_PATH)
   }
 }
 
-export function createSitemapCompatibilityRedirect(): Response {
-  return NextResponse.redirect(toAbsoluteUrl(CANONICAL_SITEMAP_INDEX_PATH), {
-    status: 307
-  })
-}
-
-export function createSitemapIndexResponse(loaders: SitemapContentLoaders): Response {
-  return toXmlResponse(renderSitemapIndex(getIndexEntries(loaders)))
+export function createSitemapIndexResponse(): Response {
+  return toXmlResponse(
+    renderSitemapIndex(sitemapGroups.map(group => ({ loc: toAbsoluteUrl(sitemapPaths[group]) })))
+  )
 }
 
 export function createPagesSitemapResponse(): Response {
-  return toXmlResponse(renderSitemap(buildUrlEntries(getStaticPagePaths())))
+  return toXmlResponse(
+    renderSitemap(sitemapRoutePaths('pages').map(path => ({ loc: toAbsoluteUrl(path) })))
+  )
 }
 
 export async function createListingsSitemapResponse(
   loaders: SitemapContentLoaders
 ): Promise<Response> {
-  return toXmlResponse(renderSitemap(await getListingPaths(loaders.getWebsites)))
+  return toXmlResponse(renderSitemap(await getListingEntries(loaders.getWebsites)))
 }
 
 export async function createTaxonomiesSitemapResponse(
   loaders: SitemapContentLoaders
 ): Promise<Response> {
-  return toXmlResponse(renderSitemap(buildUrlEntries(await getTaxonomyPaths(loaders.getWebsites))))
-}
-
-export function createDocsSitemapResponse(loaders: SitemapContentLoaders): Response {
-  return toXmlResponse(renderSitemap(buildUrlEntries(getDocsPaths(loaders.getDocs))))
-}
-
-export function createPostsSitemapResponse(loaders: SitemapContentLoaders): Response {
-  return toXmlResponse(renderSitemap(buildUrlEntries(getPostsPaths(loaders.getGuides))))
+  return toXmlResponse(renderSitemap(await getCategoryEntries(loaders.getWebsites)))
 }

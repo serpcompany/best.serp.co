@@ -62,8 +62,8 @@ describe('trailing-slash redirects', () => {
   it('sends file URLs with a slash to the unslashed file', () => {
     expect(redirect('/robots.txt/')).toEqual({ location: '/robots.txt', status: 308 })
     expect(redirect('/sitemap-index.xml/')).toEqual({ location: '/sitemap-index.xml', status: 308 })
-    expect(redirect('/sitemaps/pages/1.xml/')).toEqual({
-      location: '/sitemaps/pages/1.xml',
+    expect(redirect('/sitemap-pages.xml/')).toEqual({
+      location: '/sitemap-pages.xml',
       status: 308
     })
   })
@@ -76,7 +76,7 @@ describe('trailing-slash redirects', () => {
       '/products/autoenhance.ai/',
       '/robots.txt',
       '/sitemap-index.xml',
-      '/sitemaps/directory/1.xml'
+      '/sitemap-products.xml'
     ]) {
       expect(redirect(path), path).toBeNull()
     }

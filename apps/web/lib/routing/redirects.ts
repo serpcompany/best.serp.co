@@ -8,7 +8,7 @@
  * second, parameterless rule because OpenNext cannot fill an empty parameter: `/website`
  * would otherwise redirect to the literal `/products/:path*`.
  */
-import { site } from '@serpdirectory/site-config'
+import { SITEMAP_INDEX_PATH, site, sitemapPaths } from '@serpdirectory/site-config'
 import type { Redirect } from 'next/dist/lib/load-custom-routes'
 
 /** The canonical legal pages; `getRoute('privacy')` and `getRoute('terms')` name the same. */
@@ -68,6 +68,15 @@ export function movedUrlRedirects(): Redirect[] {
         ['/terms', LEGAL_CANONICAL.terms],
         ['/legal/privacy', LEGAL_CANONICAL.privacy],
         ['/legal/terms', LEGAL_CANONICAL.terms]
+      ] as const
+    ).map(([source, destination]) => ({ source, destination, permanent: true })),
+    // Sitemaps moved to root-level files (#167; serp websites/features/xml-sitemaps.md).
+    ...(
+      [
+        ['/sitemap.xml', SITEMAP_INDEX_PATH],
+        ['/sitemaps/pages/1.xml', sitemapPaths.pages],
+        ['/sitemaps/directory/1.xml', sitemapPaths.products],
+        ['/sitemaps/categories/1.xml', sitemapPaths.categories]
       ] as const
     ).map(([source, destination]) => ({ source, destination, permanent: true })),
     ...aliasRedirects('website', listingBasePath),

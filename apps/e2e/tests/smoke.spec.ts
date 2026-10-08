@@ -217,7 +217,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       domainSlugListingPath,
       '/robots.txt',
       '/sitemap-index.xml',
-      '/sitemaps/pages/1.xml'
+      '/sitemap-pages.xml'
     ]) {
       await expectServedAsRequested(request, path)
     }
@@ -233,7 +233,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       ['/about?q=c%23%20%2B%2B&x=a%26b', '/about/?q=c%23%20%2B%2B&x=a%26b'],
       ['/robots.txt/', '/robots.txt'],
       ['/sitemap-index.xml/', '/sitemap-index.xml'],
-      ['/sitemaps/pages/1.xml/', '/sitemaps/pages/1.xml']
+      ['/sitemap-pages.xml/', '/sitemap-pages.xml']
     ]
     for (const [from, to] of redirects) {
       await expectOneHop(request, from, to)
@@ -274,7 +274,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     await page.goto(categoriesIndexPath, { waitUntil: 'networkidle' })
     await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible()
     await expectCanonical(page, categoriesIndexPath)
-    // Every published category is linked, including `other`, which the sitemap omits.
+    // Every published category is linked, `other` included.
     expect(
       await page.locator('main a[href^="/products/categories/"]').count()
     ).toBeGreaterThanOrEqual(site.categoryCount)
@@ -283,7 +283,9 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     ).toBeVisible()
 
     await page.goto('/products/', { waitUntil: 'networkidle' })
-    await expectCanonical(page, '/products/')
+    // The directory's first page is the homepage's content, so it canonicalizes to `/` (#167).
+    await expectCanonical(page, '/')
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /^index/u)
     expect(await listingLinks.count()).toBeGreaterThan(0)
 
     await page.goto(`/search/?q=${encodeURIComponent(detailListing.searchQuery)}`, {
@@ -452,13 +454,23 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       expect(await robots.text()).toContain(`Sitemap: ${absoluteUrl('/sitemap-index.xml')}`)
     else expect(await robots.text()).toBe('User-agent: *\nDisallow: /\n')
 
+    // Root-level child sitemaps (#167); the old URLs and /sitemap.xml answer one 308.
     expect(await getSitemap(request, '/sitemap-index.xml')).toEqual([
-      absoluteUrl('/sitemaps/pages/1.xml'),
-      absoluteUrl('/sitemaps/directory/1.xml'),
-      absoluteUrl('/sitemaps/categories/1.xml')
+      absoluteUrl('/sitemap-pages.xml'),
+      absoluteUrl('/sitemap-products.xml'),
+      absoluteUrl('/sitemap-categories.xml')
     ])
+    for (const [from, to] of [
+      ['/sitemap.xml', '/sitemap-index.xml'],
+      ['/sitemaps/pages/1.xml', '/sitemap-pages.xml'],
+      ['/sitemaps/directory/1.xml', '/sitemap-products.xml'],
+      ['/sitemaps/categories/1.xml', '/sitemap-categories.xml']
+    ]) {
+      await expectOneHop(request, from, to)
+      await expectOneHop(request, `${from}/`, to)
+    }
 
-    const pages = await getSitemap(request, '/sitemaps/pages/1.xml')
+    const pages = await getSitemap(request, '/sitemap-pages.xml')
     // The homepage entry is the bare origin; every other page ends with a slash.
     expect(pages).toContain(site.publicUrl)
     expect(pages).not.toContain(`${site.publicUrl}/`)
@@ -467,12 +479,18 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     }
     expect(pages).toContain(absoluteUrl('/about/'))
     expect(pages).toContain(absoluteUrl(categoriesIndexPath))
-    for (const excluded of ['/submit/', '/legal/privacy-policy/', '/legal/terms-conditions/']) {
+    for (const excluded of [
+      '/submit/',
+      '/search/',
+      '/products/',
+      '/legal/privacy-policy/',
+      '/legal/terms-conditions/'
+    ]) {
       expect(pages).not.toContain(absoluteUrl(excluded))
     }
 
     const listingCount = await liveListingCount(request, baseURL)
-    const listings = await getSitemap(request, '/sitemaps/directory/1.xml')
+    const listings = await getSitemap(request, '/sitemap-products.xml')
     expect(listings).toHaveLength(listingCount)
     expect(new Set(listings).size).toBe(listingCount)
     for (const location of listings) {
@@ -480,14 +498,15 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     }
     expect(listings).toContain(absoluteUrl(detailListing.path))
 
-    const categories = await getSitemap(request, '/sitemaps/categories/1.xml')
+    const categories = await getSitemap(request, '/sitemap-categories.xml')
     expect(categories).toHaveLength(site.categoryCount)
     for (const location of categories) {
       expect(location).toMatch(/^https:\/\/best\.serp\.co\/products\/categories\/[^/]+\/$/u)
     }
     expect(categories).toContain(absoluteUrl(categoryPath(sampleCategory.slug)))
     expect(categories).not.toContain(absoluteUrl(categoryPath('featured')))
-    expect(categories).not.toContain(absoluteUrl(categoryPath('other')))
+    // `other` is an indexable category page like the rest (#167).
+    expect(categories).toContain(absoluteUrl(categoryPath('other')))
   })
 
   test('serves the D1-derived JSON feed', async ({ baseURL, request }) => {

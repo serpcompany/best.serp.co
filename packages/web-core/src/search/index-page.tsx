@@ -37,8 +37,7 @@ export function generateSearchPageMetadata(): Metadata {
     path: '/search',
     keywords: showExternalResources
       ? ['search', 'find', 'directory listings', 'external resources', 'resources']
-      : ['search', 'find', 'directory listings', 'resources'],
-    noindex: true
+      : ['search', 'find', 'directory listings', 'resources']
   })
 }
 

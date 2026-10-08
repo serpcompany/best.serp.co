@@ -131,8 +131,8 @@ export const homePageMetadata: Metadata = {
 
 /**
  * The homepage canonical and `og:url`, written as the bare origin. React hoists both tags
- * into `<head>`. Only the homepage renders this: `/products/` reuses `HomePageRoute` with
- * its own canonical metadata.
+ * into `<head>`. The homepage renders it, and so does `/products/`'s first page, whose canonical
+ * is `/` (#167); its later pages keep their own canonical metadata.
  */
 export function HomePageCanonicalTags(): ReactElement {
   return (
