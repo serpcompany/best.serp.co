@@ -206,6 +206,9 @@ for the signed-in owner; an RS256 token with a `kid` makes the Worker fetch the 
 JWKS and still answers 403. After each deploy, `scripts/d1-preview-http-gates.ts` requires the
 admin paths to answer exactly what `wrangler.jsonc` implies: production 403 now that its
 Access values are set (503 fails the deploy), staging 401, or 403/503 if `CF_ACCESS_REQUIRED=on`.
+The same gates require `GET /api/auth/get-session` to answer 200 without a redirect, and a
+sign-in `POST` with an invalid email, sent from the environment's trusted origin, to answer 4xx
+(never 3xx); the invalid address fails validation before any code is sent.
 
 The edge HTML cache bypasses `/api`, `/admin`, `/account`, `/login`, and every request that
 carries a `better-auth.*` cookie, so pages under auth are never served from or stored in it.

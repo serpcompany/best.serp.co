@@ -160,11 +160,19 @@ function routeUrl(baseUrl: URL, path: string): URL {
   return url
 }
 
+/** A gate request other than a plain GET. */
+interface GateRequest {
+  body: string
+  headers: Record<string, string>
+  method: 'POST'
+}
+
 async function boundedRequest<T>(
   url: URL,
   timeoutMs: number,
   inspect: (response: Response) => Promise<T>,
-  smoke = true
+  smoke = true,
+  request?: GateRequest
 ): Promise<T> {
   const controller = new AbortController()
   let timeout: ReturnType<typeof setTimeout> | undefined
@@ -177,7 +185,8 @@ async function boundedRequest<T>(
   try {
     return await Promise.race([
       fetch(url, {
-        headers: smoke ? { [SMOKE_TEST_HEADER]: '1' } : {},
+        ...(request && { body: request.body, method: request.method }),
+        headers: { ...request?.headers, ...(smoke ? { [SMOKE_TEST_HEADER]: '1' } : {}) },
         redirect: 'manual',
         signal: controller.signal
       }).then(inspect),
@@ -247,7 +256,7 @@ async function pinnedFetch<T>(
   target: GateTarget,
   url: URL,
   inspect: (response: Response) => Promise<T>,
-  options: { skipNonWorker?: boolean; smoke?: boolean } = {}
+  options: { request?: GateRequest; skipNonWorker?: boolean; smoke?: boolean } = {}
 ): Promise<GateAnswer<T>> {
   const pin = target.version
   for (let attempt = 1; ; attempt += 1) {
@@ -273,7 +282,8 @@ async function pinnedFetch<T>(
             return { kind: 'failed', error }
           }
         },
-        options.smoke ?? true
+        options.smoke ?? true,
+        options.request
       )
     } catch (error) {
       // No answer is never skipped: zone protection answers, with a challenge or a block.
@@ -298,9 +308,10 @@ async function boundedFetch<T>(
   target: GateTarget,
   url: URL,
   inspect: (response: Response) => Promise<T>,
-  smoke = true
+  smoke = true,
+  request?: GateRequest
 ): Promise<T> {
-  const answer = await pinnedFetch(target, url, inspect, { smoke })
+  const answer = await pinnedFetch(target, url, inspect, { request, smoke })
   if (answer.kind === 'skipped') throw new Error(`${url.href} was not answered: ${answer.reason}.`)
   return answer.value
 }
@@ -476,6 +487,39 @@ async function expectAdminLock(target: GateTarget, statuses: AdminLockStatuses):
         )
     })
   }
+}
+
+/**
+ * Better Auth smoke tests (serp docs/engineering/standards/web-stack/better-auth.md,
+ * Verification): the session endpoint answers 200 without a redirect, and a sign-in request
+ * with bad input answers 4xx, never 3xx. The bad input is an invalid email address, which
+ * Better Auth rejects before it sends any code, from the environment's own trusted origin.
+ */
+async function expectAuthEndpoints(target: GateTarget): Promise<void> {
+  const { baseUrl, mode } = target
+  await boundedFetch(target, routeUrl(baseUrl, '/api/auth/get-session'), async response => {
+    await response.body?.cancel().catch(() => undefined)
+    if (response.status !== 200)
+      throw new Error(`${mode} GET /api/auth/get-session returned ${response.status}, not 200.`)
+  })
+  const origin = mode === 'production' ? canonicalOrigin.origin : baseUrl.origin
+  await boundedFetch(
+    target,
+    routeUrl(baseUrl, '/api/auth/email-otp/send-verification-otp'),
+    async response => {
+      await response.body?.cancel().catch(() => undefined)
+      if (response.status < 400 || response.status > 499)
+        throw new Error(
+          `${mode} sign-in POST with an invalid email returned ${response.status}, not a 4xx.`
+        )
+    },
+    true,
+    {
+      body: JSON.stringify({ email: 'not-an-email', type: 'sign-in' }),
+      headers: { 'content-type': 'application/json', origin },
+      method: 'POST'
+    }
+  )
 }
 
 /**
@@ -841,7 +885,8 @@ export async function runHttpGates(
     expectRoute(target, '/sitemap-index.xml'),
     expectLegacyRedirect(target, `/${listingSlug}/`, listingRoute(listingSlug)),
     expectRoute(target, '/submit/'),
-    expectAdminLock(target, adminLockStatusesFromConfig(options.wranglerConfigPath))
+    expectAdminLock(target, adminLockStatusesFromConfig(options.wranglerConfigPath)),
+    expectAuthEndpoints(target)
   ])
   await expectNonProductionPolicy(target, listingRoute(listingSlug))
   await expectHostRedirectPolicy(target, redirectOn)
