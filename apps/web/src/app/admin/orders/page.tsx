@@ -1,5 +1,4 @@
 import type { AdminOrderRow } from '@serpdirectory/data-ops/billing'
-import { site } from '@/lib/site'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
@@ -11,6 +10,7 @@ import { requireAdmin } from '@/lib/auth/server'
 import { billing, ordersEnabled } from '@/lib/billing/runtime'
 import { mediaBaseUrl } from '@/lib/media/media-base'
 import { renderableImage } from '@/lib/media/renderable-image'
+import { site } from '@/lib/site'
 
 /** Orders (#68, #70 screen 13). A 404 while orders are off. */
 export const dynamic = 'force-dynamic'

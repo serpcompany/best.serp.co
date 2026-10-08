@@ -9,6 +9,8 @@
  * `published_at`), a category's newest listing, the catalog pages' newest listing, and each
  * index entry's newest child. A static page whose content lives in code carries none.
  */
+
+import type { MetadataRoute } from 'next'
 import {
   disallowedPaths,
   SITEMAP_INDEX_PATH,
@@ -17,7 +19,6 @@ import {
   sitemapPaths,
   sitemapRoutePaths
 } from '@/lib/site'
-import type { MetadataRoute } from 'next'
 import { getActiveCategories } from '../directory/category-navigation'
 import { getRoute } from '../routing/routes'
 import { siteConfig } from '../site/site-config'

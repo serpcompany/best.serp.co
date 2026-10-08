@@ -6,11 +6,7 @@
     "forceConsistentCasingInFileNames": true,
     "incremental": false,
     "isolatedModules": true,
-    "lib": [
-      "es2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["es2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleDetection": "force",
     "moduleResolution": "Bundler",
@@ -29,16 +25,9 @@
       }
     ],
     "paths": {
-      "@serpdirectory/*": [
-        "../*"
-      ]
+      "@serpdirectory/*": ["../*"]
     }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
 }

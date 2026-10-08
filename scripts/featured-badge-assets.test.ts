@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { inflateSync } from 'node:zlib'
-import { site } from '../apps/web/src/lib/site'
 import { describe, expect, it } from 'vitest'
+import { site } from '../apps/web/src/lib/site'
 import { project } from './project'
 
 const badgeVariants = ['light', 'dark'] as const

@@ -130,10 +130,7 @@ const forbiddenExactCatalogPaths = [
   [project.appDirectory, 'public', 'search', 'search-index.json'].join('/')
 ]
 
-const guardedSourceRoots = [
-  `${project.appDirectory}/`,
-  '.github/workflows/'
-]
+const guardedSourceRoots = [`${project.appDirectory}/`, '.github/workflows/']
 
 const sharedDataOperations = [
   'packages/data-ops/src/catalog.ts',

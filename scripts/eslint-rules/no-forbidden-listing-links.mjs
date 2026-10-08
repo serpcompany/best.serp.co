@@ -54,10 +54,7 @@ export function isProtectedListingSurface(filename) {
     return false
   }
 
-  return (
-    path.startsWith('apps/') ||
-    path.startsWith('apps/web/content/')
-  )
+  return path.startsWith('apps/') || path.startsWith('apps/web/content/')
 }
 
 export const preserveTextLinesProcessor = {

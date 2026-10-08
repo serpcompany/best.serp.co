@@ -5,9 +5,9 @@ import { withContentCollections } from '@content-collections/next'
 import withBundleAnalyzer from '@next/bundle-analyzer'
 import withMDX from '@next/mdx'
 import { withSentryConfig } from '@sentry/nextjs/config'
-import { site } from './src/lib/site'
 import type { NextConfig } from 'next'
 import { movedUrlRedirects } from './src/lib/routing/redirects'
+import { site } from './src/lib/site'
 import { sentryRelease } from './src/lib/telemetry/sentry'
 
 export const INTERNAL_PACKAGES = ['@serpdirectory/design-system', '@serpdirectory/utils']

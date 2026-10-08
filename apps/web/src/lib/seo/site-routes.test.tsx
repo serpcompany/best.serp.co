@@ -3,10 +3,11 @@
  * reads it: the sitemaps, robots.txt, page metadata, and the footer. The page modules' own
  * metadata is checked against it in `apps/web/src/lib/environment/noindex-sources.test.ts`.
  */
-import { SITEMAP_INDEX_PATH, sitemapPaths, siteRoutes } from '@/lib/site'
+
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { SITEMAP_INDEX_PATH, sitemapPaths, siteRoutes } from '@/lib/site'
 import { Footer } from '../../components/layout/footer'
 import { canonicalPathname } from './canonical-url'
 import { generateBaseMetadata, registeredRoute } from './seo-config'

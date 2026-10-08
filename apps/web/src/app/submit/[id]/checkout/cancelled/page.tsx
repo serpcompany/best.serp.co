@@ -1,8 +1,8 @@
-import { site } from '@/lib/site'
 import type { Metadata } from 'next'
 import { CheckoutCancelled } from '@/components/submit/checkout-screens'
 import { checkoutPage, checkoutPayable, toAccount } from '@/lib/billing/pages'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
+import { site } from '@/lib/site'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = generateBaseMetadata({
