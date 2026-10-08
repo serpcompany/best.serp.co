@@ -28,7 +28,7 @@ email is #61.
 | `requireUser()` / `requireAdmin()` | `apps/web/src/lib/auth/{guards,server}.ts` |
 | Worker gate: Access JWT and session cookie | `apps/web/src/lib/auth/{admin-gate,cloudflare-access}.ts` |
 | Endpoints | `apps/web/src/app/api/auth/[...all]/route.ts` (`/api/auth/*`) |
-| `/login`, `/account`, header sign-out | `apps/web/src/app/{login,account}/page.tsx`, `apps/web/src/components/{auth,account}/` |
+| `/login`, `/account`, header sign-out | `apps/web/src/app/(site)/login/page.tsx`, `apps/web/src/app/(dashboard)/account/page.tsx`, `apps/web/src/components/{auth,account}/` |
 
 ## Sign-in over HTTP
 

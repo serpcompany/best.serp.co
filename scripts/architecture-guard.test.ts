@@ -449,11 +449,20 @@ describe('single-site D1-only repository architecture', () => {
     expect(operations).not.toMatch(/getCloudflareContext|process\.env/u)
   })
 
+  /**
+   * An app file's path as its URL sees it: below `app/`, without route groups, so a page under
+   * `/admin` is found in any group or none. A file outside `app/` returns ''.
+   */
+  function appRoutePath(file: string): string {
+    const app = `${project.sourceDirectory}/app/`
+    if (!file.startsWith(app)) return ''
+    return file.slice(app.length).replace(/(?:^|(?<=\/))\([^/]+\)\//gu, '')
+  }
+
   it('makes every admin page and admin API route require an admin', () => {
     const adminRoutes = trackedFiles().filter(
       file =>
-        (file.startsWith(`${project.sourceDirectory}/app/(dashboard)/admin/`) ||
-          file.startsWith(`${project.sourceDirectory}/app/api/admin/`)) &&
+        /^(?:api\/)?admin\//u.test(appRoutePath(file)) &&
         /(?:^|\/)(?:page|route|layout)\.tsx?$/u.test(file) &&
         existsSync(resolve(file))
     )
@@ -478,8 +487,7 @@ describe('single-site D1-only repository architecture', () => {
   it('makes every account page and account API route require the signed-in user (#65)', () => {
     const accountRoutes = trackedFiles().filter(
       file =>
-        (file.startsWith(`${project.sourceDirectory}/app/(dashboard)/account/`) ||
-          file.startsWith(`${project.sourceDirectory}/app/api/account/`)) &&
+        /^(?:api\/)?account\//u.test(appRoutePath(file)) &&
         /(?:^|\/)(?:page|route)\.tsx?$/u.test(file) &&
         existsSync(resolve(file))
     )
