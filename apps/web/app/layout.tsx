@@ -10,7 +10,7 @@ import { DrawerSignOutButton, HeaderSignOutButton } from '@/components/auth/sign
 import { PublicChrome } from '@/components/layout/public-chrome'
 import { getHeaderAuthState } from '@/lib/auth/header-state'
 import { getActiveCategories } from '@/lib/catalog/repository'
-import { googleTagManagerIdForRequest } from '@/lib/environment/request-environment'
+import { analyticsForRequest } from '@/lib/environment/request-environment'
 
 export const metadata = rootLayoutMetadata
 export const dynamic = 'force-dynamic'
@@ -22,23 +22,24 @@ type RootLayoutProps = {
 export default async function RootLayout({ children }: RootLayoutProps): Promise<ReactElement> {
   // Analytics load only on the public production site, never on local, staging, or the
   // production Worker's workers.dev host (docs/ARCHITECTURE.md#environments-and-hosts).
-  const [authState, activeCategories, gtmId] = await Promise.all([
+  const [authState, activeCategories, analytics] = await Promise.all([
     getHeaderAuthState(),
     getActiveCategories(),
-    googleTagManagerIdForRequest()
+    analyticsForRequest()
   ])
   const activeCategorySlugs = activeCategories.map(category => category.slug)
 
   return (
     <RootAppShell
       bodyClassName={fonts}
+      cloudflareWebAnalyticsToken={analytics.cloudflareWebAnalyticsToken}
       feedTitle={`${siteConfig.name} - New ${siteCopy.listingName.pluralTitle}`}
       footer={
         <PublicChrome>
           <Footer />
         </PublicChrome>
       }
-      gtmId={gtmId}
+      gtmId={analytics.gtmId}
       header={
         <PublicChrome>
           <Header

@@ -18,6 +18,7 @@
 | [Admin panel](./ADMIN_PANEL.md) | `/admin` screens, decisions, the production-write exception |
 | [Submissions mockups](./mockups/submissions/README.md) | The owner-approved #70 mockups and their copy |
 | [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, release flow, cutover checklist |
+| [Telemetry](./TELEMETRY.md) | Sentry error reporting, GTM and Cloudflare Web Analytics |
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel |
 | [Catalog hygiene](./CATALOG_HYGIENE.md) | The listing domain check: hijacked, parked, and moved domains |
 | [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, staging before production |

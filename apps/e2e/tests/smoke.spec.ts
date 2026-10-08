@@ -411,15 +411,20 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     const robots = await request.get('/robots.txt')
     expect(await robots.text()).toBe('User-agent: *\nDisallow: /\n')
 
-    const tagManagerRequests: string[] = []
+    // Neither Google Tag Manager nor the Cloudflare Web Analytics beacon (#170).
+    const analyticsRequests: string[] = []
     page.on('request', sent => {
-      if (sent.url().includes('googletagmanager.com')) tagManagerRequests.push(sent.url())
+      if (/googletagmanager\.com|cloudflareinsights\.com/u.test(sent.url())) {
+        analyticsRequests.push(sent.url())
+      }
     })
     const home = await page.goto('/', { waitUntil: 'networkidle' })
     expect(home?.status()).toBe(200)
-    expect(await home?.text()).not.toContain('googletagmanager.com')
+    const html = (await home?.text()) ?? ''
+    expect(html).not.toContain('googletagmanager.com')
+    expect(html).not.toContain('cloudflareinsights')
     await expect(page.locator('script#google-tag-manager')).toHaveCount(0)
-    expect(tagManagerRequests).toEqual([])
+    expect(analyticsRequests).toEqual([])
   })
 
   test('renders static, commercial, and legal pages', async ({ page }) => {

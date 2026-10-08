@@ -61,6 +61,11 @@ interface CloudflareEnv {
   CF_ACCESS_REQUIRED?: 'on' | 'off'
   /** Zero Trust team domain, `<team>.cloudflareaccess.com`. */
   CF_ACCESS_TEAM_DOMAIN?: string
+  /**
+   * Production only (#170): best.serp.co's Cloudflare Web Analytics site token (public, not a
+   * secret). Unset or malformed, no beacon renders; it never renders outside public production.
+   */
+  CF_WEB_ANALYTICS_TOKEN?: string
   DB: D1Database
   D1_RUNTIME_ENV: 'local' | 'staging' | 'production'
   /**
