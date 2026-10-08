@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   catalogEpochToken,
+  legacyRootTarget,
   parseCatalogEpochToken,
   readCatalogEpoch,
   shareCatalogEpochToken,
@@ -667,5 +668,27 @@ describe('catalog epoch tokens shared by the Worker entry', () => {
       effectiveAt: '2026-07-05T00:00:00.000Z',
       version: 5
     })
+  })
+})
+
+describe('legacy root-level URLs (#168)', () => {
+  it('finds a public listing first, then an active category, else nothing', async () => {
+    const sqlite = new SqliteD1()
+    seedContractFixture(sqlite)
+    sqlite.database.exec(`
+      UPDATE listings SET is_active = 0 WHERE slug = 'echo';
+      INSERT INTO categories(slug, name, description, sort_order, is_active)
+        VALUES ('alpha', 'Shadowed', '', 9, 1), ('retired', 'Retired', '', 9, 0);
+    `)
+    const client = createDatabase(sqlite.asD1Database())
+    const target = (slug: string) => legacyRootTarget({ asOf: now().toISOString(), client, slug })
+    expect(await target('bravo')).toBe('listing')
+    // A listing and a category with one slug: the listing wins, as on the old site.
+    expect(await target('alpha')).toBe('listing')
+    expect(await target('primary')).toBe('category')
+    // Unpublished, scheduled, inactive, or unknown: Next.js answers as before.
+    for (const slug of ['echo', 'future', 'retired', 'missing']) {
+      expect(await target(slug), slug).toBeNull()
+    }
   })
 })

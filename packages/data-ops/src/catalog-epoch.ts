@@ -140,6 +140,63 @@ export async function isUnpublishedListingSlug(input: {
 }
 
 /**
+ * Where an old root-level URL `/<slug>` moved (#168): a public listing first, then an active
+ * category, or null. One seek on each unique slug, so the Worker entry can answer the one 308
+ * itself instead of letting Next.js redirect after the trailing-slash rule (two hops).
+ */
+export async function legacyRootTarget(input: {
+  asOf: string
+  client: Database
+  observe?: CatalogObserver
+  slug: string
+}): Promise<'category' | 'listing' | null> {
+  const startedAt = performance.now()
+  let rowsRead: number | null = null
+  let d1DurationMs: number | null = null
+  let success = false
+  let resultRows = 0
+  let errorCode: string | undefined
+  try {
+    const result = await runQuery<{ kind: 'category' | 'listing' }>(
+      input.client,
+      sql<{ kind: 'category' | 'listing' }>`SELECT kind FROM (
+          SELECT 'listing' AS kind, 0 AS rank FROM listings
+            WHERE slug = ${input.slug} AND status = 'approved' AND is_active = 1
+              AND published_at IS NOT NULL AND published_at <= ${input.asOf}
+          UNION ALL
+          SELECT 'category' AS kind, 1 AS rank FROM categories
+            WHERE slug = ${input.slug} AND is_active = 1
+        )
+        ORDER BY rank
+        LIMIT 1`
+    )
+    const meta = result.meta as { duration?: number; rows_read?: number } | undefined
+    rowsRead = typeof meta?.rows_read === 'number' ? meta.rows_read : null
+    d1DurationMs = typeof meta?.duration === 'number' ? meta.duration : null
+    success = result.success
+    resultRows = result.results.length
+    if (!result.success) throw new Error('D1 legacy root-level URL query failed.')
+    return result.results[0]?.kind ?? null
+  } catch (error) {
+    errorCode = d1ErrorCode(error)
+    throw error
+  } finally {
+    input.observe?.({
+      d1DurationMs,
+      ...(errorCode ? { errorCode } : {}),
+      event: 'd1_query',
+      operation: 'legacy-root-target',
+      queryShape: 'legacy-root-target',
+      resultRows,
+      rowsRead,
+      rowsWritten: 0,
+      success,
+      wallDurationMs: performance.now() - startedAt
+    })
+  }
+}
+
+/**
  * Reads the epoch with one prepared statement (two index seeks) and reports the same
  * `d1_query` telemetry the catalog operations emit.
  */

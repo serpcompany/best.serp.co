@@ -1,7 +1,8 @@
 /**
- * Worker entry: canonical-host and trailing-slash redirects, the environment's crawl policy,
- * then the OpenNext-generated handler behind a catalog-epoch-keyed edge cache. Its cron hosts
- * queued listing media, and locally it serves the media bucket at `/_media` (#95).
+ * Worker entry: canonical-host, old root-level URL, and trailing-slash redirects, the
+ * environment's crawl policy, then the OpenNext-generated handler behind a catalog-epoch-keyed
+ * edge cache. Its cron hosts queued listing media, and locally it serves the media bucket at
+ * `/_media` (#95).
  *
  * Admin paths pass the Cloudflare Access and session-cookie gate first (`lib/auth/admin-gate.ts`).
  *
@@ -19,8 +20,9 @@
  */
 import { withEdgeCache } from './lib/edge-cache/html-cache'
 import { serveLocalMedia } from './lib/media/worker-media'
+import { legacyRootRedirect, legacyRootSlugMatcher } from './lib/routing/legacy-root'
 import { configRedirectPatterns } from './lib/routing/trailing-slash'
-import { catalogEpochReader, catalogRenderer } from './lib/worker/catalog'
+import { catalogEpochReader, catalogLegacyRootLookup, catalogRenderer } from './lib/worker/catalog'
 import { handleWorkerRequest } from './lib/worker/handle-request'
 import {
   handleScheduled,
@@ -39,11 +41,15 @@ export { BucketCachePurge, DOQueueHandler, DOShardedTagCache } from './worker-bu
 
 const EDGE_CACHE_NAME = 'edge-html'
 /**
- * next.config.ts redirects, which send moved URLs to their canonical page in one hop. A
- * malformed manifest throws here, at startup, so the deploy and every request fail loudly
- * instead of the trailing-slash rule silently switching off.
+ * next.config.ts redirects, which send moved URLs to their canonical page in one hop, and the
+ * root-level paths no route serves: old listing and category URLs (#168). A malformed manifest
+ * throws here, at startup, so the deploy and every request fail loudly instead of the
+ * trailing-slash rule switching off or old URLs silently answering 404.
  */
-const configRedirects = loadConfigRedirects()
+const configRedirects = fromRoutesManifest(() => configRedirectPatterns(routesManifest))
+const legacyRootSlug = fromRoutesManifest(() =>
+  legacyRootSlugMatcher(routesManifest, configRedirects)
+)
 
 interface WorkerEnv {
   CANONICAL_HOST_REDIRECT?: string
@@ -57,9 +63,9 @@ interface WorkerEnv {
   SITE_ENVIRONMENT?: string
 }
 
-function loadConfigRedirects(): RegExp[] {
+function fromRoutesManifest<T>(read: () => T): T {
   try {
-    return configRedirectPatterns(routesManifest)
+    return read()
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -99,6 +105,8 @@ export default {
     )
     return handleWorkerRequest(request, env, {
       configRedirects,
+      legacyRoot: incoming =>
+        legacyRootRedirect(incoming, legacyRootSlug, catalogLegacyRootLookup(env, log)),
       // Redirects and the non-production robots.txt are answered before this, so they are
       // never rendered or stored. A cacheable request reaches OpenNext with allowlisted
       // headers only (`renderRequestFor` in lib/edge-cache/html-cache.ts).
