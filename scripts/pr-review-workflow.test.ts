@@ -50,7 +50,7 @@ const requiredChecks = [
 ]
 
 describe('pr-review workflow', () => {
-  it('reviews pull requests into staging (the base branch) and main (promotions, hotfixes)', () => {
+  it('reviews pull requests into staging (the base branch) and main (hotfixes)', () => {
     const workflow = loadWorkflow()
 
     expect(workflow.on.pull_request).toEqual({ branches: ['staging', 'main'] })
@@ -70,10 +70,10 @@ describe('pr-review workflow', () => {
     expect(workflow.jobs.changes).toBeUndefined()
   })
 
-  it('accepts pull requests into main only from staging or a hotfix branch of this repository', () => {
+  it('accepts pull requests into main only from a hotfix branch of this repository', () => {
     const workflow = loadWorkflow()
     const steps = workflow.jobs.validate.steps ?? []
-    const guard = steps.find(step => step.run?.includes('accepts only a promotion from staging'))
+    const guard = steps.find(step => step.run?.includes('it accepts only hotfix-* pull requests'))
 
     expect(steps.indexOf(guard as WorkflowStep)).toBe(1)
     expect(guard?.if).toBe("github.base_ref == 'main'")
@@ -90,7 +90,7 @@ describe('pr-review workflow', () => {
 
   it('runs the head-branch guard exactly, failing closed when the branch list is unavailable', () => {
     const steps = loadWorkflow().jobs.validate.steps ?? []
-    const guard = String(steps.find(step => step.name?.startsWith('Require a promotion'))?.run)
+    const guard = String(steps.find(step => step.name?.startsWith('Require a hotfix'))?.run)
     const exact = 'abc123\trefs/heads/staging\n'
     // [ls-remote exit status, ls-remote output, head ref, head repository, expected exit]
     const cases: Array<[number, string, string, string, number]> = [
@@ -100,13 +100,14 @@ describe('pr-review workflow', () => {
       [128, '', 'staging', repository, 1],
       // ls-remote tail-matches patterns; only refs/heads/staging itself counts.
       [0, 'abc123\trefs/heads/x/staging\n', 'issue-46-x', repository, 0],
-      [0, exact, 'staging', repository, 0],
+      // Promotions fast-forward main without a pull request (#171).
+      [0, exact, 'staging', repository, 1],
       [0, exact, 'hotfix-12-search', repository, 0],
       [0, exact, 'issue-46-x', repository, 1],
       [0, exact, 'x/staging', repository, 1],
       [0, exact, 'staging-2', repository, 1],
       [0, exact, 'hotfix-a/b', repository, 1],
-      [0, exact, 'staging', 'someone/best.serp.co', 1]
+      [0, exact, 'hotfix-12-search', 'someone/best.serp.co', 1]
     ]
     for (const [status, output, headRef, headRepository, expected] of cases) {
       // A shell function stands in for the git binary, so nothing reaches the network.
@@ -145,7 +146,7 @@ describe('pr-review workflow', () => {
     expect(stepRuns).toContain('pnpm test:d1')
     expect(stepRuns).toContain('pnpm lint:forbidden-links')
     const biomeStep = stepRuns?.find(run => run?.includes('pnpm exec biome check'))
-    // Against the pull request's own base: staging for changes, main for promotions.
+    // Against the pull request's own base: staging for changes, main for hotfixes.
     expect(biomeStep).toContain(
       'git diff --name-only --diff-filter=ACMR -z "origin/$GITHUB_BASE_REF...HEAD"'
     )
