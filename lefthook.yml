@@ -81,14 +81,14 @@ pre-commit:
         - "**/*.spec.*"
       run: node scripts/lint-forbidden-links.mjs {staged_files}
 
-    # Test modified test files
+    # Run the Vitest tests that import the staged files (Playwright specs run in pnpm test:e2e)
     test-modified:
-      glob: "apps/**/*.{test,spec}.{js,ts,tsx}"
-      run: pnpm tsx scripts/run-app-tests.ts {staged_files}
+      glob: "{apps/web/src,scripts}/**/*.{ts,tsx}"
+      run: pnpm exec vitest related --run --passWithNoTests {staged_files}
 
 # Pre-push validation
 pre-push:
   commands:
     # Run tests
     test-all:
-      run: pnpm tsx scripts/run-app-tests.ts
+      run: pnpm test

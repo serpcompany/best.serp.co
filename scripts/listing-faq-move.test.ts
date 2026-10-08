@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
@@ -69,104 +70,110 @@ describe('the committed FAQ manifest', () => {
     expect(listings.reduce((total, item) => total + item.faqs.length, 0)).toBe(2254)
   })
 
+  // Each case applies the whole reviewed import and every manifest: seconds on a CI runner.
   it.each([
     ['after #100’s', [HIJACKED_DOMAINS_PATH]],
     [
       'after #100’s and #98’s',
-      readdirSync(resolve(publications))
+      // Committed manifests only: d1-remote-publisher.test.ts writes temporary ones here.
+      execFileSync('git', ['ls-files', publications], { encoding: 'utf8' })
+        .split('\n')
         .filter(file => file.endsWith('.yaml') && !file.includes('listing-faqs'))
         .sort()
-        .map(file => `${publications}/${file}`)
     ]
-  ])('applies %s to the reviewed catalog, removing only the FAQ blocks', (_name, previous) => {
-    const database = new DatabaseSync(':memory:')
-    for (const migration of freshMigrationNames())
-      database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
-    database.exec(readReviewedImportSql(readParityReport()))
-    const contents = () =>
-      new Map(
-        (
-          database
-            .prepare("SELECT id, COALESCE(content,'') AS content FROM listings")
-            .all() as Array<{
-            content: string
-            id: string
-          }>
-        ).map(row => [row.id, row.content])
-      )
-    const faqRows = () =>
-      database
-        .prepare(
-          'SELECT listing_id,question,answer,sort_order FROM listing_faqs ORDER BY listing_id,sort_order'
+  ])(
+    'applies %s to the reviewed catalog, removing only the FAQ blocks',
+    (_name, previous) => {
+      const database = new DatabaseSync(':memory:')
+      for (const migration of freshMigrationNames())
+        database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
+      database.exec(readReviewedImportSql(readParityReport()))
+      const contents = () =>
+        new Map(
+          (
+            database
+              .prepare("SELECT id, COALESCE(content,'') AS content FROM listings")
+              .all() as Array<{
+              content: string
+              id: string
+            }>
+          ).map(row => [row.id, row.content])
         )
-        .all()
-    const apply = (path: string) => {
-      const text = readFileSync(resolve(path), 'utf8')
-      const parsed = parseManifest(text)
-      const live =
-        parsed.concurrency === 'rows'
-          ? (database.prepare('SELECT version, checksum FROM publication_state').get() as {
-              checksum: string
-              version: number
-            })
-          : undefined
-      const plan = buildPublicationPlan(parsed, text, '2026-10-06T00:00:00.000Z', live)
-      database.exec('BEGIN')
-      for (const item of plan.statements) {
-        assertD1StatementLimits(item.query, item.bindings)
+      const faqRows = () =>
         database
-          .prepare(item.query)
-          .run(
-            ...(item.bindings.map(value =>
-              typeof value === 'boolean' ? Number(value) : value
-            ) as SQLInputValue[])
+          .prepare(
+            'SELECT listing_id,question,answer,sort_order FROM listing_faqs ORDER BY listing_id,sort_order'
           )
+          .all()
+      const apply = (path: string) => {
+        const text = readFileSync(resolve(path), 'utf8')
+        const parsed = parseManifest(text)
+        const live =
+          parsed.concurrency === 'rows'
+            ? (database.prepare('SELECT version, checksum FROM publication_state').get() as {
+                checksum: string
+                version: number
+              })
+            : undefined
+        const plan = buildPublicationPlan(parsed, text, '2026-10-06T00:00:00.000Z', live)
+        database.exec('BEGIN')
+        for (const item of plan.statements) {
+          assertD1StatementLimits(item.query, item.bindings)
+          database
+            .prepare(item.query)
+            .run(
+              ...(item.bindings.map(value =>
+                typeof value === 'boolean' ? Number(value) : value
+              ) as SQLInputValue[])
+            )
+        }
+        database.exec('COMMIT')
       }
-      database.exec('COMMIT')
-    }
-    for (const path of previous) apply(path)
-    const before = contents()
-    const faqsBefore = faqRows()
-    const versionBefore = (
-      database.prepare('SELECT version FROM publication_state').get() as { version: number }
-    ).version
-    apply(FAQ_MANIFEST_PATH)
-    const after = contents()
-    const moved = new Map(
-      manifest.operations.map(operation =>
-        operation.action === 'listing-content-remove-suffix'
-          ? [operation.id, operation.suffix]
-          : ['', '']
-      )
-    )
-    for (const [id, content] of before) {
-      const suffix = moved.get(id)
-      // Every other character stays; listings without FAQs are untouched.
-      expect(after.get(id), id).toBe(
-        suffix ? content.slice(0, content.length - suffix.length) : content
-      )
-      if (suffix) expect(content.endsWith(suffix), id).toBe(true)
-    }
-    for (const item of listings) {
-      const content = after.get(item.id) ?? ''
-      expect(content, item.slug).not.toMatch(/^## FAQ$/mu)
-      for (const faq of item.faqs)
-        expect(content.includes(`### ${faq.question}`), item.slug).toBe(false)
-    }
-    // The FAQs themselves stay, for the FAQs section.
-    expect(faqRows()).toEqual(faqsBefore)
-    expect(database.prepare('SELECT version FROM publication_state').get()).toEqual({
-      version: versionBefore + 1
-    })
-    expect(
-      database
-        .prepare(
-          "SELECT COUNT(*) AS count FROM listing_events WHERE event_type='edited' AND detail LIKE '%#105%'"
+      for (const path of previous) apply(path)
+      const before = contents()
+      const faqsBefore = faqRows()
+      const versionBefore = (
+        database.prepare('SELECT version FROM publication_state').get() as { version: number }
+      ).version
+      apply(FAQ_MANIFEST_PATH)
+      const after = contents()
+      const moved = new Map(
+        manifest.operations.map(operation =>
+          operation.action === 'listing-content-remove-suffix'
+            ? [operation.id, operation.suffix]
+            : ['', '']
         )
-        .get()
-    ).toEqual({ count: 335 })
-    database.close()
-  })
+      )
+      for (const [id, content] of before) {
+        const suffix = moved.get(id)
+        // Every other character stays; listings without FAQs are untouched.
+        expect(after.get(id), id).toBe(
+          suffix ? content.slice(0, content.length - suffix.length) : content
+        )
+        if (suffix) expect(content.endsWith(suffix), id).toBe(true)
+      }
+      for (const item of listings) {
+        const content = after.get(item.id) ?? ''
+        expect(content, item.slug).not.toMatch(/^## FAQ$/mu)
+        for (const faq of item.faqs)
+          expect(content.includes(`### ${faq.question}`), item.slug).toBe(false)
+      }
+      // The FAQs themselves stay, for the FAQs section.
+      expect(faqRows()).toEqual(faqsBefore)
+      expect(database.prepare('SELECT version FROM publication_state').get()).toEqual({
+        version: versionBefore + 1
+      })
+      expect(
+        database
+          .prepare(
+            "SELECT COUNT(*) AS count FROM listing_events WHERE event_type='edited' AND detail LIKE '%#105%'"
+          )
+          .get()
+      ).toEqual({ count: 335 })
+      database.close()
+    },
+    60_000
+  )
 })
 
 describe('regenerating for an environment that has moved on', () => {

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
@@ -990,7 +991,11 @@ describe('listing domain report and manifest', () => {
   })
 
   it('keeps each committed owner-list cleanup identical to its decisions, and disjoint from other unpublications', () => {
-    const publications = readdirSync(resolve('d1/publications'))
+    // Committed manifests only: d1-remote-publisher.test.ts writes temporary ones here.
+    const publications = execFileSync('git', ['ls-files', 'd1/publications'], { encoding: 'utf8' })
+      .split('\n')
+      .filter(path => path.endsWith('.yaml'))
+      .map(path => path.slice('d1/publications/'.length))
     const unpublished = new Map<string, string>()
     for (const file of publications) {
       if (file.endsWith('-owner-list-cleanup.yaml')) continue
