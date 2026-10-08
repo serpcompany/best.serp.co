@@ -50,6 +50,8 @@ jobs:
     concurrency:
       group: deploy-best-serp-co-staging
       cancel-in-progress: false
+      # Waits behind a staging deploy rather than replacing or being replaced by one (web.yml).
+      queue: max
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment:
