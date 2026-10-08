@@ -69,6 +69,8 @@ const maxTextProbeBytes = 131_072
 // script is in the payload near the end.
 const maxDocumentProbeBytes = 4 * 1_048_576
 const googleTagManagerMarker = 'googletagmanager.com'
+/** The Cloudflare Web Analytics beacon's host (#170), which non-production must not load. */
+const webAnalyticsMarker = 'cloudflareinsights.com'
 const workerVersionPattern = /^[A-Za-z0-9-]{1,64}$/u
 /** The production Worker's platform host: where CI reaches it, with the smoke-test header. */
 const productionPlatformOrigin = new URL(project.remote.production.reviewOrigin)
@@ -632,14 +634,16 @@ async function readBoundedText(
 async function readDocument(
   response: Response,
   label: string
-): Promise<{ head: string; loadsGoogleTagManager: boolean }> {
+): Promise<{ head: string; loadsGoogleTagManager: boolean; loadsWebAnalytics: boolean }> {
   const document = await readBoundedText(response, label, {
     maxBytes: maxDocumentProbeBytes,
     stopAt: /googletagmanager\.com/iu
   })
   return {
     head: document,
-    loadsGoogleTagManager: document.toLowerCase().includes(googleTagManagerMarker)
+    loadsGoogleTagManager: document.toLowerCase().includes(googleTagManagerMarker),
+    // Read in full whenever Google Tag Manager is absent, so the beacon before `</body>` is seen.
+    loadsWebAnalytics: document.toLowerCase().includes(webAnalyticsMarker)
   }
 }
 
@@ -682,6 +686,8 @@ async function expectNonProductionPolicy(target: GateTarget, listingPath: string
         const document = await readDocument(response, `${mode} route /`)
         if (document.loadsGoogleTagManager)
           throw new Error(`${mode} route / loads Google Tag Manager.`)
+        if (document.loadsWebAnalytics)
+          throw new Error(`${mode} route / loads the Cloudflare Web Analytics beacon.`)
         if (metaRobotsBlocksIndexing(document.head))
           throw new Error(`${mode} route / sent noindex in its robots meta, on every host.`)
       }

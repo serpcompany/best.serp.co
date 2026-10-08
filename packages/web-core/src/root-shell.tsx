@@ -30,9 +30,26 @@ export const rootLayoutMetadata: Metadata = {
   }
 }
 
+/**
+ * The Cloudflare Web Analytics beacon (#170), at the end of `<body>` where Cloudflare's own
+ * injection puts it. The layout passes a token only on the public production site.
+ */
+function CloudflareWebAnalyticsBeacon({ token }: { token?: string }) {
+  if (!token) return null
+  return (
+    <script
+      data-cf-beacon={JSON.stringify({ token })}
+      defer
+      src="https://static.cloudflareinsights.com/beacon.min.js"
+    />
+  )
+}
+
 interface RootAppShellProps {
   bodyClassName?: string
   children: ReactNode
+  /** The Cloudflare Web Analytics site token; no beacon without it. */
+  cloudflareWebAnalyticsToken?: string
   feedTitle: string
   footer: ReactNode
   gtmId?: string
@@ -42,6 +59,7 @@ interface RootAppShellProps {
 export function RootAppShell({
   bodyClassName,
   children,
+  cloudflareWebAnalyticsToken,
   feedTitle,
   footer,
   gtmId,
@@ -66,6 +84,7 @@ export function RootAppShell({
             <BackToTop />
           </FavoritesProvider>
         </DesignSystemProvider>
+        <CloudflareWebAnalyticsBeacon token={cloudflareWebAnalyticsToken} />
       </body>
     </html>
   )

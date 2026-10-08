@@ -7,10 +7,10 @@
  * the request is for the canonical host (`best.serp.co`). Everything else is non-production:
  * local, staging, the production Worker's `*.workers.dev` host, and a missing or misspelled
  * var. Non-production responses carry `X-Robots-Tag: noindex, nofollow`, robots.txt disallows
- * every crawler, and Google Tag Manager does not load.
+ * every crawler, and no analytics load (Google Tag Manager, Cloudflare Web Analytics).
  *
  * The Worker entry applies the headers and robots.txt (`lib/worker/handle-request.ts`); the
- * root layout gates Google Tag Manager (`./request-environment.ts`). This module has no
+ * root layout gates the analytics (`analyticsForRequest` in `./request-environment.ts`). This module has no
  * Next.js or `server-only` imports so the Worker can run it before OpenNext loads.
  */
 import { site } from '@serpdirectory/site-config'
