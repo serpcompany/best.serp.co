@@ -25,7 +25,7 @@ const sharedSteps: HarnessStep[] = [
   {
     name: 'catalog data operations',
     command: 'pnpm',
-    args: ['--filter', 'web', 'test'],
+    args: ['exec', 'vitest', 'run', '--project', 'unit', 'apps/web/src/db'],
     remediation:
       'Fix the shared catalog contract, isolation, projection, cache, telemetry, or benchmark failure. See docs/DATA_MODEL.md.'
   },

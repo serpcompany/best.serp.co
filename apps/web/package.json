@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "analyze": "ANALYZE=true pnpm build",
-    "benchmark": "vitest run src/db/benchmark.test.ts",
     "build": "NODE_NO_WARNINGS=1 next build",
     "build:worker": "NODE_NO_WARNINGS=1 opennextjs-cloudflare build",
     "clean": "git clean -xdf .cache .turbo .next coverage node_modules",
@@ -15,7 +14,6 @@
     "preview:worker": "pnpm --dir=../.. tsx scripts/d1-local-preview.ts",
     "report": "playwright show-report",
     "start": "next start",
-    "test": "vitest run src/db/account.test.ts src/db/admin-plans.test.ts src/db/admin-queries.test.ts src/db/auth.test.ts src/db/test-support.test.ts src/db/cache.test.ts src/db/catalog.test.ts src/db/client.test.ts src/db/email-deliveries.test.ts src/db/public-url.test.ts src/db/submissions.test.ts src/db/submission-plans.test.ts src/db/draft-plans.test.ts src/db/draft-jobs.test.ts src/db/badge-program.test.ts src/db/claims.test.ts src/db/listing-plans.test.ts src/db/revision-plans.test.ts src/db/schema-invariants.test.ts src/db/url-key.test.ts src/db/media-format.test.ts src/db/media-keys.test.ts src/db/media-plans.test.ts src/db/media-ingest.test.ts src/db/media-operations.test.ts src/db/site-metadata.test.ts src/db/safe-fetch.test.ts src/db/safe-fetch-node.test.ts src/db/benchmark.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:fast": "playwright test --project=chromium",

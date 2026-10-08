@@ -16,9 +16,8 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `apps/web/`: the best.serp.co Next.js routes and OpenNext Worker (`wrangler.jsonc`); its
   code is in `apps/web/src/` (`app/`, `components/`, `lib/`, `hooks/`, `actions/`).
   `worker.ts` is the Worker entry: an epoch-keyed edge HTML cache in front of OpenNext.
-- `apps/web/src/lib/catalog/`: server-only adapter that acquires and validates the `DB`
-  binding and delegates to `apps/web/src/db/`. `apps/web/src/lib/admin/` does the same for the
-  admin panel's decisions.
+- `apps/web/src/lib/catalog/`: server-only adapter that validates the `DB` binding and delegates
+  to `apps/web/src/db/`; `apps/web/src/lib/admin/` does the same for the admin panel's decisions.
 - `apps/web/src/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
   the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/ACCOUNTS.md)).
 - `apps/web/e2e/`: Playwright suites that run against the local or deployed Worker.
@@ -50,7 +49,8 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
   and production only after Deploy Staging verified the same source tree
   (see [Release guards](./docs/RELEASE_GUARDS.md)).
 - `pnpm harness:fast` / `pnpm harness:check`: fast and full validation loops.
-- `pnpm test:e2e`: Playwright against a local Worker.
+- `pnpm test` (all Vitest projects), `pnpm test:e2e` (Playwright on a local Worker); while
+  editing, `pnpm exec vitest related --run <files>`.
 - `pnpm migration:compare -- <origin>`: structural page parity against best.serp.co.
 - `pnpm agent:manifest`, `pnpm agent:doctor`, `pnpm agent:dev`: machine-readable
   runtime identity, prerequisite diagnostics, and a logged isolated Worker preview.

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
+import { D1_TESTS } from '../vitest.config'
 import { githubHostedRunner } from './ci-runners'
 import { type ReleaseCommand, readOnlyCommands, releaseAuthorizations } from './cloudflare-release'
 import { MEDIA_HEALTH_SQL } from './media-health'
@@ -1710,9 +1711,12 @@ describe('protected deployment boundaries', () => {
   })
 
   it('runs these workflow and release contracts in the repository and D1 test suites', () => {
-    expect(packageScripts['test:repo']).toContain('scripts/deploy-workflows.test.ts')
-    expect(packageScripts['test:d1']).toContain('scripts/cloudflare-release.test.ts')
-    expect(packageScripts['test:d1']).toContain('scripts/staging-verification.test.ts')
+    // The unit project takes every scripts/ test the D1 project does not (vitest.config.ts).
+    expect(packageScripts['test:repo']).toBe('vitest run --project unit')
+    expect(packageScripts['test:d1']).toBe('vitest run --project d1')
+    expect(D1_TESTS).not.toContain('scripts/deploy-workflows.test.ts')
+    expect(D1_TESTS).toContain('scripts/cloudflare-release.test.ts')
+    expect(D1_TESTS).toContain('scripts/staging-verification.test.ts')
   })
 
   it('names every database command after its target, routing remote mutations through the guard', () => {
