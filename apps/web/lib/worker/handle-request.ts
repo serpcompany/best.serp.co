@@ -11,7 +11,10 @@
  * 4. Outside public production, `/robots.txt` disallows every crawler.
  * 5. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
  *    503, 403, or 401 (`lib/auth/admin-gate.ts`); pages and handlers then require an admin.
- * 6. Everything else is served through the edge HTML cache and OpenNext (`serve`).
+ * 6. The local dev endpoints (`/api/dev/*`, `/api/auth/dev/*`) answer 404 unless the Worker was
+ *    reached on a local host (#164). This uses the Worker's own URL: inside OpenNext a client's
+ *    `X-Forwarded-Host` becomes `Host`, so a check there alone could be talked past.
+ * 7. Everything else is served through the edge HTML cache and OpenNext (`serve`).
  *
  * Every response then carries the configured environment, the Worker version and, outside
  * public production, `X-Robots-Tag: noindex, nofollow` (`lib/environment/site-environment.ts`). These headers are
@@ -19,6 +22,7 @@
  */
 import { adminGate } from '../auth/admin-gate'
 import type { AccessEnv, VerifyAccessOptions } from '../auth/cloudflare-access'
+import { isLocalRequestHost } from '../environment/local-host'
 import {
   isPublicProduction,
   nonProductionRobotsTxt,
@@ -55,10 +59,24 @@ export async function handleWorkerRequest(
     trailingSlashRedirect(request, pipeline.configRedirects) ??
     (publicProduction ? null : nonProductionRobotsTxt(request)) ??
     (await adminGate(request, env, pipeline.access)) ??
+    devEndpointGate(request) ??
     (await pipeline.serve(request))
   return withEnvironmentHeaders(response, {
     environment: parseSiteEnvironment(env.SITE_ENVIRONMENT),
     publicProduction,
     versionId: env.CF_VERSION_METADATA?.id
   })
+}
+
+const DEV_ENDPOINT_PREFIXES = ['/api/dev/', '/api/auth/dev/']
+
+/** 404 for a local dev endpoint the Worker was not reached on a local host for (#164). */
+function devEndpointGate(request: Request): Response | null {
+  const { pathname } = new URL(request.url)
+  if (!DEV_ENDPOINT_PREFIXES.some(prefix => pathname.startsWith(prefix))) return null
+  if (isLocalRequestHost(request.url)) return null
+  return Response.json(
+    { error: 'not_found' },
+    { headers: { 'Cache-Control': 'private, no-store' }, status: 404 }
+  )
 }

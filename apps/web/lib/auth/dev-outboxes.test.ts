@@ -29,10 +29,10 @@ function worker(vars: { D1_RUNTIME_ENV: string; SITE_ENVIRONMENT: string }) {
   return env
 }
 
-async function otpOutbox(): Promise<Response> {
+async function otpOutbox(origin = ORIGIN): Promise<Response> {
   return handleAuthRequest(
-    new Request(`${ORIGIN}/api/auth/dev/otp-outbox?email=a%40example.com`, {
-      headers: { origin: ORIGIN }
+    new Request(`${origin}/api/auth/dev/otp-outbox?email=a%40example.com`, {
+      headers: { origin }
     })
   )
 }
@@ -64,6 +64,24 @@ describe('dev outboxes', () => {
       const env = worker({ D1_RUNTIME_ENV: environment, SITE_ENVIRONMENT: environment })
       expect((await otpOutbox()).status, environment).toBe(404)
       expect(devEmailOutboxResponse(env, `${ORIGIN}/api/dev/email-outbox`).status).toBe(404)
+    }
+  })
+
+  // A Worker that runs with the local vars must still serve nothing to a deployed host (#164).
+  // Better Auth's allowed hosts for the local config refuse the code outbox first; the email
+  // outbox checks the host itself.
+  it('stay closed on a local Worker for a request to a non-local host', async () => {
+    const env = worker({ D1_RUNTIME_ENV: 'local', SITE_ENVIRONMENT: 'local' })
+    for (const origin of ['https://best.serp.co', 'https://best-serp-co-staging.example.test']) {
+      const codes = await otpOutbox(origin).catch((error: unknown) => error)
+      if (codes instanceof Response) {
+        expect(codes.status, origin).not.toBe(200)
+        expect(await codes.text()).not.toMatch(/"otp"/u)
+      } else {
+        expect(String(codes), origin).toMatch(/not in the allowed hosts list/u)
+      }
+      const emails = devEmailOutboxResponse(env, `${origin}/api/dev/email-outbox?to=a@example.com`)
+      expect(emails.status, origin).toBe(404)
     }
   })
 

@@ -314,3 +314,44 @@ describe('admin gate', () => {
     }
   })
 })
+
+describe('local dev endpoints (#164)', () => {
+  const devPaths = ['/api/dev/email-outbox?to=a%40example.com', '/api/auth/dev/otp-outbox?email=a']
+
+  it.each(devPaths)(
+    'answers %s with 404 on a deployed host, whatever the headers say',
+    async path => {
+      for (const origin of [production, review, staging]) {
+        const { handler, response } = run(`${origin}${path}`, productionEnv, {
+          // Inside OpenNext this header becomes Host; the Worker must not trust it.
+          headers: { host: 'localhost', 'x-forwarded-host': 'localhost' }
+        })
+        expect((await response).status, origin).toBe(404)
+        expect(handler.serve).not.toHaveBeenCalled()
+      }
+    }
+  )
+
+  // The case #164 guards against: a deploy that ran with the local config.
+  it.each(devPaths)(
+    'answers %s with 404 on a deployed host even with the local vars',
+    async path => {
+      const { handler, response } = run(`${production}${path}`, {
+        ...productionEnv,
+        D1_RUNTIME_ENV: 'local',
+        SITE_ENVIRONMENT: 'local'
+      })
+      expect((await response).status).toBe(404)
+      expect(handler.serve).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each(devPaths)('serves %s on a local host', async path => {
+    const { handler, response } = run(`http://127.0.0.1:3100${path}`, {
+      ...productionEnv,
+      SITE_ENVIRONMENT: 'local'
+    })
+    expect((await response).status).toBe(200)
+    expect(handler.serve).toHaveBeenCalledTimes(1)
+  })
+})
