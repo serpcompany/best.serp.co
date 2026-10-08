@@ -24,6 +24,7 @@
 | [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, staging before production |
 | [Promotion plan 2026-10-06](./releases/2026-10-06-promotion-plan.md) | The first staging → main promotion of the #59 work: blockers, order, rollback |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees |
+| [CI](./CI.md) | `web.yml` checks and staging deploy, rulesets, runners |
 | [Dependency security](./DEPENDENCY_SECURITY.md) | Production dependency audit |
 | [Issue tracker](./agents/issue-tracker.md) | Agent issue workflow configuration |
 | [Triage labels](./agents/triage-labels.md) | Label conventions |

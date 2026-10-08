@@ -1,5 +1,5 @@
 /**
- * Where CI jobs run (docs/HARNESS.md#ci-runners).
+ * Where CI jobs run (docs/CI.md#runners).
  *
  * A routed job runs where the repository variable `CI_RUNNER_LABELS` points: JSON, either a
  * label array such as `["self-hosted","linux","x64"]` or a quoted runner name. While the
@@ -23,9 +23,5 @@ export const routedJobs = [
   'harness-gardening.yml:deterministic-audit',
   'labels.yml:triage',
   'link-checker.yml:links-checker',
-  'main-validation.yml:validate',
-  'pr-review.yml:test',
-  'pr-review.yml:typecheck',
-  'pr-review.yml:validate',
-  'pr-review.yml:worker-build'
+  'web.yml:check'
 ]

@@ -81,8 +81,17 @@ const fullOnlySteps: HarnessStep[] = [
   }
 ]
 
-export function stepsForProfile(profile: 'fast' | 'full'): HarnessStep[] {
-  return profile === 'fast' ? sharedSteps : [...sharedSteps, ...fullOnlySteps]
+export function stepsForProfile(
+  profile: 'fast' | 'full',
+  env: Partial<NodeJS.ProcessEnv> = process.env
+): HarnessStep[] {
+  if (profile === 'fast') return sharedSteps
+  // On a push, CI's deploy job builds the commit, so the check there leaves the build to it
+  // (.github/workflows/web.yml): each commit is built once.
+  const full = [...sharedSteps, ...fullOnlySteps]
+  return env.HARNESS_SKIP_BUILD === '1'
+    ? full.filter(step => step.name !== 'OpenNext Worker build')
+    : full
 }
 
 export function runHarness(profile: 'fast' | 'full'): void {
@@ -90,12 +99,14 @@ export function runHarness(profile: 'fast' | 'full'): void {
   const steps = stepsForProfile(profile)
   console.log(`Harness ${profile}: ${steps.length} deterministic checks`)
 
+  // HARNESS_SKIP_BUILD picks the steps above; the steps' own tests must not see it.
+  const { HARNESS_SKIP_BUILD: _skipBuild, ...inherited } = process.env
   for (const [index, step] of steps.entries()) {
     console.log(`\n[${index + 1}/${steps.length}] ${step.name}`)
     const result = spawnSync(step.command, step.args, {
       cwd: resolve('.'),
       env: {
-        ...process.env,
+        ...inherited,
         CI: process.env.CI || '1',
         FORCE_COLOR: process.env.FORCE_COLOR || '0'
       },

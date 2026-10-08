@@ -16,7 +16,7 @@ const stagingSha = '1'.repeat(40)
 const otherSha = 'f'.repeat(40)
 const otherTree = 'e'.repeat(40)
 const token = 'ghs_test'
-const rerun = 'gh workflow run deploy-staging.yml --ref staging'
+const rerun = 'gh workflow run web.yml --ref staging'
 
 interface Run {
   conclusion: string | null
@@ -41,7 +41,7 @@ function run(id: number, overrides: Partial<Run> = {}): Run {
     head_sha: head,
     html_url: `https://github.com/${project.repository}/actions/runs/${id}`,
     id,
-    path: '.github/workflows/deploy-staging.yml',
+    path: '.github/workflows/web.yml',
     run_attempt: 1,
     status: 'completed',
     ...overrides
@@ -102,7 +102,7 @@ function github(
 }
 
 const paths = (api: ReturnType<typeof github>) => api.requests.map(request => request.url.pathname)
-const runsPath = `/repos/${project.repository}/actions/workflows/deploy-staging.yml/runs`
+const runsPath = `/repos/${project.repository}/actions/workflows/web.yml/runs`
 const jobsPath = (id: number, attempt = 1) =>
   `/repos/${project.repository}/actions/runs/${id}/attempts/${attempt}/jobs`
 

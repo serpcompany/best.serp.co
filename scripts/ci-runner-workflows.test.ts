@@ -39,7 +39,6 @@ function allJobs(): Array<[string, WorkflowJob, WorkflowDefinition]> {
 const credentialedWorkflows = [
   'bootstrap-production-d1.yml',
   'deploy-production.yml',
-  'deploy-staging.yml',
   'media-health.yml',
   'publish-d1-staging.yml',
   'publish-d1.yml',
@@ -142,7 +141,7 @@ describe('CI runner routing', () => {
       else expect(job['runs-on'], id).toBe(githubHostedRunner)
     }
     expect(routed.sort()).toEqual([...routedJobs].sort())
-    expect(routedJobs).not.toContain('pr-review.yml:e2e')
+    expect(routedJobs).not.toContain('web.yml:e2e')
   })
 
   it('never hardcodes a self-hosted runner in a workflow', () => {
