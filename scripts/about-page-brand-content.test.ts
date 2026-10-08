@@ -94,8 +94,7 @@ describe('best.serp.co About page brand content', () => {
   it('points the web app at the site-owned About collection', () => {
     const source = readFileSync(resolve(process.cwd(), 'apps/web/content-collections.ts'), 'utf8')
 
-    expect(source).toContain("const aboutPath = '../../apps/web/content/about'")
-    expect(source).not.toContain("const aboutPath = '../../apps/web/content/about'")
+    expect(source).toContain("const aboutPath = './content/about'")
   })
 
   it('renders About with the shared content loader', () => {

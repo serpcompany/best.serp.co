@@ -9,9 +9,9 @@ import { features, type SiteFeatures } from './features'
  * (`email/emails/links.test.ts`) does for emails: submitter-facing copy that needs a later site
  * area lives in `feature-copy.ts` behind that area's flag, and no page or component says it
  * anywhere else while the flag is off. Scanned: `app/`, `components/`, `lib/submissions/` (its
- * messages reach the submitter), `lib/account/` (the dashboard's, #65), and
- * `lib/site` and `content/about` (site copy, including the About page). The admin panel is left out: its copy describes listing states to the team, not what
- * a submitter can do.
+ * messages reach the submitter), `lib/account/` (the dashboard's, #65), `lib/site/` and
+ * `content/about/` (site copy, including the About page). The admin panel is left out: its
+ * copy describes listing states to the team, not what a submitter can do.
  */
 
 const WEB_DIRECTORY = resolve(__dirname, '..')
@@ -112,8 +112,8 @@ describe('page copy', () => {
     expect(paths).toContain('components/submit/badge-step.tsx')
     expect(paths).toContain('components/submit/submit-form.tsx')
     expect(paths).toContain('lib/submissions/contract.ts')
-    expect(paths).toContain('../../../apps/web/src/lib/site/site.ts')
-    expect(paths).toContain('../../../apps/web/content/about/about.mdx')
+    expect(paths).toContain('lib/site/site.ts')
+    expect(paths).toContain('../content/about/about.mdx')
     expect(paths.some(path => path.includes('admin'))).toBe(false)
   })
 

@@ -10,7 +10,10 @@
  */
 
 import type { Redirect } from 'next/dist/lib/load-custom-routes'
-import { SITEMAP_INDEX_PATH, site, sitemapPaths } from '@/lib/site'
+// Relative module paths: next.config.ts loads this file, and its loader resolves neither `@/`
+// nor directory imports.
+import { site } from '../site/site'
+import { SITEMAP_INDEX_PATH, sitemapPaths } from '../site/site-routes'
 
 /** The canonical legal pages; `getRoute('privacy')` and `getRoute('terms')` name the same. */
 export const LEGAL_CANONICAL = {

@@ -7,7 +7,7 @@ import withMDX from '@next/mdx'
 import { withSentryConfig } from '@sentry/nextjs/config'
 import type { NextConfig } from 'next'
 import { movedUrlRedirects } from './src/lib/routing/redirects'
-import { site } from './src/lib/site'
+import { site } from './src/lib/site/site'
 import { sentryRelease } from './src/lib/telemetry/sentry'
 
 export const INTERNAL_PACKAGES = ['@serpdirectory/design-system', '@serpdirectory/utils']
