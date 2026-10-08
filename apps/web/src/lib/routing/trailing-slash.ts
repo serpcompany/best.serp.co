@@ -35,7 +35,7 @@ function invalidManifest(detail: string): Error {
   return new Error(
     `Invalid .next/routes-manifest.json: ${detail}. The Worker cannot tell which requests ` +
       'next.config.ts redirects, so it refuses to start rather than skip the trailing-slash ' +
-      'rule; see apps/web/lib/routing/trailing-slash.ts.'
+      'rule; see apps/web/src/lib/routing/trailing-slash.ts.'
   )
 }
 

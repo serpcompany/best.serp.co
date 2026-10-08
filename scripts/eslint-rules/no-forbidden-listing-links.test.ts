@@ -1,6 +1,8 @@
+import { globSync } from 'node:fs'
 import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 import noForbiddenListingLinks, {
+  DEFAULT_LINK_LINT_PATTERNS,
   preserveTextLinesProcessor
 } from './no-forbidden-listing-links.mjs'
 
@@ -112,5 +114,12 @@ describe('no-forbidden-listing-links', () => {
     )
 
     expect(messages).toEqual([])
+  })
+})
+
+describe('lint:forbidden-links default patterns (#172)', () => {
+  it.each(DEFAULT_LINK_LINT_PATTERNS)('%s matches files', pattern => {
+    // A pattern a move left behind would lint nothing and pass.
+    expect(globSync(pattern, { exclude: ['**/node_modules/**'] }).length).toBeGreaterThan(0)
   })
 })

@@ -169,6 +169,11 @@ describe('single-site D1-only repository architecture', () => {
       .sort()
     expect(appDirectories).toEqual(['e2e', 'web'])
     expect(project.appDirectory).toBe('apps/web')
+    // Next.js prefers apps/web/app over src/app: a leftover folder would build with no routes.
+    for (const folder of ['app', 'components', 'lib', 'actions', 'hooks']) {
+      expect(existsSync(resolve(project.appDirectory, folder)), folder).toBe(false)
+    }
+    expect(project.sourceDirectory).toBe('apps/web/src')
 
     const appManifest = JSON.parse(
       readFileSync(resolve(project.appDirectory, 'package.json'), 'utf8')

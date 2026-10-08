@@ -4,19 +4,21 @@
  * edge cache. Its cron hosts queued listing media, and locally it serves the media bucket at
  * `/_media` (#95).
  *
- * Admin paths pass the Cloudflare Access and session-cookie gate first (`lib/auth/admin-gate.ts`).
+ * Admin paths pass the Cloudflare Access and session-cookie gate first
+ * (`src/lib/auth/admin-gate.ts`).
  *
  * `scheduled()` serves the Cron Triggers in `wrangler.jsonc` (`triggers.crons`): the hourly draft
  * reminders and expiry (#63), the listing media queue every 15 minutes (#95), and the weekly
- * badge program (#66) with its daily rechecks, in `lib/worker/scheduled.ts`.
+ * badge program (#66) with its daily rechecks, in `src/lib/worker/scheduled.ts`.
  *
  * Wrangler's `main` points here (OpenNext "custom worker" pattern). The build output it wires
  * in (`.open-next/worker.js`, `.next/routes-manifest.json`) comes through
  * `worker-build-output.js`, so this file typechecks without a build. It only wires: the
- * pipeline lives in `lib/worker/handle-request.ts`, `lib/worker/catalog.ts`, `lib/routing/`,
- * `lib/environment/`, and `lib/edge-cache/html-cache.ts`, which are unit-tested, and it keeps
- * no state of its own (#165). See docs/ARCHITECTURE.md#environments-and-hosts,
- * docs/ARCHITECTURE.md#url-canonicalization, and docs/ARCHITECTURE.md#caching.
+ * pipeline lives in `src/lib/worker/handle-request.ts`, `src/lib/worker/catalog.ts`,
+ * `src/lib/routing/`, `src/lib/environment/`, and `src/lib/edge-cache/html-cache.ts`, which are
+ * unit-tested, and it keeps no state of its own (#165). See
+ * docs/ARCHITECTURE.md#environments-and-hosts, docs/ARCHITECTURE.md#url-canonicalization, and
+ * docs/ARCHITECTURE.md#caching.
  */
 import { withEdgeCache } from './src/lib/edge-cache/html-cache'
 import { serveLocalMedia } from './src/lib/media/worker-media'
@@ -99,7 +101,7 @@ export default {
     env: WorkerEnv,
     context: WorkerExecutionContext
   ): Promise<Response> {
-    // Local only: the media bucket has no public host there (lib/media/worker-media.ts).
+    // Local only: the media bucket has no public host there (src/lib/media/worker-media.ts).
     const localMedia = await serveLocalMedia(request, env)
     if (localMedia) return localMedia
     const render = catalogRenderer(
@@ -113,7 +115,7 @@ export default {
         legacyRootRedirect(incoming, legacyRootSlug, catalogLegacyRootLookup(env, log)),
       // Redirects and the non-production robots.txt are answered before this, so they are
       // never rendered or stored. A cacheable request reaches OpenNext with allowlisted
-      // headers only (`renderRequestFor` in lib/edge-cache/html-cache.ts).
+      // headers only (`renderRequestFor` in src/lib/edge-cache/html-cache.ts).
       serve: async served => {
         const cache = await caches.open(EDGE_CACHE_NAME)
         return withEdgeCache(

@@ -33,7 +33,7 @@ Until the token is set, production renders no beacon.
 
 ## Error reporting (Sentry)
 
-Sentry reports errors from the Worker (`apps/web/instrumentation.ts`, server rendering and
+Sentry reports errors from the Worker (`apps/web/src/instrumentation.ts`, server rendering and
 route handlers) and the browser (`instrumentation-client.ts`), with the settings and the
 scrubber in `apps/web/src/lib/telemetry/sentry.ts`: errors only, with no PII, query strings,
 cookies, headers, console output, logger data, sessions, tracing, or replay. Both deploy
