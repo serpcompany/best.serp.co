@@ -55,7 +55,10 @@ interface CloudflareEnv {
   BETTER_AUTH_URL?: string
   /** `on` 308s the production Worker's workers.dev host to best.serp.co (production only). */
   CANONICAL_HOST_REDIRECT?: 'on' | 'off'
-  /** Cloudflare Access application AUD tag for /admin and /api/admin (lib/auth/cloudflare-access.ts). */
+  /**
+   * Cloudflare Access application AUD tag for /admin and /api/admin
+   * (`src/lib/auth/cloudflare-access.ts`).
+   */
   CF_ACCESS_AUD?: string
   /** `on` requires Cloudflare Access locally or on staging; production always requires it. */
   CF_ACCESS_REQUIRED?: 'on' | 'off'
