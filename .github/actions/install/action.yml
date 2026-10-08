@@ -16,7 +16,7 @@ runs:
       uses: pnpm/action-setup@v6
       id: pnpm-install
       with:
-        version: "10.7.1"
+        # The version comes from package.json's packageManager.
         run_install: false
         dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
 

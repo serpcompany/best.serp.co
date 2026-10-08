@@ -17,7 +17,7 @@ import { mediaOrigin, mediaServerCommand, mediaServerEnabled } from './e2e/media
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`
 // Prepare the local best.serp.co D1 catalog, then serve the OpenNext Worker preview.
-const defaultWebServerCommand = `cd ../.. && pnpm db:migrate:local && pnpm db:import:local && pnpm db:verify:local && PORT=${playwrightPort} pnpm worker:preview`
+const defaultWebServerCommand = `cd ../.. && pnpm db:migrate:local && pnpm db:import:local && pnpm db:verify:local && PORT=${playwrightPort} pnpm preview`
 const webServerCommand = process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? defaultWebServerCommand
 const useExternalServer = process.env.PLAYWRIGHT_EXTERNAL_SERVER === '1'
 const workerCount = Number(process.env.E2E_WORKERS ?? 2)

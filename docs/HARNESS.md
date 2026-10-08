@@ -38,20 +38,20 @@ and TypeScript checks. Each step stops on failure and prints the governing docum
 The catalog contract also proves the injected Drizzle client retains per-statement
 D1 telemetry and reviewed query-plan bounds.
 
-### Full loop
+### Full loop: the finish gate
 
 ```bash
-pnpm harness:check
+pnpm check
 # equivalent
-pnpm validate
+pnpm harness:check
 ```
 
-The full loop adds a read-only Biome check over committed branch changes plus staged,
-unstaged, and untracked local files, followed by repository lint, repository tests,
-Wrangler identity validation, and the OpenNext Worker build. The changed-file check
-matches the file classes enforced by pull-request CI without requiring unrelated
-legacy files to be reformatted. The full loop never deploys or accesses a remote D1
-database.
+`pnpm check` is the finish gate (#179), and pull-request CI runs it. It adds `pnpm lint`
+(read-only `biome check .` over the whole repository and the forbidden-link guard),
+`pnpm db:check` (`drizzle-kit check` on the migration history), the repository tests,
+Wrangler identity validation, and the OpenNext Worker build. It never writes files, never
+deploys, and never accesses a remote D1 database; `pnpm lint:fix` and `pnpm format` are the
+commands that write.
 
 Run a focused test while implementing, the fast loop at milestone boundaries, and the
 full loop before a substantial completion claim.

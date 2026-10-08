@@ -34,12 +34,12 @@ otherwise `db:verify:local` finds two databases.
 ## Run the Worker
 
 ```bash
-pnpm dev
+pnpm preview
 ```
 
 This builds the OpenNext Worker and serves it on http://localhost:8787 against local
-D1. `pnpm --filter web dev` runs `next dev` for UI work, but only the Worker preview
-exercises the real D1 binding.
+D1. `pnpm dev` runs `next dev` for UI work, but only the Worker preview exercises the real D1
+binding.
 
 Listing media (#95) uses a local R2 bucket in the same state; the Worker serves it at
 `/_media/<key>`, and `curl localhost:8787/cdn-cgi/handler/scheduled` runs the media cron once
@@ -69,7 +69,7 @@ pnpm db:migrate:local
 
 Review the SQL and keep the D1 specifics described in [Data model](./DATA_MODEL.md)
 (`STRICT` tables and triggers). Never use `drizzle-kit push`. Then run
-`pnpm harness:check` (typecheck, tests, and the Worker build).
+`pnpm check` (lint, typecheck, `drizzle-kit check`, tests, and the Worker build).
 
 After the pull request merges into `staging`, Deploy Staging applies the migration to staging
 (`pnpm db:migrate:staging` in the workflow). When the owner promotes `staging` to `main`,

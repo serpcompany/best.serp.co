@@ -46,18 +46,18 @@ const sharedSteps: HarnessStep[] = [
 
 const fullOnlySteps: HarnessStep[] = [
   {
-    name: 'changed-file Biome policy',
-    command: 'pnpm',
-    args: ['tsx', 'scripts/harness/biome-changed.ts'],
-    remediation:
-      'Format or correct the reported changed files so the local result matches PR CI. See docs/HARNESS.md.'
-  },
-  {
-    name: 'read-only lint',
+    name: 'lint',
     command: 'pnpm',
     args: ['lint'],
     remediation:
-      'Fix lint findings, or use pnpm lint:fix intentionally and review its complete diff.'
+      'Fix the Biome or forbidden-link findings; pnpm lint:fix applies Biome fixes, so review its diff.'
+  },
+  {
+    name: 'database migrations',
+    command: 'pnpm',
+    args: ['db:check'],
+    remediation:
+      'Fix the migration history drizzle-kit reports; never edit generated SQL by hand. See docs/DATA_MODEL.md.'
   },
   {
     name: 'repository tests',
@@ -76,7 +76,7 @@ const fullOnlySteps: HarnessStep[] = [
   {
     name: 'OpenNext Worker build',
     command: 'pnpm',
-    args: ['worker:build'],
+    args: ['build'],
     remediation: 'Fix the Worker build before attempting any protected deployment.'
   }
 ]

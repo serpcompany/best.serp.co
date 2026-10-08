@@ -175,6 +175,10 @@ one you won't ship instead of leaving it waiting. Hotfixes follow
   ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)). Time Travel keeps 30 days.
 - Worker rollback: dashboard → Workers → `best-serp-co-production` → Deployments → Rollback,
   or `wrangler rollback --env production`. A rollback does not undo a migration.
+- Emergency deploy (the owner only, when the workflows cannot run): `pnpm deploy:staging` or
+  `pnpm deploy:production` builds the Worker and runs `opennextjs-cloudflare deploy --env`. It
+  skips every release guard, including the migration check, so apply pending migrations first
+  and prefer a rollback when one will do. Agents never run it.
 
 ## Rehearsals and read-only checks
 

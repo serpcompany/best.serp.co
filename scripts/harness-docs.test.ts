@@ -98,7 +98,8 @@ describe('repository harness contract', () => {
     expect(full.slice(0, fast.length)).toEqual(fast)
     expect(full).toEqual(
       expect.arrayContaining([
-        'read-only lint',
+        'lint',
+        'database migrations',
         'repository tests',
         'Cloudflare configuration',
         'OpenNext Worker build'
@@ -116,8 +117,7 @@ describe('repository harness contract', () => {
 
   it('keeps documentation and D1 contracts visible in pull-request validation', () => {
     const workflow = readFileSync(resolve('.github/workflows/pr-review.yml'), 'utf8')
-    expect(workflow).toContain('run: pnpm docs:check')
-    expect(workflow).toContain('run: pnpm test:repo')
-    expect(workflow).toContain('run: pnpm test:d1')
+    // pnpm check runs documentation health and both Vitest projects (scripts/harness/runner.ts).
+    expect(workflow).toContain('run: pnpm check')
   })
 })
