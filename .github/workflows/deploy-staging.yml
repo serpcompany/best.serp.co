@@ -59,6 +59,14 @@ jobs:
 
       - name: Build OpenNext Worker
         if: steps.credentials.outputs.configured == 'true'
+        # Sentry (#48): the public DSN and the commit as the release are baked into the build; the
+        # auth token only uploads source maps. Unset values leave Sentry off.
+        env:
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          NEXT_PUBLIC_SENTRY_RELEASE: ${{ github.sha }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: serpcompany
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: pnpm worker:build
 
       - name: Record staging D1 Time Travel bookmark

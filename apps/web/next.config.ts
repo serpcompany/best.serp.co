@@ -1,10 +1,12 @@
 import path from 'node:path'
 import { withContentCollections } from '@content-collections/next'
 import withMDX from '@next/mdx'
+import { withSentryConfig } from '@sentry/nextjs/config'
 import { baseConfig, withAnalyzer } from '@serpdirectory/config-next'
 import { site } from '@serpdirectory/site-config'
 import type { NextConfig } from 'next'
 import { movedUrlRedirects } from './lib/routing/redirects'
+import { sentryRelease } from './lib/telemetry/sentry'
 
 export const INTERNAL_PACKAGES = [
   '@serpdirectory/design-system',
@@ -151,6 +153,26 @@ nextConfig = withMDX()(nextConfig)
 if (process.env.ANALYZE === 'true') {
   nextConfig = withAnalyzer(nextConfig)
 }
+
+// Sentry (#48): uploads source maps and creates the release only when the deploy build has the
+// auth token; every other build (PRs, local) skips both and needs no network.
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN || undefined
+nextConfig = withSentryConfig(nextConfig, {
+  authToken: sentryAuthToken,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  release: {
+    create: Boolean(sentryAuthToken),
+    name: sentryRelease(process.env.NEXT_PUBLIC_SENTRY_RELEASE)
+  },
+  silent: !process.env.CI,
+  sourcemaps: { deleteSourcemapsAfterUpload: true, disable: !sentryAuthToken },
+  telemetry: false,
+  widenClientFileUpload: true
+})
+// withSentryConfig always adds `sentry-trace` and `baggage` meta tags for pageload tracing.
+// Tracing is off, and behind the edge HTML cache every visitor would share one trace id.
+if (nextConfig.experimental) delete nextConfig.experimental.clientTraceMetadata
 
 // withContentCollections must be the outermost wrapper
 export default withContentCollections(nextConfig)
