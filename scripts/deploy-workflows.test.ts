@@ -140,7 +140,8 @@ describe('staging deploy job', () => {
     })
     expect(Object.keys(workflow.jobs)).toEqual(['changes', 'check', 'e2e', 'tip', 'deploy-staging'])
     expect(job.needs).toEqual(['check', 'e2e', 'tip'])
-    // Only the staging tip starts it (the tip job), so a stale commit never joins the group.
+    // Only the staging tip starts it (the tip job); a partial re-run that reuses an old `tip`
+    // output waits in the queue, and the in-job tip guard skips it.
     expect(job.if).toBe(
       "github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'"
     )
@@ -1629,7 +1630,8 @@ describe('protected deployment boundaries', () => {
   })
 
   it('serializes privileged jobs only after their guards, so a refused run evicts nothing', () => {
-    // GitHub keeps one pending run per concurrency group and cancels the older one. A group on
+    // By default GitHub keeps one pending run per concurrency group and cancels the older one
+    // (the staging group queues instead, `queue: max`). A group on
     // the whole workflow let a mistyped dispatch replace a valid queued run before `authorize`
     // refused it. A job skipped by a failed `needs` or a false `if` never joins its group.
     const expected: Record<string, Record<string, unknown>> = {

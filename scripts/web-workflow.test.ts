@@ -246,7 +246,7 @@ describe('web workflow', () => {
   })
 
   it('starts the deploy only for the staging tip, and fails when the tip cannot be read', () => {
-    // Decided before deploy-staging joins its group, where joining cancels the queued deploy.
+    // Decided before deploy-staging starts, so a stale commit doesn't build or wait in the group.
     const job = workflow.jobs.tip
     expect(job?.needs).toEqual(['check', 'e2e'])
     expect(job?.if).toBe(
