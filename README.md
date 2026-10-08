@@ -37,6 +37,6 @@ pnpm migration:compare -- http://localhost:8787
 ```
 
 Pull requests target `staging`, which deploys the staging Worker. `main` is production: the
-owner promotes `staging` to `main` with a merge-commit pull request, and protected GitHub
-Actions workflows release it. See [Release guards](./docs/RELEASE_GUARDS.md#promotion), the
+owner promotes `staging` to `main` by fast-forward (`pnpm release:promote`), and protected
+GitHub Actions workflows release it. See [Release guards](./docs/RELEASE_GUARDS.md#promotion), the
 [deploy runbook](./docs/DEPLOY_RUNBOOK.md), and the [docs index](./docs/README.md).

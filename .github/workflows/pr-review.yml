@@ -1,7 +1,7 @@
 name: PR Review
 
-# Required checks for every pull request into staging (the base branch) and main (promotions
-# from staging and hotfixes). Every job runs on every PR: a skipped job satisfies a required
+# Required checks for every pull request into staging (the base branch) and main (hotfix-*
+# branches; staging reaches main by fast-forward, not a pull request). Every job runs on every PR: a skipped job satisfies a required
 # check, so nothing here is path-filtered.
 on:
   pull_request:
@@ -26,10 +26,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Catches a pull request opened against the wrong base. It is an accident guard, not the
-      # control: a pull request runs its own copy of this file. The control is Deploy
-      # Production's release-time tree check (docs/RELEASE_GUARDS.md#promotion).
-      - name: Require a promotion or hotfix branch for pull requests into main
+      # Catches a pull request opened against the wrong base: main changes only by the owner's
+      # fast-forward promotion (`pnpm release:promote`, no pull request) or a hotfix-* pull
+      # request. It is an accident guard, not the control: a pull request runs its own copy of
+      # this file. The control is Deploy Production's release-time tree check
+      # (docs/RELEASE_GUARDS.md#promotion).
+      - name: Require a hotfix branch for pull requests into main
         if: github.base_ref == 'main'
         env:
           HEAD_REF: ${{ github.head_ref }}
@@ -45,10 +47,10 @@ jobs:
             echo "No staging branch exists yet, so main still accepts every pull request."
             exit 0
           fi
-          if [ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] && { [ "$HEAD_REF" = "staging" ] || [[ "$HEAD_REF" =~ ^hotfix-[A-Za-z0-9._-]+$ ]]; }; then
+          if [ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] && [[ "$HEAD_REF" =~ ^hotfix-[A-Za-z0-9._-]+$ ]]; then
             exit 0
           fi
-          echo "::error::main is production and accepts only a promotion from staging or a hotfix-* branch. Retarget this pull request to staging (docs/RELEASE_GUARDS.md#promotion)."
+          echo "::error::main is production: it accepts only hotfix-* pull requests, and staging reaches it by the owner's fast-forward promotion, not a pull request. Retarget this pull request to staging (docs/RELEASE_GUARDS.md#promotion)."
           exit 1
 
       - name: Install

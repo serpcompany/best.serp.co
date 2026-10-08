@@ -56,27 +56,31 @@ database.
 Run a focused test while implementing, the fast loop at milestone boundaries, and the
 full loop before a substantial completion claim.
 
-Pull requests into `staging` (the base branch) and `main` (promotions from `staging`, and
-`hotfix-*` branches) run `pr-review.yml`. The repository rulesets `staging` and `main` (id
+Pull requests into `staging` (the base branch) and `main` (`hotfix-*` branches only) run
+`pr-review.yml`. The repository rulesets `staging` and `main` (id
 24391799) apply these rules:
 
 - Every change needs a pull request: squash-merged into `staging` (except the merge commit
-  that brings a hotfix back from `main`); into `main`, a merge commit for promotions and a
-  squash for hotfixes.
-- Six checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
-  `OpenNext Worker Build`, and `E2E Tests` from `pr-review.yml`, and `issue-link` from
-  `pr-issue-link.yml` (serp's workflow, copied unchanged), which fails a pull request that
-  closes no issue. Every `pr-review.yml` job runs on every pull request, because a skipped job
-  satisfies a required check. `issue-link` skips bot PRs and PRs whose head and base are
-  `staging` and `main`; a merge-back from any other branch needs a `No issue: <reason>` line.
-- Force pushes and branch deletion are blocked.
+  that brings a hotfix back from `main`) and into `main` for hotfixes. The one exception is
+  the owner's fast-forward promotion of `staging` (`pnpm release:promote`), a bypass push.
+- Five checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
+  `OpenNext Worker Build`, and `E2E Tests` from `pr-review.yml`. `issue-link` from
+  `pr-issue-link.yml` (serp's workflow, copied unchanged) runs on every pull request and fails
+  one that closes no issue; it is not a required check yet. Every `pr-review.yml` job runs on
+  every pull request, because a skipped job satisfies a required check. `issue-link` skips bot
+  PRs and PRs whose head and base are `staging` and `main`; a merge-back from any other branch
+  needs a `No issue: <reason>` line.
+- Force pushes and branch deletion are blocked, with no bypass.
 
-The rulesets require no approving review, no up-to-date branch, and no resolved
-conversations. Repository admins can bypass them only through a pull request, never with a
-direct push. Rulesets cannot restrict a pull request's head branch, so `Validate Site &
-Policy` fails a pull request into `main` whose head is not `staging` or `hotfix-*`. That only
-catches mis-targeted pull requests; Deploy Production's tree check is the control. Agents
-never merge: the owner approves every merge
+The rulesets require no approving review, no up-to-date branch, and no resolved conversations.
+Repository admins can bypass them only through a pull request. The exception is the owner's
+fast-forward promotion (`pnpm release:promote`, #171), a direct push to `main`. A bypass covers
+a whole ruleset, so that push needs `main`'s pull request and check rules in a ruleset of their
+own the owner may bypass, with deletion and force-push blocking left in one nobody can bypass
+(#171 owner step; until then the push is rejected). Agents never push. Rulesets cannot restrict
+a pull request's head branch, so `Validate Site & Policy` fails a pull request into `main` whose
+head is not a `hotfix-*` branch. That only catches mis-targeted pull requests; Deploy
+Production's tree check is the control. Agents never merge: the owner approves every merge
 ([Release guards](./RELEASE_GUARDS.md#promotion)).
 
 After a reviewed pull request merges, `main-validation.yml` runs the full loop again
