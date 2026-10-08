@@ -306,6 +306,22 @@ describe('email OTP sign-in', () => {
     expect(Number((rows as { n: number }).n)).toBeGreaterThan(0)
   })
 
+  // The deploy HTTP gates send this request after every deploy (#161), so it must get the same
+  // answer however often it repeats, and never count toward a limit or send a code.
+  it('answers an empty email 400 INVALID_EMAIL every time, without counting or sending', async () => {
+    const h = harness()
+    const browser = new Browser('198.51.100.9')
+    const tries = OTP_REQUEST_LIMITS.ipBurst.max + 3
+    for (let index = 0; index < tries; index += 1) {
+      const response = await h.call(SEND, { body: { email: '', type: 'sign-in' }, browser })
+      expect(response.status).toBe(400)
+      expect(((await response.json()) as { code: string }).code).toBe('INVALID_EMAIL')
+    }
+    expect(h.sent).toEqual([])
+    const rows = h.sqlite.database.prepare('SELECT count(*) AS n FROM auth_rate_limit_hits').get()
+    expect(Number((rows as { n: number }).n)).toBe(0)
+  })
+
   it('groups an IPv6 /64 into one client for the per-client limits', async () => {
     const h = harness()
     for (let index = 1; index <= OTP_REQUEST_LIMITS.ipBurst.max; index += 1) {

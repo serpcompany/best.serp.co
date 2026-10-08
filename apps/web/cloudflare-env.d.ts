@@ -89,4 +89,6 @@ interface CloudflareEnv {
   USESEND_API_KEY?: string
   /** The useSend instance origin, `https://app.usesend.com` (staging and production). */
   USESEND_BASE_URL?: string
+  /** This environment's own Worker, which OpenNext calls through (wrangler.jsonc `services`). */
+  WORKER_SELF_REFERENCE?: { fetch(request: Request): Promise<Response> }
 }

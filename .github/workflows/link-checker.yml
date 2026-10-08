@@ -6,9 +6,6 @@ on:
   schedule:
     - cron: "0 0 * * 1" # weekly on Monday
 
-env:
-  HUSKY: 0
-
 jobs:
   links-checker:
     # CI_RUNNER_LABELS picks the runner; fork pull requests stay on ubuntu-latest (docs/HARNESS.md).
