@@ -144,8 +144,7 @@ describe('theme colors only (#183)', () => {
       '7: palette variable --color-red-500',
       '7: palette variable --color-amber-600',
       '8: hex color #000000',
-      '8: hex color #fff',
-      '8: hex color #000'
+      '8: hex color #fff'
     ])
     expect(literalColors('a {\n  /* #fff */\n  border: 1px solid #ccc;\n}', 'probe.css')).toEqual([
       '3: hex color #ccc'
@@ -161,12 +160,13 @@ describe('theme colors only (#183)', () => {
           '/** Never `bg-red-500`. */',
           'const a = 1 /* #fff */',
           "const href = '#faqs'",
-          "const fail = () => { throw new Error('Retry later (#68), see #12, #13.') }",
+          "const fail = () => { throw new Error('Retry later (#68), see #155, #183.') }",
           'const page = (',
           '  <>',
           '    <p className="bg-destructive text-muted-foreground border-border ring-ring" />',
           '    <div className="text-balance bg-background/80 from-primary" />',
           '    <p>// not a comment, and #155 in copy</p>',
+          '    <p>Badge or payment only (#130, #133).</p>',
           '    {/* bg-red-500 */}',
           '  </>',
           ')'

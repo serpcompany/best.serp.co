@@ -20,13 +20,14 @@ const patterns: ReadonlyArray<readonly [string, RegExp]> = [
   ['palette variable', new RegExp(`--color-${PALETTE}(?:-\\d{2,3})?(?![\\w-])`, 'gu')],
   // A hex with a letter is a color wherever it stands. Copy names issues with digits (`(#68)`),
   // so a hex of 3 or 4 digits only counts where a value starts (`'#000'`, `: #000`, `_#000]`,
-  // `, #000`); one of 6 or 8 digits, which no issue number has, counts after a space or `(` too.
+  // `,#000`), never after a space (`(#130, #133)`); one of 6 or 8 digits, which no issue number
+  // has, counts after a space or `(` too.
   [
     'hex color',
     new RegExp(
       [
         `(?<![\\w&#])(?=#\\d*[a-fA-F])${HEX}`,
-        `(?:(?<=['"\`[=:,]\\s?)|(?<=_))${HEX}`,
+        `(?:(?<=['"\`[=:]\\s?)|(?<=[_,]))${HEX}`,
         '(?<=[\\s(])#(?:\\d{8}|\\d{6})(?![\\w-])'
       ].join('|'),
       'gu'
