@@ -53,7 +53,7 @@ export function MobileDrawer({
     if (isOpen) {
       onClose()
     }
-  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   // Prevent body scroll when drawer is open
   useEffect(() => {
