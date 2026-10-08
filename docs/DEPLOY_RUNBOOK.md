@@ -85,6 +85,21 @@ Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "S
 skipped" notice. After they exist, the next push to `staging` deploys staging. The
 `BETTER_AUTH_SECRET` secret and the `/admin` Access app: [Accounts](./ACCOUNTS.md).
 
+### Cloudflare Web Analytics
+
+Production loads the Cloudflare Web Analytics beacon next to Google Tag Manager once it has a
+site token (#170). Until then it renders no beacon.
+
+1. In the Cloudflare dashboard, open Web Analytics and add the site `best.serp.co`. Pick the
+   JavaScript snippet setup. Leave automatic injection off: the Worker renders the beacon
+   itself, so injection would add a second one.
+2. Copy the `token` from the snippet (32 hex characters; public, not a secret) into
+   `env.production.vars.CF_WEB_ANALYTICS_TOKEN` in `apps/web/wrangler.jsonc`, through a pull
+   request. Staging and local never set it.
+3. After the production deploy, best.serp.co's HTML ends with a
+   `static.cloudflareinsights.com/beacon.min.js` script; the workers.dev host and staging have
+   none (`analyticsForRequest`, [Architecture](./ARCHITECTURE.md#environments-and-hosts)).
+
 ## Workflows
 
 | Workflow | Trigger | Environment | Typed confirmation | Does |

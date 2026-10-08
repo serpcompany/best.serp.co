@@ -34,7 +34,7 @@ vi.mock('@/components/layout/public-chrome', () => ({
 }))
 vi.mock('@/lib/catalog/repository', () => ({ getActiveCategories: async () => [] }))
 vi.mock('@/lib/environment/request-environment', () => ({
-  googleTagManagerIdForRequest: async () => undefined
+  analyticsForRequest: async () => ({})
 }))
 vi.mock('@/actions/get-home-page-data', () => ({ getHomePageData: async () => null }))
 
