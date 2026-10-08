@@ -522,6 +522,29 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     }
   })
 
+  test('tags every serp.ly link with the Dub partner ID', async ({ page }) => {
+    // The footer's social links on every page; links in a listing's body text (321tube's
+    // "Start here" link); a listing's "Visit Site" button and resource links (#169). The
+    // listing with the button goes last for the check below.
+    for (const path of ['/', '/brands/', listingPath('321tube-downloader'), detailListing.path]) {
+      await page.goto(path, { waitUntil: 'domcontentloaded' })
+      const hrefs = await page
+        .locator('a[href]')
+        .evaluateAll(links => links.map(link => (link as HTMLAnchorElement).href))
+      const shortLinks = hrefs.filter(href => new URL(href).hostname === 'serp.ly')
+      expect(shortLinks.length, `${path} renders serp.ly links`).toBeGreaterThan(0)
+      for (const href of shortLinks) {
+        expect(new URL(href).searchParams.get('via'), href).toBe(site.dubPartnerId)
+      }
+      if (path === listingPath('321tube-downloader')) {
+        // The body text's own serp.ly link, not only the button or the footer.
+        await expect(page.locator('.prose a[href^="https://serp.ly/"]').first()).toBeAttached()
+      }
+    }
+    const visitSite = page.getByRole('link', { name: /visit site/i }).first()
+    expect(new URL((await visitSite.getAttribute('href')) ?? '').hostname).toBe('serp.ly')
+  })
+
   test('has no horizontal overflow on a mobile viewport', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/', { waitUntil: 'networkidle' })

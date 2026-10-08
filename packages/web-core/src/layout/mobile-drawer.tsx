@@ -17,6 +17,7 @@ import { ExternalLink, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { type ReactNode, useEffect, useRef } from 'react'
+import { withDubVia } from '../dub-via'
 import { FavoritesLink } from '../ui/favorites-link'
 import type { HeaderAuthState } from './header-auth-state'
 
@@ -272,7 +273,7 @@ export function MobileDrawer({
                 {externalResources.map(resource => (
                   <Link
                     key={resource.slug}
-                    href={resource.url}
+                    href={withDubVia(resource.url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={directoryNavigationInteractiveClassName}

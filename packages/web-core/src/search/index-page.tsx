@@ -5,6 +5,7 @@ import type { ComponentType } from 'react'
 import { Suspense } from 'react'
 import { resolveCategories } from '../categories'
 import { getCategoryDisplayName } from '../category-display'
+import { withDubVia } from '../dub-via'
 import { externalResources } from '../external-resources'
 import { getRoute } from '../routes'
 import { generateBaseMetadata } from '../seo-config'
@@ -85,7 +86,7 @@ export function SearchIndexPage({ activeCategorySlugs, slots }: SearchIndexPageP
                   {externalResources.map(resource => (
                     <Link
                       key={resource.slug}
-                      href={resource.url}
+                      href={withDubVia(resource.url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="group flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"

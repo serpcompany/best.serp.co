@@ -16,6 +16,7 @@ import { siteCopy } from '@serpdirectory/web-core/site-copy'
 import { Linkedin } from 'lucide-react'
 import Link from 'next/link'
 import type { ComponentType } from 'react'
+import { withDubVia } from '../dub-via'
 import { ModeToggle } from '../mode-toggle'
 import { resolveFooterBadgeConfigs } from './footer-badges'
 
@@ -97,7 +98,7 @@ function getFooterSocialLinks(): SocialLink[] {
     }
 
     socialLinks.set(link.href, {
-      href: link.href,
+      href: withDubVia(link.href),
       icon,
       label: link.label
     })
