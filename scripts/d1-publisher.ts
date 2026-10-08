@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parse } from 'yaml'
+import { z } from 'zod'
 import { IMAGE_CONTENT_TYPES, MAX_IMAGE_SIDE } from '../apps/web/src/db/media-format'
 import {
   contentTypeForKey,
@@ -10,8 +12,6 @@ import {
   parseMediaKey
 } from '../apps/web/src/db/media-keys'
 import { listingHasQueuedSubmission } from '../apps/web/src/db/plan-support'
-import { parse } from 'yaml'
-import { z } from 'zod'
 import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
 import { assertD1Compatible } from './d1-compat'
 import { validateCanonicalLocalConfig } from './d1-local-config'

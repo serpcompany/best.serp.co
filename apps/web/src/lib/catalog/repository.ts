@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { cache } from 'react'
 import { createCacheApiDataCache, noCatalogDataCache } from '@/db/cache'
 import { createCatalogOperations, MAX_SEARCH_LIMIT } from '@/db/catalog'
 import { sharedCatalogEpoch } from '@/db/catalog-epoch'
@@ -17,7 +18,6 @@ import {
   resolveListingMedia,
   validateMediaBaseUrl
 } from '@/db/media-keys'
-import { cache } from 'react'
 import type { WebsiteDetailMetadata, WebsiteMetadata } from '@/lib/directory/content-query'
 
 export type { ListingNamePage, PublishedCategory, UnpublishedListing }

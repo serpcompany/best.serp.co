@@ -1,10 +1,10 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createDatabase } from '@/db/client'
 import {
   createEmailDeliveryLedger,
   EMAIL_DELIVERY_MAX_ATTEMPTS,
   type EmailDeliveryLedger
 } from '@/db/email-deliveries'
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SqliteD1 } from '@/db/test-support'
 import { type EmailEnvironmentVars, resolveEmailPolicy } from './config'
 import { createWorkerEmailService, isEmailDeliveryConfigured } from './runtime'

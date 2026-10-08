@@ -1,13 +1,5 @@
-import type {
-  DraftJobOperations,
-  DueDraftReminder,
-  ExpiredDraft
-} from '@/db/draft-jobs'
-import {
-  DRAFT_REMINDER_COUNT,
-  draftExpiredEmailKey,
-  draftReminderEmailKey
-} from '@/db/draft-plans'
+import type { DraftJobOperations, DueDraftReminder, ExpiredDraft } from '@/db/draft-jobs'
+import { DRAFT_REMINDER_COUNT, draftExpiredEmailKey, draftReminderEmailKey } from '@/db/draft-plans'
 import { EMAIL_DELIVERY_MAX_ATTEMPTS } from '@/db/email-deliveries'
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'

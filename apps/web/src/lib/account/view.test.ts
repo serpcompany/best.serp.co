@@ -1,9 +1,5 @@
-import type {
-  AccountListing,
-  AccountOverview,
-  AccountSubmission
-} from '@/db/account'
 import { describe, expect, it } from 'vitest'
+import type { AccountListing, AccountOverview, AccountSubmission } from '@/db/account'
 import { accountCards, accountRows, categoryChoices } from './view'
 
 /** The dashboard's table (#65, #70 screen 5): which rows, statuses, next steps, and menus. */

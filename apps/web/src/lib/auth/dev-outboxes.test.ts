@@ -3,8 +3,9 @@
  * Worker whose `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` both say `local` (PR #84 review round 1,
  * finding 10). One var alone is never enough.
  */
-import { SqliteD1 } from '@/db/test-support'
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SqliteD1 } from '@/db/test-support'
 import { devEmailOutboxResponse } from '../email/dev-outbox'
 import { clearDevEmailOutbox, createLogEmailSender } from '../email/senders'
 import { handleAuthRequest } from './server'

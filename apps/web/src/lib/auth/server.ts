@@ -13,16 +13,12 @@ import 'server-only'
  * route answers 503 and the guards never grant access.
  */
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import {
-  type AuthRateLimitDecision,
-  type AuthRateLimitRule,
-  createAuthOperations
-} from '@/db/auth'
-import { createDatabase } from '@/db/client'
-import { pruneEmailDeliveries } from '@/db/email-deliveries'
 import { headers } from 'next/headers'
 import { forbidden, unauthorized } from 'next/navigation'
 import { cache } from 'react'
+import { type AuthRateLimitDecision, type AuthRateLimitRule, createAuthOperations } from '@/db/auth'
+import { createDatabase } from '@/db/client'
+import { pruneEmailDeliveries } from '@/db/email-deliveries'
 import { type Auth, createAuth } from './config'
 import {
   type Authorization,

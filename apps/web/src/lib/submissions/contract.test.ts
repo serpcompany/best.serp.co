@@ -1,9 +1,9 @@
+import { describe, expect, it } from 'vitest'
 import {
   VERIFICATION_COOLDOWN_SECONDS as DATA_COOLDOWN,
   SUBMISSION_LIMITS,
   VERIFICATION_MAX_ATTEMPTS
 } from '@/db/submissions'
-import { describe, expect, it } from 'vitest'
 import { parseLocalDraft } from '../../components/submit/draft-storage'
 import {
   checksLeft,

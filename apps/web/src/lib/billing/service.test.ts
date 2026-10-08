@@ -5,6 +5,8 @@
  * target can't accept is refunded; upgrades and relists apply to the listing; and refunds follow
  * the rejection or the badge check at refund.
  */
+
+import { describe, expect, it } from 'vitest'
 import { createBadgeProgramOperations } from '@/db/badge-program'
 import { createBillingOperations } from '@/db/billing'
 import { createDatabase } from '@/db/client'
@@ -12,7 +14,6 @@ import { executePlans } from '@/db/plan-runner'
 import { prepareCatalogPublication } from '@/db/plan-support'
 import { buildRejectSubmissionPlans } from '@/db/submission-plans'
 import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
-import { describe, expect, it } from 'vitest'
 import { checkBadgeAtRefund } from '../badge-program/refund'
 import { features, type SiteFeatures } from '../features'
 import type { GuardrailResult } from './guardrails'

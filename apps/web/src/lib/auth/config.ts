@@ -18,6 +18,10 @@
  * imports, so tests run the real configuration against SQLite (`config.test.ts`).
  */
 
+import { APIError, createAuthEndpoint, createAuthMiddleware } from 'better-auth/api'
+import { betterAuth } from 'better-auth/minimal'
+import { emailOTP } from 'better-auth/plugins/email-otp'
+import type { BetterAuthPlugin } from 'better-auth/types'
 import {
   type AuthOperations,
   authSchemaOptions,
@@ -25,10 +29,6 @@ import {
   normalizeEmail
 } from '@/db/auth'
 import type { Database } from '@/db/client'
-import { APIError, createAuthEndpoint, createAuthMiddleware } from 'better-auth/api'
-import { betterAuth } from 'better-auth/minimal'
-import { emailOTP } from 'better-auth/plugins/email-otp'
-import type { BetterAuthPlugin } from 'better-auth/types'
 import { signInCodeDigits } from '../email/sign-in-code'
 import { isLocalRequestHost } from '../environment/local-host'
 import {

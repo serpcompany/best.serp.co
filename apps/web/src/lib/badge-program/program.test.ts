@@ -1,3 +1,4 @@
+import { describe, expect, it, vi } from 'vitest'
 import type {
   BadgeCheckRecord,
   BadgeProgramListing,
@@ -5,7 +6,6 @@ import type {
   PendingConfirmation,
   RecordedBadgeCheck
 } from '@/db/badge-program'
-import { describe, expect, it, vi } from 'vitest'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'
 import {
   BADGE_CHECK_LIMIT,

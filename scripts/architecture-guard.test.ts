@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import ts from 'typescript'
+import { describe, expect, it } from 'vitest'
 import {
   D1_MAX_FUNCTION_ARGUMENTS,
   d1StatementLimitViolations,
@@ -8,8 +10,6 @@ import {
   oversizedPatternLiterals,
   stripSqlLiteralsAndComments
 } from '../apps/web/src/db/sql-limits'
-import ts from 'typescript'
-import { describe, expect, it } from 'vitest'
 import { project } from './project'
 
 /** Drizzle's pattern helpers: they build a LIKE from a bound value without SQL text. */

@@ -1,9 +1,9 @@
 import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { cache } from 'react'
 import { type AccountOperations, createAccountOperations } from '@/db/account'
 import { createDatabase } from '@/db/client'
-import { cache } from 'react'
 
 /**
  * Server-only adapter for the submitter dashboard (serpcompany/best.serp.co#65): it validates

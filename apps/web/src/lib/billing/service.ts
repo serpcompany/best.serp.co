@@ -18,11 +18,7 @@ import {
   prepareCatalogPublication,
   type StatementPlan
 } from '@/db/plan-support'
-import type {
-  OrderOutcome,
-  OrderRefundListingAction,
-  OrderRefundReason
-} from '@/db/schema'
+import type { OrderOutcome, OrderRefundListingAction, OrderRefundReason } from '@/db/schema'
 import {
   buildChooseSubmissionPlanPlans,
   buildRecordSubmissionPaymentPlans,

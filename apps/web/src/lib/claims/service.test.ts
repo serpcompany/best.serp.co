@@ -1,7 +1,7 @@
+import { beforeEach, describe, expect, it } from 'vitest'
 import { createBadgeProgramOperations } from '@/db/badge-program'
 import { createClaimOperations } from '@/db/claims'
 import { createDatabase } from '@/db/client'
-import { beforeEach, describe, expect, it } from 'vitest'
 import { SqliteD1 } from '@/db/test-support'
 import { features } from '../features'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'

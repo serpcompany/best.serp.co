@@ -8,11 +8,7 @@
 
 import type { ListingLogoIngestion } from '@/db/listing-plans'
 import { ingestImage, scopedMediaBucket } from '@/db/media-ingest'
-import {
-  isMediaKey,
-  LOCAL_MEDIA_PATH,
-  MEDIA_CACHE_CONTROL
-} from '@/db/media-keys'
+import { isMediaKey, LOCAL_MEDIA_PATH, MEDIA_CACHE_CONTROL } from '@/db/media-keys'
 import {
   createMediaOperations,
   type MediaOperations,

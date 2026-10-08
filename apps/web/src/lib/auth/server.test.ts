@@ -5,8 +5,9 @@
  * read the allowlist on every request, so removing an email revokes admin access on the next
  * request, also while another admin stays on the allowlist.
  */
-import { SqliteD1 } from '@/db/test-support'
+
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { SqliteD1 } from '@/db/test-support'
 import { hasSessionCookie } from './cookies'
 import { clearDevOtpOutbox } from './otp-sender'
 import { authorizeAdminRequest, handleAuthRequest, requireAdmin } from './server'

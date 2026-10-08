@@ -1,5 +1,5 @@
-import { safeFetch } from '@/db/safe-fetch'
 import type { DefaultTreeAdapterMap } from 'parse5'
+import { safeFetch } from '@/db/safe-fetch'
 import { HtmlBudget, parseBoundedHtml } from './bounded-html'
 import {
   declaredEncodings,

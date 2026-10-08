@@ -1,7 +1,7 @@
+import { beforeEach, describe, expect, it } from 'vitest'
 import { createDatabase } from '@/db/client'
 import { createDraftJobOperations } from '@/db/draft-jobs'
 import { createEmailDeliveryLedger } from '@/db/email-deliveries'
-import { beforeEach, describe, expect, it } from 'vitest'
 import { SqliteD1 } from '@/db/test-support'
 import { resolveEmailPolicy } from '../email/config'
 import { appEmailTemplates } from '../email/registry'
