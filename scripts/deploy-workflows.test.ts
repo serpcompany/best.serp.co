@@ -134,7 +134,9 @@ describe('staging deploy job', () => {
     // the group.
     expect(job.concurrency).toEqual({
       group: 'deploy-best-serp-co-staging',
-      'cancel-in-progress': false
+      'cancel-in-progress': false,
+      // Nothing joining the group cancels a waiting deploy or publication.
+      queue: 'max'
     })
     expect(Object.keys(workflow.jobs)).toEqual(['changes', 'check', 'e2e', 'tip', 'deploy-staging'])
     expect(job.needs).toEqual(['check', 'e2e', 'tip'])
@@ -1634,14 +1636,18 @@ describe('protected deployment boundaries', () => {
       'bootstrap-production-d1.yml': { bootstrap: productionGroup },
       'deploy-production.yml': { release: productionGroup },
       'web.yml': {
-        'deploy-staging': { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
+        'deploy-staging': {
+          group: 'deploy-best-serp-co-staging',
+          'cancel-in-progress': false,
+          queue: 'max'
+        }
       },
       'media-health.yml': {
         check: { group: 'media-health-best-serp-co-production', 'cancel-in-progress': false }
       },
       'publish-d1.yml': { publish: productionGroup },
       'publish-d1-staging.yml': {
-        publish: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false }
+        publish: { group: 'deploy-best-serp-co-staging', 'cancel-in-progress': false, queue: 'max' }
       },
       // Uploads hold their own groups, never the deploy groups (#97 review S5).
       'upload-media.yml': {

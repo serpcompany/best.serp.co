@@ -17,10 +17,12 @@ One workflow, `web.yml` (#182), checks pull requests into `staging` (the base br
 - `e2e` runs Playwright and uploads a `passed-e2e-<tree>` receipt. A push whose tree a pull
   request already tested finds the receipt and skips the suite; a lookup error runs it. Draft
   pull requests skip `e2e` until they are marked ready for review.
-- `tip` runs on a push to `staging` once `check` and `e2e` pass, and starts `deploy-staging` only
-  if the commit is still the `staging` head. A job joining the deploy group cancels the one
-  waiting there, so an older commit (a re-run) must never join it. A failed lookup fails the job.
-- `deploy-staging` builds, checks the tip again, then runs the staging release steps
+- `tip` runs on a push or dispatch on `staging` once `check` and `e2e` pass, and starts
+  `deploy-staging` only if the commit is still the `staging` head, so an older commit (a re-run)
+  doesn't build for nothing. A failed lookup fails the job.
+- `deploy-staging` waits in `deploy-best-serp-co-staging` with `queue: max`, so nothing joining
+  cancels a waiting deploy or catalog publication. It builds, checks the tip again (a partial
+  re-run reuses the old `tip` output), then runs the staging release steps
   ([deploy runbook](./DEPLOY_RUNBOOK.md#workflows)).
 - `changes` compares with `--no-renames`, so code moved into `docs/` still counts as code.
 
@@ -69,7 +71,7 @@ gh variable delete CI_RUNNER_LABELS  # rollback: runs that start later use ubunt
 
 | Follows `CI_RUNNER_LABELS` | Always `ubuntu-latest` |
 | --- | --- |
-| Web: check | Web: changes, e2e (installs Playwright browsers), deploy-staging (credentials, Playwright smoke) |
+| Web: check | Web: changes, e2e (installs Playwright browsers), tip, deploy-staging (credentials, Playwright smoke) |
 | Production Dependency Audit, Harness Gardening, Label PRs, Links Checker | PR Issue Link (serp's file, unchanged), Deploy Production, Bootstrap Production D1, Publish D1 Catalog, Review D1 Submission, Notify Verified D1 Submissions, Check Listing Media Health, Submit GSC Sitemaps |
 
 Routed jobs hold no secret beyond their own `GITHUB_TOKEN` and need no browser, `sudo`, or

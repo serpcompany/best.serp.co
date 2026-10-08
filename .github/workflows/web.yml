@@ -190,9 +190,8 @@ jobs:
           overwrite: true
 
   tip:
-    # Decides before deploy-staging starts. A job that joins the deploy group cancels the one
-    # waiting there, so a commit that is no longer the staging tip (a re-run of an older check)
-    # must never join it, or it could cancel the newest commit's queued deploy.
+    # Decides before deploy-staging starts, so a commit that is no longer the staging tip (a
+    # re-run of an older check) doesn't build or wait in the deploy group for nothing.
     name: staging tip
     needs: [check, e2e]
     if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'
@@ -224,11 +223,13 @@ jobs:
     name: Validate, migrate, deploy & smoke-test staging
     needs: [check, e2e, tip]
     if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'
-    # Job-level, so a pull request never joins the group and never replaces a queued push run.
-    # Only the staging tip joins (the tip job), so a queued run is replaced only by a newer one.
+    # Job-level, so a pull request never joins the group. `queue: max`: a job joining never
+    # cancels one waiting (staging publications share the group), whatever order they arrive in,
+    # including a partial re-run that reuses an old `tip` output; the guard below skips it.
     concurrency:
       group: deploy-best-serp-co-staging
       cancel-in-progress: false
+      queue: max
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:

@@ -91,7 +91,7 @@ Error reporting (Sentry) and analytics (GTM, Cloudflare Web Analytics):
 
 | Workflow | Trigger | Environment | Typed confirmation | Does |
 |---|---|---|---|---|
-| `web.yml` (`deploy-staging`) | push to `staging` after `check` and `e2e`, manual from `staging` | `staging` | none | build → tip guard → D1 bookmark → migrations → deploy → HTTP gates → Playwright smoke |
+| `web.yml` (`deploy-staging`) | push to `staging` after `check`, `e2e` and `tip`, manual from `staging` | `staging` | none | build → tip guard → D1 bookmark → migrations → deploy → HTTP gates → Playwright smoke |
 | `deploy-production.yml` | push to `main`, manual | `production` | dispatch: `deploy-best.serp.co-production` (or `hotfix-…`) | Staging verification → `pnpm harness:fast` → build → `plan-release` → (pending migrations: bookmark → migrate) → deploy → HTTP gates |
 | `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → D1 bookmark → initial catalog import into an empty production D1 → parity verification |
 | `publish-d1.yml`, `publish-d1-staging.yml` (#95) | manual, `main` / `staging` | `production` / `staging` | `publish-best.serp.co-<env>` | D1 bookmark → apply one reviewed manifest, staging first |
@@ -120,12 +120,13 @@ The HTTP gates: [Environments and hosts](./ARCHITECTURE.md#environments-and-host
 
 Concurrency sits on the privileged job, after its guards: production jobs share
 `deploy-best-serp-co-production`, staging uses `deploy-best-serp-co-staging`, media health and
-media uploads their own groups, and none cancels a running job. A run refused by `authorize`
-or skipped by a branch `if` never joins a group, so it cannot replace a valid queued run.
+media uploads their own groups, and none cancels a running job. The staging group queues
+(`queue: max`), so a staging deploy and a staging publication never cancel each other. A run
+refused by `authorize` or skipped by a branch `if` never joins a group.
 
-The staging deploy is a job of `web.yml` and `needs:` its `check` and `e2e`, so it builds the
-commit once and deploys only after both pass; its tip guard skips a commit `staging` has moved
-past ([CI](./CI.md)). Deploy Production runs `pnpm harness:fast` in its own job: it releases
+The staging deploy is a job of `web.yml` and `needs:` its `check`, `e2e` and `tip`, so it builds
+the commit once and deploys only after both checks pass and only while it is the `staging`
+head; its in-job tip guard skips a commit `staging` moved past while it waited ([CI](./CI.md)). Deploy Production runs `pnpm harness:fast` in its own job: it releases
 only a tree the staging deploy verified, which is the stronger gate, and a `workflow_run` job
 would receive the default branch head as `GITHUB_SHA` rather than the released commit.
 
