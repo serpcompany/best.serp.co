@@ -597,8 +597,7 @@ export const RELISTABLE_UNPUBLISH_REASON = 'badge_missing'
 export function listingCheckoutPurpose(listing: CheckoutListing): 'relist' | 'upgrade' | null {
   const submission = listing.submission
   if (
-    !submission ||
-    submission.status !== 'approved' ||
+    submission?.status !== 'approved' ||
     submission.plan !== 'free' ||
     submission.paidAt !== null
   ) {

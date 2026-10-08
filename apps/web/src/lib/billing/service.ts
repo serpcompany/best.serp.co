@@ -1037,7 +1037,7 @@ export async function refundRejectedSubmission(
   input: { actor: string; submissionId: string }
 ): Promise<void> {
   const submission = await deps.operations.checkoutSubmission(input.submissionId)
-  if (!submission || submission.status !== 'rejected') {
+  if (submission?.status !== 'rejected') {
     throw new Error('Only a rejected submission is refunded this way.')
   }
   const review = await deps.operations.rejection(input.submissionId)

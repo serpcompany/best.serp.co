@@ -42,6 +42,8 @@ const LISTING_IMAGE_CALLERS = [
   'apps/web/src/components/admin/product-cell.tsx',
   'apps/web/src/components/directory/project-navigation.tsx',
   'apps/web/src/components/directory/websites-list-with-sort-route.tsx',
+  // Renders the slot it is given, typed as ListingImage (#181).
+  'apps/web/src/components/directory/websites-list-with-sort.tsx',
   'apps/web/src/components/llm/listing-card.tsx',
   'apps/web/src/components/search/favicon.tsx',
   'apps/web/src/components/submit/submit-ui.tsx',

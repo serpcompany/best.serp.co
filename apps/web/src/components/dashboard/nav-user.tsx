@@ -2,7 +2,6 @@
 
 import { EllipsisVertical, LogOut, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
-import React from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,

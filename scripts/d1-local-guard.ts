@@ -124,7 +124,7 @@ export function localSqlitePath(directory: string): string {
         `If the local database_id changed (#176), delete ${directory} and run pnpm db:migrate:local && pnpm db:import:local again.`
     )
   }
-  return matches[0]!
+  return matches[0]
 }
 
 function localSnapshotDatabase(): DatabaseSync {
@@ -135,7 +135,7 @@ async function verify(): Promise<void> {
   const report = readParityReport()
   const expected = await expectedBootstrapSnapshot(readReviewedImportSql(report))
   const actualDatabase = localSnapshotDatabase()
-  let actual
+  let actual: Awaited<ReturnType<typeof captureApplicationSnapshot>>
   try {
     actual = await captureApplicationSnapshot(sqliteTransport(actualDatabase))
   } finally {

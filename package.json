@@ -79,7 +79,7 @@
     "worktree:new": "pnpm tsx scripts/harness/worktree.ts new"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.2",
+    "@biomejs/biome": "2.5.15",
     "@types/js-yaml": "^4.0.9",
     "drizzle-kit": "0.31.11",
     "js-yaml": "^4.3.2",

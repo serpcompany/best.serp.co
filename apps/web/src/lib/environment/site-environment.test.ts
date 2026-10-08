@@ -47,7 +47,8 @@ describe('site environment', () => {
     const response = nonProductionRobotsTxt(request('/robots.txt'))
     expect(response?.status).toBe(200)
     expect(response?.headers.get('content-type')).toBe('text/plain; charset=utf-8')
-    const groups = parseRobotsTxt(await response!.text())
+    if (!response) throw new Error('expected a robots.txt response')
+    const groups = parseRobotsTxt(await response.text())
     for (const agent of ['*', 'googlebot', 'bingbot']) {
       expect(robotsTxtAllows(groups, agent, '/'), agent).toBe(false)
       expect(robotsTxtAllows(groups, agent, '/products/autoenhance.ai/'), agent).toBe(false)

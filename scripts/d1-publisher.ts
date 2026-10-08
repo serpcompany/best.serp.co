@@ -528,7 +528,7 @@ function listingStatements(
         value.id
       )
     )
-  value.categories.forEach((cat, order) =>
+  for (const [order, cat] of value.categories.entries())
     out.push(
       statement(
         'INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) SELECT ?,id,?,? FROM categories WHERE slug=? AND is_active=1',
@@ -538,7 +538,6 @@ function listingStatements(
         cat
       )
     )
-  )
   out.push(
     statement(
       `SELECT CASE WHEN (SELECT COUNT(*) FROM listing_categories WHERE listing_id=?)=? THEN 1 ELSE ${GUARD_FAILURE} END`,
@@ -561,7 +560,8 @@ function listingStatements(
       image.height
     )
   if (value.media?.logo) out.push(hostedRow('logo', value.media.logo, 0))
-  value.media?.images?.forEach((image, order) => out.push(hostedRow('image', image, order)))
+  for (const [order, image] of (value.media?.images ?? []).entries())
+    out.push(hostedRow('image', image, order))
   if (value.media?.video)
     out.push(
       statement(
@@ -570,7 +570,7 @@ function listingStatements(
         value.media.video
       )
     )
-  value.resources?.forEach((item, order) =>
+  for (const [order, item] of (value.resources ?? []).entries())
     out.push(
       statement(
         'INSERT INTO listing_resource_links (listing_id,label,url,sort_order) VALUES (?,?,?,?)',
@@ -580,8 +580,7 @@ function listingStatements(
         order
       )
     )
-  )
-  value.faqs?.forEach((item, order) =>
+  for (const [order, item] of (value.faqs ?? []).entries())
     out.push(
       statement(
         'INSERT INTO listing_faqs (listing_id,question,answer,sort_order) VALUES (?,?,?,?)',
@@ -591,7 +590,6 @@ function listingStatements(
         order
       )
     )
-  )
   out.push(statement("UPDATE listings SET status='approved' WHERE id=?", value.id))
   return out
 }
@@ -617,7 +615,7 @@ export function publicationBase(
   live?: PublicationBase
 ): PublicationBase {
   if (manifest.concurrency === 'rows') {
-    if (!live || !live.checksum || !Number.isSafeInteger(live.version) || live.version < 0) {
+    if (!live?.checksum || !Number.isSafeInteger(live.version) || live.version < 0) {
       throw new Error('A row-level manifest is planned against the live publication state.')
     }
     return live
@@ -637,8 +635,9 @@ export function buildPublicationPlan(
   const inputChecksum = hash(source)
   const afterChecksum = hash(`${base.checksum}\0${inputChecksum}`)
   const routes = new Set<string>()
-  const addCategories = (values: string[]) =>
-    values.forEach(value => routes.add(categoryRoute(value)))
+  const addCategories = (values: string[]) => {
+    for (const value of values) routes.add(categoryRoute(value))
+  }
   const statements: PlannedStatement[] = [
     statement(
       `SELECT CASE WHEN COUNT(*)=1 AND MAX(version)=? AND MAX(checksum)=? THEN 1 ELSE ${GUARD_FAILURE} END FROM publication_state WHERE id=1`,

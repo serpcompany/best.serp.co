@@ -62,7 +62,7 @@ export function formatSender(from: EmailSenderAddress): string {
 const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/u
 const DEFAULT_USESEND_TIMEOUT_MS = 10_000
 
-function useSendErrorCode(body: unknown, status: number): string {
+function errorCodeFromUseSend(body: unknown, status: number): string {
   const code =
     typeof body === 'object' &&
     body !== null &&
@@ -83,7 +83,7 @@ export function scrubSecrets(text: string, apiKey?: string): string {
   return withoutKey.replace(TOKEN_IN_TEXT, '[redacted]')
 }
 
-function useSendErrorMessage(body: unknown): string {
+function errorMessageFromUseSend(body: unknown): string {
   const message =
     typeof body === 'object' &&
     body !== null &&
@@ -153,9 +153,9 @@ export function createUseSendSender(options: {
       }
       const body = await jsonBody(response)
       if (!response.ok) {
-        const detail = scrubSecrets(useSendErrorMessage(body), options.apiKey)
+        const detail = scrubSecrets(errorMessageFromUseSend(body), options.apiKey)
         throw new EmailProviderError(
-          useSendErrorCode(body, response.status),
+          errorCodeFromUseSend(body, response.status),
           `useSend answered ${response.status}${detail ? `: ${detail}` : ''}`
         )
       }

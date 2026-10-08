@@ -2,10 +2,15 @@
 
 import { Clock, SortAsc } from 'lucide-react'
 import Link from 'next/link'
-import { type ComponentType, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { Badge } from '@/components/ui/badge'
+import type { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import { siteCopy } from '../../lib/site/site-copy'
+import type { ListingImage } from '../ui/listing-image'
+import type { Card } from './card'
+import type { EmptyState } from './empty-state'
 
 export interface WebsitesListWithSortProps {
   initialWebsites: WebsiteBrowseCardMetadata[]
@@ -13,12 +18,12 @@ export interface WebsitesListWithSortProps {
   emptyDescription?: string
   trackSortChange?: (currentSort: string, nextSort: string, source?: string) => void
   slots: {
-    Badge: ComponentType<any>
-    Card: ComponentType<any>
-    EmptyState: ComponentType<any>
-    ListingImage: ComponentType<any>
-    ToggleGroup: ComponentType<any>
-    ToggleGroupItem: ComponentType<any>
+    Badge: typeof Badge
+    Card: typeof Card
+    EmptyState: typeof EmptyState
+    ListingImage: typeof ListingImage
+    ToggleGroup: typeof ToggleGroup
+    ToggleGroupItem: typeof ToggleGroupItem
   }
 }
 

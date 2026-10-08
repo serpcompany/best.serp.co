@@ -2,7 +2,7 @@
 
 import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
-import React, { type ComponentProps } from 'react'
+import type { ComponentProps } from 'react'
 import {
   SidebarGroup,
   SidebarGroupContent,

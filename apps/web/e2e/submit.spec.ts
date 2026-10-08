@@ -95,7 +95,6 @@ async function typeWebsite(page: Page, website: string) {
 
 test.describe('submit v2', () => {
   test('fills the form signed out, signs in, saves the draft, chooses free, and verifies the badge', async ({
-    baseURL,
     browser
   }) => {
     test.setTimeout(150_000)

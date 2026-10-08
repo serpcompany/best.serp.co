@@ -482,7 +482,7 @@ describe('environment-specific crawl policy gates', () => {
   ])(
     'requires %s gates on %s to see the Worker report SITE_ENVIRONMENT %s',
     async (mode, given, reported, expected) => {
-      stubCrawlPolicy((url, response) => {
+      stubCrawlPolicy((_url, response) => {
         const headers = new Headers(response.headers)
         if (reported) headers.set(SITE_ENVIRONMENT_HEADER, reported)
         else headers.delete(SITE_ENVIRONMENT_HEADER)

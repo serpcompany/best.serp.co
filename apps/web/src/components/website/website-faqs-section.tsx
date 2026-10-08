@@ -50,7 +50,7 @@ export function WebsiteFaqsSection({ website }: WebsiteFaqsSectionProps) {
           <Accordion type="multiple">
             {faqs.map((faq, index) => (
               <AccordionItem
-                key={`${index}-${faq.question}`}
+                key={faq.question}
                 value={`faq-${index}`}
                 // `forceMount` keeps a closed answer rendered, so it's hidden here instead.
                 className="[&_[data-slot=accordion-content][data-state=closed]]:hidden"

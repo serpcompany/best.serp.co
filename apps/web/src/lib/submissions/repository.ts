@@ -20,8 +20,8 @@ import {
  * `@/db/submissions`, scoped to the signed-in owner.
  */
 
-export { isSubmissionError, SubmissionError }
 export type { DraftContent, NewDraftInput, OwnSubmission, UrlAvailability }
+export { isSubmissionError, SubmissionError }
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 

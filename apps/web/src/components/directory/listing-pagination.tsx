@@ -92,6 +92,8 @@ export function ListingPagination({
         ) : null}
         {paginationWindow(page, pageCount).map((entry, index) =>
           entry === 'gap' ? (
+            // The window has at most a leading and a trailing gap, so position is the identity.
+            // biome-ignore lint/suspicious/noArrayIndexKey: see above
             <PaginationItem key={`gap-${index}`}>
               <PaginationEllipsis />
             </PaginationItem>

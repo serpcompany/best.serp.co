@@ -69,7 +69,7 @@ export function buildHomePageData({
 }
 
 interface JsonLdProps {
-  data: Record<string, any>
+  data: Record<string, unknown>
 }
 
 interface FeaturedGuidesSectionProps {

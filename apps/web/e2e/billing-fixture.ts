@@ -142,7 +142,7 @@ export async function startStripeMock(): Promise<StripeMock> {
         /^\/v1\/checkout\/sessions\/[^/]+\/expire$/u.test(url.pathname)
       ) {
         const session = sessions.get(url.pathname.split('/')[4] ?? '')
-        if (!session || session.status !== 'open') {
+        if (session?.status !== 'open') {
           json(400, { error: { code: 'checkout_session_not_open' } })
           return
         }

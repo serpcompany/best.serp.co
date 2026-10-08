@@ -21,6 +21,8 @@ This application is the best.serp.co Cloudflare Worker, not a filesystem-backed 
   redirects everything else (see the URL canonicalization section of the architecture doc).
 - Site identity, copy, and route layout come from `src/lib/site`; do not add
   environment-based site selection.
-- Validate Worker compatibility with `pnpm worker:build`.
+- Imports flow one way: `src/lib` and `src/db` never import components or routes, and components
+  never import routes (`noRestrictedImports` in `biome.jsonc`; tests are exempt).
+- Validate Worker compatibility with `pnpm build`.
 
 See [Architecture](../../docs/ARCHITECTURE.md) and [Harness](../../docs/HARNESS.md).

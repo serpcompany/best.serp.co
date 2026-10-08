@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import React, { Fragment, type ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -41,7 +41,7 @@ export function SiteHeader({
             {crumbs.map((crumb, index) => {
               const last = index === crumbs.length - 1
               return (
-                <Fragment key={`${crumb.label}-${index}`}>
+                <Fragment key={crumb.href ?? crumb.label}>
                   <BreadcrumbItem className={last ? undefined : 'hidden md:block'}>
                     {last || !crumb.href ? (
                       <BreadcrumbPage>{crumb.label}</BreadcrumbPage>

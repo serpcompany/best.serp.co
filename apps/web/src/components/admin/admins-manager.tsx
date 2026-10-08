@@ -30,8 +30,8 @@ import {
   TableRow
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { formatLongDate, initials } from '@/lib/admin/format'
 import { adminRequest } from './api'
-import { formatLongDate, initials } from './format'
 
 /**
  * The admin allowlist (#64 screen 14): the list with Remove (disabled, with a tooltip, for the

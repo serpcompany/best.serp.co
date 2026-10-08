@@ -607,7 +607,11 @@ describe('listing activity log and admin edits (#64)', () => {
   })
 
   it('refuses a website that collides, inside the batch, with the submission intake rules', () => {
-    const move = (db: DatabaseSync, website: string, fields: ListingDetailsField[] = ['website']) =>
+    const move = (
+      _db: DatabaseSync,
+      website: string,
+      fields: ListingDetailsField[] = ['website']
+    ) =>
       buildUpdateListingDetailsPlans({
         details: { ...edit, website },
         expectedChecksum: 'checksum-lst_live',
@@ -715,7 +719,7 @@ describe('listing activity log and admin edits (#64)', () => {
   it('validates and writes the website and logo only when the edit changes them', () => {
     const logos = (db: DatabaseSync) =>
       db.prepare("SELECT url FROM listing_media WHERE listing_id=? AND kind='logo'").all(listingId)
-    const rename = (db: DatabaseSync, details: Partial<typeof edit>) =>
+    const rename = (_db: DatabaseSync, details: Partial<typeof edit>) =>
       buildUpdateListingDetailsPlans({
         details: { ...edit, ...details },
         expectedChecksum: 'checksum-lst_live',
@@ -742,7 +746,7 @@ describe('listing activity log and admin edits (#64)', () => {
     expect(listing(keeps)).toMatchObject({ website: 'https://lst_live.example/' })
 
     // A changed logo is checked; an emptied one removes the logo row.
-    const changeLogo = (db: DatabaseSync, logoUrl: string) =>
+    const changeLogo = (_db: DatabaseSync, logoUrl: string) =>
       buildUpdateListingDetailsPlans({
         details: { ...edit, logoUrl },
         expectedChecksum: 'checksum-lst_live',
@@ -772,7 +776,7 @@ describe('listing activity log and admin edits (#64)', () => {
       sourceUrl: edit.logoUrl,
       width: 256
     }
-    const withIngestion = (db: DatabaseSync, logoIngestion: ListingLogoIngestion) =>
+    const withIngestion = (_db: DatabaseSync, logoIngestion: ListingLogoIngestion) =>
       buildUpdateListingDetailsPlans({
         details: edit,
         expectedChecksum: 'checksum-lst_live',

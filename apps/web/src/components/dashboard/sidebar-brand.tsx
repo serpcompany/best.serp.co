@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import React, { type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import { useCloseMobileSidebar } from './nav-main'
 

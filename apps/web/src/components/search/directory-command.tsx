@@ -113,5 +113,5 @@ function DirectoryCommand({
   )
 }
 
-export { DirectoryCommand }
 export type { DirectoryCommandItem, DirectoryCommandProps }
+export { DirectoryCommand }

@@ -1,11 +1,11 @@
-import { PAID_LISTING_PRICE_CENTS } from '@/components/admin/format'
-import type { ReviewView } from '@/components/admin/review-detail'
 import type { RevisionReview, SubmissionReview } from '@/db/admin-queries'
 import type { ListingDetail } from '@/db/contracts'
 import { resolveListingDetailMedia } from '@/db/media-keys'
 import { renderableImage } from '../media/renderable-image'
 import { buildSubmissionReviewPreview } from '../submissions/review-preview'
 import { featuredImageView } from './featured-image'
+import { PAID_LISTING_PRICE_CENTS } from './format'
+import type { LinkRel } from './listing-view'
 
 /**
  * Maps the admin reads to what the review screen renders (#64 screen 11), and builds the
@@ -168,4 +168,46 @@ export function stagedPreview(
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) }
   }
+}
+
+/** What the admin review screen (`components/admin/review-detail.tsx`) renders. */
+export interface ReviewView {
+  badge: { attempts: number; verifiedAt: string | null } | null
+  badgeChecks: Array<{ checkedAt: string | null; outcome: 'fail' | 'pass'; reason: string | null }>
+  block: { urlKey: string } | null
+  blockKey: string
+  categoryName: string | null
+  categorySlug: string
+  content: string
+  contentVersion: number
+  description: string
+  duplicates: number
+  id: string
+  kind: 'revision' | 'submission'
+  linkRel: LinkRel
+  listing: { live: boolean; liveSince: string | null; slug: string } | null
+  /**
+   * A submission's featured image as approval would publish it (#96 round 2 B1): the hosted
+   * copy, which the listing preview shows, and its key, which approval sends back. Null for a
+   * revision.
+   */
+  featuredImage: { image: string | null; key: string | null } | null
+  /** The hosted copy of `logoUrl`, or null for the fallback tile (#96 review S9). */
+  logoImage: string | null
+  /** The hosted logo's key, which approval sends back (null: approval leaves the tile). */
+  logoKey: string | null
+  /** The submitted logo source; never rendered as an image. */
+  logoUrl: string
+  name: string
+  paid: boolean
+  paidAmountCents: number | null
+  queuedAt: string | null
+  rejectionCategory: 'other' | 'prohibited' | null
+  rejectionReason: string | null
+  reviewerNote: string | null
+  slug: string
+  stale: boolean
+  status: string
+  submitter: { createdAt: string | null; email: string; otherSubmissions: number } | null
+  website: string
 }
