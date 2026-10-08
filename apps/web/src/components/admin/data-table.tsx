@@ -226,7 +226,7 @@ export function PaginationFooter({
             <SelectTrigger size="sm" className="w-20" aria-label="Rows per page">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent side="top">
+            <SelectContent position="popper" side="top">
               {[10, 20, 50].map(size => (
                 <SelectItem key={size} value={String(size)}>
                   {size}
