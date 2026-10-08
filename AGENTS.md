@@ -74,18 +74,18 @@ Issues and labels never grant production, database, or deployment authority.
 
 ## Non-negotiable architecture
 
-`scripts/architecture-guard.test.ts` enforces the first three rules; each guard cites the
-issue behind it.
+`scripts/architecture-guard.test.ts` checks parts of these; review covers the rest.
 
-- Read catalog data through `apps/web/lib/catalog/repository.ts`, which takes the server-only
-  OpenNext `DB` binding, fails closed when it or `D1_RUNTIME_ENV` is missing or invalid, and
-  delegates all SQL to `packages/data-ops/`. Never put catalog SQL in the app.
+- Read catalog data through `apps/web/lib/catalog/repository.ts`, which delegates all
+  SQL to `packages/data-ops/`. Never put catalog SQL in the app.
+- Obtain the database only through the server-only OpenNext `DB` binding; fail closed
+  when the binding or `D1_RUNTIME_ENV` is missing or invalid.
+- Use prepared statements and bind every runtime value.
 - Model tables in `packages/data-ops/src/schema.ts` and generate migrations into
   `d1/drizzle/` with `pnpm db:generate`; `drizzle-kit push` is forbidden.
 - No catalog JSON/YAML/CSV runtime, generated browser search index, filesystem fallback,
   static export, or GitHub Pages deploy path. The legacy `products.json` is an import input
   read from an external checkout, never an application input.
-- Use prepared statements and bind every runtime value.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
 - Public URLs are part of the SEO contract: `/products/<slug>/`,
   `/products/categories/<category>/`. Changing a route requires permanent redirects.
@@ -97,17 +97,17 @@ issue behind it.
 
 ## Recorded exceptions to the SERP web stack
 
-These differ on purpose from `serpcompany/serp` `docs/engineering/standards/web-stack/`;
-change one only through an issue.
+Deliberate differences from serp's `web-stack/` standard; change one only through an issue.
 
 - UI stays shadcn `new-york` on Radix until #186 moves it to `base-nova`; add no Base UI parts.
-- R2 is serp.co's shared `cdn` / `cdn-staging` buckets under `best.serp.co/`: moving would
-  rewrite production media keys. Email is useSend from `noreply@mail.serp.co`.
+- R2 is serp.co's shared `cdn` and `cdn-staging` buckets; moving would rewrite media keys.
+- Email is useSend from `noreply@mail.serp.co`, the transactional-email standard's exception
+  for directories on serp.co subdomains.
 - One build serves every environment; the environment is read per request
   (`apps/web/lib/environment/request-environment.ts`), so nothing per-environment is prerendered.
 - `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
-- The Stripe webhook is `/api/billing/webhook/` behind a six-operation `BillingProvider` with no
-  Stripe SDK, until the payments audit (#156) decides. Footer brand icons use
+- The Stripe webhook is `/api/billing/webhook/` behind a provider-neutral `BillingProvider`
+  with no Stripe SDK, until the payments audit (#156) decides. Brand icons use
   `@icons-pack/react-simple-icons` because lucide has no brand icons.
 
 ## Completion contract

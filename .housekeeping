@@ -1,5 +1,4 @@
-# Disposable paths for serp scripts/housekeeping.sh (one per line). Never list .runtime/:
-# it holds each worktree's local D1 state.
-tmp/
-logs/
-sessions/
+# Disposable paths for serp's scripts/housekeeping.sh, one per line. Without this file the
+# script removes all of tmp/, which also keeps R2 badge backups (tmp/r2-featured-badge-backups/,
+# from scripts/sync-featured-badges-r2.mjs). Never list .runtime/: it holds local D1 state.
+tmp/migrations/
