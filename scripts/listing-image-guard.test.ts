@@ -183,7 +183,8 @@ describe('listing images render only through ListingImage (#122)', () => {
     const callers = sourceFiles().filter(
       file =>
         file !== LISTING_IMAGE &&
-        /from '(?:@\/components|\.{1,2}(?:\/[\w.-]+)*)\/listing\/listing-image'/u.test(
+        // `@/components/listing/…`, a relative path through `listing/`, or a sibling in it.
+        /from '(?:(?:@\/components|\.{1,2}(?:\/[\w.-]+)*)\/listing|\.)\/listing-image'/u.test(
           readFileSync(resolve(file), 'utf8')
         )
     )
