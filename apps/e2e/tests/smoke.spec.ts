@@ -515,6 +515,10 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       for (const href of shortLinks) {
         expect(new URL(href).searchParams.get('via'), href).toBe(site.dubPartnerId)
       }
+      if (path === listingPath('321tube-downloader')) {
+        // The body text's own serp.ly link, not only the button or the footer.
+        await expect(page.locator('.prose a[href^="https://serp.ly/"]').first()).toBeAttached()
+      }
     }
     const visitSite = page.getByRole('link', { name: /visit site/i }).first()
     expect(new URL((await visitSite.getAttribute('href')) ?? '').hostname).toBe('serp.ly')
