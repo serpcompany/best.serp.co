@@ -208,16 +208,8 @@ describe('auditArtifactSitemaps', () => {
     )
     writeFile(resolve(artifactDir, 'search/index.html'))
 
-    const audit = auditArtifactSitemaps(
-      {
-        ...siteConfig,
-        sitemap: {
-          ...siteConfig.sitemap,
-          excludedPaths: ['/search']
-        }
-      },
-      artifactDir
-    )
+    // The route registry keeps /search/ out of every sitemap (#167).
+    const audit = auditArtifactSitemaps(siteConfig, artifactDir)
 
     expect(audit.issues).toContainEqual(
       expect.objectContaining({

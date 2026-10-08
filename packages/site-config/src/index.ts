@@ -5,11 +5,9 @@ export {
   SITEMAP_INDEX_PATH,
   type SitemapGroup,
   type SiteRoute,
-  type SiteRoutePath,
   sitemapGroups,
   sitemapPaths,
   sitemapRoutePaths,
-  siteRoute,
   siteRoutes
 } from './site-routes'
 export type { SiteDefinition, SiteOwnedContent } from './types'

@@ -182,14 +182,14 @@ extensions (`chart.js`), and a test checks the committed import.
   framework upgrade cannot silently turn either rule off. OpenNext re-serializes the query
   string of config redirects from decoded values, so a query that contains an encoded `&`,
   `=`, `#`, or `+` is not preserved exactly; the pre-D1 URLs never carried one.
-- **Written URLs.** Canonical tags, `og:url`, sitemaps, `robots.txt`, and JSON-LD build
-  absolute URLs with `absoluteUrl` (`siteUrl` in `seo-config.ts`), which writes the homepage
-  as the bare origin. With `trailingSlash`, the Next.js metadata API appends `/` to every
-  same-origin URL, so the homepage leaves `alternates.canonical` and `openGraph.url` unset
-  and `apps/web/app/page.tsx` renders both tags with `HomePageCanonicalTags`. Never render
-  them in `HomePageRoute`: `/products/` reuses it with its own canonical. JSON-LD node
-  identifiers keep their
-  fragment form (`https://best.serp.co/#website`); they name a graph node, not the page.
+- **Written URLs.** Canonical tags, `og:url`, sitemaps, `robots.txt`, and JSON-LD build absolute
+  URLs with `absoluteUrl` (`siteUrl` in `seo-config.ts`), which writes the homepage as the bare
+  origin. With `trailingSlash`, the Next.js metadata API appends `/` to every same-origin URL,
+  so the homepage leaves `alternates.canonical` and `openGraph.url` unset and
+  `apps/web/app/page.tsx` renders both tags with `HomePageCanonicalTags`. Never render them in
+  `HomePageRoute`: `/products/` reuses it, and only its page 1 (canonical `/`) renders them.
+  JSON-LD node identifiers keep their fragment form (`https://best.serp.co/#website`); they name
+  a graph node, not the page.
 - **Origin.** Sitemaps, canonical tags, and structured data always use the production
   origin from `packages/site-config` (`https://best.serp.co`), also locally and on the
   noindex `*.workers.dev` hosts. This is deliberate: the e2e suite and the HTTP gates then

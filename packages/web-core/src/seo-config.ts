@@ -85,7 +85,8 @@ export const KEYWORDS = {
 
 /** The route registry's entry for a page path, if it lists one (`site-routes.ts`, #167). */
 export function registeredRoute(path: string): SiteRoute | undefined {
-  const pathname = canonicalPathname(path.split(/[?#]/u)[0] || '/')
+  const bare = path.split(/[?#]/u)[0] || '/'
+  const pathname = canonicalPathname(bare.startsWith('/') ? bare : `/${bare}`)
   return siteRoutes.find(route => route.path === pathname)
 }
 

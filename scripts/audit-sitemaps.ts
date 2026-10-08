@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { type SiteDefinition, site, sitemapPaths } from '@serpdirectory/site-config'
+import { type SiteDefinition, site, sitemapPaths, siteRoutes } from '@serpdirectory/site-config'
 import { project } from './project'
 
 type AuditScope = 'artifact' | 'live'
@@ -228,12 +228,12 @@ function addIssue(
   })
 }
 
-function configuredExcludedPaths(siteConfig: SiteDefinition): Set<string> {
+/** Registered pages no sitemap may list: noindex, disallowed, or canonical elsewhere (#167). */
+function configuredExcludedPaths(_siteConfig: SiteDefinition): Set<string> {
   return new Set(
-    [
-      ...(siteConfig.sitemap.excludedPaths ?? []),
-      ...(siteConfig.sitemap.artifactExcludedPaths ?? [])
-    ].map(path => normalizePath(path))
+    siteRoutes
+      .filter(route => route.sitemapGroup === null && !route.path.includes('['))
+      .map(route => normalizePath(route.path))
   )
 }
 
