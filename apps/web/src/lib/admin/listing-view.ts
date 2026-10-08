@@ -1,13 +1,12 @@
+import type { ActivityEvent, AdminListingDetail } from '@/db/admin-queries'
+import { renderableImage } from '../media/renderable-image'
 import {
   formatDateTime,
   formatDay,
   formatLongDate,
   formatUsd,
   PAID_LISTING_PRICE_CENTS
-} from '@/components/admin/format'
-import type { ListingDetailView } from '@/components/admin/listing-detail'
-import type { ActivityEvent, AdminListingDetail } from '@/db/admin-queries'
-import { renderableImage } from '../media/renderable-image'
+} from './format'
 import { verifiedViaLabel } from './listing-labels'
 import { logoNote } from './logo-note'
 
@@ -186,4 +185,54 @@ export function listingDetailView(
         : null,
     website: listing.website
   }
+}
+
+/** How a listing's outbound website link is marked (`rel`). */
+export type LinkRel = 'follow' | 'nofollow' | 'sponsored'
+
+/** What the admin listing screen (`components/admin/listing-detail.tsx`) renders. */
+export interface ListingDetailView {
+  activity: Array<{ detail: string; key: string; title: string; tone?: 'err' | 'ok' | 'warn' }>
+  adminStatus: 'blocked' | 'draft' | 'live' | 'rejected' | 'unlisted'
+  badgeChecks: Array<{
+    checkedAt: string | null
+    key: string
+    note: string
+    outcome: 'fail' | 'pass'
+    conclusive: boolean
+  }>
+  block: { blockedAt: string | null; blockedBy: string; reason: string; urlKey: string } | null
+  categoryName: string | null
+  categorySlug: string | null
+  checksum: string
+  description: string
+  id: string
+  linkRel: LinkRel
+  /** Set while the logo is not hosted yet (#95). */
+  logoNote: { text: string; tone: 'err' | 'warn' } | null
+  /** The source of the logo the page shows now (a queued replacement is `logoUrl`). */
+  currentLogoUrl: string | null
+  /** What the screen renders: the hosted copy or an own-origin path, else the tile (#96 S9). */
+  logoImage: string | null
+  /** The logo's source, edited in the form; never rendered as an image. */
+  logoUrl: string | null
+  meta: string
+  name: string
+  owner: {
+    email: string
+    userId: string
+    verifiedAt: string | null
+    verifiedVia: string
+    verifiedViaLabel: string
+  } | null
+  slug: string
+  submission: {
+    id: string
+    paidLabel: string | null
+    submitterCreatedAt: string | null
+    submitterEmail: string | null
+  } | null
+  submissionQueued: boolean
+  unpublished: { at: string | null; by: string; note: string | null } | null
+  website: string
 }

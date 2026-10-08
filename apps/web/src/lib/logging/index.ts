@@ -131,16 +131,12 @@ class Logger {
       sentry.withScope(scope => {
         // Add extra context
         if (options?.extra) {
-          Object.keys(options.extra).forEach(key => {
-            scope.setExtra(key, options.extra![key])
-          })
+          for (const [key, value] of Object.entries(options.extra)) scope.setExtra(key, value)
         }
 
         // Add tags
         if (options?.tags) {
-          Object.keys(options.tags).forEach(key => {
-            scope.setTag(key, options.tags![key])
-          })
+          for (const [key, value] of Object.entries(options.tags)) scope.setTag(key, value)
         }
 
         // Add fingerprint for grouping

@@ -167,10 +167,10 @@ export function getRoute<T extends Routes>(
   params?: T extends keyof DynamicRouteParams ? DynamicRouteParams[T] : never
 ): string {
   const parts = route.split('.')
-  let current: any = routes
+  let current: unknown = routes
 
   for (const part of parts) {
-    current = current[part]
+    current = (current as Record<string, unknown>)[part]
   }
 
   if (typeof current === 'string' && params) {
@@ -178,5 +178,5 @@ export function getRoute<T extends Routes>(
     return current.replace(`[${param[0]}]`, param[1])
   }
 
-  return current
+  return current as string
 }

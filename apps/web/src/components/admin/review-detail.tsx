@@ -58,9 +58,18 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import {
+  ageWords,
+  formatDateTime,
+  formatSince,
+  formatUsd,
+  initials,
+  listingPath
+} from '@/lib/admin/format'
+import type { LinkRel } from '@/lib/admin/listing-view'
+import type { ReviewView } from '@/lib/admin/review-view'
 import { cn } from '@/lib/utils'
 import { adminRequest } from './api'
-import { ageWords, formatDateTime, formatSince, formatUsd, initials, listingPath } from './format'
 import { Kv } from './kv'
 import { LogoPreview } from './logo-preview'
 import { RecordHeader } from './record-header'
@@ -72,49 +81,6 @@ import { PlanBadge, StatusBadge, type StatusKind } from './status-badge'
  * Decisions call `/api/admin/{submissions|revisions}/<id>/<action>`; each compares and swaps on
  * the content version shown here, so a stale page gets a 409 and a prompt to reload.
  */
-
-type LinkRel = 'follow' | 'nofollow' | 'sponsored'
-
-export interface ReviewView {
-  badge: { attempts: number; verifiedAt: string | null } | null
-  badgeChecks: Array<{ checkedAt: string | null; outcome: 'fail' | 'pass'; reason: string | null }>
-  block: { urlKey: string } | null
-  blockKey: string
-  categoryName: string | null
-  categorySlug: string
-  content: string
-  contentVersion: number
-  description: string
-  duplicates: number
-  id: string
-  kind: 'revision' | 'submission'
-  linkRel: LinkRel
-  listing: { live: boolean; liveSince: string | null; slug: string } | null
-  /**
-   * A submission's featured image as approval would publish it (#96 round 2 B1): the hosted
-   * copy, which the listing preview shows, and its key, which approval sends back. Null for a
-   * revision.
-   */
-  featuredImage: { image: string | null; key: string | null } | null
-  /** The hosted copy of `logoUrl`, or null for the fallback tile (#96 review S9). */
-  logoImage: string | null
-  /** The hosted logo's key, which approval sends back (null: approval leaves the tile). */
-  logoKey: string | null
-  /** The submitted logo source; never rendered as an image. */
-  logoUrl: string
-  name: string
-  paid: boolean
-  paidAmountCents: number | null
-  queuedAt: string | null
-  rejectionCategory: 'other' | 'prohibited' | null
-  rejectionReason: string | null
-  reviewerNote: string | null
-  slug: string
-  stale: boolean
-  status: string
-  submitter: { createdAt: string | null; email: string; otherSubmissions: number } | null
-  website: string
-}
 
 interface Category {
   name: string

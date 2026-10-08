@@ -67,6 +67,7 @@ export function RootAppShell({
 }: RootAppShellProps) {
   return (
     <html lang="en" suppressHydrationWarning>
+      {/* biome-ignore lint/style/noHeadElement: the App Router root layout owns <head>; next/head is the Pages Router's. */}
       <head>
         <GoogleTagManagerScript gtmId={gtmId} />
         <link rel="alternate" type="application/feed+json" title={feedTitle} href="/rss.xml" />

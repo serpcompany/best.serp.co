@@ -104,5 +104,5 @@ function DirectoryEmpty({
   )
 }
 
-export { DirectoryEmpty }
 export type { DirectoryEmptyAction, DirectoryEmptyProps }
+export { DirectoryEmpty }

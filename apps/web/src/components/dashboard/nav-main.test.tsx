@@ -1,5 +1,5 @@
 import { FileText, Inbox, LayoutDashboard } from 'lucide-react'
-import React from 'react'
+import type React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SidebarProvider } from '@/components/ui/sidebar'

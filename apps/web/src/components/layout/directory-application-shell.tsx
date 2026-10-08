@@ -108,6 +108,13 @@ function DirectoryApplicationMobileSearchPanel({
   )
 }
 
+export type {
+  DirectoryApplicationHeaderBarProps,
+  DirectoryApplicationHeaderGroupProps,
+  DirectoryApplicationHeaderProps,
+  DirectoryApplicationNavProps,
+  DirectoryApplicationSearchSurfaceProps
+}
 export {
   DirectoryApplicationActions,
   DirectoryApplicationHeader,
@@ -117,11 +124,4 @@ export {
   DirectoryApplicationMobileSearchPanel,
   DirectoryApplicationNav,
   DirectoryApplicationSearchColumn
-}
-export type {
-  DirectoryApplicationHeaderBarProps,
-  DirectoryApplicationHeaderGroupProps,
-  DirectoryApplicationHeaderProps,
-  DirectoryApplicationNavProps,
-  DirectoryApplicationSearchSurfaceProps
 }

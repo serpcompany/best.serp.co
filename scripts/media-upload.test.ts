@@ -112,11 +112,12 @@ function fakeFetch(
         const more = start + size < keys.length
         return Response.json({
           result: page.map(id => {
-            const object = stored.get(id)!
+            const object = stored.get(id)
+            if (!object) throw new Error(`listed a missing object: ${id}`)
             return {
               etag: md5(object.body),
               http_metadata: { cacheControl: object.cacheControl, contentType: object.type },
-              key: id.slice(list[1]!.length + 1),
+              key: id.slice((list[1] ?? '').length + 1),
               size: object.body.byteLength
             }
           }),

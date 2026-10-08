@@ -403,12 +403,24 @@ pre code span {
   }
 }
 
-/* These imports come after the theme on purpose: Tailwind inlines them here, and
-   tw-animate-css's accordion animations must override the theme's, as they did when this
-   theme was its own package (#175). */
-@import "./sidebar-theme.css";
+/* Tailwind colours for the sidebar tokens defined per theme above (--sidebar-background and
+   friends), used by components/ui/sidebar.tsx. */
+@theme {
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+}
+
 /* The enter and exit animations shadcn's dialogs, sheets, menus, popovers, selects, and
-   tooltips name (`animate-in`, `fade-in-0`, `zoom-in-95`, `slide-in-from-*`). */
+   tooltips name (`animate-in`, `fade-in-0`, `zoom-in-95`, `slide-in-from-*`). The import comes
+   after the theme on purpose: Tailwind inlines it here, and its accordion animations must
+   override the theme's, as they did when the theme was its own package (#175). */
+/* biome-ignore lint/correctness/noInvalidPositionAtImportRule: the late position is the point (above). */
 @import "tw-animate-css";
 
 /* tw-animate-css ignores reduced motion on its own. Components apply it through variants such

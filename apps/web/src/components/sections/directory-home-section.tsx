@@ -159,19 +159,6 @@ function DirectoryLinkListItem({ children, className }: DirectoryLinkListItemPro
   return <li className={className}>{children}</li>
 }
 
-export {
-  DirectoryCtaBand,
-  DirectoryFeatureGrid,
-  DirectoryHero,
-  DirectoryHeroContainer,
-  DirectoryLinkList,
-  DirectoryLinkListItem,
-  DirectoryPageSection,
-  DirectorySectionAction,
-  DirectorySectionDescription,
-  DirectorySectionHeader,
-  DirectorySectionTitle
-}
 export type {
   DirectoryCtaBandProps,
   DirectoryFeatureGridProps,
@@ -184,4 +171,17 @@ export type {
   DirectorySectionDescriptionProps,
   DirectorySectionHeaderProps,
   DirectorySectionTitleProps
+}
+export {
+  DirectoryCtaBand,
+  DirectoryFeatureGrid,
+  DirectoryHero,
+  DirectoryHeroContainer,
+  DirectoryLinkList,
+  DirectoryLinkListItem,
+  DirectoryPageSection,
+  DirectorySectionAction,
+  DirectorySectionDescription,
+  DirectorySectionHeader,
+  DirectorySectionTitle
 }

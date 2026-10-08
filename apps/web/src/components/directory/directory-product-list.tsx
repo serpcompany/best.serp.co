@@ -139,5 +139,5 @@ function DirectoryProductBadge({
   )
 }
 
-export { DirectoryProductBadge, DirectoryProductCard, DirectoryProductList, DirectoryProductRow }
 export type { DirectoryProductCardProps, DirectoryProductListProps, DirectoryProductRowProps }
+export { DirectoryProductBadge, DirectoryProductCard, DirectoryProductList, DirectoryProductRow }

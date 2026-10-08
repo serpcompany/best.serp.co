@@ -54,9 +54,10 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { formatDay, initials, listingPath } from '@/lib/admin/format'
+import type { LinkRel, ListingDetailView } from '@/lib/admin/listing-view'
 import { cn } from '@/lib/utils'
 import { adminRequest } from './api'
-import { formatDay, initials, listingPath } from './format'
 import { Kv } from './kv'
 import { LogoPreview } from './logo-preview'
 import { RecordHeader } from './record-header'
@@ -67,54 +68,6 @@ import { StatusBadge, type StatusKind } from './status-badge'
  * unpublish or republish, transfer and remove owner, and "Allow resubmission" for a URL blocked
  * by a prohibited rejection. Each action posts to `/api/admin/listings/<id>/<action>`.
  */
-
-type LinkRel = 'follow' | 'nofollow' | 'sponsored'
-
-export interface ListingDetailView {
-  activity: Array<{ detail: string; key: string; title: string; tone?: 'err' | 'ok' | 'warn' }>
-  adminStatus: 'blocked' | 'draft' | 'live' | 'rejected' | 'unlisted'
-  badgeChecks: Array<{
-    checkedAt: string | null
-    key: string
-    note: string
-    outcome: 'fail' | 'pass'
-    conclusive: boolean
-  }>
-  block: { blockedAt: string | null; blockedBy: string; reason: string; urlKey: string } | null
-  categoryName: string | null
-  categorySlug: string | null
-  checksum: string
-  description: string
-  id: string
-  linkRel: LinkRel
-  /** Set while the logo is not hosted yet (#95). */
-  logoNote: { text: string; tone: 'err' | 'warn' } | null
-  /** The source of the logo the page shows now (a queued replacement is `logoUrl`). */
-  currentLogoUrl: string | null
-  /** What the screen renders: the hosted copy or an own-origin path, else the tile (#96 S9). */
-  logoImage: string | null
-  /** The logo's source, edited in the form; never rendered as an image. */
-  logoUrl: string | null
-  meta: string
-  name: string
-  owner: {
-    email: string
-    userId: string
-    verifiedAt: string | null
-    verifiedVia: string
-    verifiedViaLabel: string
-  } | null
-  slug: string
-  submission: {
-    id: string
-    paidLabel: string | null
-    submitterCreatedAt: string | null
-    submitterEmail: string | null
-  } | null
-  submissionQueued: boolean
-  unpublished: { at: string | null; by: string; note: string | null } | null
-  website: string
-}
 
 interface Category {
   name: string

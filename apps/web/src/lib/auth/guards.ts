@@ -109,8 +109,7 @@ export async function authorizeAdmin(dependencies: AdminGuardDependencies): Prom
     return unavailable
   }
   if (
-    !status ||
-    !status.allowlisted ||
+    !status?.allowlisted ||
     !status.emailVerified ||
     status.role !== 'admin' ||
     status.email !== user.user.email.trim().toLowerCase()

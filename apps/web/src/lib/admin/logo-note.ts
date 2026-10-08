@@ -1,5 +1,5 @@
 import type { AdminListingDetail } from '@/db/admin-queries'
-import { formatDateTime } from '../../components/admin/format'
+import { formatDateTime } from './format'
 
 const failureText: Record<string, string> = {
   copy_mismatch: "the stored copy didn't match its record",

@@ -1,0 +1,157 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/build",
+      "!**/node_modules",
+      "!**/.next",
+      "!**/coverage",
+      "!**/.content-collections",
+      "!d1/media/*.json",
+      "!**/.open-next",
+      "!**/.wrangler",
+      "!apps/web/cloudflare-env.d.ts",
+      "!apps/web/drizzle"
+    ]
+  },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "formatter": {
+    "enabled": true,
+    "formatWithErrors": false,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 100,
+    "attributePosition": "auto"
+  },
+  "linter": {
+    "domains": { "next": "recommended", "react": "recommended" },
+    "rules": {
+      "preset": "recommended",
+      "correctness": {
+        "noUnusedImports": "warn",
+        // 22 hooks would rerun on dependencies they leave out on purpose (focus, scroll and
+        // drawer effects); each needs a behavior check, so this stays off until the UI work
+        // (#185-#188) rewrites them.
+        "useExhaustiveDependencies": "off",
+        // Static ids name single-instance form fields and anchors that labels, tests and
+        // links point at; useId would change them on every render tree.
+        "useUniqueElementIds": "off"
+      },
+      "performance": {
+        // Next's image optimizer does not run on Workers; listing images come from the media
+        // host through ListingImage, which sets sizes and loading itself.
+        "noImgElement": "off"
+      },
+      "complexity": {
+        // globals.css uses !important only to make prefers-reduced-motion win over utilities.
+        "noImportantStyles": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["docs/mockups/**"],
+      "assist": {
+        "enabled": false
+      },
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["**/*.svg"],
+      "linter": {
+        "enabled": false
+      }
+    },
+    // Imports flow one way (#181): lib and db never import components or routes, and
+    // components never import routes. Tests may render the pieces they check.
+    {
+      "includes": ["apps/web/src/lib/**", "apps/web/src/db/**", "!**/*.test.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    // Anchored on @/ and relative paths, so npm subpaths such as
+                    // next/dist/client/components/... stay allowed.
+                    "group": [
+                      "@/components",
+                      "@/components/**",
+                      "@/app/**",
+                      "./**/components/**",
+                      "../**/components/**",
+                      "./**/app/**",
+                      "../**/app/**"
+                    ],
+                    "message": "src/lib and src/db never import components or routes; move the shared piece into src/lib."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/src/components/**", "!**/*.test.*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/app/**", "./**/app/**", "../**/app/**"],
+                    "message": "Components never import routes; move the shared piece into src/lib or src/components."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/src/components/ui/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noArrayIndexKey": "off"
+          },
+          "a11y": {
+            "useSemanticElements": "off"
+          }
+        }
+      }
+    }
+  ],
+  "javascript": {
+    "formatter": {
+      "arrowParentheses": "asNeeded",
+      "trailingCommas": "none",
+      "semicolons": "asNeeded",
+      "quoteStyle": "single"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  }
+}

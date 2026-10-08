@@ -1,7 +1,6 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import type React from 'react'
 import { useCallback, useState } from 'react'
 import { getRoute } from '../lib/routing/routes'
 import { useDebounce } from './use-debounce'

@@ -24,8 +24,8 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ageLabel, formatUsd, listingPath } from '@/lib/admin/format'
 import { DataTableView, FacetFilter, PaginationFooter } from './data-table'
-import { ageLabel, formatUsd, listingPath } from './format'
 import { ProductCell } from './product-cell'
 import { PlanBadge, StatusBadge, type StatusKind } from './status-badge'
 

@@ -7,7 +7,7 @@ import { SITE_LOGO_URL, SITE_NAME, SITE_PUBLIC_URL, SITE_URL, SITE_WEBSITE_ID } 
 export interface SchemaOrg {
   '@context': 'https://schema.org'
   '@type': string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 /**

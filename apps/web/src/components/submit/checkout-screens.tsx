@@ -4,7 +4,6 @@ import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type ReactNode, useEffect } from 'react'
-import { formatUsd } from '@/components/admin/format'
 import { Kv } from '@/components/admin/kv'
 import { StatusBadge, type StatusKind } from '@/components/admin/status-badge'
 import { Button } from '@/components/ui/button'
@@ -25,6 +24,7 @@ import {
   ItemTitle
 } from '@/components/ui/item'
 import { Spinner } from '@/components/ui/spinner'
+import { formatUsd } from '@/lib/admin/format'
 import { ProductLogo, ToneAlert } from './submit-ui'
 
 /**

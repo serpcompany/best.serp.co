@@ -65,9 +65,9 @@ function DirectoryNavigationItem({
   )
 }
 
+export type { DirectoryNavigationItemProps, DirectoryNavigationSectionProps }
 export {
   DirectoryNavigationItem,
   DirectoryNavigationSection,
   directoryNavigationInteractiveClassName
 }
-export type { DirectoryNavigationItemProps, DirectoryNavigationSectionProps }
