@@ -65,7 +65,7 @@ const STOCK_UI = [
 ].map(name => `apps/web/src/components/ui/${name}.tsx`)
 
 /** Each file's literal-color count on 2026-10-08. Lower it as a file moves to tokens. */
-export const COLOR_BASELINE: Readonly<Record<string, number>> = {
+const COLOR_BASELINE: Readonly<Record<string, number>> = {
   'apps/web/src/app/error.tsx': 3,
   'apps/web/src/app/not-found.tsx': 3,
   'apps/web/src/components/account/account-dashboard.tsx': 3,
@@ -119,7 +119,7 @@ function withoutComments(source: string): string {
 }
 
 /** Every literal color in `source`, as `line: kind text`. */
-export function literalColors(source: string): string[] {
+function literalColors(source: string): string[] {
   const code = withoutComments(source)
   const uses: string[] = []
   for (const [kind, pattern] of patterns) {
@@ -145,7 +145,7 @@ describe('theme colors only (#183)', () => {
         [
           '<div className="bg-red-500 hover:text-zinc-400/80 border-t-amber-300 ring-offset-white" />',
           "const accent = { ink: '#09090b', bright: '#fff' }",
-          'ctx.fillStyle = `rgba(${rgb}, 1)`',
+          'ctx.fillStyle = `rgba(' + '$' + '{rgb}, 1)`',
           'style={{ color: hsl(240 5% 92%) }}'
         ].join('\n')
       )
