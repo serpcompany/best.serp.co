@@ -171,7 +171,6 @@ export function Header({
               {siteConfig.features.showGuides ? (
                 <NavLink href={getRoute('guides.list')}>Posts</NavLink>
               ) : null}
-              {/* <NavLink href={getRoute('news')}>News</NavLink> */}
             </DirectoryApplicationNav>
 
             {/* Mobile search icon */}

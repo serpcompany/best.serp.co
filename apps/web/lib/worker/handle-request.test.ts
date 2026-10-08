@@ -315,6 +315,16 @@ describe('admin gate', () => {
   })
 })
 
+describe('retired paths (#166)', () => {
+  it.each(['/news', '/news/'])('answers %s 410 before the slash rule and the cache', async path => {
+    const { handler, response } = run(`${production}${path}`, productionEnv)
+    const served = await response
+    expect(served.status).toBe(410)
+    expect(served.headers.get('location')).toBeNull()
+    expect(handler.serve).not.toHaveBeenCalled()
+  })
+})
+
 describe('local dev endpoints (#164)', () => {
   const devPaths = ['/api/dev/email-outbox?to=a%40example.com', '/api/auth/dev/otp-outbox?email=a']
 
