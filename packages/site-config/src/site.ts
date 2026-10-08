@@ -63,35 +63,7 @@ export const site: SiteDefinition = {
     networkBasePath: 'network'
   },
   sitemap: {
-    categoryBasePath: 'products/categories',
-    excludedPaths: [
-      '/legal/affiliate-disclosure',
-      '/legal/dmca',
-      '/legal/privacy-policy',
-      '/legal/terms-conditions',
-      '/products/categories/other',
-      '/submit'
-    ],
-    pathByGroup: {
-      listings: '/sitemaps/directory/1.xml',
-      pages: '/sitemaps/pages/1.xml',
-      taxonomies: '/sitemaps/categories/1.xml'
-    },
-    staticPagePaths: [
-      '/',
-      '/about',
-      '/brands',
-      '/contact',
-      '/legal',
-      '/legal/affiliate-disclosure',
-      '/legal/dmca',
-      '/legal/privacy-policy',
-      '/legal/terms-conditions',
-      '/pricing',
-      '/products/categories',
-      '/sponsor',
-      '/submit'
-    ]
+    categoryBasePath: 'products/categories'
   },
   submissions: {
     // $49 USD, one-off and permanent (#59 owner decision, 2026-10-06).

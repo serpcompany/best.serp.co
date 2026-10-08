@@ -29,7 +29,7 @@ Those generated artifacts were moved to `_archive/legacy-e2e-artifacts/**` durin
 
 - The repo workflow only runs E2E when changes touch E2E-relevant frontend paths.
 - Keep route expectations aligned with the active best.serp.co Worker and D1 contract
-  (`/products/<slug>/`, `/products/categories/<category>/`, `/sitemaps/*/1.xml`), not a removed
+  (`/products/<slug>/`, `/products/categories/<category>/`, `/sitemap-*.xml`), not a removed
   starter app, the former multi-site platform, or the older llms-era route map. Shared best.serp.co
   facts (catalog counts, public URL, route helpers) live in `tests/site-fixture.ts`.
 - By default Playwright migrates, imports, and verifies the local D1 catalog and then starts

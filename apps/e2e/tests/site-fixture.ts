@@ -4,7 +4,8 @@
  * fails the suite rather than silently moving the expectation with it.
  */
 export const site = {
-  categoryCount: 140,
+  /** Categories with a published listing, `other` included. */
+  categoryCount: 141,
   /** `?via=` on every serp.ly link the site renders (#169). */
   dubPartnerId: 'best.serp.co',
   /**

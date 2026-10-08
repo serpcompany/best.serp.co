@@ -1,3 +1,5 @@
+import { getRoute } from '@serpdirectory/web-core/routes'
+import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { SubmitForm } from '@/components/submit/submit-form'
@@ -6,10 +8,12 @@ import { getActiveCategories } from '@/lib/catalog/repository'
 import { toSummary } from '@/lib/submissions/http'
 import { getOwnSubmission, insecureLogosAllowed } from '@/lib/submissions/repository'
 
-export const metadata: Metadata = {
+// Noindex and robots-disallowed, from the route registry (#167).
+export const metadata: Metadata = generateBaseMetadata({
   title: 'Submit to SERP',
-  description: 'Submit your software, AI tool, company, resource, or SERP project to SERP.'
-}
+  description: 'Submit your software, AI tool, company, resource, or SERP project to SERP.',
+  path: getRoute('submit')
+})
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
 

@@ -11,7 +11,8 @@ import {
 const origin = 'https://best.serp.co'
 const websites = [
   { category: 'video-downloaders', publishedAt: '2026-05-16', slug: 'autoenhance.ai' },
-  { category: 'video-downloaders', publishedAt: '2026-05-17', slug: 'example-product' }
+  // The catch-all category is a page like any other, so its sitemap lists it.
+  { category: 'other', publishedAt: '2026-05-17', slug: 'example-product' }
 ]
 
 function locations(xml: string): string[] {
@@ -41,18 +42,32 @@ describe('sitemaps and absolute URLs', () => {
     const categories = locations(
       await (await createTaxonomiesSitemapResponse({ getWebsites: () => websites })).text()
     )
-    expect(categories).toEqual([`${origin}/products/categories/video-downloaders/`])
+    expect(categories).toEqual([
+      `${origin}/products/categories/other/`,
+      `${origin}/products/categories/video-downloaders/`
+    ])
   })
 
-  it('points robots.txt and the index at unslashed sitemap files', async () => {
+  it('points robots.txt and the index at the root-level sitemap files (#167)', async () => {
     expect(createCanonicalRobots().sitemap).toBe(`${origin}/sitemap-index.xml`)
-    expect(
-      locations(await createSitemapIndexResponse({ getWebsites: () => websites }).text())
-    ).toEqual([
-      `${origin}/sitemaps/pages/1.xml`,
-      `${origin}/sitemaps/directory/1.xml`,
-      `${origin}/sitemaps/categories/1.xml`
+    expect(locations(await createSitemapIndexResponse().text())).toEqual([
+      `${origin}/sitemap-pages.xml`,
+      `${origin}/sitemap-products.xml`,
+      `${origin}/sitemap-categories.xml`
     ])
+  })
+
+  it('writes no lastmod it cannot back with data', async () => {
+    const pages = await createPagesSitemapResponse().text()
+    const index = await createSitemapIndexResponse().text()
+    const categories = await (
+      await createTaxonomiesSitemapResponse({ getWebsites: () => websites })
+    ).text()
+    for (const xml of [pages, index, categories]) expect(xml).not.toContain('<lastmod>')
+    const listings = await (
+      await createListingsSitemapResponse({ getWebsites: () => websites })
+    ).text()
+    expect(listings).toContain('<lastmod>2026-05-16T00:00:00.000Z</lastmod>')
   })
 
   it('writes the homepage as the bare origin in structured data', () => {

@@ -56,15 +56,6 @@ function buildCategoryRoute(pattern = '[category]'): string {
   return buildRouteFromBase('categories', pattern)
 }
 
-function isConfiguredSitemapExcludedPath(path: string): boolean {
-  const normalizedPath = path.replace(/^\/+|\/+$/g, '')
-  const comparablePath = normalizedPath ? `/${normalizedPath}` : '/'
-
-  return (siteConfig.sitemap.excludedPaths ?? []).some(
-    excludedPath => excludedPath.replace(/^\/+|\/+$/g, '') === comparablePath.replace(/^\/+/, '')
-  )
-}
-
 export const routes = {
   home: '/',
   listing: {
@@ -113,8 +104,12 @@ export const routes = {
   rss: '/rss.xml'
 } as const
 
+/**
+ * The directory index, `/products/`, linked from breadcrumbs and "view all". Its first page
+ * renders the homepage's content, so its canonical is `/` (the route registry).
+ */
 export function getCanonicalListingListRoute(): string {
-  return isConfiguredSitemapExcludedPath(routes.listing.list) ? routes.home : routes.listing.list
+  return routes.listing.list
 }
 
 type StaticRoutes =

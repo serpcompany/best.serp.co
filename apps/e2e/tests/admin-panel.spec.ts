@@ -296,7 +296,7 @@ test.describe('review decisions', () => {
         expect(html).toContain('rel="noopener noreferrer"')
       }).toPass({ intervals: [1_000, 2_000, 5_000], timeout: 90_000 })
       await expect(async () => {
-        const sitemap = await visitor.get('/sitemaps/directory/1.xml')
+        const sitemap = await visitor.get('/sitemap-products.xml')
         expect(await sitemap.text()).toContain(`/products/${submission.slug}/`)
       }).toPass({ intervals: [2_000, 5_000], timeout: 90_000 })
     } finally {
@@ -424,7 +424,7 @@ test.describe('listings', () => {
       await expect(page.getByText('Is this your product?')).toBeVisible()
       await capture(page, '09-gone-410')
       await expect(async () => {
-        const sitemap = await visitor.get('/sitemaps/directory/1.xml')
+        const sitemap = await visitor.get('/sitemap-products.xml')
         expect(await sitemap.text()).not.toContain(`/products/${submission.slug}/`)
         const search = await visitor.get(`/api/search?q=${encodeURIComponent(submission.name)}`)
         expect(await search.text()).not.toContain(submission.slug)

@@ -24,7 +24,7 @@ describe('canonical URL policy', () => {
       ['/robots.txt/', '/robots.txt'],
       ['/robots.txt', '/robots.txt'],
       ['/sitemap-index.xml/', '/sitemap-index.xml'],
-      ['/sitemaps/pages/1.xml/', '/sitemaps/pages/1.xml'],
+      ['/sitemap-pages.xml/', '/sitemap-pages.xml'],
       ['/favicon.ico/', '/favicon.ico'],
       ['/badge/featured-on-serp.co-dark.svg/', '/badge/featured-on-serp.co-dark.svg'],
       ['/fonts/Inter.WOFF2/', '/fonts/Inter.WOFF2']
@@ -66,7 +66,7 @@ describe('canonical URL policy', () => {
 
   it('recognizes files only by known extensions, never by a domain-like slug', () => {
     expect(isFilePath('/robots.txt')).toBe(true)
-    expect(isFilePath('/sitemaps/directory/1.xml/')).toBe(true)
+    expect(isFilePath('/sitemap-products.xml/')).toBe(true)
     expect(isFilePath('/opengraph-image.png')).toBe(true)
     for (const page of [
       '/',

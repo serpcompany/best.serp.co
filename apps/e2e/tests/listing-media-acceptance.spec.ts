@@ -63,7 +63,7 @@ test('listing images come only from the media host and load', async ({
   test.setTimeout(10 * 60_000)
   const origin = baseURL ?? ''
   const host = mediaHost(origin)
-  const sitemap = await (await request.get(`${origin}/sitemaps/directory/1.xml`)).text()
+  const sitemap = await (await request.get(`${origin}/sitemap-products.xml`)).text()
   const listingPaths = [...sitemap.matchAll(/<loc>https?:\/\/[^/]+(\/products\/[^<]+)<\/loc>/gu)]
     .map(match => match[1] ?? '')
     .filter(path => !path.includes('/categories/'))

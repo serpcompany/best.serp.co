@@ -6,6 +6,7 @@
  * must stay indexable; noindex must apply exactly where intended. Only the build-time wrappers
  * and the data and runtime modules these files import are stubbed.
  */
+import { siteRoutes } from '@serpdirectory/site-config'
 import { rootLayoutMetadata } from '@serpdirectory/web-core/root-shell'
 import { buildCustomRoute } from 'next/dist/lib/build-custom-route'
 import loadCustomRoutes from 'next/dist/lib/load-custom-routes'
@@ -32,7 +33,22 @@ vi.mock('@/components/auth/sign-out-button', () => ({
 vi.mock('@/components/layout/public-chrome', () => ({
   PublicChrome: ({ children }: { children: unknown }) => children
 }))
-vi.mock('@/lib/catalog/repository', () => ({ getActiveCategories: async () => [] }))
+vi.mock('@/lib/catalog/repository', () => ({
+  getActiveCategories: async () => [],
+  getListedCategorySlugs: async () => []
+}))
+// The other registry pages' data and form modules (#167); their metadata does not use them.
+vi.mock('@/lib/content-loader', () => ({
+  getAboutPage: async () => null,
+  getLegalContent: async () => ''
+}))
+vi.mock('@/components/submit/submit-form', () => ({ SubmitForm: () => null }))
+vi.mock('@/lib/auth/server', () => ({ getSessionUser: async () => null }))
+vi.mock('@/lib/submissions/http', () => ({ toSummary: () => null }))
+vi.mock('@/lib/submissions/repository', () => ({
+  getOwnSubmission: async () => null,
+  insecureLogosAllowed: () => false
+}))
 vi.mock('@/lib/environment/request-environment', () => ({
   analyticsForRequest: async () => ({})
 }))
@@ -55,7 +71,7 @@ const PUBLIC_PATHS = [
   '/legal/privacy-policy/',
   '/robots.txt',
   '/sitemap-index.xml',
-  '/sitemaps/directory/1.xml',
+  '/sitemap-products.xml',
   '/rss.xml'
 ]
 const PLATFORM_HOSTS = [
@@ -146,4 +162,61 @@ describe('exported page metadata', () => {
       googleBot: 'noindex, follow'
     })
   })
+})
+
+/** Every static page the route registry lists, by the module that renders it. */
+const registryPageModules: Record<
+  string,
+  () => Promise<{ generateMetadata?: unknown; metadata?: unknown }>
+> = {
+  '/': () => import('../../app/page'),
+  '/about/': () => import('../../app/about/page'),
+  '/brands/': () => import('../../app/brands/page'),
+  '/contact/': () => import('../../app/contact/page'),
+  '/legal/': () => import('../../app/legal/page'),
+  '/legal/affiliate-disclosure/': () => import('../../app/legal/affiliate-disclosure/page'),
+  '/legal/cookies/': () => import('../../app/legal/cookies/page'),
+  '/legal/dmca/': () => import('../../app/legal/dmca/page'),
+  '/legal/privacy-policy/': () => import('../../app/legal/privacy-policy/page'),
+  '/legal/terms-conditions/': () => import('../../app/legal/terms-conditions/page'),
+  '/pricing/': () => import('../../app/pricing/page'),
+  '/products/': () => import('../../app/products/page'),
+  '/products/categories/': () => import('../../app/products/categories/page'),
+  '/search/': () => import('../../app/search/page'),
+  '/sponsor/': () => import('../../app/sponsor/page'),
+  '/submit/': () => import('../../app/submit/page')
+}
+
+describe('the route registry and the pages (#167)', () => {
+  it('maps every static registry route to its page module', () => {
+    expect(Object.keys(registryPageModules).sort()).toEqual(
+      siteRoutes
+        .filter(route => !route.path.includes('['))
+        .map(route => route.path)
+        .sort()
+    )
+  })
+
+  it.each(siteRoutes.filter(route => !route.path.includes('[')).map(route => [route.path, route]))(
+    '%s renders the robots directive and canonical the registry gives it',
+    async (path, route) => {
+      const page = await registryPageModules[path]?.()
+      const metadata = (
+        typeof page?.generateMetadata === 'function'
+          ? await page.generateMetadata({ searchParams: Promise.resolve({}) })
+          : page?.metadata
+      ) as { alternates?: { canonical?: unknown }; robots?: Parameters<typeof resolveRobots>[0] }
+      expect(noindexIn(resolveRobots(metadata.robots)), 'noindex').toBe(!route.indexable)
+      const canonical = 'canonicalPath' in route ? route.canonicalPath : path
+      // A page canonical to `/` writes its tag itself (HomePageCanonicalTags): Next.js would add
+      // a slash to the bare origin.
+      if (canonical === '/') {
+        expect(metadata.alternates?.canonical, 'canonical').toBeUndefined()
+        return
+      }
+      expect(String(metadata.alternates?.canonical), 'canonical').toBe(
+        `https://best.serp.co${canonical}`
+      )
+    }
+  )
 })

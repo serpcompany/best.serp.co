@@ -110,12 +110,12 @@ describe('runSubmitGscSitemaps', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
 
     await runSubmitGscSitemaps(
-      ['--dry-run', '--no-submit', '--delete-sitemap', 'https://best.serp.co/pages-sitemap.xml'],
+      ['--dry-run', '--no-submit', '--delete-sitemap', 'https://best.serp.co/sitemaps/pages/1.xml'],
       {}
     )
 
     expect(log).toHaveBeenCalledWith(
-      'DELETE https://best.serp.co/ -> https://best.serp.co/pages-sitemap.xml'
+      'DELETE https://best.serp.co/ -> https://best.serp.co/sitemaps/pages/1.xml'
     )
   })
 
@@ -134,19 +134,19 @@ describe('runSubmitGscSitemaps', () => {
     vi.stubGlobal('fetch', fetchMock)
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
 
-    await runSubmitGscSitemaps(['--delete-sitemap', 'https://best.serp.co/pages-sitemap.xml'], {
+    await runSubmitGscSitemaps(['--delete-sitemap', 'https://best.serp.co/sitemaps/pages/1.xml'], {
       GSC_ACCESS_TOKEN: 'token'
     })
 
     expect(calls.map(call => call.method)).toEqual(['DELETE', 'PUT'])
     expect(calls[0]?.url).toContain(
-      '/sites/https%3A%2F%2Fbest.serp.co%2F/sitemaps/https%3A%2F%2Fbest.serp.co%2Fpages-sitemap.xml'
+      '/sites/https%3A%2F%2Fbest.serp.co%2F/sitemaps/https%3A%2F%2Fbest.serp.co%2Fsitemaps%2Fpages%2F1.xml'
     )
     expect(calls[1]?.url).toContain(
       '/sites/https%3A%2F%2Fbest.serp.co%2F/sitemaps/https%3A%2F%2Fbest.serp.co%2Fsitemap-index.xml'
     )
     expect(log).toHaveBeenCalledWith(
-      'Deleted https://best.serp.co/pages-sitemap.xml for https://best.serp.co/'
+      'Deleted https://best.serp.co/sitemaps/pages/1.xml for https://best.serp.co/'
     )
     expect(log).toHaveBeenCalledWith(
       'Submitted https://best.serp.co/sitemap-index.xml for https://best.serp.co/'
@@ -163,7 +163,7 @@ describe('runSubmitGscSitemaps', () => {
       })
     )
 
-    await runSubmitGscSitemaps(['--delete-sitemap', 'https://best.serp.co/pages-sitemap.xml'], {
+    await runSubmitGscSitemaps(['--delete-sitemap', 'https://best.serp.co/sitemaps/pages/1.xml'], {
       GSC_ACCESS_TOKEN: 'token',
       GSC_SITE_URL_MAP: JSON.stringify({
         'best.serp.co': 'sc-domain:best.serp.co'
@@ -190,13 +190,13 @@ describe('runSubmitGscSitemaps', () => {
     )
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
 
-    await runSubmitGscSitemaps(['--delete-sitemap', 'https://best.serp.co/pages-sitemap.xml'], {
+    await runSubmitGscSitemaps(['--delete-sitemap', 'https://best.serp.co/sitemaps/pages/1.xml'], {
       GSC_ACCESS_TOKEN: 'token'
     })
 
     expect(calls.map(call => call.method)).toEqual(['DELETE', 'PUT'])
     expect(log).toHaveBeenCalledWith(
-      'Deleted https://best.serp.co/pages-sitemap.xml for https://best.serp.co/'
+      'Deleted https://best.serp.co/sitemaps/pages/1.xml for https://best.serp.co/'
     )
   })
 })
