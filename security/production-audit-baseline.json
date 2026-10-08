@@ -7,13 +7,13 @@
       "batch": "framework-runtime",
       "modules": ["ws"],
       "rationale": "These packages are transitive runtime dependencies of the current Next.js, Vercel, and Cloudflare stack. They require upgrades through their direct framework owners plus both Worker builds and Preview verification.",
-      "target": "Issue #93 \u2014 framework/runtime upgrade batch"
+      "target": "Issue #93 — framework/runtime upgrade batch"
     },
     "product-parsing-and-transport": {
       "batch": "product-libraries",
       "modules": ["form-data", "js-yaml", "serialize-javascript"],
       "rationale": "These parsers and transport helpers are transitive dependencies of current product packages. The safe remediation is to upgrade their owning direct dependencies and validate sitemap, feed, submission, and serialization behavior.",
-      "target": "Issue #92 follow-up \u2014 product-libraries upgrade batch"
+      "target": "Issue #92 follow-up — product-libraries upgrade batch"
     }
   },
   "advisories": [
