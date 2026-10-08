@@ -17,17 +17,22 @@ One workflow, `web.yml` (#182), checks pull requests into `staging` (the base br
 - `e2e` runs Playwright and uploads a `passed-e2e-<tree>` receipt. A push whose tree a pull
   request already tested finds the receipt and skips the suite; a lookup error runs it. Draft
   pull requests skip `e2e` until they are marked ready for review.
-- `deploy-staging` runs on a push to `staging` once `check` and `e2e` pass: build, a tip guard
-  (a re-run of an older commit never deploys over newer code; a failed lookup fails the job),
-  then the staging release steps
+- `tip` runs on a push to `staging` once `check` and `e2e` pass, and starts `deploy-staging` only
+  if the commit is still the `staging` head. A job joining the deploy group cancels the one
+  waiting there, so an older commit (a re-run) must never join it. A failed lookup fails the job.
+- `deploy-staging` builds, checks the tip again, then runs the staging release steps
   ([deploy runbook](./DEPLOY_RUNBOOK.md#workflows)).
+- `changes` compares with `--no-renames`, so code moved into `docs/` still counts as code.
 
-The repository rulesets `staging` and `main` (id 24391799) apply these rules:
+Three branch rulesets apply: `staging` (24491650), `main pull requests` (24716331), and `main`
+(24391799), which blocks deletion and force pushes for everyone:
 
 - Every change needs a pull request: squash-merged into `staging` (except the merge commit
   that brings a hotfix back from `main`) and into `main` for hotfixes. The one exception is
   the owner's fast-forward promotion of `staging` (`pnpm release:promote`), a bypass push.
-- `check` and `e2e` from `web.yml` are the required checks. `issue-link` from
+- `check` and `e2e` from `web.yml` are `staging`'s required checks, and a pull request must be
+  up to date with `staging` to merge. `main pull requests` still requires the old
+  `pr-review.yml` checks until the owner swaps them at the next promotion. `issue-link` from
   `pr-issue-link.yml` (serp's workflow, copied unchanged) runs on every pull request and fails
   one that closes no issue; it is not a required check yet. Neither required job is
   path-filtered, because a skipped job satisfies a required check. `issue-link` skips bot PRs
@@ -35,12 +40,11 @@ The repository rulesets `staging` and `main` (id 24391799) apply these rules:
   a `No issue: <reason>` line.
 - Force pushes and branch deletion are blocked, with no bypass.
 
-The rulesets require no approving review, no up-to-date branch, and no resolved conversations.
-Repository admins can bypass them only through a pull request. The exception is the owner's
-fast-forward promotion (`pnpm release:promote`, #171), a direct push to `main`. A bypass covers
-a whole ruleset, so that push needs `main`'s pull request and check rules in a ruleset of their
-own the owner may bypass, with deletion and force-push blocking left in one nobody can bypass
-(#171 owner step; until then the push is rejected). Agents never push. Rulesets cannot restrict
+The rulesets require no approving review and no resolved conversations. Admins can bypass
+`staging` only through a pull request. The owner's fast-forward promotion
+(`pnpm release:promote`, #171) is a direct push to `main`, and a bypass covers a whole ruleset,
+so `main`'s pull request and check rules sit in `main pull requests`, which admins may bypass,
+and `main` keeps the deletion and force-push blocks nobody can bypass. Agents never push. Rulesets cannot restrict
 a pull request's head branch, so `check` fails a pull request into `main` whose
 head is not a `hotfix-*` branch. That only catches mis-targeted pull requests; Deploy
 Production's tree check is the control. Agents never merge: the owner approves every merge

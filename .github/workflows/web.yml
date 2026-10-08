@@ -53,8 +53,9 @@ jobs:
             echo "code=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Documentation is docs/ and Markdown; MDX is site content, so it is code.
-          if git diff --name-only "$BASE" "$GITHUB_SHA" | grep -qvE '^docs/|\.md$'; then
+          # Documentation is docs/ and Markdown; MDX is site content, so it is code. Without
+          # --no-renames, code moved into docs/ would list only its new path.
+          if git diff --name-only --no-renames "$BASE" "$GITHUB_SHA" | grep -qvE '^docs/|\.md$'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -188,6 +189,32 @@ jobs:
           retention-days: 30
           overwrite: true
 
+  tip:
+    # Decides before deploy-staging starts. A job that joins the deploy group cancels the one
+    # waiting there, so a commit that is no longer the staging tip (a re-run of an older check)
+    # must never join it, or it could cancel the newest commit's queued deploy.
+    name: staging tip
+    needs: [check, e2e]
+    if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.tip.outputs.deploy }}
+    steps:
+      - name: Is this commit the staging tip?
+        id: tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A failed lookup fails the job, so nothing deploys and the run shows it.
+          tip="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/staging" --jq .object.sha)"
+          if [ "$tip" = "$GITHUB_SHA" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          message="Not deployed: staging has moved on from $GITHUB_SHA to $tip, whose run deploys it."
+          echo "::notice title=Staging deploy skipped::$message"
+          echo "$message" >> "$GITHUB_STEP_SUMMARY"
+
   deploy-staging:
     # Every push to staging (and a dispatch on staging): build, a staging D1 Time Travel
     # bookmark, staging D1 migrations, Worker deploy, HTTP gates, and the Playwright smoke suite
@@ -195,10 +222,10 @@ jobs:
     # jobs verified. Skips (green) until the `staging` environment holds Cloudflare credentials;
     # see docs/DEPLOY_RUNBOOK.md.
     name: Validate, migrate, deploy & smoke-test staging
-    needs: [check, e2e]
-    if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'
+    needs: [check, e2e, tip]
+    if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'
     # Job-level, so a pull request never joins the group and never replaces a queued push run.
-    # A queued run is replaced only by a newer staging run.
+    # Only the staging tip joins (the tip job), so a queued run is replaced only by a newer one.
     concurrency:
       group: deploy-best-serp-co-staging
       cancel-in-progress: false
@@ -249,8 +276,8 @@ jobs:
       - name: Deploy only the staging tip
         id: tip
         if: steps.credentials.outputs.configured == 'true'
-        # Deploys enter the group in the order their checks finish, and a re-run of an older
-        # commit's check would otherwise deploy older code over newer.
+        # The tip job checked before this job joined the group; staging may have moved while it
+        # waited, and an older commit never deploys over newer code.
         run: |
           # A failed lookup fails the job rather than passing without a deploy.
           line="$(git ls-remote --exit-code origin refs/heads/staging)"

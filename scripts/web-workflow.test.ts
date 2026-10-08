@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 import { githubHostedRunner, routedRunsOn } from './ci-runners'
-import { stepsForProfile } from './harness/runner'
+import { stepEnvironment, stepsForProfile } from './harness/runner'
 import { project } from './project'
 import { hotfixBranch } from './staging-verification'
 
@@ -130,19 +130,40 @@ describe('web workflow', () => {
     expect(names({ HARNESS_SKIP_BUILD: '1' })).toEqual(
       names({}).filter(name => name !== 'OpenNext Worker build')
     )
+    // The steps themselves never see it: their tests check the full step list.
+    expect(stepEnvironment({ HARNESS_SKIP_BUILD: '1', PATH: '/bin' })).toEqual({
+      CI: '1',
+      FORCE_COLOR: '0',
+      PATH: '/bin'
+    })
+    expect(stepEnvironment({ CI: 'true', FORCE_COLOR: '1' })).toEqual({
+      CI: 'true',
+      FORCE_COLOR: '1'
+    })
   })
 
   it('treats a change as documentation only when every file is under docs/ or Markdown', () => {
     const find = step('changes', 'Find code changes')
     expect(find.env).toEqual({ BASE: expression('github.event.pull_request.base.sha') })
-    const classify = (files: string[], env: Record<string, string> = {}) =>
-      runStep(
+    // Like git, the stub lists a renamed file only by its new path unless --no-renames is set.
+    const classify = (
+      files: string[],
+      env: Record<string, string> = {},
+      withRenames: string[] = files
+    ) => {
+      const list = (paths: string[]) => paths.map(file => `'${file}'`).join(' ')
+      return runStep(
         String(find.run),
-        `git() { if [ "$1" = cat-file ]; then return "\${CAT_STATUS:-0}"; fi; printf '%s\\n' ${files
-          .map(file => `'${file}'`)
-          .join(' ')}; }`,
+        `git() {
+          if [ "$1" = cat-file ]; then return "\${CAT_STATUS:-0}"; fi
+          case " $* " in
+            *" --no-renames "*) printf '%s\\n' ${list(files)} ;;
+            *) printf '%s\\n' ${list(withRenames)} ;;
+          esac
+        }`,
         { BASE: 'abc', GITHUB_EVENT_NAME: 'pull_request', GITHUB_SHA: 'def', ...env }
       ).outputs.code
+    }
     expect(classify(['docs/HARNESS.md'])).toBe('false')
     expect(classify(['docs/HARNESS.md', 'AGENTS.md', 'apps/web/e2e/README.md'])).toBe('false')
     expect(classify(['docs/mockups/submissions/index.html'])).toBe('false')
@@ -150,6 +171,8 @@ describe('web workflow', () => {
     // MDX is site content.
     expect(classify(['apps/web/content/legal/terms-conditions.mdx'])).toBe('true')
     expect(classify(['.github/workflows/web.yml'])).toBe('true')
+    // Code moved into docs/ is still a code change.
+    expect(classify(['apps/web/src/util.ts', 'docs/util.ts'], {}, ['docs/util.ts'])).toBe('true')
     // A push deploys, so it checks the tree it deploys whatever changed; unknown bases run
     // everything.
     expect(classify(['docs/HARNESS.md'], { GITHUB_EVENT_NAME: 'push' })).toBe('true')
@@ -222,7 +245,31 @@ describe('web workflow', () => {
     )
   })
 
-  it('deploys only the staging tip, and fails when the tip cannot be read', () => {
+  it('starts the deploy only for the staging tip, and fails when the tip cannot be read', () => {
+    // Decided before deploy-staging joins its group, where joining cancels the queued deploy.
+    const job = workflow.jobs.tip
+    expect(job?.needs).toEqual(['check', 'e2e'])
+    expect(job?.if).toBe(
+      "github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'"
+    )
+    expect(job?.outputs).toEqual({ deploy: expression('steps.tip.outputs.deploy') })
+    expect(workflow.jobs['deploy-staging']?.needs).toEqual(['check', 'e2e', 'tip'])
+    expect(workflow.jobs['deploy-staging']?.if).toBe(
+      "github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'"
+    )
+    const decide = step('tip', 'Is this commit the staging tip?')
+    expect(decide.env).toEqual({ GH_TOKEN: expression('github.token') })
+    const before = (gh: string) =>
+      runStep(String(decide.run), `gh() { ${gh}; }`, {
+        GITHUB_REPOSITORY: repository,
+        GITHUB_SHA: 'abc123'
+      })
+    expect(before('echo abc123')).toEqual({ outputs: { deploy: 'true' }, status: 0 })
+    expect(before('echo def456')).toEqual({ outputs: {}, status: 0 })
+    expect(before('return 1').status).not.toBe(0)
+  })
+
+  it('checks the tip again inside the deploy, and fails when it cannot be read', () => {
     const tip = workflow.jobs['deploy-staging']?.steps?.find(candidate => candidate.id === 'tip')
     const guard = (status: number, output: string) =>
       runStep(String(tip?.run), `git() { printf '%s' "$LS_OUTPUT"; return "$LS_STATUS"; }`, {
@@ -293,7 +340,7 @@ describe('web workflow', () => {
   it('routes only check through CI_RUNNER_LABELS, behind the fork guard', () => {
     expect(workflow.jobs.check?.['runs-on']).toBe(routedRunsOn)
     // E2E installs Playwright browsers, and the deploy holds credentials: GitHub-hosted.
-    for (const job of ['changes', 'e2e', 'deploy-staging']) {
+    for (const job of ['changes', 'e2e', 'tip', 'deploy-staging']) {
       expect(workflow.jobs[job]?.['runs-on'], job).toBe(githubHostedRunner)
     }
     expect(source).not.toMatch(/self-hosted/u)

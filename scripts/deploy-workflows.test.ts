@@ -136,9 +136,12 @@ describe('staging deploy job', () => {
       group: 'deploy-best-serp-co-staging',
       'cancel-in-progress': false
     })
-    expect(Object.keys(workflow.jobs)).toEqual(['changes', 'check', 'e2e', 'deploy-staging'])
-    expect(job.needs).toEqual(['check', 'e2e'])
-    expect(job.if).toBe("github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'")
+    expect(Object.keys(workflow.jobs)).toEqual(['changes', 'check', 'e2e', 'tip', 'deploy-staging'])
+    expect(job.needs).toEqual(['check', 'e2e', 'tip'])
+    // Only the staging tip starts it (the tip job), so a stale commit never joins the group.
+    expect(job.if).toBe(
+      "github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'"
+    )
     expect(job.environment).toEqual({ name: 'staging', url: project.remote.staging.origin })
     expect(job.env).toEqual({ STAGING_ORIGIN: project.remote.staging.origin })
     expect(JSON.stringify(job)).not.toMatch(/production/u)
