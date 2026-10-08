@@ -122,7 +122,8 @@ export interface ReleaseAuthorization {
 
 /** The only workflows that may mutate a remote environment, and what each may do. */
 export const releaseAuthorizations: Readonly<Record<string, ReleaseAuthorization>> = {
-  'deploy-staging.yml': {
+  // The staging deploy job of the CI workflow (web.yml); on main it runs no release command.
+  'web.yml': {
     branch: 'staging',
     commands: ['migrate', 'deploy'],
     confirmation: null,

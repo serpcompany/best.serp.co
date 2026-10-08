@@ -5,7 +5,7 @@ Status (serpcompany/best.serp.co#34):
 - **Staging** is live at https://best-serp-co-staging.serpcompany.workers.dev (D1
   `best-serp-co-staging`, catalog imported and verified against the parity report). Every
   `*.workers.dev` response carries `X-Robots-Tag: noindex, nofollow`. It was first deployed
-  by hand with `wrangler login`; `deploy-staging.yml` now deploys every push to `staging`.
+  by hand with `wrangler login`; `web.yml` now deploys every push to `staging`.
 - **Production** D1 `best-serp-co-production` is bootstrapped and verified (run
   36800330629), and the production Worker is deployed (run 36802748585) at its noindex
   review URL. DNS has not moved. `deploy-production.yml` releases every promotion to `main`.
@@ -34,7 +34,7 @@ when the two disagree. Cloudflare account: `SERP`, `cec5f04e1d18bcc65f2be0aefb04
 the `staging` → `main` promotion and the hotfix path, and explains the staging-before-production
 check (the released commit must carry a tree Deploy Staging verified) that gates production
 migrations, imports, and Worker deploys. Re-verify the `staging` head with
-`gh workflow run deploy-staging.yml --ref staging`.
+`gh workflow run web.yml --ref staging`.
 
 ## Setup
 
@@ -81,7 +81,7 @@ its own token, scoped to its Worker, D1 database, and R2 bucket (production's al
 `cdn-staging`, the upload's copy source), each proven in its workflow before the
 account-wide token goes. Until then, a leak reaches both.
 
-Until the `staging` secrets exist, `deploy-staging.yml` finishes green with a "Staging deploy
+Until the `staging` secrets exist, `web.yml`'s `deploy-staging` finishes green with a "Staging deploy
 skipped" notice. After they exist, the next push to `staging` deploys staging. The
 `BETTER_AUTH_SECRET` secret and the `/admin` Access app: [Accounts](./ACCOUNTS.md).
 Error reporting (Sentry) and analytics (GTM, Cloudflare Web Analytics):
@@ -91,7 +91,7 @@ Error reporting (Sentry) and analytics (GTM, Cloudflare Web Analytics):
 
 | Workflow | Trigger | Environment | Typed confirmation | Does |
 |---|---|---|---|---|
-| `deploy-staging.yml` | push to `staging`, manual from `staging` | `staging` | none | `pnpm harness:fast` → build → D1 bookmark → migrations → deploy → HTTP gates → Playwright smoke |
+| `web.yml` (`deploy-staging`) | push to `staging` after `check` and `e2e`, manual from `staging` | `staging` | none | build → tip guard → D1 bookmark → migrations → deploy → HTTP gates → Playwright smoke |
 | `deploy-production.yml` | push to `main`, manual | `production` | dispatch: `deploy-best.serp.co-production` (or `hotfix-…`) | Staging verification → `pnpm harness:fast` → build → `plan-release` → (pending migrations: bookmark → migrate) → deploy → HTTP gates |
 | `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → D1 bookmark → initial catalog import into an empty production D1 → parity verification |
 | `publish-d1.yml`, `publish-d1-staging.yml` (#95) | manual, `main` / `staging` | `production` / `staging` | `publish-best.serp.co-<env>` | D1 bookmark → apply one reviewed manifest, staging first |
@@ -123,12 +123,11 @@ Concurrency sits on the privileged job, after its guards: production jobs share
 media uploads their own groups, and none cancels a running job. A run refused by `authorize`
 or skipped by a branch `if` never joins a group, so it cannot replace a valid queued run.
 
-Each deploy runs `pnpm harness:fast` in its own job rather than waiting on Main Validation
-through `workflow_run`. A `workflow_run` job receives the default branch head as
-`GITHUB_SHA`, not the validated commit. That would break the release guard's `HEAD ==
-GITHUB_SHA` check, and a slow validation of an older commit could deploy after a newer one.
-PR Review already gates every merge, and Main Validation re-runs the full loop on the same
-`staging` or `main` commit in parallel.
+The staging deploy is a job of `web.yml` and `needs:` its `check` and `e2e`, so it builds the
+commit once and deploys only after both pass; its tip guard skips a commit `staging` has moved
+past ([CI](./CI.md)). Deploy Production runs `pnpm harness:fast` in its own job: it releases
+only a tree the staging deploy verified, which is the stronger gate, and a `workflow_run` job
+would receive the default branch head as `GITHUB_SHA` rather than the released commit.
 
 ## Production release
 
@@ -208,7 +207,7 @@ passed against the staging Worker.
 
 `wrangler.jsonc` points `main` at `apps/web/worker.ts`, which wraps the generated
 `.open-next/worker.js`, so `opennextjs-cloudflare deploy` (and therefore
-`deploy-staging.yml` / `deploy-production.yml`) ships the edge HTML cache with the Worker
+`web.yml`'s `deploy-staging` / `deploy-production.yml`) ships the edge HTML cache with the Worker
 (see [Architecture](./ARCHITECTURE.md#caching)). Confirm it after a deploy:
 
 ```bash

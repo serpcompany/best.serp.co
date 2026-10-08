@@ -12,7 +12,7 @@
  * `assertCurrentRelease` refuses a release once main has moved on to different source.
  *
  * The commit defaults to GITHUB_SHA. Read-only: it asks the GitHub API for the commit's tree and
- * for `deploy-staging.yml` push or dispatch runs on `staging`, and accepts the commit when any
+ * for `web.yml` push or dispatch runs on `staging`, and accepts the commit when any
  * attempt of a run whose head has **the same tree** completed the staging migration, deploy,
  * HTTP gate, and Playwright smoke steps successfully. A green attempt that skipped those steps
  * (for example, before the staging credentials existed) does not count.
@@ -43,7 +43,8 @@ export const stagingWorkflow = {
   branch: 'staging',
   /** A pull_request run never deploys staging, so it never proves anything. */
   events: ['push', 'workflow_dispatch'],
-  file: 'deploy-staging.yml',
+  file: 'web.yml',
+  /** What messages call web.yml's `deploy-staging` job. */
   name: 'Deploy Staging',
   /** Steps of the staging job that must all have succeeded for the tree to count as verified. */
   requiredSteps: [

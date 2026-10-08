@@ -1,0 +1,316 @@
+name: Web
+
+# The checks for every pull request into staging (the base branch) and main (hotfix-* branches;
+# staging reaches main by fast-forward), the same checks on every push to them, and the staging
+# deploy, which waits for both (docs/CI.md, serp's CI workflows standard):
+# - `check` runs `pnpm check`. On a push the deploy job builds the Worker, so `check` skips its
+#   build and each commit is built once.
+# - `e2e` runs Playwright and records a `passed-e2e-<tree>` receipt. A push whose tree a pull
+#   request already tested finds the receipt and skips the suite.
+# - A pull request that touches only documentation runs the documentation check and the tests
+#   and skips the build and E2E; every job still reports success. A push always runs the checks.
+# - Draft pull requests skip `e2e` until they are marked ready for review.
+# Production releases from deploy-production.yml, only a tree this workflow's staging deploy
+# verified (docs/RELEASE_GUARDS.md).
+on:
+  pull_request:
+    branches: ['staging', 'main']
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: ['staging', 'main']
+  workflow_dispatch:
+
+permissions:
+  # actions: read finds E2E receipts.
+  actions: read
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Find code changes
+        id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Only a pull request may be documentation-only: a push deploys, so it always runs the
+          # checks on the tree it deploys. An unknown base fails toward running everything.
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ] || [ -z "$BASE" ] \
+            || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Documentation is docs/ and Markdown; MDX is site content, so it is code.
+          if git diff --name-only "$BASE" "$GITHUB_SHA" | grep -qvE '^docs/|\.md$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "Documentation only: check runs the documentation check and the tests; e2e is skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  check:
+    name: check
+    needs: [changes]
+    # A skipped required job reports success, so a failed `changes` must not skip this one:
+    # with no output, it runs everything.
+    if: '!cancelled()'
+    # CI_RUNNER_LABELS picks the runner; a fork's pull request always runs on ubuntu-latest
+    # (docs/CI.md#runners).
+    runs-on: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER_LABELS || '"ubuntu-latest"') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Full history: the media plan test reads deleted repo: sources from Git (#124).
+          fetch-depth: 0
+
+      # Catches a pull request opened against the wrong base: main changes only by the owner's
+      # fast-forward promotion (`pnpm release:promote`, no pull request) or a hotfix-* pull
+      # request. It is an accident guard, not the control: a pull request runs its own copy of
+      # this file. The control is Deploy Production's release-time tree check
+      # (docs/RELEASE_GUARDS.md#promotion).
+      - name: Require a hotfix branch for pull requests into main
+        if: github.base_ref == 'main'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          # Exit code 2 means no matching ref; any other failure fails closed.
+          if refs="$(git ls-remote --exit-code origin refs/heads/staging)"; then status=0; else status=$?; fi
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            echo "::error::Could not list the staging branch (git ls-remote exited $status); failing closed."
+            exit 1
+          fi
+          if ! awk '$2 == "refs/heads/staging" { found = 1 } END { exit !found }' <<<"$refs"; then
+            echo "No staging branch exists yet, so main still accepts every pull request."
+            exit 0
+          fi
+          if [ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] && [[ "$HEAD_REF" =~ ^hotfix-[A-Za-z0-9._-]+$ ]]; then
+            exit 0
+          fi
+          echo "::error::main is production: it accepts only hotfix-* pull requests, and staging reaches it by the owner's fast-forward promotion, not a pull request. Retarget this pull request to staging (docs/RELEASE_GUARDS.md#promotion)."
+          exit 1
+
+      - name: Install
+        uses: ./.github/actions/install
+
+      - name: Run the finish gate
+        if: needs.changes.outputs.code != 'false'
+        env:
+          # A push deploys, and the deploy job's build is this commit's build.
+          HARNESS_SKIP_BUILD: ${{ github.event_name != 'pull_request' && '1' || '' }}
+        run: pnpm check
+
+      - name: Check the documentation
+        if: needs.changes.outputs.code == 'false'
+        # The tests read documentation too (the D1 restore command, the AGENTS map).
+        run: pnpm docs:check && pnpm test
+
+  e2e:
+    name: e2e
+    needs: [changes]
+    if: "!cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)"
+    # Installs Playwright browsers, so it never leaves GitHub-hosted runners.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Find a receipt for this tree
+        id: receipt
+        env:
+          CODE: ${{ needs.changes.outputs.code }}
+          GH_TOKEN: ${{ github.token }}
+          REPO_ID: ${{ github.repository_id }}
+        run: |
+          tree="$(git rev-parse 'HEAD^{tree}')"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          if [ "$CODE" = "false" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Documentation only: E2E skipped." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [ "$GITHUB_EVENT_NAME" = "push" ] || exit 0
+          # Any error counts as no receipt, so the suite runs.
+          n="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=passed-e2e-$tree" --jq \
+            "[.artifacts[] | select(.expired | not) | select(.workflow_run.head_repository_id == $REPO_ID)] | length")" || n=0
+          if [ "${n:-0}" -gt 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "E2E passed for tree $tree in an earlier run; skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Install
+        if: steps.receipt.outputs.skip != 'true'
+        uses: ./.github/actions/install
+
+      - name: Install Playwright Browsers
+        if: steps.receipt.outputs.skip != 'true'
+        run: pnpm --filter web test:install
+
+      - name: Run Playwright tests
+        if: steps.receipt.outputs.skip != 'true'
+        run: pnpm test:e2e
+
+      - name: Upload test results
+        if: always() && steps.receipt.outputs.skip != 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 30
+
+      - name: Write the receipt
+        # A fork's run never counts: its receipt is ignored by head_repository_id anyway.
+        if: steps.receipt.outputs.skip != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        env:
+          TREE: ${{ steps.receipt.outputs.tree }}
+        run: echo "$TREE" > "$RUNNER_TEMP/receipt.txt"
+
+      - name: Record the receipt
+        if: steps.receipt.outputs.skip != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: actions/upload-artifact@v7
+        with:
+          name: passed-e2e-${{ steps.receipt.outputs.tree }}
+          path: ${{ runner.temp }}/receipt.txt
+          retention-days: 30
+          overwrite: true
+
+  deploy-staging:
+    # Every push to staging (and a dispatch on staging): build, a staging D1 Time Travel
+    # bookmark, staging D1 migrations, Worker deploy, HTTP gates, and the Playwright smoke suite
+    # against the deployed staging Worker. Deploy Production releases only a tree one of these
+    # jobs verified. Skips (green) until the `staging` environment holds Cloudflare credentials;
+    # see docs/DEPLOY_RUNBOOK.md.
+    name: Validate, migrate, deploy & smoke-test staging
+    needs: [check, e2e]
+    if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request'
+    # Job-level, so a pull request never joins the group and never replaces a queued push run.
+    # A queued run is replaced only by a newer staging run.
+    concurrency:
+      group: deploy-best-serp-co-staging
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: staging
+      url: https://best-serp-co-staging.serpcompany.workers.dev
+    env:
+      STAGING_ORIGIN: https://best-serp-co-staging.serpcompany.workers.dev
+    steps:
+      - name: Check Cloudflare credentials
+        id: credentials
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "configured=false" >> "$GITHUB_OUTPUT"
+          message="Staging deploy skipped: the staging environment has no CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets yet (docs/DEPLOY_RUNBOOK.md)."
+          echo "::notice title=Staging deploy skipped::$message"
+          echo "$message" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout reviewed source
+        if: steps.credentials.outputs.configured == 'true'
+        uses: actions/checkout@v7
+
+      - name: Install
+        if: steps.credentials.outputs.configured == 'true'
+        uses: ./.github/actions/install
+
+      - name: Build OpenNext Worker
+        if: steps.credentials.outputs.configured == 'true'
+        # This commit's build (`check` skipped its own). Sentry (#48): the public DSN and the
+        # commit as the release are baked into the build; the auth token only uploads source
+        # maps. Unset values leave Sentry off.
+        env:
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          NEXT_PUBLIC_SENTRY_RELEASE: ${{ github.sha }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: serpcompany
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: pnpm worker:build
+
+      - name: Deploy only the staging tip
+        id: tip
+        if: steps.credentials.outputs.configured == 'true'
+        # Deploys enter the group in the order their checks finish, and a re-run of an older
+        # commit's check would otherwise deploy older code over newer.
+        run: |
+          # A failed lookup fails the job rather than passing without a deploy.
+          line="$(git ls-remote --exit-code origin refs/heads/staging)"
+          tip="${line%%[[:space:]]*}"
+          if [ "$tip" = "$GITHUB_SHA" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          message="Not deployed: staging has moved on from $GITHUB_SHA to $tip, whose run deploys it."
+          echo "::notice title=Staging deploy skipped::$message"
+          echo "$message" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record staging D1 Time Travel bookmark
+        if: steps.tip.outputs.deploy == 'true'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm tsx scripts/cloudflare-release.ts bookmark staging
+
+      - name: Apply staging D1 migrations
+        if: steps.tip.outputs.deploy == 'true'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm tsx scripts/cloudflare-release.ts migrate staging
+
+      - name: Deploy staging Worker
+        if: steps.tip.outputs.deploy == 'true'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Wrangler records the new version here; the gates wait for it. Outside the checkout,
+          # because the release script refuses an unclean tree.
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
+        run: pnpm tsx scripts/cloudflare-release.ts deploy staging
+
+      - name: Run staging HTTP gates
+        if: steps.tip.outputs.deploy == 'true'
+        env:
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
+        run: pnpm tsx scripts/d1-preview-http-gates.ts staging "$STAGING_ORIGIN"
+
+      - name: Install Chromium
+        if: steps.tip.outputs.deploy == 'true'
+        run: pnpm --filter web test:install
+
+      - name: Run Playwright smoke against staging
+        if: steps.tip.outputs.deploy == 'true'
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ env.STAGING_ORIGIN }}
+          PLAYWRIGHT_EXTERNAL_SERVER: '1'
+        run: pnpm --filter web test:e2e:smoke
+
+      - name: Retain smoke evidence
+        if: always() && steps.tip.outputs.deploy == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: staging-smoke-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
