@@ -1,8 +1,4 @@
 @import "tailwindcss" source("../../../..");
-@import "./sidebar-theme.css";
-/* The enter and exit animations shadcn's dialogs, sheets, menus, popovers, selects, and
-   tooltips name (`animate-in`, `fade-in-0`, `zoom-in-95`, `slide-in-from-*`). */
-@import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
@@ -406,6 +402,14 @@ pre code span {
     @apply bg-background text-foreground;
   }
 }
+
+/* These imports come after the theme on purpose: Tailwind inlines them here, and
+   tw-animate-css's accordion animations must override the theme's, as they did when this
+   theme was its own package (#175). */
+@import "./sidebar-theme.css";
+/* The enter and exit animations shadcn's dialogs, sheets, menus, popovers, selects, and
+   tooltips name (`animate-in`, `fade-in-0`, `zoom-in-95`, `slide-in-from-*`). */
+@import "tw-animate-css";
 
 /* tw-animate-css ignores reduced motion on its own. Components apply it through variants such
    as `data-[state=open]:animate-in`, so match the class names, not `.animate-in` alone. The
