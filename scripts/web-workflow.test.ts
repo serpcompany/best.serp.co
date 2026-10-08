@@ -259,14 +259,14 @@ describe('web workflow', () => {
     )
     const decide = step('tip', 'Is this commit the staging tip?')
     expect(decide.env).toEqual({ GH_TOKEN: expression('github.token') })
-    const before = (gh: string) =>
+    const tipFor = (gh: string) =>
       runStep(String(decide.run), `gh() { ${gh}; }`, {
         GITHUB_REPOSITORY: repository,
         GITHUB_SHA: 'abc123'
       })
-    expect(before('echo abc123')).toEqual({ outputs: { deploy: 'true' }, status: 0 })
-    expect(before('echo def456')).toEqual({ outputs: {}, status: 0 })
-    expect(before('return 1').status).not.toBe(0)
+    expect(tipFor('echo abc123')).toEqual({ outputs: { deploy: 'true' }, status: 0 })
+    expect(tipFor('echo def456')).toEqual({ outputs: {}, status: 0 })
+    expect(tipFor('return 1').status).not.toBe(0)
   })
 
   it('checks the tip again inside the deploy, and fails when it cannot be read', () => {
