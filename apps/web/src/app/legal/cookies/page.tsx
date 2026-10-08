@@ -1,9 +1,9 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
-import { components } from '@serpdirectory/web-core/mdx-components'
+import { components } from '@/components/content/mdx-components'
 import {
   generateLegalPageMetadata,
   LegalStaticPage
-} from '@serpdirectory/web-core/static-pages/legal-page'
+} from '@/components/static-pages/legal-page'
 import type { Metadata } from 'next'
 import { getLegalContent } from '@/lib/content-loader'
 

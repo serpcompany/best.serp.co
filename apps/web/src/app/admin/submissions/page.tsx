@@ -1,5 +1,5 @@
 import type { ReviewQueueItem, ReviewQueueView } from '@serpdirectory/data-ops/admin-queries'
-import { DashboardPageHeader } from '@serpdirectory/web-core/dashboard/page-header'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import type { Metadata } from 'next'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { ageWords, PAID_LISTING_PRICE_CENTS } from '@/components/admin/format'

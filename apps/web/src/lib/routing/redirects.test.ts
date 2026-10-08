@@ -1,5 +1,5 @@
-import { canonicalPathname } from '@serpdirectory/web-core/canonical-url'
-import { getRoute } from '@serpdirectory/web-core/routes'
+import { canonicalPathname } from '@/lib/seo/canonical-url'
+import { getRoute } from '@/lib/routing/routes'
 import { buildCustomRoute } from 'next/dist/lib/build-custom-route'
 import { describe, expect, it } from 'vitest'
 import { LEGAL_CANONICAL, movedUrlRedirects } from './redirects'

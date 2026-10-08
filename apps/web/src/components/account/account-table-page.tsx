@@ -9,8 +9,8 @@ import {
   EmptyMedia,
   EmptyTitle
 } from '@serpdirectory/design-system/empty'
-import { DashboardPageHeader } from '@serpdirectory/web-core/dashboard/page-header'
-import { getRoute } from '@serpdirectory/web-core/routes'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { getRoute } from '@/lib/routing/routes'
 import { Inbox, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactElement } from 'react'

@@ -1,4 +1,4 @@
-import { createTaxonomiesSitemapResponse } from '@serpdirectory/web-core/sitemaps'
+import { createTaxonomiesSitemapResponse } from '@/lib/seo/sitemaps'
 import { getWebsites } from '@/lib/content-loader'
 
 export const dynamic = 'force-dynamic'

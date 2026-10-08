@@ -24,7 +24,7 @@ import {
   InputOTPSlot
 } from '@serpdirectory/design-system/input-otp'
 import { Spinner } from '@serpdirectory/design-system/spinner'
-import { getRoute } from '@serpdirectory/web-core/routes'
+import { getRoute } from '@/lib/routing/routes'
 import { ArrowRight, CircleX, Clock, Info } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'

@@ -1,5 +1,5 @@
-import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
-import { siteConfig } from '@serpdirectory/web-core/site-config'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
+import { siteConfig } from '@/lib/site/site-config'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = generateBaseMetadata({

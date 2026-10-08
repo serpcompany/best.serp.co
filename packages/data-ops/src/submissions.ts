@@ -36,7 +36,7 @@ export const VERIFICATION_COOLDOWN_SECONDS = 30
 export const SUBMISSION_WINDOW_LIMIT = 10
 const SUBMISSION_WINDOW_SECONDS = 60 * 60
 
-/** Field limits, mirrored by the form contract in `@serpdirectory/web-core/forms`. */
+/** Field limits, mirrored by the form contract in `apps/web/src/lib/submissions/contract.ts`. */
 export const SUBMISSION_LIMITS = {
   content: 5000,
   description: 160,

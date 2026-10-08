@@ -1,4 +1,4 @@
-import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import {

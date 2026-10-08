@@ -19,7 +19,7 @@ import {
 } from '@serpdirectory/design-system/item'
 import { Spinner } from '@serpdirectory/design-system/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@serpdirectory/design-system/tooltip'
-import { buildFeaturedOnBadgeEmbedHtml } from '@serpdirectory/web-core/website/featured-on-badge-embed-panel'
+import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import {
   ArrowRight,
   Check,

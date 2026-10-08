@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { inflateSync } from 'node:zlib'
-import { DEFAULT_SITE_LISTING_LOGO_FALLBACK_PATH } from '@serpdirectory/web-core/listing-logo-presentation'
+import { DEFAULT_SITE_LISTING_LOGO_FALLBACK_PATH } from '../apps/web/src/lib/directory/listing-logo-presentation'
 import { describe, expect, it } from 'vitest'
 import { project } from './project'
 

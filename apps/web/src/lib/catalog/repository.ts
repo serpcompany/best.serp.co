@@ -17,7 +17,7 @@ import {
   resolveListingMedia,
   validateMediaBaseUrl
 } from '@serpdirectory/data-ops/media-keys'
-import type { WebsiteDetailMetadata, WebsiteMetadata } from '@serpdirectory/web-core/content-query'
+import type { WebsiteDetailMetadata, WebsiteMetadata } from '@/lib/directory/content-query'
 import { cache } from 'react'
 
 export type { ListingNamePage, PublishedCategory, UnpublishedListing }

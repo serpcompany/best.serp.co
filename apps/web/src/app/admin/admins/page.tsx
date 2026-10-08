@@ -1,4 +1,4 @@
-import { DashboardPageHeader } from '@serpdirectory/web-core/dashboard/page-header'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import type { Metadata } from 'next'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { AdminsManager } from '@/components/admin/admins-manager'

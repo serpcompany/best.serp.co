@@ -16,7 +16,7 @@ import {
   ItemMedia,
   ItemTitle
 } from '@serpdirectory/design-system/item'
-import { getRoute } from '@serpdirectory/web-core/routes'
+import { getRoute } from '@/lib/routing/routes'
 import { ArrowRight, BadgeCheck, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 

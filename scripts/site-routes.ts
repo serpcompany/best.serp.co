@@ -2,7 +2,7 @@ import { SITEMAP_INDEX_PATH, site, sitemapPaths } from '@serpdirectory/site-conf
 
 /**
  * Public route shapes of best.serp.co, derived from the checked-in site config the
- * same way `packages/web-core/src/routes.ts` builds them (trailing slashes included).
+ * same way `apps/web/src/lib/routing/routes.ts` builds them (trailing slashes included).
  * Scripts use these for publication audit routes and HTTP gates.
  */
 function joinRoute(...segments: string[]): string {

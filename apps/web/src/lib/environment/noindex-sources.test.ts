@@ -7,7 +7,7 @@
  * and the data and runtime modules these files import are stubbed.
  */
 import { siteRoutes } from '@serpdirectory/site-config'
-import { rootLayoutMetadata } from '@serpdirectory/web-core/root-shell'
+import { rootLayoutMetadata } from '@/components/layout/root-shell'
 import { buildCustomRoute } from 'next/dist/lib/build-custom-route'
 import loadCustomRoutes from 'next/dist/lib/load-custom-routes'
 import { resolveRobots } from 'next/dist/lib/metadata/resolvers/resolve-basics'

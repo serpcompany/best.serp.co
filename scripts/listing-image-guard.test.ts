@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Every listing image renders through one component, `ListingImage`
- * (`packages/web-core/src/ui/listing-image.tsx`, serpcompany/best.serp.co#122), which falls back
+ * (`apps/web/src/components/ui/listing-image.tsx`, serpcompany/best.serp.co#122), which falls back
  * to the #86 tile and never shows alt text or a broken-image icon. This guard parses the app and
  * shared UI code and fails on any other image element: a raw `<img>`, `next/image`, an avatar
  * image, `<picture>`/`<source>`, or HTML written as a string (comments are not read). The few images that are not
@@ -17,11 +17,11 @@ const roots = [
   'apps/web/src/app',
   'apps/web/src/components',
   'apps/web/src/lib',
-  'packages/web-core/src',
+  'apps/web/src/hooks',
   'packages/design-system/components'
 ]
 /** The shared listing image itself. */
-const LISTING_IMAGE = 'packages/web-core/src/ui/listing-image.tsx'
+const LISTING_IMAGE = 'apps/web/src/components/ui/listing-image.tsx'
 /** Images that are not listing media, by file, with why. */
 const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
   'apps/web/src/components/claims/claim-listing.tsx':
@@ -30,25 +30,25 @@ const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
   'apps/web/src/lib/email/emails/layout.ts': 'the site logo in email HTML',
   'packages/design-system/components/shadcn/avatar.tsx':
     'the avatar primitive (people, not listings)',
-  'packages/web-core/src/layout/footer.tsx': 'network badges in the footer',
-  'packages/web-core/src/mdx-components.tsx':
+  'apps/web/src/components/layout/footer.tsx': 'network badges in the footer',
+  'apps/web/src/components/content/mdx-components.tsx':
     'Markdown images in site content; listing content holds none (scripts/catalog-media.test.ts)',
-  'packages/web-core/src/sections/external-resources-section.tsx': 'site-owned resource images',
-  'packages/web-core/src/sections/guide-card.tsx': 'guide cover images',
-  'packages/web-core/src/website/featured-on-badge-embed-panel.tsx':
+  'apps/web/src/components/sections/external-resources-section.tsx': 'site-owned resource images',
+  'apps/web/src/components/sections/guide-card.tsx': 'guide cover images',
+  'apps/web/src/components/website/featured-on-badge-embed-panel.tsx':
     'the badge preview and its embed snippet'
 }
 /** Where `ListingImage` is used: every listing image on the site, admin, account, and submit. */
 const LISTING_IMAGE_CALLERS = [
   'apps/web/src/components/admin/mini-listing.tsx',
   'apps/web/src/components/admin/product-cell.tsx',
+  'apps/web/src/components/directory/project-navigation.tsx',
+  'apps/web/src/components/directory/websites-list-with-sort-route.tsx',
+  'apps/web/src/components/llm/listing-card.tsx',
+  'apps/web/src/components/search/favicon.tsx',
   'apps/web/src/components/submit/submit-ui.tsx',
-  'packages/web-core/src/llm/listing-card.tsx',
-  'packages/web-core/src/project-navigation.tsx',
-  'packages/web-core/src/search/favicon.tsx',
-  'packages/web-core/src/website/website-content-section.tsx',
-  'packages/web-core/src/website/website-hero-route.tsx',
-  'packages/web-core/src/websites-list-with-sort-route.tsx'
+  'apps/web/src/components/website/website-content-section.tsx',
+  'apps/web/src/components/website/website-hero-route.tsx'
 ]
 /** A source that names listing media: a logo, an image list, a featured image, a media key. */
 const listingMediaSource = /\b(?:media\w*|logo\w*|images|imageKey|featured\w*)\b/iu
@@ -172,7 +172,7 @@ describe('listing images render only through ListingImage (#122)', () => {
     }
     expect(
       outside,
-      'Render a listing image with ListingImage (@serpdirectory/web-core/ui/listing-image); add a non-listing image to NON_LISTING_IMAGES with the reason.'
+      'Render a listing image with ListingImage (@/components/ui/listing-image); add a non-listing image to NON_LISTING_IMAGES with the reason.'
     ).toEqual([])
     expect(fromListingMedia, 'A reviewed non-listing image may not show listing media.').toEqual([])
     // A reviewed entry that no longer renders an image goes, so the list stays exact.
@@ -183,7 +183,7 @@ describe('listing images render only through ListingImage (#122)', () => {
     const callers = sourceFiles().filter(
       file =>
         file !== LISTING_IMAGE &&
-        /from '(?:@serpdirectory\/web-core|\.{1,2}(?:\/[\w.-]+)*)\/ui\/listing-image'/u.test(
+        /from '(?:@\/components|\.{1,2}(?:\/[\w.-]+)*)\/ui\/listing-image'/u.test(
           readFileSync(resolve(file), 'utf8')
         )
     )

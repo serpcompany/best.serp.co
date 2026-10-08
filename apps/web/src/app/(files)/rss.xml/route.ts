@@ -1,11 +1,11 @@
-import { getRoute } from '@serpdirectory/web-core/routes'
+import { getRoute } from '@/lib/routing/routes'
 import {
   SITE_APPLE_TOUCH_ICON_URL,
   SITE_FAVICON_URL,
   SITE_NAME,
   SITE_PUBLIC_URL
-} from '@serpdirectory/web-core/seo-config'
-import { siteCopy } from '@serpdirectory/web-core/site-copy'
+} from '@/lib/seo/seo-config'
+import { siteCopy } from '@/lib/site/site-copy'
 import { getWebsites, type WebsiteMetadata } from '@/lib/content-loader'
 
 const baseUrl = SITE_PUBLIC_URL

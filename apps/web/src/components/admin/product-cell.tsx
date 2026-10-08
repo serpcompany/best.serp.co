@@ -1,4 +1,4 @@
-import { ListingImage } from '@serpdirectory/web-core/ui/listing-image'
+import { ListingImage } from '@/components/ui/listing-image'
 import Link from 'next/link'
 
 /**

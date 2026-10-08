@@ -45,7 +45,7 @@ import { RadioGroup, RadioGroupItem } from '@serpdirectory/design-system/radio-g
 import { Separator } from '@serpdirectory/design-system/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@serpdirectory/design-system/tooltip'
 import { useIsMobile } from '@serpdirectory/design-system/use-mobile'
-import { buildFeaturedOnBadgeEmbedHtml } from '@serpdirectory/web-core/website/featured-on-badge-embed-panel'
+import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { ArrowRight, BadgeCheck, Copy, MessageSquare, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'

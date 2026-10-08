@@ -68,8 +68,9 @@ change runs in a protected workflow.
   lives in `packages/data-ops/src/auth.ts` ([Accounts](./ACCOUNTS.md)).
 - `packages/site-config/` is the checked-in site definition (name, domain, copy,
   routes, sitemap layout, badges, feature flags) and site-owned content.
-- `packages/web-core/` owns reusable page/view behavior and reads the site definition
-  through `siteConfig`; it never obtains a database binding.
+- `apps/web/src/components/` and `apps/web/src/lib/{seo,site,directory,analytics}/` hold the
+  page and view building blocks (folded in from `packages/web-core`, #174); they read the site
+  definition through `siteConfig` and never obtain a database binding.
 - `packages/data-ops/` owns the Drizzle schema, the injected D1 client, catalog DTOs,
   eligibility SQL, pagination, redirects, related ranking, adjacency, the catalog
   epoch and the epoch-keyed data cache, query telemetry, and all submission operations.
@@ -153,7 +154,7 @@ Every URL has one canonical form, per the SERP URL trailing-slash and sitemap st
 | File | never ends with `/`: `/robots.txt`, `/sitemap-pages.xml` | `/robots.txt/` -> 308 `/robots.txt` |
 | `/api`, `/api/*`, `/.well-known/*`, `/_next/*` | served exactly as requested | never redirected |
 
-`packages/web-core/src/canonical-url.ts` defines the rule. A file is a path whose last segment ends
+`apps/web/src/lib/seo/canonical-url.ts` defines the rule. A file is a path whose last segment ends
 in a known file extension (`FILE_EXTENSIONS` in `packages/utils/file-extensions.ts`), not any dot:
 most listing slugs are domain names (`autoenhance.ai`), and their pages keep the slash. Never add an
 extension that is also a top-level domain. The data side holds the invariant: submission intake
@@ -200,7 +201,7 @@ and a test checks the committed import.
   `scripts/assets/listing-logo-fallback.svg`). The tile is UI only: listing JSON-LD names
   the listing's own logo as `primaryImageOfPage` and omits the property when there is none,
   rather than give every logo-less listing the same image or the SERP logo
-  (`packages/web-core/src/schema.ts`). `apps/e2e/tests/listing-logo-assets.spec.ts` checks
+  (`apps/web/src/lib/seo/schema.ts`). `apps/e2e/tests/listing-logo-assets.spec.ts` checks
   that the Worker serves the tile and that sample pages reference no missing same-origin file.
 - **Listing offers.** D1 holds no product pricing, so listing JSON-LD has no `offers`
   (`generateWebsiteDetailSchema` emits one only for known `pricing`; the submission `plan` is
@@ -226,7 +227,7 @@ links into `/products/?page=N`. `/products/` itself renders the homepage's conte
 canonical is `/`. Page 1 is the bare URL; pages 2+ are linked with plain `<a href>` anchors,
 canonicalize to themselves, carry `noindex, follow` and a "- Page N" title, and a page
 past the end is a 404. Category JSON-LD describes the whole category on every page.
-`packages/web-core/src/listing-pagination.tsx` owns the parameter, links, and metadata;
+`apps/web/src/components/directory/listing-pagination.tsx` owns the parameter, links, and metadata;
 `getListingNamePage` in `packages/data-ops` reads one page (ids in name order are cached
 per epoch, then only that page's summaries are read). Routes never load the full catalog
 for display; only the sitemaps and the JSON feed read every listing.

@@ -1,6 +1,6 @@
 import type { AdminOrderRow } from '@serpdirectory/data-ops/billing'
 import { site } from '@serpdirectory/site-config'
-import { DashboardPageHeader } from '@serpdirectory/web-core/dashboard/page-header'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { AdminCrumbs } from '@/components/admin/admin-shell'

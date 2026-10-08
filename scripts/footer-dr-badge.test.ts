@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { resolveDrBadgeConfig } from '../packages/web-core/src/layout/dr-badge.ts'
-import { resolveFooterBadgeConfigs } from '../packages/web-core/src/layout/footer-badges.ts'
+import { resolveDrBadgeConfig } from '../apps/web/src/components/layout/dr-badge.ts'
+import { resolveFooterBadgeConfigs } from '../apps/web/src/components/layout/footer-badges.ts'
 
 describe('resolveDrBadgeConfig', () => {
   it('returns the DR badge config for active directory domains', () => {

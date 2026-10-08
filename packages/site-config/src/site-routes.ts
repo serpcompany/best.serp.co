@@ -2,7 +2,7 @@
  * The route registry (#167; serp web-stack/nextjs-on-workers.md, Rendering and requests): every
  * public page of best.serp.co, once, with whether search engines may index it and which child
  * sitemap lists it. The sitemaps, robots.txt, the footer, and the pages' robots metadata all
- * read it, and `packages/web-core/src/site-routes.test.tsx` holds them to it, so they cannot
+ * read it, and `apps/web/src/lib/seo/site-routes.test.tsx` holds them to it, so they cannot
  * disagree.
  *
  * Paths are canonical: a trailing slash, and `[param]` for a segment D1 fills in.

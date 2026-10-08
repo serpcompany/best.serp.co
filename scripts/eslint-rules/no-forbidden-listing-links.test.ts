@@ -68,7 +68,7 @@ describe('no-forbidden-listing-links', () => {
   it('reports help.serp.co/en links in listing normalization code', () => {
     const messages = lintText(
       'const helpCenter = "https://help.serp.co/en/"\n',
-      'packages/web-core/src/content-query.ts'
+      'apps/web/src/lib/directory/content-query.ts'
     )
 
     expect(messages).toHaveLength(1)

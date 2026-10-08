@@ -25,7 +25,7 @@ import {
   TableRow
 } from '@serpdirectory/design-system/table'
 import { useIsMobile } from '@serpdirectory/design-system/use-mobile'
-import { buildFeaturedOnBadgeEmbedHtml } from '@serpdirectory/web-core/website/featured-on-badge-embed-panel'
+import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { ChevronsUpDown, Copy, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'

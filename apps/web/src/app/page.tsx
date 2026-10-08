@@ -2,14 +2,14 @@ import {
   HomePageCanonicalTags,
   HomePageRoute,
   homePageMetadata
-} from '@serpdirectory/web-core/home-page'
-import { JsonLd } from '@serpdirectory/web-core/json-ld'
-import { CreatorProjectsSectionRoute as CreatorProjectsSection } from '@serpdirectory/web-core/sections/creator-projects-section-route'
-import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@serpdirectory/web-core/sections/external-resources-section-route'
-import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@serpdirectory/web-core/sections/featured-guides-section-route'
-import { FeaturedProjectsSectionRoute as FeaturedProjectsSection } from '@serpdirectory/web-core/sections/featured-projects-section-route'
-import { RecentlyAddedSectionRoute as RecentlyAddedSection } from '@serpdirectory/web-core/sections/recently-added-section-route'
-import { StaticWebsitesListRoute as StaticWebsitesList } from '@serpdirectory/web-core/sections/static-websites-list-route'
+} from '@/components/home/home-page'
+import { JsonLd } from '@/components/seo/json-ld'
+import { CreatorProjectsSectionRoute as CreatorProjectsSection } from '@/components/sections/creator-projects-section-route'
+import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@/components/sections/external-resources-section-route'
+import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@/components/sections/featured-guides-section-route'
+import { FeaturedProjectsSectionRoute as FeaturedProjectsSection } from '@/components/sections/featured-projects-section-route'
+import { RecentlyAddedSectionRoute as RecentlyAddedSection } from '@/components/sections/recently-added-section-route'
+import { StaticWebsitesListRoute as StaticWebsitesList } from '@/components/sections/static-websites-list-route'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getHomePageData } from '@/actions/get-home-page-data'

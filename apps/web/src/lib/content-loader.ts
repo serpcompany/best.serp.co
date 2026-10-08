@@ -10,7 +10,7 @@ import type {
   DocEntry,
   GuideEntry,
   LegalEntry
-} from '@serpdirectory/web-core/content-query'
+} from '@/lib/directory/content-query'
 import {
   applyLegalContentBranding,
   buildDocs,
@@ -18,8 +18,8 @@ import {
   resolveAboutPage,
   resolveDocBySlug,
   resolveGuideBySlug
-} from '@serpdirectory/web-core/content-query'
-import { siteConfig } from '@serpdirectory/web-core/site-config'
+} from '@/lib/directory/content-query'
+import { siteConfig } from '@/lib/site/site-config'
 import {
   getCanonicalSlugForRedirect,
   getListingBySlug,
@@ -32,7 +32,7 @@ export type {
   DocMetadata,
   GuideMetadata,
   WebsiteMetadata
-} from '@serpdirectory/web-core/content-query'
+} from '@/lib/directory/content-query'
 
 interface Resource {
   slug?: string

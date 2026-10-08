@@ -1,4 +1,4 @@
-import { siteConfig } from '@serpdirectory/web-core/site-config'
+import { siteConfig } from '@/lib/site/site-config'
 import { submissionBadgeTargets } from '@/lib/submissions/presentation'
 import { featureCopy } from '../feature-copy'
 import type { BadgeTarget } from './view'

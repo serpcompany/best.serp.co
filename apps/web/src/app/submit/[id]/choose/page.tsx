@@ -1,5 +1,5 @@
 import { site } from '@serpdirectory/site-config'
-import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { ChoosePlan } from '@/components/submit/choose-plan'

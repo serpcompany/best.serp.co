@@ -133,7 +133,6 @@ const forbiddenExactCatalogPaths = [
 const guardedSourceRoots = [
   `${project.appDirectory}/`,
   'packages/site-config/',
-  'packages/web-core/',
   '.github/workflows/'
 ]
 
@@ -612,12 +611,11 @@ describe('single-site D1-only repository architecture', () => {
         /\.(?:ts|tsx)$/u.test(file) &&
         !/\.(?:test|spec)\.tsx?$/u.test(file) &&
         !file.endsWith('.d.ts') &&
-        (['app/', 'components/', 'lib/'].some(dir =>
+        (['app/', 'components/', 'lib/', 'hooks/'].some(dir =>
           file.startsWith(`${project.sourceDirectory}/${dir}`)
         ) ||
           [
             'packages/site-config/src/',
-            'packages/web-core/src/',
             'packages/design-system/',
             // Validation and error messages the data layer returns to pages (#111 round 4).
             'packages/data-ops/src/'

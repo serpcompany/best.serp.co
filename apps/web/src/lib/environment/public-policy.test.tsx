@@ -6,7 +6,7 @@
  * stubbed: the Cloudflare env and the request headers the layout reads.
  */
 import { readFileSync } from 'node:fs'
-import { RootAppShell } from '@serpdirectory/web-core/root-shell'
+import { RootAppShell } from '@/components/layout/root-shell'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

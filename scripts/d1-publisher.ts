@@ -10,7 +10,7 @@ import {
   parseMediaKey
 } from '@serpdirectory/data-ops/media-keys'
 import { listingHasQueuedSubmission } from '@serpdirectory/data-ops/plan-support'
-import { hasFileExtension } from '@serpdirectory/web-core/canonical-url'
+import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
 import { parse } from 'yaml'
 import { z } from 'zod'
 import { assertD1Compatible } from './d1-compat'

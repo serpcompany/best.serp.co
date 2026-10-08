@@ -1,8 +1,8 @@
 import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { resolveGoogleTagManagerId } from '@serpdirectory/web-core/google-tag-manager'
-import { siteConfig } from '@serpdirectory/web-core/site-config'
+import { resolveGoogleTagManagerId } from '@/lib/analytics/google-tag-manager'
+import { siteConfig } from '@/lib/site/site-config'
 import { headers } from 'next/headers'
 import { isPublicProduction } from './site-environment'
 

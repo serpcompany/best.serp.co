@@ -2,8 +2,8 @@ import { Button } from '@serpdirectory/design-system/button'
 import {
   AboutStaticPage,
   generateAboutPageMetadata
-} from '@serpdirectory/web-core/static-pages/about-page'
-import { Card, CardContent, CardHeader, CardTitle } from '@serpdirectory/web-core/ui/card'
+} from '@/components/static-pages/about-page'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getAboutPage } from '@/lib/content-loader'

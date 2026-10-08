@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-syste
 import { Badge } from '@serpdirectory/design-system/badge'
 import { cn } from '@serpdirectory/design-system/lib/utils'
 import { Progress } from '@serpdirectory/design-system/progress'
-import { ListingImage } from '@serpdirectory/web-core/ui/listing-image'
+import { ListingImage } from '@/components/ui/listing-image'
 import {
   CircleAlert,
   CircleCheck,

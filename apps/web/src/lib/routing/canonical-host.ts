@@ -15,7 +15,7 @@
  * answer the wrong client: the redirect is never stored, and the cache only sees workers.dev
  * requests that carry the smoke header.
  */
-import { canonicalPathname } from '@serpdirectory/web-core/canonical-url'
+import { canonicalPathname } from '@/lib/seo/canonical-url'
 import {
   CANONICAL_ORIGIN,
   parseSiteEnvironment,

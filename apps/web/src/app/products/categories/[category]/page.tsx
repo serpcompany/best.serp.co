@@ -1,20 +1,20 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
-import { getCategoryIcon } from '@serpdirectory/web-core/categories'
+import { getCategoryIcon } from '@/lib/directory/categories'
 import {
   CategoryRoutePage,
   generateCategoryRouteMetadata
-} from '@serpdirectory/web-core/category-routes/category-page'
-import { CategoryWebsitesListRoute as CategoryWebsitesList } from '@serpdirectory/web-core/category-websites-list-route'
-import { JsonLd } from '@serpdirectory/web-core/json-ld'
+} from '@/components/category-routes/category-page'
+import { CategoryWebsitesListRoute as CategoryWebsitesList } from '@/components/directory/category-websites-list-route'
+import { JsonLd } from '@/components/seo/json-ld'
 import {
   ListingPagination,
   paginatedMetadata,
   parseListingPageParam
-} from '@serpdirectory/web-core/listing-pagination'
-import { getRoute } from '@serpdirectory/web-core/routes'
-import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@serpdirectory/web-core/sections/external-resources-section-route'
-import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@serpdirectory/web-core/sections/featured-guides-section-route'
-import { SITE_PUBLIC_URL } from '@serpdirectory/web-core/seo-config'
+} from '@/components/directory/listing-pagination'
+import { getRoute } from '@/lib/routing/routes'
+import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@/components/sections/external-resources-section-route'
+import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@/components/sections/featured-guides-section-route'
+import { SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import {

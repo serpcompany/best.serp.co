@@ -1,10 +1,10 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
-import { components } from '@serpdirectory/web-core/mdx-components'
-import { getRoute } from '@serpdirectory/web-core/routes'
+import { components } from '@/components/content/mdx-components'
+import { getRoute } from '@/lib/routing/routes'
 import {
   generateLegalPageMetadata,
   LegalStaticPage
-} from '@serpdirectory/web-core/static-pages/legal-page'
+} from '@/components/static-pages/legal-page'
 import type { Metadata } from 'next'
 import { getLegalContent } from '@/lib/content-loader'
 
