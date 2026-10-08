@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { stringify } from 'yaml'
-import type { AccessEnv } from '../apps/web/lib/auth/cloudflare-access'
-import { accessConfig } from '../apps/web/lib/auth/cloudflare-access'
+import type { AccessEnv } from '../apps/web/src/lib/auth/cloudflare-access'
+import { accessConfig } from '../apps/web/src/lib/auth/cloudflare-access'
 import {
   SITE_ENVIRONMENT_HEADER,
   SMOKE_TEST_HEADER,
   WORKER_VERSION_HEADER
-} from '../apps/web/lib/environment/site-environment'
+} from '../apps/web/src/lib/environment/site-environment'
 import {
   metaRobotsBlocksIndexing,
   robotsTxtBlockedPath,

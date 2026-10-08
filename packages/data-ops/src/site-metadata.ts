@@ -5,7 +5,7 @@ import { validatePublicHttpUrl } from './public-url'
  * social (Open Graph) image. Shared by media ingestion and the legacy media migration
  * (serpcompany/best.serp.co#95), which take a listing's logo from its site icon and its featured
  * image from its social image. Submit v2 (#84) carries the same parser in
- * `apps/web/lib/submissions/prefill.ts`; it should import this module instead once both are on
+ * `apps/web/src/lib/submissions/prefill.ts`; it should import this module instead once both are on
  * `staging` (its form-specific `proposeName` and `fitShortDescription` stay there).
  */
 

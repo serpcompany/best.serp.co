@@ -5,8 +5,8 @@ import { withSentryConfig } from '@sentry/nextjs/config'
 import { baseConfig, withAnalyzer } from '@serpdirectory/config-next'
 import { site } from '@serpdirectory/site-config'
 import type { NextConfig } from 'next'
-import { movedUrlRedirects } from './lib/routing/redirects'
-import { sentryRelease } from './lib/telemetry/sentry'
+import { movedUrlRedirects } from './src/lib/routing/redirects'
+import { sentryRelease } from './src/lib/telemetry/sentry'
 
 export const INTERNAL_PACKAGES = [
   '@serpdirectory/design-system',

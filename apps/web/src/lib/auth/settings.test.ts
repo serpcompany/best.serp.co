@@ -29,7 +29,7 @@ interface WranglerBlock {
 describe('Better Auth settings', () => {
   it('pins the per-environment base URL and trusted origins in wrangler.jsonc', () => {
     const config = JSON.parse(
-      readFileSync(resolve(import.meta.dirname, '../../wrangler.jsonc'), 'utf8')
+      readFileSync(resolve(import.meta.dirname, '../../../wrangler.jsonc'), 'utf8')
     ) as WranglerBlock & { env: { production: WranglerBlock; staging: WranglerBlock } }
     expect(config.vars?.BETTER_AUTH_URL).toBeUndefined()
     expect(config.env.staging.vars?.BETTER_AUTH_URL).toBe(STAGING_ORIGIN)

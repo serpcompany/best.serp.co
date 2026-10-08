@@ -5,7 +5,7 @@ import {
   type EmailDeliveryLedger
 } from '@serpdirectory/data-ops/email-deliveries'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SqliteD1 } from '../../../../packages/data-ops/src/test-support'
+import { SqliteD1 } from '../../../../../packages/data-ops/src/test-support'
 import { type EmailEnvironmentVars, resolveEmailPolicy } from './config'
 import { createWorkerEmailService, isEmailDeliveryConfigured } from './runtime'
 import { createCapturingEmailSender } from './senders'

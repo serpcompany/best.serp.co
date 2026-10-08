@@ -18,7 +18,7 @@ code, and the admin review notice) follow the mockups approved in #70.
 
 ## Module
 
-`apps/web/lib/email/` owns sending. Only `server.ts` touches Next.js; the rest also runs in a
+`apps/web/src/lib/email/` owns sending. Only `server.ts` touches Next.js; the rest also runs in a
 Worker handler outside Next.js.
 
 | File | Owns |
@@ -165,7 +165,7 @@ A template is `defineEmailTemplate<Input>({ id, audience?, footerPath?, render }
 `dashboardUrl`: the template's own `footerPath`, or else the absolute `/account/` URL
 (`/admin/submissions/` for `audience: 'admin'`). Every registered email and its inputs are
 listed in [Email templates](./EMAIL_TEMPLATES.md); they share the layout in
-`apps/web/lib/email/emails/layout.ts`.
+`apps/web/src/lib/email/emails/layout.ts`.
 
 - **Footer.** Every email says the address isn't monitored and links to `dashboardUrl`;
   `renderEmail` refuses a template whose text or HTML body lacks that link.

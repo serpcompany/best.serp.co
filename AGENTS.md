@@ -15,10 +15,10 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 
 - `apps/web/`: the best.serp.co Next.js routes and OpenNext Worker (`wrangler.jsonc`).
   `worker.ts` is the Worker entry: an epoch-keyed edge HTML cache in front of OpenNext.
-- `apps/web/lib/catalog/`: server-only adapter that acquires and validates the `DB`
-  binding and delegates to `packages/data-ops/`. `apps/web/lib/admin/` does the same for the
+- `apps/web/src/lib/catalog/`: server-only adapter that acquires and validates the `DB`
+  binding and delegates to `packages/data-ops/`. `apps/web/src/lib/admin/` does the same for the
   admin panel's decisions.
-- `apps/web/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
+- `apps/web/src/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
   the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/ACCOUNTS.md)).
 - `apps/e2e/`: Playwright suites that run against the local or deployed Worker.
 - `packages/site-config/`: the checked-in site definition (routes, copy, badges,
@@ -76,7 +76,7 @@ Issues and labels never grant production, database, or deployment authority.
 
 `scripts/architecture-guard.test.ts` checks parts of these; review covers the rest.
 
-- Read catalog data through `apps/web/lib/catalog/repository.ts`, which delegates all
+- Read catalog data through `apps/web/src/lib/catalog/repository.ts`, which delegates all
   SQL to `packages/data-ops/`. Never put catalog SQL in the app.
 - Obtain the database only through the server-only OpenNext `DB` binding; fail closed
   when the binding or `D1_RUNTIME_ENV` is missing or invalid.
@@ -104,7 +104,8 @@ Deliberate differences from serp's `web-stack/` standard; change one only throug
 - Email is useSend from `noreply@mail.serp.co`, the transactional-email standard's exception
   for directories on serp.co subdomains.
 - One build serves every environment; the environment is read per request
-  (`apps/web/lib/environment/request-environment.ts`), so nothing per-environment is prerendered.
+  (`apps/web/src/lib/environment/request-environment.ts`), so nothing per-environment is
+  prerendered.
 - `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
 - The Stripe webhook is `/api/billing/webhook/` behind a provider-neutral `BillingProvider`
   with no Stripe SDK, until the payments audit (#156) decides. Brand icons use

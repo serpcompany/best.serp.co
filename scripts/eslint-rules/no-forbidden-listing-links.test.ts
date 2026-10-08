@@ -37,7 +37,7 @@ describe('no-forbidden-listing-links', () => {
   it('reports help.serp.co/en links in D1 repository code', () => {
     const messages = lintText(
       'const supportUrl = "https://help.serp.co/en/"\n',
-      'apps/web/lib/catalog/repository.ts'
+      'apps/web/src/lib/catalog/repository.ts'
     )
 
     expect(messages).toEqual([
@@ -56,7 +56,7 @@ describe('no-forbidden-listing-links', () => {
         '  return <a href="https://help.serp.co/en/">Help</a>',
         '}'
       ].join('\n'),
-      'apps/web/app/products/[slug]/page.tsx'
+      'apps/web/src/app/products/[slug]/page.tsx'
     )
 
     expect(messages).toHaveLength(1)

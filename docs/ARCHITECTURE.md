@@ -14,13 +14,13 @@ Browser
   -> Cloudflare Worker entry (apps/web/worker.ts): canonical-host, old root-level URL, and
      trailing-slash redirects, the crawl policy, then the epoch-keyed edge HTML cache
   -> OpenNext / Next.js routes (apps/web), on a cache miss
-     -> server-only catalog adapter (apps/web/lib/catalog)
+     -> server-only catalog adapter (apps/web/src/lib/catalog)
         -> catalog operations (packages/data-ops) -> D1 (DB) public catalog tables
-     -> server-only submission adapter (apps/web/lib/submissions)
+     -> server-only submission adapter (apps/web/src/lib/submissions)
         -> submission operations (packages/data-ops) -> D1 (DB) private intake tables
-     -> server-only account adapter (apps/web/lib/auth): Better Auth, requireUser/requireAdmin
+     -> server-only account adapter (apps/web/src/lib/auth): Better Auth, requireUser/requireAdmin
         -> account operations (packages/data-ops/auth) -> D1 (DB) users, sessions, allowlist
-     -> server-only admin adapter (apps/web/lib/admin), /admin and /api/admin only
+     -> server-only admin adapter (apps/web/src/lib/admin), /admin and /api/admin only
         -> admin reads and statement plans (packages/data-ops) -> D1 (DB), production included
 ```
 
@@ -31,19 +31,19 @@ change runs in a protected workflow.
 
 ## Responsibility map
 
-- `apps/web/app/` adapts HTTP routes to page behavior. Public URLs:
+- `apps/web/src/app/` adapts HTTP routes to page behavior. Public URLs:
   `/products/<slug>/` (detail), `/products/categories/` (index),
   `/products/categories/<category>/` (category), `/products/`, `/brands/`, `/search/`,
   `/submit/`, `/legal/*`, `/rss.xml`, `/sitemap-index.xml`,
   `/sitemap-{pages,products,categories}.xml`. The static site's root-level `/<slug>` URLs
-  get one 308 from the Worker (`apps/web/lib/routing/legacy-root.ts`); the pre-D1 scheme
+  get one 308 from the Worker (`apps/web/src/lib/routing/legacy-root.ts`); the pre-D1 scheme
   (`/products/<slug>/reviews/`, `/products/best/<category>/`, `/categories/<x>/`) redirects
-  permanently through `apps/web/next.config.ts` (rules in `apps/web/lib/routing/redirects.ts`).
+  permanently through `apps/web/next.config.ts` (rules in `apps/web/src/lib/routing/redirects.ts`).
   "Featured" is a listing flag for placements (the homepage section), not a category page.
 - `apps/web/worker.ts` is the Worker entry. It wires the build output into the request pipeline
-  (`apps/web/lib/worker/handle-request.ts`), which redirects non-canonical hosts and URLs
-  (`apps/web/lib/routing/`), applies the crawl policy (`apps/web/lib/environment/`), serves
-  anonymous pages from the edge HTML cache (`apps/web/lib/edge-cache/`), and otherwise
+  (`apps/web/src/lib/worker/handle-request.ts`), which redirects non-canonical hosts and URLs
+  (`apps/web/src/lib/routing/`), applies the crawl policy (`apps/web/src/lib/environment/`), serves
+  anonymous pages from the edge HTML cache (`apps/web/src/lib/edge-cache/`), and otherwise
   delegates to the generated `.open-next/worker.js`. It reads only the catalog epoch, where an
   unrouted `/<slug>` moved (`lib/routing/legacy-root.ts`), and, after a listing page rendered
   404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is rendered
@@ -51,19 +51,19 @@ change runs in a protected workflow.
   Its `scheduled()` handler runs `lib/worker/scheduled.ts`, which maps each Cron Trigger to its
   jobs: [draft reminders](./SUBMISSION_FLOW.md#draft-reminders-and-expiry) and the
   [billing sweep](./BILLING.md) (hourly), and the [badge program](./BADGE_PROGRAM.md).
-- `apps/web/lib/catalog/` acquires the binding, validates the runtime environment,
+- `apps/web/src/lib/catalog/` acquires the binding, validates the runtime environment,
   and deduplicates reads per request. It contains no SQL.
-- `apps/web/lib/submissions/` validates the binding, fetches submitters' pages and images
+- `apps/web/src/lib/submissions/` validates the binding, fetches submitters' pages and images
   only through its bounded safe fetcher (badge checks, URL prefill, logo checks), and
   delegates every submission read and write to `packages/data-ops/`, scoped to the owner.
-  `apps/web/lib/claims/` does the same for [claims](./CLAIMS.md) (#67).
-- `apps/web/lib/email/` sends transactional email through the useSend API after the
+  `apps/web/src/lib/claims/` does the same for [claims](./CLAIMS.md) (#67).
+- `apps/web/src/lib/email/` sends transactional email through the useSend API after the
   response, claims each template and event key in the `email_deliveries` ledger
   (`packages/data-ops/`) so it never sends twice, and only logs locally
   ([Email](./EMAIL.md)).
-- `apps/web/lib/admin/` validates the binding for the admin panel, parses `/api/admin/*`
+- `apps/web/src/lib/admin/` validates the binding for the admin panel, parses `/api/admin/*`
   bodies, and runs each decision as reviewed plans from `packages/data-ops/` (no SQL here).
-- `apps/web/lib/auth/` configures Better Auth (email sign-in codes) on the `DB` binding,
+- `apps/web/src/lib/auth/` configures Better Auth (email sign-in codes) on the `DB` binding,
   serves `/api/auth/*`, guards admin routes, and verifies Cloudflare Access JWTs; account SQL
   lives in `packages/data-ops/src/auth.ts` ([Accounts](./ACCOUNTS.md)).
 - `packages/site-config/` is the checked-in site definition (name, domain, copy,
@@ -86,7 +86,7 @@ change runs in a protected workflow.
 
 Each environment is marked explicitly in the `vars` of `apps/web/wrangler.jsonc` and read
 per request (serp `standards/environment-configuration.md`); nothing is inferred from the
-host alone. A test (`apps/web/lib/environment/site-environment.test.ts`) pins the values.
+host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pins the values.
 
 | Var | local | staging | production |
 | --- | --- | --- | --- |
@@ -99,14 +99,14 @@ host alone. A test (`apps/web/lib/environment/site-environment.test.ts`) pins th
   `*.workers.dev` host, and a missing or misspelled var. There the Worker entry sends
   `X-Robots-Tag: noindex, nofollow` on every response it answers and answers `/robots.txt`
   with `Disallow: /` for every crawler, and the root layout leaves analytics out
-  (`apps/web/lib/environment/`). Static files are served before the Worker runs, so
+  (`apps/web/src/lib/environment/`). Static files are served before the Worker runs, so
   `apps/web/public/_headers` keeps them `noindex` on every `*.workers.dev` host, and
   `next.config.ts` keeps its `*.workers.dev` `noindex` rule as defense in depth.
 - **Canonical host** (#42 decision e). With `CANONICAL_HOST_REDIRECT=on`, the production
   Worker answers every `*.workers.dev` request (the workers.dev URL and preview URLs) with one
   308 to `https://best.serp.co`, in canonical form and with the query kept byte for byte:
   `/about?x=1` -> `https://best.serp.co/about/?x=1`. It runs before the trailing-slash rule
-  and the edge cache (`apps/web/lib/routing/canonical-host.ts`), so a stored response never
+  and the edge cache (`apps/web/src/lib/routing/canonical-host.ts`), so a stored response never
   answers the wrong client. Requests that carry the `x-best-serp-co-smoke-test` header (any
   value; not a secret) are served normally, so CI can test through the platform host. A
   moved URL keeps its path and gets its own redirect on best.serp.co. Static files on
@@ -129,7 +129,7 @@ host alone. A test (`apps/web/lib/environment/site-environment.test.ts`) pins th
   (which fails while the switch is `on`). A 503 without Worker headers (for example, a Worker
   over its limits), no answer, or any other answer fails. The workers.dev pass also rejects a
   robots-meta noindex on `/` and a listing page, which is the same on every host. In
-  `apps/web/lib/environment/`, `public-policy.test.tsx` runs the policy through the Worker
+  `apps/web/src/lib/environment/`, `public-policy.test.tsx` runs the policy through the Worker
   pipeline and the root layout's analytics decision, and `noindex-sources.test.ts` checks the
   real `next.config.ts` headers and the layout's and pages' robots metadata.
 - **Manual check of best.serp.co** (deploy runbook, cutover step 4, and after any gate run
@@ -153,22 +153,22 @@ Every URL has one canonical form, per the SERP URL trailing-slash and sitemap st
 | File | never ends with `/`: `/robots.txt`, `/sitemap-pages.xml` | `/robots.txt/` -> 308 `/robots.txt` |
 | `/api`, `/api/*`, `/.well-known/*`, `/_next/*` | served exactly as requested | never redirected |
 
-`packages/web-core/src/canonical-url.ts` defines the rule. A file is a path whose last
-segment ends in a known file extension (`FILE_EXTENSIONS` in
-`packages/utils/file-extensions.ts`), not any dot: most listing slugs are domain names
-(`autoenhance.ai`), and their pages keep the slash. Never add an extension that is also a
-top-level domain. The data side holds the invariant: submission intake
+`packages/web-core/src/canonical-url.ts` defines the rule. A file is a path whose last segment ends
+in a known file extension (`FILE_EXTENSIONS` in `packages/utils/file-extensions.ts`), not any dot:
+most listing slugs are domain names (`autoenhance.ai`), and their pages keep the slash. Never add an
+extension that is also a top-level domain. The data side holds the invariant: submission intake
 (`packages/data-ops/src/submissions.ts`), the admin panel's approval
-(`apps/web/lib/admin/decisions.ts`), and the publication manifest schema (`scripts/d1-publisher.ts`) refuse a listing slug that ends in one of these
-extensions (`chart.js`), and a test checks the committed import.
+(`apps/web/src/lib/admin/decisions.ts`), and the publication manifest schema
+(`scripts/d1-publisher.ts`) refuse a listing slug that ends in one of these extensions (`chart.js`),
+and a test checks the committed import.
 
 - **Redirects.** The Worker entry answers a non-canonical request with one 308 before the
-  edge cache and before OpenNext (`apps/web/lib/routing/trailing-slash.ts`), so slash
+  edge cache and before OpenNext (`apps/web/src/lib/routing/trailing-slash.ts`), so slash
   variants are never rendered or cached. The `Location` is relative and keeps the query
   string byte for byte. `skipTrailingSlashRedirect` (in `configs/next`) keeps the framework's
   own slash redirect off: it differs between Next.js and OpenNext and has no `/api`
   exception. OpenNext Node middleware is not used (it is experimental on Cloudflare).
-- **Moved URLs.** `apps/web/lib/routing/redirects.ts` lists them and `next.config.ts`
+- **Moved URLs.** `apps/web/src/lib/routing/redirects.ts` lists them and `next.config.ts`
   applies them. Next.js matches each source with or without a slash and every destination
   is canonical, so the Worker leaves any request a moved-URL rule matches to OpenNext (it
   reads the same compiled patterns from `.next/routes-manifest.json`), and the request
@@ -186,7 +186,7 @@ extensions (`chart.js`), and a test checks the committed import.
   URLs with `absoluteUrl` (`siteUrl` in `seo-config.ts`), which writes the homepage as the bare
   origin. With `trailingSlash`, the Next.js metadata API appends `/` to every same-origin URL,
   so the homepage leaves `alternates.canonical` and `openGraph.url` unset and
-  `apps/web/app/page.tsx` renders both tags with `HomePageCanonicalTags`. Never render them in
+  `apps/web/src/app/page.tsx` renders both tags with `HomePageCanonicalTags`. Never render them in
   `HomePageRoute`: `/products/` reuses it, and only its page 1 (canonical `/`) renders them.
   JSON-LD node identifiers keep their fragment form (`https://best.serp.co/#website`); they name
   a graph node, not the page.
@@ -238,7 +238,7 @@ the newest `published_at` that is already public (so a listing scheduled for the
 appears when it becomes due, without a publication). `packages/data-ops/src/catalog-epoch.ts`
 reads it with one statement (two index seeks). Four layers, from the edge inward:
 
-1. **Edge HTML cache** (`apps/web/worker.ts`, logic in `apps/web/lib/edge-cache/`). The
+1. **Edge HTML cache** (`apps/web/worker.ts`, logic in `apps/web/src/lib/edge-cache/`). The
    Worker entry wraps the OpenNext handler. Anonymous `GET`/`HEAD` requests are served from
    the Workers Cache API under a key of Worker version (`CF_VERSION_METADATA`), catalog
    epoch, host, path and query (and, for React Server Components requests, the router

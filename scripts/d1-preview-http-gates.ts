@@ -40,12 +40,12 @@ import {
   type AccessEnv,
   accessConfig,
   accessRequired
-} from '../apps/web/lib/auth/cloudflare-access'
+} from '../apps/web/src/lib/auth/cloudflare-access'
 import {
   SITE_ENVIRONMENT_HEADER,
   SMOKE_TEST_HEADER,
   WORKER_VERSION_HEADER
-} from '../apps/web/lib/environment/site-environment'
+} from '../apps/web/src/lib/environment/site-environment'
 import {
   metaRobotsBlocksIndexing,
   parseRobotsTxt,

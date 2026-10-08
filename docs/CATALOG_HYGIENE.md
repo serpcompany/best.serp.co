@@ -47,7 +47,7 @@ environments were bootstrapped from. Most websites are `serp.ly` links that redi
 browser, so the check follows HTTP redirects, `<meta http-equiv="refresh">`, and script-only
 redirect pages to the page a visitor lands on:
 
-- **Fetching** reuses the submission flow's `safeFetch` (`apps/web/lib/submissions/`): every hop
+- **Fetching** reuses the submission flow's `safeFetch` (`apps/web/src/lib/submissions/`): every hop
   must be a public http(s) URL, each request times out after 12 seconds, and a page is read up to
   2 MB. On a maintainer machine there is no Cloudflare egress, so its fetcher
   (`scripts/listing-domain-fetch.ts`) also allows ports 80 and 443 only and checks every address

@@ -16,7 +16,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import * as rootLayout from '../../app/layout'
 import * as homePage from '../../app/page'
 import * as productsPage from '../../app/products/page'
-import nextConfig from '../../next.config'
+import nextConfig from '../../../next.config'
 
 // Build-time wrappers that only add MDX and content collections; headers() is untouched.
 vi.mock('@content-collections/next', () => ({

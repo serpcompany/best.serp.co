@@ -14,9 +14,9 @@ import { describe, expect, it } from 'vitest'
  */
 
 const roots = [
-  'apps/web/app',
-  'apps/web/components',
-  'apps/web/lib',
+  'apps/web/src/app',
+  'apps/web/src/components',
+  'apps/web/src/lib',
   'packages/web-core/src',
   'packages/design-system/components'
 ]
@@ -24,10 +24,10 @@ const roots = [
 const LISTING_IMAGE = 'packages/web-core/src/ui/listing-image.tsx'
 /** Images that are not listing media, by file, with why. */
 const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
-  'apps/web/components/claims/claim-listing.tsx':
+  'apps/web/src/components/claims/claim-listing.tsx':
     'the "Featured on" badge preview in the claim flow',
-  'apps/web/components/submit/badge-step.tsx': 'the "Featured on" badge preview',
-  'apps/web/lib/email/emails/layout.ts': 'the site logo in email HTML',
+  'apps/web/src/components/submit/badge-step.tsx': 'the "Featured on" badge preview',
+  'apps/web/src/lib/email/emails/layout.ts': 'the site logo in email HTML',
   'packages/design-system/components/shadcn/avatar.tsx':
     'the avatar primitive (people, not listings)',
   'packages/web-core/src/layout/footer.tsx': 'network badges in the footer',
@@ -40,9 +40,9 @@ const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
 }
 /** Where `ListingImage` is used: every listing image on the site, admin, account, and submit. */
 const LISTING_IMAGE_CALLERS = [
-  'apps/web/components/admin/mini-listing.tsx',
-  'apps/web/components/admin/product-cell.tsx',
-  'apps/web/components/submit/submit-ui.tsx',
+  'apps/web/src/components/admin/mini-listing.tsx',
+  'apps/web/src/components/admin/product-cell.tsx',
+  'apps/web/src/components/submit/submit-ui.tsx',
   'packages/web-core/src/llm/listing-card.tsx',
   'packages/web-core/src/project-navigation.tsx',
   'packages/web-core/src/search/favicon.tsx',

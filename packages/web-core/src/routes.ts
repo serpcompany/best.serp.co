@@ -91,7 +91,7 @@ export const routes = {
     guide: '/posts/[slug]/'
   },
   pricing: '/pricing/',
-  // The one URL per legal page; the others 308 here (apps/web/lib/routing/redirects.ts, #166).
+  // The one URL per legal page; the others 308 here (apps/web/src/lib/routing/redirects.ts, #166).
   privacy: '/legal/privacy-policy/',
   cookies: '/legal/cookies/',
   dmca: '/legal/dmca/',

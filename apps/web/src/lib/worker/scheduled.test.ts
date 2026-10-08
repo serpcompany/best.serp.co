@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SqliteD1 } from '../../../../packages/data-ops/src/test-support'
+import { SqliteD1 } from '../../../../../packages/data-ops/src/test-support'
 import { BADGE_DAILY_CRON, BADGE_WEEKLY_CRON } from '../badge-program/schedule'
 import { MISSING_PROVIDER_SECRETS, TEST_PROVIDER_SECRETS } from '../billing/providers/test-support'
 import { clearDevEmailOutbox, readDevEmailOutbox } from '../email/senders'
@@ -90,7 +90,7 @@ describe('scheduled handler', () => {
 
   it('declares the same crons in every wrangler environment as the jobs they run', () => {
     const config = JSON.parse(
-      readFileSync(resolve(import.meta.dirname, '../../wrangler.jsonc'), 'utf8')
+      readFileSync(resolve(import.meta.dirname, '../../../wrangler.jsonc'), 'utf8')
     ) as {
       env: Record<string, { triggers?: { crons?: string[] } }>
       triggers?: { crons?: string[] }

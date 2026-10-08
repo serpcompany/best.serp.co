@@ -18,7 +18,7 @@ import type { ListingClaimMethod, ListingClaimStatus } from './schema'
  * owner (`listing_owners`, `verified_via` `badge_claim` or `paid_claim`). Every transition is a
  * compare-and-swap scoped to the claimer in SQL, so someone else's claim reads as missing and a
  * repeated or concurrent request fails instead of applying twice. The app
- * (`apps/web/lib/claims/`) validates addresses, hashes codes, sends the email, and checks the
+ * (`apps/web/src/lib/claims/`) validates addresses, hashes codes, sends the email, and checks the
  * badge; this module never sees a plain code.
  */
 

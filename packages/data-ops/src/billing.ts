@@ -24,7 +24,7 @@ import { selectActiveUrlBlockStatement } from './submissions'
 
 /**
  * Billing ledger (serpcompany/best.serp.co#68): `orders` and `billing_events`. The app's
- * billing module (`apps/web/lib/billing/`) composes these statement plans with the submission
+ * billing module (`apps/web/src/lib/billing/`) composes these statement plans with the submission
  * and listing plans and never prepares SQL itself. Every write is a compare-and-swap on the
  * order's status, so a replayed webhook, a return from checkout, and the hourly sweep can all
  * run the same step and only one of them changes anything.

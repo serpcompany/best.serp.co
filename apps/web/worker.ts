@@ -18,18 +18,18 @@
  * no state of its own (#165). See docs/ARCHITECTURE.md#environments-and-hosts,
  * docs/ARCHITECTURE.md#url-canonicalization, and docs/ARCHITECTURE.md#caching.
  */
-import { withEdgeCache } from './lib/edge-cache/html-cache'
-import { serveLocalMedia } from './lib/media/worker-media'
-import { legacyRootRedirect, legacyRootSlugMatcher } from './lib/routing/legacy-root'
-import { configRedirectPatterns } from './lib/routing/trailing-slash'
-import { catalogEpochReader, catalogLegacyRootLookup, catalogRenderer } from './lib/worker/catalog'
-import { handleWorkerRequest } from './lib/worker/handle-request'
+import { withEdgeCache } from './src/lib/edge-cache/html-cache'
+import { serveLocalMedia } from './src/lib/media/worker-media'
+import { legacyRootRedirect, legacyRootSlugMatcher } from './src/lib/routing/legacy-root'
+import { configRedirectPatterns } from './src/lib/routing/trailing-slash'
+import { catalogEpochReader, catalogLegacyRootLookup, catalogRenderer } from './src/lib/worker/catalog'
+import { handleWorkerRequest } from './src/lib/worker/handle-request'
 import {
   handleScheduled,
   type ScheduledContext,
   type ScheduledEnv,
   type ScheduledEvent
-} from './lib/worker/scheduled'
+} from './src/lib/worker/scheduled'
 // The build output, typed by worker-build-output.d.ts (it exists only after a build).
 import openNextWorker, {
   routesManifest,

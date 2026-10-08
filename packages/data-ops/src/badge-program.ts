@@ -14,7 +14,7 @@ import {
 
 /**
  * The D1 side of the weekly badge program (serpcompany/best.serp.co#59, #66). The Worker's
- * scheduled handler (`apps/web/lib/badge-program/program.ts`) reads the listings that are
+ * scheduled handler (`apps/web/src/lib/badge-program/program.ts`) reads the listings that are
  * due, checks their badge, and records each result here with a compare-and-swap, so two
  * overlapping runs never record (or email) the same check twice.
  *

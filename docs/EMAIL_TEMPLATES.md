@@ -2,8 +2,8 @@
 
 The emails best.serp.co sends, built to the mockups in serpcompany/best.serp.co#70 (screen
 15, revisions 3–5). Sending, environments, and the template contract are in
-[Email](./EMAIL.md). Each template lives in `apps/web/lib/email/emails/` and is registered in
-`apps/web/lib/email/registry.ts` under the id below.
+[Email](./EMAIL.md). Each template lives in `apps/web/src/lib/email/emails/` and is registered in
+`apps/web/src/lib/email/registry.ts` under the id below.
 
 Template ids are stable: each one is part of every delivery's ledger key and provider
 idempotency key, so renaming a template would let an event send again.
@@ -47,9 +47,9 @@ idempotency key, so renaming a template would let an event send again.
 
 ## Routes the buttons need
 
-Every button opens a page that exists; `apps/web/lib/email/emails/links.test.ts` renders every
+Every button opens a page that exists; `apps/web/src/lib/email/emails/links.test.ts` renders every
 sample and fails on a link to a missing page. Copy and links that need a later site area read
-its flag in `apps/web/lib/features.ts` and switch to the approved wording when that issue turns
+its flag in `apps/web/src/lib/features.ts` and switch to the approved wording when that issue turns
 it on (owner decision on #64):
 
 - `features.accountDashboard` (#65, on: [Submitter dashboard](./ACCOUNT_DASHBOARD.md)). Off,
@@ -82,7 +82,7 @@ it on (owner decision on #64):
   point to the dashboard conversation (`messageUsPath`).
 
 Submitter-facing pages follow the same rule: copy that needs a later area comes from
-`apps/web/lib/feature-copy.ts` behind its flag (the badge step's "Add FAQs and links" and
+`apps/web/src/lib/feature-copy.ts` behind its flag (the badge step's "Add FAQs and links" and
 "Keep the badge up" cards, the form's FAQs hint, the free plan's weekly check), and
 `feature-copy.test.ts` fails when another page, component, `lib/submissions` message, or
 `packages/site-config` copy (or `lib/account`, the dashboard's) says it while the flag is off.
@@ -118,7 +118,7 @@ while orders are on (`FLAGGED_SENDERS`, so they are sent now).
 
 ## Sign-in code wiring
 
-Better Auth (#60) sends sign-in codes through `apps/web/lib/auth/sign-in-code-email.ts`:
+Better Auth (#60) sends sign-in codes through `apps/web/src/lib/auth/sign-in-code-email.ts`:
 
 ```ts
 enqueueEmail(SIGN_IN_CODE_TEMPLATE_ID, {
@@ -129,7 +129,7 @@ enqueueEmail(SIGN_IN_CODE_TEMPLATE_ID, {
 ```
 
 - **One definition:** the template id, the code length (6), and the lifetime (600 seconds) live
-  in `apps/web/lib/email/sign-in-code.ts`, which imports nothing. `lib/auth/rate-limits.ts`
+  in `apps/web/src/lib/email/sign-in-code.ts`, which imports nothing. `lib/auth/rate-limits.ts`
   configures Better Auth's email OTP plugin with them, and `lib/auth` imports from `lib/email`,
   never the reverse (`boundary.test.ts`). `rate-limits.test.ts` pins the values.
 - **Lifetime:** the email states `expiresInMinutes`, which Better Auth's sender derives from the
@@ -156,7 +156,7 @@ enqueueEmail(SIGN_IN_CODE_TEMPLATE_ID, {
 ## Previews
 
 `pnpm tsx scripts/email-previews.ts <dir> [local|staging|production]` writes every template's
-HTML and text with the mockups' sample data (`apps/web/lib/email/emails/samples.ts`), plus an
+HTML and text with the mockups' sample data (`apps/web/src/lib/email/emails/samples.ts`), plus an
 index. It never sends anything.
 
 ## Differences from the mockups (approved)

@@ -89,7 +89,7 @@ describe('labels workflow', () => {
         .flatMap(rule => rule['any-glob-to-any-file'] || []) || []
 
     expect(globs).toEqual(
-      expect.arrayContaining(['d1/drizzle/**', 'apps/web/lib/submissions/**', 'd1/publications/**'])
+      expect.arrayContaining(['d1/drizzle/**', 'apps/web/src/lib/submissions/**', 'd1/publications/**'])
     )
     expect(globs.join('\n')).not.toMatch(/d1\/migrations|serp\.software|pornvideodownloaders/u)
   })

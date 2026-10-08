@@ -22,8 +22,8 @@ import {
   type SafeFetchResult,
   safeFetch
 } from '@serpdirectory/data-ops/safe-fetch'
-import { decodeHtml, fetchMimeType } from '../apps/web/lib/submissions/html-encoding'
-import { parseSiteMetadata } from '../apps/web/lib/submissions/prefill'
+import { decodeHtml, fetchMimeType } from '../apps/web/src/lib/submissions/html-encoding'
+import { parseSiteMetadata } from '../apps/web/src/lib/submissions/prefill'
 import { markupSignals, THIN_PAGE_TEXT } from './listing-domain-classifier'
 
 /** A browser-like agent with our name in it: hijacked domains often cloak bots. */

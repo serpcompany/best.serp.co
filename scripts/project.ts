@@ -4,6 +4,8 @@
  */
 export const project = {
   appDirectory: 'apps/web',
+  /** The app's code: routes, components, logic (serp repository-layout.md, #172). */
+  sourceDirectory: 'apps/web/src',
   appPackageName: 'web',
   artifact: {
     batchDirectory: 'd1/artifacts/best-serp-co-v1-import',

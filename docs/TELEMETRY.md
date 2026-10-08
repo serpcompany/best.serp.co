@@ -7,7 +7,7 @@ event with its environment.
 ## Analytics
 
 Analytics load only on public production: `SITE_ENVIRONMENT=production` on best.serp.co
-(`analyticsForRequest` in `apps/web/lib/environment/request-environment.ts`;
+(`analyticsForRequest` in `apps/web/src/lib/environment/request-environment.ts`;
 [Architecture](./ARCHITECTURE.md#environments-and-hosts)). Local, staging, and the production
 Worker's workers.dev host render neither tag, and `public-policy.test.tsx` holds that line.
 
@@ -35,7 +35,7 @@ Until the token is set, production renders no beacon.
 
 Sentry reports errors from the Worker (`apps/web/instrumentation.ts`, server rendering and
 route handlers) and the browser (`instrumentation-client.ts`), with the settings and the
-scrubber in `apps/web/lib/telemetry/sentry.ts`: errors only, with no PII, query strings,
+scrubber in `apps/web/src/lib/telemetry/sentry.ts`: errors only, with no PII, query strings,
 cookies, headers, console output, logger data, sessions, tracing, or replay. Both deploy
 builds bake in `NEXT_PUBLIC_SENTRY_DSN` (repo variable `SENTRY_DSN`) and the commit as the
 release; with no DSN, Sentry stays off (E2E sets none). `SENTRY_AUTH_TOKEN` (repo secret,

@@ -147,7 +147,7 @@ describe('Cloudflare Access JWT validation', () => {
 
   it('leaves the Access vars for the owner to fill in, and the flag off on staging', () => {
     const config = JSON.parse(
-      readFileSync(resolve(import.meta.dirname, '../../wrangler.jsonc'), 'utf8')
+      readFileSync(resolve(import.meta.dirname, '../../../wrangler.jsonc'), 'utf8')
     ) as {
       env: Record<'production' | 'staging', { vars: Record<string, string> }>
       vars: Record<string, string>

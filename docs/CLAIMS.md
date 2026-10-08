@@ -2,16 +2,16 @@
 
 A signed-in user claims an existing, ownerless listing (serpcompany/best.serp.co#59, #67): they
 prove an address on the listing's domain with an emailed code, then either the badge (free) or a
-payment (#68), and become its owner. The flow lives in `apps/web/lib/claims/` (no SQL) and
+payment (#68), and become its owner. The flow lives in `apps/web/src/lib/claims/` (no SQL) and
 `packages/data-ops/src/claims.ts`; the API is `POST /api/claims` and
 `POST /api/claims/<id>/<action>`.
 
 ## Switching it on
 
-Claims run only while `features.claims` (`apps/web/lib/features.ts`) is on. **It is on** since
+Claims run only while `features.claims` (`apps/web/src/lib/features.ts`) is on. **It is on** since
 #130 (the owner's launch decision, 2026-10-07): every listing page without a current owner shows
 "Work at …? Claim this listing" in its sidebar (#70 screen 9a), which opens the claim dialog
-(`apps/web/components/claims/claim-listing.tsx`, #70 screen 8; a drawer on a phone). A visitor
+(`apps/web/src/components/claims/claim-listing.tsx`, #70 screen 8; a drawer on a phone). A visitor
 signs in first and comes back to `#claim`. Held listings and listings whose slug and landing
 disagree still show the link, and the dialog answers "This URL can’t be claimed." with
 "Message us" (the contact path, `/contact/` while #73 is off). The dialog's badge card and
@@ -37,7 +37,7 @@ both `local`). No suite needs it while the flag is on: `apps/e2e/tests/claims.sp
 Order (#70): method → work email → code → badge check or payment → done, so nobody pays before
 proving the address.
 
-1. **The product's domain** (`apps/web/lib/claims/product.ts`). Most imported listings store a
+1. **The product's domain** (`apps/web/src/lib/claims/product.ts`). Most imported listings store a
    `serp.ly` affiliate link as their website, so the claim never uses that domain. A website on
    the product's own domain is the product's site; a `serp.ly` (or other shortener) link is
    followed server-side through the shared safe fetcher, HTTP redirects and then up to five
