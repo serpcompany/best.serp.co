@@ -162,8 +162,10 @@ Procedure: [Listing media](./MEDIA.md#uploading-and-publishing).
 ## Hotfixes
 
 A hotfix that cannot wait for staging is a `hotfix-<n>-<slug>` branch from `main`, squash-merged
-into `main` through a pull request. Its push runs Deploy Production, which stops at the
-staging check because staging never verified that tree. To release it anyway:
+into `main` through a pull request. GitHub ignores `Closes #N` on a merge into `main`
+(`issue-link` accepts it with a warning), so close the hotfix's issue by hand. Its push runs
+Deploy Production, which stops at the staging check because staging never verified that tree.
+To release it anyway:
 
 1. The owner dispatches Deploy Production from `main` with `hotfix-best.serp.co-production`.
    `authorize` accepts it only when `main`'s head is the merge commit of a merged `hotfix-*`
