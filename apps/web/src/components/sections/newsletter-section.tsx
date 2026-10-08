@@ -23,7 +23,7 @@ export function NewsletterSection() {
         <div className="pt-2">
           <Button
             asChild
-            className="h-auto rounded-none bg-foreground px-5 py-2.5 text-sm font-bold text-background shadow-none transition-colors hover:bg-foreground/90 active:scale-100"
+            className="h-auto rounded-none bg-foreground px-5 py-2.5 text-sm font-bold text-background shadow-none transition-colors hover:bg-foreground/90"
           >
             <Link href={getRoute('submit')}>{siteCopy.submitLabel}</Link>
           </Button>

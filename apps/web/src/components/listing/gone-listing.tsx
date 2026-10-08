@@ -36,7 +36,9 @@ export function GoneListing({ listing }: { listing: UnpublishedListing }) {
           <EmptyMedia variant="icon">
             <EyeOff />
           </EmptyMedia>
-          <EmptyTitle>{listing.name} is no longer listed</EmptyTitle>
+          <EmptyTitle>
+            <h2>{listing.name} is no longer listed</h2>
+          </EmptyTitle>
           <EmptyDescription>
             This listing was removed from SERP. Browse other products in{' '}
             <Link href={categoryHref} className="underline underline-offset-4">

@@ -13,7 +13,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import { buttonVariants } from '@/components/ui/button'
 import { withdrawSubmission } from './account-api'
 
 /**
@@ -64,7 +63,7 @@ export function WithdrawDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className={buttonVariants({ variant: 'destructive' })}
+            variant="destructive"
             disabled={busy}
             onClick={event => {
               event.preventDefault()

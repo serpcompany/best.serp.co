@@ -1,17 +1,23 @@
 'use client'
 
-import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
+import { cn } from 'cn'
 import { PanelLeftIcon } from 'lucide-react'
+import { Slot } from 'radix-ui'
 import * as React from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle
+} from '@/components/ui/sheet'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { cn } from '@/lib/utils'
-import { Button } from './button'
-import { Input } from './input'
-import { Separator } from './separator'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './sheet'
-import { Skeleton } from './skeleton'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
 
 const SIDEBAR_WIDTH = '16rem'
 const SIDEBAR_WIDTH_MOBILE = '18rem'
@@ -26,7 +32,7 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
-  /** The SidebarTrigger, so the mobile Sheet can return focus to it on close (local addition). */
+  /** Site exception (#239): the SidebarTrigger, so the mobile Sheet can return focus to it. */
   triggerRef: React.RefObject<HTMLButtonElement | null>
 }
 
@@ -71,7 +77,8 @@ function SidebarProvider({
         _setOpen(openState)
       }
 
-      // Not persisted: the shadcn block keeps a `sidebar_state` cookie, which this site does not set.
+      // Site exception (#239): not persisted. Stock keeps a `sidebar_state` cookie; this site
+      // sets no cookie for it.
     },
     [setOpenProp, open]
   )
@@ -109,7 +116,7 @@ function SidebarProvider({
       toggleSidebar,
       triggerRef
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, triggerRef]
   )
 
   return (
@@ -180,8 +187,8 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
-          // Local addition: the trigger lives outside the Sheet, so Radix has nothing to return
-          // focus to and would leave it on <body> after Escape or a followed link.
+          // Site exception (#239): the trigger lives outside the Sheet, so Radix has nothing to
+          // return focus to and would leave it on <body> after Escape or a followed link.
           onCloseAutoFocus={event => {
             if (!triggerRef.current) return
             event.preventDefault()
@@ -253,6 +260,7 @@ function SidebarTrigger({
   ...props
 }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar, triggerRef } = useSidebar()
+  // Site exception (#239): the mobile Sheet returns focus here on close.
   const setRef = React.useCallback(
     (node: HTMLButtonElement | null) => {
       triggerRef.current = node
@@ -308,8 +316,8 @@ function SidebarRail({ className, ...props }: React.ComponentProps<'button'>) {
 }
 
 /**
- * The content area beside the sidebar. A `div` here, not shadcn's `main`: the site's root
- * layout already wraps every page in `<main>`, and landmarks must not nest.
+ * Site exception (#239) until #185 part 3: a `div`, not stock's `main`, because the root layout
+ * still wraps every page in `<main>`, and landmarks must not nest.
  */
 function SidebarInset({ className, ...props }: React.ComponentProps<'div'>) {
   return (
@@ -399,7 +407,7 @@ function SidebarGroupLabel({
   asChild = false,
   ...props
 }: React.ComponentProps<'div'> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : 'div'
+  const Comp = asChild ? Slot.Root : 'div'
 
   return (
     <Comp
@@ -420,7 +428,7 @@ function SidebarGroupAction({
   asChild = false,
   ...props
 }: React.ComponentProps<'button'> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : 'button'
+  const Comp = asChild ? Slot.Root : 'button'
 
   return (
     <Comp
@@ -506,7 +514,7 @@ function SidebarMenuButton({
   isActive?: boolean
   tooltip?: string | React.ComponentProps<typeof TooltipContent>
 } & VariantProps<typeof sidebarMenuButtonVariants>) {
-  const Comp = asChild ? Slot : 'button'
+  const Comp = asChild ? Slot.Root : 'button'
   const { isMobile, state } = useSidebar()
 
   const button = (
@@ -552,7 +560,7 @@ function SidebarMenuAction({
   asChild?: boolean
   showOnHover?: boolean
 }) {
-  const Comp = asChild ? Slot : 'button'
+  const Comp = asChild ? Slot.Root : 'button'
 
   return (
     <Comp
@@ -664,7 +672,7 @@ function SidebarMenuSubButton({
   size?: 'sm' | 'md'
   isActive?: boolean
 }) {
-  const Comp = asChild ? Slot : 'a'
+  const Comp = asChild ? Slot.Root : 'a'
 
   return (
     <Comp

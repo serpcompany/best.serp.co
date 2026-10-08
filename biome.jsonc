@@ -135,7 +135,11 @@
             "noArrayIndexKey": "off"
           },
           "a11y": {
-            "useSemanticElements": "off"
+            "useSemanticElements": "off",
+            // Stock patterns kept as the registry ships them: BreadcrumbPage is role="link" with
+            // aria-disabled, and InputGroupAddon focuses its input on click.
+            "useFocusableInteractive": "off",
+            "useKeyWithClickEvents": "off"
           }
         }
       }

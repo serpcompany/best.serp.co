@@ -17,7 +17,7 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -348,7 +348,7 @@ export function ListingDetail({
                 value={details.categorySlug}
                 onValueChange={value => setDetails({ ...details, categorySlug: value })}
               >
-                <SelectTrigger id="listing-category">
+                <SelectTrigger id="listing-category" className="w-full">
                   <SelectValue placeholder="Choose a category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -693,7 +693,7 @@ export function ListingDetail({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className={buttonVariants({ variant: 'destructive' })}
+              variant="destructive"
               disabled={busy}
               onClick={event => {
                 event.preventDefault()
@@ -719,7 +719,7 @@ export function ListingDetail({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className={buttonVariants({ variant: 'destructive' })}
+              variant="destructive"
               disabled={busy}
               onClick={event => {
                 event.preventDefault()

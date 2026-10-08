@@ -427,7 +427,7 @@ export function AccountDashboard({
         <div className="flex items-center justify-between gap-2">
           <div className="@3xl/main:hidden">
             <Select value={filter} onValueChange={choose}>
-              <SelectTrigger className="h-8 w-40" aria-label="Show">
+              <SelectTrigger size="sm" className="w-40" aria-label="Show">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

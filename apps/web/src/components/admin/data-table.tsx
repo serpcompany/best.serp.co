@@ -223,7 +223,7 @@ export function PaginationFooter({
         <div className="hidden items-center gap-2 lg:flex">
           <span className="whitespace-nowrap text-sm font-medium">Rows per page</span>
           <Select value={String(pageSize)} onValueChange={value => onPageSize(Number(value))}>
-            <SelectTrigger className="h-8 w-20" aria-label="Rows per page">
+            <SelectTrigger size="sm" className="w-20" aria-label="Rows per page">
               <SelectValue />
             </SelectTrigger>
             <SelectContent side="top">

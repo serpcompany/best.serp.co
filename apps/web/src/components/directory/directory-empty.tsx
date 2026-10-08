@@ -87,7 +87,9 @@ function DirectoryEmpty({
             />
           </EmptyMedia>
         ) : null}
-        <EmptyTitle className={cn('mb-2 text-2xl font-bold', titleClassName)}>{title}</EmptyTitle>
+        <EmptyTitle className={cn('mb-2 text-2xl font-bold', titleClassName)}>
+          <h2>{title}</h2>
+        </EmptyTitle>
         <EmptyDescription className={cn('mb-4 max-w-md', descriptionClassName)}>
           {description}
         </EmptyDescription>

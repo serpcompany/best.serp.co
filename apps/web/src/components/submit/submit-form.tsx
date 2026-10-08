@@ -630,6 +630,7 @@ export function SubmitForm({
                     >
                       <SelectTrigger
                         id="submit-category"
+                        className="w-full"
                         aria-invalid={errors.categorySlug ? true : undefined}
                       >
                         <SelectValue placeholder="Choose a category" />
