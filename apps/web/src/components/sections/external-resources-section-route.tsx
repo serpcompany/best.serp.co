@@ -1,10 +1,5 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '@/components/directory/card'
+import { SiteCard, SiteCardHeader } from '@/components/directory/site-card'
+import { CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import {
   type ExternalResourcesSectionProps,
   ExternalResourcesSection as SharedExternalResourcesSection
@@ -14,7 +9,13 @@ export function ExternalResourcesSectionRoute(props: Omit<ExternalResourcesSecti
   return (
     <SharedExternalResourcesSection
       {...props}
-      slots={{ Card, CardContent, CardDescription, CardHeader, CardTitle }}
+      slots={{
+        Card: SiteCard,
+        CardContent,
+        CardDescription,
+        CardHeader: SiteCardHeader,
+        CardTitle
+      }}
     />
   )
 }

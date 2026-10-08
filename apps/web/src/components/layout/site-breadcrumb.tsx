@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import * as React from 'react'
 import {
+  Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator,
-  Breadcrumb as ShadcnBreadcrumb
+  BreadcrumbSeparator
 } from '@/components/ui/breadcrumb'
 
 /**
@@ -17,7 +17,7 @@ export interface BreadcrumbItemData {
   href: string
 }
 
-export interface BreadcrumbProps {
+export interface SiteBreadcrumbProps {
   items: BreadcrumbItemData[]
   homeHref?: string
   baseUrl?: string
@@ -35,7 +35,7 @@ function absoluteHref(href: string, baseUrl: string | undefined): string {
 }
 
 /**
- * Breadcrumb component for navigation hierarchy with JSON-LD support
+ * The site's breadcrumb: the stock Breadcrumb with a Home link and optional JSON-LD
  *
  * @param props - Component properties
  * @param props.items - Array of breadcrumb items to display
@@ -44,15 +44,15 @@ function absoluteHref(href: string, baseUrl: string | undefined): string {
  * @param props.structuredData - Set false for private routes that must not emit JSON-LD
  * @returns React component with breadcrumb navigation and optional structured data
  */
-export function Breadcrumb({
+export function SiteBreadcrumb({
   items,
   homeHref = '/',
   baseUrl,
   structuredData = true
-}: BreadcrumbProps) {
+}: SiteBreadcrumbProps) {
   return (
     <div className="mb-4">
-      <ShadcnBreadcrumb>
+      <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
@@ -74,7 +74,7 @@ export function Breadcrumb({
             </React.Fragment>
           ))}
         </BreadcrumbList>
-      </ShadcnBreadcrumb>
+      </Breadcrumb>
       {structuredData && (
         <script
           type="application/ld+json"

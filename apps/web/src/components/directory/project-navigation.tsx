@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { getRoute } from '../../lib/routing/routes'
-import { ListingImage } from '../ui/listing-image'
+import { ListingImage } from '../listing/listing-image'
 
 interface ProjectNavItem {
   media?: {

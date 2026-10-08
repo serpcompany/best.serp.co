@@ -1,5 +1,6 @@
-import { Card, CardContent } from '@/components/directory/card'
+import { SiteCard } from '@/components/directory/site-card'
 import { Badge } from '@/components/ui/badge'
+import { CardContent } from '@/components/ui/card'
 import type { GuideMetadata } from '../../lib/directory/content-query'
 import { GuideCard as SharedGuideCard } from './guide-card'
 
@@ -9,5 +10,7 @@ interface GuideCardRouteProps {
 }
 
 export function GuideCardRoute({ guide, index = 0 }: GuideCardRouteProps) {
-  return <SharedGuideCard guide={guide} index={index} slots={{ Badge, Card, CardContent }} />
+  return (
+    <SharedGuideCard guide={guide} index={index} slots={{ Badge, Card: SiteCard, CardContent }} />
+  )
 }

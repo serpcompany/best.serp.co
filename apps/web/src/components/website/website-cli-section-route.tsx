@@ -1,4 +1,4 @@
-import { CopyButton } from '../ui/copy-button'
+import { CopyButton } from './copy-button'
 import {
   WebsiteCliSection as SharedWebsiteCliSection,
   type WebsiteCliSectionProps as SharedWebsiteCliSectionProps

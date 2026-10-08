@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { components } from '@/components/content/mdx-components'
-import { Breadcrumb } from '@/components/layout/breadcrumb'
+import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
 import { generateLegalPageMetadata, LegalStaticPage } from '@/components/static-pages/legal-page'
 import { getLegalContent } from '@/lib/content-loader'
 import { getRoute } from '@/lib/routing/routes'
@@ -20,7 +20,7 @@ export default async function TermsOfServicePage() {
       content={content}
       mdxComponents={components}
       path={getRoute('terms')}
-      slots={{ Breadcrumb }}
+      slots={{ Breadcrumb: SiteBreadcrumb }}
       title="Terms of Service"
     />
   )
