@@ -257,9 +257,7 @@ export function SearchAutocomplete({
             <TrendingUp className="h-3 w-3 text-muted-foreground" />
           )}
           {suggestion.type === 'category' && (
-            <div className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-              Category
-            </div>
+            <div className="rounded bg-info/10 px-1.5 py-0.5 text-xs text-info">Category</div>
           )}
           <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
         </>

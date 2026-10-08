@@ -66,7 +66,7 @@ export function WebsitesSearchControls({
               }`}
             >
               <Heart
-                className={`h-4 w-4 ${showFavoritesOnly ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`}
+                className={`h-4 w-4 ${showFavoritesOnly ? 'fill-destructive text-destructive' : 'text-muted-foreground'}`}
               />
               <span>{showFavoritesOnly ? 'Show All' : 'Favorites Only'}</span>
             </button>

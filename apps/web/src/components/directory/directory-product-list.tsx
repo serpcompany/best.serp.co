@@ -130,7 +130,7 @@ function DirectoryProductBadge({
     <Badge
       variant="outline"
       className={cn(
-        'border-yellow-500/20 bg-yellow-500/10 text-xs text-yellow-700 transition-colors hover:bg-yellow-500/20 dark:border-yellow-400/30 dark:bg-yellow-400/10 dark:text-yellow-300 dark:hover:bg-yellow-400/20',
+        'border-warning/30 bg-warning/10 text-xs text-warning transition-colors hover:bg-warning/20',
         className
       )}
     >

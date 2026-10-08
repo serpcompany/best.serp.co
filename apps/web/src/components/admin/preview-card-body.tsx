@@ -13,7 +13,7 @@ export function PreviewCardBody({
 }) {
   if ('error' in preview) {
     return (
-      <Alert className="border-amber-500/40 bg-card text-amber-700 dark:text-amber-400">
+      <Alert className="border-warning/40 bg-card text-warning">
         <TriangleAlert />
         <AlertTitle>The preview can’t be shown</AlertTitle>
         <AlertDescription className="text-muted-foreground">{preview.error}</AlertDescription>

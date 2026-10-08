@@ -35,13 +35,13 @@ export interface GuideCardProps {
 function getDifficultyColor(difficulty: GuideMetadata['difficulty']) {
   switch (difficulty) {
     case 'beginner':
-      return 'bg-green-500/10 text-green-500 dark:bg-green-500/20'
+      return 'bg-success/10 text-success'
     case 'intermediate':
-      return 'bg-blue-500/10 text-blue-500 dark:bg-blue-500/20'
+      return 'bg-info/10 text-info'
     case 'advanced':
-      return 'bg-purple-500/10 text-purple-500 dark:bg-purple-500/20'
+      return 'bg-warning/10 text-warning'
     default:
-      return 'bg-gray-500/10 text-gray-500 dark:bg-gray-500/20'
+      return 'bg-muted text-muted-foreground'
   }
 }
 

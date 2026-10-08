@@ -74,11 +74,11 @@ export function TwoColumns({ aside, children }: { aside: ReactNode; children: Re
 }
 
 const DOT: Record<HistoryItem['tone'], string> = {
-  err: 'bg-red-500',
+  err: 'bg-destructive',
   muted: 'bg-muted-foreground/40',
-  now: 'bg-sky-500 ring-4 ring-sky-500/20',
-  ok: 'bg-emerald-500',
-  warn: 'bg-orange-500'
+  now: 'bg-info ring-4 ring-info/20',
+  ok: 'bg-success',
+  warn: 'bg-warning'
 }
 
 export function HistoryCard({ items }: { items: readonly HistoryItem[] }) {

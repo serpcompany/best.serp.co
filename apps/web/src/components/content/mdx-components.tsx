@@ -103,8 +103,8 @@ export const components: MDXComponents = {
     <pre
       className={cn(
         'mb-4 mt-6 overflow-x-auto rounded-none border border-border/50 p-4 text-sm',
-        'bg-neutral-100 dark:bg-neutral-900',
-        '[&_code]:bg-transparent [&_code]:p-0 [&_code]:text-neutral-800 [&_code]:dark:text-neutral-200',
+        'bg-muted',
+        '[&_code]:bg-transparent [&_code]:p-0 [&_code]:text-foreground',
         '[&_code_span]:bg-transparent',
         className
       )}

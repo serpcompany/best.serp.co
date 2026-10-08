@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { FieldGroup } from '@/components/ui/field'
 import { Separator } from '@/components/ui/separator'
@@ -112,14 +112,12 @@ function Changes({
       <div key={label} className="flex flex-col gap-2">
         <p className="text-sm font-medium">{label}</p>
         {before.trim() ? (
-          <p className="whitespace-pre-line rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-900 line-through decoration-red-500/50 dark:text-red-200">
+          <p className="whitespace-pre-line rounded-md bg-destructive/10 px-3 py-2 text-sm line-through decoration-destructive/50">
             {before}
           </p>
         ) : null}
         {after.trim() ? (
-          <p className="whitespace-pre-line rounded-md bg-emerald-500/10 px-3 py-2 text-sm text-emerald-900 dark:text-emerald-100">
-            {after}
-          </p>
+          <p className="whitespace-pre-line rounded-md bg-success/10 px-3 py-2 text-sm">{after}</p>
         ) : null}
       </div>
     )
@@ -168,7 +166,7 @@ function Changes({
         <ul className="grid gap-1 text-sm">
           {added.map(item => (
             <li key={`+${item}`} className="flex flex-wrap gap-2">
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">+</span>
+              <span className="font-semibold text-success">+</span>
               {render(item)}
             </li>
           ))}
@@ -177,7 +175,7 @@ function Changes({
               key={`-${item}`}
               className="flex flex-wrap gap-2 text-muted-foreground line-through"
             >
-              <span className="font-semibold text-red-600 no-underline dark:text-red-400">−</span>
+              <span className="font-semibold text-destructive no-underline">−</span>
               {render(item)}
             </li>
           ))}
@@ -380,7 +378,7 @@ export function ListingEdit({
             <AlertDialogFooter>
               <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-destructive text-white hover:bg-destructive/90"
+                className={buttonVariants({ variant: 'destructive' })}
                 disabled={busy}
                 onClick={event => {
                   event.preventDefault()
