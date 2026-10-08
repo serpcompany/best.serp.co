@@ -79,7 +79,7 @@ describe('best.serp.co About page brand content', () => {
 
   it('renders optional shared About sections only when frontmatter exists', () => {
     const aboutRenderer = readFileSync(
-      resolve(process.cwd(), 'packages/web-core/src/static-pages/about-page.tsx'),
+      resolve(process.cwd(), 'apps/web/src/components/static-pages/about-page.tsx'),
       'utf8'
     )
 

@@ -1,9 +1,9 @@
 import 'server-only'
 
-import type { HeaderAuthState } from '@serpdirectory/web-core/layout/header-auth-state'
-import { siteConfig } from '@serpdirectory/web-core/site-config'
 import { headers } from 'next/headers'
+import { siteConfig } from '@/lib/site/site-config'
 import { hasSessionCookie } from './cookies'
+import type { HeaderAuthState } from './header-auth-state'
 
 /**
  * The header's signed-in state for the root layout. Without a Better Auth session cookie the

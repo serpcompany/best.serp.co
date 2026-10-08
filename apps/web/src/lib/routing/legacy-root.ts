@@ -6,7 +6,7 @@
  *
  * This module has no Next.js imports so it can run before the Next.js server is loaded.
  */
-import { getRoute } from '@serpdirectory/web-core/routes'
+import { getRoute } from '@/lib/routing/routes'
 
 /** Where `/<slug>` moved, from D1: a public listing, an active category, or nothing. */
 export type LegacyRootLookup = (slug: string) => Promise<'category' | 'listing' | null>

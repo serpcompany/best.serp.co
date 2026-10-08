@@ -7,10 +7,10 @@ import {
   getNetworkBrandsForGroup,
   parseNetworkBrandGroup,
   parseNetworkBrands
-} from '../packages/web-core/src/network-brands.ts'
+} from '../apps/web/src/lib/site/network-brands.ts'
 
 const serpBrandsJsonPath = '/Users/devin/dev/repos/serp/docs/websites/pages/brands.json'
-const localBrandsJsonPath = resolve(process.cwd(), 'packages/web-core/src/data/network-brands.json')
+const localBrandsJsonPath = resolve(process.cwd(), 'apps/web/src/lib/site/data/network-brands.json')
 
 describe('parseNetworkBrands', () => {
   it('returns sorted brand entries with hostnames', () => {

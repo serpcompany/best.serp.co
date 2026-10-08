@@ -13,7 +13,8 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 
 ## Repository map
 
-- `apps/web/`: the best.serp.co Next.js routes and OpenNext Worker (`wrangler.jsonc`).
+- `apps/web/`: the best.serp.co Next.js routes and OpenNext Worker (`wrangler.jsonc`); its
+  code is in `apps/web/src/` (`app/`, `components/`, `lib/`, `hooks/`, `actions/`).
   `worker.ts` is the Worker entry: an epoch-keyed edge HTML cache in front of OpenNext.
 - `apps/web/src/lib/catalog/`: server-only adapter that acquires and validates the `DB`
   binding and delegates to `packages/data-ops/`. `apps/web/src/lib/admin/` does the same for the
@@ -23,7 +24,6 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `apps/e2e/`: Playwright suites that run against the local or deployed Worker.
 - `packages/site-config/`: the checked-in site definition (routes, copy, badges,
   sitemap layout) and site-owned content such as the About page.
-- `packages/web-core/`: page, navigation, search, sitemap, and RSS building blocks.
 - `packages/data-ops/`: Drizzle schema, catalog and submission queries, caching.
 - `packages/design-system/`: UI primitives.
 - `d1/drizzle/`: forward-only migration history applied by Wrangler.

@@ -1,30 +1,30 @@
 import { site } from '@serpdirectory/site-config'
-import { JsonLd } from '@serpdirectory/web-core/json-ld'
-import { ProjectNavigation } from '@serpdirectory/web-core/project-navigation'
-import { getRoute } from '@serpdirectory/web-core/routes'
-import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@serpdirectory/web-core/sections/external-resources-section-route'
-import { siteConfig } from '@serpdirectory/web-core/site-config'
-import { getFeaturedOnBadgePreviewPathFromKey } from '@serpdirectory/web-core/website/featured-on-badge-url'
-import { WebsiteContentSectionRoute as WebsiteContentSection } from '@serpdirectory/web-core/website/website-content-section-route'
-import { WebsiteDetailSidebar } from '@serpdirectory/web-core/website/website-detail-sidebar'
-import { WebsiteFaqsSection } from '@serpdirectory/web-core/website/website-faqs-section'
-import { WebsiteHeroRoute as WebsiteHero } from '@serpdirectory/web-core/website/website-hero-route'
-import { WebsiteRelatedProjectsRoute as WebsiteRelatedProjects } from '@serpdirectory/web-core/website/website-related-projects-route'
-import { WebsiteResourcesSectionRoute as WebsiteResourcesSection } from '@serpdirectory/web-core/website/website-resources-section-route'
-import {
-  generateWebsiteDetailRouteMetadata,
-  WebsiteDetailRoutePage
-} from '@serpdirectory/web-core/website-routes/detail-page'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
 import type { ComponentProps } from 'react'
 import { ClaimListing } from '@/components/claims/claim-listing'
+import { ProjectNavigation } from '@/components/directory/project-navigation'
 import { GoneListing } from '@/components/listing/gone-listing'
+import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@/components/sections/external-resources-section-route'
+import { JsonLd } from '@/components/seo/json-ld'
+import { WebsiteContentSectionRoute as WebsiteContentSection } from '@/components/website/website-content-section-route'
+import { WebsiteDetailSidebar } from '@/components/website/website-detail-sidebar'
+import { WebsiteFaqsSection } from '@/components/website/website-faqs-section'
+import { WebsiteHeroRoute as WebsiteHero } from '@/components/website/website-hero-route'
+import { WebsiteRelatedProjectsRoute as WebsiteRelatedProjects } from '@/components/website/website-related-projects-route'
+import { WebsiteResourcesSectionRoute as WebsiteResourcesSection } from '@/components/website/website-resources-section-route'
+import {
+  generateWebsiteDetailRouteMetadata,
+  WebsiteDetailRoutePage
+} from '@/components/website-routes/detail-page'
 import { getUnpublishedListing } from '@/lib/catalog/repository'
 import { currentClaimCopy, currentClaimFlags } from '@/lib/claims/runtime'
 import { getWebsiteBySlug, getWebsiteCanonicalRedirect } from '@/lib/content-loader'
+import { getFeaturedOnBadgePreviewPathFromKey } from '@/lib/directory/featured-on-badge-url'
 import { GONE_RENDER_HEADER } from '@/lib/routing/gone-listing'
+import { getRoute } from '@/lib/routing/routes'
+import { siteConfig } from '@/lib/site/site-config'
 import { submissionBadgeTargets } from '@/lib/submissions/presentation'
 
 interface ProjectPageProps {

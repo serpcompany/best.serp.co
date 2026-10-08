@@ -1,6 +1,6 @@
-import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
-import { siteConfig } from '@serpdirectory/web-core/site-config'
 import type { Metadata } from 'next'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
+import { siteConfig } from '@/lib/site/site-config'
 
 export const metadata: Metadata = generateBaseMetadata({
   title: `Contact ${siteConfig.name}`,

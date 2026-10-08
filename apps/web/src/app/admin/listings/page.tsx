@@ -1,7 +1,7 @@
-import { DashboardPageHeader } from '@serpdirectory/web-core/dashboard/page-header'
 import type { Metadata } from 'next'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { type ListingFilters, ListingSearch } from '@/components/admin/listing-search'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { planLabel, sourceLabel } from '@/lib/admin/listing-labels'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'

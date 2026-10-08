@@ -1,18 +1,6 @@
 'use client'
 
 import { Button } from '@serpdirectory/design-system/button'
-import { AppShell } from '@serpdirectory/web-core/dashboard/app-shell'
-import {
-  type DashboardNavItem,
-  isNavItemActive,
-  NavMain
-} from '@serpdirectory/web-core/dashboard/nav-main'
-import { NavSecondary } from '@serpdirectory/web-core/dashboard/nav-secondary'
-import { type DashboardUser, NavUser } from '@serpdirectory/web-core/dashboard/nav-user'
-import { SidebarBrand } from '@serpdirectory/web-core/dashboard/sidebar-brand'
-import { type DashboardCrumb, SiteHeader } from '@serpdirectory/web-core/dashboard/site-header'
-import { ModeToggle } from '@serpdirectory/web-core/mode-toggle'
-import { getRoute } from '@serpdirectory/web-core/routes'
 import {
   Box,
   ExternalLink,
@@ -26,10 +14,18 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { signOut } from '@/components/auth/sign-in-api'
+import { AppShell } from '@/components/dashboard/app-shell'
+import { type DashboardNavItem, isNavItemActive, NavMain } from '@/components/dashboard/nav-main'
+import { NavSecondary } from '@/components/dashboard/nav-secondary'
+import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
+import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
+import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
+import { ModeToggle } from '@/components/layout/mode-toggle'
+import { getRoute } from '@/lib/routing/routes'
 
 /**
  * The account dashboard shell from the #70 mockups (screens 5 to 7): shadcn dashboard-01, built
- * from the shared dashboard pieces in `@serpdirectory/web-core/dashboard/*` (the admin panel
+ * from the shared dashboard pieces in `@/components/dashboard/*` (the admin panel
  * reuses them with sidebar-07's options). The layout renders it once; each page names its
  * breadcrumb with `AccountCrumbs`. Messages (#73) and Settings are not built yet, so they show a
  * "Soon" badge.

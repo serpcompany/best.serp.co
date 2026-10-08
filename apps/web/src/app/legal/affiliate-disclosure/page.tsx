@@ -1,10 +1,7 @@
 import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
-import { components } from '@serpdirectory/web-core/mdx-components'
-import {
-  generateLegalPageMetadata,
-  LegalStaticPage
-} from '@serpdirectory/web-core/static-pages/legal-page'
 import type { Metadata } from 'next'
+import { components } from '@/components/content/mdx-components'
+import { generateLegalPageMetadata, LegalStaticPage } from '@/components/static-pages/legal-page'
 import { getLegalContent } from '@/lib/content-loader'
 
 export const metadata: Metadata = generateLegalPageMetadata({

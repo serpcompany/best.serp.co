@@ -1,4 +1,3 @@
-import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import {
@@ -11,6 +10,7 @@ import { checkoutPageProblem } from '@/lib/billing/guardrails'
 import { checkoutPage, toAccount } from '@/lib/billing/pages'
 import { billing } from '@/lib/billing/runtime'
 import { confirmReturn } from '@/lib/billing/service'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { submissionBadgeTargets } from '@/lib/submissions/presentation'
 
 export const dynamic = 'force-dynamic'

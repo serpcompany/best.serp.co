@@ -1,5 +1,5 @@
-import { getRoute } from '@serpdirectory/web-core/routes'
 import { getAutocomplete, MAX_SEARCH_LIMIT } from '@/lib/catalog/repository'
+import { getRoute } from '@/lib/routing/routes'
 
 export const dynamic = 'force-dynamic'
 

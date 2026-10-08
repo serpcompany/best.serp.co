@@ -14,7 +14,7 @@
  * serpcompany/best.serp.co#70.
  */
 import { isEmailTemplateId } from '@serpdirectory/data-ops/email-deliveries'
-import { absoluteUrl } from '@serpdirectory/web-core/canonical-url'
+import { absoluteUrl } from '@/lib/seo/canonical-url'
 import type { SiteEnvironment } from '../environment/site-environment'
 import type { SiteFeatures } from '../features'
 

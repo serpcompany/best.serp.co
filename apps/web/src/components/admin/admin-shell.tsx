@@ -1,26 +1,22 @@
 'use client'
 
 import { Button } from '@serpdirectory/design-system/button'
-import { AppShell } from '@serpdirectory/web-core/dashboard/app-shell'
-import {
-  type DashboardNavItem,
-  isNavItemActive,
-  NavMain
-} from '@serpdirectory/web-core/dashboard/nav-main'
-import { NavSecondary } from '@serpdirectory/web-core/dashboard/nav-secondary'
-import { type DashboardUser, NavUser } from '@serpdirectory/web-core/dashboard/nav-user'
-import { SidebarBrand } from '@serpdirectory/web-core/dashboard/sidebar-brand'
-import { type DashboardCrumb, SiteHeader } from '@serpdirectory/web-core/dashboard/site-header'
-import { ModeToggle } from '@serpdirectory/web-core/mode-toggle'
 import { Box, CircleUser, ExternalLink, Inbox, Receipt, Users } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { signOut } from '@/components/auth/sign-in-api'
+import { AppShell } from '@/components/dashboard/app-shell'
+import { type DashboardNavItem, isNavItemActive, NavMain } from '@/components/dashboard/nav-main'
+import { NavSecondary } from '@/components/dashboard/nav-secondary'
+import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
+import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
+import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
+import { ModeToggle } from '@/components/layout/mode-toggle'
 
 /**
  * The admin shell (#64): shadcn sidebar-07 (`collapsible="icon"` with a rail, the logo tile,
  * NavUser with the switch to the account area), built from the shared dashboard pieces in
- * `@serpdirectory/web-core/dashboard/*` like the account shell. The layout renders it once, so
+ * `@/components/dashboard/*` like the account shell. The layout renders it once, so
  * the sidebar keeps its state across admin pages; each page names its breadcrumb with
  * `AdminCrumbs`. Unbuilt areas are hidden: the Inbox arrives with #73 and Orders with #68
  * (`showOrders`).

@@ -1,3 +1,3 @@
 import 'server-only'
 
-export { resolveWorkspacePath as resolveFromRoot } from '@serpdirectory/web-core/workspace-path'
+export { resolveWorkspacePath as resolveFromRoot } from '@/lib/site/workspace-path'

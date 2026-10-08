@@ -1,21 +1,18 @@
-import { HomePageCanonicalTags, HomePageRoute } from '@serpdirectory/web-core/home-page'
-import { JsonLd } from '@serpdirectory/web-core/json-ld'
-import {
-  paginatedMetadata,
-  parseListingPageParam
-} from '@serpdirectory/web-core/listing-pagination'
-import { getRoute } from '@serpdirectory/web-core/routes'
-import { CreatorProjectsSectionRoute as CreatorProjectsSection } from '@serpdirectory/web-core/sections/creator-projects-section-route'
-import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@serpdirectory/web-core/sections/external-resources-section-route'
-import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@serpdirectory/web-core/sections/featured-guides-section-route'
-import { FeaturedProjectsSectionRoute as FeaturedProjectsSection } from '@serpdirectory/web-core/sections/featured-projects-section-route'
-import { RecentlyAddedSectionRoute as RecentlyAddedSection } from '@serpdirectory/web-core/sections/recently-added-section-route'
-import { StaticWebsitesListRoute as StaticWebsitesList } from '@serpdirectory/web-core/sections/static-websites-list-route'
-import { generateBaseMetadata, SITE_NAME } from '@serpdirectory/web-core/seo-config'
-import { siteCopy } from '@serpdirectory/web-core/site-copy'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getHomePageData } from '@/actions/get-home-page-data'
+import { paginatedMetadata, parseListingPageParam } from '@/components/directory/listing-pagination'
+import { HomePageCanonicalTags, HomePageRoute } from '@/components/home/home-page'
+import { CreatorProjectsSectionRoute as CreatorProjectsSection } from '@/components/sections/creator-projects-section-route'
+import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@/components/sections/external-resources-section-route'
+import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@/components/sections/featured-guides-section-route'
+import { FeaturedProjectsSectionRoute as FeaturedProjectsSection } from '@/components/sections/featured-projects-section-route'
+import { RecentlyAddedSectionRoute as RecentlyAddedSection } from '@/components/sections/recently-added-section-route'
+import { StaticWebsitesListRoute as StaticWebsitesList } from '@/components/sections/static-websites-list-route'
+import { JsonLd } from '@/components/seo/json-ld'
+import { getRoute } from '@/lib/routing/routes'
+import { generateBaseMetadata, SITE_NAME } from '@/lib/seo/seo-config'
+import { siteCopy } from '@/lib/site/site-copy'
 
 const productsPath = getRoute('listing.list')
 

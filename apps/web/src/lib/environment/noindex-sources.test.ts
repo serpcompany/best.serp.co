@@ -7,12 +7,12 @@
  * and the data and runtime modules these files import are stubbed.
  */
 import { siteRoutes } from '@serpdirectory/site-config'
-import { rootLayoutMetadata } from '@serpdirectory/web-core/root-shell'
 import { buildCustomRoute } from 'next/dist/lib/build-custom-route'
 import loadCustomRoutes from 'next/dist/lib/load-custom-routes'
 import { resolveRobots } from 'next/dist/lib/metadata/resolvers/resolve-basics'
 import { matchHas } from 'next/dist/shared/lib/router/utils/prepare-destination'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { rootLayoutMetadata } from '@/components/layout/root-shell'
 import nextConfig from '../../../next.config'
 import * as rootLayout from '../../app/layout'
 import * as homePage from '../../app/page'

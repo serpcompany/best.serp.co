@@ -15,8 +15,7 @@ export const INTERNAL_PACKAGES = [
   '@serpdirectory/content',
   '@serpdirectory/logging',
   '@serpdirectory/site-config',
-  '@serpdirectory/utils',
-  '@serpdirectory/web-core'
+  '@serpdirectory/utils'
 ]
 
 function normalizeBasePath(basePath: string): string {

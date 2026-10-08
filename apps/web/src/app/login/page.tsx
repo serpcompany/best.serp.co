@@ -1,10 +1,10 @@
-import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import type { Metadata } from 'next'
 import type { ReactElement } from 'react'
 import { LoginCard } from '@/components/auth/login-card'
 import { safeCallbackPath } from '@/lib/auth/callback-url'
 import { getSessionUser } from '@/lib/auth/server'
 import { requireRouteFeature } from '@/lib/route-feature-gates'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
 export const metadata: Metadata = generateBaseMetadata({
   title: 'Sign up or sign in',

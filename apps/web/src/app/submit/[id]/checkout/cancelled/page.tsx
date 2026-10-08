@@ -1,8 +1,8 @@
 import { site } from '@serpdirectory/site-config'
-import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import type { Metadata } from 'next'
 import { CheckoutCancelled } from '@/components/submit/checkout-screens'
 import { checkoutPage, checkoutPayable, toAccount } from '@/lib/billing/pages'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = generateBaseMetadata({

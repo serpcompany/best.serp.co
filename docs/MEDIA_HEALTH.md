@@ -5,7 +5,7 @@ A listing image never renders as a broken image, and hosted media is checked eve
 
 ## One listing image component
 
-`ListingImage` (`packages/web-core/src/ui/listing-image.tsx`) renders every listing image: the
+`ListingImage` (`apps/web/src/components/ui/listing-image.tsx`) renders every listing image: the
 card logos, the detail page's logo, featured image, and previous/next links, search
 suggestions, and the admin, account, and submit previews (`ProductLogo` in
 `components/admin/product-cell.tsx` and `components/submit/submit-ui.tsx` wrap it).

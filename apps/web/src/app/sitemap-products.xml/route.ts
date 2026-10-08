@@ -1,5 +1,5 @@
-import { createListingsSitemapResponse } from '@serpdirectory/web-core/sitemaps'
 import { getWebsites } from '@/lib/content-loader'
+import { createListingsSitemapResponse } from '@/lib/seo/sitemaps'
 
 export const dynamic = 'force-dynamic'
 

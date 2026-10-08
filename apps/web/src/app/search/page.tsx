@@ -1,9 +1,6 @@
-import {
-  generateSearchPageMetadata,
-  SearchIndexPage
-} from '@serpdirectory/web-core/search/index-page'
-import { SearchResultsRoute as SearchResults } from '@serpdirectory/web-core/search/search-results-route'
 import type { Metadata } from 'next'
+import { generateSearchPageMetadata, SearchIndexPage } from '@/components/search/index-page'
+import { SearchResultsRoute as SearchResults } from '@/components/search/search-results-route'
 import { getListedCategorySlugs } from '@/lib/catalog/repository'
 
 /**

@@ -31,7 +31,7 @@ function importSpecifiers(code: string): string[] {
   ].map(match => match[1] ?? '')
 }
 
-/** True when a specifier in `file` (relative to apps/web) points into `lib/email`. */
+/** True when a specifier in `file` (relative to apps/web/src) points into `lib/email`. */
 function importsEmailModule(file: string, specifier: string): boolean {
   let target: string | null = null
   if (specifier.startsWith('@/')) target = resolve(appDirectory, specifier.slice(2))

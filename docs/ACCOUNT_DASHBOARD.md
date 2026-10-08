@@ -3,7 +3,7 @@
 `/account` (serpcompany/best.serp.co#65) is where a signed-in submitter follows their
 submissions and manages the listings they own. The screens follow the mockups approved in #70
 (screens 5 to 7 and the dashboard-01 shell, `components/account/account-shell.tsx`, which the
-admin panel shares through `@serpdirectory/web-core/dashboard/*`). `features.accountDashboard`
+admin panel shares through `@/components/dashboard/*`). `features.accountDashboard`
 (`apps/web/src/lib/features.ts`) is on, so emails and the submit pages use its approved wording and
 links ([Email templates](./EMAIL_TEMPLATES.md#routes-the-buttons-need)).
 

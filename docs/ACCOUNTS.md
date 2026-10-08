@@ -167,7 +167,7 @@ the request carries a session cookie, so anonymous pages never load Better Auth 
   submitter dashboard ([Submitter dashboard](./ACCOUNT_DASHBOARD.md), #65). Signed out, it
   redirects to `/login?callbackUrl=/account/`. Messages (#73) and Settings show a "Soon" badge
   and do not link. The shell is composed from the shared dashboard pieces in
-  `packages/web-core/src/dashboard/` (`AppShell`, `SidebarBrand`, `NavMain`, `NavSecondary`,
+  `apps/web/src/components/dashboard/` (`AppShell`, `SidebarBrand`, `NavMain`, `NavSecondary`,
   `NavUser`, `SiteHeader`, `DashboardPageHeader`), which the admin panel (#64, shadcn
   sidebar-07) reuses with `collapsible="icon"` and `rail`. `NavMain` marks the current page
   from the path; the collapsed off-canvas sidebar is `inert`; and the mobile Sheet returns

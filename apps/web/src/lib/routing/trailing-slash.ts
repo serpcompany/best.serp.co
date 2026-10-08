@@ -3,7 +3,7 @@
  * request before the edge cache and before OpenNext. See docs/ARCHITECTURE.md#url-canonicalization.
  *
  * A page URL without its slash, or a file URL with one, gets one 308 to the canonical form
- * (`@serpdirectory/web-core/canonical-url`); `/api`, `/.well-known`, and `/_next` paths are
+ * (`@/lib/seo/canonical-url`); `/api`, `/.well-known`, and `/_next` paths are
  * served as requested. The query string is kept byte for byte, and the `Location` is
  * relative, so the response does not depend on the host or scheme.
  *
@@ -14,7 +14,7 @@
  *
  * This module has no Next.js imports so it can run before the Next.js server is loaded.
  */
-import { canonicalPathname } from '@serpdirectory/web-core/canonical-url'
+import { canonicalPathname } from '@/lib/seo/canonical-url'
 
 /**
  * Paths no moved-URL rule may match. Each has many segments and ends in both a page and a

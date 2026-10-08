@@ -1,10 +1,10 @@
-import { getRoute } from '@serpdirectory/web-core/routes'
-import { generateBaseMetadata } from '@serpdirectory/web-core/seo-config'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { SubmitForm } from '@/components/submit/submit-form'
 import { getSessionUser } from '@/lib/auth/server'
 import { getActiveCategories } from '@/lib/catalog/repository'
+import { getRoute } from '@/lib/routing/routes'
+import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { toSummary } from '@/lib/submissions/http'
 import { getOwnSubmission, insecureLogosAllowed } from '@/lib/submissions/repository'
 

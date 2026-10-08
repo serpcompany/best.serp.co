@@ -398,7 +398,7 @@ export function revisionContentSource(id: string): StagedContentSource {
 
 /**
  * Resource links and FAQs per submission or revision: the submission form's caps
- * (`packages/web-core/src/forms/submission-contract.ts`), enforced here as well so a batch's
+ * (`apps/web/src/lib/submissions/contract.ts`), enforced here as well so a batch's
  * statement count stays bounded whatever the caller (#77).
  */
 export const MAX_STAGED_RESOURCE_LINKS = 5

@@ -1,4 +1,4 @@
-import { buildHomePageData, type HomePageData } from '@serpdirectory/web-core/home-page'
+import { buildHomePageData, type HomePageData } from '@/components/home/home-page'
 import {
   getFeaturedListings,
   getLatestListings,

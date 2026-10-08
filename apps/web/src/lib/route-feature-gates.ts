@@ -1,9 +1,9 @@
+import { notFound } from 'next/navigation'
 import {
   generateDisabledRouteMetadata,
   isRouteFeatureEnabled,
   type RoutableSiteFeature
-} from '@serpdirectory/web-core/route-feature-gates'
-import { notFound } from 'next/navigation'
+} from '@/lib/site/route-feature-gates'
 
 export function requireRouteFeature(feature: RoutableSiteFeature): void {
   if (!isRouteFeatureEnabled(feature)) {
