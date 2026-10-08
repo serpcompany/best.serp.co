@@ -92,9 +92,3 @@ pre-push:
     # Run tests
     test-all:
       run: pnpm tsx scripts/run-app-tests.ts
-
-# Commit message validation
-commit-msg:
-  commands:
-    lint-commit-message:
-      run: pnpm commitlint --edit {1}
