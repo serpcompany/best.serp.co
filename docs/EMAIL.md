@@ -213,7 +213,7 @@ Apply migrations (`pnpm db:migrate:local`) so `email_deliveries` exists, then ru
 sender, recipient, subject, and text body. Nothing is sent locally, even with a useSend key.
 The local Worker also keeps the last 30 minutes of messages in memory for end-to-end tests:
 `GET /api/dev/email-outbox?to=<address>` returns their subjects and text, and answers 404
-anywhere but local.
+anywhere but a local Worker reached on a local host.
 Local links always use `http://localhost:8787`; a `pnpm worktree:init` worktree serves on
 its own port (`pnpm agent:manifest` → `webUrl`), so swap the port when following one.
 
