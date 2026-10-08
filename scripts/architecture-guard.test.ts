@@ -379,7 +379,9 @@ describe('single-site D1-only repository architecture', () => {
     // Every fetch of a submitter's URL (badge checks, prefill, logos) and of listing media goes
     // through the one shared safe fetcher, which validates each hop with the public-URL policy
     // (#95 moved submit v2's copy into data-ops).
-    expect(existsSync(resolve(project.sourceDirectory, 'lib/submissions/safe-fetch.ts'))).toBe(false)
+    expect(existsSync(resolve(project.sourceDirectory, 'lib/submissions/safe-fetch.ts'))).toBe(
+      false
+    )
     const safeFetch = readFileSync(resolve('packages/data-ops/src/safe-fetch.ts'), 'utf8')
     expect(safeFetch).toContain("from './public-url'")
     expect(safeFetch).toContain("from './mime-type'")

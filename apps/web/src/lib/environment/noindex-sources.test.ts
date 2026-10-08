@@ -13,10 +13,10 @@ import loadCustomRoutes from 'next/dist/lib/load-custom-routes'
 import { resolveRobots } from 'next/dist/lib/metadata/resolvers/resolve-basics'
 import { matchHas } from 'next/dist/shared/lib/router/utils/prepare-destination'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
+import nextConfig from '../../../next.config'
 import * as rootLayout from '../../app/layout'
 import * as homePage from '../../app/page'
 import * as productsPage from '../../app/products/page'
-import nextConfig from '../../../next.config'
 
 // Build-time wrappers that only add MDX and content collections; headers() is untouched.
 vi.mock('@content-collections/next', () => ({
