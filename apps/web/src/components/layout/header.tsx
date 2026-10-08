@@ -187,7 +187,7 @@ export function Header({
 
             <Button
               asChild
-              className="inline-flex items-center justify-center rounded-none text-sm font-bold h-9 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all duration-200 press-effect shadow-none"
+              className="inline-flex items-center justify-center text-sm font-bold h-9 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all duration-200 press-effect shadow-none"
             >
               <Link
                 href={getRoute('submit')}
@@ -204,7 +204,7 @@ export function Header({
                 <Button
                   asChild
                   variant="outline"
-                  className="hidden sm:inline-flex items-center justify-center rounded-none text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none"
+                  className="hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none"
                 >
                   <Link href={getRoute('account')}>Account</Link>
                 </Button>
@@ -214,7 +214,7 @@ export function Header({
               <Button
                 asChild
                 variant="outline"
-                className="hidden sm:inline-flex items-center justify-center rounded-none text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none"
+                className="hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none"
               >
                 <Link href={getRoute('login')}>Sign up / Sign in</Link>
               </Button>

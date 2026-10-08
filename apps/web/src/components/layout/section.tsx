@@ -45,7 +45,7 @@ export function Section({
             <Button
               asChild
               variant="ghost"
-              className="group h-auto gap-0 rounded px-0 py-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:bg-transparent hover:text-foreground has-[>svg]:px-0 sm:text-base"
+              className="group h-auto gap-0 rounded-sm px-0 py-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:bg-transparent hover:text-foreground has-[>svg]:px-0 sm:text-base"
             >
               <Link href={viewAllHref} aria-label={viewAllText}>
                 <span className="hidden sm:inline">{viewAllText}</span>
