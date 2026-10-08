@@ -47,6 +47,10 @@ export default async function CheckoutReturnPage({ params, searchParams }: Props
   // What was charged: less than the price when a promotion code applied (#250).
   const details = {
     amountCents: order.chargedCents ?? order.amountCents,
+    discountCents:
+      order.attention !== 'amount_mismatch' && order.chargedCents !== null
+        ? order.amountCents - order.chargedCents
+        : 0,
     email: user.email,
     number: order.number
   }

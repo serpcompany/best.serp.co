@@ -56,9 +56,17 @@ export default async function OrdersPage() {
   const media = await mediaBaseUrl()
   const orders: OrderRow[] = (await getAdminOrders()).map(order => {
     const charged = order.chargedCents ?? order.amountCents
-    // A promotion code's discount (#250) is on the checkout, so a discounted order links there.
+    // A promotion code's discount (#250): only a charge that matched the order has one. A
+    // flagged mismatch is a wrong charge, refunded in full, never a discount.
+    const discountCents =
+      order.attention !== 'amount_mismatch' &&
+      order.chargedCents !== null &&
+      order.chargedCurrency === order.currency
+        ? order.amountCents - order.chargedCents
+        : 0
+    // The code is on the checkout, so a discounted order links there; others to the payment.
     const paymentRef =
-      (charged < order.amountCents ? order.providerCheckoutId : order.providerPaymentId) ??
+      (discountCents > 0 ? order.providerCheckoutId : order.providerPaymentId) ??
       order.providerPaymentId ??
       order.providerCheckoutId
     return {
@@ -74,8 +82,8 @@ export default async function OrdersPage() {
             website: order.website ?? ''
           }
         : null,
+      discountCents,
       kind: order.kind === 'paid_claim' ? 'Paid claim' : 'Paid listing',
-      priceCents: order.amountCents,
       listingHref: order.listingSlug
         ? `/admin/listings/${encodeURIComponent(order.listingSlug)}/`
         : null,

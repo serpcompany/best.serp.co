@@ -43,7 +43,10 @@ export interface CheckoutProduct {
 }
 
 export interface CheckoutOrder {
+  /** What was charged. */
   amountCents: number
+  /** A promotion code's discount (#250); 0 without one. */
+  discountCents: number
   email: string
   number: number
 }
@@ -89,7 +92,12 @@ function OrderDetails({ order }: { order: CheckoutOrder }) {
     <Kv
       rows={[
         ['Order', <span key="order" className="font-mono">{`ORD-${order.number}`}</span>],
-        ['Amount', `${formatUsd(order.amountCents)} USD, one-off`],
+        [
+          'Amount',
+          order.discountCents > 0
+            ? `${formatUsd(order.amountCents)} USD, one-off (${formatUsd(order.discountCents)} off with a promotion code)`
+            : `${formatUsd(order.amountCents)} USD, one-off`
+        ],
         ['Status', <StatusBadge key="status" kind="o_paid" />],
         // A 100%-off promotion code (#250) charged nothing, so no receipt is sent.
         ...(order.amountCents === 0

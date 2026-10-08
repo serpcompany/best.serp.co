@@ -255,7 +255,9 @@ test('promotion codes: a discounted and a 100%-off checkout both go live; a chan
     billingD1(`SELECT charged_cents, attention FROM orders WHERE id = ${q(halfOrder.id)}`)
   ).toEqual([{ attention: null, charged_cents: 2450 }])
   await page.goto(`/submit/${half.id}/checkout/return/?order=${halfOrder.id}`)
-  await expect(page.getByText('$24.50 USD, one-off')).toBeVisible()
+  await expect(
+    page.getByText('$24.50 USD, one-off ($24.50 off with a promotion code)')
+  ).toBeVisible()
 
   // 100% off: nothing charged, no payment, still live.
   const free = seedDraft(submitter.id, 'promo-free')
@@ -279,6 +281,24 @@ test('promotion codes: a discounted and a 100%-off checkout both go live; a chan
   await expect(page.getByText('$0.00 USD, one-off')).toBeVisible()
   await expect(page.getByText('Receipt', { exact: true })).toHaveCount(0)
 
+  // A 100%-off upgrade: an order the Orders screen can close (a submission in review is
+  // rejected instead).
+  const listing = seedFreeListing(submitter.id, 'promo-upgrade')
+  const upgradeSession = await openCheckout(
+    page.request,
+    `/account/listings/${listing.slug}/checkout/`
+  )
+  const upgradeEvent = JSON.stringify({
+    data: { object: stripe.pay(upgradeSession, 4900) },
+    id: `evt_e2e_${unique()}`,
+    livemode: false,
+    object: 'event',
+    type: 'checkout.session.completed'
+  })
+  expect((await postEvent(page.request, upgradeEvent)).status()).toBe(200)
+  const upgradeOrder = order(`listing_id = ${q(listing.listingId)}`)
+  expect(upgradeOrder).toMatchObject({ outcome: 'upgraded', status: 'paid' })
+
   // A catalog price that isn't the site's $49: no checkout opens, and the session is expired.
   stripe.prices.set(TEST_LISTING_PRICE, { amount: 9900, currency: 'usd' })
   try {
@@ -290,6 +310,38 @@ test('promotion codes: a discounted and a 100%-off checkout both go live; a chan
     expect([...stripe.sessions.values()].at(-1)?.status).toBe('expired')
   } finally {
     stripe.prices.delete(TEST_LISTING_PRICE)
+  }
+
+  // Admin Orders: the discount under what was charged, the discounted order linking to its
+  // checkout (where the code is), and the 100%-off order closed with nothing sent back.
+  const admin = await asAdmin(page)
+  try {
+    await page.goto('/admin/orders/')
+    const halfRow = page.locator(`tr[data-order="${halfOrder.id}"]`)
+    await expect(halfRow.getByText('$24.50 off with a promotion code')).toBeVisible()
+    await halfRow.getByRole('button', { name: /^Open menu for ORD-/u }).click()
+    await expect(page.getByRole('menuitem', { name: /payment/iu })).toHaveAttribute(
+      'href',
+      new RegExp(`${halfSession}$`, 'u')
+    )
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await expect(
+      page.locator(`tr[data-order="${freeOrder.id}"]`).getByText('$49.00 off with a promotion code')
+    ).toBeVisible()
+    const freeRow = page.locator(`tr[data-order="${upgradeOrder.id}"]`)
+    await freeRow.getByRole('button', { name: /^Open menu for ORD-/u }).click()
+    await page.getByRole('menuitem', { name: 'Refund…' }).click()
+    const close = page.getByRole('alertdialog')
+    await expect(close.getByRole('heading', { name: /^Close the order/u })).toBeVisible()
+    await expect(close.getByText(/nothing goes back/u)).toBeVisible()
+    await close.getByLabel('Reason for the activity log').fill('Test promotion code.')
+    await close.getByRole('button', { name: /^Close/u }).click()
+    await expect(page.getByText(/^Closed ORD-\d+: nothing was charged$/u)).toBeVisible()
+    expect(order(`id = ${q(upgradeOrder.id)}`)).toMatchObject({ status: 'refunded' })
+    expect(stripe.refunds.some(refund => refund.payment_intent === upgradeSession)).toBe(false)
+  } finally {
+    removeAdmin(admin, billingServer)
   }
 })
 

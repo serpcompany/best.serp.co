@@ -62,6 +62,8 @@ export interface OrderRow {
   amountCents: number
   createdAt: string
   customer: string | null
+  /** A promotion code's discount on a charge that matched (#250); 0 without one. */
+  discountCents: number
   id: string
   item: { logoUrl: string | null; name: string; website: string } | null
   kind: 'Paid claim' | 'Paid listing'
@@ -69,8 +71,6 @@ export interface OrderRow {
   /** The line under the status (the mockup's notes). */
   note: string | null
   number: number
-  /** The order's price before any discount. */
-  priceCents: number
   refundable: boolean
   status: 'failed' | 'paid' | 'pending' | 'refunded' | 'refunding'
   paymentRef: string | null
@@ -270,10 +270,9 @@ export function OrdersManager({ actor, orders }: { actor: string; orders: OrderR
                   <TableCell className="text-right tabular-nums">
                     <div className="flex flex-col items-end">
                       {formatUsd(order.amountCents)}
-                      {order.amountCents < order.priceCents && order.status !== 'pending' ? (
+                      {order.discountCents > 0 ? (
                         <span className="text-[11px] text-muted-foreground">
-                          {formatUsd(order.priceCents - order.amountCents)} off with a promotion
-                          code
+                          {formatUsd(order.discountCents)} off with a promotion code
                         </span>
                       ) : null}
                     </div>
@@ -494,7 +493,17 @@ function RefundDialog({
               onConfirm()
             }}
           >
-            {unpublish ? 'Refund and unpublish' : keepFree ? 'Refund, keep live as free' : 'Refund'}
+            {free
+              ? unpublish
+                ? 'Close and unpublish'
+                : keepFree
+                  ? 'Close, keep live as free'
+                  : 'Close the order'
+              : unpublish
+                ? 'Refund and unpublish'
+                : keepFree
+                  ? 'Refund, keep live as free'
+                  : 'Refund'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
