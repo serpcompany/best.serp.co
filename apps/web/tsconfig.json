@@ -23,7 +23,6 @@
     "node_modules",
     ".next",
     ".open-next",
-    "worker.ts",
     "_archive",
     "_archive/**/*",
     "**/*.test.ts",
