@@ -1,6 +1,6 @@
 'use client'
 
-import { ListingImage } from '../ui/listing-image'
+import { ListingImage } from '../listing/listing-image'
 
 interface FaviconProps {
   website: string

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * Every listing image renders through one component, `ListingImage`
- * (`apps/web/src/components/ui/listing-image.tsx`, serpcompany/best.serp.co#122), which falls back
+ * (`apps/web/src/components/listing/listing-image.tsx`, serpcompany/best.serp.co#122), which falls back
  * to the #86 tile and never shows alt text or a broken-image icon. This guard parses the app and
  * shared UI code and fails on any other image element: a raw `<img>`, `next/image`, an avatar
  * image, `<picture>`/`<source>`, or HTML written as a string (comments are not read). The few images that are not
@@ -20,7 +20,7 @@ const roots = [
   'apps/web/src/hooks'
 ]
 /** The shared listing image itself. */
-const LISTING_IMAGE = 'apps/web/src/components/ui/listing-image.tsx'
+const LISTING_IMAGE = 'apps/web/src/components/listing/listing-image.tsx'
 /** Images that are not listing media, by file, with why. */
 const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
   'apps/web/src/components/claims/claim-listing.tsx':
@@ -172,7 +172,7 @@ describe('listing images render only through ListingImage (#122)', () => {
     }
     expect(
       outside,
-      'Render a listing image with ListingImage (@/components/ui/listing-image); add a non-listing image to NON_LISTING_IMAGES with the reason.'
+      'Render a listing image with ListingImage (@/components/listing/listing-image); add a non-listing image to NON_LISTING_IMAGES with the reason.'
     ).toEqual([])
     expect(fromListingMedia, 'A reviewed non-listing image may not show listing media.').toEqual([])
     // A reviewed entry that no longer renders an image goes, so the list stays exact.
@@ -183,7 +183,7 @@ describe('listing images render only through ListingImage (#122)', () => {
     const callers = sourceFiles().filter(
       file =>
         file !== LISTING_IMAGE &&
-        /from '(?:@\/components|\.{1,2}(?:\/[\w.-]+)*)\/ui\/listing-image'/u.test(
+        /from '(?:@\/components|\.{1,2}(?:\/[\w.-]+)*)\/listing\/listing-image'/u.test(
           readFileSync(resolve(file), 'utf8')
         )
     )

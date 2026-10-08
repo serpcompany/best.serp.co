@@ -1,7 +1,8 @@
 import { ExternalLink } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { Card, CardContent } from '@/components/directory/card'
+import { SiteCard } from '@/components/directory/site-card'
+import { CardContent } from '@/components/ui/card'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { getRoute } from '../../lib/routing/routes'
 import { generateBaseMetadata, SITE_PUBLIC_URL, SITE_WEBSITE_ID } from '../../lib/seo/seo-config'
@@ -92,7 +93,7 @@ export default function BrandsPage() {
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
           {brands.map(brand => (
-            <Card
+            <SiteCard
               key={brand.slug}
               className="transition-all hover:border-primary hover:bg-muted/50"
             >
@@ -112,7 +113,7 @@ export default function BrandsPage() {
                   </h2>
                 </div>
               </CardContent>
-            </Card>
+            </SiteCard>
           ))}
         </section>
       </div>

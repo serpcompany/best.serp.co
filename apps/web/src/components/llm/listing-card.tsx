@@ -9,8 +9,8 @@ import {
 import { cn } from '@/lib/utils'
 import type { WebsiteRelatedCardMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
-import { FavoriteButton } from '../ui/favorite-button'
-import { ListingImage } from '../ui/listing-image'
+import { FavoriteButton } from '../favorites/favorite-button'
+import { ListingImage } from '../listing/listing-image'
 
 interface ListingCardProps {
   item: WebsiteRelatedCardMetadata

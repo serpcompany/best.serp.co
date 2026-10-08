@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { components } from '@/components/content/mdx-components'
-import { Breadcrumb } from '@/components/layout/breadcrumb'
+import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
 import { generateLegalPageMetadata, LegalStaticPage } from '@/components/static-pages/legal-page'
 import { getLegalContent } from '@/lib/content-loader'
 import { getRoute } from '@/lib/routing/routes'
@@ -20,7 +20,7 @@ export default async function PrivacyPolicyPage() {
       content={content}
       mdxComponents={components}
       path={getRoute('privacy')}
-      slots={{ Breadcrumb }}
+      slots={{ Breadcrumb: SiteBreadcrumb }}
       title="Privacy Policy"
     />
   )

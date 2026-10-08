@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Breadcrumb } from '@/components/layout/breadcrumb'
+import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
 import { getActiveCategories } from '@/lib/catalog/repository'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata, SITE_NAME, SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
@@ -22,7 +22,7 @@ export default async function CategoriesPage() {
 
   return (
     <main className="container mx-auto max-w-6xl px-6 py-12">
-      <Breadcrumb
+      <SiteBreadcrumb
         items={[{ name: 'Categories', href: categoriesPath }]}
         baseUrl={SITE_PUBLIC_URL}
       />

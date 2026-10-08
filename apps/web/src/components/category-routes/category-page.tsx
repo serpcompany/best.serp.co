@@ -19,7 +19,7 @@ import {
 } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
-import { AppSidebar } from '../layout/app-sidebar'
+import { CategoryNav } from '../layout/category-nav'
 import { NewsletterSection } from '../sections/newsletter-section'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
 
@@ -227,7 +227,7 @@ export function CategoryRoutePage({
         )}
         <div className="border-t">
           <div className="relative flex h-full w-full max-w-full flex-row flex-nowrap">
-            <AppSidebar
+            <CategoryNav
               availableCategorySlugs={activeCategorySlugs}
               currentCategory={category.slug}
             />

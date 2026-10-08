@@ -1,4 +1,4 @@
-import { ListingImage } from '@/components/ui/listing-image'
+import { ListingImage } from '@/components/listing/listing-image'
 import { WebsiteContentSectionRoute } from '@/components/website/website-content-section-route'
 import type { ListingDetail } from '@/db/contracts'
 import { ProductLogo } from './product-cell'

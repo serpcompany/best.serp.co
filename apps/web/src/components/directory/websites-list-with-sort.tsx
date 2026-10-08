@@ -8,9 +8,9 @@ import type { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import { siteCopy } from '../../lib/site/site-copy'
-import type { ListingImage } from '../ui/listing-image'
-import type { Card } from './card'
+import type { ListingImage } from '../listing/listing-image'
 import type { EmptyState } from './empty-state'
+import type { SiteCard } from './site-card'
 
 export interface WebsitesListWithSortProps {
   initialWebsites: WebsiteBrowseCardMetadata[]
@@ -19,7 +19,7 @@ export interface WebsitesListWithSortProps {
   trackSortChange?: (currentSort: string, nextSort: string, source?: string) => void
   slots: {
     Badge: typeof Badge
-    Card: typeof Card
+    Card: typeof SiteCard
     EmptyState: typeof EmptyState
     ListingImage: typeof ListingImage
     ToggleGroup: typeof ToggleGroup

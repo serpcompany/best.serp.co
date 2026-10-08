@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ListingImage } from '@/components/ui/listing-image'
+import { ListingImage } from '@/components/listing/listing-image'
 
 /**
  * A product's logo on the admin screens: the shared listing image (#122), so a missing or broken

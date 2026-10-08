@@ -14,7 +14,7 @@ import { getRoute } from '../../lib/routing/routes'
 import { externalResources } from '../../lib/site/external-resources'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
-import { FavoritesLink } from '../ui/favorites-link'
+import { FavoritesLink } from '../favorites/favorites-link'
 import {
   DirectoryNavigationItem,
   DirectoryNavigationSection,
