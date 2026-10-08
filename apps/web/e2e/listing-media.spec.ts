@@ -10,7 +10,7 @@ import { test } from './test'
 
 /**
  * Hosted listing media against local R2 (serpcompany/best.serp.co#95), on the seeded media
- * server (`tests/media-fixture.ts`). Locally the bucket is served by the Worker at `/_media`;
+ * server (`e2e/media-fixture.ts`). Locally the bucket is served by the Worker at `/_media`;
  * staging and production use their media host instead.
  */
 const keyPath =

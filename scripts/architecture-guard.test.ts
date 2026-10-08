@@ -158,10 +158,15 @@ function writesBadgeChecks(source: string): boolean {
 
 describe('single-site D1-only repository architecture', () => {
   it('builds exactly one web application from one checked-in site config', () => {
-    const appDirectories = readdirSync(resolve('apps'), { withFileTypes: true })
-      .filter(entry => entry.isDirectory())
-      .map(entry => entry.name)
-      .sort()
+    // Committed files only: a checkout from before #177 keeps its old apps/e2e/test-results/.
+    const appDirectories = [
+      ...new Set(
+        execFileSync('git', ['ls-files', '--cached', 'apps'], { encoding: 'utf8' })
+          .split('\n')
+          .filter(Boolean)
+          .map(file => file.split('/')[1])
+      )
+    ].sort()
     expect(appDirectories).toEqual(['web'])
     expect(project.appDirectory).toBe('apps/web')
     // Next.js prefers apps/web/app over src/app: a leftover folder would build with no routes.
