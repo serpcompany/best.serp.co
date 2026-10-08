@@ -53,7 +53,7 @@ let allDocs: DocEntry[] = []
 let allAboutPages: AboutPageEntry[] = []
 
 try {
-  const collections = require('@/.content-collections/generated')
+  const collections = require('content-collections')
   allGuides = (collections.allGuides || []) as GuideEntry[]
   allLegals = (collections.allLegals || []) as LegalEntry[]
   allResources = (collections.allResources || []) as Resource[]
