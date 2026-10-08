@@ -4,6 +4,7 @@
   "main": "worker.ts",
   "compatibility_date": "2026-07-13",
   "compatibility_flags": ["nodejs_compat"],
+  "keep_names": false,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -37,6 +38,7 @@
   "env": {
     "staging": {
       "name": "best-serp-co-staging",
+      "keep_names": false,
       "workers_dev": true,
       "preview_urls": false,
       "observability": {
@@ -78,6 +80,7 @@
     },
     "production": {
       "name": "best-serp-co-production",
+      "keep_names": false,
       "workers_dev": true,
       "preview_urls": false,
       "observability": {
