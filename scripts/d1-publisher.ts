@@ -878,10 +878,9 @@ export function buildPublicationPlan(
             image.width,
             image.height
           )
-        ),
-        // The page shows its logo and images, so it changed (#218).
-        statement('UPDATE listings SET updated_at=? WHERE id=?', now, op.id),
-        statement(CHANGED_ONE_GUARD)
+        )
+        // No `updated_at` (#218): these manifests re-host the same logo and images, as the media
+        // cron does, so the page looks the same and its lastmod should not move.
       )
       routes.add(listingRoute(op.slug))
     }

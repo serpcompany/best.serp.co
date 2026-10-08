@@ -17,7 +17,15 @@ const websites = [
     slug: 'autoenhance.ai'
   },
   // The catch-all category is a page like any other, so its sitemap lists it.
-  { category: 'other', publishedAt: '2026-05-17', slug: 'example-product' }
+  { category: 'other', publishedAt: '2026-05-17', slug: 'example-product' },
+  // A secondary category counts too: it moves `other`'s lastmod.
+  {
+    categories: ['video-downloaders', 'other'],
+    category: 'video-downloaders',
+    modifiedAt: '2026-08-01T00:00:00.000Z',
+    publishedAt: '2026-05-01',
+    slug: 'both-categories'
+  }
 ]
 const loaders = { getWebsites: () => websites }
 
@@ -43,7 +51,8 @@ describe('sitemaps and absolute URLs', () => {
     )
     expect(listings).toEqual([
       `${origin}/products/autoenhance.ai/`,
-      `${origin}/products/example-product/`
+      `${origin}/products/example-product/`,
+      `${origin}/products/both-categories/`
     ])
     const categories = locations(
       await (await createTaxonomiesSitemapResponse({ getWebsites: () => websites })).text()
@@ -74,11 +83,12 @@ describe('sitemaps and absolute URLs', () => {
     // A listing's modifiedAt, or its publication date when it never changed.
     expect(entries(await (await createListingsSitemapResponse(loaders)).text())).toEqual({
       [`${origin}/products/autoenhance.ai/`]: '2026-09-30T12:00:00.000Z',
+      [`${origin}/products/both-categories/`]: '2026-08-01T00:00:00.000Z',
       [`${origin}/products/example-product/`]: '2026-05-17T00:00:00.000Z'
     })
-    // A category's newest listing.
+    // A category's newest listing, its secondary listings included.
     expect(entries(await (await createTaxonomiesSitemapResponse(loaders)).text())).toEqual({
-      [`${origin}/products/categories/other/`]: '2026-05-17T00:00:00.000Z',
+      [`${origin}/products/categories/other/`]: '2026-08-01T00:00:00.000Z',
       [`${origin}/products/categories/video-downloaders/`]: '2026-09-30T12:00:00.000Z'
     })
     // The catalog pages carry the newest listing; the others none.
