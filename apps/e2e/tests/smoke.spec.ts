@@ -167,6 +167,16 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     expect(linkedUrls).toContain(site.publicUrl)
   })
 
+  test('answers the retired /news with 410 Gone, without a redirect (#166)', async ({
+    request
+  }) => {
+    for (const path of ['/news', '/news/']) {
+      const response = await request.get(path, { maxRedirects: 0 })
+      expect(response.status(), path).toBe(410)
+      expect(response.headers().location, path).toBeUndefined()
+    }
+  })
+
   test('permanently redirects the pre-D1 URL scheme to the current routes in one hop', async ({
     request
   }) => {
@@ -176,10 +186,13 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       [`/categories/${sampleCategory.slug}/`, categoryPath(sampleCategory.slug)],
       ['/products/best/featured/', categoriesIndexPath],
       ['/products/best/', categoriesIndexPath],
-      // Top-level legal pages of the static site, now under /legal/.
-      ['/privacy/', '/legal/privacy/'],
-      ['/terms/', '/legal/terms/'],
-      ['/cookies/', '/legal/cookies/']
+      // Top-level legal pages of the static site and the short legal URLs: each legal page has
+      // one canonical URL under /legal/ (#166).
+      ['/privacy/', '/legal/privacy-policy/'],
+      ['/terms/', '/legal/terms-conditions/'],
+      ['/cookies/', '/legal/cookies/'],
+      ['/legal/privacy/', '/legal/privacy-policy/'],
+      ['/legal/terms/', '/legal/terms-conditions/']
     ]
     for (const [from, to] of redirects) {
       // Both slash forms of a moved URL reach the canonical page directly.
@@ -413,9 +426,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       { path: '/sponsor/', heading: /^sponsor serp$/i },
       { path: '/submit/', heading: /^submit a product$/i },
       { path: '/legal/privacy-policy/', heading: /^privacy policy$/i },
-      { path: '/legal/privacy/', heading: /^privacy policy$/i },
-      { path: '/legal/terms-conditions/', heading: /^terms of service$/i },
-      { path: '/legal/terms/', heading: /^terms of service$/i }
+      { path: '/legal/terms-conditions/', heading: /^terms of service$/i }
     ]
 
     for (const { path, heading } of pages) {

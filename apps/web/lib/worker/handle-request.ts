@@ -6,14 +6,15 @@
  * 1. Canonical host: on the production Worker with `CANONICAL_HOST_REDIRECT=on`, a
  *    `*.workers.dev` request without the smoke-test header gets one 308 to best.serp.co
  *    (`lib/routing/canonical-host.ts`).
- * 2. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
- * 3. Outside public production, `/robots.txt` disallows every crawler.
- * 4. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
+ * 2. Retired URLs without a replacement (`/news`) answer 410 Gone (`lib/routing/retired-paths.ts`).
+ * 3. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
+ * 4. Outside public production, `/robots.txt` disallows every crawler.
+ * 5. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
  *    503, 403, or 401 (`lib/auth/admin-gate.ts`); pages and handlers then require an admin.
- * 5. The local dev endpoints (`/api/dev/*`, `/api/auth/dev/*`) answer 404 unless the Worker was
+ * 6. The local dev endpoints (`/api/dev/*`, `/api/auth/dev/*`) answer 404 unless the Worker was
  *    reached on a local host (#164). This uses the Worker's own URL: inside OpenNext a client's
  *    `X-Forwarded-Host` becomes `Host`, so a check there alone could be talked past.
- * 6. Everything else is served through the edge HTML cache and OpenNext (`serve`).
+ * 7. Everything else is served through the edge HTML cache and OpenNext (`serve`).
  *
  * Every response then carries the configured environment, the Worker version and, outside
  * public production, `X-Robots-Tag: noindex, nofollow` (`lib/environment/site-environment.ts`). These headers are
@@ -29,6 +30,7 @@ import {
   withEnvironmentHeaders
 } from '../environment/site-environment'
 import { type CanonicalHostEnv, canonicalHostRedirect } from '../routing/canonical-host'
+import { retiredPathResponse } from '../routing/retired-paths'
 import { trailingSlashRedirect } from '../routing/trailing-slash'
 
 export interface WorkerRequestEnv extends CanonicalHostEnv, AccessEnv {
@@ -52,6 +54,7 @@ export async function handleWorkerRequest(
   const publicProduction = isPublicProduction(env.SITE_ENVIRONMENT, new URL(request.url).host)
   const response =
     canonicalHostRedirect(request, env, pipeline.configRedirects) ??
+    retiredPathResponse(request) ??
     trailingSlashRedirect(request, pipeline.configRedirects) ??
     (publicProduction ? null : nonProductionRobotsTxt(request)) ??
     (await adminGate(request, env, pipeline.access)) ??
