@@ -15,7 +15,7 @@ export async function SiteChrome({ children }: { children: ReactNode }) {
     getActiveCategories()
   ])
   return (
-    <div className="flex min-h-screen flex-col">
+    <div data-site-chrome="" className="flex min-h-screen flex-col">
       <Header
         activeCategorySlugs={activeCategories.map(category => category.slug)}
         authState={authState}
