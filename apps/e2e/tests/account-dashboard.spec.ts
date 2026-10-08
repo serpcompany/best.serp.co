@@ -24,7 +24,14 @@ import {
   unique
 } from './admin-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
-import { test } from './test'
+import { expectedResponse, test } from './test'
+
+test.use({
+  allowedConsoleErrors: {
+    because: 'three tabs save the version they loaded at once: one wins, the others get 409',
+    patterns: [expectedResponse(409, /\/api\/account\/listings\/[^/]+\/revision/u)]
+  }
+})
 
 /**
  * The submitter dashboard (serpcompany/best.serp.co#65) against its own local Worker and D1

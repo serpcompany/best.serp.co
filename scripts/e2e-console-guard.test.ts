@@ -19,7 +19,10 @@ describe('E2E console-error guard (#160)', () => {
       const importsBaseTest = /import \{[^}]*\btest\b[^}]*\} from '@playwright\/test'/su.test(
         source
       )
-      return !importsGuardedTest || importsBaseTest
+      // A default or namespace import would reach the unchecked test too (`pw.test`).
+      const importsWholeModule =
+        /import\s+(?:\*\s+as\s+)?\w+\s*(?:,|from)[^;]*'@playwright\/test'/u.test(source)
+      return !importsGuardedTest || importsBaseTest || importsWholeModule
     })
     expect(violations, "import { test } from './test', not from '@playwright/test'").toEqual([])
   })

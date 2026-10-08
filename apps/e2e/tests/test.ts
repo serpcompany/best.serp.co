@@ -3,10 +3,11 @@ import { type BrowserContext, test as base, type Page } from '@playwright/test'
 /**
  * Always allowed: images the committed D1 import still points at legacy media hosts that no
  * longer serve them. Local and CI runs load that import; production's listing media is migrated
- * and checked by `pnpm media:health`, so a miss here is data, not a code error.
+ * and checked by `pnpm media:health`, so a miss here is data, not a code error. The fallback
+ * tile is the site's own asset, so a miss on it is never allowed.
  */
 const catalogMediaMiss =
-  /Failed to load resource: the server responded with a status of 404 \(Not Found\) \((?:http:\/\/127\.0\.0\.1:\d+\/listing-logos\/|https:\/\/imagedelivery\.net\/|https:\/\/raw\.githubusercontent\.com\/serpapps\/)/u
+  /Failed to load resource: the server responded with a status of 404 \(Not Found\) \((?!.*favicon-fallback-512x512\.png)(?:http:\/\/127\.0\.0\.1:\d+\/listing-logos\/|https:\/\/imagedelivery\.net\/|https:\/\/raw\.githubusercontent\.com\/serpapps\/)/u
 
 /** Allows the browser's "Failed to load resource" for a response a spec expects on purpose. */
 export function expectedResponse(status: number, path: RegExp): RegExp {
@@ -30,7 +31,8 @@ type ConsoleFixtures = {
  * test"), so hydration mismatches and broken client code can't pass silently.
  *
  * It watches every page the test opens: pages of the default context, and pages of contexts the
- * test creates itself with `browser.newContext()`. A spec that triggers an error on purpose
+ * test creates itself with `browser.newContext()` or `browser.newPage()`. Pages opened in
+ * `beforeAll` and `afterAll` hooks are not watched, because those hooks run outside a test. A spec that triggers an error on purpose
  * allows it with `test.use({ allowedConsoleErrors: { because, patterns } })`.
  */
 export const test = base.extend<ConsoleFixtures>({
