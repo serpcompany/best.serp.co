@@ -7,19 +7,13 @@
       "batch": "framework-runtime",
       "modules": ["ws"],
       "rationale": "These packages are transitive runtime dependencies of the current Next.js, Vercel, and Cloudflare stack. They require upgrades through their direct framework owners plus both Worker builds and Preview verification.",
-      "target": "Issue #93 — framework/runtime upgrade batch"
+      "target": "Issue #93 \u2014 framework/runtime upgrade batch"
     },
     "product-parsing-and-transport": {
       "batch": "product-libraries",
-      "modules": ["fast-xml-parser", "form-data", "js-yaml", "serialize-javascript"],
+      "modules": ["form-data", "js-yaml", "serialize-javascript"],
       "rationale": "These parsers and transport helpers are transitive dependencies of current product packages. The safe remediation is to upgrade their owning direct dependencies and validate sitemap, feed, submission, and serialization behavior.",
-      "target": "Issue #92 follow-up — product-libraries upgrade batch"
-    },
-    "product-utilities": {
-      "batch": "product-libraries",
-      "modules": ["lodash", "lodash-es"],
-      "rationale": "These utilities are transitively pinned by shipped product dependencies. They remain pending owner-package upgrades that preserve generated identifiers and shared UI behavior across both Sites.",
-      "target": "Issue #92 follow-up — product-libraries upgrade batch"
+      "target": "Issue #92 follow-up \u2014 product-libraries upgrade batch"
     }
   },
   "advisories": [
@@ -48,12 +42,6 @@
       "batch": "product-libraries"
     },
     {
-      "id": "GHSA-8gc5-j5rx-235r",
-      "module": "fast-xml-parser",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
       "id": "GHSA-96hv-2xvq-fx4p",
       "module": "ws",
       "severity": "high",
@@ -62,24 +50,6 @@
     {
       "id": "GHSA-hmw2-7cc7-3qxx",
       "module": "form-data",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-jmr7-xgp7-cmfj",
-      "module": "fast-xml-parser",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-r5fr-rjxr-66jc",
-      "module": "lodash",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-r5fr-rjxr-66jc",
-      "module": "lodash-es",
       "severity": "high",
       "batch": "product-libraries"
     }

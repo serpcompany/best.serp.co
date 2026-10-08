@@ -9,7 +9,6 @@
     "./url-key": "./url-key.ts"
   },
   "dependencies": {
-    "path": "^0.12.7",
     "tldts": "7.4.16"
   }
 }
