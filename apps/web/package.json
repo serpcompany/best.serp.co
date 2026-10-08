@@ -23,6 +23,7 @@
     "@mdx-js/react": "^3.1.1",
     "@next/mdx": "16.3.8",
     "@opennextjs/cloudflare": "1.20.6",
+    "@sentry/nextjs": "^10.76.0",
     "@serpdirectory/config-next": "workspace:*",
     "@serpdirectory/config-typescript": "workspace:*",
     "@serpdirectory/content": "workspace:*",
