@@ -8,9 +8,9 @@ import { compareWithBaseline, literalColors } from './theme-color-guard'
  * rgb() or hsl() literals and no Tailwind palette colors (`bg-red-500`, `text-white`) in
  * `apps/web/src`. Use the tokens (`bg-destructive`, `text-muted-foreground`) instead.
  *
- * Today's uses are a ratchet: `COLOR_BASELINE` holds each file's count, which may only go
- * down. A change that adds a palette class fails; a change that removes some must lower the
- * file's number (or delete the entry at zero), so the count never creeps back up.
+ * Each file's count is a ratchet: `COLOR_BASELINE` holds it, and it may only go down. A change
+ * that adds a palette class fails; a change that removes some must lower the file's number (or
+ * delete the entry at zero), so the count never creeps back up.
  */
 
 /** Files that may use literal colors, each with why. */
@@ -65,37 +65,14 @@ const STOCK_UI = [
   'tooltip'
 ].map(name => `apps/web/src/components/ui/${name}.tsx`)
 
-/** Each file's literal-color count on 2026-10-08. Lower it as a file moves to tokens. */
+/**
+ * Each file's literal-color count, which may only go down. Since #184 only the hand-built
+ * overlays are left, with stock shadcn's overlay color `bg-black/50`; #187 moves them onto Sheet
+ * and Dialog, and their entries go.
+ */
 const COLOR_BASELINE: Readonly<Record<string, number>> = {
-  'apps/web/src/app/error.tsx': 3,
-  'apps/web/src/app/not-found.tsx': 3,
-  'apps/web/src/components/account/account-dashboard.tsx': 3,
-  'apps/web/src/components/account/listing-edit.tsx': 12,
-  'apps/web/src/components/account/record.tsx': 5,
-  'apps/web/src/components/account/status.tsx': 14,
-  'apps/web/src/components/account/withdraw-dialog.tsx': 1,
-  'apps/web/src/components/admin/admins-manager.tsx': 1,
-  'apps/web/src/components/admin/listing-detail.tsx': 5,
-  'apps/web/src/components/admin/orders-manager.tsx': 7,
-  'apps/web/src/components/admin/preview-card-body.tsx': 3,
-  'apps/web/src/components/admin/review-detail.tsx': 10,
-  'apps/web/src/components/admin/status-badge.tsx': 26,
-  'apps/web/src/components/auth/login-card.tsx': 3,
-  'apps/web/src/components/content/mdx-components.tsx': 4,
-  'apps/web/src/components/directory/directory-product-list.tsx': 8,
-  'apps/web/src/components/directory/websites-search-controls.tsx': 2,
   'apps/web/src/components/layout/header-search.tsx': 1,
-  'apps/web/src/components/layout/mobile-drawer.tsx': 1,
-  'apps/web/src/components/search/search-autocomplete.tsx': 4,
-  'apps/web/src/components/search/search-results.tsx': 14,
-  'apps/web/src/components/sections/guide-card.tsx': 12,
-  'apps/web/src/components/submit/badge-step.tsx': 3,
-  'apps/web/src/components/submit/submit-form.tsx': 2,
-  'apps/web/src/components/submit/submit-ui.tsx': 15,
-  'apps/web/src/components/ui/copy-button.tsx': 9,
-  'apps/web/src/components/ui/favorite-button.tsx': 12,
-  'apps/web/src/components/website/website-cli-section.tsx': 11,
-  'apps/web/src/components/website/website-hero.tsx': 6
+  'apps/web/src/components/layout/mobile-drawer.tsx': 1
 }
 
 function sourceFiles(): string[] {
@@ -121,7 +98,8 @@ describe('theme colors only (#183)', () => {
           '<p className="shadow-[0_0_0_1px_#000] bg-[linear-gradient(90deg,#fff,#000)]" />',
           '<p className="inset-shadow-sky-500 drop-shadow-black/50 text-shadow-white" />',
           '<p className="bg-(--color-red-500) text-[var(--color-amber-600)]" />',
-          "const line = { border: '1px solid #000000', background: 'linear-gradient(#fff, #000)' }"
+          "const line = { border: '1px solid #000000', background: 'linear-gradient(#fff, #000)' }",
+          '<p className="bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px)] shadow-[0_0_0_1px_#fff_inset]" />'
         ].join('\n'),
         'probe.tsx'
       )
@@ -144,7 +122,9 @@ describe('theme colors only (#183)', () => {
       '7: palette variable --color-red-500',
       '7: palette variable --color-amber-600',
       '8: hex color #000000',
-      '8: hex color #fff'
+      '8: hex color #fff',
+      '9: hex color #8080800a',
+      '9: hex color #fff'
     ])
     expect(literalColors('a {\n  /* #fff */\n  border: 1px solid #ccc;\n}', 'probe.css')).toEqual([
       '3: hex color #ccc'

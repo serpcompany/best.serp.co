@@ -607,7 +607,7 @@ function LoginLayout({ children }: { children: ReactNode }) {
 function LoginNotice({ notice, seconds }: { notice: Notice; seconds: number }) {
   if (notice?.kind === 'limited' && seconds > 0) {
     return (
-      <Alert className="border-amber-500/40 bg-card text-amber-700 dark:text-amber-400">
+      <Alert className="border-warning/40 bg-card text-warning">
         <Clock />
         <AlertTitle>Too many code requests</AlertTitle>
         <AlertDescription>

@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
@@ -558,7 +558,7 @@ export function ReviewDetail({
   const banner = (() => {
     if (paidLive && view.listing) {
       return (
-        <Alert className="border-sky-500/40 bg-card text-sky-700 dark:text-sky-400">
+        <Alert className="border-info/40 bg-card text-info">
           <Info />
           <AlertTitle>
             Live since {formatDateTime(view.listing.liveSince)} UTC, after payment
@@ -600,7 +600,7 @@ export function ReviewDetail({
     }
     if (!isSubmission && view.stale && queued) {
       return (
-        <Alert className="border-amber-500/40 bg-card text-amber-700 dark:text-amber-400">
+        <Alert className="border-warning/40 bg-card text-warning">
           <TriangleAlert />
           <AlertTitle>The listing changed after this revision was made</AlertTitle>
           <AlertDescription className="text-muted-foreground">
@@ -796,7 +796,7 @@ export function ReviewDetail({
             {isSubmission ? categoryCards : null}
             {refundDue ? (
               category === 'prohibited' ? (
-                <Alert className="border-amber-500/40 bg-card text-amber-700 dark:text-amber-400">
+                <Alert className="border-warning/40 bg-card text-warning">
                   <TriangleAlert />
                   <AlertTitle>No refund</AlertTitle>
                   <AlertDescription className="text-muted-foreground">
@@ -871,7 +871,7 @@ export function ReviewDetail({
               Go back
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className={buttonVariants({ variant: 'destructive' })}
               disabled={busy}
               onClick={event => {
                 event.preventDefault()

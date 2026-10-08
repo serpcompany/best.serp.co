@@ -31,20 +31,15 @@ export function CopyButton({ text, variant = 'default' }: CopyButtonProps) {
       className={cn(
         'shrink-0 rounded-lg p-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         variant === 'terminal'
-          ? 'border border-zinc-300 dark:border-zinc-700 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700'
+          ? 'border border-border bg-background hover:bg-accent'
           : 'border border-border/50 bg-muted hover:bg-muted/80'
       )}
       aria-label="Copy to clipboard"
     >
       {copied ? (
-        <Check className="size-4 text-emerald-400" />
+        <Check className="size-4 text-success" />
       ) : (
-        <Copy
-          className={cn(
-            'size-4',
-            variant === 'terminal' ? 'text-zinc-600 dark:text-zinc-400' : 'text-muted-foreground'
-          )}
-        />
+        <Copy className="size-4 text-muted-foreground" />
       )}
     </button>
   )
