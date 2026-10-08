@@ -1,12 +1,12 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
-import { cn } from '@serpdirectory/design-system/lib/utils'
+import { useState } from 'react'
 import {
   DirectoryNavigationItem,
   directoryNavigationInteractiveClassName
-} from '@serpdirectory/design-system/shadcnblocks/directory-navigation'
-import { useState } from 'react'
+} from '@/components/layout/directory-navigation'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { signOut } from './sign-in-api'
 
 /**

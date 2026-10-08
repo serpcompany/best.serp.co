@@ -1,14 +1,14 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
-import { Checkbox } from '@serpdirectory/design-system/checkbox'
+import { Filter, X } from 'lucide-react'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger
-} from '@serpdirectory/design-system/dropdown-menu'
-import { Filter, X } from 'lucide-react'
-import { useState } from 'react'
+} from '@/components/ui/dropdown-menu'
 import { getCategoryBySlug, resolveCategories } from '../../lib/directory/categories'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 

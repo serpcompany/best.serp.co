@@ -28,7 +28,7 @@ function renderRail() {
       html += `<a href="#s${S.n}" data-i="${i}" ${i === UI.s ? 'aria-current="true"' : ''}><span class="num">${S.n}</span><span class="t">${S.title}${S.isNew ? `<span class="new">New r${S.isNew === true ? 2 : S.isNew}</span>` : ''}${S.rev4 ? '<span class="new r4">R4: needs approval</span>' : ''}${S.rev5 ? '<span class="new r4">R5: needs approval</span>' : ''}</span><span class="r">${esc(S.route)}</span><span class="cnt">${S.states.length}</span></a>`;
     });
   }
-  html += `<div class="foot">Keys: <kbd>←</kbd> <kbd>→</kbd> states, <kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd> screens.<br>Copy is draft. Components follow shadcn/ui (packages/design-system). Example products are fictional; categories are real D1 categories.</div>`;
+  html += `<div class="foot">Keys: <kbd>←</kbd> <kbd>→</kbd> states, <kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd> screens.<br>Copy is draft. Components follow shadcn/ui (apps/web/src/components/ui). Example products are fictional; categories are real D1 categories.</div>`;
   $('#rail').innerHTML = html;
   $('#screenSelect').innerHTML = SCREENS.map((S, i) => `<option value="${i}" ${i === UI.s ? 'selected' : ''}>${S.n}. ${S.title} (${S.states.length} states)</option>`).join('');
 }

@@ -1,6 +1,6 @@
-import { Button } from '@serpdirectory/design-system/button'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { hasConfiguredGitHubIssueTarget, siteConfig } from '@/lib/site/site-config'

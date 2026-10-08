@@ -1,6 +1,10 @@
 import type { AccountOverview } from '@serpdirectory/data-ops/account'
-import { Button } from '@serpdirectory/design-system/button'
-import { Card, CardContent } from '@serpdirectory/design-system/card'
+import { Inbox, Plus, Search } from 'lucide-react'
+import Link from 'next/link'
+import type { ReactElement } from 'react'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Empty,
   EmptyContent,
@@ -8,11 +12,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle
-} from '@serpdirectory/design-system/empty'
-import { Inbox, Plus, Search } from 'lucide-react'
-import Link from 'next/link'
-import type { ReactElement } from 'react'
-import { DashboardPageHeader } from '@/components/dashboard/page-header'
+} from '@/components/ui/empty'
 import { accountBadgeTarget, badgePanelCopy, badgeSiteName } from '@/lib/account/presentation'
 import { type AccountRow, accountCards, accountRows } from '@/lib/account/view'
 import { ordersEnabled } from '@/lib/billing/runtime'

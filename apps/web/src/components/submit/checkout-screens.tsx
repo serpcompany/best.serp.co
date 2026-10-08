@@ -1,23 +1,5 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle
-} from '@serpdirectory/design-system/card'
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle
-} from '@serpdirectory/design-system/item'
-import { Spinner } from '@serpdirectory/design-system/spinner'
 import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -25,6 +7,24 @@ import { type ReactNode, useEffect } from 'react'
 import { formatUsd } from '@/components/admin/format'
 import { Kv } from '@/components/admin/kv'
 import { StatusBadge, type StatusKind } from '@/components/admin/status-badge'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card'
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle
+} from '@/components/ui/item'
+import { Spinner } from '@/components/ui/spinner'
 import { ProductLogo, ToneAlert } from './submit-ui'
 
 /**

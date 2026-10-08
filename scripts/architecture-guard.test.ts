@@ -613,7 +613,6 @@ describe('single-site D1-only repository architecture', () => {
         ) ||
           [
             'apps/web/src/lib/site/',
-            'packages/design-system/',
             // Validation and error messages the data layer returns to pages (#111 round 4).
             'packages/data-ops/src/'
           ].some(dir => file.startsWith(dir))) &&

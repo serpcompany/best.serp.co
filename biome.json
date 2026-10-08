@@ -11,7 +11,8 @@
       "!**/.turbo",
       "!**/coverage",
       "!**/.content-collections",
-      "!d1/media/*.json"
+      "!d1/media/*.json",
+      "!apps/web/src/app/globals.css"
     ]
   },
   "vcs": {

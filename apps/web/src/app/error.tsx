@@ -1,7 +1,7 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
 import { useEffect } from 'react'
+import { Button } from '@/components/ui/button'
 import { logger } from '@/lib/logging'
 
 type ErrorProps = {

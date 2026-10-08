@@ -1,6 +1,5 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
 import {
   Box,
   ExternalLink,
@@ -21,6 +20,7 @@ import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
 import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
 import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
 import { ModeToggle } from '@/components/layout/mode-toggle'
+import { Button } from '@/components/ui/button'
 import { getRoute } from '@/lib/routing/routes'
 
 /**

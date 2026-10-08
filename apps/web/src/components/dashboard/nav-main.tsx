@@ -1,6 +1,9 @@
 'use client'
 
-import { cn } from '@serpdirectory/design-system/lib/utils'
+import type { LucideIcon } from 'lucide-react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import React, { type ComponentProps, type ReactNode } from 'react'
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -10,11 +13,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar
-} from '@serpdirectory/design-system/sidebar'
-import type { LucideIcon } from 'lucide-react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import React, { type ComponentProps, type ReactNode } from 'react'
+} from '@/components/ui/sidebar'
+import { cn } from '@/lib/utils'
 
 export interface DashboardNavItem {
   title: string

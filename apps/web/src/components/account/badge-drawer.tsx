@@ -1,11 +1,12 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from '@serpdirectory/design-system/collapsible'
+import { ChevronsUpDown, Copy, RefreshCw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { ToneAlert } from '@/components/submit/submit-ui'
+import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   Drawer,
   DrawerContent,
@@ -13,9 +14,9 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle
-} from '@serpdirectory/design-system/drawer'
-import { Separator } from '@serpdirectory/design-system/separator'
-import { Spinner } from '@serpdirectory/design-system/spinner'
+} from '@/components/ui/drawer'
+import { Separator } from '@/components/ui/separator'
+import { Spinner } from '@/components/ui/spinner'
 import {
   Table,
   TableBody,
@@ -23,14 +24,9 @@ import {
   TableHead,
   TableHeader,
   TableRow
-} from '@serpdirectory/design-system/table'
-import { useIsMobile } from '@serpdirectory/design-system/use-mobile'
-import { ChevronsUpDown, Copy, RefreshCw } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
-import { ToneAlert } from '@/components/submit/submit-ui'
+} from '@/components/ui/table'
 import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { formatFull, formatWhen } from '@/lib/account/format'
 import { type AccountRow, badgeResultLabel } from '@/lib/account/view'
 import { hostOf, VERIFICATION_COOLDOWN_SECONDS } from '@/lib/submissions/contract'

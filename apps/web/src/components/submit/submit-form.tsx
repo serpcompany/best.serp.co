@@ -1,47 +1,5 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle
-} from '@serpdirectory/design-system/card'
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel
-} from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText
-} from '@serpdirectory/design-system/input-group'
-import {
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle
-} from '@serpdirectory/design-system/item'
-import { cn } from '@serpdirectory/design-system/lib/utils'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@serpdirectory/design-system/select'
-import { Skeleton } from '@serpdirectory/design-system/skeleton'
-import { Spinner } from '@serpdirectory/design-system/spinner'
-import { Textarea } from '@serpdirectory/design-system/textarea'
-import { ToggleGroup, ToggleGroupItem } from '@serpdirectory/design-system/toggle-group'
 import {
   ArrowRight,
   BadgeCheck,
@@ -56,6 +14,35 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText
+} from '@/components/ui/input-group'
+import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
+import { Textarea } from '@/components/ui/textarea'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { featureCopy } from '@/lib/feature-copy'
 import {
   type Availability,
@@ -70,6 +57,7 @@ import {
   type SubmissionField,
   type SubmissionSummary
 } from '@/lib/submissions/contract'
+import { cn } from '@/lib/utils'
 import {
   clearLocalDraft,
   type LocalSubmitDraft,

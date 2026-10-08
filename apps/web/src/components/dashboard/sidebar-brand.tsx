@@ -1,12 +1,8 @@
 'use client'
 
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem
-} from '@serpdirectory/design-system/sidebar'
 import Link from 'next/link'
 import React, { type ReactNode } from 'react'
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import { useCloseMobileSidebar } from './nav-main'
 
 const SERP_MARK =

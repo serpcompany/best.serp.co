@@ -1,7 +1,7 @@
-import { DirectoryFeatureGrid } from '@serpdirectory/design-system/shadcnblocks/directory-home-section'
 import type { ComponentType, ReactNode } from 'react'
 import type { GuideMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
+import { DirectoryFeatureGrid } from './directory-home-section'
 
 type SectionProps = {
   children: ReactNode

@@ -1,12 +1,12 @@
 'use client'
 
-import { Badge } from '@serpdirectory/design-system/badge'
-import { ToggleGroup, ToggleGroupItem } from '@serpdirectory/design-system/toggle-group'
+import { Badge } from '@/components/ui/badge'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { siteCopy } from '../../lib/site/site-copy'
 import { useAnalyticsEvents } from '../layout/root-shell-client'
-import { Card } from '../ui/card'
 import { ListingImage } from '../ui/listing-image'
+import { Card } from './card'
 import { EmptyState } from './empty-state'
 import { WebsitesListWithSort as SharedWebsitesListWithSort } from './websites-list-with-sort'
 

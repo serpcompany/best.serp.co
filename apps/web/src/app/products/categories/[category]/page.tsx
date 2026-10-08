@@ -1,4 +1,3 @@
-import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import {
@@ -11,6 +10,7 @@ import {
   paginatedMetadata,
   parseListingPageParam
 } from '@/components/directory/listing-pagination'
+import { Breadcrumb } from '@/components/layout/breadcrumb'
 import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@/components/sections/external-resources-section-route'
 import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@/components/sections/featured-guides-section-route'
 import { JsonLd } from '@/components/seo/json-ld'

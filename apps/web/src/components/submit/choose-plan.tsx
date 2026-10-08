@@ -1,7 +1,11 @@
 'use client'
 
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Button } from '@serpdirectory/design-system/button'
+import { ArrowRight, Check, Info, Lock, Pencil } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -10,7 +14,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
+} from '@/components/ui/card'
 import {
   Item,
   ItemActions,
@@ -18,15 +22,11 @@ import {
   ItemDescription,
   ItemMedia,
   ItemTitle
-} from '@serpdirectory/design-system/item'
-import { cn } from '@serpdirectory/design-system/lib/utils'
-import { Spinner } from '@serpdirectory/design-system/spinner'
-import { ArrowRight, Check, Info, Lock, Pencil } from 'lucide-react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+} from '@/components/ui/item'
+import { Spinner } from '@/components/ui/spinner'
 import { featureCopy } from '@/lib/feature-copy'
 import { hostOf, type SubmissionSummary } from '@/lib/submissions/contract'
+import { cn } from '@/lib/utils'
 import { chooseFreePlan } from './submit-api'
 import { ProductLogo, StepProgress, SubmissionStatusBadge, ToneAlert } from './submit-ui'
 

@@ -1,34 +1,17 @@
 'use client'
 
-import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-system/alert'
-import { Button } from '@serpdirectory/design-system/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '@serpdirectory/design-system/card'
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel
-} from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot
-} from '@serpdirectory/design-system/input-otp'
-import { Spinner } from '@serpdirectory/design-system/spinner'
 import { ArrowRight, CircleX, Clock, Info } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { readLocalDraft } from '@/components/submit/draft-storage'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from '@/components/ui/input-otp'
+import { Spinner } from '@/components/ui/spinner'
 import { callbackDestination } from '@/lib/auth/callback-url'
 import { getRoute } from '@/lib/routing/routes'
 import { hostOf } from '@/lib/submissions/contract'

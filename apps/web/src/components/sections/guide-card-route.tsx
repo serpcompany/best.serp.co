@@ -1,6 +1,6 @@
-import { Badge } from '@serpdirectory/design-system/badge'
+import { Card, CardContent } from '@/components/directory/card'
+import { Badge } from '@/components/ui/badge'
 import type { GuideMetadata } from '../../lib/directory/content-query'
-import { Card, CardContent } from '../ui/card'
 import { GuideCard as SharedGuideCard } from './guide-card'
 
 interface GuideCardRouteProps {

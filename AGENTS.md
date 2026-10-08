@@ -25,7 +25,7 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `apps/web/src/lib/site/`: the checked-in site definition (routes, copy, badges, the route
   registry); `apps/web/content/` holds the MDX content (legal pages, the About page).
 - `packages/data-ops/`: Drizzle schema, catalog and submission queries, caching.
-- `packages/design-system/`: UI primitives.
+- `apps/web/src/components/ui/`: stock shadcn/ui components, added with `pnpm shadcn <name>`.
 - `d1/drizzle/`: forward-only migration history applied by Wrangler.
 - `d1/publications/`: reviewed catalog mutation manifests (staging first, then production).
 - `d1/media/`: reviewed listing media upload plans (keys and sources; no image files).

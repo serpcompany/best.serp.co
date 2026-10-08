@@ -1,17 +1,17 @@
 'use client'
 
-import { Field, FieldDescription, FieldError, FieldLabel } from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
+import { ImageIcon } from 'lucide-react'
+import { ProductLogo } from '@/components/submit/submit-ui'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@serpdirectory/design-system/select'
-import { Textarea } from '@serpdirectory/design-system/textarea'
-import { ImageIcon } from 'lucide-react'
-import { ProductLogo } from '@/components/submit/submit-ui'
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { SUBMISSION_FIELD_LIMITS } from '@/lib/submissions/contract'
 
 /**

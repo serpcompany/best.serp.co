@@ -1,9 +1,9 @@
 'use client'
 
-import { Input } from '@serpdirectory/design-system/input'
-import { cn } from '@serpdirectory/design-system/lib/utils'
 import { Search } from 'lucide-react'
 import * as React from 'react'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 type SearchInputProps = Omit<React.ComponentProps<'input'>, 'type'> & {
   searchButtonLabel?: string

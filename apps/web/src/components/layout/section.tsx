@@ -1,14 +1,14 @@
-import { Button } from '@serpdirectory/design-system/button'
+import { ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+import type { ReactNode } from 'react'
 import {
   DirectoryPageSection,
   DirectorySectionAction,
   DirectorySectionDescription,
   DirectorySectionHeader,
   DirectorySectionTitle
-} from '@serpdirectory/design-system/shadcnblocks/directory-home-section'
-import { ArrowRight } from 'lucide-react'
-import Link from 'next/link'
-import type { ReactNode } from 'react'
+} from '@/components/sections/directory-home-section'
+import { Button } from '@/components/ui/button'
 
 export type SectionProps = {
   title: string

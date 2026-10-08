@@ -1,6 +1,9 @@
 'use client'
 
-import { Avatar, AvatarFallback } from '@serpdirectory/design-system/avatar'
+import { EllipsisVertical, LogOut, type LucideIcon } from 'lucide-react'
+import Link from 'next/link'
+import React from 'react'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,16 +12,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from '@serpdirectory/design-system/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar
-} from '@serpdirectory/design-system/sidebar'
-import { EllipsisVertical, LogOut, type LucideIcon } from 'lucide-react'
-import Link from 'next/link'
-import React from 'react'
+} from '@/components/ui/sidebar'
 
 export interface DashboardUser {
   email: string

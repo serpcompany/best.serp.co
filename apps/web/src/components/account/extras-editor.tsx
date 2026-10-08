@@ -1,18 +1,13 @@
 'use client'
 
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Button } from '@serpdirectory/design-system/button'
-import {
-  FieldDescription,
-  FieldError,
-  FieldLegend,
-  FieldSet
-} from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
-import { cn } from '@serpdirectory/design-system/lib/utils'
-import { Textarea } from '@serpdirectory/design-system/textarea'
 import { Plus, X } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { FieldDescription, FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { ACCOUNT_EXTRAS_LIMITS, type ExtrasInput, linkUrlProblem } from '@/lib/account/contract'
+import { cn } from '@/lib/utils'
 
 /**
  * The FAQs and Links fieldsets of #70 screen 7 (FieldSet with Item rows): each FAQ is a question

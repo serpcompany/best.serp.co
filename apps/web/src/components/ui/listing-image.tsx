@@ -1,12 +1,12 @@
 'use client'
 
-import { AspectRatio } from '@serpdirectory/design-system/aspect-ratio'
-import { cn } from '@serpdirectory/design-system/lib/utils'
 import { useCallback, useState } from 'react'
+import { cn } from '@/lib/utils'
 import {
   LISTING_LOGO_FALLBACK_PATH,
   shouldUseProvidedListingLogo
 } from '../../lib/directory/listing-logo-presentation'
+import { AspectRatio } from './aspect-ratio'
 
 /**
  * The one way a listing image renders (serpcompany/best.serp.co#122): cards, the detail page's

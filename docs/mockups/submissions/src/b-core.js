@@ -93,7 +93,7 @@ const P = {
 const listingUrl = p => `${SITE}/products/${p.domain}/`;
 
 /* ---------- shadcn/ui building blocks ----------
-   Classes follow packages/design-system/components/shadcn and the new-york-v4 registry
+   Classes follow apps/web/src/components/ui and the new-york-v4 registry
    (ui.shadcn.com/r/styles/new-york-v4/<name>.json), on the site's tokens. */
 const BTN = {
   base: "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-all [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",

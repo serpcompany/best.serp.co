@@ -1,17 +1,12 @@
 'use client'
 
-import { cn } from '@serpdirectory/design-system/lib/utils'
-import { ScrollArea } from '@serpdirectory/design-system/scroll-area'
-import {
-  DirectoryNavigationItem,
-  DirectoryNavigationSection,
-  directoryNavigationInteractiveClassName
-} from '@serpdirectory/design-system/shadcnblocks/directory-navigation'
 import { ExternalLink, X } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { type ReactNode, useEffect, useRef } from 'react'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import type { HeaderAuthState } from '@/lib/auth/header-auth-state'
+import { cn } from '@/lib/utils'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { resolveCategories } from '../../lib/directory/categories'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
@@ -20,6 +15,11 @@ import { externalResources } from '../../lib/site/external-resources'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
 import { FavoritesLink } from '../ui/favorites-link'
+import {
+  DirectoryNavigationItem,
+  DirectoryNavigationSection,
+  directoryNavigationInteractiveClassName
+} from './directory-navigation'
 
 interface MobileDrawerProps {
   availableCategorySlugs?: string[]

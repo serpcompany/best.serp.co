@@ -1,9 +1,9 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
 import { Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 /**
  * Switches between the light and dark themes. Once mounted (the theme is only known in the

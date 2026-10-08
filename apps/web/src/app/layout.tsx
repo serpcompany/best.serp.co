@@ -1,6 +1,5 @@
 import type { ReactElement, ReactNode } from 'react'
 import './globals.css'
-import { fonts } from '@serpdirectory/design-system/lib/fonts'
 import { DrawerSignOutButton, HeaderSignOutButton } from '@/components/auth/sign-out-button'
 import { Footer } from '@/components/layout/footer'
 import { Header } from '@/components/layout/header'
@@ -9,6 +8,7 @@ import { RootAppShell, rootLayoutMetadata } from '@/components/layout/root-shell
 import { getHeaderAuthState } from '@/lib/auth/header-state'
 import { getActiveCategories } from '@/lib/catalog/repository'
 import { analyticsForRequest } from '@/lib/environment/request-environment'
+import { fonts } from '@/lib/fonts'
 import { siteConfig } from '@/lib/site/site-config'
 import { siteCopy } from '@/lib/site/site-copy'
 

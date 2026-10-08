@@ -1,10 +1,16 @@
 'use client'
 
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Button } from '@serpdirectory/design-system/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from '@/components/directory/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { analytics } from '../../lib/analytics/analytics'
 import { Section } from '../layout/section'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { CreatorProjectsSection as SharedCreatorProjectsSection } from './creator-projects-section'
 
 export function CreatorProjectsSectionRoute() {

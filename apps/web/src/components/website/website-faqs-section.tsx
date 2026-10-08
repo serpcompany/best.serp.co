@@ -3,7 +3,7 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger
-} from '@serpdirectory/design-system/accordion'
+} from '@/components/ui/accordion'
 import type { WebsiteFaq } from '../../lib/directory/content-query'
 import { Section } from '../layout/section'
 

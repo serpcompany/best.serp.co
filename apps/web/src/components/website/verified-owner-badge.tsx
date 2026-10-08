@@ -1,6 +1,6 @@
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@serpdirectory/design-system/tooltip'
 import { BadgeCheck } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 /**
  * The public "Verified owner" badge (owner decision on #59; #70 screen 9b): a listing with a

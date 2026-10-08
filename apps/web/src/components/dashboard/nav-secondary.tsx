@@ -1,15 +1,15 @@
 'use client'
 
+import type { LucideIcon } from 'lucide-react'
+import Link from 'next/link'
+import React, { type ComponentProps } from 'react'
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem
-} from '@serpdirectory/design-system/sidebar'
-import type { LucideIcon } from 'lucide-react'
-import Link from 'next/link'
-import React, { type ComponentProps } from 'react'
+} from '@/components/ui/sidebar'
 import { useCloseMobileSidebar } from './nav-main'
 
 export interface DashboardLink {

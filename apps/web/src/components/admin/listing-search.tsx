@@ -1,19 +1,19 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
+import { type ColumnDef, getCoreRowModel, useReactTable } from '@tanstack/react-table'
+import { Copy, EllipsisVertical, ExternalLink, EyeOff, Pencil, Users, X } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from '@serpdirectory/design-system/dropdown-menu'
-import { Input } from '@serpdirectory/design-system/input'
-import { type ColumnDef, getCoreRowModel, useReactTable } from '@tanstack/react-table'
-import { Copy, EllipsisVertical, ExternalLink, EyeOff, Pencil, Users, X } from 'lucide-react'
-import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { toast } from 'sonner'
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { DataTableView, FacetFilter, PaginationFooter } from './data-table'
 import { formatShortDate, listingPath } from './format'
 import { ProductCell } from './product-cell'

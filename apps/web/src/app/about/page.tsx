@@ -1,8 +1,8 @@
-import { Button } from '@serpdirectory/design-system/button'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/directory/card'
 import { AboutStaticPage, generateAboutPageMetadata } from '@/components/static-pages/about-page'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { getAboutPage } from '@/lib/content-loader'
 
 export async function generateMetadata(): Promise<Metadata> {

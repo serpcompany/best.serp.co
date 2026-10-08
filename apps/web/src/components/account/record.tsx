@@ -1,8 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@serpdirectory/design-system/card'
-import { cn } from '@serpdirectory/design-system/lib/utils'
 import type { ReactNode } from 'react'
 import { ProductLogo } from '@/components/submit/submit-ui'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { HistoryItem } from '@/lib/account/history'
+import { cn } from '@/lib/utils'
 
 /**
  * Pieces of the account's detail pages (#70 screens 6 and 7): the heading row (logo, name with
