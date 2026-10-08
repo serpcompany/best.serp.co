@@ -18,10 +18,16 @@ describe('forbidden listing links', () => {
     ])
   })
 
+  it('finds a quoted or punctuated link with no trailing slash', () => {
+    expect(findForbiddenLinks('<a href="https://help.serp.co/en">Help</a>')).toHaveLength(1)
+    expect(findForbiddenLinks("const help = 'https://help.serp.co/en'")).toHaveLength(1)
+    expect(findForbiddenLinks('(see https://help.serp.co/en), then')).toHaveLength(1)
+  })
+
   it('allows other Help Center paths and hosts', () => {
     expect(
       findForbiddenLinks(
-        'https://help.serp.co/fr/ https://serp.co/en/ https://help.serp.co/english'
+        'https://help.serp.co/fr/ https://serp.co/en/ https://help.serp.co/english https://help.serp.co/en-us/'
       )
     ).toEqual([])
   })

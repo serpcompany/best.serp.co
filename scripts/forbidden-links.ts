@@ -1,13 +1,17 @@
-import { existsSync, globSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { globSync } from 'tinyglobby'
 
 /**
  * No listing, product, directory, or rendered page links to the Help Center (`help.serp.co/en`):
  * pages use a product-specific support or issue link instead. `pnpm lint` runs this over the
  * app sources and content; `pnpm audit:forbidden-links` runs it over a built Worker's pages.
  */
-export const FORBIDDEN_LISTING_LINK_PATTERN = /\bhttps?:\/\/help\.serp\.co\/en(?:\/|(?=$)|[?#])/gimu
+// `/en` ends the path or is followed by `/`, a query, a fragment, a quote, or other punctuation
+// (`/english` and `/en-us` are other pages).
+export const FORBIDDEN_LISTING_LINK_PATTERN =
+  /\bhttps?:\/\/help\.serp\.co\/en(?:\/|(?=$)|[?#]|(?=["'`\s<>)\],;]))/gimu
 
 const PROTECTED_EXTENSIONS = new Set([
   '.html',
@@ -70,9 +74,8 @@ function main(argv: string[]): number {
       ? explicit
       : globSync(
           argv.includes('--generated') ? GENERATED_LINK_LINT_PATTERNS : DEFAULT_LINK_LINT_PATTERNS,
-          {
-            exclude: ['**/node_modules/**']
-          }
+          // dot: a link in public/.well-known or a dot-directory of the build counts too.
+          { dot: true, ignore: ['**/node_modules/**'] }
         )
   let failures = 0
   for (const file of files) {
