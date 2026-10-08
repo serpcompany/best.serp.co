@@ -117,10 +117,11 @@ describe('web workflow', () => {
     expect(draft.if).toBe('github.event.pull_request.draft == true')
     expect(runStep(String(draft.run), '', {}).status).toBe(1)
     expect(draft.run).toContain('draft: mark ready to run e2e')
+    // continue-on-error would let the failed step leave the job green.
+    expect(source).not.toContain('continue-on-error')
     // Every later step either needs the earlier ones to succeed or checks the receipt step ran.
     for (const later of steps.slice(1)) {
-      expect(later.if ?? '', later.name).not.toMatch(/^(?:always|failure)\(\)$/u)
-      if (later.if?.includes('always()')) {
+      if (/always\(\)|failure\(\)|cancelled\(\)/u.test(later.if ?? '')) {
         expect(later.if, later.name).toContain("steps.receipt.outcome == 'success'")
       }
     }
