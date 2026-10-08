@@ -57,7 +57,8 @@ export default async function OrdersPage() {
   const orders: OrderRow[] = (await getAdminOrders()).map(order => {
     const paymentRef = order.providerPaymentId ?? order.providerCheckoutId
     return {
-      amountCents: order.amountCents,
+      // What was charged (and what a refund sends back): less after a promotion code (#250).
+      amountCents: order.chargedCents ?? order.amountCents,
       createdAt: order.createdAt,
       customer: order.buyerEmail,
       id: order.id,

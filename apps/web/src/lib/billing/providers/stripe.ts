@@ -9,7 +9,8 @@ import {
 /**
  * Stripe Checkout behind the billing interface (serpcompany/best.serp.co#68), on the Worker's
  * `fetch` and Web Crypto: no Node SDK. Stripe account `acct_1RiT0QCp8si97z5s`, test mode on
- * staging and live mode in production; the keys are the Worker secrets `STRIPE_SECRET_KEY` and
+ * staging and live mode in production; checkout sells its catalog prices (#250), with promotion
+ * codes allowed. The keys are the Worker secrets `STRIPE_SECRET_KEY` and
  * `STRIPE_WEBHOOK_SECRET`, which only the owner sets. This is the only file that knows Stripe's
  * API, event names, or signature scheme.
  */
@@ -19,6 +20,12 @@ export const STRIPE_API_BASE = 'https://api.stripe.com'
 export const STRIPE_API_VERSION = '2024-06-20'
 /** Stripe's own default tolerance for a webhook's signed timestamp. */
 export const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300
+
+/** The catalog prices a checkout sells (#250): one-off, in the account's dashboard. */
+export interface StripePrices {
+  paid_claim: string
+  paid_listing: string
+}
 
 export interface StripeConfig {
   /** `https://api.stripe.com`; a local Worker may point it at the end-to-end mock. */
@@ -32,6 +39,11 @@ export interface StripeConfig {
   /** Live mode (production) or test mode: an event or session of the other mode is refused. */
   live: boolean
   now?: () => Date
+  /**
+   * The price per kind. Price ids exist only in the account, so a key from another account
+   * can't open a checkout (Stripe answers "No such price").
+   */
+  prices: StripePrices
   secretKey: string
   webhookSecret: string
 }
@@ -56,26 +68,34 @@ function idOf(value: unknown): string | null {
   return null
 }
 
-/** A Checkout Session as the provider-neutral state. */
+const cents = (value: unknown) => (typeof value === 'number' ? value : null)
+
+/**
+ * A Checkout Session as the provider-neutral state. A 100%-off promotion code completes it with
+ * `no_payment_required` and no payment: that is settled too.
+ */
 export function stripeCheckoutState(session: StripeObject): CheckoutState {
   const status = session.status
   const paymentStatus = session.payment_status
   const metadata = (session.metadata ?? {}) as Record<string, unknown>
+  const totals = (session.total_details ?? {}) as Record<string, unknown>
   const state: CheckoutState['state'] =
     status === 'expired'
       ? 'expired'
       : status === 'complete'
-        ? paymentStatus === 'paid'
+        ? paymentStatus === 'paid' || paymentStatus === 'no_payment_required'
           ? 'paid'
           : 'processing'
         : 'open'
   return {
-    amountCents: typeof session.amount_total === 'number' ? session.amount_total : null,
+    amountCents: cents(session.amount_total),
     checkoutId: String(session.id ?? ''),
     currency: text(session.currency),
+    discountCents: cents(totals.amount_discount) ?? 0,
     orderId: text(session.client_reference_id) ?? text(metadata.order_id),
     paymentId: idOf(session.payment_intent),
-    state
+    state,
+    subtotalCents: cents(session.amount_subtotal)
   }
 }
 
@@ -197,16 +217,17 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
         'POST',
         '/v1/checkout/sessions',
         form({
+          // Promotion codes made in the dashboard apply at checkout (#250).
+          allow_promotion_codes: true,
           cancel_url: request.cancelUrl,
           client_reference_id: request.orderId,
           customer_email: request.customerEmail,
           expires_at: Math.floor(request.expiresAt.getTime() / 1000),
-          'line_items[0][price_data][currency]': request.currency,
-          'line_items[0][price_data][product_data][name]': request.description,
-          'line_items[0][price_data][unit_amount]': request.amountCents,
+          'line_items[0][price]': config.prices[request.kind],
           'line_items[0][quantity]': 1,
           'metadata[order_id]': request.orderId,
           mode: 'payment',
+          'payment_intent_data[description]': request.description,
           'payment_intent_data[metadata][order_id]': request.orderId,
           // Stripe emails the receipt (#70 screen 4: "Emailed to … by Stripe").
           'payment_intent_data[receipt_email]': request.customerEmail,
@@ -220,6 +241,18 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
       const checkoutId = text(session.id)
       if (!url || !checkoutId) {
         throw new BillingProviderError('Stripe returned no checkout URL.', 'provider_error', 502)
+      }
+      // The catalog price must be the site's: otherwise the page and the charge would differ.
+      if (
+        session.amount_subtotal !== request.amountCents ||
+        session.currency !== request.currency
+      ) {
+        await call('POST', `/v1/checkout/sessions/${checkoutId}/expire`, form({})).catch(() => null)
+        throw new BillingProviderError(
+          `The ${request.kind} price is not ${request.amountCents} ${request.currency}.`,
+          'price_mismatch',
+          503
+        )
       }
       const expires = typeof session.expires_at === 'number' ? session.expires_at * 1000 : null
       return {

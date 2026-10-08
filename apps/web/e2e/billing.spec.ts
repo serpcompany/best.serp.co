@@ -228,6 +228,67 @@ test('checkout success: paid at checkout, live at once and in the review queue',
   expect(order(`id = ${q(paid.id)}`)).toMatchObject({ outcome: 'published', status: 'paid' })
 })
 
+// The test-mode catalog price of a paid listing (`STRIPE_PRICES.test` in the Worker), hard-coded
+// so a config change fails the suite rather than moving the expectation with it.
+const TEST_LISTING_PRICE = 'price_1UOQRHCp8si97z5sqYTUNjxv'
+
+test('promotion codes: a discounted and a 100%-off checkout both go live; a changed price never opens (#250)', async ({
+  page
+}) => {
+  const submitter = await signInSubmitter(page, 'promo')
+
+  // Half off: charged $24.50, live at once, and the return shows what was paid.
+  const half = seedDraft(submitter.id, 'promo-half')
+  const halfSession = await openCheckout(page.request, `/submit/${half.id}/checkout/start/`)
+  expect(stripe.sessions.get(halfSession)?.amount_subtotal).toBe(4900)
+  const halfEvent = JSON.stringify({
+    data: { object: stripe.pay(halfSession, 2450) },
+    id: `evt_e2e_${unique()}`,
+    livemode: false,
+    object: 'event',
+    type: 'checkout.session.completed'
+  })
+  expect((await postEvent(page.request, halfEvent)).status()).toBe(200)
+  const halfOrder = order(`submission_id = ${q(half.id)}`)
+  expect(halfOrder).toMatchObject({ outcome: 'published', status: 'paid' })
+  expect(
+    billingD1(`SELECT charged_cents, attention FROM orders WHERE id = ${q(halfOrder.id)}`)
+  ).toEqual([{ attention: null, charged_cents: 2450 }])
+  await page.goto(`/submit/${half.id}/checkout/return/?order=${halfOrder.id}`)
+  await expect(page.getByText('$24.50 USD, one-off')).toBeVisible()
+
+  // 100% off: nothing charged, no payment, still live.
+  const free = seedDraft(submitter.id, 'promo-free')
+  const freeSession = await openCheckout(page.request, `/submit/${free.id}/checkout/start/`)
+  const freeEvent = JSON.stringify({
+    data: { object: stripe.pay(freeSession, 4900) },
+    id: `evt_e2e_${unique()}`,
+    livemode: false,
+    object: 'event',
+    type: 'checkout.session.completed'
+  })
+  expect((await postEvent(page.request, freeEvent)).status()).toBe(200)
+  const freeOrder = order(`submission_id = ${q(free.id)}`)
+  expect(freeOrder).toMatchObject({ outcome: 'published', status: 'paid' })
+  expect(
+    billingD1(`SELECT charged_cents, provider_payment_id FROM orders WHERE id = ${q(freeOrder.id)}`)
+  ).toEqual([{ charged_cents: 0, provider_payment_id: freeSession }])
+  expect((await page.request.get(`/products/${free.slug}/`)).status()).toBe(200)
+
+  // A catalog price that isn't the site's $49: no checkout opens, and the session is expired.
+  stripe.prices.set(TEST_LISTING_PRICE, { amount: 9900, currency: 'usd' })
+  try {
+    const changed = seedDraft(submitter.id, 'promo-changed')
+    const refused = await page.request.get(`/submit/${changed.id}/checkout/start/`, {
+      maxRedirects: 0
+    })
+    expect(refused.status()).toBe(503)
+    expect([...stripe.sessions.values()].at(-1)?.status).toBe('expired')
+  } finally {
+    stripe.prices.delete(TEST_LISTING_PRICE)
+  }
+})
+
 test('checks failed: paid, then held for review instead of going live', async ({ page }) => {
   const submitter = await signInSubmitter(page, 'held')
   const draft = seedDraft(submitter.id, 'held')

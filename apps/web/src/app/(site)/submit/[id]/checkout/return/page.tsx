@@ -44,7 +44,12 @@ export default async function CheckoutReturnPage({ params, searchParams }: Props
   if (!deps) notFound()
   const order = await confirmReturn(deps, { orderId, userId: user.id })
   if (!order || order.submissionId !== submission.id) notFound()
-  const details = { amountCents: order.amountCents, email: user.email, number: order.number }
+  // What was charged: less than the price when a promotion code applied (#250).
+  const details = {
+    amountCents: order.chargedCents ?? order.amountCents,
+    email: user.email,
+    number: order.number
+  }
   if (order.status === 'failed') {
     return (
       <CheckoutFailed

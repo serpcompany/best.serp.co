@@ -270,6 +270,7 @@ async function openCheckout(
         Math.min(now.getTime() + CHECKOUT_LIFETIME_MS, target.closesBy?.getTime() ?? Infinity)
       ),
       idempotencyKey: `checkout:${order.id}`,
+      kind: order.kind,
       orderId: order.id,
       successUrl: `${input.origin}${target.successPath(order.id)}`
     })
@@ -517,9 +518,28 @@ async function actOnCheckout(
 }
 
 /**
+ * Whether a checkout charged the order's price: the order's amount before any discount, in
+ * its currency, less exactly the discount a promotion code took (#250). Anything else, a
+ * changed price or an unexplained difference, does not match.
+ */
+export function chargeMatchesOrder(checkout: CheckoutState, order: OrderRecord): boolean {
+  if (checkout.currency !== order.currency || checkout.amountCents === null) return false
+  const subtotal = checkout.subtotalCents ?? checkout.amountCents
+  const discount = checkout.discountCents ?? 0
+  return (
+    subtotal === order.amountCents &&
+    discount >= 0 &&
+    checkout.amountCents >= 0 &&
+    checkout.amountCents + discount === order.amountCents
+  )
+}
+
+/**
  * A paid checkout: the order becomes `paid` (once), recording what was actually charged, then
- * the payment is applied. A charge that doesn't match the order's amount and currency is never
- * applied: it is flagged for an admin (`amount_mismatch`) and refunded in full.
+ * the payment is applied. A promotion code's discount is charged less (#250); a 100%-off code
+ * charges nothing and has no payment, so the checkout stands as its reference. A charge that
+ * doesn't match the order is never applied: it is flagged for an admin (`amount_mismatch`) and
+ * refunded in full.
  */
 async function recordPayment(
   deps: BillingDependencies,
@@ -530,9 +550,10 @@ async function recordPayment(
     return 'checkout_mismatch'
   }
   if (order.status === 'pending' || order.status === 'failed') {
-    if (!checkout.paymentId) return 'no_payment_id'
-    const mismatch =
-      checkout.amountCents !== order.amountCents || checkout.currency !== order.currency
+    const paymentId =
+      checkout.paymentId ?? (checkout.amountCents === 0 ? checkout.checkoutId : null)
+    if (!paymentId) return 'no_payment_id'
+    const mismatch = !chargeMatchesOrder(checkout, order)
     await deps.operations.apply(
       buildMarkOrderPaidPlans({
         attention: mismatch ? 'amount_mismatch' : null,
@@ -540,7 +561,7 @@ async function recordPayment(
         chargedCurrency: checkout.currency ?? order.currency,
         now: nowIso(deps),
         orderId: order.id,
-        paymentId: checkout.paymentId
+        paymentId
       })
     )
     if (mismatch) {
@@ -703,7 +724,7 @@ async function emailPaidSubmission(
             input: {
               listingName: submission.name,
               listingSlug: submission.slug,
-              paidCents: order.amountCents
+              paidCents: order.chargedCents ?? order.amountCents
             },
             to: submission.ownerEmail
           })
@@ -711,7 +732,7 @@ async function emailPaidSubmission(
             eventKey,
             input: {
               checkProblem: result.problem,
-              paidCents: order.amountCents,
+              paidCents: order.chargedCents ?? order.amountCents,
               submissionId: submission.id,
               submissionName: submission.name,
               website: submission.website
@@ -858,14 +879,19 @@ async function claimRefund(
   return deps.operations.apply(claim)
 }
 
-/** The provider refund of exactly what was charged, under the order's refund key. */
+/**
+ * The provider refund of exactly what was charged, under the order's refund key. A 100%-off
+ * order charged nothing, so there is nothing to send back (#250).
+ */
 async function providerRefund(
   deps: BillingDependencies,
   order: OrderRecord
 ): Promise<string | null> {
+  const charged = order.chargedCents ?? order.amountCents
+  if (charged === 0) return null
   if (!order.providerPaymentId) throw new Error(`Order ${order.id} has no payment to refund.`)
   const { refundId } = await deps.provider.refund({
-    amountCents: order.chargedCents ?? order.amountCents,
+    amountCents: charged,
     idempotencyKey: `refund:${order.id}`,
     orderId: order.id,
     paymentId: order.providerPaymentId

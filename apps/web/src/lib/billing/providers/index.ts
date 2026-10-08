@@ -1,7 +1,7 @@
 import { site } from '@/lib/site'
 import { isLocalWorker, type OrdersEnv } from '../flags'
 import type { BillingProvider } from '../provider'
-import { createStripeProvider } from './stripe'
+import { createStripeProvider, type StripePrices } from './stripe'
 
 /**
  * The configured billing provider (#68), from the Worker's secrets and vars. Everything that
@@ -17,6 +17,23 @@ import { createStripeProvider } from './stripe'
  */
 
 export const STRIPE_ACCOUNT_ID = 'acct_1RiT0QCp8si97z5s'
+
+/**
+ * The catalog prices checkout sells (#250), one-off $49.00 USD each, in that account's dashboard
+ * ("best.serp.co Paid listing" and "best.serp.co Paid claim"). The owner manages them and their
+ * promotion codes there; checkout refuses if a price stops matching `paidListingPriceCents`.
+ * Not secrets: a price id is useless without the account's key.
+ */
+export const STRIPE_PRICES: Readonly<Record<'live' | 'test', StripePrices>> = {
+  live: {
+    paid_claim: 'price_1UOQT5Cp8si97z5s8gXo0jHH',
+    paid_listing: 'price_1UOQSUCp8si97z5sqEz614sI'
+  },
+  test: {
+    paid_claim: 'price_1UOQRiCp8si97z5sJHO0RNcz',
+    paid_listing: 'price_1UOQRHCp8si97z5sqYTUNjxv'
+  }
+}
 
 export const STRIPE_SECRET_KEY_SECRET = 'STRIPE_SECRET_KEY'
 export const STRIPE_WEBHOOK_SECRET_SECRET = 'STRIPE_WEBHOOK_SECRET'
@@ -61,10 +78,12 @@ export function createConfiguredProvider(env: ProviderEnv): BillingProvider {
     // order (and refunds it), so Stripe Tax stays off until billing handles it.
     throw new Error('Stripe Tax is not supported by billing yet.')
   }
+  const live = env.D1_RUNTIME_ENV === 'production'
   return createStripeProvider({
     accountId: STRIPE_ACCOUNT_ID,
     apiBase: stripeApiBase(env),
-    live: env.D1_RUNTIME_ENV === 'production',
+    live,
+    prices: STRIPE_PRICES[live ? 'live' : 'test'],
     secretKey,
     webhookSecret
   })

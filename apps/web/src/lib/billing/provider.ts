@@ -7,18 +7,27 @@
  */
 
 export interface CheckoutRequest {
+  /**
+   * The order's price. The provider charges its own catalog price for `kind` and refuses (503)
+   * when that price differs from this, so the site's price and the charge can't drift apart.
+   */
   amountCents: number
   /** Where the provider sends the buyer when they leave checkout without paying. */
   cancelUrl: string
   /** Lowercase ISO 4217, e.g. `usd`. */
   currency: string
   customerEmail: string
-  /** The item's name on the provider's checkout page. */
+  /**
+   * The order's neutral description (`Paid listing: <name>`), on the provider's record of the
+   * payment. The checkout page shows the catalog product's own name.
+   */
   description: string
   /** When the checkout stops accepting payment (the provider may round it). */
   expiresAt: Date
   /** The provider's idempotency key: retrying the same order never opens a second checkout. */
   idempotencyKey: string
+  /** What is sold: picks the provider's catalog price. */
+  kind: 'paid_claim' | 'paid_listing'
   orderId: string
   /** Where the provider sends the buyer after paying. */
   successUrl: string
@@ -36,13 +45,18 @@ export interface CheckoutSession {
  * can no longer be paid; `failed`: the payment failed.
  */
 export interface CheckoutState {
+  /** What the buyer was charged: the price less any discount (0 for a 100%-off code). */
   amountCents: number | null
   checkoutId: string
   currency: string | null
+  /** The discount a promotion code took off the price, in cents (0 without one). */
+  discountCents: number | null
   /** The order id the checkout was opened for (from its reference), if the provider echoes it. */
   orderId: string | null
   paymentId: string | null
   state: 'expired' | 'failed' | 'open' | 'paid' | 'processing'
+  /** The price before any discount. */
+  subtotalCents: number | null
 }
 
 /**
