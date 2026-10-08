@@ -140,6 +140,9 @@ importers:
       '@opennextjs/cloudflare':
         specifier: 1.20.6
         version: 1.20.6(next@16.3.8(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(wrangler@4.147.0(@cloudflare/workers-types@5.20261001.1)(@types/node@22.19.11)(bufferutil@4.0.9))
+      '@sentry/nextjs':
+        specifier: ^10.76.0
+        version: 10.76.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(next@16.3.8(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.98.0(lightningcss@1.30.2)(postcss@8.5.28))
       '@serpdirectory/config-next':
         specifier: workspace:*
         version: link:../../configs/next
@@ -373,9 +376,6 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@serpdirectory/observability':
-        specifier: workspace:*
-        version: link:../observability
       '@tailwindcss/typography':
         specifier: ^0.5.19
         version: 0.5.19(tailwindcss@4.1.18)
@@ -478,43 +478,6 @@ importers:
       '@sentry/nextjs':
         specifier: ^10.76.0
         version: 10.76.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(next@16.3.8(@babel/core@7.26.9)(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.98.0(lightningcss@1.30.2))
-
-  packages/observability:
-    dependencies:
-      '@sentry/nextjs':
-        specifier: ^10.76.0
-        version: 10.76.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(next@16.3.8(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.98.0(lightningcss@1.30.2))
-      '@t3-oss/env-nextjs':
-        specifier: 'catalog:'
-        version: 0.12.0(typescript@5.9.3)(zod@3.25.76)
-      react:
-        specifier: 'catalog:'
-        version: 19.2.4
-      zod:
-        specifier: 'catalog:'
-        version: 3.25.76
-    devDependencies:
-      '@serpdirectory/config-typescript':
-        specifier: workspace:*
-        version: link:../../configs/typescript
-      '@serpdirectory/logging':
-        specifier: workspace:*
-        version: link:../logging
-      '@serpdirectory/utils':
-        specifier: workspace:*
-        version: link:../utils
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.19.11
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.2.14
-      '@types/react-dom':
-        specifier: 'catalog:'
-        version: 19.2.3(@types/react@19.2.14)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
 
   packages/site-config:
     devDependencies:
@@ -9066,6 +9029,22 @@ snapshots:
       - encoding
       - supports-color
 
+  '@sentry/bundler-plugins@10.76.0(rollup@4.63.5)(webpack@5.98.0(lightningcss@1.30.2)(postcss@8.5.28))':
+    dependencies:
+      '@babel/core': 7.26.9
+      '@sentry/cli': 2.58.6
+      '@sentry/core': 10.76.0
+      dotenv: 17.4.2
+      find-up: 5.0.0
+      glob: 13.0.6
+      magic-string: 0.30.21
+    optionalDependencies:
+      rollup: 4.63.5
+      webpack: 5.98.0(lightningcss@1.30.2)(postcss@8.5.28)
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
+
   '@sentry/bundler-plugins@10.76.0(rollup@4.63.5)(webpack@5.98.0(lightningcss@1.30.2))':
     dependencies:
       '@babel/core': 7.26.9
@@ -9081,6 +9060,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
       - supports-color
+    optional: true
 
   '@sentry/cli-darwin@2.58.6':
     optional: true
@@ -9163,7 +9143,7 @@ snapshots:
       - webpack
     optional: true
 
-  '@sentry/nextjs@10.76.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(next@16.3.8(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.98.0(lightningcss@1.30.2))':
+  '@sentry/nextjs@10.76.0(@opentelemetry/core@2.11.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.11.0(@opentelemetry/api@1.9.1))(next@16.3.8(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)(webpack@5.98.0(lightningcss@1.30.2)(postcss@8.5.28))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@rollup/plugin-commonjs': 28.0.1(rollup@4.63.5)
@@ -9176,7 +9156,7 @@ snapshots:
       '@sentry/react': 10.76.0(react@19.2.4)
       '@sentry/server-utils': 10.76.0
       '@sentry/vercel-edge': 10.76.0
-      '@sentry/webpack-plugin': 5.4.0(rollup@4.63.5)(webpack@5.98.0(lightningcss@1.30.2))
+      '@sentry/webpack-plugin': 5.4.0(rollup@4.63.5)(webpack@5.98.0(lightningcss@1.30.2)(postcss@8.5.28))
       next: 16.3.8(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       rollup: 4.63.5
       stacktrace-parser: 0.1.11
@@ -9252,6 +9232,15 @@ snapshots:
       '@opentelemetry/api': 1.9.1
       '@sentry/core': 10.76.0
 
+  '@sentry/webpack-plugin@5.4.0(rollup@4.63.5)(webpack@5.98.0(lightningcss@1.30.2)(postcss@8.5.28))':
+    dependencies:
+      '@sentry/bundler-plugins': 10.76.0(rollup@4.63.5)(webpack@5.98.0(lightningcss@1.30.2)(postcss@8.5.28))
+      webpack: 5.98.0(lightningcss@1.30.2)(postcss@8.5.28)
+    transitivePeerDependencies:
+      - encoding
+      - rollup
+      - supports-color
+
   '@sentry/webpack-plugin@5.4.0(rollup@4.63.5)(webpack@5.98.0(lightningcss@1.30.2))':
     dependencies:
       '@sentry/bundler-plugins': 10.76.0(rollup@4.63.5)(webpack@5.98.0(lightningcss@1.30.2))
@@ -9260,6 +9249,7 @@ snapshots:
       - encoding
       - rollup
       - supports-color
+    optional: true
 
   '@sindresorhus/is@7.2.0': {}
 
@@ -12544,7 +12534,6 @@ snapshots:
     optionalDependencies:
       lightningcss: 1.30.2
       postcss: 8.5.28
-    optional: true
 
   terser-webpack-plugin@5.6.1(lightningcss@1.30.2)(webpack@5.98.0(lightningcss@1.30.2)):
     dependencies:
@@ -12555,6 +12544,7 @@ snapshots:
       webpack: 5.98.0(lightningcss@1.30.2)
     optionalDependencies:
       lightningcss: 1.30.2
+    optional: true
 
   terser@5.16.9:
     dependencies:
@@ -12969,6 +12959,7 @@ snapshots:
       - lightningcss
       - postcss
       - uglify-js
+    optional: true
 
   webpack@5.98.0(lightningcss@1.30.2)(postcss@8.5.28):
     dependencies:
@@ -13008,7 +12999,6 @@ snapshots:
       - lightningcss
       - postcss
       - uglify-js
-    optional: true
 
   whatwg-encoding@2.0.0:
     dependencies:
