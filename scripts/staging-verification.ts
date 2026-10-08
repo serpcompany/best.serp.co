@@ -20,8 +20,8 @@
  * Why the tree and not the commit: `main` receives `staging` by a fast-forward promotion
  * (`release-promote.ts`, #171), which keeps the staging commit itself. Before #171, a `staging`
  * -> `main` pull request merged with a merge commit gave `main` a new commit. That merge commit
- * has the verified staging commit's tree exactly when `main` had not diverged, so its source, migrations, and workflows are byte-for-byte what
- * staging verified. When `main` had diverged (a hotfix not yet merged back into `staging`), the
+ * has the verified staging commit's tree exactly when `main` had not diverged, so its source,
+ * migrations, and workflows are byte-for-byte what staging verified. When `main` had diverged (a hotfix not yet merged back into `staging`), the
  * merged tree was never on staging and the release is refused until staging verifies it.
  *
  * Verification is monotonic on purpose: once an attempt has proven a tree on staging, a later
@@ -81,7 +81,7 @@ interface WorkflowJob {
 }
 
 export interface StagingVerification {
-  /** `commit` when staging verified the released commit itself, `tree` for a promotion merge. */
+  /** `commit` when staging verified the released commit itself, `tree` for a same-tree commit. */
   match: 'commit' | 'tree'
   runAttempt: number
   runId: number
@@ -316,8 +316,8 @@ export async function assertStagingVerified(
     .sort(newestFirst)
   const sameCommit = await verify(exact, 'commit')
   if (sameCommit) return sameCommit
-  // A promotion merge commit never ran on staging itself; look for the staging commit whose
-  // tree it carries.
+  // A commit that never ran on staging itself (such as a pre-#171 promotion merge commit); look
+  // for the staging commit whose tree it carries.
   const sameTree = (await listRuns({ per_page: String(stagingWorkflow.treeSearchRuns) }))
     .filter(run => run.head_sha !== sha && run.head_commit?.tree_id === tree)
     .sort(newestFirst)

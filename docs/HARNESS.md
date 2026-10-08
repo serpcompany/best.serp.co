@@ -72,15 +72,15 @@ Pull requests into `staging` (the base branch) and `main` (`hotfix-*` branches o
   needs a `No issue: <reason>` line.
 - Force pushes and branch deletion are blocked, with no bypass.
 
-The rulesets require no approving review, no up-to-date branch, and no resolved
-conversations. Repository admins can bypass them only through a pull request. The exception
-is the owner's fast-forward promotion (`pnpm release:promote`, #171), a direct push to `main`.
-A bypass covers a whole ruleset, so `main` keeps deletion and force-push blocking in a ruleset
-with no bypass and its pull request and check rules in a second one the owner may bypass
-(an owner step). Rulesets cannot restrict a pull request's head branch, so `Validate Site &
-Policy` fails a pull request into `main` whose head is not a `hotfix-*` branch. That only
-catches mis-targeted pull requests; Deploy Production's tree check is the control. Agents
-never merge: the owner approves every merge
+The rulesets require no approving review, no up-to-date branch, and no resolved conversations.
+Repository admins can bypass them only through a pull request. The exception is the owner's
+fast-forward promotion (`pnpm release:promote`, #171), a direct push to `main`. A bypass covers
+a whole ruleset, so that push needs `main`'s pull request and check rules in a ruleset of their
+own the owner may bypass, with deletion and force-push blocking left in one nobody can bypass
+(#171 owner step; until then the push is rejected). Agents never push. Rulesets cannot restrict
+a pull request's head branch, so `Validate Site & Policy` fails a pull request into `main` whose
+head is not a `hotfix-*` branch. That only catches mis-targeted pull requests; Deploy
+Production's tree check is the control. Agents never merge: the owner approves every merge
 ([Release guards](./RELEASE_GUARDS.md#promotion)).
 
 After a reviewed pull request merges, `main-validation.yml` runs the full loop again

@@ -46,10 +46,10 @@ The repository follows the serp git-workflow standard for repositories with Stag
 - **`main` is production.** `staging` reaches it by a **fast-forward**: the owner runs
   `pnpm release:promote` (`scripts/release-promote.ts`, #171), so `main` receives exactly the
   squash commits staging verified, with no promotion pull request and no merge commit. The push
-  uses the owner's bypass of `main`'s pull request and check rules, kept in a ruleset of their
-  own so deletion and force pushes stay blocked for everyone; any other change to `main` is a
-  `hotfix-*` pull request. Each push to `main` runs Deploy Production, which waits for the
-  reviewers.
+  needs the owner's bypass of `main`'s pull request and check rules, kept in a ruleset of their
+  own so deletion and force pushes stay blocked for everyone (#171 owner step); any other change
+  to `main` is a `hotfix-*` pull request. Each push to `main` runs Deploy Production, which
+  waits for the reviewers.
 - **Only the owner releases.** Agents never dispatch a production workflow, never type a
   production confirmation, and never approve a deployment.
 - **PR Review catches mis-targeted pull requests.** Once `staging` exists, `Validate Site &

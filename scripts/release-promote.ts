@@ -102,7 +102,11 @@ export async function promoteStaging(
   try {
     verified = await deps.verify({ sha: staging, token: await deps.token() })
   } catch (error) {
-    throw new Error(`Refusing: ${error instanceof Error ? error.message : String(error)}`)
+    // The staging check's own hint names the production workflow; here the next step is this
+    // command, once Deploy Staging has verified the staging head.
+    throw new Error(
+      `Refusing: ${error instanceof Error ? error.message : String(error)}\nOnce Deploy Staging has verified the staging head, run pnpm release:promote again.`
+    )
   }
 
   const commits = await gitOrThrow(deps, [
