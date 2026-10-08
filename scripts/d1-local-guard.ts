@@ -120,7 +120,8 @@ export function localSqlitePath(directory: string): string {
   visit(directory)
   if (matches.length !== 1) {
     throw new Error(
-      `Canonical local D1 state must contain exactly one SQLite database; found ${matches.length}: ${matches.join(', ')}`
+      `Canonical local D1 state must contain exactly one SQLite database; found ${matches.length}: ${matches.join(', ')}. ` +
+        `If the local database_id changed (#176), delete ${directory} and run pnpm db:migrate:local && pnpm db:import:local again.`
     )
   }
   return matches[0]!
