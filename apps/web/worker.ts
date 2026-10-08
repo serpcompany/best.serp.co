@@ -19,8 +19,9 @@
  */
 import { withEdgeCache } from './lib/edge-cache/html-cache'
 import { serveLocalMedia } from './lib/media/worker-media'
+import { legacyRootRedirect, legacyRootSlugMatcher } from './lib/routing/legacy-root'
 import { configRedirectPatterns } from './lib/routing/trailing-slash'
-import { catalogEpochReader, catalogRenderer } from './lib/worker/catalog'
+import { catalogEpochReader, catalogLegacyRootLookup, catalogRenderer } from './lib/worker/catalog'
 import { handleWorkerRequest } from './lib/worker/handle-request'
 import {
   handleScheduled,
@@ -44,6 +45,8 @@ const EDGE_CACHE_NAME = 'edge-html'
  * instead of the trailing-slash rule silently switching off.
  */
 const configRedirects = loadConfigRedirects()
+/** Root-level paths no route serves: old listing and category URLs (#168). */
+const legacyRootSlug = legacyRootSlugMatcher(routesManifest, configRedirects)
 
 interface WorkerEnv {
   CANONICAL_HOST_REDIRECT?: string
@@ -99,6 +102,8 @@ export default {
     )
     return handleWorkerRequest(request, env, {
       configRedirects,
+      legacyRoot: incoming =>
+        legacyRootRedirect(incoming, legacyRootSlug, catalogLegacyRootLookup(env, log)),
       // Redirects and the non-production robots.txt are answered before this, so they are
       // never rendered or stored. A cacheable request reaches OpenNext with allowlisted
       // headers only (`renderRequestFor` in lib/edge-cache/html-cache.ts).

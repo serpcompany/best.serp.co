@@ -179,13 +179,18 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       // Top-level legal pages of the static site, now under /legal/.
       ['/privacy/', '/legal/privacy/'],
       ['/terms/', '/legal/terms/'],
-      ['/cookies/', '/legal/cookies/']
+      ['/cookies/', '/legal/cookies/'],
+      // The static site's root-level listing and category URLs (#168).
+      ['/autoenhance.ai/', domainSlugListingPath],
+      [`/${detailListing.slug}/`, detailListing.path],
+      [`/${sampleCategory.slug}/`, categoryPath(sampleCategory.slug)]
     ]
     for (const [from, to] of redirects) {
       // Both slash forms of a moved URL reach the canonical page directly.
       await expectOneHop(request, from, to)
       await expectOneHop(request, from.slice(0, -1), to)
     }
+    await expectOneHop(request, '/autoenhance.ai?ref=x%26y', `${domainSlugListingPath}?ref=x%26y`)
   })
 
   test('serves one canonical form per URL under the trailing-slash standard', async ({

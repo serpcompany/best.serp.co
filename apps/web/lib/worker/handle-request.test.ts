@@ -73,6 +73,33 @@ describe('Worker request pipeline', () => {
     expect(response.headers.get('location')).toBe('/robots.txt')
   })
 
+  it('sends an old root-level listing URL to its page in one hop, before the slash rule', async () => {
+    const legacyRoot = vi.fn(async (request: Request) =>
+      new URL(request.url).pathname.startsWith('/autoenhance.ai')
+        ? new Response(null, { headers: { location: '/products/autoenhance.ai/' }, status: 308 })
+        : null
+    )
+    for (const path of ['/autoenhance.ai', '/autoenhance.ai/']) {
+      const handler = { ...pipeline(), legacyRoot }
+      const redirect = await handleWorkerRequest(
+        new Request(`${production}${path}`),
+        productionEnv,
+        handler
+      )
+      expect(redirect.status, path).toBe(308)
+      expect(redirect.headers.get('location'), path).toBe('/products/autoenhance.ai/')
+      expect(redirect.headers.get(WORKER_VERSION_HEADER), path).toBe(version.id)
+      expect(handler.serve, path).not.toHaveBeenCalled()
+    }
+    const handler = { ...pipeline(), legacyRoot }
+    const slash = await handleWorkerRequest(
+      new Request(`${production}/about`),
+      productionEnv,
+      handler
+    )
+    expect(slash.headers.get('location')).toBe('/about/')
+  })
+
   describe('with CANONICAL_HOST_REDIRECT=on', () => {
     const env = { ...productionEnv, CANONICAL_HOST_REDIRECT: 'on' }
 
