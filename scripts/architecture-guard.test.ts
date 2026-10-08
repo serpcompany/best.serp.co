@@ -452,16 +452,16 @@ describe('single-site D1-only repository architecture', () => {
   it('makes every admin page and admin API route require an admin', () => {
     const adminRoutes = trackedFiles().filter(
       file =>
-        (file.startsWith(`${project.sourceDirectory}/app/admin/`) ||
+        (file.startsWith(`${project.sourceDirectory}/app/(dashboard)/admin/`) ||
           file.startsWith(`${project.sourceDirectory}/app/api/admin/`)) &&
         /(?:^|\/)(?:page|route|layout)\.tsx?$/u.test(file) &&
         existsSync(resolve(file))
     )
     expect(adminRoutes).toEqual(
       expect.arrayContaining([
-        `${project.sourceDirectory}/app/admin/layout.tsx`,
-        `${project.sourceDirectory}/app/admin/page.tsx`,
-        `${project.sourceDirectory}/app/admin/[...path]/page.tsx`,
+        `${project.sourceDirectory}/app/(dashboard)/admin/layout.tsx`,
+        `${project.sourceDirectory}/app/(dashboard)/admin/page.tsx`,
+        `${project.sourceDirectory}/app/(dashboard)/admin/[...path]/page.tsx`,
         `${project.sourceDirectory}/app/api/admin/[[...path]]/route.ts`
       ])
     )
@@ -478,16 +478,16 @@ describe('single-site D1-only repository architecture', () => {
   it('makes every account page and account API route require the signed-in user (#65)', () => {
     const accountRoutes = trackedFiles().filter(
       file =>
-        (file.startsWith(`${project.sourceDirectory}/app/account/`) ||
+        (file.startsWith(`${project.sourceDirectory}/app/(dashboard)/account/`) ||
           file.startsWith(`${project.sourceDirectory}/app/api/account/`)) &&
         /(?:^|\/)(?:page|route)\.tsx?$/u.test(file) &&
         existsSync(resolve(file))
     )
     expect(accountRoutes).toEqual(
       expect.arrayContaining([
-        `${project.sourceDirectory}/app/account/page.tsx`,
-        `${project.sourceDirectory}/app/account/submissions/[id]/page.tsx`,
-        `${project.sourceDirectory}/app/account/listings/[slug]/edit/page.tsx`,
+        `${project.sourceDirectory}/app/(dashboard)/account/page.tsx`,
+        `${project.sourceDirectory}/app/(dashboard)/account/submissions/[id]/page.tsx`,
+        `${project.sourceDirectory}/app/(dashboard)/account/listings/[slug]/edit/page.tsx`,
         `${project.sourceDirectory}/app/api/account/submissions/[id]/[action]/route.ts`,
         `${project.sourceDirectory}/app/api/account/listings/[id]/[action]/route.ts`
       ])

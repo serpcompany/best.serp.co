@@ -1,12 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 import './globals.css'
-import { DrawerSignOutButton, HeaderSignOutButton } from '@/components/auth/sign-out-button'
-import { Footer } from '@/components/layout/footer'
-import { Header } from '@/components/layout/header'
-import { PublicChrome } from '@/components/layout/public-chrome'
 import { RootAppShell, rootLayoutMetadata } from '@/components/layout/root-shell'
-import { getHeaderAuthState } from '@/lib/auth/header-state'
-import { getActiveCategories } from '@/lib/catalog/repository'
 import { analyticsForRequest } from '@/lib/environment/request-environment'
 import { fonts } from '@/lib/fonts'
 import { siteConfig } from '@/lib/site/site-config'
@@ -19,37 +13,21 @@ type RootLayoutProps = {
   children: ReactNode
 }
 
+/**
+ * The document and its providers. The public chrome is the `(site)` layout's, and the
+ * dashboards (`(dashboard)`) render their own shells.
+ */
 export default async function RootLayout({ children }: RootLayoutProps): Promise<ReactElement> {
   // Analytics load only on the public production site, never on local, staging, or the
   // production Worker's workers.dev host (docs/ARCHITECTURE.md#environments-and-hosts).
-  const [authState, activeCategories, analytics] = await Promise.all([
-    getHeaderAuthState(),
-    getActiveCategories(),
-    analyticsForRequest()
-  ])
-  const activeCategorySlugs = activeCategories.map(category => category.slug)
+  const analytics = await analyticsForRequest()
 
   return (
     <RootAppShell
       bodyClassName={fonts}
       cloudflareWebAnalyticsToken={analytics.cloudflareWebAnalyticsToken}
       feedTitle={`${siteConfig.name} - New ${siteCopy.listingName.pluralTitle}`}
-      footer={
-        <PublicChrome>
-          <Footer />
-        </PublicChrome>
-      }
       gtmId={analytics.gtmId}
-      header={
-        <PublicChrome>
-          <Header
-            activeCategorySlugs={activeCategorySlugs}
-            authState={authState}
-            desktopSignOutButton={<HeaderSignOutButton />}
-            mobileSignOutButton={<DrawerSignOutButton />}
-          />
-        </PublicChrome>
-      }
     >
       {children}
     </RootAppShell>

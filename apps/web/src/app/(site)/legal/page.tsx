@@ -12,7 +12,7 @@ export const metadata: Metadata = generateBaseMetadata({
 
 export default function LegalPage() {
   return (
-    <main className="container mx-auto max-w-3xl px-6 py-16">
+    <div className="container mx-auto max-w-3xl px-6 py-16">
       <div className="space-y-6">
         <h1 className="text-4xl font-bold tracking-tight">Legal</h1>
         <div className="grid gap-3">
@@ -24,6 +24,6 @@ export default function LegalPage() {
           </Link>
         </div>
       </div>
-    </main>
+    </div>
   )
 }

@@ -186,8 +186,8 @@ and a test checks the committed import.
 - **Written URLs.** Canonical tags, `og:url`, sitemaps, `robots.txt`, and JSON-LD build absolute
   URLs with `absoluteUrl` (`siteUrl` in `seo-config.ts`), which writes the homepage as the bare
   origin. With `trailingSlash`, the Next.js metadata API appends `/` to every same-origin URL,
-  so the homepage leaves `alternates.canonical` and `openGraph.url` unset and
-  `apps/web/src/app/page.tsx` renders both tags with `HomePageCanonicalTags`. Never render them in
+  so the homepage (`app/(site)/page.tsx`) leaves `alternates.canonical` and `openGraph.url`
+  unset and renders both tags with `HomePageCanonicalTags`. Never render them in
   `HomePageRoute`: `/products/` reuses it, and only its page 1 (canonical `/`) renders them.
   JSON-LD node identifiers keep their fragment form (`https://best.serp.co/#website`); they name
   a graph node, not the page.

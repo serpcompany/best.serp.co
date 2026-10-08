@@ -131,12 +131,12 @@ const ADMIN_ACTIONS: Array<['DELETE' | 'POST', string]> = [
   )
 ]
 
-/** Every `page.tsx` and `route.ts` under `dir`, relative to the app directory. */
+/** Every `page.tsx` and `route.ts` under `dir`, as URL paths (route groups such as `(dashboard)` drop out). */
 function appFiles(dir: string, name: string): string[] {
   const app = resolve(__dirname, '../src/app')
   return readdirSync(resolve(app, dir), { encoding: 'utf8', recursive: true })
     .filter(file => file === name || file.endsWith(`/${name}`))
-    .map(file => `/${dir}/${file.slice(0, -name.length)}`)
+    .map(file => `/${dir}/${file.slice(0, -name.length)}`.replace(/\/\([^/)]+\)/gu, ''))
 }
 
 /** A route file's path as a pattern: `[id]` matches one segment, `[...path]` one or more. */
@@ -150,7 +150,7 @@ function routePattern(route: string): RegExp {
 
 test.describe('admin gate', () => {
   test('lists every admin page, API route, and action', () => {
-    for (const page of appFiles('admin', 'page.tsx')) {
+    for (const page of appFiles('(dashboard)/admin', 'page.tsx')) {
       expect(
         ADMIN_PAGES.some(path => routePattern(page).test(path)),
         page

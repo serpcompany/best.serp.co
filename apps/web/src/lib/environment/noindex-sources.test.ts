@@ -15,9 +15,9 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { rootLayoutMetadata } from '@/components/layout/root-shell'
 import { siteRoutes } from '@/lib/site'
 import nextConfig from '../../../next.config'
+import * as homePage from '../../app/(site)/page'
+import * as productsPage from '../../app/(site)/products/page'
 import * as rootLayout from '../../app/layout'
-import * as homePage from '../../app/page'
-import * as productsPage from '../../app/products/page'
 
 // Build-time wrappers that only add MDX and content collections; headers() is untouched.
 vi.mock('@content-collections/next', () => ({
@@ -30,9 +30,6 @@ vi.mock('@/lib/auth/header-state', () => ({ getHeaderAuthState: async () => null
 vi.mock('@/components/auth/sign-out-button', () => ({
   DrawerSignOutButton: () => null,
   HeaderSignOutButton: () => null
-}))
-vi.mock('@/components/layout/public-chrome', () => ({
-  PublicChrome: ({ children }: { children: unknown }) => children
 }))
 vi.mock('@/lib/catalog/repository', () => ({
   getActiveCategories: async () => [],
@@ -170,22 +167,22 @@ const registryPageModules: Record<
   string,
   () => Promise<{ generateMetadata?: unknown; metadata?: unknown }>
 > = {
-  '/': () => import('../../app/page'),
-  '/about/': () => import('../../app/about/page'),
-  '/brands/': () => import('../../app/brands/page'),
-  '/contact/': () => import('../../app/contact/page'),
-  '/legal/': () => import('../../app/legal/page'),
-  '/legal/affiliate-disclosure/': () => import('../../app/legal/affiliate-disclosure/page'),
-  '/legal/cookies/': () => import('../../app/legal/cookies/page'),
-  '/legal/dmca/': () => import('../../app/legal/dmca/page'),
-  '/legal/privacy-policy/': () => import('../../app/legal/privacy-policy/page'),
-  '/legal/terms-conditions/': () => import('../../app/legal/terms-conditions/page'),
-  '/pricing/': () => import('../../app/pricing/page'),
-  '/products/': () => import('../../app/products/page'),
-  '/products/categories/': () => import('../../app/products/categories/page'),
-  '/search/': () => import('../../app/search/page'),
-  '/sponsor/': () => import('../../app/sponsor/page'),
-  '/submit/': () => import('../../app/submit/page')
+  '/': () => import('../../app/(site)/page'),
+  '/about/': () => import('../../app/(site)/about/page'),
+  '/brands/': () => import('../../app/(site)/brands/page'),
+  '/contact/': () => import('../../app/(site)/contact/page'),
+  '/legal/': () => import('../../app/(site)/legal/page'),
+  '/legal/affiliate-disclosure/': () => import('../../app/(site)/legal/affiliate-disclosure/page'),
+  '/legal/cookies/': () => import('../../app/(site)/legal/cookies/page'),
+  '/legal/dmca/': () => import('../../app/(site)/legal/dmca/page'),
+  '/legal/privacy-policy/': () => import('../../app/(site)/legal/privacy-policy/page'),
+  '/legal/terms-conditions/': () => import('../../app/(site)/legal/terms-conditions/page'),
+  '/pricing/': () => import('../../app/(site)/pricing/page'),
+  '/products/': () => import('../../app/(site)/products/page'),
+  '/products/categories/': () => import('../../app/(site)/products/categories/page'),
+  '/search/': () => import('../../app/(site)/search/page'),
+  '/sponsor/': () => import('../../app/(site)/sponsor/page'),
+  '/submit/': () => import('../../app/(site)/submit/page')
 }
 
 describe('the route registry and the pages (#167)', () => {

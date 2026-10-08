@@ -11,7 +11,7 @@ export const metadata: Metadata = generateBaseMetadata({
 
 export default function ContactPage() {
   return (
-    <main className="container mx-auto max-w-3xl px-6 py-16">
+    <div className="container mx-auto max-w-3xl px-6 py-16">
       <div className="space-y-6">
         <h1 className="text-4xl font-bold tracking-tight">Contact SERP</h1>
         <p className="text-lg text-muted-foreground">
@@ -24,6 +24,6 @@ export default function ContactPage() {
           hello@serp.co
         </a>
       </div>
-    </main>
+    </div>
   )
 }

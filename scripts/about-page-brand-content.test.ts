@@ -98,7 +98,10 @@ describe('best.serp.co About page brand content', () => {
   })
 
   it('renders About with the shared content loader', () => {
-    const source = readFileSync(resolve(process.cwd(), 'apps/web/src/app/about/page.tsx'), 'utf8')
+    const source = readFileSync(
+      resolve(process.cwd(), 'apps/web/src/app/(site)/about/page.tsx'),
+      'utf8'
+    )
 
     expect(source).toContain("import { getAboutPage } from '@/lib/content-loader'")
     expect(source).toContain('AboutStaticPage')
