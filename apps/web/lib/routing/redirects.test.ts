@@ -1,7 +1,8 @@
 import { canonicalPathname } from '@serpdirectory/web-core/canonical-url'
+import { getRoute } from '@serpdirectory/web-core/routes'
 import { buildCustomRoute } from 'next/dist/lib/build-custom-route'
 import { describe, expect, it } from 'vitest'
-import { movedUrlRedirects } from './redirects'
+import { LEGAL_CANONICAL, movedUrlRedirects } from './redirects'
 import { configRedirectPatterns, trailingSlashRedirect } from './trailing-slash'
 
 // Compile the rules exactly as `next build` writes them to `.next/routes-manifest.json`,
@@ -58,7 +59,11 @@ describe('moved-URL redirects', () => {
       '/terms',
       '/terms/',
       '/cookies',
-      '/cookies/'
+      '/cookies/',
+      '/legal/privacy',
+      '/legal/privacy/',
+      '/legal/terms',
+      '/legal/terms/'
     ]) {
       expect(covered(path), path).toBe(true)
     }
@@ -69,21 +74,39 @@ describe('moved-URL redirects', () => {
       '/products/categories/',
       '/products/categories/video-downloaders/',
       '/about/',
-      '/legal/privacy/',
-      '/legal/terms/',
+      '/legal/privacy-policy/',
+      '/legal/terms-conditions/',
       '/legal/cookies/'
     ]) {
       expect(covered(path), path).toBe(false)
     }
   })
 
-  it('send the static-site legal pages to /legal/ in one hop', () => {
-    for (const page of ['cookies', 'privacy', 'terms']) {
-      expect(rules.find(rule => rule.source === `/${page}`)).toMatchObject({
-        destination: `/legal/${page}/`,
+  it("send every legal page's other URLs to its one canonical URL (#166)", () => {
+    for (const [source, destination] of [
+      ['/cookies', '/legal/cookies/'],
+      ['/privacy', '/legal/privacy-policy/'],
+      ['/terms', '/legal/terms-conditions/'],
+      ['/legal/privacy', '/legal/privacy-policy/'],
+      ['/legal/terms', '/legal/terms-conditions/']
+    ]) {
+      expect(
+        rules.find(rule => rule.source === source),
+        source
+      ).toMatchObject({
+        destination,
         permanent: true
       })
     }
+    // The canonical URLs are the ones the routes name.
+    expect(LEGAL_CANONICAL).toEqual({
+      privacy: getRoute('privacy'),
+      terms: getRoute('terms')
+    })
+  })
+
+  it('no longer redirects the retired /news (the Worker answers it 410)', () => {
+    expect(rules.find(rule => rule.source === '/news')).toBeUndefined()
   })
 
   it('give parameterized aliases a parameterless rule OpenNext can answer', () => {

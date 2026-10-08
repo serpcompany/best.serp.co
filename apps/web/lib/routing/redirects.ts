@@ -11,6 +11,12 @@
 import { site } from '@serpdirectory/site-config'
 import type { Redirect } from 'next/dist/lib/load-custom-routes'
 
+/** The canonical legal pages; `getRoute('privacy')` and `getRoute('terms')` name the same. */
+export const LEGAL_CANONICAL = {
+  privacy: '/legal/privacy-policy/',
+  terms: '/legal/terms-conditions/'
+} as const
+
 function normalizeBasePath(basePath: string): string {
   return basePath.replace(/^\/+|\/+$/g, '')
 }
@@ -33,11 +39,6 @@ function aliasRedirects(fromBasePath: string, toBasePath: string): Redirect[] {
 export function movedUrlRedirects(): Redirect[] {
   const listingBasePath = site.routes.listingBasePath
   return [
-    {
-      source: '/news',
-      destination: '/',
-      permanent: false
-    },
     // Pre-D1 URL scheme (serpcompany/best.serp.co#34): /products/<slug>/reviews/ and
     // /products/best/<category>/. "featured" is a placement flag, not a public page.
     {
@@ -58,12 +59,17 @@ export function movedUrlRedirects(): Redirect[] {
       destination: '/products/categories/:category/',
       permanent: true
     },
-    // Top-level legal pages of the static site (still 200 on it), now under /legal/.
-    ...['/cookies', '/privacy', '/terms'].map(source => ({
-      source,
-      destination: `/legal${source}/`,
-      permanent: true
-    })),
+    // Top-level legal pages of the static site, and the short legal URLs: each legal page has one
+    // canonical URL under /legal/ (#166).
+    ...(
+      [
+        ['/cookies', '/legal/cookies/'],
+        ['/privacy', LEGAL_CANONICAL.privacy],
+        ['/terms', LEGAL_CANONICAL.terms],
+        ['/legal/privacy', LEGAL_CANONICAL.privacy],
+        ['/legal/terms', LEGAL_CANONICAL.terms]
+      ] as const
+    ).map(([source, destination]) => ({ source, destination, permanent: true })),
     ...aliasRedirects('website', listingBasePath),
     ...aliasRedirects('websites', listingBasePath),
     ...aliasRedirects('docs', site.routes.docsBasePath),

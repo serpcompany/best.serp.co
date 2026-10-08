@@ -52,7 +52,7 @@ const PUBLIC_PATHS = [
   '/products/',
   '/products/autoenhance.ai/',
   '/products/categories/video-downloaders/',
-  '/legal/privacy/',
+  '/legal/privacy-policy/',
   '/robots.txt',
   '/sitemap-index.xml',
   '/sitemaps/directory/1.xml',
