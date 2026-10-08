@@ -59,18 +59,22 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 
 ## Planning and implementation
 
+Stage: ship
+
 GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning.
 `staging` is the base branch: branch from `origin/staging` as `issue-<n>-<slug>` and open
 pull requests into `staging` (`gh pr create --base staging`); each merge deploys staging.
 `main` is production and changes only by the owner's `staging` → `main` promotion (a merge
 commit) or a `hotfix-*` pull request ([Release guards](./docs/RELEASE_GUARDS.md#promotion)).
-Rulesets require a PR and the five PR Review checks, and block force pushes and deletion.
+Rulesets require a PR, the PR Review checks and `issue-link`, and block force pushes and deletion.
 Agents never merge; the owner approves every merge. Agents never dispatch a production
 workflow or a staging data workflow (catalog publication, media upload), type their
 confirmations, or approve a deployment; only the owner does.
 Issues and labels never grant production, database, or deployment authority.
 
 ## Non-negotiable architecture
+
+`scripts/architecture-guard.test.ts` checks parts of these; review covers the rest.
 
 - Read catalog data through `apps/web/lib/catalog/repository.ts`, which delegates all
   SQL to `packages/data-ops/`. Never put catalog SQL in the app.
@@ -79,6 +83,9 @@ Issues and labels never grant production, database, or deployment authority.
 - Use prepared statements and bind every runtime value.
 - Model tables in `packages/data-ops/src/schema.ts` and generate migrations into
   `d1/drizzle/` with `pnpm db:generate`; `drizzle-kit push` is forbidden.
+- No catalog JSON/YAML/CSV runtime, generated browser search index, filesystem fallback,
+  static export, or GitHub Pages deploy path. The legacy `products.json` is an import input
+  read from an external checkout, never an application input.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
 - Public URLs are part of the SEO contract: `/products/<slug>/`,
   `/products/categories/<category>/`. Changing a route requires permanent redirects.
@@ -88,11 +95,20 @@ Issues and labels never grant production, database, or deployment authority.
   ([Admin panel](./docs/ADMIN_PANEL.md#the-production-write-exception)). Agents never use it
   on production; recovery is D1 Time Travel ([D1 recovery](./docs/D1_RECOVERY.md)).
 
-## Forbidden patterns
+## Recorded exceptions to the SERP web stack
 
-Do not add a catalog JSON/YAML/CSV runtime, generated browser search index, filesystem
-fallback, static export, or GitHub Pages deploy path. The legacy `products.json` is an
-import input read from an external checkout, never an application input.
+Deliberate differences from serp's `web-stack/` standard; change one only through an issue.
+
+- UI stays shadcn `new-york` on Radix until #186 moves it to `base-nova`; add no Base UI parts.
+- R2 is serp.co's shared `cdn` and `cdn-staging` buckets; moving would rewrite media keys.
+- Email is useSend from `noreply@mail.serp.co`, the transactional-email standard's exception
+  for directories on serp.co subdomains.
+- One build serves every environment; the environment is read per request
+  (`apps/web/lib/environment/request-environment.ts`), so nothing per-environment is prerendered.
+- `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
+- The Stripe webhook is `/api/billing/webhook/` behind a provider-neutral `BillingProvider`
+  with no Stripe SDK, until the payments audit (#156) decides. Brand icons use
+  `@icons-pack/react-simple-icons` because lucide has no brand icons.
 
 ## Completion contract
 

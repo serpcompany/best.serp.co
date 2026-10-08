@@ -162,8 +162,10 @@ Procedure: [Listing media](./MEDIA.md#uploading-and-publishing).
 ## Hotfixes
 
 A hotfix that cannot wait for staging is a `hotfix-<n>-<slug>` branch from `main`, squash-merged
-into `main` through a pull request. Its push runs Deploy Production, which stops at the
-staging check because staging never verified that tree. To release it anyway:
+into `main` through a pull request. GitHub ignores `Closes #N` on a merge into `main`
+(`issue-link` accepts it with a warning), so close the hotfix's issue by hand. Its push runs
+Deploy Production, which stops at the staging check because staging never verified that tree.
+To release it anyway:
 
 1. The owner dispatches Deploy Production from `main` with `hotfix-best.serp.co-production`.
    `authorize` accepts it only when `main`'s head is the merge commit of a merged `hotfix-*`
@@ -268,7 +270,7 @@ Until the token split, this is a process control, not a security boundary.
 - **Still open:** both environments still hold the account-wide Cloudflare token (Edit on every
   Worker, D1 database, and R2 bucket, including serp.co's `cdn`), so a workflow merged to
   `staging` that uses the `staging` environment could still reach production directly. That
-  path requires a pull request and the five required checks, but no approving review.
+  path requires a pull request and the required checks, but no approving review.
 - **No human gate on staging data:** the `staging` environment has no reviewers, so anything
   that can dispatch workflows can run the staging publication or upload. Agents never do
   (AGENTS.md); an optional `staging-data` environment would enforce it (MEDIA.md).

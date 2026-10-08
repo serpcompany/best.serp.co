@@ -63,9 +63,12 @@ Pull requests into `staging` (the base branch) and `main` (promotions from `stag
 - Every change needs a pull request: squash-merged into `staging` (except the merge commit
   that brings a hotfix back from `main`); into `main`, a merge commit for promotions and a
   squash for hotfixes.
-- Five checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
-  `OpenNext Worker Build`, and `E2E Tests`. Every job runs on every pull request, because a
-  skipped job satisfies a required check.
+- Six checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
+  `OpenNext Worker Build`, and `E2E Tests` from `pr-review.yml`, and `issue-link` from
+  `pr-issue-link.yml` (serp's workflow, copied unchanged), which fails a pull request that
+  closes no issue. Every `pr-review.yml` job runs on every pull request, because a skipped job
+  satisfies a required check. `issue-link` skips bot PRs and PRs whose head and base are
+  `staging` and `main`; a merge-back from any other branch needs a `No issue: <reason>` line.
 - Force pushes and branch deletion are blocked.
 
 The rulesets require no approving review, no up-to-date branch, and no resolved
@@ -100,7 +103,7 @@ gh variable delete CI_RUNNER_LABELS  # rollback: runs that start later use ubunt
 | Follows `CI_RUNNER_LABELS` | Always `ubuntu-latest` |
 | --- | --- |
 | PR Review: Validate Site & Policy, Type Check, Unit Tests, OpenNext Worker Build | PR Review: E2E Tests (installs Playwright browsers) |
-| Main Validation, Production Dependency Audit, Harness Gardening, Label PRs, Links Checker | Deploy Staging (also Playwright smoke), Deploy Production, Bootstrap Production D1, Publish D1 Catalog, Review D1 Submission, Notify Verified D1 Submissions, Check Listing Media Health, Submit GSC Sitemaps |
+| Main Validation, Production Dependency Audit, Harness Gardening, Label PRs, Links Checker | PR Issue Link (serp's file, unchanged), Deploy Staging (also Playwright smoke), Deploy Production, Bootstrap Production D1, Publish D1 Catalog, Review D1 Submission, Notify Verified D1 Submissions, Check Listing Media Health, Submit GSC Sitemaps |
 
 Routed jobs hold no secret beyond their own `GITHUB_TOKEN` and need no browser, `sudo`, or
 `apt`. Jobs with Cloudflare or Google credentials, a protected environment, or a deploy stay on
