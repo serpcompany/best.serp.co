@@ -1,2 +1,16 @@
 @import "../../../packages/design-system/styles/globals.css";
 @import "../../../packages/design-system/styles/sidebar-theme.css";
+/* The enter and exit animations shadcn's dialogs, sheets, menus, popovers, selects, and
+   tooltips name (`animate-in`, `fade-in-0`, `zoom-in-95`, `slide-in-from-*`). */
+@import "tw-animate-css";
+
+/* tw-animate-css ignores reduced motion on its own. Components apply it through variants such
+   as `data-[state=open]:animate-in`, so match the class names, not `.animate-in` alone. The
+   sign-in code's caret blinks with `animate-caret-blink`. */
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-in"],
+  [class*="animate-out"],
+  [class*="animate-caret-blink"] {
+    animation: none !important;
+  }
+}

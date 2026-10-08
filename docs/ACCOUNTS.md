@@ -107,7 +107,7 @@ Rate-limit rows hold HMAC-SHA256 digests under a key derived from `BETTER_AUTH_S
 
 **Delivery.** Locally, the dev sender logs each code and `GET /api/auth/dev/otp-outbox?email=`
 returns the latest one and when it was sent (the endpoint exists only when the dev sender
-runs, which is refused outside `local`). Staging and production send the code as the
+runs, which is refused outside `local`, and the Worker answers it only on a local host). Staging and production send the code as the
 `sign-in-code` email through `enqueueEmail` ([Email](./EMAIL.md)), keyed
 `emailEventKey('sign-in-code', crypto.randomUUID())`: every code is a new event, and no key
 derives from a code. Only `sign-in` codes are sent. The code's length and lifetime are
