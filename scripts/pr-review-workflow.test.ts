@@ -158,7 +158,7 @@ describe('pr-review workflow', () => {
       ])
     )
     expect(stepRuns).not.toContain('pnpm db:migrate:local')
-    expect(stepRuns).not.toContain('pnpm worker:deploy:production')
+    expect(stepRuns).not.toContain('pnpm deploy:production')
     expect(stepRuns).not.toContain('pnpm typecheck')
     expect(stepRuns).not.toContain('pnpm test')
   })

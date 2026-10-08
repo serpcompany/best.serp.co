@@ -84,8 +84,7 @@ Production's tree check is the control. Agents never merge: the owner approves e
 ([Release guards](./RELEASE_GUARDS.md#promotion)).
 
 After a reviewed pull request merges, `main-validation.yml` runs the full loop again
-on the exact resulting `staging` or `main` revision. It supplies the before/after push
-revisions to the changed-file policy and has read-only repository permission. It does not
+on the exact resulting `staging` or `main` revision with read-only repository permission. It does not
 deploy, use a protected environment, or access a remote D1 database. This post-merge
 result proves the integrated revision independently; it does not replace the required
 pre-merge checks. Deployment is separate: `deploy-staging.yml` runs the fast loop and

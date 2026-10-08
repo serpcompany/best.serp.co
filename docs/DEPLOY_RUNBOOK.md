@@ -177,8 +177,11 @@ one you won't ship instead of leaving it waiting. Hotfixes follow
   or `wrangler rollback --env production`. A rollback does not undo a migration.
 - Emergency deploy (the owner only, when the workflows cannot run): `pnpm deploy:staging` or
   `pnpm deploy:production` builds the Worker and runs `opennextjs-cloudflare deploy --env`. It
-  skips every release guard, including the migration check, so apply pending migrations first
-  and prefer a rollback when one will do. Agents never run it.
+  skips every release guard: the staging verification, the authorization, and the migration
+  check. Use it only when `pnpm db:migrations:list:<env>` shows nothing pending (migrations
+  apply only in the workflows); otherwise roll back. Export `NEXT_PUBLIC_SENTRY_DSN` and
+  `NEXT_PUBLIC_SENTRY_RELEASE` (the commit) first, or the build ships with Sentry off. Agents
+  never run it.
 
 ## Rehearsals and read-only checks
 

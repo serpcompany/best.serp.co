@@ -89,11 +89,11 @@ Issues and labels never grant production, database, or deployment authority.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
 - Public URLs are part of the SEO contract: `/products/<slug>/`,
   `/products/categories/<category>/`. Changing a route requires permanent redirects.
-- Route production mutations through protected GitHub Actions only. The one exception is the
-  admin panel (`/admin`, #64): an admin's decision writes production D1 from the Worker
-  through the reviewed plans, behind Cloudflare Access, the allowlist, and an `Origin` check
-  ([Admin panel](./docs/ADMIN_PANEL.md#the-production-write-exception)). Agents never use it
-  on production; recovery is D1 Time Travel ([D1 recovery](./docs/D1_RECOVERY.md)).
+- Route production mutations through protected GitHub Actions only, apart from the owner's
+  emergency `pnpm deploy:*` and the admin panel (`/admin`, #64): an admin's decision writes
+  production D1 through the reviewed plans, behind Cloudflare Access, the allowlist, and an
+  `Origin` check ([Admin panel](./docs/ADMIN_PANEL.md#the-production-write-exception)). Agents
+  use neither in production; recovery is D1 Time Travel ([D1 recovery](./docs/D1_RECOVERY.md)).
 
 ## Recorded exceptions to the SERP web stack
 

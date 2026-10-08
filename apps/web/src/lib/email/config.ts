@@ -102,7 +102,7 @@ export const STAGING_ALLOWLIST_VAR = 'EMAIL_STAGING_ALLOWLIST'
 
 /**
  * The origin each environment's email links point at. Links are absolute so they work in any
- * mail client; staging links stay on staging. Local links assume `pnpm dev` (port 8787).
+ * mail client; staging links stay on staging. Local links assume `pnpm preview` (port 8787).
  */
 export const EMAIL_LINK_ORIGINS: Readonly<Record<SiteEnvironment, string>> = {
   local: 'http://localhost:8787',

@@ -1635,7 +1635,7 @@ describe('protected deployment boundaries', () => {
 
   it('mutates production automatically only on a push to main, behind the production reviewers', () => {
     const productionMutation =
-      /cloudflare-release\.ts (?:migrate|import|deploy) production|db:(?:migrate|publish):production|opennextjs-cloudflare deploy/u
+      /cloudflare-release\.ts (?:migrate|import|deploy) production|db:(?:migrate|publish):production|deploy:production|opennextjs-cloudflare deploy/u
     const automaticMutations: string[] = []
     for (const [file, workflow] of allWorkflows()) {
       const triggers = Object.keys(workflow.on)
