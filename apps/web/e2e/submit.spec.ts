@@ -84,6 +84,12 @@ async function emailsTo(request: APIRequestContext, to: string): Promise<OutboxM
 
 async function chooseCategory(page: Page, name: string) {
   await page.getByRole('combobox', { name: 'Primary category' }).click()
+  // The list opens below its trigger, capped at max-h-80 (320 px). Stock's item-aligned default
+  // ignores the cap and fills the viewport with the 140-odd categories (#241).
+  const list = page.getByRole('listbox')
+  await expect(list).toBeVisible()
+  const box = await list.boundingBox()
+  expect(box?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(320)
   await page.getByRole('option', { name, exact: true }).click()
 }
 
