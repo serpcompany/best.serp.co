@@ -5,7 +5,7 @@ import type { NetworkBrandEntry } from '../network-brands'
 import { getNetworkBrandsForGroup } from '../network-brands'
 import { generateDisabledRouteMetadata } from '../route-feature-gates'
 import { getRoute } from '../routes'
-import { generateBaseMetadata, SITE_PUBLIC_URL } from '../seo-config'
+import { generateBaseMetadata, SITE_PUBLIC_URL, SITE_WEBSITE_ID } from '../seo-config'
 import { siteConfig } from '../site-config'
 import { siteCopy } from '../site-copy'
 import { Card, CardContent } from '../ui/card'
@@ -35,6 +35,7 @@ function BrandsJsonLd({ brands }: { brands: NetworkBrandEntry[] }) {
     url: brandsUrl,
     isPartOf: {
       '@type': 'WebSite',
+      '@id': SITE_WEBSITE_ID,
       name: siteConfig.name,
       url: SITE_PUBLIC_URL
     },
@@ -96,16 +97,18 @@ export default function BrandsPage() {
             >
               <CardContent className="flex h-full flex-col justify-between gap-6 p-6">
                 <div className="space-y-2">
-                  <h2 className="text-lg font-semibold tracking-tight">{brand.name}</h2>
-                  <a
-                    className="inline-flex items-center gap-2 break-all text-sm text-primary hover:underline"
-                    href={brand.url}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    {brand.url}
-                    <ExternalLink className="size-4 shrink-0" aria-hidden="true" />
-                  </a>
+                  {/* The visible link text is the brand name (serp marketing/brands-page.md). */}
+                  <h2 className="text-lg font-semibold tracking-tight">
+                    <a
+                      className="inline-flex items-center gap-2 text-primary hover:underline"
+                      href={brand.url}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      {brand.name}
+                      <ExternalLink className="size-4 shrink-0" aria-hidden="true" />
+                    </a>
+                  </h2>
                 </div>
               </CardContent>
             </Card>

@@ -83,7 +83,6 @@
     "./static-pages/about-page": "./src/static-pages/about-page.tsx",
     "./static-pages/brands-page": "./src/static-pages/brands-page.tsx",
     "./static-pages/legal-page": "./src/static-pages/legal-page.tsx",
-    "./static-pages/news-page": "./src/static-pages/news-page.tsx",
     "./sitemaps": "./src/sitemaps.ts",
     "./ui/animated-background": "./src/ui/animated-background.tsx",
     "./ui/card": "./src/ui/card.tsx",

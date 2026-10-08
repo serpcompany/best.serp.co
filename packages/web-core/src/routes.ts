@@ -99,11 +99,9 @@ export const routes = {
     list: '/posts/',
     guide: '/posts/[slug]/'
   },
-  news: '/news/',
   pricing: '/pricing/',
-  privacy: siteConfig.sitemap.staticPagePaths?.includes('/legal/privacy-policy')
-    ? '/legal/privacy-policy/'
-    : '/legal/privacy/',
+  // The one URL per legal page; the others 308 here (apps/web/lib/routing/redirects.ts, #166).
+  privacy: '/legal/privacy-policy/',
   cookies: '/legal/cookies/',
   dmca: '/legal/dmca/',
   projects: buildNetworkRoute(),
@@ -111,9 +109,7 @@ export const routes = {
   login: '/login/',
   sponsor: '/sponsor/',
   submit: '/submit/',
-  terms: siteConfig.sitemap.staticPagePaths?.includes('/legal/terms-conditions')
-    ? '/legal/terms-conditions/'
-    : '/legal/terms/',
+  terms: '/legal/terms-conditions/',
   rss: '/rss.xml'
 } as const
 
@@ -138,7 +134,6 @@ type StaticRoutes =
   | 'brands'
   | 'contact'
   | 'guides.list'
-  | 'news'
   | 'pricing'
   | 'privacy'
   | 'cookies'

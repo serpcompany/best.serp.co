@@ -1,7 +1,7 @@
 import { getCategoryDisplayName } from './category-display'
 import { shouldUseProvidedListingLogo } from './listing-logo-presentation'
 import { getCanonicalListingListRoute, getRoute } from './routes'
-import { SITE_LOGO_URL, SITE_NAME, SITE_PUBLIC_URL, SITE_URL } from './seo-config'
+import { SITE_LOGO_URL, SITE_NAME, SITE_PUBLIC_URL, SITE_URL, SITE_WEBSITE_ID } from './seo-config'
 import { siteCopy } from './site-copy'
 
 export interface SchemaOrg {
@@ -141,7 +141,7 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
         name: `${website.name} ${listingLabelTitle}`,
         description: website.description,
         isPartOf: {
-          '@id': `${SITE_URL}/#website`
+          '@id': SITE_WEBSITE_ID
         },
         ...(primaryImageUrl
           ? { primaryImageOfPage: { '@type': 'ImageObject', url: primaryImageUrl } }
