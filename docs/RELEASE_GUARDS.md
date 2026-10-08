@@ -268,7 +268,7 @@ Until the token split, this is a process control, not a security boundary.
 - **Still open:** both environments still hold the account-wide Cloudflare token (Edit on every
   Worker, D1 database, and R2 bucket, including serp.co's `cdn`), so a workflow merged to
   `staging` that uses the `staging` environment could still reach production directly. That
-  path requires a pull request and the five required checks, but no approving review.
+  path requires a pull request and the required checks, but no approving review.
 - **No human gate on staging data:** the `staging` environment has no reviewers, so anything
   that can dispatch workflows can run the staging publication or upload. Agents never do
   (AGENTS.md); an optional `staging-data` environment would enforce it (MEDIA.md).

@@ -63,9 +63,11 @@ Pull requests into `staging` (the base branch) and `main` (promotions from `stag
 - Every change needs a pull request: squash-merged into `staging` (except the merge commit
   that brings a hotfix back from `main`); into `main`, a merge commit for promotions and a
   squash for hotfixes.
-- Five checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
-  `OpenNext Worker Build`, and `E2E Tests`. Every job runs on every pull request, because a
-  skipped job satisfies a required check.
+- Six checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
+  `OpenNext Worker Build`, and `E2E Tests` from `pr-review.yml`, and `issue-link` from
+  `pr-issue-link.yml` (serp's workflow, copied unchanged), which fails a pull request that
+  closes no issue. Every `pr-review.yml` job runs on every pull request, because a skipped job
+  satisfies a required check; `issue-link` skips only bot, promotion, and merge-back PRs.
 - Force pushes and branch deletion are blocked.
 
 The rulesets require no approving review, no up-to-date branch, and no resolved
