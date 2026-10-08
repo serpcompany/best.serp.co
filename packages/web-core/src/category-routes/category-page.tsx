@@ -16,7 +16,8 @@ import {
   generateDynamicMetadata,
   SITE_LOGO_URL,
   SITE_NAME,
-  SITE_PUBLIC_URL
+  SITE_PUBLIC_URL,
+  SITE_WEBSITE_ID
 } from '../seo-config'
 import { siteConfig } from '../site-config'
 import { siteCopy } from '../site-copy'
@@ -148,7 +149,7 @@ export function CategoryRoutePage({
             inLanguage: 'en-US',
             isPartOf: {
               '@type': 'WebSite',
-              '@id': SITE_PUBLIC_URL,
+              '@id': SITE_WEBSITE_ID,
               name: SITE_NAME,
               description: siteConfig.description,
               url: SITE_PUBLIC_URL
