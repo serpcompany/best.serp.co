@@ -25,6 +25,7 @@ import {
   withEnvironmentHeaders
 } from '../environment/site-environment'
 import { type CanonicalHostEnv, canonicalHostRedirect } from '../routing/canonical-host'
+import { retiredPathResponse } from '../routing/retired-paths'
 import { trailingSlashRedirect } from '../routing/trailing-slash'
 
 export interface WorkerRequestEnv extends CanonicalHostEnv, AccessEnv {
@@ -48,6 +49,7 @@ export async function handleWorkerRequest(
   const publicProduction = isPublicProduction(env.SITE_ENVIRONMENT, new URL(request.url).host)
   const response =
     canonicalHostRedirect(request, env, pipeline.configRedirects) ??
+    retiredPathResponse(request) ??
     trailingSlashRedirect(request, pipeline.configRedirects) ??
     (publicProduction ? null : nonProductionRobotsTxt(request)) ??
     (await adminGate(request, env, pipeline.access)) ??

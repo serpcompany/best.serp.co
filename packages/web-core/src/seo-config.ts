@@ -15,6 +15,8 @@ export const SITE_TAGLINE = siteConfig.tagline
 export const SITE_DESCRIPTION = siteConfig.description
 export const SITE_PUBLIC_URL = siteConfig.publicUrl
 export const SITE_URL = SITE_PUBLIC_URL
+/** The `@id` of the site's one `WebSite` JSON-LD node, defined on the homepage. */
+export const SITE_WEBSITE_ID = `${SITE_PUBLIC_URL}/#website`
 
 /**
  * The canonical absolute URL of a site path. The homepage is the bare origin
@@ -260,17 +262,11 @@ export function generateWebsiteSchema() {
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
+    // Every page's JSON-LD points at this one node (#166).
+    '@id': SITE_WEBSITE_ID,
     name: SITE_NAME,
     description: SITE_DESCRIPTION,
     url: SITE_PUBLIC_URL,
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: `${SITE_PUBLIC_URL}/search/?q={search_term_string}`
-      },
-      'query-input': 'required name=search_term_string'
-    },
     publisher: {
       '@type': 'Organization',
       name: SITE_NAME,
@@ -299,6 +295,7 @@ export function generateCollectionSchema(options: {
     numberOfItems: options.itemCount,
     isPartOf: {
       '@type': 'WebSite',
+      '@id': SITE_WEBSITE_ID,
       name: SITE_NAME,
       url: SITE_URL
     }
