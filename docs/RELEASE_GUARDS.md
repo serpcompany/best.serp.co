@@ -122,8 +122,7 @@ gh workflow run web.yml --ref staging
 ```
 
 Re-running the commit's own failed run also works. Re-running an older commit's run deploys
-nothing: only the `staging` head deploys (`web.yml`'s `tip` job, and the deploy's own tip
-guard after a partial re-run), so it can't verify that commit.
+nothing (its tip guards), so it can't verify that commit.
 
 To check a commit from a maintainer machine:
 
