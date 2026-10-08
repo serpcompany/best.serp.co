@@ -1,9 +1,18 @@
 import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { type BrowserContext, expect, type Page, test } from '@playwright/test'
+import { type BrowserContext, expect, type Page } from '@playwright/test'
 import { client, q, signIn, unique } from './admin-fixture'
 import { claimsD1, claimsOrigin, claimsSuiteEnabled } from './claims-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
+import { expectedResponse, test } from './test'
+
+test.use({
+  allowedConsoleErrors: {
+    because:
+      "each claim step's refusals are exercised: signed out, held or owned listings, wrong and expired codes, a revoked badge, and the hourly caps",
+    patterns: [401, 409, 410, 422, 429].map(status => expectedResponse(status, /\/api\/claims/u))
+  }
+})
 
 /**
  * The claim dialog (serpcompany/best.serp.co#67, #70 screens 8 and 9) in the browser, on the

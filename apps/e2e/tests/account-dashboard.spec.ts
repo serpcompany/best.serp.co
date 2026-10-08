@@ -6,8 +6,7 @@ import {
   type BrowserContext,
   expect,
   type Page,
-  request as playwrightRequest,
-  test
+  request as playwrightRequest
 } from '@playwright/test'
 import {
   ADMIN_EMAIL_PREFIXES,
@@ -25,6 +24,15 @@ import {
   unique
 } from './admin-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
+import { expectedResponse, test } from './test'
+
+test.use({
+  allowedConsoleErrors: {
+    because:
+      'three tabs save the revision they loaded at once, so two of the revision saves get 409',
+    patterns: [expectedResponse(409, /\/api\/account\/listings\/[^/]+\/revision/u)]
+  }
+})
 
 /**
  * The submitter dashboard (serpcompany/best.serp.co#65) against its own local Worker and D1

@@ -1,5 +1,4 @@
-import { type APIRequestContext, expect, type Page, test } from '@playwright/test'
-
+import { type APIRequestContext, expect, type Page } from '@playwright/test'
 import { detailListing } from './listing-fixture'
 import {
   absoluteUrl,
@@ -11,6 +10,7 @@ import {
   sampleCategory,
   site
 } from './site-fixture'
+import { test } from './test'
 
 /** Most listing slugs are domain names; their dot is not a file extension. */
 const domainSlugListingPath = listingPath('autoenhance.ai')

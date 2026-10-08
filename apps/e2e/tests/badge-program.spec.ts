@@ -1,7 +1,8 @@
-import { type APIRequestContext, expect, test } from '@playwright/test'
+import { type APIRequestContext, expect } from '@playwright/test'
 import { q, unique } from './admin-fixture'
 import { badgeD1, badgeOrigin, badgeSuiteEnabled } from './badge-program-fixture'
 import { type FixtureProduct, type FixtureSite, startFixtureSite } from './submit-fixture'
+import { test } from './test'
 
 /**
  * The weekly badge program (serpcompany/best.serp.co#66) end to end: a local Worker runs

@@ -1,6 +1,6 @@
 import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { expect, type Page, request as playwrightRequest, test } from '@playwright/test'
+import { expect, type Page, request as playwrightRequest } from '@playwright/test'
 import {
   ADMIN_EMAIL_PREFIXES,
   activeCategory,
@@ -18,6 +18,20 @@ import {
   signInAsNewAdmin,
   unique
 } from './admin-fixture'
+import { expectedResponse, test } from './test'
+
+test.use({
+  allowedConsoleErrors: {
+    because:
+      'unpublishing a listing makes its page answer 410, an invalid logo URL is refused with 422, and the listing editor intermittently hits a Server Components render error until #204 fixes it',
+    patterns: [
+      expectedResponse(410, /\/products\//u),
+      expectedResponse(422, /\/api\/admin\/listings\/[^/]+\/details/u),
+      // #204: remove once the listing editor's render error is fixed.
+      /^console\.error on http:\/\/127\.0\.0\.1:\d+\/admin\/listings\/[^/]+\/: (?:\[ERROR\] )?(?:Error: )?Minified React error #441;/u
+    ]
+  }
+})
 
 /**
  * The admin panel (serpcompany/best.serp.co#64) against the local Worker and local D1: the

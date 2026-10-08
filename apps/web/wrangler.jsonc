@@ -3,8 +3,10 @@
   "name": "best-serp-co-local",
   "main": "worker.ts",
   "compatibility_date": "2026-07-13",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "keep_names": false,
+  "upload_source_maps": true,
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "best-serp-co-local" }],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -39,10 +41,13 @@
     "staging": {
       "name": "best-serp-co-staging",
       "keep_names": false,
+      "upload_source_maps": true,
+      "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "best-serp-co-staging" }],
       "workers_dev": true,
       "preview_urls": false,
       "observability": {
-        "enabled": true
+        "enabled": true,
+        "redact_query_string": true
       },
       "vars": {
         "BETTER_AUTH_TRUSTED_ORIGINS": "https://best-serp-co-staging.serpcompany.workers.dev",
@@ -81,10 +86,13 @@
     "production": {
       "name": "best-serp-co-production",
       "keep_names": false,
+      "upload_source_maps": true,
+      "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "best-serp-co-production" }],
       "workers_dev": true,
       "preview_urls": false,
       "observability": {
-        "enabled": true
+        "enabled": true,
+        "redact_query_string": true
       },
       "vars": {
         "BETTER_AUTH_TRUSTED_ORIGINS": "https://best.serp.co",
