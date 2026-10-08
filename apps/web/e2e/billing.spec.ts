@@ -383,6 +383,12 @@ async function refundFromOrders(
   await confirm.getByRole('button', { name: dialog.button }).click()
   await expect(page.getByText(/^Refunded \$49\.00 for ORD-\d+$/u)).toBeVisible()
   await expect(page.getByText(toast)).toBeVisible()
+  // The toast is a filled card: stock Sonner reads its colors from the theme (#241), and a
+  // theme that hands it bare HSL numbers leaves it transparent.
+  const shown = page.locator('[data-sonner-toast]').filter({ hasText: toast })
+  const fill = await shown.evaluate(element => getComputedStyle(element).backgroundColor)
+  expect(fill).not.toBe('rgba(0, 0, 0, 0)')
+  expect(fill).not.toBe('transparent')
   await capture(page, `${dialog.screenshot}-done`)
 }
 

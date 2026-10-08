@@ -111,7 +111,7 @@ export function ContentFields({
             >
               <SelectValue placeholder="Choose a category" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent position="popper">
               {categories.map(category => (
                 <SelectItem key={category.slug} value={category.slug}>
                   {category.label}

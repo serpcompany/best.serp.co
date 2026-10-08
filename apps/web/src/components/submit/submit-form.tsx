@@ -635,7 +635,7 @@ export function SubmitForm({
                       >
                         <SelectValue placeholder="Choose a category" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-80">
+                      <SelectContent position="popper" className="max-h-80">
                         {categories.map(category => (
                           <SelectItem key={category.slug} value={category.slug}>
                             {category.label}

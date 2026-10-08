@@ -351,7 +351,7 @@ export function ListingDetail({
                 <SelectTrigger id="listing-category" className="w-full">
                   <SelectValue placeholder="Choose a category" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper">
                   {categories.map(option => (
                     <SelectItem key={option.slug} value={option.slug}>
                       {option.name}

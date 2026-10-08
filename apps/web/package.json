@@ -47,7 +47,7 @@
     "next": "catalog:",
     "next-themes": "^0.4.6",
     "parse5": "7.3.0",
-    "radix-ui": "1.6.0",
+    "radix-ui": "1.6.7",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-markdown": "^10.1.0",

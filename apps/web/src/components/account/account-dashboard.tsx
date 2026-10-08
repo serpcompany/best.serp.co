@@ -430,7 +430,7 @@ export function AccountDashboard({
               <SelectTrigger size="sm" className="w-40" aria-label="Show">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper">
                 {FILTERS.map(([key, label]) => (
                   <SelectItem key={key} value={key}>
                     {label} ({counts[key]})
