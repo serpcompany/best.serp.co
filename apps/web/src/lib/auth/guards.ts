@@ -9,7 +9,7 @@
  * role, set from the allowlist at sign-in, is `admin`; removing an email from the allowlist
  * revokes admin access on the next request.
  */
-import type { AdminStatus } from '@serpdirectory/data-ops/auth'
+import type { AdminStatus } from '@/db/auth'
 
 export interface SessionUser {
   email: string

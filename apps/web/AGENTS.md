@@ -5,7 +5,7 @@ This application is the best.serp.co Cloudflare Worker, not a filesystem-backed 
 - Keep D1 binding acquisition and runtime validation in `src/lib/catalog/repository.ts`,
   `src/lib/submissions/repository.ts`, `src/lib/email/runtime.ts`, `src/lib/auth/server.ts`,
   and (with the `MEDIA` R2 binding) `src/lib/media/worker-media.ts`; keep catalog, account,
-  email, and media SQL and DTOs in `packages/data-ops/`.
+  email, and media SQL and DTOs in `apps/web/src/db/`.
 - Listing images are hosted, never hotlinked: render media URLs the catalog adapter resolved on
   `MEDIA_BASE_URL`, and send new images through `src/lib/media/server.ts` (#95).
 - Every page and route under `src/app/admin/` and `src/app/api/admin/` calls `requireAdmin()` or

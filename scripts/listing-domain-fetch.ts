@@ -16,12 +16,12 @@ import { request as httpsRequest } from 'node:https'
 import { isIP, type LookupFunction } from 'node:net'
 import { pipeline, Readable } from 'node:stream'
 import { createBrotliDecompress, createGunzip, createInflate } from 'node:zlib'
-import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
+import { validatePublicHttpUrl } from '../apps/web/src/db/public-url'
 import {
   type SafeFetchFailure,
   type SafeFetchResult,
   safeFetch
-} from '@serpdirectory/data-ops/safe-fetch'
+} from '../apps/web/src/db/safe-fetch'
 import { decodeHtml, fetchMimeType } from '../apps/web/src/lib/submissions/html-encoding'
 import { parseSiteMetadata } from '../apps/web/src/lib/submissions/prefill'
 import { markupSignals, THIN_PAGE_TEXT } from './listing-domain-classifier'

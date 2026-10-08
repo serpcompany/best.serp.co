@@ -1,8 +1,8 @@
 import { appendFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { IMAGE_CONTENT_TYPES } from '@serpdirectory/data-ops/media-format'
-import { MEDIA_CACHE_CONTROL, MEDIA_SITE, parseMediaKey } from '@serpdirectory/data-ops/media-keys'
+import { IMAGE_CONTENT_TYPES } from '../apps/web/src/db/media-format'
+import { MEDIA_CACHE_CONTROL, MEDIA_SITE, parseMediaKey } from '../apps/web/src/db/media-keys'
 import { type D1Row, processRunner, validateRemoteConfig, wranglerD1 } from './cloudflare-release'
 import { project, type RemoteEnvironment } from './project'
 import {

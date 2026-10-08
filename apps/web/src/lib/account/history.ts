@@ -1,4 +1,4 @@
-import type { AccountEvent, AccountSubmissionDetail } from '@serpdirectory/data-ops/account'
+import type { AccountEvent, AccountSubmissionDetail } from '@/db/account'
 import { formatStamp } from './format'
 
 /**

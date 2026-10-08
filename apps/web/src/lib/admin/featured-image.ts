@@ -1,4 +1,4 @@
-import type { SubmissionReview } from '@serpdirectory/data-ops/admin-queries'
+import type { SubmissionReview } from '@/db/admin-queries'
 import { renderableImage } from '../media/renderable-image'
 
 /** A submission's hosted featured image as the review screen shows it, and the key it approves. */

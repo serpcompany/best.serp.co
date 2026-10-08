@@ -1,8 +1,8 @@
 import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import type { MediaOperations } from '@serpdirectory/data-ops/media-operations'
-import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
+import type { MediaOperations } from '@/db/media-operations'
+import { validatePublicHttpUrl } from '@/db/public-url'
 import { readSitePrefill } from '../submissions/prefill'
 import { createWorkerMediaOperations } from './worker-media'
 

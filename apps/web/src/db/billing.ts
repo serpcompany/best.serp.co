@@ -1,4 +1,4 @@
-import { urlKey } from '@serpdirectory/utils/url-key'
+import { urlKey } from '@/lib/url-key'
 import type { Database } from './client'
 import { listingIdsWithWebsite } from './listing-plans'
 import { executePlans, isPlanConflict, queryPlan } from './plan-runner'

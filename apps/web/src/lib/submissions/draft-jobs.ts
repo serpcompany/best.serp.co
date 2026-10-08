@@ -2,13 +2,13 @@ import type {
   DraftJobOperations,
   DueDraftReminder,
   ExpiredDraft
-} from '@serpdirectory/data-ops/draft-jobs'
+} from '@/db/draft-jobs'
 import {
   DRAFT_REMINDER_COUNT,
   draftExpiredEmailKey,
   draftReminderEmailKey
-} from '@serpdirectory/data-ops/draft-plans'
-import { EMAIL_DELIVERY_MAX_ATTEMPTS } from '@serpdirectory/data-ops/email-deliveries'
+} from '@/db/draft-plans'
+import { EMAIL_DELIVERY_MAX_ATTEMPTS } from '@/db/email-deliveries'
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'

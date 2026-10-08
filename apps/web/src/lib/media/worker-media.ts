@@ -6,18 +6,18 @@
  * Fails closed: an unknown environment or a missing `DB` or `MEDIA` binding refuses to ingest.
  */
 
-import type { ListingLogoIngestion } from '@serpdirectory/data-ops/listing-plans'
-import { ingestImage, scopedMediaBucket } from '@serpdirectory/data-ops/media-ingest'
+import type { ListingLogoIngestion } from '@/db/listing-plans'
+import { ingestImage, scopedMediaBucket } from '@/db/media-ingest'
 import {
   isMediaKey,
   LOCAL_MEDIA_PATH,
   MEDIA_CACHE_CONTROL
-} from '@serpdirectory/data-ops/media-keys'
+} from '@/db/media-keys'
 import {
   createMediaOperations,
   type MediaOperations,
   type MediaRunSummary
-} from '@serpdirectory/data-ops/media-operations'
+} from '@/db/media-operations'
 
 export interface MediaWorkerEnv {
   D1_RUNTIME_ENV?: string

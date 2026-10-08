@@ -1,6 +1,6 @@
-import type { WebsiteConflicts } from '@serpdirectory/data-ops/billing'
-import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
-import { safeFetch } from '@serpdirectory/data-ops/safe-fetch'
+import type { WebsiteConflicts } from '@/db/billing'
+import { validatePublicHttpUrl } from '@/db/public-url'
+import { safeFetch } from '@/db/safe-fetch'
 
 /**
  * The guardrail checks a paid submission passes before it goes live at payment (#68): the

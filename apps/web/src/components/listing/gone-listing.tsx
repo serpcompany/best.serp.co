@@ -1,4 +1,4 @@
-import type { UnpublishedListing } from '@serpdirectory/data-ops/contracts'
+import type { UnpublishedListing } from '@/db/contracts'
 import { ArrowRight, BadgeCheck, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'

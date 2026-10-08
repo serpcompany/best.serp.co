@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { MAX_MEDIA_BYTES } from '@serpdirectory/data-ops/media-keys'
+import { MAX_MEDIA_BYTES } from '../apps/web/src/db/media-keys'
 
 /**
  * Reads and writes listing media objects through the Cloudflare R2 REST API (#95), never through

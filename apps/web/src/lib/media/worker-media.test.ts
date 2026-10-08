@@ -1,4 +1,4 @@
-import { MEDIA_CACHE_CONTROL } from '@serpdirectory/data-ops/media-keys'
+import { MEDIA_CACHE_CONTROL } from '@/db/media-keys'
 import { describe, expect, it, vi } from 'vitest'
 import { createMediaHost, type MediaWorkerEnv, runMediaCron, serveLocalMedia } from './worker-media'
 

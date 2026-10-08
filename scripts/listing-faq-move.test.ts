@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
-import { assertD1StatementLimits } from '@serpdirectory/data-ops/sql-limits'
+import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
 import { describe, expect, it } from 'vitest'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
 import { readParityReport, readReviewedImportSql } from './d1-import-artifact'

@@ -14,7 +14,7 @@ export type LegacyRootLookup = (slug: string) => Promise<'category' | 'listing' 
 const ROOT_SEGMENT = /^\/([^/]+)\/?$/u
 /**
  * What a listing or category slug can be (the media keys' `slugPattern` in
- * `packages/data-ops/src/media-keys.ts`, at most a domain name's 253 characters). Anything else
+ * `apps/web/src/db/media-keys.ts`, at most a domain name's 253 characters). Anything else
  * never reaches D1.
  */
 const SLUG = /^[a-z0-9][a-z0-9._-]{0,252}$/u

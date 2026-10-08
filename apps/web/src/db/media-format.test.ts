@@ -21,7 +21,7 @@ describe('sniffImage', () => {
 
   it('reads the checked-in fallback tile as a 512px PNG', () => {
     const tile = readFileSync(
-      resolve(__dirname, '../../../apps/web/public/listing-logos/favicon-fallback-512x512.png')
+      resolve(__dirname, '../../public/listing-logos/favicon-fallback-512x512.png')
     )
     expect(sniffImage(tile)).toEqual({ format: 'png', height: 512, ok: true, width: 512 })
   })

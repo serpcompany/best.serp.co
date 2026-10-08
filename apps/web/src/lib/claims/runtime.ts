@@ -1,8 +1,8 @@
 import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { createClaimOperations } from '@serpdirectory/data-ops/claims'
-import { createDatabase } from '@serpdirectory/data-ops/client'
+import { createClaimOperations } from '@/db/claims'
+import { createDatabase } from '@/db/client'
 import { claimCodeKey, consumeRequestRateLimit } from '@/lib/auth/server'
 import { emailEventKey, enqueueEmail } from '@/lib/email/server'
 import { featureCopy } from '@/lib/feature-copy'
@@ -15,8 +15,8 @@ import type { ClaimDependencies } from './service'
 
 /**
  * Server-only adapter for claims (#67): validates the Worker's `DB` binding and
- * `D1_RUNTIME_ENV`, and wires the claim flow to D1 (`@serpdirectory/data-ops/claims`), the
- * code key, and the email module. All SQL lives in data-ops.
+ * `D1_RUNTIME_ENV`, and wires the claim flow to D1 (`@/db/claims`), the
+ * code key, and the email module. All SQL lives in `src/db`.
  */
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])

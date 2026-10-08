@@ -2,14 +2,14 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { IMAGE_CONTENT_TYPES, MAX_IMAGE_SIDE } from '@serpdirectory/data-ops/media-format'
+import { IMAGE_CONTENT_TYPES, MAX_IMAGE_SIDE } from '../apps/web/src/db/media-format'
 import {
   contentTypeForKey,
   MAX_MEDIA_BYTES,
   MEDIA_HASH_LENGTH,
   parseMediaKey
-} from '@serpdirectory/data-ops/media-keys'
-import { listingHasQueuedSubmission } from '@serpdirectory/data-ops/plan-support'
+} from '../apps/web/src/db/media-keys'
+import { listingHasQueuedSubmission } from '../apps/web/src/db/plan-support'
 import { parse } from 'yaml'
 import { z } from 'zod'
 import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
@@ -20,7 +20,7 @@ import { catalogSitemapRoutes, categoryRoute, listingIndexRoute, listingRoute } 
 /**
  * How a publication batch refuses itself on D1 (#95 release blocker): an assertion `SELECT` whose
  * failing branch raises `malformed JSON`, which rolls the whole batch back, the mechanism the
- * Worker's own plans use (`assertGuard` in `packages/data-ops/src/plan-support.ts`). D1's remote
+ * Worker's own plans use (`assertGuard` in `apps/web/src/db/plan-support.ts`). D1's remote
  * API refuses a temporary table with `not authorized: SQLITE_AUTH`, so the earlier
  * `CREATE TEMP TABLE publication_guard` could never run there. `scripts/d1-compat.ts` keeps every
  * generated statement inside what D1 accepts.

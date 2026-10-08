@@ -153,7 +153,7 @@ function validLocalConfig(): LocalConfigFixture {
         binding: 'DB',
         database_id: project.local.databaseId,
         database_name: project.local.databaseName,
-        migrations_dir: resolve('d1/drizzle'),
+        migrations_dir: resolve('apps/web/drizzle'),
         migrations_table: project.migrationsTable
       }
     ],
@@ -169,9 +169,9 @@ function validLocalConfig(): LocalConfigFixture {
 
 describe('fresh Drizzle D1 history', () => {
   it('uses a credential-free generator and one forward-only Wrangler history', () => {
-    const config = readFileSync(resolve('drizzle.config.ts'), 'utf8')
-    expect(config).toContain("out: './d1/drizzle'")
-    expect(config).toContain("schema: './packages/data-ops/src/schema.ts'")
+    const config = readFileSync(resolve('apps/web/drizzle.config.ts'), 'utf8')
+    expect(config).toContain("out: './drizzle'")
+    expect(config).toContain("schema: './src/db/schema.ts'")
     expect(config).not.toMatch(/accountId|databaseId|token|process\.env/u)
     expect(freshMigrationNames()).toEqual([
       '0000_baseline.sql',
@@ -632,8 +632,8 @@ describe('fresh Drizzle D1 history', () => {
     expect(config.name).toBe('best-serp-co-local')
     expect(config.main).toBe('worker.ts')
     expect(config.d1_databases).toHaveLength(1)
-    expect(config.d1_databases[0]?.database_id).toBe('00000000-0000-0000-0000-000000000001')
-    expect(config.d1_databases[0]?.migrations_dir).toBe('../../d1/drizzle')
+    expect(config.d1_databases[0]?.database_id).toBe('local-only-do-not-deploy')
+    expect(config.d1_databases[0]?.migrations_dir).toBe('drizzle')
     expect(config.d1_databases[0]?.migrations_table).toBe('d1_migrations')
     expect(config.vars.D1_RUNTIME_ENV).toBe('local')
     expect(Object.keys(config.vars)).not.toContain('SITE_ID')
@@ -713,7 +713,7 @@ describe('fresh Drizzle D1 history', () => {
         const binding = config.d1_databases[0]
         if (binding) binding.migrations_dir = resolve('d1/migrations')
       },
-      /d1\/drizzle/u
+      /apps\/web\/drizzle/u
     )
     assertRejected(
       'migrations-table',
@@ -816,7 +816,7 @@ describe('fresh Drizzle D1 history', () => {
         scripts: Record<string, string>
       }
     ).scripts
-    expect(scripts['db:generate']).toBe('pnpm exec drizzle-kit generate --config drizzle.config.ts')
+    expect(scripts['db:generate']).toBe('cd apps/web && drizzle-kit generate')
     expect(Object.keys(scripts).filter(name => name.startsWith('d1:'))).toEqual([])
     expect(scripts['db:migrations:list:local']).toBe('pnpm tsx scripts/d1-local-guard.ts list')
     for (const command of ['migrate', 'import', 'verify', 'publish']) {

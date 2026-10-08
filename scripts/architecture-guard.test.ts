@@ -7,7 +7,7 @@ import {
   maxFunctionArguments,
   oversizedPatternLiterals,
   stripSqlLiteralsAndComments
-} from '@serpdirectory/data-ops/sql-limits'
+} from '../apps/web/src/db/sql-limits'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { project } from './project'
@@ -133,13 +133,13 @@ const forbiddenExactCatalogPaths = [
 const guardedSourceRoots = [`${project.appDirectory}/`, '.github/workflows/']
 
 const sharedDataOperations = [
-  'packages/data-ops/src/catalog.ts',
-  'packages/data-ops/src/client.ts',
-  'packages/data-ops/src/contracts.ts',
-  'packages/data-ops/src/email-deliveries.ts',
-  'packages/data-ops/src/schema.ts',
-  'packages/data-ops/src/submission-plans.ts',
-  'packages/data-ops/src/submissions.ts'
+  'apps/web/src/db/catalog.ts',
+  'apps/web/src/db/client.ts',
+  'apps/web/src/db/contracts.ts',
+  'apps/web/src/db/email-deliveries.ts',
+  'apps/web/src/db/schema.ts',
+  'apps/web/src/db/submission-plans.ts',
+  'apps/web/src/db/submissions.ts'
 ]
 
 /**
@@ -243,8 +243,8 @@ describe('single-site D1-only repository architecture', () => {
     expect(repository).toContain("import 'server-only'")
     expect(repository).toContain('getCloudflareContext')
     expect(repository).toContain('env.DB')
-    expect(repository).toContain('@serpdirectory/data-ops/catalog')
-    expect(repository).toContain("from '@serpdirectory/data-ops/client'")
+    expect(repository).toContain('@/db/catalog')
+    expect(repository).toContain("from '@/db/client'")
     expect(repository).toContain('createDatabase(assertCatalogBinding(cloudflareEnv))')
     expect(repository).toContain('readListingBySlug = cache(')
     expect(repository).not.toMatch(/\b(?:SELECT|WITH)\b/u)
@@ -255,7 +255,7 @@ describe('single-site D1-only repository architecture', () => {
     }
     expect(wrangler.d1_databases?.map(binding => binding.binding)).toEqual(['DB'])
 
-    const sharedOperations = readFileSync(resolve('packages/data-ops/src/catalog.ts'), 'utf8')
+    const sharedOperations = readFileSync(resolve('apps/web/src/db/catalog.ts'), 'utf8')
     expect(sharedOperations).toContain('createCatalogOperations')
     expect(sharedOperations).toContain('runQuery')
     expect(sharedOperations).toContain('statement: CompiledQuery | SQL<T>')
@@ -270,7 +270,7 @@ describe('single-site D1-only repository architecture', () => {
       const source = readFileSync(resolve(file), 'utf8')
       expect(source, file).not.toMatch(/\bsite_id\b|\bsiteId\b|SiteDatabase|\bsites\b/u)
     }
-    const schema = readFileSync(resolve('packages/data-ops/src/schema.ts'), 'utf8')
+    const schema = readFileSync(resolve('apps/web/src/db/schema.ts'), 'utf8')
     expect(schema).toContain("'publication_state'")
     expect(schema).toContain('publication_state_singleton')
   })
@@ -291,27 +291,23 @@ describe('single-site D1-only repository architecture', () => {
     })
 
     expect(schemaOrClientFiles).not.toContain(`${project.sourceDirectory}/lib/catalog/schema.ts`)
-    expect(drizzleSources.every(file => file.startsWith('packages/data-ops/'))).toBe(true)
-    expect(files).toContain('packages/data-ops/src/schema.ts')
-    expect(files).toContain('packages/data-ops/src/client.ts')
+    expect(drizzleSources.every(file => file.startsWith('apps/web/src/db/'))).toBe(true)
+    expect(files).toContain('apps/web/src/db/schema.ts')
+    expect(files).toContain('apps/web/src/db/client.ts')
 
     const manifest = JSON.parse(
       readFileSync(resolve(project.appDirectory, 'package.json'), 'utf8')
     ) as {
       dependencies?: Record<string, string>
     }
-    expect(manifest.dependencies?.['drizzle-orm']).toBeUndefined()
-    const dataOpsManifest = JSON.parse(
-      readFileSync(resolve('packages/data-ops/package.json'), 'utf8')
-    ) as { dependencies?: Record<string, string> }
-    expect(dataOpsManifest.dependencies?.['drizzle-orm']).toMatch(/^\d+\.\d+\.\d+$/u)
+    expect(manifest.dependencies?.['drizzle-orm']).toMatch(/^\d+\.\d+\.\d+$/u)
 
-    const client = readFileSync(resolve('packages/data-ops/src/client.ts'), 'utf8')
+    const client = readFileSync(resolve('apps/web/src/db/client.ts'), 'utf8')
     expect(client).toContain('binding: D1Database')
     expect(client).toContain('export function createDatabase(binding: D1Database): Database')
     expect(client).not.toMatch(/getCloudflareContext|process\.env/u)
 
-    const contracts = readFileSync(resolve('packages/data-ops/src/contracts.ts'), 'utf8')
+    const contracts = readFileSync(resolve('apps/web/src/db/contracts.ts'), 'utf8')
     expect(contracts).toContain('client: Database')
     expect(contracts).not.toContain('database: D1Database')
   })
@@ -325,8 +321,8 @@ describe('single-site D1-only repository architecture', () => {
     expect(binding).toBeGreaterThan(policy)
     expect(runtime.indexOf('createDatabase(')).toBeGreaterThan(binding)
     expect(runtime.match(/createDatabase\(/gu)).toHaveLength(1)
-    expect(runtime).toContain("from '@serpdirectory/data-ops/client'")
-    expect(runtime).toContain("from '@serpdirectory/data-ops/email-deliveries'")
+    expect(runtime).toContain("from '@/db/client'")
+    expect(runtime).toContain("from '@/db/email-deliveries'")
     expect(runtime).toContain('createDisabledEmailService')
 
     const emailDirectory = resolve(project.sourceDirectory, 'lib/email')
@@ -337,7 +333,7 @@ describe('single-site D1-only repository architecture', () => {
       expect(code, file).not.toMatch(/\.prepare\(|\.batch\(|drizzle-orm/u)
     }
 
-    const ledger = readFileSync(resolve('packages/data-ops/src/email-deliveries.ts'), 'utf8')
+    const ledger = readFileSync(resolve('apps/web/src/db/email-deliveries.ts'), 'utf8')
     expect(ledger).toContain('createEmailDeliveryLedger')
     expect(ledger).toContain('client: Database')
     expect(ledger).not.toMatch(/getCloudflareContext|process\.env|sql\.raw/u)
@@ -348,13 +344,13 @@ describe('single-site D1-only repository architecture', () => {
       resolve(project.sourceDirectory, 'lib/submissions/repository.ts'),
       'utf8'
     )
-    expect(adapter).toContain('@serpdirectory/data-ops/submissions')
+    expect(adapter).toContain('@/db/submissions')
     expect(adapter).toContain('createDatabase(workerEnv.DB)')
     expect(adapter).not.toMatch(/\b(?:SELECT|INSERT|UPDATE|DELETE|WITH)\b/u)
     expect(adapter).not.toContain('.prepare(')
     expect(adapter).not.toContain('.batch(')
 
-    const operations = readFileSync(resolve('packages/data-ops/src/submissions.ts'), 'utf8')
+    const operations = readFileSync(resolve('apps/web/src/db/submissions.ts'), 'utf8')
     // Statement plans (#62): submissions, listings, revisions, and their shared support.
     const plans = [
       'submission-plans',
@@ -363,7 +359,7 @@ describe('single-site D1-only repository architecture', () => {
       'revision-plans',
       'plan-support'
     ]
-      .map(name => readFileSync(resolve(`packages/data-ops/src/${name}.ts`), 'utf8'))
+      .map(name => readFileSync(resolve(`apps/web/src/db/${name}.ts`), 'utf8'))
       .join('\n')
     expect(operations).toContain('createSubmissionOperations')
     expect(operations).toContain('client: Database')
@@ -379,23 +375,23 @@ describe('single-site D1-only repository architecture', () => {
     expect(existsSync(resolve(project.sourceDirectory, 'lib/url-safety.ts'))).toBe(false)
     // Every fetch of a submitter's URL (badge checks, prefill, logos) and of listing media goes
     // through the one shared safe fetcher, which validates each hop with the public-URL policy
-    // (#95 moved submit v2's copy into data-ops).
+    // (#95 moved submit v2's copy into the data layer, now `src/db`).
     expect(existsSync(resolve(project.sourceDirectory, 'lib/submissions/safe-fetch.ts'))).toBe(
       false
     )
-    const safeFetch = readFileSync(resolve('packages/data-ops/src/safe-fetch.ts'), 'utf8')
+    const safeFetch = readFileSync(resolve('apps/web/src/db/safe-fetch.ts'), 'utf8')
     expect(safeFetch).toContain("from './public-url'")
     expect(safeFetch).toContain("from './mime-type'")
     expect(safeFetch).toContain("redirect: 'manual'")
     for (const file of ['badge-verifier.ts', 'prefill.ts']) {
       const source = readFileSync(resolve(project.sourceDirectory, 'lib/submissions', file), 'utf8')
-      expect(source, file).toContain("from '@serpdirectory/data-ops/safe-fetch'")
+      expect(source, file).toMatch(/from '(?:@|\.\.\/\.\.)\/db\/safe-fetch'/u)
       expect(source, file).not.toMatch(/\bfetcher\(|\bawait fetch\(/u)
     }
-    const ingest = readFileSync(resolve('packages/data-ops/src/media-ingest.ts'), 'utf8')
+    const ingest = readFileSync(resolve('apps/web/src/db/media-ingest.ts'), 'utf8')
     expect(ingest).toContain("from './safe-fetch'")
     expect(ingest).not.toMatch(/\bfetcher\(|\bawait fetch\(/u)
-    // The site parser has one copy, in data-ops; prefill re-exports it.
+    // The site parser has one copy, in `src/db`; prefill re-exports it.
     expect(
       readFileSync(resolve(project.sourceDirectory, 'lib/submissions/prefill.ts'), 'utf8')
     ).not.toMatch(/function parseSiteMetadata|const NAMED_ENTITIES/u)
@@ -409,7 +405,7 @@ describe('single-site D1-only repository architecture', () => {
         /\benv\.MEDIA\b|\.MEDIA\??\./u.test(readFileSync(resolve(file), 'utf8'))
     )
     expect(mediaBindingUsers).toEqual(['apps/web/src/lib/media/worker-media.ts'])
-    const publicUrl = readFileSync(resolve('packages/data-ops/src/public-url.ts'), 'utf8')
+    const publicUrl = readFileSync(resolve('apps/web/src/db/public-url.ts'), 'utf8')
     expect(publicUrl).toContain('validatePublicHttpUrl')
     expect(publicUrl).not.toMatch(/getCloudflareContext|process\.env|node:net/u)
   })
@@ -444,7 +440,7 @@ describe('single-site D1-only repository architecture', () => {
     expect(server).toContain("import 'server-only'")
     expect(server).toContain('getCloudflareContext')
     expect(server).toContain('createDatabase(binding)')
-    const operations = readFileSync(resolve('packages/data-ops/src/auth.ts'), 'utf8')
+    const operations = readFileSync(resolve('apps/web/src/db/auth.ts'), 'utf8')
     expect(operations).not.toMatch(/getCloudflareContext|process\.env/u)
   })
 
@@ -505,7 +501,7 @@ describe('single-site D1-only repository architecture', () => {
     const runtime = readFileSync(resolve(accountDirectory, 'runtime.ts'), 'utf8')
     expect(runtime).toContain("import 'server-only'")
     expect(runtime).toContain('createDatabase(workerEnv.DB)')
-    const operations = readFileSync(resolve('packages/data-ops/src/account.ts'), 'utf8')
+    const operations = readFileSync(resolve('apps/web/src/db/account.ts'), 'utf8')
     expect(operations).not.toMatch(/getCloudflareContext|process\.env/u)
   })
 
@@ -541,7 +537,7 @@ describe('single-site D1-only repository architecture', () => {
     const outside = trackedFiles().filter(
       file =>
         /\.(?:ts|tsx)$/u.test(file) &&
-        (file.startsWith(`${project.appDirectory}/`) || file.startsWith('packages/')) &&
+        file.startsWith(`${project.appDirectory}/`) &&
         !file.startsWith(`${project.sourceDirectory}/lib/billing/providers/`) &&
         existsSync(resolve(file)) &&
         providerSpecific.test(readFileSync(resolve(file), 'utf8'))
@@ -614,7 +610,7 @@ describe('single-site D1-only repository architecture', () => {
           [
             'apps/web/src/lib/site/',
             // Validation and error messages the data layer returns to pages (#111 round 4).
-            'packages/data-ops/src/'
+            'apps/web/src/db/'
           ].some(dir => file.startsWith(dir))) &&
         !file.startsWith(`${project.sourceDirectory}/lib/billing/providers/`) &&
         existsSync(resolve(file))
@@ -688,11 +684,11 @@ describe('single-site D1-only repository architecture', () => {
       file =>
         /\.(?:ts|tsx)$/u.test(file) &&
         !/\.test\.tsx?$/u.test(file) &&
-        !file.startsWith('packages/data-ops/src/test-support') &&
+        !file.startsWith('apps/web/src/db/test-support') &&
         !file.startsWith('apps/e2e/') &&
         writesBadgeChecks(readFileSync(resolve(file), 'utf8'))
     )
-    expect(writers).toEqual(['packages/data-ops/src/badge-program.ts'])
+    expect(writers).toEqual(['apps/web/src/db/badge-program.ts'])
     const programDirectory = resolve(project.sourceDirectory, 'lib/badge-program')
     for (const file of readdirSync(programDirectory).filter(name => !name.includes('.test.'))) {
       const source = readFileSync(resolve(programDirectory, file), 'utf8')
@@ -708,7 +704,7 @@ describe('single-site D1-only repository architecture', () => {
   it('keeps Server Actions out of the app: admin writes are /api/admin route handlers (#64)', () => {
     const violations = trackedFiles().filter(file => {
       if (
-        !(file.startsWith(`${project.appDirectory}/`) || file.startsWith('packages/')) ||
+        !file.startsWith(`${project.appDirectory}/`) ||
         !/\.(?:m?[jt]sx?)$/u.test(file) ||
         !existsSync(resolve(file))
       )
@@ -719,8 +715,8 @@ describe('single-site D1-only repository architecture', () => {
   })
 
   it('keeps one fresh Drizzle migration history and forbids push-based schema mutation', () => {
-    const config = readFileSync(resolve('drizzle.config.ts'), 'utf8')
-    expect(config).toContain("out: './d1/drizzle'")
+    const config = readFileSync(resolve('apps/web/drizzle.config.ts'), 'utf8')
+    expect(config).toContain("out: './drizzle'")
     expect(config).not.toContain('d1/migrations')
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
 
@@ -771,7 +767,7 @@ describe('single-site D1-only repository architecture', () => {
   it('keeps user input out of LIKE/GLOB patterns and every SQL function within 32 arguments', () => {
     const sqlSources = trackedFiles().filter(
       file =>
-        (file.startsWith('packages/data-ops/src/') || /^scripts\/[^/]+\.ts$/u.test(file)) &&
+        (file.startsWith('apps/web/src/db/') || /^scripts\/[^/]+\.ts$/u.test(file)) &&
         file.endsWith('.ts') &&
         !file.endsWith('.test.ts') &&
         existsSync(resolve(file))
@@ -779,15 +775,15 @@ describe('single-site D1-only repository architecture', () => {
     const violations = sqlSources.flatMap(file =>
       sqlSourceViolations(file, readFileSync(resolve(file), 'utf8'))
     )
-    for (const migration of readdirSync(resolve('d1/drizzle')).filter(name =>
+    for (const migration of readdirSync(resolve('apps/web/drizzle')).filter(name =>
       name.endsWith('.sql')
     )) {
-      const statements = readFileSync(resolve('d1/drizzle', migration), 'utf8').split(
+      const statements = readFileSync(resolve('apps/web/drizzle', migration), 'utf8').split(
         '--> statement-breakpoint'
       )
       for (const statement of statements) {
         for (const violation of d1StatementLimitViolations(statement)) {
-          violations.push(`d1/drizzle/${migration}: ${violation}`)
+          violations.push(`apps/web/drizzle/${migration}: ${violation}`)
         }
       }
     }

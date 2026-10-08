@@ -25,7 +25,7 @@ user menu holds the email and sign-out.
 
 ## Ownership and requests
 
-Every read and write is scoped to the session's user in SQL (`packages/data-ops/src/account.ts`):
+Every read and write is scoped to the session's user in SQL (`apps/web/src/db/account.ts`):
 a submission by `owner_user_id`, a listing by a current `listing_owners` row, a revision by
 `author_user_id`. Someone else's id reads as missing, so pages and requests answer 404. Pages
 call `requireAccountUser()` (`lib/account/pages.ts`: signed out, `/login` and back). Writes are
@@ -101,7 +101,7 @@ lands, a revision's changed logo should be hosted on save the way #96 hosts a su
 
 ## Tests
 
-`packages/data-ops/src/account.test.ts` (node:sqlite), the plan tests in `submission-plans.test.ts`,
+`apps/web/src/db/account.test.ts` (node:sqlite), the plan tests in `submission-plans.test.ts`,
 `scripts/d1-workerd-plans.test.ts` (every plan and read on Wrangler-local D1),
 `apps/web/src/lib/account/*.test.ts`, and `apps/e2e/tests/account-dashboard.spec.ts` (Playwright on
 its own local Worker and empty D1, `PLAYWRIGHT_PORT` + 5, like the admin suite's +3, since both

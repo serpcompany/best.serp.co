@@ -34,7 +34,7 @@ export const project = {
    */
   migrationsTable: 'd1_migrations',
   local: {
-    databaseId: '00000000-0000-0000-0000-000000000001',
+    databaseId: 'local-only-do-not-deploy',
     databaseName: 'best-serp-co-local',
     /** Local listing media (#95): Wrangler state only; the Worker serves it at `/_media`. */
     media: { baseUrl: '/_media', bucket: 'best-serp-co-media-local' },

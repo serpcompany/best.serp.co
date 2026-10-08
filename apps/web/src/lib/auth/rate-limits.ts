@@ -1,6 +1,6 @@
 /**
  * Abuse limits for sign-in codes (serpcompany/best.serp.co#60), enforced in D1 by
- * `consumeRateLimit` in `@serpdirectory/data-ops/auth`: isolates share no memory, so nothing is
+ * `consumeRateLimit` in `@/db/auth`: isolates share no memory, so nothing is
  * counted in memory. Each code also allows at most `OTP_ALLOWED_ATTEMPTS` guesses (Better Auth
  * stores the attempt count with the code and deletes the code after the last one), and only
  * from the browser that requested it (`code-binding.ts`).
@@ -23,7 +23,7 @@
  *     request without the cookie can spend, so other clients cannot stop it and a stolen
  *     cookie cannot remove the inbox cap.
  */
-import type { AuthRateLimitRule } from '@serpdirectory/data-ops/auth'
+import type { AuthRateLimitRule } from '@/db/auth'
 import {
   SIGN_IN_CODE_ATTEMPTS,
   SIGN_IN_CODE_LENGTH,

@@ -1,6 +1,6 @@
 /**
  * Exact application table and column inventory of the D1 schema in
- * `packages/data-ops/src/schema.ts` (applied by the `d1/drizzle` migrations).
+ * `apps/web/src/db/schema.ts` (applied by the `apps/web/drizzle` migrations).
  * Snapshot, parity, and verification tooling reads every column listed here, so
  * a schema change must update this inventory in the same change.
  */

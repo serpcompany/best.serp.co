@@ -17,16 +17,16 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
   code is in `apps/web/src/` (`app/`, `components/`, `lib/`, `hooks/`, `actions/`).
   `worker.ts` is the Worker entry: an epoch-keyed edge HTML cache in front of OpenNext.
 - `apps/web/src/lib/catalog/`: server-only adapter that acquires and validates the `DB`
-  binding and delegates to `packages/data-ops/`. `apps/web/src/lib/admin/` does the same for the
+  binding and delegates to `apps/web/src/db/`. `apps/web/src/lib/admin/` does the same for the
   admin panel's decisions.
 - `apps/web/src/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
   the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/ACCOUNTS.md)).
 - `apps/e2e/`: Playwright suites that run against the local or deployed Worker.
 - `apps/web/src/lib/site/`: the checked-in site definition (routes, copy, badges, the route
   registry); `apps/web/content/` holds the MDX content (legal pages, the About page).
-- `packages/data-ops/`: Drizzle schema, catalog and submission queries, caching.
+- `apps/web/src/db/`: Drizzle schema, catalog and submission queries, caching.
 - `apps/web/src/components/ui/`: stock shadcn/ui components, added with `pnpm shadcn <name>`.
-- `d1/drizzle/`: forward-only migration history applied by Wrangler.
+- `apps/web/drizzle/`: forward-only migration history applied by Wrangler.
 - `d1/publications/`: reviewed catalog mutation manifests (staging first, then production).
 - `d1/media/`: reviewed listing media upload plans (keys and sources; no image files).
 - `d1/artifacts/`: one-time JSON import; the parity report and the brotli-compressed
@@ -77,12 +77,12 @@ Issues and labels never grant production, database, or deployment authority.
 `scripts/architecture-guard.test.ts` checks parts of these; review covers the rest.
 
 - Read catalog data through `apps/web/src/lib/catalog/repository.ts`, which delegates all
-  SQL to `packages/data-ops/`. Never put catalog SQL in the app.
+  SQL to `apps/web/src/db/`. Never put catalog SQL anywhere else.
 - Obtain the database only through the server-only OpenNext `DB` binding; fail closed
   when the binding or `D1_RUNTIME_ENV` is missing or invalid.
 - Use prepared statements and bind every runtime value.
-- Model tables in `packages/data-ops/src/schema.ts` and generate migrations into
-  `d1/drizzle/` with `pnpm db:generate`; `drizzle-kit push` is forbidden.
+- Model tables in `apps/web/src/db/schema.ts` and generate migrations into
+  `apps/web/drizzle/` with `pnpm db:generate`; `drizzle-kit push` is forbidden.
 - No catalog JSON/YAML/CSV runtime, generated browser search index, filesystem fallback,
   static export, or GitHub Pages deploy path. The legacy `products.json` is an import input
   read from an external checkout, never an application input.

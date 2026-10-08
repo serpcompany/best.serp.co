@@ -80,8 +80,8 @@ hosted logo. Only the submitter's own form previews the URL they typed.
 
 ## Ingestion
 
-`packages/data-ops/src/media-ingest.ts` fetches a source through the one shared `safeFetch`
-(`packages/data-ops/src/safe-fetch.ts`, also submit v2's badge checks and prefill): every hop is
+`apps/web/src/db/media-ingest.ts` fetches a source through the one shared `safeFetch`
+(`apps/web/src/db/safe-fetch.ts`, also submit v2's badge checks and prefill): every hop is
 checked by `validatePublicHttpUrl`, at most three redirects, 8 s, a 5 MB cap, the response type
 read as Fetch reads it, and for media only ports 80 and 443. It recognizes PNG, JPEG, WebP, GIF,
 AVIF, and ICO by their bytes and checks each file's structure, not just its header

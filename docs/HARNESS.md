@@ -184,7 +184,7 @@ Git identity, Worker name, D1 binding, and runtime variables as JSON.
 local D1 preview on the manifest port, and mirrors output into
 `.runtime/<instance>/logs/runtime.log`. `agent:logs` returns the last 200 lines.
 The agent runtime, canonical local D1 aliases, app preview, and Playwright all resolve
-the same `d1/drizzle/` state below the manifest's D1 directory. They do
+the same `apps/web/drizzle/` state below the manifest's D1 directory. They do
 not inspect or migrate a legacy local state directory.
 
 `agent:evidence` writes a timestamped JSON record containing the commit, dirty paths,

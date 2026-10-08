@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "analyze": "ANALYZE=true pnpm build",
+    "benchmark": "vitest run src/db/benchmark.test.ts",
     "build": "NODE_NO_WARNINGS=1 next build",
     "build:worker": "NODE_NO_WARNINGS=1 opennextjs-cloudflare build",
     "clean": "git clean -xdf .cache .turbo .next coverage node_modules",
@@ -13,6 +14,7 @@
     "lint:fix": "biome check --write .",
     "preview:worker": "pnpm --dir=../.. tsx scripts/d1-local-preview.ts",
     "start": "next start",
+    "test": "vitest run src/db/account.test.ts src/db/admin-plans.test.ts src/db/admin-queries.test.ts src/db/auth.test.ts src/db/test-support.test.ts src/db/cache.test.ts src/db/catalog.test.ts src/db/client.test.ts src/db/email-deliveries.test.ts src/db/public-url.test.ts src/db/submissions.test.ts src/db/submission-plans.test.ts src/db/draft-plans.test.ts src/db/draft-jobs.test.ts src/db/badge-program.test.ts src/db/claims.test.ts src/db/listing-plans.test.ts src/db/revision-plans.test.ts src/db/schema-invariants.test.ts src/db/url-key.test.ts src/db/media-format.test.ts src/db/media-keys.test.ts src/db/media-plans.test.ts src/db/media-ingest.test.ts src/db/media-operations.test.ts src/db/site-metadata.test.ts src/db/safe-fetch.test.ts src/db/safe-fetch-node.test.ts src/db/benchmark.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
@@ -44,8 +46,6 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/nextjs": "^10.76.0",
-    "@serpdirectory/data-ops": "workspace:*",
-    "@serpdirectory/utils": "workspace:*",
     "@t3-oss/env-nextjs": "catalog:",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-table": "8.21.3",
@@ -53,6 +53,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "drizzle-orm": "0.45.3",
     "geist": "^1.7.0",
     "input-otp": "^1.4.2",
     "jose": "6.2.12",
@@ -67,7 +68,9 @@
     "server-only": "catalog:",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
+    "tldts": "7.4.16",
     "tw-animate-css": "1.4.0",
+    "undici": "7.29.1",
     "vaul": "^1.1.2",
     "zod": "catalog:"
   },
@@ -81,6 +84,7 @@
     "postcss": "^8.5.6",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
+    "vitest": "4.1.11",
     "wrangler": "4.147.0"
   }
 }

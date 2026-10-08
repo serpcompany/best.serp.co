@@ -1,4 +1,4 @@
-import { isHostBlocked, urlKey, websiteSpellings } from '@serpdirectory/utils/url-key'
+import { isHostBlocked, urlKey, websiteSpellings } from '@/lib/url-key'
 import { describe, expect, it } from 'vitest'
 
 describe('urlKey (shared website normalization, #62 review finding 4)', () => {

@@ -49,7 +49,7 @@ export function urlKey(website: string): UrlKey {
  * (#64 review): http or https, the host with and without a leading `www.` (the host is
  * `urlKey`'s), and the path with and without a trailing slash, all without the query and
  * fragment. `listings.website` stores a URL as it was entered, so `listingWebsiteMatch` in
- * data-ops compares the stored value with the URL as given, with each spelling, and with each
+ * `src/db` compares the stored value with the URL as given, with each spelling, and with each
  * spelling followed by any query or fragment. Shared by submission intake and the admin website
  * edit, so both match the same listings.
  */

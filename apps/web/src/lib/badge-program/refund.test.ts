@@ -1,4 +1,4 @@
-import type { BadgeCheckRecord } from '@serpdirectory/data-ops/badge-program'
+import type { BadgeCheckRecord } from '@/db/badge-program'
 import { describe, expect, it, vi } from 'vitest'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'
 import { checkBadgeAtRefund } from './refund'

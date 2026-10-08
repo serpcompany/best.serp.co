@@ -1,4 +1,4 @@
-import { isValidAssetReference } from '@serpdirectory/utils/asset-reference'
+import { isValidAssetReference } from '@/lib/asset-reference'
 import { z } from 'zod'
 
 const publishedAtPattern = /^\d{4}-\d{2}-\d{2}$/

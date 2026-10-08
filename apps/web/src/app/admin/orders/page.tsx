@@ -1,4 +1,4 @@
-import type { AdminOrderRow } from '@serpdirectory/data-ops/billing'
+import type { AdminOrderRow } from '@/db/billing'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { AdminCrumbs } from '@/components/admin/admin-shell'

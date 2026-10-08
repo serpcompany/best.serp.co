@@ -4,10 +4,10 @@
  * D1 delivery ledger, the `sign-in-code` template, and the useSend sender. `fetch` is a fake, so
  * nothing is ever sent.
  */
-import { createAuthOperations } from '@serpdirectory/data-ops/auth'
-import { createDatabase } from '@serpdirectory/data-ops/client'
-import { pruneEmailDeliveries } from '@serpdirectory/data-ops/email-deliveries'
-import { SqliteD1 } from '@serpdirectory/data-ops/test-support'
+import { createAuthOperations } from '@/db/auth'
+import { createDatabase } from '@/db/client'
+import { pruneEmailDeliveries } from '@/db/email-deliveries'
+import { SqliteD1 } from '@/db/test-support'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EMAIL_SENDER } from '../email/config'
 import { createAuth } from './config'

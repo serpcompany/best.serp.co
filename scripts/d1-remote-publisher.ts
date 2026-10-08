@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { MEDIA_CACHE_CONTROL, MEDIA_SITE } from '@serpdirectory/data-ops/media-keys'
+import { MEDIA_CACHE_CONTROL, MEDIA_SITE } from '../apps/web/src/db/media-keys'
 import { validateRemoteConfig } from './cloudflare-release'
 import { assertD1Compatible } from './d1-compat'
 import {

@@ -23,8 +23,8 @@ import {
   authSchemaOptions,
   createAuthDatabaseAdapter,
   normalizeEmail
-} from '@serpdirectory/data-ops/auth'
-import type { Database } from '@serpdirectory/data-ops/client'
+} from '@/db/auth'
+import type { Database } from '@/db/client'
 import { APIError, createAuthEndpoint, createAuthMiddleware } from 'better-auth/api'
 import { betterAuth } from 'better-auth/minimal'
 import { emailOTP } from 'better-auth/plugins/email-otp'

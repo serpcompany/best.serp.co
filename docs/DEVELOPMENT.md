@@ -58,7 +58,7 @@ seeded admin. Cloudflare Access is off locally and on staging; to exercise it, s
 
 ## Schema changes
 
-Edit `packages/data-ops/src/schema.ts`, then generate and apply a migration locally:
+Edit `apps/web/src/db/schema.ts`, then generate and apply a migration locally:
 
 ```bash
 pnpm db:generate

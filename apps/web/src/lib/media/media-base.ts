@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { validateMediaBaseUrl } from '@serpdirectory/data-ops/media-keys'
+import { validateMediaBaseUrl } from '@/db/media-keys'
 
 /**
  * This environment's media host (`MEDIA_BASE_URL`, #95) for screens outside the catalog

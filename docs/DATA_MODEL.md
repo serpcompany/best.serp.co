@@ -1,7 +1,7 @@
 # D1 data model
 
-The schema is modeled once in `packages/data-ops/src/schema.ts`. `pnpm db:generate`
-(`drizzle-kit generate`) writes reviewable SQL into `d1/drizzle/`, and Wrangler applies
+The schema is modeled once in `apps/web/src/db/schema.ts`. `pnpm db:generate`
+(`drizzle-kit generate`) writes reviewable SQL into `apps/web/drizzle/`, and Wrangler applies
 it while recording the `d1_migrations` ledger. Every D1 binding in
 `apps/web/wrangler.jsonc` (local, staging, production) declares the same `DB` binding,
 `migrations_dir`, and `migrations_table: "d1_migrations"`; the local config check and the
@@ -19,7 +19,7 @@ catalog from the committed import. That data is public and pinned, contains no s
 or other user data, and the parity checks and Playwright suites need it. Submissions and any
 future user data are seeded from fixtures only, never copied from staging or production.
 
-`d1/drizzle/0000_baseline.sql` is hand-finished after generation: every table is
+`apps/web/drizzle/0000_baseline.sql` is hand-finished after generation: every table is
 `STRICT`, `PRAGMA foreign_keys = ON` leads the file, and four triggers enforce that a
 published listing always has exactly one primary category. Keep those properties when
 adding migrations (later migrations end each `CREATE TABLE` with `STRICT` by hand too);
@@ -50,8 +50,8 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 - No CHECK or trigger uses LIKE or GLOB (ISO instants are checked with
   `x IS strftime('%Y-%m-%dT%H:%M:%fZ', x)`), and no statement binds user input into a pattern.
   The architecture guard fails on a bound or concatenated LIKE/GLOB pattern, a literal pattern
-  over 50 bytes, or a function with more than 32 arguments, in data-ops, scripts, and migrations.
-- `packages/data-ops/src/sql-limits.ts` checks every statement the SQLite and workerd test
+  over 50 bytes, or a function with more than 32 arguments, in `src/db`, scripts, and migrations.
+- `apps/web/src/db/sql-limits.ts` checks every statement the SQLite and workerd test
   helpers run against those limits, and against a column compared with itself (#78).
 - `scripts/d1-workerd-plans.test.ts` runs the #62 plans on workerd, and
   `scripts/d1-workerd-queries.test.ts` runs every catalog, search, account, email, and
@@ -159,7 +159,7 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   expiry queries in `draft-plans.ts`; the schedule and the two reminder variants are in
   [Submission flow](./SUBMISSION_FLOW.md).
 - **URL keys and prohibited URLs** (#59 amendments). `urlKey()`
-  (`packages/utils/url-key.ts`) normalizes every website once: the WHATWG URL parser (as in
+  (`apps/web/src/lib/url-key.ts`) normalizes every website once: the WHATWG URL parser (as in
   workerd) percent-decodes, punycodes, and lowercases the host; trailing dots and a leading
   `www.` are removed. The host is the slug and the duplicate key: a website is already listed
   when a listing's slug is its host, or a listing's stored website is one of its spellings
@@ -197,13 +197,13 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   submission's.
 - `badge_checks` (listing, `checked_at`, `outcome`, `reason`, `conclusive`, `kind` `weekly` |
   `confirmation` | `refund`) is the badge program history, written only by
-  `packages/data-ops/src/badge-program.ts` ([Badge program](./BADGE_PROGRAM.md)); an owner's own
+  `apps/web/src/db/badge-program.ts` ([Badge program](./BADGE_PROGRAM.md)); an owner's own
   checks are recorded on the submission ([Submitter dashboard](./ACCOUNT_DASHBOARD.md#badge-panel)).
   Writing it never changes the catalog epoch.
 - `listing_claims` (`0008_listing_claims`) holds claims of existing listings ([Claims](./CLAIMS.md)).
 
 - `orders` and `billing_events` (`0009_billing_orders`): the billing ledger and the provider's
-  webhook events, written only by `packages/data-ops/src/billing.ts`.
+  webhook events, written only by `apps/web/src/db/billing.ts`.
 
 These tables are empty in the initial import, so bootstrap parity compares them like the
 submission tables (`scripts/d1-table-inventory.ts`).
@@ -220,7 +220,7 @@ Details: [Listing media](./MEDIA.md).
 
 ## Statement plans
 
-Every transition is a credential-free statement plan in `packages/data-ops`
+Every transition is a credential-free statement plan in `apps/web/src/db`
 (`submission-plans.ts`, `draft-plans.ts`, `listing-plans.ts`, `revision-plans.ts`,
 `admin-plans.ts`, `plan-support.ts`; the admin panel's reads are `admin-queries.ts`) sent as
 one D1 batch. Each mutation repeats its expected state in the `WHERE` and is followed by a
@@ -244,7 +244,7 @@ content, media, and resource links. List pages read one page at a time
 are cached per epoch, and only the requested page's summaries are then read by id.
 
 The **catalog epoch** is `publication_state.version` plus the newest public
-`published_at` (`packages/data-ops/src/catalog-epoch.ts`), so it also changes when a
+`published_at` (`apps/web/src/db/catalog-epoch.ts`), so it also changes when a
 listing scheduled for the future becomes due. Shell counts, name order and pages,
 featured and latest heads, details, and the full summary list are cached in the Workers
 Cache API under epoch-scoped keys (24-hour retention, live D1 fallback on cache failure),

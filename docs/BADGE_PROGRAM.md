@@ -3,7 +3,7 @@
 The weekly badge program (serpcompany/best.serp.co#59, #66) checks every week that the listings
 which rely on the badge still show it, and confirms a missing badge about 24 hours later before
 anything happens (`apps/web/src/lib/badge-program/`, D1 side in
-`packages/data-ops/src/badge-program.ts`, run by `apps/web/src/lib/worker/scheduled.ts`).
+`apps/web/src/db/badge-program.ts`, run by `apps/web/src/lib/worker/scheduled.ts`).
 
 ## Switching it on
 

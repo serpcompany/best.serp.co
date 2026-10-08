@@ -2,7 +2,7 @@ import type {
   AccountListing,
   AccountOverview,
   AccountSubmission
-} from '@serpdirectory/data-ops/account'
+} from '@/db/account'
 import { describe, expect, it } from 'vitest'
 import { accountCards, accountRows, categoryChoices } from './view'
 

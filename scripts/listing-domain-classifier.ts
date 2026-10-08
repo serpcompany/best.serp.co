@@ -13,7 +13,7 @@
  * needs a strong signal, and a listing that is itself about gambling or domains never gets them
  * from page words alone (it goes to the owner list instead).
  */
-import { urlKey } from '@serpdirectory/utils/url-key'
+import { urlKey } from '../apps/web/src/lib/url-key'
 import type { Hop, PageSignals, SiteObservation } from './listing-domain-fetch'
 
 /** Provider fingerprints only count on a page with less visible text than this. */

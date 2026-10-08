@@ -1064,12 +1064,12 @@ describe('D1 data stays in Cloudflare', () => {
         .map(match => match[1])
         .sort()
     expect(imports('scripts/media-upload.ts')).toEqual([
+      '../apps/web/src/db/media-format',
+      '../apps/web/src/db/media-keys',
+      '../apps/web/src/db/safe-fetch',
+      '../apps/web/src/db/safe-fetch-node',
       './project',
       './r2-objects',
-      '@serpdirectory/data-ops/media-format',
-      '@serpdirectory/data-ops/media-keys',
-      '@serpdirectory/data-ops/safe-fetch',
-      '@serpdirectory/data-ops/safe-fetch-node',
       'node:crypto',
       'node:fs',
       'node:path',
@@ -1077,7 +1077,7 @@ describe('D1 data stays in Cloudflare', () => {
       'zod'
     ])
     expect(imports('scripts/r2-objects.ts')).toEqual([
-      '@serpdirectory/data-ops/media-keys',
+      '../apps/web/src/db/media-keys',
       'node:crypto'
     ])
     const r2 = readFileSync(resolve('scripts/r2-objects.ts'), 'utf8')
@@ -1149,11 +1149,11 @@ describe('D1 data stays in Cloudflare', () => {
         .map(match => match[1])
         .sort()
     expect(imports('scripts/media-health.ts')).toEqual([
+      '../apps/web/src/db/media-format',
+      '../apps/web/src/db/media-keys',
       './cloudflare-release',
       './project',
       './r2-objects',
-      '@serpdirectory/data-ops/media-format',
-      '@serpdirectory/data-ops/media-keys',
       'node:fs',
       'node:path',
       'node:url'

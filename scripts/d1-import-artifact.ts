@@ -113,7 +113,7 @@ export function sqliteTransport(database: DatabaseSync): SnapshotTransport {
 }
 
 /**
- * The exact application snapshot a fresh database reaches after every `d1/drizzle` migration
+ * The exact application snapshot a fresh database reaches after every `apps/web/drizzle` migration
  * and the reviewed import SQL, built in memory.
  */
 export async function expectedBootstrapSnapshot(

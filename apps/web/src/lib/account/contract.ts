@@ -4,7 +4,7 @@ import { draftContentSchema, SUBMISSION_FIELD_LIMITS } from '../submissions/cont
 /**
  * The submitter dashboard's HTTP contract (serpcompany/best.serp.co#65), shared by the route
  * handlers under `/api/account/` and the browser. The server checks the same rules again in
- * `@serpdirectory/data-ops/account` (`ACCOUNT_LIMITS`, https links).
+ * `@/db/account` (`ACCOUNT_LIMITS`, https links).
  */
 
 export const ACCOUNT_EXTRAS_LIMITS = {

@@ -1,7 +1,7 @@
 /**
  * Admin panel decisions (serpcompany/best.serp.co#64): each action reads the current state,
  * answers a replay of a decision that already happened as a no-op, composes the reviewed
- * statement plans from `@serpdirectory/data-ops` (`prepareCatalogPublication` for anything that
+ * statement plans from `@/db` (`prepareCatalogPublication` for anything that
  * changes public output), and sends them as one D1 batch. Every plan compares and swaps on the
  * state it read (the submission's `content_version`, the listing checksum, the publication
  * version), so a concurrent or stale decision is refused whole and answered 409.
@@ -23,14 +23,14 @@ import {
   buildRemoveAdminPlans,
   selectAdminAllowlistPlan,
   selectVerifiedUserByEmailPlan
-} from '@serpdirectory/data-ops/admin-plans'
+} from '@/db/admin-plans'
 import {
   createAdminReadOperations,
   selectActiveUrlBlockPlan,
   selectListingWebsiteConflictPlan,
   selectResubmissionTargetPlan
-} from '@serpdirectory/data-ops/admin-queries'
-import type { Database } from '@serpdirectory/data-ops/client'
+} from '@/db/admin-queries'
+import type { Database } from '@/db/client'
 import {
   buildRepublishListingPlans,
   buildRevokeListingOwnerPlans,
@@ -42,21 +42,21 @@ import {
   type ListingDetailsField,
   type ListingLogoIngestion,
   selectListingForPublicationPlan
-} from '@serpdirectory/data-ops/listing-plans'
-import { executePlans, isPlanConflict, queryPlan } from '@serpdirectory/data-ops/plan-runner'
+} from '@/db/listing-plans'
+import { executePlans, isPlanConflict, queryPlan } from '@/db/plan-runner'
 import {
   type CatalogPublication,
   prepareCatalogPublication,
   type StatementPlan
-} from '@serpdirectory/data-ops/plan-support'
-import { validatePublicHttpUrl } from '@serpdirectory/data-ops/public-url'
+} from '@/db/plan-support'
+import { validatePublicHttpUrl } from '@/db/public-url'
 import {
   buildApproveRevisionPlans,
   buildRejectRevisionPlans,
   buildRequestRevisionChangesPlans,
   selectRevisionForDecisionPlan
-} from '@serpdirectory/data-ops/revision-plans'
-import type { ListingLinkRel, RejectionCategory } from '@serpdirectory/data-ops/schema'
+} from '@/db/revision-plans'
+import type { ListingLinkRel, RejectionCategory } from '@/db/schema'
 import {
   buildApproveLiveSubmissionPlans,
   buildApproveSubmissionPlans,
@@ -66,8 +66,8 @@ import {
   buildRequestSubmissionChangesPlans,
   selectSubmissionForDecisionPlan,
   submissionTransitions
-} from '@serpdirectory/data-ops/submission-plans'
-import { hasFileExtension } from '@serpdirectory/utils/file-extensions'
+} from '@/db/submission-plans'
+import { hasFileExtension } from '@/lib/file-extensions'
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'

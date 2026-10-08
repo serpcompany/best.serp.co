@@ -10,7 +10,6 @@ import { movedUrlRedirects } from './src/lib/routing/redirects'
 import { site } from './src/lib/site/site'
 import { sentryRelease } from './src/lib/telemetry/sentry'
 
-export const INTERNAL_PACKAGES = ['@serpdirectory/utils']
 
 const BUILD_ID_HASH_LENGTH = 20
 
@@ -77,7 +76,6 @@ const brandsBasePath = normalizeBasePath(site.routes.brandsBasePath)
 let nextConfig: NextConfig = {
   ...baseConfig,
 
-  transpilePackages: INTERNAL_PACKAGES,
 
   // `unauthorized()` / `forbidden()` give admin pages real 401 and 403 responses
   // (`requireAdmin()` in src/lib/auth/server.ts; docs/ACCOUNTS.md).

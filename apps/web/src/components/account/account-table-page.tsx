@@ -1,4 +1,4 @@
-import type { AccountOverview } from '@serpdirectory/data-ops/account'
+import type { AccountOverview } from '@/db/account'
 import { Inbox, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactElement } from 'react'

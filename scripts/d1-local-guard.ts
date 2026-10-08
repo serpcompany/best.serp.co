@@ -56,7 +56,7 @@ function query(command: string): unknown[] {
   return parsed[0]?.results || []
 }
 
-/** `pnpm db:migrations:list:local`: the d1/drizzle migrations local D1 has not applied yet. */
+/** `pnpm db:migrations:list:local`: the apps/web/drizzle migrations local D1 has not applied yet. */
 function listMigrations(): void {
   wrangler(['d1', 'migrations', 'list', project.local.databaseName])
 }

@@ -31,7 +31,7 @@ Worker handler outside Next.js.
 | `templates.ts` | Template contract: `defineEmailTemplate`, the escaping `html` tag, `css`, absolute links |
 | `registry.ts` | The site's 18 emails, built to #70; catalog in [Email templates](./EMAIL_TEMPLATES.md) |
 
-The idempotency ledger lives in `packages/data-ops/src/email-deliveries.ts` (table
+The idempotency ledger lives in `apps/web/src/db/email-deliveries.ts` (table
 `email_deliveries`), like every other SQL statement. The sender and the dashboard paths come
 from `apps/web/src/lib/site` (`email.from`, `email.dashboardPath`, `email.adminDashboardPath`).
 

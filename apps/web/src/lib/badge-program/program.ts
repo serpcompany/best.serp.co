@@ -4,9 +4,9 @@ import {
   type BadgeProgramListing,
   type BadgeProgramOperations,
   badgeProgramEmailKey
-} from '@serpdirectory/data-ops/badge-program'
-import { EMAIL_DELIVERY_MAX_ATTEMPTS } from '@serpdirectory/data-ops/email-deliveries'
-import { CONCLUSIVE_VERIFICATION_FAILURES } from '@serpdirectory/data-ops/submissions'
+} from '@/db/badge-program'
+import { EMAIL_DELIVERY_MAX_ATTEMPTS } from '@/db/email-deliveries'
+import { CONCLUSIVE_VERIFICATION_FAILURES } from '@/db/submissions'
 import type { BadgeProblem } from '../email/emails/listings'
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
@@ -45,7 +45,7 @@ import {
  * subrequest limit (1,000 on the Paid plan) and the 30-second CPU default. The rest wait for
  * the next hourly run; with 20 per hour a cycle covers about 3,000 listings a week.
  *
- * Every write is a compare-and-swap (`@serpdirectory/data-ops/badge-program`) and every email
+ * Every write is a compare-and-swap (`@/db/badge-program`) and every email
  * goes through the email ledger under a key per template and check, so an overlapping or
  * repeated run never records a check twice or sends an email twice.
  */

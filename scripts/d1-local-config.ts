@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { project } from './project'
 
-export const canonicalLocalMigrationsDirectory = resolve('d1/drizzle')
+export const canonicalLocalMigrationsDirectory = resolve('apps/web/drizzle')
 
 interface WranglerConfig {
   assets?: { binding?: string; directory?: string }
@@ -25,7 +25,7 @@ const retiredSiteVariables = ['NEXT_PUBLIC_SITE_ID', 'SITE_ID'] as const
 
 /**
  * Validates that the top level of the Wrangler config is the dedicated local
- * best.serp.co Worker: local identity, local D1 binding, `d1/drizzle` history recorded in the
+ * best.serp.co Worker: local identity, local D1 binding, `apps/web/drizzle` history recorded in the
  * declared `d1_migrations` ledger, the `apps/web` Worker entry (which wraps the OpenNext
  * build), and its assets.
  */
@@ -71,7 +71,7 @@ export function validateCanonicalLocalConfig(
     resolve(dirname(absoluteConfigPath), binding.migrations_dir) !==
       canonicalLocalMigrationsDirectory
   ) {
-    throw new Error('Canonical local D1 must apply the d1/drizzle migration history.')
+    throw new Error('Canonical local D1 must apply the apps/web/drizzle migration history.')
   }
   if (binding.migrations_table !== project.migrationsTable) {
     throw new Error(

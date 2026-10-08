@@ -23,7 +23,7 @@ import {
   type EmailDeliveryLedger,
   isEmailEventKey,
   isEmailTemplateId
-} from '@serpdirectory/data-ops/email-deliveries'
+} from '../../db/email-deliveries'
 import {
   EMAIL_ADMIN_DASHBOARD_PATH,
   EMAIL_DASHBOARD_PATH,

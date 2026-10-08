@@ -1,7 +1,7 @@
 # D1 change rules
 
-- The schema belongs in `packages/data-ops/src/schema.ts`; `pnpm db:generate` writes
-  migrations to `d1/drizzle/`, and Wrangler applies them. `drizzle-kit push` is
+- The schema belongs in `apps/web/src/db/schema.ts`; `pnpm db:generate` writes
+  migrations to `apps/web/drizzle/`, and Wrangler applies them. `drizzle-kit push` is
   forbidden.
 - Migrations are forward-only and must keep the D1 specifics of the baseline
   (`STRICT` tables, primary-category triggers).

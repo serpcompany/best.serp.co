@@ -98,7 +98,7 @@ function sqliteD1(database = new DatabaseSync(':memory:')) {
       )
       for (const name of freshMigrationNames()) {
         if (applied.has(name)) continue
-        database.exec(readFileSync(resolve('d1/drizzle', name), 'utf8'))
+        database.exec(readFileSync(resolve('apps/web/drizzle', name), 'utf8'))
         database.prepare('INSERT INTO d1_migrations (name) VALUES (?)').run(name)
       }
     },
@@ -978,7 +978,7 @@ describe('remote Wrangler identity', () => {
   it('refuses a drifted environment identity', () => {
     const base = JSON.parse(readFileSync(resolve(project.wranglerConfigPath), 'utf8'))
     for (const environment of ['staging', 'production'] as const) {
-      base.env[environment].d1_databases[0].migrations_dir = resolve('d1/drizzle')
+      base.env[environment].d1_databases[0].migrations_dir = resolve('apps/web/drizzle')
     }
     const mutations: Array<[string, (config: typeof base) => void]> = [
       [

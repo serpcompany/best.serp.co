@@ -1,4 +1,4 @@
-import type { ActivityEvent, AdminListingDetail } from '@serpdirectory/data-ops/admin-queries'
+import type { ActivityEvent, AdminListingDetail } from '@/db/admin-queries'
 import {
   formatDateTime,
   formatDay,

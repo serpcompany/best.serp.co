@@ -336,7 +336,7 @@ function localSchemaProof(migrationDirectory: string, names: readonly string[]):
   }
 }
 
-/** The schema proof a database reaches after applying every `d1/drizzle` migration. */
+/** The schema proof a database reaches after applying every `apps/web/drizzle` migration. */
 export function expectedSchemaProof(): SchemaProof {
   return localSchemaProof(freshMigrationsDirectory, freshMigrationNames())
 }

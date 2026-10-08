@@ -3,7 +3,7 @@
 A signed-in user claims an existing, ownerless listing (serpcompany/best.serp.co#59, #67): they
 prove an address on the listing's domain with an emailed code, then either the badge (free) or a
 payment (#68), and become its owner. The flow lives in `apps/web/src/lib/claims/` (no SQL) and
-`packages/data-ops/src/claims.ts`; the API is `POST /api/claims` and
+`apps/web/src/db/claims.ts`; the API is `POST /api/claims` and
 `POST /api/claims/<id>/<action>`.
 
 ## Switching it on

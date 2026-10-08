@@ -15,9 +15,9 @@ the account area shares (`@/components/dashboard/*`); pages set their breadcrumb
 | Listings | `/admin/listings/` (`?q=`, `status`, `source`, `link`, `page`, `size`) | `selectAdminListingsPlans` |
 | Listing | `/admin/listings/<slug>/` | `selectAdminListingPlans` |
 | Admins | `/admin/admins/` | `selectAdminAllowlistPlan` |
-| Orders (#68) | `/admin/orders/` | `selectAdminOrdersPlan` (`data-ops/billing.ts`) |
+| Orders (#68) | `/admin/orders/` | `selectAdminOrdersPlan` (`src/db/billing.ts`) |
 
-The reads are statement plans in `packages/data-ops/src/admin-queries.ts`; `apps/web/src/lib/admin/`
+The reads are statement plans in `apps/web/src/db/admin-queries.ts`; `apps/web/src/lib/admin/`
 holds no SQL (the architecture guard checks it). Orders (screen 13, [Billing](./BILLING.md)) are
 shown while orders are on (`features.orders`, on since #133); otherwise the entry is hidden and
 `/admin/orders/` is a 404. The Inbox and the conversation panels on screens 11 and 12 are #73's.
@@ -149,7 +149,7 @@ guards instead:
 - the Cloudflare Access application on `/admin*` and `/api/admin*`, plus an admin session whose
   verified email is on the D1 allowlist, re-checked on every request;
 - the trusted-`Origin` check on every write, JSON-only bodies, and no Server Actions;
-- only the reviewed statement plans in `packages/data-ops`, each a compare-and-swap with
+- only the reviewed statement plans in `apps/web/src/db`, each a compare-and-swap with
   `changes()` assertions, so a write applies whole or not at all;
 - an audit row per decision with the admin's email, and a `publication_runs` row per catalog
   change.
@@ -159,7 +159,7 @@ the app writes production data, and agents never use the production admin panel.
 
 ## Tests
 
-`packages/data-ops/src/{admin-plans,admin-queries,listing-plans}.test.ts` and
+`apps/web/src/db/{admin-plans,admin-queries,listing-plans}.test.ts` and
 `apps/web/src/lib/admin/decisions.test.ts` (node:sqlite), `scripts/d1-workerd-plans.test.ts` (every
 plan builder and read on Wrangler-local D1), and `apps/e2e/tests/admin-panel.spec.ts`
 (Playwright: the gate, approve, request changes, reject, allow resubmission, unpublish with 410

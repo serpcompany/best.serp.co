@@ -1,4 +1,4 @@
-import type { ListingDetail } from '@serpdirectory/data-ops/contracts'
+import type { ListingDetail } from '@/db/contracts'
 import { TriangleAlert } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { MiniListing } from './mini-listing'

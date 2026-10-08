@@ -1,4 +1,4 @@
-import type { ReviewQueueItem, ReviewQueueView } from '@serpdirectory/data-ops/admin-queries'
+import type { ReviewQueueItem, ReviewQueueView } from '@/db/admin-queries'
 import type { Metadata } from 'next'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { ageWords, PAID_LISTING_PRICE_CENTS } from '@/components/admin/format'

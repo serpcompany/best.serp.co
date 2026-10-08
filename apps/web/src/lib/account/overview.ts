@@ -1,6 +1,6 @@
 import 'server-only'
 
-import type { AccountOverview } from '@serpdirectory/data-ops/account'
+import type { AccountOverview } from '@/db/account'
 import { cache } from 'react'
 import { accountOperations } from './runtime'
 

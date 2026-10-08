@@ -1,6 +1,6 @@
 import 'server-only'
 
-import type { AccountListingDetail, AccountSubmissionDetail } from '@serpdirectory/data-ops/account'
+import type { AccountListingDetail, AccountSubmissionDetail } from '@/db/account'
 import { EMAIL_ADMIN_RECIPIENT, emailEventKey, enqueueEmail } from '@/lib/email/server'
 
 /**

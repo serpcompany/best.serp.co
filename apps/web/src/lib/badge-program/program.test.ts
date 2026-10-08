@@ -4,7 +4,7 @@ import type {
   BadgeProgramOperations,
   PendingConfirmation,
   RecordedBadgeCheck
-} from '@serpdirectory/data-ops/badge-program'
+} from '@/db/badge-program'
 import { describe, expect, it, vi } from 'vitest'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'
 import {

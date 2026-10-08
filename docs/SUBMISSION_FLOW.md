@@ -4,7 +4,7 @@
 
 Native submissions (serpcompany/best.serp.co#59) move through these statuses in
 `listing_submissions.status`. Every transition is a compare-and-swap statement plan in
-`packages/data-ops/src/submission-plans.ts` (`submissionTransitions`), tested for every source
+`apps/web/src/db/submission-plans.ts` (`submissionTransitions`), tested for every source
 status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement-plans).
 
 | Status | Meaning | Live | Review queue |
@@ -198,8 +198,8 @@ owner except filling in the form; the anonymous capability-token flow is gone.
 ### Fetching submitters' sites
 
 Badge checks, prefill, and logo checks fetch only through the shared `safeFetch`
-(`packages/data-ops/src/safe-fetch.ts`, which listing media ingestion uses too, #95): every hop, including each of at most 3 manually followed redirects, must pass
-`validatePublicHttpUrl` (`packages/data-ops/src/public-url.ts`: http or https, no credentials
+(`apps/web/src/db/safe-fetch.ts`, which listing media ingestion uses too, #95): every hop, including each of at most 3 manually followed redirects, must pass
+`validatePublicHttpUrl` (`apps/web/src/db/public-url.ts`: http or https, no credentials
 in the URL, no `localhost`, `*.local`, `*.localhost`, `*.internal`, `*.home.arpa` or similar
 names, and no private, shared, loopback, link-local, documentation, benchmark, multicast, or
 reserved IPv4 or IPv6 address, including IPv4-mapped and -compatible, NAT64 `64:ff9b::/96`,
@@ -228,7 +228,7 @@ Only the submitter's own form previews the URL they typed, through
 
 An hourly Cron Trigger (`0 * * * *`, `triggers.crons` in `apps/web/wrangler.jsonc`) runs the
 Worker's `scheduled()` handler (`apps/web/src/lib/worker/scheduled.ts`). Its draft job
-(`apps/web/src/lib/submissions/draft-jobs.ts`, D1 side in `packages/data-ops/src/draft-jobs.ts`)
+(`apps/web/src/lib/submissions/draft-jobs.ts`, D1 side in `apps/web/src/db/draft-jobs.ts`)
 first sends again the draft emails whose last send failed (a `failed` email-ledger row with
 attempts left, for a draft still in the state the email describes), then withdraws drafts 30
 days old as `expired` and sends `draft-expired`, then claims and sends the latest due
@@ -246,7 +246,7 @@ behavior is covered by `scheduled.test.ts` and `draft-jobs.test.ts` against SQLi
 
 Code: `apps/web/src/app/submit/`, `apps/web/src/components/submit/`,
 `apps/web/src/app/api/submissions/`, `apps/web/src/lib/submissions/`,
-`packages/data-ops/src/submissions.ts`, and `packages/data-ops/src/submission-plans.ts`.
+`apps/web/src/db/submissions.ts`, and `apps/web/src/db/submission-plans.ts`.
 
 ## Listing media
 
