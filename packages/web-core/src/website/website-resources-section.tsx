@@ -1,6 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import type { ComponentType, ReactNode } from 'react'
+import { withDubVia } from '../dub-via'
 import { getListingSpecificResourceLinks } from '../resource-links'
 import type { WebsiteResourceLink } from '../website-schema'
 
@@ -48,7 +49,7 @@ export function WebsiteResourcesSection({
                 {resourceLinks.map(link => (
                   <li key={`${link.label}-${link.url}`}>
                     <Link
-                      href={link.url}
+                      href={withDubVia(link.url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="group flex items-start gap-4 px-6 py-4 transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"

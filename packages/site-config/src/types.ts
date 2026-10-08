@@ -51,6 +51,8 @@ export type SiteOwnedContent = {
 }
 
 export type SiteAnalyticsConfig = {
+  /** The site's Dub partner ID: `?via=` on every `serp.ly` link it renders (#169). */
+  dubPartnerId?: string
   gtmId?: string
 }
 

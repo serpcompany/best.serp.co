@@ -30,6 +30,8 @@ export type SiteConfig = {
   description: string
   docsRouteBasePath: string
   domain: string
+  /** `?via=` on every `serp.ly` link (`dub-via.ts`, #169). */
+  dubPartnerId?: string
   features: SiteFeatureFlags
   gtmId?: string
   githubIssueOwner: string | null
@@ -144,6 +146,7 @@ function resolveSiteConfig(configuredSite = site): SiteConfig {
     description: configuredSite.site.description,
     docsRouteBasePath: configuredSite.routes.docsBasePath,
     domain: configuredSite.site.domain,
+    dubPartnerId: configuredSite.analytics?.dubPartnerId,
     features: configuredSite.features,
     gtmId: configuredSite.analytics?.gtmId,
     githubIssueOwner: configuredSite.social.githubIssueOwner,

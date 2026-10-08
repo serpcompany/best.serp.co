@@ -2,6 +2,7 @@ import type { SiteDefinition } from './types'
 
 export const site: SiteDefinition = {
   analytics: {
+    dubPartnerId: 'best.serp.co',
     gtmId: 'GTM-W59GNHXF'
   },
   badges: {

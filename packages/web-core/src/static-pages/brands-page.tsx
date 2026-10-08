@@ -1,6 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { withDubVia } from '../dub-via'
 import type { NetworkBrandEntry } from '../network-brands'
 import { getNetworkBrandsForGroup } from '../network-brands'
 import { generateDisabledRouteMetadata } from '../route-feature-gates'
@@ -101,7 +102,7 @@ export default function BrandsPage() {
                   <h2 className="text-lg font-semibold tracking-tight">
                     <a
                       className="inline-flex items-center gap-2 text-primary hover:underline"
-                      href={brand.url}
+                      href={withDubVia(brand.url)}
                       rel="noopener noreferrer"
                       target="_blank"
                     >

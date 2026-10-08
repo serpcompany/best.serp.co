@@ -5,6 +5,8 @@
  */
 export const site = {
   categoryCount: 140,
+  /** `?via=` on every serp.ly link the site renders (#169). */
+  dubPartnerId: 'best.serp.co',
   /**
    * Live listings in the reviewed import, which the local suite runs against. A deployed
    * environment publishes reviewed manifests and admin decisions on top (#100 unpublished 95
