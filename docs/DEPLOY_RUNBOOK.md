@@ -128,6 +128,16 @@ GITHUB_SHA` check, and a slow validation of an older commit could deploy after a
 PR Review already gates every merge, and Main Validation re-runs the full loop on the same
 `staging` or `main` commit in parallel.
 
+## Error reporting (Sentry)
+
+Sentry reports errors from the Worker (`apps/web/instrumentation.ts`, server rendering and
+route handlers) and the browser (`instrumentation-client.ts`), with the settings and the
+scrubber in `apps/web/lib/telemetry/sentry.ts`: no PII, query strings, cookies, headers,
+console output, tracing, or replay. Both deploy builds bake in `NEXT_PUBLIC_SENTRY_DSN` (repo
+variable `SENTRY_DSN`) and the commit as the release; with no DSN, Sentry stays off.
+`SENTRY_AUTH_TOKEN` (repo secret, project releases scope) and the `SENTRY_PROJECT` variable
+only upload source maps. The owner creates the project and sets all three.
+
 ## Production release
 
 ### First release (Phase 4b)
