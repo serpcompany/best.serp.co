@@ -64,6 +64,17 @@ describe('catalogEpochReader (#165)', () => {
     expect(await after(context)).toBe('epoch-of-new')
   })
 
+  it("loads through the latest request's cache handle, not the first one's", async () => {
+    const database = binding('handoff')
+    const first = cache()
+    const latest = cache()
+    const read = catalogEpochReader({ D1_RUNTIME_ENV: 'local', DB: database }, first, observe)
+    catalogEpochReader({ D1_RUNTIME_ENV: 'local', DB: database }, latest, observe)
+    await read(context)
+    expect(latest.match).toHaveBeenCalled()
+    expect(first.match).not.toHaveBeenCalled()
+  })
+
   it.each([
     { D1_RUNTIME_ENV: 'local' },
     { D1_RUNTIME_ENV: 'preview', DB: binding('a') },
