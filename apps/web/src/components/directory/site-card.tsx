@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
  * lighter border, p-4, and the hover lift). Its other parts are the stock ones from `ui/card`.
  */
 const publicCardClassName =
-  'rounded-none border-border/50 p-4 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-foreground/10 hover:shadow-lg'
+  'border-border/50 p-4 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-foreground/10 hover:shadow-lg'
 
 export function SiteCard({
   className,

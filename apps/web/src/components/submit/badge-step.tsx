@@ -204,7 +204,7 @@ export function badgeCheckResultAlert(
           &lt;a href="{listingUrl}" rel="
           {found.map(token => (
             <span key={token}>
-              <span className="rounded bg-destructive/20 px-0.5 line-through decoration-destructive">
+              <span className="rounded-sm bg-destructive/20 px-0.5 line-through decoration-destructive">
                 {token}
               </span>{' '}
             </span>
@@ -486,7 +486,7 @@ export function BadgeStep({
             <p className="mt-1 text-muted-foreground text-sm">
               Paste a snippet into the HTML of <b className="font-medium text-foreground">{site}</b>
               . The footer works well. Keep it a plain link: don’t add <UnfollowedTokens /> to its{' '}
-              <code className="rounded bg-muted px-1 font-mono text-xs">rel</code>.
+              <code className="rounded-sm bg-muted px-1 font-mono text-xs">rel</code>.
             </p>
           </div>
         </div>

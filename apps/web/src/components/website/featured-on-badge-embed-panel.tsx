@@ -74,7 +74,7 @@ export function FeaturedOnBadgeEmbedPanel({
             key={`${siteId}-${theme}`}
             type="button"
             onClick={() => void handleCopy(theme, embedHtml)}
-            className="mt-4 block max-w-full cursor-pointer rounded bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="mt-4 block max-w-full cursor-pointer rounded-sm bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             aria-label={`Copy ${theme} badge embed code`}
             title={`Copy ${theme} badge embed code`}
           >

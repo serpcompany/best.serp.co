@@ -74,7 +74,7 @@ function DirectoryEmpty({
   return (
     <Empty
       className={cn(
-        'h-[50vh] flex-none gap-0 rounded-none border-none p-0 text-center [text-wrap:wrap] md:p-0',
+        'h-[50vh] flex-none gap-0 border-none p-0 text-center [text-wrap:wrap] md:p-0',
         className
       )}
     >

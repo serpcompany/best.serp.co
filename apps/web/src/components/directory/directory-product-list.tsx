@@ -57,7 +57,7 @@ function DirectoryProductCard({
   return (
     <Card
       className={cn(
-        'relative h-full rounded-none border-border/50 p-4 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-foreground/10 hover:shadow-lg',
+        'relative h-full border-border/50 p-4 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-foreground/10 hover:shadow-lg',
         className
       )}
     >

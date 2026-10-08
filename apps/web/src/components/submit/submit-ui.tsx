@@ -97,7 +97,7 @@ export function ToneAlert({
       <Icon aria-hidden="true" />
       <AlertTitle>{title}</AlertTitle>
       {children || actions ? (
-        <AlertDescription className="[overflow-wrap:anywhere] [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-xs">
+        <AlertDescription className="[overflow-wrap:anywhere] [&_code]:rounded-sm [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-xs">
           {children}
           {actions ? <div className="mt-2 flex flex-wrap gap-2">{actions}</div> : null}
         </AlertDescription>

@@ -249,7 +249,7 @@ export function SearchAutocomplete({
       trailing: (
         <>
           {suggestion.type === 'recent' && (
-            <div className="rounded bg-muted/30 px-1.5 py-0.5 text-xs text-muted-foreground">
+            <div className="rounded-sm bg-muted/30 px-1.5 py-0.5 text-xs text-muted-foreground">
               Recent
             </div>
           )}
@@ -257,7 +257,7 @@ export function SearchAutocomplete({
             <TrendingUp className="h-3 w-3 text-muted-foreground" />
           )}
           {suggestion.type === 'category' && (
-            <div className="rounded bg-info/10 px-1.5 py-0.5 text-xs text-info">Category</div>
+            <div className="rounded-sm bg-info/10 px-1.5 py-0.5 text-xs text-info">Category</div>
           )}
           <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
         </>
