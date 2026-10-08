@@ -325,6 +325,8 @@ export function createAuth({ client, operations, sender, settings }: CreateAuthO
           if (body.type !== 'sign-in') {
             throw badRequest('UNSUPPORTED_OTP_TYPE', 'Only sign-in codes are supported.')
           }
+          // No email: Better Auth's own validation answers 400 INVALID_EMAIL, before any rate
+          // limit is counted. The deploy HTTP gates send one on every deploy (#161).
           if (typeof body.email !== 'string' || body.email.trim() === '') return
           const headers = ctx.request?.headers
           const cookieHeader = headers?.get('cookie')
