@@ -6,13 +6,13 @@ import { ThemeProvider } from './theme-provider'
 
 /**
  * Stock Sonner reads `var(--popover)` and friends as whole colors; this theme keeps HSL
- * components in those variables (`--popover: 0 0% 100%`), so the toaster gets whole colors.
- * #186's base-nova theme stores whole colors, and this goes.
+ * components in those variables (`--popover: 0 0% 100%`), so the toaster gets the theme's
+ * whole colors (`--color-popover`). #186's base-nova theme stores whole colors, and this goes.
  */
 const toasterColors = {
-  '--normal-bg': 'hsl(var(--popover))',
-  '--normal-text': 'hsl(var(--popover-foreground))',
-  '--normal-border': 'hsl(var(--border))',
+  '--normal-bg': 'var(--color-popover)',
+  '--normal-text': 'var(--color-popover-foreground)',
+  '--normal-border': 'var(--color-border)',
   // The style prop replaces stock's whole object, so its radius comes along.
   '--border-radius': 'var(--radius)'
 } as CSSProperties
