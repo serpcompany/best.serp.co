@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { compareWithBaseline, literalColors } from './theme-color-guard'
 
 /**
  * Components style only through the theme tokens (serp's shadcn-first standard, #183): no hex,
@@ -97,57 +98,31 @@ const COLOR_BASELINE: Readonly<Record<string, number>> = {
   'apps/web/src/components/website/website-hero.tsx': 6
 }
 
-const PREFIX =
-  '(?:bg|text|border(?:-[xytrblse])?|ring(?:-offset)?|fill|stroke|from|via|to|outline|divide|shadow|decoration|caret|accent|placeholder)'
-const PALETTE =
-  '(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black)'
-const patterns: ReadonlyArray<readonly [string, RegExp]> = [
-  [
-    'palette class',
-    new RegExp(`(?<![\\w-])${PREFIX}-${PALETTE}(?:-\\d{2,3})?(?:\\/\\d{1,3})?(?![\\w-])`, 'gu')
-  ],
-  // A hex color in a string or CSS value; `#155` in a comment or `(#68)` in copy is an issue.
-  ['hex color', /(?<=['"`[=:]\s?)#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])/gu],
-  ['color function', /(?<![\w-])(?:rgba?|hsla?|oklch|oklab)\(/gu]
-]
-
-/** Comments name issues (`#155`) and colors in prose; only code counts. */
-function withoutComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//gu, comment => comment.replace(/[^\n]/gu, ' '))
-    .replace(/^\s*\/\/.*$/gmu, '')
-}
-
-/** Every literal color in `source`, as `line: kind text`. */
-function literalColors(source: string): string[] {
-  const code = withoutComments(source)
-  const uses: string[] = []
-  for (const [kind, pattern] of patterns) {
-    for (const match of code.matchAll(pattern)) {
-      const line = code.slice(0, match.index).split('\n').length
-      uses.push(`${line}: ${kind} ${match[0]}`)
-    }
-  }
-  return uses
-}
-
 function sourceFiles(): string[] {
-  return execFileSync('git', ['ls-files', 'apps/web/src'], { encoding: 'utf8' })
+  return execFileSync(
+    'git',
+    ['ls-files', '--cached', '--others', '--exclude-standard', 'apps/web/src'],
+    { encoding: 'utf8' }
+  )
     .split('\n')
     .filter(file => /\.(?:css|ts|tsx)$/u.test(file) && !/\.test\.tsx?$/u.test(file))
     .filter(file => existsSync(file))
 }
 
 describe('theme colors only (#183)', () => {
-  it('finds palette classes, hex values and color functions, and nothing else', () => {
+  it('finds palette classes, palette variables, hex values and color functions', () => {
     expect(
       literalColors(
         [
           '<div className="bg-red-500 hover:text-zinc-400/80 border-t-amber-300 ring-offset-white" />',
-          "const accent = { ink: '#09090b', bright: '#fff' }",
+          "const accent = { ink: '#09090b', bright: '#fff', line: '1px solid #e5e7eb' }",
           'ctx.fillStyle = `rgba(' + '$' + '{rgb}, 1)`',
-          'style={{ color: hsl(240 5% 92%) }}'
-        ].join('\n')
+          'style={{ color: hsl(240 5% 92%) }}',
+          '<p className="shadow-[0_0_0_1px_#000] bg-[linear-gradient(90deg,#fff,#000)]" />',
+          '<p className="inset-shadow-sky-500 drop-shadow-black/50 text-shadow-white" />',
+          '<p className="bg-(--color-red-500) text-[var(--color-amber-600)]" />'
+        ].join('\n'),
+        'probe.tsx'
       )
     ).toEqual([
       '1: palette class bg-red-500',
@@ -156,46 +131,94 @@ describe('theme colors only (#183)', () => {
       '1: palette class ring-offset-white',
       '2: hex color #09090b',
       '2: hex color #fff',
+      '2: hex color #e5e7eb',
       '3: color function rgba(',
-      '4: color function hsl('
+      '4: color function hsl(',
+      '5: hex color #000',
+      '5: hex color #fff',
+      '5: hex color #000',
+      '6: palette class inset-shadow-sky-500',
+      '6: palette class drop-shadow-black/50',
+      '6: palette class text-shadow-white',
+      '7: palette variable --color-red-500',
+      '7: palette variable --color-amber-600'
     ])
+    expect(literalColors('a {\n  /* #fff */\n  border: 1px solid #ccc;\n}', 'probe.css')).toEqual([
+      '3: hex color #ccc'
+    ])
+  })
+
+  it('ignores tokens, anchors, issue numbers and comments, and keeps line numbers', () => {
     expect(
       literalColors(
         [
           '// Fixed in #155; see #68.',
           '/* The amber badge (#64) */',
-          '<p className="bg-destructive text-muted-foreground border-border ring-ring" />',
-          "throw new Error('Retry later (#68).')",
+          '/** Never `bg-red-500`. */',
+          'const a = 1 /* #fff */',
           "const href = '#faqs'",
-          '<div className="text-balance bg-background/80 from-primary" />'
-        ].join('\n')
+          "const fail = () => { throw new Error('Retry later (#68), see #12, #13.') }",
+          'const page = (',
+          '  <>',
+          '    <p className="bg-destructive text-muted-foreground border-border ring-ring" />',
+          '    <div className="text-balance bg-background/80 from-primary" />',
+          '    <p>// not a comment, and #155 in copy</p>',
+          '    {/* bg-red-500 */}',
+          '  </>',
+          ')'
+        ].join('\n'),
+        'probe.tsx'
       )
     ).toEqual([])
+    // A `/*` in a string isn't a comment, and a blank line before `//` keeps its line.
+    expect(
+      literalColors(
+        [
+          "const accept = 'image/*'",
+          "const red = 'bg-red-500'",
+          '',
+          '// a comment',
+          "const white = 'text-white'",
+          '/* the end */'
+        ].join('\n'),
+        'probe.tsx'
+      )
+    ).toEqual(['2: palette class bg-red-500', '5: palette class text-white'])
+  })
+
+  it('fails a file over its count, and a count or entry left above the code', () => {
+    const uses = {
+      'a.tsx': ['1: palette class bg-red-500', '2: hex color #fff'],
+      'b.tsx': ['3: x']
+    }
+    expect(compareWithBaseline(uses, { 'a.tsx': 2, 'b.tsx': 1 })).toEqual({ over: [], stale: [] })
+    expect(compareWithBaseline(uses, { 'a.tsx': 1, 'b.tsx': 1 })).toEqual({
+      over: [
+        'a.tsx: 2 literal colors (baseline 1)\n  1: palette class bg-red-500\n  2: hex color #fff'
+      ],
+      stale: []
+    })
+    expect(compareWithBaseline(uses, { 'a.tsx': 2 }).over).toEqual([
+      'b.tsx: 1 literal colors (baseline 0)\n  3: x'
+    ])
+    expect(compareWithBaseline(uses, { 'a.tsx': 3, 'b.tsx': 1 }).stale).toEqual([
+      'a.tsx: 2 (baseline 3)'
+    ])
+    // A file that was cleaned up or deleted still has an entry.
+    expect(compareWithBaseline(uses, { 'a.tsx': 2, 'b.tsx': 1, 'gone.tsx': 4 }).stale).toEqual([
+      'gone.tsx: 0 (baseline 4)'
+    ])
   })
 
   it('keeps every file at or under its recorded count, and records every decrease', () => {
     const allowed = new Set([...Object.keys(ALLOWED), ...STOCK_UI])
-    const over: string[] = []
-    const stale: string[] = []
-    const counts: Record<string, number> = {}
+    const uses: Record<string, string[]> = {}
     for (const file of sourceFiles()) {
       if (allowed.has(file)) continue
-      const uses = literalColors(readFileSync(file, 'utf8'))
-      if (uses.length > 0) counts[file] = uses.length
-      const baseline = COLOR_BASELINE[file] ?? 0
-      if (uses.length > baseline) {
-        over.push(
-          `${file}: ${uses.length} literal colors (baseline ${baseline})\n  ${uses.join('\n  ')}`
-        )
-      } else if (uses.length < baseline) {
-        stale.push(`${file}: ${uses.length} (baseline ${baseline})`)
-      }
+      const found = literalColors(readFileSync(file, 'utf8'), file)
+      if (found.length > 0) uses[file] = found
     }
-    for (const file of Object.keys(COLOR_BASELINE)) {
-      if (!(file in counts) && !stale.some(entry => entry.startsWith(`${file}:`))) {
-        stale.push(`${file}: 0 (baseline ${COLOR_BASELINE[file]})`)
-      }
-    }
+    const { over, stale } = compareWithBaseline(uses, COLOR_BASELINE)
     expect(
       over,
       'Style with the theme tokens (bg-destructive, text-muted-foreground, border-border, …), not palette classes or literal colors. See the shadcn-first standard.'
