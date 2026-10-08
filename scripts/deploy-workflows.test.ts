@@ -712,7 +712,9 @@ describe('D1 data stays in Cloudflare', () => {
     'GSC_OAUTH_CLIENT_SECRET',
     'GSC_OAUTH_REFRESH_TOKEN',
     'GSC_QUOTA_PROJECT',
-    'GSC_SERVICE_ACCOUNT_JSON'
+    'GSC_SERVICE_ACCOUNT_JSON',
+    // Uploads source maps to Sentry during the deploy build (#48).
+    'SENTRY_AUTH_TOKEN'
   ])
   /** The variables Wrangler reads a Cloudflare credential from, deprecated names included. */
   const cloudflareCredentialName = /(?:CLOUDFLARE|CF)_(?:API_TOKEN|API_KEY|EMAIL)/iu

@@ -110,12 +110,9 @@ export default defineConfig({
           reuseExistingServer: !process.env.CI,
           timeout: 360000, // D1 initialization plus the OpenNext Worker build on CI runners
           env: {
-            // Minimize external dependencies for testing
-            NEXT_PUBLIC_SENTRY_DSN:
-              process.env.NEXT_PUBLIC_SENTRY_DSN || 'https://dummy@dummy.ingest.sentry.io/123',
-            SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN || 'dummy_token',
-            SENTRY_ORG: process.env.SENTRY_ORG || 'dummy_org',
-            SENTRY_PROJECT: process.env.SENTRY_PROJECT || 'dummy_project',
+            // Sentry stays off in E2E: no DSN, so no events, and no token, so no upload (#48).
+            NEXT_PUBLIC_SENTRY_DSN: '',
+            SENTRY_AUTH_TOKEN: '',
             LOG_LEVEL: process.env.LOG_LEVEL || 'error',
             // Faster builds
             NEXT_TELEMETRY_DISABLED: '1',
