@@ -43,19 +43,23 @@ The repository follows the serp git-workflow standard for repositories with Stag
 - **`staging` is the base branch.** Branch from it as `issue-<n>-<slug>` and open pull
   requests into it. The owner squash-merges them (the hotfix merge-back below is the one
   merge commit), and each push to `staging` runs Deploy Staging. Agents never merge.
-- **`main` is production.** Changes reach it only by promotion: the owner opens a `staging` →
-  `main` pull request and merges it with a **merge commit**, never a squash. Each push to
-  `main` runs Deploy Production, whose release job waits for the `production` reviewers.
+- **`main` is production.** `staging` reaches it by a **fast-forward**: the owner runs
+  `pnpm release:promote` (`scripts/release-promote.ts`, #171), so `main` receives exactly the
+  squash commits staging verified, with no promotion pull request and no merge commit. The
+  push uses the owner's bypass of the `main` ruleset; any other change to `main` is a `hotfix-*`
+  pull request. Each push to `main` runs Deploy Production, which waits for the reviewers.
 - **Only the owner releases.** Agents never dispatch a production workflow, never type a
   production confirmation, and never approve a deployment.
 - **PR Review catches mis-targeted pull requests.** Once `staging` exists, `Validate Site &
-  Policy` fails a pull request into `main` unless its head is this repository's `staging` or a
-  `hotfix-*` branch (rulesets cannot restrict a head branch). It is an accident guard, not the
+  Policy` fails a pull request into `main` unless its head is a `hotfix-*` branch of this
+  repository (rulesets cannot restrict a head branch). It is an accident guard, not the
   control: a pull request runs its own copy of the check and could edit it. The control is
   the release-time tree check below.
 
-Promote only a `staging` head that Deploy Staging has verified; otherwise Deploy Production
-refuses the merge commit (see below) until it is.
+`pnpm release:promote` fetches, then refuses unless `main` is an ancestor of `staging` (after a
+hotfix, merge `main` back first; see Hotfixes), Deploy Staging verified the head of `staging`
+(below), and the owner types its first 12 characters at a terminal. It pushes that exact
+commit, never forced. Agents never run it.
 
 ## Staging before production
 
@@ -79,10 +83,10 @@ count, and neither do runs on other branches or `pull_request` runs.
   as the released commit.
 
 The tree is everything the release ships: source, migrations, configuration, and workflows. A
-promotion merge commit is a new commit, but its tree equals the merged `staging` head's tree
-whenever `main` had nothing that `staging` lacked. If `main` had diverged (a hotfix not yet
-merged back), the merged tree was never on staging, and the release is refused. Merge `main`
-into `staging`, let Deploy Staging verify the result, then promote again.
+fast-forward promotion releases the verified commit itself. The tree rule covers a release
+commit that never ran on staging, such as the merge commits of the pull-request promotions
+before #171: its tree equals a verified `staging` head's tree only if `main` had nothing that
+`staging` lacked, and otherwise the release is refused.
 
 Verification is permanent once earned. A later attempt or run of the same commit cannot
 withdraw it, whether that attempt is a re-run still in progress, a flaky smoke test, a broken
@@ -175,12 +179,12 @@ To release it anyway:
    without the staging check. `plan-release` refuses a hotfix with pending migrations before
    the bookmark; a hotfix that needs a migration goes through staging.
 3. Merge `main` into `staging` immediately: a pull request from `main` into `staging`, merged
-   with **Create a merge commit**, the only merge commit `staging` takes. A squash would leave
-   the hotfix out of `staging`'s history, so the promotion's merge base stays before it, and
-   any later `staging` change to the same lines makes every `staging` → `main` promotion
-   conflict, with no way to resolve it through a pull request. With a merge commit, Deploy
-   Staging verifies the merged tree and the next promotion carries it. GitHub remembers the
-   last merge method, so switch the button back to **Squash and merge** for the next PR.
+   with **Create a merge commit**, the only merge commit `staging` takes. Until then `main` has
+   a commit `staging` lacks, so `pnpm release:promote` refuses: `main` cannot fast-forward. A
+   squash would never fix that, since it leaves the hotfix commit out of `staging`'s history.
+   With a merge commit, Deploy Staging verifies the merged tree and the next promotion
+   fast-forwards over it. GitHub remembers the last merge method, so switch the button back
+   to **Squash and merge** for the next PR.
 
 ## D1 data stays in Cloudflare
 
