@@ -12,12 +12,13 @@
  * (fail closed). This module has no Next.js or `server-only` imports, so the Worker entry (a
  * future cron handler) can use it as well as route handlers.
  */
-import { site } from '@/lib/site'
+
 import {
   CANONICAL_ORIGIN,
   parseSiteEnvironment,
   type SiteEnvironment
 } from '../environment/site-environment'
+import { site } from '../site/site'
 
 export interface EmailSenderIdentity {
   email: string

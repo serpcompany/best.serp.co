@@ -13,7 +13,7 @@
  * root layout gates the analytics (`analyticsForRequest` in `./request-environment.ts`). This module has no
  * Next.js or `server-only` imports so the Worker can run it before OpenNext loads.
  */
-import { site } from '@/lib/site'
+import { site } from '../site/site'
 
 export const siteEnvironments = ['local', 'staging', 'production'] as const
 export type SiteEnvironment = (typeof siteEnvironments)[number]
