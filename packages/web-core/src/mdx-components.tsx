@@ -1,6 +1,7 @@
 import { cn } from '@serpdirectory/design-system/lib/utils'
 import type { MDXComponents } from 'mdx/types'
 import Link from 'next/link'
+import { withDubVia } from './dub-via'
 
 export const components: MDXComponents = {
   h1: () => {
@@ -44,7 +45,8 @@ export const components: MDXComponents = {
     <Link
       className={cn('font-medium underline underline-offset-4', className)}
       {...props}
-      href={props.href || '#'}
+      // Listing body text links to serp.ly too (#169).
+      href={withDubVia(props.href || '#')}
     />
   ),
   p: ({ className, ...props }) => (

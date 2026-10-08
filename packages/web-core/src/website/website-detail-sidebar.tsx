@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { getCategoryDisplayName } from '../category-display'
 import type { WebsiteLinkRel } from '../content-query'
+import { withDubVia } from '../dub-via'
 import { getRoute } from '../routes'
 import { siteConfig } from '../site-config'
 import { siteContent } from '../site-content'
@@ -25,11 +26,6 @@ type WebsiteSidebarMetadata = {
   website: string
 }
 
-type OutboundViaConfig = {
-  domain?: string | null
-  publicUrl?: string | null
-}
-
 export type WebsiteDetailSidebarProps = {
   /**
    * The claim link (#67, #70 screen 9a: "Work at …? Claim this listing"), shown under the
@@ -37,52 +33,6 @@ export type WebsiteDetailSidebarProps = {
    */
   claim?: ReactNode
   website: WebsiteSidebarMetadata
-}
-
-function resolveViaDomain(config: OutboundViaConfig): string | null {
-  const configuredDomain = config.domain?.trim()
-
-  if (configuredDomain) {
-    return configuredDomain
-  }
-
-  const publicUrl = config.publicUrl?.trim()
-
-  if (!publicUrl) {
-    return null
-  }
-
-  try {
-    return new URL(publicUrl).hostname || null
-  } catch {
-    return null
-  }
-}
-
-function getOutboundUrlWithVia(url: string, config: OutboundViaConfig): string {
-  const viaDomain = resolveViaDomain(config)
-
-  if (!viaDomain) {
-    return url
-  }
-
-  try {
-    const parsedUrl = new URL(url)
-
-    if (
-      parsedUrl.protocol !== 'https:' ||
-      parsedUrl.hostname !== 'serp.ly' ||
-      parsedUrl.searchParams.has('via')
-    ) {
-      return url
-    }
-
-    parsedUrl.searchParams.set('via', viaDomain)
-
-    return parsedUrl.toString()
-  } catch {
-    return url
-  }
 }
 
 const OUTBOUND_REL: Record<WebsiteLinkRel, string> = {
@@ -100,7 +50,7 @@ export function outboundWebsiteRel(linkRel: WebsiteLinkRel): string {
 }
 
 export function WebsiteDetailSidebar({ claim, website }: WebsiteDetailSidebarProps) {
-  const outboundWebsiteUrl = getOutboundUrlWithVia(website.website, siteConfig)
+  const outboundWebsiteUrl = withDubVia(website.website)
   const listingUrl = getFeaturedOnBadgeListingUrl({
     listingBasePath: siteConfig.listingRouteBasePath,
     listingDetailSuffix: siteConfig.sitemap.listingDetailSuffix,

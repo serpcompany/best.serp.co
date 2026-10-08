@@ -7,6 +7,7 @@ import { ExternalLink } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { ComponentType, ReactNode } from 'react'
+import { withDubVia } from '../dub-via'
 import { externalResources } from '../external-resources'
 import { Section } from '../layout/section'
 
@@ -44,7 +45,7 @@ export function ExternalResourcesSection({
           {externalResources.map(resource => (
             <DirectoryLinkListItem key={resource.url}>
               <Link
-                href={resource.url}
+                href={withDubVia(resource.url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex items-start gap-4 px-6 py-4 transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
@@ -80,7 +81,7 @@ export function ExternalResourcesSection({
           {externalResources.map(resource => (
             <Link
               key={resource.url}
-              href={resource.url}
+              href={withDubVia(resource.url)}
               target="_blank"
               rel="noopener noreferrer"
               className="group rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"

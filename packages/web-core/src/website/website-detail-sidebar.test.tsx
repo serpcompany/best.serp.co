@@ -78,7 +78,7 @@ describe('WebsiteDetailSidebar', () => {
     vi.resetModules()
   })
 
-  it('decorates SERP listing URLs with the current site via domain', () => {
+  it("adds the site's Dub partner ID to a serp.ly listing URL", () => {
     const sidebar = WebsiteDetailSidebar({
       website: {
         linkRel: 'follow',
@@ -89,7 +89,7 @@ describe('WebsiteDetailSidebar', () => {
     })
 
     expect(collectHrefProps(sidebar)).toContain(
-      `https://serp.ly/example-product?via=${siteConfig.domain}`
+      `https://serp.ly/example-product?via=${siteConfig.dubPartnerId}`
     )
   })
 
