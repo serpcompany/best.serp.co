@@ -50,13 +50,17 @@ function manifestPatterns(entries: unknown, label: string): RegExp[] {
   })
 }
 
-/** Rewrite sources, from either form of `rewrites`: one list, or Next.js's three phases. */
+/**
+ * Rewrite sources that take a path ahead of dynamic routes, from either form of `rewrites`: one
+ * list (Next.js runs it as `afterFiles`), or the `beforeFiles` and `afterFiles` phases.
+ * `fallback` rewrites ran after the old `[slug]` page, so they never served these paths.
+ */
 function rewritePatterns(rewrites: unknown): RegExp[] {
   if (rewrites === undefined || Array.isArray(rewrites)) {
     return manifestPatterns(rewrites ?? [], 'rewrites')
   }
   if (!isRecord(rewrites)) throw invalidManifest('`rewrites` is neither an array nor an object')
-  return (['beforeFiles', 'afterFiles', 'fallback'] as const).flatMap(phase =>
+  return (['beforeFiles', 'afterFiles'] as const).flatMap(phase =>
     manifestPatterns(rewrites[phase] ?? [], `rewrites.${phase}`)
   )
 }

@@ -11,7 +11,8 @@ const manifest = {
   rewrites: {
     afterFiles: [],
     beforeFiles: [{ regex: '^/network(?:/)?$', source: '/network' }],
-    fallback: []
+    // Ran after the old `[slug]` page, so a legacy slug still wins over it.
+    fallback: [{ regex: '^/([^/]+?)(?:/)?$', source: '/:path' }]
   },
   staticRoutes: [
     { page: '/', regex: '^/(?:/)?$' },
