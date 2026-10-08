@@ -112,12 +112,14 @@ function Changes({
       <div key={label} className="flex flex-col gap-2">
         <p className="text-sm font-medium">{label}</p>
         {before.trim() ? (
-          <p className="whitespace-pre-line rounded-md bg-destructive/10 px-3 py-2 text-sm line-through decoration-destructive/50">
+          <p className="whitespace-pre-line rounded-md bg-destructive/10 px-3 py-2 text-sm line-through decoration-destructive">
             {before}
           </p>
         ) : null}
         {after.trim() ? (
-          <p className="whitespace-pre-line rounded-md bg-success/10 px-3 py-2 text-sm">{after}</p>
+          <p className="whitespace-pre-line rounded-md bg-success/10 px-3 py-2 text-sm text-success">
+            {after}
+          </p>
         ) : null}
       </div>
     )

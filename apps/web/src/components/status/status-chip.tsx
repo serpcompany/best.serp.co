@@ -14,13 +14,13 @@ const ICON_TONE: Record<StatusTone, string> = {
   warning: 'text-warning'
 }
 
-/** A filled circle's tone: the token fills it, and its glyph takes the token's foreground. */
+/** A filled circle: the token fills it, and its outline and glyph are cut out in the background. */
 const FILLED_TONE: Record<StatusTone, string> = {
-  destructive: 'fill-destructive text-destructive-foreground',
-  info: 'fill-info text-info-foreground',
+  destructive: 'fill-destructive text-background',
+  info: 'fill-info text-background',
   muted: 'fill-muted-foreground text-background',
-  success: 'fill-success text-success-foreground',
-  warning: 'fill-warning text-warning-foreground'
+  success: 'fill-success text-background',
+  warning: 'fill-warning text-background'
 }
 
 /**
