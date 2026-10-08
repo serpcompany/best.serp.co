@@ -86,7 +86,7 @@ function adminLockResponse(url: URL): Response {
     : new Response('Access not configured\n', { status: 503 })
 }
 
-/** The sign-in request the auth gate sends on purpose with an invalid email. */
+/** The sign-in request the auth gate sends on purpose with an empty email. */
 const badSignInPath = '/api/auth/email-otp/send-verification-otp'
 /** Requests the Better Auth gate makes: the session read, then the bad sign-in. */
 const authGatePaths = ['/api/auth/get-session', badSignInPath]
@@ -1171,15 +1171,12 @@ describe('Better Auth smoke gates', () => {
   it.each([
     ['production', origin, 'https://best.serp.co'],
     ['staging', stagingOrigin, stagingOrigin]
-  ])('sends %s an invalid sign-in from its trusted origin', async (mode, baseUrl, expected) => {
+  ])('sends %s an empty-email sign-in from its trusted origin', async (mode, baseUrl, expected) => {
     const requests = installAuthFetch({})
     await expect(gates(mode, baseUrl)).resolves.toBeUndefined()
     const signIn = requests.find(request => request.url.pathname === badSignInPath)
     expect(signIn?.init?.method).toBe('POST')
-    expect(JSON.parse(String(signIn?.init?.body))).toEqual({
-      email: 'not-an-email',
-      type: 'sign-in'
-    })
+    expect(JSON.parse(String(signIn?.init?.body))).toEqual({ email: '', type: 'sign-in' })
     expect(signIn?.init?.headers).toMatchObject({
       'content-type': 'application/json',
       origin: expected
@@ -1195,12 +1192,28 @@ describe('Better Auth smoke gates', () => {
     [{ session: new Response('error', { status: 500 }) }, /get-session returned 500, not 200/u],
     [
       { badSignIn: new Response(null, { status: 302, headers: { location: '/login/' } }) },
-      /invalid email returned 302, not a 4xx/u
+      /empty email returned 302 , not 400 INVALID_EMAIL/u
     ],
-    [{ badSignIn: new Response('{}', { status: 200 }) }, /invalid email returned 200, not a 4xx/u],
+    [
+      { badSignIn: new Response('{"success":true}', { status: 200 }) },
+      /empty email returned 200 , not 400 INVALID_EMAIL/u
+    ],
+    // A CSRF refusal, a missing route, or the rate limit is a 4xx, but not the validation check.
+    [
+      { badSignIn: new Response('{"code":"INVALID_ORIGIN"}', { status: 403 }) },
+      /empty email returned 403 INVALID_ORIGIN, not 400 INVALID_EMAIL/u
+    ],
+    [
+      { badSignIn: new Response('Not found', { status: 404 }) },
+      /empty email returned 404 , not 400 INVALID_EMAIL/u
+    ],
+    [
+      { badSignIn: new Response('{"code":"cooldown"}', { status: 429 }) },
+      /empty email returned 429 cooldown, not 400 INVALID_EMAIL/u
+    ],
     [
       { badSignIn: new Response('error', { status: 500 }) },
-      /invalid email returned 500, not a 4xx/u
+      /empty email returned 500 , not 400 INVALID_EMAIL/u
     ]
   ])('fails when Better Auth answers %o', async (answers, message) => {
     installAuthFetch(answers)

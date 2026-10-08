@@ -492,8 +492,11 @@ async function expectAdminLock(target: GateTarget, statuses: AdminLockStatuses):
 /**
  * Better Auth smoke tests (serp docs/engineering/standards/web-stack/better-auth.md,
  * Verification): the session endpoint answers 200 without a redirect, and a sign-in request
- * with bad input answers 4xx, never 3xx. The bad input is an invalid email address, which
- * Better Auth rejects before it sends any code, from the environment's own trusted origin.
+ * with bad input answers 4xx, never 3xx. The bad input is an empty email: the site's
+ * send-code hook returns before its rate limits for it, so every run gets Better Auth's own
+ * 400 `INVALID_EMAIL` (a fixed invalid address would hit the per-address limit from the
+ * second run on and be answered 200), and no code is ever sent. Exactly that answer is
+ * required, so a CSRF 403, a 404, or a 429 can't pass for validation.
  */
 async function expectAuthEndpoints(target: GateTarget): Promise<void> {
   const { baseUrl, mode } = target
@@ -507,15 +510,21 @@ async function expectAuthEndpoints(target: GateTarget): Promise<void> {
     target,
     routeUrl(baseUrl, '/api/auth/email-otp/send-verification-otp'),
     async response => {
-      await response.body?.cancel().catch(() => undefined)
-      if (response.status < 400 || response.status > 499)
+      const text = await response.text()
+      let code: unknown
+      try {
+        code = (JSON.parse(text) as { code?: unknown }).code
+      } catch {
+        code = undefined
+      }
+      if (response.status !== 400 || code !== 'INVALID_EMAIL')
         throw new Error(
-          `${mode} sign-in POST with an invalid email returned ${response.status}, not a 4xx.`
+          `${mode} sign-in POST with an empty email returned ${response.status} ${String(code ?? '')}, not 400 INVALID_EMAIL.`
         )
     },
     true,
     {
-      body: JSON.stringify({ email: 'not-an-email', type: 'sign-in' }),
+      body: JSON.stringify({ email: '', type: 'sign-in' }),
       headers: { 'content-type': 'application/json', origin },
       method: 'POST'
     }
