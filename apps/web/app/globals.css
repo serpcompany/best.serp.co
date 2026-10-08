@@ -5,10 +5,12 @@
 @import "tw-animate-css";
 
 /* tw-animate-css ignores reduced motion on its own. Components apply it through variants such
-   as `data-[state=open]:animate-in`, so match the class names, not `.animate-in` alone. */
+   as `data-[state=open]:animate-in`, so match the class names, not `.animate-in` alone. The
+   sign-in code's caret blinks with `animate-caret-blink`. */
 @media (prefers-reduced-motion: reduce) {
   [class*="animate-in"],
-  [class*="animate-out"] {
+  [class*="animate-out"],
+  [class*="animate-caret-blink"] {
     animation: none !important;
   }
 }
