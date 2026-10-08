@@ -86,8 +86,15 @@ function adminLockResponse(url: URL): Response {
     : new Response('Access not configured\n', { status: 503 })
 }
 
+/** The sign-in request the auth gate sends on purpose with an empty email. */
+const badSignInPath = '/api/auth/email-otp/send-verification-otp'
+/** Requests the Better Auth gate makes: the session read, then the bad sign-in. */
+const authGatePaths = ['/api/auth/get-session', badSignInPath]
+
 function successfulResponse(url: URL, redirectLocation?: string, emptyBody = false): Response {
   if (adminLockGatePaths.includes(url.pathname)) return adminLockResponse(url)
+  if (url.pathname === badSignInPath)
+    return new Response('{"code":"INVALID_EMAIL"}', { status: 400 })
   const canonical = canonicalRedirects[url.pathname]
   if (canonical) return new Response(null, { status: 308, headers: { location: canonical } })
   if (url.pathname === `/${slug}/`)
@@ -121,6 +128,7 @@ describe('environment-specific HTTP gates', () => {
         8 +
           trailingSlashGatePaths.length +
           adminLockGatePaths.length +
+          authGatePaths.length +
           CRAWL_POLICY_REQUESTS.production
       )
       // Routes and versions go through the platform host; only the public policy probes, last,
@@ -141,7 +149,8 @@ describe('environment-specific HTTP gates', () => {
           `/${slug}/`,
           '/submit/',
           '/admin/',
-          '/api/admin'
+          '/api/admin',
+          ...authGatePaths
         ])
       )
       expect(urls.some(url => url.pathname === '/api/search' && url.search.startsWith('?q='))).toBe(
@@ -1138,5 +1147,76 @@ describe('admin lock gate', () => {
     await expect(
       gates('staging', staging, undefined, { wranglerConfigPath: accessConfiguredPath })
     ).resolves.toBeUndefined()
+  })
+})
+
+describe('Better Auth smoke gates', () => {
+  function installAuthFetch(answers: { badSignIn?: Response; session?: Response }) {
+    const requests: Array<{ init?: RequestInit; url: URL }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input))
+        requests.push({ init, url })
+        if (url.pathname === '/api/auth/get-session' && answers.session)
+          return withCrawlPolicy(url, answers.session)
+        if (url.pathname === badSignInPath && answers.badSignIn)
+          return withCrawlPolicy(url, answers.badSignIn)
+        return withCrawlPolicy(url, successfulResponse(url))
+      })
+    )
+    return requests
+  }
+
+  it.each([
+    ['production', origin, 'https://best.serp.co'],
+    ['staging', stagingOrigin, stagingOrigin]
+  ])('sends %s an empty-email sign-in from its trusted origin', async (mode, baseUrl, expected) => {
+    const requests = installAuthFetch({})
+    await expect(gates(mode, baseUrl)).resolves.toBeUndefined()
+    const signIn = requests.find(request => request.url.pathname === badSignInPath)
+    expect(signIn?.init?.method).toBe('POST')
+    expect(JSON.parse(String(signIn?.init?.body))).toEqual({ email: '', type: 'sign-in' })
+    expect(signIn?.init?.headers).toMatchObject({
+      'content-type': 'application/json',
+      origin: expected
+    })
+    expect(signIn?.init?.redirect).toBe('manual')
+  })
+
+  it.each([
+    [
+      { session: new Response(null, { status: 302, headers: { location: '/login/' } }) },
+      /get-session returned 302, not 200/u
+    ],
+    [{ session: new Response('error', { status: 500 }) }, /get-session returned 500, not 200/u],
+    [
+      { badSignIn: new Response(null, { status: 302, headers: { location: '/login/' } }) },
+      /empty email returned 302, not 400 INVALID_EMAIL/u
+    ],
+    [
+      { badSignIn: new Response('{"success":true}', { status: 200 }) },
+      /empty email returned 200, not 400 INVALID_EMAIL/u
+    ],
+    // A CSRF refusal, a missing route, or the rate limit is a 4xx, but not the validation check.
+    [
+      { badSignIn: new Response('{"code":"INVALID_ORIGIN"}', { status: 403 }) },
+      /empty email returned 403 INVALID_ORIGIN, not 400 INVALID_EMAIL/u
+    ],
+    [
+      { badSignIn: new Response('Not found', { status: 404 }) },
+      /empty email returned 404, not 400 INVALID_EMAIL/u
+    ],
+    [
+      { badSignIn: new Response('{"code":"cooldown"}', { status: 429 }) },
+      /empty email returned 429 cooldown, not 400 INVALID_EMAIL/u
+    ],
+    [
+      { badSignIn: new Response('error', { status: 500 }) },
+      /empty email returned 500, not 400 INVALID_EMAIL/u
+    ]
+  ])('fails when Better Auth answers %o', async (answers, message) => {
+    installAuthFetch(answers)
+    await expect(gates('staging', stagingOrigin)).rejects.toThrow(message)
   })
 })
