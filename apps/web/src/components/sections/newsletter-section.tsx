@@ -1,5 +1,5 @@
-import { Button } from '@serpdirectory/design-system/button'
-import { DirectoryCtaBand } from '@serpdirectory/design-system/shadcnblocks/directory-home-section'
+import { Button } from '@/components/ui/button'
+import { DirectoryCtaBand } from './directory-home-section'
 import Link from 'next/link'
 import { getRoute } from '../../lib/routing/routes'
 import { siteCopy } from '../../lib/site/site-copy'

@@ -7,9 +7,9 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator
-} from '@serpdirectory/design-system/breadcrumb-primitives'
-import { Separator } from '@serpdirectory/design-system/separator'
-import { SidebarTrigger } from '@serpdirectory/design-system/sidebar'
+} from '@/components/ui/breadcrumb'
+import { Separator } from '@/components/ui/separator'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 import Link from 'next/link'
 import React, { Fragment, type ReactNode } from 'react'
 

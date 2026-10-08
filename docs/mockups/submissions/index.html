@@ -59,7 +59,7 @@
 html, body { background: var(--ui-bg); color: var(--ui-fg); }
 body { font-family: var(--font-ui); font-size: 14px; -webkit-font-smoothing: antialiased; }
 
-/* best.serp.co tokens, copied from packages/design-system/styles/globals.css, scoped to the mockup frame */
+/* best.serp.co tokens, copied from apps/web/src/app/globals.css, scoped to the mockup frame */
 .site {
   --background: 0 0% 99%; --foreground: 240 10% 4%;
   --card: 0 0% 100%; --card-foreground: 240 10% 4%;
@@ -407,7 +407,7 @@ const P = {
 const listingUrl = p => `${SITE}/products/${p.domain}/`;
 
 /* ---------- shadcn/ui building blocks ----------
-   Classes follow packages/design-system/components/shadcn and the new-york-v4 registry
+   Classes follow apps/web/src/components/ui and the new-york-v4 registry
    (ui.shadcn.com/r/styles/new-york-v4/<name>.json), on the site's tokens. */
 const BTN = {
   base: "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-all [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
@@ -1818,7 +1818,7 @@ function renderRail() {
       html += `<a href="#s${S.n}" data-i="${i}" ${i === UI.s ? 'aria-current="true"' : ''}><span class="num">${S.n}</span><span class="t">${S.title}${S.isNew ? `<span class="new">New r${S.isNew === true ? 2 : S.isNew}</span>` : ''}${S.rev4 ? '<span class="new r4">R4: needs approval</span>' : ''}${S.rev5 ? '<span class="new r4">R5: needs approval</span>' : ''}</span><span class="r">${esc(S.route)}</span><span class="cnt">${S.states.length}</span></a>`;
     });
   }
-  html += `<div class="foot">Keys: <kbd>←</kbd> <kbd>→</kbd> states, <kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd> screens.<br>Copy is draft. Components follow shadcn/ui (packages/design-system). Example products are fictional; categories are real D1 categories.</div>`;
+  html += `<div class="foot">Keys: <kbd>←</kbd> <kbd>→</kbd> states, <kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd> screens.<br>Copy is draft. Components follow shadcn/ui (apps/web/src/components/ui). Example products are fictional; categories are real D1 categories.</div>`;
   $('#rail').innerHTML = html;
   $('#screenSelect').innerHTML = SCREENS.map((S, i) => `<option value="${i}" ${i === UI.s ? 'selected' : ''}>${S.n}. ${S.title} (${S.states.length} states)</option>`).join('');
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { cn } from '@serpdirectory/design-system/lib/utils'
+import { cn } from '@/lib/utils'
 import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 

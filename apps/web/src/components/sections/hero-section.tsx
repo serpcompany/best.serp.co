@@ -1,8 +1,8 @@
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import {
   DirectoryHero,
   DirectoryHeroContainer
-} from '@serpdirectory/design-system/shadcnblocks/directory-home-section'
+} from './directory-home-section'
 import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { getRoute } from '../../lib/routing/routes'

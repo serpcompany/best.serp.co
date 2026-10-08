@@ -1,0 +1,16 @@
+/*
+ * Tailwind colours for the sidebar tokens that globals.css already defines per theme
+ * (--sidebar-background and friends), used by components/ui/sidebar.tsx; globals.css imports
+ * it. It is a separate file because Biome cannot parse globals.css's `@import ... source()`
+ * until #181 turns on Tailwind directive parsing.
+ */
+@theme {
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+}

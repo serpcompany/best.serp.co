@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/directory/card'
 import {
   type ExternalResourcesSectionProps,
   ExternalResourcesSection as SharedExternalResourcesSection

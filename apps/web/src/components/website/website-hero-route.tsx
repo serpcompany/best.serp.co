@@ -1,5 +1,5 @@
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
+import { Badge } from '@/components/ui/badge'
+import { Breadcrumb } from '@/components/layout/breadcrumb'
 import type { ComponentProps } from 'react'
 import { FavoriteButton } from '../ui/favorite-button'
 import { ListingImage } from '../ui/listing-image'

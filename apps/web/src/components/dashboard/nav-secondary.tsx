@@ -6,7 +6,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem
-} from '@serpdirectory/design-system/sidebar'
+} from '@/components/ui/sidebar'
 import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import React, { type ComponentProps } from 'react'

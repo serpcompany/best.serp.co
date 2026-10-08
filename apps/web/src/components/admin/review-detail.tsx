@@ -1,6 +1,6 @@
 'use client'
 
-import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-system/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,17 +10,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from '@serpdirectory/design-system/alert-dialog'
-import { Avatar, AvatarFallback } from '@serpdirectory/design-system/avatar'
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Button } from '@serpdirectory/design-system/button'
+} from '@/components/ui/alert-dialog'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
+} from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -28,7 +28,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle
-} from '@serpdirectory/design-system/dialog'
+} from '@/components/ui/dialog'
 import {
   Field,
   FieldContent,
@@ -39,19 +39,19 @@ import {
   FieldLegend,
   FieldSet,
   FieldTitle
-} from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
-import { cn } from '@serpdirectory/design-system/lib/utils'
-import { RadioGroup, RadioGroupItem } from '@serpdirectory/design-system/radio-group'
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@serpdirectory/design-system/select'
-import { Textarea } from '@serpdirectory/design-system/textarea'
-import { ToggleGroup, ToggleGroupItem } from '@serpdirectory/design-system/toggle-group'
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   Ban,
   Check,

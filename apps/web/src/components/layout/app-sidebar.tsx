@@ -1,11 +1,11 @@
 'use client'
 
-import { ScrollArea } from '@serpdirectory/design-system/scroll-area'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   DirectoryNavigationItem,
   DirectoryNavigationSection,
   directoryNavigationInteractiveClassName
-} from '@serpdirectory/design-system/shadcnblocks/directory-navigation'
+} from './directory-navigation'
 import { ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 import { withDubVia } from '../../lib/analytics/dub-via'

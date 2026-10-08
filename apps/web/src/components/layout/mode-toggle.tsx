@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import { Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'

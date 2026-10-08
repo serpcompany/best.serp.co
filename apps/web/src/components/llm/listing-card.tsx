@@ -1,11 +1,11 @@
 'use client'
 
-import { cn } from '@serpdirectory/design-system/lib/utils'
+import { cn } from '@/lib/utils'
 import {
   DirectoryProductBadge,
   DirectoryProductCard,
   DirectoryProductRow
-} from '@serpdirectory/design-system/shadcnblocks/directory-product-list'
+} from '@/components/directory/directory-product-list'
 import Link from 'next/link'
 import type { WebsiteRelatedCardMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'

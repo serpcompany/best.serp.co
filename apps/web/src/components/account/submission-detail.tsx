@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -9,10 +9,10 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
-import { FieldDescription, FieldGroup } from '@serpdirectory/design-system/field'
-import { Separator } from '@serpdirectory/design-system/separator'
-import { Spinner } from '@serpdirectory/design-system/spinner'
+} from '@/components/ui/card'
+import { FieldDescription, FieldGroup } from '@/components/ui/field'
+import { Separator } from '@/components/ui/separator'
+import { Spinner } from '@/components/ui/spinner'
 import { MessageSquare, Pencil, Plus, Undo2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'

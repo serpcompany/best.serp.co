@@ -1,4 +1,4 @@
-import { cn } from '@serpdirectory/design-system/lib/utils'
+import { cn } from '@/lib/utils'
 import type { MDXComponents } from 'mdx/types'
 import Link from 'next/link'
 import { withDubVia } from '../../lib/analytics/dub-via'

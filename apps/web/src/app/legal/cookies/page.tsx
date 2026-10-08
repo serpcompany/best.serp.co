@@ -1,4 +1,4 @@
-import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
+import { Breadcrumb } from '@/components/layout/breadcrumb'
 import type { Metadata } from 'next'
 import { components } from '@/components/content/mdx-components'
 import { generateLegalPageMetadata, LegalStaticPage } from '@/components/static-pages/legal-page'

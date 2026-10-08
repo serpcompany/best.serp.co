@@ -1,5 +1,5 @@
 import type { UnpublishedListing } from '@serpdirectory/data-ops/contracts'
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import {
   Empty,
   EmptyContent,
@@ -7,7 +7,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle
-} from '@serpdirectory/design-system/empty'
+} from '@/components/ui/empty'
 import {
   Item,
   ItemActions,
@@ -15,7 +15,7 @@ import {
   ItemDescription,
   ItemMedia,
   ItemTitle
-} from '@serpdirectory/design-system/item'
+} from '@/components/ui/item'
 import { ArrowRight, BadgeCheck, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { getRoute } from '@/lib/routing/routes'

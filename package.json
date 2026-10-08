@@ -63,7 +63,7 @@
     "lint:fix": "turbo lint:fix && manypkg fix && pnpm biome lint --write .",
     "lint:forbidden-links": "node scripts/lint-forbidden-links.mjs",
     "audit:forbidden-links": "node scripts/lint-forbidden-links.mjs --generated",
-    "shadcn": "cd packages/design-system && pnpm dlx shadcn@canary add",
+    "shadcn": "cd apps/web && pnpm dlx shadcn@canary add",
     "start": "turbo run start",
     "test": "turbo test --cache-dir=.turbo",
     "test:d1": "pnpm exec vitest run scripts/d1-drizzle-local.test.ts scripts/d1-workerd-plans.test.ts scripts/d1-workerd-queries.test.ts scripts/d1-local-state.test.ts scripts/d1-preview-http-gates.test.ts scripts/d1-publisher.sqlite.test.ts scripts/d1-remote-publisher.test.ts scripts/cloudflare-release.test.ts scripts/staging-verification.test.ts scripts/release-promote.test.ts scripts/listing-domain-check.test.ts scripts/media-upload.test.ts scripts/catalog-media.test.ts scripts/d1-compat.test.ts scripts/r2-objects.test.ts scripts/media-health.test.ts",

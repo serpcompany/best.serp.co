@@ -4,7 +4,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem
-} from '@serpdirectory/design-system/sidebar'
+} from '@/components/ui/sidebar'
 import Link from 'next/link'
 import React, { type ReactNode } from 'react'
 import { useCloseMobileSidebar } from './nav-main'

@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -8,7 +8,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
+} from '@/components/ui/card'
 import {
   Item,
   ItemActions,
@@ -16,8 +16,8 @@ import {
   ItemDescription,
   ItemMedia,
   ItemTitle
-} from '@serpdirectory/design-system/item'
-import { Spinner } from '@serpdirectory/design-system/spinner'
+} from '@/components/ui/item'
+import { Spinner } from '@/components/ui/spinner'
 import { ArrowLeft, ArrowRight, ExternalLink, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'

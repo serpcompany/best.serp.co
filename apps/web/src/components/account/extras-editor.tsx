@@ -1,16 +1,16 @@
 'use client'
 
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Button } from '@serpdirectory/design-system/button'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   FieldDescription,
   FieldError,
   FieldLegend,
   FieldSet
-} from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
-import { cn } from '@serpdirectory/design-system/lib/utils'
-import { Textarea } from '@serpdirectory/design-system/textarea'
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+import { Textarea } from '@/components/ui/textarea'
 import { Plus, X } from 'lucide-react'
 import { ACCOUNT_EXTRAS_LIMITS, type ExtrasInput, linkUrlProblem } from '@/lib/account/contract'
 

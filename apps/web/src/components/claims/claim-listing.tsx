@@ -1,7 +1,7 @@
 'use client'
 
-import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-system/alert'
-import { Button } from '@serpdirectory/design-system/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle
-} from '@serpdirectory/design-system/dialog'
+} from '@/components/ui/dialog'
 import {
   Drawer,
   DrawerContent,
@@ -17,7 +17,7 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle
-} from '@serpdirectory/design-system/drawer'
+} from '@/components/ui/drawer'
 import {
   Field,
   FieldContent,
@@ -25,26 +25,26 @@ import {
   FieldError,
   FieldLabel,
   FieldTitle
-} from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSeparator,
   InputOTPSlot
-} from '@serpdirectory/design-system/input-otp'
+} from '@/components/ui/input-otp'
 import {
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemTitle
-} from '@serpdirectory/design-system/item'
-import { Progress } from '@serpdirectory/design-system/progress'
-import { RadioGroup, RadioGroupItem } from '@serpdirectory/design-system/radio-group'
-import { Separator } from '@serpdirectory/design-system/separator'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@serpdirectory/design-system/tooltip'
-import { useIsMobile } from '@serpdirectory/design-system/use-mobile'
+} from '@/components/ui/item'
+import { Progress } from '@/components/ui/progress'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Separator } from '@/components/ui/separator'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { ArrowRight, BadgeCheck, Copy, MessageSquare, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'

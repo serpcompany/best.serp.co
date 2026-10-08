@@ -1,22 +1,22 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
-import { Card } from '@serpdirectory/design-system/card'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
-} from '@serpdirectory/design-system/dropdown-menu'
+} from '@/components/ui/dropdown-menu'
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle
-} from '@serpdirectory/design-system/empty'
-import { Input } from '@serpdirectory/design-system/input'
-import { Tabs, TabsList, TabsTrigger } from '@serpdirectory/design-system/tabs'
+} from '@/components/ui/empty'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   type ColumnDef,
   getCoreRowModel,

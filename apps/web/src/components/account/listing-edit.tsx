@@ -9,18 +9,18 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from '@serpdirectory/design-system/alert-dialog'
-import { Button } from '@serpdirectory/design-system/button'
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
   CardFooter,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
-import { FieldGroup } from '@serpdirectory/design-system/field'
-import { Separator } from '@serpdirectory/design-system/separator'
-import { Spinner } from '@serpdirectory/design-system/spinner'
+} from '@/components/ui/card'
+import { FieldGroup } from '@/components/ui/field'
+import { Separator } from '@/components/ui/separator'
+import { Spinner } from '@/components/ui/spinner'
 import { ExternalLink, MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'

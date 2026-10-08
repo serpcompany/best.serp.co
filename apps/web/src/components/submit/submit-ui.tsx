@@ -1,9 +1,9 @@
 'use client'
 
-import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-system/alert'
-import { Badge } from '@serpdirectory/design-system/badge'
-import { cn } from '@serpdirectory/design-system/lib/utils'
-import { Progress } from '@serpdirectory/design-system/progress'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
+import { Progress } from '@/components/ui/progress'
 import {
   CircleAlert,
   CircleCheck,

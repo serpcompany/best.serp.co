@@ -1,6 +1,6 @@
 'use client'
 
-import { ToggleGroup, ToggleGroupItem } from '@serpdirectory/design-system/toggle-group'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Clock, Heart, SortAsc } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getRoute } from '../../lib/routing/routes'

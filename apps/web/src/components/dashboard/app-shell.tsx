@@ -1,6 +1,6 @@
 'use client'
 
-import { cn } from '@serpdirectory/design-system/lib/utils'
+import { cn } from '@/lib/utils'
 import {
   Sidebar,
   SidebarContent,
@@ -10,7 +10,7 @@ import {
   SidebarProvider,
   SidebarRail,
   useSidebar
-} from '@serpdirectory/design-system/sidebar'
+} from '@/components/ui/sidebar'
 import React, { type CSSProperties, type ReactNode } from 'react'
 
 /**

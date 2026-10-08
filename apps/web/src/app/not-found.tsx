@@ -1,4 +1,4 @@
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getRoute } from '@/lib/routing/routes'

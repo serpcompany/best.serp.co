@@ -1,6 +1,6 @@
 'use client'
 
-import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-system/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,9 +10,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from '@serpdirectory/design-system/alert-dialog'
-import { Avatar, AvatarFallback } from '@serpdirectory/design-system/avatar'
-import { Button } from '@serpdirectory/design-system/button'
+} from '@/components/ui/alert-dialog'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -20,7 +20,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
+} from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -28,30 +28,30 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle
-} from '@serpdirectory/design-system/dialog'
+} from '@/components/ui/dialog'
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel
-} from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import {
   Item,
   ItemContent,
   ItemDescription,
   ItemMedia,
   ItemTitle
-} from '@serpdirectory/design-system/item'
-import { cn } from '@serpdirectory/design-system/lib/utils'
+} from '@/components/ui/item'
+import { cn } from '@/lib/utils'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@serpdirectory/design-system/select'
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -59,9 +59,9 @@ import {
   TableHead,
   TableHeader,
   TableRow
-} from '@serpdirectory/design-system/table'
-import { Textarea } from '@serpdirectory/design-system/textarea'
-import { ToggleGroup, ToggleGroupItem } from '@serpdirectory/design-system/toggle-group'
+} from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Ban, ExternalLink, EyeOff, Undo2, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'

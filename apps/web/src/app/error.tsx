@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import { useEffect } from 'react'
 import { logger } from '@/lib/logging'
 

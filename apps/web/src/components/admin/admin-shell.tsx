@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import { Box, CircleUser, ExternalLink, Inbox, Receipt, Users } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'

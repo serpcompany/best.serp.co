@@ -2,7 +2,7 @@ import {
   DirectoryFeatureGrid,
   DirectoryLinkList,
   DirectoryLinkListItem
-} from '@serpdirectory/design-system/shadcnblocks/directory-home-section'
+} from './directory-home-section'
 import { ExternalLink } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'

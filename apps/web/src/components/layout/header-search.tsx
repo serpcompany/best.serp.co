@@ -3,7 +3,7 @@ import {
   DirectoryApplicationMobileSearchBackdrop,
   DirectoryApplicationMobileSearchPanel,
   DirectoryApplicationSearchColumn
-} from '@serpdirectory/design-system/shadcnblocks/directory-application-shell'
+} from './directory-application-shell'
 import { useRef } from 'react'
 import { siteCopy } from '../../lib/site/site-copy'
 import { SearchAutocomplete } from '../search/search-autocomplete'

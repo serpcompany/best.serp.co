@@ -1,5 +1,5 @@
-import { cn } from '@serpdirectory/design-system/lib/utils'
-import { DirectoryEmpty } from '@serpdirectory/design-system/shadcnblocks/directory-empty'
+import { cn } from '@/lib/utils'
+import { DirectoryEmpty } from './directory-empty'
 import { FolderOpen, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 

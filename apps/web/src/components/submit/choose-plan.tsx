@@ -1,7 +1,7 @@
 'use client'
 
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Button } from '@serpdirectory/design-system/button'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -10,7 +10,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
+} from '@/components/ui/card'
 import {
   Item,
   ItemActions,
@@ -18,9 +18,9 @@ import {
   ItemDescription,
   ItemMedia,
   ItemTitle
-} from '@serpdirectory/design-system/item'
-import { cn } from '@serpdirectory/design-system/lib/utils'
-import { Spinner } from '@serpdirectory/design-system/spinner'
+} from '@/components/ui/item'
+import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 import { ArrowRight, Check, Info, Lock, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'

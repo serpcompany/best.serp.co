@@ -1,4 +1,4 @@
-import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
+import { Breadcrumb } from '@/components/layout/breadcrumb'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getActiveCategories } from '@/lib/catalog/repository'

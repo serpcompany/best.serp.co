@@ -1,4 +1,4 @@
-import { DesignSystemProvider } from '@serpdirectory/design-system/theme-provider'
+import { DesignSystemProvider } from './design-system-provider'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import {

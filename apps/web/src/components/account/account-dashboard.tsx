@@ -1,7 +1,7 @@
 'use client'
 
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Button } from '@serpdirectory/design-system/button'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -9,12 +9,12 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
+} from '@/components/ui/card'
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger
-} from '@serpdirectory/design-system/collapsible'
+} from '@/components/ui/collapsible'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -22,16 +22,16 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from '@serpdirectory/design-system/dropdown-menu'
-import { cn } from '@serpdirectory/design-system/lib/utils'
+} from '@/components/ui/dropdown-menu'
+import { cn } from '@/lib/utils'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@serpdirectory/design-system/select'
-import { Tabs, TabsList, TabsTrigger } from '@serpdirectory/design-system/tabs'
+} from '@/components/ui/select'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   type ColumnDef,
   getCoreRowModel,

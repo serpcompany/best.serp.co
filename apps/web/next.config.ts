@@ -10,7 +10,7 @@ import { movedUrlRedirects } from './src/lib/routing/redirects'
 import { site } from './src/lib/site/site'
 import { sentryRelease } from './src/lib/telemetry/sentry'
 
-export const INTERNAL_PACKAGES = ['@serpdirectory/design-system', '@serpdirectory/utils']
+export const INTERNAL_PACKAGES = ['@serpdirectory/utils']
 
 const BUILD_ID_HASH_LENGTH = 20
 

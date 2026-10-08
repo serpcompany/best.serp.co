@@ -1,11 +1,11 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger
-} from '@serpdirectory/design-system/collapsible'
+} from '@/components/ui/collapsible'
 import {
   Drawer,
   DrawerContent,
@@ -13,9 +13,9 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle
-} from '@serpdirectory/design-system/drawer'
-import { Separator } from '@serpdirectory/design-system/separator'
-import { Spinner } from '@serpdirectory/design-system/spinner'
+} from '@/components/ui/drawer'
+import { Separator } from '@/components/ui/separator'
+import { Spinner } from '@/components/ui/spinner'
 import {
   Table,
   TableBody,
@@ -23,8 +23,8 @@ import {
   TableHead,
   TableHeader,
   TableRow
-} from '@serpdirectory/design-system/table'
-import { useIsMobile } from '@serpdirectory/design-system/use-mobile'
+} from '@/components/ui/table'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { ChevronsUpDown, Copy, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'

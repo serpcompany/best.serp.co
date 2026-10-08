@@ -1,7 +1,7 @@
 'use client'
 
-import { AspectRatio } from '@serpdirectory/design-system/aspect-ratio'
-import { cn } from '@serpdirectory/design-system/lib/utils'
+import { AspectRatio } from './aspect-ratio'
+import { cn } from '@/lib/utils'
 import { useCallback, useState } from 'react'
 import {
   LISTING_LOGO_FALLBACK_PATH,

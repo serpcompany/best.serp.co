@@ -1,6 +1,6 @@
 'use client'
 
-import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-system/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,17 +10,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from '@serpdirectory/design-system/alert-dialog'
-import { Button } from '@serpdirectory/design-system/button'
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from '@serpdirectory/design-system/dropdown-menu'
-import { Field, FieldGroup, FieldLabel } from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
+} from '@/components/ui/dropdown-menu'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -28,8 +28,8 @@ import {
   TableHead,
   TableHeader,
   TableRow
-} from '@serpdirectory/design-system/table'
-import { Tabs, TabsList, TabsTrigger } from '@serpdirectory/design-system/tabs'
+} from '@/components/ui/table'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Box,
   CircleCheck,

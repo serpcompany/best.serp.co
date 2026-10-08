@@ -1,6 +1,6 @@
 import type { AccountOverview } from '@serpdirectory/data-ops/account'
-import { Button } from '@serpdirectory/design-system/button'
-import { Card, CardContent } from '@serpdirectory/design-system/card'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Empty,
   EmptyContent,
@@ -8,7 +8,7 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle
-} from '@serpdirectory/design-system/empty'
+} from '@/components/ui/empty'
 import { Inbox, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactElement } from 'react'

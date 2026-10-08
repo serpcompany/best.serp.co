@@ -1,5 +1,5 @@
-import { Badge } from '@serpdirectory/design-system/badge'
-import { cn } from '@serpdirectory/design-system/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import {
   CircleCheck,
   CircleMinus,

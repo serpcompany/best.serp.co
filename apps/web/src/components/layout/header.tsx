@@ -1,12 +1,12 @@
 'use client'
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import {
   DirectoryApplicationActions,
   DirectoryApplicationHeader,
   DirectoryApplicationHeaderBar,
   DirectoryApplicationHeaderGroup,
   DirectoryApplicationNav
-} from '@serpdirectory/design-system/shadcnblocks/directory-application-shell'
+} from './directory-application-shell'
 import { Menu, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from 'react'

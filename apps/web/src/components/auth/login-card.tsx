@@ -1,29 +1,29 @@
 'use client'
 
-import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-system/alert'
-import { Button } from '@serpdirectory/design-system/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
+} from '@/components/ui/card'
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel
-} from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSeparator,
   InputOTPSlot
-} from '@serpdirectory/design-system/input-otp'
-import { Spinner } from '@serpdirectory/design-system/spinner'
+} from '@/components/ui/input-otp'
+import { Spinner } from '@/components/ui/spinner'
 import { ArrowRight, CircleX, Clock, Info } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'

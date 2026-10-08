@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 import './globals.css'
-import { fonts } from '@serpdirectory/design-system/lib/fonts'
+import { fonts } from '@/lib/fonts'
 import { DrawerSignOutButton, HeaderSignOutButton } from '@/components/auth/sign-out-button'
 import { Footer } from '@/components/layout/footer'
 import { Header } from '@/components/layout/header'

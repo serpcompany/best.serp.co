@@ -1,5 +1,5 @@
 import type { ListingDetail } from '@serpdirectory/data-ops/contracts'
-import { Alert, AlertDescription, AlertTitle } from '@serpdirectory/design-system/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { TriangleAlert } from 'lucide-react'
 import { MiniListing } from './mini-listing'
 

@@ -1,5 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@serpdirectory/design-system/card'
-import { cn } from '@serpdirectory/design-system/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import type { ReactNode } from 'react'
 import { ProductLogo } from '@/components/submit/submit-ui'
 import type { HistoryItem } from '@/lib/account/history'

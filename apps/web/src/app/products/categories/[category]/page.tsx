@@ -1,4 +1,4 @@
-import { Breadcrumb } from '@serpdirectory/design-system/breadcrumb'
+import { Breadcrumb } from '@/components/layout/breadcrumb'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import {

@@ -1,5 +1,5 @@
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@serpdirectory/design-system/tooltip'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { BadgeCheck } from 'lucide-react'
 
 /**

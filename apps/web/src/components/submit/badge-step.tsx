@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -9,16 +9,16 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
+} from '@/components/ui/card'
 import {
   Item,
   ItemContent,
   ItemDescription,
   ItemMedia,
   ItemTitle
-} from '@serpdirectory/design-system/item'
-import { Spinner } from '@serpdirectory/design-system/spinner'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@serpdirectory/design-system/tooltip'
+} from '@/components/ui/item'
+import { Spinner } from '@/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   ArrowRight,
   Check,

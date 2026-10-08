@@ -1,7 +1,7 @@
 'use client'
 
-import { Badge } from '@serpdirectory/design-system/badge'
-import { Button } from '@serpdirectory/design-system/button'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Command,
   CommandEmpty,
@@ -10,17 +10,17 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator
-} from '@serpdirectory/design-system/command'
-import { cn } from '@serpdirectory/design-system/lib/utils'
-import { Popover, PopoverContent, PopoverTrigger } from '@serpdirectory/design-system/popover'
+} from '@/components/ui/command'
+import { cn } from '@/lib/utils'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@serpdirectory/design-system/select'
-import { Separator } from '@serpdirectory/design-system/separator'
+} from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 import {
   Table,
   TableBody,
@@ -28,7 +28,7 @@ import {
   TableHead,
   TableHeader,
   TableRow
-} from '@serpdirectory/design-system/table'
+} from '@/components/ui/table'
 import { flexRender, type Table as TanstackTable } from '@tanstack/react-table'
 import {
   Check,

@@ -3,7 +3,7 @@
 import {
   DirectoryCommand,
   type DirectoryCommandItem
-} from '@serpdirectory/design-system/shadcnblocks/directory-command'
+} from './directory-command'
 import { ArrowRight, Clock, Search, TrendingUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

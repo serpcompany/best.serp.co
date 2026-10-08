@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@serpdirectory/design-system/button'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -8,40 +8,40 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from '@serpdirectory/design-system/card'
+} from '@/components/ui/card'
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel
-} from '@serpdirectory/design-system/field'
-import { Input } from '@serpdirectory/design-system/input'
+} from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
   InputGroupText
-} from '@serpdirectory/design-system/input-group'
+} from '@/components/ui/input-group'
 import {
   Item,
   ItemContent,
   ItemDescription,
   ItemMedia,
   ItemTitle
-} from '@serpdirectory/design-system/item'
-import { cn } from '@serpdirectory/design-system/lib/utils'
+} from '@/components/ui/item'
+import { cn } from '@/lib/utils'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from '@serpdirectory/design-system/select'
-import { Skeleton } from '@serpdirectory/design-system/skeleton'
-import { Spinner } from '@serpdirectory/design-system/spinner'
-import { Textarea } from '@serpdirectory/design-system/textarea'
-import { ToggleGroup, ToggleGroupItem } from '@serpdirectory/design-system/toggle-group'
+} from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
+import { Textarea } from '@/components/ui/textarea'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   ArrowRight,
   BadgeCheck,

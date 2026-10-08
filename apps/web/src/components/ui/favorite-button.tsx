@@ -1,6 +1,6 @@
 'use client'
 
-import { cn } from '@serpdirectory/design-system/lib/utils'
+import { cn } from '@/lib/utils'
 import { Heart } from 'lucide-react'
 import { type MouseEvent, useState } from 'react'
 import { useFavorites } from '../layout/root-shell-client'

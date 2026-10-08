@@ -1,4 +1,4 @@
-import { SidebarProvider } from '@serpdirectory/design-system/sidebar'
+import { SidebarProvider } from '@/components/ui/sidebar'
 import { FileText, Inbox, LayoutDashboard } from 'lucide-react'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'

@@ -9,7 +9,7 @@ import { getNetworkBrandsForGroup } from '../../lib/site/network-brands'
 import { generateDisabledRouteMetadata } from '../../lib/site/route-feature-gates'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
-import { Card, CardContent } from '../ui/card'
+import { Card, CardContent } from '@/components/directory/card'
 
 export const dynamic = 'force-static'
 
