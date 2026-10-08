@@ -161,7 +161,7 @@ export function listingTitle(name: string): string {
 }
 
 export function generateDynamicMetadata(options: {
-  type: 'website' | 'listing' | 'category' | 'member' | 'guide' | 'news' | 'doc'
+  type: 'website' | 'listing' | 'category' | 'member' | 'guide' | 'doc'
   name: string
   description: string
   slug: string
@@ -202,10 +202,6 @@ export function generateDynamicMetadata(options: {
       path = getRoute('guides.guide', { slug })
       title = `${name} - Developer Guide`
       break
-    case 'news':
-      path = `/news/${slug}`
-      title = `${name} - News & Updates`
-      break
     case 'doc':
       path = getRoute('docs.doc', { slug })
       title = `${name} - ${siteCopy.docsLabel}`
@@ -220,10 +216,7 @@ export function generateDynamicMetadata(options: {
     image
   })
 
-  if (
-    (type === 'guide' || type === 'news' || type === 'website' || type === 'listing') &&
-    publishedAt
-  ) {
+  if ((type === 'guide' || type === 'website' || type === 'listing') && publishedAt) {
     metadata.openGraph = {
       ...metadata.openGraph,
       type: 'article',
