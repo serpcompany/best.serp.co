@@ -8,9 +8,9 @@ import { compareWithBaseline, literalColors } from './theme-color-guard'
  * rgb() or hsl() literals and no Tailwind palette colors (`bg-red-500`, `text-white`) in
  * `apps/web/src`. Use the tokens (`bg-destructive`, `text-muted-foreground`) instead.
  *
- * Today's uses are a ratchet: `COLOR_BASELINE` holds each file's count, which may only go
- * down. A change that adds a palette class fails; a change that removes some must lower the
- * file's number (or delete the entry at zero), so the count never creeps back up.
+ * Each file's count is a ratchet: `COLOR_BASELINE` holds it, and it may only go down. A change
+ * that adds a palette class fails; a change that removes some must lower the file's number (or
+ * delete the entry at zero), so the count never creeps back up. Since #184 every file is at zero.
  */
 
 /** Files that may use literal colors, each with why. */
@@ -19,6 +19,12 @@ const ALLOWED: Readonly<Record<string, string>> = {
   'apps/web/src/lib/email/emails/layout.ts':
     'email clients ignore CSS variables, so the email palette is literal hex',
   'apps/web/src/components/ui/animated-background.tsx': 'draws on a canvas with rgba()'
+}
+
+/** Classes stock shadcn uses, allowed in any file, each with why. */
+const ALLOWED_CLASSES: Readonly<Record<string, string>> = {
+  'bg-black/50':
+    'the stock overlay behind Dialog, Sheet and AlertDialog; #187 moves the hand-built mobile drawer and search overlays onto those components'
 }
 
 /** Stock shadcn components (#175): they stay as the registry ships them (#186 replaces them). */
@@ -65,38 +71,8 @@ const STOCK_UI = [
   'tooltip'
 ].map(name => `apps/web/src/components/ui/${name}.tsx`)
 
-/** Each file's literal-color count on 2026-10-08. Lower it as a file moves to tokens. */
-const COLOR_BASELINE: Readonly<Record<string, number>> = {
-  'apps/web/src/app/error.tsx': 3,
-  'apps/web/src/app/not-found.tsx': 3,
-  'apps/web/src/components/account/account-dashboard.tsx': 3,
-  'apps/web/src/components/account/listing-edit.tsx': 12,
-  'apps/web/src/components/account/record.tsx': 5,
-  'apps/web/src/components/account/status.tsx': 14,
-  'apps/web/src/components/account/withdraw-dialog.tsx': 1,
-  'apps/web/src/components/admin/admins-manager.tsx': 1,
-  'apps/web/src/components/admin/listing-detail.tsx': 5,
-  'apps/web/src/components/admin/orders-manager.tsx': 7,
-  'apps/web/src/components/admin/preview-card-body.tsx': 3,
-  'apps/web/src/components/admin/review-detail.tsx': 10,
-  'apps/web/src/components/admin/status-badge.tsx': 26,
-  'apps/web/src/components/auth/login-card.tsx': 3,
-  'apps/web/src/components/content/mdx-components.tsx': 4,
-  'apps/web/src/components/directory/directory-product-list.tsx': 8,
-  'apps/web/src/components/directory/websites-search-controls.tsx': 2,
-  'apps/web/src/components/layout/header-search.tsx': 1,
-  'apps/web/src/components/layout/mobile-drawer.tsx': 1,
-  'apps/web/src/components/search/search-autocomplete.tsx': 4,
-  'apps/web/src/components/search/search-results.tsx': 14,
-  'apps/web/src/components/sections/guide-card.tsx': 12,
-  'apps/web/src/components/submit/badge-step.tsx': 3,
-  'apps/web/src/components/submit/submit-form.tsx': 2,
-  'apps/web/src/components/submit/submit-ui.tsx': 15,
-  'apps/web/src/components/ui/copy-button.tsx': 9,
-  'apps/web/src/components/ui/favorite-button.tsx': 12,
-  'apps/web/src/components/website/website-cli-section.tsx': 11,
-  'apps/web/src/components/website/website-hero.tsx': 6
-}
+/** Each file's literal-color count, which may only go down. Empty since #184 (all at zero). */
+const COLOR_BASELINE: Readonly<Record<string, number>> = {}
 
 function sourceFiles(): string[] {
   return execFileSync(
@@ -220,7 +196,9 @@ describe('theme colors only (#183)', () => {
     const uses: Record<string, string[]> = {}
     for (const file of sourceFiles()) {
       if (allowed.has(file)) continue
-      const found = literalColors(readFileSync(file, 'utf8'), file)
+      const found = literalColors(readFileSync(file, 'utf8'), file).filter(
+        use => ALLOWED_CLASSES[use.slice(use.lastIndexOf(' ') + 1)] === undefined
+      )
       if (found.length > 0) uses[file] = found
     }
     const { over, stale } = compareWithBaseline(uses, COLOR_BASELINE)
@@ -238,7 +216,7 @@ describe('theme colors only (#183)', () => {
     for (const file of [...Object.keys(ALLOWED), ...STOCK_UI, ...Object.keys(COLOR_BASELINE)]) {
       expect(existsSync(file), file).toBe(true)
     }
-    for (const [file, reason] of Object.entries(ALLOWED))
-      expect(reason.length, file).toBeGreaterThan(10)
+    for (const [name, reason] of Object.entries({ ...ALLOWED, ...ALLOWED_CLASSES }))
+      expect(reason.length, name).toBeGreaterThan(10)
   })
 })
