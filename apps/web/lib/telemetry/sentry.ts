@@ -109,6 +109,9 @@ export function browserEnvironment(hostname: string): SiteEnvironment {
   return 'local'
 }
 
+/** Errors only: no session per page view (browser) or per isolate (Worker). */
+const SESSION_INTEGRATIONS = new Set(['BrowserSession', 'ProcessSession'])
+
 export function sentryOptions(environment: () => SiteEnvironment) {
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN || undefined
   return {
@@ -120,6 +123,8 @@ export function sentryOptions(environment: () => SiteEnvironment) {
     dsn,
     enabled: Boolean(dsn),
     environment: environment(),
+    integrations: <I extends { name: string }>(defaults: I[]): I[] =>
+      defaults.filter(integration => !SESSION_INTEGRATIONS.has(integration.name)),
     maxBreadcrumbs: 30,
     release: sentryRelease(process.env.NEXT_PUBLIC_SENTRY_RELEASE),
     sendDefaultPii: false,

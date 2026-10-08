@@ -114,6 +114,16 @@ describe('Sentry settings (#48)', () => {
     ])
   })
 
+  it('sends no sessions from the browser or the Worker', () => {
+    const { integrations } = sentryOptions(() => 'production')
+    const kept = integrations([
+      { name: 'BrowserSession' },
+      { name: 'ProcessSession' },
+      { name: 'GlobalHandlers' }
+    ])
+    expect(kept.map(integration => integration.name)).toEqual(['GlobalHandlers'])
+  })
+
   it('leaves tracing off and sets the environment at init too', () => {
     const options = sentryOptions(() => 'staging')
     expect(options).not.toHaveProperty('tracesSampleRate')
