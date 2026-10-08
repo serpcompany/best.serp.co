@@ -146,7 +146,7 @@ describe('pr-review workflow', () => {
     expect(stepRuns).toContain('pnpm test:d1')
     expect(stepRuns).toContain('pnpm lint:forbidden-links')
     const biomeStep = stepRuns?.find(run => run?.includes('pnpm exec biome check'))
-    // Against the pull request's own base: staging for changes, main for promotions.
+    // Against the pull request's own base: staging for changes, main for hotfixes.
     expect(biomeStep).toContain(
       'git diff --name-only --diff-filter=ACMR -z "origin/$GITHUB_BASE_REF...HEAD"'
     )

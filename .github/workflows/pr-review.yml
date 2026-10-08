@@ -1,7 +1,7 @@
 name: PR Review
 
-# Required checks for every pull request into staging (the base branch) and main (promotions
-# from staging and hotfixes). Every job runs on every PR: a skipped job satisfies a required
+# Required checks for every pull request into staging (the base branch) and main (hotfix-*
+# branches; staging reaches main by fast-forward, not a pull request). Every job runs on every PR: a skipped job satisfies a required
 # check, so nothing here is path-filtered.
 on:
   pull_request:

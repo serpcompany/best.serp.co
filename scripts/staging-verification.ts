@@ -17,10 +17,10 @@
  * HTTP gate, and Playwright smoke steps successfully. A green attempt that skipped those steps
  * (for example, before the staging credentials existed) does not count.
  *
- * Why the tree and not the commit: `main` receives `staging` by promotion. A fast-forward keeps
- * the staging commit itself, but a `staging` -> `main` pull request merged with a merge commit
- * gives `main` a new commit. That merge commit has the verified staging commit's tree exactly
- * when `main` had not diverged, so its source, migrations, and workflows are byte-for-byte what
+ * Why the tree and not the commit: `main` receives `staging` by a fast-forward promotion
+ * (`release-promote.ts`, #171), which keeps the staging commit itself. Before #171, a `staging`
+ * -> `main` pull request merged with a merge commit gave `main` a new commit. That merge commit
+ * has the verified staging commit's tree exactly when `main` had not diverged, so its source, migrations, and workflows are byte-for-byte what
  * staging verified. When `main` had diverged (a hotfix not yet merged back into `staging`), the
  * merged tree was never on staging and the release is refused until staging verifies it.
  *
@@ -326,7 +326,7 @@ export async function assertStagingVerified(
 
   if (checked.length === 0) {
     throw new Error(
-      `${stagingWorkflow.name} has no run on ${stagingWorkflow.branch} for ${sha} or for any commit with its tree ${tree}. Production releases only source that ${stagingWorkflow.name} has migrated, deployed, and smoke-tested on staging. A promotion merge commit carries a staging commit's tree only when main has not diverged; if main has commits that staging lacks, merge main into staging first. ${rerunHint}`
+      `${stagingWorkflow.name} has no run on ${stagingWorkflow.branch} for ${sha} or for any commit with its tree ${tree}. Production releases only source that ${stagingWorkflow.name} has migrated, deployed, and smoke-tested on staging. A fast-forward promotion releases a verified staging commit itself (pnpm release:promote); a hotfix pushed to main is released with the hotfix confirmation instead (docs/RELEASE_GUARDS.md#hotfixes). If main has commits that staging lacks, merge main into staging first. ${rerunHint}`
     )
   }
   const seen = checked

@@ -63,17 +63,21 @@ Pull requests into `staging` (the base branch) and `main` (`hotfix-*` branches o
 - Every change needs a pull request: squash-merged into `staging` (except the merge commit
   that brings a hotfix back from `main`) and into `main` for hotfixes. The one exception is
   the owner's fast-forward promotion of `staging` (`pnpm release:promote`), a bypass push.
-- Six checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
-  `OpenNext Worker Build`, and `E2E Tests` from `pr-review.yml`, and `issue-link` from
-  `pr-issue-link.yml` (serp's workflow, copied unchanged), which fails a pull request that
-  closes no issue. Every `pr-review.yml` job runs on every pull request, because a skipped job
-  satisfies a required check. `issue-link` skips bot PRs and PRs whose head and base are
-  `staging` and `main`; a merge-back from any other branch needs a `No issue: <reason>` line.
-- Force pushes and branch deletion are blocked.
+- Five checks are required: `Validate Site & Policy`, `Type Check`, `Unit Tests`,
+  `OpenNext Worker Build`, and `E2E Tests` from `pr-review.yml`. `issue-link` from
+  `pr-issue-link.yml` (serp's workflow, copied unchanged) runs on every pull request and fails
+  one that closes no issue; it is not a required check yet. Every `pr-review.yml` job runs on
+  every pull request, because a skipped job satisfies a required check. `issue-link` skips bot
+  PRs and PRs whose head and base are `staging` and `main`; a merge-back from any other branch
+  needs a `No issue: <reason>` line.
+- Force pushes and branch deletion are blocked, with no bypass.
 
 The rulesets require no approving review, no up-to-date branch, and no resolved
-conversations. Repository admins can bypass them only through a pull request, except the
-owner's bypass for pushes to `main`, which only `pnpm release:promote` uses (#171). Rulesets cannot restrict a pull request's head branch, so `Validate Site &
+conversations. Repository admins can bypass them only through a pull request. The exception
+is the owner's fast-forward promotion (`pnpm release:promote`, #171), a direct push to `main`.
+A bypass covers a whole ruleset, so `main` keeps deletion and force-push blocking in a ruleset
+with no bypass and its pull request and check rules in a second one the owner may bypass
+(an owner step). Rulesets cannot restrict a pull request's head branch, so `Validate Site &
 Policy` fails a pull request into `main` whose head is not a `hotfix-*` branch. That only
 catches mis-targeted pull requests; Deploy Production's tree check is the control. Agents
 never merge: the owner approves every merge

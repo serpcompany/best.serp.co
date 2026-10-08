@@ -18,6 +18,7 @@ interface Fakes {
   fetch?: GitResult
   mainSha?: string
   push?: GitResult
+  revParse?: GitResult
   verify?: () => Promise<StagingVerification>
 }
 
@@ -29,6 +30,7 @@ function fakes(options: Fakes = {}) {
     const [command] = args
     if (command === 'fetch') return options.fetch ?? ok()
     if (command === 'rev-parse') {
+      if (options.revParse) return options.revParse
       return ok(args[2]?.includes('origin/main') ? (options.mainSha ?? main) : staging)
     }
     if (command === 'merge-base') return options.ancestry ?? ok()
@@ -49,15 +51,16 @@ function fakes(options: Fakes = {}) {
       }))
   )
   const confirm = vi.fn(async () => options.answer ?? staging.slice(0, CONFIRM_LENGTH))
+  const log = vi.fn()
   const deps: PromoteDependencies = {
     confirm,
     git,
-    log: vi.fn(),
+    log,
     token: async () => 'token',
     verify
   }
   const pushes = () => calls.filter(([command]) => command === 'push')
-  return { confirm, deps, pushes, verify }
+  return { calls, confirm, deps, log, pushes, verify }
 }
 
 describe('pnpm release:promote (#171)', () => {
@@ -68,6 +71,46 @@ describe('pnpm release:promote (#171)', () => {
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining(staging.slice(0, 12)))
     // The exact verified commit, never a ref that could move, and never forced.
     expect(pushes()).toEqual([['push', 'origin', `${staging}:refs/heads/main`]])
+  })
+
+  it('fetches both branches by explicit refspec', async () => {
+    const { calls, deps } = fakes()
+    await promoteStaging(deps)
+    expect(calls[0]).toEqual([
+      'fetch',
+      '--quiet',
+      'origin',
+      '+refs/heads/main:refs/remotes/origin/main',
+      '+refs/heads/staging:refs/remotes/origin/staging'
+    ])
+  })
+
+  it('names the verifying staging commit when the check matched by tree', async () => {
+    const other = 'd'.repeat(40)
+    const { deps, log } = fakes({
+      verify: async () => ({
+        match: 'tree',
+        runAttempt: 2,
+        runId: 8,
+        runUrl: 'https://github.com/serpcompany/best.serp.co/actions/runs/8',
+        sha: staging,
+        stagingSha: other,
+        tree: 'c'.repeat(40)
+      })
+    })
+    await promoteStaging(deps)
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining(`at staging commit ${other.slice(0, CONFIRM_LENGTH)}`)
+    )
+  })
+
+  it('refuses when a branch cannot be resolved', async () => {
+    const { deps, pushes, verify } = fakes({
+      revParse: { status: 128, stderr: 'fatal: Needed a single revision', stdout: '' }
+    })
+    await expect(promoteStaging(deps)).rejects.toThrow(/Needed a single revision/u)
+    expect(verify).not.toHaveBeenCalled()
+    expect(pushes()).toEqual([])
   })
 
   it('does nothing when main is already at staging', async () => {
@@ -123,7 +166,7 @@ describe('pnpm release:promote (#171)', () => {
     const { deps } = fakes({
       push: { status: 1, stderr: 'GH013: Repository rule violations found', stdout: '' }
     })
-    await expect(promoteStaging(deps)).rejects.toThrow(/bypass actor/u)
+    await expect(promoteStaging(deps)).rejects.toThrow(/cannot bypass main's pull request rules/u)
   })
 
   it('runs only at a terminal', () => {

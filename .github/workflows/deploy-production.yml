@@ -1,9 +1,10 @@
 name: Deploy Production
 
-# main is production. Every push to main (a staging -> main promotion) releases it, and a
-# manual dispatch from main re-runs a release with a typed confirmation. Only source that
-# Deploy Staging verified on the staging branch is released: the same commit (fast-forward) or
-# the same tree (a promotion merge commit). The production environment's required reviewers
+# main is production. Every push to main (the owner's fast-forward promotion of staging,
+# `pnpm release:promote`) releases it, and a manual dispatch from main re-runs a release with a
+# typed confirmation. Only source that Deploy Staging verified on the staging branch is
+# released: the same commit (a fast-forward) or the same tree (such as an older promotion merge
+# commit). The production environment's required reviewers
 # approve every release job. The release records a D1 Time Travel bookmark and migrates
 # production D1 only when migrations are pending, and otherwise deploys the Worker only. A
 # hotfix-* pull request merged into main stops at the staging check; dispatching with the hotfix

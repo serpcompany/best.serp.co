@@ -69,7 +69,14 @@ async function commitOf(deps: PromoteDependencies, ref: string): Promise<string>
 export async function promoteStaging(
   deps: PromoteDependencies
 ): Promise<'promoted' | 'up-to-date'> {
-  await gitOrThrow(deps, ['fetch', '--quiet', 'origin', 'main', 'staging'])
+  // Explicit refspecs, so this works in a clone whatever its configured fetch rules.
+  await gitOrThrow(deps, [
+    'fetch',
+    '--quiet',
+    'origin',
+    '+refs/heads/main:refs/remotes/origin/main',
+    '+refs/heads/staging:refs/remotes/origin/staging'
+  ])
   const main = await commitOf(deps, 'refs/remotes/origin/main')
   const staging = await commitOf(deps, 'refs/remotes/origin/staging')
   if (main === staging) {
@@ -106,7 +113,9 @@ export async function promoteStaging(
   ])
   deps.log(
     [
-      `${stagingWorkflow.name} verified ${staging.slice(0, CONFIRM_LENGTH)}: ${verified.runUrl} (attempt ${verified.runAttempt}).`,
+      verified.match === 'commit'
+        ? `${stagingWorkflow.name} verified ${staging.slice(0, CONFIRM_LENGTH)}: ${verified.runUrl} (attempt ${verified.runAttempt}).`
+        : `${stagingWorkflow.name} verified the tree of ${staging.slice(0, CONFIRM_LENGTH)} at staging commit ${verified.stagingSha.slice(0, CONFIRM_LENGTH)}: ${verified.runUrl} (attempt ${verified.runAttempt}).`,
       `Fast-forwarding main from ${main.slice(0, CONFIRM_LENGTH)} adds:`,
       commits,
       'The push runs Deploy Production, which waits for the production reviewers.'
@@ -121,14 +130,17 @@ export async function promoteStaging(
   const push = await deps.git(['push', 'origin', `${staging}:refs/heads/main`])
   if (push.status !== 0) {
     throw new Error(
-      `git push to main failed (exit ${push.status}): ${push.stderr.trim()}\nA ruleset rejection means your account is not a bypass actor for pushes on the main ruleset; a non-fast-forward rejection means main moved, so run this again.`
+      `git push to main failed (exit ${push.status}): ${push.stderr.trim()}\nA ruleset rejection means your account cannot bypass main's pull request rules (docs/HARNESS.md); a non-fast-forward or "fetch first" rejection means main moved, so run this again.`
     )
   }
   deps.log(`main is now ${staging}. Deploy Production is running for it.`)
   return 'promoted'
 }
 
-/** The promotion needs a person at a terminal: a script or agent cannot confirm it. */
+/**
+ * The promotion asks a person at a terminal. This stops accidental non-interactive runs (a CI job,
+ * a piped command); it is a guard, not a security boundary.
+ */
 export function assertInteractive(stdinIsTty: boolean | undefined): void {
   if (!stdinIsTty) {
     throw new Error(
