@@ -4,6 +4,7 @@ import { type UrlKey, urlKey } from '@serpdirectory/utils/url-key'
 import { and, eq, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
+import { toInstant } from './instants'
 import { listingIdsWithWebsite } from './listing-plans'
 import { isMediaKey, mediaUrl } from './media-keys'
 import { validatePublicHttpUrl } from './public-url'
@@ -363,6 +364,8 @@ export function buildSubmissionReviewPreview(
     },
     // New submissions are listed with a nofollow outbound link (#59); preview it that way.
     linkRel: 'nofollow',
+    // A preview has never been public, so it last changed when it was created.
+    modifiedAt: toInstant(createdAt) ?? `${publishedAt}T00:00:00.000Z`,
     name: requiredTrimmedText(row.name, 'name'),
     nextWebsite: null,
     previousWebsite: null,

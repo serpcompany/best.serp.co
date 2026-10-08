@@ -211,7 +211,7 @@ extensions (`chart.js`), and a test checks the committed import.
   old `/sitemaps/*/1.xml` answer one 308. The route registry
   (`packages/site-config/src/site-routes.ts`, #167) sets each static page's indexability and
   sitemap for the sitemaps, robots.txt, page metadata, and footer (`site-routes.test.tsx`).
-  Listing entries carry `published_at` as `lastmod`; the others carry none.
+  `lastmod` (#218): a listing's later `updated_at`/`published_at`, else the newest child.
 
 The Playwright smoke suite (staging) and `scripts/d1-preview-http-gates.ts` (staging and
 production) assert the redirects, the `/api` exemption, and the homepage form.

@@ -4,10 +4,15 @@
  * root-level child sitemaps (serp websites/features/xml-sitemaps.md): `/sitemap-pages.xml` (the
  * registry's indexable static pages), `/sitemap-products.xml` (every public listing), and
  * `/sitemap-categories.xml` (every category with a public listing).
+ *
+ * `lastmod` comes from D1 (#218): a listing's `modifiedAt` (the later of `updated_at` and
+ * `published_at`), a category's newest listing, the catalog pages' newest listing, and each
+ * index entry's newest child. A static page whose content lives in code carries none.
  */
 import {
   disallowedPaths,
   SITEMAP_INDEX_PATH,
+  type SitemapGroup,
   sitemapGroups,
   sitemapPaths,
   sitemapRoutePaths
@@ -23,6 +28,7 @@ type WebsiteSitemapEntry = {
   categories?: string[]
   category?: string
   featured?: boolean
+  modifiedAt?: string
   publishedAt: string
   slug: string
 }
@@ -102,16 +108,24 @@ function toXmlResponse(xml: string): Response {
   })
 }
 
-/**
- * The listing pages. `lastmod` is the publication date until the sitemaps read D1's
- * `updated_at` (#167 follow-up); the static pages and categories carry none rather than a
- * generation time that would claim every page changed on every request.
- */
-async function getListingEntries(
-  getWebsites: SitemapContentLoaders['getWebsites']
-): Promise<SitemapEntry[]> {
-  return (await getWebsites()).map(website => ({
-    lastmod: new Date(website.publishedAt).toISOString(),
+/** The static pages that show the catalog, so they change when a listing does. */
+const CATALOG_PAGE_PATHS = new Set(['/', getRoute('category.index')])
+
+function listingLastmod(website: WebsiteSitemapEntry): string {
+  return website.modifiedAt ?? new Date(website.publishedAt).toISOString()
+}
+
+/** The newest of ISO instants (they sort as text), or undefined for none. */
+function newest(values: Array<string | undefined>): string | undefined {
+  return values.reduce<string | undefined>(
+    (latest, value) => (value && (!latest || value > latest) ? value : latest),
+    undefined
+  )
+}
+
+function getListingEntries(websites: WebsiteSitemapEntry[]): SitemapEntry[] {
+  return websites.map(website => ({
+    lastmod: listingLastmod(website),
     loc: toAbsoluteUrl(
       appendPathSegment(
         getRoute('listing.detail', { slug: website.slug }),
@@ -121,13 +135,29 @@ async function getListingEntries(
   }))
 }
 
-async function getCategoryEntries(
-  getWebsites: SitemapContentLoaders['getWebsites']
-): Promise<SitemapEntry[]> {
-  return getActiveCategories(await getWebsites())
-    .map(category => toAbsoluteUrl(getRoute('category.page', { category: category.slug })))
-    .sort()
-    .map(loc => ({ loc }))
+function getCategoryEntries(websites: WebsiteSitemapEntry[]): SitemapEntry[] {
+  const latestBySlug = new Map<string, string>()
+  for (const website of websites) {
+    const lastmod = listingLastmod(website)
+    for (const slug of website.categories ?? (website.category ? [website.category] : [])) {
+      const latest = latestBySlug.get(slug)
+      if (!latest || lastmod > latest) latestBySlug.set(slug, lastmod)
+    }
+  }
+  return getActiveCategories(websites)
+    .map(category => ({
+      lastmod: latestBySlug.get(category.slug),
+      loc: toAbsoluteUrl(getRoute('category.page', { category: category.slug }))
+    }))
+    .sort((left, right) => left.loc.localeCompare(right.loc))
+}
+
+function getPageEntries(websites: WebsiteSitemapEntry[]): SitemapEntry[] {
+  const catalogLastmod = newest(websites.map(listingLastmod))
+  return sitemapRoutePaths('pages').map(path => ({
+    lastmod: CATALOG_PAGE_PATHS.has(path) ? catalogLastmod : undefined,
+    loc: toAbsoluteUrl(path)
+  }))
 }
 
 export function createCanonicalRobots(): MetadataRoute.Robots {
@@ -141,26 +171,39 @@ export function createCanonicalRobots(): MetadataRoute.Robots {
   }
 }
 
-export function createSitemapIndexResponse(): Response {
+export async function createSitemapIndexResponse(
+  loaders: SitemapContentLoaders
+): Promise<Response> {
+  const websites = await loaders.getWebsites()
+  const entriesByGroup: Record<SitemapGroup, SitemapEntry[]> = {
+    categories: getCategoryEntries(websites),
+    pages: getPageEntries(websites),
+    products: getListingEntries(websites)
+  }
   return toXmlResponse(
-    renderSitemapIndex(sitemapGroups.map(group => ({ loc: toAbsoluteUrl(sitemapPaths[group]) })))
+    renderSitemapIndex(
+      sitemapGroups.map(group => ({
+        lastmod: newest(entriesByGroup[group].map(entry => entry.lastmod)),
+        loc: toAbsoluteUrl(sitemapPaths[group])
+      }))
+    )
   )
 }
 
-export function createPagesSitemapResponse(): Response {
-  return toXmlResponse(
-    renderSitemap(sitemapRoutePaths('pages').map(path => ({ loc: toAbsoluteUrl(path) })))
-  )
+export async function createPagesSitemapResponse(
+  loaders: SitemapContentLoaders
+): Promise<Response> {
+  return toXmlResponse(renderSitemap(getPageEntries(await loaders.getWebsites())))
 }
 
 export async function createListingsSitemapResponse(
   loaders: SitemapContentLoaders
 ): Promise<Response> {
-  return toXmlResponse(renderSitemap(await getListingEntries(loaders.getWebsites)))
+  return toXmlResponse(renderSitemap(getListingEntries(await loaders.getWebsites())))
 }
 
 export async function createTaxonomiesSitemapResponse(
   loaders: SitemapContentLoaders
 ): Promise<Response> {
-  return toXmlResponse(renderSitemap(await getCategoryEntries(loaders.getWebsites)))
+  return toXmlResponse(renderSitemap(getCategoryEntries(await loaders.getWebsites())))
 }

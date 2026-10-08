@@ -94,6 +94,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     collection: {
       count: listingPage.total,
       firstPublishedAt: listingPage.firstPublishedAt,
+      lastModifiedAt: listingPage.lastModifiedAt,
       lastPublishedAt: listingPage.lastPublishedAt,
       leadingProjects: firstPage.items
     },

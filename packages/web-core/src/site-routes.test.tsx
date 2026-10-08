@@ -57,24 +57,28 @@ describe('the route registry (#167)', () => {
   })
 
   it('the pages sitemap lists exactly its static pages, in canonical form', async () => {
-    const listed = locations(await createPagesSitemapResponse().text()).map(pathOf)
+    const listed = locations(
+      await (await createPagesSitemapResponse({ getWebsites: () => [] })).text()
+    ).map(pathOf)
     expect(listed).toEqual(
       staticRoutes.filter(route => route.sitemapGroup === 'pages').map(route => route.path)
     )
   })
 
   it('the index lists exactly the child sitemaps, and robots.txt names the index', async () => {
-    expect(locations(await createSitemapIndexResponse().text()).map(pathOf)).toEqual([
-      sitemapPaths.pages,
-      sitemapPaths.products,
-      sitemapPaths.categories
-    ])
+    expect(
+      locations(await (await createSitemapIndexResponse({ getWebsites: () => [] })).text()).map(
+        pathOf
+      )
+    ).toEqual([sitemapPaths.pages, sitemapPaths.products, sitemapPaths.categories])
     expect(createCanonicalRobots().sitemap).toBe(`${origin}${SITEMAP_INDEX_PATH}`)
   })
 
   it('robots.txt disallows exactly the disallowed routes, and nothing a sitemap lists', () => {
     const disallow = createCanonicalRobots().rules
-    const values = Array.isArray(disallow) ? [] : [disallow.disallow].flat()
+    const values = (Array.isArray(disallow) ? [] : [disallow.disallow].flat()).filter(
+      (value): value is string => typeof value === 'string'
+    )
     expect(values).toEqual(['/search', '/submit'])
     for (const route of siteRoutes) {
       if (!route.sitemapGroup) continue

@@ -57,6 +57,8 @@ export function generateCategoryRouteStaticParams(categories: Category[]) {
 export interface CategoryCollection {
   count: number
   firstPublishedAt: string | null
+  /** The newest change among its listings (#218): the CollectionPage's `dateModified`. */
+  lastModifiedAt?: string | null
   lastPublishedAt: string | null
   /** At least the first 20 listings of the category in directory (name) order. */
   leadingProjects: WebsiteMetadata[]
@@ -126,11 +128,15 @@ export function CategoryRoutePage({
   const categoryCount = collection.count
   const leadingProjects = collection.leadingProjects
   const listedCategoryProjectCards = pageProjects.map(toWebsiteBrowseCardMetadata)
-  const schemaDates = resolveCollectionPageSchemaDates(
+  const publicationDates = resolveCollectionPageSchemaDates(
     [collection.firstPublishedAt, collection.lastPublishedAt]
       .filter((publishedAt): publishedAt is string => Boolean(publishedAt))
       .map(publishedAt => ({ publishedAt }))
   )
+  // The same value as the categories sitemap's `lastmod` (#218).
+  const schemaDates = collection.lastModifiedAt
+    ? { ...publicationDates, dateModified: collection.lastModifiedAt }
+    : publicationDates
 
   return {
     element: (

@@ -835,7 +835,10 @@ export function buildPublicationPlan(
             categorySlugToAdd
           ),
           statement(CHANGED_ONE_GUARD)
-        ])
+        ]),
+        // The page shows its categories, so it changed: sitemap lastmod and dateModified (#218).
+        statement('UPDATE listings SET updated_at=? WHERE id=?', now, op.id),
+        statement(CHANGED_ONE_GUARD)
       )
       routes.add(listingRoute(op.slug))
       addCategories([...op.expected, ...op.add])
@@ -875,7 +878,10 @@ export function buildPublicationPlan(
             image.width,
             image.height
           )
-        )
+        ),
+        // The page shows its logo and images, so it changed (#218).
+        statement('UPDATE listings SET updated_at=? WHERE id=?', now, op.id),
+        statement(CHANGED_ONE_GUARD)
       )
       routes.add(listingRoute(op.slug))
     }

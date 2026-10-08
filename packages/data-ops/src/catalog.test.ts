@@ -198,7 +198,7 @@ describe('shared catalog data operations', () => {
     expect(after.listingCount).toBe(6)
     expect(after.publicationVersion).toBe(before.publicationVersion)
     expect((await later.getListingNamePage()).items.map(item => item.slug)).toContain('future')
-    expect([...cache.values.keys()]).toContain('catalog-shell:v6:1.2027-01-01T00:00:00.000Z')
+    expect([...cache.values.keys()]).toContain('catalog-shell:v7:1.2027-01-01T00:00:00.000Z')
   })
 
   it('reads the catalog epoch for the Worker edge cache with query telemetry', async () => {
@@ -435,14 +435,14 @@ describe('shared catalog data operations', () => {
       )
     ).toHaveLength(1)
     expect([...cache.values.keys()].sort()).toEqual([
-      `catalog-shell:v6:${epoch(1)}`,
-      `catalog-shell:v6:${epoch(2)}`
+      `catalog-shell:v7:${epoch(1)}`,
+      `catalog-shell:v7:${epoch(2)}`
     ])
   })
 
   it('falls back to live D1 when cached shell data is corrupt or unavailable', async () => {
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-shell:v6:${epoch(1)}`, { featuredCount: 'wrong' })
+    corrupt.values.set(`catalog-shell:v7:${epoch(1)}`, { featuredCount: 'wrong' })
     const corruptCatalog = operations(corrupt)
     expect((await corruptCatalog.operations.getShellStats()).featuredCount).toBe(2)
     expect(corruptCatalog.events).toContainEqual({
@@ -548,8 +548,8 @@ describe('shared catalog data operations', () => {
     ).toHaveLength(2)
 
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-published:v6:${epoch(2)}`, { items: 'wrong' })
-    corrupt.values.set(`catalog-detail:v6:${epoch(2)}:charlie`, { detail: 'wrong' })
+    corrupt.values.set(`catalog-published:v7:${epoch(2)}`, { items: 'wrong' })
+    corrupt.values.set(`catalog-detail:v7:${epoch(2)}:charlie`, { detail: 'wrong' })
     const recovered = operations(corrupt)
     expect(await recovered.operations.getPublishedListings()).toHaveLength(5)
     expect((await recovered.operations.getListingBySlug('charlie'))?.slug).toBe('charlie')
@@ -690,5 +690,42 @@ describe('legacy root-level URLs (#168)', () => {
     for (const slug of ['echo', 'future', 'retired', 'missing']) {
       expect(await target(slug), slug).toBeNull()
     }
+  })
+})
+
+describe('when a public listing last changed (#218)', () => {
+  it('is the later of updated_at and published_at, in either D1 time format', async () => {
+    const sqlite = new SqliteD1()
+    seedContractFixture(sqlite)
+    sqlite.database.exec(`
+      UPDATE listings SET updated_at = '2026-07-20 10:30:00' WHERE slug = 'bravo';
+      UPDATE listings SET updated_at = '2026-01-01T00:00:00.000Z' WHERE slug = 'charlie';
+    `)
+    const catalog = createCatalogOperations({
+      cache: new MemoryCatalogCache(),
+      client: createDatabase(sqlite.asD1Database()),
+      clock: now,
+      observe: () => {}
+    })
+    const bySlug = new Map((await catalog.getPublishedListings()).map(item => [item.slug, item]))
+    // A `CURRENT_TIMESTAMP`-format edit after publication moves it.
+    expect(bySlug.get('bravo')?.modifiedAt).toBe('2026-07-20T10:30:00.000Z')
+    // An `updated_at` before publication (a scheduled listing) does not.
+    const charlie = bySlug.get('charlie')
+    expect(charlie?.modifiedAt).toBe(
+      new Date(
+        sqlite.database.prepare("SELECT published_at FROM listings WHERE slug = 'charlie'").get()
+          ?.published_at as string
+      ).toISOString()
+    )
+    expect((await catalog.getListingBySlug('bravo'))?.modifiedAt).toBe('2026-07-20T10:30:00.000Z')
+    // A directory page carries its collection's newest change.
+    const page = await catalog.getListingNamePage({ page: 1, pageSize: 2 })
+    expect(page.lastModifiedAt).toBe(
+      [...bySlug.values()]
+        .map(item => item.modifiedAt)
+        .sort()
+        .at(-1)
+    )
   })
 })

@@ -139,6 +139,33 @@ describe('collection page schema dates', () => {
     expect(JSON.stringify(data)).not.toContain('2099-01-01')
   })
 
+  it('writes dateModified as the newest change among the listings, the sitemap lastmod (#218)', () => {
+    const alphaListings = websites.filter(website => website.categories?.includes('alpha'))
+    const { element } = CategoryRoutePage({
+      activeCategorySlugs: ['alpha'],
+      category,
+      collection: {
+        count: alphaListings.length,
+        firstPublishedAt: '2026-01-01',
+        lastModifiedAt: '2026-02-01T10:00:00.000Z',
+        lastPublishedAt: '2026-01-03',
+        leadingProjects: alphaListings
+      },
+      featuredGuides: [],
+      pageProjects: alphaListings,
+      slots: {
+        CategoryWebsitesList: NullComponent,
+        ExternalResourcesSection: NullComponent,
+        FeaturedGuidesSection: NullComponent,
+        JsonLd,
+        breadcrumb: null
+      }
+    })
+    const data = getCollectionPageData(element)
+    expect(data.datePublished).toBe('2026-01-01')
+    expect(data.dateModified).toBe('2026-02-01T10:00:00.000Z')
+  })
+
   it('omits schema dates when a collection has no published listings', () => {
     expect(resolveCollectionPageSchemaDates([])).toEqual({})
   })
