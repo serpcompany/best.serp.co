@@ -204,7 +204,7 @@ export function badgeCheckResultAlert(
           &lt;a href="{listingUrl}" rel="
           {found.map(token => (
             <span key={token}>
-              <span className="rounded bg-destructive/15 px-0.5 text-destructive line-through">
+              <span className="rounded bg-destructive/20 px-0.5 line-through decoration-destructive">
                 {token}
               </span>{' '}
             </span>
