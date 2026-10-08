@@ -64,11 +64,11 @@ Stage: ship
 GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning.
 `staging` is the base branch: branch from `origin/staging` as `issue-<n>-<slug>` and open
 pull requests into `staging` (`gh pr create --base staging`); each merge deploys staging.
-`main` is production and changes only by the owner's `staging` → `main` promotion (a merge
-commit) or a `hotfix-*` pull request ([Release guards](./docs/RELEASE_GUARDS.md#promotion)).
-Rulesets require a PR, the PR Review checks and `issue-link`, and block force pushes and deletion.
-Agents never merge; the owner approves every merge. Agents never dispatch a production
-workflow or a staging data workflow (catalog publication, media upload), type their
+`main` is production and changes only by a fast-forward promotion (`pnpm release:promote`,
+owner only) or a `hotfix-*` pull request ([Release guards](./docs/RELEASE_GUARDS.md#promotion)).
+Rulesets require a PR and the five PR Review checks, and block force pushes and deletion.
+Agents never merge or push to `main`; the owner approves every merge. Agents never dispatch a
+production workflow or a staging data workflow (catalog publication, media upload), type their
 confirmations, or approve a deployment; only the owner does.
 Issues and labels never grant production, database, or deployment authority.
 

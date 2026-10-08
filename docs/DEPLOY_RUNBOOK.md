@@ -20,7 +20,7 @@ Status (serpcompany/best.serp.co#34):
 | D1 | `best-serp-co-staging` `8e6b67e5-9c58-4fa9-aca1-25b0020c0833` | `best-serp-co-production` `404ec437-53a2-4fbc-8b5f-b5e69065708e` |
 | Origin | https://best-serp-co-staging.serpcompany.workers.dev | https://best.serp.co (Worker Custom Domain on `serp.co`, at cutover) |
 | Review origin (pre-cutover) | — | https://best-serp-co-production.serpcompany.workers.dev (`workers_dev: true`, noindex). The production HTTP gates run here with the smoke-test header and, after cutover, on best.serp.co, where they skip only zone protection (`cf-mitigated`, or a 403 or 429 without Worker headers) and GitHub Pages ([Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)). It stays after cutover: `CANONICAL_HOST_REDIRECT` flips to `on` and it 308s to best.serp.co except for smoke-test requests (#42 decision e). |
-| Branch | `staging` (the base branch; PRs squash-merge here, hotfix merge-backs use a merge commit) | `main` (promotions from `staging`, and `hotfix-*` PRs) |
+| Branch | `staging` (the base branch; PRs squash-merge here, hotfix merge-backs use a merge commit) | `main` (fast-forward promotions of `staging`, and `hotfix-*` PRs) |
 | GitHub environment | `staging` (`staging` branch only, no reviewers) | `production` (required reviewers, `main` only) |
 | Email ([useSend](./EMAIL.md)) | `mail.serp.co`, `[staging]` prefix, allowlist | `mail.serp.co` |
 
@@ -152,11 +152,11 @@ PR Review already gates every merge, and Main Validation re-runs the full loop o
 ### Routine releases (promotion)
 
 1. Wait until Deploy Staging is green for the `staging` head.
-2. The owner opens a `staging` → `main` pull request (`gh pr create --base main --head
-   staging`) and, after PR Review, merges it with **Create a merge commit**, never a squash.
-3. The push to `main` runs Deploy Production: the staging check matches the merge commit's
-   tree, the `production` reviewers approve, and the release bookmarks and migrates D1 first
-   only when `d1/drizzle` migrations are pending.
+2. The owner runs `pnpm release:promote` at a terminal and types the short SHA it shows. It
+   fast-forwards `main` to that verified commit ([Promotion](./RELEASE_GUARDS.md#promotion)).
+3. The push to `main` runs Deploy Production: the staging check finds that commit's own run,
+   the `production` reviewers approve, and the release bookmarks and migrates D1 first only
+   when `d1/drizzle` migrations are pending.
 
 Migrations are forward-only and applied before the new Worker deploys, so each must stay
 compatible with the live Worker while it applies. A `deploy-best.serp.co-production` dispatch
@@ -244,11 +244,11 @@ Caching needs no KV namespace, Durable Object, or queue. Media: [Listing media](
    submit `sitemap-index.xml` in Search Console.
 5. Only after step 4, switch the platform host to the canonical host. Merge a reviewed PR
    into `staging` that sets `env.production.vars.CANONICAL_HOST_REDIRECT` to `"on"` in
-   `apps/web/wrangler.jsonc`, wait for Deploy Staging to go green, then merge a `staging` →
-   `main` promotion PR with a merge commit ([Routine releases](#routine-releases-promotion)).
+   `apps/web/wrangler.jsonc`, wait for Deploy Staging to go green, then promote it
+   (`pnpm release:promote`, [Routine releases](#routine-releases-promotion)).
    That push runs Deploy Production, which releases it after the owner's approval; its gates
    then also require the workers.dev host to answer one 308 to best.serp.co. Do not dispatch
-   Deploy Production before the promotion is merged: it would release the `main` head with
+   Deploy Production before the promotion is pushed: it would release the `main` head with
    the switch still `off` and never check the 308. Keep `workers_dev: true`; CI reaches the
    Worker there with the `x-best-serp-co-smoke-test` header. A flip before step 4 is live as
    soon as the deploy finishes (the review URL sends every visitor to GitHub Pages); the gates
