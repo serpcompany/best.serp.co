@@ -138,14 +138,14 @@ test.describe('public parity interactions', () => {
 
     const browseSection = page.getByRole('heading', { name: /browse the directory/i })
     await browseSection.scrollIntoViewIfNeeded()
-    const nameSortButton = page.getByRole('radio', { name: /^name$/i }).last()
+    const nameSortButton = page.getByRole('button', { name: /^name$/i }).last()
     await nameSortButton.click()
     await expect(page.getByText(/showing \d+ of \d+ matching products/i)).toBeVisible()
 
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await expect(page.getByRole('radio', { name: /^name$/i }).last()).toHaveAttribute(
-      'data-state',
-      'on'
+    await expect(page.getByRole('button', { name: /^name$/i }).last()).toHaveAttribute(
+      'aria-pressed',
+      'true'
     )
     await expect(page.getByText(/showing \d+ of \d+ matching products/i)).toBeVisible()
   })

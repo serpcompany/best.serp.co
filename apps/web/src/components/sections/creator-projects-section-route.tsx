@@ -2,7 +2,7 @@
 
 import { SiteCard, SiteCardHeader } from '@/components/directory/site-card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { analytics } from '../../lib/analytics/analytics'
 import { Section } from '../layout/section'
@@ -16,7 +16,7 @@ export function CreatorProjectsSectionRoute() {
       }}
       slots={{
         Badge,
-        Button,
+        buttonVariants,
         Card: SiteCard,
         CardContent,
         CardDescription,

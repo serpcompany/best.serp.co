@@ -1,7 +1,4 @@
-import type { ClassValue } from 'clsx'
-import { clsx } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-
-export const cn = (...inputs: ClassValue[]): string => twMerge(clsx(inputs))
+// One class merger: shadcn's `cn` package, which components/ui/ imports too (#186).
+export { cn } from 'cn'
 
 export const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1)

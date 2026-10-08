@@ -471,7 +471,7 @@ test.describe('on a phone', () => {
     await page.getByRole('button', { name: 'Claim this listing' }).click()
     const drawer = page.getByRole('dialog')
     await expect(drawer.getByRole('heading', { name: 'Claim Phone product' })).toBeVisible()
-    await expect(drawer).toHaveAttribute('data-vaul-drawer-direction', 'bottom')
+    await expect(drawer).toHaveAttribute('data-swipe-direction', 'down')
     await capture(page, 'mobile-8a-method')
     await drawer.getByRole('button', { name: 'Continue' }).click()
     await drawer.getByLabel('Your email at localtest.me').fill('jo@gmail.com')

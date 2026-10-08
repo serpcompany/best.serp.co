@@ -131,9 +131,8 @@ export function WebsitesListWithSort({
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Sort by:</span>
           <ToggleGroup
-            type="single"
-            value={sortBy}
-            onValueChange={(value: string) => {
+            value={[sortBy]}
+            onValueChange={([value]: string[]) => {
               if (value && value !== sortBy) {
                 trackSortChange?.(sortBy, value, 'category-sort')
                 setSortBy(value as 'name' | 'latest')
@@ -143,14 +142,14 @@ export function WebsitesListWithSort({
           >
             <ToggleGroupItem
               value="name"
-              className="px-3 py-2 h-10 data-[state=on]:bg-accent cursor-pointer"
+              className="px-3 py-2 h-10 data-pressed:bg-accent cursor-pointer"
             >
               <SortAsc className="size-4 mr-2" />
               <span className="text-sm">Name</span>
             </ToggleGroupItem>
             <ToggleGroupItem
               value="latest"
-              className="px-3 py-2 h-10 data-[state=on]:bg-accent cursor-pointer"
+              className="px-3 py-2 h-10 data-pressed:bg-accent cursor-pointer"
             >
               <Clock className="size-4 mr-2" />
               <span className="text-sm">Latest</span>

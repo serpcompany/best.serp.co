@@ -47,17 +47,17 @@ export function SearchFilters({
   return (
     <div className="flex items-center gap-2">
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2 text-sm">
-            <Filter className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden sm:inline">Filter Results</span>
-            <span className="sm:hidden">Filter</span>
-            {activeFiltersCount > 0 && (
-              <span className="ml-1 bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs min-w-[20px] text-center">
-                {activeFiltersCount}
-              </span>
-            )}
-          </Button>
+        <DropdownMenuTrigger
+          render={<Button variant="outline" size="sm" className="gap-2 text-sm" />}
+        >
+          <Filter className="h-4 w-4 flex-shrink-0" />
+          <span className="hidden sm:inline">Filter Results</span>
+          <span className="sm:hidden">Filter</span>
+          {activeFiltersCount > 0 && (
+            <span className="ml-1 bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs min-w-[20px] text-center">
+              {activeFiltersCount}
+            </span>
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64 sm:w-72 p-0">
           <div className="p-4">

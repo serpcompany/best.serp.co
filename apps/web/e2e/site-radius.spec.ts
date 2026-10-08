@@ -5,8 +5,8 @@ import { test } from './test'
 /**
  * The public site is square through one rule (#185): while `SiteChrome` (`data-site-chrome`) is
  * on the page, `--radius` is 0, and the radius scale is multiples of it. The dashboards keep
- * 0.5rem. Renaming the attribute or dropping the rule would round the public site again, and
- * only computed styles show it.
+ * the stock 0.625rem. Renaming the attribute or dropping the rule would round the public site
+ * again, and only computed styles show it.
  */
 async function cornerRadius(element: Locator): Promise<string> {
   return element.evaluate(node => getComputedStyle(node).borderTopLeftRadius)
@@ -21,9 +21,8 @@ test('the public site is square, its portals and Markdown code blocks included',
 
   // The category list is a portal outside SiteChrome, under the same :root.
   await trigger.click()
-  const list = page.getByRole('listbox')
-  await expect(list).toBeVisible()
-  expect(await cornerRadius(list)).toBe('0px')
+  await expect(page.getByRole('listbox')).toBeVisible()
+  expect(await cornerRadius(page.locator('[data-slot="select-content"]'))).toBe('0px')
   await page.keyboard.press('Escape')
 
   // MDX `pre` (mdx-components.tsx) takes `rounded-md` inside `.prose`, whose typography rule
@@ -42,13 +41,13 @@ test('the public site is square, its portals and Markdown code blocks included',
   expect(radius).toBe('0px')
 })
 
-test('the dashboards keep the 0.5rem radius', async ({ baseURL, page }) => {
+test('the dashboards keep the stock radius', async ({ baseURL, page }) => {
   test.skip(!adminSuiteEnabled, 'signs in with the local dev code sender')
   if (!baseURL) throw new Error('Playwright baseURL is required.')
   await signIn(client(page.request, baseURL), `e2e-radius-${unique()}@example.com`)
   await page.goto('/account/')
-  // A stock button is `rounded-md`: 0.75 × 0.5rem.
+  // Stock buttons take the scale (rounded-lg, or radius-md capped by size); never square here.
   const button = page.locator('main [data-slot="button"]').first()
   await expect(button).toBeVisible()
-  expect(await cornerRadius(button)).toBe('6px')
+  expect(Number.parseFloat(await cornerRadius(button))).toBeGreaterThan(0)
 })

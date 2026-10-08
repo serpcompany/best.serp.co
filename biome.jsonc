@@ -131,13 +131,19 @@
       "includes": ["apps/web/src/components/ui/**"],
       "linter": {
         "rules": {
+          // Stock patterns kept as the registry ships them (base-nova, #186): the sidebar keeps
+          // its state in a cookie, FieldError compares with `==`, Label is a bare <label>,
+          // Pagination's <nav> repeats role="navigation", BreadcrumbPage is role="link" with
+          // aria-disabled, and InputGroupAddon focuses its input on click.
           "suspicious": {
-            "noArrayIndexKey": "off"
+            "noArrayIndexKey": "off",
+            "noDocumentCookie": "off",
+            "noDoubleEquals": "off"
           },
           "a11y": {
+            "noLabelWithoutControl": "off",
+            "noRedundantRoles": "off",
             "useSemanticElements": "off",
-            // Stock patterns kept as the registry ships them: BreadcrumbPage is role="link" with
-            // aria-disabled, and InputGroupAddon focuses its input on click.
             "useFocusableInteractive": "off",
             "useKeyWithClickEvents": "off"
           }

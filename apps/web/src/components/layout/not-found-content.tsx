@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { hasConfiguredGitHubIssueTarget, siteConfig } from '@/lib/site/site-config'
@@ -41,9 +41,9 @@ export function NotFoundContent() {
               'Try the homepage or one of the starter listings instead.'
             )}
           </p>
-          <Button asChild className="mt-8">
-            <Link href={getRoute('home')}>Back to homepage</Link>
-          </Button>
+          <Link href={getRoute('home')} className={buttonVariants({ className: 'mt-8' })}>
+            Back to homepage
+          </Link>
         </div>
       </div>
     </div>

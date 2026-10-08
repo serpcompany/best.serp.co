@@ -11,7 +11,7 @@ import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
 import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
 import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
 import { ModeToggle } from '@/components/layout/mode-toggle'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 
 /**
  * The admin shell (#64): shadcn sidebar-07 (`collapsible="icon"` with a rail, the logo tile,
@@ -55,12 +55,17 @@ function AdminHeader() {
       crumbs={context?.crumbs ?? defaultCrumbs(pathname.toLowerCase())}
       actions={
         <>
-          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
-            <a href="/">
-              View site
-              <ExternalLink />
-            </a>
-          </Button>
+          <a
+            href="/"
+            className={buttonVariants({
+              variant: 'ghost',
+              size: 'sm',
+              className: 'hidden sm:flex'
+            })}
+          >
+            View site
+            <ExternalLink />
+          </a>
           <ModeToggle />
         </>
       }

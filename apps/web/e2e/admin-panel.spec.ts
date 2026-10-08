@@ -260,7 +260,7 @@ test.describe('review decisions', () => {
     await page.getByLabel('Short description').fill('Edited by the reviewer before approval.')
     await expect(page.getByText('1 field edited.', { exact: false })).toBeVisible()
     await capture(page, '11-review-edit')
-    await page.getByRole('radio', { name: 'follow', exact: true }).click()
+    await page.getByRole('button', { name: 'follow', exact: true }).click()
     expect(publicationsFor(submission.slug)).toBe(0)
     await page.getByRole('button', { name: 'Approve with edits' }).click()
     const dialog = page.getByRole('alertdialog')

@@ -55,9 +55,7 @@ export function SiteBreadcrumb({
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link href={homeHref}>Home</Link>
-            </BreadcrumbLink>
+            <BreadcrumbLink render={<Link href={homeHref} />}>Home</BreadcrumbLink>
           </BreadcrumbItem>
           {items.map((item, index) => (
             <React.Fragment key={item.href}>
@@ -66,9 +64,7 @@ export function SiteBreadcrumb({
                 {index === items.length - 1 ? (
                   <BreadcrumbPage>{item.name}</BreadcrumbPage>
                 ) : (
-                  <BreadcrumbLink asChild>
-                    <Link href={item.href}>{item.name}</Link>
-                  </BreadcrumbLink>
+                  <BreadcrumbLink render={<Link href={item.href} />}>{item.name}</BreadcrumbLink>
                 )}
               </BreadcrumbItem>
             </React.Fragment>

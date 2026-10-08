@@ -101,17 +101,19 @@ export function AdminsManager({
     if (last) {
       return (
         <Tooltip>
-          <TooltipTrigger asChild>
-            {/* aria-disabled, not disabled, so the button can still be focused for the tooltip. */}
-            <Button
-              variant="outline"
-              size="sm"
-              aria-disabled="true"
-              className="cursor-not-allowed opacity-50"
-              onClick={event => event.preventDefault()}
-            >
-              Remove
-            </Button>
+          {/* aria-disabled, not disabled, so the button can still be focused for the tooltip. */}
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                aria-disabled="true"
+                className="cursor-not-allowed opacity-50"
+                onClick={event => event.preventDefault()}
+              />
+            }
+          >
+            Remove
           </TooltipTrigger>
           <TooltipContent>The last admin can’t be removed</TooltipContent>
         </Tooltip>

@@ -123,33 +123,31 @@ export function FacetFilter({
     )
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 border-dashed">
-          <PlusCircle />
-          {title}
-          {selected.length > 0 ? (
-            <>
-              <Separator orientation="vertical" className="mx-1 h-4" />
-              {selected.length > 2 ? (
-                <Badge variant="secondary" className="rounded-sm px-1 font-normal">
-                  {selected.length} selected
-                </Badge>
-              ) : (
-                options
-                  .filter(option => selected.includes(option.value))
-                  .map(option => (
-                    <Badge
-                      key={option.value}
-                      variant="secondary"
-                      className="rounded-sm px-1 font-normal"
-                    >
-                      {option.label}
-                    </Badge>
-                  ))
-              )}
-            </>
-          ) : null}
-        </Button>
+      <PopoverTrigger render={<Button variant="outline" size="sm" className="h-8 border-dashed" />}>
+        <PlusCircle />
+        {title}
+        {selected.length > 0 ? (
+          <>
+            <Separator orientation="vertical" className="mx-1 h-4" />
+            {selected.length > 2 ? (
+              <Badge variant="secondary" className="rounded-sm px-1 font-normal">
+                {selected.length} selected
+              </Badge>
+            ) : (
+              options
+                .filter(option => selected.includes(option.value))
+                .map(option => (
+                  <Badge
+                    key={option.value}
+                    variant="secondary"
+                    className="rounded-sm px-1 font-normal"
+                  >
+                    {option.label}
+                  </Badge>
+                ))
+            )}
+          </>
+        ) : null}
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0" align="start">
         <Command>
@@ -222,11 +220,16 @@ export function PaginationFooter({
       <div className="flex w-full items-center gap-6 md:w-fit">
         <div className="hidden items-center gap-2 lg:flex">
           <span className="whitespace-nowrap text-sm font-medium">Rows per page</span>
-          <Select value={String(pageSize)} onValueChange={value => onPageSize(Number(value))}>
+          <Select
+            value={String(pageSize)}
+            onValueChange={value => {
+              if (value) onPageSize(Number(value))
+            }}
+          >
             <SelectTrigger size="sm" className="w-20" aria-label="Rows per page">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent position="popper" side="top">
+            <SelectContent alignItemWithTrigger={false} side="top">
               {[10, 20, 50].map(size => (
                 <SelectItem key={size} value={String(size)}>
                   {size}

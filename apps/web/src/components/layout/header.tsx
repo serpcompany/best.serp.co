@@ -2,7 +2,7 @@
 import { Menu, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
 import { type ChangeEvent, type FormEvent, type ReactNode, useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import type { HeaderAuthState } from '@/lib/auth/header-auth-state'
 import { useSearch } from '../../hooks/use-search'
 import { getRoute } from '../../lib/routing/routes'
@@ -185,39 +185,44 @@ export function Header({
               <Search className="h-5 w-5" />
             </Button>
 
-            <Button
-              asChild
-              className="inline-flex items-center justify-center text-sm font-bold h-9 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all duration-200 press-effect shadow-none"
+            <Link
+              href={getRoute('submit')}
+              aria-label={siteCopy.submitLabel}
+              title={siteCopy.submitLabel}
+              className={buttonVariants({
+                className:
+                  'inline-flex items-center justify-center text-sm font-bold h-9 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all duration-200 press-effect shadow-none'
+              })}
             >
-              <Link
-                href={getRoute('submit')}
-                aria-label={siteCopy.submitLabel}
-                title={siteCopy.submitLabel}
-              >
-                <Plus className="h-4 w-4 sm:hidden" />
-                <span className="hidden sm:inline">{siteCopy.submitLabel}</span>
-              </Link>
-            </Button>
+              <Plus className="h-4 w-4 sm:hidden" />
+              <span className="hidden sm:inline">{siteCopy.submitLabel}</span>
+            </Link>
 
             {siteConfig.features.showAuth && isAuthenticated ? (
               <>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none"
+                <Link
+                  href={getRoute('account')}
+                  className={buttonVariants({
+                    variant: 'outline',
+                    className:
+                      'hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none'
+                  })}
                 >
-                  <Link href={getRoute('account')}>Account</Link>
-                </Button>
+                  Account
+                </Link>
                 {desktopSignOutButton}
               </>
             ) : siteConfig.features.showAuth && isAuthConfigured ? (
-              <Button
-                asChild
-                variant="outline"
-                className="hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none"
+              <Link
+                href={getRoute('login')}
+                className={buttonVariants({
+                  variant: 'outline',
+                  className:
+                    'hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none'
+                })}
               >
-                <Link href={getRoute('login')}>Sign up / Sign in</Link>
-              </Button>
+                Sign up / Sign in
+              </Link>
             ) : null}
           </DirectoryApplicationActions>
         </DirectoryApplicationHeaderBar>

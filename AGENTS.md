@@ -99,7 +99,6 @@ Issues and labels never grant production, database, or deployment authority.
 
 Deliberate differences from serp's `web-stack/` standard; change one only through an issue.
 
-- UI stays shadcn `new-york` on Radix until #186 moves it to `base-nova`; add no Base UI parts.
 - R2 is serp.co's shared `cdn` and `cdn-staging` buckets; moving would rewrite media keys.
 - Email is useSend from `noreply@mail.serp.co`, the transactional-email standard's exception
   for directories on serp.co subdomains.

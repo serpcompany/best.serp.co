@@ -103,7 +103,13 @@ export function ContentFields({
         </Field>
         <Field data-invalid={errors.categorySlug ? true : undefined}>
           <FieldLabel htmlFor={id('category')}>Primary category</FieldLabel>
-          <Select value={value.categorySlug} onValueChange={categorySlug => set({ categorySlug })}>
+          <Select
+            value={value.categorySlug || null}
+            onValueChange={categorySlug => {
+              if (categorySlug) set({ categorySlug })
+            }}
+            items={categories.map(category => ({ label: category.label, value: category.slug }))}
+          >
             <SelectTrigger
               id={id('category')}
               className="w-full"
@@ -111,7 +117,7 @@ export function ContentFields({
             >
               <SelectValue placeholder="Choose a category" />
             </SelectTrigger>
-            <SelectContent position="popper">
+            <SelectContent alignItemWithTrigger={false}>
               {categories.map(category => (
                 <SelectItem key={category.slug} value={category.slug}>
                   {category.label}

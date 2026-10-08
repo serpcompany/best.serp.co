@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -132,11 +132,9 @@ function BadgeCard({
         <CardTitle>{theme === 'light' ? 'Light badge' : 'Dark badge'}</CardTitle>
         <CardAction>
           <Tooltip open={copied}>
-            <TooltipTrigger asChild>
-              <Button variant="outline" size="sm" onClick={copy}>
-                {copied ? <Check /> : <Copy />}
-                {copied ? 'Copied' : 'Copy code'}
-              </Button>
+            <TooltipTrigger render={<Button variant="outline" size="sm" onClick={copy} />}>
+              {copied ? <Check /> : <Copy />}
+              {copied ? 'Copied' : 'Copy code'}
             </TooltipTrigger>
             <TooltipContent>Copied to clipboard</TooltipContent>
           </Tooltip>
@@ -417,12 +415,10 @@ export function BadgeStep({
               </CardContent>
             ) : null}
             <CardFooter>
-              <Button asChild>
-                <Link href="/account/">
-                  Go to my account
-                  <ArrowRight />
-                </Link>
-              </Button>
+              <Link href="/account/" className={buttonVariants()}>
+                Go to my account
+                <ArrowRight />
+              </Link>
             </CardFooter>
           </Card>
         </div>
@@ -441,16 +437,17 @@ export function BadgeStep({
         title="Automatic checks are paused"
         actions={
           <>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/contact/">
-                <MessageSquare />
-                Message us
-              </Link>
-            </Button>
+            <Link href="/contact/" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              <MessageSquare />
+              Message us
+            </Link>
             {showPaid ? (
-              <Button asChild size="sm" variant="outline">
-                <a href={`/submit/${submission.id}/checkout/`}>Skip the badge: $49 one-off</a>
-              </Button>
+              <a
+                href={`/submit/${submission.id}/checkout/`}
+                className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              >
+                Skip the badge: $49 one-off
+              </a>
             ) : null}
           </>
         }
@@ -540,9 +537,12 @@ export function BadgeStep({
             <>
               {' '}
               Rather not add a badge?{' '}
-              <Button asChild variant="link" className="h-auto p-0">
-                <a href={`/submit/${submission.id}/checkout/`}>Skip the badge: $49 one-off</a>
-              </Button>
+              <a
+                href={`/submit/${submission.id}/checkout/`}
+                className={buttonVariants({ variant: 'link', className: 'h-auto p-0' })}
+              >
+                Skip the badge: $49 one-off
+              </a>
             </>
           ) : null}
         </p>

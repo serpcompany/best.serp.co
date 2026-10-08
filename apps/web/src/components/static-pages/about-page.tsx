@@ -14,11 +14,8 @@ const ABOUT_STEP_ICONS = {
 } as const
 
 interface AboutCardSlots {
-  Button: ComponentType<{
-    asChild?: boolean
-    children: ReactNode
-    variant?: 'default' | 'outline'
-  }>
+  /** The stock `buttonVariants`: links styled as buttons keep their link role. */
+  buttonVariants: (options?: { variant?: 'default' | 'outline' }) => string
   Card: ComponentType<{ children: ReactNode }>
   CardContent: ComponentType<{ children: ReactNode }>
   CardHeader: ComponentType<{ children: ReactNode }>
@@ -48,7 +45,7 @@ export function generateAboutPageMetadata(aboutPage: AboutPageMetadata | null): 
 }
 
 export function AboutStaticPage({ aboutPage, slots }: AboutStaticPageProps) {
-  const { Button, Card, CardContent, CardHeader, CardTitle } = slots
+  const { buttonVariants, Card, CardContent, CardHeader, CardTitle } = slots
   const hasContactSection = Boolean(
     aboutPage.contactTitle && aboutPage.contactBody && aboutPage.contactEmail
   )
@@ -111,13 +108,13 @@ export function AboutStaticPage({ aboutPage, slots }: AboutStaticPageProps) {
             </>
           )}
           <div className="flex flex-col sm:flex-row gap-4">
-            <Button asChild>
-              <Link href={getRoute('submit')}>{aboutPage.primaryCtaLabel}</Link>
-            </Button>
+            <Link href={getRoute('submit')} className={buttonVariants()}>
+              {aboutPage.primaryCtaLabel}
+            </Link>
             {siteConfig.features.showProjects && (
-              <Button asChild variant="outline">
-                <Link href={getRoute('projects')}>{aboutPage.secondaryCtaLabel}</Link>
-              </Button>
+              <Link href={getRoute('projects')} className={buttonVariants({ variant: 'outline' })}>
+                {aboutPage.secondaryCtaLabel}
+              </Link>
             )}
           </div>
         </section>

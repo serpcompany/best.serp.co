@@ -31,9 +31,10 @@ describe('listing FAQs (#105)', () => {
     expect(html).toContain('Does it file taxes?')
     expect(html).toContain('Which banks can I connect?')
     expect(html).toContain('No. It prepares the worksheets; you file.')
-    // Closed, and hidden by the item's CSS rather than left out.
-    expect(html).toContain('data-slot="accordion-content"')
-    expect(html).toContain('[&amp;_[data-slot=accordion-content][data-state=closed]]:hidden')
+    // Closed: each answer's panel is in the HTML with the `hidden` attribute, not left out.
+    expect(
+      html.match(/data-closed="" [^>]*hidden=""[^>]*data-slot="accordion-content"/gu)
+    ).toHaveLength(2)
   })
 
   it('leaves out only FAQs whose exact heading line the description still holds (#105)', () => {

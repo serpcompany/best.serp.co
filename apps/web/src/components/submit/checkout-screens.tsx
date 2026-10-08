@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { type ReactNode, useEffect } from 'react'
 import { Kv } from '@/components/admin/kv'
 import { StatusBadge, type StatusKind } from '@/components/admin/status-badge'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -166,18 +166,14 @@ export function CheckoutHandoff({
         </CardContent>
         <CardFooter>
           <Actions>
-            <Button asChild>
-              <a href={startHref}>
-                Continue to checkout
-                <ExternalLink />
-              </a>
-            </Button>
-            <Button asChild variant="ghost">
-              <Link href={backHref}>
-                <ArrowLeft />
-                Back to options
-              </Link>
-            </Button>
+            <a href={startHref} className={buttonVariants()}>
+              Continue to checkout
+              <ExternalLink />
+            </a>
+            <Link href={backHref} className={buttonVariants({ variant: 'ghost' })}>
+              <ArrowLeft />
+              Back to options
+            </Link>
           </Actions>
         </CardFooter>
       </Card>
@@ -262,15 +258,18 @@ export function CheckoutLive({
         </CardContent>
         <CardFooter>
           <Actions>
-            <Button asChild>
-              <a href={`/products/${product.slug}/`} target="_blank" rel="noreferrer">
-                View your listing
-                <ExternalLink />
-              </a>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/account/">Go to my account</Link>
-            </Button>
+            <a
+              href={`/products/${product.slug}/`}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonVariants()}
+            >
+              View your listing
+              <ExternalLink />
+            </a>
+            <Link href="/account/" className={buttonVariants({ variant: 'outline' })}>
+              Go to my account
+            </Link>
           </Actions>
         </CardFooter>
       </Card>
@@ -314,9 +313,9 @@ export function CheckoutHeld({
           <OrderDetails order={order} />
         </CardContent>
         <CardFooter>
-          <Button asChild>
-            <Link href="/account/">Go to my account</Link>
-          </Button>
+          <Link href="/account/" className={buttonVariants()}>
+            Go to my account
+          </Link>
         </CardFooter>
       </Card>
     </Page>
@@ -352,15 +351,13 @@ export function CheckoutCancelled({
         </CardContent>
         <CardFooter>
           <Actions>
-            <Button asChild>
-              <a href={startHref}>
-                Return to checkout
-                <ArrowRight />
-              </a>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={backHref}>Back to options</Link>
-            </Button>
+            <a href={startHref} className={buttonVariants()}>
+              Return to checkout
+              <ArrowRight />
+            </a>
+            <Link href={backHref} className={buttonVariants({ variant: 'outline' })}>
+              Back to options
+            </Link>
           </Actions>
         </CardFooter>
       </Card>
@@ -407,15 +404,13 @@ export function CheckoutFailed({
         </CardContent>
         <CardFooter>
           <Actions>
-            <Button asChild>
-              <a href={startHref}>
-                <RefreshCw />
-                Try again
-              </a>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={backHref}>Back to options</Link>
-            </Button>
+            <a href={startHref} className={buttonVariants()}>
+              <RefreshCw />
+              Try again
+            </a>
+            <Link href={backHref} className={buttonVariants({ variant: 'outline' })}>
+              Back to options
+            </Link>
           </Actions>
         </CardFooter>
       </Card>
