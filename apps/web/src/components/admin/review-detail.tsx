@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
@@ -325,10 +325,10 @@ export function ReviewDetail({
                 value={edits.categorySlug}
                 onValueChange={value => setEdits({ ...edits, categorySlug: value })}
               >
-                <SelectTrigger id="edit-category">
+                <SelectTrigger id="edit-category" className="w-full">
                   <SelectValue placeholder="Choose a category" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper">
                   {categories.map(option => (
                     <SelectItem key={option.slug} value={option.slug}>
                       {option.name}
@@ -871,7 +871,7 @@ export function ReviewDetail({
               Go back
             </AlertDialogCancel>
             <AlertDialogAction
-              className={buttonVariants({ variant: 'destructive' })}
+              variant="destructive"
               disabled={busy}
               onClick={event => {
                 event.preventDefault()

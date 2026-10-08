@@ -1,11 +1,9 @@
-import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
+import { cn } from 'cn'
+import { Slot } from 'radix-ui'
 import type * as React from 'react'
 
-import { cn } from '@/lib/utils'
-import { Separator } from './separator'
-
-/** shadcn/ui Item (new-york-v4 registry), for the admin owner card and the 410 page (#64). */
+import { Separator } from '@/components/ui/separator'
 
 function ItemGroup({ className, ...props }: React.ComponentProps<'div'>) {
   return (
@@ -30,7 +28,7 @@ function ItemSeparator({ className, ...props }: React.ComponentProps<typeof Sepa
 }
 
 const itemVariants = cva(
-  'group/item flex flex-wrap items-center rounded-md border border-transparent text-sm outline-none transition-colors duration-100 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [a]:transition-colors [a]:hover:bg-accent/50',
+  'group/item flex flex-wrap items-center rounded-md border border-transparent text-sm transition-colors duration-100 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [a]:transition-colors [a]:hover:bg-accent/50',
   {
     variants: {
       variant: {
@@ -57,7 +55,7 @@ function Item({
   asChild = false,
   ...props
 }: React.ComponentProps<'div'> & VariantProps<typeof itemVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : 'div'
+  const Comp = asChild ? Slot.Root : 'div'
   return (
     <Comp
       data-slot="item"
@@ -114,7 +112,7 @@ function ItemTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="item-title"
-      className={cn('flex w-fit items-center gap-2 text-sm font-medium leading-snug', className)}
+      className={cn('flex w-fit items-center gap-2 text-sm leading-snug font-medium', className)}
       {...props}
     />
   )
@@ -125,8 +123,8 @@ function ItemDescription({ className, ...props }: React.ComponentProps<'p'>) {
     <p
       data-slot="item-description"
       className={cn(
-        'line-clamp-2 text-balance text-sm font-normal leading-normal text-muted-foreground',
-        '[&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4',
+        'line-clamp-2 text-sm leading-normal font-normal text-balance text-muted-foreground',
+        '[&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary',
         className
       )}
       {...props}

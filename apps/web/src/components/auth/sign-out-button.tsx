@@ -36,7 +36,7 @@ export function HeaderSignOutButton() {
       variant="ghost"
       disabled={pending}
       onClick={onSignOut}
-      className="hidden sm:inline-flex items-center rounded-none text-sm font-bold h-9 px-4 hover:bg-accent shadow-none active:scale-100"
+      className="hidden sm:inline-flex items-center rounded-none text-sm font-bold h-9 px-4 hover:bg-accent shadow-none"
     >
       Sign out
     </Button>

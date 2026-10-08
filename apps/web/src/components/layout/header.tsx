@@ -130,7 +130,7 @@ export function Header({
               variant="ghost"
               size="icon"
               onClick={() => setShowMobileDrawer(true)}
-              className="block sm:hidden p-2 hover:bg-muted rounded-md transition-colors -ml-2 shadow-none active:scale-100"
+              className="block sm:hidden p-2 hover:bg-muted rounded-md transition-colors -ml-2 shadow-none"
               aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
@@ -178,7 +178,7 @@ export function Header({
               type="button"
               variant="ghost"
               size="icon"
-              className="md:hidden text-muted-foreground hover:text-foreground shadow-none active:scale-100"
+              className="md:hidden text-muted-foreground hover:text-foreground shadow-none"
               onClick={() => setShowMobileSearch(!showMobileSearch)}
               aria-label="Toggle search"
             >
@@ -187,7 +187,7 @@ export function Header({
 
             <Button
               asChild
-              className="inline-flex items-center justify-center rounded-none text-sm font-bold h-9 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all duration-200 press-effect shadow-none active:scale-100"
+              className="inline-flex items-center justify-center rounded-none text-sm font-bold h-9 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all duration-200 press-effect shadow-none"
             >
               <Link
                 href={getRoute('submit')}
@@ -204,7 +204,7 @@ export function Header({
                 <Button
                   asChild
                   variant="outline"
-                  className="hidden sm:inline-flex items-center justify-center rounded-none text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none active:scale-100"
+                  className="hidden sm:inline-flex items-center justify-center rounded-none text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none"
                 >
                   <Link href={getRoute('account')}>Account</Link>
                 </Button>
@@ -214,7 +214,7 @@ export function Header({
               <Button
                 asChild
                 variant="outline"
-                className="hidden sm:inline-flex items-center justify-center rounded-none text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none active:scale-100"
+                className="hidden sm:inline-flex items-center justify-center rounded-none text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none"
               >
                 <Link href={getRoute('login')}>Sign up / Sign in</Link>
               </Button>

@@ -630,11 +630,12 @@ export function SubmitForm({
                     >
                       <SelectTrigger
                         id="submit-category"
+                        className="w-full"
                         aria-invalid={errors.categorySlug ? true : undefined}
                       >
                         <SelectValue placeholder="Choose a category" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-80">
+                      <SelectContent position="popper" className="max-h-80">
                         {categories.map(category => (
                           <SelectItem key={category.slug} value={category.slug}>
                             {category.label}

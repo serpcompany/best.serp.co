@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { FieldGroup } from '@/components/ui/field'
 import { Separator } from '@/components/ui/separator'
@@ -380,7 +380,7 @@ export function ListingEdit({
             <AlertDialogFooter>
               <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                className={buttonVariants({ variant: 'destructive' })}
+                variant="destructive"
                 disabled={busy}
                 onClick={event => {
                   event.preventDefault()

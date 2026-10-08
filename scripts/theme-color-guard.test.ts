@@ -214,6 +214,20 @@ describe('theme colors only (#183)', () => {
     ).toEqual([])
   })
 
+  it('keeps components/ui/ to exactly the stock shadcn files (#238)', () => {
+    const files = execFileSync(
+      'git',
+      ['ls-files', '--cached', '--others', '--exclude-standard', 'apps/web/src/components/ui'],
+      { encoding: 'utf8' }
+    )
+      .split('\n')
+      .filter(file => file && existsSync(file))
+    expect(
+      files.sort(),
+      'components/ui/ holds only stock shadcn files: put a site component under its area (components/<area>/), or list a newly added registry component in STOCK_UI.'
+    ).toEqual([...STOCK_UI].sort())
+  })
+
   it('names only files that exist, and gives each allowance a reason', () => {
     for (const file of [...Object.keys(ALLOWED), ...STOCK_UI, ...Object.keys(COLOR_BASELINE)]) {
       expect(existsSync(file), file).toBe(true)

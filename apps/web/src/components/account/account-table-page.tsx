@@ -102,7 +102,9 @@ export async function AccountTablePage({
                 <EmptyMedia variant="icon">
                   <Inbox />
                 </EmptyMedia>
-                <EmptyTitle>{copy.empty.title}</EmptyTitle>
+                <EmptyTitle>
+                  <h2>{copy.empty.title}</h2>
+                </EmptyTitle>
                 <EmptyDescription>{copy.empty.description}</EmptyDescription>
               </EmptyHeader>
               <EmptyContent>

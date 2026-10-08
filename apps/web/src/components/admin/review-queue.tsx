@@ -349,7 +349,9 @@ export function ReviewQueue({
               <EmptyMedia variant="icon">
                 <Inbox />
               </EmptyMedia>
-              <EmptyTitle>Queue is clear</EmptyTitle>
+              <EmptyTitle>
+                <h2>Queue is clear</h2>
+              </EmptyTitle>
               <EmptyDescription>
                 New submissions show up here once their badge is verified or their payment goes
                 through. Revisions to live listings show up too.
