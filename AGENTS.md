@@ -59,6 +59,8 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 
 ## Planning and implementation
 
+Stage: ship
+
 GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning.
 `staging` is the base branch: branch from `origin/staging` as `issue-<n>-<slug>` and open
 pull requests into `staging` (`gh pr create --base staging`); each merge deploys staging.
@@ -72,13 +74,18 @@ Issues and labels never grant production, database, or deployment authority.
 
 ## Non-negotiable architecture
 
-- Read catalog data through `apps/web/lib/catalog/repository.ts`, which delegates all
-  SQL to `packages/data-ops/`. Never put catalog SQL in the app.
-- Obtain the database only through the server-only OpenNext `DB` binding; fail closed
-  when the binding or `D1_RUNTIME_ENV` is missing or invalid.
-- Use prepared statements and bind every runtime value.
+`scripts/architecture-guard.test.ts` enforces the first three rules; each guard cites the
+issue behind it.
+
+- Read catalog data through `apps/web/lib/catalog/repository.ts`, which takes the server-only
+  OpenNext `DB` binding, fails closed when it or `D1_RUNTIME_ENV` is missing or invalid, and
+  delegates all SQL to `packages/data-ops/`. Never put catalog SQL in the app.
 - Model tables in `packages/data-ops/src/schema.ts` and generate migrations into
   `d1/drizzle/` with `pnpm db:generate`; `drizzle-kit push` is forbidden.
+- No catalog JSON/YAML/CSV runtime, generated browser search index, filesystem fallback,
+  static export, or GitHub Pages deploy path. The legacy `products.json` is an import input
+  read from an external checkout, never an application input.
+- Use prepared statements and bind every runtime value.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
 - Public URLs are part of the SEO contract: `/products/<slug>/`,
   `/products/categories/<category>/`. Changing a route requires permanent redirects.
@@ -88,11 +95,20 @@ Issues and labels never grant production, database, or deployment authority.
   ([Admin panel](./docs/ADMIN_PANEL.md#the-production-write-exception)). Agents never use it
   on production; recovery is D1 Time Travel ([D1 recovery](./docs/D1_RECOVERY.md)).
 
-## Forbidden patterns
+## Recorded exceptions to the SERP web stack
 
-Do not add a catalog JSON/YAML/CSV runtime, generated browser search index, filesystem
-fallback, static export, or GitHub Pages deploy path. The legacy `products.json` is an
-import input read from an external checkout, never an application input.
+These differ on purpose from `serpcompany/serp` `docs/engineering/standards/web-stack/`;
+change one only through an issue.
+
+- UI stays shadcn `new-york` on Radix until #186 moves it to `base-nova`; add no Base UI parts.
+- R2 is serp.co's shared `cdn` / `cdn-staging` buckets under `best.serp.co/`: moving would
+  rewrite production media keys. Email is useSend from `noreply@mail.serp.co`.
+- One build serves every environment; the environment is read per request
+  (`apps/web/lib/environment/request-environment.ts`), so nothing per-environment is prerendered.
+- `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
+- The Stripe webhook is `/api/billing/webhook/` behind a six-operation `BillingProvider` with no
+  Stripe SDK, until the payments audit (#156) decides. Footer brand icons use
+  `@icons-pack/react-simple-icons` because lucide has no brand icons.
 
 ## Completion contract
 
