@@ -41,6 +41,19 @@ test.describe('listing structured data', () => {
   }
 })
 
+// The visible breadcrumb writes no JSON-LD of its own (#273): the graph's BreadcrumbList is the one.
+test('the product page has one BreadcrumbList, from Home to the listing', async ({ page }) => {
+  await page.goto(detailListing.path, { waitUntil: 'domcontentloaded' })
+  const lists = (await jsonLdNodes(page)).filter(node => node['@type'] === 'BreadcrumbList')
+  expect(lists).toHaveLength(1)
+  const items = lists[0]?.itemListElement as Array<{ item: string; name: string }>
+  expect(items.map(item => item.item)).toEqual([
+    'https://best.serp.co',
+    'https://best.serp.co/products/',
+    `https://best.serp.co${detailListing.path}`
+  ])
+})
+
 const websiteId = 'https://best.serp.co/#website'
 
 // One WebSite node, defined on the homepage, that every page points at (#166).

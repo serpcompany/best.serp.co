@@ -36,7 +36,7 @@ export function faqsToShow(faqs: readonly WebsiteFaq[] | undefined, content: str
 
 /**
  * The listing's FAQs (#105): the owner-approved questions and answers from D1, in a stock shadcn
- * Accordion inside the same card as the Links section. Nothing renders when there are none.
+ * Accordion under the section's header (#273). Nothing renders when there are none.
  * Answers stay in the HTML while closed (`hiddenUntilFound`: `hidden="until-found"`, so find-in-page opens them), so the page
  * reads the same to visitors and crawlers.
  */
@@ -44,29 +44,25 @@ export function WebsiteFaqsSection({ website }: WebsiteFaqsSectionProps) {
   const faqs = website.faqs ?? []
   if (faqs.length === 0) return null
   return (
-    <section className="animate-fade-in-up opacity-0 stagger-3">
-      <Section title="FAQs" titleId="faqs">
-        <div className="rounded-2xl border bg-card/50 backdrop-blur-sm overflow-hidden">
-          <Accordion multiple>
-            {faqs.map((faq, index) => (
-              <AccordionItem
-                // Questions may repeat within a listing; the list is static and ordered.
-                // biome-ignore lint/suspicious/noArrayIndexKey: see above
-                key={`${index}-${faq.question}`}
-                value={`faq-${index}`}
-              >
-                <AccordionTrigger className="px-6 text-base">{faq.question}</AccordionTrigger>
-                <AccordionContent
-                  hiddenUntilFound
-                  className="px-6 whitespace-pre-line text-muted-foreground"
-                >
-                  {faq.answer}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </div>
-      </Section>
-    </section>
+    <Section title="FAQs" titleId="faqs">
+      <Accordion multiple>
+        {faqs.map((faq, index) => (
+          <AccordionItem
+            // Questions may repeat within a listing; the list is static and ordered.
+            // biome-ignore lint/suspicious/noArrayIndexKey: see above
+            key={`${index}-${faq.question}`}
+            value={`faq-${index}`}
+          >
+            <AccordionTrigger>{faq.question}</AccordionTrigger>
+            <AccordionContent
+              hiddenUntilFound
+              className="whitespace-pre-line text-muted-foreground"
+            >
+              {faq.answer}
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </Section>
   )
 }

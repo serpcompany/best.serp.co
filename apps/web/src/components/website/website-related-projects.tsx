@@ -34,15 +34,13 @@ export function WebsiteRelatedProjects({
   }
 
   return (
-    <section className="animate-fade-in-up opacity-0 stagger-7">
-      <Section
-        title="Related Entries"
-        viewAllHref={getCanonicalListingListRoute()}
-        viewAllText="Browse the directory"
-        titleId="related-projects"
-      >
-        <LLMGrid items={websites.slice(0, 3)} analyticsSource="related-projects" />
-      </Section>
-    </section>
+    <Section
+      title="Related Entries"
+      viewAllHref={getCanonicalListingListRoute()}
+      viewAllText="Browse the directory"
+      titleId="related-projects"
+    >
+      <LLMGrid items={websites.slice(0, 3)} analyticsSource="related-projects" />
+    </Section>
   )
 }

@@ -41,9 +41,9 @@ export function WebsiteContentSection({ website, mdxComponents }: WebsiteContent
     )
 
     return (
-      <section className="animate-fade-in-up opacity-0 stagger-4">
+      <section>
         {featuredImageUrl ? (
-          <div className="mb-8 overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+          <div className="mb-8 overflow-hidden rounded-xl border">
             <ListingImage kind="image" name={website.name} src={featuredImageUrl} />
           </div>
         ) : null}
@@ -57,12 +57,9 @@ export function WebsiteContentSection({ website, mdxComponents }: WebsiteContent
   }
 
   return (
-    <section
-      className="animate-fade-in-up space-y-8 opacity-0 stagger-4"
-      aria-labelledby="about-heading"
-    >
+    <section className="space-y-8" aria-labelledby="about-heading">
       {featuredImageUrl ? (
-        <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/50">
+        <div className="overflow-hidden rounded-xl border">
           <ListingImage kind="image" name={website.name} src={featuredImageUrl} />
         </div>
       ) : null}

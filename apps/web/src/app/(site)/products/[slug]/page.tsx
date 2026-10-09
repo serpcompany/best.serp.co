@@ -1,16 +1,13 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
-import type { ComponentProps } from 'react'
 import { ClaimListing } from '@/components/claims/claim-listing'
 import { ProjectNavigation } from '@/components/directory/project-navigation'
 import { GoneListing } from '@/components/listing/gone-listing'
 import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@/components/sections/external-resources-section-route'
 import { JsonLd } from '@/components/seo/json-ld'
 import { WebsiteContentSectionRoute as WebsiteContentSection } from '@/components/website/website-content-section-route'
-import { WebsiteDetailSidebar } from '@/components/website/website-detail-sidebar'
 import { WebsiteFaqsSection } from '@/components/website/website-faqs-section'
-import { WebsiteHeroRoute as WebsiteHero } from '@/components/website/website-hero-route'
 import { WebsiteRelatedProjectsRoute as WebsiteRelatedProjects } from '@/components/website/website-related-projects-route'
 import { WebsiteResourcesSectionRoute as WebsiteResourcesSection } from '@/components/website/website-resources-section-route'
 import {
@@ -85,21 +82,16 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     !project.verifiedOwner && (await currentClaimFlags()).enabled
       ? claimLink(project.name, project.slug, await currentClaimCopy())
       : undefined
-  const Sidebar = (props: ComponentProps<typeof WebsiteDetailSidebar>) => (
-    <WebsiteDetailSidebar {...props} claim={claim} />
-  )
-
   return (
     <WebsiteDetailRoutePage
+      claim={claim}
       project={project}
       slots={{
         ExternalResourcesSection,
         JsonLd,
         ProjectNavigation,
         WebsiteContentSection,
-        WebsiteDetailSidebar: Sidebar,
         WebsiteFaqsSection,
-        WebsiteHero,
         WebsiteRelatedProjects,
         WebsiteResourcesSection
       }}

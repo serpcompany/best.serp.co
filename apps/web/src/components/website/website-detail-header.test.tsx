@@ -1,7 +1,12 @@
 import React, { isValidElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { siteConfig } from '../../lib/site/site-config'
-import { outboundWebsiteRel, WebsiteDetailSidebar } from './website-detail-sidebar'
+import {
+  outboundWebsiteRel,
+  WebsiteDetailActions,
+  WebsiteDetailAside,
+  websiteDetailMeta
+} from './website-detail-header'
 
 function collectHrefProps(node: ReactNode): string[] {
   if (Array.isArray(node)) {
@@ -15,9 +20,15 @@ function collectHrefProps(node: ReactNode): string[] {
   const props = node.props as {
     children?: ReactNode
     href?: string
+    render?: ReactNode
   }
 
-  return [...(props.href ? [props.href] : []), ...collectHrefProps(props.children)]
+  // A Base UI part linked through `render={<Link href=… />}` counts as its link.
+  return [
+    ...(props.href ? [props.href] : []),
+    ...collectHrefProps(props.render),
+    ...collectHrefProps(props.children)
+  ]
 }
 
 function collectStringProp(node: ReactNode, propName: string): string[] {
@@ -67,7 +78,20 @@ function collectRecordProp<T extends Record<string, unknown>>(
   ]
 }
 
-describe('WebsiteDetailSidebar', () => {
+function collectText(node: ReactNode): string {
+  if (Array.isArray(node)) {
+    return node.map(child => collectText(child)).join('')
+  }
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node)
+  }
+  if (!isValidElement(node)) {
+    return ''
+  }
+  return collectText((node.props as { children?: ReactNode }).children)
+}
+
+describe('the product page header', () => {
   beforeEach(() => {
     vi.stubGlobal('React', React)
   })
@@ -79,44 +103,41 @@ describe('WebsiteDetailSidebar', () => {
   })
 
   it("adds the site's Dub partner ID to a serp.ly listing URL", () => {
-    const sidebar = WebsiteDetailSidebar({
+    const actions = WebsiteDetailActions({
       website: {
         linkRel: 'follow',
-        name: 'Example Product',
         slug: 'example-product',
         website: 'https://serp.ly/example-product'
       }
     })
 
-    expect(collectHrefProps(sidebar)).toContain(
+    expect(collectHrefProps(actions)).toContain(
       `https://serp.ly/example-product?via=${siteConfig.dubPartnerId}`
     )
   })
 
   it('leaves non-SERP listing URLs unchanged', () => {
-    const sidebar = WebsiteDetailSidebar({
+    const actions = WebsiteDetailActions({
       website: {
         linkRel: 'follow',
-        name: 'Example Product',
         slug: 'example-product',
         website: 'https://vendor.example.com/pricing?plan=pro#buy'
       }
     })
 
-    expect(collectHrefProps(sidebar)).toContain('https://vendor.example.com/pricing?plan=pro#buy')
+    expect(collectHrefProps(actions)).toContain('https://vendor.example.com/pricing?plan=pro#buy')
   })
 
   it('renders the per-listing outbound rel, keeping followed links exactly as before', () => {
     const rels = (['follow', 'nofollow', 'sponsored'] as const).map(linkRel => {
-      const sidebar = WebsiteDetailSidebar({
+      const actions = WebsiteDetailActions({
         website: {
           linkRel,
-          name: 'Example Product',
           slug: 'example-product',
           website: 'https://vendor.example.com/'
         }
       })
-      return collectStringProp(sidebar, 'rel')[0]
+      return collectStringProp(actions, 'rel')[0]
     })
     expect(rels).toEqual([
       'noopener noreferrer',
@@ -128,22 +149,43 @@ describe('WebsiteDetailSidebar', () => {
   })
 
   it('passes suffix-aware listing URLs and badge names into copied badge embeds', () => {
-    const sidebar = WebsiteDetailSidebar({
-      website: {
-        linkRel: 'follow',
-        name: 'LaunchBuzz',
-        slug: 'launchbuzz.io',
-        website: 'https://launchbuzz.io'
-      }
-    })
+    const aside = WebsiteDetailAside({ website: { slug: 'launchbuzz.io' } })
 
-    expect(collectStringProp(sidebar, 'listingUrl')).toContain(
+    expect(collectStringProp(aside, 'listingUrl')).toContain(
       'https://best.serp.co/products/launchbuzz.io/'
     )
-    expect(collectRecordProp<Record<string, string>>(sidebar, 'badgeUrls')).toContainEqual({
+    expect(collectRecordProp<Record<string, string>>(aside, 'badgeUrls')).toContainEqual({
       dark: 'https://best.serp.co/badge/featured-on-serp.co-dark.svg',
       light: 'https://best.serp.co/badge/featured-on-serp.co-light.svg'
     })
-    expect(collectStringProp(sidebar, 'siteName')).toContain('SERP Best')
+    expect(collectStringProp(aside, 'siteName')).toContain('SERP Best')
+  })
+
+  it('offers the claim only on a listing without an owner', () => {
+    const claim = <button type="button">Claim this listing</button>
+    const unowned = WebsiteDetailAside({ claim, website: { slug: 'example-product' } })
+    const owned = WebsiteDetailAside({
+      claim,
+      website: { slug: 'example-product', verifiedOwner: true }
+    })
+
+    expect(collectText(unowned)).toContain('Claim this listing')
+    expect(collectText(owned)).not.toContain('Claim this listing')
+  })
+
+  it('shows the badges and category links, and nothing for a listing with none', () => {
+    const meta = websiteDetailMeta({
+      category: 'video-downloaders',
+      categories: ['video-downloaders', 'browser-extensions'],
+      isUnofficial: true,
+      verifiedOwner: true
+    })
+
+    expect(collectText(meta)).toContain('Unofficial')
+    expect(collectHrefProps(meta)).toEqual([
+      '/products/categories/video-downloaders/',
+      '/products/categories/browser-extensions/'
+    ])
+    expect(websiteDetailMeta({})).toBeUndefined()
   })
 })

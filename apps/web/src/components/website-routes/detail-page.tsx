@@ -8,46 +8,27 @@ import type {
   WebsiteRelatedCardMetadata
 } from '../../lib/directory/content-query'
 import { resolveListingDetailTemplate } from '../../lib/directory/listing-detail-template'
-import { getCanonicalListingListRoute, getRoute } from '../../lib/routing/routes'
+import { getCanonicalListingListRoute } from '../../lib/routing/routes'
 import { generateWebsiteDetailSchema } from '../../lib/seo/schema'
 import { composeMetaDescription, generateDynamicMetadata } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
+import { DetailPageLayout } from '../layout/detail-page-layout'
+import { SectionHeader } from '../layout/section-header'
+import { ListingImage } from '../listing/listing-image'
+import {
+  WebsiteDetailActions,
+  WebsiteDetailAside,
+  websiteDetailMeta
+} from '../website/website-detail-header'
 import { faqsToShow } from '../website/website-faqs-section'
 
 type JsonLdProps = {
   data: Record<string, unknown>
 }
 
-type LogoOnlyMedia = {
-  media?: {
-    logo?: string
-  }
-}
-
-type WebsiteHeroWebsite = Pick<
-  WebsiteDetailMetadata,
-  'description' | 'isUnofficial' | 'name' | 'slug' | 'verifiedOwner' | 'website'
-> &
-  LogoOnlyMedia
-
 type WebsiteContentSectionProps = {
   website: WebsiteDetailMetadata
-}
-
-type WebsiteHeroProps = {
-  breadcrumbItems: Array<{ href: string; name: string }>
-  website: WebsiteHeroWebsite
-}
-
-type WebsiteDetailSidebarWebsite = Pick<
-  WebsiteDetailMetadata,
-  'category' | 'categories' | 'name' | 'publishedAt' | 'slug' | 'verifiedOwner' | 'website'
-> &
-  Required<Pick<WebsiteDetailMetadata, 'linkRel'>>
-
-type WebsiteDetailSidebarProps = {
-  website: WebsiteDetailSidebarWebsite
 }
 
 type WebsiteResourcesSectionWebsite = Pick<WebsiteDetailMetadata, 'resourceLinks' | 'slug'>
@@ -79,9 +60,7 @@ type WebsiteDetailRouteSlots = {
   JsonLd: (props: JsonLdProps) => ReactNode | Promise<ReactNode>
   ProjectNavigation: ComponentType<ProjectNavigationProps>
   WebsiteContentSection: ComponentType<WebsiteContentSectionProps>
-  WebsiteDetailSidebar: ComponentType<WebsiteDetailSidebarProps>
   WebsiteFaqsSection: ComponentType<WebsiteFaqsSectionProps>
-  WebsiteHero: ComponentType<WebsiteHeroProps>
   WebsiteRelatedProjects: ComponentType<WebsiteRelatedProjectsProps>
   WebsiteResourcesSection: ComponentType<WebsiteResourcesSectionProps>
 }
@@ -138,9 +117,12 @@ export function generateWebsiteDetailRouteStaticParams(
 }
 
 export function WebsiteDetailRoutePage({
+  claim,
   project,
   slots
 }: {
+  /** The claim link of a listing without an owner, while claims are on (#67). */
+  claim?: ReactNode
   project: WebsiteDetailMetadata
   slots: WebsiteDetailRouteSlots
 }) {
@@ -149,111 +131,85 @@ export function WebsiteDetailRoutePage({
     JsonLd,
     ProjectNavigation,
     WebsiteContentSection,
-    WebsiteDetailSidebar,
     WebsiteFaqsSection,
-    WebsiteHero,
     WebsiteRelatedProjects,
     WebsiteResourcesSection
   } = slots
 
-  const breadcrumbItems = [
-    {
-      name: siteCopy.listingName.pluralTitle,
-      href: getCanonicalListingListRoute()
-    },
-    {
-      name: project.name,
-      href: getRoute('listing.detail', { slug: project.slug })
-    }
-  ]
   const detailTemplate = resolveListingDetailTemplate(project.entityType)
-  const logoMedia = project.media?.logo
-    ? {
-        logo: project.media.logo
-      }
-    : undefined
-  const heroWebsite: WebsiteHeroWebsite = {
-    slug: project.slug,
-    name: project.name,
-    description: project.description,
-    website: project.website,
-    ...(project.isUnofficial !== undefined ? { isUnofficial: project.isUnofficial } : {}),
-    ...(project.verifiedOwner ? { verifiedOwner: true as const } : {}),
-    ...(logoMedia ? { media: logoMedia } : {})
-  }
-  const sidebarWebsite: WebsiteDetailSidebarWebsite = {
-    slug: project.slug,
-    name: project.name,
-    website: project.website,
-    // D1 details always carry the setting; a missing one fails safe to nofollow.
-    linkRel: project.linkRel ?? 'nofollow',
-    category: project.category,
-    publishedAt: project.publishedAt,
-    ...(project.verifiedOwner ? { verifiedOwner: true as const } : {}),
-    ...(project.categories?.length ? { categories: project.categories } : {})
-  }
   const resourcesWebsite: WebsiteResourcesSectionWebsite = {
     slug: project.slug,
     ...(project.resourceLinks ? { resourceLinks: project.resourceLinks } : {})
   }
+  const verifiedOwner = project.verifiedOwner ? { verifiedOwner: true as const } : {}
 
   return (
-    <div
-      className="min-h-screen"
-      data-entity-type={project.entityType || 'listing'}
-      data-listing-template={detailTemplate}
-    >
+    <div data-entity-type={project.entityType || 'listing'} data-listing-template={detailTemplate}>
       <JsonLd data={generateWebsiteDetailSchema(project)} />
 
-      <WebsiteHero website={heroWebsite} breadcrumbItems={breadcrumbItems} />
+      {/* serplists' detail page (#273); the JSON-LD graph above carries the breadcrumb. */}
+      <DetailPageLayout
+        breadcrumbs={[
+          { href: getCanonicalListingListRoute(), label: siteCopy.listingName.pluralTitle },
+          { label: project.name }
+        ]}
+        media={
+          <ListingImage
+            name={project.name}
+            src={project.media?.logo}
+            size={56}
+            className="rounded-xl"
+          />
+        }
+        title={project.name}
+        description={project.description}
+        meta={websiteDetailMeta({
+          category: project.category,
+          ...(project.categories?.length ? { categories: project.categories } : {}),
+          ...(project.isUnofficial ? { isUnofficial: true } : {}),
+          ...verifiedOwner
+        })}
+        actions={
+          <WebsiteDetailActions
+            website={{
+              // D1 details always carry the setting; a missing one fails safe to nofollow.
+              linkRel: project.linkRel ?? 'nofollow',
+              slug: project.slug,
+              website: project.website
+            }}
+          />
+        }
+        aside={
+          <WebsiteDetailAside claim={claim} website={{ slug: project.slug, ...verifiedOwner }} />
+        }
+      >
+        <div className="flex flex-col gap-12">
+          {/* The listing's own text, links and FAQs read in one column. */}
+          <div className="flex max-w-3xl flex-col gap-12">
+            <WebsiteContentSection website={project} />
 
-      <div className="container mx-auto px-6 py-10 md:py-14">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            <div className="lg:col-span-8 space-y-14 md:space-y-16">
-              <WebsiteContentSection website={project} />
-
-              {siteConfig.features.showExternalResources && (
-                <section className="animate-fade-in-up opacity-0 stagger-5">
-                  <ExternalResourcesSection layout="default" showImages={false} />
-                </section>
-              )}
-
-              <WebsiteResourcesSection website={resourcesWebsite} />
-
-              <WebsiteFaqsSection website={{ faqs: faqsToShow(project.faqs, project.content) }} />
-            </div>
-
-            <div className="lg:col-span-4">
-              <WebsiteDetailSidebar website={sidebarWebsite} />
-            </div>
-          </div>
-
-          <div className="mt-14 md:mt-16 space-y-14 md:space-y-16">
-            <section
-              className="animate-fade-in-up opacity-0 stagger-6"
-              aria-labelledby="browse-more-heading"
-            >
-              <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 md:p-8">
-                <h2
-                  id="browse-more-heading"
-                  className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4"
-                >
-                  Browse more
-                </h2>
-                <ProjectNavigation
-                  previousWebsite={project.previousWebsite}
-                  nextWebsite={project.nextWebsite}
-                />
-              </div>
-            </section>
-
-            {project.relatedWebsites?.length > 0 && (
-              <WebsiteRelatedProjects websites={project.relatedWebsites} />
+            {siteConfig.features.showExternalResources && (
+              <ExternalResourcesSection layout="default" showImages={false} />
             )}
+
+            <WebsiteResourcesSection website={resourcesWebsite} />
+
+            <WebsiteFaqsSection website={{ faqs: faqsToShow(project.faqs, project.content) }} />
           </div>
+
+          <section aria-labelledby="browse-more-heading">
+            <SectionHeader id="browse-more-heading" title="Browse more" />
+            <ProjectNavigation
+              previousWebsite={project.previousWebsite}
+              nextWebsite={project.nextWebsite}
+            />
+          </section>
+
+          {project.relatedWebsites?.length > 0 && (
+            <WebsiteRelatedProjects websites={project.relatedWebsites} />
+          )}
         </div>
-      </div>
+      </DetailPageLayout>
     </div>
   )
 }
