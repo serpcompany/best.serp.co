@@ -3,6 +3,8 @@
 | Document | Covers |
 |---|---|
 | [Architecture](./ARCHITECTURE.md) | Runtime boundaries and responsibilities |
+| [URLs](./URLS.md) | Canonical URLs, redirects, pagination, sitemaps and structured data |
+| [Caching](./CACHING.md) | The catalog epoch and the four cache layers |
 | [Data model](./DATA_MODEL.md) | D1 schema, eligibility, caching, the initial import |
 | [Development](./DEVELOPMENT.md) | Local catalog, Worker preview, schema changes |
 | [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review |
