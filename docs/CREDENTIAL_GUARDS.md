@@ -38,7 +38,7 @@ restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
   in the same job, for the job's environment, with the same `if:`. Neither step may use
   `continue-on-error` or a status function (`always()`, `failure()`, `cancelled()`,
   `success()`), so the implicit `success()` skips the change when the bookmark fails. A change
-  that names a D1 database must name its environment's.
+  step that sets `CLOUDFLARE_D1_DATABASE_ID` must set its environment's database.
 - **Token steps that change no D1.** The R2-only listing media upload and the weekly media
   health check hold the token, but their exact commands cannot change D1, so they need no
   bookmark; any variant of either still does. The health check's issue step holds no
@@ -46,7 +46,9 @@ restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
 - **Nothing leaves as a file.** Only reviewed artifacts and caches are allowed (test evidence
   and the install action's dependency caches), matched by action, name, and path. No workflow
   or script exports D1. In every job where any step holds the token, each step uses only
-  reviewed actions and runs no upload command (`gh`, `curl`, or `wget` sending a file or body).
+  reviewed actions and runs no `gh gist`, `gh release upload|create`, `gh api` file field,
+  `curl` file upload (`-T`, `--upload-file`, `-F`, `--form`, `-d @`, `--data*=@`), or `wget`
+  post (`outboundUploads` in the test).
 
 ## Adding a credentialed job
 
@@ -63,6 +65,8 @@ These checks read workflow and script text, not data, and they are not a sandbox
 - An upload by a program the parser does not name (`node -e`, `python -c`, `nc`, or a renamed
   copy of `curl`) is not caught, and neither is a file written in a credentialed job and sent
   from a job without the token.
+- A `curl` body that carries data inline rather than from a file (`curl -d "$(cat out.json)"`)
+  is not caught: only file uploads are.
 - An allowlisted artifact or cache path, a log line, or a job summary could still carry data.
 - A remote reusable workflow or action is judged by its reference, not its content.
 - A pull request can edit the checks themselves.
