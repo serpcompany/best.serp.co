@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { PreviewCardBody } from '@/components/admin/preview-card-body'
 import { ReviewDetail } from '@/components/admin/review-detail'
-import { revisionView, stagedPreview } from '@/lib/admin/review-view'
+import { previewVerifiedOwner, revisionView, stagedPreview } from '@/lib/admin/review-view'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { decisionIdSchema } from '@/lib/admin/schemas'
 import { requireAdmin } from '@/lib/auth/server'
@@ -44,6 +44,7 @@ export default async function RevisionReviewPage({ params }: Props) {
           <PreviewCardBody
             categoryName={review.categoryName}
             preview={stagedPreview(review, media)}
+            verifiedOwner={previewVerifiedOwner(review)}
           />
         }
         view={revisionView(review, media)}
