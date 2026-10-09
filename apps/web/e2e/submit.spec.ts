@@ -1,5 +1,5 @@
 import { type APIRequestContext, type BrowserContext, expect, type Page } from '@playwright/test'
-import { listingPath, site } from './site-fixture'
+import { escapeRegExp, listingPath, site } from './site-fixture'
 import { executeLocalD1, type FixtureSite, startFixtureSite } from './submit-fixture'
 import { expectedResponse, test } from './test'
 
@@ -191,7 +191,9 @@ test.describe('submit v2', () => {
     await page.waitForURL(`**/submit/${submissionId}/badge/`)
     await expect(page.getByRole('heading', { name: `Add the badge to ${slug}` })).toBeVisible()
     const listingUrl = `${site.publicUrl}${listingPath(slug)}`
-    await expect(page.getByLabel('light badge snippet')).toContainText(listingUrl)
+    await expect(page.getByLabel('light badge snippet')).toHaveValue(
+      new RegExp(escapeRegExp(listingUrl))
+    )
     await expect(page.getByText(`10 of 10`)).toBeVisible()
 
     // A check before the badge is published: page reached, badge not found, one check used.

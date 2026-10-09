@@ -98,20 +98,20 @@ export function literalColors(source: string, fileName: string): string[] {
 /**
  * The ratchet: `over` lists each file with more uses than its baseline (0 when it has none),
  * with every use; `stale` lists each baseline entry above the file's count, including an entry
- * for a file that no longer has uses or no longer exists.
+ * for a file that no longer has uses or no longer exists. `noun` names the uses in `over`, so
+ * the raw-control guard (#188) shares it.
  */
 export function compareWithBaseline(
   uses: Readonly<Record<string, readonly string[]>>,
-  baseline: Readonly<Record<string, number>>
+  baseline: Readonly<Record<string, number>>,
+  noun = 'literal colors'
 ): { over: string[]; stale: string[] } {
   const over: string[] = []
   const stale: string[] = []
   for (const [file, found] of Object.entries(uses)) {
     const recorded = baseline[file] ?? 0
     if (found.length > recorded) {
-      over.push(
-        `${file}: ${found.length} literal colors (baseline ${recorded})\n  ${found.join('\n  ')}`
-      )
+      over.push(`${file}: ${found.length} ${noun} (baseline ${recorded})\n  ${found.join('\n  ')}`)
     }
   }
   for (const [file, recorded] of Object.entries(baseline)) {

@@ -23,6 +23,7 @@ import {
   localD1 as suiteD1,
   unique
 } from './admin-fixture'
+import { escapeRegExp } from './site-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
 import { expectedResponse, test } from './test'
 
@@ -312,6 +313,10 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await expect(panel.getByText(`${name} badge`)).toBeVisible()
   await expect(panel.getByText('Free listing · checked weekly')).toBeVisible()
   await expect(panel.getByText('Badge found, dofollow')).toBeVisible()
+  // The badge code (#188's shared embed-code box) links the badge to this listing.
+  await expect(panel.getByLabel('Badge snippet')).toHaveValue(
+    new RegExp(`href="[^"]*/products/${escapeRegExp(slug)}/"`, 'u')
+  )
   // Orders are on (#68, #133): a live free listing can be upgraded to the paid plan.
   await expect(panel.getByRole('link', { name: 'Upgrade: $49 one-off' })).toHaveAttribute(
     'href',

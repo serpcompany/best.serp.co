@@ -3,6 +3,7 @@
 import { ArrowUp } from 'lucide-react'
 import Script from 'next/script'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 interface GoogleTagManagerProps {
   gtmId?: string
@@ -226,13 +227,14 @@ export function BackToTop() {
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="outline"
+      size="icon-lg"
       onClick={scrollToTop}
-      className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full p-0 shadow-lg transition-all duration-200 hover:shadow-xl"
+      className="fixed right-6 bottom-6 z-50 rounded-full shadow-lg"
       aria-label="Back to top"
     >
-      <ArrowUp className="h-4 w-4" />
-    </button>
+      <ArrowUp />
+    </Button>
   )
 }

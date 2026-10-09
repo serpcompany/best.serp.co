@@ -1,9 +1,10 @@
 'use client'
 
-import { ChevronsUpDown, Copy, RefreshCw } from 'lucide-react'
+import { ChevronsUpDown, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { EmbedCode } from '@/components/submit/embed-code'
 import { ToneAlert } from '@/components/submit/submit-ui'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -202,24 +203,8 @@ export function BadgeDrawer({
               Badge code
               <ChevronsUpDown />
             </CollapsibleTrigger>
-            <CollapsibleContent className="flex flex-col gap-2">
-              <div className="w-full overflow-x-auto rounded-md border border-input px-3 py-2 font-mono text-[11px] leading-relaxed shadow-xs dark:bg-input/30">
-                <pre className="whitespace-pre">{embed}</pre>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-fit"
-                onClick={() => {
-                  void navigator.clipboard
-                    .writeText(embed)
-                    .then(() => toast.success('Badge code copied.'))
-                    .catch(() => toast.error('Couldn’t copy. Select the code and copy it.'))
-                }}
-              >
-                <Copy />
-                Copy code
-              </Button>
+            <CollapsibleContent>
+              <EmbedCode code={embed} label="Badge snippet" />
             </CollapsibleContent>
           </Collapsible>
           <Separator />

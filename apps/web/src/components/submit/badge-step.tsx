@@ -1,15 +1,6 @@
 'use client'
 
-import {
-  ArrowRight,
-  Check,
-  Clock,
-  Copy,
-  Globe,
-  MessageSquare,
-  Plus,
-  ShieldCheck
-} from 'lucide-react'
+import { ArrowRight, Clock, Globe, MessageSquare, Plus, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -24,7 +15,6 @@ import {
 } from '@/components/ui/card'
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Spinner } from '@/components/ui/spinner'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { featureCopy } from '@/lib/feature-copy'
 import {
@@ -37,6 +27,7 @@ import {
   verificationInstant
 } from '@/lib/submissions/contract'
 import { cn } from '@/lib/utils'
+import { EmbedCode } from './embed-code'
 import { verifyBadge } from './submit-api'
 import { ProductLogo, StepProgress, ToneAlert } from './submit-ui'
 
@@ -117,29 +108,10 @@ function BadgeCard({
   embed: string
   theme: 'dark' | 'light'
 }) {
-  const [copied, setCopied] = useState(false)
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(embed)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopied(false)
-    }
-  }
   return (
     <Card className="min-w-0 gap-4">
       <CardHeader>
         <CardTitle>{theme === 'light' ? 'Light badge' : 'Dark badge'}</CardTitle>
-        <CardAction>
-          <Tooltip open={copied}>
-            <TooltipTrigger render={<Button variant="outline" size="sm" onClick={copy} />}>
-              {copied ? <Check /> : <Copy />}
-              {copied ? 'Copied' : 'Copy code'}
-            </TooltipTrigger>
-            <TooltipContent>Copied to clipboard</TooltipContent>
-          </Tooltip>
-        </CardAction>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-3">
@@ -150,13 +122,7 @@ function BadgeCard({
             height={45}
             className="h-auto w-[180px]"
           />
-          <figure
-            data-slot="textarea"
-            aria-label={`${theme} badge snippet`}
-            className="w-full overflow-x-auto rounded-md border border-input bg-transparent px-3 py-2 font-mono text-[11px] leading-relaxed shadow-xs dark:bg-input/30"
-          >
-            <div className="whitespace-pre">{embed}</div>
-          </figure>
+          <EmbedCode code={embed} label={`${theme} badge snippet`} />
         </div>
       </CardContent>
     </Card>

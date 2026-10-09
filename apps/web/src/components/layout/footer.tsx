@@ -12,7 +12,9 @@ import {
 import { Linkedin } from 'lucide-react'
 import Link from 'next/link'
 import type { ComponentType } from 'react'
+import { buttonVariants } from '@/components/ui/button'
 import { siteRoutes } from '@/lib/site'
+import { cn } from '@/lib/utils'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { getRoute } from '../../lib/routing/routes'
 import { hasConfiguredPublicSocialLinks, siteConfig } from '../../lib/site/site-config'
@@ -233,7 +235,10 @@ export function Footer() {
                       key={href}
                       href={href}
                       aria-label={label}
-                      className="inline-flex items-center justify-center size-9 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                      className={cn(
+                        buttonVariants({ variant: 'ghost', size: 'icon-lg' }),
+                        'text-muted-foreground'
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
