@@ -128,7 +128,7 @@ The first runs the same best.serp.co checks without skipping anything; the secon
 
 `wrangler.jsonc` points `main` at `apps/web/worker.ts`, which wraps the generated
 `.open-next/worker.js`, so every deploy ships the edge HTML cache with the Worker
-([Architecture](./ARCHITECTURE.md#caching)). Confirm it after a deploy:
+([Caching](./CACHING.md)). Confirm it after a deploy:
 
 ```bash
 curl -sI https://best-serp-co-staging.serpcompany.workers.dev/about/ | grep -i x-edge-cache  # MISS

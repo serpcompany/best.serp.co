@@ -17,8 +17,7 @@
  * pipeline lives in `src/lib/worker/handle-request.ts`, `src/lib/worker/catalog.ts`,
  * `src/lib/routing/`, `src/lib/environment/`, and `src/lib/edge-cache/html-cache.ts`, which are
  * unit-tested, and it keeps no state of its own (#165). See
- * docs/ARCHITECTURE.md#environments-and-hosts, docs/ARCHITECTURE.md#url-canonicalization, and
- * docs/ARCHITECTURE.md#caching.
+ * docs/ARCHITECTURE.md#environments-and-hosts, docs/URLS.md, and docs/CACHING.md.
  */
 import { withEdgeCache } from './src/lib/edge-cache/html-cache'
 import { serveLocalMedia } from './src/lib/media/worker-media'
