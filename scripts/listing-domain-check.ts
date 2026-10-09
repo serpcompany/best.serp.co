@@ -133,6 +133,7 @@ export function applyManifest(database: DatabaseSync, source: string, now: strin
 /** What decides which listings are live and which categories they are filed under. */
 const catalogShapingActions = new Set([
   'listing-categories-add',
+  'listing-categories-remove',
   'listing-unpublish',
   'category-unpublish'
 ])
@@ -141,16 +142,17 @@ const catalogShapingActions = new Set([
  * The reviewed import with every committed manifest that changes which listings are live or what
  * categories they are filed under applied in file order, as staging and production publish them
  * (#260): #98's manifest gave 14 adult downloaders the Adult category, which their unpublish must
- * expect, and a listing another manifest unpublishes is no longer live. `exclude` names manifest
- * ids to leave out: the ones being generated.
+ * expect, and a listing another manifest unpublishes is no longer live. With `before` (a manifest
+ * id), only the manifests whose file sorts before it: the catalog a manifest being generated, and
+ * every later one, is published on.
  */
-export function reviewedCatalogDatabase(exclude: readonly string[] = []): DatabaseSync {
+export function reviewedCatalogDatabase(before?: string): DatabaseSync {
   const database = reviewedImportDatabase()
   try {
     for (const path of committedPublications()) {
+      if (before !== undefined && path >= `d1/publications/${before}.yaml`) break
       const source = readFileSync(resolve(path), 'utf8')
       const manifest = parseManifest(source)
-      if (exclude.includes(manifest.id)) continue
       if (!manifest.operations.some(op => catalogShapingActions.has(op.action))) continue
       try {
         applyManifest(database, source, '2026-10-09T00:00:00.000Z')
@@ -166,8 +168,8 @@ export function reviewedCatalogDatabase(exclude: readonly string[] = []): Databa
 }
 
 /** Live listings of the reviewed catalog (`reviewedCatalogDatabase`). */
-export function reviewedCatalogListings(exclude: readonly string[] = []): CatalogListing[] {
-  const database = reviewedCatalogDatabase(exclude)
+export function reviewedCatalogListings(before?: string): CatalogListing[] {
+  const database = reviewedCatalogDatabase(before)
   try {
     return liveListings(database)
   } finally {
@@ -658,7 +660,8 @@ async function main(): Promise<void> {
     const ids = adultManifestIds(args.date)
     const manifests = buildAdultManifests(
       parse(readFileSync(resolve(decisionsPath), 'utf8')) as AdultDecisions,
-      reviewedCatalogListings([ids.categoryId, ids.removalId]),
+      // The catalog before this decision's manifests (the category manifest sorts first).
+      reviewedCatalogListings(ids.categoryId),
       { decisionsPath, ...ids }
     )
     for (const [id, source] of [

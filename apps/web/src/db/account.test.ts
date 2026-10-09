@@ -157,6 +157,28 @@ describe('account operations', () => {
     expect((await operations().overview(OWNER)).listings).toEqual([])
   })
 
+  it('offers Relist for a listing the badge program unlisted, never one filed under a retired category (#260)', async () => {
+    for (const id of ['lst_gone', 'lst_retired']) {
+      seedOwnedListing(id)
+      sqlite.database.exec(`
+        UPDATE listings SET is_active=0 WHERE id='${id}';
+        INSERT INTO listing_submission_events (submission_id,event_type,detail,actor)
+          VALUES ('sub_${id}','unpublished','badge_missing','badge-program');
+      `)
+    }
+    // Filed under the retired category once unpublished, as the adult removal leaves a listing.
+    sqlite.database.exec(`INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+      VALUES ('lst_retired',3,1,0)`)
+    const listings = new Map(
+      (await operations().overview(OWNER)).listings.map(listing => [listing.id, listing])
+    )
+    expect(listings.get('lst_gone')).toMatchObject({ checkoutPurpose: 'relist', live: false })
+    expect(listings.get('lst_retired')).toMatchObject({ checkoutPurpose: null, live: false })
+    expect(await operations().listing(OWNER, 'lst_retired.example')).toMatchObject({
+      checkoutPurpose: null
+    })
+  })
+
   it('withdraws only the owner’s unpaid submission, once', async () => {
     seedSubmission('sub_open', 'verified')
     seedSubmission('sub_paid', 'verified', { paid: true })

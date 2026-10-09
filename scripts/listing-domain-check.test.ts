@@ -1204,10 +1204,20 @@ describe('adult listings and the Adult category (#260)', () => {
       const decisionsPath = adultDecisionsPathFor(date)
       const ids = adultManifestIds(date)
       const decided = parse(readFileSync(resolve(decisionsPath), 'utf8')) as AdultDecisions
-      // The catalog both environments publish on, without this decision's manifests.
-      const database = reviewedCatalogDatabase([ids.categoryId, ids.removalId])
+      // The catalog this decision's manifests are published on: every committed manifest that
+      // sorts before them, never a later one (it may expect this decision's result).
+      const database = reviewedCatalogDatabase(ids.categoryId)
+      const inactive = () =>
+        database
+          .prepare('SELECT slug FROM categories WHERE is_active = 0')
+          .all()
+          .map(row => String(row.slug))
       try {
         const before = liveListings(database)
+        const inactiveBefore = new Set(inactive())
+        // Later manifests, this decision's own included, are not applied.
+        for (const slug of decided.retireCategories)
+          expect(inactiveBefore.has(slug), slug).toBe(false)
         const generated = buildAdultManifests(decided, before, { decisionsPath, ...ids })
         const committed = (id: string) => {
           const path = resolve(`d1/publications/${id}.yaml`)
@@ -1216,7 +1226,8 @@ describe('adult listings and the Adult category (#260)', () => {
         expect(committed(ids.categoryId), ids.categoryId).toBe(generated.category)
         expect(committed(ids.removalId), ids.removalId).toBe(generated.removal)
 
-        // Another manifest's unpublish would leave a listing not live, and this one refuses whole.
+        // Another manifest's unpublish, earlier or later, would leave a listing not live, and
+        // whichever publishes second refuses whole.
         const elsewhere = new Map<string, string>()
         for (const path of committedPublications()) {
           const manifest = parseManifest(readFileSync(resolve(path), 'utf8'))
@@ -1244,12 +1255,11 @@ describe('adult listings and the Adult category (#260)', () => {
             assertD1StatementLimits(item.query, item.bindings)
           applyManifest(database, source, `${date}T00:00:00.000Z`)
         }
-        // Exactly the decided categories retire (no category was inactive before).
+        // Exactly the decided categories retire (Fansite Downloaders, which keeps listings, stays).
         expect(
-          database
-            .prepare('SELECT slug FROM categories WHERE is_active = 0 ORDER BY slug')
-            .all()
-            .map(row => row.slug)
+          inactive()
+            .filter(slug => !inactiveBefore.has(slug))
+            .sort()
         ).toEqual([...decided.retireCategories].sort())
         const after = liveListings(database)
         expect(before.length - after.length).toBe(decided.unpublish.length)
@@ -1294,8 +1304,12 @@ describe('adult listings and the Adult category (#260)', () => {
             )
             .get(slug) !== undefined
         for (const entry of decided.unpublish) expect(gone(entry.slug), entry.slug).toBe(false)
-        const [otherId] = elsewhere.keys()
-        const other = database.prepare('SELECT slug FROM listings WHERE id = ?').get(otherId ?? '')
+        const earlier = [...elsewhere].find(
+          ([, path]) => path < `d1/publications/${ids.categoryId}.yaml`
+        )
+        const other = database
+          .prepare('SELECT slug FROM listings WHERE id = ?')
+          .get(earlier?.[0] ?? '')
         expect(gone(String(other?.slug)), String(other?.slug)).toBe(true)
       } finally {
         database.close()
