@@ -93,7 +93,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::The production environment needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/DEPLOY_RUNBOOK.md)."
+            echo "::error::The production environment needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/DEPLOY_CREDENTIALS.md)."
             exit 1
           fi
 
@@ -178,7 +178,7 @@ jobs:
           if [ "$server" = "GitHub.com" ]; then
             # Pre-cutover: best.serp.co is still GitHub Pages, so gate the production Worker on
             # its noindex workers.dev review origin instead.
-            message="best.serp.co is still served by GitHub Pages; gating the production Worker at $PRODUCTION_REVIEW_ORIGIN. Attach the Custom Domain, then rerun (docs/DEPLOY_RUNBOOK.md)."
+            message="best.serp.co is still served by GitHub Pages; gating the production Worker at $PRODUCTION_REVIEW_ORIGIN. Attach the Custom Domain, then rerun (docs/PRODUCTION_CUTOVER.md)."
             echo "::notice title=Pre-cutover HTTP gates::$message"
             echo "$message" >> "$GITHUB_STEP_SUMMARY"
             pnpm tsx scripts/d1-preview-http-gates.ts staging "$PRODUCTION_REVIEW_ORIGIN"

@@ -133,9 +133,9 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   `apps/web/src/lib/environment/`, `public-policy.test.tsx` runs the policy through the Worker
   pipeline and the root layout's analytics decision, and `noindex-sources.test.ts` checks the
   real `next.config.ts` headers and the layout's and pages' robots metadata.
-- **Manual check of best.serp.co** (deploy runbook, cutover step 4, and after any gate run
-  that logged `best.serp.co check skipped`). `pnpm tsx scripts/d1-preview-http-gates.ts public
-  https://best.serp.co` runs the same best.serp.co checks without skipping anything. Then
+- **Manual check of best.serp.co** (after any gate run that logged `best.serp.co check skipped`;
+  [deploy runbook](./DEPLOY_RUNBOOK.md#after-a-deploy)). `pnpm tsx scripts/d1-preview-http-gates.ts
+  public https://best.serp.co` runs the same best.serp.co checks without skipping anything. Then
   `curl -sI https://best.serp.co/` must show `x-site-environment: production` and an
   `x-worker-version` equal to the version Deploy Production deployed: the id its gate log
   prints (`Worker version <id> answered N probe(s)`), or the active deployment under Workers &
