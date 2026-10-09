@@ -280,6 +280,6 @@ Until the token split, this is a process control, not a security boundary.
   path requires a pull request and the required checks, but no approving review.
 - **No human gate on staging data:** the `staging` environment has no reviewers, so anything that
   can dispatch workflows can run the staging publication or upload. Agents never do (AGENTS.md);
-  an optional `staging-data` environment would enforce it ([media](./MEDIA_PUBLISHING.md)).
+  an optional `staging-data` environment would enforce it ([media](./MEDIA_PUBLISHING.md#a-human-gate-on-staging-data)).
 
 Decision b (the per-environment token split, right after cutover) closes that path.

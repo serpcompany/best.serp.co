@@ -42,7 +42,7 @@ address, so DNS rebinding cannot swap it; `Host` and TLS SNI stay the host's.
 - **Owner revisions.** Saving a revision whose logo differs from the listing's hosts it under
   `revisions/<id>/` after the response (`hostRevisionLogo`). A revision that keeps the listing's
   logo needs no copy. Resubmitting a submission with a changed logo replaces its hosted copy, as
-  a first save does.
+  saving a changed logo on the submit form does.
 - **Approvals publish only what the reviewer saw** (`adoptStagedLogoPlans` and
   `adoptSubmissionImagePlans` hold the rules). The review screen and both previews show the
   hosted logo and featured image; the approval sends those keys back and is refused if either

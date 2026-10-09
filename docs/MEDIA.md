@@ -69,7 +69,8 @@ this site's listing keys on the two media hosts.
 
 ## Rendering
 
-The catalog reads a row's key where it has one, so DTOs and the data cache hold keys, not URLs.
+The catalog reads a row's key where it has one, and its source URL where it is not hosted yet
+(`mediaUrl` passes that through), so DTOs and the data cache hold keys for hosted rows.
 The web adapter (`apps/web/src/lib/catalog/repository.ts`) turns keys into URLs on
 `MEDIA_BASE_URL` and fails closed when the variable is missing or malformed. Listing JSON-LD
 names the hosted logo, so on staging and in production it names the media host rather than

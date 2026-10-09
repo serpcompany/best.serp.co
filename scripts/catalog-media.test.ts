@@ -155,7 +155,7 @@ describe('hosted catalog media (#95)', () => {
         .map(row => `${row.slug} ${row.kind} ${row.url}`)
       expect(
         hotlinked,
-        'Every listing logo and image must be a hosted key (docs/MEDIA.md). Repoint it with a listing-media-update manifest after uploading its plan, or drop it.'
+        'Every listing logo and image must be a hosted key (docs/MEDIA.md). Repoint it with a listing-media-update manifest after uploading its plan (docs/MEDIA_PUBLISHING.md#uploading-and-publishing), or drop it.'
       ).toEqual([])
       // A key on the media host, and its own: the listing's slug and the row's kind (#122).
       const foreign = rows.flatMap(row => {
@@ -225,7 +225,7 @@ describe('hosted catalog media (#95)', () => {
     expect(named).toBeGreaterThan(1_000)
     expect(
       problems,
-      'A manifest image is a hosted listings/<slug>/<kind>/ key with its plan (docs/MEDIA.md).'
+      'A manifest image is a hosted listings/<slug>/<kind>/ key with its plan (docs/MEDIA_PUBLISHING.md#uploading-and-publishing).'
     ).toEqual([])
   })
 
