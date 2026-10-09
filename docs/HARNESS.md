@@ -176,6 +176,16 @@ writes the ignored `d1/artifacts/` SQL and must reproduce the committed parity
 report. `pnpm migration:compare -- <origin>` compares sampled pages between
 https://best.serp.co and a candidate origin.
 
+## Sibling checkouts
+
+A few repository tests compare a committed copy with its source in another repository's
+checkout: `scripts/network-brands.test.ts` reads devinschumacher.com's brand list (`/brands/`,
+#193) and serpcompany/serp's shared brand data. They look for the checkouts under
+`SERP_REPOS_ROOT` (default `~/dev/repos`, for example `~/dev/repos/devinschumacher.com`), read
+a commit the test or source constant records with `git show`, never a working tree, and skip
+when the checkout or that commit is missing, as in CI. After updating a copy, record its new
+source commit.
+
 ## Issue-driven planning and review
 
 GitHub Issues hold active specs, decision maps, implementation tickets, blocking
