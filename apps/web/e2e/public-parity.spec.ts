@@ -89,6 +89,15 @@ test.describe('public parity interactions', () => {
       .map(tag => /href="([^"]*)"/u.exec(tag)?.[1])
     expect(currentLinks.length).toBeGreaterThan(0)
     expect(new Set(currentLinks)).toEqual(new Set(['/products/categories/']))
+
+    // And the live header follows the client navigation: reopened, the menu marks Categories.
+    await nav.getByRole('button', { name: 'Products' }).click()
+    const reopened = page.locator('[data-slot="navigation-menu-content"]')
+    await expect(reopened.getByRole('link', { name: 'Categories', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    await expect(reopened.locator('a[aria-current="page"]')).toHaveCount(1)
   })
 
   test('the search page has its own search field, holding the query', async ({ page }) => {
