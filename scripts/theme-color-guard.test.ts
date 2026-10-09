@@ -45,6 +45,7 @@ const STOCK_UI = [
   'input-otp',
   'item',
   'label',
+  'navigation-menu',
   'pagination',
   'popover',
   'progress',
@@ -66,14 +67,10 @@ const STOCK_UI = [
 ].map(name => `apps/web/src/components/ui/${name}.tsx`)
 
 /**
- * Each file's literal-color count, which may only go down. Since #184 only the hand-built
- * overlays are left, with stock shadcn's overlay color `bg-black/50`; #187 moves them onto Sheet
- * and Dialog, and their entries go.
+ * Each file's literal-color count, which may only go down. Empty since the shared shell (#256)
+ * replaced the hand-built overlays.
  */
-const COLOR_BASELINE: Readonly<Record<string, number>> = {
-  'apps/web/src/components/layout/header-search.tsx': 1,
-  'apps/web/src/components/layout/mobile-drawer.tsx': 1
-}
+const COLOR_BASELINE: Readonly<Record<string, number>> = {}
 
 function sourceFiles(): string[] {
   return execFileSync(

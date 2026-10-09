@@ -14,15 +14,10 @@ import { compareWithBaseline } from './theme-color-guard'
  */
 
 /**
- * Each file's raw-control count, which may only go down. Left: the hand-built header search,
- * mobile drawer and autocomplete, and the search input that the header and the home page's
- * search controls share. #253 removes the header search and rebuilds the shell and home page,
- * and their entries go.
+ * Each file's raw-control count, which may only go down. Left: the search input of the home
+ * page's search controls, which #257 rebuilds, and its entry goes.
  */
 const CONTROL_BASELINE: Readonly<Record<string, number>> = {
-  'apps/web/src/components/layout/header-search.tsx': 1,
-  'apps/web/src/components/layout/mobile-drawer.tsx': 2,
-  'apps/web/src/components/search/search-autocomplete.tsx': 1,
   'apps/web/src/components/search/search-input.tsx': 1
 }
 

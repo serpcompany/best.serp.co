@@ -10,7 +10,7 @@ import { NavSecondary } from '@/components/dashboard/nav-secondary'
 import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
 import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
 import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
-import { ModeToggle } from '@/components/layout/mode-toggle'
+import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -63,7 +63,7 @@ function AdminHeader() {
             View site
             <ExternalLink />
           </a>
-          <ModeToggle />
+          <ThemeToggle />
         </>
       }
     />

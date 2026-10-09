@@ -93,7 +93,7 @@ function DirectorySectionHeader({ children, className }: DirectorySectionHeaderP
   return (
     <div
       className={cn(
-        '-mx-6 sticky top-16 z-30 flex items-center justify-between border-b border-border/50 bg-background/95 px-6 py-3 backdrop-blur-sm sm:py-4',
+        '-mx-6 sticky top-14 z-30 flex items-center justify-between border-b border-border/50 bg-background/95 px-6 py-3 backdrop-blur-sm sm:py-4',
         className
       )}
     >
