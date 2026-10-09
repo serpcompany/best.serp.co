@@ -300,6 +300,19 @@ test.describe('public parity interactions', () => {
 
   // Links styled with buttonVariants keep their own classes through cn (#186): the header's
   // sign-in link is `hidden md:inline-flex`, so it waits for the menu on phones.
+  // The card title clips a brand link's own focus ring, so its card draws one (#278 review).
+  test('a brand card shows a focus ring while its link has keyboard focus', async ({ page }) => {
+    await gotoPublicPage(page, '/brands/')
+    const card = page.locator('[data-list-card]').first()
+    const link = card.locator('h2 a')
+    const ring = () => card.evaluate(element => getComputedStyle(element).boxShadow)
+    expect(await ring()).toBe('none')
+    await page.keyboard.press('Tab')
+    await link.focus()
+    await expect(link).toBeFocused()
+    await expect.poll(ring).not.toBe('none')
+  })
+
   test('desktop-only header links stay hidden on phones', async ({ page }) => {
     await page.setViewportSize({ height: 844, width: 390 })
     await gotoPublicPage(page, '/')

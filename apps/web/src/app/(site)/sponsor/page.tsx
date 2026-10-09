@@ -1,4 +1,9 @@
+import { Mail } from 'lucide-react'
 import type { Metadata } from 'next'
+import { CardGrid } from '@/components/layout/card-grid'
+import { ListCard } from '@/components/layout/list-card'
+import { PageHero } from '@/components/layout/page-hero'
+import { PageSection } from '@/components/layout/page-shell'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
 export const metadata: Metadata = generateBaseMetadata({
@@ -8,21 +13,22 @@ export const metadata: Metadata = generateBaseMetadata({
   path: '/sponsor/'
 })
 
+/** Laid out as serplists' Contact (#275): a centered hero, then the address as a card. */
 export default function SponsorPage() {
   return (
-    <div className="container mx-auto max-w-3xl px-6 py-16">
-      <div className="space-y-6">
-        <h1 className="text-4xl font-bold tracking-tight">Sponsor SERP</h1>
-        <p className="text-lg text-muted-foreground">
-          Reach people researching software, AI tools, resources, and SERP network projects.
-        </p>
-        <a
-          className="inline-flex font-medium text-primary underline-offset-4 hover:underline"
-          href="mailto:sponsor@serp.co"
-        >
-          sponsor@serp.co
-        </a>
-      </div>
-    </div>
+    <>
+      <PageSection spacing="hero">
+        <PageHero
+          align="center"
+          title="Sponsor SERP"
+          description="Reach people researching software, AI tools, resources, and SERP network projects."
+        />
+      </PageSection>
+      <PageSection className="pt-0" spacing="spacious" width="narrow">
+        <CardGrid columns={1}>
+          <ListCard href="mailto:sponsor@serp.co" icon={<Mail />} title="sponsor@serp.co" />
+        </CardGrid>
+      </PageSection>
+    </>
   )
 }
