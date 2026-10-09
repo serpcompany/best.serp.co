@@ -45,7 +45,6 @@ export const site: SiteDefinition = {
   features: {
     showAuth: true,
     showBrands: true,
-    showCreatorProjects: false,
     showDocs: false,
     showExternalResources: false,
     showFavorites: false,

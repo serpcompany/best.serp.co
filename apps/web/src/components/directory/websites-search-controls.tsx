@@ -51,6 +51,7 @@ export function WebsitesSearchControls({
           name="q"
           autoComplete="off"
           aria-label="Search"
+          submitLabel="Search"
           placeholder="Search the directory..."
           value={searchQuery}
           onChange={event => setSearchQuery(event.target.value)}

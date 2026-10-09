@@ -96,6 +96,35 @@ test.describe('public parity interactions', () => {
     )
   })
 
+  test('listing grids show one, two, then three columns (#264)', async ({ page }) => {
+    const grid = page.locator('section[aria-labelledby="featured"] [data-slot="card-grid"]')
+    const columns = () =>
+      grid.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
+    for (const [width, expected] of [
+      [1440, 3],
+      [820, 2],
+      [390, 1]
+    ] as const) {
+      await page.setViewportSize({ width, height: 900 })
+      await gotoPublicPage(page, '/')
+      expect(await columns(), `${width}px`).toBe(expected)
+    }
+  })
+
+  test('the home search sends its query to /search/, by Enter or its button', async ({ page }) => {
+    await gotoPublicPage(page, '/')
+    const field = page.getByPlaceholder('Search the directory...')
+    await field.fill('video')
+    await Promise.all([page.waitForURL(/\/search\/?\?q=video$/u), field.press('Enter')])
+
+    await gotoPublicPage(page, '/')
+    await page.getByPlaceholder('Search the directory...').fill('audio')
+    await Promise.all([
+      page.waitForURL(/\/search\/?\?q=audio$/u),
+      page.getByRole('button', { name: 'Search', exact: true }).first().click()
+    ])
+  })
+
   test('favorite toggle and favorites-only filter preserve local state behavior', async ({
     page
   }) => {

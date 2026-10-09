@@ -20,6 +20,7 @@ export function SearchPageForm() {
           defaultValue={query}
           autoComplete="off"
           aria-label="Search"
+          submitLabel="Search"
           placeholder={siteCopy.listingSearchPlaceholder}
         />
       </form>

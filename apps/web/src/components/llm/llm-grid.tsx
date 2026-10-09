@@ -19,7 +19,7 @@ export function LLMGrid({ items = [], className, maxItems, analyticsSource }: LL
   }
 
   return (
-    <CardGrid className={className}>
+    <CardGrid as="ul" className={className}>
       {items.map((item, index) => {
         if (!item?.slug) return null
         const isVisible = !maxItems || index < maxItems
