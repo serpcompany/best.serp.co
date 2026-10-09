@@ -31,15 +31,10 @@ change runs in a protected workflow.
 
 ## Responsibility map
 
-- `apps/web/src/app/` adapts HTTP routes to page behavior. Public URLs:
-  `/products/<slug>/` (detail), `/products/categories/` (index),
-  `/products/categories/<category>/` (category), `/products/`, `/brands/`, `/search/`,
-  `/submit/`, `/legal/*`, `/rss.xml`, `/sitemap-index.xml`,
-  `/sitemap-{pages,products,categories}.xml`. The static site's root-level `/<slug>` URLs
-  get one 308 from the Worker (`apps/web/src/lib/routing/legacy-root.ts`); the pre-D1 scheme
-  (`/products/<slug>/reviews/`, `/products/best/<category>/`, `/categories/<x>/`) redirects
-  permanently through `apps/web/next.config.ts` (rules in `apps/web/src/lib/routing/redirects.ts`).
-  "Featured" is a listing flag for placements (the homepage section), not a category page.
+- `apps/web/src/app/` adapts HTTP routes to page behavior. The route registry
+  (`apps/web/src/lib/site/site-routes.ts`) and `getRoute` hold the public URLs; [URLs](./URLS.md)
+  covers their canonical form and the redirects of older URL schemes. "Featured" is a listing
+  flag for placements (the homepage section), not a category page.
 - `apps/web/worker.ts` is the Worker entry. It wires the build output into the request pipeline
   (`apps/web/src/lib/worker/handle-request.ts`), which redirects non-canonical hosts and URLs
   (`apps/web/src/lib/routing/`), applies the crawl policy (`apps/web/src/lib/environment/`), serves
@@ -56,7 +51,7 @@ change runs in a protected workflow.
 - `apps/web/src/lib/submissions/` validates the binding, fetches submitters' pages and images
   only through its bounded safe fetcher (badge checks, URL prefill, logo checks), and
   delegates every submission read and write to `apps/web/src/db/`, scoped to the owner.
-  `apps/web/src/lib/claims/` does the same for [claims](./CLAIMS.md) (#67).
+  `apps/web/src/lib/claims/` does the same for [claims](./CLAIMS.md).
 - `apps/web/src/lib/email/` sends transactional email through the useSend API after the
   response, claims each template and event key in the `email_deliveries` ledger
   (`apps/web/src/db/`) so it never sends twice, and only logs locally
@@ -69,8 +64,8 @@ change runs in a protected workflow.
 - `apps/web/src/lib/site/` is the checked-in site definition (name, domain, copy, routes,
   badges, feature flags, the route registry); `apps/web/content/` holds the MDX content.
 - `src/components/`, `src/hooks/`, and `src/lib/{seo,site,directory,analytics,routing}/`
-  hold the page and view building blocks (from `packages/web-core`, #174); they read the site
-  definition through `siteConfig` and never obtain a database binding.
+  hold the page and view building blocks; they read the site definition through `siteConfig`
+  and never obtain a database binding.
 - `apps/web/src/db/` owns the Drizzle schema, the injected D1 client, catalog DTOs,
   eligibility SQL, pagination, redirects, related ranking, adjacency, the catalog
   epoch and the epoch-keyed data cache, query telemetry, and all submission operations.
@@ -103,7 +98,7 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   (`apps/web/src/lib/environment/`). Static files are served before the Worker runs, so
   `apps/web/public/_headers` keeps them `noindex` on every `*.workers.dev` host, and
   `next.config.ts` keeps its `*.workers.dev` `noindex` rule as defense in depth.
-- **Canonical host** (#42 decision e). With `CANONICAL_HOST_REDIRECT=on`, the production
+- **Canonical host.** With `CANONICAL_HOST_REDIRECT=on`, the production
   Worker answers every `*.workers.dev` request (the workers.dev URL and preview URLs) with one
   308 to `https://best.serp.co`, in canonical form and with the query kept byte for byte:
   `/about?x=1` -> `https://best.serp.co/about/?x=1`. It runs before the trailing-slash rule
@@ -141,140 +136,12 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   prints (`Worker version <id> answered N probe(s)`), or the active deployment under Workers &
   Pages → `best-serp-co-production` → Deployments in the Cloudflare dashboard.
 
-## URL canonicalization
+## URLs and caching
 
-Every URL has one canonical form, per the SERP URL trailing-slash and sitemap standards
-(serpcompany/serp `docs/engineering/standards/url-trailing-slash.md` and
-`docs/engineering/websites/features/xml-sitemaps.md`):
-
-| URL | Canonical form | Non-canonical request |
-| --- | --- | --- |
-| Homepage | `https://best.serp.co` (written without a slash) | none: `/` is the only path |
-| Page | ends with `/`: `/about/`, `/products/autoenhance.ai/` | `/about` -> 308 `/about/` |
-| File | never ends with `/`: `/robots.txt`, `/sitemap-pages.xml` | `/robots.txt/` -> 308 `/robots.txt` |
-| `/api`, `/api/*`, `/.well-known/*`, `/_next/*` | served exactly as requested | never redirected |
-
-`apps/web/src/lib/seo/canonical-url.ts` defines the rule. A file is a path whose last segment ends
-in a known file extension (`FILE_EXTENSIONS` in `apps/web/src/lib/file-extensions.ts`), not any dot:
-most listing slugs are domain names (`autoenhance.ai`), and their pages keep the slash. Never add an
-extension that is also a top-level domain. The data side holds the invariant: submission intake
-(`apps/web/src/db/submissions.ts`), the admin panel's approval
-(`apps/web/src/lib/admin/decisions.ts`), and the publication manifest schema
-(`scripts/d1-publisher.ts`) refuse a listing slug that ends in one of these extensions (`chart.js`),
-and a test checks the committed import.
-
-- **Redirects.** The Worker entry answers a non-canonical request with one 308 before the
-  edge cache and before OpenNext (`apps/web/src/lib/routing/trailing-slash.ts`), so slash
-  variants are never rendered or cached. The `Location` is relative and keeps the query
-  string byte for byte. `skipTrailingSlashRedirect` (in `next.config.ts`) keeps the framework's
-  own slash redirect off: it differs between Next.js and OpenNext and has no `/api`
-  exception. OpenNext Node middleware is not used (it is experimental on Cloudflare).
-- **Moved URLs.** `apps/web/src/lib/routing/redirects.ts` lists them and `next.config.ts`
-  applies them. Next.js matches each source with or without a slash and every destination
-  is canonical, so the Worker leaves any request a moved-URL rule matches to OpenNext (it
-  reads the same compiled patterns from `.next/routes-manifest.json`), and the request
-  reaches its page in one hop. Add static moved URLs there (not as a page that calls
-  `permanentRedirect()`); `redirects.test.ts` checks that each destination is canonical and
-  each source is matched in both slash forms. Redirects that need D1 run in their pages
-  (renamed listing slugs) or in the Worker (root-level `/<slug>`, before the slash rule) and
-  write a canonical destination (`getRoute`). The Worker validates the manifest at startup
-  and refuses to start if its shape is unexpected (no `redirects` array or route list, a rule
-  without a string `regex`, a pattern that does not compile or matches every path), so a
-  framework upgrade cannot silently turn either rule off. OpenNext re-serializes the query
-  string of config redirects from decoded values, so a query that contains an encoded `&`,
-  `=`, `#`, or `+` is not preserved exactly; the pre-D1 URLs never carried one.
-- **Written URLs.** Canonical tags, `og:url`, sitemaps, `robots.txt`, and JSON-LD build absolute
-  URLs with `absoluteUrl` (`siteUrl` in `seo-config.ts`), which writes the homepage as the bare
-  origin. With `trailingSlash`, the Next.js metadata API appends `/` to every same-origin URL,
-  so the homepage (`app/(site)/page.tsx`) leaves `alternates.canonical` and `openGraph.url`
-  unset and renders both tags with `HomePageCanonicalTags`. Never render them in
-  `HomePageRoute`: `/products/` reuses it, and only its page 1 (canonical `/`) renders them.
-  JSON-LD node identifiers keep their fragment form (`https://best.serp.co/#website`); they name
-  a graph node, not the page.
-- **Origin.** Sitemaps, canonical tags, and structured data always use the production
-  origin from `src/lib/site` (`https://best.serp.co`), also locally and on the
-  noindex `*.workers.dev` hosts. This is deliberate: the e2e suite and the HTTP gates then
-  verify on staging exactly the URLs production publishes, and those hosts are never
-  indexed.
-- **Listing images.** A listing without a usable logo renders the checked-in "no logo" tile
-  `apps/web/public/listing-logos/favicon-fallback-512x512.png` (source and render notes in
-  `scripts/assets/listing-logo-fallback.svg`). The tile is UI only: listing JSON-LD names
-  the listing's own logo as `primaryImageOfPage` and omits the property when there is none,
-  rather than give every logo-less listing the same image or the SERP logo
-  (`apps/web/src/lib/seo/schema.ts`). `apps/web/e2e/listing-logo-assets.spec.ts` checks
-  that the Worker serves the tile and that sample pages reference no missing same-origin file.
-- **Listing offers.** D1 holds no product pricing, so listing JSON-LD has no `offers`
-  (`generateWebsiteDetailSchema` emits one only for known `pricing`; the submission `plan` is
-  the listing fee). `listing-structured-data.spec.ts` checks it (serpcompany/best.serp.co#88).
-- **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other host
-  serves a disallow-all robots.txt; see [Environments and hosts](#environments-and-hosts)). The
-  index lists the root-level `/sitemap-{pages,products,categories}.xml`; `/sitemap.xml` and the
-  old `/sitemaps/*/1.xml` answer one 308. The route registry
-  (`apps/web/src/lib/site/site-routes.ts`, #167) sets each static page's indexability and
-  sitemap for the sitemaps, robots.txt, page metadata, and footer (`site-routes.test.tsx`).
-  `lastmod` (#218): a listing's later `updated_at`/`published_at`, else the newest child.
-
-The Playwright smoke suite (staging) and `scripts/d1-preview-http-gates.ts` (staging and
-production) assert the redirects, the `/api` exemption, and the homepage form.
-
-## Pagination
-
-The directory (`/`, `/products/`) and category pages show 48 listings per page in
-directory order (publication order, then a stable locale sort by name, as the pages
-always rendered). Later pages use a `?page=N` query parameter on the existing URL:
-`/products/?page=2`, `/products/categories/other/?page=3`. The homepage shows page 1 and
-links into `/products/?page=N`. `/products/` itself renders the homepage's content, so its
-canonical is `/`. Page 1 is the bare URL; pages 2+ are linked with plain `<a href>` anchors,
-canonicalize to themselves, carry `noindex, follow` and a "- Page N" title, and a page
-past the end is a 404. Category JSON-LD describes the whole category on every page.
-`apps/web/src/components/directory/listing-pagination.tsx` owns the parameter, links, and metadata;
-`getListingNamePage` in `apps/web/src/db` reads one page (ids in name order are cached
-per epoch, then only that page's summaries are read). Routes never load the full catalog
-for display; only the sitemaps and the JSON feed read every listing.
-
-## Caching
-
-Public content changes only with the **catalog epoch**: `publication_state.version` plus
-the newest `published_at` that is already public (so a listing scheduled for the future
-appears when it becomes due, without a publication). `apps/web/src/db/catalog-epoch.ts`
-reads it with one statement (two index seeks). Four layers, from the edge inward:
-
-1. **Edge HTML cache** (`apps/web/worker.ts`, logic in `apps/web/src/lib/edge-cache/`). The
-   Worker entry wraps the OpenNext handler. Anonymous `GET`/`HEAD` requests are served from
-   the Workers Cache API under a key of Worker version (`CF_VERSION_METADATA`), catalog
-   epoch, host, path and query (and, for React Server Components requests, the router
-   headers Next.js varies on). A hit loads neither Next.js nor D1. Misses render normally
-   and 200/301/308/404/410 responses without `Set-Cookie` are stored for 24 hours; visitors
-   still receive the origin `Cache-Control`. A cacheable request reaches OpenNext with only
-   `accept`, `host`, `user-agent`, and the router headers; every other request header
-   (cookies, `x-nonce`, forwarded and framework-internal headers) is dropped, so nothing a
-   client sends can be stored and served to others (`renderRequestFor`). Bypassed: `/api`
-   (including `/api/auth`), `/admin`, `/account`, `/login`, `/search`, `/_next` (first path
-   segment in any case), requests with `Authorization`, and requests carrying a Better Auth
-   (`better-auth.*`) or preview cookie, so a signed-in request is never served from or
-   stored in the cache. Responses carry `x-edge-cache: HIT | MISS | BYPASS`.
-2. **Epoch memo.** Each isolate reuses its epoch for 30 seconds and revalidates it in the
-   background for up to 5 minutes; isolates in one data center share it through the Cache
-   API for 30 seconds. D1 therefore sees about one one-row epoch read per data center per
-   30 seconds, and a publication reaches cached pages within about a minute. Nothing is
-   purged: old keys stop matching and expire. The entry shares the epoch with the renders in
-   its isolate (`shareCatalogEpochToken`, a global, never a request header), so a render
-   reuses it for up to 30 seconds instead of reading it again.
-3. **Data cache** (Workers Cache API, `apps/web/src/db/cache.ts`). Shell counts,
-   name order, name pages, featured/latest heads, details, search results (per normalized
-   query and limit), and the full summary list (for sitemaps and the feed) are cached under
-   epoch-scoped keys for 24 hours, with live D1 fallback when the cache fails.
-4. React `cache()` deduplicates reads within a request.
-
-Both Cache API layers are per data center and populate on demand. A deployment gets a new
-Worker version and therefore a cold HTML cache; the data cache survives deployments.
-
-Alternatives evaluated for @opennextjs/cloudflare 1.20.6 / Next 16.3.6
-(serpcompany/best.serp.co#34): OpenNext ISR with the R2 incremental cache would need static
-pages, a Durable Object revalidation queue, and a per-request tag cache; KV caches are
-eventually consistent or experimental. The epoch-keyed wrapper needs no new resources.
-Cloudflare's Workers Caching could replace layer 1 later, but it bills every static asset
-request and needs a purge trigger the out-of-Worker publish flow cannot send today.
+- [URLs](./URLS.md): the canonical form of every URL, the redirects, pagination, and what pages
+  publish for search engines (sitemaps, structured data).
+- [Caching](./CACHING.md): the catalog epoch and the four cache layers from the edge HTML cache
+  inward.
 
 ## Trust direction
 
