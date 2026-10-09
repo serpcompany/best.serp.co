@@ -1,34 +1,12 @@
-import type { ComponentType, ReactNode } from 'react'
-import type {
-  WebsiteBrowseCardMetadata,
-  WebsiteRelatedCardMetadata
-} from '../../lib/directory/content-query'
-
-type SectionProps = {
-  title: string
-  description?: string
-  children: ReactNode
-  viewAllHref?: string
-  viewAllText?: string
-  titleId?: string
-}
-
-type LLMGridProps = {
-  items: WebsiteRelatedCardMetadata[]
-}
+import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
+import { Section } from '../layout/section'
+import { LLMGrid } from '../llm/llm-grid'
 
 interface FeaturedProjectsSectionProps {
   projects: WebsiteBrowseCardMetadata[]
-  slots: {
-    LLMGrid: ComponentType<LLMGridProps>
-    Section: ComponentType<SectionProps>
-  }
 }
 
-export function FeaturedProjectsSection({
-  projects,
-  slots: { LLMGrid, Section }
-}: FeaturedProjectsSectionProps) {
+export function FeaturedProjectsSection({ projects }: FeaturedProjectsSectionProps) {
   return (
     <Section
       title="Featured Listings"

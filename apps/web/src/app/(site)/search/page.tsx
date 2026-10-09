@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { generateSearchPageMetadata, SearchIndexPage } from '@/components/search/index-page'
-import { SearchResultsRoute as SearchResults } from '@/components/search/search-results-route'
 
 /**
  * Generate metadata for the static search shell.
@@ -11,5 +10,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function SearchPage() {
-  return <SearchIndexPage slots={{ SearchResults }} />
+  return <SearchIndexPage />
 }

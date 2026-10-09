@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import type { ComponentType } from 'react'
 import { Suspense } from 'react'
 import { Spinner } from '@/components/ui/spinner'
 import { generateBaseMetadata } from '../../lib/seo/seo-config'
@@ -8,14 +7,7 @@ import { siteCopy } from '../../lib/site/site-copy'
 import { PageHero } from '../layout/page-hero'
 import { PageContainer, PageSection } from '../layout/page-shell'
 import { SearchPageForm } from './search-page-form'
-
-type SearchResultsSlot = ComponentType
-
-type SearchIndexPageProps = {
-  slots: {
-    SearchResults: SearchResultsSlot
-  }
-}
+import { SearchResults } from './search-results'
 
 export function generateSearchPageMetadata(): Metadata {
   return generateBaseMetadata({
@@ -30,9 +22,7 @@ export function generateSearchPageMetadata(): Metadata {
  * The search page (#268): a `PageHero` holding the page's own search field, then the results in
  * the shared card grid.
  */
-export function SearchIndexPage({ slots }: SearchIndexPageProps) {
-  const { SearchResults } = slots
-
+export function SearchIndexPage() {
   return (
     <>
       <PageSection spacing="hero" className="border-b">

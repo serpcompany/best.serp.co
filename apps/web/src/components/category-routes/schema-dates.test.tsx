@@ -3,6 +3,7 @@ import React, { isValidElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Category } from '../../lib/directory/categories'
 import type { WebsiteMetadata } from '../../lib/directory/content-query'
+import { JsonLd } from '../seo/json-ld'
 import { CategoryRoutePage } from './category-page'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
 
@@ -45,14 +46,6 @@ const websites: WebsiteMetadata[] = [
     publishedAt: '2026-01-02'
   }
 ]
-
-function JsonLd(_props: { data: Record<string, unknown> }) {
-  return null
-}
-
-function NullComponent() {
-  return null
-}
 
 function collectJsonLdData(node: ReactNode): Record<string, unknown>[] {
   if (Array.isArray(node)) {
@@ -107,12 +100,7 @@ describe('collection page schema dates', () => {
         lastPublishedAt: '2026-01-03',
         leadingProjects: alphaListings
       },
-      pageProjects: alphaListings,
-      slots: {
-        CategoryWebsitesList: NullComponent,
-        JsonLd,
-        breadcrumb: null
-      }
+      pageProjects: alphaListings
     })
     const data = getCollectionPageData(element)
 
@@ -146,12 +134,7 @@ describe('collection page schema dates', () => {
         lastPublishedAt: '2026-01-03',
         leadingProjects: alphaListings
       },
-      pageProjects: alphaListings,
-      slots: {
-        CategoryWebsitesList: NullComponent,
-        JsonLd,
-        breadcrumb: null
-      }
+      pageProjects: alphaListings
     })
     const data = getCollectionPageData(element)
     expect(data.datePublished).toBe('2026-01-01')

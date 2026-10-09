@@ -1,40 +1,14 @@
-import type { ComponentType, ReactNode } from 'react'
-import type {
-  WebsiteBrowseCardMetadata,
-  WebsiteRelatedCardMetadata
-} from '../../lib/directory/content-query'
+import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { siteConfig } from '../../lib/site/site-config'
-
-type SectionProps = {
-  title: string
-  description?: string
-  children: ReactNode
-  viewAllHref?: string
-  viewAllText?: string
-  titleId?: string
-}
-
-type LLMGridProps = {
-  items: WebsiteRelatedCardMetadata[]
-  className?: string
-  maxItems?: number
-  analyticsSource?: string
-}
+import { Section } from '../layout/section'
+import { LLMGrid } from '../llm/llm-grid'
 
 interface RecentlyAddedSectionProps {
   websites: WebsiteBrowseCardMetadata[]
   maxItems?: number
-  slots: {
-    LLMGrid: ComponentType<LLMGridProps>
-    Section: ComponentType<SectionProps>
-  }
 }
 
-export function RecentlyAddedSection({
-  websites,
-  maxItems = 8,
-  slots: { LLMGrid, Section }
-}: RecentlyAddedSectionProps) {
+export function RecentlyAddedSection({ websites, maxItems = 8 }: RecentlyAddedSectionProps) {
   if (!websites || websites.length === 0) {
     return null
   }
