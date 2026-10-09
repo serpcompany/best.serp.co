@@ -43,8 +43,8 @@ Each holds two environment secrets:
   environment therefore reaches staging and production alike
   ([Security boundary](./RELEASE_GUARDS.md#security-boundary)).
 
-The planned fix, an owner decision (decision b in #42) scheduled right after the cutover, gives
-each environment its own token, scoped to its Worker, D1 database, and R2 bucket (production's
+The planned fix, an owner decision (decision b in #42) due now that the cutover is complete
+(#310), gives each environment its own token, scoped to its Worker, D1 database, and R2 bucket (production's
 also reads `cdn-staging`, the upload's copy source), each proven in its workflow before the
 account-wide token goes. Until then, a leak reaches both.
 

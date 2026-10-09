@@ -40,4 +40,5 @@ Production gated the Worker there while best.serp.co still answered with `server
 6. Submission review moves in-app ([Admin panel](./ADMIN_PANEL.md));
    `submit-gsc-sitemaps.yml` stays manual-only.
 7. Disable GitHub Pages and delete the `legacy-static` branch (done 2026-10-05).
-8. Remove only serp.co pieces from `json-directory-template`; it still serves other sites.
+8. Remove only serp.co pieces from `json-directory-template`, which still serves other sites
+   (done 2026-10-06, json-directory-template#160).
