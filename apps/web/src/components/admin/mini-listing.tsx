@@ -5,6 +5,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { VerifiedOwnerBadge } from '@/components/website/verified-owner-badge'
 import { WebsiteContentSection } from '@/components/website/website-content-section'
+import { faqsToShow, WebsiteFaqsSection } from '@/components/website/website-faqs-section'
 import { WebsiteResourcesSection } from '@/components/website/website-resources-section'
 import type { ListingDetail } from '@/db/contracts'
 
@@ -13,7 +14,8 @@ import type { ListingDetail } from '@/db/contracts'
  * `DetailPageLayout`, #273) and content in small, built from the staged content by
  * `buildSubmissionReviewPreview` (`lib/submissions/review-preview.ts`). It is a picture of the
  * page: Visit Site and the category are inert, and the category is the staged one's name. A
- * revision's preview shows the Verified owner badge while the listing has a current owner.
+ * preview shows the Verified owner badge when the live page will: a revision's while its listing
+ * has a current owner, a submission's when approval makes its signed-in submitter the owner.
  */
 export function MiniListing({
   categoryName,
@@ -54,8 +56,9 @@ export function MiniListing({
       {/* The content section draws the featured image approval would publish (#96 round 2 B1). */}
       <div className="flex max-w-3xl min-w-0 flex-col gap-12">
         <WebsiteContentSection website={listing} />
-        {/* The staged links, drawn as the product page draws them. */}
+        {/* The staged links and FAQs, drawn as the product page draws them. */}
         <WebsiteResourcesSection website={{ resourceLinks: listing.resourceLinks }} />
+        <WebsiteFaqsSection website={{ faqs: faqsToShow(listing.faqs, listing.content) }} />
       </div>
     </div>
   )

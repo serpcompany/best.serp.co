@@ -11,7 +11,7 @@ export function PreviewCardBody({
 }: {
   categoryName: string | null
   preview: { error: string } | { listing: ListingDetail }
-  /** The listing has a current owner, so its live page shows Verified owner (a revision's). */
+  /** The live page shows Verified owner: the listing has, or approval gives it, an owner. */
   verifiedOwner?: boolean
 }) {
   if ('error' in preview) {

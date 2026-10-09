@@ -19,6 +19,7 @@ const listing: ListingDetail = {
   previousWebsite: null,
   publishedAt: '2026-10-09',
   relatedWebsites: [],
+  faqs: [{ answer: 'Yes, every plan includes it.', question: 'Is there a free plan?' }],
   resourceLinks: [{ label: 'Docs', url: 'https://docs.staged.example/' }],
   slug: 'staged.example',
   website: 'https://staged.example/'
@@ -43,7 +44,7 @@ describe('admin review preview (#292)', () => {
   it("draws the product page's header: the name, description, staged category and Visit Site", () => {
     const html = markup()
     // The review page's `h1` is the record; the preview's name is the next level (#296).
-    expect(html).toContain('<h2')
+    expect(header(html)).toMatch(/<h2[^>]*>Staged Tool<\/h2>/)
     expect(html).toContain('Staged Tool')
     expect(html).toContain('A staged listing.')
     expect(html).toContain('E2E Tools')
@@ -65,7 +66,13 @@ describe('admin review preview (#292)', () => {
     expect(html).toContain('docs.staged.example')
   })
 
-  it("shows Verified owner on a revision's preview only (#296)", () => {
+  it('draws the staged FAQs, as the product page does (#296 review)', () => {
+    const html = markup()
+    expect(header(html)).not.toContain('Is there a free plan?')
+    expect(html).toContain('Is there a free plan?')
+  })
+
+  it('shows Verified owner only when asked to (#296)', () => {
     expect(header(markup(true))).toContain('Verified owner')
     expect(markup()).not.toContain('Verified owner')
   })

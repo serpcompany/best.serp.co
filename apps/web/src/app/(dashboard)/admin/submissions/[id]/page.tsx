@@ -44,6 +44,8 @@ export default async function SubmissionReviewPage({ params }: Props) {
           <PreviewCardBody
             categoryName={review.categoryName}
             preview={stagedPreview(review, media)}
+            // Approval makes a signed-in submitter the listing's owner.
+            verifiedOwner={review.submitter !== null}
           />
         }
         view={submissionView(review, media)}

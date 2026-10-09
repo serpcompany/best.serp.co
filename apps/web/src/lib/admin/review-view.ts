@@ -133,6 +133,8 @@ export function stagedPreview(
     content: string
     createdAt: string | null
     description: string
+    /** The staged FAQs, which approval publishes with the listing. */
+    faqs?: Array<{ answer: string; question: string }>
     id: string
     /** The hosted featured image a submission's approval would publish (none for a revision). */
     imageKey?: string | null
@@ -164,7 +166,8 @@ export function stagedPreview(
       },
       staged.resourceLinks.map((link, index) => ({ ...link, sort_order: index }))
     )
-    return { listing: resolveListingDetailMedia(listing, mediaBaseUrl) }
+    const withFaqs = staged.faqs?.length ? { ...listing, faqs: staged.faqs } : listing
+    return { listing: resolveListingDetailMedia(withFaqs, mediaBaseUrl) }
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) }
   }
