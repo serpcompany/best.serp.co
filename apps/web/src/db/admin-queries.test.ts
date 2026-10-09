@@ -177,7 +177,7 @@ describe('admin review queue reads', () => {
         reason: 'Unauthorized license keys',
         urlKey: 'keybazaar.shop'
       },
-      listing: { id: 'lst_keyb', live: false, slug: 'keybazaar.shop' },
+      listing: { id: 'lst_keyb', live: false, slug: 'keybazaar.shop', verifiedOwner: false },
       rejectionCategory: 'prohibited'
     })
     expect(await reads.getSubmissionReview('missing')).toBeNull()

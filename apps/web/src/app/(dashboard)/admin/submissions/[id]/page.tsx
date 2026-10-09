@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { PreviewCardBody } from '@/components/admin/preview-card-body'
 import { ReviewDetail } from '@/components/admin/review-detail'
-import { stagedPreview, submissionView } from '@/lib/admin/review-view'
+import { previewVerifiedOwner, stagedPreview, submissionView } from '@/lib/admin/review-view'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { decisionIdSchema } from '@/lib/admin/schemas'
 import { requireAdmin } from '@/lib/auth/server'
@@ -44,8 +44,7 @@ export default async function SubmissionReviewPage({ params }: Props) {
           <PreviewCardBody
             categoryName={review.categoryName}
             preview={stagedPreview(review, media)}
-            // Approval makes a signed-in submitter the listing's owner.
-            verifiedOwner={review.submitter !== null}
+            verifiedOwner={previewVerifiedOwner(review)}
           />
         }
         view={submissionView(review, media)}
