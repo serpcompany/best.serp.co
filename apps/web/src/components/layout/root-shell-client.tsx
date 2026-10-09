@@ -70,7 +70,6 @@ export function useAnalyticsEvents() {
     trackProfileUpdateSuccess: noop,
     trackProfileVisibilityToggle: noop,
     trackSearch: noop,
-    trackSearchAutocomplete: noop,
     trackShowAll: noop,
     trackShowLess: noop,
     trackSortChange: noop,

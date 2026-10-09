@@ -14,13 +14,13 @@ import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
 import { headerItems, type SiteLink } from './site-links'
-import { isPathWithin } from './site-navigation-menu'
+import { isCurrentPage } from './site-navigation-menu'
 import { ThemeToggle } from './theme-toggle'
 
 type MenuLinkProps = { link: SiteLink; onNavigate: () => void; pathname: string }
 
 function MobileMenuLink({ link, onNavigate, pathname }: MenuLinkProps) {
-  const active = isPathWithin(pathname, link.href)
+  const active = isCurrentPage(pathname, link.href)
   return (
     <Link
       href={link.href}

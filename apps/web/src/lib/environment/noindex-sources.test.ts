@@ -28,8 +28,7 @@ vi.mock('@next/mdx', () => ({ default: () => (config: unknown) => config }))
 vi.mock('@/lib/fonts', () => ({ fonts: '' }))
 vi.mock('@/lib/auth/header-state', () => ({ getHeaderAuthState: async () => null }))
 vi.mock('@/components/auth/sign-out-button', () => ({
-  DrawerSignOutButton: () => null,
-  HeaderSignOutButton: () => null
+  useSignOut: () => [false, async () => {}]
 }))
 vi.mock('@/lib/catalog/repository', () => ({
   getActiveCategories: async () => [],

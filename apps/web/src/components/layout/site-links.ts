@@ -37,8 +37,9 @@ export type FooterGroup = { title: string; links: readonly SiteLink[] }
 
 export type SocialLink = SiteLink & { icon: ComponentType<{ className?: string }> }
 
+// "All products" is the homepage, the canonical URL of `/products/`'s first page (#167).
 const productLinks: SiteLink[] = [
-  { href: getRoute('listing.list'), label: `All ${siteCopy.listingName.plural}` },
+  { href: getRoute('home'), label: `All ${siteCopy.listingName.plural}` },
   { href: getRoute('category.index'), label: 'Categories' },
   ...(siteConfig.features.showBrands
     ? [{ href: getRoute('brands'), label: siteCopy.brandsLabel }]
@@ -61,7 +62,8 @@ function directoryLinks(): SiteLink[] {
   return [
     { href: getRoute('submit'), label: siteCopy.submitLabel },
     ...(hasStaticPagePath('/pricing') ? [{ href: getRoute('pricing'), label: 'Pricing' }] : []),
-    ...(hasStaticPagePath('/contact') ? [{ href: getRoute('contact'), label: 'Contact' }] : [])
+    ...(hasStaticPagePath('/contact') ? [{ href: getRoute('contact'), label: 'Contact' }] : []),
+    { href: getRoute('about'), label: 'About' }
   ]
 }
 
@@ -78,10 +80,10 @@ function resourceLinks(): SiteLink[] {
   ]
 }
 
-function legalLinks(): SiteLink[] {
+/** The footer's bottom row, after serp.co's: the legal pages. */
+export function legalLinks(): SiteLink[] {
   return [
     ...(hasStaticPagePath('/legal') ? [{ href: '/legal/', label: 'Legal' }] : []),
-    { href: getRoute('about'), label: 'About' },
     { href: getRoute('privacy'), label: 'Privacy Policy' },
     { href: getRoute('terms'), label: 'Terms of Service' },
     { href: getRoute('affiliateDisclosure'), label: 'Affiliate Disclosure' },
@@ -93,8 +95,7 @@ function legalLinks(): SiteLink[] {
 export function footerGroups(): FooterGroup[] {
   return [
     { title: 'Directory', links: directoryLinks() },
-    { title: 'Resources', links: resourceLinks() },
-    { title: 'Legal', links: legalLinks() }
+    { title: 'Resources', links: resourceLinks() }
   ].filter(group => group.links.length > 0)
 }
 

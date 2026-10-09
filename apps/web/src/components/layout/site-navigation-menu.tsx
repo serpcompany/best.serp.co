@@ -15,8 +15,13 @@ import { type HeaderItem, headerItems } from './site-links'
 
 const withoutTrailingSlash = (path: string) => path.replace(/\/+$/u, '') || '/'
 
-/** Whether `pathname` is `href` or a page under it, with or without trailing slashes. */
-export function isPathWithin(pathname: string, href: string): boolean {
+/** Whether `pathname` is the page `href` names, with or without a trailing slash. */
+export function isCurrentPage(pathname: string, href: string): boolean {
+  return withoutTrailingSlash(pathname) === withoutTrailingSlash(href)
+}
+
+/** Whether `pathname` is `href` or a page under it: a menu's section, never `aria-current`. */
+function isPathWithin(pathname: string, href: string): boolean {
   const path = withoutTrailingSlash(pathname)
   const base = withoutTrailingSlash(href)
   return base === '/' ? path === '/' : path === base || path.startsWith(`${base}/`)
@@ -41,7 +46,7 @@ export function SiteNavigationMenu({ className }: { className?: string }) {
           item.kind === 'link' ? (
             <NavigationMenuItem key={item.link.href}>
               <NavigationMenuLink
-                active={isItemActive(pathname, item)}
+                active={isCurrentPage(pathname, item.link.href)}
                 className={navigationMenuTriggerStyle()}
                 render={<Link href={item.link.href} />}
               >
@@ -58,7 +63,7 @@ export function SiteNavigationMenu({ className }: { className?: string }) {
                   {item.links.map(link => (
                     <li key={link.href}>
                       <NavigationMenuLink
-                        active={isPathWithin(pathname, link.href)}
+                        active={isCurrentPage(pathname, link.href)}
                         closeOnClick
                         render={<Link href={link.href} />}
                       >

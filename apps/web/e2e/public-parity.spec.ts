@@ -59,13 +59,16 @@ test.describe('public parity interactions', () => {
     await expect(page).toHaveURL(/\/products\/categories\/$/u)
   })
 
-  test('the header menu opens on click and its links stay in the HTML while closed', async ({
-    page
+  test('the header menu is in the server HTML, opens on click, and navigates', async ({
+    page,
+    request
   }) => {
+    // keepMounted: the closed menu's links are in the HTML crawlers read, before any script runs.
+    const html = await (await request.get('/about/')).text()
+    expect(html).toMatch(/<nav[^>]*aria-label="Site"[\s\S]*?href="\/products\/categories\/"/u)
+
     await gotoPublicPage(page, '/')
     const nav = page.getByRole('navigation', { name: 'Site' })
-    // keepMounted: closed-menu links are in the page for crawlers.
-    await expect(nav.locator('a[href="/products/categories/"]')).toHaveCount(1)
     await nav.getByRole('button', { name: 'Products' }).click()
     // An open menu's content moves into Base UI's popup, a portal outside the <nav>.
     await page
@@ -73,6 +76,10 @@ test.describe('public parity interactions', () => {
       .getByRole('link', { name: 'Categories', exact: true })
       .click()
     await expect(page).toHaveURL(/\/products\/categories\/$/u)
+    // Only the page itself is current, never "All products" as well (#259 review).
+    const current = page.locator('header a[aria-current="page"]')
+    await expect(current).toHaveCount(1)
+    await expect(current).toHaveAttribute('href', '/products/categories/')
   })
 
   test('favorite toggle and favorites-only filter preserve local state behavior', async ({

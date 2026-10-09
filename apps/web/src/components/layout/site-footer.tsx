@@ -5,13 +5,14 @@ import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { resolveFooterBadgeConfigs } from './footer-badges'
 import { PageContainer } from './page-shell'
-import { footerGroups, socialLinks } from './site-links'
+import { footerGroups, legalLinks, socialLinks } from './site-links'
 
 const footerLinkClassName = 'text-sm text-muted-foreground transition-colors hover:text-foreground'
 
 /**
  * The public site's footer (serplists' `SiteFooter`, #256): the site name, tagline and social
- * links, then the link columns, then the DR and featured-on badges.
+ * links, then the link columns, the DR and featured-on badges, and serp.co's bottom row of the
+ * copyright and the legal pages.
  */
 export function SiteFooter() {
   const badges = resolveFooterBadgeConfigs(siteConfig.domain)
@@ -92,6 +93,23 @@ export function SiteFooter() {
             ))}
           </ul>
         ) : null}
+
+        <div className="flex flex-col gap-4 border-t pt-8 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
+          <p>
+            © {new Date().getFullYear()} {siteConfig.name}
+          </p>
+          <nav aria-label="Legal">
+            <ul className="flex flex-wrap gap-x-5 gap-y-2">
+              {legalLinks().map(link => (
+                <li key={link.href}>
+                  <Link href={link.href} className="hover:text-foreground hover:underline">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
       </PageContainer>
     </footer>
   )
