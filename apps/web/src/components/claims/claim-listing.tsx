@@ -48,7 +48,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
  * listing" link in the product page's header panel (#273) opens a dialog (a drawer on mobile)
  * that walks through the method, the work email, its code, then the badge (or the payment, #68,
  * offered only while orders are on).
- * Every string is the approved #70 copy (`docs/mockups/submissions/COPY.md`). The API decides
+ * Every string is the approved #70 copy (`.archive/mockups/submissions/COPY.md`). The API decides
  * everything (`/api/claims`); this component only shows its answers.
  */
 

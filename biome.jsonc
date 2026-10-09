@@ -14,7 +14,8 @@
       "!**/.open-next",
       "!**/.wrangler",
       "!apps/web/cloudflare-env.d.ts",
-      "!apps/web/drizzle"
+      "!apps/web/drizzle",
+      "!.archive"
     ]
   },
   "vcs": {
@@ -57,18 +58,6 @@
     }
   },
   "overrides": [
-    {
-      "includes": ["docs/mockups/**"],
-      "assist": {
-        "enabled": false
-      },
-      "formatter": {
-        "enabled": false
-      },
-      "linter": {
-        "enabled": false
-      }
-    },
     {
       "includes": ["**/*.svg"],
       "linter": {

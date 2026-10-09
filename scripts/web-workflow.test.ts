@@ -182,7 +182,8 @@ describe('web workflow', () => {
     }
     expect(classify(['docs/HARNESS.md'])).toBe('false')
     expect(classify(['docs/HARNESS.md', 'AGENTS.md', 'apps/web/e2e/README.md'])).toBe('false')
-    expect(classify(['docs/mockups/submissions/index.html'])).toBe('false')
+    expect(classify(['docs/diagram.svg'])).toBe('false')
+    expect(classify(['.archive/mockups/submissions/index.html'])).toBe('false')
     expect(classify(['docs/HARNESS.md', 'scripts/harness/runner.ts'])).toBe('true')
     // MDX is site content.
     expect(classify(['apps/web/content/legal/terms-conditions.mdx'])).toBe('true')
