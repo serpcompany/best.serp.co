@@ -1,4 +1,4 @@
-import { Globe, LayoutGrid, Link2 } from 'lucide-react'
+import { Layers3, LayoutGrid, Link2 } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
@@ -17,9 +17,10 @@ export const notFoundMetadata: Metadata = generateBaseMetadata({
   noindex: true
 })
 
-const linkIcons: Record<string, typeof Globe> = {
+// serp.co's page icons (`components/icons.ts`): Layers3 is its brands icon.
+const linkIcons: Record<string, typeof Layers3> = {
   [getRoute('category.index')]: LayoutGrid,
-  [getRoute('brands')]: Globe
+  [getRoute('brands')]: Layers3
 }
 
 /** The header's Products menu, less its first link: the homepage the button already offers. */
@@ -63,7 +64,14 @@ export function NotFoundContent() {
             const Icon = linkIcons[link.href] ?? Link2
             return (
               <li key={link.href} className="min-w-0">
-                <ListCard href={link.href} icon={<Icon />} title={link.label} titleAs="h2" />
+                <ListCard
+                  className="h-full"
+                  href={link.href}
+                  icon={<Icon />}
+                  orientation="vertical"
+                  title={link.label}
+                  titleAs="h2"
+                />
               </li>
             )
           })}

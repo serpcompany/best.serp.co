@@ -18,7 +18,7 @@ test.use({
 /**
  * The claim dialog (serpcompany/best.serp.co#67, #70 screens 8 and 9) in the browser, on the
  * claims suite's Worker with the site's flags (claims, the badge program, and orders on; #130,
- * #133): the sidebar's claim link, sign-in first for visitors, the method step's badge and
+ * #133): the product page's claim link, sign-in first for visitors, the method step's badge and
  * payment options, the four steps with their approved errors (webmail, another domain, a wrong,
  * expired, or over-attempt code), the badge check and the badge program's weekly-check copy,
  * success, the "Verified owner" badge, the already-owned dialog, and the contact path for a held
