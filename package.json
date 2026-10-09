@@ -15,6 +15,7 @@
     "catalog:claim-holds": "pnpm tsx scripts/claim-holds-manifest.ts",
     "catalog:domains": "pnpm tsx scripts/listing-domain-check.ts",
     "catalog:faqs": "pnpm tsx scripts/listing-faq-move.ts",
+    "cf-typegen": "pnpm --filter web cf-typegen",
     "check": "pnpm tsx scripts/harness/runner.ts full",
     "check:links": "lychee --config ./lychee.toml --verbose .",
     "clean": "git clean -xdf node_modules dist .next",

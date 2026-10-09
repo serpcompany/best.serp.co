@@ -55,15 +55,18 @@ function runStep(
   const directory = mkdtempSync(join(tmpdir(), 'web-workflow-'))
   try {
     const output = join(directory, 'output')
+    // The generated `NodeJS.ProcessEnv` (apps/web/cloudflare-env.d.ts) lists the Worker's vars,
+    // which this bash child never has, so the bare environment is typed as Node's own.
+    const childEnv: NodeJS.Dict<string> = {
+      GITHUB_OUTPUT: output,
+      GITHUB_STEP_SUMMARY: join(directory, 'summary'),
+      NODE_ENV: 'test',
+      PATH: process.env.PATH,
+      ...env
+    }
     const result = spawnSync('bash', ['-eo', 'pipefail', '-c', `${stubs}\n${script}`], {
       encoding: 'utf8',
-      env: {
-        GITHUB_OUTPUT: output,
-        GITHUB_STEP_SUMMARY: join(directory, 'summary'),
-        NODE_ENV: 'test',
-        PATH: process.env.PATH,
-        ...env
-      }
+      env: childEnv as NodeJS.ProcessEnv
     })
     let text = ''
     try {

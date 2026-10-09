@@ -11,7 +11,7 @@ test('the public site uses Geist, Geist Mono and the stock radius', async ({ pag
   await page.goto('/about/')
   const theme = await page.evaluate(() => {
     const code = document.createElement('code')
-    document.body.append(code)
+    document.body.appendChild(code)
     return {
       body: getComputedStyle(document.body).fontFamily,
       code: getComputedStyle(code).fontFamily,

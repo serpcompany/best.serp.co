@@ -4,7 +4,9 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 
 | Document | Covers | Read it when |
 |---|---|---|
-| [Architecture](./ARCHITECTURE.md) | Runtime boundaries and responsibilities | You change the Worker entry, a binding, the edge cache, routing, or which layer owns what |
+| [Architecture](./ARCHITECTURE.md) | Runtime boundaries and responsibilities | You change the Worker entry, a binding, an environment or host rule, or which layer owns what |
+| [URLs](./URLS.md) | Canonical URLs, redirects, pagination, sitemaps and structured data | You add a route, a redirect, a sitemap, or structured data |
+| [Caching](./CACHING.md) | The catalog epoch and the four cache layers | You change what a page caches, or a change isn't showing |
 | [Data model](./DATA_MODEL.md) | D1 schema, eligibility, caching, the initial import | You touch a table, a query, what a page may show, or the catalog caches |
 | [Development](./DEVELOPMENT.md) | Local catalog, Worker preview, schema changes | You set up a checkout, run the Worker locally, or change the schema |
 | [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review | You change `/submit` or how a submission reaches review |
