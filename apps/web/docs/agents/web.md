@@ -16,7 +16,7 @@ the sites belongs in the theme's token values, not in a component.
 | Local Worker, local D1, accounts and email locally | [Development](../../../../docs/DEVELOPMENT.md) |
 | Environments, workflows, releases and caching after a deploy | [Deploy runbook](../../../../docs/DEPLOY_RUNBOOK.md) |
 | `wrangler.jsonc`, bindings, the Worker entry and the edge cache | [Architecture](../../../../docs/ARCHITECTURE.md) |
-| Worker vars and secrets | `cloudflare-env.d.ts` (`pnpm --filter web cf-typegen`), and the doc each var's feature names |
+| Worker vars and secrets | Vars are set in `wrangler.jsonc` and typed in the generated `cloudflare-env.d.ts` (`pnpm cf-typegen`); secrets and local-only vars are declared by hand in `cloudflare-env-secrets.d.ts`. Each is described in its feature's doc |
 | Checks, runtime evidence and worktrees | [Harness](../../../../docs/HARNESS.md) |
 | Sign-in, the dashboard shell and the admin gate | [Accounts](../../../../docs/ACCOUNTS.md) |
 | `/account` screens | [Submitter dashboard](../../../../docs/ACCOUNT_DASHBOARD.md) |
@@ -53,7 +53,7 @@ Every color and the radius are CSS variables in `globals.css`: light values in `
 | `secondary`, `accent` (each with `-foreground`) | Quieter buttons, hover and selected rows |
 | `muted`, `muted-foreground` | Panels and tiles behind content, and secondary text |
 | `destructive` | Deleting, refusing and errors (`buttonVariants({ variant: 'destructive' })`) |
-| `success`, `warning`, `info` (each with `-foreground`) | Status (#184): live or verified, needs attention or unofficial, in review or informational. `components/status/status-chip.tsx` is the one status chip |
+| `success`, `warning`, `info` (each with `-foreground`) | Status (#184): live or verified, needs attention or unofficial, in review or informational. The dashboards show a record's status with `StatusChip` (`components/status/status-chip.tsx`) |
 | `border`, `input`, `ring` | Borders, form-control borders, focus rings |
 | `chart-1` to `chart-5` | Charts (none yet) |
 | `sidebar-*` | The dashboards' sidebar |
@@ -70,12 +70,16 @@ These are the rules the other SERP sites follow (zenbujapanese.com's UI componen
 
 - **Use the stock component.** A table is `Table`, a set of views is `Tabs` or `ToggleGroup`, a
   question list is `Accordion`, an empty list is `Empty`, an action is `Button`. Add a missing one
-  with `pnpm dlx shadcn@latest add <name>` from `apps/web` and keep the file as the CLI wrote it,
-  apart from what Biome requires. Never hand-roll a pill, chip, segmented control, table or check
-  box that a stock component covers.
+  with `pnpm shadcn <name>` from the repository root, keep the file as the CLI wrote it apart from
+  what Biome requires, and add its name to `STOCK_UI` in `scripts/theme-color-guard.test.ts`,
+  which otherwise fails. Never hand-roll a pill, chip, segmented control, table or check box that
+  a stock component covers.
 - **Don't restyle it.** A `className` on a stock component may lay it out (width, grid placement,
   margin), but not change its size, padding, radius, border, color, type size or density. Use its
-  variants and sizes. A link that looks like a button takes `buttonVariants()`.
+  variants and sizes. A link that looks like a button takes `buttonVariants()`. Status tones are
+  the one exception: shadcn ships no success, warning or info variants, so they go on `Badge` and
+  `Alert` as token classes (`text-warning`, `border-warning/40`), as `StatusChip`, the product
+  page's Unofficial badge and the dashboards' notices do.
 - **Colors come only from the tokens.** No hex or rgb values and no Tailwind palette classes
   (`white`, `gray-500`) in components.
 - **Copy the reference blocks.** A new page or section starts from the layout blocks below, or
@@ -89,28 +93,22 @@ down, and both baselines are empty.
 
 ### Layout blocks
 
-The public pages are composed from `src/components/layout/`, each built from stock components and
-named after the serplists or serp.co block it copies.
+The public pages are composed from the blocks in `src/components/layout/`, each built from stock
+components; each file's doc comment says what it draws and which reference block it copies.
 
-| Block | File | What it is |
-|---|---|---|
-| `SiteChrome` | `site-chrome.tsx` | The public header, footer and the page's one `<main>` |
-| `SiteHeader` | `site-header.tsx` | Sticky: the phone menu and site name, `SiteNavigationMenu`, then Submit and `AccountMenu` |
-| `SiteNavigationMenu` | `site-navigation-menu.tsx` | The `NavigationMenu`, from `site-links.ts`; closed menus stay in the HTML (`keepMounted`) |
-| `SiteMobileNav` | `site-mobile-nav.tsx` | The phone menu, a `Sheet` built from the same links |
-| `AccountMenu` | `account-menu.tsx` | zenbujapanese.com's round account button: sign-in or Account and Sign out, and the theme row |
-| `SiteFooter` | `site-footer.tsx` | The name and social links, the link columns, the DR and featured-on badges, the legal row |
-| `PageContainer`, `PageSection` | `page-shell.tsx` | The page width (`max-w-7xl`, `px-4 md:px-6`) and a band of vertical spacing |
-| `PageHero` | `page-hero.tsx` | Eyebrow badge, the page's `h1`, description, then actions, a search field and chips |
-| `SectionHeader`, `Section` | `section-header.tsx`, `section.tsx` | A section's title, description and "View all" link, over its content |
-| `CardGrid` | `card-grid.tsx` | One column on phones, then two, then three (or two then four for tiles) |
-| `ListCard` | `list-card.tsx` | A bordered `Item`: icon tile, title, description, trailing meta; one link with `href` |
-| `IconTile` | `icon-tile.tsx` | The muted icon square, decorative |
-| `DetailPageLayout` | `detail-page-layout.tsx` | One record's page: breadcrumb, a header with a panel beside it, then the content |
-| `PageBreadcrumb` | `page-breadcrumb.tsx` | Home as an icon, then the trail; the page writes its own `BreadcrumbList` |
-| `PageShell`, `Eyebrow` | `docs-page-shell.tsx` | serp.co's docs layout, for the legal pages |
-| `Toolbar`, `SearchField` | `toolbar.tsx`, `search-field.tsx` | The row of controls over a list, and the search input in it |
-| `NotFoundContent`, `ErrorContent` | `not-found-content.tsx`, `error-content.tsx` | The 404 and error pages' content |
+| Use | For |
+|---|---|
+| `SiteChrome` | Nothing to add: the `(site)` layout and the 404 already wrap pages in the header, footer and `<main>` |
+| `PageContainer`, `PageSection` (`page-shell.tsx`) | Every page's width and its bands of vertical spacing |
+| `PageHero` | A page's opening and its `h1` |
+| `Section`, `SectionHeader` | A titled band with an optional "View all" link |
+| `CardGrid` with `ListCard` | Lists of links: categories, contact options, brands |
+| `DetailPageLayout` | One record's page, such as the product page |
+| `PageBreadcrumb` | A detail page's trail, when the page's own JSON-LD carries the `BreadcrumbList` (the product page) |
+| `SiteBreadcrumb` | A trail that writes its own `BreadcrumbList` (the categories pages); `BreadcrumbJsonLd` from the same file writes only the JSON-LD, for pages whose layout draws the trail (legal) |
+| `PageShell` (`docs-page-shell.tsx`) | Long-form text pages, after serp.co's docs layout (legal) |
+| `Toolbar`, `SearchField` | The controls over a list |
+| `IconTile` | An icon on a muted square, as decoration |
 
 Listing cards are `components/llm/listing-card.tsx` in `LLMGrid`, on `CardGrid`. An empty list or
 search is `components/directory/empty-state.tsx`: the stock `Empty`, as serplists' `PageEmptyState`.
@@ -124,16 +122,28 @@ search is `components/directory/empty-state.tsx`: the stock `Empty`, as serplist
 | Category | `/products/categories/<category>/` | `components/category-routes/category-page.tsx`: breadcrumb, `PageHero`, the sortable listings, the page links |
 | Product | `/products/<slug>/` | `components/website-routes/detail-page.tsx` on `DetailPageLayout`: the logo, name, description, badges, Visit Site and favorite in the header, the featured-on badge and claim link in the panel, then the content, links, FAQs, browse-more and related listings |
 | Search | `/search/` | `components/search/index-page.tsx`: `PageHero` with the page's search field, then the results |
-| About, contact, sponsor, brands | `/about/` and the rest | `PageHero` and `SectionHeader` over `ListCard`s in `CardGrid` (`components/static-pages/`) |
+| About | `/about/` | `components/static-pages/about-page.tsx`: `PageHero`, then `SectionHeader`s over `ListCard`s in `CardGrid` |
+| Brands | `/brands/` | `components/static-pages/brands-page.tsx`: `PageHero` over `ListCard`s in `CardGrid` |
+| Contact, sponsor | `/contact/`, `/sponsor/` | Their route files: `PageHero` over a `ListCard` in a one-column `CardGrid` |
 | Pricing | `/pricing/` | `PageHero`, then serplists' `PlanCard` (a stock `Card`) per plan in `CardGrid` |
 | Legal | `/legal/`, `/legal/<policy>/` | `PageShell`'s docs layout with `LegalNav`; the index is a `ListCard` per policy |
 | Sign in | `/login/` | `components/auth/login-card.tsx` in serplists' `AuthCard` |
 | 404 | any unknown path | serp.co's not-found page (`NotFoundContent`) |
 
-The submit flow (`/submit/…`), `/account` and `/admin` keep their own flows: the dashboards share
-the shadcn sidebar shell in `components/dashboard/` (see [Accounts](../../../../docs/ACCOUNTS.md)).
-The admin review page previews a listing in the product page's header (`components/admin/
-mini-listing.tsx`).
+The submit flow (`/submit/…`) keeps its own screens. The admin review page previews a listing in
+the product page's header (`components/admin/mini-listing.tsx`).
+
+## Dashboards
+
+`/account` and `/admin` share the shadcn sidebar shell in `components/dashboard/` (its parts are
+in [Accounts](../../../../docs/ACCOUNTS.md)). Their UI rules are serp's
+[dashboard UI rules](https://github.com/serpcompany/serp/blob/main/docs/engineering/websites/features/submissions/account-dashboard.md#ui-rules),
+from best.serp.co's own review: start from the stock blocks (dashboard-01, sidebar-07) and keep
+their structure; show unbuilt items with a "Soon" badge, never greyed out; put `Empty` inside a
+`Card` under a visible heading; give every page a heading and a description; and status tones are
+classes on `Alert` and `Badge`. The owner-approved #70 mockups and their copy
+(`docs/mockups/submissions/`) are the contract for those screens: a visible change needs the
+owner's re-approval.
 
 Public URLs are part of the SEO contract: changing one needs a permanent redirect
 (`src/lib/routing/redirects.ts`).
@@ -143,5 +153,6 @@ Public URLs are part of the SEO contract: changing one needs a permanent redirec
 - Look at each changed page at 1440 and 390 px wide, in light and dark: no sideways scrolling,
   visible focus, AA contrast.
 - Publish the before and after captures as a private review page and link it from the PR.
-- Cover changed behavior with Playwright (`apps/web/e2e/`): the parity, landmark and smoke specs
-  run against the built Worker in CI.
+- Cover changed behavior with Playwright (`apps/web/e2e/`). CI runs every spec there against the
+  built Worker, except the opt-in `visual.spec.ts` and `agent-capture.spec.ts`; a light or dark
+  change most likely touches `theme.spec.ts`.
