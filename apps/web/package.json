@@ -6,6 +6,8 @@
     "analyze": "ANALYZE=true pnpm build",
     "build": "NODE_NO_WARNINGS=1 next build",
     "build:worker": "NODE_NO_WARNINGS=1 opennextjs-cloudflare build",
+    "cf-typegen": "wrangler types ./cloudflare-env.d.ts --env-interface CloudflareEnv --env-file /dev/null --strict-vars=false",
+    "cf-typegen:check": "wrangler types ./cloudflare-env.d.ts --env-interface CloudflareEnv --env-file /dev/null --strict-vars=false --check",
     "clean": "git clean -xdf .cache .turbo .next coverage node_modules",
     "dev": "next dev --webpack --port ${PORT:-3005}",
     "dev:inspect": "NODE_OPTIONS='--inspect' next dev --webpack --port ${PORT:-3005}",
@@ -58,7 +60,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "5.20261001.1",
     "@next/bundle-analyzer": "16.3.8",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4.1.18",

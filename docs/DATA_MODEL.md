@@ -250,7 +250,7 @@ The **catalog epoch** is `publication_state.version` plus the newest public
 listing scheduled for the future becomes due. Shell counts, name order and pages,
 featured and latest heads, details, and the full summary list are cached in the Workers
 Cache API under epoch-scoped keys (24-hour retention, live D1 fallback on cache failure),
-and the edge HTML cache uses the same epoch (see [Architecture](./ARCHITECTURE.md#caching)).
+and the edge HTML cache uses the same epoch (see [Caching](./CACHING.md)).
 
 Shell statistics (category counts, listing and featured totals) come from one `GROUP BY`
 pass over public memberships: ~15k rows read for the imported catalog instead of ~487k
