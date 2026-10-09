@@ -142,7 +142,7 @@ test.describe('visual regression coverage', () => {
     const favoritesOnlyButton = page.getByRole('button', { name: /favorites only/i })
     await expect(favoritesOnlyButton).toBeVisible()
     await favoritesOnlyButton.click()
-    await expect(page.getByRole('button', { name: /show all/i })).toBeVisible()
+    await expect(favoritesOnlyButton).toHaveAttribute('aria-pressed', 'true')
 
     await expect(page).toHaveScreenshot('favorites-only-desktop.png', screenshotOptions)
   })

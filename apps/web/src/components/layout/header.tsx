@@ -131,10 +131,10 @@ export function Header({
               variant="ghost"
               size="icon"
               onClick={() => setShowMobileDrawer(true)}
-              className="block sm:hidden p-2 hover:bg-muted rounded-md transition-colors -ml-2 shadow-none"
+              className="-ml-2 sm:hidden"
               aria-label="Open menu"
             >
-              <Menu className="h-5 w-5" />
+              <Menu />
             </Button>
             <Link
               href={getRoute('home')}
@@ -179,23 +179,20 @@ export function Header({
               type="button"
               variant="ghost"
               size="icon"
-              className="md:hidden text-muted-foreground hover:text-foreground shadow-none"
+              className="md:hidden"
               onClick={() => setShowMobileSearch(!showMobileSearch)}
               aria-label="Toggle search"
             >
-              <Search className="h-5 w-5" />
+              <Search />
             </Button>
 
             <Link
               href={getRoute('submit')}
               aria-label={siteCopy.submitLabel}
               title={siteCopy.submitLabel}
-              className={cn(
-                buttonVariants(),
-                'inline-flex items-center justify-center text-sm font-bold h-9 px-4 bg-foreground text-background hover:bg-foreground/90 transition-all duration-200 press-effect shadow-none'
-              )}
+              className={buttonVariants({ size: 'lg' })}
             >
-              <Plus className="h-4 w-4 sm:hidden" />
+              <Plus className="sm:hidden" />
               <span className="hidden sm:inline">{siteCopy.submitLabel}</span>
             </Link>
 
@@ -204,8 +201,8 @@ export function Header({
                 <Link
                   href={getRoute('account')}
                   className={cn(
-                    buttonVariants({ variant: 'outline' }),
-                    'hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none'
+                    buttonVariants({ variant: 'outline', size: 'lg' }),
+                    'hidden sm:inline-flex'
                   )}
                 >
                   Account
@@ -216,8 +213,8 @@ export function Header({
               <Link
                 href={getRoute('login')}
                 className={cn(
-                  buttonVariants({ variant: 'outline' }),
-                  'hidden sm:inline-flex items-center justify-center text-sm font-bold h-9 px-4 border border-border hover:bg-accent transition-colors shadow-none'
+                  buttonVariants({ variant: 'outline', size: 'lg' }),
+                  'hidden sm:inline-flex'
                 )}
               >
                 Sign up / Sign in
