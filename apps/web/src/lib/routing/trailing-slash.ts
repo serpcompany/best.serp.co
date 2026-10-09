@@ -1,6 +1,6 @@
 /**
  * Trailing-slash redirects, applied by the Worker entry (`apps/web/worker.ts`) to every
- * request before the edge cache and before OpenNext. See docs/ARCHITECTURE.md#url-canonicalization.
+ * request before the edge cache and before OpenNext. See docs/URLS.md.
  *
  * A page URL without its slash, or a file URL with one, gets one 308 to the canonical form
  * (`@/lib/seo/canonical-url`); `/api`, `/.well-known`, and `/_next` paths are

@@ -48,6 +48,7 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
   and production only after Deploy Staging verified the same source tree
   (see [Release guards](./docs/RELEASE_GUARDS.md)).
 - `pnpm check`: the read-only finish gate CI runs; `pnpm harness:fast` is the quicker loop.
+- `pnpm cf-typegen`: regenerate `apps/web/cloudflare-env.d.ts` after a Wrangler change.
 - `pnpm test` (all Vitest projects), `pnpm test:e2e` (Playwright on a local Worker); while
   editing, `pnpm exec vitest related --run <files>`.
 - `pnpm migration:compare -- <origin>`: structural page parity against best.serp.co.

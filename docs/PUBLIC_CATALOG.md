@@ -2,7 +2,7 @@
 
 What makes a listing public, the states a listing can be in, and how the public reads are
 shaped. The tables, migrations, and write plans are in [Data model](./DATA_MODEL.md); the cache
-layers are in [Architecture](./ARCHITECTURE.md#caching).
+layers are in [Caching](./CACHING.md).
 
 ## Public eligibility
 
