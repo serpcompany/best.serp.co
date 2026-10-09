@@ -9,8 +9,9 @@
  * it goes to the contact path until the owner clears the hold with `listing-claim-hold-clear`. The
  * manifest is row-level (`concurrency: rows`): each operation checks the listing still has the
  * slug and website the report saw, so it applies on staging and production alike, through the
- * protected Publish D1 Catalog workflow. Re-run `pnpm catalog:domains` periodically and generate
- * a new manifest from the new report: holds already placed are left as they are.
+ * protected Publish D1 Catalog workflow. Re-run `pnpm catalog:domains -- --env production`
+ * periodically and generate a new manifest from the new report: holds already placed are left as
+ * they are.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'

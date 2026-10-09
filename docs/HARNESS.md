@@ -32,8 +32,7 @@ pnpm harness:fast
 
 This runs documentation health, the D1-only architecture guard, shared catalog
 data-operation contracts and scan benchmark, fresh Drizzle migration/idempotency
-tests, deterministic local D1-to-D1 transfer/parity tests, D1 schema/publication
-contract tests,
+tests, the fixture seed's tests, D1 schema/publication contract tests,
 and TypeScript checks. Each step stops on failure and prints the governing document.
 The catalog contract also proves the injected Drizzle client retains per-statement
 D1 telemetry and reviewed query-plan bounds.
@@ -164,21 +163,12 @@ The local D1 guard reads the worktree manifest and passes that instance’s stat
 to Wrangler. No worktree receives preview or production credentials automatically,
 and `.env` files are deliberately not copied.
 
-## Migration harness
+## Migration harness (retired)
 
-The one-time import reads the legacy json-directory-template checkout in place:
-
-```bash
-pnpm migration:preflight -- \
-  --source-root /absolute/path/to/json-directory \
-  --site-id serp.co
-pnpm migration:generate -- --source-root /absolute/path/to/json-directory --site-id serp.co
-```
-
-The preflight reports source hashes, counts, and integrity issues; the generator
-writes the ignored `d1/artifacts/` SQL and must reproduce the committed parity
-report. `pnpm migration:compare -- <origin>` compares sampled pages between
-https://best.serp.co and a candidate origin.
+The one-time json-directory-template import and its harness (`migration:preflight`,
+`migration:generate`, `migration:compare`, `migration:legacy-media`) are archived in
+[`.archive/`](../.archive/README.md) (#315). `.archive/` is history: no check, lint, typecheck,
+test, or workflow reads it.
 
 ## Sibling checkouts
 

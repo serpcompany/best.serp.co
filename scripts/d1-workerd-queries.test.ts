@@ -54,7 +54,6 @@ const NOW = new Date('2026-10-06T12:00:00.000Z')
 const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   'canonical-redirect': 10, // one of 50 redirects: 2
   'legacy-root-target': 10, // worker-entry slug seek; not run by this suite
-  'category-summaries': 2_000,
   'featured-summaries': 2_500, // 100 featured: 1,887 (walks the publication index)
   'latest-summaries': 1_500, // 100 latest: 829
   'listing-detail': 100, // the most FAQs, links and images: 37
@@ -603,10 +602,10 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
     const overBudget = [...worst].filter(([shape, rows]) => rows > ROWS_READ_BUDGET[shape])
     expect(overBudget, JSON.stringify(Object.fromEntries(worst))).toEqual([])
     // Every budget was measured: the generated catalog reaches every shape this suite runs. The
-    // two worker-entry seeks run elsewhere, and no catalog query issues `category-summaries` now.
+    // two worker-entry seeks run elsewhere.
     expect(
       (Object.keys(ROWS_READ_BUDGET) as CatalogQueryShape[]).filter(shape => !worst.has(shape))
-    ).toEqual(['legacy-root-target', 'category-summaries', 'unpublished-listing-status'])
+    ).toEqual(['legacy-root-target', 'unpublished-listing-status'])
     expect(operationNames.filter(name => !called.has(name))).toEqual([])
   })
 })

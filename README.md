@@ -33,7 +33,6 @@ D1 database. It cannot reach staging or production resources. See
 ```bash
 pnpm harness:fast
 pnpm test:e2e
-pnpm migration:compare -- http://localhost:8787
 ```
 
 Pull requests target `staging`, which deploys the staging Worker. `main` is production: the

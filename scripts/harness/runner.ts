@@ -33,8 +33,7 @@ const sharedSteps: HarnessStep[] = [
     name: 'D1 contracts',
     command: 'pnpm',
     args: ['test:d1'],
-    remediation:
-      'Fix the schema, publisher, parity, or environment contract. See docs/DATA_MODEL.md.'
+    remediation: 'Fix the schema, publisher, seed, or environment contract. See docs/DATA_MODEL.md.'
   },
   {
     name: 'TypeScript boundaries',

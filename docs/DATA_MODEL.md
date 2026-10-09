@@ -14,17 +14,16 @@ Deploy Staging, then to production by Deploy Production only after Deploy Stagin
 that commit (see [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
 
 Local data is seeded fake/fixture data, as the standard says: `pnpm db:seed:local` (#312,
-[Development](./DEVELOPMENT.md#local-data)). The committed import of the real public catalog
-(owner decision a, serpcompany/best.serp.co#42) remains a documented exception only for the
-catalog-scale tests, until #314 and #315 retire it; Playwright runs on the seed (#313). User data
-is never copied from staging or production.
+[Development](./DEVELOPMENT.md#local-data)). Playwright runs on the seed (#313), and the
+rows-read budgets on a generated catalog of production's size (#314). No local or CI data comes
+from the real catalog (#311), and user data is never copied from staging or production.
 
 `apps/web/drizzle/0000_baseline.sql` is hand-finished after generation: every table is
 `STRICT`, `PRAGMA foreign_keys = ON` leads the file, and four triggers enforce that a
 published listing always has exactly one primary category. Keep those properties when
 adding migrations (later migrations end each `CREATE TABLE` with `STRICT` by hand too);
 Drizzle cannot express them. `0002_better_auth.sql` also seeds the admin allowlist with a
-fixed `created_at`, so bootstrap parity stays exact.
+fixed `created_at`, so every fresh database, and so the fixture seed, is the same.
 
 `0003_submissions_data_model.sql` (serpcompany/best.serp.co#62) is hand-finished in two more
 ways, because D1 enforces foreign keys and runs a migration in one transaction, where
@@ -80,7 +79,8 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 - `listing_categories` stores ordered category membership with one primary category.
 - `listing_media`, `listing_resource_links`, and `listing_faqs` store detail content.
 - `publication_state` is a single row (`id = 1`) with the current version and checksum.
-- `migration_runs` and `publication_runs` record imports and applied manifests.
+- `migration_runs` records the one-time import (locally, the fixture seed's run), and
+  `publication_runs` the applied manifests.
 - `listing_slug_redirects` maps retired slugs to their listing.
 - `listing_submissions` and its resource, FAQ, event, and rate-limit tables hold private
   intake, owned by the signed-in submitter (#63).
@@ -96,9 +96,7 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   hours ([Accounts](./ACCOUNTS.md)).
 - `users`, `sessions`, `accounts`, and `verification` are Better Auth's tables (epoch
   millisecond timestamps; sign-in codes stored hashed). `users.role` is `user` or `admin`.
-  These, `auth_rate_limit_hits`, and `email_deliveries` hold runtime data, so bootstrap
-  parity (`db:verify:local`, `verify-import`) skips their rows (`runtimeTableNames`), and
-  `verify-import` requires them to be empty.
+  These, `auth_rate_limit_hits`, and `email_deliveries` hold runtime data.
 - `admin_allowlist` lists admin emails (lowercase); `auth_rate_limit_hits` is the sliding
   window behind the sign-in code limits. Its rows are pseudonymous: HMAC-SHA256 digests under
   a key derived from `BETTER_AUTH_SECRET`, never an email or IP address. `sessions` stores
@@ -207,8 +205,8 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
 - `orders` and `billing_events` (`0009_billing_orders`): the billing ledger and the provider's
   webhook events, written only by `apps/web/src/db/billing.ts`.
 
-These tables are empty in the initial import, so bootstrap parity compares them like the
-submission tables (`scripts/d1-table-inventory.ts`).
+`scripts/d1-table-inventory.ts` lists every table and column; the fresh-schema check
+(`scripts/d1-drizzle-local.ts verify`) and its tests hold the migrations to it.
 
 ## Hosted listing media
 
@@ -282,15 +280,12 @@ each after recording a D1 Time Travel bookmark (no export). A row-level manifest
 checks each row it changes, not a base version ([media](./MEDIA.md)). Verification, rejection, and approval
 batches assert `changes() = 1` after every compare-and-swap step, so stale decisions roll back.
 
-## Initial import
+## Where the catalog came from
 
-The catalog was bootstrapped once from `serpcompany/json-directory-template@25e2a8d`
-(`sites/serp.co/products.json`, 3,422 listings, 141 categories) with
-`pnpm migration:generate`. Listing IDs are
-`lst_` + `sha256("legacy-product-map" NUL <slug>)[0:24]`, so re-running the generator
-produces identical rows. `best-serp-co-v1-parity.yaml` records source checksums,
-counts, the SQL checksum, and the target checksum written to `publication_state`;
-`best-serp-co-v1.sql.br` is the committed brotli copy of the SQL that `pnpm db:import:local` and
-the catalog-scale tests load; the raw SQL and batch files are git-ignored. Remote environments are
-bootstrapped from the same checksum-verified SQL by `bootstrap-production-d1.yml`, which
-imports only into an empty database and then verifies exact parity with the report.
+The catalog was bootstrapped once from `serpcompany/json-directory-template@25e2a8d` (3,422
+listings, 141 categories). Imported listing IDs are
+`lst_` + `sha256("legacy-product-map" NUL <slug>)[0:24]`. Staging and production have changed
+since through publications, admin decisions, claims, payments, and hosted media, so neither is
+ever re-imported: recovery is D1 Time Travel ([D1 recovery](./D1_RECOVERY.md)). The import, its
+tooling, and the production bootstrap workflow are history in [`.archive/`](../.archive/README.md)
+(#315).

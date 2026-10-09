@@ -5,7 +5,7 @@ import { seedListingId } from '../apps/web/e2e/fixture-seed'
 import { queuedMediaListing } from '../apps/web/e2e/media-fixture'
 import { createMediaOperations } from '../apps/web/src/db/media-operations'
 import { buildQueueMediaPlans } from '../apps/web/src/db/media-plans'
-import { validateCanonicalLocalConfig } from './d1-local-config'
+import { assertLocalSeedTarget } from './d1-local-seed'
 import { configuredFreshD1StateRoot } from './d1-local-state'
 import { project } from './project'
 
@@ -34,9 +34,13 @@ export function fixtureFetch(fixtures: Readonly<Record<string, Uint8Array>>): ty
   }
 }
 
-/** Runs `use` with the local Worker's D1 and R2 bindings, on the canonical local state. */
+/**
+ * Runs `use` with the local Worker's D1 and R2 bindings, on the canonical local state. Every entry
+ * point checks the target here, the e2e media server's direct run too: the dedicated local
+ * config, no remote binding, and no `CLOUDFLARE_ENV` (#313 review).
+ */
 export async function withLocalPlatform<T>(use: (env: LocalPlatform) => Promise<T>): Promise<T> {
-  validateCanonicalLocalConfig()
+  assertLocalSeedTarget()
   const { dispose, env } = await getPlatformProxy<LocalPlatform>({
     configPath: project.wranglerConfigPath,
     // `--persist-to <root>` stores under <root>/v3, which is what getPlatformProxy takes.

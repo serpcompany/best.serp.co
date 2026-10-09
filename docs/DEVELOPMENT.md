@@ -31,13 +31,9 @@ then `pnpm preview`), and the e2e specs assert its facts
 reads the real one, so a relative time it shows for a seeded row ("expires in 3 days") changes
 from day to day; never assert one.
 
-Until #315 retires it, the committed import of the real public catalog
-(`d1/artifacts/best-serp-co-v1.sql.br`) still loads with `pnpm db:migrate:local &&
-pnpm db:import:local` on an empty state, where `db:verify:local` checks exact parity with the
-report. Nothing local or in CI uses it. The import refuses a seeded D1. To rebuild the artifacts,
-check out `serpcompany/json-directory-template` at `25e2a8d` and run
-`pnpm migration:generate -- --source-root ../json-directory --site-id serp.co`; it must
-reproduce the committed parity report exactly.
+The one-time import of the real catalog and its tooling (`db:import:local`, `migration:*`) are
+retired and archived in [`.archive/`](../.archive/README.md) (#315). A checkout older than that
+may still hold the generated import under the ignored `d1/artifacts/`; delete it freely.
 
 State lives under `.wrangler/drizzle-state/best-serp-co/` (a worktree's under its
 `.runtime/` directory) and uses the synthetic local database in `apps/web/wrangler.jsonc`.
@@ -97,15 +93,6 @@ Locally, email is never sent: each message is written to the Worker output as an
 `email_logged` line (recipient, subject, text body). Apply migrations first so the
 `email_deliveries` ledger exists. Environment behavior, the template contract, and the owner
 prerequisites for staging and production are in [Email](./EMAIL.md).
-
-## Parity against the live site
-
-```bash
-pnpm migration:compare -- http://localhost:8787 --sample 60
-```
-
-This compares status, title, h1, canonical path, meta description, JSON-LD types, and
-FAQ count for sampled pages between https://best.serp.co and the candidate origin.
 
 ## Validation
 

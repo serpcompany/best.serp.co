@@ -1,7 +1,7 @@
 /**
  * Exact application table and column inventory of the D1 schema in
  * `apps/web/src/db/schema.ts` (applied by the `apps/web/drizzle` migrations).
- * Snapshot, parity, and verification tooling reads every column listed here, so
+ * The fresh-schema verification and the seed's tests read every column listed here, so
  * a schema change must update this inventory in the same change.
  */
 export const applicationColumnInventory = {
@@ -325,31 +325,11 @@ export const applicationTableNames = Object.keys(
   applicationColumnInventory
 ) as ApplicationTableName[]
 
-/**
- * Tables written at runtime: Better Auth and its sign-in limits (#60), the transactional email
- * ledger (#71), the media ingestion queue (#95), and claim holds (#67: seeded by migration from
- * the live catalog, then cleared by admins). They belong to the exact schema inventory,
- * but not to bootstrap parity: the import never writes them, and a database that has served a
- * sign-in, sent an email, or ingested an image (local preview, Playwright, a deployed Worker)
- * holds rows.
- */
-export const runtimeTableNames = [
-  'users',
-  'sessions',
-  'accounts',
-  'verification',
-  'auth_rate_limit_hits',
-  'email_deliveries',
-  'media_ingestions',
-  'listing_claim_holds'
-] as const satisfies readonly ApplicationTableName[]
-
-export type ParityTableName = Exclude<ApplicationTableName, (typeof runtimeTableNames)[number]>
-
-/** Tables whose rows bootstrap parity (`db:verify:local`, `verify-import`) compares exactly. */
-export const parityTableNames = applicationTableNames.filter(
-  (table): table is ParityTableName => !(runtimeTableNames as readonly string[]).includes(table)
-)
+/** Every row of `table`, ordered by all its columns, so two databases compare row for row. */
+export function orderedRowsSql(table: ApplicationTableName): string {
+  const columns = applicationColumnInventory[table].map(column => `"${column}"`).join(',')
+  return `SELECT ${columns} FROM "${table}" ORDER BY ${columns}`
+}
 
 /** Foreign-key-safe order for loading or replaying application rows. */
 export const importOrder: ApplicationTableName[] = [

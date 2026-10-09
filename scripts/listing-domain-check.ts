@@ -1,8 +1,10 @@
 /**
  * Listing domain check (serpcompany/best.serp.co#100). Read-only and repeatable.
  *
- *   pnpm catalog:domains                 follow every live listing's website, classify it, and
+ *   pnpm catalog:domains -- --env production
+ *                                        follow every live listing's website, classify it, and
  *                                        write d1/hygiene/<date>-listing-domains.yaml
+ *   (Every command below takes the same --env.)
  *   pnpm catalog:domains -- --reuse      reuse the observations cached in .runtime/listing-domains/
  *                                        and fetch only the listings missing there (resumes an
  *                                        interrupted run; reclassifies without the network)
@@ -20,25 +22,32 @@
  *                                        does not exist in the --since report and in
  *                                        d1/hygiene/<date>-dead-domains.recheck.yaml
  *
- * Listings come from the reviewed import (`d1/artifacts`), the catalog both environments were
- * bootstrapped from. Each manifest operation carries the website it was checked against, so the
+ * Every command reads the live listings of the environment `--env staging|production` names: one
+ * SELECT (`LIVE_LISTINGS_SQL`) through the release tooling's Wrangler D1 target, as
+ * `pnpm media:health` reads it, so it needs the operator's Cloudflare credentials and writes
+ * nothing to D1. (Until #315 they came from the archived v1 import with the committed manifests
+ * replayed on it.) Each manifest operation carries the website it was checked against, so the
  * publisher refuses any listing that changed since (`listing-unpublish` `expected`).
  *
- * Options: --date YYYY-MM-DD, --concurrency N, --only slug[,slug].
+ * Options: --env staging|production (required), --date YYYY-MM-DD, --concurrency N,
+ * --only slug[,slug].
  *
  * The manifest is row-level (`concurrency: rows`): it names no base version, and each operation
  * checks its listing's website, categories, and live state, so one file applies on staging and
  * production in any order, whatever else each environment published.
  */
-import { execFileSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { parse, stringify } from 'yaml'
-import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
-import { readParityReport, readReviewedImportSql } from './d1-import-artifact'
-import { buildPublicationPlan, type PublicationBase, parseManifest } from './d1-publisher'
+import {
+  type D1Row,
+  type ProcessRunner,
+  processRunner,
+  validateRemoteConfig,
+  wranglerD1
+} from './cloudflare-release'
+import { buildPublicationPlan, parseManifest } from './d1-publisher'
 import {
   type CheckedListing,
   type Classification,
@@ -50,131 +59,40 @@ import {
   unpublishClasses
 } from './listing-domain-classifier'
 import { isTransient, type SiteObservation, traceWebsite } from './listing-domain-fetch'
+import type { RemoteEnvironment } from './project'
 
 export interface CatalogListing extends CheckedListing {
   categories: string[]
 }
 
-/** The reviewed import in an in-memory database: the fresh migrations, then the committed SQL. */
-export function reviewedImportDatabase(): DatabaseSync {
-  const database = new DatabaseSync(':memory:')
-  for (const migration of freshMigrationNames()) {
-    database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
-  }
-  database.exec(readReviewedImportSql(readParityReport()))
-  return database
-}
+/** An environment's live listings, each with its active categories in order. */
+export const LIVE_LISTINGS_SQL = `SELECT l.id,l.slug,l.name,l.description,l.website,
+  (SELECT json_group_array(slug) FROM (SELECT c.slug FROM listing_categories lc
+    JOIN categories c ON c.id=lc.category_id
+    WHERE lc.listing_id=l.id AND c.is_active=1 ORDER BY lc.sort_order)) AS categories
+FROM listings l WHERE l.status='approved' AND l.is_active=1 ORDER BY l.slug`
 
-/** A database's live listings, with their active categories in order. */
-export function liveListings(database: DatabaseSync): CatalogListing[] {
-  const rows = database
-    .prepare(
-      `SELECT l.id,l.slug,l.name,l.description,l.website,
-        (SELECT json_group_array(slug) FROM (SELECT c.slug FROM listing_categories lc
-          JOIN categories c ON c.id=lc.category_id
-          WHERE lc.listing_id=l.id AND c.is_active=1 ORDER BY lc.sort_order)) AS categories
-      FROM listings l WHERE l.status='approved' AND l.is_active=1 ORDER BY l.slug`
-    )
-    .all() as Array<Record<string, string>>
+/** The listings `LIVE_LISTINGS_SQL` returns. */
+export function catalogListings(rows: readonly D1Row[]): CatalogListing[] {
+  const text = (value: unknown) => (typeof value === 'string' ? value : '')
   return rows.map(row => ({
-    categories: JSON.parse(row.categories ?? '[]') as string[],
-    description: row.description ?? '',
-    id: row.id ?? '',
-    name: row.name ?? '',
-    slug: row.slug ?? '',
-    website: row.website ?? ''
+    categories: JSON.parse(text(row.categories) || '[]') as string[],
+    description: text(row.description),
+    id: text(row.id),
+    name: text(row.name),
+    slug: text(row.slug),
+    website: text(row.website)
   }))
 }
 
-/** Live listings of the reviewed import, with their active categories in order. */
-export function reviewedImportListings(): CatalogListing[] {
-  const database = reviewedImportDatabase()
-  try {
-    return liveListings(database)
-  } finally {
-    database.close()
-  }
-}
-
-/** Committed publication manifests in file (date) order; other tests write temporary ones there. */
-export function committedPublications(): string[] {
-  return execFileSync('git', ['ls-files', 'd1/publications'], { encoding: 'utf8' })
-    .split('\n')
-    .filter(path => path.endsWith('.yaml'))
-    .sort()
-}
-
-/**
- * Applies a manifest to `database` as the publisher's batch would, at the database's publication
- * state, in one transaction: it applies whole or throws and writes nothing.
- */
-export function applyManifest(database: DatabaseSync, source: string, now: string): void {
-  const live = database
-    .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
-    .get() as unknown as PublicationBase
-  const plan = buildPublicationPlan(parseManifest(source), source, now, live)
-  database.exec('BEGIN')
-  try {
-    for (const item of plan.statements)
-      database
-        .prepare(item.query)
-        .run(
-          ...(item.bindings.map(value =>
-            typeof value === 'boolean' ? Number(value) : value
-          ) as SQLInputValue[])
-        )
-    database.exec('COMMIT')
-  } catch (error) {
-    database.exec('ROLLBACK')
-    throw error
-  }
-}
-
-/** What decides which listings are live and which categories they are filed under. */
-const catalogShapingActions = new Set([
-  'listing-categories-add',
-  'listing-categories-remove',
-  'listing-unpublish',
-  'category-unpublish'
-])
-
-/**
- * The reviewed import with every committed manifest that changes which listings are live or what
- * categories they are filed under applied in file order, as staging and production publish them
- * (#260): #98's manifest gave 14 adult downloaders the Adult category, which their unpublish must
- * expect, and a listing another manifest unpublishes is no longer live. With `before` (a manifest
- * id), only the manifests whose file sorts before it: the catalog a manifest being generated, and
- * every later one, is published on.
- */
-export function reviewedCatalogDatabase(before?: string): DatabaseSync {
-  const database = reviewedImportDatabase()
-  try {
-    for (const path of committedPublications()) {
-      if (before !== undefined && path >= `d1/publications/${before}.yaml`) break
-      const source = readFileSync(resolve(path), 'utf8')
-      const manifest = parseManifest(source)
-      if (!manifest.operations.some(op => catalogShapingActions.has(op.action))) continue
-      try {
-        applyManifest(database, source, '2026-10-09T00:00:00.000Z')
-      } catch (error) {
-        throw new Error(`${path} does not apply after the manifests before it: ${error}`)
-      }
-    }
-    return database
-  } catch (error) {
-    database.close()
-    throw error
-  }
-}
-
-/** Live listings of the reviewed catalog (`reviewedCatalogDatabase`). */
-export function reviewedCatalogListings(before?: string): CatalogListing[] {
-  const database = reviewedCatalogDatabase(before)
-  try {
-    return liveListings(database)
-  } finally {
-    database.close()
-  }
+/** The live listings of an environment's D1, read with one SELECT (`LIVE_LISTINGS_SQL`). */
+export async function environmentListings(
+  environment: RemoteEnvironment,
+  runner: ProcessRunner = processRunner
+): Promise<CatalogListing[]> {
+  return catalogListings(
+    await wranglerD1(environment, { kind: 'remote' }, runner).query(LIVE_LISTINGS_SQL)
+  )
 }
 
 export interface ReportEntry {
@@ -288,7 +206,7 @@ function unpublishOperations<Entry extends Pick<ReportEntry, 'id' | 'slug' | 'we
   return operations
 }
 
-/** A row-level manifest the publisher accepts (planned at the import's state), or an error. */
+/** A row-level manifest the publisher accepts (planned at any publication state), or an error. */
 function manifestSource(header: string, id: string, operations: unknown[]): string {
   const manifest = {
     version: 1,
@@ -575,6 +493,8 @@ interface Arguments {
   command: 'adult-manifest' | 'dead-manifest' | 'decisions-manifest' | 'manifest' | 'scan'
   concurrency: number
   date: string
+  /** The environment whose D1 the listings are read from; required. */
+  environment: RemoteEnvironment
   only: Set<string> | null
   reuse: boolean
   since: string | null
@@ -582,7 +502,8 @@ interface Arguments {
 
 export function parseArguments(argv: readonly string[]): Arguments {
   const args = argv.filter(value => value !== '--')
-  const parsed: Arguments = {
+  let environment: string | null = null
+  const parsed: Omit<Arguments, 'environment'> = {
     command: 'scan',
     concurrency: 8,
     date: new Date().toISOString().slice(0, 10),
@@ -602,6 +523,7 @@ export function parseArguments(argv: readonly string[]): Arguments {
     else if (flag === 'dead-manifest' && index === 0) parsed.command = 'dead-manifest'
     else if (flag === 'decisions-manifest' && index === 0) parsed.command = 'decisions-manifest'
     else if (flag === 'adult-manifest' && index === 0) parsed.command = 'adult-manifest'
+    else if (flag === '--env') environment = value()
     else if (flag === '--since') parsed.since = value()
     else if (flag === '--reuse') parsed.reuse = true
     else if (flag === '--date') parsed.date = value()
@@ -614,7 +536,11 @@ export function parseArguments(argv: readonly string[]): Arguments {
     throw new Error('dead-manifest needs --since YYYY-MM-DD.')
   if (!Number.isInteger(parsed.concurrency) || parsed.concurrency < 1 || parsed.concurrency > 32)
     throw new Error('--concurrency must be 1 to 32.')
-  return parsed
+  if (environment !== 'staging' && environment !== 'production')
+    throw new Error(
+      "--env staging|production is required: the listings come from that environment's D1 (read-only)."
+    )
+  return { ...parsed, environment }
 }
 
 // v2 (#104 review): markup signals, longer redirect chains, and own-domain traces.
@@ -644,24 +570,26 @@ function readCache(): Map<string, SiteObservation & { id: string }> {
   return cache
 }
 const reportPathFor = (date: string) => `d1/hygiene/${date}-listing-domains.yaml`
-export const recheckPathFor = (date: string) => `d1/hygiene/${date}-dead-domains.recheck.yaml`
-export const decisionsPathFor = (date: string) => `d1/hygiene/${date}-owner-list-decisions.yaml`
-export const adultDecisionsPathFor = (date: string) => `d1/hygiene/${date}-adult-decisions.yaml`
+const recheckPathFor = (date: string) => `d1/hygiene/${date}-dead-domains.recheck.yaml`
+const decisionsPathFor = (date: string) => `d1/hygiene/${date}-owner-list-decisions.yaml`
+const adultDecisionsPathFor = (date: string) => `d1/hygiene/${date}-adult-decisions.yaml`
 /** The manifests `adult-manifest` writes for a decisions date. */
-export const adultManifestIds = (date: string) => ({
+const adultManifestIds = (date: string) => ({
   categoryId: `${date}-adult-category`,
   removalId: `${date}-adult-removal`
 })
 
 async function main(): Promise<void> {
   const args = parseArguments(process.argv.slice(2))
+  validateRemoteConfig(args.environment)
+  // The catalog as the environment publishes it, before the manifests this run writes.
+  const listings = await environmentListings(args.environment)
   if (args.command === 'adult-manifest') {
     const decisionsPath = adultDecisionsPathFor(args.date)
     const ids = adultManifestIds(args.date)
     const manifests = buildAdultManifests(
       parse(readFileSync(resolve(decisionsPath), 'utf8')) as AdultDecisions,
-      // The catalog before this decision's manifests (the category manifest sorts first).
-      reviewedCatalogListings(ids.categoryId),
+      listings,
       { decisionsPath, ...ids }
     )
     for (const [id, source] of [
@@ -674,8 +602,6 @@ async function main(): Promise<void> {
     }
     return
   }
-  const report = readParityReport()
-  const listings = reviewedImportListings()
   if (args.command === 'decisions-manifest') {
     const decisionsPath = decisionsPathFor(args.date)
     const id = `${args.date}-owner-list-cleanup`
@@ -768,7 +694,7 @@ async function main(): Promise<void> {
   const result = buildReport(
     checked,
     new Date().toISOString(),
-    `reviewed import ${report.target.checksum.slice(0, 12)} (publication ${report.target.publicationVersion}), ${selected.length} live listings`
+    `${args.environment} D1, ${selected.length} live listings`
   )
   if (args.only) {
     console.log(renderReport(result))

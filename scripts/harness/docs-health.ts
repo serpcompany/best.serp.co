@@ -21,13 +21,16 @@ const REQUIRED_FILES = [
   '.github/workflows/harness-gardening.yml'
 ] as const
 
+/** History moved to `.archive/` (#315): kept as it was, with the links it had, so not checked. */
+const ARCHIVE_DIRECTORY = '.archive/'
+
 function repositoryFiles(root: string): string[] {
   return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
     cwd: root,
     encoding: 'utf8'
   })
     .split('\n')
-    .filter(Boolean)
+    .filter(file => file && !file.startsWith(ARCHIVE_DIRECTORY))
 }
 
 function markdownLinkTargets(source: string): string[] {
@@ -229,8 +232,7 @@ export function checkDocumentation(root = resolve('.')): string[] {
     'agent:ui:capture',
     'worktree:new',
     'worktree:doctor',
-    'worktree:destroy',
-    'migration:preflight'
+    'worktree:destroy'
   ]) {
     if (!rootManifest.scripts?.[script]) violations.push(`package.json: missing ${script} command`)
   }

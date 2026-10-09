@@ -117,12 +117,13 @@ function sqlSourceViolations(file: string, sourceText: string): string[] {
   return violations
 }
 
+/** Live files: `.archive/` is history (#315), kept as it was and never built or run. */
 function trackedFiles(): string[] {
   return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
     encoding: 'utf8'
   })
     .split('\n')
-    .filter(Boolean)
+    .filter(file => file && !file.startsWith('.archive/'))
 }
 
 const forbiddenExactCatalogPaths = [
@@ -765,8 +766,6 @@ describe('single-site D1-only repository architecture', () => {
       .filter(
         file =>
           file.startsWith('scripts/') &&
-          !file.startsWith('scripts/migration/') &&
-          file !== 'scripts/migration-preflight.test.ts' &&
           file !== 'scripts/architecture-guard.test.ts' &&
           /\.(?:m?js|ts)$/u.test(file) &&
           existsSync(resolve(file))
@@ -777,6 +776,35 @@ describe('single-site D1-only repository architecture', () => {
         )
       )
     expect(violations).toEqual([])
+  })
+
+  it('keeps the retired v1 catalog import in .archive/: nothing live reads or runs it (#315)', () => {
+    const files = trackedFiles()
+    expect(
+      files.filter(
+        file => file.startsWith('d1/artifacts/') || file.startsWith('scripts/migration/')
+      )
+    ).toEqual([])
+    const scripts = (
+      JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
+        scripts: Record<string, string>
+      }
+    ).scripts
+    expect(
+      Object.keys(scripts).filter(name => /^(?:migration:|db:import:|catalog:faqs$)/u.test(name))
+    ).toEqual([])
+    // Code, configs, and workflows; tests may name what they assert is gone.
+    const retired =
+      /(?<!\.archive\/)\bd1\/artifacts\b|scripts\/migration\/|\bmigration:(?:compare|generate|legacy-media|preflight)\b|db:import:local|d1-import-artifact|d1-application-snapshot|bootstrap-production-d1\.yml/u
+    const readers = files.filter(
+      file =>
+        (file === 'package.json' || /^(?:scripts|apps\/web|\.github)\//u.test(file)) &&
+        /\.(?:m?[jt]sx?|jsonc?|ya?ml)$/u.test(file) &&
+        !/\.(?:test|spec)\.tsx?$/u.test(file) &&
+        existsSync(resolve(file)) &&
+        retired.test(readFileSync(resolve(file), 'utf8'))
+    )
+    expect(readers).toEqual([])
   })
 
   // #77: node:sqlite applies none of D1's statement limits and workerd does not enforce the

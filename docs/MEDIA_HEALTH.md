@@ -33,9 +33,11 @@ Every listing image carries `data-listing-image="logo|image"`. Guards:
   with JavaScript off, it requires the `::after` tile on each broken image.
 - `scripts/catalog-media.test.ts` requires every manifest to name only its own listing's hosted
   keys (`listings/<slug>/<kind>/`), each in an upload plan with the same bytes, or no image, and
-  no listing content to embed an image, so no other host is ever rendered.
-  `scripts/v1-import-publications.test.ts` checks the same of every published logo and image, on
-  the v1 import with the manifests applied, until #315 archives it with the import.
+  no listing content to embed an image, so no other host is ever rendered. On fixture rows, it
+  also requires a `listing-slug-change` to leave no media keyed to the old slug, and every
+  committed rename to be followed by a `listing-media-update` under the new slug. (Until #315 the
+  same checks also ran on every published logo and image of the v1 import; that test is archived
+  with the import.)
 
 ## Media health check
 

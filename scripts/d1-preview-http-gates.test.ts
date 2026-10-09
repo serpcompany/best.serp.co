@@ -1,8 +1,9 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { stringify } from 'yaml'
+import { parse, stringify } from 'yaml'
 import type { AccessEnv } from '../apps/web/src/lib/auth/cloudflare-access'
 import { accessConfig } from '../apps/web/src/lib/auth/cloudflare-access'
 import {
@@ -23,6 +24,7 @@ import {
   expectedWorkerVersionFromEnvironment,
   type GateClock,
   type HttpGateOptions,
+  httpGateSamples,
   retiredCategorySlugs,
   runHttpGates,
   waitForWorkerVersion
@@ -36,15 +38,8 @@ const platformOrigin = 'https://best-serp-co-production.serpcompany.workers.dev'
 const stagingOrigin = 'https://best-serp-co-staging.example.test'
 const slug = 'example-product'
 const category = 'seo-tools'
+const samples = { categories: [category], listing: slug }
 const fixtureDirectory = mkdtempSync(join(tmpdir(), 'best-serp-co-http-gates-'))
-const parityReportPath = join(fixtureDirectory, 'parity.yaml')
-writeFileSync(
-  parityReportPath,
-  stringify({
-    parity: { categories: [{ slug: category }], exactSlugSet: [slug] },
-    target: { checksum: 'a'.repeat(64) }
-  })
-)
 // Production gates read CANONICAL_HOST_REDIRECT from wrangler.jsonc. These tests pin it to `off`
 // unless they pass their own config, so they don't depend on the checked-in value.
 const switchOffConfigPath = join(fixtureDirectory, 'wrangler-switch-off.jsonc')
@@ -67,8 +62,8 @@ function gates(
   options: HttpGateOptions = {}
 ): Promise<void> {
   return runHttpGates(mode, baseUrl, {
-    parityReportPath,
     publicationsDirectory: noPublications,
+    samples,
     timeoutMs,
     wranglerConfigPath: switchOffConfigPath,
     ...options
@@ -173,22 +168,43 @@ describe('environment-specific HTTP gates', () => {
       join(publications, 'retire.yaml'),
       stringify({ operations: [{ action: 'category-unpublish', slug: 'adult' }] })
     )
-    const report = join(fixtureDirectory, 'parity-retired.yaml')
-    writeFileSync(
-      report,
-      stringify({
-        parity: { categories: [{ slug: 'adult' }, { slug: category }], exactSlugSet: [slug] }
-      })
-    )
     const urls = installSuccessfulFetch()
     await gates('staging', stagingOrigin, undefined, {
-      parityReportPath: report,
-      publicationsDirectory: publications
+      publicationsDirectory: publications,
+      samples: { categories: ['adult', category], listing: slug }
     })
     const paths = urls.map(url => url.pathname)
     expect(paths).toContain(`/products/categories/${category}/`)
     expect(paths).not.toContain('/products/categories/adult/')
     expect(retiredCategorySlugs(publications)).toEqual(new Set(['adult']))
+    await expect(
+      gates('staging', stagingOrigin, undefined, {
+        publicationsDirectory: publications,
+        samples: { categories: ['adult'], listing: slug }
+      })
+    ).rejects.toThrow('add a live one to httpGateSamples')
+  })
+
+  it('samples a listing and a category no committed manifest takes off the site (#315)', () => {
+    // Committed manifests only: d1-remote-publisher.test.ts writes temporary ones here.
+    const committed = execFileSync('git', ['ls-files', 'd1/publications'], { encoding: 'utf8' })
+      .split('\n')
+      .filter(path => /\.ya?ml$/u.test(path))
+    expect(committed.length).toBeGreaterThan(0)
+    const retired = new Set<string>()
+    const gone = new Set<string>()
+    for (const path of committed) {
+      const manifest = parse(readFileSync(resolve(path), 'utf8')) as {
+        operations?: Array<{ action?: string; from?: string; slug?: string }>
+      }
+      for (const operation of manifest.operations ?? []) {
+        if (operation.action === 'category-unpublish' && operation.slug) retired.add(operation.slug)
+        if (operation.action === 'listing-unpublish' && operation.slug) gone.add(operation.slug)
+        if (operation.action === 'listing-slug-change' && operation.from) gone.add(operation.from)
+      }
+    }
+    expect(gone.has(httpGateSamples.listing), httpGateSamples.listing).toBe(false)
+    expect(httpGateSamples.categories.filter(slug => !retired.has(slug))).not.toEqual([])
   })
 
   it('keeps Staging isolated from the Production hostname', async () => {

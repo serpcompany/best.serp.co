@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
 import { LISTING_IN_RETIRED_CATEGORY_SQL } from '../apps/web/src/db/catalog-epoch'
 import { isMediaKey, parseMediaKey } from '../apps/web/src/db/media-keys'
+import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
 import { readParityReport, readReviewedImportSql } from './d1-import-artifact'
@@ -29,6 +30,7 @@ import {
   reviewedImportListings
 } from './listing-domain-check'
 import { mediaPlanSchema } from './media-upload'
+import { project } from './project'
 import { ADULT_TERMS } from './migration/legacy-media'
 
 /**
@@ -539,4 +541,18 @@ describe('the listing domain manifests on the v1 import (#100, #104, #260)', () 
       }
     }
   }, 120_000)
+})
+
+// Moved here from `scripts/d1-publisher.sqlite.test.ts` by #315: it read the import's parity report.
+describe('slugs of the v1 import', () => {
+  it('keeps every slug in the reviewed initial import a page URL', () => {
+    const report = parse(readFileSync(resolve(project.artifact.parityReportPath), 'utf8')) as {
+      parity: { categories: Array<{ slug: string }>; exactSlugSet: string[] }
+    }
+    expect(report.parity.exactSlugSet.length).toBeGreaterThan(3000)
+    expect(report.parity.exactSlugSet.filter(value => hasFileExtension(value))).toEqual([])
+    expect(
+      report.parity.categories.map(category => category.slug).filter(hasFileExtension)
+    ).toEqual([])
+  })
 })
