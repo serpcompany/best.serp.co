@@ -76,6 +76,22 @@ async function autofillCode(page: Page, value: string): Promise<void> {
   }, value)
 }
 
+/**
+ * The signed-out header (#286): its account menu offers "Sign up / Sign in". Sign-out reloads
+ * the page, so the menu is opened again until the reloaded header shows the signed-out item.
+ */
+async function expectSignedOutHeader(page: Page): Promise<void> {
+  const account = page.locator('header').first().getByRole('button', { name: 'Account' })
+  await expect(async () => {
+    await page.keyboard.press('Escape')
+    await account.click()
+    await expect(page.getByRole('menuitem', { name: 'Sign up / Sign in' })).toBeVisible({
+      timeout: 1000
+    })
+  }).toPass()
+  await page.keyboard.press('Escape')
+}
+
 /** Counts the page's code guesses (`/api/auth/sign-in/email-otp` requests). */
 function countGuesses(page: Page): { readonly count: number } {
   const guesses = { count: 0 }
@@ -134,15 +150,17 @@ test.describe('sign-in screens', () => {
     await page.waitForURL('**/account/')
     await expect(page.getByRole('heading', { name: 'No listings yet' })).toBeVisible()
     await expect(page.getByText(email).first()).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Sign up / Sign in' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Account, signed in' })).toHaveCount(0)
 
-    // Public pages show the signed-in header: the account menu, with Account and Sign out.
+    // Public pages show the signed-in header: the account menu, with Account, the theme row
+    // and Sign out.
     await page.goto('/about/')
     const header = page.locator('header').first()
-    await header.getByRole('button', { name: 'Account' }).click()
+    await header.getByRole('button', { name: 'Account, signed in' }).click()
     await expect(page.getByRole('menuitem', { name: 'Account' })).toBeVisible()
+    await expect(page.getByRole('menuitemradio', { name: 'System' })).toBeVisible()
     await page.getByRole('menuitem', { name: 'Sign out' }).click()
-    await expect(header.getByRole('link', { name: 'Sign up / Sign in' })).toBeVisible()
+    await expectSignedOutHeader(page)
 
     // Signed out, /account sends the visitor to /login and back.
     await page.goto('/account/')
@@ -178,7 +196,7 @@ test.describe('sign-in screens', () => {
     await page.getByRole('button', { name: email }).click()
     await page.getByRole('menuitem', { name: 'Sign out' }).click()
     await page.waitForURL(url => url.pathname === '/')
-    await expect(page.getByRole('link', { name: 'Sign up / Sign in' }).first()).toBeVisible()
+    await expectSignedOutHeader(page)
   })
 
   test('counts down the attempts on a wrong code, then asks for a new code', async ({ page }) => {
@@ -254,7 +272,7 @@ test.describe('sign-in screens', () => {
     await page.waitForURL('**/about/')
     await page.locator('header').first().getByRole('button', { name: 'Account' }).click()
     await page.getByRole('menuitem', { name: 'Sign out' }).click()
-    await expect(page.getByRole('link', { name: 'Sign up / Sign in' }).first()).toBeVisible()
+    await expectSignedOutHeader(page)
 
     await page.goto('/login/?callbackUrl=%2Fabout%2F')
     await requestCodeInPage(page, email)
@@ -464,12 +482,14 @@ test.describe('sign-in screens', () => {
     await page.waitForURL('**/about/')
     await page.getByRole('button', { name: 'Open menu' }).click()
     await page.getByRole('button', { name: 'Sign out' }).click()
-    // Sign-out reloads the page: wait for the signed-out header (its sign-in link, hidden on
-    // phones) before opening the menu again, so the click can't land on the page going away.
-    await expect(page.locator('header a[href="/login/"]')).toBeAttached()
-    await page.getByRole('button', { name: 'Open menu' }).click()
-    await expect(
-      page.getByRole('dialog').getByRole('link', { name: 'Sign up / Sign in' })
-    ).toBeVisible()
+    // Sign-out reloads the page, and the signed-out header has no sign-in link of its own (#286):
+    // open the menu again until the reloaded page's menu offers sign-in.
+    await expect(async () => {
+      await page.keyboard.press('Escape')
+      await page.getByRole('button', { name: 'Open menu' }).click()
+      await expect(
+        page.getByRole('dialog').getByRole('link', { name: 'Sign up / Sign in' })
+      ).toBeVisible({ timeout: 1000 })
+    }).toPass()
   })
 })

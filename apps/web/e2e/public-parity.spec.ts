@@ -368,15 +368,40 @@ test.describe('public parity interactions', () => {
     }
   })
 
-  // Links styled with buttonVariants keep their own classes through cn (#186): the header's
-  // sign-in link is `hidden md:inline-flex`, so it waits for the menu on phones.
-  test('desktop-only header links stay hidden on phones', async ({ page }) => {
+  // Controls styled with buttonVariants keep their own classes through cn (#186): the header's
+  // account button is `hidden md:inline-flex`, so it waits for the menu on phones.
+  test('the desktop-only account button stays hidden on phones', async ({ page }) => {
     await page.setViewportSize({ height: 844, width: 390 })
     await gotoPublicPage(page, '/')
     const header = page.getByRole('banner')
-    await expect(header.getByRole('link', { name: 'Sign up / Sign in' })).toBeHidden()
+    await expect(header.getByRole('button', { name: 'Account' })).toBeHidden()
     await expect(header.getByRole('button', { name: /open menu/i })).toBeVisible()
     await page.setViewportSize({ height: 900, width: 1440 })
-    await expect(header.getByRole('link', { name: 'Sign up / Sign in' })).toBeVisible()
+    await expect(header.getByRole('button', { name: 'Account' })).toBeVisible()
+  })
+
+  // zenbujapanese.com's header (#286): Submit, then one account menu holding sign-in and the
+  // theme. The theme toggle and the sign-in link are no longer in the header itself.
+  test('the header account menu offers sign-in and switches the theme', async ({ page }) => {
+    await page.setViewportSize({ height: 900, width: 1440 })
+    await gotoPublicPage(page, '/')
+    const header = page.getByRole('banner')
+    await expect(header.getByRole('link', { name: 'Submit' })).toBeVisible()
+    await expect(header.getByRole('link', { name: 'Sign up / Sign in' })).toHaveCount(0)
+    await expect(header.getByRole('button', { name: 'Toggle dark mode' })).toHaveCount(0)
+
+    await header.getByRole('button', { name: 'Account' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Sign up / Sign in' })).toHaveAttribute(
+      'href',
+      /^\/login\/?$/u
+    )
+    await page.getByRole('menuitemradio', { name: 'Dark' }).click()
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/u)
+    await page.getByRole('menuitemradio', { name: 'Light' }).click()
+    await expect(page.locator('html')).not.toHaveClass(/\bdark\b/u)
+    // System follows the browser's color scheme.
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await page.getByRole('menuitemradio', { name: 'System' }).click()
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/u)
   })
 })
