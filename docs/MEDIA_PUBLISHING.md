@@ -3,7 +3,7 @@
 A catalog-wide media change (the legacy migration, or a regeneration of it) reaches staging and
 then production as reviewed files, uploaded and published by protected workflows. Keys and
 storage: [Listing media](./MEDIA.md). Why staging comes first:
-[Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first).
+[Catalog publication](./CATALOG_PUBLICATION.md).
 
 Agents prepare and review these files; they never run the uploads or publications.
 

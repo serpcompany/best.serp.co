@@ -167,7 +167,7 @@ Production then publishes exactly the manifests staging published.
 ## 7. Runbook
 
 Agents prepare PRs and run read-only checks; the owner dispatches every workflow, staging
-included ([Release guards](../RELEASE_GUARDS.md#security-boundary), MEDIA_PUBLISHING.md). Each
+included ([Credential guards](../CREDENTIAL_GUARDS.md#security-boundary), MEDIA_PUBLISHING.md). Each
 publish writes its Time Travel bookmark and restore command to the run summary: record it.
 
 ### a. Staging

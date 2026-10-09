@@ -41,7 +41,7 @@ Each holds two environment secrets:
 - `CLOUDFLARE_API_TOKEN`: today, **both environments hold the same account-wide token**, with
   Edit on every Worker, D1 database, and R2 bucket (serp.co's `cdn` too). A leak from either
   environment therefore reaches staging and production alike
-  ([Security boundary](./RELEASE_GUARDS.md#security-boundary)).
+  ([Security boundary](./CREDENTIAL_GUARDS.md#security-boundary)).
 
 The planned fix, an owner decision (decision b in #42) due now that the cutover is complete
 (#310), gives each environment its own token, scoped to its Worker, D1 database, and R2 bucket (production's

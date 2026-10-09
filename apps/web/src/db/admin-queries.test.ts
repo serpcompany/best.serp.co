@@ -177,10 +177,19 @@ describe('admin review queue reads', () => {
         reason: 'Unauthorized license keys',
         urlKey: 'keybazaar.shop'
       },
-      listing: { id: 'lst_keyb', live: false, slug: 'keybazaar.shop' },
+      listing: { id: 'lst_keyb', live: false, slug: 'keybazaar.shop', verifiedOwner: false },
       rejectionCategory: 'prohibited'
     })
     expect(await reads.getSubmissionReview('missing')).toBeNull()
+  })
+
+  it("reads whether a submission's live listing has a current owner (#297 review)", async () => {
+    const reads =
+      fixture(`INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+      VALUES ('lst_keyb', 'user_maya', 'submission', '2026-10-01T00:00:00.000Z');`)
+    expect(await reads.getSubmissionReview('sub_keyb')).toMatchObject({
+      listing: { id: 'lst_keyb', verifiedOwner: true }
+    })
   })
 
   it('reads a revision with the listing it edits and flags a stale base', async () => {
@@ -192,10 +201,24 @@ describe('admin review queue reads', () => {
       ],
       categoryName: 'Apps',
       kind: 'revision',
-      listing: { id: 'lst_brief', live: true, name: 'Brieflow', slug: 'brieflow.ai' },
+      listing: {
+        id: 'lst_brief',
+        live: true,
+        name: 'Brieflow',
+        slug: 'brieflow.ai',
+        verifiedOwner: true
+      },
       name: 'Brieflow 2',
       stale: true,
       submitter: { email: 'jordan@example.com' }
+    })
+  })
+
+  it("follows the listing's current owner, not the revision's author (#297 review)", async () => {
+    const reads = fixture(`UPDATE listing_owners SET revoked_at = '2026-10-01T00:00:00.000Z',
+      revoked_reason = 'transferred' WHERE listing_id = 'lst_brief';`)
+    expect(await reads.getRevisionReview('rev_brief')).toMatchObject({
+      listing: { verifiedOwner: false }
     })
   })
 })
