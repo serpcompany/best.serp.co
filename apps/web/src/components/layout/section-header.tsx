@@ -14,7 +14,8 @@ type SectionHeaderProps = {
 
 /**
  * A section's title and description, with a "View all"-style link on the right (serplists'
- * `SectionHeader`, #257). Give it an `id` and its section `aria-labelledby` to name the region.
+ * `SectionHeader`, #257). Give it an `id` and its section `aria-labelledby` to name the region;
+ * the title keeps clear of the sticky header when a link jumps to it (`#all-products`).
  */
 export function SectionHeader({ action, className, description, id, title }: SectionHeaderProps) {
   return (
@@ -23,7 +24,10 @@ export function SectionHeader({ action, className, description, id, title }: Sec
       data-slot="section-header"
     >
       <div className="flex min-w-0 flex-col gap-1">
-        <h2 className="text-xl font-semibold tracking-tight text-balance sm:text-2xl" id={id}>
+        <h2
+          className="scroll-mt-20 text-xl font-semibold tracking-tight text-balance sm:text-2xl"
+          id={id}
+        >
           {title}
         </h2>
         {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
