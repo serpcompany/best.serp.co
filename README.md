@@ -15,18 +15,18 @@ the source of truth.
 
 ## Local development
 
-Use Node 24 and pnpm. Local D1 is seeded from the committed initial import:
+Use Node 24 and pnpm. Local D1 is seeded with fixtures (fake listings, users, and
+submissions), never real data:
 
 ```bash
 pnpm install
-pnpm db:migrate:local
-pnpm db:import:local
-pnpm db:verify:local
+pnpm db:seed:local
 pnpm preview
 ```
 
 `pnpm preview` builds the Worker and serves it on http://localhost:8787 against the local
-D1 database. It cannot reach staging or production resources.
+D1 database. It cannot reach staging or production resources. See
+[Development](./docs/DEVELOPMENT.md#local-data) for what the seed holds.
 
 ## Verification
 

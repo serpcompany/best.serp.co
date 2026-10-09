@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 /** Directory name of the isolated local D1 state below each state root. */
@@ -43,4 +43,16 @@ export function configuredFreshD1StateRoot(): string {
     manifest,
     repositoryRoot
   })
+}
+
+/**
+ * Whether the local D1 below `stateRoot` exists yet: Wrangler creates its SQLite file on the first
+ * migration. A fresh worktree has none until `pnpm db:seed:local` runs.
+ */
+export function hasLocalD1Database(stateRoot: string): boolean {
+  const directory = resolve(stateRoot, 'v3', 'd1', 'miniflare-D1DatabaseObject')
+  return (
+    existsSync(directory) &&
+    readdirSync(directory).some(name => name.endsWith('.sqlite') && name !== 'metadata.sqlite')
+  )
 }

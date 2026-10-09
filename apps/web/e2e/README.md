@@ -30,7 +30,8 @@ Those generated artifacts were moved to `_archive/legacy-e2e-artifacts/**` durin
 - Keep route expectations aligned with the active best.serp.co Worker and D1 contract
   (`/products/<slug>/`, `/products/categories/<category>/`, `/sitemap-*.xml`), not a removed
   starter app, the former multi-site platform, or the older llms-era route map. Shared best.serp.co
-  facts (catalog counts, public URL, route helpers) live in `e2e/site-fixture.ts`.
+  facts (catalog counts, public URL, route helpers) live in `e2e/site-fixture.ts`; the fixture
+  seed's (`pnpm db:seed:local`) in `e2e/seed-facts.ts`, its rows in `e2e/fixture-seed.ts`.
 - By default Playwright migrates, imports, and verifies the local D1 catalog and then starts
   `pnpm preview` on port 3100. To reuse an already running preview instead, set
   `PLAYWRIGHT_EXTERNAL_SERVER=1 PLAYWRIGHT_BASE_URL=http://localhost:8787`.

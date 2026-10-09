@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, describe, expect, it } from 'vitest'
 import { claimHoldsManifest } from './claim-holds-manifest'
+import { captureCanonicalTable } from './d1-application-snapshot'
 import {
   applicationTableNames,
   canonicalLocalConfig,
@@ -13,7 +14,9 @@ import {
   freshMigrationsDirectory,
   requiredIndexNames
 } from './d1-drizzle-local'
+import { sqliteTransport } from './d1-import-artifact'
 import { validateCanonicalLocalConfig } from './d1-local-config'
+import { localSqlitePath } from './d1-local-guard'
 import { canonicalPreviewCommand, localPreviewVarArgs } from './d1-local-preview'
 import { resolveFreshD1StateRoot } from './d1-local-state'
 import { parseManifest } from './d1-publisher'
@@ -605,6 +608,37 @@ describe('fresh Drizzle D1 history', () => {
     240_000
   )
 
+  it('seeds fixtures (#312) with the same rows on every run, and verifies their facts', async () => {
+    const stateDirectory = temporaryDirectory('best-serp-co-seed-')
+    const rows = async () => {
+      const database = new DatabaseSync(
+        localSqlitePath(resolve(stateDirectory, 'drizzle', 'best-serp-co')),
+        { readOnly: true }
+      )
+      try {
+        const transport = sqliteTransport(database)
+        const tables: Record<string, unknown> = {}
+        for (const table of applicationTableNames) {
+          tables[table] = (await captureCanonicalTable(transport, table)).rows
+        }
+        return tables
+      } finally {
+        database.close()
+      }
+    }
+    expect(runLocal('seed', stateDirectory)).toContain('Seeded local D1 with fixtures')
+    const first = await rows()
+    expect(runLocal('verify', stateDirectory)).toContain('fixture seed facts')
+    // A seeded D1 is never overwritten by the import.
+    expect(failingLocalStderr('import', stateDirectory)).toContain('Refusing a different')
+    // A re-run resets the state first, so local changes are gone and the rows are the same.
+    executeLocal(stateDirectory, "UPDATE listings SET name='Changed' WHERE slug='fixture-studio'")
+    expect(failingLocalStderr('verify', stateDirectory)).toContain('no longer matches')
+    runLocal('seed', stateDirectory)
+    expect(await rows()).toEqual(first)
+    expect(runLocal('verify', stateDirectory)).toContain('fixture seed facts')
+  }, 240_000)
+
   it('rejects the retired --site argument with remediation', () => {
     expect(() =>
       execFileSync(
@@ -820,7 +854,7 @@ describe('fresh Drizzle D1 history', () => {
     expect(scripts['db:generate']).toBe('cd apps/web && drizzle-kit generate')
     expect(Object.keys(scripts).filter(name => name.startsWith('d1:'))).toEqual([])
     expect(scripts['db:migrations:list:local']).toBe('pnpm tsx scripts/d1-local-guard.ts list')
-    for (const command of ['migrate', 'import', 'verify', 'publish']) {
+    for (const command of ['migrate', 'seed', 'import', 'verify', 'publish']) {
       expect(scripts[`db:${command}:local`]).toBe(`pnpm tsx scripts/d1-local-guard.ts ${command}`)
     }
     expect(Object.values(scripts).join('\n')).not.toMatch(/--site\b/u)
