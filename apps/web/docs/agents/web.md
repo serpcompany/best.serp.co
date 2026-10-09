@@ -76,10 +76,12 @@ These are the rules the other SERP sites follow (zenbujapanese.com's UI componen
   a stock component covers.
 - **Don't restyle it.** A `className` on a stock component may lay it out (width, grid placement,
   margin), but not change its size, padding, radius, border, color, type size or density. Use its
-  variants and sizes. A link that looks like a button takes `buttonVariants()`. Status tones are
-  the one exception: shadcn ships no success, warning or info variants, so they go on `Badge` and
-  `Alert` as token classes (`text-warning`, `border-warning/40`), as `StatusChip`, the product
-  page's Unofficial badge and the dashboards' notices do.
+  variants and sizes. A link that looks like a button takes `buttonVariants()`. Two kinds of
+  class are not restyling: those that came with a block copied as it is (dashboard-01's status
+  chip, the data table's toolbar, serp.co's docs badges), which stay as copied; and status tones,
+  since shadcn ships no success, warning or info variants: they go on `Badge` and `Alert` as
+  token classes (`text-warning`, `border-warning/40`), as the product page's Unofficial badge and
+  the dashboards' notices do.
 - **Colors come only from the tokens.** No hex or rgb values and no Tailwind palette classes
   (`white`, `gray-500`) in components.
 - **Copy the reference blocks.** A new page or section starts from the layout blocks below, or
@@ -94,7 +96,7 @@ down, and both baselines are empty.
 ### Layout blocks
 
 The public pages are composed from the blocks in `src/components/layout/`, each built from stock
-components; each file's doc comment says what it draws and which reference block it copies.
+components; each file's doc comment says what it draws.
 
 | Use | For |
 |---|---|
@@ -133,6 +135,9 @@ search is `components/directory/empty-state.tsx`: the stock `Empty`, as serplist
 The submit flow (`/submit/…`) keeps its own screens. The admin review page previews a listing in
 the product page's header (`components/admin/mini-listing.tsx`).
 
+Public URLs are part of the SEO contract: changing one needs a permanent redirect
+(`src/lib/routing/redirects.ts`).
+
 ## Dashboards
 
 `/account` and `/admin` share the shadcn sidebar shell in `components/dashboard/` (its parts are
@@ -144,9 +149,6 @@ their structure; show unbuilt items with a "Soon" badge, never greyed out; put `
 classes on `Alert` and `Badge`. The owner-approved #70 mockups and their copy
 (`docs/mockups/submissions/`) are the contract for those screens: a visible change needs the
 owner's re-approval.
-
-Public URLs are part of the SEO contract: changing one needs a permanent redirect
-(`src/lib/routing/redirects.ts`).
 
 ## Checking a UI change
 
