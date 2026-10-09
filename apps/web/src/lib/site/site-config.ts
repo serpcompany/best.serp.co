@@ -89,10 +89,6 @@ export function getTwitterHandleFromUrl(url: string): string | null {
   }
 }
 
-export function hasConfiguredGitHubIssueTarget(config: SiteConfig): boolean {
-  return Boolean(config.githubIssueOwner && config.githubIssueRepo && config.githubIssuesUrl)
-}
-
 export function hasConfiguredPublicSocialLinks(config: SiteConfig): boolean {
   return Boolean(config.githubRepoUrl && config.githubUrl && config.redditUrl && config.twitterUrl)
 }
