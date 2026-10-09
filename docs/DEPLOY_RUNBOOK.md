@@ -26,7 +26,7 @@ Cloudflare token and the GitHub environments that hold it are in
 
 ## Database commands, promotion, and staging before production
 
-[Release guards](./RELEASE_GUARDS.md) lists every `db:*` command with its target, defines
+[Release guards](./RELEASE_GUARDS.md) says which target each `db:*` command reaches, defines
 the `staging` → `main` promotion and the hotfix path, and explains the staging-before-production
 check (the released commit must carry a tree Deploy Staging verified) that gates production
 migrations, imports, and Worker deploys.
