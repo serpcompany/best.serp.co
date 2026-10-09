@@ -267,7 +267,9 @@ test.describe('public parity interactions', () => {
     )
   })
 
-  test('empty search state action link preserves submit href semantics', async ({ page }) => {
+  test('empty states keep their actions: Clear Search, and the link home on /search/', async ({
+    page
+  }) => {
     await gotoPublicPage(page, '/')
 
     const browseSection = page.getByRole('heading', { name: /browse the directory/i })
@@ -280,6 +282,14 @@ test.describe('public parity interactions', () => {
     )
     await page.getByRole('button', { name: /clear search/i }).click()
     await expect(page.getByRole('heading', { name: /no results found/i })).not.toBeVisible()
+
+    // An empty state's link action is an in-site link (#291 review): /search/ with no query.
+    await gotoPublicPage(page, '/search/')
+    await expect(page.getByRole('heading', { name: 'Start Your Search' })).toBeVisible()
+    await expectInternalLink(
+      page.getByRole('main').getByRole('link', { name: /^explore all/i }),
+      /^\/$/
+    )
   })
 
   test('public link href target and rel semantics are preserved', async ({ page }) => {

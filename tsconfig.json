@@ -16,5 +16,10 @@
     "target": "ES2022",
     "types": ["node"]
   },
-  "include": ["scripts/**/*.ts", "vitest.config.ts", "apps/web/cloudflare-env.d.ts"]
+  "include": [
+    "scripts/**/*.ts",
+    "vitest.config.ts",
+    "apps/web/cloudflare-env.d.ts",
+    "apps/web/cloudflare-env-secrets.d.ts"
+  ]
 }
