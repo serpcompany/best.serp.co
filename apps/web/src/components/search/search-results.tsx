@@ -9,6 +9,7 @@ import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-quer
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
+import { SortedListings } from '../directory/sorted-listings'
 
 type EmptyStateProps = {
   actionHref?: string
@@ -25,12 +26,6 @@ type SearchFiltersProps = {
   selectedCategories: string[]
 }
 
-type WebsitesListWithSortProps = {
-  emptyDescription?: string
-  emptyTitle?: string
-  initialWebsites: WebsiteBrowseCardMetadata[]
-}
-
 export interface SearchResultsViewProps {
   error: string | null
   loading: boolean
@@ -39,13 +34,12 @@ export interface SearchResultsViewProps {
   slots: {
     EmptyState: ComponentType<EmptyStateProps>
     SearchFilters: ComponentType<SearchFiltersProps>
-    WebsitesListWithSort: ComponentType<WebsitesListWithSortProps>
   }
 }
 
 export function SearchResults({ error, loading, query, results, slots }: SearchResultsViewProps) {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const { EmptyState, SearchFilters, WebsitesListWithSort } = slots
+  const { EmptyState, SearchFilters } = slots
 
   const filteredResults = useMemo(() => {
     if (selectedCategories.length === 0) {
@@ -122,7 +116,6 @@ export function SearchResults({ error, loading, query, results, slots }: SearchR
             <ul className="mx-auto max-w-md list-inside list-disc space-y-1">
               <li>Check for typos in your search terms</li>
               <li>Try more general keywords (e.g., "AI" instead of "artificial intelligence")</li>
-              <li>Browse by category using the sidebar</li>
               <li>Submit a new {siteCopy.listingName.singular} if you do not see it listed</li>
             </ul>
           </div>
@@ -137,68 +130,69 @@ export function SearchResults({ error, loading, query, results, slots }: SearchR
     )
   }
 
+  const resultCategoryCounts = Object.entries(
+    results.reduce<Record<string, number>>((counts, result) => {
+      for (const category of result.categories || []) {
+        counts[category] = (counts[category] || 0) + 1
+      }
+      return counts
+    }, {})
+  )
+
   return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">
-              {filteredResults.length} result
-              {filteredResults.length !== 1 ? 's' : ''} for "{query}"
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {selectedCategories.length > 0 ? (
-                <>
-                  Filtered by {selectedCategories.length} categor
-                  {selectedCategories.length !== 1 ? 'ies' : 'y'}
-                  {results.length !== filteredResults.length ? (
-                    <> • {results.length} total results</>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  Found in {availableCategoryCount} categor
-                  {availableCategoryCount !== 1 ? 'ies' : 'y'}
-                </>
-              )}
-            </p>
-          </div>
-
-          <SearchFilters
-            selectedCategories={selectedCategories}
-            onCategoryChange={setSelectedCategories}
-            availableCategories={availableCategories}
-            resultCount={results.length}
-          />
-        </div>
-      </div>
-
-      {results.length > 3 && selectedCategories.length === 0 ? (
-        <div className="rounded-lg border bg-muted/20 p-4">
-          <h3 className="mb-3 text-sm font-semibold">Results by category:</h3>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(
-              results.reduce<Record<string, number>>((acc, result) => {
-                for (const category of result.categories || []) {
-                  acc[category] = (acc[category] || 0) + 1
-                }
-                return acc
-              }, {})
-            ).map(([category, count]) => (
+    <SortedListings
+      listings={filteredResults}
+      analyticsSource="search"
+      summary={
+        <>
+          <h2 className="text-lg font-semibold">
+            {filteredResults.length} result
+            {filteredResults.length !== 1 ? 's' : ''} for "{query}"
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {selectedCategories.length > 0 ? (
+              <>
+                Filtered by {selectedCategories.length} categor
+                {selectedCategories.length !== 1 ? 'ies' : 'y'}
+                {results.length !== filteredResults.length ? (
+                  <> • {results.length} total results</>
+                ) : null}
+              </>
+            ) : (
+              <>
+                Found in {availableCategoryCount} categor
+                {availableCategoryCount !== 1 ? 'ies' : 'y'}
+              </>
+            )}
+          </p>
+        </>
+      }
+      actions={
+        <SearchFilters
+          selectedCategories={selectedCategories}
+          onCategoryChange={setSelectedCategories}
+          availableCategories={availableCategories}
+          resultCount={results.length}
+        />
+      }
+      notice={
+        results.length > 3 && selectedCategories.length === 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold">Results by category:</h3>
+            {resultCategoryCounts.map(([category, count]) => (
               <Button
                 key={category}
-                variant="outline"
-                size="xs"
+                variant="secondary"
+                size="sm"
                 onClick={() => setSelectedCategories([category])}
               >
                 {getCategoryDisplayName(category)} ({count})
               </Button>
             ))}
           </div>
-        </div>
-      ) : null}
-
-      {filteredResults.length === 0 && selectedCategories.length > 0 ? (
+        ) : null
+      }
+      empty={
         <div className="py-8 text-center">
           <h3 className="mb-2 text-lg font-semibold">No results match your filters</h3>
           <p className="mb-4 text-muted-foreground">
@@ -208,13 +202,7 @@ export function SearchResults({ error, loading, query, results, slots }: SearchR
             Clear all filters
           </Button>
         </div>
-      ) : (
-        <WebsitesListWithSort
-          initialWebsites={filteredResults}
-          emptyTitle="No results found"
-          emptyDescription={`We couldn't find any results for "${query}". Try using different keywords or check your spelling.`}
-        />
-      )}
-    </div>
+      }
+    />
   )
 }

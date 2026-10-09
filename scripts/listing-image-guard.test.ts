@@ -32,7 +32,6 @@ const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
   'apps/web/src/components/content/mdx-components.tsx':
     'Markdown images in site content; listing content holds none (scripts/catalog-media.test.ts)',
   'apps/web/src/components/sections/external-resources-section.tsx': 'site-owned resource images',
-  'apps/web/src/components/sections/guide-card.tsx': 'guide cover images',
   'apps/web/src/components/website/featured-on-badge-embed-panel.tsx':
     'the badge preview and its embed snippet'
 }
@@ -41,9 +40,6 @@ const LISTING_IMAGE_CALLERS = [
   'apps/web/src/components/admin/mini-listing.tsx',
   'apps/web/src/components/admin/product-cell.tsx',
   'apps/web/src/components/directory/project-navigation.tsx',
-  'apps/web/src/components/directory/websites-list-with-sort-route.tsx',
-  // Renders the slot it is given, typed as ListingImage (#181).
-  'apps/web/src/components/directory/websites-list-with-sort.tsx',
   'apps/web/src/components/llm/listing-card.tsx',
   'apps/web/src/components/submit/submit-ui.tsx',
   'apps/web/src/components/website/website-content-section.tsx',

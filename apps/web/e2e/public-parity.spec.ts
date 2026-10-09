@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 import { detailListing } from './listing-fixture'
-import { escapeRegExp } from './site-fixture'
+import { categoryPath, escapeRegExp, sampleCategory } from './site-fixture'
 import { test } from './test'
 
 async function gotoPublicPage(page: Page, path: string) {
@@ -114,33 +114,57 @@ test.describe('public parity interactions', () => {
     )
   })
 
-  test('listing grids show one, two, then three columns (#264)', async ({ page }) => {
-    const grid = page.locator('section[aria-labelledby="featured"] [data-slot="card-grid"]')
-    const columns = () =>
-      grid.evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
-    for (const [width, expected] of [
-      [1440, 3],
-      [820, 2],
-      [390, 1]
+  test('listing grids are lists in one, two, then three columns (#264, #268)', async ({ page }) => {
+    for (const [path, selector] of [
+      ['/', 'section[aria-labelledby="featured"] [data-slot="card-grid"]'],
+      [categoryPath(sampleCategory.slug), 'main [data-slot="card-grid"]'],
+      ['/search/?q=video', 'main [data-slot="card-grid"]']
     ] as const) {
-      await page.setViewportSize({ width, height: 900 })
-      await gotoPublicPage(page, '/')
-      expect(await columns(), `${width}px`).toBe(expected)
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await gotoPublicPage(page, path)
+      const grid = page.locator(selector).first()
+      // Each card is a list item (#264 review).
+      expect(await grid.evaluate(element => element.tagName), path).toBe('UL')
+      for (const [width, expected] of [
+        [1440, 3],
+        [820, 2],
+        [390, 1]
+      ] as const) {
+        await page.setViewportSize({ width, height: 900 })
+        await expect
+          .poll(
+            () =>
+              grid.evaluate(
+                element => getComputedStyle(element).gridTemplateColumns.split(' ').length
+              ),
+            { message: `${path} at ${width}px` }
+          )
+          .toBe(expected)
+      }
+      // A long listing name must not widen the phone column past the screen (#268).
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+        `${path} scroll width at 390px`
+      ).toBeLessThanOrEqual(390)
     }
   })
 
   test('the home search sends its query to /search/, by Enter or its button', async ({ page }) => {
+    // The field filters the list once hydrated; typing earlier is lost, so retype until it does.
     await gotoPublicPage(page, '/')
     const field = page.getByPlaceholder('Search the directory...')
-    await field.fill('video')
+    await fillUntilVisible(field, 'video', page.getByText(/results? for "video"/u))
     await Promise.all([page.waitForURL(/\/search\/?\?q=video$/u), field.press('Enter')])
 
     await gotoPublicPage(page, '/')
-    await page.getByPlaceholder('Search the directory...').fill('audio')
-    await Promise.all([
-      page.waitForURL(/\/search\/?\?q=audio$/u),
-      page.getByRole('button', { name: 'Search', exact: true }).first().click()
-    ])
+    const homeField = page.getByPlaceholder('Search the directory...')
+    await fillUntilVisible(homeField, 'video', page.getByText(/results? for "video"/u))
+    // The field's own button, found through its form.
+    const button = page
+      .locator('form')
+      .filter({ has: homeField })
+      .getByRole('button', { name: 'Search', exact: true })
+    await Promise.all([page.waitForURL(/\/search\/?\?q=video$/u), button.click()])
   })
 
   test('favorite toggle and favorites-only filter preserve local state behavior', async ({

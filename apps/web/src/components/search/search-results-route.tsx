@@ -2,7 +2,6 @@
 
 import { useSearchParams } from 'next/navigation'
 import { EmptyState } from '../directory/empty-state'
-import { WebsitesListWithSortRoute } from '../directory/websites-list-with-sort-route'
 import { SearchFilters } from './search-filters'
 import { SearchResults as SharedSearchResults } from './search-results'
 import { useSearch } from './use-search'
@@ -20,8 +19,7 @@ export function SearchResultsRoute() {
       error={error}
       slots={{
         EmptyState,
-        SearchFilters,
-        WebsitesListWithSort: WebsitesListWithSortRoute
+        SearchFilters
       }}
     />
   )

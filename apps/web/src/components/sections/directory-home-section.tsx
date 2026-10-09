@@ -2,13 +2,8 @@ import type { ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
 
-// Source reference: adapted from ShadcnBlocks hero7, feature3, feature68, cta7, cta23, and cta34.
+// Source reference: adapted from ShadcnBlocks feature3 and feature68.
 interface DirectoryFeatureGridProps {
-  children: ReactNode
-  className?: string
-}
-
-interface DirectoryCtaBandProps {
   children: ReactNode
   className?: string
 }
@@ -25,16 +20,6 @@ interface DirectoryLinkListItemProps {
 
 function DirectoryFeatureGrid({ children, className }: DirectoryFeatureGridProps) {
   return <div className={cn('grid gap-4', className)}>{children}</div>
-}
-
-function DirectoryCtaBand({ children, className }: DirectoryCtaBandProps) {
-  return (
-    <section
-      className={cn('rounded-2xl border border-border/50 bg-muted/30 py-8 sm:py-10', className)}
-    >
-      {children}
-    </section>
-  )
 }
 
 function DirectoryLinkList({ children, className }: DirectoryLinkListProps) {
@@ -54,10 +39,5 @@ function DirectoryLinkListItem({ children, className }: DirectoryLinkListItemPro
   return <li className={className}>{children}</li>
 }
 
-export type {
-  DirectoryCtaBandProps,
-  DirectoryFeatureGridProps,
-  DirectoryLinkListItemProps,
-  DirectoryLinkListProps
-}
-export { DirectoryCtaBand, DirectoryFeatureGrid, DirectoryLinkList, DirectoryLinkListItem }
+export type { DirectoryFeatureGridProps, DirectoryLinkListItemProps, DirectoryLinkListProps }
+export { DirectoryFeatureGrid, DirectoryLinkList, DirectoryLinkListItem }

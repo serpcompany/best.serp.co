@@ -1,24 +1,18 @@
-import { ExternalLink, Home as HomeIcon } from 'lucide-react'
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import type { ComponentType } from 'react'
 import { Suspense } from 'react'
 import { Spinner } from '@/components/ui/spinner'
-import { withDubVia } from '../../lib/analytics/dub-via'
-import { resolveCategories } from '../../lib/directory/categories'
-import { getCategoryDisplayName } from '../../lib/directory/category-display'
-import { getRoute } from '../../lib/routing/routes'
 import { generateBaseMetadata } from '../../lib/seo/seo-config'
 import { externalResources } from '../../lib/site/external-resources'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
+import { PageHero } from '../layout/page-hero'
+import { PageContainer, PageSection } from '../layout/page-shell'
 import { SearchPageForm } from './search-page-form'
 
 type SearchResultsSlot = ComponentType
 
 type SearchIndexPageProps = {
-  /** Categories with public listings, in navigation order. */
-  activeCategorySlugs: string[]
   slots: {
     SearchResults: SearchResultsSlot
   }
@@ -43,96 +37,42 @@ export function generateSearchPageMetadata(): Metadata {
   })
 }
 
-export function SearchIndexPage({ activeCategorySlugs, slots }: SearchIndexPageProps) {
+/**
+ * The search page (#268): a `PageHero` holding the page's own search field, then the results in
+ * the shared card grid.
+ */
+export function SearchIndexPage({ slots }: SearchIndexPageProps) {
   const showExternalResources = showExternalSearchResources()
-  const activeCategories = resolveCategories(activeCategorySlugs)
   const { SearchResults } = slots
 
   return (
-    <div className="border-t">
-      <div className="relative flex h-full w-full max-w-full flex-row flex-nowrap">
-        <div className="sticky top-14 hidden h-screen w-[240px] max-w-[240px] min-w-[240px] overflow-hidden border-r sm:block">
-          <div className="space-y-6 p-4">
-            <h2 className="sr-only">Search Filters</h2>
-
-            <div>
-              <h3 className="mb-4 text-sm font-semibold text-muted-foreground">Categories</h3>
-              <nav className="space-y-1">
-                <Link
-                  href={getRoute('home')}
-                  className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                >
-                  <HomeIcon className="h-4 w-4" />
-                  {siteCopy.allLabel}
-                </Link>
-                {activeCategories.map(category => (
-                  <Link
-                    key={category.slug}
-                    href={getRoute('category.page', {
-                      category: category.slug
-                    })}
-                    className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                  >
-                    <category.icon className="h-4 w-4" />
-                    {getCategoryDisplayName(category.slug)}
-                  </Link>
-                ))}
-              </nav>
-            </div>
-
-            {showExternalResources ? (
-              <div>
-                <h3 className="mb-4 text-sm font-semibold text-muted-foreground">Resources</h3>
-                <nav className="space-y-1">
-                  {externalResources.map(resource => (
-                    <Link
-                      key={resource.slug}
-                      href={withDubVia(resource.url)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <resource.icon className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate">{resource.name}</span>
-                      </div>
-                      <ExternalLink className="h-3 w-3 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-                    </Link>
-                  ))}
-                </nav>
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="relative flex h-full w-full flex-col gap-3 px-6 pt-6">
-          <section className="space-y-6">
-            <div className="sticky top-14 z-35 -mx-6 flex flex-col gap-3 border-b bg-background px-6 py-4">
-              <div>
-                <h1 className="text-2xl font-bold">Search</h1>
-                <p className="mt-1 text-muted-foreground">
-                  {showExternalResources
-                    ? `Searching across all ${siteCopy.listingName.plural} and resources`
-                    : `Searching across all ${siteCopy.listingName.plural}`}
-                </p>
-              </div>
-              <Suspense>
-                <SearchPageForm />
-              </Suspense>
-            </div>
-
-            <Suspense
-              fallback={
-                <div className="flex justify-center py-8">
-                  <Spinner className="size-8" />
-                </div>
-              }
-            >
-              <SearchResults />
+    <>
+      <PageSection spacing="hero" className="border-b">
+        <PageHero
+          title="Search"
+          description={
+            showExternalResources
+              ? `Searching across all ${siteCopy.listingName.plural} and resources`
+              : `Searching across all ${siteCopy.listingName.plural}`
+          }
+          search={
+            <Suspense>
+              <SearchPageForm />
             </Suspense>
-          </section>
-        </div>
-      </div>
-    </div>
+          }
+        />
+      </PageSection>
+      <PageContainer className="py-12">
+        <Suspense
+          fallback={
+            <div className="flex justify-center py-8">
+              <Spinner className="size-8" />
+            </div>
+          }
+        >
+          <SearchResults />
+        </Suspense>
+      </PageContainer>
+    </>
   )
 }

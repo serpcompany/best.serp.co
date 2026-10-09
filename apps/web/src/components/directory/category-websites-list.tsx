@@ -1,28 +1,36 @@
-import type { ComponentType } from 'react'
-import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
-import { siteCopy } from '../../lib/site/site-copy'
+'use client'
 
-type WebsitesListWithSortProps = {
-  emptyDescription?: string
-  emptyTitle?: string
-  initialWebsites: WebsiteBrowseCardMetadata[]
-}
+import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
+import { getRoute } from '../../lib/routing/routes'
+import { siteCopy } from '../../lib/site/site-copy'
+import { EmptyState } from './empty-state'
+import { SortedListings } from './sorted-listings'
 
 interface CategoryWebsitesListProps {
   initialWebsites: WebsiteBrowseCardMetadata[]
-  slots: {
-    WebsitesListWithSort: ComponentType<WebsitesListWithSortProps>
-  }
 }
 
-export function CategoryWebsitesList({ initialWebsites, slots }: CategoryWebsitesListProps) {
-  const { WebsitesListWithSort } = slots
-
+/** A category page's listings, sortable by name or newest first. */
+export function CategoryWebsitesList({ initialWebsites }: CategoryWebsitesListProps) {
   return (
-    <WebsitesListWithSort
-      initialWebsites={initialWebsites}
-      emptyTitle={siteCopy.categoryEmptyTitle}
-      emptyDescription={siteCopy.categoryEmptyDescription}
+    <SortedListings
+      listings={initialWebsites}
+      analyticsSource="category"
+      summary={
+        initialWebsites.length > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Showing {initialWebsites.length} {siteCopy.listingName.plural} in this category
+          </p>
+        ) : null
+      }
+      empty={
+        <EmptyState
+          title={siteCopy.categoryEmptyTitle}
+          description={siteCopy.categoryEmptyDescription}
+          actionLabel={siteCopy.submitLabel}
+          actionHref={getRoute('submit')}
+        />
+      }
     />
   )
 }

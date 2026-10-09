@@ -48,9 +48,7 @@ export const site: SiteDefinition = {
     showDocs: false,
     showExternalResources: false,
     showFavorites: false,
-    showFeaturedGuides: false,
     showGuides: false,
-    showNewsletter: true,
     showProjects: false
   },
   id: 'best.serp.co',

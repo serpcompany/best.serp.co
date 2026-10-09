@@ -111,13 +111,6 @@ export async function getPublishedListingCount(): Promise<number> {
   return (await readShellStats()).listingCount
 }
 
-/** Categories that have public listings, in navigation (sort order, name) order. */
-export async function getListedCategorySlugs(): Promise<string[]> {
-  return (await readShellStats()).categories
-    .filter(category => category.count > 0)
-    .map(category => category.slug)
-}
-
 export async function getFeaturedListings(limit = 6): Promise<WebsiteMetadata[]> {
   return withMediaUrls(await (await getOperations()).getFeaturedListings(limit))
 }

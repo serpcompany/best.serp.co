@@ -4,23 +4,19 @@ import {
   CategoryRoutePage,
   generateCategoryRouteMetadata
 } from '@/components/category-routes/category-page'
-import { CategoryWebsitesListRoute as CategoryWebsitesList } from '@/components/directory/category-websites-list-route'
+import { CategoryWebsitesList } from '@/components/directory/category-websites-list'
 import {
   ListingPagination,
   paginatedMetadata,
   parseListingPageParam
 } from '@/components/directory/listing-pagination'
 import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
-import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@/components/sections/external-resources-section-route'
-import { FeaturedGuidesSectionRoute as FeaturedGuidesSection } from '@/components/sections/featured-guides-section-route'
 import { JsonLd } from '@/components/seo/json-ld'
 import {
-  getActiveCategories,
   getCategoryBySlug,
   getListingNamePage,
   type PublishedCategory
 } from '@/lib/catalog/repository'
-import { getGuides } from '@/lib/content-loader'
 import { getCategoryIcon } from '@/lib/directory/categories'
 import { getRoute } from '@/lib/routing/routes'
 import { SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
@@ -74,12 +70,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   }
 
   const page = parseListingPageParam(resolvedSearchParams.page)
-  const [listingPage, firstPage, featuredGuides, activeCategories] = await Promise.all([
+  const [listingPage, firstPage] = await Promise.all([
     getListingNamePage({ category: storedCategory.slug, page }),
     // Structured data describes the whole category, so every page repeats page 1's list.
-    getListingNamePage({ category: storedCategory.slug, page: 1 }),
-    getGuides(),
-    getActiveCategories()
+    getListingNamePage({ category: storedCategory.slug, page: 1 })
   ])
   if (page > listingPage.pageCount) {
     notFound()
@@ -87,9 +81,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   const category = presentCategory(storedCategory)
   const categoryPath = getRoute('category.page', { category: category.slug })
-  const activeCategorySlugs = activeCategories.map(activeCategory => activeCategory.slug)
   const route = CategoryRoutePage({
-    activeCategorySlugs,
     category,
     collection: {
       count: listingPage.total,
@@ -98,7 +90,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       lastPublishedAt: listingPage.lastPublishedAt,
       leadingProjects: firstPage.items
     },
-    featuredGuides,
     pageProjects: listingPage.items,
     pagination: (
       <ListingPagination
@@ -110,8 +101,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     ),
     slots: {
       CategoryWebsitesList,
-      ExternalResourcesSection,
-      FeaturedGuidesSection,
       JsonLd,
       breadcrumb: (
         <SiteBreadcrumb

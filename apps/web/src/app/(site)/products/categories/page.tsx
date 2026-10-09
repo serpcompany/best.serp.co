@@ -1,7 +1,13 @@
+import { ChevronRight } from 'lucide-react'
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import { CardGrid } from '@/components/layout/card-grid'
+import { ListCard } from '@/components/layout/list-card'
+import { PageHero } from '@/components/layout/page-hero'
+import { PageSection } from '@/components/layout/page-shell'
 import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
+import { Badge } from '@/components/ui/badge'
 import { getActiveCategories } from '@/lib/catalog/repository'
+import { getCategoryIcon } from '@/lib/directory/categories'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata, SITE_NAME, SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
 import { siteCopy } from '@/lib/site/site-copy'
@@ -15,38 +21,47 @@ export const metadata: Metadata = generateBaseMetadata({
   path: categoriesPath
 })
 
+/** The categories index (#268): a `PageHero`, then each category as a `ListCard` in the grid. */
 export default async function CategoriesPage() {
   const categories = (await getActiveCategories())
     .filter(category => category.count > 0)
     .sort((left, right) => left.name.localeCompare(right.name))
 
   return (
-    <div className="container mx-auto max-w-6xl px-6 py-12">
-      <SiteBreadcrumb
-        items={[{ name: 'Categories', href: categoriesPath }]}
-        baseUrl={SITE_PUBLIC_URL}
-      />
-      <div className="mt-6 space-y-3">
-        <h1 className="text-4xl font-bold tracking-tight">Categories</h1>
-        <p className="text-lg text-muted-foreground">
-          {categories.length} categories of {siteCopy.listingName.plural} on {SITE_NAME}.
-        </p>
-      </div>
-      <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {categories.map(category => (
-          <li key={category.slug}>
-            <Link
-              className="flex h-full items-start justify-between gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50"
-              href={getRoute('category.page', { category: category.slug })}
-            >
-              <span className="font-medium">{category.name}</span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {category.count}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <>
+      <PageSection spacing="hero" className="border-b">
+        <SiteBreadcrumb
+          items={[{ name: 'Categories', href: categoriesPath }]}
+          baseUrl={SITE_PUBLIC_URL}
+        />
+        <PageHero
+          title="Categories"
+          description={`${categories.length} categories of ${siteCopy.listingName.plural} on ${SITE_NAME}.`}
+        />
+      </PageSection>
+      <PageSection spacing="spacious">
+        <CardGrid as="ul">
+          {categories.map(category => {
+            const Icon = getCategoryIcon(category.slug)
+            return (
+              <li key={category.slug}>
+                <ListCard
+                  className="h-full"
+                  href={getRoute('category.page', { category: category.slug })}
+                  icon={<Icon />}
+                  meta={
+                    <>
+                      <Badge variant="secondary">{category.count}</Badge>
+                      <ChevronRight aria-hidden="true" className="size-4" />
+                    </>
+                  }
+                  title={category.name}
+                />
+              </li>
+            )
+          })}
+        </CardGrid>
+      </PageSection>
+    </>
   )
 }
