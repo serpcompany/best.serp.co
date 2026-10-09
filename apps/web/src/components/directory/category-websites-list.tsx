@@ -2,7 +2,7 @@
 
 import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
-import { siteCopy } from '../../lib/site/site-copy'
+import { formatListingCount, siteCopy } from '../../lib/site/site-copy'
 import { EmptyState } from './empty-state'
 import { SortedListings } from './sorted-listings'
 
@@ -19,7 +19,7 @@ export function CategoryWebsitesList({ initialWebsites }: CategoryWebsitesListPr
       summary={
         initialWebsites.length > 0 ? (
           <p className="text-sm text-muted-foreground">
-            Showing {initialWebsites.length} {siteCopy.listingName.plural} in this category
+            Showing {formatListingCount(initialWebsites.length)} in this category
           </p>
         ) : null
       }

@@ -211,6 +211,26 @@ test.describe('public parity interactions', () => {
     await expect(page.getByText(/showing \d+ of \d+ matching products/i)).toBeVisible()
   })
 
+  test('a category page keeps the chosen sort after reload (#269)', async ({ page }) => {
+    await gotoPublicPage(page, categoryPath(sampleCategory.slug))
+    const latest = page.getByRole('button', { name: /^latest$/i })
+    await expect(page.getByRole('button', { name: /^name$/i })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    // The toggle is a client component; click until the hydrated one reacts.
+    await expect(async () => {
+      await latest.click()
+      await expect(latest).toHaveAttribute('aria-pressed', 'true', { timeout: 2_000 })
+    }).toPass()
+
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(page.getByRole('button', { name: /^latest$/i })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
+
   test('empty search state action link preserves submit href semantics', async ({ page }) => {
     await gotoPublicPage(page, '/')
 

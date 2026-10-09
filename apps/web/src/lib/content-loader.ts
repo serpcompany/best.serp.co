@@ -14,7 +14,6 @@ import type {
 import {
   applyLegalContentBranding,
   buildDocs,
-  buildGuides,
   resolveAboutPage,
   resolveDocBySlug,
   resolveGuideBySlug
@@ -88,10 +87,6 @@ export async function getWebsiteBySlug(slug: string) {
 
 export async function getWebsiteCanonicalRedirect(slug: string) {
   return getCanonicalSlugForRedirect(slug)
-}
-
-export function getGuides(): AppGuideMetadata[] {
-  return buildGuides(allGuides)
 }
 
 export async function getGuideBySlug(slug: string): Promise<AppGuideMetadata | null> {

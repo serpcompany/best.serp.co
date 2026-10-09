@@ -311,36 +311,6 @@ export function resolveWebsiteBySlug(
   return resolveWebsiteBySlugFromIndex(buildWebsiteLookupIndex(websites), slug)
 }
 
-export function buildGuides(guides: GuideEntry[]): GuideMetadata[] {
-  if (!guides || guides.length === 0) {
-    return []
-  }
-
-  return guides
-    .filter(guide => guide.published)
-    .map(guide => ({
-      title: guide.title || '',
-      description: guide.description || '',
-      slug: guide.slug || '',
-      image: guide.image || undefined,
-      difficulty: (guide.difficulty || 'beginner') as 'beginner' | 'intermediate' | 'advanced',
-      category: (guide.category || 'getting-started') as
-        | 'getting-started'
-        | 'implementation'
-        | 'best-practices'
-        | 'integration',
-      published: guide.published !== false,
-      publishedAt: guide.publishedAt || guide.date || new Date().toISOString(),
-      date: guide.date || new Date().toISOString(),
-      authors: guide.authors || []
-    }))
-    .sort((a, b) => {
-      return (
-        new Date(b.publishedAt || b.date).getTime() - new Date(a.publishedAt || a.date).getTime()
-      )
-    })
-}
-
 export function resolveGuideBySlug(guides: GuideEntry[], slug: string): GuideMetadata | null {
   const guide = guides.find(currentGuide => currentGuide.slug === slug && currentGuide.published)
 

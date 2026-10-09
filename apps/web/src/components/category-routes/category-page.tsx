@@ -17,7 +17,7 @@ import {
   SITE_WEBSITE_ID
 } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
-import { siteCopy } from '../../lib/site/site-copy'
+import { formatListingCount, siteCopy } from '../../lib/site/site-copy'
 import { PageHero } from '../layout/page-hero'
 import { PageContainer, PageSection } from '../layout/page-shell'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
@@ -215,7 +215,7 @@ export function CategoryRoutePage({
         <PageSection spacing="hero" className="border-b">
           {breadcrumb}
           <PageHero
-            eyebrow={`${categoryCount} ${siteCopy.listingName.plural}`}
+            eyebrow={formatListingCount(categoryCount)}
             title={seoContent.h1Title}
             description={seoContent.introText}
           />
