@@ -8,10 +8,21 @@ import { components } from './mdx-components'
 const markdown = [
   '## Heading',
   '',
+  '### Third',
+  '',
+  '#### Fourth',
+  '',
+  '##### Fifth',
+  '',
+  '###### Sixth',
+  '',
   'A paragraph with a [link](https://example.com/), `code`, and ![an image](/image.png).',
   '',
   '- one',
   '- two',
+  '',
+  '1. first',
+  '2. second',
   '',
   '> A quote.',
   '',
@@ -41,7 +52,9 @@ describe('Markdown components (#289)', () => {
         {markdown}
       </ReactMarkdown>
     )
-    expect(markup).toContain('<td class=')
+    for (const tag of ['h2', 'h3', 'h4', 'h5', 'h6', 'ol', 'ul', 'blockquote', 'hr', 'img', 'td']) {
+      expect(markup).toContain(`<${tag} `)
+    }
     expect(markup).not.toContain(' node=')
   })
 })

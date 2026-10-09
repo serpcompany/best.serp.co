@@ -1,12 +1,16 @@
+import { ExternalLink } from 'lucide-react'
 import { ListingImage } from '@/components/listing/listing-image'
+import { Badge } from '@/components/ui/badge'
+import { buttonVariants } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
 import { WebsiteContentSection } from '@/components/website/website-content-section'
 import type { ListingDetail } from '@/db/contracts'
-import { ProductLogo } from './product-cell'
 
 /**
- * The listing preview on the review page (#64 screen 11): the site's listing layout in small,
- * built from the staged content by `buildSubmissionReviewPreview` (`lib/submissions/
- * review-preview.ts`), with the listing's own content section.
+ * The listing preview on the review page (#64 screen 11): the product page's header (serplists'
+ * `DetailPageLayout`, #273) and content in small, built from the staged content by
+ * `buildSubmissionReviewPreview` (`lib/submissions/review-preview.ts`). It is a picture of the
+ * page: Visit Site and the category are inert, and the category is the staged one's name.
  */
 export function MiniListing({
   categoryName,
@@ -16,47 +20,34 @@ export function MiniListing({
   listing: ListingDetail
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border">
-      <div className="relative border-b border-border/50 bg-gradient-to-b from-muted/30 to-background">
-        <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-start">
-          <div className="inline-block w-fit rounded-2xl border border-border/50 bg-card p-2.5 shadow-lg">
-            <ProductLogo
-              className="rounded-xl"
-              logoUrl={listing.media?.logo}
-              name={listing.name}
-              size={56}
-              website={listing.website}
-            />
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-3xl font-bold tracking-tight">{listing.name}</h3>
-            <p className="text-muted-foreground">{listing.description}</p>
-          </div>
+    <div className="rounded-xl border p-6" data-slot="mini-listing">
+      <div className="flex min-w-0 flex-col items-start gap-4">
+        <ListingImage
+          name={listing.name}
+          src={listing.media?.logo}
+          size={56}
+          className="rounded-xl"
+        />
+        <h3 className="text-3xl font-semibold tracking-tight text-balance wrap-break-word">
+          {listing.name}
+        </h3>
+        <p className="text-base whitespace-pre-line text-pretty wrap-anywhere text-muted-foreground">
+          {listing.description}
+        </p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+          <Badge variant="outline">{categoryName ?? listing.category}</Badge>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className={buttonVariants()}>
+            Visit Site
+            <ExternalLink data-icon="inline-end" aria-hidden />
+          </span>
         </div>
       </div>
-      {listing.media?.images?.[0] ? (
-        // The hosted featured image approval would publish (#96 round 2 B1).
-        <div className="max-w-xl border-b">
-          <ListingImage kind="image" name={listing.name} src={listing.media.images[0]} />
-        </div>
-      ) : null}
-      <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1fr)_200px]">
-        <div className="min-w-0 text-sm leading-7">
-          <WebsiteContentSection website={listing} />
-        </div>
-        <div className="space-y-3">
-          <div className="rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground">
-            Visit Site
-          </div>
-          <div className="rounded-xl border border-border/50 p-4">
-            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-              Category
-            </p>
-            <span className="mt-1 inline-flex rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-xs font-medium">
-              {categoryName ?? listing.category}
-            </span>
-          </div>
-        </div>
+      <Separator className="my-6" />
+      {/* The content section draws the featured image approval would publish (#96 round 2 B1). */}
+      <div className="max-w-3xl min-w-0">
+        <WebsiteContentSection website={listing} />
       </div>
     </div>
   )
