@@ -640,16 +640,16 @@ describe('single-site D1-only repository architecture', () => {
         .filter(({ text }) => named.test(text))
         .map(({ line, text }) => `${file}:${line}: ${text.trim().slice(0, 80)}`)
     )
-    // The provider's own folder names it in code, but what it shows on the provider's page comes
-    // only from the order's neutral description (#111 round 4), checked above where it is built.
+    // The provider's own folder names it in code. Its checkout page shows the catalog price's
+    // product (#250, "best.serp.co Paid listing"/"Paid claim", named by the owner in the
+    // dashboard), and its payment record only the order's neutral description (#111 round 4).
     const provider = readFileSync(
       resolve(project.sourceDirectory, 'lib/billing/providers/stripe.ts'),
       'utf8'
     )
-    expect(provider).toMatch(
-      /'line_items\[0\]\[price_data\]\[product_data\]\[name\]': request\.description,/u
-    )
-    expect(provider).not.toMatch(/product_data\]\[(?!name\])/u)
+    expect(provider).toMatch(/'line_items\[0\]\[price\]': config\.prices\[request\.kind\],/u)
+    expect(provider).toMatch(/'payment_intent_data\[description\]': request\.description,/u)
+    expect(provider).not.toMatch(/price_data|product_data/u)
     expect(provider).not.toMatch(/custom_text|submit_type|statement_descriptor/u)
     // The legal pages and the site's other written content.
     for (const file of trackedFiles().filter(

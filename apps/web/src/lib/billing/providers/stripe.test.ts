@@ -1,15 +1,22 @@
 /**
  * The Stripe provider (#68) on a recorded `fetch`: Checkout Sessions are created form-encoded
- * with the order's reference, amount, card-only payment, expiry, and idempotency key; refunds
+ * with the order's reference, catalog price (#250), card-only payment, expiry, and idempotency
+ * key, and refused when that price isn't the site's; refunds
  * carry their own key; and webhooks verify the raw body's signature within the timestamp
  * tolerance before anything is read.
  */
 import { describe, expect, it } from 'vitest'
 import { BillingProviderError, BillingWebhookError } from '../provider'
-import { createStripeProvider, stripeSignature, verifyStripeSignature } from './stripe'
+import {
+  createStripeProvider,
+  stripeCheckoutState,
+  stripeSignature,
+  verifyStripeSignature
+} from './stripe'
 
 const NOW = new Date('2026-10-06T12:00:00.000Z')
 const SECRET = 'whsec_unit'
+const PRICES = { paid_claim: 'price_claim', paid_listing: 'price_listing' }
 
 function recorder(responses: Array<{ body: unknown; status?: number }>) {
   const calls: Array<{
@@ -37,27 +44,39 @@ async function signed(body: string, at = NOW): Promise<Headers> {
 }
 
 describe('Stripe provider', () => {
-  it('opens a card-only Checkout Session for the order, under its idempotency key', async () => {
+  const checkoutRequest = {
+    amountCents: 4900,
+    cancelUrl: 'https://best.serp.co/submit/s/choose/',
+    currency: 'usd',
+    customerEmail: 'maya@example.com',
+    description: 'Paid listing: Tablesmith',
+    expiresAt: new Date('2026-10-06T13:00:00.000Z'),
+    idempotencyKey: 'checkout:order-1',
+    kind: 'paid_listing' as const,
+    orderId: 'order-1',
+    successUrl: 'https://best.serp.co/submit/s/checkout/success/?order=order-1'
+  }
+
+  it('opens a card-only Checkout Session for the catalog price, with promotion codes (#250)', async () => {
     const { calls, fetcher } = recorder([
-      { body: { expires_at: 1791295200, id: 'cs_test_1', url: 'https://checkout.stripe.com/c/1' } }
+      {
+        body: {
+          amount_subtotal: 4900,
+          currency: 'usd',
+          expires_at: 1791295200,
+          id: 'cs_test_1',
+          url: 'https://checkout.stripe.com/c/1'
+        }
+      }
     ])
     const stripe = createStripeProvider({
       fetcher,
       live: false,
+      prices: PRICES,
       secretKey: 'sk_test_x',
       webhookSecret: SECRET
     })
-    const session = await stripe.createCheckout({
-      amountCents: 4900,
-      cancelUrl: 'https://best.serp.co/submit/s/choose/',
-      currency: 'usd',
-      customerEmail: 'maya@example.com',
-      description: 'Paid listing: Tablesmith',
-      expiresAt: new Date('2026-10-06T13:00:00.000Z'),
-      idempotencyKey: 'checkout:order-1',
-      orderId: 'order-1',
-      successUrl: 'https://best.serp.co/submit/s/checkout/success/?order=order-1'
-    })
+    const session = await stripe.createCheckout(checkoutRequest)
     expect(session).toEqual({
       checkoutId: 'cs_test_1',
       expiresAt: new Date(1791295200 * 1000).toISOString(),
@@ -72,18 +91,62 @@ describe('Stripe provider', () => {
     })
     const form = new URLSearchParams(call?.body ?? '')
     expect(Object.fromEntries(form)).toMatchObject({
+      allow_promotion_codes: 'true',
       client_reference_id: 'order-1',
       expires_at: String(Math.floor(Date.parse('2026-10-06T13:00:00.000Z') / 1000)),
-      'line_items[0][price_data][currency]': 'usd',
-      'line_items[0][price_data][unit_amount]': '4900',
+      'line_items[0][price]': 'price_listing',
       'metadata[order_id]': 'order-1',
       mode: 'payment',
+      'payment_intent_data[description]': 'Paid listing: Tablesmith',
       'payment_method_types[0]': 'card'
     })
+    // The catalog price, never an inline one.
+    expect([...form.keys()].some(key => key.includes('price_data'))).toBe(false)
     // Stripe Tax stays off.
     expect(form.has('automatic_tax[enabled]')).toBe(false)
-    // Nothing shown on the provider's page names the provider (owner decision on #70).
+    // Nothing sent names the provider (owner decision on #70).
     for (const [key, value] of form) expect(`${key}=${value}`).not.toMatch(/stripe/iu)
+  })
+
+  it('sells the claim price for a paid claim', async () => {
+    const { calls, fetcher } = recorder([
+      { body: { amount_subtotal: 4900, currency: 'usd', id: 'cs_test_2', url: 'https://c/2' } }
+    ])
+    const stripe = createStripeProvider({
+      fetcher,
+      live: false,
+      prices: PRICES,
+      secretKey: 'sk_test_x',
+      webhookSecret: SECRET
+    })
+    await stripe.createCheckout({ ...checkoutRequest, kind: 'paid_claim' })
+    expect(new URLSearchParams(calls[0]?.body ?? '').get('line_items[0][price]')).toBe(
+      'price_claim'
+    )
+  })
+
+  it('refuses and expires a checkout whose catalog price is not the site price', async () => {
+    for (const changed of [
+      { amount_subtotal: 9900, currency: 'usd' },
+      { amount_subtotal: 4900, currency: 'eur' }
+    ]) {
+      const { calls, fetcher } = recorder([
+        { body: { ...changed, id: 'cs_test_3', url: 'https://c/3' } },
+        { body: { id: 'cs_test_3', status: 'expired' } }
+      ])
+      const stripe = createStripeProvider({
+        fetcher,
+        live: false,
+        prices: PRICES,
+        secretKey: 'sk_test_x',
+        webhookSecret: SECRET
+      })
+      await expect(stripe.createCheckout(checkoutRequest)).rejects.toMatchObject({
+        code: 'price_mismatch',
+        status: 503
+      })
+      expect(calls[1]?.url).toBe('https://api.stripe.com/v1/checkout/sessions/cs_test_3/expire')
+    }
   })
 
   it('reads a session as a provider-neutral state', async () => {
@@ -104,6 +167,7 @@ describe('Stripe provider', () => {
     const stripe = createStripeProvider({
       fetcher,
       live: false,
+      prices: PRICES,
       secretKey: 'sk_test_x',
       webhookSecret: SECRET
     })
@@ -111,11 +175,40 @@ describe('Stripe provider', () => {
       amountCents: 4900,
       checkoutId: 'cs_test_1',
       currency: 'usd',
+      discountCents: 0,
       orderId: 'order-1',
       paymentId: 'pi_1',
-      state: 'paid'
+      state: 'paid',
+      subtotalCents: null
     })
     await expect(stripe.getCheckout('../v1/customers')).rejects.toBeInstanceOf(BillingProviderError)
+  })
+
+  it('reads a promotion code’s discount, and a 100%-off checkout as paid with no payment', () => {
+    expect(
+      stripeCheckoutState({
+        amount_subtotal: 4900,
+        amount_total: 2450,
+        currency: 'usd',
+        id: 'cs_1',
+        payment_intent: 'pi_1',
+        payment_status: 'paid',
+        status: 'complete',
+        total_details: { amount_discount: 2450, amount_tax: 0 }
+      })
+    ).toMatchObject({ amountCents: 2450, discountCents: 2450, state: 'paid', subtotalCents: 4900 })
+    expect(
+      stripeCheckoutState({
+        amount_subtotal: 4900,
+        amount_total: 0,
+        currency: 'usd',
+        id: 'cs_2',
+        payment_intent: null,
+        payment_status: 'no_payment_required',
+        status: 'complete',
+        total_details: { amount_discount: 4900, amount_tax: 0 }
+      })
+    ).toMatchObject({ amountCents: 0, discountCents: 4900, paymentId: null, state: 'paid' })
   })
 
   it('refunds under the key, and treats an already refunded charge as refunded', async () => {
@@ -127,6 +220,7 @@ describe('Stripe provider', () => {
     const stripe = createStripeProvider({
       fetcher,
       live: false,
+      prices: PRICES,
       secretKey: 'sk_test_x',
       webhookSecret: SECRET
     })
@@ -178,6 +272,7 @@ describe('Stripe provider', () => {
       accountId: 'acct_serp',
       live: false,
       now: () => NOW,
+      prices: PRICES,
       secretKey: 'sk_test_x',
       webhookSecret: SECRET
     })
@@ -237,6 +332,7 @@ describe('Stripe provider', () => {
     const stripe = createStripeProvider({
       fetcher,
       live: false,
+      prices: PRICES,
       secretKey: 'sk_test_x',
       webhookSecret: SECRET
     })

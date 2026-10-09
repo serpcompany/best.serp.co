@@ -36,6 +36,7 @@ export function stripeSignatureHeader(body: string, at = Math.floor(Date.now() /
 }
 
 export interface MockSession {
+  amount_subtotal: number
   amount_total: number
   cancel_url: string
   client_reference_id: string
@@ -46,9 +47,10 @@ export interface MockSession {
   metadata: { order_id: string }
   object: 'checkout.session'
   payment_intent: string | null
-  payment_status: 'paid' | 'unpaid'
+  payment_status: 'no_payment_required' | 'paid' | 'unpaid'
   status: 'complete' | 'expired' | 'open'
   success_url: string
+  total_details: { amount_discount: number; amount_tax: number }
   url: string
 }
 
@@ -60,8 +62,16 @@ export interface MockRefund {
 
 export interface StripeMock {
   close(): Promise<void>
-  /** Marks the session paid, as Stripe does when the buyer pays. */
-  pay(sessionId: string): MockSession
+  /**
+   * Marks the session paid, as Stripe does when the buyer pays; `discount` is a promotion
+   * code's (#250), and at 100% off the session completes with no payment.
+   */
+  pay(sessionId: string, discount?: number): MockSession
+  /**
+   * What each catalog price charges, by price id; any other id is $49.00 USD (the site's price).
+   * A spec sets one to test a price the site doesn't show (#250).
+   */
+  prices: Map<string, { amount: number; currency: string }>
   refunds: MockRefund[]
   sessions: Map<string, MockSession>
 }
@@ -87,14 +97,17 @@ export async function startStripeMock(): Promise<StripeMock> {
   const sessions = new Map<string, MockSession>()
   const refunds: MockRefund[] = []
   const idempotent = new Map<string, unknown>()
+  const prices = new Map<string, { amount: number; currency: string }>()
   let counter = 0
-  const pay = (sessionId: string): MockSession => {
+  const pay = (sessionId: string, discount = 0): MockSession => {
     const session = sessions.get(sessionId)
     if (!session) throw new Error(`unknown session ${sessionId}`)
     if (session.status !== 'complete') {
       session.status = 'complete'
-      session.payment_status = 'paid'
-      session.payment_intent = `pi_e2e_${sessionId.slice(-6)}`
+      session.amount_total = session.amount_subtotal - discount
+      session.total_details = { amount_discount: discount, amount_tax: 0 }
+      session.payment_status = session.amount_total === 0 ? 'no_payment_required' : 'paid'
+      session.payment_intent = session.amount_total === 0 ? null : `pi_e2e_${sessionId.slice(-6)}`
     }
     return session
   }
@@ -119,11 +132,16 @@ export async function startStripeMock(): Promise<StripeMock> {
       if (request.method === 'POST' && url.pathname === '/v1/checkout/sessions') {
         counter += 1
         const id = `cs_test_e2e${Date.now().toString(36)}${counter}`
+        const price = prices.get(form.get('line_items[0][price]') ?? '') ?? {
+          amount: 4900,
+          currency: 'usd'
+        }
         const session: MockSession = {
-          amount_total: Number(form.get('line_items[0][price_data][unit_amount]')),
+          amount_subtotal: price.amount,
+          amount_total: price.amount,
           cancel_url: form.get('cancel_url') ?? '',
           client_reference_id: form.get('client_reference_id') ?? '',
-          currency: form.get('line_items[0][price_data][currency]') ?? '',
+          currency: price.currency,
           expires_at: Number(form.get('expires_at')),
           id,
           livemode: false,
@@ -133,6 +151,7 @@ export async function startStripeMock(): Promise<StripeMock> {
           payment_status: 'unpaid',
           status: 'open',
           success_url: form.get('success_url') ?? '',
+          total_details: { amount_discount: 0, amount_tax: 0 },
           url: `http://127.0.0.1:${stripeMockPort}/pay/${id}`
         }
         sessions.set(id, session)
@@ -201,6 +220,7 @@ export async function startStripeMock(): Promise<StripeMock> {
   return {
     close: () => new Promise(resolveClose => server.close(() => resolveClose())),
     pay,
+    prices,
     refunds,
     sessions
   }

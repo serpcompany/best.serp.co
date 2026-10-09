@@ -8,6 +8,7 @@ import { formatUsd } from '@/lib/admin/format'
 import { getAdminOrders } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'
 import { billing, ordersEnabled } from '@/lib/billing/runtime'
+import { orderDiscountCents } from '@/lib/billing/service'
 import { mediaBaseUrl } from '@/lib/media/media-base'
 import { renderableImage } from '@/lib/media/renderable-image'
 import { site } from '@/lib/site'
@@ -55,9 +56,17 @@ export default async function OrdersPage() {
   const deps = await billingOrNull()
   const media = await mediaBaseUrl()
   const orders: OrderRow[] = (await getAdminOrders()).map(order => {
-    const paymentRef = order.providerPaymentId ?? order.providerCheckoutId
+    const charged = order.chargedCents ?? order.amountCents
+    // A promotion code's discount (#250), never a mismatched charge's shortfall.
+    const discountCents = orderDiscountCents(order)
+    // The code is on the checkout, so a discounted order links there; others to the payment.
+    const paymentRef =
+      (discountCents > 0 ? order.providerCheckoutId : order.providerPaymentId) ??
+      order.providerPaymentId ??
+      order.providerCheckoutId
     return {
-      amountCents: order.amountCents,
+      // What was charged (and what a refund sends back): less after a promotion code (#250).
+      amountCents: charged,
       createdAt: order.createdAt,
       customer: order.buyerEmail,
       id: order.id,
@@ -68,6 +77,7 @@ export default async function OrdersPage() {
             website: order.website ?? ''
           }
         : null,
+      discountCents,
       kind: order.kind === 'paid_claim' ? 'Paid claim' : 'Paid listing',
       listingHref: order.listingSlug
         ? `/admin/listings/${encodeURIComponent(order.listingSlug)}/`

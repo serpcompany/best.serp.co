@@ -70,15 +70,19 @@ export const listingLivePaidEmail = defineEmailTemplate<ListingLivePaidInput>({
   render(input, context) {
     const name = required(input.listingName, 'a listing name')
     const url = listingUrl(context, input.listingSlug)
+    // A 100%-off promotion code (#250) paid nothing: no payment to thank for or refund.
+    const free = input.paidCents === 0
     return composeEmail(
       {
         body: [
           paragraph(
-            `Thanks for your payment of ${formatUsd(input.paidCents, { cents: true })}. ${name} passed our automatic checks and is now listed on SERP:`
+            `${free ? 'Your promotion code covered the full price.' : `Thanks for your payment of ${formatUsd(input.paidCents, { cents: true })}.`} ${name} passed our automatic checks and is now listed on SERP:`
           ),
           box(bold(url)),
           paragraph(
-            'A reviewer still looks at every paid listing. If we reject it for anything other than prohibited content, you get a full refund automatically.'
+            free
+              ? 'A reviewer still looks at every paid listing.'
+              : 'A reviewer still looks at every paid listing. If we reject it for anything other than prohibited content, you get a full refund automatically.'
           ),
           paragraph('The badge is optional for paid listings.')
         ],

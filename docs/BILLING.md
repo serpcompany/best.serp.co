@@ -67,7 +67,10 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   `/submit/<id>/checkout/cancelled/` (4f).
 - **Checkout.** `GET /submit/<id>/checkout/start/` and `GET /account/listings/<slug>/checkout/` ("Upgrade:
   $49 one-off" in the badge panel of a live free listing, "Relist for $49" on a listing the badge
-  program unlisted) open or reuse a one-hour, card-only Checkout Session and redirect to it. A
+  program unlisted) open or reuse a one-hour, card-only Checkout Session and redirect to it. It
+  sells the catalog price for the order's kind (#250, [Prices](#prices-and-promotion-codes)) and
+  allows promotion codes; a price that isn't `paidListingPriceCents` in USD expires the new
+  session and answers 503, so the page and the charge never differ. A
   superseded session is expired at Stripe, and one the ledger failed to record is expired and
   never handed out. A website now covered by a prohibited block, or already listed, is refused
   before any checkout. A draft with no plan chooses paid first. The account shows "Upgrade"
@@ -81,8 +84,10 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   `replayed: true`. A failure answers 500 and the retry runs it again. An event of the other
   mode (`livemode` against the environment) or naming another account is recorded as ignored,
   and an event acts only on the order holding its session id (the session's order reference
-  only for an order that never recorded its session). A charge that doesn't match the order's
-  amount and currency is flagged `amount_mismatch` and refunded in full, never applied.
+  only for an order that never recorded its session). A charge must be the order's amount and
+  currency less exactly the promotion code's discount (`chargedCents` records what was paid). A
+  100%-off checkout has no payment, so its session id is the payment reference and a refund of
+  it calls nothing. Any other charge is flagged `amount_mismatch` and refunded in full.
 - **Paid submission.** The guardrails run: a public address under the safe-fetch rules, the site
   answers with an HTML page, no listing has the website, and no prohibited block covers it. Pass:
   the listing is created and published (catalog version bump) and the submission is
@@ -144,11 +149,26 @@ never set or read these values.
 | `STRIPE_WEBHOOK_SECRET` | the staging endpoint's `whsec_…` | the production endpoint's `whsec_…` |
 
 The Worker refuses a live key outside production and a test key in production. A restricted
-key needs write access to Checkout Sessions and Refunds. Webhook endpoints (trailing slash
+key needs write access to Checkout Sessions and Refunds, and read access to Products and Prices. Webhook endpoints (trailing slash
 included; Stripe does not follow redirects):
 
 - `https://best.serp.co/api/billing/webhook/` (live mode)
 - the staging Worker's origin + `/api/billing/webhook/` (test mode)
+
+### Prices and promotion codes
+
+The owner manages the catalog in the account's dashboard (#250). Checkout sells these one-off
+$49.00 USD prices (`STRIPE_PRICES` in `lib/billing/providers/index.ts`):
+
+| Product | Test mode (staging) | Live mode (production) |
+|---|---|---|
+| best.serp.co Paid listing | `price_1UOQRHCp8si97z5sqYTUNjxv` | `price_1UOQSUCp8si97z5sqEz614sI` |
+| best.serp.co Paid claim | `price_1UOQRiCp8si97z5sJHO0RNcz` | `price_1UOQT5Cp8si97z5s8gXo0jHH` |
+
+A coupon with a promotion code, made in the same mode, works at checkout. Changing the price
+needs `paidListingPriceCents` changed too, or checkout refuses. A price id exists only in this
+account, so a key from another account can't open a checkout. A restricted key needs read
+access to Products and Prices as well.
 
 Events: `checkout.session.completed`, `checkout.session.expired`,
 `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`. No Stripe

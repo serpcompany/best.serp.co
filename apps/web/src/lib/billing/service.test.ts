@@ -29,6 +29,7 @@ import {
   type BillingDependencies,
   confirmReturn,
   handleWebhook,
+  orderDiscountCents,
   previewRefund,
   refundOrder,
   refundRejectedSubmission,
@@ -54,7 +55,11 @@ function fakeProvider() {
   const expireFails = { value: false }
   let created = 0
   const provider: BillingProvider & {
-    pay(checkoutId: string, charged?: number): CheckoutState
+    /**
+     * Pays the checkout: `charged` overrides what was charged; `discount` is a promotion code's
+     * (#250), charging the price less it, and nothing to pay at 100% off.
+     */
+    pay(checkoutId: string, charged?: number, discount?: number): CheckoutState
   } = {
     async createCheckout(request) {
       created += 1
@@ -63,9 +68,11 @@ function fakeProvider() {
         amountCents: request.amountCents,
         checkoutId,
         currency: request.currency,
+        discountCents: 0,
         orderId: request.orderId,
         paymentId: null,
-        state: 'open'
+        state: 'open',
+        subtotalCents: request.amountCents
       })
       return {
         checkoutId,
@@ -87,14 +94,20 @@ function fakeProvider() {
       return session
     },
     name: 'fake',
-    pay(checkoutId, charged) {
+    pay(checkoutId, charged, discount = 0) {
       const session = sessions.get(checkoutId)
       if (!session) throw new Error('unknown session')
+      const price = session.subtotalCents ?? session.amountCents ?? 0
+      const amountCents = charged ?? price - discount
       const paid = {
         ...session,
-        amountCents: charged ?? session.amountCents,
-        paymentId: `pi_${checkoutId}`,
-        state: 'paid' as const
+        amountCents,
+        discountCents: discount,
+        // A 100%-off checkout completes with no payment.
+        paymentId: amountCents === 0 ? null : `pi_${checkoutId}`,
+        state: 'paid' as const,
+        // An override with no discount stands for a changed price (the subtotal moved too).
+        subtotalCents: charged !== undefined && discount === 0 ? charged : price
       }
       sessions.set(checkoutId, paid)
       return paid
@@ -143,7 +156,7 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
     fakeProvider()
   const clock = { now: NOW }
   const badgeChecks = { count: 0 }
-  const emails: Array<{ eventKey: string; template: string; to: string }> = []
+  const emails: Array<{ eventKey: string; input: unknown; template: string; to: string }> = []
   let ids = 0
   const deps: BillingDependencies = {
     adminRecipient: 'devin@serp.co',
@@ -165,7 +178,7 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
       return `00000000-0000-4000-8000-${String(ids).padStart(12, '0')}`
     },
     notify: async (template, request) => {
-      emails.push({ eventKey: request.eventKey, template, to: request.to })
+      emails.push({ eventKey: request.eventKey, input: request.input, template, to: request.to })
     },
     now: () => clock.now,
     operations,
@@ -470,6 +483,113 @@ describe('races and mismatches (#111 review round 1)', () => {
       refund_reason: 'admin',
       status: 'refunded'
     })
+  })
+
+  it('applies a payment a promotion code discounted, recording what was charged (#250)', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    const checkoutId = await checkout(f, 's1')
+    await webhook(
+      f,
+      JSON.stringify({
+        checkout: f.provider.pay(checkoutId, undefined, 2450),
+        id: 'evt_discounted',
+        providerType: 'fake.checkout.paid',
+        type: 'checkout_paid'
+      })
+    )
+    expect(f.row('SELECT status, outcome, attention, charged_cents FROM orders')).toEqual({
+      attention: null,
+      charged_cents: 2450,
+      outcome: 'published',
+      status: 'paid'
+    })
+    expect(f.refunds).toEqual([])
+    // The receipt email says what was paid, not the list price.
+    expect(f.emails.find(email => email.template === 'listing-live-paid')).toMatchObject({
+      input: { paidCents: 2450 }
+    })
+  })
+
+  it('applies a 100%-off checkout, with no payment, its checkout standing as the reference', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    const checkoutId = await checkout(f, 's1')
+    await webhook(
+      f,
+      JSON.stringify({
+        checkout: f.provider.pay(checkoutId, undefined, 4900),
+        id: 'evt_free',
+        providerType: 'fake.checkout.paid',
+        type: 'checkout_paid'
+      })
+    )
+    expect(
+      f.row('SELECT status, outcome, attention, charged_cents, provider_payment_id FROM orders')
+    ).toEqual({
+      attention: null,
+      charged_cents: 0,
+      outcome: 'published',
+      provider_payment_id: checkoutId,
+      status: 'paid'
+    })
+  })
+
+  it('flags a discount that does not add up to the price, and refunds what was charged', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    const checkoutId = await checkout(f, 's1')
+    const paid = f.provider.pay(checkoutId, undefined, 1000)
+    await webhook(
+      f,
+      JSON.stringify({
+        checkout: { ...paid, amountCents: 3000 },
+        id: 'evt_odd',
+        providerType: 'fake.checkout.paid',
+        type: 'checkout_paid'
+      })
+    )
+    expect(f.row('SELECT attention, charged_cents, status FROM orders')).toEqual({
+      attention: 'amount_mismatch',
+      charged_cents: 3000,
+      status: 'refunded'
+    })
+    expect(f.refunds).toEqual([expect.objectContaining({ amountCents: 3000 })])
+  })
+
+  it('shows a discount only for an applied order, never a mismatch, even after a failed refund', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    await webhook(
+      f,
+      JSON.stringify({
+        checkout: f.provider.pay(await checkout(f, 's1'), undefined, 2450),
+        id: 'evt_half',
+        providerType: 'fake.checkout.paid',
+        type: 'checkout_paid'
+      })
+    )
+    const discounted = await f.deps.operations.order(
+      f.row<{ id: string }>('SELECT id FROM orders').id
+    )
+    expect(discounted && orderDiscountCents(discounted)).toBe(2450)
+    // A $20.00 charge that didn't match: claimed for refund as `unapplied` before the provider
+    // is asked. Its flag then becomes `refund_failed`, as after five refused attempts.
+    f.submission('s2', 'draft', null)
+    await webhook(
+      f,
+      JSON.stringify({
+        checkout: f.provider.pay(await checkout(f, 's2'), 2000),
+        id: 'evt_short',
+        providerType: 'fake.checkout.paid',
+        type: 'checkout_paid'
+      })
+    )
+    const short = f.row<{ id: string }>(`SELECT id FROM orders WHERE submission_id='s2'`).id
+    f.db.exec(`UPDATE orders SET attention='refund_failed' WHERE id='${short}'`)
+    const mismatched = await f.deps.operations.order(short)
+    expect(mismatched?.chargedCents).toBe(2000)
+    expect(mismatched && orderDiscountCents(mismatched)).toBe(0)
   })
 
   it('flags a charge that does not match its order and refunds exactly what was charged', async () => {
@@ -931,9 +1051,7 @@ describe('refunds', () => {
     return f.row<{ id: string }>('SELECT id FROM orders').id
   }
 
-  it('refunds a paid submission rejected as other, once, with its email', async () => {
-    const f = fixture()
-    await paidLive(f)
+  async function rejectLiveAsOther(f: Fixture): Promise<void> {
     const listingId = f.row<{ listing_id: string }>(
       `SELECT listing_id FROM listing_submissions WHERE id='s1'`
     ).listing_id
@@ -963,6 +1081,12 @@ describe('refunds', () => {
         submissionId: 's1'
       })
     )
+  }
+
+  it('refunds a paid submission rejected as other, once, with its email', async () => {
+    const f = fixture()
+    await paidLive(f)
+    await rejectLiveAsOther(f)
     await refundRejectedSubmission(f.deps, { actor: 'devin@serp.co', submissionId: 's1' })
     await refundRejectedSubmission(f.deps, { actor: 'devin@serp.co', submissionId: 's1' })
     expect(f.refunds).toHaveLength(1)
@@ -976,6 +1100,33 @@ describe('refunds', () => {
     expect(
       f.emails.filter(email => email.template === 'submission-rejected-refunded')
     ).toHaveLength(2)
+  })
+
+  it('closes a 100%-off order rejected as other without a provider refund (#250)', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    const checkoutId = await checkout(f, 's1')
+    await webhook(
+      f,
+      JSON.stringify({
+        checkout: f.provider.pay(checkoutId, undefined, 4900),
+        id: 'evt_free',
+        providerType: 'fake.checkout.paid',
+        type: 'checkout_paid'
+      })
+    )
+    await rejectLiveAsOther(f)
+    await refundRejectedSubmission(f.deps, { actor: 'devin@serp.co', submissionId: 's1' })
+    expect(f.refundSeen.count).toBe(0)
+    expect(f.row('SELECT status, refund_reason, provider_refund_id FROM orders')).toEqual({
+      provider_refund_id: null,
+      refund_reason: 'rejected',
+      status: 'refunded'
+    })
+    // The plain rejection: there was no payment to announce a refund of.
+    const sent = f.emails.map(email => email.template)
+    expect(sent).toContain('submission-rejected')
+    expect(sent).not.toContain('submission-rejected-refunded')
   })
 
   it('sends a refund of a submission in review to its rejection instead', async () => {
