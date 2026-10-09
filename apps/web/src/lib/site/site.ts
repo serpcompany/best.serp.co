@@ -54,7 +54,6 @@ export const site: SiteDefinition = {
     showProjects: false
   },
   id: 'best.serp.co',
-  networkBrandGroup: 'all',
   routes: {
     brandsBasePath: 'brands',
     docsBasePath: 'docs',

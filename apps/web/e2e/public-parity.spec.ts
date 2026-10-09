@@ -76,13 +76,31 @@ test.describe('public parity interactions', () => {
       .getByRole('link', { name: 'Categories', exact: true })
       .click()
     await expect(page).toHaveURL(/\/products\/categories\/$/u)
-    // Only the page itself is current, never "All products" as well (#259 review). Once opened,
-    // the menu's links stay in its popup, outside <header>.
-    const current = page.locator('a[data-slot="navigation-menu-link"][aria-current="page"]')
-    await expect(current).toHaveCount(1)
-    await expect(current).toHaveAttribute('href', '/products/categories/')
+
+    // Only the page itself is current, never "All products" as well (#259 review). Read from the
+    // server HTML: after the menu closes, Base UI unmounts its popup, and on a slow host that
+    // happens before the client navigation finishes, so the live DOM may hold no menu links.
+    const categoriesHtml = await (await request.get('/products/categories/')).text()
+    const currentLinks = [
+      ...categoriesHtml.matchAll(/<a\b[^>]*data-slot="navigation-menu-link"[^>]*>/gu)
+    ]
+      .map(([tag]) => tag)
+      .filter(tag => tag.includes('aria-current="page"'))
+      .map(tag => /href="([^"]*)"/u.exec(tag)?.[1])
+    expect(currentLinks.length).toBeGreaterThan(0)
+    expect(new Set(currentLinks)).toEqual(new Set(['/products/categories/']))
+
     // The Products button marks its section (#259 review).
     await expect(nav.getByRole('button', { name: 'Products' })).toHaveAttribute('data-active', '')
+
+    // And the live header follows the client navigation: reopened, the menu marks Categories.
+    await nav.getByRole('button', { name: 'Products' }).click()
+    const reopened = page.locator('[data-slot="navigation-menu-content"]')
+    await expect(reopened.getByRole('link', { name: 'Categories', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    await expect(reopened.locator('a[aria-current="page"]')).toHaveCount(1)
   })
 
   test('the search page has its own search field, holding the query', async ({ page }) => {

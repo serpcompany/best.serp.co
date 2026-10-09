@@ -113,7 +113,6 @@ export type SiteDefinition = {
   }
   features: SiteFeatureFlags
   id: string
-  networkBrandGroup: string | null
   routes: {
     brandsBasePath: string
     docsBasePath: string
