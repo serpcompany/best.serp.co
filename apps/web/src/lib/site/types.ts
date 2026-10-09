@@ -142,9 +142,6 @@ export type SiteDefinition = {
   }
   sitemap: SiteSitemapConfig
   social: {
-    githubIssueOwner: string | null
-    githubIssueRepo: string | null
-    githubIssuesUrl: string | null
     githubRepoUrl: string
     githubUrl: string
     redditUrl: string

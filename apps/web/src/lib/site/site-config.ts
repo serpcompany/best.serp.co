@@ -34,9 +34,6 @@ export type SiteConfig = {
   dubPartnerId?: string
   features: SiteFeatureFlags
   gtmId?: string
-  githubIssueOwner: string | null
-  githubIssueRepo: string | null
-  githubIssuesUrl: string | null
   githubRepoUrl: string
   githubUrl: string
   id: string
@@ -87,10 +84,6 @@ export function getTwitterHandleFromUrl(url: string): string | null {
   } catch {
     return null
   }
-}
-
-export function hasConfiguredGitHubIssueTarget(config: SiteConfig): boolean {
-  return Boolean(config.githubIssueOwner && config.githubIssueRepo && config.githubIssuesUrl)
 }
 
 export function hasConfiguredPublicSocialLinks(config: SiteConfig): boolean {
@@ -148,9 +141,6 @@ function resolveSiteConfig(configuredSite = site): SiteConfig {
     dubPartnerId: configuredSite.analytics?.dubPartnerId,
     features: configuredSite.features,
     gtmId: configuredSite.analytics?.gtmId,
-    githubIssueOwner: configuredSite.social.githubIssueOwner,
-    githubIssueRepo: configuredSite.social.githubIssueRepo,
-    githubIssuesUrl: configuredSite.social.githubIssuesUrl,
     githubRepoUrl: configuredSite.social.githubRepoUrl,
     githubUrl: configuredSite.social.githubUrl,
     id: configuredSite.id,

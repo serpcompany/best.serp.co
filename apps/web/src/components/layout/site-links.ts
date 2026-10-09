@@ -44,7 +44,7 @@ export type FooterGroup = { title: string; links: readonly SiteLink[] }
 export type SocialLink = SiteLink & { icon: ComponentType<{ className?: string }> }
 
 // "All products" is the homepage, the canonical URL of `/products/`'s first page (#167).
-const productLinks: SiteLink[] = [
+export const productLinks: SiteLink[] = [
   { href: getRoute('home'), label: `All ${siteCopy.listingName.plural}` },
   { href: getRoute('category.index'), label: 'Categories' },
   ...(siteConfig.features.showBrands

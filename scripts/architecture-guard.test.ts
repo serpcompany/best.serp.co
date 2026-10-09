@@ -841,9 +841,6 @@ describe('single-site D1-only repository architecture', () => {
     const siteConfig = readFileSync(resolve('apps/web/src/lib/site/site.ts'), 'utf8')
     const cookiePolicy = readFileSync(resolve('apps/web/content/legal/cookies.mdx'), 'utf8')
 
-    expect(siteConfig).toContain('githubIssueOwner: null')
-    expect(siteConfig).toContain('githubIssueRepo: null')
-    expect(siteConfig).toContain('githubIssuesUrl: null')
     expect(siteConfig).not.toMatch(
       /github\.com\/serpcompany\/(?:serp\.software|pornvideodownloaders)/u
     )

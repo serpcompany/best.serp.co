@@ -80,9 +80,6 @@ export const site: SiteDefinition = {
     tagline: 'Software, AI tools, companies, resources, and SERP projects'
   },
   social: {
-    githubIssueOwner: null,
-    githubIssueRepo: null,
-    githubIssuesUrl: null,
     githubRepoUrl: 'https://github.com/serpcompany',
     githubUrl: 'https://github.com/serpcompany',
     redditUrl: 'https://www.reddit.com/r/serpapps/',
