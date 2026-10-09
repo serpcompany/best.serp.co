@@ -122,17 +122,6 @@ test.describe('visual regression coverage', () => {
     await expect(page).toHaveScreenshot('empty-search-state-desktop.png', screenshotOptions)
   })
 
-  test('desktop autocomplete suggestions remain visually stable', async ({ page }) => {
-    await prepareVisualViewport(page, 'desktop', '/')
-
-    const searchForm = page.getByRole('form', { name: /desktop search/i })
-    const searchInput = searchForm.getByRole('textbox', { name: /^search$/i })
-    await searchInput.fill(detailListing.searchQuery)
-    await expect(page.getByRole('option', { name: detailListing.namePattern })).toBeVisible()
-
-    await expect(page).toHaveScreenshot('autocomplete-desktop.png', screenshotOptions)
-  })
-
   test('favorites-only state remains visually stable when favorites exist', async ({ page }) => {
     await page.addInitScript(slug => {
       localStorage.setItem('llms-txt-hub-favorites', JSON.stringify([slug]))
@@ -161,17 +150,8 @@ test.describe('visual regression coverage', () => {
     await prepareVisualViewport(page, 'mobile', '/')
 
     await page.getByRole('button', { name: /open menu/i }).click()
-    await expect(page.getByRole('heading', { name: /^menu$/i })).toBeVisible()
+    await expect(page.getByRole('dialog').getByRole('navigation', { name: 'Site' })).toBeVisible()
 
     await expect(page).toHaveScreenshot('mobile-drawer-open.png', screenshotOptions)
-  })
-
-  test('mobile search overlay open state remains visually stable', async ({ page }) => {
-    await prepareVisualViewport(page, 'mobile', '/')
-
-    await page.getByRole('button', { name: /toggle search/i }).click()
-    await expect(page.getByRole('form', { name: /mobile search/i })).toBeVisible()
-
-    await expect(page).toHaveScreenshot('mobile-search-overlay-open.png', screenshotOptions)
   })
 })

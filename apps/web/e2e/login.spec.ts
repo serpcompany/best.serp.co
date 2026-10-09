@@ -136,11 +136,12 @@ test.describe('sign-in screens', () => {
     await expect(page.getByText(email).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'Sign up / Sign in' })).toHaveCount(0)
 
-    // Public pages show the signed-in header: Account and Sign out.
+    // Public pages show the signed-in header: the account menu, with Account and Sign out.
     await page.goto('/about/')
     const header = page.locator('header').first()
-    await expect(header.getByRole('link', { name: 'Account' })).toBeVisible()
-    await header.getByRole('button', { name: 'Sign out' }).click()
+    await header.getByRole('button', { name: 'Account' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Account' })).toBeVisible()
+    await page.getByRole('menuitem', { name: 'Sign out' }).click()
     await expect(header.getByRole('link', { name: 'Sign up / Sign in' })).toBeVisible()
 
     // Signed out, /account sends the visitor to /login and back.
@@ -251,7 +252,8 @@ test.describe('sign-in screens', () => {
     await requestCodeInPage(page, email)
     await typeCode(page, await outboxCode(page, email))
     await page.waitForURL('**/about/')
-    await page.locator('header').first().getByRole('button', { name: 'Sign out' }).click()
+    await page.locator('header').first().getByRole('button', { name: 'Account' }).click()
+    await page.getByRole('menuitem', { name: 'Sign out' }).click()
     await expect(page.getByRole('link', { name: 'Sign up / Sign in' }).first()).toBeVisible()
 
     await page.goto('/login/?callbackUrl=%2Fabout%2F')

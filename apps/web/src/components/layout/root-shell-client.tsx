@@ -1,6 +1,5 @@
 'use client'
 
-import { ArrowUp } from 'lucide-react'
 import Script from 'next/script'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react'
 
@@ -192,47 +191,4 @@ export function useFavorites(): FavoritesContextValue {
   }
 
   return context
-}
-
-export function BackToTop() {
-  const [isVisible, setIsVisible] = useState(false)
-
-  useEffect(() => {
-    const toggleVisibility = () => {
-      const scrolled = window.scrollY
-      const pageHeight = document.documentElement.scrollHeight
-      const viewportHeight = window.innerHeight
-      const isPageLongEnough = pageHeight > viewportHeight * 1.5
-      const hasScrolledEnough = scrolled > 400
-
-      setIsVisible(isPageLongEnough && hasScrolledEnough)
-    }
-
-    window.addEventListener('scroll', toggleVisibility, { passive: true })
-    toggleVisibility()
-
-    return () => window.removeEventListener('scroll', toggleVisibility)
-  }, [])
-
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    })
-  }
-
-  if (!isVisible) {
-    return null
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={scrollToTop}
-      className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full p-0 shadow-lg transition-all duration-200 hover:shadow-xl"
-      aria-label="Back to top"
-    >
-      <ArrowUp className="h-4 w-4" />
-    </button>
-  )
 }

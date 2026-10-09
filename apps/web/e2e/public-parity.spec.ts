@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 import { detailListing } from './listing-fixture'
-import { categoryPath, escapeRegExp, sampleCategory } from './site-fixture'
+import { escapeRegExp } from './site-fixture'
 import { test } from './test'
 
 async function gotoPublicPage(page: Page, path: string) {
@@ -39,72 +39,36 @@ async function expectExternalLink(link: Locator) {
 }
 
 test.describe('public parity interactions', () => {
-  test('homepage search submit preserves search URL behavior', async ({ page }) => {
-    await gotoPublicPage(page, '/')
-
-    const searchForm = page.getByRole('form', { name: /desktop search/i })
-    const searchInput = searchForm.getByRole('textbox', { name: /^search$/i })
-    await searchInput.fill('video')
-
-    await Promise.all([page.waitForURL(/\/search\/?\?q=video/), searchInput.press('Enter')])
-
-    await expect(page.getByRole('heading', { name: /^search$/i })).toBeVisible()
-  })
-
-  test('desktop autocomplete keyboard selection preserves navigation behavior', async ({
-    page
-  }) => {
-    await gotoPublicPage(page, '/')
-
-    const searchForm = page.getByRole('form', { name: /desktop search/i })
-    const searchInput = searchForm.getByRole('textbox', { name: /^search$/i })
-    await fillUntilVisible(
-      searchInput,
-      detailListing.searchQuery,
-      page.getByRole('option', { name: detailListing.namePattern })
-    )
-
-    await page.keyboard.press('ArrowDown')
-    await page.keyboard.press('Enter')
-
-    await expect(page).toHaveURL(new RegExp(`${escapeRegExp(detailListing.path)}$`))
-  })
-
-  test('mobile search overlay opens, submits, closes, and unlocks body scroll', async ({
+  test('the mobile menu opens, closes through Escape back to its trigger, and navigates', async ({
     page
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await gotoPublicPage(page, '/')
 
-    await page.getByRole('button', { name: /toggle search/i }).click()
-
-    const mobileSearchForm = page.getByRole('form', { name: /mobile search/i })
-    await expect(mobileSearchForm).toBeVisible()
-    await expect(page.locator('body')).toHaveCSS('overflow', 'hidden')
-
-    const searchInput = mobileSearchForm.getByRole('textbox', { name: /search listings/i })
-    await searchInput.fill('video')
-    await Promise.all([page.waitForURL(/\/search\/?\?q=video/), searchInput.press('Enter')])
-    await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
-  })
-
-  test('mobile drawer opens, closes through Escape, locks scroll, and navigates', async ({
-    page
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    await gotoPublicPage(page, '/')
-
-    await page.getByRole('button', { name: /open menu/i }).click()
-    await expect(page.getByRole('heading', { name: /^menu$/i })).toBeVisible()
-    await expect(page.locator('body')).toHaveCSS('overflow', 'hidden')
+    const trigger = page.getByRole('button', { name: /open menu/i })
+    await trigger.click()
+    const menu = page.getByRole('dialog')
+    await expect(menu.getByRole('navigation', { name: 'Site' })).toBeVisible()
 
     await page.keyboard.press('Escape')
-    await expect(page.getByRole('heading', { name: /^menu$/i })).not.toBeInViewport()
-    await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
+    await expect(menu).toBeHidden()
+    await expect(trigger).toBeFocused()
 
-    await page.getByRole('button', { name: /open menu/i }).click()
-    await page.getByRole('link', { name: sampleCategory.name }).first().click()
-    await expect(page).toHaveURL(new RegExp(`${escapeRegExp(categoryPath(sampleCategory.slug))}$`))
+    await trigger.click()
+    await menu.getByRole('link', { name: 'Categories' }).click()
+    await expect(page).toHaveURL(/\/products\/categories\/$/u)
+  })
+
+  test('the header menu opens on click and its links stay in the HTML while closed', async ({
+    page
+  }) => {
+    await gotoPublicPage(page, '/')
+    const nav = page.getByRole('navigation', { name: 'Site' })
+    // keepMounted: closed-menu links are in the page for crawlers.
+    await expect(nav.locator('a[href="/products/categories/"]')).toHaveCount(1)
+    await nav.getByRole('button', { name: 'Products' }).click()
+    await nav.getByRole('link', { name: 'Categories' }).click()
+    await expect(page).toHaveURL(/\/products\/categories\/$/u)
   })
 
   test('favorite toggle and favorites-only filter preserve local state behavior', async ({
@@ -182,7 +146,7 @@ test.describe('public parity interactions', () => {
   })
 
   // Links styled with buttonVariants keep their own classes through cn (#186): the header's
-  // sign-in link is `hidden sm:inline-flex`, so it waits for the menu on phones.
+  // sign-in link is `hidden md:inline-flex`, so it waits for the menu on phones.
   test('desktop-only header links stay hidden on phones', async ({ page }) => {
     await page.setViewportSize({ height: 844, width: 390 })
     await gotoPublicPage(page, '/')
