@@ -92,7 +92,9 @@ export default function BrandsPage() {
           {brands.map(brand => (
             <li key={brand.slug} className="min-w-0">
               <ListCard
-                className="h-full"
+                // The title clips the link's own focus ring, so the card shows the stock
+                // `Item` ring while its link has keyboard focus (#278 review).
+                className="h-full has-[a:focus-visible]:border-ring has-[a:focus-visible]:ring-[3px] has-[a:focus-visible]:ring-ring/50"
                 icon={<Globe />}
                 titleAs="h2"
                 title={
