@@ -76,8 +76,9 @@ test.describe('public parity interactions', () => {
       .getByRole('link', { name: 'Categories', exact: true })
       .click()
     await expect(page).toHaveURL(/\/products\/categories\/$/u)
-    // Only the page itself is current, never "All products" as well (#259 review).
-    const current = page.locator('header a[aria-current="page"]')
+    // Only the page itself is current, never "All products" as well (#259 review). Once opened,
+    // the menu's links stay in its popup, outside <header>.
+    const current = page.locator('a[data-slot="navigation-menu-link"][aria-current="page"]')
     await expect(current).toHaveCount(1)
     await expect(current).toHaveAttribute('href', '/products/categories/')
   })
