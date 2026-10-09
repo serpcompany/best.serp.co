@@ -4,9 +4,9 @@ import { CardGrid } from '@/components/layout/card-grid'
 import { PageShell } from '@/components/layout/docs-page-shell'
 import { ListCard } from '@/components/layout/list-card'
 import { LegalNav, legalDescription } from '@/components/legal/legal-nav'
-import { legalPages } from '@/lib/legal/legal-pages'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata, SITE_NAME } from '@/lib/seo/seo-config'
+import { legalPages } from '@/lib/site/legal-pages'
 
 const description =
   'Legal policies and terms for SERP: the privacy policy and the terms and conditions that apply to using the SERP directory.'

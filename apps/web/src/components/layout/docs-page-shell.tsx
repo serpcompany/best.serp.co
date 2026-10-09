@@ -33,8 +33,8 @@ export function Eyebrow({ className, children }: { className?: string; children:
  * serp.co's `PageShell` (#276): a hero with the page title, then the content. `wide` holds cards
  * and grids on the page grid, `prose` a centered article, `docs` an article beside a sidebar
  * (`aside`), and `sidebar` other content beside one. On best.serp.co `SiteChrome` owns the page's
- * `<main>` and its header is sticky, not fixed, so the shell is a `div` without serp.co's top
- * offset.
+ * `<main>` and its header stays on screen (sticky; serp.co's is absolute and scrolls away), so the shell is a `div` without serp.co's top
+ * offset, and the sticky aside sits below the 56px header (`lg:top-20`, serp.co's `lg:top-8`).
  */
 export function PageShell({
   title,
@@ -117,7 +117,7 @@ export function PageShell({
       <div className="mx-auto w-full max-w-7xl xl:border-x">
         {layout === 'docs' || layout === 'sidebar' ? (
           <div className="grid grid-cols-1 gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-16 lg:px-8 lg:py-16">
-            {aside ? <aside className="lg:sticky lg:top-8 lg:self-start">{aside}</aside> : <div />}
+            {aside ? <aside className="lg:sticky lg:top-20 lg:self-start">{aside}</aside> : <div />}
             {layout === 'docs' ? (
               <article className="prose-docs">{children}</article>
             ) : (

@@ -337,6 +337,34 @@ test.describe('public parity interactions', () => {
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
         width
       )
+
+      // The index: the legal nav on Overview and a card for each of the five policies (#282 review).
+      await gotoPublicPage(page, '/legal/')
+      await expect(
+        page
+          .getByRole('navigation', { name: 'Legal pages' })
+          .getByRole('link', { name: 'Overview' })
+      ).toHaveAttribute('aria-current', 'page')
+      await expect(page.locator('main [data-list-card] h2')).toHaveText([
+        'Privacy Policy',
+        'Terms of Service',
+        'Cookie Policy',
+        'Affiliate Disclosure',
+        'DMCA'
+      ])
+
+      // The cookie policy's wide tables scroll in their own boxes, with padded cells (#282 review).
+      await gotoPublicPage(page, '/legal/cookies/')
+      await expect(page.locator('article.prose-docs table').first()).toBeVisible()
+      expect(
+        await page
+          .locator('article.prose-docs td')
+          .first()
+          .evaluate(cell => Number.parseFloat(getComputedStyle(cell).paddingLeft))
+      ).toBeGreaterThan(0)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width
+      )
     }
   })
 

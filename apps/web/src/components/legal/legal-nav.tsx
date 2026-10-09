@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { type LegalPagePath, legalPageFor, legalPages } from '@/lib/legal/legal-pages'
 import { SITE_NAME } from '@/lib/seo/seo-config'
+import { type LegalPagePath, legalPageFor, legalPages } from '@/lib/site/legal-pages'
 import { cn } from '@/lib/utils'
 
 const items = [{ path: '/legal/', title: 'Overview' }, ...legalPages]
