@@ -399,5 +399,9 @@ test.describe('public parity interactions', () => {
     await expect(page.locator('html')).toHaveClass(/\bdark\b/u)
     await page.getByRole('menuitemradio', { name: 'Light' }).click()
     await expect(page.locator('html')).not.toHaveClass(/\bdark\b/u)
+    // System follows the browser's color scheme.
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await page.getByRole('menuitemradio', { name: 'System' }).click()
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/u)
   })
 })

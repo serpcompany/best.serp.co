@@ -76,7 +76,6 @@ async function autofillCode(page: Page, value: string): Promise<void> {
   }, value)
 }
 
-/** Counts the page's code guesses (`/api/auth/sign-in/email-otp` requests). */
 /**
  * The signed-out header (#286): its account menu offers "Sign up / Sign in". Sign-out reloads
  * the page, so the menu is opened again until the reloaded header shows the signed-out item.
@@ -93,6 +92,7 @@ async function expectSignedOutHeader(page: Page): Promise<void> {
   await page.keyboard.press('Escape')
 }
 
+/** Counts the page's code guesses (`/api/auth/sign-in/email-otp` requests). */
 function countGuesses(page: Page): { readonly count: number } {
   const guesses = { count: 0 }
   page.on('request', request => {
@@ -150,13 +150,15 @@ test.describe('sign-in screens', () => {
     await page.waitForURL('**/account/')
     await expect(page.getByRole('heading', { name: 'No listings yet' })).toBeVisible()
     await expect(page.getByText(email).first()).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Sign up / Sign in' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Account, signed in' })).toHaveCount(0)
 
-    // Public pages show the signed-in header: the account menu, with Account and Sign out.
+    // Public pages show the signed-in header: the account menu, with Account, the theme row
+    // and Sign out.
     await page.goto('/about/')
     const header = page.locator('header').first()
-    await header.getByRole('button', { name: 'Account' }).click()
+    await header.getByRole('button', { name: 'Account, signed in' }).click()
     await expect(page.getByRole('menuitem', { name: 'Account' })).toBeVisible()
+    await expect(page.getByRole('menuitemradio', { name: 'System' })).toBeVisible()
     await page.getByRole('menuitem', { name: 'Sign out' }).click()
     await expectSignedOutHeader(page)
 
