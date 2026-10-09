@@ -1401,8 +1401,8 @@ export const listingClaimHolds = sqliteTable(
 
 /**
  * Billing (#68). `orders` is the ledger of record for every charge and refund, whatever the
- * submission or listing it was for could accept (docs/DATA_MODEL.md, "Charges are recorded in
- * #68's `orders`"). Provider-neutral: `provider` names the billing provider (`stripe` now, Lago
+ * submission or listing it was for could accept (docs/SUBMISSION_DATA.md, "Payments and
+ * refunds"). Provider-neutral: `provider` names the billing provider (`stripe` now, Lago
  * later) and the `provider_*` columns hold its references. Amounts are integer minor units.
  */
 export const orderKinds = ['paid_listing', 'paid_claim'] as const

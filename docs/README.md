@@ -3,7 +3,9 @@
 | Document | Covers |
 |---|---|
 | [Architecture](./ARCHITECTURE.md) | Runtime boundaries and responsibilities |
-| [Data model](./DATA_MODEL.md) | D1 schema, eligibility, caching, the initial import |
+| [Data model](./DATA_MODEL.md) | D1 schema and migrations, D1 limits, statement plans, manifests, the initial import |
+| [Public catalog](./PUBLIC_CATALOG.md) | Public eligibility, listing states, the catalog epoch, read shapes, search |
+| [Submission and ownership data](./SUBMISSION_DATA.md) | Submission, ownership, revision, and payment invariants; URL keys and prohibited-URL blocks |
 | [Development](./DEVELOPMENT.md) | Local catalog, Worker preview, schema changes |
 | [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review |
 | [Claims](./CLAIMS.md) | Claiming an existing listing: domain-email code, badge or payment |

@@ -67,9 +67,10 @@ pnpm db:generate
 pnpm db:migrate:local
 ```
 
-Review the SQL and keep the D1 specifics described in [Data model](./DATA_MODEL.md)
-(`STRICT` tables and triggers). Never use `drizzle-kit push`. Then run
-`pnpm check` (lint, typecheck, `drizzle-kit check`, tests, and the Worker build).
+Review the SQL and keep the D1 specifics described in
+[Data model](./DATA_MODEL.md#hand-finished-migrations) (`STRICT` tables and triggers). Never use
+`drizzle-kit push`. Then run `pnpm check` (lint, typecheck, `drizzle-kit check`, tests, and the
+Worker build).
 
 After the pull request merges into `staging`, Deploy Staging applies the migration to staging
 (`pnpm db:migrate:staging` in the workflow). When the owner promotes `staging` to `main`,

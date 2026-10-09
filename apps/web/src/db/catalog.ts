@@ -79,7 +79,7 @@ async function sha256Hex(value: string): Promise<string> {
  * A single-category listing's related candidates are read from its category's members
  * when the category is at most this large; larger (dense) categories walk the name index
  * instead, which finds four members after a handful of rows. Both plans return the same
- * rows; this only picks the cheaper one (see DATA_MODEL.md).
+ * rows; this only picks the cheaper one (see `relatedListings`).
  */
 const RELATED_MEMBER_SCAN_LIMIT = 128
 const runtimePriorities = new Set(['high', 'medium', 'low'])
