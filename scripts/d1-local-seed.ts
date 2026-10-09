@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
-import { readFileSync, rmSync } from 'node:fs'
-import { basename, dirname, resolve } from 'node:path'
+import { existsSync, readFileSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
   fixtureSeedImages,
   fixtureSeedListings,
@@ -20,7 +21,7 @@ import {
   seedUsers
 } from '../apps/web/e2e/seed-facts'
 import { validateCanonicalLocalConfig } from './d1-local-config'
-import { localD1StateDirectoryName } from './d1-local-state'
+import { localD1StateDirectoryName, resolveFreshD1StateRoot } from './d1-local-state'
 import { solidPng } from './fixtures/solid-png'
 import { project } from './project'
 
@@ -61,28 +62,56 @@ export function assertLocalSeedTarget(configPath: string = project.wranglerConfi
   }
 }
 
+function isInside(path: string, base: string): boolean {
+  const offset = relative(base, path)
+  return offset !== '' && !offset.startsWith('..') && !isAbsolute(offset)
+}
+
+/** The path with its longest existing prefix resolved through symlinks. */
+function physicalPath(path: string): string {
+  let existing = path
+  while (!existsSync(existing) && dirname(existing) !== existing) existing = dirname(existing)
+  return join(realpathSync(existing), relative(existing, path))
+}
+
+export interface ResettableBases {
+  /** This checkout: `.wrangler/drizzle-state/` and a worktree's `.runtime/` live inside it. */
+  repositoryRoot: string
+  /** Throwaway state (`mktemp -d`, the tests' `mkdtemp`) lives inside it. */
+  temporaryRoot: string
+}
+
 /**
  * The canonical local state root, refusing any other path: the seed deletes it, so it must be
- * `<state>/drizzle/best-serp-co` as `resolveFreshD1StateRoot` builds it.
+ * `<state>/drizzle/best-serp-co` or the checkout's `.wrangler/drizzle-state/best-serp-co`, as
+ * `resolveFreshD1StateRoot` builds them, inside this checkout or
+ * the system temp directory, also once symlinks are resolved. A stale `HARNESS_D1_STATE_DIRECTORY`
+ * or runtime manifest pointing anywhere else is refused (#316 review).
  */
-export function assertResettableStateRoot(stateRoot: string): string {
+export function assertResettableStateRoot(
+  stateRoot: string,
+  bases: ResettableBases = { repositoryRoot: resolve('.'), temporaryRoot: tmpdir() }
+): string {
   const absolute = resolve(stateRoot)
+  const allowed = [bases.repositoryRoot, bases.temporaryRoot].map(base => resolve(base))
+  // The checkout's own state when no runtime or harness directory is set.
+  const checkoutDefault = resolveFreshD1StateRoot({ repositoryRoot: bases.repositoryRoot })
   if (
     basename(absolute) !== localD1StateDirectoryName ||
-    basename(dirname(absolute)) !== 'drizzle' ||
-    // `<state>` itself must not be the filesystem root.
-    dirname(dirname(absolute)) === dirname(dirname(dirname(absolute)))
+    (basename(dirname(absolute)) !== 'drizzle' && absolute !== checkoutDefault) ||
+    !allowed.some(base => isInside(absolute, base)) ||
+    !allowed.some(base => isInside(physicalPath(absolute), physicalPath(base)))
   ) {
     throw new Error(
-      `Refusing to reset ${absolute}: only a local D1 state root (<state>/drizzle/${localD1StateDirectoryName}) is reset.`
+      `Refusing to reset ${absolute}: only a local D1 state root (<state>/drizzle/${localD1StateDirectoryName}, or ${checkoutDefault}) inside this checkout or the system temp directory is reset.`
     )
   }
   return absolute
 }
 
 /** Deletes the local D1, R2, and cache state below the canonical root. */
-export function resetLocalState(stateRoot: string): void {
-  rmSync(assertResettableStateRoot(stateRoot), { force: true, recursive: true })
+export function resetLocalState(stateRoot: string, bases?: ResettableBases): void {
+  rmSync(assertResettableStateRoot(stateRoot, bases), { force: true, recursive: true })
 }
 
 /** The seed's identity: a digest of its statements and images, recorded on its run. */

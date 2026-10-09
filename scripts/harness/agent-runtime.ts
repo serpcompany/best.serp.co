@@ -96,8 +96,22 @@ async function runLogged(
   })
 }
 
-async function dev(root: string): Promise<void> {
+/**
+ * The runtime `agent:dev` serves, refused unless it belongs to this worktree and keeps its state
+ * inside it (`runtimeViolations`, as `agent:doctor` checks): the seed resets the manifest's D1
+ * directory, so a stale or foreign manifest must never reach it (#316 review).
+ */
+export function devRuntimeManifest(root: string): RuntimeManifest {
   const manifest = currentManifest(root, true)
+  const violations = runtimeViolations(root, manifest)
+  if (violations.length > 0) {
+    throw new Error(`${violations.join('\n')}\nSee docs/HARNESS.md#runtime-legibility.`)
+  }
+  return manifest
+}
+
+async function dev(root: string): Promise<void> {
+  const manifest = devRuntimeManifest(root)
   mkdirSync(manifest.logDirectory, { recursive: true })
   const logPath = resolve(manifest.logDirectory, 'runtime.log')
   writeFileSync(logPath, '')

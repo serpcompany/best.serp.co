@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -227,6 +235,38 @@ describe('pnpm db:seed:local refuses anything but local state', () => {
     expect(existsSync(join(state, 'drizzle', 'kept.txt'))).toBe(true)
     expect(() => resetLocalState(state)).toThrow(/Refusing to reset/u)
     expect(existsSync(state)).toBe(true)
+  })
+
+  it('resets a state root only inside this checkout or the temp directory (#316 review)', () => {
+    // The checkout's default state, and a worktree's runtime state, are inside the checkout.
+    const inCheckout = resolve('.wrangler/drizzle-state/best-serp-co')
+    expect(assertResettableStateRoot(inCheckout)).toBe(inCheckout)
+    const runtime = resolve('.runtime/feature/d1/drizzle/best-serp-co')
+    expect(assertResettableStateRoot(runtime)).toBe(runtime)
+    expect(() => assertResettableStateRoot(resolve('.wrangler/other/best-serp-co'))).toThrow(
+      /Refusing to reset/u
+    )
+    // A stale HARNESS_D1_STATE_DIRECTORY or runtime manifest pointing elsewhere is refused.
+    expect(() => assertResettableStateRoot(resolve('../elsewhere/drizzle/best-serp-co'))).toThrow(
+      /inside this checkout or the system temp directory/u
+    )
+    // So is one that leaves through a symlink.
+    const checkout = temporaryDirectory()
+    const temporary = temporaryDirectory()
+    const outside = temporaryDirectory()
+    const bases = { repositoryRoot: checkout, temporaryRoot: temporary }
+    const victim = join(outside, 'drizzle', 'best-serp-co')
+    mkdirSync(victim, { recursive: true })
+    writeFileSync(join(victim, 'keep.txt'), 'kept')
+    symlinkSync(outside, join(checkout, 'link'))
+    const escaping = join(checkout, 'link', 'drizzle', 'best-serp-co')
+    expect(() => resetLocalState(escaping, bases)).toThrow(/Refusing to reset/u)
+    expect(existsSync(join(victim, 'keep.txt'))).toBe(true)
+    expect(() => assertResettableStateRoot(victim, bases)).toThrow(/Refusing to reset/u)
+    const inside = join(checkout, 'state', 'drizzle', 'best-serp-co')
+    const inTemporary = join(temporary, 'state', 'drizzle', 'best-serp-co')
+    expect(assertResettableStateRoot(inside, bases)).toBe(inside)
+    expect(assertResettableStateRoot(inTemporary, bases)).toBe(inTemporary)
   })
 
   it('refuses a remote, staging, or production Worker config before touching state', () => {
