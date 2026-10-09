@@ -59,7 +59,8 @@ export function FeaturedOnBadgeEmbedPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card/50 p-6 backdrop-blur-sm">
+    // The product page's header panel holds it (#273), so it brings no card of its own.
+    <div>
       <h2 className="text-sm font-semibold text-foreground">
         Add a badge to your website. Click the badge below to copy the code.
       </h2>

@@ -149,6 +149,42 @@ test.describe('public parity interactions', () => {
     }
   })
 
+  test("the product page is serplists' detail page (#273)", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await gotoPublicPage(page, detailListing.path)
+    const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' })
+    await expectInternalLink(breadcrumb.getByRole('link', { name: 'Home' }), /^\/$/u)
+    await expectInternalLink(breadcrumb.getByRole('link', { name: 'Products' }), /^\/products\/$/u)
+    const header = page.locator('[data-slot="detail-page-header"]')
+    await expect(
+      header.getByRole('heading', { level: 1, name: detailListing.namePattern })
+    ).toBeVisible()
+    const visit = header.getByRole('link', { name: 'Visit Site' })
+    await expect(visit).toHaveAttribute('target', '_blank')
+    await expect(visit).toHaveAttribute('rel', /\bnoopener\b/u)
+    // The panel beside the header holds the badge embed.
+    await expect(
+      page.getByRole('complementary').getByRole('button', { name: 'Copy light badge embed code' })
+    ).toBeVisible()
+
+    // The previous and next listings sit side by side, and nothing scrolls sideways on phones.
+    const browse = page.locator('section[aria-labelledby="browse-more-heading"] ul')
+    for (const [width, expected] of [
+      [1440, 2],
+      [390, 1]
+    ] as const) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect
+        .poll(() =>
+          browse.evaluate(
+            element => getComputedStyle(element).gridTemplateColumns.split(' ').length
+          )
+        )
+        .toBe(expected)
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  })
+
   test('the home search sends its query to /search/, by Enter or its button', async ({ page }) => {
     // The field filters the list once hydrated; typing earlier is lost, so retype until it does.
     await gotoPublicPage(page, '/')

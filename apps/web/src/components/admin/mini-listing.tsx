@@ -41,7 +41,7 @@ export function MiniListing({
         </div>
       ) : null}
       <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1fr)_200px]">
-        <div className="min-w-0 text-sm leading-7 [&_.animate-fade-in-up]:opacity-100">
+        <div className="min-w-0 text-sm leading-7">
           <WebsiteContentSectionRoute website={listing} />
         </div>
         <div className="space-y-3">

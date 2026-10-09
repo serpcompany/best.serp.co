@@ -32,7 +32,7 @@ export function WebsiteCliSection({ website, slots: { CopyButton } }: WebsiteCli
   const installCommand = `${cliInstall.commandPrefix} ${cliSlug}`
 
   return (
-    <section className="animate-fade-in-up opacity-0 stagger-2">
+    <section>
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center size-10 rounded-xl bg-success/10">

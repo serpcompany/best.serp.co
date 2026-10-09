@@ -42,8 +42,8 @@ const LISTING_IMAGE_CALLERS = [
   'apps/web/src/components/directory/project-navigation.tsx',
   'apps/web/src/components/llm/listing-card.tsx',
   'apps/web/src/components/submit/submit-ui.tsx',
-  'apps/web/src/components/website/website-content-section.tsx',
-  'apps/web/src/components/website/website-hero-route.tsx'
+  'apps/web/src/components/website-routes/detail-page.tsx',
+  'apps/web/src/components/website/website-content-section.tsx'
 ]
 /** A source that names listing media: a logo, an image list, a featured image, a media key. */
 const listingMediaSource = /\b(?:media\w*|logo\w*|images|imageKey|featured\w*)\b/iu
