@@ -3,6 +3,8 @@
 | Document | Covers |
 |---|---|
 | [Architecture](./ARCHITECTURE.md) | Runtime boundaries and responsibilities |
+| [URLs](./URLS.md) | Canonical URLs, redirects, pagination, sitemaps and structured data |
+| [Caching](./CACHING.md) | The catalog epoch and the four cache layers |
 | [Data model](./DATA_MODEL.md) | D1 schema, eligibility, caching, the initial import |
 | [Development](./DEVELOPMENT.md) | Local catalog, Worker preview, schema changes |
 | [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review |
@@ -25,6 +27,7 @@
 | [Catalog publication](./CATALOG_PUBLICATION.md) | Catalog manifests and listing media plans: staging first, the publisher's and uploader's guards |
 | [Credential guards](./CREDENTIAL_GUARDS.md) | Workflow jobs holding the Cloudflare token: no D1 exports, bookmarks before changes, the security boundary |
 | [Promotion plan 2026-10-06](./releases/2026-10-06-promotion-plan.md) | The first staging → main promotion of the #59 work: blockers, order, rollback |
+| [Website guide](../apps/web/docs/agents/web.md) | Design tokens, UI rules, layout blocks, page patterns |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees |
 | [CI](./CI.md) | `web.yml` checks and staging deploy, rulesets, runners |
 | [Dependency security](./DEPENDENCY_SECURITY.md) | Production dependency audit |

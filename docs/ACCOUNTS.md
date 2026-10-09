@@ -212,8 +212,8 @@ sign-in `POST` with an empty email, from the environment's trusted origin, to an
 `INVALID_EMAIL`: the send hook returns before its rate limits for an empty email, so repeated
 deploys get the same answer and no code is sent.
 
-The edge HTML cache bypasses `/api`, `/admin`, `/account`, `/login`, and every request that
-carries a `better-auth.*` cookie, so pages under auth are never served from or stored in it.
+The edge HTML cache bypasses the auth paths and every request that carries a `better-auth.*`
+cookie, so pages under auth are never served from or stored in it ([Caching](./CACHING.md)).
 
 ## Configuration
 

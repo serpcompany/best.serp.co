@@ -209,7 +209,7 @@ passed against the staging Worker.
 `wrangler.jsonc` points `main` at `apps/web/worker.ts`, which wraps the generated
 `.open-next/worker.js`, so `opennextjs-cloudflare deploy` (and therefore
 `web.yml`'s `deploy-staging` / `deploy-production.yml`) ships the edge HTML cache with the Worker
-(see [Architecture](./ARCHITECTURE.md#caching)). Confirm it after a deploy:
+(see [Caching](./CACHING.md)). Confirm it after a deploy:
 
 ```bash
 curl -sI https://best-serp-co-staging.serpcompany.workers.dev/about/ | grep -i x-edge-cache  # MISS
