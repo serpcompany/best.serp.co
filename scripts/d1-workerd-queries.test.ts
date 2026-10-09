@@ -52,7 +52,7 @@ const NOW = new Date('2026-10-06T12:00:00.000Z')
  * full scan of a larger table.
  */
 const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
-  'canonical-redirect': 10, // a redirect: 2
+  'canonical-redirect': 10, // one of 50 redirects: 2
   'legacy-root-target': 10, // worker-entry slug seek; not run by this suite
   'category-summaries': 2_000,
   'featured-summaries': 2_500, // 100 featured: 1,887 (walks the publication index)
@@ -60,13 +60,13 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   'listing-detail': 100, // the most FAQs, links and images: 37
   'listing-name-order': 12_000, // `other`: 8,854 (3 rows per member)
   'listing-name-page-items': 1_200, // 100 ids: ~900
-  'navigation-next': 20,
-  'navigation-previous': 20,
+  'navigation-next': 20, // 5 at worst, at every boundary (3,425 on the oldest before #314)
+  'navigation-previous': 20, // 5
   'publication-version': 5, // 2 index seeks
   'published-summaries': 35_000, // 28,203, cached per epoch for sitemaps and the feed
   'related-shared-categories': 3_000, // worst listing: 2,401
   'related-single-category-members': 500, // 104
-  'related-single-category-seek': 200,
+  'related-single-category-seek': 200, // the sparsest category over 128: 79
   'search-summaries': 17_000, // worst: a term that matches category names only: 15,520
   'shell-stats': 20_000, // 15,243, cached per epoch
   'unpublished-listing': 10, // a hit, in one category like all of #100's and #104's: 8
@@ -120,6 +120,44 @@ const small = first(
     .map(([slug]) => ({ listing: onlyIn(slug) as ScaleListing, slug })),
   'small category'
 )
+/**
+ * The sparsest category the related query reaches through the name index (more than 128 public
+ * members, the fewest such), with a listing filed only there: the longest walk to four members.
+ */
+const sparse = first(
+  [...publicMembers]
+    .filter(([slug, size]) => slug !== CATCH_ALL_CATEGORY && size > 128 && onlyIn(slug))
+    .sort((left, right) => left[1] - right[1])
+    .map(([slug]) => ({ listing: onlyIn(slug) as ScaleListing, slug })),
+  'sparse category'
+)
+const binary = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0)
+/** Public listings in publication order (`PUBLICATION_ORDER` in `catalog.ts`): newest first. */
+const publicationOrder = [...live].sort(
+  (left, right) =>
+    binary(right.publishedAt as string, left.publishedAt as string) ||
+    left.displayOrder - right.displayOrder ||
+    binary(left.slug, right.slug)
+)
+const bulkStart = publicationOrder.findIndex(
+  listing => listing.publishedAt === publicationOrder.at(-1)?.publishedAt
+)
+/**
+ * Navigation at every kind of boundary: the newest listing (no previous), listings published
+ * after the bulk import (each its own date: the next one is on another date), the last of them
+ * (next crosses into the bulk import), the first and a middle bulk listing (same date, next
+ * display order), and the oldest (no next).
+ */
+const navigationStops = [
+  0,
+  1,
+  Math.floor(bulkStart / 2),
+  bulkStart - 2,
+  bulkStart - 1,
+  bulkStart,
+  Math.floor((bulkStart + publicationOrder.length) / 2),
+  publicationOrder.length - 1
+].map(index => ({ index, listing: publicationOrder[index] as ScaleListing }))
 /** The listing with the most FAQs, resource links and images: the largest detail statement. */
 const richness = new Map<string, number>()
 for (const { listingId } of [...scale.faqs, ...scale.resources, ...scale.media]) {
@@ -188,7 +226,6 @@ function expectedSearch(query: string, limit = MAX_SEARCH_LIMIT): string[] {
     if (name === phrase || fold(listing.slug) === phrase) return 0
     return name.startsWith(phrase) ? 1 : name.includes(phrase) ? 2 : 3
   }
-  const binary = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0)
   return matches
     .sort(
       (left, right) =>
@@ -348,12 +385,13 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
     ]) {
       await ops.getListingNamePage(query)
     }
-    // The detail shapes: several categories (worst related scan), one dense and one small
-    // category, the most FAQs, links and images, an unpublished listing, and a slug that does
-    // not exist.
+    // The detail shapes: several categories (worst related scan), one dense, one sparse and one
+    // small category, the most FAQs, links and images, an unpublished listing, and a slug that
+    // does not exist.
     for (const slug of [
       widest.slug,
       dense.slug,
+      sparse.listing.slug,
       small.listing.slug,
       richest.slug,
       unpublished.slug,
@@ -362,6 +400,18 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       await ops.getListingBySlug(slug)
     }
     expect(await ops.getListingBySlug(widest.slug)).toMatchObject({ slug: widest.slug })
+    // Previous and next are the neighbours in publication order, across every boundary.
+    for (const { index, listing } of navigationStops) {
+      // A fresh operations object, so no detail read earlier in this test is reused.
+      const detail = await catalog().getListingBySlug(listing.slug)
+      expect(
+        [detail?.previousWebsite?.slug ?? null, detail?.nextWebsite?.slug ?? null],
+        `${index}: ${listing.slug}`
+      ).toEqual([
+        publicationOrder[index - 1]?.slug ?? null,
+        publicationOrder[index + 1]?.slug ?? null
+      ])
+    }
     expect(await ops.getListingBySlug(unpublished.slug)).toBeNull()
     expect(await ops.getUnpublishedListing(widest.slug)).toBeNull()
     expect(await ops.getUnpublishedListing(unpublished.slug)).toMatchObject({
@@ -502,8 +552,7 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       })
     ).toMatchObject({ verificationAttempts: 1 })
 
-    // The daily draft job (#63): a reminder at +13 hours, expiry after 30 days. The generated
-    // catalog's own drafts are due too; these checks follow this test's two submissions.
+    // The daily draft job (#63): a reminder at +13 hours, expiry after 30 days.
     const waiting = await submissions.createDraft({
       ownerUserId: owner,
       submission: { ...content, website: 'https://workerd-queries-2.example/' }
@@ -511,10 +560,19 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
     expect(await submissions.listOwnSubmissions(owner, 10_000)).toHaveLength(2)
     const jobs = tracked('draftJobs', createDraftJobOperations({ client }))
     const later = (hours: number) => new Date(NOW.getTime() + hours * 3_600_000).toISOString()
-    const ours = <T extends { id: string }>(items: T[]) =>
-      items.filter(item => item.id === draft.id || item.id === waiting.id)
+    // The generated catalog's two drafts, saved two and five days before, are due for their
+    // second reminder and expire with this one. No other submission is due: not `draft`, now
+    // pending its badge, nor any generated submission in another status.
+    const generatedDrafts = scale.submissions
+      .filter(item => item.status === 'draft')
+      .sort((left, right) => binary(left.draftSavedAt as string, right.draftSavedAt as string))
+      .map(item => item.id)
+    expect(generatedDrafts).toHaveLength(2)
     const due = await jobs.remindersDue({ limit: 100, now: later(13) })
-    expect(ours(due).map(item => [item.id, item.reminder])).toEqual([[waiting.id, 1]])
+    expect(due.map(item => [item.id, item.reminder])).toEqual([
+      ...generatedDrafts.map(id => [id, 2]),
+      [waiting.id, 1]
+    ])
     expect(
       await jobs.claimReminder({
         now: later(13),
@@ -524,8 +582,8 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       })
     ).toBe(true)
     expect(
-      ours(await jobs.expiredDrafts({ limit: 100, now: later(31 * 24) })).map(item => item.id)
-    ).toEqual([waiting.id])
+      (await jobs.expiredDrafts({ limit: 100, now: later(31 * 24) })).map(item => item.id)
+    ).toEqual([...generatedDrafts, waiting.id])
     expect(await jobs.expireDraft({ now: later(31 * 24), submissionId: waiting.id })).toBe(true)
     expect(await jobs.retryableEmails({ limit: 100, maxAttempts: 5, now: later(31 * 24) })).toEqual(
       []

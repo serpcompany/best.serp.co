@@ -739,9 +739,10 @@ export function generateScaleCatalog(seed: number = SCALE_CATALOG_SEED): ScaleCa
     }
   }
 
+  // Enough redirects that a scan of them would show against the canonical-redirect budget.
   const redirects = random
     .shuffle([...liveDomains])
-    .slice(0, 6)
+    .slice(0, 50)
     .map(listing => ({
       listingId: listing.id,
       newSlug: listing.slug,
