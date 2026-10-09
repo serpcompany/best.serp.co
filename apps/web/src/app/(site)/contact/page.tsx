@@ -1,4 +1,9 @@
+import { Mail } from 'lucide-react'
 import type { Metadata } from 'next'
+import { CardGrid } from '@/components/layout/card-grid'
+import { ListCard } from '@/components/layout/list-card'
+import { PageHero } from '@/components/layout/page-hero'
+import { PageSection } from '@/components/layout/page-shell'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { siteConfig } from '@/lib/site/site-config'
 
@@ -9,21 +14,22 @@ export const metadata: Metadata = generateBaseMetadata({
   path: '/contact/'
 })
 
+/** serplists' Contact (#275): a centered hero, then the address as a card. */
 export default function ContactPage() {
   return (
-    <div className="container mx-auto max-w-3xl px-6 py-16">
-      <div className="space-y-6">
-        <h1 className="text-4xl font-bold tracking-tight">Contact SERP</h1>
-        <p className="text-lg text-muted-foreground">
-          Contact the SERP team for listing, partnership, and support questions.
-        </p>
-        <a
-          className="inline-flex font-medium text-primary underline-offset-4 hover:underline"
-          href="mailto:hello@serp.co"
-        >
-          hello@serp.co
-        </a>
-      </div>
-    </div>
+    <>
+      <PageSection spacing="hero">
+        <PageHero
+          align="center"
+          title="Contact SERP"
+          description="Contact the SERP team for listing, partnership, and support questions."
+        />
+      </PageSection>
+      <PageSection className="pt-0" spacing="spacious" width="narrow">
+        <CardGrid columns={1}>
+          <ListCard href="mailto:hello@serp.co" icon={<Mail />} title="hello@serp.co" />
+        </CardGrid>
+      </PageSection>
+    </>
   )
 }

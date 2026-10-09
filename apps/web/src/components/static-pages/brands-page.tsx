@@ -1,8 +1,10 @@
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Globe } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { SiteCard } from '@/components/directory/site-card'
-import { CardContent } from '@/components/ui/card'
+import { CardGrid } from '@/components/layout/card-grid'
+import { ListCard } from '@/components/layout/list-card'
+import { PageHero } from '@/components/layout/page-hero'
+import { PageSection } from '@/components/layout/page-shell'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { getRoute } from '../../lib/routing/routes'
 import { generateBaseMetadata, SITE_PUBLIC_URL, SITE_WEBSITE_ID } from '../../lib/seo/seo-config'
@@ -74,49 +76,42 @@ export default function BrandsPage() {
 
   const brands = getNetworkBrands()
 
+  // Laid out as the categories index (#275): a hero, then each brand as a card in the grid.
   return (
-    <div className="container mx-auto py-8">
+    <>
       <BrandsJsonLd brands={brands} />
-      <div className="space-y-10">
-        <section className="space-y-3">
-          <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-            Network
-          </p>
-          <h1 className="text-4xl font-bold tracking-tight">{siteCopy.brandsLabel}</h1>
-          <p className="max-w-3xl text-lg text-muted-foreground">
-            Browse sites and products in the {siteConfig.name} network.
-          </p>
-        </section>
-
-        <section
-          aria-label={siteCopy.brandsLabel}
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-        >
+      <PageSection spacing="hero" className="border-b">
+        <PageHero
+          eyebrow="Network"
+          title={siteCopy.brandsLabel}
+          description={`Browse sites and products in the ${siteConfig.name} network.`}
+        />
+      </PageSection>
+      <PageSection spacing="spacious">
+        <CardGrid as="ul" aria-label={siteCopy.brandsLabel}>
           {brands.map(brand => (
-            <SiteCard
-              key={brand.slug}
-              className="transition-all hover:border-primary hover:bg-muted/50"
-            >
-              <CardContent className="flex h-full flex-col justify-between gap-6 p-6">
-                <div className="space-y-2">
-                  {/* The visible link text is the brand name (serp marketing/brands-page.md). */}
-                  <h2 className="text-lg font-semibold tracking-tight">
-                    <a
-                      className="inline-flex items-center gap-2 text-primary hover:underline"
-                      href={withDubVia(brand.url)}
-                      rel="noopener noreferrer"
-                      target="_blank"
-                    >
-                      {brand.name}
-                      <ExternalLink className="size-4 shrink-0" aria-hidden="true" />
-                    </a>
-                  </h2>
-                </div>
-              </CardContent>
-            </SiteCard>
+            <li key={brand.slug} className="min-w-0">
+              <ListCard
+                className="h-full"
+                icon={<Globe />}
+                titleAs="h2"
+                title={
+                  // The visible link text is the brand name (serp marketing/brands-page.md).
+                  <a
+                    className="inline-flex items-center gap-2 underline-offset-4 hover:underline"
+                    href={withDubVia(brand.url)}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    {brand.name}
+                    <ExternalLink className="size-4 shrink-0" aria-hidden="true" />
+                  </a>
+                }
+              />
+            </li>
           ))}
-        </section>
-      </div>
-    </div>
+        </CardGrid>
+      </PageSection>
+    </>
   )
 }
