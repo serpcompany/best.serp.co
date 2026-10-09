@@ -81,6 +81,8 @@ test.describe('public parity interactions', () => {
     const current = page.locator('a[data-slot="navigation-menu-link"][aria-current="page"]')
     await expect(current).toHaveCount(1)
     await expect(current).toHaveAttribute('href', '/products/categories/')
+    // The Products button marks its section (#259 review).
+    await expect(nav.getByRole('button', { name: 'Products' })).toHaveAttribute('data-active', '')
   })
 
   test('the search page has its own search field, holding the query', async ({ page }) => {

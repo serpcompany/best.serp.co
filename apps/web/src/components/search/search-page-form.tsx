@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { SearchField } from '@/components/layout/search-field'
 import { getRoute } from '../../lib/routing/routes'
+import { siteCopy } from '../../lib/site/site-copy'
 
 /**
  * The search page's own field (#259): a GET form to `/search/` in a `<search>` landmark, holding
@@ -19,7 +20,7 @@ export function SearchPageForm() {
           defaultValue={query}
           autoComplete="off"
           aria-label="Search"
-          placeholder="Search the directory..."
+          placeholder={siteCopy.listingSearchPlaceholder}
         />
       </form>
     </search>
