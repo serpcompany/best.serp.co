@@ -1,7 +1,10 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
+import { localSqlitePath } from '../d1-local-guard'
+import { type SeedQuery, seedIncomplete } from '../d1-local-seed'
 import { hasLocalD1Database, resolveFreshD1StateRoot } from '../d1-local-state'
 import { project } from '../project'
 import {
@@ -91,9 +94,26 @@ async function runLogged(
     process.stderr.write(chunk)
     appendFileSync(logPath, chunk)
   })
+  // A command a signal killed has no exit code, and never succeeded (#313).
   return new Promise<number>(resolveStatus => {
-    child.on('close', code => resolveStatus(code || 0))
+    child.on('close', code => resolveStatus(code ?? 1))
   })
+}
+
+/**
+ * Whether the runtime's local D1 needs the fixture seed before it is served: none exists yet, or
+ * a seed that failed part-way left it migrated but empty, or seeded but unfinished (#313).
+ */
+export function needsFixtureSeed(stateRoot: string): boolean {
+  if (!hasLocalD1Database(stateRoot)) return true
+  const database = new DatabaseSync(localSqlitePath(stateRoot), { readOnly: true })
+  try {
+    const query: SeedQuery = (sql, params = []) =>
+      database.prepare(sql).all(...params) as Array<Record<string, unknown>>
+    return seedIncomplete(query)
+  } finally {
+    database.close()
+  }
 }
 
 /**
@@ -117,13 +137,14 @@ async function dev(root: string): Promise<void> {
   writeFileSync(logPath, '')
   console.log(`Runtime: ${manifest.webUrl}`)
   console.log(`Log: ${logPath}`)
-  // A fresh runtime has no local D1 yet: seed it with the fixtures (#312) before serving.
+  // A fresh runtime has no local D1 yet: seed it with the fixtures (#312) before serving. So does
+  // one a failed seed left half-written (#313).
   const stateRoot = resolveFreshD1StateRoot({
     harnessStateDirectory: manifest.d1StateDirectory,
     repositoryRoot: root
   })
-  if (!hasLocalD1Database(stateRoot)) {
-    console.log('No local D1 yet: seeding fixtures with pnpm db:seed:local.')
+  if (needsFixtureSeed(stateRoot)) {
+    console.log('No seeded local D1 yet: seeding fixtures with pnpm db:seed:local.')
     const seeded = await runLogged(root, manifest, logPath, 'seed')
     if (seeded !== 0) {
       process.exitCode = seeded

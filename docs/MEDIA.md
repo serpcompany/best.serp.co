@@ -150,9 +150,9 @@ review B1).
 The local Worker serves its bucket at `/_media/<key>` (GET and HEAD, this site's keys only, never
 on staging or in production). Locally, media fetches may use any port, for the e2e fixture sites
 on `*.localtest.me:<port>`. `curl localhost:8787/cdn-cgi/handler/scheduled` runs the cron once.
-`pnpm db:seed:local` hosts fixture logos through the real ingestion path
-(`scripts/seed-local-media.ts`), as the e2e media server (`apps/web/e2e/media-fixture.ts`) does;
-`apps/web/e2e/listing-media.spec.ts` checks the rendered media against local R2.
+`pnpm db:seed:local` hosts fixture logos through the real ingestion path (`seed-local-media.ts`);
+the e2e media server (`apps/web/e2e/media-fixture.ts`) runs it and queues an unreachable logo, and
+`listing-media.spec.ts` checks the rendered media against local R2.
 
 ## Uploading and publishing
 

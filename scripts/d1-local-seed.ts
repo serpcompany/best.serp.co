@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, realpathSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
   fixtureSeedImages,
@@ -40,10 +40,19 @@ const SEED_WORKFLOW = 'local/db-seed-local'
 
 /**
  * The seed writes only local state: the Worker config must be the dedicated local one (local D1
- * identity, local media bucket, `D1_RUNTIME_ENV=local`), and no binding may be `remote`, which
- * would send the platform proxy's writes to a Cloudflare resource.
+ * identity, local media bucket, `D1_RUNTIME_ENV=local`), no binding may be `remote`, which
+ * would send the platform proxy's writes to a Cloudflare resource, and no `CLOUDFLARE_ENV` may
+ * name a Wrangler environment (#313).
  */
-export function assertLocalSeedTarget(configPath: string = project.wranglerConfigPath): void {
+export function assertLocalSeedTarget(
+  configPath: string = project.wranglerConfigPath,
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): void {
+  if (environment.CLOUDFLARE_ENV) {
+    throw new Error(
+      `Refusing to seed with CLOUDFLARE_ENV=${environment.CLOUDFLARE_ENV}: the seed writes only local state. Unset it.`
+    )
+  }
   validateCanonicalLocalConfig(configPath)
   const config = JSON.parse(readFileSync(resolve(configPath), 'utf8')) as Record<string, unknown>
   const remote = Object.values(config)
@@ -75,6 +84,8 @@ function physicalPath(path: string): string {
 }
 
 export interface ResettableBases {
+  /** The user's home directory, which the temp directory must not hold (default `homedir()`). */
+  homeDirectory?: string
   /** This checkout: `.wrangler/drizzle-state/` and a worktree's `.runtime/` live inside it. */
   repositoryRoot: string
   /** Throwaway state (`mktemp -d`, the tests' `mkdtemp`) lives inside it. */
@@ -82,18 +93,37 @@ export interface ResettableBases {
 }
 
 /**
+ * The temp directory counts only while it holds neither this checkout nor the home directory:
+ * it follows `$TMPDIR`, and `TMPDIR=/` must not make `$HOME/x/drizzle/best-serp-co` resettable
+ * (#316 review, #313).
+ */
+function temporaryBase(bases: ResettableBases): string[] {
+  const temporary = resolve(bases.temporaryRoot)
+  const holds = (path: string) => {
+    const target = resolve(path)
+    return (
+      target === temporary ||
+      isInside(target, temporary) ||
+      physicalPath(target) === physicalPath(temporary) ||
+      isInside(physicalPath(target), physicalPath(temporary))
+    )
+  }
+  return [bases.repositoryRoot, bases.homeDirectory ?? homedir()].some(holds) ? [] : [temporary]
+}
+
+/**
  * The canonical local state root, refusing any other path: the seed deletes it, so it must be
  * `<state>/drizzle/best-serp-co` or the checkout's `.wrangler/drizzle-state/best-serp-co`, as
- * `resolveFreshD1StateRoot` builds them, inside this checkout or
- * the system temp directory, also once symlinks are resolved. A stale `HARNESS_D1_STATE_DIRECTORY`
- * or runtime manifest pointing anywhere else is refused (#316 review).
+ * `resolveFreshD1StateRoot` builds them, inside this checkout or the system temp directory (unless
+ * that holds the checkout or the home directory), also once symlinks are resolved. A stale
+ * `HARNESS_D1_STATE_DIRECTORY` or runtime manifest pointing anywhere else is refused (#316 review).
  */
 export function assertResettableStateRoot(
   stateRoot: string,
   bases: ResettableBases = { repositoryRoot: resolve('.'), temporaryRoot: tmpdir() }
 ): string {
   const absolute = resolve(stateRoot)
-  const allowed = [bases.repositoryRoot, bases.temporaryRoot].map(base => resolve(base))
+  const allowed = [resolve(bases.repositoryRoot), ...temporaryBase(bases)]
   // The checkout's own state when no runtime or harness directory is set.
   const checkoutDefault = resolveFreshD1StateRoot({ repositoryRoot: bases.repositoryRoot })
   if (
@@ -262,6 +292,15 @@ export function seedFactViolations(
       listing.name
     )
   }
+  expect(
+    'detail listing primary category',
+    value(
+      `SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id
+        JOIN listings l ON l.id=lc.listing_id WHERE l.slug=? AND lc.is_primary=1`,
+      [seedListings.detail.slug]
+    ),
+    seedListings.detail.category.slug
+  )
 
   const term = seedFacts.search.query.toLowerCase()
   expect(
@@ -271,7 +310,7 @@ export function seedFactViolations(
         OR instr(lower(l.description),?)>0 OR instr(lower(l.slug),?)>0) ORDER BY l.slug`,
       [term, term, term]
     ),
-    [...seedFacts.search.slugs].sort()
+    seedFacts.search.listings.map(listing => listing.slug).sort()
   )
 
   expect(
@@ -359,4 +398,20 @@ export function seedFactViolations(
 export function isSeeded(query: SeedQuery): boolean {
   const runs = firstValue(query, 'SELECT COUNT(*) FROM migration_runs WHERE id=?', [SEED_RUN_ID])
   return Number(runs) > 0
+}
+
+/**
+ * Whether an existing local D1 still needs `pnpm db:seed:local` before `pnpm agent:dev` serves it
+ * (#313): its migrations never finished (a table is missing), nothing was written to it, or a
+ * seed run started and never succeeded. An imported or completely seeded D1 is served as is.
+ */
+export function seedIncomplete(query: SeedQuery): boolean {
+  try {
+    const run = firstValue(query, 'SELECT outcome FROM migration_runs WHERE id=?', [SEED_RUN_ID])
+    if (run !== undefined) return run !== 'succeeded'
+    return Number(firstValue(query, 'SELECT COUNT(*) FROM publication_state')) === 0
+  } catch (error) {
+    if (/no such table/u.test(error instanceof Error ? error.message : String(error))) return true
+    throw error
+  }
 }

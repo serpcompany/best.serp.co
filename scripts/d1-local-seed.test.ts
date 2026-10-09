@@ -36,6 +36,7 @@ import {
   type SeedQuery,
   seedFactViolations,
   seedFinishStatement,
+  seedIncomplete,
   seedStartStatements
 } from './d1-local-seed'
 import { applicationColumnInventory, applicationTableNames } from './d1-table-inventory'
@@ -161,6 +162,30 @@ describe('fixture seed (#312)', () => {
     }
   })
 
+  it('tells agent:dev to seed a local D1 a failed seed left half-written (#313)', () => {
+    // Migrated but empty: the seed failed before its batch, or between its migrations and it.
+    expect(seedIncomplete(queryOf(migratedDatabase()))).toBe(true)
+    // Not even migrated: a table is missing.
+    expect(seedIncomplete(queryOf(new DatabaseSync(':memory:')))).toBe(true)
+    // The batch ran, but hosting the media failed: the run never finished.
+    const started = migratedDatabase()
+    for (const statement of seedStartStatements()) {
+      started.prepare(statement.sql).run(...statement.params)
+    }
+    expect(seedIncomplete(queryOf(started))).toBe(true)
+    started.close()
+    const seeded = seededDatabase()
+    expect(seedIncomplete(queryOf(seeded))).toBe(false)
+    seeded.close()
+    // An imported D1 (a catalog, no seed run) is served as it is.
+    const imported = migratedDatabase()
+    imported
+      .prepare('INSERT INTO publication_state (id,version,checksum) VALUES (1,0,?)')
+      .run('imported')
+    expect(seedIncomplete(queryOf(imported))).toBe(false)
+    imported.close()
+  })
+
   it('writes the same rows on every run, with no clock of its own', async () => {
     expect(JSON.stringify(seedStartStatements())).toBe(JSON.stringify(seedStartStatements()))
     expect(JSON.stringify(fixtureSeedImages())).toBe(JSON.stringify(fixtureSeedImages()))
@@ -269,6 +294,32 @@ describe('pnpm db:seed:local refuses anything but local state', () => {
     expect(assertResettableStateRoot(inTemporary, bases)).toBe(inTemporary)
   })
 
+  it('ignores a temp directory that holds the checkout or the home directory (#313)', () => {
+    const home = temporaryDirectory()
+    const checkout = join(home, 'checkout')
+    mkdirSync(checkout)
+    const inHome = join(home, 'x', 'drizzle', 'best-serp-co')
+    const inCheckout = join(checkout, 'state', 'drizzle', 'best-serp-co')
+    // TMPDIR=/ (or the home directory) would make every state root below it resettable.
+    for (const temporaryRoot of ['/', home]) {
+      const bases = { homeDirectory: home, repositoryRoot: checkout, temporaryRoot }
+      expect(() => assertResettableStateRoot(inHome, bases), temporaryRoot).toThrow(
+        /Refusing to reset/u
+      )
+      expect(assertResettableStateRoot(inCheckout, bases)).toBe(inCheckout)
+    }
+    // A temp directory beside them still counts.
+    const temporary = temporaryDirectory()
+    const inTemporary = join(temporary, 'drizzle', 'best-serp-co')
+    expect(
+      assertResettableStateRoot(inTemporary, {
+        homeDirectory: home,
+        repositoryRoot: checkout,
+        temporaryRoot: temporary
+      })
+    ).toBe(inTemporary)
+  })
+
   it('refuses a remote, staging, or production Worker config before touching state', () => {
     const directory = temporaryDirectory()
     const write = (name: string, config: Record<string, unknown>) => {
@@ -276,8 +327,12 @@ describe('pnpm db:seed:local refuses anything but local state', () => {
       writeFileSync(path, JSON.stringify(config))
       return path
     }
-    expect(() => assertLocalSeedTarget(write('local', localConfig()))).not.toThrow()
+    expect(() => assertLocalSeedTarget(write('local', localConfig()), {})).not.toThrow()
     expect(() => assertLocalSeedTarget()).not.toThrow()
+    // A Wrangler environment is never the seed's target (#313).
+    expect(() =>
+      assertLocalSeedTarget(write('local-env', localConfig()), { CLOUDFLARE_ENV: 'staging' })
+    ).toThrow(/CLOUDFLARE_ENV=staging/u)
     const database = (change: Record<string, unknown>) => {
       const config = localConfig()
       const [binding] = config.d1_databases as Array<Record<string, unknown>>

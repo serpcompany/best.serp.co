@@ -1,7 +1,18 @@
 import { expect, type Locator, type Page } from '@playwright/test'
-import { detailListing } from './listing-fixture'
-import { categoryPath, escapeRegExp, sampleCategory } from './site-fixture'
+import { catalogSample } from './catalog-sample'
+import { categoryPath, escapeRegExp } from './site-fixture'
 import { test } from './test'
+
+/**
+ * Public UI behavior, run locally on the fixture seed and against staging after each deploy
+ * (`pnpm test:e2e:smoke`). The listing, category and search it drives come from `catalogSample`
+ * (#313): the seed's facts locally, a listing read from the live catalog on a deployed Worker.
+ */
+
+/** Whether the page is `/search/` for exactly `query`. */
+function isSearchFor(query: string): (url: URL) => boolean {
+  return url => url.pathname === '/search/' && url.searchParams.get('q') === query
+}
 
 async function gotoPublicPage(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded' })
@@ -103,22 +114,33 @@ test.describe('public parity interactions', () => {
     await expect(reopened.locator('a[aria-current="page"]')).toHaveCount(1)
   })
 
-  test('the search page has its own search field, holding the query', async ({ page }) => {
-    await gotoPublicPage(page, '/search/?q=video')
+  test('the search page has its own search field, holding the query', async ({
+    baseURL,
+    page,
+    request
+  }) => {
+    const { search } = await catalogSample(request, baseURL)
+    await gotoPublicPage(page, `/search/?q=${encodeURIComponent(search.query)}`)
     const field = page.getByRole('search').getByRole('searchbox', { name: 'Search' })
-    await expect(field).toHaveValue('video')
-    await field.fill('audio')
-    await Promise.all([page.waitForURL(/\/search\/?\?q=audio$/u), field.press('Enter')])
+    await expect(field).toHaveValue(search.query)
+    const next = 'another search'
+    await field.fill(next)
+    await Promise.all([page.waitForURL(isSearchFor(next)), field.press('Enter')])
     await expect(page.getByRole('search').getByRole('searchbox', { name: 'Search' })).toHaveValue(
-      'audio'
+      next
     )
   })
 
-  test('listing grids are lists in one, two, then three columns (#264, #268)', async ({ page }) => {
+  test('listing grids are lists in one, two, then three columns (#264, #268)', async ({
+    baseURL,
+    page,
+    request
+  }) => {
+    const { category, search } = await catalogSample(request, baseURL)
     for (const [path, selector] of [
       ['/', 'section[aria-labelledby="featured"] [data-slot="card-grid"]'],
-      [categoryPath(sampleCategory.slug), 'main [data-slot="card-grid"]'],
-      ['/search/?q=video', 'main [data-slot="card-grid"]']
+      [categoryPath(category.slug), 'main [data-slot="card-grid"]'],
+      [`/search/?q=${encodeURIComponent(search.query)}`, 'main [data-slot="card-grid"]']
     ] as const) {
       await page.setViewportSize({ width: 1440, height: 900 })
       await gotoPublicPage(page, path)
@@ -149,16 +171,15 @@ test.describe('public parity interactions', () => {
     }
   })
 
-  test("the product page is serplists' detail page (#273)", async ({ page }) => {
+  test("the product page is serplists' detail page (#273)", async ({ baseURL, page, request }) => {
+    const { listing } = await catalogSample(request, baseURL)
     await page.setViewportSize({ width: 1440, height: 900 })
-    await gotoPublicPage(page, detailListing.path)
+    await gotoPublicPage(page, listing.path)
     const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' })
     await expectInternalLink(breadcrumb.getByRole('link', { name: 'Home' }), /^\/$/u)
     await expectInternalLink(breadcrumb.getByRole('link', { name: 'Products' }), /^\/products\/$/u)
     const header = page.locator('[data-slot="detail-page-header"]')
-    await expect(
-      header.getByRole('heading', { level: 1, name: detailListing.namePattern })
-    ).toBeVisible()
+    await expect(header.getByRole('heading', { level: 1, name: listing.namePattern })).toBeVisible()
     const visit = header.getByRole('link', { name: 'Visit Site' })
     await expect(visit).toHaveAttribute('target', '_blank')
     await expect(visit).toHaveAttribute('rel', /\bnoopener\b/u)
@@ -185,31 +206,40 @@ test.describe('public parity interactions', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   })
 
-  test('the home search sends its query to /search/, by Enter or its button', async ({ page }) => {
+  test('the home search sends its query to /search/, by Enter or its button', async ({
+    baseURL,
+    page,
+    request
+  }) => {
+    const { query } = (await catalogSample(request, baseURL)).search
+    const results = new RegExp(`results? for "${escapeRegExp(query)}"`, 'u')
     // The field filters the list once hydrated; typing earlier is lost, so retype until it does.
     await gotoPublicPage(page, '/')
     const field = page.getByPlaceholder('Search the directory...')
-    await fillUntilVisible(field, 'video', page.getByText(/results? for "video"/u))
-    await Promise.all([page.waitForURL(/\/search\/?\?q=video$/u), field.press('Enter')])
+    await fillUntilVisible(field, query, page.getByText(results))
+    await Promise.all([page.waitForURL(isSearchFor(query)), field.press('Enter')])
 
     await gotoPublicPage(page, '/')
     const homeField = page.getByPlaceholder('Search the directory...')
-    await fillUntilVisible(homeField, 'video', page.getByText(/results? for "video"/u))
+    await fillUntilVisible(homeField, query, page.getByText(results))
     // The field's own button, found through its form.
     const button = page
       .locator('form')
       .filter({ has: homeField })
       .getByRole('button', { name: 'Search', exact: true })
-    await Promise.all([page.waitForURL(/\/search\/?\?q=video$/u), button.click()])
+    await Promise.all([page.waitForURL(isSearchFor(query)), button.click()])
   })
 
   test('favorite toggle and favorites-only filter preserve local state behavior', async ({
-    page
+    baseURL,
+    page,
+    request
   }) => {
+    const { listing } = await catalogSample(request, baseURL)
     await gotoPublicPage(page, '/')
     await page.evaluate(slug => {
       localStorage.setItem('llms-txt-hub-favorites', JSON.stringify([slug]))
-    }, detailListing.slug)
+    }, listing.slug)
     await page.reload({ waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('main').first()).toBeVisible()
 
@@ -247,8 +277,13 @@ test.describe('public parity interactions', () => {
     await expect(page.getByText(/showing \d+ of \d+ matching products/i)).toBeVisible()
   })
 
-  test('a category page keeps the chosen sort after reload (#269)', async ({ page }) => {
-    await gotoPublicPage(page, categoryPath(sampleCategory.slug))
+  test('a category page keeps the chosen sort after reload (#269)', async ({
+    baseURL,
+    page,
+    request
+  }) => {
+    const { category } = await catalogSample(request, baseURL)
+    await gotoPublicPage(page, categoryPath(category.slug))
     const latest = page.getByRole('button', { name: /^latest$/i })
     await expect(page.getByRole('button', { name: /^name$/i })).toHaveAttribute(
       'aria-pressed',
@@ -292,7 +327,12 @@ test.describe('public parity interactions', () => {
     )
   })
 
-  test('public link href target and rel semantics are preserved', async ({ page }) => {
+  test('public link href target and rel semantics are preserved', async ({
+    baseURL,
+    page,
+    request
+  }) => {
+    const { listing } = await catalogSample(request, baseURL)
     await gotoPublicPage(page, '/')
 
     await expectInternalLink(
@@ -300,12 +340,16 @@ test.describe('public parity interactions', () => {
       /^\/submit\/$/
     )
     await expectInternalLink(
-      page.getByRole('link', { name: detailListing.namePattern }).first(),
-      new RegExp(`^${escapeRegExp(detailListing.path)}$`)
+      page.getByRole('link', { name: listing.namePattern }).first(),
+      new RegExp(`^${escapeRegExp(listing.path)}$`)
     )
 
-    await gotoPublicPage(page, detailListing.path)
-    await expectExternalLink(page.getByRole('link', { name: /install browser extension/i }).first())
+    // A resource link opens in a new tab. The seed's listing has one; a deployed listing may not,
+    // and its Visit Site link's rel follows the listing's admin setting (#62).
+    await gotoPublicPage(page, listing.path)
+    if (listing.resourceLink) {
+      await expectExternalLink(page.getByRole('link', { name: listing.resourceLink }).first())
+    }
   })
 
   // The card title clips a brand link's own focus ring, so its card draws one (#278 review).

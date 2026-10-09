@@ -1,34 +1,23 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getPlatformProxy } from 'wrangler'
+import { seedListingId } from '../apps/web/e2e/fixture-seed'
+import { queuedMediaListing } from '../apps/web/e2e/media-fixture'
 import { createMediaOperations } from '../apps/web/src/db/media-operations'
 import { buildQueueMediaPlans } from '../apps/web/src/db/media-plans'
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { configuredFreshD1StateRoot } from './d1-local-state'
-import { solidPng } from './fixtures/solid-png'
 import { project } from './project'
 
 /**
  * Hosts listing media in local state through the real ingestion path (byte sniffing,
  * content-addressed key, R2 write with its cache policy, D1 plan with a catalog publication),
  * against local D1 and R2; only the source fetch is answered from memory, with generated PNGs.
- * `pnpm db:seed:local` (`d1-local-seed.ts`) hosts the fixture seed's logos with it, and run
- * directly it seeds the e2e media server (`apps/web/e2e/media-fixture.ts`,
+ * `pnpm db:seed:local` (`d1-local-seed.ts`) hosts the fixture seed's logos with it. Run directly
+ * on a seeded D1, it adds the e2e media server's queued logo (`apps/web/e2e/media-fixture.ts`,
  * serpcompany/best.serp.co#95). Local state only: the config check refuses anything else, and
  * no binding may reach a remote resource.
  */
-
-export const MEDIA_FIXTURE_ORIGIN = 'https://fixtures.best-serp-co.test'
-/** A listing that gets a hosted logo and featured image. */
-export const HOSTED_MEDIA_LISTING = '123movies-downloader'
-/** A listing whose logo waits in the queue (its source is unreachable). */
-export const QUEUED_MEDIA_LISTING = 'autoenhance.ai'
-export const QUEUED_LOGO_SOURCE = 'https://unreachable.best-serp-co.test/logo.png'
-
-export const mediaFixtures: Record<string, Uint8Array> = {
-  [`${MEDIA_FIXTURE_ORIGIN}/logo.png`]: solidPng(512, 512, [16, 185, 129]),
-  [`${MEDIA_FIXTURE_ORIGIN}/featured.png`]: solidPng(1200, 630, [59, 130, 246])
-}
 
 export interface LocalPlatform {
   DB: D1Database
@@ -95,44 +84,32 @@ export async function hostListingImages(
   }
 }
 
-async function seed(): Promise<void> {
+/** Queues a logo for the seed's logo-less listing, from a source that never answers. */
+async function queueUnreachableLogo(): Promise<void> {
   await withLocalPlatform(async env => {
-    const id = async (slug: string) => {
-      const row = await env.DB.prepare('SELECT id FROM listings WHERE slug=?').bind(slug).first<{
-        id: string
-      }>()
-      if (!row) throw new Error(`Listing ${slug} is not in the local catalog.`)
-      return row.id
+    const listingId = seedListingId(queuedMediaListing.slug)
+    const row = await env.DB.prepare('SELECT id FROM listings WHERE id=?').bind(listingId).first()
+    if (!row) {
+      throw new Error(`Listing ${queuedMediaListing.slug} is not seeded; run pnpm db:seed:local.`)
     }
-    const hosted = await id(HOSTED_MEDIA_LISTING)
-    await hostListingImages(
-      env,
-      (['logo', 'image'] as const).map(kind => {
-        const sourceUrl = `${MEDIA_FIXTURE_ORIGIN}/${kind === 'logo' ? 'logo' : 'featured'}.png`
-        return { bytes: mediaFixtures[sourceUrl] as Uint8Array, kind, listingId: hosted, sourceUrl }
-      }),
-      { actor: 'e2e-seed', workflow: 'e2e/seed-local-media' }
-    )
-    const queued = await id(QUEUED_MEDIA_LISTING)
-    const now = new Date().toISOString()
     await env.DB.batch([
-      env.DB.prepare("DELETE FROM listing_media WHERE listing_id=? AND kind='logo'").bind(queued),
+      env.DB.prepare("DELETE FROM listing_media WHERE listing_id=? AND kind='logo'").bind(
+        listingId
+      ),
       ...buildQueueMediaPlans({
         kind: 'logo',
-        now,
+        now: new Date().toISOString(),
         sortOrder: 0,
-        sourceUrl: QUEUED_LOGO_SOURCE,
-        target: { listingId: queued }
+        sourceUrl: queuedMediaListing.source,
+        target: { listingId }
       }).map(plan => env.DB.prepare(plan.sql).bind(...plan.params))
     ])
-    console.log(
-      `Seeded hosted media for ${HOSTED_MEDIA_LISTING} and a queued logo for ${QUEUED_MEDIA_LISTING}.`
-    )
+    console.log(`Queued an unreachable logo for ${queuedMediaListing.slug}.`)
   })
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
-  seed().catch(error => {
+  queueUnreachableLogo().catch(error => {
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1
   })

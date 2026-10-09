@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test'
-import { detailListing } from './listing-fixture'
-import { categoryPath, sampleCategory } from './site-fixture'
+import { detailListing, sampleCategory, searchSample } from './listing-fixture'
+import { categoryPath } from './site-fixture'
 import { test } from './test'
 
 type ViewportName = 'desktop' | 'tablet' | 'mobile'
@@ -70,11 +70,7 @@ test.describe('visual regression coverage', () => {
   })
 
   test('search page remains visually stable', async ({ page }) => {
-    await prepareVisualViewport(
-      page,
-      'desktop',
-      `/search/?q=${encodeURIComponent(detailListing.searchQuery)}`
-    )
+    await prepareVisualViewport(page, 'desktop', `/search/?q=${searchSample.query}`)
     await expect(page.getByRole('heading', { name: /results? for/i })).toBeVisible()
 
     await expect(page).toHaveScreenshot('search-page.png', screenshotOptions)
@@ -88,11 +84,7 @@ test.describe('visual regression coverage', () => {
     })
 
     test(`search ${viewport} remains visually stable`, async ({ page }) => {
-      await prepareVisualViewport(
-        page,
-        viewport,
-        `/search/?q=${encodeURIComponent(detailListing.searchQuery)}`
-      )
+      await prepareVisualViewport(page, viewport, `/search/?q=${searchSample.query}`)
       await expect(page.getByRole('heading', { name: /results? for/i })).toBeVisible()
 
       await expect(page).toHaveScreenshot(`search-page-${viewport}.png`, screenshotOptions)

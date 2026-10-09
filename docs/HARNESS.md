@@ -120,8 +120,10 @@ pnpm test:e2e:smoke
 ```
 
 Playwright retains traces, screenshots, and video on failure. A running isolated
-Worker may be supplied through `PLAYWRIGHT_BASE_URL` and
-`PLAYWRIGHT_WEB_SERVER_COMMAND`.
+Worker may be supplied through `PLAYWRIGHT_BASE_URL` and `PLAYWRIGHT_EXTERNAL_SERVER=1` (or
+`PLAYWRIGHT_WEB_SERVER_COMMAND`). E2E data is the fixture seed: by default Playwright reseeds local
+D1 and specs assert the seed's facts (`apps/web/e2e/seed-facts.ts`); only the smoke run against a
+deployed Worker reads the live catalog ([E2E data](../apps/web/e2e/README.md#data)).
 
 ## Worktree isolation
 
