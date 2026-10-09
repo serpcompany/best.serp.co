@@ -30,13 +30,13 @@ function repositoryFiles(root: string): string[] {
     .filter(Boolean)
 }
 
-function markdownLinkTargets(source: string): string[] {
+function markdownLinkTargets(source: string, { anchors = false } = {}): string[] {
   return [...source.matchAll(/\[[^\]]+\]\(([^)]+)\)/gu)]
     .map(match => match[1]?.trim() || '')
     .filter(
       target =>
         target.length > 0 &&
-        !target.startsWith('#') &&
+        (anchors || !target.startsWith('#')) &&
         !target.startsWith('http://') &&
         !target.startsWith('https://') &&
         !target.startsWith('mailto:')
@@ -55,6 +55,86 @@ function validateLocalLink(root: string, sourcePath: string, rawTarget: string):
     return `${sourcePath}: directory link ${rawTarget} has no README.md index`
   }
   return null
+}
+
+const KEBAB_CASE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u
+const UPPERCASE_NAMES = new Set(['AGENTS.md', 'CLAUDE.md', 'README.md'])
+
+/**
+ * Every folder and file under `docs/` is named in kebab-case; only `README.md`, `AGENTS.md`
+ * and `CLAUDE.md` are uppercase (serp's docs README, "Writing Guidance").
+ */
+export function validateDocumentNames(files: readonly string[]): string[] {
+  const misnamed = new Set<string>()
+  for (const file of files.filter(candidate => candidate.startsWith('docs/'))) {
+    const segments = file.split('/').slice(1)
+    segments.forEach((segment, index) => {
+      const isFile = index === segments.length - 1
+      if (isFile && UPPERCASE_NAMES.has(segment)) return
+      const name = isFile ? segment.replace(/\.[^.]+$/u, '') : segment
+      if (!KEBAB_CASE.test(name)) misnamed.add(['docs', ...segments.slice(0, index + 1)].join('/'))
+    })
+  }
+  return [...misnamed].map(
+    path =>
+      `${path}: not kebab-case; use lowercase words joined by hyphens (only README.md, AGENTS.md and CLAUDE.md are uppercase)`
+  )
+}
+
+/**
+ * The anchors GitHub gives a Markdown file's headings: the heading's text, lowercased, with
+ * everything but letters, digits, spaces, hyphens and underscores removed and spaces made
+ * hyphens; a repeated slug gets `-1`, `-2`, and so on. Headings inside code fences don't count;
+ * `<a id>` and `<a name>` anchors do.
+ */
+export function markdownAnchors(source: string): Set<string> {
+  const anchors = new Set<string>()
+  const seen = new Map<string, number>()
+  let fence: string | null = null
+  for (const line of source.split('\n')) {
+    const fenceMatch = /^\s*(`{3,}|~{3,})/u.exec(line)
+    if (fenceMatch?.[1]) {
+      const marker = fenceMatch[1][0] as string
+      if (fence === null) fence = marker
+      else if (fence === marker) fence = null
+      continue
+    }
+    if (fence !== null) continue
+    for (const match of line.matchAll(/<a\s+(?:id|name)="([^"]+)"/gu)) {
+      if (match[1]) anchors.add(match[1])
+    }
+    const heading = /^#{1,6}\s+(.*?)\s*#*\s*$/u.exec(line)
+    if (!heading?.[1]) continue
+    const text = heading[1]
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/gu, '$1')
+      .replace(/<[^>]+>/gu, '')
+      .replace(/`/gu, '')
+    const base = text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+      .replace(/\s/gu, '-')
+    const count = seen.get(base) ?? 0
+    seen.set(base, count + 1)
+    anchors.add(count === 0 ? base : `${base}-${count}`)
+  }
+  return anchors
+}
+
+/** A local Markdown link's `#fragment` that names no heading or anchor in its target file. */
+function validateLinkAnchor(root: string, sourcePath: string, rawTarget: string): string | null {
+  const targetWithoutTitle = rawTarget.split(/\s+"/u)[0] || rawTarget
+  const target = targetWithoutTitle.replace(/^<|>$/gu, '')
+  const hash = target.indexOf('#')
+  if (hash === -1) return null
+  const path = target.slice(0, hash)
+  const fragment = decodeURIComponent(target.slice(hash + 1))
+  if (!fragment) return null
+  const file = path
+    ? resolve(root, dirname(sourcePath), decodeURIComponent(path))
+    : resolve(root, sourcePath)
+  if (extname(file) !== '.md' || !existsSync(file) || statSync(file).isDirectory()) return null
+  if (markdownAnchors(readFileSync(file, 'utf8')).has(fragment.toLowerCase())) return null
+  return `${sourcePath}: broken anchor ${rawTarget}`
 }
 
 function validateSkill(root: string, file: string): string[] {
@@ -86,7 +166,10 @@ export function wrappedLineCount(source: string): number {
   return source
     .trimEnd()
     .split('\n')
-    .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / WRAP_COLUMNS)), 0)
+    .reduce(
+      (total, line) => total + Math.max(1, Math.ceil(Array.from(line).length / WRAP_COLUMNS)),
+      0
+    )
 }
 
 function documentationBudget(file: string): { budget: number; kind: 'leaf' | 'map' } | null {
@@ -100,10 +183,8 @@ function documentationBudget(file: string): { budget: number; kind: 'leaf' | 'ma
  * Size budgets: maps (`AGENTS.md`, `README.md`) stay at or under 120 wrapped lines and every
  * other doc under `docs/` at or under 300, unless `allowances` holds a doc at a recorded size.
  * An allowance whose doc fits its budget or no longer exists fails too, so it gets deleted.
- * The numbers come from the docs-are-maps principle drafted for serpcompany/serp
- * (`docs/engineering/standards/agent-harness/docs-are-maps.md` on the unpublished
- * `agent-harness-principles` branch); serp `main` says only that docs stay under "a few
- * hundred lines" (`docs/engineering/standards/agent-harness.md`).
+ * The numbers are serp's docs-are-maps budgets
+ * (`docs/engineering/standards/agent-harness/docs-are-maps.md`), counted in code points.
  */
 export function validateDocumentationBudgets(
   documents: Readonly<Record<string, string>>,
@@ -185,7 +266,12 @@ export function checkDocumentation(root = resolve('.')): string[] {
       const violation = validateLocalLink(root, file, target)
       if (violation) violations.push(violation)
     }
+    for (const target of markdownLinkTargets(source, { anchors: true })) {
+      const violation = validateLinkAnchor(root, file, target)
+      if (violation) violations.push(violation)
+    }
   }
+  violations.push(...validateDocumentNames(files))
 
   for (const file of files.filter(candidate =>
     /^\.agents\/skills\/[^/]+\/SKILL\.md$/u.test(candidate)

@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest'
 import {
   checkDocumentation,
   DOC_LINE_ALLOWANCES,
+  markdownAnchors,
   validateDocumentationBudgets,
+  validateDocumentNames,
   validatePlanningDocumentation,
   wrappedLineCount
 } from './harness/docs-health.ts'
@@ -13,6 +15,47 @@ import { stepsForProfile } from './harness/runner.ts'
 describe('repository harness contract', () => {
   it('keeps documentation, indexes, skills, links, and commands healthy', () => {
     expect(checkDocumentation(resolve('.'))).toEqual([])
+  })
+
+  it('names every doc and folder under docs/ in kebab-case (#190)', () => {
+    expect(
+      validateDocumentNames([
+        'docs/README.md',
+        'docs/deploy-runbook.md',
+        'docs/agents/issue-tracker.md',
+        'AGENTS.md',
+        'apps/web/docs/agents/web.md',
+        'docs/DATA_MODEL.md',
+        'docs/Mockups/copy.md'
+      ])
+    ).toEqual([
+      'docs/DATA_MODEL.md: not kebab-case; use lowercase words joined by hyphens (only README.md, AGENTS.md and CLAUDE.md are uppercase)',
+      'docs/Mockups: not kebab-case; use lowercase words joined by hyphens (only README.md, AGENTS.md and CLAUDE.md are uppercase)'
+    ])
+  })
+
+  it("reads a doc's anchors as GitHub writes them (#190)", () => {
+    const anchors = markdownAnchors(
+      [
+        '# Release guards',
+        '## `db:*` commands by target',
+        '## Staging before production',
+        '## Staging before production',
+        '### [Linked](./x.md) heading',
+        '```md',
+        '## Not a heading',
+        '```',
+        '<a id="custom-anchor"></a>'
+      ].join('\n')
+    )
+    expect([...anchors]).toEqual([
+      'release-guards',
+      'db-commands-by-target',
+      'staging-before-production',
+      'staging-before-production-1',
+      'linked-heading',
+      'custom-anchor'
+    ])
   })
 
   it('holds maps and leaves to the docs-are-maps size budgets at 100 columns', () => {
