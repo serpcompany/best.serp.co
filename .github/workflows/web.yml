@@ -231,7 +231,7 @@ jobs:
     # bookmark, staging D1 migrations, Worker deploy, HTTP gates, and the Playwright smoke suite
     # against the deployed staging Worker. Deploy Production releases only a tree one of these
     # jobs verified. Skips (green) until the `staging` environment holds Cloudflare credentials;
-    # see docs/DEPLOY_RUNBOOK.md.
+    # see docs/DEPLOY_CREDENTIALS.md.
     name: Validate, migrate, deploy & smoke-test staging
     needs: [check, e2e, tip]
     if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'
@@ -261,7 +261,7 @@ jobs:
             exit 0
           fi
           echo "configured=false" >> "$GITHUB_OUTPUT"
-          message="Staging deploy skipped: the staging environment has no CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets yet (docs/DEPLOY_RUNBOOK.md)."
+          message="Staging deploy skipped: the staging environment has no CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets yet (docs/DEPLOY_CREDENTIALS.md)."
           echo "::notice title=Staging deploy skipped::$message"
           echo "$message" >> "$GITHUB_STEP_SUMMARY"
 

@@ -170,6 +170,8 @@ export function selectSubmissionReviewPlans(submissionId: string): StatementPlan
           CASE WHEN l.status='approved' AND l.is_active=1 AND l.published_at IS NOT NULL
             THEN 1 ELSE 0 END AS listing_live,
           l.published_at AS listing_published_at,
+          EXISTS (SELECT 1 FROM listing_owners lo WHERE lo.listing_id=l.id AND lo.role='owner'
+            AND lo.revoked_at IS NULL) AS listing_verified_owner,
           (SELECT COUNT(*) FROM listings d WHERE d.slug=s.slug
             AND d.id IS NOT s.listing_id) AS duplicate_listings,
           (SELECT COUNT(*) FROM listing_submissions d WHERE d.slug=s.slug AND d.id!=s.id
@@ -219,6 +221,8 @@ export function selectRevisionReviewPlans(revisionId: string): StatementPlan[] {
           l.link_rel AS listing_link_rel,
           CASE WHEN l.status='approved' AND l.is_active=1 AND l.published_at IS NOT NULL
             THEN 1 ELSE 0 END AS listing_live,
+          EXISTS (SELECT 1 FROM listing_owners lo WHERE lo.listing_id=l.id AND lo.role='owner'
+            AND lo.revoked_at IS NULL) AS listing_verified_owner,
           ${listingPaidSql('r.listing_id')} AS plan,
           u.id AS owner_user_id,u.email AS owner_email,u.created_at AS owner_created_at,
           (SELECT COUNT(*) FROM listing_submissions o WHERE o.owner_user_id=r.author_user_id)
@@ -577,6 +581,8 @@ export interface SubmissionReview {
     live: boolean
     publishedAt: string | null
     slug: string
+    /** The live listing has a current owner now, so its page shows "Verified owner". */
+    verifiedOwner: boolean
   } | null
   /** The hosted copy of the submission's social image, if any (#95). */
   imageKey: string | null
@@ -624,6 +630,11 @@ export interface RevisionReview {
     live: boolean
     name: string
     slug: string
+    /**
+     * The listing has a current owner now, so its page shows "Verified owner". A revision proves
+     * ownership only when it was started: the owner may since be revoked or replaced.
+     */
+    verifiedOwner: boolean
   }
   /** The hosted copy of `logoUrl`, if any: render this, never `logoUrl` (#96 S9). */
   logoKey: string | null
@@ -924,7 +935,8 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
           linkRel: text(row.listing_link_rel) as ListingLinkRel,
           live: Number(row.listing_live) === 1,
           name: text(row.listing_name),
-          slug: text(row.slug)
+          slug: text(row.slug),
+          verifiedOwner: Number(row.listing_verified_owner) === 1
         },
         logoKey: optionalText(row.logo_key),
         logoUrl: text(row.logo_url),
@@ -982,7 +994,8 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
                 linkRel: text(row.listing_link_rel) as ListingLinkRel,
                 live: Number(row.listing_live) === 1,
                 publishedAt: toInstant(row.listing_published_at),
-                slug: text(row.listing_slug)
+                slug: text(row.listing_slug),
+                verifiedOwner: Number(row.listing_verified_owner) === 1
               }
             : null,
         imageKey: optionalText(row.image_key),

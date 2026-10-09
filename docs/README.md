@@ -20,7 +20,10 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Submitter dashboard](./ACCOUNT_DASHBOARD.md) | `/account`: statuses, edits, revisions, the badge panel | You change a `/account` screen |
 | [Accounts](./ACCOUNTS.md) | Better Auth sign-in codes, admins, Cloudflare Access | You change sign-in, sessions, the dashboard shell, or the admin gate |
 | [Admin panel](./ADMIN_PANEL.md) | `/admin` screens, decisions, the production-write exception | You change an `/admin` screen or a decision it writes |
-| [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, release flow, cutover checklist | Before any Cloudflare operation or release |
+| [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, workflows and their guards, production release, recovery, post-deploy checks | Before any Cloudflare operation or release, or when a deploy gate fails |
+| [Deploy credentials](./DEPLOY_CREDENTIALS.md) | The Cloudflare API token, the GitHub environments that hold it, what a leak reaches | You create, rotate or narrow the token or an environment's secrets |
+| [Production D1 bootstrap](./PRODUCTION_BOOTSTRAP.md) | Importing the reviewed catalog into an empty production D1, its rehearsal and read-only checks | You re-create production D1 from the reviewed import |
+| [Production cutover](./PRODUCTION_CUTOVER.md) | The finished move of best.serp.co from GitHub Pages to the Worker, and the canonical-host switch | Code or a gate mentions the cutover or the canonical-host switch |
 | [Telemetry](./TELEMETRY.md) | Sentry error reporting, GTM and Cloudflare Web Analytics | You add logging, error reporting, or analytics |
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel | A production write needs undoing |
 | [Catalog hygiene](./CATALOG_HYGIENE.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains | You add or remove listings, change the domain check, or touch the listing FAQs' `faqsToShow` stopgap |

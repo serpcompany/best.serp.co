@@ -19,6 +19,8 @@ const listing: ListingDetail = {
   previousWebsite: null,
   publishedAt: '2026-10-09',
   relatedWebsites: [],
+  faqs: [{ answer: 'Yes, every plan includes it.', question: 'Is there a free plan?' }],
+  resourceLinks: [{ label: 'Docs', url: 'https://docs.staged.example/' }],
   slug: 'staged.example',
   website: 'https://staged.example/'
 }
@@ -32,12 +34,17 @@ describe('admin review preview (#292)', () => {
     vi.unstubAllGlobals()
   })
 
-  const markup = () =>
-    renderToStaticMarkup(<MiniListing categoryName="E2E Tools" listing={listing} />)
+  const markup = (verifiedOwner = false) =>
+    renderToStaticMarkup(
+      <MiniListing categoryName="E2E Tools" listing={listing} verifiedOwner={verifiedOwner} />
+    )
+  /** The header: everything before the separator over the content. */
+  const header = (html: string) => html.split('data-slot="separator"')[0] ?? ''
 
   it("draws the product page's header: the name, description, staged category and Visit Site", () => {
     const html = markup()
-    expect(html).toContain('<h3')
+    // The review page's `h1` is the record; the preview's name is the next level (#296).
+    expect(header(html)).toMatch(/<h2[^>]*>Staged Tool<\/h2>/)
     expect(html).toContain('Staged Tool')
     expect(html).toContain('A staged listing.')
     expect(html).toContain('E2E Tools')
@@ -48,7 +55,25 @@ describe('admin review preview (#292)', () => {
     expect(markup().split('/listings/staged/image/1.png').length - 1).toBe(1)
   })
 
-  it('links nowhere: the preview is a picture of the page', () => {
-    expect(markup()).not.toContain('<a ')
+  it("links nowhere in the header: it's a picture of the page", () => {
+    expect(header(markup())).not.toContain('<a ')
+  })
+
+  it('draws the staged resource links under the content, as the product page does (#296)', () => {
+    const html = markup()
+    expect(header(html)).not.toContain('docs.staged.example')
+    expect(html).toContain('Docs')
+    expect(html).toContain('docs.staged.example')
+  })
+
+  it('draws the staged FAQs, as the product page does (#296 review)', () => {
+    const html = markup()
+    expect(header(html)).not.toContain('Is there a free plan?')
+    expect(html).toContain('Is there a free plan?')
+  })
+
+  it('shows Verified owner only when asked to (#296)', () => {
+    expect(header(markup(true))).toContain('Verified owner')
+    expect(markup()).not.toContain('Verified owner')
   })
 })

@@ -278,7 +278,7 @@ done
 
 Done on 2026-10-06: the `cdn-staging` bucket and both custom domains exist, and the deploy token
 `best-serp-co-deploy` has Account → Workers R2 Storage → Edit (see the
-[deploy runbook](./DEPLOY_RUNBOOK.md#cloudflare-api-token)).
+[deploy credentials](./DEPLOY_CREDENTIALS.md#cloudflare-api-token)).
 
 ### Optional owner actions
 
