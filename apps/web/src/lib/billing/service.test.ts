@@ -29,6 +29,7 @@ import {
   type BillingDependencies,
   confirmReturn,
   handleWebhook,
+  orderDiscountCents,
   previewRefund,
   refundOrder,
   refundRejectedSubmission,
@@ -554,6 +555,41 @@ describe('races and mismatches (#111 review round 1)', () => {
       status: 'refunded'
     })
     expect(f.refunds).toEqual([expect.objectContaining({ amountCents: 3000 })])
+  })
+
+  it('shows a discount only for an applied order, never a mismatch, even after a failed refund', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    await webhook(
+      f,
+      JSON.stringify({
+        checkout: f.provider.pay(await checkout(f, 's1'), undefined, 2450),
+        id: 'evt_half',
+        providerType: 'fake.checkout.paid',
+        type: 'checkout_paid'
+      })
+    )
+    const discounted = await f.deps.operations.order(
+      f.row<{ id: string }>('SELECT id FROM orders').id
+    )
+    expect(discounted && orderDiscountCents(discounted)).toBe(2450)
+    // A $20.00 charge that didn't match: claimed for refund as `unapplied` before the provider
+    // is asked. Its flag then becomes `refund_failed`, as after five refused attempts.
+    f.submission('s2', 'draft', null)
+    await webhook(
+      f,
+      JSON.stringify({
+        checkout: f.provider.pay(await checkout(f, 's2'), 2000),
+        id: 'evt_short',
+        providerType: 'fake.checkout.paid',
+        type: 'checkout_paid'
+      })
+    )
+    const short = f.row<{ id: string }>(`SELECT id FROM orders WHERE submission_id='s2'`).id
+    f.db.exec(`UPDATE orders SET attention='refund_failed' WHERE id='${short}'`)
+    const mismatched = await f.deps.operations.order(short)
+    expect(mismatched?.chargedCents).toBe(2000)
+    expect(mismatched && orderDiscountCents(mismatched)).toBe(0)
   })
 
   it('flags a charge that does not match its order and refunds exactly what was charged', async () => {

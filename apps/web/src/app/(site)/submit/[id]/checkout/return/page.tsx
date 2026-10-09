@@ -9,7 +9,7 @@ import {
 import { checkoutPageProblem } from '@/lib/billing/guardrails'
 import { checkoutPage, toAccount } from '@/lib/billing/pages'
 import { billing } from '@/lib/billing/runtime'
-import { confirmReturn } from '@/lib/billing/service'
+import { confirmReturn, orderDiscountCents } from '@/lib/billing/service'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { submissionBadgeTargets } from '@/lib/submissions/presentation'
 
@@ -47,10 +47,7 @@ export default async function CheckoutReturnPage({ params, searchParams }: Props
   // What was charged: less than the price when a promotion code applied (#250).
   const details = {
     amountCents: order.chargedCents ?? order.amountCents,
-    discountCents:
-      order.attention !== 'amount_mismatch' && order.chargedCents !== null
-        ? order.amountCents - order.chargedCents
-        : 0,
+    discountCents: orderDiscountCents(order),
     email: user.email,
     number: order.number
   }

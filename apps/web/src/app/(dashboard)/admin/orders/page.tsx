@@ -8,6 +8,7 @@ import { formatUsd } from '@/lib/admin/format'
 import { getAdminOrders } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'
 import { billing, ordersEnabled } from '@/lib/billing/runtime'
+import { orderDiscountCents } from '@/lib/billing/service'
 import { mediaBaseUrl } from '@/lib/media/media-base'
 import { renderableImage } from '@/lib/media/renderable-image'
 import { site } from '@/lib/site'
@@ -56,14 +57,8 @@ export default async function OrdersPage() {
   const media = await mediaBaseUrl()
   const orders: OrderRow[] = (await getAdminOrders()).map(order => {
     const charged = order.chargedCents ?? order.amountCents
-    // A promotion code's discount (#250): only a charge that matched the order has one. A
-    // flagged mismatch is a wrong charge, refunded in full, never a discount.
-    const discountCents =
-      order.attention !== 'amount_mismatch' &&
-      order.chargedCents !== null &&
-      order.chargedCurrency === order.currency
-        ? order.amountCents - order.chargedCents
-        : 0
+    // A promotion code's discount (#250), never a mismatched charge's shortfall.
+    const discountCents = orderDiscountCents(order)
     // The code is on the checkout, so a discounted order links there; others to the payment.
     const paymentRef =
       (discountCents > 0 ? order.providerCheckoutId : order.providerPaymentId) ??

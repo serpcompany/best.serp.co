@@ -535,6 +535,18 @@ export function chargeMatchesOrder(checkout: CheckoutState, order: OrderRecord):
 }
 
 /**
+ * A promotion code's discount on an order, for people to see (#250): the price less what was
+ * charged, only for an order its payment applied. A charge that didn't match the order is
+ * never applied (it is refunded as `unapplied`), so it never reads as a discount, whatever
+ * `attention` became later (a failed refund replaces `amount_mismatch` with `refund_failed`).
+ */
+export function orderDiscountCents(order: OrderRecord): number {
+  if (order.outcome === null || order.outcome === 'unapplied') return 0
+  if (order.chargedCents === null || order.chargedCurrency !== order.currency) return 0
+  return Math.max(0, order.amountCents - order.chargedCents)
+}
+
+/**
  * A paid checkout: the order becomes `paid` (once), recording what was actually charged, then
  * the payment is applied. A promotion code's discount is charged less (#250); a 100%-off code
  * charges nothing and has no payment, so the checkout stands as its reference. A charge that
