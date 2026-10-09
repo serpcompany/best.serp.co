@@ -25,4 +25,5 @@ This application is the best.serp.co Cloudflare Worker, not a filesystem-backed 
   never import routes (`noRestrictedImports` in `biome.jsonc`; tests are exempt).
 - Validate Worker compatibility with `pnpm build`.
 
-See [Architecture](../../docs/ARCHITECTURE.md) and [Harness](../../docs/HARNESS.md).
+See [Architecture](../../docs/ARCHITECTURE.md) and [Harness](../../docs/HARNESS.md). Design, UI components and
+the page patterns are in the [website guide](./docs/agents/web.md).

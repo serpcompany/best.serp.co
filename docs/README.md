@@ -25,6 +25,7 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel | A production write needs undoing |
 | [Catalog hygiene](./CATALOG_HYGIENE.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains | You add or remove listings, change the domain check, or touch the listing FAQs' `faqsToShow` stopgap |
 | [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, promotion, staging before production, hotfixes | You run a `db:*` command, promote `staging`, open a `hotfix-*` pull request, or change a release workflow |
+| [Website guide](../apps/web/docs/agents/web.md) | Design tokens, UI rules, layout blocks, page patterns | You change how a page looks, add a component, or build a page |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees | You validate a change, capture runtime evidence, or start a worktree |
 | [CI](./CI.md) | `web.yml` checks and staging deploy, rulesets, runners | A check fails in CI, or you change a workflow |
 | [Dependency security](./DEPENDENCY_SECURITY.md) | Production dependency audit | You add or upgrade a dependency, or the audit fails |
