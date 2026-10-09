@@ -664,7 +664,7 @@ export function recordTimeTravelBookmark(
     )
   } catch (error) {
     throw new Error(
-      `Could not record a D1 Time Travel bookmark of ${database}; refusing to change it without a restore point. The Cloudflare token needs Account → D1 → Edit (docs/DEPLOY_RUNBOOK.md#cloudflare-api-token). ${
+      `Could not record a D1 Time Travel bookmark of ${database}; refusing to change it without a restore point. The Cloudflare token needs Account → D1 → Edit (docs/DEPLOY_CREDENTIALS.md#cloudflare-api-token). ${
         error instanceof Error ? error.message : String(error)
       }`
     )

@@ -6,7 +6,7 @@ name: Bootstrap Production D1
 # d1/artifacts/best-serp-co-v1.sql.br only if its sha256 matches the parity report, then proves
 # exact parity with the report. Because it applies every migration at this commit, it runs only
 # for a commit whose tree Deploy Staging verified on the staging branch (staging before
-# production). See docs/DEPLOY_RUNBOOK.md.
+# production). See docs/PRODUCTION_BOOTSTRAP.md.
 on:
   workflow_dispatch:
     inputs:
@@ -68,7 +68,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::The production environment needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/DEPLOY_RUNBOOK.md)."
+            echo "::error::The production environment needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/DEPLOY_CREDENTIALS.md)."
             exit 1
           fi
 

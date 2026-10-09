@@ -6,7 +6,7 @@ import { MAX_MEDIA_BYTES } from '../apps/web/src/db/media-keys'
  * a media host's CDN: what a bucket holds, byte for byte, whatever an edge cache, image
  * optimization, or `Accept` negotiation would serve (#97 review B2, S3). Used by the media
  * upload (`media-upload.ts`) and the publisher's served-objects check (`d1-remote-publisher.ts`).
- * The token needs Account → Workers R2 Storage (docs/DEPLOY_RUNBOOK.md#cloudflare-api-token).
+ * The token needs Account → Workers R2 Storage (docs/DEPLOY_CREDENTIALS.md#cloudflare-api-token).
  *
  * Every call goes through one process-wide rate limiter and retries 429s and 5xx answers (#95
  * release blocker 3): the Cloudflare API allows about 1,200 requests per five minutes for the
