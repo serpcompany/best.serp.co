@@ -224,3 +224,124 @@ code:not(pre code) {
     animation: none !important;
   }
 }
+
+/* serp.co's headline type and long-form text (`globals.css`), for the legal pages' docs layout
+   (#276). */
+@utility text-display {
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+@utility text-headline {
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+/* Long-form text (legal pages): GitHub-style markdown rhythm. */
+@layer components {
+  .prose-docs {
+    color: var(--foreground);
+    font-size: 1rem;
+    line-height: 1.7;
+    max-width: 72ch;
+    overflow-wrap: break-word;
+  }
+  .prose-docs > * + * {
+    margin-top: 1rem;
+  }
+  .prose-docs h2 {
+    margin-top: 2.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--foreground);
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    scroll-margin-top: 1.5rem;
+  }
+  .prose-docs > :first-child {
+    margin-top: 0;
+  }
+  .prose-docs h3 {
+    margin-top: 2rem;
+    color: var(--foreground);
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.4;
+    scroll-margin-top: 1.5rem;
+  }
+  .prose-docs code {
+    border-radius: var(--radius-sm);
+    background: var(--muted);
+    padding: 0.15em 0.4em;
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 0.875em;
+  }
+  .prose-docs pre {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--card);
+    padding: 1rem 1.25rem;
+    line-height: 1.6;
+  }
+  .prose-docs pre code {
+    background: none;
+    padding: 0;
+  }
+  .prose-docs blockquote {
+    border-left: 3px solid var(--border);
+    padding-left: 1rem;
+    color: var(--muted-foreground);
+  }
+  .prose-docs hr {
+    margin-block: 2.5rem;
+    border-color: var(--border);
+  }
+  .prose-docs img {
+    border-radius: var(--radius-xl);
+  }
+  .prose-docs a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklch, currentColor 40%, transparent);
+    text-underline-offset: 0.2em;
+  }
+  .prose-docs a:hover {
+    text-decoration-color: currentColor;
+  }
+  .prose-docs strong {
+    color: var(--foreground);
+  }
+  .prose-docs ul,
+  .prose-docs ol {
+    padding-left: 1.5rem;
+  }
+  .prose-docs ul {
+    list-style: disc;
+  }
+  .prose-docs ol {
+    list-style: decimal;
+  }
+  .prose-docs li + li {
+    margin-top: 0.5rem;
+  }
+  .prose-docs li::marker {
+    color: var(--muted-foreground);
+  }
+  .prose-docs address {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--card);
+    padding: 1rem 1.25rem;
+    font-style: normal;
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 0.875rem;
+    line-height: 1.8;
+  }
+}

@@ -71,32 +71,44 @@ export function SiteBreadcrumb({
           ))}
         </BreadcrumbList>
       </Breadcrumb>
-      {structuredData && (
-        <script
-          type="application/ld+json"
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'BreadcrumbList',
-              itemListElement: [
-                {
-                  '@type': 'ListItem',
-                  position: 1,
-                  name: 'Home',
-                  item: absoluteHref(homeHref, baseUrl)
-                },
-                ...items.map((item, index) => ({
-                  '@type': 'ListItem',
-                  position: index + 2,
-                  name: item.name,
-                  item: absoluteHref(item.href, baseUrl)
-                }))
-              ]
-            })
-          }}
-        />
-      )}
+      {structuredData && <BreadcrumbJsonLd items={items} homeHref={homeHref} baseUrl={baseUrl} />}
     </div>
+  )
+}
+
+/**
+ * A trail's `BreadcrumbList` JSON-LD, Home first. The legal pages write it beside their own
+ * breadcrumb (#276), which has none.
+ */
+export function BreadcrumbJsonLd({
+  items,
+  homeHref = '/',
+  baseUrl
+}: Pick<SiteBreadcrumbProps, 'items' | 'homeHref' | 'baseUrl'>) {
+  return (
+    <script
+      type="application/ld+json"
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            {
+              '@type': 'ListItem',
+              position: 1,
+              name: 'Home',
+              item: absoluteHref(homeHref, baseUrl)
+            },
+            ...items.map((item, index) => ({
+              '@type': 'ListItem',
+              position: index + 2,
+              name: item.name,
+              item: absoluteHref(item.href, baseUrl)
+            }))
+          ]
+        })
+      }}
+    />
   )
 }

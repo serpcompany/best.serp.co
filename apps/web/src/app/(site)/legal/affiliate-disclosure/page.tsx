@@ -1,26 +1,15 @@
 import type { Metadata } from 'next'
-import { components } from '@/components/content/mdx-components'
-import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
 import { generateLegalPageMetadata, LegalStaticPage } from '@/components/static-pages/legal-page'
 import { getLegalContent } from '@/lib/content-loader'
+import { getRoute } from '@/lib/routing/routes'
+import { legalPageFor } from '@/lib/site/legal-pages'
 
-export const metadata: Metadata = generateLegalPageMetadata({
-  title: 'Affiliate Disclosure',
-  description:
-    'Affiliate disclosure for {{SITE_NAME}}. Learn how this site handles affiliate relationships and compensation.',
-  path: '/legal/affiliate-disclosure'
-})
+const path = getRoute('affiliateDisclosure')
+
+export const metadata: Metadata = generateLegalPageMetadata(path)
 
 export default async function AffiliateDisclosurePage() {
-  const content = await getLegalContent('affiliate-disclosure')
-
   return (
-    <LegalStaticPage
-      content={content}
-      mdxComponents={components}
-      path="/legal/affiliate-disclosure"
-      slots={{ Breadcrumb: SiteBreadcrumb }}
-      title="Affiliate Disclosure"
-    />
+    <LegalStaticPage content={await getLegalContent(legalPageFor(path).contentKey)} path={path} />
   )
 }
