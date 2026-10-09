@@ -1,6 +1,13 @@
 import { type APIRequestContext, expect } from '@playwright/test'
 import { q, unique } from './admin-fixture'
-import { badgeD1, badgeOrigin, badgeSuiteEnabled } from './badge-program-fixture'
+import {
+  badgeCategory,
+  badgeD1,
+  badgeOrigin,
+  badgeSuiteEnabled,
+  seedBadgeCatalog,
+  seedBadgeListing
+} from './badge-program-fixture'
 import { type FixtureProduct, type FixtureSite, startFixtureSite } from './submit-fixture'
 import { test } from './test'
 
@@ -72,22 +79,27 @@ function seed(kind: Kind, product: FixtureProduct): Seeded {
   badgeD1(`
     INSERT INTO users (id, name, email, email_verified)
       VALUES (${q(userId)}, 'E2E owner', ${q(listing.email)}, 1);
-    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
-      source_kind, source_identity, checksum, source)
-    VALUES (${q(listing.id)}, ${q(slug)}, ${q(product.name)}, ${q(product.description)},
-      ${q(fixture.website(label))}, 'A listing for the badge program suite.', 'draft',
-      '2026-05-16', 'e2e', ${q(listing.id)}, ${q(`e2e-${key}`)}, ${q(source)});
-    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
-      SELECT ${q(listing.id)}, id, 0, 1 FROM categories WHERE slug = 'e2e-badge-tools';
-    UPDATE listings SET status = 'approved' WHERE id = ${q(listing.id)};
   `)
+  seedBadgeListing({
+    checksum: `e2e-${key}`,
+    content: 'A listing for the badge program suite.',
+    description: product.description,
+    id: listing.id,
+    name: product.name,
+    published_at: '2026-05-16',
+    slug,
+    source,
+    source_identity: listing.id,
+    source_kind: 'e2e',
+    website: fixture.website(label)
+  })
   if (source === 'submission') {
     const paid = kind === 'paid'
     badgeD1(`
       INSERT INTO listing_submissions (id, slug, name, description, website, content,
         category_slug, logo_url, status, plan, paid_at, listing_id, owner_user_id)
       VALUES (${q(`sub-${key}`)}, ${q(slug)}, ${q(product.name)}, ${q(product.description)},
-        ${q(fixture.website(label))}, 'c', 'e2e-badge-tools', ${q(`${fixture.website(label)}icon.png`)},
+        ${q(fixture.website(label))}, 'c', ${q(badgeCategory.slug)}, ${q(`${fixture.website(label)}icon.png`)},
         'approved', ${paid ? "'paid'" : "'free'"}, ${paid ? q(new Date().toISOString()) : 'NULL'},
         ${q(listing.id)}, ${q(userId)});
       INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
@@ -129,11 +141,7 @@ function version(): number {
 
 test.beforeAll(async () => {
   fixture = await startFixtureSite()
-  badgeD1(`
-    INSERT OR IGNORE INTO publication_state (id, version, checksum) VALUES (1, 0, 'e2e-badge');
-    INSERT OR IGNORE INTO categories (slug, name, description, sort_order)
-      VALUES ('e2e-badge-tools', 'E2E Badge Tools', 'Tools for the badge program suite.', 0);
-  `)
+  seedBadgeCatalog()
   const product = (name: string, badge: FixtureProduct['badge']): FixtureProduct => ({
     badge,
     description: `${name}, a fixture product.`,

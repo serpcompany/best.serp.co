@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -833,12 +833,17 @@ describe('fresh Drizzle D1 history', () => {
         expect(() => localPreviewVarArgs(refused), refused).toThrow(/LOCAL_PREVIEW_VARS/u)
       }
 
+      // Playwright's default server runs on the fixture seed, never the real catalog (#313).
       const playwright = readFileSync(resolve('apps/web/playwright.config.ts'), 'utf8')
-      expect(playwright).toContain('pnpm db:migrate:local')
-      expect(playwright).toContain('pnpm db:import:local')
-      expect(playwright).toContain('pnpm db:verify:local')
-      expect(playwright).toContain('pnpm preview')
+      expect(playwright).toMatch(
+        /pnpm db:seed:local && pnpm db:verify:local && PORT=\S+ pnpm preview/u
+      )
+      expect(playwright).not.toContain('db:import:local')
       expect(playwright).not.toContain('pornvideodownloaders')
+      const e2eSources = readdirSync(resolve('apps/web/e2e'))
+        .filter(name => name.endsWith('.ts'))
+        .map(name => readFileSync(resolve('apps/web/e2e', name), 'utf8'))
+      expect(e2eSources.filter(source => source.includes('db:import:local'))).toEqual([])
     } finally {
       if (previous === undefined) delete process.env.HARNESS_D1_STATE_DIRECTORY
       else process.env.HARNESS_D1_STATE_DIRECTORY = previous

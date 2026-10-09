@@ -1,6 +1,13 @@
 import { createHmac } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
-import { adminOrigin, adminServer, adminSuiteEnabled, localD1 } from './admin-fixture'
+import {
+  adminOrigin,
+  adminServer,
+  adminSuiteEnabled,
+  localD1,
+  runStatements
+} from './admin-fixture'
+import { listingStatements, type SeedValue, suiteCatalogStatements } from './fixture-seed'
 import { E2E_STRIPE_SECRET_KEY, E2E_STRIPE_WEBHOOK_SECRET, stripeMockPort } from './orders-worker'
 
 /**
@@ -25,6 +32,26 @@ export function billingOrigin(): string {
 
 export function billingD1<T = Record<string, unknown>>(sql: string): T[] {
   return localD1<T>(sql, billingServer)
+}
+
+/** The category the orders suite's submissions and listings use, beside the admin suite's. */
+export const billingCategory = {
+  description: 'Tools for the orders suite.',
+  name: 'E2E Billing Tools',
+  slug: 'e2e-billing-tools'
+} as const
+
+/** The shared D1's publication state (whichever suite writes it first) and this category. */
+export function seedBillingCatalog(): void {
+  runStatements(
+    suiteCatalogStatements({ category: billingCategory, checksum: 'e2e-billing' }),
+    billingServer
+  )
+}
+
+/** A live listing filed under `billingCategory`. */
+export function seedBillingListing(row: Record<string, SeedValue> & { id: string }): void {
+  runStatements(listingStatements({ category: billingCategory.slug, row }), billingServer)
 }
 
 /** A `Stripe-Signature` header for `body`, signed now (or at `at`, in seconds). */

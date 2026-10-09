@@ -8,6 +8,8 @@
  * Everything here is fake: listing names start with "Fixture", websites are on `.test` hosts,
  * and people are `@example.com` addresses. Times are fixed (`SEED_NOW`), so re-running the seed
  * writes the same rows; time-based states (a badge warning, a draft's clock) are as of that day.
+ * The app reads the real clock, so a relative time it shows for a seeded row ("expires in 3 days",
+ * "2 days ago") changes from day to day: specs never assert one (#313).
  */
 
 /** The `migration_runs` id and manifest identity that mark a local D1 as seeded. */
@@ -42,14 +44,17 @@ export const seedCategories = {
 } as const
 
 export const seedListings = {
-  /** Hosted logo and featured image, content, FAQs, resource links; featured. */
-  detail: { name: 'Fixture Studio', slug: 'fixture-studio' },
+  /**
+   * Hosted logo and featured image, content, FAQs, resource links (`seedResourceLinks`);
+   * featured, with no owner. The e2e suite's sample listing, in its sample category.
+   */
+  detail: { category: seedCategories.design, name: 'Fixture Studio', slug: 'fixture-studio' },
   /** No logo: cards and the page show the fallback tile. Marked unofficial. */
-  noLogo: { name: 'Fixture Sketch', slug: 'fixture-sketch' },
+  noLogo: { name: 'Fixture Doodlewick', slug: 'fixture-doodlewick' },
   /** No owner and no claim hold: the page offers a claim. Featured. */
   claimable: { name: 'Fixture Canvas', slug: 'fixture-canvas' },
   /** Its instant claim is held for review (`listing_claim_holds`). */
-  held: { name: 'Fixture Harbor', slug: 'fixture-harbor' },
+  held: { name: 'Fixture Quaybin', slug: 'fixture-quaybin' },
   /**
    * A Verified owner (`seedUsers.owner`, badge claim) in a badge warning, with a revision in
    * every closed status and one awaiting changes.
@@ -66,6 +71,20 @@ export const seedListings = {
   /** Never published: its page answers 404. */
   draft: { name: 'Fixture Draft', slug: 'fixture-draft' }
 } as const
+
+/** `seedListings.detail`'s resource links, in order; each opens in a new tab. */
+export const seedResourceLinks = [
+  { label: 'Documentation', url: 'https://docs.fixture-studio.test/' },
+  { label: 'Pricing', url: 'https://fixture-studio.test/pricing/' }
+] as const
+
+/**
+ * A seeded listing's or submission's website: `https://<slug>/` when the slug is a `.test` host,
+ * else `https://<slug>.test/`.
+ */
+export function seedWebsite(slug: string): string {
+  return `https://${slug.endsWith('.test') ? slug : `${slug}.test`}/`
+}
 
 /** The filler listings that make `seedCategories.writing` paginate. */
 export const seedFillerListings = {
@@ -123,6 +142,6 @@ export const seedFacts = {
   hostedLogoCount: 54,
   /** Published listings with a hosted featured image. */
   hostedImageCount: 1,
-  /** A query that matches exactly these published listings. */
-  search: { query: 'harbor', slugs: [seedListings.held.slug] }
+  /** A query that matches exactly these published listings (name, description, or slug). */
+  search: { query: 'quaybin', listings: [seedListings.held] }
 } as const

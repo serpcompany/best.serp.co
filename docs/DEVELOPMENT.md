@@ -25,11 +25,17 @@ The facts tests assert (slugs, names, counts) live in `apps/web/e2e/seed-facts.t
 `pnpm db:migrations:list:local` shows the migrations local D1 has not applied yet;
 `pnpm db:migrate:local` applies them without touching the data.
 
-Until #313 and #315 retire it, the committed import of the real public catalog
-(`d1/artifacts/best-serp-co-v1.sql.br`, 3,422 listings) still seeds Playwright's default server:
-`pnpm db:migrate:local && pnpm db:import:local && pnpm db:verify:local` on an empty state, where
-`db:verify:local` checks exact parity with the report. The import refuses a seeded D1. To rebuild
-the artifacts, check out `serpcompany/json-directory-template` at `25e2a8d` and run
+Playwright's default server runs on the seed too (`pnpm db:seed:local && pnpm db:verify:local`,
+then `pnpm preview`), and the e2e specs assert its facts
+([E2E data](../apps/web/e2e/README.md#data)). The seed's clock is fixed (`SEED_NOW`) while the app
+reads the real one, so a relative time it shows for a seeded row ("expires in 3 days") changes
+from day to day; never assert one.
+
+Until #315 retires it, the committed import of the real public catalog
+(`d1/artifacts/best-serp-co-v1.sql.br`) still loads with `pnpm db:migrate:local &&
+pnpm db:import:local` on an empty state, where `db:verify:local` checks exact parity with the
+report. Nothing local or in CI uses it. The import refuses a seeded D1. To rebuild the artifacts,
+check out `serpcompany/json-directory-template` at `25e2a8d` and run
 `pnpm migration:generate -- --source-root ../json-directory --site-id serp.co`; it must
 reproduce the committed parity report exactly.
 

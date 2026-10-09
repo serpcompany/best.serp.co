@@ -5,18 +5,21 @@ import {
   seedCategories,
   seedFillerListings,
   seedListings,
+  seedResourceLinks,
   seedRevisions,
   seedSubmissions,
-  seedUsers
+  seedUsers,
+  seedWebsite
 } from './seed-facts'
 
 /**
- * The fixture seed's rows (serpcompany/best.serp.co#312), facts in `seed-facts.ts`. Built the way
- * the e2e suites seed their own D1s (`admin-fixture.ts`): a listing is inserted as a draft, filed
- * under its primary category, then published, so the publication triggers hold. Every value is a
- * bound parameter. `pnpm db:seed:local` (`scripts/d1-local-seed.ts`) runs these statements in one
- * D1 batch on a freshly migrated local D1, then hosts `fixtureSeedImages()` through the real media
- * ingestion path. The statements are deterministic: the same rows on every run.
+ * The fixture seed's rows (serpcompany/best.serp.co#312), facts in `seed-facts.ts`. A listing is
+ * inserted as a draft, filed under its primary category, then published, so the publication
+ * triggers hold (`listingStatements`, which the e2e suites that seed their own D1s use too, with
+ * `suiteCatalogStatements`, #313). Every value is a bound parameter. `pnpm db:seed:local`
+ * (`scripts/d1-local-seed.ts`) runs these statements in one D1 batch on a freshly migrated local
+ * D1, then hosts `fixtureSeedImages()` through the real media ingestion path. The statements are
+ * deterministic: the same rows on every run.
  */
 
 export type SeedValue = number | string | null
@@ -36,7 +39,7 @@ export interface SeedImage {
   width: number
 }
 
-type ListingState = 'draft' | 'published' | 'unpublished'
+export type ListingState = 'draft' | 'published' | 'unpublished'
 
 interface ListingDefinition {
   category: string
@@ -77,27 +80,78 @@ function listingChecksum(slug: string): string {
   return `fixture-${slug}-v1`
 }
 
-function website(host: string): string {
-  return `https://${host}/`
-}
-
 /** The listing's hosted logo source, which an owner's revision keeps. */
 function logoSource(slug: string): string {
   return `${SEED_MEDIA_ORIGIN}/logos/${slug}.png`
 }
 
-function insert(table: string, row: Record<string, SeedValue>): SeedStatement {
+/** One row, every value bound. `INSERT OR IGNORE` for a row each worker's `beforeAll` writes. */
+export function insert(
+  table: string,
+  row: Record<string, SeedValue>,
+  verb: 'INSERT' | 'INSERT OR IGNORE' = 'INSERT'
+): SeedStatement {
   const columns = Object.keys(row)
   return {
-    sql: `INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`,
+    sql: `${verb} INTO ${table} (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`,
     params: Object.values(row)
   }
+}
+
+/**
+ * A listing the catalog's triggers accept: `row` inserted as a draft, filed under its primary
+ * `category`, then, unless `state` is `draft`, approved and published (or left unpublished).
+ * `beforeApproval` runs between filing and approval: media or FAQs present when it goes live.
+ */
+export function listingStatements(listing: {
+  beforeApproval?: SeedStatement[]
+  category: string
+  row: Record<string, SeedValue> & { id: string }
+  state?: ListingState
+}): SeedStatement[] {
+  const { beforeApproval = [], category, row, state = 'published' } = listing
+  return [
+    insert('listings', { ...row, status: 'draft' }),
+    {
+      sql: `INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+          SELECT ?,id,0,1 FROM categories WHERE slug=?`,
+      params: [row.id, category]
+    },
+    ...beforeApproval,
+    ...(state === 'draft'
+      ? []
+      : [
+          {
+            sql: `UPDATE listings SET status='approved',is_active=? WHERE id=?`,
+            params: [state === 'published' ? 1 : 0, row.id]
+          }
+        ])
+  ]
+}
+
+/**
+ * The catalog rows an e2e suite's own fresh D1 starts from (`admin-fixture.ts`; the badge,
+ * claims and orders suites): the publication state and the suite's category, as the seed writes
+ * its own. Each Playwright worker's `beforeAll` writes them, so a second write is ignored.
+ */
+export function suiteCatalogStatements(suite: {
+  category: { description: string; name: string; slug: string }
+  checksum: string
+}): SeedStatement[] {
+  return [
+    insert(
+      'publication_state',
+      { checksum: suite.checksum, id: 1, version: 0 },
+      'INSERT OR IGNORE'
+    ),
+    insert('categories', { ...suite.category, sort_order: 0 }, 'INSERT OR IGNORE')
+  ]
 }
 
 const namedListings: ListingDefinition[] = [
   {
     ...seedListings.detail,
-    category: seedCategories.design.slug,
+    category: seedListings.detail.category.slug,
     content:
       'Fixture Studio is a made-up design tool that exists only in the local fixture seed.\n\n' +
       '## What this page shows\n\nA hosted logo and featured image, FAQs, and resource links.',
@@ -116,10 +170,7 @@ const namedListings: ListingDefinition[] = [
     image: true,
     logo: true,
     publishedDaysAgo: 1,
-    resourceLinks: [
-      { label: 'Documentation', url: 'https://docs.fixture-studio.test/' },
-      { label: 'Pricing', url: 'https://fixture-studio.test/pricing/' }
-    ],
+    resourceLinks: [...seedResourceLinks],
     state: 'published'
   },
   {
@@ -135,7 +186,7 @@ const namedListings: ListingDefinition[] = [
   {
     ...seedListings.noLogo,
     category: seedCategories.design.slug,
-    content: 'Fixture Sketch has no logo, so it shows the fallback tile.',
+    content: 'Fixture Doodlewick has no logo, so it shows the fallback tile.',
     description: 'A fixture drawing pad with no logo of its own.',
     logo: false,
     publishedDaysAgo: 3,
@@ -145,7 +196,7 @@ const namedListings: ListingDefinition[] = [
   {
     ...seedListings.held,
     category: seedCategories.developer.slug,
-    content: 'Claims of Fixture Harbor wait for an admin to review them.',
+    content: 'Claims of Fixture Quaybin wait for an admin to review them.',
     description: 'A fixture container registry whose claims are held for review.',
     logo: true,
     publishedDaysAgo: 4,
@@ -296,8 +347,9 @@ function catalogStatements(): SeedStatement[] {
     const id = seedListingId(listing.slug)
     const publishedAt =
       listing.publishedDaysAgo === null ? null : seedTime(listing.publishedDaysAgo)
-    const statements: SeedStatement[] = [
-      insert('listings', {
+    const statements = listingStatements({
+      category: listing.category,
+      row: {
         checksum: listingChecksum(listing.slug),
         content: listing.content,
         created_at: publishedAt ?? seedTime(1),
@@ -316,20 +368,10 @@ function catalogStatements(): SeedStatement[] {
         source_kind: listing.submissionId ? 'verified-submission' : 'fixture-seed',
         status: 'draft',
         updated_at: publishedAt ?? seedTime(1),
-        website: website(listing.slug.endsWith('.test') ? listing.slug : `${listing.slug}.test`)
-      }),
-      {
-        sql: `INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
-          SELECT ?,id,0,1 FROM categories WHERE slug=?`,
-        params: [id, listing.category]
-      }
-    ]
-    if (listing.state !== 'draft') {
-      statements.push({
-        sql: `UPDATE listings SET status='approved',is_active=? WHERE id=?`,
-        params: [listing.state === 'published' ? 1 : 0, id]
-      })
-    }
+        website: seedWebsite(listing.slug)
+      },
+      state: listing.state
+    })
     for (const [sortOrder, faq] of (listing.faqs ?? []).entries()) {
       statements.push(
         insert('listing_faqs', {
@@ -522,14 +564,14 @@ function submissionStatements(): SeedStatement[] {
         created_at: seedTime(submission.created),
         description: `A fixture submission (${submission.status.replaceAll('_', ' ')}).`,
         id: submission.id,
-        logo_url: `${website(submission.slug)}logo.png`,
+        logo_url: `${seedWebsite(submission.slug)}logo.png`,
         name: submission.name,
         owner_user_id: submitter,
         plan: 'free',
         slug: submission.slug,
         status: submission.status,
         updated_at: seedTime(lastEvent),
-        website: website(submission.slug),
+        website: seedWebsite(submission.slug),
         ...submission.fields
       }),
       ...submission.events.map(event =>
