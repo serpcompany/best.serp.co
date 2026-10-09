@@ -2,14 +2,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { ClaimListing } from '@/components/claims/claim-listing'
-import { ProjectNavigation } from '@/components/directory/project-navigation'
 import { GoneListing } from '@/components/listing/gone-listing'
-import { ExternalResourcesSectionRoute as ExternalResourcesSection } from '@/components/sections/external-resources-section-route'
-import { JsonLd } from '@/components/seo/json-ld'
-import { WebsiteContentSectionRoute as WebsiteContentSection } from '@/components/website/website-content-section-route'
-import { WebsiteFaqsSection } from '@/components/website/website-faqs-section'
-import { WebsiteRelatedProjectsRoute as WebsiteRelatedProjects } from '@/components/website/website-related-projects-route'
-import { WebsiteResourcesSectionRoute as WebsiteResourcesSection } from '@/components/website/website-resources-section-route'
 import {
   generateWebsiteDetailRouteMetadata,
   WebsiteDetailRoutePage
@@ -82,21 +75,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     !project.verifiedOwner && (await currentClaimFlags()).enabled
       ? claimLink(project.name, project.slug, await currentClaimCopy())
       : undefined
-  return (
-    <WebsiteDetailRoutePage
-      claim={claim}
-      project={project}
-      slots={{
-        ExternalResourcesSection,
-        JsonLd,
-        ProjectNavigation,
-        WebsiteContentSection,
-        WebsiteFaqsSection,
-        WebsiteRelatedProjects,
-        WebsiteResourcesSection
-      }}
-    />
-  )
+  return <WebsiteDetailRoutePage claim={claim} project={project} />
 }
 
 function claimLink(name: string, slug: string, copy: Awaited<ReturnType<typeof currentClaimCopy>>) {

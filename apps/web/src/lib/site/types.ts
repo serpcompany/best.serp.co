@@ -20,23 +20,6 @@ export type SiteCopyConfig = {
   submitLabel: string
 }
 
-export type SiteExternalResourceIcon = 'chrome' | 'code2' | 'command' | 'gitBranch' | 'terminal'
-
-export type SiteExternalResource = {
-  description: string
-  href: string
-  icon: SiteExternalResourceIcon
-  imageAlt?: string
-  imageSrc?: string
-  name: string
-  slug: string
-}
-
-export type SiteListingCliInstall = {
-  commandPrefix: string
-  installTargetByListingSlug: Record<string, string>
-}
-
 export type SiteNetworkLink = {
   description: string
   href: string
@@ -45,8 +28,6 @@ export type SiteNetworkLink = {
 }
 
 export type SiteOwnedContent = {
-  externalResources: SiteExternalResource[]
-  listingCliInstall: SiteListingCliInstall | null
   networkLinks: SiteNetworkLink[]
 }
 
@@ -68,7 +49,6 @@ export type SiteFeatureFlags = {
   showAuth: boolean
   showBrands: boolean
   showDocs: boolean
-  showExternalResources: boolean
   showFavorites: boolean
   showGuides: boolean
   showProjects: boolean
