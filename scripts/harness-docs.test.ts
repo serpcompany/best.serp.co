@@ -102,6 +102,7 @@ describe('repository harness contract', () => {
         'database migrations',
         'repository tests',
         'Cloudflare configuration',
+        'Cloudflare types',
         'OpenNext Worker build'
       ])
     )

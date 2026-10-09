@@ -49,9 +49,10 @@ pnpm harness:check
 `pnpm check` is the finish gate (#179), and pull-request CI runs it. It adds `pnpm lint`
 (read-only `biome check .` over the whole repository and the forbidden-link guard),
 `pnpm db:check` (`drizzle-kit check` on the migration history), the repository tests,
-Wrangler identity validation, and the OpenNext Worker build. It never writes files, never
-deploys, and never accesses a remote D1 database; `pnpm lint:fix` and `pnpm format` are the
-commands that write.
+Wrangler identity validation, a check that `apps/web/cloudflare-env.d.ts` is current for
+`wrangler.jsonc` and the installed Wrangler (`pnpm cf-typegen` regenerates it), and the OpenNext
+Worker build. It never writes files, never deploys, and never accesses a remote D1 database;
+`pnpm lint:fix` and `pnpm format` are the commands that write.
 
 Run a focused test while implementing, the fast loop at milestone boundaries, and the
 full loop before a substantial completion claim.

@@ -74,6 +74,13 @@ const fullOnlySteps: HarnessStep[] = [
       'Restore the isolated local Worker and D1 identity in apps/web/wrangler.jsonc. See docs/DEPLOY_RUNBOOK.md.'
   },
   {
+    name: 'Cloudflare types',
+    command: 'pnpm',
+    args: ['--filter', 'web', 'cf-typegen:check'],
+    remediation:
+      'Run pnpm cf-typegen after changing apps/web/wrangler.jsonc or upgrading Wrangler, and commit apps/web/cloudflare-env.d.ts.'
+  },
+  {
     name: 'OpenNext Worker build',
     command: 'pnpm',
     args: ['build'],
