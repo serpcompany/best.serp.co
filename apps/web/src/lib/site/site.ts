@@ -46,7 +46,6 @@ export const site: SiteDefinition = {
     showAuth: true,
     showBrands: true,
     showDocs: false,
-    showExternalResources: false,
     showFavorites: false,
     showGuides: false,
     showProjects: false

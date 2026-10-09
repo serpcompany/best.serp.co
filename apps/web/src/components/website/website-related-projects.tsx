@@ -1,34 +1,13 @@
-import type { ComponentType, ReactNode } from 'react'
 import type { WebsiteRelatedCardMetadata } from '../../lib/directory/content-query'
 import { getCanonicalListingListRoute } from '../../lib/routing/routes'
-
-type SectionProps = {
-  children: ReactNode
-  description?: string
-  title: string
-  titleId?: string
-  viewAllHref?: string
-  viewAllText?: string
-}
-
-type LLMGridProps = {
-  analyticsSource?: string
-  className?: string
-  items: WebsiteRelatedCardMetadata[]
-}
+import { Section } from '../layout/section'
+import { LLMGrid } from '../llm/llm-grid'
 
 export type WebsiteRelatedProjectsProps = {
   websites: WebsiteRelatedCardMetadata[]
-  slots: {
-    LLMGrid: ComponentType<LLMGridProps>
-    Section: ComponentType<SectionProps>
-  }
 }
 
-export function WebsiteRelatedProjects({
-  websites,
-  slots: { LLMGrid, Section }
-}: WebsiteRelatedProjectsProps) {
+export function WebsiteRelatedProjects({ websites }: WebsiteRelatedProjectsProps) {
   if (websites.length === 0) {
     return null
   }

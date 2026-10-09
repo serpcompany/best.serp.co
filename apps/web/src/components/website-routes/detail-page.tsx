@@ -1,69 +1,29 @@
 import type { Metadata } from 'next'
-import type { ComponentType, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
-import type {
-  WebsiteDetailMetadata,
-  WebsiteMetadata,
-  WebsiteNavigationMetadata,
-  WebsiteRelatedCardMetadata
-} from '../../lib/directory/content-query'
+import type { WebsiteDetailMetadata, WebsiteMetadata } from '../../lib/directory/content-query'
 import { resolveListingDetailTemplate } from '../../lib/directory/listing-detail-template'
 import { getCanonicalListingListRoute } from '../../lib/routing/routes'
 import { generateWebsiteDetailSchema } from '../../lib/seo/schema'
 import { composeMetaDescription, generateDynamicMetadata } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
+import { ProjectNavigation } from '../directory/project-navigation'
 import { DetailPageLayout } from '../layout/detail-page-layout'
 import { SectionHeader } from '../layout/section-header'
 import { ListingImage } from '../listing/listing-image'
+import { JsonLd } from '../seo/json-ld'
+import { WebsiteContentSection } from '../website/website-content-section'
 import {
   WebsiteDetailActions,
   WebsiteDetailAside,
   websiteDetailMeta
 } from '../website/website-detail-header'
-import { faqsToShow } from '../website/website-faqs-section'
-
-type JsonLdProps = {
-  data: Record<string, unknown>
-}
-
-type WebsiteContentSectionProps = {
-  website: WebsiteDetailMetadata
-}
+import { faqsToShow, WebsiteFaqsSection } from '../website/website-faqs-section'
+import { WebsiteRelatedProjects } from '../website/website-related-projects'
+import { WebsiteResourcesSection } from '../website/website-resources-section'
 
 type WebsiteResourcesSectionWebsite = Pick<WebsiteDetailMetadata, 'resourceLinks' | 'slug'>
-
-type WebsiteResourcesSectionProps = {
-  website: WebsiteResourcesSectionWebsite
-}
-
-type WebsiteFaqsSectionProps = {
-  website: Pick<WebsiteDetailMetadata, 'faqs'>
-}
-
-type WebsiteRelatedProjectsProps = {
-  websites: WebsiteRelatedCardMetadata[]
-}
-
-type ProjectNavigationProps = {
-  nextWebsite: WebsiteNavigationMetadata | null
-  previousWebsite: WebsiteNavigationMetadata | null
-}
-
-type ExternalResourcesSectionProps = {
-  layout?: 'default' | 'compact'
-  showImages?: boolean
-}
-
-type WebsiteDetailRouteSlots = {
-  ExternalResourcesSection: ComponentType<ExternalResourcesSectionProps>
-  JsonLd: (props: JsonLdProps) => ReactNode | Promise<ReactNode>
-  ProjectNavigation: ComponentType<ProjectNavigationProps>
-  WebsiteContentSection: ComponentType<WebsiteContentSectionProps>
-  WebsiteFaqsSection: ComponentType<WebsiteFaqsSectionProps>
-  WebsiteRelatedProjects: ComponentType<WebsiteRelatedProjectsProps>
-  WebsiteResourcesSection: ComponentType<WebsiteResourcesSectionProps>
-}
 
 export async function generateWebsiteDetailRouteMetadata(
   project: WebsiteDetailMetadata
@@ -118,24 +78,12 @@ export function generateWebsiteDetailRouteStaticParams(
 
 export function WebsiteDetailRoutePage({
   claim,
-  project,
-  slots
+  project
 }: {
   /** The claim link of a listing without an owner, while claims are on (#67). */
   claim?: ReactNode
   project: WebsiteDetailMetadata
-  slots: WebsiteDetailRouteSlots
 }) {
-  const {
-    ExternalResourcesSection,
-    JsonLd,
-    ProjectNavigation,
-    WebsiteContentSection,
-    WebsiteFaqsSection,
-    WebsiteRelatedProjects,
-    WebsiteResourcesSection
-  } = slots
-
   const detailTemplate = resolveListingDetailTemplate(project.entityType)
   const resourcesWebsite: WebsiteResourcesSectionWebsite = {
     slug: project.slug,
@@ -187,10 +135,6 @@ export function WebsiteDetailRoutePage({
           {/* The listing's own text, links and FAQs read in one column. */}
           <div className="flex max-w-3xl flex-col gap-12">
             <WebsiteContentSection website={project} />
-
-            {siteConfig.features.showExternalResources && (
-              <ExternalResourcesSection layout="default" showImages={false} />
-            )}
 
             <WebsiteResourcesSection website={resourcesWebsite} />
 

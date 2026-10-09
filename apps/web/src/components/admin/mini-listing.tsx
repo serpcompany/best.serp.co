@@ -1,5 +1,5 @@
 import { ListingImage } from '@/components/listing/listing-image'
-import { WebsiteContentSectionRoute } from '@/components/website/website-content-section-route'
+import { WebsiteContentSection } from '@/components/website/website-content-section'
 import type { ListingDetail } from '@/db/contracts'
 import { ProductLogo } from './product-cell'
 
@@ -42,7 +42,7 @@ export function MiniListing({
       ) : null}
       <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1fr)_200px]">
         <div className="min-w-0 text-sm leading-7">
-          <WebsiteContentSectionRoute website={listing} />
+          <WebsiteContentSection website={listing} />
         </div>
         <div className="space-y-3">
           <div className="rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground">

@@ -1,14 +1,13 @@
 import { Info } from 'lucide-react'
-import type { MDXComponents } from 'mdx/types'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import type { WebsiteMetadata } from '../../lib/directory/content-query'
 import { siteCopy } from '../../lib/site/site-copy'
+import { components as mdxComponents } from '../content/mdx-components'
 import { ListingImage } from '../listing/listing-image'
 
 export interface WebsiteContentSectionProps {
-  mdxComponents: MDXComponents
   website: WebsiteMetadata
 }
 
@@ -25,7 +24,7 @@ function stripHtmlTags(html: string | null | undefined): string {
   return html.replace(/<[^>]*>/g, '').trim()
 }
 
-export function WebsiteContentSection({ website, mdxComponents }: WebsiteContentSectionProps) {
+export function WebsiteContentSection({ website }: WebsiteContentSectionProps) {
   const categoryLabels = [
     ...(website.category ? [website.category] : []),
     ...(website.categories || [])

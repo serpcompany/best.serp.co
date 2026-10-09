@@ -31,7 +31,6 @@ const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
   'apps/web/src/components/layout/site-footer.tsx': 'network badges in the footer',
   'apps/web/src/components/content/mdx-components.tsx':
     'Markdown images in site content; listing content holds none (scripts/catalog-media.test.ts)',
-  'apps/web/src/components/sections/external-resources-section.tsx': 'site-owned resource images',
   'apps/web/src/components/website/featured-on-badge-embed-panel.tsx':
     'the badge preview and its embed snippet'
 }

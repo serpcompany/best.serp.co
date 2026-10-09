@@ -1,8 +1,6 @@
 import type { SiteOwnedContent } from './types'
 
 export const content: SiteOwnedContent = {
-  externalResources: [],
-  listingCliInstall: null,
   networkLinks: [
     {
       description: 'Follow SERP updates on LinkedIn.',
