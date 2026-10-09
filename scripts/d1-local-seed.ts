@@ -34,7 +34,7 @@ import { project } from './project'
  * seeded D1 against the seed's facts (`seedFactViolations`).
  */
 
-/** The `migration_runs` row that marks a local D1 as seeded (the import writes its own). */
+/** The `migration_runs` row that marks a local D1 as seeded. */
 export const SEED_RUN_ID = `migration-${SEED_ID}`
 const SEED_WORKFLOW = 'local/db-seed-local'
 
@@ -394,7 +394,7 @@ export function seedFactViolations(
   return violations
 }
 
-/** Whether a local D1 was seeded with fixtures (rather than imported). */
+/** Whether a local D1 was seeded with fixtures. */
 export function isSeeded(query: SeedQuery): boolean {
   const runs = firstValue(query, 'SELECT COUNT(*) FROM migration_runs WHERE id=?', [SEED_RUN_ID])
   return Number(runs) > 0
@@ -403,7 +403,8 @@ export function isSeeded(query: SeedQuery): boolean {
 /**
  * Whether an existing local D1 still needs `pnpm db:seed:local` before `pnpm agent:dev` serves it
  * (#313): its migrations never finished (a table is missing), nothing was written to it, or a
- * seed run started and never succeeded. An imported or completely seeded D1 is served as is.
+ * seed run started and never succeeded. A completely seeded D1, or one holding a catalog but no
+ * seed run (the retired v1 import left one before #315), is served as is.
  */
 export function seedIncomplete(query: SeedQuery): boolean {
   try {

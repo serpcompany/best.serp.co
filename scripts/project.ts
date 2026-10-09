@@ -7,16 +7,8 @@ export const project = {
   /** The app's code: routes, components, logic (serp repository-layout.md, #172). */
   sourceDirectory: 'apps/web/src',
   appPackageName: 'web',
-  artifact: {
-    batchDirectory: 'd1/artifacts/best-serp-co-v1-import',
-    /** Brotli copy of the combined import SQL, committed so fresh clones and CI can seed D1. */
-    compressedSqlPath: 'd1/artifacts/best-serp-co-v1.sql.br',
-    name: 'best-serp-co-v1',
-    parityReportPath: 'd1/artifacts/best-serp-co-v1-parity.yaml'
-  },
   /** Typed confirmations the protected workflows require. */
   confirmation: {
-    bootstrap: 'bootstrap-best.serp.co-production',
     deploy: 'deploy-best.serp.co-production',
     /** Owner-approved Worker hotfix from main that skips the staging check; see RELEASE_GUARDS. */
     hotfix: 'hotfix-best.serp.co-production',

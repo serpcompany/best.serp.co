@@ -23,8 +23,7 @@ export const D1_TESTS = [
   'scripts/media-upload.test.ts',
   'scripts/r2-objects.test.ts',
   'scripts/release-promote.test.ts',
-  'scripts/staging-verification.test.ts',
-  'scripts/v1-import-publications.test.ts'
+  'scripts/staging-verification.test.ts'
 ]
 
 /**

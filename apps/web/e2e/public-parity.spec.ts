@@ -339,8 +339,12 @@ test.describe('public parity interactions', () => {
       page.getByRole('banner').getByRole('link', { name: /^submit$/i }),
       /^\/submit\/$/
     )
+    // By name and href, so a listing whose name contains this one's is not taken for it.
     await expectInternalLink(
-      page.getByRole('link', { name: listing.namePattern }).first(),
+      page
+        .getByRole('link', { name: listing.namePattern })
+        .and(page.locator(`[href="${listing.path}"]`))
+        .first(),
       new RegExp(`^${escapeRegExp(listing.path)}$`)
     )
 

@@ -277,8 +277,13 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     await page.goto(`/search/?q=${encodeURIComponent(search.query)}`, {
       waitUntil: 'networkidle'
     })
+    // By name and href: a higher-ranked listing whose name contains this one's ("X Pro") is
+    // another link (#313 review).
     await expect(
-      page.getByRole('link', { name: search.listing.namePattern }).first()
+      page
+        .getByRole('link', { name: search.listing.namePattern })
+        .and(page.locator(`[href="${search.listing.path}"]`))
+        .first()
     ).toHaveAttribute('href', search.listing.path)
   })
 

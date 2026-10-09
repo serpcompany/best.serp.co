@@ -77,7 +77,7 @@ gh variable delete CI_RUNNER_LABELS  # rollback: runs that start later use ubunt
 | Follows `CI_RUNNER_LABELS` | Always `ubuntu-latest` |
 | --- | --- |
 | Web: check | Web: changes, e2e (installs Playwright browsers), tip, deploy-staging (credentials, Playwright smoke) |
-| Production Dependency Audit, Harness Gardening, Label PRs, Links Checker | PR Issue Link (serp's file, unchanged), Deploy Production, Bootstrap Production D1, Publish D1 Catalog, Review D1 Submission, Notify Verified D1 Submissions, Check Listing Media Health, Submit GSC Sitemaps |
+| Production Dependency Audit, Harness Gardening, Label PRs, Links Checker | PR Issue Link (serp's file, unchanged), Deploy Production, Publish D1 Catalog, Review D1 Submission, Notify Verified D1 Submissions, Check Listing Media Health, Submit GSC Sitemaps |
 
 Routed jobs hold no secret beyond their own `GITHUB_TOKEN` and need no browser, `sudo`, or
 `apt`. Jobs with Cloudflare or Google credentials, a protected environment, or a deploy stay on

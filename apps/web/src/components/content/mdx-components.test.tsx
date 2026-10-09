@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { siteConfig } from '../../lib/site/site-config'
 import { components } from './mdx-components'
 
 const markdown = [
@@ -65,9 +64,8 @@ describe('Markdown components (#289)', () => {
         {'[Start here](https://serp.ly/start) or [elsewhere](https://example.com/).'}
       </ReactMarkdown>
     )
-    const via = encodeURIComponent(siteConfig.dubPartnerId ?? '')
-    expect(via).not.toBe('')
-    expect(markup).toContain(`href="https://serp.ly/start?via=${via}"`)
+    // Written out, not read from the config, so a config regression fails here (#313 review).
+    expect(markup).toContain('href="https://serp.ly/start?via=best.serp.co"')
     expect(markup).toContain('href="https://example.com/"')
   })
 })

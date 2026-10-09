@@ -1,16 +1,8 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
-import { captureApplicationSnapshot } from './d1-application-snapshot'
-import {
-  expectedBootstrapSnapshot,
-  readParityReport,
-  readReviewedImportSql,
-  sqliteTransport
-} from './d1-import-artifact'
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { runCanonicalPreview } from './d1-local-preview'
 import {
@@ -22,46 +14,23 @@ import {
   seedLocalFixtures
 } from './d1-local-seed'
 import { configuredFreshD1StateRoot } from './d1-local-state'
-import { parityTableNames } from './d1-table-inventory'
 import { project } from './project'
 
-function wrangler(args: string[], capture = false): string {
-  try {
-    return (
-      execFileSync(
-        'pnpm',
-        [
-          'exec',
-          'wrangler',
-          ...args,
-          '--local',
-          '--persist-to',
-          configuredFreshD1StateRoot(),
-          '--config',
-          project.wranglerConfigPath
-        ],
-        {
-          encoding: 'utf8',
-          env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
-          maxBuffer: 64 * 1024 * 1024,
-          stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit'
-        }
-      ) || ''
-    )
-  } catch (error) {
-    const stderr = (error as { stderr?: Buffer | string }).stderr
-    if (capture && stderr) throw new Error(String(stderr).trim())
-    throw error
-  }
-}
-
-function query(command: string): unknown[] {
-  const output = wrangler(
-    ['d1', 'execute', project.local.databaseName, '--command', command, '--json'],
-    true
+function wrangler(args: string[]): void {
+  execFileSync(
+    'pnpm',
+    [
+      'exec',
+      'wrangler',
+      ...args,
+      '--local',
+      '--persist-to',
+      configuredFreshD1StateRoot(),
+      '--config',
+      project.wranglerConfigPath
+    ],
+    { env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, stdio: 'inherit' }
   )
-  const parsed = JSON.parse(output) as Array<{ results?: unknown[] }>
-  return parsed[0]?.results || []
 }
 
 /** `pnpm db:migrations:list:local`: the apps/web/drizzle migrations local D1 has not applied yet. */
@@ -71,35 +40,6 @@ function listMigrations(): void {
 
 function migrate(): void {
   wrangler(['d1', 'migrations', 'apply', project.local.databaseName])
-}
-
-function importArtifact(): void {
-  const report = readParityReport()
-  const current = query(
-    `SELECT
-      (SELECT checksum FROM publication_state WHERE id=1) AS checksum,
-      (SELECT COUNT(*) FROM categories) + (SELECT COUNT(*) FROM listings) AS catalog_rows`
-  ) as Array<{ catalog_rows?: number; checksum?: string | null }>
-  if (current[0]?.checksum === report.target.checksum) {
-    console.log(`Local D1 already matches ${report.target.checksum}; import is a no-op.`)
-    return
-  }
-  if (current[0]?.checksum || current[0]?.catalog_rows)
-    throw new Error(
-      'Refusing a different or partial initial catalog; restore the clean pre-import state.'
-    )
-  const combined = readReviewedImportSql(report)
-  // Local D1 applies the checksum-verified SQL in one execution instead of one Wrangler
-  // start-up per batch.
-  const directory = mkdtempSync(join(tmpdir(), 'best-serp-co-d1-import-'))
-  try {
-    const importPath = join(directory, 'import.sql')
-    writeFileSync(importPath, combined)
-    wrangler(['d1', 'execute', project.local.databaseName, '--file', importPath, '--yes'], true)
-  } finally {
-    rmSync(directory, { force: true, recursive: true })
-  }
-  console.log(`Imported the reviewed initial catalog into local ${project.domain}.`)
 }
 
 /** Miniflare's D1 storage directory; its Cache API, KV, and R2 SQLite files live elsewhere. */
@@ -135,7 +75,7 @@ export function localSqlitePath(directory: string): string {
   return matches[0]
 }
 
-function localSnapshotDatabase(): DatabaseSync {
+function localDatabase(): DatabaseSync {
   return new DatabaseSync(localSqlitePath(configuredFreshD1StateRoot()), { readOnly: true })
 }
 
@@ -144,60 +84,24 @@ function sqliteQuery(database: DatabaseSync): SeedQuery {
     database.prepare(sql).all(...params) as Array<Record<string, unknown>>
 }
 
-/**
- * `pnpm db:verify:local`: a seeded local D1 (`pnpm db:seed:local`) is checked against the seed's
- * facts; an imported one (`pnpm db:import:local`) against the import's exact parity.
- */
-async function verify(): Promise<void> {
-  const database = localSnapshotDatabase()
+/** `pnpm db:verify:local`: checks a seeded local D1 (`pnpm db:seed:local`) against the seed's facts. */
+function verify(): void {
+  const database = localDatabase()
   try {
     const query = sqliteQuery(database)
-    if (isSeeded(query)) {
-      const violations = seedFactViolations(query, { marker: true, media: true })
-      if (violations.length > 0) {
-        throw new Error(
-          `Local D1 no longer matches the fixture seed; pnpm db:seed:local resets it.\n${violations.join('\n')}`
-        )
-      }
-      console.log('Verified local D1 against the fixture seed facts.')
-      return
+    if (!isSeeded(query)) {
+      throw new Error('Local D1 holds no fixture seed; pnpm db:seed:local resets and seeds it.')
     }
+    const violations = seedFactViolations(query, { marker: true, media: true })
+    if (violations.length > 0) {
+      throw new Error(
+        `Local D1 no longer matches the fixture seed; pnpm db:seed:local resets it.\n${violations.join('\n')}`
+      )
+    }
+    console.log('Verified local D1 against the fixture seed facts.')
   } finally {
     database.close()
   }
-  await verifyImport()
-}
-
-async function verifyImport(): Promise<void> {
-  const report = readParityReport()
-  const expected = await expectedBootstrapSnapshot(readReviewedImportSql(report))
-  const actualDatabase = localSnapshotDatabase()
-  let actual: Awaited<ReturnType<typeof captureApplicationSnapshot>>
-  try {
-    actual = await captureApplicationSnapshot(sqliteTransport(actualDatabase))
-  } finally {
-    actualDatabase.close()
-  }
-  const mismatches = parityTableNames.filter(
-    table =>
-      actual.tables[table].count !== expected.tables[table].count ||
-      actual.tables[table].checksum !== expected.tables[table].checksum
-  )
-  if (actual.checksum !== expected.checksum || mismatches.length > 0) {
-    throw new Error(
-      `Local D1 exact ${parityTableNames.length}-table bootstrap parity failed${mismatches.length > 0 ? `: ${mismatches.join(', ')}` : ''}.`
-    )
-  }
-  const state = query('SELECT version, checksum FROM publication_state WHERE id=1') as Array<{
-    checksum?: string
-    version?: number
-  }>
-  if (state[0]?.checksum !== report.target.checksum) {
-    throw new Error('D1 publication checksum does not match the migration report.')
-  }
-  console.log(
-    `Verified local D1 publication v${state[0]?.version}: exact ${parityTableNames.length}-table snapshot ${actual.checksum}, checksum ${state[0]?.checksum}`
-  )
 }
 
 function publish(args: string[]): void {
@@ -244,11 +148,12 @@ export async function runLocalD1Command(args: string[]): Promise<void> {
     return
   }
   if (command === 'import') {
-    importArtifact()
-    return
+    throw new Error(
+      'The v1 catalog import is retired (#315; history in .archive/). pnpm db:seed:local seeds local D1 with fixtures.'
+    )
   }
   if (command === 'verify') {
-    await verify()
+    verify()
     return
   }
   if (command === 'seed') {
@@ -260,7 +165,7 @@ export async function runLocalD1Command(args: string[]): Promise<void> {
     return
   }
   throw new Error(
-    `Unknown local D1 command: ${command || 'missing'}. Use list, migrate, seed, import, verify, publish, or preview.`
+    `Unknown local D1 command: ${command || 'missing'}. Use list, migrate, seed, verify, publish, or preview.`
   )
 }
 

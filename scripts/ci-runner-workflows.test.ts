@@ -37,7 +37,6 @@ function allJobs(): Array<[string, WorkflowJob, WorkflowDefinition]> {
 
 /** Workflows that hold Cloudflare or Google credentials or deploy: ephemeral VMs only. */
 const credentialedWorkflows = [
-  'bootstrap-production-d1.yml',
   'deploy-production.yml',
   'media-health.yml',
   'publish-d1-staging.yml',

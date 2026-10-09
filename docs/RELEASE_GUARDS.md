@@ -17,8 +17,8 @@ ambiguous `db:migrate`. The root `package.json` holds them.
 - **No target.** `pnpm db:generate` writes a migration into `apps/web/drizzle/` and touches no
   database. `pnpm media:upload:dry-run -- <plan>` fetches and verifies every object of a media
   plan and writes nothing.
-- **Local D1** (`db:*:local`): apply and list migrations, seed the reviewed initial catalog and
-  prove exact parity, or apply a `d1/publications/` manifest.
+- **Local D1** (`db:*:local`): apply and list migrations, seed fixtures and check their facts,
+  or apply a `d1/publications/` manifest.
 - **Remote reads.** `pnpm db:migrations:list:<staging|production>` lists applied, pending, and
   unknown migrations from a maintainer machine after `wrangler login`. It reads the ledger with
   a `SELECT` through `wrangler d1 execute --remote` rather than `wrangler d1 migrations list`,
@@ -64,8 +64,7 @@ exact commit, never forced. Agents never run it.
 
 ## Staging before production
 
-Deploy Production and Bootstrap Production D1 release only source that Deploy Staging has
-verified on `staging`. Deploy Staging verified a commit when **any attempt** of a push or
+Deploy Production releases only source that Deploy Staging has verified on `staging`. Deploy Staging verified a commit when **any attempt** of a push or
 dispatch run of `web.yml` on `staging` completed every required `deploy-staging` step
 successfully: the staging migration, Worker deploy, HTTP gates, and Playwright smoke
 (`stagingWorkflow` in `scripts/staging-verification.ts` names them). A green attempt that
@@ -90,8 +89,8 @@ The check runs twice, both times with the workflow's read-only `GITHUB_TOKEN`:
 
 1. The `authorize` job runs `scripts/staging-verification.ts` before the `production`
    environment asks for reviewer approval.
-2. `cloudflare-release.ts` repeats it immediately before `migrate production`,
-   `deploy production`, and `import production`, and before any Wrangler call.
+2. `cloudflare-release.ts` repeats it immediately before `migrate production` and
+   `deploy production`, before any Wrangler call.
 
 **A release must still be current.** Every push to `main` queues its own release, so
 `cloudflare-release.ts` also refuses a release once `main` points at a commit with a different
@@ -118,9 +117,7 @@ To check a commit from a maintainer machine:
 GITHUB_TOKEN="$(gh auth token)" pnpm tsx scripts/staging-verification.ts <commit-sha>
 ```
 
-The bootstrap gate matters even after the first import: the bootstrap applies every migration
-at its commit to an empty production database, for example a re-created one. The publication
-and submission workflows change production data, not schema or code, so no check gates them on
+The publication and submission workflows change production data, not schema or code, so no check gates them on
 staging; catalog data reaches staging first by procedure instead
 ([Catalog publication](./CATALOG_PUBLICATION.md)).
 

@@ -28,17 +28,19 @@ Some listings' product domains now serve gambling or betting pages, are parked, 
 ## The check
 
 ```bash
-pnpm catalog:domains                # fetch and classify; writes d1/hygiene/<date>-listing-domains.yaml
-pnpm catalog:domains -- --reuse     # reuse .runtime/listing-domains/, fetch only what is missing
-pnpm catalog:domains -- --only a.ai,b.io   # print the classification of a few listings
-pnpm catalog:domains -- manifest    # write d1/publications/<date>-hijacked-domains.yaml
-pnpm catalog:domains -- --only <the earlier report's NXDOMAIN slugs> \
+# Every catalog:domains command reads the live listings of --env production (or staging): the scan
+# checks them, and each manifest takes its listings' categories and websites from them.
+pnpm catalog:domains -- --env production          # fetch and classify; writes d1/hygiene/<date>-listing-domains.yaml
+pnpm catalog:domains -- --reuse --env production  # reuse .runtime/listing-domains/, fetch only what is missing
+pnpm catalog:domains -- --only a.ai,b.io --env production   # print the classification of a few listings
+pnpm catalog:domains -- manifest --env production # write d1/publications/<date>-hijacked-domains.yaml
+pnpm catalog:domains -- --only <the earlier report's NXDOMAIN slugs> --env production \
   > d1/hygiene/<date>-dead-domains.recheck.yaml   # the second check, a day or more later
-pnpm catalog:domains -- dead-manifest --since <earlier date>
+pnpm catalog:domains -- dead-manifest --since <earlier date> --env production
                                     # write d1/publications/<date>-dead-domains.yaml
-pnpm catalog:domains -- decisions-manifest   # d1/hygiene/<date>-owner-list-decisions.yaml →
+pnpm catalog:domains -- decisions-manifest --env production   # d1/hygiene/<date>-owner-list-decisions.yaml →
                                     # d1/publications/<date>-owner-list-cleanup.yaml
-pnpm catalog:domains -- adult-manifest       # #260, see Adult products above
+pnpm catalog:domains -- adult-manifest --env production       # #260, see Adult products above
 pnpm catalog:claim-holds -- d1/hygiene/<date>-listing-domains.yaml <date>-listing-claim-holds
                                     # hold instant claims of the owner list (#67)
 ```
@@ -48,8 +50,10 @@ generate a claim-hold manifest from the new report and publish it like any catal
 holds already placed stay as they are. The owner clears a hold with a
 `listing-claim-hold-clear` operation ([Claims](./CLAIMS.md)).
 
-It is read-only. The listings come from the reviewed import (`d1/artifacts`), the catalog both
-environments were bootstrapped from. Most websites are `serp.ly` links that redirect in the
+It is read-only. The listings come from the D1 of the environment `--env` names, read with one
+`SELECT` through Wrangler (the operator's `wrangler login`), so a run checks the catalog as that
+environment publishes it. Until #315 they came from the v1 import with the committed manifests
+replayed on it, now archived. Most websites are `serp.ly` links that redirect in the
 browser, so the check follows HTTP redirects, `<meta http-equiv="refresh">`, and script-only
 redirect pages to the page a visitor lands on:
 
@@ -118,9 +122,9 @@ such a listing should leave is the owner's open question.
   the reviewed catalog: 259 filed under the Adult category, and 13 adult-site downloaders filed
   under other categories (12 that #98 gave Adult as a secondary category, and
   `ashemaletube-downloader`, which no keyword caught). They were found by the category, by
-  `ADULT_TERMS` (`scripts/migration/legacy-media.ts`) and a broader word list over every listing's
-  text, FAQs, resource links, and media URLs, and by reading every downloader listing outside
-  Adult. `kept` records the four fan-site downloaders and the keyword matches that stay, and why.
+  `ADULT_TERMS` (`scripts/migration/legacy-media.ts`, in `.archive/` since #315) and a broader
+  word list over every listing's text, FAQs, resource links, and media URLs, and by reading every
+  downloader listing outside Adult. `kept` records the four fan-site downloaders and the keyword matches that stay, and why.
 - **The manifests.** `2026-10-09-adult-category.yaml` gives `ashemaletube-downloader` the Adult
   category (as #98 did), then `2026-10-09-adult-removal.yaml` takes Adult off the kept fan-site
   downloaders (`listing-categories-remove`, never a primary category), unpublishes the 272
@@ -143,7 +147,7 @@ such a listing should leave is the owner's open question.
   of them adult (`scripts/network-brands.test.ts`).
 
 ```bash
-pnpm catalog:domains -- adult-manifest   # d1/hygiene/<date>-adult-decisions.yaml →
+pnpm catalog:domains -- adult-manifest --env production   # d1/hygiene/<date>-adult-decisions.yaml →
                                          # d1/publications/<date>-adult-category.yaml and
                                          # d1/publications/<date>-adult-removal.yaml
 ```
@@ -167,43 +171,40 @@ under Adult once the category manifest is published, so none is already unpublis
 `gif-downloaders` 1 live and 0 not live. On production, use `best-serp-co-production --env
 production`.
 
-The generator reads the reviewed catalog as the committed manifests leave it
-(`reviewedCatalogDatabase`: the import plus every committed manifest that sorts before the ones
-being generated and adds or removes categories, unpublishes, or retires one), so each operation
-expects the categories staging and production have. It refuses a live listing of a retired category that the decisions neither unpublish nor
-keep, and `scripts/v1-import-publications.test.ts` keeps the committed manifests identical to the
-decisions, applies them to the reviewed catalog, and checks that exactly the decided categories
-retire, that kept listings stay live off them, that no other listing named for an adult platform
-is live, and that every removed URL answers 404.
+The generator read the reviewed catalog as the committed manifests left it (the v1 import plus
+every committed manifest that sorted before the ones being generated), so each operation expected
+the categories staging and production had. It refuses a live listing of a retired category that
+the decisions neither unpublish nor keep. The test that kept these manifests identical to the
+decisions and replayed them on the import (exactly the decided categories retire, kept listings
+stay live off them, no other adult-platform listing is live, every removed URL answers 404) is
+archived with the import in `.archive/scripts/v1-import-publications.test.ts` (#315); since then
+the generator reads the environment's own D1 (`--env`), and `scripts/listing-domain-check.test.ts`
+covers it on fixture listings.
 
 ## Listing FAQs (#105)
 
 The one-time import wrote each listing's FAQs twice: as `listing_faqs` rows and as a closing
-`## FAQ` block in the long description (`scripts/migration/generate-initial-artifact.ts` appended
-it after the body and a blank line): 335 listings, 2,254 FAQs, each under a `### <question>`
-heading. The listing page now shows `listing_faqs` in its FAQs section, so the owner decided on
-2026-10-06 to move them: `d1/publications/2026-10-06-listing-faqs.yaml` removes each block.
-
-```bash
-pnpm catalog:faqs                  # count what would change
-pnpm catalog:faqs -- manifest      # write the manifest from the reviewed import
-```
+`## FAQ` block in the long description (its generator appended it after the body and a blank
+line): 335 listings, 2,254 FAQs, each under a `### <question>` heading. The listing page now
+shows `listing_faqs` in its FAQs section, so the owner decided on 2026-10-06 to move them:
+`d1/publications/2026-10-06-listing-faqs.yaml` removes each block. Its generator
+(`pnpm catalog:faqs`, `scripts/listing-faq-move.ts`) and test read the v1 import, so they are
+archived with it in `.archive/scripts/` (#315); the committed manifest is the record.
 
 - Each operation is `listing-content-remove-suffix`: the description must still be exactly its
   imported length (in SQLite characters) and end with exactly the block, or the whole batch is
   refused. It keeps every other character, sets a new checksum (so a revision or admin edit read
   before it is stale), and logs an `edited` event. The generator refuses a listing whose block
-  isn't the last section or doesn't say exactly its FAQs, and a test applies the manifest to the
-  reviewed import and checks every description byte by byte.
+  isn't the last section or doesn't say exactly its FAQs, and its test applied the manifest to
+  the import and checked every description byte by byte.
 - **Order:** the manifest is row-level (`concurrency: rows`, as #97 introduced): it names no
   base version, so it publishes in any order relative to #100's and #98's (also row-level) and fits
   staging and production whatever else each published. Staging first (#97's staging path), then
   production after promotion.
 - **A description that changed** on an environment (an approved revision, an admin edit) makes
-  the publisher refuse the whole batch. Leave such listings out of a new manifest with
-  `pnpm catalog:faqs -- manifest --skip <slug> --manifest-id 2026-10-07-listing-faqs-staging`
-  (`--skip` is repeatable or comma-separated; the id names the file, `d1/publications/<id>.yaml`,
-  so the reviewed manifest stays) and fix them by hand, as their FAQs already show in the section.
+  the publisher refuse the whole batch. The generator's `--skip <slug>` left such listings out of
+  a new manifest (`--manifest-id 2026-10-07-listing-faqs-staging`), to be fixed by hand, as their
+  FAQs already show in the section.
 - **Until it is published**, the FAQs section leaves out an FAQ whose exact `### <question>`
   heading line the description still holds after its last `## FAQ` line (`faqsToShow`), so
   imported FAQs never show twice.

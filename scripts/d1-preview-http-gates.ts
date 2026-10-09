@@ -94,9 +94,10 @@ export interface HttpGateOptions {
   clock?: GateClock
   /** The deployed Worker version; gates wait for it and require it on every response. */
   expectedVersion?: string
-  parityReportPath?: string
   /** The reviewed manifests whose retired categories the gates never sample (#260). */
   publicationsDirectory?: string
+  /** The listing and categories the gates request; `httpGateSamples` by default. */
+  samples?: HttpGateSamples
   timeoutMs?: number
   versionPollIntervalMs?: number
   /** Budget for the expected version to answer, shared by the wait and every retry (≤ 60 s). */
@@ -860,14 +861,13 @@ export async function runHttpGates(
 ): Promise<void> {
   const mode = parseMode(modeValue)
   const baseUrl = gateOrigin(mode, validateBaseUrl(mode, baseUrlValue))
-  const parityReportPath = options.parityReportPath ?? project.artifact.parityReportPath
-  const report = parse(readFileSync(resolve(parityReportPath), 'utf8')) as {
-    parity: { categories: Array<{ slug: string }>; exactSlugSet: string[] }
-  }
-  const listingSlug = report.parity.exactSlugSet[0]
+  const { categories, listing: listingSlug } = options.samples ?? httpGateSamples
   const retired = retiredCategorySlugs(options.publicationsDirectory ?? 'd1/publications')
-  const categorySlug = report.parity.categories.find(category => !retired.has(category.slug))?.slug
-  if (!listingSlug || !categorySlug) throw new Error('Reviewed parity samples are empty.')
+  const categorySlug = categories.find(slug => !retired.has(slug))
+  if (!categorySlug)
+    throw new Error(
+      'Every HTTP gate sample category is retired; add a live one to httpGateSamples.'
+    )
   const timeoutMs = options.timeoutMs ?? defaultRequestTimeoutMs
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > defaultRequestTimeoutMs)
     throw new Error('HTTP gate timeout must be a positive integer within the protected bound.')
@@ -912,6 +912,24 @@ export async function runHttpGates(
   await expectHostRedirectPolicy(target, redirectOn)
   if (mode === 'production')
     await expectPublicPolicy(target, listingRoute(listingSlug), { redirectOn, skipNonWorker: true })
+}
+
+/**
+ * The live listing and categories the gates request on a deployed Worker. They are real catalog
+ * rows, because the gates run against staging's and production's data: the v1 import's first
+ * listing and its first category no manifest retires, which the gates read from the import's
+ * parity report until #315 archived it. A committed manifest that unpublishes the listing or
+ * retires every category here fails `d1-preview-http-gates.test.ts`; name another live one then.
+ */
+export interface HttpGateSamples {
+  /** In order of preference: the gates request the first one no reviewed manifest retires. */
+  categories: readonly string[]
+  listing: string
+}
+
+export const httpGateSamples: HttpGateSamples = {
+  categories: ['ai-advertising-tools'],
+  listing: '123movies-downloader'
 }
 
 /**

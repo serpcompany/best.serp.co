@@ -4,7 +4,6 @@ import type { Database } from './client'
 export type CatalogOperation =
   | 'autocomplete'
   | 'canonical-redirect'
-  | 'category-summaries'
   | 'featured-summaries'
   | 'latest-summaries'
   | 'legacy-root-target'
@@ -20,7 +19,6 @@ export type CatalogOperation =
 
 export type CatalogQueryShape =
   | 'canonical-redirect'
-  | 'category-summaries'
   | 'featured-summaries'
   | 'latest-summaries'
   | 'legacy-root-target'

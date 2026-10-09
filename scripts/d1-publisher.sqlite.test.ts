@@ -3,12 +3,9 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
-import { parse } from 'yaml'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
-import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
 import { buildPublicationPlan, manifestSchema, type PublicationPlan } from './d1-publisher.ts'
-import { project } from './project'
 
 const beforeChecksum = 'a'.repeat(64)
 const afterChecksum = createHash('sha256')
@@ -178,17 +175,6 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
     for (const value of ['2026-5-16', '16/05/2026', '2026-05-16T00:00:00', '2026-13-01', '']) {
       expect(() => manifestSchema.parse(create(value)), value).toThrow()
     }
-  })
-
-  it('keeps every slug in the reviewed initial import a page URL', () => {
-    const report = parse(readFileSync(resolve(project.artifact.parityReportPath), 'utf8')) as {
-      parity: { categories: Array<{ slug: string }>; exactSlugSet: string[] }
-    }
-    expect(report.parity.exactSlugSet.length).toBeGreaterThan(3000)
-    expect(report.parity.exactSlugSet.filter(value => hasFileExtension(value))).toEqual([])
-    expect(
-      report.parity.categories.map(category => category.slug).filter(hasFileExtension)
-    ).toEqual([])
   })
 
   it('commits a verified checksum transition and audited redirect', () => {

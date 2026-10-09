@@ -24,9 +24,7 @@ import {
   seedListings,
   seedUsers
 } from '../apps/web/e2e/seed-facts'
-import { captureCanonicalTable } from './d1-application-snapshot'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
-import { sqliteTransport } from './d1-import-artifact'
 import { runLocalD1Command } from './d1-local-guard'
 import {
   assertLocalSeedTarget,
@@ -39,7 +37,11 @@ import {
   seedIncomplete,
   seedStartStatements
 } from './d1-local-seed'
-import { applicationColumnInventory, applicationTableNames } from './d1-table-inventory'
+import {
+  applicationColumnInventory,
+  applicationTableNames,
+  orderedRowsSql
+} from './d1-table-inventory'
 import { project } from './project'
 
 const temporaryDirectories: string[] = []
@@ -77,13 +79,10 @@ function seededDatabase(): DatabaseSync {
   return database
 }
 
-async function allRows(database: DatabaseSync): Promise<Record<string, unknown>> {
-  const transport = sqliteTransport(database)
-  const tables: Record<string, unknown> = {}
-  for (const table of applicationTableNames) {
-    tables[table] = (await captureCanonicalTable(transport, table)).rows
-  }
-  return tables
+function allRows(database: DatabaseSync): Record<string, unknown> {
+  return Object.fromEntries(
+    applicationTableNames.map(table => [table, database.prepare(orderedRowsSql(table)).all()])
+  )
 }
 
 /** A local Worker config as `validateCanonicalLocalConfig` accepts it. */
@@ -177,7 +176,7 @@ describe('fixture seed (#312)', () => {
     const seeded = seededDatabase()
     expect(seedIncomplete(queryOf(seeded))).toBe(false)
     seeded.close()
-    // An imported D1 (a catalog, no seed run) is served as it is.
+    // A D1 holding a catalog but no seed run (the v1 import left one before #315) is served as it is.
     const imported = migratedDatabase()
     imported
       .prepare('INSERT INTO publication_state (id,version,checksum) VALUES (1,0,?)')
@@ -186,13 +185,13 @@ describe('fixture seed (#312)', () => {
     imported.close()
   })
 
-  it('writes the same rows on every run, with no clock of its own', async () => {
+  it('writes the same rows on every run, with no clock of its own', () => {
     expect(JSON.stringify(seedStartStatements())).toBe(JSON.stringify(seedStartStatements()))
     expect(JSON.stringify(fixtureSeedImages())).toBe(JSON.stringify(fixtureSeedImages()))
     const first = seededDatabase()
     const second = seededDatabase()
     try {
-      expect(await allRows(second)).toEqual(await allRows(first))
+      expect(allRows(second)).toEqual(allRows(first))
       // A column left to a CURRENT_TIMESTAMP default would hold today, after SEED_NOW, and
       // differ between runs on different days.
       const later: string[] = []
@@ -357,6 +356,24 @@ describe('pnpm db:seed:local refuses anything but local state', () => {
     const staging = localConfig()
     staging.vars = { D1_RUNTIME_ENV: 'staging', MEDIA_BASE_URL: project.local.media.baseUrl }
     expect(() => assertLocalSeedTarget(write('staging', staging))).toThrow(/dedicated local/u)
+  })
+
+  it('refuses CLOUDFLARE_ENV in the media seed the e2e media server runs directly (#313 review)', async () => {
+    const { withLocalPlatform } = await import('./seed-local-media')
+    const previous = process.env.CLOUDFLARE_ENV
+    process.env.CLOUDFLARE_ENV = 'staging'
+    let ran = false
+    try {
+      await expect(
+        withLocalPlatform(async () => {
+          ran = true
+        })
+      ).rejects.toThrow(/CLOUDFLARE_ENV=staging/u)
+    } finally {
+      if (previous === undefined) delete process.env.CLOUDFLARE_ENV
+      else process.env.CLOUDFLARE_ENV = previous
+    }
+    expect(ran).toBe(false)
   })
 
   it('takes no target arguments', async () => {

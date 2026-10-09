@@ -1,6 +1,6 @@
 # D1 recovery with Time Travel
 
-Production D1 changes in two ways. The protected workflows (deploy, bootstrap, publish, approve)
+Production D1 changes in two ways. The protected workflows (deploy, publish, approve)
 record a Time Travel bookmark first, in the run summary
 ([Deploy runbook](./DEPLOY_RUNBOOK.md#bookmarks-and-recovery)). None exports the database: this
 repository is public, so any signed-in GitHub user could download an export uploaded as an
@@ -35,8 +35,8 @@ statuses are final or wait on the submitter). Restore only when fixing forward i
 
 ## Restore a workflow bookmark
 
-Every workflow step that changes D1 (Deploy Staging and Deploy Production migrations, Bootstrap
-Production D1, Publish D1 Catalog, Review D1 Submission) comes right after a step that runs
+Every workflow step that changes D1 (Deploy Staging and Deploy Production migrations, Publish D1
+Catalog, Review D1 Submission) comes right after a step that runs
 `cloudflare-release.ts bookmark <env>`. If that step cannot read a bookmark, the job fails before
 the change. Otherwise the run summary shows the bookmark, when it was recorded, and the exact
 command, for example:
@@ -63,7 +63,7 @@ Which procedure:
 - A Deploy Production bookmark (a migration ran after it): [Undo a bad
   migration](#undo-a-bad-migration). Restoring D1 alone and redeploying would apply the same
   migration again.
-- Any other bookmark (Publish D1 Catalog, Review D1 Submission, the bootstrap): follow
+- Any other bookmark (Publish D1 Catalog, Review D1 Submission): follow
   [Restore](#restore) below with the bookmark in step 2, then [After a restore](#after-a-restore).
 
 ## Find the moment
