@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
@@ -23,35 +24,61 @@ const sourceCopyPath = resolve(
   project.appDirectory,
   'src/lib/site/data/devinschumacher-com-brands.json'
 )
-const publicDirectory = resolve(project.appDirectory, 'public')
 
-/** Sibling checkouts in the owner's layout. The comparisons with them skip when one is missing. */
+/**
+ * Sibling checkouts (docs/HARNESS.md, "Sibling checkouts"). The comparisons read a recorded
+ * commit, never a working tree, and skip when the checkout or the commit is missing (CI).
+ */
 const reposRoot = process.env.SERP_REPOS_ROOT ?? resolve(homedir(), 'dev/repos')
-const devinschumacherCom = resolve(reposRoot, 'devinschumacher.com')
-const serpCo = resolve(reposRoot, 'serp.co')
-const serpBrandData = resolve(reposRoot, 'serp/workers/brands-page/data')
+/** serpcompany/serp `main` when this list was decided (2026-10-09). */
+const SHARED_BRAND_DATA_COMMIT = 'd13fa4c0d55a83af32029a5363f940748eada135'
+
+function fileAtCommit(repository: string, commit: string, path: string): string | undefined {
+  const checkout = resolve(reposRoot, repository)
+  if (!existsSync(checkout)) return undefined
+  try {
+    return execFileSync('git', ['-C', checkout, 'show', `${commit}:${path}`], {
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'ignore']
+    })
+  } catch {
+    return undefined
+  }
+}
+
+const sourceAtCommit = fileAtCommit(
+  'devinschumacher.com',
+  NETWORK_BRANDS_SOURCE.commit,
+  NETWORK_BRANDS_SOURCE.path
+)
+const sharedBrands = fileAtCommit(
+  'serp',
+  SHARED_BRAND_DATA_COMMIT,
+  'workers/brands-page/data/brands.json'
+)
+const sharedBrandSets = fileAtCommit(
+  'serp',
+  SHARED_BRAND_DATA_COMMIT,
+  'workers/brands-page/data/brand-sets.json'
+)
 
 const sourceCopy = JSON.parse(readFileSync(sourceCopyPath, 'utf8')) as RawNetworkBrandsData
 const sourceBrands = Object.values(sourceCopy.brands ?? {})
 const brands = getNetworkBrands()
 
 describe('/brands/ data source (#193)', () => {
-  it('reads an unedited copy of the list devinschumacher.com/brands/ renders', () => {
-    expect(NETWORK_BRANDS_SOURCE).toEqual({
-      page: 'https://devinschumacher.com/brands/',
-      path: 'lib/data/network-brands.json',
-      repository: 'devinschumacher/devinschumacher.com'
-    })
+  it('renders the copy of the list devinschumacher.com/brands/ renders', () => {
     expect(brands).toEqual(selectNetworkBrands(sourceCopy))
   })
 
-  it.runIf(existsSync(resolve(devinschumacherCom, NETWORK_BRANDS_SOURCE.path)))(
-    'keeps the copy identical to the devinschumacher.com checkout',
+  it.runIf(sourceAtCommit !== undefined)(
+    'keeps the copy identical to the recorded devinschumacher.com commit',
     () => {
       expect(
         readFileSync(sourceCopyPath, 'utf8'),
-        `Copy ${NETWORK_BRANDS_SOURCE.repository}'s ${NETWORK_BRANDS_SOURCE.path} to ${sourceCopyPath}`
-      ).toBe(readFileSync(resolve(devinschumacherCom, NETWORK_BRANDS_SOURCE.path), 'utf8'))
+        `${sourceCopyPath} must equal ${NETWORK_BRANDS_SOURCE.repository}'s ${NETWORK_BRANDS_SOURCE.path} at ${NETWORK_BRANDS_SOURCE.commit}`
+      ).toBe(sourceAtCommit)
     }
   )
 
@@ -62,29 +89,22 @@ describe('/brands/ data source (#193)', () => {
     expect(listed.length).toBe(sourceBrands.length - 1)
     expect(brands).toHaveLength(listed.length + 1)
     for (const brand of [...listed, ...Object.values(ADDED_NETWORK_BRANDS)]) {
-      expect(brands).toContainEqual(
-        expect.objectContaining({
-          description: brand.description,
-          imageSrc: brand.logo,
-          name: brand.name,
-          url: brand.url
-        })
-      )
+      expect(brands).toContainEqual(expect.objectContaining({ name: brand.name, url: brand.url }))
     }
-    expect(brands.map(brand => brand.hostname)).toEqual([
-      'boxingundefeated.com',
-      'browserextensions.io',
-      'devinschumacher.com',
-      'keybumps.app',
-      'serp.co',
-      'serp.ai',
-      'apps.serp.co',
-      'dr.serp.co',
-      'extensions.serp.co',
-      'games.serp.co',
-      'serplists.com',
-      'tools.serp.co',
-      'zenbujapanese.com'
+    expect(brands.map(({ name, url }) => [name, url])).toEqual([
+      ['Boxing Undefeated', 'https://boxingundefeated.com'],
+      ['BrowserExtensions.io', 'https://browserextensions.io'],
+      ['Devin Schumacher', 'https://devinschumacher.com'],
+      ['Keybumps', 'https://keybumps.app'],
+      ['SERP', 'https://serp.co'],
+      ['SERP AI', 'https://serp.ai'],
+      ['SERP Apps', 'https://apps.serp.co'],
+      ['SERP DR', 'https://dr.serp.co'],
+      ['SERP Extensions', 'https://extensions.serp.co'],
+      ['SERP Games', 'https://games.serp.co'],
+      ['SERP Lists', 'https://serplists.com'],
+      ['SERP Tools', 'https://tools.serp.co'],
+      ['Zenbu Japanese', 'https://zenbujapanese.com']
     ])
   })
 })
@@ -101,15 +121,15 @@ describe('/brands/ list rules (#193)', () => {
     ).toEqual([])
   })
 
-  it.runIf(existsSync(resolve(serpBrandData, 'brands.json')))(
+  it.runIf(sharedBrands !== undefined && sharedBrandSets !== undefined)(
     'lists no brand the shared brand data marks as adult',
     () => {
-      const shared = JSON.parse(readFileSync(resolve(serpBrandData, 'brands.json'), 'utf8')) as {
+      const shared = JSON.parse(sharedBrands ?? '') as {
         brands: Record<string, { isAdult?: boolean; url: string }>
       }
-      const { brandSets } = JSON.parse(
-        readFileSync(resolve(serpBrandData, 'brand-sets.json'), 'utf8')
-      ) as { brandSets: Record<string, string[]> }
+      const { brandSets } = JSON.parse(sharedBrandSets ?? '') as {
+        brandSets: Record<string, string[]>
+      }
       const adultOnly = new Set(brandSets.adultsOnly)
       const adultHostnames = new Set(
         Object.entries(shared.brands)
@@ -120,65 +140,26 @@ describe('/brands/ list rules (#193)', () => {
       expect(brands.filter(brand => adultHostnames.has(brand.hostname))).toEqual([])
     }
   )
-
-  it('lists every brand with a description and a logo file this site serves', () => {
-    for (const brand of brands) {
-      expect(brand.description, brand.slug).not.toBe('')
-      expect(brand.imageSrc, brand.slug).toMatch(/^\/logos\/[\w-]+\.png$/u)
-      expect(existsSync(resolve(publicDirectory, `.${brand.imageSrc}`)), brand.imageSrc).toBe(true)
-    }
-  })
-
-  it.runIf(existsSync(resolve(devinschumacherCom, 'public/logos')))(
-    "serves devinschumacher.com's logo files unedited",
-    () => {
-      for (const brand of brands) {
-        const added = brand.slug in ADDED_NETWORK_BRANDS
-        // devinschumacher.com's own logo is serp.co's: devinschumacher.com has none in /logos/.
-        const origin = added
-          ? resolve(serpCo, 'apps/web/public')
-          : resolve(devinschumacherCom, 'public')
-        if (!existsSync(origin)) continue
-        expect(
-          readFileSync(resolve(publicDirectory, `.${brand.imageSrc}`)).equals(
-            readFileSync(resolve(origin, `.${brand.imageSrc}`))
-          ),
-          brand.imageSrc
-        ).toBe(true)
-      }
-    }
-  )
 })
 
 describe('parseNetworkBrands', () => {
-  const brand = (name: string, url: string) => ({
-    description: `${name} description`,
-    logo: '/logos/example.png',
-    name,
-    url
-  })
-
   it('returns sorted brand entries with hostnames', () => {
     expect(
       parseNetworkBrands({
         brands: {
-          zed: brand('Zed Brand', 'https://zed.example/path'),
-          alpha: brand('Alpha Brand', 'https://alpha.example/')
+          zed: { name: 'Zed Brand', url: 'https://zed.example/path' },
+          alpha: { name: 'Alpha Brand', url: 'https://alpha.example/' }
         }
       })
     ).toEqual([
       {
-        description: 'Alpha Brand description',
         hostname: 'alpha.example',
-        imageSrc: '/logos/example.png',
         name: 'Alpha Brand',
         slug: 'alpha',
         url: 'https://alpha.example/'
       },
       {
-        description: 'Zed Brand description',
         hostname: 'zed.example',
-        imageSrc: '/logos/example.png',
         name: 'Zed Brand',
         slug: 'zed',
         url: 'https://zed.example/path'
@@ -190,8 +171,8 @@ describe('parseNetworkBrands', () => {
     expect(() =>
       parseNetworkBrands({
         brands: {
-          first: brand('First', 'https://example.com/path?utm=1#top'),
-          second: brand('Second', 'https://EXAMPLE.com/path/')
+          first: { name: 'First', url: 'https://example.com/path?utm=1#top' },
+          second: { name: 'Second', url: 'https://EXAMPLE.com/path/' }
         }
       })
     ).toThrow(
@@ -201,28 +182,13 @@ describe('parseNetworkBrands', () => {
 
   it('rejects invalid brand URLs', () => {
     expect(() =>
-      parseNetworkBrands({ brands: { alpha: brand('Alpha', 'ftp://alpha.example') } })
+      parseNetworkBrands({ brands: { alpha: { name: 'Alpha', url: 'ftp://alpha.example' } } })
     ).toThrow('Invalid network brand URL for "alpha": ftp://alpha.example')
   })
 
-  it('rejects missing names and descriptions', () => {
+  it('rejects missing names', () => {
     expect(() =>
-      parseNetworkBrands({ brands: { alpha: brand(' ', 'https://alpha.example') } })
+      parseNetworkBrands({ brands: { alpha: { name: ' ', url: 'https://alpha.example' } } })
     ).toThrow('Network brand "alpha" must include a name')
-    expect(() =>
-      parseNetworkBrands({
-        brands: { alpha: { ...brand('Alpha', 'https://alpha.example'), description: '' } }
-      })
-    ).toThrow('Network brand "alpha" must include a description')
-  })
-
-  it('rejects a logo that is not a root-relative path', () => {
-    for (const logo of [undefined, 'logos/alpha.png', '//cdn.example/alpha.png']) {
-      expect(() =>
-        parseNetworkBrands({
-          brands: { alpha: { ...brand('Alpha', 'https://alpha.example'), logo } }
-        })
-      ).toThrow('Network brand "alpha" must name its logo as a root-relative path')
-    }
   })
 })

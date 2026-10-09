@@ -35,8 +35,7 @@ function isLocalWorker(baseURL: string | undefined): boolean {
 
 /**
  * Pages a visitor reaches first, plus listings with an imported logo (123movies, whose file was
- * deleted in #124, and autoenhance.ai's remote one) and without one (321tube), and `/brands/`,
- * whose brand logos are files in `public/logos/` (#193).
+ * deleted in #124, and autoenhance.ai's remote one) and without one (321tube).
  */
 const samplePages = [
   '/',
@@ -44,7 +43,6 @@ const samplePages = [
   categoriesIndexPath,
   categoryPath(sampleCategory.slug),
   '/about/',
-  '/brands/',
   '/search/?q=video',
   detailListing.path,
   remoteLogoListingPath,

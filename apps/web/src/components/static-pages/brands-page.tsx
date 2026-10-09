@@ -2,7 +2,7 @@ import { ExternalLink } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { SiteCard } from '@/components/directory/site-card'
-import { CardContent, CardDescription } from '@/components/ui/card'
+import { CardContent } from '@/components/ui/card'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { getRoute } from '../../lib/routing/routes'
 import { generateBaseMetadata, SITE_PUBLIC_URL, SITE_WEBSITE_ID } from '../../lib/seo/seo-config'
@@ -97,17 +97,7 @@ export default function BrandsPage() {
               key={brand.slug}
               className="transition-all hover:border-primary hover:bg-muted/50"
             >
-              <CardContent className="flex h-full flex-col gap-3 p-6">
-                {/* Decorative: the brand name next to it names the link. */}
-                <img
-                  alt=""
-                  className="size-10 shrink-0 rounded-lg object-cover"
-                  decoding="async"
-                  height={40}
-                  loading="lazy"
-                  src={brand.imageSrc}
-                  width={40}
-                />
+              <CardContent className="flex h-full flex-col justify-between gap-6 p-6">
                 <div className="space-y-2">
                   {/* The visible link text is the brand name (serp marketing/brands-page.md). */}
                   <h2 className="text-lg font-semibold tracking-tight">
@@ -121,7 +111,6 @@ export default function BrandsPage() {
                       <ExternalLink className="size-4 shrink-0" aria-hidden="true" />
                     </a>
                   </h2>
-                  <CardDescription>{brand.description}</CardDescription>
                 </div>
               </CardContent>
             </SiteCard>

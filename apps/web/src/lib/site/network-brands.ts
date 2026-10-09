@@ -3,17 +3,17 @@
  * same list as https://devinschumacher.com/brands/, plus devinschumacher.com itself, with no adult
  * EMD, no `*.pages.dev` mirror, and no link to this site.
  *
- * `data/devinschumacher-com-brands.json` is an unedited copy of the file that page renders
- * (`NETWORK_BRANDS_SOURCE`), and `apps/web/public/logos/` holds the logo files it names, at the
- * same paths. That list is not a set in the shared brand data (serpcompany/serp
- * `workers/brands-page/data/`): no set matches it, and the sets carry no descriptions or logos.
- * To update, copy the file and any new logo again; `network-brands.test.ts` compares both with
- * a devinschumacher.com checkout when there is one. This site's own rules stay here: links to
- * best.serp.co are dropped and devinschumacher.com is added.
+ * `data/devinschumacher-com-brands.json` is an unedited copy of the file that page renders, at the
+ * commit in `NETWORK_BRANDS_SOURCE`. That list is not a set in the shared brand data
+ * (serpcompany/serp `workers/brands-page/data/`): no set matches it. To update, copy the file
+ * again and record its new commit; `scripts/network-brands.test.ts` compares the copy with that
+ * commit in a devinschumacher.com checkout when there is one. This site's own rules stay here:
+ * links to best.serp.co are dropped and devinschumacher.com is added.
  */
 import sourceData from './data/devinschumacher-com-brands.json' with { type: 'json' }
 
 export const NETWORK_BRANDS_SOURCE = {
+  commit: '743d5fe376de1e87e6911a411fb281733dcd0daa',
   page: 'https://devinschumacher.com/brands/',
   path: 'lib/data/network-brands.json',
   repository: 'devinschumacher/devinschumacher.com'
@@ -22,33 +22,20 @@ export const NETWORK_BRANDS_SOURCE = {
 /** best.serp.co's own hosts (`serp.best` is an alias of it): never listed here. */
 export const SELF_HOSTNAMES: ReadonlySet<string> = new Set(['best.serp.co', 'serp.best'])
 
-/**
- * devinschumacher.com: its name in the shared brand data, and the description and logo of its
- * product page on serp.co (`apps/web/content/products/devinschumacher.md`).
- */
+/** devinschumacher.com, with its name in the shared brand data. */
 export const ADDED_NETWORK_BRANDS: Readonly<Record<string, RawNetworkBrand>> = {
-  'devinschumacher-com': {
-    description:
-      "Posts and videos on SEO, AI, programming, and entrepreneurship from SERP's founder.",
-    logo: '/logos/devinschumacher.png',
-    name: 'Devin Schumacher',
-    url: 'https://devinschumacher.com'
-  }
+  'devinschumacher-com': { name: 'Devin Schumacher', url: 'https://devinschumacher.com' }
 }
 
 export type NetworkBrandEntry = {
-  description: string
   hostname: string
-  /** The brand's logo: a root-relative path to a file in `apps/web/public/logos/`. */
-  imageSrc: string
   name: string
   slug: string
   url: string
 }
 
+/** A source record; its other fields (devinschumacher.com's description and logo) are unused. */
 export type RawNetworkBrand = {
-  description?: string
-  logo?: string
   name?: string
   url?: string
 }
@@ -84,8 +71,6 @@ function toNetworkBrandEntry(
   const cleanSlug = slug.trim()
   const name = brand.name?.trim()
   const url = brand.url?.trim()
-  const description = brand.description?.trim()
-  const logo = brand.logo?.trim()
 
   if (!cleanSlug) {
     throw new Error('Network brand slug must not be empty')
@@ -97,14 +82,6 @@ function toNetworkBrandEntry(
 
   if (!url) {
     throw new Error(`Network brand "${cleanSlug}" must include a URL`)
-  }
-
-  if (!description) {
-    throw new Error(`Network brand "${cleanSlug}" must include a description`)
-  }
-
-  if (!logo?.startsWith('/') || logo.startsWith('//')) {
-    throw new Error(`Network brand "${cleanSlug}" must name its logo as a root-relative path`)
   }
 
   const parsedUrl = parseBrandUrl(cleanSlug, url)
@@ -120,9 +97,7 @@ function toNetworkBrandEntry(
   seenUrls.set(normalizedUrl, cleanSlug)
 
   return {
-    description,
     hostname: parsedUrl.hostname,
-    imageSrc: logo,
     name,
     slug: cleanSlug,
     url
