@@ -34,8 +34,8 @@ one of these extensions (`chart.js`), and a test checks the committed import.
   own slash redirect off: it differs between Next.js and OpenNext and has no `/api`
   exception. OpenNext Node middleware is not used (it is experimental on Cloudflare).
 - **Moved URLs.** `apps/web/src/lib/routing/redirects.ts` lists them and `next.config.ts`
-  applies them: the pre-D1 scheme (`/products/<slug>/reviews/`, `/products/best/<category>/`,
-  `/categories/<x>/`) redirects permanently this way.
+  applies them (`movedUrlRedirects`): the pre-D1 URL scheme and the old sitemap paths
+  redirect permanently this way.
   Next.js matches each source with or without a slash and every destination is canonical, so
   the Worker leaves any request a moved-URL rule matches to OpenNext (it reads the same compiled
   patterns from `.next/routes-manifest.json`), and the request reaches its page in one hop. Add
@@ -46,8 +46,9 @@ one of these extensions (`chart.js`), and a test checks the committed import.
   write a canonical destination (`getRoute`).
 - **Fail closed.** The Worker validates the manifest at startup and refuses to start if its shape
   is unexpected (no `redirects` array or route list, a rule without a string `regex`, a pattern
-  that does not compile or matches every path), so a framework upgrade cannot silently turn
-  either rule off.
+  that does not compile or matches every path), so a framework upgrade cannot silently turn off
+  either the Worker's skip of the slash redirect for moved URLs or the root-level `/<slug>`
+  redirect.
 - **Query strings.** OpenNext re-serializes the query string of config redirects from decoded
   values, so a query that contains an encoded `&`, `=`, `#`, or `+` is not preserved exactly;
   the pre-D1 URLs never carried one.
@@ -90,8 +91,8 @@ for display; only the sitemaps and the JSON feed read every listing.
 
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other host
   serves a disallow-all robots.txt; see [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)).
-  The index lists the root-level `/sitemap-{pages,products,categories}.xml`; `/sitemap.xml` and
-  the old `/sitemaps/*/1.xml` answer one 308. The route registry
+  The index lists the root-level sitemaps; the older sitemap URLs answer one 308. The route
+  registry
   (`apps/web/src/lib/site/site-routes.ts`) sets each static page's indexability and sitemap for
   the sitemaps, robots.txt, page metadata, and footer. A listing's `lastmod` is its later
   `updated_at` or `published_at`; a collection's is its newest listing's.

@@ -1,9 +1,9 @@
 # Caching
 
-How public pages stay fast without serving stale content: four cache layers, all keyed by the
-catalog epoch, so a publication reaches every page without a purge. The Worker entry that runs
-the first layer is in [Architecture](./ARCHITECTURE.md); what a publication changes is in
-[Data model](./DATA_MODEL.md).
+How public pages stay fast without serving stale content: four cache layers, of which the edge
+HTML cache and the data cache are keyed by the catalog epoch, so a publication reaches every page
+without a purge. The Worker entry that runs the first layer is in
+[Architecture](./ARCHITECTURE.md); what a publication changes is in [Data model](./DATA_MODEL.md).
 
 ## The catalog epoch
 
@@ -25,11 +25,11 @@ From the edge inward:
    still receive the origin `Cache-Control`. A cacheable request reaches OpenNext with only
    `accept`, `host`, `user-agent`, and the router headers; every other request header
    (cookies, `x-nonce`, forwarded and framework-internal headers) is dropped, so nothing a
-   client sends can be stored and served to others (`renderRequestFor`). Bypassed: `/api`
-   (including `/api/auth`), `/admin`, `/account`, `/login`, `/search`, `/_next` (first path
-   segment in any case), requests with `Authorization`, and requests carrying a Better Auth
-   (`better-auth.*`) or preview cookie, so a signed-in request is never served from or
-   stored in the cache. Responses carry `x-edge-cache: HIT | MISS | BYPASS`.
+   client sends can be stored and served to others (`renderRequestFor`). Personalized,
+   private, mutable and free-form paths are bypassed by their first segment, in any case
+   (`BYPASS_PATH_SEGMENTS`), and so are requests with `Authorization` and requests carrying a
+   Better Auth (`better-auth.*`) or preview cookie, so a signed-in request is never served from
+   or stored in the cache. Responses carry `x-edge-cache: HIT | MISS | BYPASS`.
 2. **Epoch memo.** Each isolate reuses its epoch for 30 seconds and revalidates it in the
    background for up to 5 minutes; isolates in one data center share it through the Cache
    API for 30 seconds. D1 therefore sees about one one-row epoch read per data center per
