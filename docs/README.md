@@ -21,7 +21,9 @@
 | [Telemetry](./TELEMETRY.md) | Sentry error reporting, GTM and Cloudflare Web Analytics |
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel |
 | [Catalog hygiene](./CATALOG_HYGIENE.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains |
-| [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, staging before production |
+| [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, promotion, staging before production, hotfixes |
+| [Catalog publication](./CATALOG_PUBLICATION.md) | Catalog manifests and listing media plans: staging first, the publisher's and uploader's guards |
+| [Credential guards](./CREDENTIAL_GUARDS.md) | Workflow jobs holding the Cloudflare token: no D1 exports, bookmarks before changes, the security boundary |
 | [Promotion plan 2026-10-06](./releases/2026-10-06-promotion-plan.md) | The first staging → main promotion of the #59 work: blockers, order, rollback |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees |
 | [CI](./CI.md) | `web.yml` checks and staging deploy, rulesets, runners |

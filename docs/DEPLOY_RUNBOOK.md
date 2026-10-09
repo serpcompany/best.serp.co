@@ -30,7 +30,7 @@ when the two disagree. Cloudflare account: `SERP`, `cec5f04e1d18bcc65f2be0aefb04
 
 ## Database commands, promotion, and staging before production
 
-[Release guards](./RELEASE_GUARDS.md) lists every `db:*` command with its target, defines
+[Release guards](./RELEASE_GUARDS.md) says which target each `db:*` command reaches, defines
 the `staging` → `main` promotion and the hotfix path, and explains the staging-before-production
 check (the released commit must carry a tree Deploy Staging verified) that gates production
 migrations, imports, and Worker deploys. Re-verify the `staging` head with
