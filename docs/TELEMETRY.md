@@ -18,7 +18,9 @@ Worker's workers.dev host render neither tag, and `public-policy.test.tsx` holds
 
 ### Cloudflare Web Analytics setup
 
-Until the token is set, production renders no beacon.
+The token is set: the site `best.serp.co` in the SERP account's Web Analytics (added 2026-10-09
+as a JS-snippet site, so Cloudflare injects nothing itself). Without a token, production renders
+no beacon.
 
 1. In the Cloudflare dashboard, open Web Analytics and add the site `best.serp.co`. Cloudflare
    turns on automatic setup for a hostname it proxies; switch it to the JS snippet (Manage

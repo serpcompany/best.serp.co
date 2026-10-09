@@ -34,9 +34,9 @@ describe('Worker configuration (serp web-stack/nextjs-on-workers.md)', () => {
     for (const [name, config] of environments.slice(0, 2)) {
       expect(config.vars.CF_WEB_ANALYTICS_TOKEN, name).toBeUndefined()
     }
-    const token = resolved('production').vars.CF_WEB_ANALYTICS_TOKEN
-    // The same pattern `analyticsForRequest` accepts (apps/web/src/lib/environment).
-    if (token !== undefined) expect(token).toMatch(/^[0-9a-f]{32}$/u)
+    // The same pattern `analyticsForRequest` accepts (apps/web/src/lib/environment). Set since
+    // 2026-10-09: the best.serp.co site in the SERP account's Web Analytics (docs/TELEMETRY.md).
+    expect(resolved('production').vars.CF_WEB_ANALYTICS_TOKEN).toMatch(/^[0-9a-f]{32}$/u)
   })
 
   it.each(environments)('uploads source maps in %s', (_name, config) => {
