@@ -98,9 +98,9 @@ pnpm agent:ui:capture -- --name home --path /
 `agent:manifest` prints URLs, ports, D1 and Wrangler state paths, log/artifact paths,
 Git identity, Worker name, D1 binding, and runtime variables as JSON.
 
-`agent:dev` initializes an isolated runtime when needed, builds the Worker, starts its
-local D1 preview on the manifest port, and mirrors output into
-`.runtime/<instance>/logs/runtime.log`. `agent:logs` returns the last 200 lines.
+`agent:dev` initializes an isolated runtime when needed, seeds its local D1 with fixtures
+(`pnpm db:seed:local`) when it has none yet, builds the Worker, starts its local D1 preview on
+the manifest port, and mirrors output into `.runtime/<instance>/logs/runtime.log`. `agent:logs` returns the last 200 lines.
 The agent runtime, canonical local D1 aliases, app preview, and Playwright all resolve
 the same `apps/web/drizzle/` state below the manifest's D1 directory. They do
 not inspect or migrate a legacy local state directory.
@@ -139,7 +139,8 @@ The command:
 4. allocates a deterministic, worktree-specific port;
 5. creates isolated D1, Wrangler, cache, log, artifact, and browser directories;
 6. writes `.runtime/manifest.json`;
-7. prints the exact directory from which to open Codex.
+7. prints the seed command for its local D1 (`pnpm db:seed:local`) and the directory from
+   which to open Codex.
 
 Inside an existing manually created worktree:
 

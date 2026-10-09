@@ -13,6 +13,14 @@ import {
 } from './d1-import-artifact'
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import { runCanonicalPreview } from './d1-local-preview'
+import {
+  assertLocalSeedTarget,
+  isSeeded,
+  resetLocalState,
+  type SeedQuery,
+  seedFactViolations,
+  seedLocalFixtures
+} from './d1-local-seed'
 import { configuredFreshD1StateRoot } from './d1-local-state'
 import { parityTableNames } from './d1-table-inventory'
 import { project } from './project'
@@ -121,7 +129,7 @@ export function localSqlitePath(directory: string): string {
   if (matches.length !== 1) {
     throw new Error(
       `Canonical local D1 state must contain exactly one SQLite database; found ${matches.length}: ${matches.join(', ')}. ` +
-        `If the local database_id changed (#176), delete ${directory} and run pnpm db:migrate:local && pnpm db:import:local again.`
+        `If the local database_id changed (#176), run pnpm db:seed:local, which deletes ${directory} and seeds it again.`
     )
   }
   return matches[0]
@@ -131,7 +139,36 @@ function localSnapshotDatabase(): DatabaseSync {
   return new DatabaseSync(localSqlitePath(configuredFreshD1StateRoot()), { readOnly: true })
 }
 
+function sqliteQuery(database: DatabaseSync): SeedQuery {
+  return (sql, params = []) =>
+    database.prepare(sql).all(...params) as Array<Record<string, unknown>>
+}
+
+/**
+ * `pnpm db:verify:local`: a seeded local D1 (`pnpm db:seed:local`) is checked against the seed's
+ * facts; an imported one (`pnpm db:import:local`) against the import's exact parity.
+ */
 async function verify(): Promise<void> {
+  const database = localSnapshotDatabase()
+  try {
+    const query = sqliteQuery(database)
+    if (isSeeded(query)) {
+      const violations = seedFactViolations(query, { marker: true, media: true })
+      if (violations.length > 0) {
+        throw new Error(
+          `Local D1 no longer matches the fixture seed; pnpm db:seed:local resets it.\n${violations.join('\n')}`
+        )
+      }
+      console.log('Verified local D1 against the fixture seed facts.')
+      return
+    }
+  } finally {
+    database.close()
+  }
+  await verifyImport()
+}
+
+async function verifyImport(): Promise<void> {
   const report = readParityReport()
   const expected = await expectedBootstrapSnapshot(readReviewedImportSql(report))
   const actualDatabase = localSnapshotDatabase()
@@ -170,6 +207,14 @@ function publish(args: string[]): void {
   execFileSync('pnpm', ['tsx', 'scripts/d1-publisher.ts', manifestPath], { stdio: 'inherit' })
 }
 
+/** `pnpm db:seed:local`: reset the local state, apply the migrations, and seed fixtures. */
+async function seed(): Promise<void> {
+  assertLocalSeedTarget()
+  resetLocalState(configuredFreshD1StateRoot())
+  migrate()
+  await seedLocalFixtures()
+}
+
 function preview(): void {
   execFileSync('pnpm', ['--filter', project.appPackageName, 'build:worker'], {
     stdio: 'inherit'
@@ -206,12 +251,16 @@ export async function runLocalD1Command(args: string[]): Promise<void> {
     await verify()
     return
   }
+  if (command === 'seed') {
+    await seed()
+    return
+  }
   if (command === 'preview') {
     preview()
     return
   }
   throw new Error(
-    `Unknown local D1 command: ${command || 'missing'}. Use list, migrate, import, verify, publish, or preview.`
+    `Unknown local D1 command: ${command || 'missing'}. Use list, migrate, seed, import, verify, publish, or preview.`
   )
 }
 

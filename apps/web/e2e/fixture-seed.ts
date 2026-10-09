@@ -1,0 +1,728 @@
+import {
+  SEED_ID,
+  SEED_MEDIA_ORIGIN,
+  SEED_NOW,
+  seedCategories,
+  seedFillerListings,
+  seedListings,
+  seedRevisions,
+  seedSubmissions,
+  seedUsers
+} from './seed-facts'
+
+/**
+ * The fixture seed's rows (serpcompany/best.serp.co#312), facts in `seed-facts.ts`. Built the way
+ * the e2e suites seed their own D1s (`admin-fixture.ts`): a listing is inserted as a draft, filed
+ * under its primary category, then published, so the publication triggers hold. Every value is a
+ * bound parameter. `pnpm db:seed:local` (`scripts/d1-local-seed.ts`) runs these statements in one
+ * D1 batch on a freshly migrated local D1, then hosts `fixtureSeedImages()` through the real media
+ * ingestion path. The statements are deterministic: the same rows on every run.
+ */
+
+export type SeedValue = number | string | null
+
+export interface SeedStatement {
+  params: SeedValue[]
+  sql: string
+}
+
+/** A generated PNG the seed hosts on a listing (logo or featured image). */
+export interface SeedImage {
+  height: number
+  kind: 'image' | 'logo'
+  listingId: string
+  rgb: [number, number, number]
+  sourceUrl: string
+  width: number
+}
+
+type ListingState = 'draft' | 'published' | 'unpublished'
+
+interface ListingDefinition {
+  category: string
+  content: string
+  description: string
+  faqs?: Array<{ answer: string; question: string }>
+  featured?: boolean
+  /** Hosts a featured image too. */
+  image?: boolean
+  logo: boolean
+  name: string
+  /** Days before `SEED_NOW`; null for a listing never published. */
+  publishedDaysAgo: number | null
+  resourceLinks?: Array<{ label: string; url: string }>
+  slug: string
+  state: ListingState
+  /** The approved submission it came from (`source = 'submission'`). */
+  submissionId?: string
+  unofficial?: boolean
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+/** The badge program's actor (`BADGE_PROGRAM_ACTOR` in `apps/web/src/db/badge-program.ts`). */
+const BADGE_PROGRAM_ACTOR = 'badge-program'
+const UNLISTED_SUBMISSION_ID = 'fixture-submission-unlisted'
+
+/** An ISO instant `days` before `SEED_NOW`. */
+export function seedTime(days: number): string {
+  return new Date(Date.parse(SEED_NOW) - days * DAY_MS).toISOString()
+}
+
+/** A listing id as the app accepts one in a URL (`[A-Za-z0-9_-]`, `ACCOUNT_ID`). */
+export function seedListingId(slug: string): string {
+  return `fixture-listing-${slug.replaceAll('.', '-')}`
+}
+
+function listingChecksum(slug: string): string {
+  return `fixture-${slug}-v1`
+}
+
+function website(host: string): string {
+  return `https://${host}/`
+}
+
+/** The listing's hosted logo source, which an owner's revision keeps. */
+function logoSource(slug: string): string {
+  return `${SEED_MEDIA_ORIGIN}/logos/${slug}.png`
+}
+
+function insert(table: string, row: Record<string, SeedValue>): SeedStatement {
+  const columns = Object.keys(row)
+  return {
+    sql: `INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`,
+    params: Object.values(row)
+  }
+}
+
+const namedListings: ListingDefinition[] = [
+  {
+    ...seedListings.detail,
+    category: seedCategories.design.slug,
+    content:
+      'Fixture Studio is a made-up design tool that exists only in the local fixture seed.\n\n' +
+      '## What this page shows\n\nA hosted logo and featured image, FAQs, and resource links.',
+    description: 'A fixture design studio for layouts and mockups.',
+    faqs: [
+      {
+        answer: 'No. It is fixture data for local development and tests.',
+        question: 'Is Fixture Studio a real product?'
+      },
+      {
+        answer: 'The seed hosts a generated PNG through the real media ingestion path.',
+        question: 'Where does its logo come from?'
+      }
+    ],
+    featured: true,
+    image: true,
+    logo: true,
+    publishedDaysAgo: 1,
+    resourceLinks: [
+      { label: 'Documentation', url: 'https://docs.fixture-studio.test/' },
+      { label: 'Pricing', url: 'https://fixture-studio.test/pricing/' }
+    ],
+    state: 'published'
+  },
+  {
+    ...seedListings.claimable,
+    category: seedCategories.design.slug,
+    content: 'Fixture Canvas has no owner yet, so its page offers a claim.',
+    description: 'A fixture whiteboard for sketching ideas together.',
+    featured: true,
+    logo: true,
+    publishedDaysAgo: 2,
+    state: 'published'
+  },
+  {
+    ...seedListings.noLogo,
+    category: seedCategories.design.slug,
+    content: 'Fixture Sketch has no logo, so it shows the fallback tile.',
+    description: 'A fixture drawing pad with no logo of its own.',
+    logo: false,
+    publishedDaysAgo: 3,
+    state: 'published',
+    unofficial: true
+  },
+  {
+    ...seedListings.held,
+    category: seedCategories.developer.slug,
+    content: 'Claims of Fixture Harbor wait for an admin to review them.',
+    description: 'A fixture container registry whose claims are held for review.',
+    logo: true,
+    publishedDaysAgo: 4,
+    state: 'published'
+  },
+  {
+    ...seedListings.owned,
+    category: seedCategories.developer.slug,
+    content: 'Fixture Ledger is owned through a badge claim and is in a badge warning.',
+    description: 'A fixture bookkeeping API with a verified owner.',
+    logo: true,
+    publishedDaysAgo: 5,
+    state: 'published'
+  },
+  {
+    ...seedListings.ownerRemoved,
+    category: seedCategories.developer.slug,
+    content: 'The badge program removed the owner of Fixture Relay after a confirmed miss.',
+    description: 'A fixture webhook relay that lost its owner.',
+    logo: true,
+    publishedDaysAgo: 6,
+    state: 'published'
+  },
+  {
+    ...seedListings.submitted,
+    category: seedCategories.writing.slug,
+    content: 'Fixture Inkwell came from an approved free submission.',
+    description: 'A fixture notebook submitted on the free plan.',
+    logo: true,
+    publishedDaysAgo: 7,
+    state: 'published',
+    submissionId: seedSubmissions.approved.id
+  },
+  {
+    ...seedListings.paid,
+    category: seedCategories.writing.slug,
+    content: 'Fixture Parchment is live while its paid submission waits for review.',
+    description: 'A fixture document editor submitted on the paid plan.',
+    logo: true,
+    publishedDaysAgo: 0.5,
+    state: 'published',
+    submissionId: seedSubmissions.paid_pending_review.id
+  },
+  {
+    ...seedListings.unlisted,
+    category: seedCategories.writing.slug,
+    content: 'The badge program unlisted Fixture Scribe after a confirmed miss.',
+    description: 'A fixture transcription tool that was unlisted.',
+    logo: false,
+    publishedDaysAgo: 20,
+    state: 'unpublished',
+    submissionId: UNLISTED_SUBMISSION_ID
+  },
+  {
+    ...seedListings.draft,
+    category: seedCategories.writing.slug,
+    content: 'Fixture Draft was never published.',
+    description: 'A fixture listing that was never published.',
+    logo: false,
+    publishedDaysAgo: null,
+    state: 'draft'
+  }
+]
+
+function fillerListings(): ListingDefinition[] {
+  return Array.from({ length: seedFillerListings.count }, (_, index) => {
+    const number = String(index + 1).padStart(2, '0')
+    return {
+      category: seedCategories.writing.slug,
+      content: `Fixture Writer ${number} fills the writing category past one directory page.`,
+      description: `Fixture writing tool number ${number}.`,
+      logo: true,
+      name: `Fixture Writer ${number}`,
+      publishedDaysAgo: 10 + index,
+      slug: `fixture-writer-${number}`,
+      state: 'published' as const
+    }
+  })
+}
+
+/** Every listing the seed writes, in display order. */
+export function fixtureSeedListings(): readonly ListingDefinition[] {
+  return [...namedListings, ...fillerListings()]
+}
+
+/** Distinct, fixed logo colors. */
+const PALETTE: Array<[number, number, number]> = [
+  [16, 185, 129],
+  [59, 130, 246],
+  [234, 88, 12],
+  [139, 92, 246],
+  [236, 72, 153],
+  [20, 184, 166],
+  [202, 138, 4],
+  [100, 116, 139]
+]
+
+/** The images the seed hosts, in order: each listed listing's logo, then featured images. */
+export function fixtureSeedImages(): SeedImage[] {
+  const listings = fixtureSeedListings()
+  const color = (index: number) => PALETTE[index % PALETTE.length] as [number, number, number]
+  return [
+    ...listings.flatMap((listing, index) =>
+      listing.logo
+        ? [
+            {
+              height: 512,
+              kind: 'logo' as const,
+              listingId: seedListingId(listing.slug),
+              rgb: color(index),
+              sourceUrl: logoSource(listing.slug),
+              width: 512
+            }
+          ]
+        : []
+    ),
+    ...listings.flatMap((listing, index) =>
+      listing.image
+        ? [
+            {
+              height: 630,
+              kind: 'image' as const,
+              listingId: seedListingId(listing.slug),
+              rgb: color(index + 3),
+              sourceUrl: `${SEED_MEDIA_ORIGIN}/images/${listing.slug}.png`,
+              width: 1200
+            }
+          ]
+        : []
+    )
+  ]
+}
+
+function catalogStatements(): SeedStatement[] {
+  const categories = Object.values(seedCategories).map((category, index) =>
+    insert('categories', {
+      created_at: seedTime(60),
+      description: `${category.name} in the local fixture seed.`,
+      id: index + 1,
+      is_active: 1,
+      name: category.name,
+      slug: category.slug,
+      sort_order: index,
+      updated_at: seedTime(60)
+    })
+  )
+  const listings = fixtureSeedListings().flatMap((listing, index) => {
+    const id = seedListingId(listing.slug)
+    const publishedAt =
+      listing.publishedDaysAgo === null ? null : seedTime(listing.publishedDaysAgo)
+    const statements: SeedStatement[] = [
+      insert('listings', {
+        checksum: listingChecksum(listing.slug),
+        content: listing.content,
+        created_at: publishedAt ?? seedTime(1),
+        description: listing.description,
+        display_order: index,
+        id,
+        is_active: 1,
+        is_featured: listing.featured ? 1 : 0,
+        is_unofficial: listing.unofficial ? 1 : 0,
+        link_rel: listing.submissionId ? 'nofollow' : 'follow',
+        name: listing.name,
+        published_at: publishedAt,
+        slug: listing.slug,
+        source: listing.submissionId ? 'submission' : 'admin',
+        source_identity: listing.submissionId ?? listing.slug,
+        source_kind: listing.submissionId ? 'verified-submission' : 'fixture-seed',
+        status: 'draft',
+        updated_at: publishedAt ?? seedTime(1),
+        website: website(listing.slug.endsWith('.test') ? listing.slug : `${listing.slug}.test`)
+      }),
+      {
+        sql: `INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+          SELECT ?,id,0,1 FROM categories WHERE slug=?`,
+        params: [id, listing.category]
+      }
+    ]
+    if (listing.state !== 'draft') {
+      statements.push({
+        sql: `UPDATE listings SET status='approved',is_active=? WHERE id=?`,
+        params: [listing.state === 'published' ? 1 : 0, id]
+      })
+    }
+    for (const [sortOrder, faq] of (listing.faqs ?? []).entries()) {
+      statements.push(
+        insert('listing_faqs', {
+          answer: faq.answer,
+          listing_id: id,
+          question: faq.question,
+          sort_order: sortOrder
+        })
+      )
+    }
+    for (const [sortOrder, link] of (listing.resourceLinks ?? []).entries()) {
+      statements.push(
+        insert('listing_resource_links', {
+          label: link.label,
+          listing_id: id,
+          sort_order: sortOrder,
+          url: link.url
+        })
+      )
+    }
+    return statements
+  })
+  return [
+    insert('publication_state', {
+      checksum: `${SEED_ID}-v0`,
+      id: 1,
+      manifest_id: SEED_ID,
+      published_at: seedTime(60),
+      version: 0
+    }),
+    ...categories,
+    ...listings
+  ]
+}
+
+function userStatements(): SeedStatement[] {
+  const createdAt = Date.parse(seedTime(30))
+  return [
+    ...Object.values(seedUsers).map(user =>
+      insert('users', {
+        created_at: createdAt,
+        email: user.email,
+        email_verified: 1,
+        id: user.id,
+        name: user.name,
+        role: user.id === seedUsers.admin.id ? 'admin' : 'user',
+        updated_at: createdAt
+      })
+    ),
+    insert('admin_allowlist', {
+      added_by: SEED_ID,
+      created_at: seedTime(30),
+      email: seedUsers.admin.email,
+      note: 'Fixture admin'
+    })
+  ]
+}
+
+interface SubmissionDefinition {
+  created: number
+  events: Array<{ actor?: string; at: number; detail?: string; type: string }>
+  fields: Record<string, SeedValue>
+  id: string
+  name: string
+  slug: string
+  status: string
+}
+
+function submissionDefinitions(): SubmissionDefinition[] {
+  const reviewer = seedUsers.admin.email
+  const reviewed = (days: number) => ({ reviewed_at: seedTime(days), reviewed_by: reviewer })
+  return [
+    {
+      ...seedSubmissions.draft,
+      created: 2,
+      events: [{ at: 2, type: 'created' }],
+      fields: { draft_saved_at: seedTime(2), plan: null },
+      status: 'draft'
+    },
+    {
+      ...seedSubmissions.pending_badge,
+      created: 4,
+      events: [{ at: 3, detail: 'badge_missing', type: 'verification_failed' }],
+      fields: {
+        last_verification_at: seedTime(3),
+        last_verification_error: 'badge_missing',
+        verification_attempts: 1
+      },
+      status: 'pending_badge'
+    },
+    {
+      ...seedSubmissions.verified,
+      created: 5,
+      events: [{ at: 3, type: 'badge_verified' }],
+      fields: { badge_verified_at: seedTime(3), verification_attempts: 1 },
+      status: 'verified'
+    },
+    {
+      ...seedSubmissions.paid_pending_review,
+      created: 1,
+      events: [{ at: 0.5, detail: 'published', type: 'paid' }],
+      fields: {
+        listing_id: seedListingId(seedSubmissions.paid_pending_review.slug),
+        paid_at: seedTime(0.5),
+        plan: 'paid',
+        published_checksum: listingChecksum(seedSubmissions.paid_pending_review.slug)
+      },
+      status: 'paid_pending_review'
+    },
+    {
+      ...seedSubmissions.changes_requested,
+      created: 6,
+      events: [
+        {
+          actor: reviewer,
+          at: 4,
+          detail: 'Say what the product does in the first sentence.',
+          type: 'changes_requested'
+        }
+      ],
+      fields: {
+        badge_verified_at: seedTime(5.5),
+        reviewer_note: 'Say what the product does in the first sentence.',
+        verification_attempts: 1,
+        ...reviewed(4)
+      },
+      status: 'changes_requested'
+    },
+    {
+      ...seedSubmissions.approved,
+      created: 9,
+      events: [{ actor: reviewer, at: 7, type: 'approved' }],
+      fields: {
+        badge_verified_at: seedTime(8.5),
+        listing_id: seedListingId(seedSubmissions.approved.slug),
+        verification_attempts: 1,
+        ...reviewed(7)
+      },
+      status: 'approved'
+    },
+    {
+      ...seedListings.unlisted,
+      created: 22,
+      events: [
+        { actor: reviewer, at: 20, type: 'approved' },
+        { actor: BADGE_PROGRAM_ACTOR, at: 9, detail: 'badge_missing', type: 'unpublished' }
+      ],
+      fields: {
+        badge_verified_at: seedTime(21.5),
+        listing_id: seedListingId(seedListings.unlisted.slug),
+        verification_attempts: 1,
+        ...reviewed(20)
+      },
+      id: UNLISTED_SUBMISSION_ID,
+      status: 'approved'
+    },
+    {
+      ...seedSubmissions.rejected,
+      created: 8,
+      events: [{ actor: reviewer, at: 6, type: 'rejected' }],
+      fields: {
+        badge_verified_at: seedTime(7.5),
+        rejection_category: 'other',
+        rejection_reason: 'The site does not describe a software product.',
+        verification_attempts: 1,
+        ...reviewed(6)
+      },
+      status: 'rejected'
+    },
+    {
+      ...seedSubmissions.withdrawn,
+      created: 10,
+      events: [{ at: 9, type: 'withdrawn' }],
+      fields: { withdrawal_reason: 'owner' },
+      status: 'withdrawn'
+    }
+  ]
+}
+
+function submissionStatements(): SeedStatement[] {
+  const submitter = seedUsers.submitter.id
+  return submissionDefinitions().flatMap(submission => {
+    const lastEvent = Math.min(...submission.events.map(event => event.at))
+    return [
+      insert('listing_submissions', {
+        block_covers_subdomains: 1,
+        block_key: submission.slug,
+        category_slug: seedCategories.writing.slug,
+        content: `${submission.name} is a fixture submission from the local seed.`,
+        created_at: seedTime(submission.created),
+        description: `A fixture submission (${submission.status.replaceAll('_', ' ')}).`,
+        id: submission.id,
+        logo_url: `${website(submission.slug)}logo.png`,
+        name: submission.name,
+        owner_user_id: submitter,
+        plan: 'free',
+        slug: submission.slug,
+        status: submission.status,
+        updated_at: seedTime(lastEvent),
+        website: website(submission.slug),
+        ...submission.fields
+      }),
+      ...submission.events.map(event =>
+        insert('listing_submission_events', {
+          actor: event.actor ?? submitter,
+          created_at: seedTime(event.at),
+          detail: event.detail ?? null,
+          event_type: event.type,
+          submission_id: submission.id
+        })
+      )
+    ]
+  })
+}
+
+function ownershipStatements(): SeedStatement[] {
+  const owned = (slug: string, user: string, via: string, days: number) =>
+    insert('listing_owners', {
+      created_at: seedTime(days),
+      listing_id: seedListingId(slug),
+      role: 'owner',
+      user_id: user,
+      verified_at: seedTime(days),
+      verified_via: via
+    })
+  const submitter = seedUsers.submitter.id
+  const owner = seedUsers.owner.id
+  return [
+    owned(seedListings.submitted.slug, submitter, 'submission', 7),
+    owned(seedListings.paid.slug, submitter, 'submission', 0.5),
+    owned(seedListings.unlisted.slug, submitter, 'submission', 20),
+    owned(seedListings.owned.slug, owner, 'badge_claim', 15),
+    insert('listing_owners', {
+      created_at: seedTime(15),
+      listing_id: seedListingId(seedListings.ownerRemoved.slug),
+      revoked_at: seedTime(9),
+      revoked_reason: 'badge_removed',
+      role: 'owner',
+      user_id: owner,
+      verified_at: seedTime(15),
+      verified_via: 'badge_claim'
+    }),
+    insert('listing_claim_holds', {
+      created_at: seedTime(4),
+      listing_id: seedListingId(seedListings.held.slug),
+      reason: 'admin',
+      source: SEED_ID
+    })
+  ]
+}
+
+interface RevisionDefinition {
+  author: string
+  days: number
+  event: string
+  fields: Record<string, SeedValue>
+  id: string
+  listing: string
+  status: string
+}
+
+function revisionStatements(): SeedStatement[] {
+  const reviewer = seedUsers.admin.email
+  const revisions: RevisionDefinition[] = [
+    {
+      ...seedRevisions.pending_review,
+      author: seedUsers.submitter.id,
+      days: 1,
+      event: 'created',
+      fields: {},
+      status: 'pending_review'
+    },
+    {
+      ...seedRevisions.changes_requested,
+      author: seedUsers.owner.id,
+      days: 2,
+      event: 'changes_requested',
+      fields: {
+        reviewed_at: seedTime(2),
+        reviewed_by: reviewer,
+        reviewer_note: 'Keep the description to one sentence.'
+      },
+      status: 'changes_requested'
+    },
+    {
+      ...seedRevisions.approved,
+      author: seedUsers.owner.id,
+      days: 12,
+      event: 'approved',
+      fields: { reviewed_at: seedTime(12), reviewed_by: reviewer },
+      status: 'approved'
+    },
+    {
+      ...seedRevisions.rejected,
+      author: seedUsers.owner.id,
+      days: 11,
+      event: 'rejected',
+      fields: {
+        rejection_reason: 'The new description is not about the product.',
+        reviewed_at: seedTime(11),
+        reviewed_by: reviewer
+      },
+      status: 'rejected'
+    },
+    {
+      ...seedRevisions.withdrawn,
+      author: seedUsers.owner.id,
+      days: 10,
+      event: 'withdrawn',
+      fields: {},
+      status: 'withdrawn'
+    }
+  ]
+  const listings = new Map(fixtureSeedListings().map(listing => [listing.slug, listing]))
+  return revisions.flatMap(revision => {
+    const listing = listings.get(revision.listing)
+    if (!listing) throw new Error(`Revision ${revision.id} names an unknown listing.`)
+    const open = revision.status === 'pending_review' || revision.status === 'changes_requested'
+    return [
+      insert('listing_revisions', {
+        author_user_id: revision.author,
+        // An open revision is based on the listing as it stands, so approving it applies.
+        base_checksum: open ? listingChecksum(listing.slug) : `fixture-${listing.slug}-v0`,
+        category_slug: listing.category,
+        content: `${listing.content} Edited by its owner.`,
+        created_at: seedTime(revision.days + 1),
+        description: `${listing.description.replace(/\.$/u, '')}, as its owner describes it.`,
+        id: revision.id,
+        listing_id: seedListingId(listing.slug),
+        logo_url: logoSource(listing.slug),
+        name: listing.name,
+        status: revision.status,
+        updated_at: seedTime(revision.days),
+        ...revision.fields
+      }),
+      insert('listing_revision_events', {
+        actor:
+          revision.event === 'created' || revision.event === 'withdrawn'
+            ? revision.author
+            : reviewer,
+        created_at: seedTime(revision.days),
+        event_type: revision.event,
+        revision_id: revision.id
+      })
+    ]
+  })
+}
+
+function badgeProgramStatements(): SeedStatement[] {
+  const check = (slug: string, days: number, kind: string, reason: string | null) =>
+    insert('badge_checks', {
+      checked_at: seedTime(days),
+      conclusive: 1,
+      kind,
+      listing_id: seedListingId(slug),
+      outcome: reason ? 'fail' : 'pass',
+      reason
+    })
+  return [
+    // Passing: the submitted listing's weekly check.
+    check(seedListings.submitted.slug, 3, 'weekly', null),
+    // Warning: a weekly miss, not yet rechecked.
+    check(seedListings.owned.slug, 1, 'weekly', 'badge_missing'),
+    // Confirmed misses: one unlisted (free submission), one owner removed (badge claim).
+    check(seedListings.unlisted.slug, 10, 'weekly', 'badge_missing'),
+    check(seedListings.unlisted.slug, 9, 'confirmation', 'badge_missing'),
+    check(seedListings.ownerRemoved.slug, 10, 'weekly', 'badge_missing'),
+    check(seedListings.ownerRemoved.slug, 9, 'confirmation', 'badge_missing'),
+    insert('listing_events', {
+      actor: BADGE_PROGRAM_ACTOR,
+      created_at: seedTime(9),
+      detail: JSON.stringify({ note: null, reason: 'badge_missing' }),
+      event_type: 'unpublished',
+      listing_id: seedListingId(seedListings.unlisted.slug)
+    }),
+    insert('listing_events', {
+      actor: BADGE_PROGRAM_ACTOR,
+      created_at: seedTime(9),
+      detail: JSON.stringify({ reason: 'badge_removed', userId: seedUsers.owner.id }),
+      event_type: 'owner_revoked',
+      listing_id: seedListingId(seedListings.ownerRemoved.slug)
+    })
+  ]
+}
+
+/** Every row of the seed but its hosted media, in foreign-key order. */
+export function fixtureSeedStatements(): SeedStatement[] {
+  return [
+    ...catalogStatements(),
+    ...userStatements(),
+    ...submissionStatements(),
+    ...ownershipStatements(),
+    ...revisionStatements(),
+    ...badgeProgramStatements()
+  ]
+}

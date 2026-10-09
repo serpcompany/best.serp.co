@@ -32,6 +32,7 @@
     "db:publish:local": "pnpm tsx scripts/d1-local-guard.ts publish",
     "db:publish:production": "pnpm tsx scripts/d1-remote-publisher.ts",
     "db:publish:staging": "pnpm tsx scripts/d1-remote-publisher.ts --staging",
+    "db:seed:local": "pnpm tsx scripts/d1-local-guard.ts seed",
     "db:verify:local": "pnpm tsx scripts/d1-local-guard.ts verify",
     "deploy:production": "pnpm worker:build && pnpm --filter web exec opennextjs-cloudflare deploy --env production",
     "deploy:staging": "pnpm worker:build && pnpm --filter web exec opennextjs-cloudflare deploy --env staging",

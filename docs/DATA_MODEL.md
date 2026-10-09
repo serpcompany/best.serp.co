@@ -13,11 +13,11 @@ history. A migration is applied locally (`pnpm db:migrate:local`), then to stagi
 Deploy Staging, then to production by Deploy Production only after Deploy Staging verified
 that commit (see [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
 
-Local data is a documented exception to the standard's "seeded fake/fixture data" rule
-(owner decision a, serpcompany/best.serp.co#42). Local D1 is seeded with the real public
-catalog from the committed import. That data is public and pinned, contains no submissions
-or other user data, and the parity checks and Playwright suites need it. Submissions and any
-future user data are seeded from fixtures only, never copied from staging or production.
+Local data is seeded fake/fixture data, as the standard says: `pnpm db:seed:local` (#312,
+[Development](./DEVELOPMENT.md#local-data)). The committed import of the real public catalog
+(owner decision a, serpcompany/best.serp.co#42) remains a documented exception only for
+Playwright's default server and the catalog-scale tests, until #313–#315 retire it. User data
+is never copied from staging or production.
 
 `apps/web/drizzle/0000_baseline.sql` is hand-finished after generation: every table is
 `STRICT`, `PRAGMA foreign_keys = ON` leads the file, and four triggers enforce that a
@@ -290,7 +290,7 @@ The catalog was bootstrapped once from `serpcompany/json-directory-template@25e2
 `lst_` + `sha256("legacy-product-map" NUL <slug>)[0:24]`, so re-running the generator
 produces identical rows. `best-serp-co-v1-parity.yaml` records source checksums,
 counts, the SQL checksum, and the target checksum written to `publication_state`;
-`best-serp-co-v1.sql.br` is the committed brotli copy of the SQL that seeds local D1 and
+`best-serp-co-v1.sql.br` is the committed brotli copy of the SQL that seeds the Playwright D1 and
 CI. The uncompressed SQL and per-batch files are git-ignored. Remote environments are
 bootstrapped from the same checksum-verified SQL by `bootstrap-production-d1.yml`, which
 imports only into an empty database and then verifies exact parity with the report.
