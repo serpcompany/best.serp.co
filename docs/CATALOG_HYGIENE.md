@@ -171,7 +171,7 @@ The generator reads the reviewed catalog as the committed manifests leave it
 (`reviewedCatalogDatabase`: the import plus every committed manifest that sorts before the ones
 being generated and adds or removes categories, unpublishes, or retires one), so each operation
 expects the categories staging and production have. It refuses a live listing of a retired category that the decisions neither unpublish nor
-keep, and `scripts/listing-domain-check.test.ts` keeps the committed manifests identical to the
+keep, and `scripts/v1-import-publications.test.ts` keeps the committed manifests identical to the
 decisions, applies them to the reviewed catalog, and checks that exactly the decided categories
 retire, that kept listings stay live off them, that no other listing named for an adult platform
 is live, and that every removed URL answers 404.
