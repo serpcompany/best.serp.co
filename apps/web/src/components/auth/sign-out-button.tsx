@@ -32,11 +32,11 @@ export function HeaderSignOutButton() {
   const [pending, onSignOut] = useSignOut()
   return (
     <Button
-      type="button"
       variant="ghost"
+      size="lg"
       disabled={pending}
       onClick={onSignOut}
-      className="hidden sm:inline-flex items-center text-sm font-bold h-9 px-4 hover:bg-accent shadow-none"
+      className="hidden sm:inline-flex"
     >
       Sign out
     </Button>
@@ -47,13 +47,13 @@ export function HeaderSignOutButton() {
 export function DrawerSignOutButton() {
   const [pending, onSignOut] = useSignOut()
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       disabled={pending}
       onClick={onSignOut}
-      className={cn(directoryNavigationInteractiveClassName, 'w-full text-left')}
+      className={cn(directoryNavigationInteractiveClassName, 'h-auto w-full justify-start p-0')}
     >
       <DirectoryNavigationItem className="py-1.5">Sign out</DirectoryNavigationItem>
-    </button>
+    </Button>
   )
 }

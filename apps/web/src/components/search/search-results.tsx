@@ -1,6 +1,9 @@
 'use client'
 
 import { type ComponentType, useEffect, useMemo, useState } from 'react'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
@@ -72,24 +75,22 @@ export function SearchResults({ error, loading, query, results, slots }: SearchR
 
   if (error) {
     return (
-      <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4">
-        <h2 className="text-lg font-semibold">Something went wrong</h2>
-        <p className="mt-1">{error}</p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="mt-3 rounded-md bg-destructive/15 px-4 py-2 transition-colors hover:bg-destructive/25"
-        >
-          Refresh Page
-        </button>
-      </div>
+      <Alert variant="destructive">
+        <AlertTitle>Something went wrong</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+        <AlertAction>
+          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+            Refresh Page
+          </Button>
+        </AlertAction>
+      </Alert>
     )
   }
 
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-primary-500" />
+        <Spinner className="size-8" />
       </div>
     )
   }
@@ -182,14 +183,14 @@ export function SearchResults({ error, loading, query, results, slots }: SearchR
                 return acc
               }, {})
             ).map(([category, count]) => (
-              <button
+              <Button
                 key={category}
-                type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => setSelectedCategories([category])}
-                className="inline-flex items-center rounded-full border bg-background px-3 py-1 text-xs transition-colors hover:bg-muted/50"
               >
                 {getCategoryDisplayName(category)} ({count})
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -201,13 +202,9 @@ export function SearchResults({ error, loading, query, results, slots }: SearchR
           <p className="mb-4 text-muted-foreground">
             Try removing some category filters or search with different terms.
           </p>
-          <button
-            type="button"
-            onClick={() => setSelectedCategories([])}
-            className="text-sm font-medium text-primary hover:text-primary/80"
-          >
+          <Button variant="link" onClick={() => setSelectedCategories([])}>
             Clear all filters
-          </button>
+          </Button>
         </div>
       ) : (
         <WebsitesListWithSort

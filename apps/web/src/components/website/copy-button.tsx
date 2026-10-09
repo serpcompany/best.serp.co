@@ -2,7 +2,7 @@
 
 import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 interface CopyButtonProps {
   text: string
@@ -25,15 +25,10 @@ export function CopyButton({ text, variant = 'default' }: CopyButtonProps) {
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant={variant === 'terminal' ? 'outline' : 'secondary'}
+      size="icon-lg"
       onClick={handleCopy}
-      className={cn(
-        'shrink-0 rounded-lg p-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        variant === 'terminal'
-          ? 'border border-border bg-background hover:bg-accent'
-          : 'border border-border/50 bg-muted hover:bg-muted/80'
-      )}
       aria-label="Copy to clipboard"
     >
       {copied ? (
@@ -41,6 +36,6 @@ export function CopyButton({ text, variant = 'default' }: CopyButtonProps) {
       ) : (
         <Copy className="size-4 text-muted-foreground" />
       )}
-    </button>
+    </Button>
   )
 }

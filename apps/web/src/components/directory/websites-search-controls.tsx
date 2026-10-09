@@ -2,6 +2,7 @@
 
 import { Clock, Heart, SortAsc } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { Toggle } from '@/components/ui/toggle'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { getRoute } from '../../lib/routing/routes'
 import { SearchInput } from '../search/search-input'
@@ -55,22 +56,16 @@ export function WebsitesSearchControls({
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
         {hasFavorites && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm transition-colors cursor-pointer ${
-                showFavoritesOnly
-                  ? 'bg-accent text-accent-foreground border-accent'
-                  : 'bg-background hover:bg-muted/50 border-border'
-              }`}
-            >
-              <Heart
-                className={`h-4 w-4 ${showFavoritesOnly ? 'fill-destructive text-destructive' : 'text-muted-foreground'}`}
-              />
-              <span>{showFavoritesOnly ? 'Show All' : 'Favorites Only'}</span>
-            </button>
-          </div>
+          <Toggle
+            variant="outline"
+            pressed={showFavoritesOnly}
+            onPressedChange={setShowFavoritesOnly}
+          >
+            <Heart
+              className={showFavoritesOnly ? 'fill-destructive text-destructive' : undefined}
+            />
+            {showFavoritesOnly ? 'Show All' : 'Favorites Only'}
+          </Toggle>
         )}
 
         <div className="flex items-center gap-2">
@@ -83,21 +78,15 @@ export function WebsitesSearchControls({
                 setSortBy(value as 'name' | 'latest')
               }
             }}
-            className="bg-background border rounded-md"
+            variant="outline"
           >
-            <ToggleGroupItem
-              value="name"
-              className="px-3 py-2 h-10 data-pressed:bg-accent cursor-pointer"
-            >
-              <SortAsc className="size-4 mr-2" />
-              <span className="text-sm">Name</span>
+            <ToggleGroupItem value="name">
+              <SortAsc />
+              Name
             </ToggleGroupItem>
-            <ToggleGroupItem
-              value="latest"
-              className="px-3 py-2 h-10 data-pressed:bg-accent cursor-pointer"
-            >
-              <Clock className="size-4 mr-2" />
-              <span className="text-sm">Latest</span>
+            <ToggleGroupItem value="latest">
+              <Clock />
+              Latest
             </ToggleGroupItem>
           </ToggleGroup>
         </div>

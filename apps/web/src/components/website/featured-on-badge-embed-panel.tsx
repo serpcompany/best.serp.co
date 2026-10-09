@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 type BadgeTheme = 'light' | 'dark'
 
@@ -70,11 +71,11 @@ export function FeaturedOnBadgeEmbedPanel({
         })
 
         return (
-          <button
+          <Button
             key={`${siteId}-${theme}`}
-            type="button"
+            variant="ghost"
             onClick={() => void handleCopy(theme, embedHtml)}
-            className="mt-4 block max-w-full cursor-pointer rounded-sm bg-transparent p-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="mt-4 flex h-auto max-w-full p-0"
             aria-label={`Copy ${theme} badge embed code`}
             title={`Copy ${theme} badge embed code`}
           >
@@ -85,7 +86,7 @@ export function FeaturedOnBadgeEmbedPanel({
               height={FEATURED_ON_BADGE_HEIGHT}
               className="h-auto max-w-full"
             />
-          </button>
+          </Button>
         )
       })}
       <p className="mt-2 min-h-4 text-xs text-muted-foreground" aria-live="polite">

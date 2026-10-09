@@ -1,7 +1,15 @@
 'use client'
 
 import { useEffect } from 'react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle
+} from '@/components/ui/empty'
 import { logger } from '@/lib/logging'
 
 export type ErrorProps = {
@@ -16,19 +24,15 @@ export function ErrorContent({ error, reset }: ErrorProps) {
   }, [error])
 
   return (
-    <div className="container relative mx-auto flex flex-col items-center justify-center px-4">
-      <div className="mx-auto flex h-screen flex-col items-center justify-center">
-        <div className="flex h-full flex-col items-center justify-center">
-          <span className="not-found rounded-md px-3.5 py-1 text-sm font-medium">Error</span>
-          <h1 className="mt-5 text-3xl font-bold md:text-5xl">Something went wrong!</h1>
-          <p className="mx-auto mt-5 max-w-xl text-center text-base font-medium text-muted-foreground">
-            An unexpected error occurred. Please try again later.
-          </p>
-          <Button onClick={reset} className="mt-8">
-            Try again
-          </Button>
-        </div>
-      </div>
-    </div>
+    <Empty className="min-h-screen">
+      <EmptyHeader>
+        <Badge variant="secondary">Error</Badge>
+        <EmptyTitle>Something went wrong!</EmptyTitle>
+        <EmptyDescription>An unexpected error occurred. Please try again later.</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={reset}>Try again</Button>
+      </EmptyContent>
+    </Empty>
   )
 }

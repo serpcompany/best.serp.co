@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
@@ -18,15 +18,14 @@ export function HeroSection({ websiteCount }: HeroSectionProps) {
       <AnimatedBackground />
       <DirectoryHeroContainer>
         <div className="animate-fade-in-up opacity-0 stagger-1">
-          <Link
-            className="mx-auto inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-background/50 px-3 py-1.5 text-xs font-medium backdrop-blur-sm transition-all hover:border-foreground/20 hover:bg-background/80 md:gap-3 md:text-sm"
-            href={getRoute('home')}
+          <Badge
+            variant="outline"
+            className="mx-auto h-auto py-1 pl-1"
+            render={<Link href={getRoute('home')} />}
           >
-            <span className="inline-flex items-center rounded-full bg-foreground px-2.5 py-0.5 text-xs font-bold tabular-nums text-background">
-              {websiteCount}
-            </span>
+            <Badge className="tabular-nums">{websiteCount}</Badge>
             <span className="text-muted-foreground">{siteCopy.listingCountLabel}</span>
-          </Link>
+          </Badge>
         </div>
 
         <h1 className="animate-fade-in-up opacity-0 stagger-2 text-4xl font-bold leading-[1.1] tracking-tight md:text-5xl lg:text-6xl xl:text-7xl">
@@ -44,15 +43,9 @@ export function HeroSection({ websiteCount }: HeroSectionProps) {
         </p>
 
         <div className="animate-fade-in-up opacity-0 stagger-4 flex flex-col justify-center gap-3 pt-2 sm:flex-row md:gap-4">
-          <Link
-            href={getRoute('submit')}
-            className={cn(
-              buttonVariants(),
-              'group h-auto bg-foreground px-6 py-3 text-sm font-bold text-background shadow-none transition-all duration-300 hover:gap-3 hover:bg-foreground/90 press-effect has-[>svg]:px-6 md:px-8 md:py-4 md:text-base md:has-[>svg]:px-8'
-            )}
-          >
+          <Link href={getRoute('submit')} className={buttonVariants({ size: 'lg' })}>
             {siteCopy.submitLabel}
-            <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+            <ArrowRight data-icon="inline-end" />
           </Link>
         </div>
       </DirectoryHeroContainer>
