@@ -1,13 +1,12 @@
 'use client'
 
-import { ArrowRight, CircleX, Clock, Info } from 'lucide-react'
+import { ArrowRight, CircleCheck, CircleX, Clock, Info, LogIn, Mail } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { readLocalDraft } from '@/components/submit/draft-storage'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from '@/components/ui/input-otp'
@@ -16,6 +15,7 @@ import { callbackDestination } from '@/lib/auth/callback-url'
 import { getRoute } from '@/lib/routing/routes'
 import { hostOf } from '@/lib/submissions/contract'
 import { cn } from '@/lib/utils'
+import { AuthCard } from './auth-card'
 import {
   CODE_ATTEMPTS,
   CODE_LENGTH,
@@ -301,44 +301,37 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
 
   if (step.kind === 'done') {
     return (
-      <LoginLayout>
-        <CardHeader>
-          <CardTitle className="text-xl">
-            <h1>You’re signed in</h1>
-          </CardTitle>
-          <CardDescription>
+      <AuthCard
+        icon={<CircleCheck />}
+        title="You’re signed in"
+        description={
+          <>
             Signed in as <b className="font-medium text-foreground">{step.email}</b>.{' '}
             {draftName
               ? 'Taking you back to Submit, where your draft is waiting.'
               : destination.sentence}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FieldGroup>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Spinner />
-              Redirecting…
-            </div>
-            <Field>
-              <Link href={callbackPath} className={cn(buttonVariants(), 'w-full')}>
-                {destination.button}
-                <ArrowRight />
-              </Link>
-              <FieldDescription className="text-center">
-                Not you?{' '}
-                <Button
-                  variant="link"
-                  className="h-auto p-0"
-                  disabled={pending}
-                  onClick={onSignOut}
-                >
-                  Sign out
-                </Button>
-              </FieldDescription>
-            </Field>
-          </FieldGroup>
-        </CardContent>
-      </LoginLayout>
+          </>
+        }
+      >
+        <FieldGroup>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner />
+            Redirecting…
+          </div>
+          <Field>
+            <Link href={callbackPath} className={cn(buttonVariants(), 'w-full')}>
+              {destination.button}
+              <ArrowRight />
+            </Link>
+            <FieldDescription className="text-center">
+              Not you?{' '}
+              <Button variant="link" className="h-auto p-0" disabled={pending} onClick={onSignOut}>
+                Sign out
+              </Button>
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
+      </AuthCard>
     )
   }
 
@@ -352,227 +345,223 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
     const guessLimitSeconds = codeError?.kind === 'limited' ? (codeError.until - now) / 1000 : 0
     const message = codeErrorMessage(codeError, guessLimitSeconds)
     return (
-      <LoginLayout>
-        <CardHeader>
-          <CardTitle className="text-xl">
-            <h1>Check your email</h1>
-          </CardTitle>
-          <CardDescription>
+      <AuthCard
+        icon={<Mail />}
+        title="Check your email"
+        description={
+          <>
             If <b className="font-medium text-foreground">{email}</b> is a valid address, a{' '}
             {CODE_LENGTH}-digit code is on its way. It expires in {CODE_LIFETIME_MINUTES} minutes.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={event => {
-              event.preventDefault()
-              void onVerify(otp)
-            }}
-          >
-            <FieldGroup>
-              <Field data-invalid={message ? true : undefined}>
-                <FieldLabel htmlFor="code">Code</FieldLabel>
-                <InputOTP
-                  ref={codeInput}
-                  id="code"
-                  autoFocus
-                  autoComplete="one-time-code"
-                  disabled={pending || codeDead}
-                  inputMode="numeric"
-                  maxLength={CODE_LENGTH}
-                  aria-invalid={message ? true : undefined}
-                  aria-describedby={message ? 'code-error' : 'code-description'}
-                  pattern={DIGITS_ONLY}
-                  // Never reached while onPasteCapture reads every paste; if it were, it keeps
-                  // only a fragment's digits, never the first six digits of a sentence.
-                  pasteTransformer={text => {
-                    const read = readCodeText(text)
-                    return read.kind === 'digits' ? read.digits : ''
-                  }}
-                  value={otp}
-                  onChange={value => {
-                    if (!inputRead.current) onCodeChange(value)
-                  }}
-                  onPasteCapture={event => {
-                    // Every paste is read here, before input-otp's own paste handling.
-                    event.preventDefault()
-                    event.stopPropagation()
-                    onCodeText(event.clipboardData.getData('text/plain'), event.currentTarget)
-                  }}
-                  onInput={event => {
-                    // Autofill and password managers set the whole value at once, past the
-                    // digits-only pattern and the six-character limit: read it like pasted
-                    // text, so seven digits or a spaced code are never cut to their first six.
-                    // Anything ambiguous is dropped, and React restores the previous value.
-                    const value = event.currentTarget.value
-                    if (codeDigits(value) === value && value.length <= CODE_LENGTH) return
-                    inputRead.current = true
-                    queueMicrotask(() => {
-                      inputRead.current = false
-                    })
-                    const read = readCodeText(value)
-                    if (read.kind === 'code') onCodeChange(read.code)
-                    else if (read.kind === 'digits') onCodeChange(read.digits)
-                  }}
-                >
-                  <InputOTPGroup>
-                    {[0, 1, 2].map(index => (
-                      <InputOTPSlot
-                        key={index}
-                        index={index}
-                        aria-invalid={message ? true : undefined}
-                        className="h-10 w-10 text-base"
-                      />
-                    ))}
-                  </InputOTPGroup>
-                  <InputOTPSeparator className="text-muted-foreground [&>svg]:size-4" />
-                  <InputOTPGroup>
-                    {[3, 4, 5].map(index => (
-                      <InputOTPSlot
-                        key={index}
-                        index={index}
-                        aria-invalid={message ? true : undefined}
-                        className="h-10 w-10 text-base"
-                      />
-                    ))}
-                  </InputOTPGroup>
-                </InputOTP>
-                {message ? (
-                  <FieldError id="code-error">{message}</FieldError>
-                ) : (
-                  <FieldDescription id="code-description">
-                    From SERP Directory &lt;noreply@mail.serp.co&gt;. Check spam if it isn’t there
-                    in a minute.
-                  </FieldDescription>
-                )}
-              </Field>
-              <LoginNotice notice={notice} seconds={limitedSeconds} />
-              <Field>
-                {codeDead ? (
-                  <Button
-                    type="button"
-                    className="w-full"
-                    disabled={pending || limitActive}
-                    onClick={onResend}
-                  >
-                    {pending ? <Spinner /> : null}
-                    Send a new code
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={
-                      pending ||
-                      otp.length !== CODE_LENGTH ||
-                      otp === rejectedCode ||
-                      guessLimitSeconds > 0
-                    }
-                  >
-                    {pending ? <Spinner /> : null}
-                    Verify
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  disabled={pending}
-                  onClick={() => {
-                    setNotice(null)
-                    setCodeError(null)
-                    setStep({ kind: 'email' })
-                  }}
-                >
-                  Use a different email
-                </Button>
-                <FieldDescription className="text-center">
-                  Didn’t get it?{' '}
-                  {resendIn > 0 && !codeError ? (
-                    <>
-                      Resend in <span className="tabular-nums">{formatCountdown(resendIn)}</span>
-                    </>
-                  ) : (
-                    <Button
-                      variant="link"
-                      className="h-auto p-0"
-                      disabled={pending || limitActive}
-                      onClick={onResend}
-                    >
-                      Send a new code
-                    </Button>
-                  )}
-                </FieldDescription>
-              </Field>
-            </FieldGroup>
-          </form>
-        </CardContent>
-      </LoginLayout>
-    )
-  }
-
-  return (
-    <LoginLayout>
-      <CardHeader>
-        <CardTitle className="text-xl">
-          <h1>Sign up or sign in</h1>
-        </CardTitle>
-        <CardDescription>
-          Enter your email and we’ll send you a {CODE_LENGTH}-digit code. New to SERP? The same code
-          creates your account.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form noValidate onSubmit={onEmailSubmit}>
+          </>
+        }
+      >
+        <form
+          onSubmit={event => {
+            event.preventDefault()
+            void onVerify(otp)
+          }}
+        >
           <FieldGroup>
-            {draftName ? (
-              <Alert className="bg-card text-card-foreground">
-                <Info aria-hidden="true" />
-                <AlertTitle>Your {draftName} draft is saved</AlertTitle>
-                <AlertDescription>Sign in to finish submitting it.</AlertDescription>
-              </Alert>
-            ) : null}
-            <Field data-invalid={emailError ? true : undefined}>
-              <FieldLabel htmlFor="email">Email</FieldLabel>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
+            <Field data-invalid={message ? true : undefined}>
+              <FieldLabel htmlFor="code">Code</FieldLabel>
+              <InputOTP
+                ref={codeInput}
+                id="code"
                 autoFocus
-                placeholder="you@company.com"
-                required
-                value={email}
-                aria-invalid={emailError ? true : undefined}
-                aria-describedby={emailError ? 'email-error' : undefined}
-                onChange={event => {
-                  setEmail(event.target.value)
-                  setEmailError(null)
+                autoComplete="one-time-code"
+                disabled={pending || codeDead}
+                inputMode="numeric"
+                maxLength={CODE_LENGTH}
+                aria-invalid={message ? true : undefined}
+                aria-describedby={message ? 'code-error' : 'code-description'}
+                pattern={DIGITS_ONLY}
+                // Never reached while onPasteCapture reads every paste; if it were, it keeps
+                // only a fragment's digits, never the first six digits of a sentence.
+                pasteTransformer={text => {
+                  const read = readCodeText(text)
+                  return read.kind === 'digits' ? read.digits : ''
                 }}
-              />
-              {emailError ? <FieldError id="email-error">{emailError}</FieldError> : null}
+                value={otp}
+                onChange={value => {
+                  if (!inputRead.current) onCodeChange(value)
+                }}
+                onPasteCapture={event => {
+                  // Every paste is read here, before input-otp's own paste handling.
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onCodeText(event.clipboardData.getData('text/plain'), event.currentTarget)
+                }}
+                onInput={event => {
+                  // Autofill and password managers set the whole value at once, past the
+                  // digits-only pattern and the six-character limit: read it like pasted
+                  // text, so seven digits or a spaced code are never cut to their first six.
+                  // Anything ambiguous is dropped, and React restores the previous value.
+                  const value = event.currentTarget.value
+                  if (codeDigits(value) === value && value.length <= CODE_LENGTH) return
+                  inputRead.current = true
+                  queueMicrotask(() => {
+                    inputRead.current = false
+                  })
+                  const read = readCodeText(value)
+                  if (read.kind === 'code') onCodeChange(read.code)
+                  else if (read.kind === 'digits') onCodeChange(read.digits)
+                }}
+              >
+                <InputOTPGroup>
+                  {[0, 1, 2].map(index => (
+                    <InputOTPSlot
+                      key={index}
+                      index={index}
+                      aria-invalid={message ? true : undefined}
+                      className="h-10 w-10 text-base"
+                    />
+                  ))}
+                </InputOTPGroup>
+                <InputOTPSeparator className="text-muted-foreground [&>svg]:size-4" />
+                <InputOTPGroup>
+                  {[3, 4, 5].map(index => (
+                    <InputOTPSlot
+                      key={index}
+                      index={index}
+                      aria-invalid={message ? true : undefined}
+                      className="h-10 w-10 text-base"
+                    />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+              {message ? (
+                <FieldError id="code-error">{message}</FieldError>
+              ) : (
+                <FieldDescription id="code-description">
+                  From SERP Directory &lt;noreply@mail.serp.co&gt;. Check spam if it isn’t there in
+                  a minute.
+                </FieldDescription>
+              )}
             </Field>
             <LoginNotice notice={notice} seconds={limitedSeconds} />
             <Field>
-              <Button type="submit" className="w-full" disabled={pending || limitActive}>
-                {pending ? <Spinner /> : null}
-                Email me a code
+              {codeDead ? (
+                <Button
+                  type="button"
+                  className="w-full"
+                  disabled={pending || limitActive}
+                  onClick={onResend}
+                >
+                  {pending ? <Spinner /> : null}
+                  Send a new code
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={
+                    pending ||
+                    otp.length !== CODE_LENGTH ||
+                    otp === rejectedCode ||
+                    guessLimitSeconds > 0
+                  }
+                >
+                  {pending ? <Spinner /> : null}
+                  Verify
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={pending}
+                onClick={() => {
+                  setNotice(null)
+                  setCodeError(null)
+                  setStep({ kind: 'email' })
+                }}
+              >
+                Use a different email
               </Button>
               <FieldDescription className="text-center">
-                By continuing you agree to the{' '}
-                <Link href={getRoute('terms')} className="underline underline-offset-4">
-                  Terms of Service
-                </Link>{' '}
-                and{' '}
-                <Link href={getRoute('privacy')} className="underline underline-offset-4">
-                  Privacy Policy
-                </Link>
-                .
+                Didn’t get it?{' '}
+                {resendIn > 0 && !codeError ? (
+                  <>
+                    Resend in <span className="tabular-nums">{formatCountdown(resendIn)}</span>
+                  </>
+                ) : (
+                  <Button
+                    variant="link"
+                    className="h-auto p-0"
+                    disabled={pending || limitActive}
+                    onClick={onResend}
+                  >
+                    Send a new code
+                  </Button>
+                )}
               </FieldDescription>
             </Field>
           </FieldGroup>
         </form>
-      </CardContent>
-    </LoginLayout>
+      </AuthCard>
+    )
+  }
+
+  return (
+    <AuthCard
+      icon={<LogIn />}
+      title="Sign up or sign in"
+      description={
+        <>
+          Enter your email and we’ll send you a {CODE_LENGTH}-digit code. New to SERP? The same code
+          creates your account.
+        </>
+      }
+    >
+      <form noValidate onSubmit={onEmailSubmit}>
+        <FieldGroup>
+          {draftName ? (
+            <Alert className="bg-card text-card-foreground">
+              <Info aria-hidden="true" />
+              <AlertTitle>Your {draftName} draft is saved</AlertTitle>
+              <AlertDescription>Sign in to finish submitting it.</AlertDescription>
+            </Alert>
+          ) : null}
+          <Field data-invalid={emailError ? true : undefined}>
+            <FieldLabel htmlFor="email">Email</FieldLabel>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              autoFocus
+              placeholder="you@company.com"
+              required
+              value={email}
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby={emailError ? 'email-error' : undefined}
+              onChange={event => {
+                setEmail(event.target.value)
+                setEmailError(null)
+              }}
+            />
+            {emailError ? <FieldError id="email-error">{emailError}</FieldError> : null}
+          </Field>
+          <LoginNotice notice={notice} seconds={limitedSeconds} />
+          <Field>
+            <Button type="submit" className="w-full" disabled={pending || limitActive}>
+              {pending ? <Spinner /> : null}
+              Email me a code
+            </Button>
+            <FieldDescription className="text-center">
+              By continuing you agree to the{' '}
+              <Link href={getRoute('terms')} className="underline underline-offset-4">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href={getRoute('privacy')} className="underline underline-offset-4">
+                Privacy Policy
+              </Link>
+              .
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
+      </form>
+    </AuthCard>
   )
 }
 
@@ -590,17 +579,6 @@ function useSubmitDraftName(callbackPath: string): string | null {
     setName(label || null)
   }, [callbackPath])
   return name
-}
-
-/** login-01's page layout: a centred column, max-w-sm, holding the card. */
-function LoginLayout({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex w-full items-center justify-center p-6 md:p-10">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <Card>{children}</Card>
-      </div>
-    </div>
-  )
 }
 
 function LoginNotice({ notice, seconds }: { notice: Notice; seconds: number }) {
