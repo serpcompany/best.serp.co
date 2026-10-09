@@ -44,8 +44,8 @@ import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-
 import { useIsMobile } from '@/hooks/use-mobile'
 
 /**
- * Claiming a listing (serpcompany/best.serp.co#67, #70 screens 8 and 9a): the sidebar's "Claim
- * this listing" link opens a dialog (a drawer on mobile) that walks through the method, the
+ * Claiming a listing (serpcompany/best.serp.co#67, #70 screens 8 and 9a): the "Claim this
+ * listing" link in the product page's header panel (#273) opens a dialog (a drawer on mobile) that walks through the method, the
  * work email, its code, then the badge (or the payment, #68, offered only while orders are on).
  * Every string is the approved #70 copy (`docs/mockups/submissions/COPY.md`). The API decides
  * everything (`/api/claims`); this component only shows its answers.
