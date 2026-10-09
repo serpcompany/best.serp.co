@@ -1,6 +1,8 @@
 # serpcompany/best.serp.co#260: best.serp.co lists no adult products (owner decision of 2026-10-09).
-# Unpublish 276 adult listings, 261 in the adult category and 15 built for an adult site but filed
-# elsewhere, then retire the adult category (category-unpublish: refused while a live listing remains in it).
+# Unpublish 272 adult listings, 259 in the adult category and 13 built for an adult site but filed
+# elsewhere. Take the adult and gif-downloaders categories off the 4 kept listings filed under them
+# (listing-categories-remove), then retire them (category-unpublish: refused while a live listing
+# remains in one).
 # An unpublished listing filed under a retired category answers 404, not 410, and so does the
 # category page; they leave the sitemap, search, RSS, and the submit and edit forms. The rows stay.
 # Decisions and evidence: d1/hygiene/2026-10-09-adult-decisions.yaml.
@@ -14,6 +16,42 @@ provenance:
   actor: devinschumacher
   workflow: github/publish-d1
 operations:
+  - action: listing-categories-remove
+    id: lst_1b86c4f59960269639ff7a40
+    slug: fansly-live-downloader
+    expected:
+      - video-downloaders
+      - adult
+      - fansite-downloaders
+    remove:
+      - adult
+  - action: listing-categories-remove
+    id: lst_3966e02ea1a078b6a092fbfd
+    slug: justforfans-downloader
+    expected:
+      - video-downloaders
+      - adult
+      - fansite-downloaders
+    remove:
+      - adult
+  - action: listing-categories-remove
+    id: lst_0d34a5b3397b463214cf708e
+    slug: onlyfans-bulk-downloader
+    expected:
+      - video-downloaders
+      - adult
+    remove:
+      - adult
+  - action: listing-categories-remove
+    id: lst_4251455a4d740603c89dd58a
+    slug: onlyfans-downloader
+    expected:
+      - video-downloaders
+      - fansite-downloaders
+      - social-media-downloaders
+      - adult
+    remove:
+      - adult
   - action: listing-unpublish
     id: lst_b23428c4b1ed2d327cfbdc2f
     slug: 321tube-downloader
@@ -580,16 +618,6 @@ operations:
     expected:
       website: https://serp.ly/fakingstv-downloader
   - action: listing-unpublish
-    id: lst_1b86c4f59960269639ff7a40
-    slug: fansly-live-downloader
-    categories:
-      - video-downloaders
-      - adult
-      - fansite-downloaders
-    reason: "#260 adult: in the Adult category"
-    expected:
-      website: https://serp.ly/fansly-live-downloader
-  - action: listing-unpublish
     id: lst_6174b0619e8991a7f1675863
     slug: fapality-downloader
     categories:
@@ -915,16 +943,6 @@ operations:
     expected:
       website: https://serp.ly/joystube-downloader
   - action: listing-unpublish
-    id: lst_3966e02ea1a078b6a092fbfd
-    slug: justforfans-downloader
-    categories:
-      - video-downloaders
-      - adult
-      - fansite-downloaders
-    reason: "#260 adult: in the Adult category"
-    expected:
-      website: https://serp.ly/justforfans-downloader
-  - action: listing-unpublish
     id: lst_d50dee767ba8619d87331ee7
     slug: justfullporn-downloader
     categories:
@@ -1222,26 +1240,6 @@ operations:
     reason: "#260 adult: in the Adult category"
     expected:
       website: https://serp.ly/omgxxx-downloader
-  - action: listing-unpublish
-    id: lst_0d34a5b3397b463214cf708e
-    slug: onlyfans-bulk-downloader
-    categories:
-      - video-downloaders
-      - adult
-    reason: "#260 adult: a downloader for OnlyFans, an adult site, filed under video-downloaders (#98 added Adult)"
-    expected:
-      website: https://serp.ly/onlyfans-bulk-downloader
-  - action: listing-unpublish
-    id: lst_4251455a4d740603c89dd58a
-    slug: onlyfans-downloader
-    categories:
-      - video-downloaders
-      - fansite-downloaders
-      - social-media-downloaders
-      - adult
-    reason: "#260 adult: a downloader for OnlyFans, an adult site, filed under video-downloaders (#98 added Adult)"
-    expected:
-      website: https://serp.ly/onlyfans-downloader
   - action: listing-unpublish
     id: lst_c9b75f3a5e7a6d3e1a887e0d
     slug: pandamovies-downloader
@@ -2519,3 +2517,5 @@ operations:
       website: https://serp.ly/zbporn-downloader
   - action: category-unpublish
     slug: adult
+  - action: category-unpublish
+    slug: gif-downloaders

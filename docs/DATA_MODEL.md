@@ -119,8 +119,8 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   instead of 404 (#64). Republishing sets `is_active = 1` and the URL works again. The
   publisher's `listing-unpublish` reaches the same state, with the same activity records
   ([Catalog hygiene](./CATALOG_HYGIENE.md)).
-- A **retired** category (`is_active = 0`, `category-unpublish`) leaves every public query and
-  form; its page and its unpublished listings answer 404, never 410 (#260).
+- A **retired** category (`is_active = 0`) leaves public queries and forms; it and its listings
+  answer 404, and `0011_retired_categories` keeps any published listing off it (#260).
 - A listing has a **verified owner** when `listing_owners` has a current `owner` row; detail
   DTOs carry `verifiedOwner: true` (one probe of `listing_owners_current_owner_idx`).
 
@@ -276,7 +276,7 @@ validates the base version, prior checksum, IDs, slugs, URLs, and categories bef
 sending one batch. `publish-d1-staging.yml` applies a manifest to staging first, then
 `publish-d1.yml` to production ([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)),
 each after recording a D1 Time Travel bookmark (no export). A row-level manifest
-(`concurrency: rows`: `listing-media-update`, `listing-categories-add`,
+(`concurrency: rows`: `listing-media-update`, `listing-categories-add`/`-remove`,
 `listing-content-remove-suffix`, `listing-unpublish` with `expected.website`,
 `listing-claim-hold-add`/`-clear` for [claim](./CLAIMS.md) holds, and `category-unpublish`)
 checks each row it changes, not a base version ([media](./MEDIA.md)). Verification, rejection, and approval

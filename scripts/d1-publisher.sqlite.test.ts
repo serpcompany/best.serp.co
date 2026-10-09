@@ -673,6 +673,84 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
       expect(() => manifest(['seo', 'adult'], ['adult'])).toThrow(/already has category adult/u)
     })
 
+    it('removes a secondary category row-level, never a primary one, refusing changed categories (#260)', () => {
+      const withAdult = () => {
+        const db = database()
+        db.exec(`INSERT INTO categories (id,slug,name,is_active) VALUES (2,'adult','Adult',1);
+          INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+            VALUES ('lst_sqlite_test',2,1,0);`)
+        return db
+      }
+      const manifest = (expected: string[], remove: string[]) =>
+        manifestSchema.parse({
+          version: 1,
+          id: 'adult-off',
+          concurrency: 'rows',
+          provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+          operations: [
+            {
+              action: 'listing-categories-remove',
+              id: 'lst_sqlite_test',
+              slug: 'old-slug',
+              expected,
+              remove
+            }
+          ]
+        })
+      const memberships = (db: DatabaseSync) =>
+        db
+          .prepare(
+            `SELECT c.slug, lc.is_primary FROM listing_categories lc JOIN categories c
+             ON c.id = lc.category_id WHERE lc.listing_id='lst_sqlite_test' ORDER BY lc.sort_order`
+          )
+          .all()
+      const live = { checksum: beforeChecksum, version: 4 }
+      const db = withAdult()
+      const publication = buildPublicationPlan(
+        manifest(['seo', 'adult'], ['adult']),
+        'm',
+        now,
+        live
+      )
+      executeInTestTransaction(db, publication)
+      expect(memberships(db)).toEqual([{ is_primary: 1, slug: 'seo' }])
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining(['/products/old-slug/', '/products/categories/adult/'])
+      )
+      expect(
+        db.prepare("SELECT updated_at FROM listings WHERE id='lst_sqlite_test'").get()
+      ).toEqual({ updated_at: now })
+      // Applied once: the categories no longer match, so the same operation is refused.
+      expect(() =>
+        executeInTestTransaction(
+          db,
+          buildPublicationPlan(manifest(['seo', 'adult'], ['adult']), 'again', now, {
+            checksum: publication.afterChecksum,
+            version: 5
+          })
+        )
+      ).toThrow()
+      // The primary category is never removed: the batch refuses and writes nothing.
+      const primary = withAdult()
+      // Adult as the primary (swapped while the listing is a draft, as the triggers require).
+      primary.exec(`UPDATE listings SET status='draft' WHERE id='lst_sqlite_test';
+        UPDATE listing_categories SET is_primary=0 WHERE category_id=1;
+        UPDATE listing_categories SET is_primary=1 WHERE category_id=2;
+        UPDATE listings SET status='approved' WHERE id='lst_sqlite_test';`)
+      expect(() =>
+        executeInTestTransaction(
+          primary,
+          buildPublicationPlan(manifest(['seo', 'adult'], ['adult']), 'm', now, live)
+        )
+      ).toThrow()
+      expect(memberships(primary)).toEqual([
+        { is_primary: 0, slug: 'seo' },
+        { is_primary: 1, slug: 'adult' }
+      ])
+      expect(() => manifest(['seo'], ['adult'])).toThrow(/does not have category adult/u)
+      expect(() => manifest(['adult'], ['adult'])).toThrow(/keeps at least one category/u)
+    })
+
     it("refuses another listing's key, a key of the wrong kind, and a forged digest", () => {
       const refused = (operation: Record<string, unknown>) => () =>
         manifestSchema.parse({

@@ -71,6 +71,7 @@ import { hasFileExtension } from '@/lib/file-extensions'
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
+import { retiredCategoryReason } from './listing-labels'
 import { describeMediaFailure } from './logo-note'
 
 /** Sends one of the site's emails after the response (`enqueueEmail` in production). */
@@ -1204,6 +1205,13 @@ async function republishListingOnce(
       409,
       'listing_rejected',
       'A rejected listing comes back only through a new submission.'
+    )
+  }
+  if (current?.retiredCategories.length) {
+    return failure(
+      409,
+      'listing_category_retired',
+      retiredCategoryReason(current.retiredCategories)
     )
   }
   const decision = await commit(

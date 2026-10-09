@@ -83,9 +83,9 @@ async function liveListingCount(
 /**
  * The categories with a published listing, as the categories sitemap and index show them.
  * Locally it is exactly the import's. A deployed environment may have retired a category or
- * unpublished a category's last listing since (#260 retired Adult and emptied two downloader
- * categories), so there the count is read from the categories sitemap, held to a floor, and the
- * categories index must agree with it.
+ * unpublished a category's last listing since (#260 retired Adult and GIF Downloaders), so there
+ * the count is read from the categories sitemap, held to a floor, and the categories index must
+ * agree with it.
  */
 async function liveCategoryCount(
   request: APIRequestContext,

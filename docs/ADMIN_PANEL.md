@@ -142,8 +142,10 @@ the gone page, and answers it with 410. The edge cache stores the 410 under the 
 An unpublished listing filed under a retired category (`categories.is_active = 0`, primary or
 secondary) keeps its plain 404 (#260): `isUnpublishedListingSlug` and `getUnpublishedListing` leave
 it out, so there is no gone page, category link, or "Relist it". That is how the adult listings
-left ([Catalog hygiene](./CATALOG_HYGIENE.md#adult-products-260)); Republish would bring one back
-without the retired category, so don't.
+left ([Catalog hygiene](./CATALOG_HYGIENE.md#adult-products-260)). Such a listing stays down: the
+listing screen shows why instead of Republish, `republishListing` answers 409
+`listing_category_retired` with the same reason, and the plan and D1
+(`0011_retired_categories`) refuse it too.
 
 ## The production-write exception
 

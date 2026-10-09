@@ -56,6 +56,28 @@ describe('listing columns', () => {
       /must retain a primary category/u
     )
   })
+
+  it('never files a published listing under a retired category (#260)', () => {
+    const db = database()
+    db.exec("INSERT INTO categories (slug, name) VALUES ('adult', 'Adult')")
+    const fileUnderAdult = `INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+      SELECT 'lst_a', id, 9, 0 FROM categories WHERE slug = 'adult'`
+    const retire = "UPDATE categories SET is_active = 0 WHERE slug = 'adult'"
+    const unpublish = "UPDATE listings SET is_active = 0 WHERE id = 'lst_a'"
+    db.exec(fileUnderAdult)
+    // Retiring a category a published listing is filed under is refused.
+    expect(() => db.exec(retire)).toThrow(/a category with a published listing cannot retire/u)
+    // Unpublished first, it retires; the listing can't be published again while filed under it.
+    db.exec(`${unpublish}; ${retire}`)
+    expect(() => db.exec("UPDATE listings SET is_active = 1 WHERE id = 'lst_a'")).toThrow(
+      /must not be filed under a retired category/u
+    )
+    // A published listing is never filed under a retired category.
+    db.exec(
+      "DELETE FROM listing_categories WHERE listing_id = 'lst_a' AND is_primary = 0; UPDATE listings SET is_active = 1 WHERE id = 'lst_a'"
+    )
+    expect(() => db.exec(fileUnderAdult)).toThrow(/must not be filed under a retired category/u)
+  })
 })
 
 describe('submission status, plan, and decision invariants', () => {

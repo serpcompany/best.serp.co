@@ -19,13 +19,13 @@ export const site = {
   listingCount: 3422,
   /**
    * The fewest categories with a published listing a deployed environment may show: the
-   * import's 141 less Adult, which #260 retires, and the fansite and GIF downloader categories,
-   * which only adult listings filled (138), less headroom for admin unpublishes.
+   * import's 141 less Adult and GIF Downloaders, which #260 retires (139), less headroom for
+   * admin unpublishes.
    */
   minimumDeployedCategoryCount: 130,
   /**
    * The fewest live listings a deployed environment may show: the import less the reviewed
-   * unpublishes (#100's 95, #104's 120 and 244, #98's 1, and #260's 276: 2,686 live once #260 is
+   * unpublishes (#100's 95, #104's 120 and 244, #98's 1, and #260's 272: 2,690 live once #260 is
    * published), less headroom for admin unpublishes. A lost catalog still fails.
    */
   minimumDeployedListingCount: 2500,

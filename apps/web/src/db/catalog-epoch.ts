@@ -1,6 +1,7 @@
 import { type SQL, sql } from 'drizzle-orm'
 import { type Database, d1ErrorCode, runQuery } from './client'
 import type { CatalogObserver } from './contracts'
+import { listingInRetiredCategory } from './plan-support'
 
 /**
  * The public catalog changes only when `publication_state.version` changes (a publication
@@ -101,14 +102,11 @@ export function sharedCatalogEpoch(
 }
 
 /**
- * Listing `l` is filed under a retired category (`categories.is_active = 0`), primary or not.
- * Retiring a category takes its listings off the domain (#260, the Adult category): an
- * unpublished listing filed under one answers a plain 404, never the 410 gone page, which would
- * point visitors back to the catalog and offer to relist it.
+ * Listing `l` is filed under a retired category (`listingInRetiredCategory`, #260, the Adult
+ * category): an unpublished listing filed under one answers a plain 404, never the 410 gone page,
+ * which would point visitors back to the catalog and offer to relist it.
  */
-export const LISTING_IN_RETIRED_CATEGORY_SQL = `EXISTS (SELECT 1 FROM listing_categories lc
-  JOIN categories c ON c.id = lc.category_id
-  WHERE lc.listing_id = l.id AND c.is_active = 0)`
+export const LISTING_IN_RETIRED_CATEGORY_SQL = listingInRetiredCategory('l.id')
 
 /**
  * Whether `slug` names a listing that was published and is now unpublished (`status =

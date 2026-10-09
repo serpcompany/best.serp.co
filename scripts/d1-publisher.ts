@@ -237,6 +237,20 @@ const operation = z.discriminatedUnion('action', [
     })
     .strict(),
   /**
+   * Removes secondary (never primary) categories from a listing, compared and swapped on its slug
+   * and current categories like `listing-categories-add` (#260: the Adult category off the
+   * fan-site downloaders that stay, so Adult can retire).
+   */
+  z
+    .object({
+      action: z.literal('listing-categories-remove'),
+      id: listingId,
+      slug: existingSlug,
+      expected: z.array(categorySlug).min(1),
+      remove: categories
+    })
+    .strict(),
+  /**
    * Holds a listing's instant claim for the owner's review (#67, #108 review round 3): #100's
    * owner-review sets, or one an admin names. Row-level guarded: the listing must still have this
    * slug and, with `expected`, this website. An active hold is left as it is; a cleared one is
@@ -291,13 +305,14 @@ const provenance = z
 export const manifestConcurrency = ['publication', 'rows'] as const
 /**
  * Operations that carry their own row-level compare-and-swap, so a `rows` manifest may hold them:
- * media rows (`expected`), categories (`expected`), a description's length and ending (#105), an
- * unpublish with its `expected.website` (#100: categories, live, website, no submission in
- * review), and a category retirement (#260: no live listing left in it).
+ * media rows (`expected`), categories (`expected`, added or removed), a description's length and
+ * ending (#105), an unpublish with its `expected.website` (#100: categories, live, website, no
+ * submission in review), and a category retirement (#260: no live listing left in it).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
   'listing-categories-add',
+  'listing-categories-remove',
   'listing-content-remove-suffix',
   'listing-unpublish',
   'listing-claim-hold-add',
@@ -332,7 +347,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, and category-unpublish operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, and category-unpublish operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -374,6 +389,24 @@ export const manifestSchema = z
               path: ['operations', index, 'add']
             })
           }
+        }
+      }
+      if (op.action === 'listing-categories-remove') {
+        for (const slug of op.remove) {
+          if (!op.expected.includes(slug)) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `The listing does not have category ${slug}.`,
+              path: ['operations', index, 'remove']
+            })
+          }
+        }
+        if (op.remove.length >= op.expected.length) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'A listing keeps at least one category.',
+            path: ['operations', index, 'remove']
+          })
         }
       }
       if (op.action === 'listing-media-update') {
@@ -473,6 +506,16 @@ function membershipGuard(id: string, expected: string[]): PlannedStatement {
     expected.length,
     id,
     ...expected
+  )
+}
+/** Refuses the batch unless the listing has this slug and exactly these categories, in order. */
+function categoriesGuard(id: string, slug: string, expected: string[]): PlannedStatement {
+  return statement(
+    `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND (SELECT json_group_array(slug) FROM (SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? ORDER BY lc.sort_order, c.slug))=? THEN 1 ELSE ${GUARD_FAILURE} END`,
+    id,
+    slug,
+    id,
+    JSON.stringify(expected)
   )
 }
 function listingStatements(
@@ -825,15 +868,28 @@ export function buildPublicationPlan(
       )
       routes.add(listingRoute(op.slug))
     }
+    if (op.action === 'listing-categories-remove') {
+      statements.push(
+        categoriesGuard(op.id, op.slug, op.expected),
+        ...op.remove.flatMap(categorySlugToRemove => [
+          // `is_primary=0`: a primary category is never removed, the batch refuses instead.
+          statement(
+            'DELETE FROM listing_categories WHERE listing_id=? AND is_primary=0 AND category_id=(SELECT id FROM categories WHERE slug=?)',
+            op.id,
+            categorySlugToRemove
+          ),
+          statement(CHANGED_ONE_GUARD)
+        ]),
+        // The page shows its categories, so it changed: sitemap lastmod and dateModified (#218).
+        statement('UPDATE listings SET updated_at=? WHERE id=?', now, op.id),
+        statement(CHANGED_ONE_GUARD)
+      )
+      routes.add(listingRoute(op.slug))
+      addCategories(op.expected)
+    }
     if (op.action === 'listing-categories-add') {
       statements.push(
-        statement(
-          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND (SELECT json_group_array(slug) FROM (SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? ORDER BY lc.sort_order, c.slug))=? THEN 1 ELSE ${GUARD_FAILURE} END`,
-          op.id,
-          op.slug,
-          op.id,
-          JSON.stringify(op.expected)
-        ),
+        categoriesGuard(op.id, op.slug, op.expected),
         ...op.add.flatMap(categorySlugToAdd => [
           statement(
             'INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) SELECT ?,id,(SELECT COALESCE(MAX(sort_order),-1)+1 FROM listing_categories WHERE listing_id=?),0 FROM categories WHERE slug=? AND is_active=1',

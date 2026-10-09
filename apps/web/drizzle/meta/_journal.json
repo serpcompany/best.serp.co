@@ -78,6 +78,13 @@
       "when": 1791340819313,
       "tag": "0010_drop_retired_submission_data",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1791534467263,
+      "tag": "0011_retired_categories",
+      "breakpoints": true
     }
   ]
 }

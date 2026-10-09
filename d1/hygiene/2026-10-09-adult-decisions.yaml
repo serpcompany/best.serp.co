@@ -1,23 +1,26 @@
-# serpcompany/best.serp.co#260: best.serp.co lists no adult products (owner decision of 2026-10-09). Every
-# listing in the Adult category and every listing built for an adult site goes, and the Adult category retires.
+# serpcompany/best.serp.co#260: best.serp.co lists no adult products (owner decisions of 2026-10-09). Every
+# listing in the Adult category and every listing built for an adult site goes, except the fan-site downloaders
+# (OnlyFans, JustForFans, and Fansly), which stay. Adult and GIF Downloaders (its only listing is RedGifs) retire.
 # d1/publications/2026-10-09-adult-category.yaml and 2026-10-09-adult-removal.yaml
-# (`pnpm catalog:domains -- adult-manifest`) unpublish each entry and retire the category, so their URLs
-# and /products/categories/adult/ answer 404.
-#   adult-category:  filed under Adult in the import. All are downloaders for adult video, cam, or fan
-#                    sites, read by hand; none is a general-purpose tool.
+# (`pnpm catalog:domains -- adult-manifest`) take the retired categories off the kept listings filed under
+# them, unpublish each entry, and retire the categories, so the entries' URLs and the categories' pages answer 404.
+#   adult-category:  filed under Adult in the import. All are downloaders for adult video or cam sites, read
+#                    by hand; none is a general-purpose tool.
 #   filed-elsewhere: built for an adult site but filed under another category in the import. #98 added Adult
-#                    to 14 of them as a secondary category; the adult-category manifest adds it to the rest.
-# kept: keyword matches read by hand that stay listed. General-purpose downloaders (YouTube, Vimeo, and the
-# like) stay. Counted against the reviewed catalog (see evidence); the manifests' guards refuse any listing
-# an environment changed since.
+#                    to most of them as a secondary category; the adult-category manifest adds it to the rest.
+# kept: the owner's fan-site exception, and keyword matches read by hand that stay listed. General-purpose
+# downloaders (YouTube, Vimeo, and the like) stay. Counted against the reviewed catalog (see evidence); the
+# manifests' guards refuse any listing an environment changed since.
 decidedAt: 2026-10-09
 evidence:
   - "The Adult category of the reviewed catalog: the committed import plus the committed manifests in d1/publications that add categories or unpublish (`reviewedCatalogDatabase`), 275 live listings."
   - "ADULT_TERMS (scripts/migration/legacy-media.ts) over the slug, name, website, and description of every other live listing: no match."
   - "A broader word list (sex, nude, NSFW, erotic, escort, cam, girlfriend, and others) over every live listing's name, description, long content, FAQs, resource links, and media URLs: policy text and false positives (Java, webcam, \"$XXX\", Kinki), each read; see kept."
   - "Every live downloader listing outside Adult (59), read by hand: ashemaletube-downloader is an adult site's downloader."
+  - "gif-downloaders: its only listing is redgifs-downloader, so it retires with Adult (owner decision of 2026-10-09). fansite-downloaders keeps the fan-site downloaders and stays."
 retireCategories:
   - adult
+  - gif-downloaders
 unpublish:
   - slug: 321tube-downloader
     id: lst_b23428c4b1ed2d327cfbdc2f
@@ -329,11 +332,6 @@ unpublish:
     website: https://serp.ly/fakingstv-downloader
     class: adult-category
     reason: in the Adult category
-  - slug: fansly-live-downloader
-    id: lst_1b86c4f59960269639ff7a40
-    website: https://serp.ly/fansly-live-downloader
-    class: adult-category
-    reason: in the Adult category
   - slug: fapality-downloader
     id: lst_6174b0619e8991a7f1675863
     website: https://serp.ly/fapality-downloader
@@ -514,11 +512,6 @@ unpublish:
     website: https://serp.ly/joystube-downloader
     class: adult-category
     reason: in the Adult category
-  - slug: justforfans-downloader
-    id: lst_3966e02ea1a078b6a092fbfd
-    website: https://serp.ly/justforfans-downloader
-    class: adult-category
-    reason: in the Adult category
   - slug: justfullporn-downloader
     id: lst_d50dee767ba8619d87331ee7
     website: https://serp.ly/justfullporn-downloader
@@ -684,16 +677,6 @@ unpublish:
     website: https://serp.ly/omgxxx-downloader
     class: adult-category
     reason: in the Adult category
-  - slug: onlyfans-bulk-downloader
-    id: lst_0d34a5b3397b463214cf708e
-    website: https://serp.ly/onlyfans-bulk-downloader
-    class: filed-elsewhere
-    reason: a downloader for OnlyFans, an adult site, filed under video-downloaders (#98 added Adult)
-  - slug: onlyfans-downloader
-    id: lst_4251455a4d740603c89dd58a
-    website: https://serp.ly/onlyfans-downloader
-    class: filed-elsewhere
-    reason: a downloader for OnlyFans, an adult site, filed under video-downloaders (#98 added Adult)
   - slug: pandamovies-downloader
     id: lst_c9b75f3a5e7a6d3e1a887e0d
     website: https://serp.ly/pandamovies-downloader
@@ -1400,8 +1383,16 @@ unpublish:
     class: adult-category
     reason: in the Adult category
 kept:
+  - slug: onlyfans-downloader
+    reason: "a fan-site downloader: the owner keeps the OnlyFans and JustForFans downloaders (2026-10-09); Adult comes off it"
+  - slug: onlyfans-bulk-downloader
+    reason: "a fan-site downloader: the owner keeps the OnlyFans and JustForFans downloaders (2026-10-09); Adult comes off it"
+  - slug: justforfans-downloader
+    reason: "a fan-site downloader: the owner keeps the OnlyFans and JustForFans downloaders (2026-10-09); Adult comes off it"
+  - slug: fansly-live-downloader
+    reason: a fan-site downloader, the same class as the OnlyFans and JustForFans ones the owner keeps (inferred, for the owner to confirm); Adult comes off it
   - slug: locusextension.com
-    reason: 'Locus, an AI research tool: "sex" only inside its domain name (locu-sex-tension), the issue''s false positive'
+    reason: "Locus, an AI research tool: \"sex\" only inside its domain name (locu-sex-tension), the issue's false positive"
   - slug: soundgasm-downloader
     reason: "Soundgasm is an audio host widely used for erotic audio, but the listing and the site are not adult: owner question"
   - slug: imgnai.com

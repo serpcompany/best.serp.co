@@ -16,7 +16,11 @@ export const d1TriggerNames = [
   'listing_categories_prevent_primary_removal',
   'listings_require_primary_on_insert',
   'listings_require_primary_on_publication',
-  'listing_submissions_refuse_blocked_url'
+  'listing_submissions_refuse_blocked_url',
+  // #260: a published listing is never filed under a retired category.
+  'listings_refuse_retired_category_on_publication',
+  'listing_categories_refuse_retired_category',
+  'categories_refuse_retiring_with_published_listings'
 ] as const
 
 export const requiredIndexNames = [

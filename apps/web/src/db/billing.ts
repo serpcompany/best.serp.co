@@ -4,6 +4,7 @@ import { listingIdsWithWebsite } from './listing-plans'
 import { executePlans, isPlanConflict, queryPlan } from './plan-runner'
 import {
   assertPreviousStatementChangedOne,
+  listingInRetiredCategory,
   listingIsLiveGuard,
   type StatementPlan
 } from './plan-support'
@@ -535,6 +536,8 @@ export interface CheckoutListing {
   name: string
   ownerEmail: string | null
   ownerUserId: string
+  /** Filed under a retired category (#260): it stays off the site, so it can't be relisted. */
+  retired: boolean
   slug: string
   submission: {
     id: string
@@ -554,6 +557,7 @@ export function selectCheckoutListingPlan(
   return {
     sql: `SELECT l.id,l.slug,l.name,o.user_id AS owner_user_id,u.email AS owner_email,
         CASE WHEN ${listingIsLiveGuard('l.id')} THEN 1 ELSE 0 END AS live,
+        CASE WHEN ${listingInRetiredCategory('l.id')} THEN 1 ELSE 0 END AS retired,
         s.id AS submission_id,s.status AS submission_status,s.plan,s.paid_at,
         (SELECT e.detail FROM listing_submission_events e
           WHERE e.submission_id=s.id AND e.event_type='unpublished'
@@ -577,6 +581,7 @@ function toCheckoutListing(row: Row): CheckoutListing {
     name: String(row.name),
     ownerEmail: optional(row.owner_email),
     ownerUserId: String(row.owner_user_id),
+    retired: Number(row.retired) === 1,
     slug: String(row.slug),
     submission: submissionId
       ? {
@@ -593,7 +598,10 @@ function toCheckoutListing(row: Row): CheckoutListing {
 /** The badge program's unpublish reason (`listing-unpublish`, #66): relisting is paid. */
 export const RELISTABLE_UNPUBLISH_REASON = 'badge_missing'
 
-/** True when the listing can be upgraded (live, free) or relisted (unlisted for its badge). */
+/**
+ * True when the listing can be upgraded (live, free) or relisted (unlisted for its badge, and not
+ * filed under a retired category, #260).
+ */
 export function listingCheckoutPurpose(listing: CheckoutListing): 'relist' | 'upgrade' | null {
   const submission = listing.submission
   if (
@@ -604,7 +612,9 @@ export function listingCheckoutPurpose(listing: CheckoutListing): 'relist' | 'up
     return null
   }
   if (listing.live) return 'upgrade'
-  return submission.unpublishedReason === RELISTABLE_UNPUBLISH_REASON ? 'relist' : null
+  return submission.unpublishedReason === RELISTABLE_UNPUBLISH_REASON && !listing.retired
+    ? 'relist'
+    : null
 }
 
 /** What the guardrails need to know about a website before a paid listing goes live. */

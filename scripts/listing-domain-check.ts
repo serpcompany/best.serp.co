@@ -394,7 +394,10 @@ export const adultClasses = ['adult-category', 'filed-elsewhere'] as const
 export interface AdultDecisions {
   decidedAt: string
   evidence: string[]
-  /** Retired (`category-unpublish`) once their listings are unpublished. */
+  /**
+   * Retired (`category-unpublish`) once their listings are unpublished; kept listings filed under
+   * one leave it first (`listing-categories-remove`). The first is the one `category` files under.
+   */
   retireCategories: string[]
   unpublish: Array<{
     slug: string
@@ -403,7 +406,7 @@ export interface AdultDecisions {
     class: (typeof adultClasses)[number]
     reason: string
   }>
-  /** Keyword matches checked by hand that stay listed, and why. */
+  /** Listings checked by hand that stay listed, and why (keyword matches, owner exceptions). */
   kept: Array<{ slug: string; reason: string }>
 }
 
@@ -418,9 +421,10 @@ export interface AdultManifestOptions {
  * The manifests that take adult listings off best.serp.co (#260). An unpublished listing filed
  * under a retired category answers 404, not 410, so every decided listing must be in one:
  * `category` gives the listings that lack one the first retired category as a secondary category
- * (as #98 did for 14 adult downloaders), and `removal` unpublishes every decided listing, then
- * retires the categories. Separate files, because a manifest names each listing once; `removal`
- * refuses whole until `category` is published.
+ * (as #98 did for 14 adult downloaders). `removal` takes the retired categories off the kept
+ * listings filed under them, unpublishes every decided listing, then retires the categories.
+ * Separate files, because a manifest names each listing once; `removal` refuses whole until
+ * `category` is published.
  */
 export function buildAdultManifests(
   decisions: AdultDecisions,
@@ -434,18 +438,22 @@ export function buildAdultManifests(
     if (!adultClasses.includes(entry.class))
       throw new Error(`${entry.slug}: class must be ${adultClasses.join(' or ')}.`)
   }
-  const decided = new Set(decisions.unpublish.map(entry => entry.id))
-  // A live listing left in a retired category would make its category-unpublish refuse.
+  const unpublished = new Set(decisions.unpublish.map(entry => entry.slug))
+  const kept = new Set(decisions.kept.map(entry => entry.slug))
+  for (const slug of kept) {
+    if (unpublished.has(slug)) throw new Error(`${slug} is both kept and unpublished.`)
+  }
+  // A live listing left in a retired category would make its category-unpublish refuse: a decided
+  // one is unpublished, and a kept one leaves the category first.
+  const detached: CatalogListing[] = []
   for (const listing of listings) {
     const category = listing.categories.find(slug => retire.includes(slug))
-    if (category && !decided.has(listing.id))
+    if (!category || unpublished.has(listing.slug)) continue
+    if (!kept.has(listing.slug))
       throw new Error(
         `${listing.slug} is live in ${category}: decide it in ${options.decisionsPath}.`
       )
-  }
-  const unpublished = new Set(decisions.unpublish.map(entry => entry.slug))
-  for (const entry of decisions.kept) {
-    if (unpublished.has(entry.slug)) throw new Error(`${entry.slug} is both kept and unpublished.`)
+    detached.push(listing)
   }
   const byId = new Map(listings.map(listing => [listing.id, listing]))
   const lacking = decisions.unpublish.flatMap(entry => {
@@ -480,15 +488,26 @@ export function buildAdultManifests(
       : listing
   )
   const operations = [
+    // Kept listings leave the retired categories first; a primary one is refused, never removed.
+    ...detached.map(listing => ({
+      action: 'listing-categories-remove',
+      id: listing.id,
+      slug: listing.slug,
+      expected: listing.categories,
+      remove: listing.categories.filter(slug => retire.includes(slug))
+    })),
     ...unpublishOperations(decisions.unpublish, filed, entry => `#260 adult: ${entry.reason}`),
     ...retire.map(slug => ({ action: 'category-unpublish', slug }))
   ]
   const counts = (name: AdultDecisions['unpublish'][number]['class']) =>
     decisions.unpublish.filter(entry => entry.class === name).length
+  const retiring = `the ${retire.join(' and ')} ${retire.length === 1 ? 'category' : 'categories'}`
   const removal = manifestSource(
     `# serpcompany/best.serp.co#260: best.serp.co lists no adult products (owner decision of ${decisions.decidedAt}).
 # Unpublish ${decisions.unpublish.length} adult listings, ${counts('adult-category')} in the ${fileUnder} category and ${counts('filed-elsewhere')} built for an adult site but filed
-# elsewhere, then retire the ${retire.join(', ')} category (category-unpublish: refused while a live listing remains in it).
+# elsewhere. Take ${retiring} off the ${detached.length} kept listings filed under them
+# (listing-categories-remove), then retire them (category-unpublish: refused while a live listing
+# remains in one).
 # An unpublished listing filed under a retired category answers 404, not 410, and so does the
 # category page; they leave the sitemap, search, RSS, and the submit and edit forms. The rows stay.
 # Decisions and evidence: ${options.decisionsPath}.

@@ -1143,11 +1143,35 @@ describe('adult listings and the Adult category (#260)', () => {
     expect(buildAdultManifests(decisions, filed, options).category).toBeNull()
   })
 
+  it('takes the retired categories off a kept listing filed under them, before anything else', () => {
+    const deltaInAdult = { ...delta, categories: ['video-downloaders', 'adult', 'gifs'] }
+    const { removal } = buildAdultManifests(
+      { ...decisions, retireCategories: ['adult', 'gifs'] },
+      [acme, bravo, carta, deltaInAdult],
+      options
+    )
+    const operations = parseManifest(removal).operations
+    expect(operations[0]).toEqual({
+      action: 'listing-categories-remove',
+      expected: ['video-downloaders', 'adult', 'gifs'],
+      id: 'lst_fixture00004',
+      remove: ['adult', 'gifs'],
+      slug: 'delta.io'
+    })
+    expect(operations.slice(-2)).toEqual([
+      { action: 'category-unpublish', slug: 'adult' },
+      { action: 'category-unpublish', slug: 'gifs' }
+    ])
+  })
+
   it('refuses a live listing of the category left undecided, a kept one decided, or a wrong class', () => {
-    const deltaInAdult = { ...delta, categories: ['video-downloaders', 'adult'] }
-    expect(() =>
-      buildAdultManifests(decisions, [acme, bravo, carta, deltaInAdult], options)
-    ).toThrow('delta.io is live in adult: decide it in d.yaml.')
+    const echoInAdult = {
+      ...listing({ id: 'lst_fixture00005', slug: 'echo.io', website: 'https://serp.ly/echo' }),
+      categories: ['video-downloaders', 'adult']
+    }
+    expect(() => buildAdultManifests(decisions, [...fixture, echoInAdult], options)).toThrow(
+      'echo.io is live in adult: decide it in d.yaml.'
+    )
     expect(() =>
       buildAdultManifests(
         { ...decisions, kept: [{ slug: 'acme.ai', reason: 'x' }] },
@@ -1220,25 +1244,42 @@ describe('adult listings and the Adult category (#260)', () => {
             assertD1StatementLimits(item.query, item.bindings)
           applyManifest(database, source, `${date}T00:00:00.000Z`)
         }
-        for (const slug of decided.retireCategories)
-          expect(
-            database.prepare('SELECT is_active FROM categories WHERE slug = ?').get(slug),
-            slug
-          ).toEqual({ is_active: 0 })
+        // Exactly the decided categories retire (no category was inactive before).
+        expect(
+          database
+            .prepare('SELECT slug FROM categories WHERE is_active = 0 ORDER BY slug')
+            .all()
+            .map(row => row.slug)
+        ).toEqual([...decided.retireCategories].sort())
         const after = liveListings(database)
         expect(before.length - after.length).toBe(decided.unpublish.length)
-        const liveSlugs = new Set(after.map(item => item.slug))
-        for (const entry of decided.unpublish)
-          expect(liveSlugs.has(entry.slug), entry.slug).toBe(false)
-        for (const entry of decided.kept) expect(liveSlugs.has(entry.slug), entry.slug).toBe(true)
-        // Nothing live is named for an adult platform any more (#98's list, and #260's find).
+        const live = new Map(after.map(item => [item.slug, item]))
+        for (const entry of decided.unpublish) expect(live.has(entry.slug), entry.slug).toBe(false)
+        // Kept listings stay live, off the retired categories.
+        for (const entry of decided.kept) {
+          expect(live.has(entry.slug), entry.slug).toBe(true)
+          expect(
+            database
+              .prepare(
+                `SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
+                 JOIN listings l ON l.id = lc.listing_id WHERE l.slug = ? AND c.is_active = 0`
+              )
+              .all(entry.slug),
+            entry.slug
+          ).toEqual([])
+        }
+        // Nothing live is named for an adult platform any more (#98's list, and #260's find),
+        // except a listing the owner keeps (the fan-site downloaders).
+        const kept = new Set(decided.kept.map(entry => entry.slug))
         expect(
           after
-            .filter(item =>
-              [item.slug, item.name, item.website].some(
-                value =>
-                  ADULT_TERMS.test(value.toLowerCase()) || /shemale/u.test(value.toLowerCase())
-              )
+            .filter(
+              item =>
+                !kept.has(item.slug) &&
+                [item.slug, item.name, item.website].some(
+                  value =>
+                    ADULT_TERMS.test(value.toLowerCase()) || /shemale/u.test(value.toLowerCase())
+                )
             )
             .map(item => item.slug)
         ).toEqual([])

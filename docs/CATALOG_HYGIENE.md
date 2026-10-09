@@ -105,32 +105,39 @@ in a new report and manifest under a new date.
 
 ## Adult products (#260)
 
-**best.serp.co lists no adult products** (owner decision of 2026-10-09): nothing built for adult
-content, including every downloader for an adult video, cam, or fan site. General-purpose
-downloaders (YouTube, Vimeo, and the like) stay. A submission for one is rejected in review
+**best.serp.co lists no adult products** (owner decisions of 2026-10-09): nothing built for adult
+content, including every downloader for an adult video or cam site. Fan-site downloaders
+(OnlyFans, JustForFans, and Fansly) stay, and so do general-purpose downloaders (YouTube, Vimeo,
+and the like). A submission for an adult product is rejected in review
 ([Submission flow](./SUBMISSION_FLOW.md#review-in-the-admin-panel-64)), and a listing found later
 leaves the same way as these.
 
-- **The decisions.** `d1/hygiene/2026-10-09-adult-decisions.yaml` lists the 276 adult listings of
-  the reviewed catalog: the 261 filed under the Adult category, and 15 adult-site downloaders
-  filed under other categories (14 that #98 gave Adult as a secondary category, and
+- **The decisions.** `d1/hygiene/2026-10-09-adult-decisions.yaml` lists the 272 adult listings of
+  the reviewed catalog: 259 filed under the Adult category, and 13 adult-site downloaders filed
+  under other categories (12 that #98 gave Adult as a secondary category, and
   `ashemaletube-downloader`, which no keyword caught). They were found by the category, by
   `ADULT_TERMS` (`scripts/migration/legacy-media.ts`) and a broader word list over every listing's
   text, FAQs, resource links, and media URLs, and by reading every downloader listing outside
-  Adult; `kept` records the keyword matches that stay, and why.
+  Adult. `kept` records the four fan-site downloaders and the keyword matches that stay, and why.
 - **The manifests.** `2026-10-09-adult-category.yaml` gives `ashemaletube-downloader` the Adult
-  category (as #98 did for the 14), then `2026-10-09-adult-removal.yaml` unpublishes all 276
-  (`listing-unpublish`, as #148's cleanup) and retires the Adult category (`category-unpublish`,
-  `categories.is_active = 0`, refused while a live listing remains in it). Publish them in that
+  category (as #98 did), then `2026-10-09-adult-removal.yaml` takes Adult off the kept fan-site
+  downloaders (`listing-categories-remove`, never a primary category), unpublishes the 272
+  (`listing-unpublish`, as #148's cleanup), and retires Adult and GIF Downloaders, whose only
+  listing was RedGifs (`category-unpublish`: `categories.is_active = 0`, refused while a live
+  listing remains in it). Fansite Downloaders keeps its listings and stays. Publish them in that
   order: the removal refuses whole until the category manifest is published. Both are row-level
   and disjoint from every other unpublish manifest.
 - **404, not 410.** An unpublished listing filed under a retired category answers a plain 404,
-  never the gone page with its category link and "Relist it" (`LISTING_IN_RETIRED_CATEGORY_SQL`
-  in `apps/web/src/db/catalog-epoch.ts`), so every listing the removal unpublishes and
-  `/products/categories/adult/` answer 404, and adult search traffic isn't sent elsewhere. The
-  retired category leaves the navigation, the category index, the sitemaps, search, RSS, and the
-  submit and edit forms, which read active D1 categories. The rows stay; don't republish one.
-- **Brands.** `/brands/` shows the shared brand data's `noAdult` group.
+  never the gone page with its category link and "Relist it" (`listingInRetiredCategory` in
+  `apps/web/src/db/plan-support.ts`), so every listing the removal unpublishes and the retired
+  categories' pages answer 404, and adult search traffic isn't sent elsewhere. A retired category
+  leaves the navigation, the category index, the sitemaps, search, RSS, and the submit and edit
+  forms, which read active D1 categories.
+- **It stays down.** The rows stay, but nothing makes such a listing live again: `/admin` refuses
+  Republish and says why ([Admin panel](./ADMIN_PANEL.md#unpublished-listings-answer-410)), a paid
+  relist is never offered (and a payment that raced is refunded), and D1 refuses it on any path
+  (`0011_retired_categories`: a published listing is never filed under a retired category).
+- **Brands.** `/brands/` shows the shared brand data's `noAdult` group until #193 replaces it.
 
 ```bash
 pnpm catalog:domains -- adult-manifest   # d1/hygiene/<date>-adult-decisions.yaml →
@@ -141,10 +148,11 @@ pnpm catalog:domains -- adult-manifest   # d1/hygiene/<date>-adult-decisions.yam
 The generator reads the reviewed catalog as the committed manifests leave it
 (`reviewedCatalogDatabase`: the import plus every committed manifest that adds categories,
 unpublishes, or retires one), so each operation expects the categories staging and production
-have. It refuses a live listing of a retired category that the decisions leave out, and
-`scripts/listing-domain-check.test.ts` keeps the committed manifests identical to the decisions,
-applies them to the reviewed catalog, and checks that the category is inactive, that no listing
-named for an adult platform is live, and that every removed URL answers 404.
+have. It refuses a live listing of a retired category that the decisions neither unpublish nor
+keep, and `scripts/listing-domain-check.test.ts` keeps the committed manifests identical to the
+decisions, applies them to the reviewed catalog, and checks that exactly the decided categories
+retire, that kept listings stay live off them, that no other listing named for an adult platform
+is live, and that every removed URL answers 404.
 
 ## Listing FAQs (#105)
 
