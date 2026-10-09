@@ -32,7 +32,7 @@
  * or from the `deploy` entry Wrangler writes to `WRANGLER_OUTPUT_FILE_PATH` when the deploy
  * step ran with that variable set.
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
@@ -95,6 +95,8 @@ export interface HttpGateOptions {
   /** The deployed Worker version; gates wait for it and require it on every response. */
   expectedVersion?: string
   parityReportPath?: string
+  /** The reviewed manifests whose retired categories the gates never sample (#260). */
+  publicationsDirectory?: string
   timeoutMs?: number
   versionPollIntervalMs?: number
   /** Budget for the expected version to answer, shared by the wait and every retry (≤ 60 s). */
@@ -863,7 +865,8 @@ export async function runHttpGates(
     parity: { categories: Array<{ slug: string }>; exactSlugSet: string[] }
   }
   const listingSlug = report.parity.exactSlugSet[0]
-  const categorySlug = report.parity.categories[0]?.slug
+  const retired = retiredCategorySlugs(options.publicationsDirectory ?? 'd1/publications')
+  const categorySlug = report.parity.categories.find(category => !retired.has(category.slug))?.slug
   if (!listingSlug || !categorySlug) throw new Error('Reviewed parity samples are empty.')
   const timeoutMs = options.timeoutMs ?? defaultRequestTimeoutMs
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > defaultRequestTimeoutMs)
@@ -909,6 +912,24 @@ export async function runHttpGates(
   await expectHostRedirectPolicy(target, redirectOn)
   if (mode === 'production')
     await expectPublicPolicy(target, listingRoute(listingSlug), { redirectOn, skipNonWorker: true })
+}
+
+/**
+ * Categories a reviewed manifest retires (`category-unpublish`, #260: Adult, the import's first
+ * category). A retired category's page answers 404 once the manifest is published, so the gates
+ * sample the first category no manifest retires, which answers 200 before and after.
+ */
+export function retiredCategorySlugs(directory: string): Set<string> {
+  const retired = new Set<string>()
+  for (const file of readdirSync(resolve(directory)).filter(name => /\.ya?ml$/u.test(name))) {
+    const manifest = parse(readFileSync(resolve(directory, file), 'utf8')) as {
+      operations?: Array<{ action?: unknown; slug?: unknown }>
+    } | null
+    for (const operation of manifest?.operations ?? [])
+      if (operation.action === 'category-unpublish' && typeof operation.slug === 'string')
+        retired.add(operation.slug)
+  }
+  return retired
 }
 
 export async function runStagingHttpGates(baseUrlValue: string): Promise<void> {

@@ -134,6 +134,14 @@ describe('parseNetworkBrands', () => {
     expect(new Set(brands.map(brand => brand.slug)).size).toBe(brands.length)
   })
 
+  it('shows no adult brand on best.serp.co (#260)', () => {
+    const adult = new Set(getNetworkBrandsForGroup('adultsOnly').map(brand => brand.slug))
+    expect(adult.size).toBeGreaterThan(0)
+    expect(
+      getNetworkBrandsForGroup(site.networkBrandGroup).filter(brand => adult.has(brand.slug))
+    ).toEqual([])
+  })
+
   it('rejects brand groups that reference missing brand entries', () => {
     expect(() =>
       parseNetworkBrandGroup(

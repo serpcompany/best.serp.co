@@ -284,13 +284,19 @@ describe('hosted catalog media (#95)', () => {
 
   it('changes only listing logos and images when the manifests are applied', () => {
     // The other reviewed manifests (#100's unpublications, #105's FAQ move) are the baseline:
-    // the media and category manifests may change nothing else on top of them.
+    // the media and category manifests may change nothing else on top of them. A manifest that
+    // retires a category (#260) unpublishes listings the category manifests filed under it, so
+    // it applies only after them: it is on neither side.
     const mediaOrCategories = (manifest: ReturnType<typeof parseManifest>) =>
       manifest.operations.every(
         op => op.action === 'listing-media-update' || op.action === 'listing-categories-add'
       )
-    const before = publishedDatabase(manifest => !mediaOrCategories(manifest))
-    const after = publishedDatabase()
+    const retiresCategory = (manifest: ReturnType<typeof parseManifest>) =>
+      manifest.operations.some(op => op.action === 'category-unpublish')
+    const before = publishedDatabase(
+      manifest => !mediaOrCategories(manifest) && !retiresCategory(manifest)
+    )
+    const after = publishedDatabase(manifest => !retiresCategory(manifest))
     try {
       for (const sql of [
         `SELECT id, slug, name, description, website, content, status, is_active, published_at,

@@ -1,0 +1,1442 @@
+# serpcompany/best.serp.co#260: best.serp.co lists no adult products (owner decision of 2026-10-09). Every
+# listing in the Adult category and every listing built for an adult site goes, and the Adult category retires.
+# d1/publications/2026-10-09-adult-category.yaml and 2026-10-09-adult-removal.yaml
+# (`pnpm catalog:domains -- adult-manifest`) unpublish each entry and retire the category, so their URLs
+# and /products/categories/adult/ answer 404.
+#   adult-category:  filed under Adult in the import. All are downloaders for adult video, cam, or fan
+#                    sites, read by hand; none is a general-purpose tool.
+#   filed-elsewhere: built for an adult site but filed under another category in the import. #98 added Adult
+#                    to 14 of them as a secondary category; the adult-category manifest adds it to the rest.
+# kept: keyword matches read by hand that stay listed. General-purpose downloaders (YouTube, Vimeo, and the
+# like) stay. Counted against the reviewed catalog (see evidence); the manifests' guards refuse any listing
+# an environment changed since.
+decidedAt: 2026-10-09
+evidence:
+  - "The Adult category of the reviewed catalog: the committed import plus the committed manifests in d1/publications that add categories or unpublish (`reviewedCatalogDatabase`), 275 live listings."
+  - "ADULT_TERMS (scripts/migration/legacy-media.ts) over the slug, name, website, and description of every other live listing: no match."
+  - "A broader word list (sex, nude, NSFW, erotic, escort, cam, girlfriend, and others) over every live listing's name, description, long content, FAQs, resource links, and media URLs: policy text and false positives (Java, webcam, \"$XXX\", Kinki), each read; see kept."
+  - "Every live downloader listing outside Adult (59), read by hand: ashemaletube-downloader is an adult site's downloader."
+retireCategories:
+  - adult
+unpublish:
+  - slug: 321tube-downloader
+    id: lst_b23428c4b1ed2d327cfbdc2f
+    website: https://serp.ly/321tube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: 3movs-downloader
+    id: lst_9536b94fb622b0cb3f78b5a3
+    website: https://serp.ly/3movs-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: 4k69-downloader
+    id: lst_539553795d07477371e42d08
+    website: https://serp.ly/4k69-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: 4kporn-downloader
+    id: lst_fdbfa7388ae52d6564e84884
+    website: https://serp.ly/4kporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: 5moviesporn-downloader
+    id: lst_f7dde0af9b7d54222e904012
+    website: https://serp.ly/5moviesporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: 8kporner-downloader
+    id: lst_00b05126d6cbdad8f4748b1c
+    website: https://serp.ly/8kporner-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: 8teenxxx18-downloader
+    id: lst_6909d455fbb27e6a35d49874
+    website: https://serp.ly/8teenxxx18-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: abelladangertv-downloader
+    id: lst_2d228cac68ccf3fef89a9828
+    website: https://serp.ly/abelladangertv-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: abxxx-downloader
+    id: lst_37779218283a83f538b59c40
+    website: https://serp.ly/abxxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: adultdvdmovies-downloader
+    id: lst_4b811b0e8e185e28ac5666d3
+    website: https://serp.ly/adultdvdmovies-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: al4a-downloader
+    id: lst_2f001428a3a6d63968c91d1a
+    website: https://serp.ly/al4a-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: allpornstream-downloader
+    id: lst_9e6640e0afc10297790858d4
+    website: https://serp.ly/allpornstream-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: alpha-porno-video-downloader
+    id: lst_cbdf3095a60bac75f6c84f36
+    website: https://serp.ly/alpha-porno-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: alphaporno-downloader
+    id: lst_bedaa65d78a770d9467f14bb
+    website: https://serp.ly/alpha-porno-downloader
+    class: filed-elsewhere
+    reason: a downloader for AlphaPorno, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: amigosporn-downloader
+    id: lst_fbcba561f31f65af9d96fdd5
+    website: https://serp.ly/amigosporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: amtube-downloader
+    id: lst_09b1a08bbbfaf62d6aebcd91
+    website: https://serp.ly/amtube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: analdin-downloader
+    id: lst_b3af9d7cbeeffa4e1b8be4fd
+    website: https://serp.ly/analdin-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: anyporn-downloader
+    id: lst_1e7609e753548d71d69e1ea6
+    website: https://serp.ly/anyporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: anysex-downloader
+    id: lst_5e25f9bf7ea00356e5d1b526
+    website: https://serp.ly/anysex-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: ashemaletube-downloader
+    id: lst_18c2e561c7a4c7e4ac5da296
+    website: https://serp.ly/ashemaletube-downloader
+    class: filed-elsewhere
+    reason: a downloader for AShemaleTube, an adult site, filed under video-downloaders (no adult keyword matched it; found by hand)
+  - slug: bananamovies-downloader
+    id: lst_b3acb16dc97b226557e6d540
+    website: https://serp.ly/bananamovies-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: beeg-downloader
+    id: lst_9056916e924e69a757a158d6
+    website: https://serp.ly/beeg-video-downloader
+    class: filed-elsewhere
+    reason: a downloader for Beeg, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: beeg-video-downloader
+    id: lst_8715e66ceec9dac21bd63656
+    website: https://serp.ly/beeg-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: bestpornflix-downloader
+    id: lst_6007cb69fdb213750d094df5
+    website: https://serp.ly/bestpornflix-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: bibamax-downloader
+    id: lst_2b6f31f33ee00c25bf523b40
+    website: https://serp.ly/bibamax-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: bibamaxph-downloader
+    id: lst_1b2f775e5bfdbc0a785453fc
+    website: https://serp.ly/bibamaxph-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: bigbuttshub-downloader
+    id: lst_4a5a1f789dddcffaa2bbf4f0
+    website: https://serp.ly/bigbuttshub-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: bingato-downloader
+    id: lst_629a807d1b6ef34013c1236b
+    website: https://serp.ly/bingato-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: bipornfun-downloader
+    id: lst_254ec63a47d80ba9b0c0d799
+    website: https://serp.ly/bipornfun-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: bongacams-downloader
+    id: lst_928bf9f59c3700ac116dcc96
+    website: https://serp.ly/bongacams-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: bootychristmas-downloader
+    id: lst_dcae3aa7b427220bdf4cc481
+    website: https://serp.ly/bootychristmas-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: bootyexpo-downloader
+    id: lst_4ddf6e1e67c69c75a967ec29
+    website: https://serp.ly/bootyexpo-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: borwap-downloader
+    id: lst_d02d9b70575501ff0cf8587c
+    website: https://serp.ly/borwap-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: boyfriendtv-downloader
+    id: lst_bdd6e28b370a0e24fa95f41b
+    website: https://serp.ly/boyfriendtv-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: boysfood-downloader
+    id: lst_4297b7c8d19b5c3ad8206a96
+    website: https://serp.ly/boysfood-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: bravotube-downloader
+    id: lst_32a59ab88f91626cacd83604
+    website: https://serp.ly/bravotube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: brazz-downloader
+    id: lst_ce0c4761884bb6806e21f787
+    website: https://serp.ly/brazz-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: brazzers3x-downloader
+    id: lst_b2ac34fed8237502279a2d16
+    website: https://serp.ly/brazzers3x-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: brazzpw-downloader
+    id: lst_b3a5bc3f747e891b705ef641
+    website: https://serp.ly/brazzpw-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: cam4-downloader
+    id: lst_b3d139424f4e6b4d886c9a39
+    website: https://serp.ly/cam4-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: camscom-downloader
+    id: lst_88e51164079b6f67eaa07da1
+    website: https://serp.ly/camscom-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: camsoda-downloader
+    id: lst_79a11f16180173466957b71f
+    website: https://serp.ly/camsoda-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: chaturbate-downloader
+    id: lst_4a3fcd80da4e5f8b56dd5ecc
+    website: https://serp.ly/chaturbate-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: clicporn-downloader
+    id: lst_f573466937f76aae3f2847d3
+    website: https://serp.ly/clicporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: collectionofbestporn-downloader
+    id: lst_29d51903f861b3d2b938357a
+    website: https://serp.ly/collectionofbestporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: coomer-downloader
+    id: lst_a518ca6c14454b5338eb223a
+    website: https://serp.ly/coomer-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: cumlouder-downloader
+    id: lst_86a13a7293c92d3b3c51686e
+    website: https://serp.ly/cumlouder-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: czechvideo-downloader
+    id: lst_f48a35915cc96c47f8b2e74e
+    website: https://serp.ly/czechvideo-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: definebabe-downloader
+    id: lst_a60479b9ef8c3ed8a9bbc8ba
+    website: https://serp.ly/definebabe-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: deflr-downloader
+    id: lst_8d426f6bd3d7229028ecde7d
+    website: https://serp.ly/deflr-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: dreamcam-downloader
+    id: lst_41e4b4bff6db6464fec6bd51
+    website: https://serp.ly/dreamcam-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: dreamcam-vr-downloader
+    id: lst_4b01691f9397aa2c60866a05
+    website: https://serp.ly/dreamcam-vr-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: drtuber-downloader
+    id: lst_a15d55ba56e35fd0623ca7ad
+    website: https://serp.ly/drtuber-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: empflix-downloader
+    id: lst_01f4cc2ea815c380fa7e7ee0
+    website: https://serp.ly/empflix-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: entensity-downloader
+    id: lst_8fbd5d407f505ab478f0ffa2
+    website: https://serp.ly/entensity-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: eporner-downloader
+    id: lst_5568a59f7f88c1ba9cd44d47
+    website: https://serp.ly/eporner-downloader
+    class: filed-elsewhere
+    reason: a downloader for EPorner, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: eporner-video-downloader
+    id: lst_bd540fb25ffd8db3d9ed1aa3
+    website: https://serp.ly/eporner-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: erome-downloader
+    id: lst_e9f51d8f7678ed9b7a1fa757
+    website: https://serp.ly/erome-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: erothots-downloader
+    id: lst_a09e3169e31a68e441374bb2
+    website: https://serp.ly/erothots-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: eroticmv-downloader
+    id: lst_cd3fb508378a63bd06ae1449
+    website: https://serp.ly/eroticmv-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: euroxxx-downloader
+    id: lst_4f653cfa9e2e021354fe33ac
+    website: https://serp.ly/euroxxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: fakingstv-downloader
+    id: lst_eba902fb61d26309d76cf28e
+    website: https://serp.ly/fakingstv-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: fansly-live-downloader
+    id: lst_1b86c4f59960269639ff7a40
+    website: https://serp.ly/fansly-live-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: fapality-downloader
+    id: lst_6174b0619e8991a7f1675863
+    website: https://serp.ly/fapality-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: fapnado-downloader
+    id: lst_f272ce8f44241031678acd80
+    website: https://serp.ly/fapnado-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: faptap-downloader
+    id: lst_d45db1ae4a93b872d3d8aebe
+    website: https://serp.ly/faptap-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: flirt4free-downloader
+    id: lst_e8a3f2072fd77e1325984068
+    website: https://serp.ly/flirt4free-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: foxtube-downloader
+    id: lst_8040221efce0c538d859260c
+    website: https://serp.ly/foxtube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: fpoxxx-downloader
+    id: lst_27362082e5bd06275994a8d8
+    website: https://serp.ly/fpoxxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: freeomovie-downloader
+    id: lst_55474a9fc0b568ebc86fa828
+    website: https://serp.ly/freeomovie-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: freeonestube-downloader
+    id: lst_1aaad33758fe81585ef60a7f
+    website: https://serp.ly/freeonestube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: freepornsexnet-downloader
+    id: lst_52bb2641c13777f83339070e
+    website: https://serp.ly/freepornsexnet-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: freepornvideosxxx-downloader
+    id: lst_780c42aada5f4adef083ea52
+    website: https://serp.ly/freepornvideosxxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: fullporner-downloader
+    id: lst_2f48c6834866987d1a9ce400
+    website: https://serp.ly/fullporner-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: fullxxxmovies-downloader
+    id: lst_31a1ea12341701745462d9c0
+    website: https://serp.ly/fullxxxmovies-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: fuxnxx-downloader
+    id: lst_d5437fe071ef6db663c1bb17
+    website: https://serp.ly/fuxnxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: fuxxx-downloader
+    id: lst_7cadd7cafdc17596a629bff7
+    website: https://serp.ly/fuxxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: galaxyporn-downloader
+    id: lst_f74c539327dadab1aeb209db
+    website: https://serp.ly/galaxyporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: gimmeporn-downloader
+    id: lst_2bdadf583d7eb0c2972ca967
+    website: https://serp.ly/gimmeporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: goonchan-downloader
+    id: lst_edc99c36887f266a7241d76e
+    website: https://serp.ly/goonchan-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: goonit-downloader
+    id: lst_48b19cf4662fb24f06b65bc7
+    website: https://serp.ly/goonit-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: hdeasyporn-downloader
+    id: lst_107f75003102cc6222cc1893
+    website: https://serp.ly/hdeasyporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: hdporn92-downloader
+    id: lst_79bac5a70f7619d55c1376e1
+    website: https://serp.ly/hdporn92-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: hdpornwatch-downloader
+    id: lst_5d993eff823e8992666636d2
+    website: https://serp.ly/hdpornwatch-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: hdzog-downloader
+    id: lst_5c8ac54da2c73904b2a4c6de
+    website: https://serp.ly/hdzog-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: helloporn-downloader
+    id: lst_bcc4aed99afc6d6cdc5685de
+    website: https://serp.ly/helloporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: hentaihaven-downloader
+    id: lst_07bba2516d34e349a9a7274c
+    website: https://serp.ly/hentaihaven-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: hornybutt-downloader
+    id: lst_69adeceeaf4cab015aceafd9
+    website: https://serp.ly/hornybutt-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: hotmovs-downloader
+    id: lst_96f08a05b47428cf33b3a23d
+    website: https://serp.ly/hotmovs-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: hqfap-downloader
+    id: lst_202adfd79d5f3e4eca6736f8
+    website: https://serp.ly/hqfap-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: hqporner-downloader
+    id: lst_cedc16e5a68c18d7d99964d9
+    website: https://serp.ly/hqporner-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: hutporner-downloader
+    id: lst_bedebb156ce679c9ad91eada
+    website: https://serp.ly/hutporner-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: iceporncasting-downloader
+    id: lst_962e1d050b8fbeb2e8c0b431
+    website: https://serp.ly/iceporncasting-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: inporn-downloader
+    id: lst_6da079cbef4149432b6564cb
+    website: https://serp.ly/inporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: inxxx-downloader
+    id: lst_5d2b789a321a87233483410b
+    website: https://serp.ly/inxxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: iporntv-downloader
+    id: lst_f927e6f3e05a144bfe028845
+    website: https://serp.ly/iporntv-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: itnaked-downloader
+    id: lst_1641c2bb6fc6b8354051419a
+    website: https://serp.ly/itnaked-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: jerkmotion-downloader
+    id: lst_c0b7d1eae8037eee6383b20b
+    website: https://serp.ly/jerkmotion-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: joystube-downloader
+    id: lst_8dcd8c950c9f2e60a0e1d216
+    website: https://serp.ly/joystube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: justforfans-downloader
+    id: lst_3966e02ea1a078b6a092fbfd
+    website: https://serp.ly/justforfans-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: justfullporn-downloader
+    id: lst_d50dee767ba8619d87331ee7
+    website: https://serp.ly/justfullporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: justporn-downloader
+    id: lst_745696d11b41d56c4b66edbb
+    website: https://serp.ly/justporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: kompoz2-downloader
+    id: lst_efff189f7e1ffb6000d29273
+    website: https://serp.ly/kompoz2-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: ladybanana-downloader
+    id: lst_176acd62ffbd932b4d538118
+    website: https://serp.ly/ladybanana-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: lanarhoadestv-downloader
+    id: lst_8e65560a2cd7d0922994f1c6
+    website: https://serp.ly/lanarhoadestv-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: latestleaks-downloader
+    id: lst_03956850e362c64821e9a03e
+    website: https://serp.ly/latestleaks-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: latestpornvideo-downloader
+    id: lst_427781ab7f10f3f577eaecdf
+    website: https://serp.ly/latestpornvideo-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: letmejerk-downloader
+    id: lst_7cf43720cce6822b95afde20
+    website: https://serp.ly/letmejerk-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: letsjerk-downloader
+    id: lst_b5591aa91622a418f6d6869d
+    website: https://serp.ly/letsjerk-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: livejasmin-downloader
+    id: lst_a615059eb5abaf07b309447b
+    website: https://serp.ly/livejasmin-downloader
+    class: filed-elsewhere
+    reason: a downloader for Livejasmin, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: lustbb-downloader
+    id: lst_da72b136076078d2be5febbb
+    website: https://serp.ly/lustbb-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: luxporn-downloader
+    id: lst_d08a0097ce55304c47e5c354
+    website: https://serp.ly/luxporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: luxuretv-downloader
+    id: lst_06cc5a4ba00ce9da6f3dffca
+    website: https://serp.ly/luxuretv-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: mangoporn-downloader
+    id: lst_b29f58d339e760c0f64924af
+    website: https://serp.ly/mangoporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: manyvids-downloader
+    id: lst_195e97592334dc06ca45e109
+    website: https://serp.ly/manyvids-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: maxporn-downloader
+    id: lst_3f6cae8e230c6088eaa7a01d
+    website: https://serp.ly/maxporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: megatube-downloader
+    id: lst_6b45b586c9d9b5dee1e185d6
+    website: https://serp.ly/megatube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: miakhalifatv-downloader
+    id: lst_423deee118ecfed426b7f273
+    website: https://serp.ly/miakhalifatv-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: mobifcuk-downloader
+    id: lst_f4b69b149f6d6f765c38cc27
+    website: https://serp.ly/mobifcuk-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: modporn-downloader
+    id: lst_6d5f679d1d52ebd2513c4783
+    website: https://serp.ly/modporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: monsterfap-downloader
+    id: lst_b0dc4b893a4b8b2406a686f1
+    website: https://serp.ly/monsterfap-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: motherless-downloader
+    id: lst_cbc186001f9fddf211a7be98
+    website: https://serp.ly/motherless-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: myfreecams-downloader
+    id: lst_00fd10c395a7053f906d26c4
+    website: https://serp.ly/myfreecams-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: mygoodporn-downloader
+    id: lst_28d2005fb9ff06ae803f1fd0
+    website: https://serp.ly/mygoodporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: mypornerleak-downloader
+    id: lst_42783f8f83a456fe5694df32
+    website: https://serp.ly/mypornerleak-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: neporn-downloader
+    id: lst_0906bc83a3b87eabdf81dfce
+    website: https://serp.ly/neporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: netfapx-downloader
+    id: lst_d78b03480fed6fde05367732
+    website: https://serp.ly/netfapx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: netfapxnet-downloader
+    id: lst_c6b34a8b88fd5b434063fbb5
+    website: https://serp.ly/netfapxnet-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: nhentai-downloader
+    id: lst_6430c364927bbf65381f6084
+    website: https://serp.ly/nhentai-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: ogporn-downloader
+    id: lst_4360532e5e2eb93b82ac7d37
+    website: https://serp.ly/ogporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: okporn-downloader
+    id: lst_f76c417e947cbbb84b2c9f8b
+    website: https://serp.ly/okporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: okxxx-downloader
+    id: lst_0c5e4f5ac9d3d383ae96bf51
+    website: https://serp.ly/okxxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: omgxxx-downloader
+    id: lst_d5b9e08d1d1f41ae1a25ae17
+    website: https://serp.ly/omgxxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: onlyfans-bulk-downloader
+    id: lst_0d34a5b3397b463214cf708e
+    website: https://serp.ly/onlyfans-bulk-downloader
+    class: filed-elsewhere
+    reason: a downloader for OnlyFans, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: onlyfans-downloader
+    id: lst_4251455a4d740603c89dd58a
+    website: https://serp.ly/onlyfans-downloader
+    class: filed-elsewhere
+    reason: a downloader for OnlyFans, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: pandamovies-downloader
+    id: lst_c9b75f3a5e7a6d3e1a887e0d
+    website: https://serp.ly/pandamovies-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: paradisehill-downloader
+    id: lst_7f711663ba07191cc817c752
+    website: https://serp.ly/paradisehill-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: peekvids-downloader
+    id: lst_3d2e7c3ab44b43396a6d1658
+    website: https://serp.ly/peekvids-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: perfectgirls-downloader
+    id: lst_cb4884a374731728dd0f4e36
+    website: https://serp.ly/perfectgirls-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: perverzija-downloader
+    id: lst_008062fa594e5f79f615f9e8
+    website: https://serp.ly/perverzija-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: phonerotica-downloader
+    id: lst_0fb2acf186f647699192bd35
+    website: https://serp.ly/phonerotica-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: playhdporn-downloader
+    id: lst_0eb7a9535d22df212623f127
+    website: https://serp.ly/playhdporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porn00-downloader
+    id: lst_e9cd93f323c4b4841ed5a96d
+    website: https://serp.ly/porn00-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porn2all-downloader
+    id: lst_73c2309215093922ef8d9247
+    website: https://serp.ly/porn2all-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porn300-downloader
+    id: lst_113c28fb9d18ae9691a4a3a5
+    website: https://serp.ly/porn300-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porn4days-downloader
+    id: lst_c40c0ae7c7464144cecc140d
+    website: https://serp.ly/porn4days-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornapi-downloader
+    id: lst_742ef51674735d4b77db7e40
+    website: https://serp.ly/pornapi-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornbaker-downloader
+    id: lst_c6bef597f4398c80cdcba086
+    website: https://serp.ly/pornbaker-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornbusy-downloader
+    id: lst_106a5ee731379d44b22d23fb
+    website: https://serp.ly/pornbusy-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porndig-downloader
+    id: lst_2cf4bc0ca948d9287ce5cc9f
+    website: https://serp.ly/porndig-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornditt-downloader
+    id: lst_5139b17756cb354b63a0cdde
+    website: https://serp.ly/pornditt-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porndoe-downloader
+    id: lst_2bfc9c374ab3dca4d25e9fad
+    website: https://serp.ly/porndoe-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porndroids-downloader
+    id: lst_4b9fbe92e0fef07858b57225
+    website: https://serp.ly/porndroids-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porneec-downloader
+    id: lst_31d4fcc809c55d780efe3493
+    website: https://serp.ly/porneec-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornekip-downloader
+    id: lst_d21e6e0789be5a3eaf3a3d18
+    website: https://serp.ly/pornekip-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornezcam-downloader
+    id: lst_73c132e334c7bb6aa8a032a5
+    website: https://serp.ly/pornezcam-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porngo-downloader
+    id: lst_4794f28b745defaf2f1cfa35
+    website: https://serp.ly/porngo-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornhat-downloader
+    id: lst_3ed3a0650eed9e3cb1d3b6df
+    website: https://serp.ly/pornhat-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornhd3x-downloader
+    id: lst_600b71e3aeaf5ea6fcf136bc
+    website: https://serp.ly/pornhd3x-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornhd4k-downloader
+    id: lst_c29120559c0648b29339cbc8
+    website: https://serp.ly/pornhd4k-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornhd8k-downloader
+    id: lst_b031d823dc53d7c9e9e176a1
+    website: https://serp.ly/pornhd8k-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornhits-downloader
+    id: lst_132c9335f5d99708526a352e
+    website: https://serp.ly/pornhits-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornhub-downloader
+    id: lst_3ea2be5dd1c1715c51d64d9a
+    website: https://serp.ly/pornhub-video-downloader
+    class: filed-elsewhere
+    reason: a downloader for Pornhub, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: pornhub-video-downloader
+    id: lst_53f3056515dd17c0dbe807bc
+    website: https://serp.ly/pornhub-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornlib-downloader
+    id: lst_04a3e401ee5ace11bc84ed28
+    website: https://serp.ly/pornlib-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornmedium-downloader
+    id: lst_a5f1fe7c525b3366335526a6
+    website: https://serp.ly/pornmedium-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornmike-downloader
+    id: lst_f55920840079bd9d8cad833b
+    website: https://serp.ly/pornmike-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornmk-downloader
+    id: lst_5bf603f7fffbd116ccdf8aa2
+    website: https://serp.ly/pornmk-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornmz-downloader
+    id: lst_70ac75a2114a6dc6b76b029a
+    website: https://serp.ly/pornmz-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornobae-downloader
+    id: lst_9f7aa3c32fc208090c5457a0
+    website: https://serp.ly/pornobae-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornoflix-downloader
+    id: lst_55a4d389813386bca812872c
+    website: https://serp.ly/pornoflix-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornoframe-downloader
+    id: lst_d9158e6e8a19efc2ebba5d2e
+    website: https://serp.ly/pornoframe-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornone-downloader
+    id: lst_ed617ab158ddcdf3ba95f139
+    website: https://serp.ly/pornone-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornslash-downloader
+    id: lst_20518b49e61902bbc19806e9
+    website: https://serp.ly/pornslash-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornsok-downloader
+    id: lst_b315a89945cf6ffbe18b217c
+    website: https://serp.ly/pornsok-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornstarstube-downloader
+    id: lst_f037e5325921279739c967d3
+    website: https://serp.ly/pornstarstube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornsy-downloader
+    id: lst_375f83c0ea3bf2ff3cfb2a70
+    website: https://serp.ly/pornsy-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porntop-downloader
+    id: lst_17e2b01f1c9a794a8705474e
+    website: https://serp.ly/porntop-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: porntrex-downloader
+    id: lst_c649f3b875f0a3d69a3d2921
+    website: https://serp.ly/porntrex-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornve-downloader
+    id: lst_f76035ffddd5e9ae3cf25020
+    website: https://serp.ly/pornve-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornvibe-downloader
+    id: lst_2c5e51a7ba9f404afbc5c6ba
+    website: https://serp.ly/pornvibe-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornvideobb-downloader
+    id: lst_e414ff59c8758646d086f218
+    website: https://serp.ly/pornvideobb-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornwex-downloader
+    id: lst_2ddd080b5ff71d67dc701e8f
+    website: https://serp.ly/pornwex-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pornxp-downloader
+    id: lst_004674434d95a1a30eb7b780
+    website: https://serp.ly/pornxp-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: pussyspace-downloader
+    id: lst_c1f5e9df0beb140090b82604
+    website: https://serp.ly/pussyspace-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: rajwap-downloader
+    id: lst_43b81829674dc7f37d62b2b0
+    website: https://serp.ly/rajwap-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: reddittube-downloader
+    id: lst_638e83b7c1131a71e6b46dee
+    website: https://serp.ly/reddittube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: redgifs-downloader
+    id: lst_fb618a4c96786afbc9f7f535
+    website: https://serp.ly/redgifs-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: redtube-downloader
+    id: lst_42d7b46cbb3545c9ca268af2
+    website: https://serp.ly/redtube-video-downloader
+    class: filed-elsewhere
+    reason: a downloader for RedTube, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: redtube-video-downloader
+    id: lst_4cb792bfe5d29ae7abfa7c5c
+    website: https://serp.ly/redtube-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: redwap-downloader
+    id: lst_a93bef3028456d515b6c4d39
+    website: https://serp.ly/redwap-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: saintporn-downloader
+    id: lst_a682cee65a0395e10e5dde62
+    website: https://serp.ly/saintporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: severeporn-downloader
+    id: lst_5c6fda322d6f006963c5b585
+    website: https://serp.ly/severeporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: sexchathu-downloader
+    id: lst_2447a1fdadf6ccdda0f63b84
+    website: https://serp.ly/sexchathu-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: sextu-downloader
+    id: lst_645d7e9f1a44f4b5574343dc
+    website: https://serp.ly/sextu-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: sextvx-downloader
+    id: lst_2a12c9ae33e35df542b5ebc4
+    website: https://serp.ly/sextvx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: sexu-downloader
+    id: lst_f7c1edbbf306085b26f08613
+    website: https://serp.ly/sexu-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: sexvid-downloader
+    id: lst_633915039263a5414e44bee6
+    website: https://serp.ly/sexvid-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: shooshtime-downloader
+    id: lst_40554a5c0402059b730fa4bf
+    website: https://serp.ly/shooshtime-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: sinpartytube-downloader
+    id: lst_4be1fbc76c5b9764455a3e81
+    website: https://serp.ly/sinpartytube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: siska-downloader
+    id: lst_83fc3566b6b79754acb54d63
+    website: https://serp.ly/siska-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: spankbang-downloader
+    id: lst_a9c53917a85d2c242aebe247
+    website: https://serp.ly/spankbang-video-downloader
+    class: filed-elsewhere
+    reason: a downloader for SpankBang, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: spankbang-video-downloader
+    id: lst_69e08fb3bd3f9b32c759010e
+    website: https://serp.ly/spankbang-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: speedporn-downloader
+    id: lst_6dec2bbeb1f5dd0524f29d93
+    website: https://serp.ly/speedporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: squirtvideos-downloader
+    id: lst_d7c440af397587a1ed0ef271
+    website: https://serp.ly/squirtvideos-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: streamate-downloader
+    id: lst_0f73c2f0ebe3407d21d659ee
+    website: https://serp.ly/streamate-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: streamporn-downloader
+    id: lst_8b2c3e6a988131b9d84a9234
+    website: https://serp.ly/streamporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: stripchat-downloader
+    id: lst_cbe6998d975477aa1b4fc1f3
+    website: https://serp.ly/stripchat-video-downloader
+    class: filed-elsewhere
+    reason: a downloader for Stripchat, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: stripchat-video-downloader
+    id: lst_2d467d5d65204a14d276c89c
+    website: https://serp.ly/stripchat-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: stripchat-vr-downloader
+    id: lst_fa31411b874ea0c17eb4a2b3
+    website: https://serp.ly/stripchat-vr-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: sunporno-downloader
+    id: lst_e4d372ad42011ff4bbe774e6
+    website: https://serp.ly/sunporno-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: superporn-downloader
+    id: lst_19db9803647eb543dab80b3f
+    website: https://serp.ly/superporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: swingerpornfun-downloader
+    id: lst_fb44177b287d4930570cb0f7
+    website: https://serp.ly/swingerpornfun-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: sxyland-downloader
+    id: lst_84436064eefd121a3a4ae7e7
+    website: https://serp.ly/sxyland-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: taxi69-downloader
+    id: lst_ddd886688c62294a73573047
+    website: https://serp.ly/taxi69-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: thepornarea-downloader
+    id: lst_4ade819459f976f75fb67f0a
+    website: https://serp.ly/thepornarea-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: thisvid-downloader
+    id: lst_c2a1b1482907a2c26aef6d19
+    website: https://serp.ly/thisvid-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: tnaflix-downloader
+    id: lst_30be0d25fa0d2c222752c1c6
+    website: https://serp.ly/tnaflix-video-downloader
+    class: filed-elsewhere
+    reason: a downloader for TNAFlix, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: tnaflix-video-downloader
+    id: lst_fd383572bf8dea68b18b2983
+    website: https://serp.ly/tnaflix-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: tokyomotion-downloader
+    id: lst_2498126e2512e10c620d9d81
+    website: https://serp.ly/tokyomotion-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: trendyporn-downloader
+    id: lst_6253666150a16ae6ecb1dd69
+    website: https://serp.ly/trendyporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: tube8-downloader
+    id: lst_50b82b29bb53730899e69b91
+    website: https://serp.ly/tube8-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: tubeorigin-downloader
+    id: lst_515f2c5cc8d8cb364a65180b
+    website: https://serp.ly/tubeorigin-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: tubev-downloader
+    id: lst_218acd48eb4b3080c957eaa1
+    website: https://serp.ly/tubev-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: twpornstars-downloader
+    id: lst_506877bdbbaae15cd7fea02d
+    website: https://serp.ly/twpornstars-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: txxx-downloader
+    id: lst_545da27b9115f66e9fe13436
+    website: https://serp.ly/txxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: upornia-downloader
+    id: lst_34d56505ec5ad0dc14f8c778
+    website: https://serp.ly/upornia-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: usersporn-downloader
+    id: lst_dbfed299e50f1e2472c675b0
+    website: https://serp.ly/usersporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: veporn-downloader
+    id: lst_8fed89661173978073eb6bf3
+    website: https://serp.ly/veporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: vivamaxsexscene-downloader
+    id: lst_849285ae23bfc9f36c0da62b
+    website: https://serp.ly/vivamaxsexscene-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: vrsmash-downloader
+    id: lst_351112e5adde3ed5d6e3425b
+    website: https://serp.ly/vrsmash-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: vxxx-downloader
+    id: lst_021b6902aa8d827dd3f8311f
+    website: https://serp.ly/vxxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: watchporn-downloader
+    id: lst_06d13ba8cb0426b57bcf0cd2
+    website: https://serp.ly/watchporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: watchxxxfree-downloader
+    id: lst_6abfe7ae4e894b2ce1fb490f
+    website: https://serp.ly/watchxxxfree-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: whatboyswant-downloader
+    id: lst_ccaf2bacf6c704b3b5263cd4
+    website: https://serp.ly/whatboyswant-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: whoreshub-downloader
+    id: lst_a4e140bf54324b3e1f340af3
+    website: https://serp.ly/whoreshub-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: worldsex-downloader
+    id: lst_e0a9433d79b613f0b1b0ad0e
+    website: https://serp.ly/worldsex-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: wowxxx-downloader
+    id: lst_bca4768bb7b1bd33f0693a2d
+    website: https://serp.ly/wowxxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: wtfpeople-downloader
+    id: lst_c9c521a9af8c8e3fcce12ae9
+    website: https://serp.ly/wtfpeople-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xcafe-downloader
+    id: lst_3d0fc43302ddebd673993bc9
+    website: https://serp.ly/xcafe-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xcum-downloader
+    id: lst_bcb7782155e82e8b42c968de
+    website: https://serp.ly/xcum-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xfantazy-downloader
+    id: lst_7d328cf0ebf70a610c891325
+    website: https://serp.ly/xfantazy-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xfreehd-downloader
+    id: lst_fbd32ee64979dc8261c4483e
+    website: https://serp.ly/xfreehd-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xfuntaxy-downloader
+    id: lst_eb09e30f66c83b364add764e
+    website: https://serp.ly/xfuntaxy-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xgroovy-downloader
+    id: lst_9e48390e577813dec11acc33
+    website: https://serp.ly/xgroovy-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xhamster-downloader
+    id: lst_d834dd88386322d7271f2536
+    website: https://serp.ly/xhamster-video-downloader
+    class: filed-elsewhere
+    reason: a downloader for xHamster, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: xhamster-video-downloader
+    id: lst_eaa73588fa271e33ad88e87b
+    website: https://serp.ly/xhamster-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xhamsterlive-downloader
+    id: lst_0dececdb46fb39ebd84d0036
+    website: https://serp.ly/xhamsterlive-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xkeezmovies-downloader
+    id: lst_08234e33a706fed3f0f23f10
+    website: https://serp.ly/xkeezmovies-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xlovecam-downloader
+    id: lst_f86cbf40eae0a3de1f7a804f
+    website: https://serp.ly/xlovecam-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xmegadrive-downloader
+    id: lst_c206476b7f2b78672519a492
+    website: https://serp.ly/xmegadrive-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xmonter-downloader
+    id: lst_cb53fe371420382d06d5adda
+    website: https://serp.ly/xmonter-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xmoviesforyou-downloader
+    id: lst_5e2568cfd6730e552e052b8f
+    website: https://serp.ly/xmoviesforyou-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xnxx-downloader
+    id: lst_ce347d01617088970080dbf4
+    website: https://serp.ly/xnxx-video-downloader
+    class: filed-elsewhere
+    reason: a downloader for XNXX, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: xnxx-video-downloader
+    id: lst_118e9056c1dc6cef07bd6741
+    website: https://serp.ly/xnxx-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xozilla-downloader
+    id: lst_7487973bbcdaf03583022c9a
+    website: https://serp.ly/xozilla-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xtapes-downloader
+    id: lst_f41b70f3c51695329957be53
+    website: https://serp.ly/xtapes-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xvgold-downloader
+    id: lst_eff11ad285b8ec45a00c6b47
+    website: https://serp.ly/xvgold-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xvideos-downloader
+    id: lst_e20bed0f9f95ab363505ac89
+    website: https://serp.ly/xvideos-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xxvideoss-downloader
+    id: lst_8170a5a02eca60cf8c6bed1a
+    website: https://serp.ly/xxvideoss-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xxxbp-downloader
+    id: lst_44d5872dc2f389078b74a074
+    website: https://serp.ly/xxxbp-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xxxfiles-downloader
+    id: lst_62d0c8e93cf279d2515bb292
+    website: https://serp.ly/xxxfiles-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xxxshut-downloader
+    id: lst_de4449ec417303c828518381
+    website: https://serp.ly/xxxshut-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xxxtube-downloader
+    id: lst_1c67affa48db85cedd27b519
+    website: https://serp.ly/xxxtube-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: xxxtv-downloader
+    id: lst_393338a2c760641de79b935c
+    website: https://serp.ly/xxxtv-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: yesporn-downloader
+    id: lst_f4686d28d9151dc167f4e1c8
+    website: https://serp.ly/yesporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: yespornplease-downloader
+    id: lst_8d7334296d4dd71bf17a222d
+    website: https://serp.ly/yespornplease-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: yespornpleasexxx-downloader
+    id: lst_3957bbcddd92378a6f1d0cc1
+    website: https://serp.ly/yespornpleasexxx-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: yespornvip-downloader
+    id: lst_8af567c56985c0c6695a9aff
+    website: https://serp.ly/yespornvip-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: youjizz-downloader
+    id: lst_5ea52472653fad60937be007
+    website: https://serp.ly/youjizz-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: youperv-downloader
+    id: lst_558017fb00281419298badce
+    website: https://serp.ly/youperv-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: youporn-downloader
+    id: lst_5791b63e205869357a498e51
+    website: https://serp.ly/youporn-video-downloader
+    class: filed-elsewhere
+    reason: a downloader for YouPorn, an adult site, filed under video-downloaders (#98 added Adult)
+  - slug: youporn-video-downloader
+    id: lst_ea46e4e3f95904cf0fddfe1c
+    website: https://serp.ly/youporn-video-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: yourdailypornvideos-downloader
+    id: lst_ca936319214915e8993697ed
+    website: https://serp.ly/yourdailypornvideos-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: yourporn-downloader
+    id: lst_929b24a7a67126b6bc5ad358
+    website: https://serp.ly/yourporn-downloader
+    class: adult-category
+    reason: in the Adult category
+  - slug: zbporn-downloader
+    id: lst_a6f27d8580548a1df098c494
+    website: https://serp.ly/zbporn-downloader
+    class: adult-category
+    reason: in the Adult category
+kept:
+  - slug: locusextension.com
+    reason: 'Locus, an AI research tool: "sex" only inside its domain name (locu-sex-tension), the issue''s false positive'
+  - slug: soundgasm-downloader
+    reason: "Soundgasm is an audio host widely used for erotic audio, but the listing and the site are not adult: owner question"
+  - slug: imgnai.com
+    reason: 'a general AI image generator whose listing content leads with its "NSFW AI Image Generator": owner question'
+  - slug: boredhumans.com
+    reason: 'a collection of AI tools, one of them a "virtual girlfriend": owner question'
+  - slug: opendream.ai
+    reason: a general AI art generator; its pricing mentions NSFW prompt support
+  - slug: il.ly
+    reason: Castpush, a content marketing tool; its content names an NSFW chatbot as an alternative
+  - slug: getinspo.co
+    reason: "Inspo; its imported description and content are an essay that mentions escorts, but the product is not adult: owner question"
+  - slug: branchbob.ai
+    reason: its content quotes a policy that prohibits pornography
+  - slug: deviantart.com
+    reason: its content quotes a policy that prohibits pornographic content
+  - slug: imagineme.ai
+    reason: its content quotes a policy that prohibits pornography
+  - slug: lens-ai.com
+    reason: an ad-safety tool that detects explicit content
+  - slug: metabrixlab.com
+    reason: its content quotes a policy that prohibits nude imagery and pornography
+  - slug: notepd.com
+    reason: its content names a novel title
+  - slug: promptbase.com
+    reason: its content says NSFW prompts are refused
+  - slug: stablehorde.net
+    reason: its content describes its NSFW filter
+  - slug: supermeme.ai
+    reason: its content describes its NSFW filter
+  - slug: theoassist.com
+    reason: its content quotes a policy that prohibits adult content
+  - slug: zizoto.com
+    reason: its content quotes a policy that prohibits nudity
+  - slug: 123movies-downloader
+    reason: a downloader for a movie streaming site, not an adult site
+  - slug: terabox-downloader
+    reason: a downloader for a general file host

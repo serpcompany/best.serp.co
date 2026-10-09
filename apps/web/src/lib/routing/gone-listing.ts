@@ -1,6 +1,8 @@
 /**
  * 410 Gone for unpublished listings (serpcompany/best.serp.co#64 owner decision): an
- * unpublished listing's URL answers 410 with a page that points to its category, not 404.
+ * unpublished listing's URL answers 410 with a page that points to its category, not 404. One
+ * filed under a retired category keeps its plain 404 (#260): `isUnpublishedListingSlug` does not
+ * count it as unpublished.
  *
  * Next.js pages can answer 200 or 404 but not 410, so the Worker entry sets the status. A
  * listing page for a slug with no public listing renders 404 as before. Only then does the Worker

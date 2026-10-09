@@ -160,7 +160,8 @@ export interface ListingDetail extends ListingSummary {
 
 /**
  * A listing that was published and is now unpublished (`status = 'approved'`, `is_active = 0`).
- * Its URL answers 410 Gone, not 404, until it is republished.
+ * Its URL answers 410 Gone, not 404, until it is republished, unless it is filed under a retired
+ * category (#260): then it is not found.
  */
 export interface UnpublishedListing {
   /** Primary category slug when that category is still active. */
@@ -225,7 +226,10 @@ export interface CatalogOperations {
   getPublishedListings(): Promise<ListingSummary[]>
   getShellStats(): Promise<CatalogShellStats>
   getSitemapListings(): Promise<ListingSummary[]>
-  /** The unpublished listing at `slug`, or null when the slug is live or never existed. */
+  /**
+   * The unpublished listing at `slug`, or null when the slug is live, never existed, or is filed
+   * under a retired category (#260).
+   */
   getUnpublishedListing(slug: string): Promise<UnpublishedListing | null>
   /**
    * Public listings whose name, short description, slug, or an active category (slug or name)

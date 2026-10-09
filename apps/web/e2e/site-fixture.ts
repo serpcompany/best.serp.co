@@ -4,7 +4,10 @@
  * fails the suite rather than silently moving the expectation with it.
  */
 export const site = {
-  /** Categories with a published listing, `other` included. */
+  /**
+   * Categories with a published listing, `other` included, in the reviewed import the local
+   * suite runs against. A deployed environment reads the live count (`liveCategoryCount`).
+   */
   categoryCount: 141,
   /** `?via=` on every serp.ly link the site renders (#169). */
   dubPartnerId: 'best.serp.co',
@@ -15,11 +18,17 @@ export const site = {
    */
   listingCount: 3422,
   /**
-   * The fewest live listings a deployed environment may show: the import less #100's 95 and
-   * #148's 244 unpublishes (2,962 live on 2026-10-07), less headroom for admin unpublishes.
-   * A lost catalog still fails.
+   * The fewest categories with a published listing a deployed environment may show: the
+   * import's 141 less Adult, which #260 retires, and the fansite and GIF downloader categories,
+   * which only adult listings filled (138), less headroom for admin unpublishes.
    */
-  minimumDeployedListingCount: 2800,
+  minimumDeployedCategoryCount: 130,
+  /**
+   * The fewest live listings a deployed environment may show: the import less the reviewed
+   * unpublishes (#100's 95, #104's 120 and 244, #98's 1, and #260's 276: 2,686 live once #260 is
+   * published), less headroom for admin unpublishes. A lost catalog still fails.
+   */
+  minimumDeployedListingCount: 2500,
   name: 'SERP',
   publicUrl: 'https://best.serp.co',
   title: 'SERP Directory of Products and Resources'

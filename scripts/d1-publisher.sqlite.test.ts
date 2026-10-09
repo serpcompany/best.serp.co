@@ -598,7 +598,12 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
         rows({ provenance: { actor: 'test@example.com', workflow: 'test/sqlite', beforeChecksum } })
       ).toThrow(/names no base/u)
       expect(() =>
-        rows({ operations: [mediaUpdate(), { action: 'category-unpublish', slug: 'seo' }] })
+        rows({
+          operations: [
+            mediaUpdate(),
+            { action: 'category-update', category: { slug: 'seo', name: 'SEO' } }
+          ]
+        })
       ).toThrow(/only listing-media-update/u)
       expect(() =>
         manifestSchema.parse({
@@ -855,6 +860,86 @@ describe('listing-unpublish (the admin panel’s unpublished state, #64 and #100
     expect(() => unpublish({ reason: '  ' })).toThrow()
     expect(() => unpublish({ expected: { website: 'https://example.com', name: 'Old' } })).toThrow()
     expect(() => unpublish({ expected: { website: 'not a url' } })).toThrow()
+  })
+})
+
+describe('category-unpublish in a row-level manifest (#260: retire the Adult category)', () => {
+  const unpublishListing = {
+    action: 'listing-unpublish',
+    id: 'lst_sqlite_test',
+    slug: 'old-slug',
+    categories: ['seo', 'adult'],
+    reason: '#260 adult',
+    expected: { website: 'https://example.com' }
+  }
+  const rows = (operations: Record<string, unknown>[]) =>
+    manifestSchema.parse({
+      version: 1,
+      id: 'retire-adult',
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations
+    })
+  /** The fixture listing also filed under Adult, as a secondary category. */
+  const withAdult = () => {
+    const db = database()
+    db.exec(`INSERT INTO categories (id,slug,name) VALUES (2,'adult','Adult');
+      INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+        VALUES ('lst_sqlite_test',2,1,0);`)
+    return db
+  }
+  const categories = (db: DatabaseSync) =>
+    db.prepare('SELECT slug,is_active FROM categories ORDER BY id').all()
+  const live = { checksum: beforeChecksum, version: 4 }
+  const listingState = (db: DatabaseSync) =>
+    db.prepare("SELECT slug,status,is_active FROM listings WHERE id='lst_sqlite_test'").get()
+
+  it('retires the category once its last live listing is unpublished, at any version', () => {
+    const db = withAdult()
+    db.prepare('UPDATE publication_state SET version=9').run()
+    const publication = buildPublicationPlan(
+      rows([unpublishListing, { action: 'category-unpublish', slug: 'adult' }]),
+      'retire manifest',
+      now,
+      { ...live, version: 9 }
+    )
+    executeInTestTransaction(db, publication)
+    expect(categories(db)).toEqual([
+      { slug: 'seo', is_active: 1 },
+      { slug: 'adult', is_active: 0 }
+    ])
+    expect(listingState(db)).toEqual({ is_active: 0, slug: 'old-slug', status: 'approved' })
+    expect(publication.affectedRoutes.split('\n')).toContain('/products/categories/adult/')
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 10
+    })
+  })
+
+  it('refuses the whole batch while a live listing remains in the category, or it comes first', () => {
+    for (const operations of [
+      // The listing stays live.
+      [{ action: 'category-unpublish', slug: 'adult' }],
+      // Retired first, the listing no longer has the active categories its unpublish expects.
+      [{ action: 'category-unpublish', slug: 'adult' }, unpublishListing]
+    ]) {
+      const db = withAdult()
+      expect(() =>
+        executeInTestTransaction(db, buildPublicationPlan(rows(operations), 'm', now, live))
+      ).toThrow()
+      expect(categories(db)).toEqual([
+        { slug: 'seo', is_active: 1 },
+        { slug: 'adult', is_active: 1 }
+      ])
+      expect(listingState(db)).toEqual({ is_active: 1, slug: 'old-slug', status: 'approved' })
+    }
+    // An unknown category changes no row.
+    const db = database()
+    expect(() =>
+      executeInTestTransaction(
+        db,
+        buildPublicationPlan(rows([{ action: 'category-unpublish', slug: 'nope' }]), 'm', now, live)
+      )
+    ).toThrow()
   })
 })
 

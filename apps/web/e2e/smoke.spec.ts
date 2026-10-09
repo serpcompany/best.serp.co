@@ -80,6 +80,24 @@ async function liveListingCount(
   return count
 }
 
+/**
+ * The categories with a published listing, as the categories sitemap and index show them.
+ * Locally it is exactly the import's. A deployed environment may have retired a category or
+ * unpublished a category's last listing since (#260 retired Adult and emptied two downloader
+ * categories), so there the count is read from the categories sitemap, held to a floor, and the
+ * categories index must agree with it.
+ */
+async function liveCategoryCount(
+  request: APIRequestContext,
+  baseURL: string | undefined
+): Promise<number> {
+  if (isLocalOrigin(baseURL)) return site.categoryCount
+  const count = (await getSitemap(request, '/sitemap-categories.xml')).length
+  expect(count, 'listed categories').toBeGreaterThanOrEqual(site.minimumDeployedCategoryCount)
+  expect(count, 'listed categories').toBeLessThanOrEqual(site.categoryCount + 50)
+  return count
+}
+
 function structuredDataUrls(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(structuredDataUrls)
   if (!value || typeof value !== 'object') return []
@@ -260,7 +278,11 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     }
   })
 
-  test('renders category, categories index, product index, and search routes', async ({ page }) => {
+  test('renders category, categories index, product index, and search routes', async ({
+    baseURL,
+    page,
+    request
+  }) => {
     const listingLinks = page.locator('main a[href^="/products/"]')
 
     await page.goto(categoryPath(sampleCategory.slug), { waitUntil: 'networkidle' })
@@ -277,7 +299,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     // Every published category is linked, `other` included.
     expect(
       await page.locator('main a[href^="/products/categories/"]').count()
-    ).toBeGreaterThanOrEqual(site.categoryCount)
+    ).toBeGreaterThanOrEqual(await liveCategoryCount(request, baseURL))
     await expect(
       page.locator(`main a[href="${categoryPath(sampleCategory.slug)}"]`).first()
     ).toBeVisible()
@@ -507,7 +529,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     expect(listings).toContain(absoluteUrl(detailListing.path))
 
     const categories = await getSitemap(request, '/sitemap-categories.xml')
-    expect(categories).toHaveLength(site.categoryCount)
+    expect(categories).toHaveLength(await liveCategoryCount(request, baseURL))
     for (const location of categories) {
       expect(location).toMatch(/^https:\/\/best\.serp\.co\/products\/categories\/[^/]+\/$/u)
     }
@@ -544,11 +566,14 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     }
   })
 
-  test('tags every serp.ly link with the Dub partner ID', async ({ page }) => {
+  test('tags every serp.ly link with the Dub partner ID', async ({ baseURL, page }) => {
     // The footer's social links on every page; links in a listing's body text (321tube's
     // "Start here" link); a listing's "Visit Site" button and resource links (#169). The
-    // listing with the button goes last for the check below.
-    for (const path of ['/', '/brands/', listingPath('321tube-downloader'), detailListing.path]) {
+    // listing with the button goes last for the check below. Only adult listings link serp.ly
+    // in their body text, and #260 takes them off deployed environments: there, only the
+    // raw import the local suite serves still has one.
+    const bodyLinkListing = isLocalOrigin(baseURL) ? [listingPath('321tube-downloader')] : []
+    for (const path of ['/', '/brands/', ...bodyLinkListing, detailListing.path]) {
       await page.goto(path, { waitUntil: 'domcontentloaded' })
       const hrefs = await page
         .locator('a[href]')

@@ -263,6 +263,13 @@ const operation = z.discriminatedUnion('action', [
     .strict(),
   z.object({ action: z.literal('category-create'), category }).strict(),
   z.object({ action: z.literal('category-update'), category }).strict(),
+  /**
+   * Retires a category (`is_active = 0`): it leaves the navigation, the category index, the
+   * sitemaps, search, and the submit and edit forms, its page answers 404, and so do its
+   * unpublished listings (#260). Refused while any live listing remains in it, primary or
+   * secondary, so it follows the unpublish operations of its listings. That guard is its own
+   * row-level check, so a `rows` manifest may hold it (#260: the Adult category).
+   */
   z.object({ action: z.literal('category-unpublish'), slug: categorySlug }).strict()
 ])
 const provenance = z
@@ -284,9 +291,9 @@ const provenance = z
 export const manifestConcurrency = ['publication', 'rows'] as const
 /**
  * Operations that carry their own row-level compare-and-swap, so a `rows` manifest may hold them:
- * media rows (`expected`), categories (`expected`), a description's length and ending (#105), and
- * an unpublish with its `expected.website` (#100: categories, live, website, no submission in
- * review).
+ * media rows (`expected`), categories (`expected`), a description's length and ending (#105), an
+ * unpublish with its `expected.website` (#100: categories, live, website, no submission in
+ * review), and a category retirement (#260: no live listing left in it).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
@@ -294,7 +301,8 @@ const rowLevelActions = new Set<string>([
   'listing-content-remove-suffix',
   'listing-unpublish',
   'listing-claim-hold-add',
-  'listing-claim-hold-clear'
+  'listing-claim-hold-clear',
+  'category-unpublish'
 ])
 export const manifestSchema = z
   .object({
@@ -324,7 +332,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add, listing-content-remove-suffix, listing-unpublish, and listing-claim-hold-add/-clear operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, and category-unpublish operations.',
             path: ['operations', index, 'action']
           })
         }

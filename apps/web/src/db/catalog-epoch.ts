@@ -101,9 +101,21 @@ export function sharedCatalogEpoch(
 }
 
 /**
+ * Listing `l` is filed under a retired category (`categories.is_active = 0`), primary or not.
+ * Retiring a category takes its listings off the domain (#260, the Adult category): an
+ * unpublished listing filed under one answers a plain 404, never the 410 gone page, which would
+ * point visitors back to the catalog and offer to relist it.
+ */
+export const LISTING_IN_RETIRED_CATEGORY_SQL = `EXISTS (SELECT 1 FROM listing_categories lc
+  JOIN categories c ON c.id = lc.category_id
+  WHERE lc.listing_id = l.id AND c.is_active = 0)`
+
+/**
  * Whether `slug` names a listing that was published and is now unpublished (`status =
- * 'approved'`, `is_active = 0`), whose URL answers 410 Gone (#64). One seek on the unique slug.
- * The Worker entry asks only after a listing page rendered 404, before Next.js knows the status.
+ * 'approved'`, `is_active = 0`), whose URL answers 410 Gone (#64), unless it is filed under a
+ * retired category (`LISTING_IN_RETIRED_CATEGORY_SQL`), which leaves its 404 standing. One seek
+ * on the unique slug. The Worker entry asks only after a listing page rendered 404, before
+ * Next.js knows the status.
  */
 export async function isUnpublishedListingSlug(input: {
   client: Database
@@ -116,9 +128,10 @@ export async function isUnpublishedListingSlug(input: {
   try {
     const result = await runQuery<{ found: number }>(
       input.client,
-      sql<{ found: number }>`SELECT 1 AS found FROM listings
-        WHERE slug = ${input.slug} AND status = 'approved' AND is_active = 0
-          AND published_at IS NOT NULL
+      sql<{ found: number }>`SELECT 1 AS found FROM listings l
+        WHERE l.slug = ${input.slug} AND l.status = 'approved' AND l.is_active = 0
+          AND l.published_at IS NOT NULL
+          AND NOT ${sql.raw(LISTING_IN_RETIRED_CATEGORY_SQL)}
         LIMIT 1`
     )
     success = result.success

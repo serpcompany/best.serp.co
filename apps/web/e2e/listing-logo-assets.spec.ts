@@ -13,8 +13,8 @@ import { test } from './test'
 const fallbackLogoPath = '/listing-logos/favicon-fallback-512x512.png'
 /** A published listing with no logo in D1. */
 const logoLessListing = {
-  name: '321tube Video Downloader',
-  path: listingPath('321tube-downloader')
+  name: 'Vimeo Video Downloader',
+  path: listingPath('vimeo-video-downloader')
 }
 /** A published listing whose imported logo is a remote image (Cloudflare Images). */
 const remoteLogoListingPath = listingPath('autoenhance.ai')
@@ -35,7 +35,7 @@ function isLocalWorker(baseURL: string | undefined): boolean {
 
 /**
  * Pages a visitor reaches first, plus listings with an imported logo (123movies, whose file was
- * deleted in #124, and autoenhance.ai's remote one) and without one (321tube).
+ * deleted in #124, and autoenhance.ai's remote one) and without one (Vimeo Video Downloader).
  */
 const samplePages = [
   '/',

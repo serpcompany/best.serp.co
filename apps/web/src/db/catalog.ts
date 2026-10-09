@@ -5,6 +5,7 @@ import {
   type CatalogEpoch,
   catalogEpochStatement,
   catalogEpochToken,
+  LISTING_IN_RETIRED_CATEGORY_SQL,
   parseCatalogEpoch
 } from './catalog-epoch'
 import { type CompiledQuery, d1ErrorCode, runQuery } from './client'
@@ -1062,7 +1063,8 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
 
   /**
    * One index seek on the unique slug. Uncached: it only runs after a detail lookup missed,
-   * and an unpublished listing has no public epoch-keyed content to share.
+   * and an unpublished listing has no public epoch-keyed content to share. A listing filed under
+   * a retired category is not found (#260), as in `isUnpublishedListingSlug`.
    */
   async function getUnpublishedListing(slug: string): Promise<UnpublishedListing | null> {
     const rows = await queryAll<UnpublishedRow>(
@@ -1089,6 +1091,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       FROM listings l
       WHERE l.slug = ? AND l.status = 'approved' AND l.is_active = 0
         AND l.published_at IS NOT NULL
+        AND NOT ${LISTING_IN_RETIRED_CATEGORY_SQL}
       LIMIT 1`,
         [slug]
       )

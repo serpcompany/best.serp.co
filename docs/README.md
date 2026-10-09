@@ -20,7 +20,7 @@
 | [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, release flow, cutover checklist |
 | [Telemetry](./TELEMETRY.md) | Sentry error reporting, GTM and Cloudflare Web Analytics |
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel |
-| [Catalog hygiene](./CATALOG_HYGIENE.md) | The listing domain check: hijacked, parked, and moved domains |
+| [Catalog hygiene](./CATALOG_HYGIENE.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains |
 | [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, staging before production |
 | [Promotion plan 2026-10-06](./releases/2026-10-06-promotion-plan.md) | The first staging → main promotion of the #59 work: blockers, order, rollback |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees |

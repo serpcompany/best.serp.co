@@ -64,6 +64,7 @@ describe('D1 compatibility of generated statements (#95 release blocker, SQLITE_
       expect(plan.statements.some(statement => statement.query.includes(GUARD_FAILURE))).toBe(true)
     }
     expect([...actions].sort()).toEqual([
+      'category-unpublish',
       'listing-categories-add',
       'listing-claim-hold-add',
       'listing-content-remove-suffix',

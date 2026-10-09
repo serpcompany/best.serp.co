@@ -30,10 +30,6 @@ type CategoryPresentation = {
 }
 
 const categoryPresentationBySlug: Record<string, CategoryPresentation> = {
-  adult: {
-    description: 'Browse adult downloader listings and resources.',
-    name: 'Adult'
-  },
   'agency-services': {
     description: 'Agencies, consultancies, and service providers',
     icon: Briefcase,

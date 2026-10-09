@@ -458,6 +458,39 @@ test.describe('listings', () => {
     }
   })
 
+  test('an unpublished listing filed under a retired category answers 404, as does the category (#260)', async ({
+    baseURL
+  }) => {
+    const retired = `e2e-retired-${unique()}`
+    localD1(
+      `INSERT INTO categories (slug, name, description, sort_order)
+        VALUES (${q(retired)}, 'E2E Retired', 'A category the suite retires.', 9)`
+    )
+    const removed = seedImportedListing('retired', retired, null)
+    const unpublished = seedImportedListing('unpublished', activeCategory(), null)
+    // As 2026-10-09-adult-removal.yaml leaves the Adult category: its listings unpublished, then
+    // the category retired.
+    localD1(`
+      UPDATE listings SET is_active = 0 WHERE id IN (${q(removed.id)}, ${q(unpublished.id)});
+      UPDATE categories SET is_active = 0 WHERE slug = ${q(retired)};
+    `)
+    const visitor = await playwrightRequest.newContext({ baseURL })
+    try {
+      const notFound = await visitor.get(`/products/${removed.slug}/`)
+      expect(notFound.status()).toBe(404)
+      const body = await notFound.text()
+      expect(body).not.toContain('is no longer listed')
+      expect(body).not.toContain('Relist it')
+      expect((await visitor.get(`/products/categories/${retired}/`)).status()).toBe(404)
+      // Unpublished from an active category: still the 410 gone page.
+      const gone = await visitor.get(`/products/${unpublished.slug}/`)
+      expect(gone.status()).toBe(410)
+      expect(await gone.text()).toContain(`${unpublished.name} is no longer listed`)
+    } finally {
+      await visitor.dispose()
+    }
+  })
+
   test('edits imported listings with no logo or a site-relative logo; a new logo is checked and hosted', async ({
     baseURL,
     page
