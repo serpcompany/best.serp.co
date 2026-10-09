@@ -1,5 +1,10 @@
 import type { Database } from './client'
-import { MAX_STAGED_FAQS, MAX_STAGED_RESOURCE_LINKS, type StatementPlan } from './plan-support'
+import {
+  listingInRetiredCategory,
+  MAX_STAGED_FAQS,
+  MAX_STAGED_RESOURCE_LINKS,
+  type StatementPlan
+} from './plan-support'
 import { validatePublicHttpUrl } from './public-url'
 import {
   buildCreateRevisionPlans,
@@ -248,6 +253,7 @@ const LISTING_COLUMNS = `l.id,l.slug,l.name,l.description,l.website,l.is_active,
   l.published_at,
   CASE WHEN l.status='approved' AND l.is_active=1 AND l.published_at IS NOT NULL
     THEN 1 ELSE 0 END AS live,
+  CASE WHEN ${listingInRetiredCategory('l.id')} THEN 1 ELSE 0 END AS retired,
   (SELECT m.url FROM listing_media m WHERE m.listing_id=l.id AND m.kind='logo'
     ORDER BY m.sort_order LIMIT 1) AS logo_url,
   (SELECT pc.slug FROM listing_categories lc JOIN categories pc ON pc.id=lc.category_id
@@ -505,7 +511,7 @@ function toListing(row: Row, history: AccountBadgeCheck[], now: Date): AccountLi
         ? null
         : Number(row.live) === 1
           ? 'upgrade'
-          : optional(row.unpublished_reason) === 'badge_missing'
+          : optional(row.unpublished_reason) === 'badge_missing' && Number(row.retired) !== 1
             ? 'relist'
             : null,
     verifiedVia: text(row.verified_via),

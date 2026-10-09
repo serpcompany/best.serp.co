@@ -464,7 +464,12 @@ test.describe('sign-in screens', () => {
     await page.waitForURL('**/about/')
     await page.getByRole('button', { name: 'Open menu' }).click()
     await page.getByRole('button', { name: 'Sign out' }).click()
+    // Sign-out reloads the page: wait for the signed-out header (its sign-in link, hidden on
+    // phones) before opening the menu again, so the click can't land on the page going away.
+    await expect(page.locator('header a[href="/login/"]')).toBeAttached()
     await page.getByRole('button', { name: 'Open menu' }).click()
-    await expect(page.getByRole('link', { name: 'Sign up / Sign in' }).last()).toBeVisible()
+    await expect(
+      page.getByRole('dialog').getByRole('link', { name: 'Sign up / Sign in' })
+    ).toBeVisible()
   })
 })

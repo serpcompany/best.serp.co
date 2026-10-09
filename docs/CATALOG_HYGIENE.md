@@ -1,4 +1,9 @@
-# Catalog hygiene: listing domains
+# Catalog hygiene
+
+What best.serp.co lists, and how listings that don't belong leave: [adult products](#adult-products-260)
+are never listed, and [the listing domain check](#the-check) finds hijacked, parked, and dead domains.
+
+## Listing domains
 
 Some listings' product domains now serve gambling or betting pages, are parked, or are for sale
 (serpcompany/best.serp.co#100). The owner decided on 2026-10-06:
@@ -33,6 +38,7 @@ pnpm catalog:domains -- dead-manifest --since <earlier date>
                                     # write d1/publications/<date>-dead-domains.yaml
 pnpm catalog:domains -- decisions-manifest   # d1/hygiene/<date>-owner-list-decisions.yaml →
                                     # d1/publications/<date>-owner-list-cleanup.yaml
+pnpm catalog:domains -- adult-manifest       # #260, see Adult products above
 pnpm catalog:claim-holds -- d1/hygiene/<date>-listing-domains.yaml <date>-listing-claim-holds
                                     # hold instant claims of the owner list (#67)
 ```
@@ -96,6 +102,79 @@ decide whether it applies, so one file fits staging and production whatever else
 staging first (the staging publish path is #97), then on production after promotion. If an
 environment refuses it (a listing changed there), nothing is written: drop or fix that listing
 in a new report and manifest under a new date.
+
+## Adult products (#260)
+
+**best.serp.co lists no adult products** (owner decisions of 2026-10-09): nothing built for adult
+content, including every downloader for an adult video or cam site. Fan-site downloaders
+(OnlyFans, JustForFans, and Fansly) stay, and so do general-purpose downloaders (YouTube, Vimeo,
+and the like). A submission for an adult product is rejected in review
+([Submission flow](./SUBMISSION_FLOW.md#review-in-the-admin-panel-64)). An adult listing found
+after these manifests can't leave the same way: a retired category can't be added to a listing,
+so for now it can only be unpublished, and its URL answers 410 with the gone page, not 404. How
+such a listing should leave is the owner's open question.
+
+- **The decisions.** `d1/hygiene/2026-10-09-adult-decisions.yaml` lists the 272 adult listings of
+  the reviewed catalog: 259 filed under the Adult category, and 13 adult-site downloaders filed
+  under other categories (12 that #98 gave Adult as a secondary category, and
+  `ashemaletube-downloader`, which no keyword caught). They were found by the category, by
+  `ADULT_TERMS` (`scripts/migration/legacy-media.ts`) and a broader word list over every listing's
+  text, FAQs, resource links, and media URLs, and by reading every downloader listing outside
+  Adult. `kept` records the four fan-site downloaders and the keyword matches that stay, and why.
+- **The manifests.** `2026-10-09-adult-category.yaml` gives `ashemaletube-downloader` the Adult
+  category (as #98 did), then `2026-10-09-adult-removal.yaml` takes Adult off the kept fan-site
+  downloaders (`listing-categories-remove`, never a primary category), unpublishes the 272
+  (`listing-unpublish`, as #148's cleanup), and retires Adult and GIF Downloaders, whose only
+  listing was RedGifs (`category-unpublish`: `categories.is_active = 0`, refused while a live
+  listing remains in it). Fansite Downloaders keeps its listings and stays. Publish them in that
+  order: the removal refuses whole until the category manifest is published. Both are row-level
+  and disjoint from every other unpublish manifest. Check each environment first (below).
+- **404, not 410.** An unpublished listing filed under a retired category answers a plain 404,
+  never the gone page with its category link and "Relist it" (`listingInRetiredCategory` in
+  `apps/web/src/db/plan-support.ts`), so every listing the removal unpublishes and the retired
+  categories' pages answer 404, and adult search traffic isn't sent elsewhere. A retired category
+  leaves the navigation, the category index, the sitemaps, search, RSS, and the submit and edit
+  forms, which read active D1 categories.
+- **It stays down.** The rows stay, but nothing makes such a listing live again: `/admin` refuses
+  Republish and says why ([Admin panel](./ADMIN_PANEL.md#unpublished-listings-answer-410)), a paid
+  relist is never offered (and a payment that raced is refunded), and D1 refuses it on any path
+  (`0011_retired_categories`: a published listing is never filed under a retired category).
+- **Brands.** `/brands/` lists devinschumacher.com's brands plus devinschumacher.com (#193), none
+  of them adult (`scripts/network-brands.test.ts`).
+
+```bash
+pnpm catalog:domains -- adult-manifest   # d1/hygiene/<date>-adult-decisions.yaml →
+                                         # d1/publications/<date>-adult-category.yaml and
+                                         # d1/publications/<date>-adult-removal.yaml
+```
+
+**Before publishing the removal** on an environment, after its category manifest, check its
+targets read-only. A listing approved into Adult since the import, or one of the 272 already
+unpublished, makes the removal refuse whole (nothing is written; regenerate it):
+
+```bash
+pnpm exec wrangler d1 execute best-serp-co-staging --env staging --remote --json \
+  --config apps/web/wrangler.jsonc --command \
+  "SELECT c.slug, SUM(l.status='approved' AND l.is_active=1) AS live,
+     SUM(NOT (l.status='approved' AND l.is_active=1)) AS not_live
+   FROM categories c JOIN listing_categories lc ON lc.category_id=c.id
+     JOIN listings l ON l.id=lc.listing_id
+   WHERE c.slug IN ('adult','gif-downloaders') GROUP BY c.slug"
+```
+
+Expect `adult` 276 live (the 272 and the 4 kept) and 0 not live (every one of the 272 is filed
+under Adult once the category manifest is published, so none is already unpublished), and
+`gif-downloaders` 1 live and 0 not live. On production, use `best-serp-co-production --env
+production`.
+
+The generator reads the reviewed catalog as the committed manifests leave it
+(`reviewedCatalogDatabase`: the import plus every committed manifest that sorts before the ones
+being generated and adds or removes categories, unpublishes, or retires one), so each operation
+expects the categories staging and production have. It refuses a live listing of a retired category that the decisions neither unpublish nor
+keep, and `scripts/listing-domain-check.test.ts` keeps the committed manifests identical to the
+decisions, applies them to the reviewed catalog, and checks that exactly the decided categories
+retire, that kept listings stay live off them, that no other listing named for an adult platform
+is live, and that every removed URL answers 404.
 
 ## Listing FAQs (#105)
 

@@ -458,6 +458,63 @@ test.describe('listings', () => {
     }
   })
 
+  test('an unpublished listing filed under a retired category answers 404, as does the category, and stays down (#260)', async ({
+    baseURL,
+    page
+  }) => {
+    const retired = `e2e-retired-${unique()}`
+    localD1(
+      `INSERT INTO categories (slug, name, description, sort_order)
+        VALUES (${q(retired)}, 'E2E Retired', 'A category the suite retires.', 9)`
+    )
+    const removed = seedImportedListing('retired', retired, null)
+    const unpublished = seedImportedListing('unpublished', activeCategory(), null)
+    // As 2026-10-09-adult-removal.yaml leaves the Adult category: its listings unpublished, then
+    // the category retired.
+    localD1(`
+      UPDATE listings SET is_active = 0 WHERE id IN (${q(removed.id)}, ${q(unpublished.id)});
+      UPDATE categories SET is_active = 0 WHERE slug = ${q(retired)};
+    `)
+    const visitor = await playwrightRequest.newContext({ baseURL })
+    try {
+      const notFound = await visitor.get(`/products/${removed.slug}/`)
+      expect(notFound.status()).toBe(404)
+      const body = await notFound.text()
+      expect(body).not.toContain('is no longer listed')
+      expect(body).not.toContain('Relist it')
+      expect((await visitor.get(`/products/categories/${retired}/`)).status()).toBe(404)
+      // Unpublished from an active category: still the 410 gone page.
+      const gone = await visitor.get(`/products/${unpublished.slug}/`)
+      expect(gone.status()).toBe(410)
+      expect(await gone.text()).toContain(`${unpublished.name} is no longer listed`)
+    } finally {
+      await visitor.dispose()
+    }
+
+    // The admin panel says why and offers no Republish; the API refuses it too.
+    const admin = client(page.request, baseURL)
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
+    const reason =
+      "It is filed under the retired E2E Retired category, so it stays off the site and can't be republished."
+    await page.goto(`/admin/listings/${removed.slug}/`)
+    await expect(page.getByRole('heading', { name: removed.name, level: 1 })).toBeVisible()
+    await expect(page.getByText(reason, { exact: false })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Republish' })).toHaveCount(0)
+    const refused = await page.request.post(`/api/admin/listings/${removed.id}/republish`, {
+      data: {},
+      headers: admin.headers
+    })
+    expect(refused.status()).toBe(409)
+    expect(await refused.json()).toMatchObject({
+      error: 'listing_category_retired',
+      message: reason,
+      ok: false
+    })
+    expect(localD1(`SELECT is_active FROM listings WHERE id = ${q(removed.id)}`)).toEqual([
+      { is_active: 0 }
+    ])
+  })
+
   test('edits imported listings with no logo or a site-relative logo; a new logo is checked and hosted', async ({
     baseURL,
     page

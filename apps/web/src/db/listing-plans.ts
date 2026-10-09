@@ -8,6 +8,7 @@ import {
   type CatalogPublication,
   finishCatalogPublicationPlans,
   listingHasQueuedSubmission,
+  listingInRetiredCategory,
   listingIsLiveGuard,
   type PlanGuard,
   type StatementPlan
@@ -210,13 +211,14 @@ export function buildRepublishListingPlans(input: {
   listingId: string
   publication: CatalogPublication
 }): StatementPlan[] {
+  // A listing filed under a retired category stays off the site (#260).
   const unpublished = `EXISTS (SELECT 1 FROM listings
     WHERE id=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL)
-    AND NOT ${listingSubmissionRejected('?')}`
+    AND NOT ${listingSubmissionRejected('?')} AND NOT ${listingInRetiredCategory('?')}`
   return [
     ...beginCatalogPublicationPlans(input.publication, {
       sql: unpublished,
-      params: [input.listingId, input.listingId]
+      params: [input.listingId, input.listingId, input.listingId]
     }),
     {
       sql: `UPDATE listings SET is_active=1,updated_at=?

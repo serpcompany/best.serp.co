@@ -7,7 +7,7 @@ import {
   formatUsd,
   PAID_LISTING_PRICE_CENTS
 } from './format'
-import { verifiedViaLabel } from './listing-labels'
+import { retiredCategoryReason, verifiedViaLabel } from './listing-labels'
 import { logoNote } from './logo-note'
 
 /**
@@ -180,7 +180,10 @@ export function listingDetailView(
         ? {
             at: lastUnpublish?.createdAt ?? listing.updatedAt,
             by: lastUnpublish?.actor ?? 'an admin',
-            note: typeof unpublishNote === 'string' && unpublishNote ? unpublishNote : null
+            note: typeof unpublishNote === 'string' && unpublishNote ? unpublishNote : null,
+            retiredReason: listing.retiredCategories.length
+              ? retiredCategoryReason(listing.retiredCategories)
+              : null
           }
         : null,
     website: listing.website
@@ -233,6 +236,12 @@ export interface ListingDetailView {
     submitterEmail: string | null
   } | null
   submissionQueued: boolean
-  unpublished: { at: string | null; by: string; note: string | null } | null
+  /** `retiredReason`: filed under a retired category (#260), so it answers 404 and stays down. */
+  unpublished: {
+    at: string | null
+    by: string
+    note: string | null
+    retiredReason: string | null
+  } | null
   website: string
 }

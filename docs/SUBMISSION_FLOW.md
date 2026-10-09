@@ -104,6 +104,12 @@ requested", "rejected", or "rejected: prohibited"). Rejecting a paid submission 
 refunds it ([Billing](./BILLING.md)). These decisions write production D1 directly: the documented
 production-write exception ([Admin panel](./ADMIN_PANEL.md#the-production-write-exception)).
 
+**Adult products are not listed** (#260, owner decisions of 2026-10-09): reject a submission for
+anything built for adult content, including a downloader for an adult video or cam site (fan-site
+downloaders such as OnlyFans stay), with the existing Reject; `prohibited` also blocks its domain
+from new submissions. The forms no longer offer the Adult category
+([Catalog hygiene](./CATALOG_HYGIENE.md#adult-products-260)).
+
 ## Submit v2 (#63)
 
 The flow follows the approved #70 mockups (screens 2, 2b, 3). Every step needs the signed-in

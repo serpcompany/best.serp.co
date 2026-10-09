@@ -4,22 +4,31 @@ import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { describe, expect, it, vi } from 'vitest'
 import { parse } from 'yaml'
+import { LISTING_IN_RETIRED_CATEGORY_SQL } from '../apps/web/src/db/catalog-epoch'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
 import { readParityReport, readReviewedImportSql } from './d1-import-artifact'
 import { buildPublicationPlan, parseManifest } from './d1-publisher'
 import {
+  type AdultDecisions,
+  adultDecisionsPathFor,
+  adultManifestIds,
+  applyManifest,
+  buildAdultManifests,
   buildDeadDomainManifest,
   buildDecisionsManifest,
   buildReport,
   buildUnpublishManifest,
   type CatalogListing,
+  committedPublications,
   type DomainReport,
   deadDomainEntries,
   decisionsPathFor,
+  liveListings,
   type OwnerListDecisions,
   parseArguments,
   recheckPathFor,
+  reviewedCatalogDatabase,
   reviewedImportListings
 } from './listing-domain-check'
 import {
@@ -40,6 +49,7 @@ import {
   traceWebsite,
   vettedLookup
 } from './listing-domain-fetch'
+import { ADULT_TERMS } from './migration/legacy-media'
 
 const listing = (overrides: Partial<CheckedListing> = {}): CheckedListing => ({
   description: 'Writes marketing copy with AI.',
@@ -790,6 +800,10 @@ describe('listing domain report and manifest', () => {
       parseArguments(['dead-manifest', '--date', '2026-10-07', '--since', '2026-10-06'])
     ).toMatchObject({ command: 'dead-manifest', date: '2026-10-07', since: '2026-10-06' })
     expect(() => parseArguments(['dead-manifest', '--date', '2026-10-07'])).toThrow('--since')
+    expect(parseArguments(['adult-manifest', '--date', '2026-10-09'])).toMatchObject({
+      command: 'adult-manifest',
+      date: '2026-10-09'
+    })
   })
 
   it('unpublishes a domain only when it does not exist in both checks (#104)', () => {
@@ -1046,4 +1060,260 @@ describe('listing domain report and manifest', () => {
       database.close()
     }
   }, 60_000)
+})
+
+describe('adult listings and the Adult category (#260)', () => {
+  const fixture: CatalogListing[] = [
+    { ...listing(), categories: ['adult', 'video-downloaders'] },
+    {
+      ...listing({ id: 'lst_fixture00002', slug: 'bravo.io', website: 'https://serp.ly/bravo' }),
+      categories: ['video-downloaders', 'adult']
+    },
+    {
+      ...listing({ id: 'lst_fixture00003', slug: 'carta.app', website: 'https://serp.ly/carta' }),
+      categories: ['video-downloaders']
+    },
+    {
+      ...listing({ id: 'lst_fixture00004', slug: 'delta.io', website: 'https://serp.ly/delta' }),
+      categories: ['video-downloaders']
+    }
+  ]
+  const entry = (item: CatalogListing, adultClass: 'adult-category' | 'filed-elsewhere') => ({
+    class: adultClass,
+    id: item.id,
+    reason: adultClass === 'adult-category' ? 'in the Adult category' : 'an adult site',
+    slug: item.slug,
+    website: item.website
+  })
+  const [acme, bravo, carta, delta] = fixture as [
+    CatalogListing,
+    CatalogListing,
+    CatalogListing,
+    CatalogListing
+  ]
+  const decisions: AdultDecisions = {
+    decidedAt: '2026-10-09',
+    evidence: [],
+    retireCategories: ['adult'],
+    unpublish: [
+      entry(acme, 'adult-category'),
+      entry(bravo, 'filed-elsewhere'),
+      entry(carta, 'filed-elsewhere')
+    ],
+    kept: [{ slug: 'delta.io', reason: 'a general-purpose downloader' }]
+  }
+  const options = { categoryId: 'x-adult-category', decisionsPath: 'd.yaml', removalId: 'x-adult' }
+
+  it('files every decided listing under the retired category, unpublishes them, then retires it', () => {
+    const { category, removal } = buildAdultManifests(decisions, fixture, options)
+    // carta.app lacks Adult: it gets it first, as a secondary category, in its own manifest.
+    expect(parseManifest(category ?? '')).toMatchObject({
+      concurrency: 'rows',
+      operations: [
+        {
+          action: 'listing-categories-add',
+          add: ['adult'],
+          expected: ['video-downloaders'],
+          id: 'lst_fixture00003',
+          slug: 'carta.app'
+        }
+      ]
+    })
+    const manifest = parseManifest(removal)
+    expect(manifest.concurrency).toBe('rows')
+    expect(manifest.operations).toEqual([
+      {
+        action: 'listing-unpublish',
+        categories: ['adult', 'video-downloaders'],
+        expected: { website: 'https://serp.ly/acme' },
+        id: 'lst_fixture00001',
+        reason: '#260 adult: in the Adult category',
+        slug: 'acme.ai'
+      },
+      expect.objectContaining({ categories: ['video-downloaders', 'adult'], slug: 'bravo.io' }),
+      // As the category manifest leaves it.
+      expect.objectContaining({ categories: ['video-downloaders', 'adult'], slug: 'carta.app' }),
+      // Last: it refuses while any listing of the category is live.
+      { action: 'category-unpublish', slug: 'adult' }
+    ])
+    // Nothing lacks the category: no category manifest.
+    const filed = fixture.map(item =>
+      item === carta ? { ...item, categories: ['video-downloaders', 'adult'] } : item
+    )
+    expect(buildAdultManifests(decisions, filed, options).category).toBeNull()
+  })
+
+  it('takes the retired categories off a kept listing filed under them, before anything else', () => {
+    const deltaInAdult = { ...delta, categories: ['video-downloaders', 'adult', 'gifs'] }
+    const { removal } = buildAdultManifests(
+      { ...decisions, retireCategories: ['adult', 'gifs'] },
+      [acme, bravo, carta, deltaInAdult],
+      options
+    )
+    const operations = parseManifest(removal).operations
+    expect(operations[0]).toEqual({
+      action: 'listing-categories-remove',
+      expected: ['video-downloaders', 'adult', 'gifs'],
+      id: 'lst_fixture00004',
+      remove: ['adult', 'gifs'],
+      slug: 'delta.io'
+    })
+    expect(operations.slice(-2)).toEqual([
+      { action: 'category-unpublish', slug: 'adult' },
+      { action: 'category-unpublish', slug: 'gifs' }
+    ])
+  })
+
+  it('refuses a live listing of the category left undecided, a kept one decided, or a wrong class', () => {
+    const echoInAdult = {
+      ...listing({ id: 'lst_fixture00005', slug: 'echo.io', website: 'https://serp.ly/echo' }),
+      categories: ['video-downloaders', 'adult']
+    }
+    expect(() => buildAdultManifests(decisions, [...fixture, echoInAdult], options)).toThrow(
+      'echo.io is live in adult: decide it in d.yaml.'
+    )
+    expect(() =>
+      buildAdultManifests(
+        { ...decisions, kept: [{ slug: 'acme.ai', reason: 'x' }] },
+        fixture,
+        options
+      )
+    ).toThrow('acme.ai is both kept and unpublished.')
+    expect(() =>
+      buildAdultManifests(
+        {
+          ...decisions,
+          unpublish: [{ ...entry(acme, 'adult-category'), class: 'meh' }]
+        } as unknown as AdultDecisions,
+        fixture,
+        options
+      )
+    ).toThrow('class must be adult-category or filed-elsewhere')
+    expect(() =>
+      buildAdultManifests({ ...decisions, retireCategories: [] }, fixture, options)
+    ).toThrow('retireCategories names no category')
+  })
+
+  it('keeps the committed manifests identical to the decisions; they apply to the reviewed catalog, disjoint from other unpublications, and leave nothing adult or gone', () => {
+    const decisionsFiles = readdirSync(resolve('d1/hygiene')).filter(file =>
+      file.endsWith('-adult-decisions.yaml')
+    )
+    expect(decisionsFiles.length).toBeGreaterThan(0)
+    for (const file of decisionsFiles) {
+      const date = file.slice(0, 10)
+      const decisionsPath = adultDecisionsPathFor(date)
+      const ids = adultManifestIds(date)
+      const decided = parse(readFileSync(resolve(decisionsPath), 'utf8')) as AdultDecisions
+      // The catalog this decision's manifests are published on: every committed manifest that
+      // sorts before them, never a later one (it may expect this decision's result).
+      const database = reviewedCatalogDatabase(ids.categoryId)
+      const inactive = () =>
+        database
+          .prepare('SELECT slug FROM categories WHERE is_active = 0')
+          .all()
+          .map(row => String(row.slug))
+      try {
+        const before = liveListings(database)
+        const inactiveBefore = new Set(inactive())
+        // Later manifests, this decision's own included, are not applied.
+        for (const slug of decided.retireCategories)
+          expect(inactiveBefore.has(slug), slug).toBe(false)
+        const generated = buildAdultManifests(decided, before, { decisionsPath, ...ids })
+        const committed = (id: string) => {
+          const path = resolve(`d1/publications/${id}.yaml`)
+          return existsSync(path) ? readFileSync(path, 'utf8') : null
+        }
+        expect(committed(ids.categoryId), ids.categoryId).toBe(generated.category)
+        expect(committed(ids.removalId), ids.removalId).toBe(generated.removal)
+
+        // Another manifest's unpublish, earlier or later, would leave a listing not live, and
+        // whichever publishes second refuses whole.
+        const elsewhere = new Map<string, string>()
+        for (const path of committedPublications()) {
+          const manifest = parseManifest(readFileSync(resolve(path), 'utf8'))
+          if (manifest.id === ids.removalId) continue
+          for (const operation of manifest.operations)
+            if (operation.action === 'listing-unpublish') elsewhere.set(operation.id, path)
+        }
+        const removal = parseManifest(generated.removal)
+        for (const operation of removal.operations)
+          if (operation.action === 'listing-unpublish')
+            expect(elsewhere.get(operation.id), operation.slug).toBeUndefined()
+
+        // Published in order, the two apply whole; the plans stay within D1's limits.
+        for (const source of [generated.category, generated.removal]) {
+          if (!source) continue
+          const live = database
+            .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
+            .get() as { checksum: string; version: number }
+          for (const item of buildPublicationPlan(
+            parseManifest(source),
+            source,
+            `${date}T00:00:00.000Z`,
+            live
+          ).statements)
+            assertD1StatementLimits(item.query, item.bindings)
+          applyManifest(database, source, `${date}T00:00:00.000Z`)
+        }
+        // Exactly the decided categories retire (Fansite Downloaders, which keeps listings, stays).
+        expect(
+          inactive()
+            .filter(slug => !inactiveBefore.has(slug))
+            .sort()
+        ).toEqual([...decided.retireCategories].sort())
+        const after = liveListings(database)
+        expect(before.length - after.length).toBe(decided.unpublish.length)
+        const live = new Map(after.map(item => [item.slug, item]))
+        for (const entry of decided.unpublish) expect(live.has(entry.slug), entry.slug).toBe(false)
+        // Kept listings stay live, off the retired categories.
+        for (const entry of decided.kept) {
+          expect(live.has(entry.slug), entry.slug).toBe(true)
+          expect(
+            database
+              .prepare(
+                `SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
+                 JOIN listings l ON l.id = lc.listing_id WHERE l.slug = ? AND c.is_active = 0`
+              )
+              .all(entry.slug),
+            entry.slug
+          ).toEqual([])
+        }
+        // Nothing live is named for an adult platform any more (#98's list, and #260's find),
+        // except a listing the owner keeps (the fan-site downloaders).
+        const kept = new Set(decided.kept.map(entry => entry.slug))
+        expect(
+          after
+            .filter(
+              item =>
+                !kept.has(item.slug) &&
+                [item.slug, item.name, item.website].some(
+                  value =>
+                    ADULT_TERMS.test(value.toLowerCase()) || /shemale/u.test(value.toLowerCase())
+                )
+            )
+            .map(item => item.slug)
+        ).toEqual([])
+
+        // The Worker's 410 check: every removed listing answers 404, other unpublished ones 410.
+        const gone = (slug: string) =>
+          database
+            .prepare(
+              `SELECT 1 AS found FROM listings l WHERE l.slug = ? AND l.status = 'approved'
+                AND l.is_active = 0 AND l.published_at IS NOT NULL
+                AND NOT ${LISTING_IN_RETIRED_CATEGORY_SQL}`
+            )
+            .get(slug) !== undefined
+        for (const entry of decided.unpublish) expect(gone(entry.slug), entry.slug).toBe(false)
+        const earlier = [...elsewhere].find(
+          ([, path]) => path < `d1/publications/${ids.categoryId}.yaml`
+        )
+        const other = database
+          .prepare('SELECT slug FROM listings WHERE id = ?')
+          .get(earlier?.[0] ?? '')
+        expect(gone(String(other?.slug)), String(other?.slug)).toBe(true)
+      } finally {
+        database.close()
+      }
+    }
+  }, 120_000)
 })

@@ -210,7 +210,8 @@ export function ListingDetail({
         </Button>
       )
     }
-    if (view.adminStatus === 'unlisted') {
+    // A listing filed under a retired category stays down (#260): the notice says why.
+    if (view.adminStatus === 'unlisted' && !view.unpublished?.retiredReason) {
       actions.push(
         <Button
           key="republish"
@@ -268,8 +269,10 @@ export function ListingDetail({
           </AlertTitle>
           <AlertDescription>
             {view.unpublished.note ? `Note: “${view.unpublished.note}” ` : ''}Removed from the site,
-            search, sitemap and RSS. The URL returns 410 Gone with a page that points to its
-            category. Republish to bring it back.
+            search, sitemap and RSS.{' '}
+            {view.unpublished.retiredReason
+              ? `The URL returns 404 Not Found. ${view.unpublished.retiredReason}`
+              : 'The URL returns 410 Gone with a page that points to its category. Republish to bring it back.'}
           </AlertDescription>
         </Alert>
       )

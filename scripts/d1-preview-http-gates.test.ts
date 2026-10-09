@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,6 +23,7 @@ import {
   expectedWorkerVersionFromEnvironment,
   type GateClock,
   type HttpGateOptions,
+  retiredCategorySlugs,
   runHttpGates,
   waitForWorkerVersion
 } from './d1-preview-http-gates.ts'
@@ -52,6 +53,11 @@ writeFileSync(
   JSON.stringify({ env: { production: { vars: { CANONICAL_HOST_REDIRECT: 'off' } } } })
 )
 
+// The reviewed manifests the gates read for retired categories (#260): none by default, so the
+// tests never read d1/publications, where d1-remote-publisher.test.ts writes temporary ones.
+const noPublications = join(fixtureDirectory, 'no-publications')
+mkdirSync(noPublications)
+
 afterAll(() => rmSync(fixtureDirectory, { force: true, recursive: true }))
 
 function gates(
@@ -62,6 +68,7 @@ function gates(
 ): Promise<void> {
   return runHttpGates(mode, baseUrl, {
     parityReportPath,
+    publicationsDirectory: noPublications,
     timeoutMs,
     wranglerConfigPath: switchOffConfigPath,
     ...options
@@ -158,6 +165,31 @@ describe('environment-specific HTTP gates', () => {
       )
     }
   )
+
+  it('never samples a category a reviewed manifest retires (#260)', async () => {
+    const publications = join(fixtureDirectory, 'publications')
+    mkdirSync(publications, { recursive: true })
+    writeFileSync(
+      join(publications, 'retire.yaml'),
+      stringify({ operations: [{ action: 'category-unpublish', slug: 'adult' }] })
+    )
+    const report = join(fixtureDirectory, 'parity-retired.yaml')
+    writeFileSync(
+      report,
+      stringify({
+        parity: { categories: [{ slug: 'adult' }, { slug: category }], exactSlugSet: [slug] }
+      })
+    )
+    const urls = installSuccessfulFetch()
+    await gates('staging', stagingOrigin, undefined, {
+      parityReportPath: report,
+      publicationsDirectory: publications
+    })
+    const paths = urls.map(url => url.pathname)
+    expect(paths).toContain(`/products/categories/${category}/`)
+    expect(paths).not.toContain('/products/categories/adult/')
+    expect(retiredCategorySlugs(publications)).toEqual(new Set(['adult']))
+  })
 
   it('keeps Staging isolated from the Production hostname', async () => {
     installSuccessfulFetch()

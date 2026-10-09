@@ -9,6 +9,7 @@ import {
   type CatalogPublication,
   finishCatalogPublicationPlans,
   hoursBefore,
+  listingInRetiredCategory,
   listingIsLiveGuard,
   type PlanGuard,
   replaceStagedChildrenPlans,
@@ -481,11 +482,12 @@ export function buildRelistListingToPaidPlans(input: {
         AND l.status='approved' AND l.is_active=0 AND l.published_at IS NOT NULL
         AND (SELECT e.detail FROM listing_submission_events e
           WHERE e.submission_id=s.id AND e.event_type='unpublished'
-          ORDER BY e.id DESC LIMIT 1)='badge_missing')`
+          ORDER BY e.id DESC LIMIT 1)='badge_missing')
+      AND NOT ${listingInRetiredCategory('?')}`
   return [
     ...beginCatalogPublicationPlans(input.publication, {
       sql: relistable,
-      params: [input.submissionId, input.listingId]
+      params: [input.submissionId, input.listingId, input.listingId]
     }),
     {
       sql: `UPDATE listings SET is_active=1,updated_at=?

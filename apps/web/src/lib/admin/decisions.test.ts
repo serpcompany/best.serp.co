@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
+import { createAdminReadOperations } from '@/db/admin-queries'
 import { createDatabase } from '@/db/client'
 import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
 import {
@@ -527,6 +528,29 @@ describe('listing decisions', () => {
         "SELECT group_concat(event_type) AS events FROM listing_events WHERE listing_id='lst_brief'"
       )
     ).toEqual({ events: 'edited,unpublished,republished,link_rel_changed' })
+  })
+
+  it('refuses to republish a listing filed under a retired category, and says why (#260)', async () => {
+    const { context, db, row } = fixture()
+    expect(await unpublishListing(context(), { listingId: 'lst_brief' })).toMatchObject({
+      ok: true
+    })
+    db.exec(`INSERT INTO categories (slug, name) VALUES ('adult', 'Adult');
+      INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+        SELECT 'lst_brief', id, 9, 0 FROM categories WHERE slug = 'adult';
+      UPDATE categories SET is_active = 0 WHERE slug = 'adult';`)
+    expect(await republishListing(context(), { listingId: 'lst_brief' })).toEqual({
+      error: 'listing_category_retired',
+      message:
+        "It is filed under the retired Adult category, so it stays off the site and can't be republished.",
+      ok: false,
+      status: 409
+    })
+    expect(row("SELECT is_active FROM listings WHERE id='lst_brief'")).toEqual({ is_active: 0 })
+    const admin = await createAdminReadOperations({ client: context().client }).getAdminListing(
+      'brieflow.ai'
+    )
+    expect(admin?.retiredCategories).toEqual(['Adult'])
   })
 
   it('validates a new website like a submission and refuses one that collides', async () => {

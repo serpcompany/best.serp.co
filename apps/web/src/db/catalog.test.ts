@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   catalogEpochToken,
+  isUnpublishedListingSlug,
   legacyRootTarget,
   parseCatalogEpochToken,
   readCatalogEpoch,
@@ -639,6 +640,26 @@ describe('listing link rel, verified owner, and unpublished state (#62)', () => 
     }
     expect((await catalog.getPublishedListings()).map(item => item.slug)).not.toContain('echo')
     expect(await catalog.searchListings('echo')).toEqual([])
+  })
+
+  it('answers 404, not 410, for an unpublished listing filed under a retired category (#260)', async () => {
+    const sqlite = seeded()
+    const client = createDatabase(sqlite.asD1Database())
+    const gone = (slug: string) => isUnpublishedListingSlug({ client, slug })
+    expect(await gone('echo')).toBe(true)
+    // A secondary membership is enough, as for the adult downloaders filed under another
+    // category; while the category is active, echo is still gone (410).
+    sqlite.database.exec(`
+      INSERT INTO categories (slug, name, description, sort_order) VALUES ('adult', 'Adult', '', 9);
+      INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+        SELECT 'serp-echo', id, 5, 0 FROM categories WHERE slug = 'adult';
+    `)
+    expect(await gone('echo')).toBe(true)
+    sqlite.database.exec("UPDATE categories SET is_active = 0 WHERE slug = 'adult'")
+    expect(await gone('echo')).toBe(false)
+    expect(await catalogFor(sqlite).getUnpublishedListing('echo')).toBeNull()
+    // Live and unknown slugs are never gone.
+    for (const slug of ['charlie', 'missing']) expect(await gone(slug), slug).toBe(false)
   })
 })
 

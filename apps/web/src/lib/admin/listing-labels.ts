@@ -26,3 +26,9 @@ const VERIFIED_VIA: Record<string, string> = {
 export function verifiedViaLabel(value: string): string {
   return VERIFIED_VIA[value] ?? value
 }
+
+/** Why a listing filed under retired categories (#260) can't be republished. */
+export function retiredCategoryReason(names: readonly string[]): string {
+  const kind = names.length === 1 ? 'category' : 'categories'
+  return `It is filed under the retired ${names.join(' and ')} ${kind}, so it stays off the site and can't be republished.`
+}

@@ -65,6 +65,17 @@ export function listingIsLiveGuard(listingIdSql: string): string {
 }
 
 /**
+ * True while the listing is filed under a retired category (`categories.is_active = 0`), primary
+ * or not (#260). Retiring a category takes its listings off the domain: such a listing answers
+ * 404, and nothing makes it live again (`0011_retired_categories` refuses it in D1 too).
+ */
+export function listingInRetiredCategory(listingIdSql: string): string {
+  return `EXISTS (SELECT 1 FROM listing_categories retired_lc
+    JOIN categories retired_c ON retired_c.id = retired_lc.category_id
+    WHERE retired_lc.listing_id = ${listingIdSql} AND retired_c.is_active = 0)`
+}
+
+/**
  * Audit and compare-and-swap inputs for a write that changes public catalog output. Public
  * pages and the data cache are keyed by the catalog epoch (`publication_state.version` plus
  * the newest public `published_at`), so such a write advances the version in the same batch

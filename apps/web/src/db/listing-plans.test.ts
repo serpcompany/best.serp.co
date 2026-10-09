@@ -184,6 +184,35 @@ describe('listing publication transitions', () => {
     expect(listing(db)).toMatchObject({ is_active: 0 })
   })
 
+  it('never republishes a listing filed under a retired category (#260)', () => {
+    const db = database()
+    execute(
+      db,
+      buildUnpublishListingPlans({
+        listingId,
+        publication: publication('listing-unpublish'),
+        reason: 'admin'
+      })
+    )
+    db.exec(`INSERT INTO categories (slug, name) VALUES ('adult', 'Adult');
+      INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+        SELECT '${listingId}', id, 9, 0 FROM categories WHERE slug = 'adult';
+      UPDATE categories SET is_active = 0 WHERE slug = 'adult';`)
+    const republish = buildRepublishListingPlans({
+      listingId,
+      publication: publication('listing-republish', {
+        checksum: publicationState(db).checksum,
+        version: 2
+      })
+    })
+    expectRefused(db, republish)
+    // The plan's guard refuses first; D1 refuses too (0011_retired_categories), whatever the path.
+    expect(() =>
+      db.prepare('UPDATE listings SET is_active = 1 WHERE id = ?').run(listingId)
+    ).toThrow(/must not be filed under a retired category/u)
+    expect(listing(db)).toMatchObject({ is_active: 0 })
+  })
+
   it('changes the outbound link setting and refuses a no-op', () => {
     const db = database()
     expect(listing(db)).toMatchObject({ link_rel: 'follow', source: 'admin' })

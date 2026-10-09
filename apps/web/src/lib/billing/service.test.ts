@@ -1042,6 +1042,43 @@ describe('upgrade and relist', () => {
     })
     expect(f.row('SELECT outcome FROM orders')).toEqual({ outcome: 'relisted' })
   })
+
+  it('never relists a listing filed under a retired category, and refunds a relist paid as it retired (#260)', async () => {
+    const f = fixture()
+    f.listing('gone2', 'free')
+    f.db.exec(`
+      UPDATE listings SET is_active=0 WHERE id='lst_gone2';
+      INSERT INTO listing_submission_events (submission_id, event_type, detail, actor)
+        VALUES ('sub_gone2', 'unpublished', 'badge_missing', 'badge-program');
+    `)
+    const start = () =>
+      startListingCheckout(f.deps, {
+        email: 'maya@example.com',
+        origin: ORIGIN,
+        slug: 'gone2.example',
+        userId: 'user_maya'
+      })
+    const relist = await start()
+    if (!relist.ok || !('url' in relist)) throw new Error('no checkout')
+    // The category retires while the checkout is open.
+    f.db.exec(`
+      INSERT INTO categories (slug, name) VALUES ('adult', 'Adult');
+      INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+        SELECT 'lst_gone2', id, 9, 0 FROM categories WHERE slug = 'adult';
+      UPDATE categories SET is_active = 0 WHERE slug = 'adult';
+    `)
+    await webhook(f, paidEvent(f, relist.url.split('/').pop() ?? ''))
+    expect(f.row(`SELECT is_active FROM listings WHERE id='lst_gone2'`)).toEqual({ is_active: 0 })
+    expect(f.row('SELECT status, outcome FROM orders')).toEqual({
+      outcome: 'unapplied',
+      status: 'refunded'
+    })
+    // And no relist is offered any more.
+    await expect(start()).resolves.toEqual({
+      ok: true,
+      redirect: '/account/listings/gone2.example/'
+    })
+  })
 })
 
 describe('refunds', () => {

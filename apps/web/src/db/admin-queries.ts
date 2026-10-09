@@ -367,6 +367,10 @@ export function selectAdminListingPlans(slug: string): StatementPlan[] {
             WHERE lc.listing_id=l.id AND lc.is_primary=1) AS category_slug,
           (SELECT c.name FROM listing_categories lc JOIN categories c ON c.id=lc.category_id
             WHERE lc.listing_id=l.id AND lc.is_primary=1) AS category_name,
+          (SELECT json_group_array(name) FROM (SELECT c.name FROM listing_categories lc
+            JOIN categories c ON c.id=lc.category_id
+            WHERE lc.listing_id=l.id AND c.is_active=0 ORDER BY lc.sort_order))
+            AS retired_categories,
           (SELECT o.user_id FROM listing_owners o
             WHERE o.listing_id=l.id AND o.role='owner' AND o.revoked_at IS NULL) AS owner_user_id,
           (SELECT o.verified_at FROM listing_owners o
@@ -704,6 +708,8 @@ export interface AdminListingDetail extends AdminListingRow {
     verifiedAt: string | null
     verifiedVia: ListingOwnerVerification
   }>
+  /** Names of the retired categories it is filed under (#260): it can't be republished. */
+  retiredCategories: string[]
   submission: {
     id: string
     paidAt: string | null
@@ -872,6 +878,9 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
           verifiedAt: toInstant(owner.verified_at),
           verifiedVia: text(owner.verified_via) as ListingOwnerVerification
         })),
+        retiredCategories: (
+          JSON.parse(optionalText(row.retired_categories) ?? '[]') as unknown[]
+        ).map(name => text(name)),
         submission: submissionId
           ? {
               id: submissionId,
