@@ -28,18 +28,19 @@ Some listings' product domains now serve gambling or betting pages, are parked, 
 ## The check
 
 ```bash
-# Each catalog:domains command takes --env production (or staging): whose D1 listings it reads.
-pnpm catalog:domains -- --env production   # fetch and classify; writes d1/hygiene/<date>-listing-domains.yaml
-pnpm catalog:domains -- --reuse     # reuse .runtime/listing-domains/, fetch only what is missing
-pnpm catalog:domains -- --only a.ai,b.io   # print the classification of a few listings
-pnpm catalog:domains -- manifest    # write d1/publications/<date>-hijacked-domains.yaml
-pnpm catalog:domains -- --only <the earlier report's NXDOMAIN slugs> \
+# Every catalog:domains command reads the live listings of --env production (or staging): the scan
+# checks them, and each manifest takes its listings' categories and websites from them.
+pnpm catalog:domains -- --env production          # fetch and classify; writes d1/hygiene/<date>-listing-domains.yaml
+pnpm catalog:domains -- --reuse --env production  # reuse .runtime/listing-domains/, fetch only what is missing
+pnpm catalog:domains -- --only a.ai,b.io --env production   # print the classification of a few listings
+pnpm catalog:domains -- manifest --env production # write d1/publications/<date>-hijacked-domains.yaml
+pnpm catalog:domains -- --only <the earlier report's NXDOMAIN slugs> --env production \
   > d1/hygiene/<date>-dead-domains.recheck.yaml   # the second check, a day or more later
-pnpm catalog:domains -- dead-manifest --since <earlier date>
+pnpm catalog:domains -- dead-manifest --since <earlier date> --env production
                                     # write d1/publications/<date>-dead-domains.yaml
-pnpm catalog:domains -- decisions-manifest   # d1/hygiene/<date>-owner-list-decisions.yaml →
+pnpm catalog:domains -- decisions-manifest --env production   # d1/hygiene/<date>-owner-list-decisions.yaml →
                                     # d1/publications/<date>-owner-list-cleanup.yaml
-pnpm catalog:domains -- adult-manifest       # #260, see Adult products above
+pnpm catalog:domains -- adult-manifest --env production       # #260, see Adult products above
 pnpm catalog:claim-holds -- d1/hygiene/<date>-listing-domains.yaml <date>-listing-claim-holds
                                     # hold instant claims of the owner list (#67)
 ```

@@ -4,25 +4,28 @@
  *   pnpm catalog:domains -- --env production
  *                                        follow every live listing's website, classify it, and
  *                                        write d1/hygiene/<date>-listing-domains.yaml
- *   (Every command below takes the same --env.)
- *   pnpm catalog:domains -- --reuse      reuse the observations cached in .runtime/listing-domains/
+ *   pnpm catalog:domains -- --reuse --env production
+ *                                        reuse the observations cached in .runtime/listing-domains/
  *                                        and fetch only the listings missing there (resumes an
  *                                        interrupted run; reclassifies without the network)
- *   pnpm catalog:domains -- manifest     write the reviewed publication manifest that unpublishes
+ *   pnpm catalog:domains -- manifest --env production
+ *                                        write the reviewed publication manifest that unpublishes
  *                                        the report's `unpublish` list
- *   pnpm catalog:domains -- decisions-manifest
+ *   pnpm catalog:domains -- decisions-manifest --env production
  *                                        write the manifest that unpublishes the owner's decisions
  *                                        in d1/hygiene/<date>-owner-list-decisions.yaml
- *   pnpm catalog:domains -- adult-manifest
+ *   pnpm catalog:domains -- adult-manifest --env production
  *                                        write the manifests that take the adult listings in
  *                                        d1/hygiene/<date>-adult-decisions.yaml off the site and
  *                                        retire their category (#260)
- *   pnpm catalog:domains -- dead-manifest --since <date>
+ *   pnpm catalog:domains -- dead-manifest --since <date> --env production
  *                                        write the manifest that unpublishes listings whose domain
  *                                        does not exist in the --since report and in
  *                                        d1/hygiene/<date>-dead-domains.recheck.yaml
  *
- * Every command reads the live listings of the environment `--env staging|production` names: one
+ * Every command, the manifest ones included, reads the live listings of the environment
+ * `--env staging|production` names (each manifest operation takes its listing's categories and
+ * website from them, and refuses a report entry that no longer matches): one
  * SELECT (`LIVE_LISTINGS_SQL`) through the release tooling's Wrangler D1 target, as
  * `pnpm media:health` reads it, so it needs the operator's Cloudflare credentials and writes
  * nothing to D1. (Until #315 they came from the archived v1 import with the committed manifests
