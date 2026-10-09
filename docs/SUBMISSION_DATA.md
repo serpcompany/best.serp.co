@@ -20,8 +20,8 @@ account deletion must resolve ownership first.
   (`badge_checks.kind = 'refund'`, the check the refund names) sets the plan to `free`.
 - CHECK constraints tie the review record together. A refund never coexists with a `prohibited`
   rejection; a withdrawn row never holds an unrefunded payment (the owner cannot withdraw once
-  paid); and a draft is native (it has an owner and a block key) and unpaid, with no plan or
-  `paid` chosen.
+  paid); and a draft is native (it has an owner and a block key) and unpaid (no `paid_at` or
+  `listing_id`), with no plan or `paid` chosen, never `free`.
 - `content_version` (submissions and revisions) increments on every content edit; approvals
   compare and swap on the version the reviewer saw. `published_checksum` is the listing
   checksum written when a paid submission went live before review; the live approval requires

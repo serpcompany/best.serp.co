@@ -27,7 +27,7 @@ const sharedSteps: HarnessStep[] = [
     command: 'pnpm',
     args: ['exec', 'vitest', 'run', '--project', 'unit', 'apps/web/src/db'],
     remediation:
-      'Fix the shared catalog contract, isolation, projection, cache, telemetry, or benchmark failure. See docs/DATA_MODEL.md.'
+      'Fix the shared catalog contract, isolation, projection, cache, telemetry, or benchmark failure. See docs/DATA_MODEL.md, docs/PUBLIC_CATALOG.md and docs/CACHING.md.'
   },
   {
     name: 'D1 contracts',

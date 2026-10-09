@@ -43,8 +43,8 @@ Column meanings and constraints are commented in `schema.ts`. By area:
 `scripts/d1-table-inventory.ts` is the exact table and column inventory that snapshot, parity,
 and verification tooling read, so a schema change updates it in the same change. Tables written
 at runtime (`runtimeTableNames`) are left out of bootstrap parity (`db:verify:local`,
-`verify-import`), which requires them to be empty; every other table is compared exactly,
-including the intake tables the import leaves empty.
+`verify-import`), and `verify-import` also requires them to be empty; every other table is
+compared exactly, including the intake tables the import leaves empty.
 
 ## Hand-finished migrations
 
