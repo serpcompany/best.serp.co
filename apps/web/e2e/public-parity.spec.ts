@@ -298,8 +298,6 @@ test.describe('public parity interactions', () => {
     await expectExternalLink(page.getByRole('link', { name: /install browser extension/i }).first())
   })
 
-  // Links styled with buttonVariants keep their own classes through cn (#186): the header's
-  // sign-in link is `hidden md:inline-flex`, so it waits for the menu on phones.
   // The card title clips a brand link's own focus ring, so its card draws one (#278 review).
   test('a brand card shows a focus ring while its link has keyboard focus', async ({ page }) => {
     await gotoPublicPage(page, '/brands/')
@@ -313,6 +311,37 @@ test.describe('public parity interactions', () => {
     await expect.poll(ring).not.toBe('none')
   })
 
+  test("login is serplists' AuthCard, and the legal pages serp.co's docs layout (#277, #276)", async ({
+    page
+  }) => {
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 })
+      await gotoPublicPage(page, '/login/')
+      await expect(
+        page.locator('[data-slot="auth-card"]').getByRole('heading', {
+          level: 1,
+          name: 'Sign up or sign in'
+        })
+      ).toBeVisible()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width
+      )
+
+      await gotoPublicPage(page, '/legal/privacy-policy/')
+      const legalNav = page.getByRole('navigation', { name: 'Legal pages' })
+      await expect(legalNav.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      )
+      await expect(page.locator('article.prose-docs h2').first()).toBeVisible()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width
+      )
+    }
+  })
+
+  // Links styled with buttonVariants keep their own classes through cn (#186): the header's
+  // sign-in link is `hidden md:inline-flex`, so it waits for the menu on phones.
   test('desktop-only header links stay hidden on phones', async ({ page }) => {
     await page.setViewportSize({ height: 844, width: 390 })
     await gotoPublicPage(page, '/')

@@ -1,27 +1,12 @@
 import type { Metadata } from 'next'
-import { components } from '@/components/content/mdx-components'
-import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
 import { generateLegalPageMetadata, LegalStaticPage } from '@/components/static-pages/legal-page'
 import { getLegalContent } from '@/lib/content-loader'
 import { getRoute } from '@/lib/routing/routes'
 
-export const metadata: Metadata = generateLegalPageMetadata({
-  title: 'Terms of Service',
-  description:
-    'Terms of service for {{SITE_NAME}}. Read our terms and conditions for using this service.',
-  path: getRoute('terms')
-})
+const path = getRoute('terms')
+
+export const metadata: Metadata = generateLegalPageMetadata(path)
 
 export default async function TermsOfServicePage() {
-  const content = await getLegalContent('terms')
-
-  return (
-    <LegalStaticPage
-      content={content}
-      mdxComponents={components}
-      path={getRoute('terms')}
-      slots={{ Breadcrumb: SiteBreadcrumb }}
-      title="Terms of Service"
-    />
-  )
+  return <LegalStaticPage content={await getLegalContent('terms')} path={path} />
 }

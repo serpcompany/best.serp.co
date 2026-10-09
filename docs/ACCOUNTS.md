@@ -152,7 +152,7 @@ Sign in"; signed in, the account menu (`layout/account-menu.tsx`) with Account a
 desktop, or the mobile menu's Account and Sign out. Sign-out posts to `/api/auth/sign-out` and reloads. The header reads a session only when
 the request carries a session cookie, so anonymous pages never load Better Auth or read D1.
 
-- **`/login`** (`components/auth/login-card.tsx`, shadcn login-01): email, then the code
+- **`/login`** (`components/auth/login-card.tsx`, in serplists' `AuthCard`, #277): email, then the code
   (InputOTP), then "You're signed in" and a redirect to `?callbackUrl=` (a path on this site,
   else `/account/`; `lib/auth/callback-url.ts`, which checks the path after normalization). The code step says a code is on its way *if*
   the address is valid, because a per-email limit answers like a sent code. It counts wrong

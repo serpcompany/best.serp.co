@@ -1,64 +1,45 @@
-import type { MDXComponents } from 'mdx/types'
 import type { Metadata } from 'next'
-import type { ComponentType } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { canonicalPathname } from '../../lib/seo/canonical-url'
-import { generateBaseMetadata, SITE_NAME, SITE_PUBLIC_URL } from '../../lib/seo/seo-config'
+import { PageShell } from '@/components/layout/docs-page-shell'
+import { BreadcrumbJsonLd } from '@/components/layout/site-breadcrumb'
+import { legalDescription, legalShell } from '@/components/legal/legal-nav'
+import { type LegalPagePath, legalPageFor } from '@/lib/legal/legal-pages'
+import { generateBaseMetadata, SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
 
-interface LegalStaticPageProps {
-  content: string
-  mdxComponents: MDXComponents
-  path: string
-  slots: {
-    Breadcrumb: ComponentType<{
-      baseUrl: string
-      items: Array<{ href: string; name: string }>
-    }>
-  }
-  title: string
-}
+/** The legal Markdown's own `# Title` is the page's h1 already; `.prose-docs` styles the rest. */
+const legalMarkdownComponents: Components = { h1: () => null }
 
-export function generateLegalPageMetadata(options: {
-  description: string
-  path: string
-  title: string
-}): Metadata {
+export function generateLegalPageMetadata(path: LegalPagePath): Metadata {
+  const page = legalPageFor(path)
   return generateBaseMetadata({
-    title: options.title,
-    description: options.description.replace(/\{\{SITE_NAME\}\}/g, SITE_NAME),
-    path: options.path,
+    title: page.title,
+    description: legalDescription(page.description),
+    path,
     // The route registry lists every legal page as noindex too; a new one stays noindex
     // until it is registered.
     noindex: true
   })
 }
 
-export function LegalStaticPage({
-  content,
-  mdxComponents,
-  path,
-  slots,
-  title
-}: LegalStaticPageProps) {
-  const { Breadcrumb } = slots
-
+/**
+ * A legal page on serp.co's docs layout (#276): the breadcrumb, title and description over the
+ * legal nav and the policy. The visible breadcrumb writes no JSON-LD, so the page writes the
+ * `BreadcrumbList` itself.
+ */
+export function LegalStaticPage({ content, path }: { content: string; path: LegalPagePath }) {
+  const shell = legalShell(path)
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Breadcrumb
-        items={[{ name: title, href: canonicalPathname(path) }]}
+    <>
+      <BreadcrumbJsonLd
+        items={shell.breadcrumbs.slice(1).map(crumb => ({ name: crumb.name, href: crumb.path }))}
         baseUrl={SITE_PUBLIC_URL}
       />
-      <div className="max-w-3xl mx-auto space-y-8">
-        <div className="space-y-4 border-b pb-8">
-          <h1 className="text-4xl font-bold tracking-tight lg:text-5xl">{title}</h1>
-        </div>
-        <div className="prose max-w-none dark:prose-invert">
-          <ReactMarkdown components={mdxComponents as Components} remarkPlugins={[remarkGfm]}>
-            {content}
-          </ReactMarkdown>
-        </div>
-      </div>
-    </div>
+      <PageShell {...shell}>
+        <ReactMarkdown components={legalMarkdownComponents} remarkPlugins={[remarkGfm]}>
+          {content}
+        </ReactMarkdown>
+      </PageShell>
+    </>
   )
 }

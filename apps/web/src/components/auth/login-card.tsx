@@ -32,8 +32,8 @@ import {
 } from './sign-in-api'
 
 /**
- * `/login`: the email-code sign-in from the #70 mockups (screen 1, shadcn login-01: Card +
- * Field). One form signs people up and in: email, then the emailed code, then a short
+ * `/login`: the email-code sign-in from the #70 mockups (screen 1), in serplists' `AuthCard`
+ * (#277) with shadcn's Field. One form signs people up and in: email, then the emailed code, then a short
  * signed-in screen that returns to `callbackPath`.
  */
 
