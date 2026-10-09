@@ -6,7 +6,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* shadcn base-nova, base color neutral (#186), as on the other SERP sites (#253). The site adds
-   the status tones (#184) and two wide breakpoints. */
+   the status tones (#184). */
 @theme inline {
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
