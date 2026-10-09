@@ -46,9 +46,8 @@ restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
 - **Nothing leaves as a file.** Only reviewed artifacts and caches are allowed (test evidence
   and the install action's dependency caches), matched by action, name, and path. No workflow
   or script exports D1. In every job where any step holds the token, each step uses only
-  reviewed actions and runs no `gh gist`, `gh release upload|create`, `gh api` file field,
-  `curl` file upload (`-T`, `--upload-file`, `-F`, `--form`, `-d @`, `--data*=@`), or `wget`
-  post (`outboundUploads` in the test).
+  reviewed actions and runs none of the `gh`, `curl` and `wget` uploads that `outboundUploads`
+  in the test recognizes (its examples in the test show which forms it catches).
 
 ## Adding a credentialed job
 
@@ -65,8 +64,9 @@ These checks read workflow and script text, not data, and they are not a sandbox
 - An upload by a program the parser does not name (`node -e`, `python -c`, `nc`, or a renamed
   copy of `curl`) is not caught, and neither is a file written in a credentialed job and sent
   from a job without the token.
-- A `curl` body that carries data inline rather than from a file (`curl -d "$(cat out.json)"`)
-  is not caught: only file uploads are.
+- `outboundUploads` matches common upload forms, not every one: an inline body
+  (`curl -d "$(cat out.json)"`), `curl --json @file`, a combined short flag (`-sd @file`), a
+  header from a file, or `gh issue create --body-file` is not caught.
 - An allowlisted artifact or cache path, a log line, or a job summary could still carry data.
 - A remote reusable workflow or action is judged by its reference, not its content.
 - A pull request can edit the checks themselves.
