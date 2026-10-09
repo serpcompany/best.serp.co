@@ -33,6 +33,8 @@ const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
     'Markdown images in site content; listing content holds none (scripts/catalog-media.test.ts)',
   'apps/web/src/components/sections/external-resources-section.tsx': 'site-owned resource images',
   'apps/web/src/components/sections/guide-card.tsx': 'guide cover images',
+  'apps/web/src/components/static-pages/brands-page.tsx':
+    'network brand logos on /brands/, from apps/web/public/logos/ (#193)',
   'apps/web/src/components/website/featured-on-badge-embed-panel.tsx':
     'the badge preview and its embed snippet'
 }
