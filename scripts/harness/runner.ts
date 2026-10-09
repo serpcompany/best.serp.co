@@ -78,7 +78,7 @@ const fullOnlySteps: HarnessStep[] = [
     command: 'pnpm',
     args: ['--filter', 'web', 'cf-typegen:check'],
     remediation:
-      'Run pnpm --filter web cf-typegen after changing apps/web/wrangler.jsonc, and commit apps/web/cloudflare-env.d.ts.'
+      'Run pnpm cf-typegen after changing apps/web/wrangler.jsonc or upgrading Wrangler, and commit apps/web/cloudflare-env.d.ts.'
   },
   {
     name: 'OpenNext Worker build',
