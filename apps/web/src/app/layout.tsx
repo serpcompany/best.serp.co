@@ -24,10 +24,10 @@ export default async function RootLayout({ children }: RootLayoutProps): Promise
 
   return (
     <RootAppShell
-      bodyClassName={fonts}
       cloudflareWebAnalyticsToken={analytics.cloudflareWebAnalyticsToken}
       feedTitle={`${siteConfig.name} - New ${siteCopy.listingName.pluralTitle}`}
       gtmId={analytics.gtmId}
+      htmlClassName={fonts}
     >
       {children}
     </RootAppShell>

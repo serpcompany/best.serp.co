@@ -46,7 +46,8 @@ function CloudflareWebAnalyticsBeacon({ token }: { token?: string }) {
 }
 
 interface RootAppShellProps {
-  bodyClassName?: string
+  /** The font variables and base classes, on `<html>` as on the other SERP sites. */
+  htmlClassName?: string
   children: ReactNode
   /** The Cloudflare Web Analytics site token; no beacon without it. */
   cloudflareWebAnalyticsToken?: string
@@ -55,20 +56,20 @@ interface RootAppShellProps {
 }
 
 export function RootAppShell({
-  bodyClassName,
   children,
   cloudflareWebAnalyticsToken,
   feedTitle,
-  gtmId
+  gtmId,
+  htmlClassName
 }: RootAppShellProps) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={htmlClassName} suppressHydrationWarning>
       {/* biome-ignore lint/style/noHeadElement: the App Router root layout owns <head>; next/head is the Pages Router's. */}
       <head>
         <GoogleTagManagerScript gtmId={gtmId} />
         <link rel="alternate" type="application/feed+json" title={feedTitle} href="/rss.xml" />
       </head>
-      <body className={bodyClassName}>
+      <body>
         <GoogleTagManagerNoScript gtmId={gtmId} />
         <DesignSystemProvider>
           <FavoritesProvider>

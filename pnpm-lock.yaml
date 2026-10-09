@@ -33,9 +33,6 @@ catalogs:
     tailwindcss:
       specifier: ^4.1.18
       version: 4.1.18
-    tsx:
-      specifier: ^4.21.0
-      version: 4.21.0
     typescript:
       specifier: ^5.9.3
       version: 5.9.3
@@ -140,9 +137,6 @@ importers:
       drizzle-orm:
         specifier: 0.45.3
         version: 0.45.3(@cloudflare/workers-types@5.20261001.1)(@opentelemetry/api@1.9.1)(@types/pg@8.15.6)(@upstash/redis@1.36.2)(kysely@0.29.6)
-      geist:
-        specifier: ^1.7.0
-        version: 1.7.0(next@16.3.8(@babel/core@7.26.9)(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
       input-otp:
         specifier: ^1.4.2
         version: 1.4.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -3946,11 +3940,6 @@ packages:
 
   fuzzysort@3.1.0:
     resolution: {integrity: sha512-sR9BNCjBg6LNgwvxlBd0sBABvQitkLzoVY9MYYROQVX/FvfJ4Mai9LsGhDgd8qYdds0bY77VzYd5iuB+v5rwQQ==}
-
-  geist@1.7.0:
-    resolution: {integrity: sha512-ZaoiZwkSf0DwwB1ncdLKp+ggAldqxl5L1+SXaNIBGkPAqcu+xjVJLxlf3/S8vLt9UHx1xu5fz3lbzKCj5iOVdQ==}
-    peerDependencies:
-      next: '>=13.2.0'
 
   gensync@1.0.0-beta.2:
     resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
@@ -9793,10 +9782,6 @@ snapshots:
   function-bind@1.1.2: {}
 
   fuzzysort@3.1.0: {}
-
-  geist@1.7.0(next@16.3.8(@babel/core@7.26.9)(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)):
-    dependencies:
-      next: 16.3.8(@babel/core@7.26.9)(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
 
   gensync@1.0.0-beta.2: {}
 
