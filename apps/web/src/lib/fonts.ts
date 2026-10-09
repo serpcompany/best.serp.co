@@ -1,12 +1,12 @@
-import { GeistMono } from 'geist/font/mono'
-import { GeistSans } from 'geist/font/sans'
+import { Geist, Geist_Mono } from 'next/font/google'
 import { cn } from './utils'
 
-export const fontSans = GeistSans
-export const fontMono = GeistMono
+/** Geist and Geist Mono through `next/font`, with the variable names the other SERP sites use. */
+const geistSans = Geist({ variable: '--font-sans', subsets: ['latin'] })
+const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
 
 export const fonts = cn(
-  GeistSans.variable,
-  GeistMono.variable,
+  geistSans.variable,
+  geistMono.variable,
   'touch-manipulation font-sans antialiased'
 )
