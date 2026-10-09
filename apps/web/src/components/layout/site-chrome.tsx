@@ -10,7 +10,7 @@ import { SiteHeader } from './site-header'
 export async function SiteChrome({ children }: { children: ReactNode }) {
   const authState = await getHeaderAuthState()
   return (
-    <div data-site-chrome="" className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col">
       <SiteHeader authState={authState} />
       <main className="flex flex-1 flex-col">{children}</main>
       <SiteFooter />
