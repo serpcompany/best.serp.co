@@ -44,6 +44,7 @@ export default async function RevisionReviewPage({ params }: Props) {
           <PreviewCardBody
             categoryName={review.categoryName}
             preview={stagedPreview(review, media)}
+            verifiedOwner
           />
         }
         view={revisionView(review, media)}

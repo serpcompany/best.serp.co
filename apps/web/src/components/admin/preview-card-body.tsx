@@ -6,10 +6,13 @@ import { MiniListing } from './mini-listing'
 /** The preview card's body: the mini listing, or why the staged content cannot be shown. */
 export function PreviewCardBody({
   categoryName,
-  preview
+  preview,
+  verifiedOwner = false
 }: {
   categoryName: string | null
   preview: { error: string } | { listing: ListingDetail }
+  /** A revision's preview: its listing has an owner, so the live page shows Verified owner. */
+  verifiedOwner?: boolean
 }) {
   if ('error' in preview) {
     return (
@@ -20,5 +23,11 @@ export function PreviewCardBody({
       </Alert>
     )
   }
-  return <MiniListing categoryName={categoryName} listing={preview.listing} />
+  return (
+    <MiniListing
+      categoryName={categoryName}
+      listing={preview.listing}
+      verifiedOwner={verifiedOwner}
+    />
+  )
 }
