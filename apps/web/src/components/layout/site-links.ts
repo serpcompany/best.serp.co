@@ -31,7 +31,13 @@ export type SiteLink = {
 
 export type HeaderItem =
   | { kind: 'link'; link: SiteLink }
-  | { kind: 'menu'; label: string; links: readonly SiteLink[] }
+  | {
+      kind: 'menu'
+      label: string
+      links: readonly SiteLink[]
+      /** The menu's section: its button is active on any page under it. */
+      sectionPath?: string
+    }
 
 export type FooterGroup = { title: string; links: readonly SiteLink[] }
 
@@ -47,10 +53,41 @@ const productLinks: SiteLink[] = [
 ]
 
 export const headerItems: readonly HeaderItem[] = [
-  { kind: 'menu', label: siteCopy.listingName.pluralTitle, links: productLinks },
+  {
+    kind: 'menu',
+    label: siteCopy.listingName.pluralTitle,
+    links: productLinks,
+    sectionPath: getRoute('listing.list')
+  },
   { kind: 'link', link: { href: getRoute('pricing'), label: 'Pricing' } },
   { kind: 'link', link: { href: getRoute('about'), label: 'About' } }
 ]
+
+const withoutTrailingSlash = (path: string) => path.replace(/\/+$/u, '') || '/'
+
+/** Whether `pathname` is the page `href` names, with or without a trailing slash. */
+export function isCurrentPage(pathname: string, href: string): boolean {
+  return withoutTrailingSlash(pathname) === withoutTrailingSlash(href)
+}
+
+/** Whether `pathname` is under `href`. The homepage contains no other page. */
+function isPathWithin(pathname: string, href: string): boolean {
+  const path = withoutTrailingSlash(pathname)
+  const base = withoutTrailingSlash(href)
+  return base === '/' ? path === '/' : path === base || path.startsWith(`${base}/`)
+}
+
+/**
+ * Whether a header menu's button marks the page's section: the page is under the menu's
+ * section path, or under one of its links other than the homepage (which every page is not).
+ */
+export function isMenuActive(
+  pathname: string,
+  item: Extract<HeaderItem, { kind: 'menu' }>
+): boolean {
+  if (item.sectionPath && isPathWithin(pathname, item.sectionPath)) return true
+  return item.links.some(link => link.href !== '/' && isPathWithin(pathname, link.href))
+}
 
 /** Whether the route registry has the page, so the footer links only pages that exist. */
 function hasStaticPagePath(path: string): boolean {

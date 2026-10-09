@@ -11,27 +11,7 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle
 } from '@/components/ui/navigation-menu'
-import { type HeaderItem, headerItems } from './site-links'
-
-const withoutTrailingSlash = (path: string) => path.replace(/\/+$/u, '') || '/'
-
-/** Whether `pathname` is the page `href` names, with or without a trailing slash. */
-export function isCurrentPage(pathname: string, href: string): boolean {
-  return withoutTrailingSlash(pathname) === withoutTrailingSlash(href)
-}
-
-/** Whether `pathname` is `href` or a page under it: a menu's section, never `aria-current`. */
-function isPathWithin(pathname: string, href: string): boolean {
-  const path = withoutTrailingSlash(pathname)
-  const base = withoutTrailingSlash(href)
-  return base === '/' ? path === '/' : path === base || path.startsWith(`${base}/`)
-}
-
-function isItemActive(pathname: string, item: HeaderItem): boolean {
-  return item.kind === 'link'
-    ? isPathWithin(pathname, item.link.href)
-    : item.links.some(link => isPathWithin(pathname, link.href))
-}
+import { headerItems, isCurrentPage, isMenuActive } from './site-links'
 
 /**
  * The header's navigation (serplists' `SiteNavigationMenu`, #256): a menu opens on hover or
@@ -55,7 +35,10 @@ export function SiteNavigationMenu({ className }: { className?: string }) {
             </NavigationMenuItem>
           ) : (
             <NavigationMenuItem key={item.label}>
-              <NavigationMenuTrigger data-active={isItemActive(pathname, item) ? '' : undefined}>
+              <NavigationMenuTrigger
+                className="data-active:bg-muted/50"
+                data-active={isMenuActive(pathname, item) ? '' : undefined}
+              >
                 {item.label}
               </NavigationMenuTrigger>
               <NavigationMenuContent keepMounted>

@@ -13,8 +13,7 @@ import { cn } from '@/lib/utils'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
-import { headerItems, type SiteLink } from './site-links'
-import { isCurrentPage } from './site-navigation-menu'
+import { headerItems, isCurrentPage, type SiteLink } from './site-links'
 import { ThemeToggle } from './theme-toggle'
 
 type MenuLinkProps = { link: SiteLink; onNavigate: () => void; pathname: string }

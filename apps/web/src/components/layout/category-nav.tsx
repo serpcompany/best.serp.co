@@ -27,7 +27,7 @@ export function CategoryNav({ availableCategorySlugs, currentCategory }: Categor
   const availableCategories = resolveCategories(availableCategorySlugs || [])
 
   return (
-    <div className="sticky top-16 hidden h-[calc(100vh-4rem)] w-[240px] max-w-[240px] min-w-[240px] border-r sm:block">
+    <div className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-[240px] max-w-[240px] min-w-[240px] border-r sm:block">
       <ScrollArea className="h-full">
         <div className="space-y-6 p-4">
           <h2 className="sr-only">Navigation</h2>

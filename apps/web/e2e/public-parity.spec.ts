@@ -83,6 +83,17 @@ test.describe('public parity interactions', () => {
     await expect(current).toHaveAttribute('href', '/products/categories/')
   })
 
+  test('the search page has its own search field, holding the query', async ({ page }) => {
+    await gotoPublicPage(page, '/search/?q=video')
+    const field = page.getByRole('search').getByRole('searchbox', { name: 'Search' })
+    await expect(field).toHaveValue('video')
+    await field.fill('audio')
+    await Promise.all([page.waitForURL(/\/search\/?\?q=audio$/u), field.press('Enter')])
+    await expect(page.getByRole('search').getByRole('searchbox', { name: 'Search' })).toHaveValue(
+      'audio'
+    )
+  })
+
   test('favorite toggle and favorites-only filter preserve local state behavior', async ({
     page
   }) => {
