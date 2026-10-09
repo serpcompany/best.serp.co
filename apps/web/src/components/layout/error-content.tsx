@@ -27,7 +27,9 @@ export function ErrorContent({ error, reset }: ErrorProps) {
     <Empty className="min-h-screen">
       <EmptyHeader>
         <Badge variant="secondary">Error</Badge>
-        <EmptyTitle>Something went wrong!</EmptyTitle>
+        <EmptyTitle>
+          <h1>Something went wrong!</h1>
+        </EmptyTitle>
         <EmptyDescription>An unexpected error occurred. Please try again later.</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>

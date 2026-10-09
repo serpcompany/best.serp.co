@@ -64,7 +64,7 @@ export function WebsitesSearchControls({
             <Heart
               className={showFavoritesOnly ? 'fill-destructive text-destructive' : undefined}
             />
-            {showFavoritesOnly ? 'Show All' : 'Favorites Only'}
+            Favorites Only
           </Toggle>
         )}
 

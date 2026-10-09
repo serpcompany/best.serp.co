@@ -76,7 +76,9 @@ export function SearchResults({ error, loading, query, results, slots }: SearchR
   if (error) {
     return (
       <Alert variant="destructive">
-        <AlertTitle>Something went wrong</AlertTitle>
+        <AlertTitle>
+          <h2>Something went wrong</h2>
+        </AlertTitle>
         <AlertDescription>{error}</AlertDescription>
         <AlertAction>
           <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
