@@ -24,7 +24,8 @@ export function LLMGrid({ items = [], className, maxItems, analyticsSource }: LL
         if (!item?.slug) return null
         const isVisible = !maxItems || index < maxItems
         return (
-          <li key={item.slug} hidden={!isVisible}>
+          // min-w-0: the phone grid's one column is `auto`, so a long name would widen it.
+          <li key={item.slug} hidden={!isVisible} className="min-w-0">
             <ListingCard item={item} analyticsSource={analyticsSource} />
           </li>
         )

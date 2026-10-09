@@ -7,8 +7,7 @@ import type {
 } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import { siteCopy } from '../../lib/site/site-copy'
-
-type SortBy = 'name' | 'latest'
+import { type ListingSort as SortBy, sortListings } from './listing-sort'
 
 type EmptyStateProps = {
   actionHref?: string
@@ -115,15 +114,7 @@ export function WebsitesListWithSearch({
       })
     }
 
-    if (sortBy === 'latest') {
-      return websites.sort((a, b) => {
-        const dateA = new Date(a.publishedAt).getTime()
-        const dateB = new Date(b.publishedAt).getTime()
-        return dateB - dateA
-      })
-    }
-
-    return websites.sort((a, b) => a.name.localeCompare(b.name))
+    return sortListings(websites, sortBy)
   }, [allWebsites, favoriteWebsites, searchQuery, showFavoritesOnly, sortBy])
 
   if (!initialWebsites.length) {

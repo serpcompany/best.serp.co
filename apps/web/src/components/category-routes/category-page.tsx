@@ -3,7 +3,6 @@ import type { ComponentType, ReactNode } from 'react'
 import type { Category } from '../../lib/directory/categories'
 import { getCategorySEO } from '../../lib/directory/category-seo'
 import {
-  type GuideMetadata,
   toWebsiteBrowseCardMetadata,
   type WebsiteBrowseCardMetadata,
   type WebsiteMetadata
@@ -18,9 +17,9 @@ import {
   SITE_WEBSITE_ID
 } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
-import { siteCopy } from '../../lib/site/site-copy'
-import { CategoryNav } from '../layout/category-nav'
-import { NewsletterSection } from '../sections/newsletter-section'
+import { formatListingCount, siteCopy } from '../../lib/site/site-copy'
+import { PageHero } from '../layout/page-hero'
+import { PageContainer, PageSection } from '../layout/page-shell'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
 
 type JsonLdProps = {
@@ -31,14 +30,8 @@ type CategoryWebsitesListProps = {
   initialWebsites: WebsiteBrowseCardMetadata[]
 }
 
-type FeaturedGuidesSectionProps = {
-  guides: GuideMetadata[]
-}
-
 type CategoryRouteSlots = {
   CategoryWebsitesList: ComponentType<CategoryWebsitesListProps>
-  ExternalResourcesSection: ComponentType
-  FeaturedGuidesSection: ComponentType<FeaturedGuidesSectionProps>
   JsonLd: (props: JsonLdProps) => ReactNode | Promise<ReactNode>
   breadcrumb: ReactNode
 }
@@ -94,31 +87,25 @@ export async function generateCategoryRouteMetadata({
   })
 }
 
+/**
+ * A category page (#268): the breadcrumb and a `PageHero` with the category's name, description
+ * and size, then its listings in the shared card grid and the page links.
+ */
 export function CategoryRoutePage({
-  activeCategorySlugs,
   category,
   collection,
-  featuredGuides,
   pageProjects,
   pagination,
   slots
 }: {
-  activeCategorySlugs: string[]
   category: Category
   collection: CategoryCollection
-  featuredGuides: GuideMetadata[]
   /** The listings on the requested page, in directory (name) order. */
   pageProjects: WebsiteMetadata[]
   pagination?: ReactNode
   slots: CategoryRouteSlots
 }) {
-  const {
-    CategoryWebsitesList,
-    ExternalResourcesSection,
-    FeaturedGuidesSection,
-    JsonLd,
-    breadcrumb
-  } = slots
+  const { CategoryWebsitesList, JsonLd, breadcrumb } = slots
 
   const seoContent = getCategorySEO(category.slug, category)
   const categoryDisplayName = seoContent.h1Title
@@ -225,36 +212,18 @@ export function CategoryRoutePage({
             }}
           />
         )}
-        <div className="border-t">
-          <div className="relative flex h-full w-full max-w-full flex-row flex-nowrap">
-            <CategoryNav
-              availableCategorySlugs={activeCategorySlugs}
-              currentCategory={category.slug}
-            />
-
-            <div className="relative flex h-full w-full flex-col gap-3 px-6 pt-6">
-              {breadcrumb}
-
-              <section className="space-y-6">
-                <div className="sticky top-14 z-35 bg-background border-b py-4 -mx-6 px-6">
-                  <div className="flex items-center gap-3">
-                    <category.icon className="h-6 w-6" />
-                    <h1 className="text-2xl font-bold">{seoContent.h1Title}</h1>
-                  </div>
-                  <p className="text-muted-foreground mt-1">{seoContent.introText}</p>
-                </div>
-                <CategoryWebsitesList initialWebsites={listedCategoryProjectCards} />
-                {pagination}
-              </section>
-
-              {siteConfig.features.showExternalResources && <ExternalResourcesSection />}
-              {siteConfig.features.showFeaturedGuides && (
-                <FeaturedGuidesSection guides={featuredGuides} />
-              )}
-              {siteConfig.features.showNewsletter && <NewsletterSection />}
-            </div>
-          </div>
-        </div>
+        <PageSection spacing="hero" className="border-b">
+          {breadcrumb}
+          <PageHero
+            eyebrow={formatListingCount(categoryCount)}
+            title={seoContent.h1Title}
+            description={seoContent.introText}
+          />
+        </PageSection>
+        <PageContainer className="flex flex-col gap-8 py-12">
+          <CategoryWebsitesList initialWebsites={listedCategoryProjectCards} />
+          {pagination}
+        </PageContainer>
       </>
     )
   }

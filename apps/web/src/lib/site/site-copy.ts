@@ -63,3 +63,9 @@ export function resolveSiteCopy(config: SiteConfig = siteConfig): ResolvedSiteCo
 }
 
 export const siteCopy: ResolvedSiteCopy = resolveSiteCopy()
+
+/** A listing count in words: "1 product", "48 products". */
+export function formatListingCount(count: number, copy: ResolvedSiteCopy = siteCopy): string {
+  const { plural, singular } = copy.listingName
+  return `${count} ${count === 1 ? singular : plural}`
+}

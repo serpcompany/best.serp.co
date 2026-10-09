@@ -1,12 +1,12 @@
 'use client'
 
-import { Clock, Heart, SortAsc } from 'lucide-react'
+import { Heart } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Toggle } from '@/components/ui/toggle'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { getRoute } from '../../lib/routing/routes'
 import { SearchField } from '../layout/search-field'
 import { Toolbar } from '../layout/toolbar'
+import { ListingSortToggle } from './listing-sort'
 
 interface WebsitesSearchControlsProps {
   searchQuery: string
@@ -72,28 +72,13 @@ export function WebsitesSearchControls({
           </Toggle>
         )}
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Sort by:</span>
-          <ToggleGroup
-            value={[sortBy]}
-            onValueChange={([value]: string[]) => {
-              if (value && value !== sortBy) {
-                trackSortChange(sortBy, value, 'homepage-sort')
-                setSortBy(value as 'name' | 'latest')
-              }
-            }}
-            variant="outline"
-          >
-            <ToggleGroupItem value="name">
-              <SortAsc />
-              Name
-            </ToggleGroupItem>
-            <ToggleGroupItem value="latest">
-              <Clock />
-              Latest
-            </ToggleGroupItem>
-          </ToggleGroup>
-        </div>
+        <ListingSortToggle
+          value={sortBy}
+          onValueChange={next => {
+            trackSortChange(sortBy, next, 'homepage-sort')
+            setSortBy(next)
+          }}
+        />
       </div>
     </Toolbar>
   )

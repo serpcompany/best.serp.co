@@ -100,7 +100,6 @@ describe('collection page schema dates', () => {
 
     const alphaListings = websites.filter(website => website.categories?.includes('alpha'))
     const { element } = CategoryRoutePage({
-      activeCategorySlugs: ['alpha'],
       category,
       collection: {
         count: alphaListings.length,
@@ -108,12 +107,9 @@ describe('collection page schema dates', () => {
         lastPublishedAt: '2026-01-03',
         leadingProjects: alphaListings
       },
-      featuredGuides: [],
       pageProjects: alphaListings,
       slots: {
         CategoryWebsitesList: NullComponent,
-        ExternalResourcesSection: NullComponent,
-        FeaturedGuidesSection: NullComponent,
         JsonLd,
         breadcrumb: null
       }
@@ -142,7 +138,6 @@ describe('collection page schema dates', () => {
   it('writes dateModified as the newest change among the listings, the sitemap lastmod (#218)', () => {
     const alphaListings = websites.filter(website => website.categories?.includes('alpha'))
     const { element } = CategoryRoutePage({
-      activeCategorySlugs: ['alpha'],
       category,
       collection: {
         count: alphaListings.length,
@@ -151,12 +146,9 @@ describe('collection page schema dates', () => {
         lastPublishedAt: '2026-01-03',
         leadingProjects: alphaListings
       },
-      featuredGuides: [],
       pageProjects: alphaListings,
       slots: {
         CategoryWebsitesList: NullComponent,
-        ExternalResourcesSection: NullComponent,
-        FeaturedGuidesSection: NullComponent,
         JsonLd,
         breadcrumb: null
       }

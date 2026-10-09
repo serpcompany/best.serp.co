@@ -46,3 +46,24 @@ export const pageHeroVariants = cva('flex flex-col gap-4', {
     align: 'left'
   }
 })
+
+export const iconTileVariants = cva(
+  'flex shrink-0 items-center justify-center rounded-lg text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0',
+  {
+    variants: {
+      size: {
+        sm: "size-8 [&_svg:not([class*='size-'])]:size-4",
+        md: "size-10 [&_svg:not([class*='size-'])]:size-5",
+        lg: "size-14 rounded-xl [&_svg:not([class*='size-'])]:size-6"
+      },
+      tone: {
+        muted: 'bg-muted',
+        card: 'bg-card ring-1 ring-foreground/10'
+      }
+    },
+    defaultVariants: {
+      size: 'md',
+      tone: 'muted'
+    }
+  }
+)

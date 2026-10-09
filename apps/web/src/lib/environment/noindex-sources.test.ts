@@ -31,8 +31,7 @@ vi.mock('@/components/auth/sign-out-button', () => ({
   useSignOut: () => [false, async () => {}]
 }))
 vi.mock('@/lib/catalog/repository', () => ({
-  getActiveCategories: async () => [],
-  getListedCategorySlugs: async () => []
+  getActiveCategories: async () => []
 }))
 // The other registry pages' data and form modules (#167); their metadata does not use them.
 vi.mock('@/lib/content-loader', () => ({

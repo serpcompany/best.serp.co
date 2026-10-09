@@ -12,7 +12,7 @@ import { siteCopy } from '../../lib/site/site-copy'
 export function SearchPageForm() {
   const query = useSearchParams().get('q') ?? ''
   return (
-    <search className="w-full max-w-xl">
+    <search>
       <form action={getRoute('search')} method="get">
         <SearchField
           key={query}

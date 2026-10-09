@@ -6,22 +6,26 @@ import { pageHeroVariants } from './page-shell.styles'
 
 type PageHeroProps = VariantProps<typeof pageHeroVariants> & {
   actions?: ReactNode
+  chips?: ReactNode
   className?: string
   description?: ReactNode
   eyebrow?: ReactNode
+  search?: ReactNode
   title: ReactNode
 }
 
 /**
  * A page's opening (serplists' `PageHero`, #257): an eyebrow badge, the page's `h1`, a muted
- * description, then the actions.
+ * description, then the actions, a search field and chips.
  */
 export function PageHero({
   actions,
   align,
+  chips,
   className,
   description,
   eyebrow,
+  search,
   title
 }: PageHeroProps) {
   const centered = align === 'center'
@@ -39,6 +43,12 @@ export function PageHero({
       {actions ? (
         <div className={cn('mt-2 flex flex-wrap gap-2', centered && 'justify-center')}>
           {actions}
+        </div>
+      ) : null}
+      {search ? <div className="mt-2 w-full max-w-xl">{search}</div> : null}
+      {chips ? (
+        <div className={cn('flex max-w-3xl flex-wrap gap-2', centered && 'justify-center')}>
+          {chips}
         </div>
       ) : null}
     </div>

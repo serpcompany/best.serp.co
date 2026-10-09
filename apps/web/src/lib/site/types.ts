@@ -70,9 +70,7 @@ export type SiteFeatureFlags = {
   showDocs: boolean
   showExternalResources: boolean
   showFavorites: boolean
-  showFeaturedGuides: boolean
   showGuides: boolean
-  showNewsletter: boolean
   showProjects: boolean
 }
 
