@@ -67,7 +67,11 @@ test.describe('public parity interactions', () => {
     // keepMounted: closed-menu links are in the page for crawlers.
     await expect(nav.locator('a[href="/products/categories/"]')).toHaveCount(1)
     await nav.getByRole('button', { name: 'Products' }).click()
-    await nav.getByRole('link', { name: 'Categories' }).click()
+    // An open menu's content moves into Base UI's popup, a portal outside the <nav>.
+    await page
+      .locator('[data-slot="navigation-menu-content"]')
+      .getByRole('link', { name: 'Categories', exact: true })
+      .click()
     await expect(page).toHaveURL(/\/products\/categories\/$/u)
   })
 
