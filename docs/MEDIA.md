@@ -247,9 +247,9 @@ refused replacements, and each logo left on the tile are in `d1/media/2026-10-06
   row-level manifest of `listing-categories-add` (secondary, never primary).
 - **Owner sign-off.** A refused replacement leaves the tile and is listed in the report with its
   final page and reason; listing content never changes here (#100 covers hijacked listings).
-- `scripts/catalog-media.test.ts` applies the manifests to the import and checks that every logo
-  and image is then a hosted key with a matching object in the plan, and that nothing else
-  changes.
+- `scripts/catalog-media.test.ts` checks that every image a manifest names is in the plan with the
+  same bytes; `scripts/v1-import-publications.test.ts` (archived with the import by #315) applies
+  the manifests to the import: every logo and image is then hosted, and nothing else changes.
 - **Cleanup (#124).** Once production had published every part, the plan's 145 `repo:` files were
   deleted (the #86 tile stays). The plan still names them, and their bytes stay in Git at
   `0e17a98e20`, where the migration reads them (`scripts/media-repo-archive.ts`). See the

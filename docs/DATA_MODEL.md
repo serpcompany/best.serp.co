@@ -55,8 +55,8 @@ expression depth of 100, but does not enforce the function limit. So (serpcompan
   helpers run against those limits, and against a column compared with itself (#78).
 - `scripts/d1-workerd-plans.test.ts` runs the #62 plans on workerd, and
   `scripts/d1-workerd-queries.test.ts` runs every catalog, search, account, email, and
-  submission operation on workerd with the full import and worst-case inputs, with a
-  rows-read budget per catalog query shape (both in harness step "D1 contracts").
+  submission operation on workerd with a generated catalog at production scale (#314) and
+  worst-case inputs, with a rows-read budget per query shape (both in harness step "D1 contracts").
 - Search matches a listing's name, short description, slug (the product's domain), and active
   category slugs and names, never its long content or website URL (nearly all are `serp.ly`
   affiliate links). The query is cut to 100 characters
