@@ -32,7 +32,6 @@ type WebsitesSearchControlsProps = {
 }
 
 type LLMGridProps = {
-  animateIn?: boolean
   className?: string
   items: WebsiteRelatedCardMetadata[]
   maxItems?: number
@@ -182,12 +181,7 @@ export function WebsitesListWithSearch({
                 isLoading ? 'opacity-80' : 'opacity-100'
               }`}
             >
-              <LLMGrid
-                items={filteredAndSortedWebsites}
-                maxItems={displayLimit}
-                animateIn={!searchQuery.trim() && !isLoading}
-                className="transition-all duration-500 ease-in-out"
-              />
+              <LLMGrid items={filteredAndSortedWebsites} maxItems={displayLimit} />
             </div>
           </div>
 

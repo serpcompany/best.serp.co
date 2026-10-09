@@ -1,12 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import {
-  DirectoryProductBadge,
-  DirectoryProductCard,
-  DirectoryProductRow
-} from '@/components/directory/directory-product-list'
-import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 import type { WebsiteRelatedCardMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import { FavoriteButton } from '../favorites/favorite-button'
@@ -15,7 +11,6 @@ import { ListingImage } from '../listing/listing-image'
 interface ListingCardProps {
   item: WebsiteRelatedCardMetadata
   analyticsSource?: string
-  className?: string
 }
 
 function stripHtmlTags(html: string | null | undefined): string {
@@ -43,66 +38,43 @@ function stripHtmlTags(html: string | null | undefined): string {
   return text.trim()
 }
 
-function UnofficialBadge() {
-  return <DirectoryProductBadge>Unofficial</DirectoryProductBadge>
-}
-
-function ListingCardLink({
-  item,
-  analyticsSource,
-  defaultSource
-}: ListingCardProps & { defaultSource: string }) {
-  return (
-    <Link
-      href={getRoute('listing.detail', { slug: item.slug })}
-      className="block after:absolute after:inset-0 after:content-[''] z-10"
-      data-analytics="website-click"
-      data-website-name={item.name}
-      data-website-slug={item.slug}
-      data-source={analyticsSource || defaultSource}
-    >
-      {item.name}
-    </Link>
-  )
-}
-
-export function CompactListingCard({ item, analyticsSource, className }: ListingCardProps) {
-  return (
-    <DirectoryProductRow
-      className={cn(className)}
-      media={
-        <ListingImage name={item.name} src={item.media?.logo} size={32} className="rounded-lg" />
-      }
-      title={
-        <ListingCardLink
-          item={item}
-          analyticsSource={analyticsSource}
-          defaultSource="grid-compact"
-        />
-      }
-      badge={item.isUnofficial ? <UnofficialBadge /> : null}
-      description={stripHtmlTags(item.description)}
-      trailing={<FavoriteButton slug={item.slug} size="sm" variant="ghost" />}
-    />
-  )
-}
-
+/**
+ * A listing as a card, after serp.co's `CatalogListing` (#257): its logo, its name, and a
+ * two-line description. The name links to the listing and covers the card; the favorite button
+ * sits above that link.
+ */
 export function ListingCard({ item, analyticsSource }: ListingCardProps) {
   return (
-    <DirectoryProductCard
-      media={
-        <ListingImage name={item.name} src={item.media?.logo} size={32} className="rounded-lg" />
-      }
-      title={
-        <ListingCardLink
-          item={item}
-          analyticsSource={analyticsSource}
-          defaultSource="grid-default"
-        />
-      }
-      badge={item.isUnofficial ? <UnofficialBadge /> : null}
-      description={stripHtmlTags(item.description)}
-      action={<FavoriteButton slug={item.slug} size="sm" variant="default" />}
-    />
+    <div className="group relative h-full rounded-xl">
+      <Card className="h-full flex-row items-start gap-4 p-4 text-base ring-foreground/10 transition-shadow group-hover:ring-border sm:p-5">
+        {/* Wrapped: Card drops its top padding when an image is its first child. */}
+        <div className="shrink-0">
+          <ListingImage name={item.name} src={item.media?.logo} size={48} className="rounded-lg" />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="truncate font-semibold">
+              <Link
+                href={getRoute('listing.detail', { slug: item.slug })}
+                className="after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ring"
+                data-analytics="website-click"
+                data-website-name={item.name}
+                data-website-slug={item.slug}
+                data-source={analyticsSource || 'grid-default'}
+              >
+                {item.name}
+              </Link>
+            </h3>
+            {item.isUnofficial ? <Badge variant="outline">Unofficial</Badge> : null}
+          </div>
+          <p className="line-clamp-2 text-sm text-muted-foreground">
+            {stripHtmlTags(item.description)}
+          </p>
+        </div>
+        <div className="relative z-10 shrink-0">
+          <FavoriteButton slug={item.slug} size="sm" variant="ghost" />
+        </div>
+      </Card>
+    </div>
   )
 }

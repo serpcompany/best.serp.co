@@ -14,12 +14,10 @@ import { compareWithBaseline } from './theme-color-guard'
  */
 
 /**
- * Each file's raw-control count, which may only go down. Left: the search input of the home
- * page's search controls, which #257 rebuilds, and its entry goes.
+ * Each file's raw-control count, which may only go down. Empty since the shared blocks (#257)
+ * replaced the last hand-built search input; a new raw control fails.
  */
-const CONTROL_BASELINE: Readonly<Record<string, number>> = {
-  'apps/web/src/components/search/search-input.tsx': 1
-}
+const CONTROL_BASELINE: Readonly<Record<string, number>> = {}
 
 function componentFiles(): string[] {
   return execFileSync(

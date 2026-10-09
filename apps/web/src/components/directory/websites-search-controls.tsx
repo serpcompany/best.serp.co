@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Toggle } from '@/components/ui/toggle'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { getRoute } from '../../lib/routing/routes'
-import { SearchInput } from '../search/search-input'
+import { SearchField } from '../layout/search-field'
+import { Toolbar } from '../layout/toolbar'
 
 interface WebsitesSearchControlsProps {
   searchQuery: string
@@ -35,7 +36,7 @@ export function WebsitesSearchControls({
   const router = useRouter()
 
   return (
-    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+    <Toolbar className="justify-between">
       <form
         onSubmit={event => {
           event.preventDefault()
@@ -44,13 +45,15 @@ export function WebsitesSearchControls({
             router.push(`${getRoute('search')}?q=${encodeURIComponent(searchQuery)}`)
           }
         }}
-        className="relative flex-1 max-w-md"
+        className="w-full max-w-md"
       >
-        <SearchInput
+        <SearchField
+          name="q"
+          autoComplete="off"
+          aria-label="Search"
           placeholder="Search the directory..."
           value={searchQuery}
           onChange={event => setSearchQuery(event.target.value)}
-          searchButtonClassName="px-2 hover:text-muted-foreground"
         />
       </form>
 
@@ -91,6 +94,6 @@ export function WebsitesSearchControls({
           </ToggleGroup>
         </div>
       </div>
-    </div>
+    </Toolbar>
   )
 }

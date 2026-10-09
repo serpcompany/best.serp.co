@@ -34,3 +34,15 @@ export const pageSectionVariants = cva('', {
 })
 
 export type PageContainerWidth = VariantProps<typeof pageContainerVariants>['width']
+
+export const pageHeroVariants = cva('flex flex-col gap-4', {
+  variants: {
+    align: {
+      left: 'items-start text-left',
+      center: 'items-center text-center'
+    }
+  },
+  defaultVariants: {
+    align: 'left'
+  }
+})

@@ -13,10 +13,8 @@ type SectionProps = {
 
 type LLMGridProps = {
   analyticsSource?: string
-  animateIn?: boolean
   className?: string
   items: WebsiteRelatedCardMetadata[]
-  overrideGrid?: boolean
 }
 
 export type WebsiteRelatedProjectsProps = {
@@ -43,13 +41,7 @@ export function WebsiteRelatedProjects({
         viewAllText="Browse the directory"
         titleId="related-projects"
       >
-        <LLMGrid
-          items={websites.slice(0, 3)}
-          analyticsSource="related-projects"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          overrideGrid={true}
-          animateIn={false}
-        />
+        <LLMGrid items={websites.slice(0, 3)} analyticsSource="related-projects" />
       </Section>
     </section>
   )

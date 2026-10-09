@@ -1,15 +1,5 @@
-import { ArrowRight } from 'lucide-react'
-import Link from 'next/link'
 import type { ReactNode } from 'react'
-import {
-  DirectoryPageSection,
-  DirectorySectionAction,
-  DirectorySectionDescription,
-  DirectorySectionHeader,
-  DirectorySectionTitle
-} from '@/components/sections/directory-home-section'
-import { buttonVariants } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { SectionHeader } from './section-header'
 
 export type SectionProps = {
   title: string
@@ -20,6 +10,10 @@ export type SectionProps = {
   titleId?: string
 }
 
+/**
+ * A titled band of a page: the shared `SectionHeader` (#257) over its content. With `titleId`,
+ * the section is a region named by its title.
+ */
 export function Section({
   children,
   title,
@@ -29,35 +23,14 @@ export function Section({
   titleId
 }: SectionProps) {
   return (
-    <DirectoryPageSection labelledBy={titleId ?? undefined}>
-      <DirectorySectionHeader>
-        <div className="space-y-0.5 sm:space-y-1 flex-1">
-          <DirectorySectionTitle id={titleId}>
-            <span
-              className="inline-block w-1.5 h-1.5 rounded-full bg-foreground"
-              aria-hidden="true"
-            />
-            {title}
-          </DirectorySectionTitle>
-          {description && <DirectorySectionDescription>{description}</DirectorySectionDescription>}
-        </div>
-        {viewAllHref && (
-          <DirectorySectionAction>
-            <Link
-              href={viewAllHref}
-              aria-label={viewAllText}
-              className={cn(
-                buttonVariants({ variant: 'ghost' }),
-                'group h-auto gap-0 rounded-sm px-0 py-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:bg-transparent hover:text-foreground has-[>svg]:px-0 sm:text-base'
-              )}
-            >
-              <span className="hidden sm:inline">{viewAllText}</span>
-              <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5 sm:ml-2 sm:size-4" />
-            </Link>
-          </DirectorySectionAction>
-        )}
-      </DirectorySectionHeader>
+    <section aria-labelledby={titleId}>
+      <SectionHeader
+        id={titleId}
+        title={title}
+        description={description}
+        action={viewAllHref ? { href: viewAllHref, label: viewAllText } : undefined}
+      />
       {children}
-    </DirectoryPageSection>
+    </section>
   )
 }

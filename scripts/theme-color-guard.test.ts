@@ -17,8 +17,7 @@ import { compareWithBaseline, literalColors } from './theme-color-guard'
 const ALLOWED: Readonly<Record<string, string>> = {
   'apps/web/src/app/globals.css': 'defines the theme tokens themselves',
   'apps/web/src/lib/email/emails/layout.ts':
-    'email clients ignore CSS variables, so the email palette is literal hex',
-  'apps/web/src/components/sections/animated-background.tsx': 'draws on a canvas with rgba()'
+    'email clients ignore CSS variables, so the email palette is literal hex'
 }
 
 /** Stock shadcn components (#175): they stay as the registry ships them (#186 replaces them). */
