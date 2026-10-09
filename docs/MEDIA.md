@@ -97,7 +97,7 @@ rendered media against local R2.
 
 The `cdn-staging` bucket and both custom domains exist, and the deploy token
 `best-serp-co-deploy` has Account → Workers R2 Storage → Edit
-([deploy runbook](./DEPLOY_RUNBOOK.md#cloudflare-api-token)).
+([deploy credentials](./DEPLOY_CREDENTIALS.md#cloudflare-api-token)).
 
 ### Optional owner actions
 

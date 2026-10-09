@@ -21,12 +21,16 @@
 | [Accounts](./ACCOUNTS.md) | Better Auth sign-in codes, admins, Cloudflare Access |
 | [Admin panel](./ADMIN_PANEL.md) | `/admin` screens, decisions, the production-write exception |
 | [Submissions mockups](./mockups/submissions/README.md) | The owner-approved #70 mockups and their copy |
-| [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, release flow, cutover checklist |
+| [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, workflows and their guards, production release, recovery, post-deploy checks |
+| [Deploy credentials](./DEPLOY_CREDENTIALS.md) | The Cloudflare API token, the GitHub environments that hold it, what a leak reaches |
+| [Production D1 bootstrap](./PRODUCTION_BOOTSTRAP.md) | Importing the reviewed catalog into an empty production D1, its rehearsal and read-only checks |
+| [Production cutover](./PRODUCTION_CUTOVER.md) | The finished move of best.serp.co from GitHub Pages to the Worker, and the canonical-host switch |
 | [Telemetry](./TELEMETRY.md) | Sentry error reporting, GTM and Cloudflare Web Analytics |
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel |
 | [Catalog hygiene](./CATALOG_HYGIENE.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains |
 | [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, staging before production |
 | [Promotion plan 2026-10-06](./releases/2026-10-06-promotion-plan.md) | The first staging → main promotion of the #59 work: blockers, order, rollback |
+| [Website guide](../apps/web/docs/agents/web.md) | Design tokens, UI rules, layout blocks, page patterns |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees |
 | [CI](./CI.md) | `web.yml` checks and staging deploy, rulesets, runners |
 | [Dependency security](./DEPENDENCY_SECURITY.md) | Production dependency audit |
