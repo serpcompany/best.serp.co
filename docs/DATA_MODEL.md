@@ -60,10 +60,10 @@ second `pnpm db:generate` reports no changes. Keep these properties in every mig
 - A migration that seeds a parity-compared table uses fixed values, as `0002_better_auth.sql`
   does for the admin allowlist's `created_at`, so bootstrap parity stays exact.
 - D1 enforces foreign keys and runs a migration in one transaction, where
-  `PRAGMA foreign_keys=OFF` has no effect. So a referenced table only gains columns
-  (`ALTER TABLE ... ADD ... CHECK`), even where Drizzle generates a rebuild, as it does for a new
-  CHECK. Never rebuild `listings`: dropping it would cascade-delete its memberships, media,
-  links, and FAQs and drop the primary-category triggers.
+  `PRAGMA foreign_keys=OFF` has no effect, so dropping a referenced table cascades.
+- `listings` only gains columns (`ALTER TABLE ... ADD ... CHECK`), even where Drizzle generates
+  a rebuild, as it does for a new CHECK. Never rebuild `listings`: dropping it would
+  cascade-delete its memberships, media, links, and FAQs and drop the primary-category triggers.
 - When a referenced table must be rebuilt, rebuild its children as `__new_*` tables that
   reference the new parent, and drop the old children before the old parent, so no drop
   cascades; the renames carry the references over. Recreate the table's triggers.
