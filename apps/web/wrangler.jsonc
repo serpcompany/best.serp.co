@@ -100,6 +100,7 @@
         "CANONICAL_HOST_REDIRECT": "on",
         "CF_ACCESS_AUD": "a30cbc5f875dd674644be917d50cce67c69747eccc127b8bb1a02d226c8b2491",
         "CF_ACCESS_TEAM_DOMAIN": "serpcompany.cloudflareaccess.com",
+        "CF_WEB_ANALYTICS_TOKEN": "9c0987781b474e1ab3aca62a299270b8",
         "D1_RUNTIME_ENV": "production",
         "MEDIA_BASE_URL": "https://cdn.serp.co",
         "SITE_ENVIRONMENT": "production",
