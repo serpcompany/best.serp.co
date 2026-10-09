@@ -58,9 +58,9 @@ import { project } from '../project'
  * - `d1/media/<id>.report.md`, counts by source and reason, and the owner sign-off lists.
  *
  * The catalog is the committed import, or with `--current <directory>` an environment's current
- * rows (docs/MEDIA.md#recovering-a-refused-media-manifest): rows already hosted are kept as
- * they are. Fetches are cached under `.runtime/legacy-media-cache` (ignored by Git), so a rerun
- * reproduces the same outputs. Usage:
+ * rows (docs/MEDIA_PUBLISHING.md#recovering-a-refused-media-manifest): rows already hosted are
+ * kept as they are. Fetches are cached under `.runtime/legacy-media-cache` (ignored by Git), so a
+ * rerun reproduces the same outputs. Usage:
  *   pnpm migration:legacy-media [-- --retry-errors] [--limit <n>] [--current <directory>]
  *     [--refresh <upload-summary.json>] [--snapshot-sql <listings|media>] [--part-size <n>]
  *     [--manifest-id <id>] [--allow-domain <slug>=<domain>]
@@ -374,7 +374,7 @@ export function importSnapshot(): CatalogSnapshot {
 /**
  * An environment's current catalog from two read-only exports (`listings.json`, `media.json`):
  * the `--json` output of `wrangler d1 execute` for `SNAPSHOT_LISTINGS_SQL` and
- * `SNAPSHOT_MEDIA_SQL` (docs/MEDIA.md#recovering-a-refused-media-manifest).
+ * `SNAPSHOT_MEDIA_SQL` (docs/MEDIA_PUBLISHING.md#regenerating).
  */
 export function currentSnapshot(directory: string): CatalogSnapshot {
   const read = (file: string) => parseWranglerRows(readFileSync(resolve(directory, file), 'utf8'))
@@ -651,7 +651,7 @@ export async function migrateLegacyMedia(options: {
   fetcher: typeof fetch
   limit?: number
   listingsPerManifest?: number
-  /** The plan, report, and manifest id prefix (new ids for a regeneration, MEDIA.md). */
+  /** The plan, report, and manifest id prefix (new ids for a regeneration, MEDIA_PUBLISHING.md). */
   migrationId?: string
   snapshot?: CatalogSnapshot
 }): Promise<MigrationResult> {
