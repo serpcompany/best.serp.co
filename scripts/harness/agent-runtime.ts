@@ -2,6 +2,7 @@ import { execFileSync, spawn } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hasLocalD1Database, resolveFreshD1StateRoot } from '../d1-local-state'
 import { project } from '../project'
 import {
   buildRuntimeManifest,
@@ -66,14 +67,14 @@ function doctor(root: string): void {
   )
 }
 
-async function dev(root: string): Promise<void> {
-  const manifest = currentManifest(root, true)
-  mkdirSync(manifest.logDirectory, { recursive: true })
-  const logPath = resolve(manifest.logDirectory, 'runtime.log')
-  writeFileSync(logPath, '')
-  console.log(`Runtime: ${manifest.webUrl}`)
-  console.log(`Log: ${logPath}`)
-  const child = spawn('pnpm', ['tsx', 'scripts/d1-local-guard.ts', 'preview'], {
+/** Runs a local D1 guard command for this runtime, mirroring its output into the log. */
+async function runLogged(
+  root: string,
+  manifest: RuntimeManifest,
+  logPath: string,
+  command: 'preview' | 'seed'
+): Promise<number> {
+  const child = spawn('pnpm', ['tsx', 'scripts/d1-local-guard.ts', command], {
     cwd: root,
     env: {
       ...process.env,
@@ -90,10 +91,32 @@ async function dev(root: string): Promise<void> {
     process.stderr.write(chunk)
     appendFileSync(logPath, chunk)
   })
-  const status = await new Promise<number>(resolveStatus => {
+  return new Promise<number>(resolveStatus => {
     child.on('close', code => resolveStatus(code || 0))
   })
-  process.exitCode = status
+}
+
+async function dev(root: string): Promise<void> {
+  const manifest = currentManifest(root, true)
+  mkdirSync(manifest.logDirectory, { recursive: true })
+  const logPath = resolve(manifest.logDirectory, 'runtime.log')
+  writeFileSync(logPath, '')
+  console.log(`Runtime: ${manifest.webUrl}`)
+  console.log(`Log: ${logPath}`)
+  // A fresh runtime has no local D1 yet: seed it with the fixtures (#312) before serving.
+  const stateRoot = resolveFreshD1StateRoot({
+    harnessStateDirectory: manifest.d1StateDirectory,
+    repositoryRoot: root
+  })
+  if (!hasLocalD1Database(stateRoot)) {
+    console.log('No local D1 yet: seeding fixtures with pnpm db:seed:local.')
+    const seeded = await runLogged(root, manifest, logPath, 'seed')
+    if (seeded !== 0) {
+      process.exitCode = seeded
+      return
+    }
+  }
+  process.exitCode = await runLogged(root, manifest, logPath, 'preview')
 }
 
 function logs(root: string): void {

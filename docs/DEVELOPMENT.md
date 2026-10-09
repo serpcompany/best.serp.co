@@ -2,34 +2,41 @@
 
 Install dependencies with Node 24 (`.nvmrc`) and `pnpm install`.
 
-## Local catalog
+## Local data
 
-Local D1 is seeded from the committed import (`d1/artifacts/best-serp-co-v1.sql.br`,
-checked against the parity report):
+Local D1 holds fixtures, not the real catalog (serpcompany/best.serp.co#311):
 
 ```bash
-pnpm db:migrate:local
-pnpm db:import:local
+pnpm db:seed:local
 pnpm db:verify:local
 ```
 
-`pnpm db:migrations:list:local` shows the migrations local D1 has not applied yet.
+`db:seed:local` deletes the local state (D1, the local media bucket, the cache), applies the
+migrations, and seeds fake data in a few seconds: 55 published listings in three categories
+(one paginates) and an empty one, listings with and without a logo, hosted media, FAQs,
+resource links, owners, claim and badge-program states, an unpublished and a never-published
+listing, and three users: `admin@example.com` (allowlisted), `submitter@example.com` (a
+submission in every status, a pending revision) and `owner@example.com`. Its logos are generated
+PNGs hosted through the real media ingestion path. Re-running it gives the same rows; it refuses
+a Worker config that is not the local one. Stop a running preview first, or restart it after.
+The facts tests assert (slugs, names, counts) live in `apps/web/e2e/seed-facts.ts`, the rows in
+`apps/web/e2e/fixture-seed.ts`. `db:verify:local` checks a seeded D1 against those facts.
 
-The import is the real public catalog (3,422 listings, no submissions or other user data),
-which the parity comparison and the Playwright suites rely on. It is a documented exception
-to the database standard's fake/fixture rule (owner decision a in serpcompany/best.serp.co#42).
-Submissions and any future user data use fixtures only; see [Data model](./DATA_MODEL.md).
+`pnpm db:migrations:list:local` shows the migrations local D1 has not applied yet;
+`pnpm db:migrate:local` applies them without touching the data.
 
-To rebuild the artifacts from the source, check out `serpcompany/json-directory-template`
-at `25e2a8d` and run
+Until #313 and #315 retire it, the committed import of the real public catalog
+(`d1/artifacts/best-serp-co-v1.sql.br`, 3,422 listings) still seeds Playwright's default server:
+`pnpm db:migrate:local && pnpm db:import:local && pnpm db:verify:local` on an empty state, where
+`db:verify:local` checks exact parity with the report. The import refuses a seeded D1. To rebuild
+the artifacts, check out `serpcompany/json-directory-template` at `25e2a8d` and run
 `pnpm migration:generate -- --source-root ../json-directory --site-id serp.co`; it must
 reproduce the committed parity report exactly.
 
-State lives under `.wrangler/drizzle-state/best-serp-co/` and uses the synthetic
-local database in `apps/web/wrangler.jsonc`. Repeating `migrate` or `import` after a
-successful import is a no-op. Wrangler names the SQLite file after the local `database_id`, so
-when the id changes (#176 set it to `local-only-do-not-deploy`), delete that directory first;
-otherwise `db:verify:local` finds two databases.
+State lives under `.wrangler/drizzle-state/best-serp-co/` (a worktree's under its
+`.runtime/` directory) and uses the synthetic local database in `apps/web/wrangler.jsonc`.
+Wrangler names the SQLite file after the local `database_id`; `db:seed:local` starts over
+when that id changes (#176).
 
 ## Run the Worker
 
@@ -52,11 +59,11 @@ Copy `apps/web/.dev.vars.example` to `apps/web/.dev.vars` (gitignored) and set
 Without it the local Worker uses a random secret per isolate, so sessions end on restart.
 
 Sign in at `/login/`. Codes are not emailed locally: the dev sender logs them, and
-`GET /api/auth/dev/otp-outbox?email=<email>` returns the latest one. `devin@serp.co` is the
-seeded admin. Cloudflare Access is off locally and on staging; to exercise it, set
-`CF_ACCESS_REQUIRED=on` with `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` in `.dev.vars`
-(which overrides vars locally) or, for staging, in `env.staging.vars`. See
-[Accounts](./ACCOUNTS.md).
+`GET /api/auth/dev/otp-outbox?email=<email>` returns the latest one. `admin@example.com` is the
+fixture admin (and `devin@serp.co` the allowlisted owner). Cloudflare Access is off locally and
+on staging; to exercise it, set `CF_ACCESS_REQUIRED=on` with `CF_ACCESS_TEAM_DOMAIN` and
+`CF_ACCESS_AUD` in `.dev.vars` (which overrides vars locally) or, for staging, in
+`env.staging.vars`. See [Accounts](./ACCOUNTS.md).
 
 ## Schema changes
 

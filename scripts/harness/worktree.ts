@@ -174,6 +174,9 @@ function newWorktree(root: string, name: string): void {
     stdio: 'inherit'
   })
   console.log(`Worktree ready: ${target}`)
+  console.log(
+    `Seed its local D1 with fixtures: cd ${JSON.stringify(target)} && pnpm db:seed:local (pnpm agent:dev seeds an empty one itself)`
+  )
   console.log(`Open Codex with: cd ${JSON.stringify(target)} && codex`)
 }
 

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { localSqlitePath } from './d1-local-guard'
-import { resolveFreshD1StateRoot } from './d1-local-state'
+import { hasLocalD1Database, resolveFreshD1StateRoot } from './d1-local-state'
 
 describe('fresh local D1 state root', () => {
   it('derives the isolated state root from an explicit harness state directory', () => {
@@ -79,6 +79,25 @@ describe('canonical local D1 database file', () => {
       expect(localSqlitePath(root)).toBe(join(d1, 'abc.sqlite'))
       writeFileSync(join(d1, 'second.sqlite'), '')
       expect(() => localSqlitePath(root)).toThrow(/exactly one SQLite database; found 2/u)
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+})
+
+describe('a runtime without a local D1 yet (#312)', () => {
+  // `pnpm agent:dev` seeds fixtures first when the runtime has no D1 database.
+  it('finds the D1 database only once Wrangler created it', () => {
+    const root = mkdtempSync(join(tmpdir(), 'best-serp-co-local-empty-'))
+    try {
+      const state = join(root, 'drizzle/best-serp-co')
+      expect(hasLocalD1Database(state)).toBe(false)
+      const d1 = join(state, 'v3/d1/miniflare-D1DatabaseObject')
+      mkdirSync(d1, { recursive: true })
+      writeFileSync(join(d1, 'metadata.sqlite'), '')
+      expect(hasLocalD1Database(state)).toBe(false)
+      writeFileSync(join(d1, 'abc.sqlite'), '')
+      expect(hasLocalD1Database(state)).toBe(true)
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

@@ -40,8 +40,8 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 ## Primary commands
 
 - `pnpm preview`: build and serve the Worker against local D1 (`pnpm dev` is `next dev`).
-- `pnpm db:migrate:local`, `pnpm db:import:local`, `pnpm db:verify:local`: prepare
-  local D1 from the committed import (see [Development](./docs/DEVELOPMENT.md)).
+- `pnpm db:seed:local`: reset local D1 and seed fixtures (fake listings, users, submissions);
+  `pnpm db:verify:local` checks them ([Development](./docs/DEVELOPMENT.md#local-data)).
 - `pnpm db:generate`: generate a reviewed migration from the Drizzle schema.
 - `pnpm db:migrations:list:{local,staging,production}`: read-only migration status.
   `pnpm db:migrate:{staging,production}` runs only inside the protected deploy workflows,
