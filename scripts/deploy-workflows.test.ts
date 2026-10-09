@@ -489,9 +489,11 @@ describe('D1 data stays in Cloudflare', () => {
   // This repository is public: any signed-in GitHub user can download a workflow artifact, and
   // fork pull requests can restore caches. A D1 export holds sessions, OAuth tokens, and emails,
   // so no workflow exports D1; recovery is a Time Travel bookmark (#99, docs/D1_RECOVERY.md).
-  // These checks read workflow and script text, not data; RELEASE_GUARDS lists what they miss.
+  // These checks read workflow and script text, not data; docs/CREDENTIAL_GUARDS.md lists what
+  // they miss.
   //
-  // Adding a job that gets CLOUDFLARE_API_TOKEN (RELEASE_GUARDS, "Adding a credentialed job"):
+  // Adding a job that gets CLOUDFLARE_API_TOKEN (docs/CREDENTIAL_GUARDS.md, "Adding a
+  // credentialed job"):
   // 1. add `<file>:<job>` to `credentialedJobs`;
   // 2. put `cloudflare-release.ts bookmark <env>` right before each step that can change D1 and
   //    add `<file>:<job>:<env>` to `bookmarkedChanges` (once per change step);

@@ -117,7 +117,7 @@ Catalog changes made outside the Worker use reviewed YAML manifests under `d1/pu
 The publisher validates the base version, prior checksum, IDs, slugs, URLs, and categories
 before sending one batch, after recording a D1 Time Travel bookmark (no export). A manifest is
 applied to staging first, then to production
-([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)). A row-level manifest
+([Catalog publication](./CATALOG_PUBLICATION.md)). A row-level manifest
 (`concurrency: rows`) checks each row it changes instead of a base version, so one manifest fits
 both environments; `rowLevelActions` in `scripts/d1-publisher.ts` lists the operations it may
 hold.

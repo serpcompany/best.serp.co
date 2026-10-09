@@ -806,7 +806,7 @@ async function expectPublicPolicy(
         `CANONICAL_HOST_REDIRECT is on, but best.serp.co${path} is still ${answer.reason}: the production workers.dev host would send visitors there. Finish the cutover or turn the switch off.`
       )
     console.log(
-      `::warning title=best.serp.co check skipped::best.serp.co${path} was not answered by the Worker but by ${answer.reason}; its crawl and analytics check was skipped. Check it by hand (docs/DEPLOY_RUNBOOK.md, cutover step 4).`
+      `::warning title=best.serp.co check skipped::best.serp.co${path} was not answered by the Worker but by ${answer.reason}; its crawl and analytics check was skipped. Check it by hand (docs/DEPLOY_RUNBOOK.md#after-a-deploy).`
     )
   }
   await check('/', async response => {

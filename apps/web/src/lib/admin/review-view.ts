@@ -123,6 +123,18 @@ export function revisionView(review: RevisionReview, mediaBaseUrl: string): Revi
 }
 
 /**
+ * Whether the preview shows "Verified owner", as the live page will: a listing that exists
+ * already (a revision's, or a submission's published at payment) shows it while it has a current
+ * owner; a submission not yet published gets an owner at approval when its submitter is signed in.
+ */
+export function previewVerifiedOwner(review: {
+  listing: { verifiedOwner: boolean } | null
+  submitter: object | null
+}): boolean {
+  return review.listing ? review.listing.verifiedOwner : review.submitter !== null
+}
+
+/**
  * The staged content as a listing for the preview, or the reason it cannot be previewed (an
  * invalid logo or website URL, which approval would also refuse). The logo is the hosted copy
  * on this environment's media host, or the fallback tile: never the submitted source.
@@ -133,6 +145,8 @@ export function stagedPreview(
     content: string
     createdAt: string | null
     description: string
+    /** The staged FAQs, which approval publishes with the listing. */
+    faqs?: Array<{ answer: string; question: string }>
     id: string
     /** The hosted featured image a submission's approval would publish (none for a revision). */
     imageKey?: string | null
@@ -164,7 +178,8 @@ export function stagedPreview(
       },
       staged.resourceLinks.map((link, index) => ({ ...link, sort_order: index }))
     )
-    return { listing: resolveListingDetailMedia(listing, mediaBaseUrl) }
+    const withFaqs = staged.faqs?.length ? { ...listing, faqs: staged.faqs } : listing
+    return { listing: resolveListingDetailMedia(withFaqs, mediaBaseUrl) }
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) }
   }

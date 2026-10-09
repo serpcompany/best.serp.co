@@ -10,7 +10,7 @@
  * are served normally so CI can test the deployment through its platform host.
  *
  * The switch was `off` until the cutover, while the workers.dev URL was the production review
- * origin, and is `on` since (deploy runbook, cutover step 5). Staging and local never redirect,
+ * origin, and is `on` since (docs/PRODUCTION_CUTOVER.md, step 5). Staging and local never redirect,
  * whatever the switch says. Running before the edge cache means a stored response can never
  * answer the wrong client: the redirect is never stored, and the cache only sees workers.dev
  * requests that carry the smoke header.

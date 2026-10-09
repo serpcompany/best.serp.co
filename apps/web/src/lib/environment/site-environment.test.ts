@@ -137,7 +137,7 @@ describe('apps/web/wrangler.jsonc environment flags', () => {
       expect(config.env[name].workers_dev, name).toBe(true)
       expect(config.env[name].preview_urls, name).toBe(false)
     }
-    // On since the cutover (deploy runbook, cutover step 5): the production workers.dev host
+    // On since the cutover (docs/PRODUCTION_CUTOVER.md, step 5): the production workers.dev host
     // 308s to best.serp.co. Staging and local never set it, so they never redirect.
     expect(config.env.production.vars?.CANONICAL_HOST_REDIRECT).toBe('on')
     expect(config.vars?.CANONICAL_HOST_REDIRECT).toBeUndefined()

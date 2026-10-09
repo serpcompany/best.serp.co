@@ -215,7 +215,7 @@ listing that changed only on production stays refused there; it keeps its produc
 until its rows match staging's again, and is never repointed without the staging check.
 
 Agents prepare and review these files; they never run the uploads or publications
-([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)).
+([Catalog publication](./CATALOG_PUBLICATION.md)).
 
 ## Legacy migration
 
@@ -278,7 +278,7 @@ done
 
 Done on 2026-10-06: the `cdn-staging` bucket and both custom domains exist, and the deploy token
 `best-serp-co-deploy` has Account → Workers R2 Storage → Edit (see the
-[deploy runbook](./DEPLOY_RUNBOOK.md#cloudflare-api-token)).
+[deploy credentials](./DEPLOY_CREDENTIALS.md#cloudflare-api-token)).
 
 ### Optional owner actions
 

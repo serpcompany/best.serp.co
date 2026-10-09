@@ -56,7 +56,7 @@ export const project = {
       /** The `cdn` bucket serp.co already uses; best.serp.co writes only under `best.serp.co/`. */
       media: { baseUrl: 'https://cdn.serp.co', bucket: 'cdn' },
       origin: 'https://best.serp.co',
-      /** noindex review URL until the best.serp.co Custom Domain is attached (#34 Phase 4b). */
+      /** The production Worker's noindex workers.dev host, which CI's HTTP gates go through. */
       reviewOrigin: 'https://best-serp-co-production.serpcompany.workers.dev',
       workerName: 'best-serp-co-production',
       workersDev: true
