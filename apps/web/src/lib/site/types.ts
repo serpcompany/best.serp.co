@@ -67,7 +67,6 @@ export type SiteBadgesConfig = {
 export type SiteFeatureFlags = {
   showAuth: boolean
   showBrands: boolean
-  showCreatorProjects: boolean
   showDocs: boolean
   showExternalResources: boolean
   showFavorites: boolean

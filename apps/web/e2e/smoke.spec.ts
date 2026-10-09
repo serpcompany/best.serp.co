@@ -131,10 +131,9 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     await expect(
       page.getByRole('heading', { level: 1, name: site.name, exact: true })
     ).toBeVisible()
+    // The hero's eyebrow badge (#257).
     await expect(
-      page.getByRole('link', {
-        name: new RegExp(`^${listingCount}\\s+products in directory$`, 'i')
-      })
+      page.getByText(new RegExp(`^${listingCount}\\s+products in directory$`, 'i'))
     ).toBeVisible()
     // The homepage is the bare origin in its canonical, og:url, and structured data.
     await expectCanonical(page, '/')
@@ -570,9 +569,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
   test('has no horizontal overflow on a mobile viewport', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/', { waitUntil: 'networkidle' })
-    const heroName = page
-      .getByRole('heading', { level: 1, name: site.name, exact: true })
-      .locator('> span')
+    const heroName = page.getByRole('heading', { level: 1, name: site.name, exact: true })
     expect(
       await heroName.evaluate(
         element => element.getBoundingClientRect().right <= document.documentElement.clientWidth

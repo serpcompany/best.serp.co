@@ -16,12 +16,9 @@ type SectionProps = {
 
 type LLMGridProps = {
   items: WebsiteRelatedCardMetadata[]
-  variant?: 'default' | 'compact'
   className?: string
   maxItems?: number
-  animateIn?: boolean
   analyticsSource?: string
-  overrideGrid?: boolean
 }
 
 interface RecentlyAddedSectionProps {
@@ -49,12 +46,7 @@ export function RecentlyAddedSection({
       title="Recently Added"
       description={`See the newest entries added to ${siteConfig.name}`}
     >
-      <LLMGrid
-        items={recentWebsites}
-        variant="default"
-        animateIn={true}
-        analyticsSource="recently-added"
-      />
+      <LLMGrid items={recentWebsites} analyticsSource="recently-added" />
     </Section>
   )
 }

@@ -1,7 +1,9 @@
+import { ArrowRight } from 'lucide-react'
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import type { ComponentType, ReactElement, ReactNode } from 'react'
+import { buttonVariants } from '@/components/ui/button'
 import {
-  type GuideMetadata,
   toWebsiteBrowseCardMetadata,
   type WebsiteBrowseCardMetadata,
   type WebsiteMetadata
@@ -16,9 +18,8 @@ import {
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
 import { type ListingPageInfo, ListingPagination } from '../directory/listing-pagination'
-import { CategoryNav } from '../layout/category-nav'
-import { HeroSection } from '../sections/hero-section'
-import { NewsletterSection } from '../sections/newsletter-section'
+import { PageHero } from '../layout/page-hero'
+import { PageContainer, PageSection } from '../layout/page-shell'
 
 /** One page of the directory, already in directory (name) order. */
 export interface DirectoryPage extends ListingPageInfo {
@@ -27,21 +28,16 @@ export interface DirectoryPage extends ListingPageInfo {
 }
 
 export interface HomePageData {
-  /** Categories with public listings, in navigation order. */
-  activeCategorySlugs: string[]
   browse: DirectoryPage
-  featuredGuides: GuideMetadata[]
   featuredProjects: WebsiteMetadata[]
   recentlyUpdatedProjects: WebsiteMetadata[]
   totalCount: number
 }
 
 interface BuildHomePageDataInput {
-  activeCategorySlugs: string[]
   browse: DirectoryPage
   /** Featured listings in publication order (the `is_featured` placement flag). */
   featured: WebsiteMetadata[]
-  guides: GuideMetadata[]
   /** Latest listings in publication order. */
   latest: WebsiteMetadata[]
   totalCount: number
@@ -50,17 +46,13 @@ interface BuildHomePageDataInput {
 const HOMEPAGE_CARD_SECTION_SIZE = 8
 
 export function buildHomePageData({
-  activeCategorySlugs,
   browse,
   featured,
-  guides,
   latest,
   totalCount
 }: BuildHomePageDataInput): HomePageData {
   return {
-    activeCategorySlugs,
     browse,
-    featuredGuides: guides,
     // Without featured listings the section falls back to the newest ones, as before.
     featuredProjects: (featured.length ? featured : latest).slice(0, HOMEPAGE_CARD_SECTION_SIZE),
     recentlyUpdatedProjects: latest.slice(0, HOMEPAGE_CARD_SECTION_SIZE),
@@ -70,10 +62,6 @@ export function buildHomePageData({
 
 interface JsonLdProps {
   data: Record<string, unknown>
-}
-
-interface FeaturedGuidesSectionProps {
-  guides: GuideMetadata[]
 }
 
 interface FeaturedProjectsSectionProps {
@@ -92,9 +80,6 @@ interface StaticWebsitesListProps {
 }
 
 export interface HomePageSlots {
-  CreatorProjectsSection: ComponentType
-  ExternalResourcesSection: ComponentType
-  FeaturedGuidesSection: ComponentType<FeaturedGuidesSectionProps>
   FeaturedProjectsSection: ComponentType<FeaturedProjectsSectionProps>
   JsonLd: (props: JsonLdProps) => ReactElement | Promise<ReactElement>
   RecentlyAddedSection: ComponentType<RecentlyAddedSectionProps>
@@ -159,74 +144,42 @@ interface HomePageRouteProps {
 }
 
 export function HomePageRoute({ data, slots }: HomePageRouteProps): ReactElement {
-  const HOMEPAGE_SECTION_LIMIT = 200
-  const {
-    activeCategorySlugs,
-    browse,
-    featuredGuides,
-    featuredProjects,
-    recentlyUpdatedProjects,
-    totalCount
-  } = data
-  const {
-    CreatorProjectsSection,
-    ExternalResourcesSection,
-    FeaturedGuidesSection,
-    FeaturedProjectsSection,
-    JsonLd,
-    RecentlyAddedSection,
-    StaticWebsitesList
-  } = slots
-
-  const homepageProjects = browse.items.map(toWebsiteBrowseCardMetadata)
-  const featuredProjectCards = featuredProjects.map(toWebsiteBrowseCardMetadata)
-  const recentlyUpdatedProjectCards = recentlyUpdatedProjects.map(toWebsiteBrowseCardMetadata)
-  const homepageFeaturedGuides = featuredGuides.slice(0, HOMEPAGE_SECTION_LIMIT)
+  const { browse, featuredProjects, recentlyUpdatedProjects, totalCount } = data
+  const { FeaturedProjectsSection, JsonLd, RecentlyAddedSection, StaticWebsitesList } = slots
 
   return (
     <>
       <JsonLd data={generateWebsiteSchema()} />
-      <div className="w-full space-y-16">
-        <HeroSection websiteCount={totalCount} />
-      </div>
-      <div className="border-t">
-        <div className="relative flex h-full w-full max-w-full flex-row flex-nowrap">
-          <CategoryNav availableCategorySlugs={activeCategorySlugs} />
-
-          <div className="relative flex h-full w-full flex-col px-6 pt-6 pb-16 space-y-8">
-            <section>
-              <FeaturedProjectsSection projects={featuredProjectCards} />
-            </section>
-
-            <section>
-              <RecentlyAddedSection websites={recentlyUpdatedProjectCards} />
-            </section>
-
-            <section>
-              <StaticWebsitesList
-                websites={homepageProjects}
-                totalCount={totalCount}
-                displayLimit={browse.pageSize}
-                pagination={
-                  <ListingPagination
-                    basePath={getRoute('listing.list')}
-                    fragment={siteCopy.allAnchorId}
-                    page={browse.page}
-                    pageCount={browse.pageCount}
-                  />
-                }
-              />
-            </section>
-
-            {siteConfig.features.showExternalResources && <ExternalResourcesSection />}
-            {siteConfig.features.showFeaturedGuides && (
-              <FeaturedGuidesSection guides={homepageFeaturedGuides} />
-            )}
-            {siteConfig.features.showCreatorProjects && <CreatorProjectsSection />}
-            {siteConfig.features.showNewsletter && <NewsletterSection />}
-          </div>
-        </div>
-      </div>
+      <PageSection spacing="hero" className="border-b">
+        <PageHero
+          eyebrow={`${totalCount} ${siteCopy.listingCountLabel}`}
+          title={siteConfig.name}
+          description={`${siteConfig.tagline} and browse curated ${siteCopy.listingName.plural}, resources, and documentation links in one searchable directory`}
+          actions={
+            <Link href={getRoute('submit')} className={buttonVariants({ size: 'lg' })}>
+              {siteCopy.submitLabel}
+              <ArrowRight data-icon="inline-end" />
+            </Link>
+          }
+        />
+      </PageSection>
+      <PageContainer className="flex flex-col gap-12 py-12">
+        <FeaturedProjectsSection projects={featuredProjects.map(toWebsiteBrowseCardMetadata)} />
+        <RecentlyAddedSection websites={recentlyUpdatedProjects.map(toWebsiteBrowseCardMetadata)} />
+        <StaticWebsitesList
+          websites={browse.items.map(toWebsiteBrowseCardMetadata)}
+          totalCount={totalCount}
+          displayLimit={browse.pageSize}
+          pagination={
+            <ListingPagination
+              basePath={getRoute('listing.list')}
+              fragment={siteCopy.allAnchorId}
+              page={browse.page}
+              pageCount={browse.pageCount}
+            />
+          }
+        />
+      </PageContainer>
     </>
   )
 }
