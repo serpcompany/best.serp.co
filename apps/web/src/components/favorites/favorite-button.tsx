@@ -2,6 +2,7 @@
 
 import { Heart } from 'lucide-react'
 import { type MouseEvent, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useFavorites } from '../layout/root-shell-client'
 
@@ -32,39 +33,20 @@ export function FavoriteButton({
     setTimeout(() => setIsAnimating(false), 200)
   }
 
-  const sizeClasses = {
-    sm: 'h-8 w-8',
-    md: 'h-10 w-10',
-    lg: 'h-12 w-12'
-  }
+  const buttonSizes = { sm: 'icon-sm', md: 'icon', lg: 'icon-lg' } as const
 
   const iconSizeClasses = {
-    sm: 'h-5 w-5',
-    md: 'h-6 w-6',
-    lg: 'h-7 w-7'
+    sm: 'size-4',
+    md: 'size-5',
+    lg: 'size-6'
   }
 
-  const baseClasses = cn(
-    'relative flex items-center justify-center rounded-full transition-all duration-200 z-20 cursor-pointer group/favorite',
-    'hover:scale-110 will-change-transform transform-gpu',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-    sizeClasses[size],
-    {
-      'bg-background border shadow-sm': variant === 'default',
-      'hover:bg-muted/50': variant === 'ghost'
-    },
-    variant === 'default' &&
-      (favorited
-        ? 'border-destructive hover:border-destructive/80'
-        : 'border-border hover:border-destructive/30'),
-    className
-  )
-
   return (
-    <button
-      type="button"
+    <Button
+      variant={variant === 'default' ? 'outline' : 'ghost'}
+      size={buttonSizes[size]}
       onClick={handleClick}
-      className={baseClasses}
+      className={cn('group/favorite relative z-20 rounded-full', className)}
       aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
       title={favorited ? 'Remove from favorites' : 'Add to favorites'}
     >
@@ -82,6 +64,6 @@ export function FavoriteButton({
           vectorEffect: 'non-scaling-stroke'
         }}
       />
-    </button>
+    </Button>
   )
 }

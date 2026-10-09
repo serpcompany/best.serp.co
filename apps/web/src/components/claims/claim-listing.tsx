@@ -1,11 +1,12 @@
 'use client'
 
-import { ArrowRight, BadgeCheck, Copy, MessageSquare, ShieldCheck } from 'lucide-react'
+import { ArrowRight, BadgeCheck, MessageSquare, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { formatWait } from '@/components/auth/sign-in-api'
 import { type BadgeOutcome, badgeCheckResultAlert } from '@/components/submit/badge-step'
+import { EmbedCode } from '@/components/submit/embed-code'
 import { call } from '@/components/submit/submit-api'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -39,7 +40,6 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/co
 import { Progress } from '@/components/ui/progress'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { useIsMobile } from '@/hooks/use-mobile'
 
@@ -186,7 +186,6 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
   const [outcome, setOutcome] = useState<BadgeOutcome>(null)
   const [badgeWaitUntil, setBadgeWaitUntil] = useState(0)
   const [busy, setBusy] = useState(false)
-  const [copied, setCopied] = useState(false)
   const inFlight = useRef(false)
   const name = listing.name
   const domain = target?.domain ?? ''
@@ -409,16 +408,6 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
       setClaim(current => (current ? { ...current, checksLeft: 0 } : current))
     } else {
       await load()
-    }
-  }
-
-  async function copyEmbed() {
-    try {
-      await navigator.clipboard.writeText(embed)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setCopied(false)
     }
   }
 
@@ -646,24 +635,10 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
           {`Paste this into the HTML of ${site} and keep the link dofollow.`}
         </p>
         <img src={badge.previewUrl} alt="Featured on SERP" width={170} height={42} />
-        <div className="w-full overflow-x-auto rounded-md border border-input px-3 py-2 font-mono text-[11px] leading-relaxed shadow-xs dark:bg-input/30">
-          {/* A div, not a <pre>: the site's global <pre> style is a dark code block. */}
-          <div className="whitespace-pre text-foreground">{embed}</div>
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <Tooltip open={copied}>
-            <TooltipTrigger
-              render={<Button variant="outline" size="sm" onClick={() => void copyEmbed()} />}
-            >
-              <Copy />
-              Copy code
-            </TooltipTrigger>
-            <TooltipContent>Copied to clipboard</TooltipContent>
-          </Tooltip>
-          <span className="text-xs text-muted-foreground">
-            {checksLeft} of {BADGE_CHECKS} checks left
-          </span>
-        </div>
+        <EmbedCode code={embed} label="Badge snippet" />
+        <span className="text-xs text-muted-foreground">
+          {checksLeft} of {BADGE_CHECKS} checks left
+        </span>
         {outcome
           ? badgeCheckResultAlert(outcome.code, outcome, {
               domain: (() => {

@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { type BrowserContext, expect, type Page } from '@playwright/test'
 import { client, q, signIn, unique } from './admin-fixture'
 import { claimsD1, claimsOrigin, claimsSuiteEnabled } from './claims-fixture'
+import { escapeRegExp } from './site-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
 import { expectedResponse, test } from './test'
 
@@ -227,6 +228,10 @@ test('claims a listing with the badge through every step and its errors', async 
       `Paste this into the HTML of ${fixture.website(listing.label)} and keep the link dofollow.`
     )
   ).toBeVisible()
+  // The snippet (#188's shared embed-code box) links the badge to this listing.
+  await expect(dialog(page).getByLabel('Badge snippet')).toHaveValue(
+    new RegExp(`href="[^"]*/products/${escapeRegExp(listing.slug)}/"`, 'u')
+  )
   await capture(page, '8d-badge')
   await dialog(page).getByRole('button', { name: 'Verify badge and claim' }).click()
   await expect(dialog(page).getByText('Page reached, badge not found')).toBeVisible()

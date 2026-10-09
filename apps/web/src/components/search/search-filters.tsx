@@ -2,6 +2,7 @@
 
 import { Filter, X } from 'lucide-react'
 import { useState } from 'react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -54,9 +55,7 @@ export function SearchFilters({
           <span className="hidden sm:inline">Filter Results</span>
           <span className="sm:hidden">Filter</span>
           {activeFiltersCount > 0 && (
-            <span className="ml-1 bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs min-w-[20px] text-center">
-              {activeFiltersCount}
-            </span>
+            <Badge className="ml-1 tabular-nums">{activeFiltersCount}</Badge>
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64 sm:w-72 p-0">
@@ -115,21 +114,19 @@ export function SearchFilters({
             const category = getCategoryBySlug(categorySlug)
 
             return (
-              <div
-                key={categorySlug}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-md text-xs"
-              >
-                <category.icon className="h-3 w-3" />
-                <span>{getCategoryDisplayName(category.slug)}</span>
-                <button
-                  type="button"
+              <Badge key={categorySlug} variant="secondary" className="pr-0.5">
+                <category.icon />
+                {getCategoryDisplayName(category.slug)}
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={() => handleCategoryToggle(categorySlug, false)}
-                  className="hover:bg-primary/20 rounded-sm p-0.5"
+                  className="size-4"
                   aria-label={`Remove ${getCategoryDisplayName(category.slug)} filter`}
                 >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
+                  <X />
+                </Button>
+              </Badge>
             )
           })}
         </div>

@@ -1,11 +1,14 @@
 import { Download, ExternalLink, Hash } from 'lucide-react'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import { Badge } from '@/components/ui/badge'
+import { buttonVariants } from '@/components/ui/button'
 import {
   getFeaturedOnBadgeListingUrl,
   getFeaturedOnBadgePreviewPathFromKey,
   getFeaturedOnBadgePublicUrlFromKey
 } from '@/lib/directory/featured-on-badge-url'
+import { cn } from '@/lib/utils'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import type { WebsiteLinkRel } from '../../lib/directory/content-query'
@@ -78,10 +81,10 @@ export function WebsiteDetailSidebar({ claim, website }: WebsiteDetailSidebarPro
         href={outboundWebsiteUrl}
         target="_blank"
         rel={outboundWebsiteRel(website.linkRel)}
-        className="sticky top-20 z-20 flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className={cn(buttonVariants({ size: 'lg' }), 'sticky top-20 z-20 w-full')}
       >
-        <span>Visit Site</span>
-        <ExternalLink className="size-4" aria-hidden />
+        Visit Site
+        <ExternalLink data-icon="inline-end" aria-hidden />
       </Link>
 
       <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-6 space-y-6">
@@ -103,13 +106,13 @@ export function WebsiteDetailSidebar({ claim, website }: WebsiteDetailSidebarPro
             </span>
             <div className="mt-1 flex flex-wrap gap-2">
               {categorySlugs.map(categorySlug => (
-                <Link
+                <Badge
                   key={categorySlug}
-                  href={getRoute('category.page', { category: categorySlug })}
-                  className="inline-flex rounded-full border border-border/60 bg-muted/40 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
+                  variant="outline"
+                  render={<Link href={getRoute('category.page', { category: categorySlug })} />}
                 >
                   {getCategoryDisplayName(categorySlug)}
-                </Link>
+                </Badge>
               ))}
             </div>
           </div>

@@ -275,11 +275,6 @@ code:not(pre code) {
   }
 }
 
-/* A subtle press on the header's submit button. */
-.press-effect:active {
-  transform: scale(0.98);
-}
-
 /* Tailwind v4 dropped the pointer cursor on buttons; shadcn's upgrade guide restores it here
    rather than in each component. */
 @layer base {

@@ -326,14 +326,14 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
               </Link>
               <FieldDescription className="text-center">
                 Not you?{' '}
-                <button
-                  type="button"
-                  className="underline underline-offset-4"
+                <Button
+                  variant="link"
+                  className="h-auto p-0"
                   disabled={pending}
                   onClick={onSignOut}
                 >
                   Sign out
-                </button>
+                </Button>
               </FieldDescription>
             </Field>
           </FieldGroup>
@@ -493,14 +493,14 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                       Resend in <span className="tabular-nums">{formatCountdown(resendIn)}</span>
                     </>
                   ) : (
-                    <button
-                      type="button"
-                      className="underline underline-offset-4"
+                    <Button
+                      variant="link"
+                      className="h-auto p-0"
                       disabled={pending || limitActive}
                       onClick={onResend}
                     >
                       Send a new code
-                    </button>
+                    </Button>
                   )}
                 </FieldDescription>
               </Field>
