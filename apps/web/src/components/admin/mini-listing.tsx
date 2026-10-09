@@ -13,7 +13,7 @@ import type { ListingDetail } from '@/db/contracts'
  * `DetailPageLayout`, #273) and content in small, built from the staged content by
  * `buildSubmissionReviewPreview` (`lib/submissions/review-preview.ts`). It is a picture of the
  * page: Visit Site and the category are inert, and the category is the staged one's name. A
- * revision is an owner's edit, so its preview shows the Verified owner badge, as the live page.
+ * revision's preview shows the Verified owner badge while the listing has a current owner.
  */
 export function MiniListing({
   categoryName,

@@ -192,10 +192,24 @@ describe('admin review queue reads', () => {
       ],
       categoryName: 'Apps',
       kind: 'revision',
-      listing: { id: 'lst_brief', live: true, name: 'Brieflow', slug: 'brieflow.ai' },
+      listing: {
+        id: 'lst_brief',
+        live: true,
+        name: 'Brieflow',
+        slug: 'brieflow.ai',
+        verifiedOwner: true
+      },
       name: 'Brieflow 2',
       stale: true,
       submitter: { email: 'jordan@example.com' }
+    })
+  })
+
+  it("follows the listing's current owner, not the revision's author (#297 review)", async () => {
+    const reads = fixture(`UPDATE listing_owners SET revoked_at = '2026-10-01T00:00:00.000Z',
+      revoked_reason = 'transferred' WHERE listing_id = 'lst_brief';`)
+    expect(await reads.getRevisionReview('rev_brief')).toMatchObject({
+      listing: { verifiedOwner: false }
     })
   })
 })
