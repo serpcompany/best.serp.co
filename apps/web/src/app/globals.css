@@ -58,11 +58,6 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@theme {
-  --breakpoint-3xl: 96rem; /* 1536px */
-  --breakpoint-4xl: 120rem; /* 1920px */
-}
-
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -156,17 +151,6 @@
   }
 }
 
-@utility container {
-  margin-inline: auto;
-  padding-inline: 2rem;
-  @media (width >= --theme(--breakpoint-sm)) {
-    max-width: none;
-  }
-  @media (width >= 1400px) {
-    max-width: 1400px;
-  }
-}
-
 /* Inline code in prose and copy; code blocks style themselves (mdx-components.tsx). */
 code:not(pre code) {
   background-color: var(--muted);
@@ -175,34 +159,6 @@ code:not(pre code) {
   border-radius: var(--radius-sm);
   font-size: 0.875em;
   font-weight: 500;
-}
-
-/* The hero's background blobs. */
-@keyframes blob {
-  0% {
-    transform: translate(0px, 0px) scale(1);
-  }
-  33% {
-    transform: translate(30px, -50px) scale(1.1);
-  }
-  66% {
-    transform: translate(-20px, 20px) scale(0.9);
-  }
-  100% {
-    transform: translate(0px, 0px) scale(1);
-  }
-}
-
-.animate-blob {
-  animation: blob 7s infinite;
-}
-
-.animation-delay-2000 {
-  animation-delay: 2s;
-}
-
-.animation-delay-4000 {
-  animation-delay: 4s;
 }
 
 /* Tailwind v4 dropped the pointer cursor on buttons; shadcn's upgrade guide restores it here

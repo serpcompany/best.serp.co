@@ -338,24 +338,37 @@ test.describe('public parity interactions', () => {
         width
       )
 
-      // The index: the legal nav on Overview and a card for each of the five policies (#282 review).
+      // The index: the legal nav on Overview and a card linking to each of the five policies
+      // (#282 review).
       await gotoPublicPage(page, '/legal/')
       await expect(
         page
           .getByRole('navigation', { name: 'Legal pages' })
           .getByRole('link', { name: 'Overview' })
       ).toHaveAttribute('aria-current', 'page')
-      await expect(page.locator('main [data-list-card] h2')).toHaveText([
+      const legalCards = page.locator('main [data-list-card]')
+      await expect(legalCards.locator('h2')).toHaveText([
         'Privacy Policy',
         'Terms of Service',
         'Cookie Policy',
         'Affiliate Disclosure',
         'DMCA'
       ])
+      expect(
+        await legalCards.evaluateAll(cards => cards.map(card => card.getAttribute('href')))
+      ).toEqual([
+        '/legal/privacy-policy/',
+        '/legal/terms-conditions/',
+        '/legal/cookies/',
+        '/legal/affiliate-disclosure/',
+        '/legal/dmca/'
+      ])
 
-      // The cookie policy's wide tables scroll in their own boxes, with padded cells (#282 review).
+      // The cookie policy's wide tables scroll in their own boxes, with padded cells (#282 review)
+      // that carry no react-markdown `node` attribute (#289).
       await gotoPublicPage(page, '/legal/cookies/')
       await expect(page.locator('article.prose-docs table').first()).toBeVisible()
+      await expect(page.locator('article.prose-docs [node]')).toHaveCount(0)
       expect(
         await page
           .locator('article.prose-docs td')

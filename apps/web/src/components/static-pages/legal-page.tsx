@@ -20,9 +20,9 @@ const legalMarkdownComponents: Components = {
       <table className="w-full" {...props} />
     </div>
   ),
-  tr: components.tr as Components['tr'],
-  th: components.th as Components['th'],
-  td: components.td as Components['td']
+  tr: components.tr,
+  th: components.th,
+  td: components.td
 }
 
 export function generateLegalPageMetadata(path: LegalPagePath): Metadata {

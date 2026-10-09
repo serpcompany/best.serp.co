@@ -1,5 +1,5 @@
 import { Info } from 'lucide-react'
-import ReactMarkdown, { type Components } from 'react-markdown'
+import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import type { WebsiteMetadata } from '../../lib/directory/content-query'
@@ -47,7 +47,7 @@ export function WebsiteContentSection({ website }: WebsiteContentSectionProps) {
           </div>
         ) : null}
         <div className="prose max-w-none prose-headings:scroll-mt-20 dark:prose-invert">
-          <ReactMarkdown components={mdxComponents as Components} remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown components={mdxComponents} remarkPlugins={[remarkGfm]}>
             {renderedContent}
           </ReactMarkdown>
         </div>
