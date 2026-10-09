@@ -1,9 +1,7 @@
 'use client'
 
-import { ArrowUp } from 'lucide-react'
 import Script from 'next/script'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
 
 interface GoogleTagManagerProps {
   gtmId?: string
@@ -72,7 +70,6 @@ export function useAnalyticsEvents() {
     trackProfileUpdateSuccess: noop,
     trackProfileVisibilityToggle: noop,
     trackSearch: noop,
-    trackSearchAutocomplete: noop,
     trackShowAll: noop,
     trackShowLess: noop,
     trackSortChange: noop,
@@ -193,48 +190,4 @@ export function useFavorites(): FavoritesContextValue {
   }
 
   return context
-}
-
-export function BackToTop() {
-  const [isVisible, setIsVisible] = useState(false)
-
-  useEffect(() => {
-    const toggleVisibility = () => {
-      const scrolled = window.scrollY
-      const pageHeight = document.documentElement.scrollHeight
-      const viewportHeight = window.innerHeight
-      const isPageLongEnough = pageHeight > viewportHeight * 1.5
-      const hasScrolledEnough = scrolled > 400
-
-      setIsVisible(isPageLongEnough && hasScrolledEnough)
-    }
-
-    window.addEventListener('scroll', toggleVisibility, { passive: true })
-    toggleVisibility()
-
-    return () => window.removeEventListener('scroll', toggleVisibility)
-  }, [])
-
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    })
-  }
-
-  if (!isVisible) {
-    return null
-  }
-
-  return (
-    <Button
-      variant="outline"
-      size="icon-lg"
-      onClick={scrollToTop}
-      className="fixed right-6 bottom-6 z-50 rounded-full shadow-lg"
-      aria-label="Back to top"
-    >
-      <ArrowUp />
-    </Button>
-  )
 }

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { ComponentType } from 'react'
 import { Suspense } from 'react'
+import { Spinner } from '@/components/ui/spinner'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { resolveCategories } from '../../lib/directory/categories'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
@@ -11,6 +12,7 @@ import { generateBaseMetadata } from '../../lib/seo/seo-config'
 import { externalResources } from '../../lib/site/external-resources'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
+import { SearchPageForm } from './search-page-form'
 
 type SearchResultsSlot = ComponentType
 
@@ -49,7 +51,7 @@ export function SearchIndexPage({ activeCategorySlugs, slots }: SearchIndexPageP
   return (
     <div className="border-t">
       <div className="relative flex h-full w-full max-w-full flex-row flex-nowrap">
-        <div className="sticky top-16 hidden h-screen w-[240px] max-w-[240px] min-w-[240px] overflow-hidden border-r sm:block">
+        <div className="sticky top-14 hidden h-screen w-[240px] max-w-[240px] min-w-[240px] overflow-hidden border-r sm:block">
           <div className="space-y-6 p-4">
             <h2 className="sr-only">Search Filters</h2>
 
@@ -105,19 +107,24 @@ export function SearchIndexPage({ activeCategorySlugs, slots }: SearchIndexPageP
 
         <div className="relative flex h-full w-full flex-col gap-3 px-6 pt-6">
           <section className="space-y-6">
-            <div className="sticky top-16 z-35 -mx-6 border-b bg-background px-6 py-4">
-              <h1 className="text-2xl font-bold">Search</h1>
-              <p className="mt-1 text-muted-foreground">
-                {showExternalResources
-                  ? `Searching across all ${siteCopy.listingName.plural} and resources`
-                  : `Searching across all ${siteCopy.listingName.plural}`}
-              </p>
+            <div className="sticky top-14 z-35 -mx-6 flex flex-col gap-3 border-b bg-background px-6 py-4">
+              <div>
+                <h1 className="text-2xl font-bold">Search</h1>
+                <p className="mt-1 text-muted-foreground">
+                  {showExternalResources
+                    ? `Searching across all ${siteCopy.listingName.plural} and resources`
+                    : `Searching across all ${siteCopy.listingName.plural}`}
+                </p>
+              </div>
+              <Suspense>
+                <SearchPageForm />
+              </Suspense>
             </div>
 
             <Suspense
               fallback={
                 <div className="flex justify-center py-8">
-                  <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-primary-500" />
+                  <Spinner className="size-8" />
                 </div>
               }
             >

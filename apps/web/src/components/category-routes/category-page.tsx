@@ -236,7 +236,7 @@ export function CategoryRoutePage({
               {breadcrumb}
 
               <section className="space-y-6">
-                <div className="sticky top-16 z-35 bg-background border-b py-4 -mx-6 px-6">
+                <div className="sticky top-14 z-35 bg-background border-b py-4 -mx-6 px-6">
                   <div className="flex items-center gap-3">
                     <category.icon className="h-6 w-6" />
                     <h1 className="text-2xl font-bold">{seoContent.h1Title}</h1>

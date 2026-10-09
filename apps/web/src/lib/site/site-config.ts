@@ -43,7 +43,6 @@ export type SiteConfig = {
   legalEmailDomain: string
   listingRouteBasePath: string
   name: string
-  networkBrandGroup: string | null
   networkRouteBasePath: string
   publicUrl: string
   redditUrl: string
@@ -158,7 +157,6 @@ function resolveSiteConfig(configuredSite = site): SiteConfig {
     legalEmailDomain: configuredSite.site.legalEmailDomain ?? configuredSite.site.domain,
     listingRouteBasePath: configuredSite.routes.listingBasePath,
     name: configuredSite.site.name,
-    networkBrandGroup: configuredSite.networkBrandGroup,
     networkRouteBasePath: configuredSite.routes.networkBasePath,
     publicUrl: configuredSite.site.publicUrl,
     redditUrl: configuredSite.social.redditUrl,

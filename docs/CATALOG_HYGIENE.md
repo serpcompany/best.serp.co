@@ -139,7 +139,8 @@ such a listing should leave is the owner's open question.
   Republish and says why ([Admin panel](./ADMIN_PANEL.md#unpublished-listings-answer-410)), a paid
   relist is never offered (and a payment that raced is refunded), and D1 refuses it on any path
   (`0011_retired_categories`: a published listing is never filed under a retired category).
-- **Brands.** `/brands/` shows the shared brand data's `noAdult` group until #193 replaces it.
+- **Brands.** `/brands/` lists devinschumacher.com's brands plus devinschumacher.com (#193), none
+  of them adult (`scripts/network-brands.test.ts`).
 
 ```bash
 pnpm catalog:domains -- adult-manifest   # d1/hygiene/<date>-adult-decisions.yaml →

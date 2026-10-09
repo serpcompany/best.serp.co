@@ -11,7 +11,6 @@ import {
 import { DesignSystemProvider } from './design-system-provider'
 import {
   AnalyticsTracker,
-  BackToTop,
   FavoritesProvider,
   GoogleTagManagerNoScript,
   GoogleTagManagerScript
@@ -75,7 +74,6 @@ export function RootAppShell({
           <FavoritesProvider>
             <AnalyticsTracker />
             {children}
-            <BackToTop />
           </FavoritesProvider>
         </DesignSystemProvider>
         <CloudflareWebAnalyticsBeacon token={cloudflareWebAnalyticsToken} />

@@ -55,8 +55,6 @@ export const site: SiteDefinition = {
     showProjects: false
   },
   id: 'best.serp.co',
-  // No adult brands on best.serp.co (#260): the shared data's group without them.
-  networkBrandGroup: 'noAdult',
   routes: {
     brandsBasePath: 'brands',
     docsBasePath: 'docs',

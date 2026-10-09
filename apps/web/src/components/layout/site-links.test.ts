@@ -1,0 +1,29 @@
+import { describe, expect, it } from 'vitest'
+import { headerItems, isCurrentPage, isMenuActive } from './site-links'
+
+const products = headerItems.find(item => item.kind === 'menu')
+if (products?.kind !== 'menu') throw new Error('the header has a Products menu')
+
+describe('header link states (#259)', () => {
+  it('marks only the exact page as current, with or without a trailing slash', () => {
+    expect(isCurrentPage('/products/categories/', '/products/categories/')).toBe(true)
+    expect(isCurrentPage('/products/categories', '/products/categories/')).toBe(true)
+    expect(isCurrentPage('/products/categories/ai-agents/', '/products/categories/')).toBe(false)
+    expect(isCurrentPage('/products/categories/', '/')).toBe(false)
+  })
+
+  it('marks the Products menu on its section, never on the homepage or other pages', () => {
+    for (const path of [
+      '/products/',
+      '/products/vimeo-downloader/',
+      '/products/categories/',
+      '/products/categories/ai-agents/',
+      '/brands/'
+    ]) {
+      expect(isMenuActive(path, products), path).toBe(true)
+    }
+    for (const path of ['/', '/pricing/', '/about/', '/submit/']) {
+      expect(isMenuActive(path, products), path).toBe(false)
+    }
+  })
+})

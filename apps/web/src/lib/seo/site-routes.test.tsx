@@ -8,7 +8,8 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SITEMAP_INDEX_PATH, sitemapPaths, siteRoutes } from '@/lib/site'
-import { Footer } from '../../components/layout/footer'
+import { SiteFooter } from '../../components/layout/site-footer'
+import { headerItems } from '../../components/layout/site-links'
 import { canonicalPathname } from './canonical-url'
 import { generateBaseMetadata, registeredRoute } from './seo-config'
 import {
@@ -111,12 +112,20 @@ describe('the route registry (#167)', () => {
   })
 
   it('the footer links only registered pages', () => {
-    const html = renderToStaticMarkup(<Footer />)
+    const html = renderToStaticMarkup(<SiteFooter />)
     const internal = [...html.matchAll(/\shref="(\/[^"#?]*)"/gu)].map(match => match[1] ?? '')
     expect(internal.length).toBeGreaterThan(0)
     for (const href of internal) {
       if (href.endsWith('.xml') || href.endsWith('.svg')) continue
       expect(registeredRoute(href), href).toBeDefined()
     }
+  })
+
+  it('the header links only registered pages', () => {
+    const hrefs = headerItems.flatMap(item =>
+      item.kind === 'link' ? [item.link.href] : item.links.map(link => link.href)
+    )
+    expect(hrefs.length).toBeGreaterThan(0)
+    for (const href of hrefs) expect(registeredRoute(href), href).toBeDefined()
   })
 })
