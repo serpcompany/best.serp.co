@@ -1,72 +1,31 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import type {
-  WebsiteBrowseCardMetadata,
-  WebsiteRelatedCardMetadata
-} from '../../lib/directory/content-query'
+import { useFavoritesFilter } from '../../hooks/use-favorites-filter'
+import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import { siteCopy } from '../../lib/site/site-copy'
+import { useAnalyticsEvents } from '../layout/root-shell-client'
+import { LLMGrid } from '../llm/llm-grid'
+import { EmptyState } from './empty-state'
 import { type ListingSort as SortBy, sortListings } from './listing-sort'
+import { WebsitesSearchControls } from './websites-search-controls'
 
-type EmptyStateProps = {
-  actionHref?: string
-  actionLabel?: string
-  description: string
-  onAction?: () => void
-  title: string
-}
-
-type WebsitesSearchControlsProps = {
-  filteredCount: number
-  hasFavorites: boolean
-  searchQuery: string
-  setSearchQuery: (query: string) => void
-  setShowFavoritesOnly: (show: boolean) => void
-  setSortBy: (sort: SortBy) => void
-  showFavoritesOnly: boolean
-  sortBy: SortBy
-  trackSearch: (query: string, count: number, source: string) => void
-  trackSortChange: (from: string, to: string, source: string) => void
-}
-
-type LLMGridProps = {
-  className?: string
-  items: WebsiteRelatedCardMetadata[]
-  maxItems?: number
-}
-
-type WebsitesListWithSearchProps = {
-  analytics: {
-    trackSearch: (query: string, count: number, source: string) => void
-    trackSortChange: (from: string, to: string, source: string) => void
-  }
+interface WebsitesListWithSearchProps {
   displayLimit?: number
   emptyDescription?: string
   emptyTitle?: string
-  favorites: {
-    favoriteWebsites: WebsiteBrowseCardMetadata[]
-    hasFavorites: boolean
-  }
   initialShowFavoritesOnly?: boolean
   initialWebsites: WebsiteBrowseCardMetadata[]
-  slots: {
-    EmptyState: React.ComponentType<EmptyStateProps>
-    LLMGrid: React.ComponentType<LLMGridProps>
-    WebsitesSearchControls: React.ComponentType<WebsitesSearchControlsProps>
-  }
   totalCount?: number
 }
 
 export function WebsitesListWithSearch({
-  analytics,
   displayLimit,
   emptyDescription = `There are no directory entries available. Try checking back later or ${siteCopy.submitLabelSentence}.`,
   emptyTitle = 'No entries found',
-  favorites,
   initialShowFavoritesOnly = false,
   initialWebsites,
-  slots,
   totalCount
 }: WebsitesListWithSearchProps) {
   const [sortBy, setSortBy] = useState<SortBy>('latest')
@@ -75,9 +34,8 @@ export function WebsitesListWithSearch({
   const [isClient, setIsClient] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [allWebsites] = useState<WebsiteBrowseCardMetadata[]>(initialWebsites)
-  const { trackSearch, trackSortChange } = analytics
-  const { favoriteWebsites, hasFavorites } = favorites
-  const { EmptyState, LLMGrid, WebsitesSearchControls } = slots
+  const { trackSearch, trackSortChange } = useAnalyticsEvents()
+  const { favoriteWebsites, hasFavorites } = useFavoritesFilter(initialWebsites)
 
   useEffect(() => {
     requestAnimationFrame(() => {

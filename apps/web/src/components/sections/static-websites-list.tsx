@@ -1,23 +1,8 @@
-import type { ComponentType, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { siteCopy } from '../../lib/site/site-copy'
-
-type SectionProps = {
-  title: string
-  description?: string
-  children: ReactNode
-  viewAllHref?: string
-  viewAllText?: string
-  titleId?: string
-}
-
-type WebsitesListWithSearchProps = {
-  initialWebsites: WebsiteBrowseCardMetadata[]
-  totalCount?: number
-  displayLimit?: number
-  emptyTitle?: string
-  emptyDescription?: string
-}
+import { WebsitesListWithSearch } from '../directory/websites-list-with-search'
+import { Section } from '../layout/section'
 
 interface StaticWebsitesListProps {
   websites: WebsiteBrowseCardMetadata[]
@@ -25,18 +10,13 @@ interface StaticWebsitesListProps {
   displayLimit?: number
   /** Crawlable page links rendered under the list. */
   pagination?: ReactNode
-  slots: {
-    Section: ComponentType<SectionProps>
-    WebsitesListWithSearch: ComponentType<WebsitesListWithSearchProps>
-  }
 }
 
 export function StaticWebsitesList({
   websites,
   totalCount,
   displayLimit,
-  pagination,
-  slots: { Section, WebsitesListWithSearch }
+  pagination
 }: StaticWebsitesListProps) {
   return (
     <Section

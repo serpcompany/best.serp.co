@@ -4,14 +4,11 @@ import {
   CategoryRoutePage,
   generateCategoryRouteMetadata
 } from '@/components/category-routes/category-page'
-import { CategoryWebsitesList } from '@/components/directory/category-websites-list'
 import {
   ListingPagination,
   paginatedMetadata,
   parseListingPageParam
 } from '@/components/directory/listing-pagination'
-import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
-import { JsonLd } from '@/components/seo/json-ld'
 import {
   getCategoryBySlug,
   getListingNamePage,
@@ -19,7 +16,6 @@ import {
 } from '@/lib/catalog/repository'
 import { getCategoryIcon } from '@/lib/directory/categories'
 import { getRoute } from '@/lib/routing/routes'
-import { SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>
@@ -98,20 +94,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         page={listingPage.page}
         pageCount={listingPage.pageCount}
       />
-    ),
-    slots: {
-      CategoryWebsitesList,
-      JsonLd,
-      breadcrumb: (
-        <SiteBreadcrumb
-          items={[
-            { name: 'Categories', href: getRoute('category.index') },
-            { name: category.name, href: categoryPath }
-          ]}
-          baseUrl={SITE_PUBLIC_URL}
-        />
-      )
-    }
+    )
   })
 
   return route.element

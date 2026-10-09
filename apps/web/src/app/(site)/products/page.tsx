@@ -3,10 +3,6 @@ import { notFound } from 'next/navigation'
 import { getHomePageData } from '@/actions/get-home-page-data'
 import { paginatedMetadata, parseListingPageParam } from '@/components/directory/listing-pagination'
 import { HomePageCanonicalTags, HomePageRoute } from '@/components/home/home-page'
-import { FeaturedProjectsSectionRoute as FeaturedProjectsSection } from '@/components/sections/featured-projects-section-route'
-import { RecentlyAddedSectionRoute as RecentlyAddedSection } from '@/components/sections/recently-added-section-route'
-import { StaticWebsitesListRoute as StaticWebsitesList } from '@/components/sections/static-websites-list-route'
-import { JsonLd } from '@/components/seo/json-ld'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata, SITE_NAME } from '@/lib/seo/seo-config'
 import { siteCopy } from '@/lib/site/site-copy'
@@ -43,15 +39,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   return (
     <>
       {page <= 1 ? <HomePageCanonicalTags /> : null}
-      <HomePageRoute
-        data={data}
-        slots={{
-          FeaturedProjectsSection,
-          JsonLd,
-          RecentlyAddedSection,
-          StaticWebsitesList
-        }}
-      />
+      <HomePageRoute data={data} />
     </>
   )
 }

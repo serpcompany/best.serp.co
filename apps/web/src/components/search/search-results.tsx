@@ -1,45 +1,24 @@
 'use client'
 
-import { type ComponentType, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
-import type { WebsiteBrowseCardMetadata } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
+import { EmptyState } from '../directory/empty-state'
 import { SortedListings } from '../directory/sorted-listings'
+import { SearchFilters } from './search-filters'
+import { useSearch } from './use-search'
 
-type EmptyStateProps = {
-  actionHref?: string
-  actionLabel?: string
-  description: string
-  onAction?: () => void
-  title: string
-}
-
-type SearchFiltersProps = {
-  availableCategories: string[]
-  onCategoryChange: (categories: string[]) => void
-  resultCount: number
-  selectedCategories: string[]
-}
-
-export interface SearchResultsViewProps {
-  error: string | null
-  loading: boolean
-  query: string
-  results: WebsiteBrowseCardMetadata[]
-  slots: {
-    EmptyState: ComponentType<EmptyStateProps>
-    SearchFilters: ComponentType<SearchFiltersProps>
-  }
-}
-
-export function SearchResults({ error, loading, query, results, slots }: SearchResultsViewProps) {
+export function SearchResults() {
+  const searchParams = useSearchParams()
+  const query = searchParams.get('q') || ''
+  const { results, loading, error } = useSearch(query)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const { EmptyState, SearchFilters } = slots
 
   const filteredResults = useMemo(() => {
     if (selectedCategories.length === 0) {

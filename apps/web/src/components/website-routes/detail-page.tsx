@@ -23,7 +23,7 @@ import { faqsToShow, WebsiteFaqsSection } from '../website/website-faqs-section'
 import { WebsiteRelatedProjects } from '../website/website-related-projects'
 import { WebsiteResourcesSection } from '../website/website-resources-section'
 
-type WebsiteResourcesSectionWebsite = Pick<WebsiteDetailMetadata, 'resourceLinks' | 'slug'>
+type WebsiteResourcesSectionWebsite = Pick<WebsiteDetailMetadata, 'resourceLinks'>
 
 export async function generateWebsiteDetailRouteMetadata(
   project: WebsiteDetailMetadata
@@ -86,7 +86,6 @@ export function WebsiteDetailRoutePage({
 }) {
   const detailTemplate = resolveListingDetailTemplate(project.entityType)
   const resourcesWebsite: WebsiteResourcesSectionWebsite = {
-    slug: project.slug,
     ...(project.resourceLinks ? { resourceLinks: project.resourceLinks } : {})
   }
   const verifiedOwner = project.verifiedOwner ? { verifiedOwner: true as const } : {}

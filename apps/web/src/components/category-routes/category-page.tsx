@@ -1,10 +1,9 @@
 import type { Metadata } from 'next'
-import type { ComponentType, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { Category } from '../../lib/directory/categories'
 import { getCategorySEO } from '../../lib/directory/category-seo'
 import {
   toWebsiteBrowseCardMetadata,
-  type WebsiteBrowseCardMetadata,
   type WebsiteMetadata
 } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
@@ -18,23 +17,12 @@ import {
 } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
 import { formatListingCount, siteCopy } from '../../lib/site/site-copy'
+import { CategoryWebsitesList } from '../directory/category-websites-list'
 import { PageHero } from '../layout/page-hero'
 import { PageContainer, PageSection } from '../layout/page-shell'
+import { SiteBreadcrumb } from '../layout/site-breadcrumb'
+import { JsonLd } from '../seo/json-ld'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
-
-type JsonLdProps = {
-  data: Record<string, unknown>
-}
-
-type CategoryWebsitesListProps = {
-  initialWebsites: WebsiteBrowseCardMetadata[]
-}
-
-type CategoryRouteSlots = {
-  CategoryWebsitesList: ComponentType<CategoryWebsitesListProps>
-  JsonLd: (props: JsonLdProps) => ReactNode | Promise<ReactNode>
-  breadcrumb: ReactNode
-}
 
 export function generateCategoryRouteStaticParams(categories: Category[]) {
   return categories.map(category => ({
@@ -95,18 +83,14 @@ export function CategoryRoutePage({
   category,
   collection,
   pageProjects,
-  pagination,
-  slots
+  pagination
 }: {
   category: Category
   collection: CategoryCollection
   /** The listings on the requested page, in directory (name) order. */
   pageProjects: WebsiteMetadata[]
   pagination?: ReactNode
-  slots: CategoryRouteSlots
 }) {
-  const { CategoryWebsitesList, JsonLd, breadcrumb } = slots
-
   const seoContent = getCategorySEO(category.slug, category)
   const categoryDisplayName = seoContent.h1Title
   const categoryPath = getRoute('category.page', { category: category.slug })
@@ -213,7 +197,13 @@ export function CategoryRoutePage({
           />
         )}
         <PageSection spacing="hero" className="border-b">
-          {breadcrumb}
+          <SiteBreadcrumb
+            items={[
+              { name: 'Categories', href: getRoute('category.index') },
+              { name: category.name, href: categoryPath }
+            ]}
+            baseUrl={SITE_PUBLIC_URL}
+          />
           <PageHero
             eyebrow={formatListingCount(categoryCount)}
             title={seoContent.h1Title}

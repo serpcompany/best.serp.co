@@ -1,11 +1,10 @@
 import { ArrowRight } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import type { ComponentType, ReactElement, ReactNode } from 'react'
+import type { ReactElement } from 'react'
 import { buttonVariants } from '@/components/ui/button'
 import {
   toWebsiteBrowseCardMetadata,
-  type WebsiteBrowseCardMetadata,
   type WebsiteMetadata
 } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
@@ -20,6 +19,10 @@ import { siteCopy } from '../../lib/site/site-copy'
 import { type ListingPageInfo, ListingPagination } from '../directory/listing-pagination'
 import { PageHero } from '../layout/page-hero'
 import { PageContainer, PageSection } from '../layout/page-shell'
+import { FeaturedProjectsSection } from '../sections/featured-projects-section'
+import { RecentlyAddedSection } from '../sections/recently-added-section'
+import { StaticWebsitesList } from '../sections/static-websites-list'
+import { JsonLd } from '../seo/json-ld'
 
 /** One page of the directory, already in directory (name) order. */
 export interface DirectoryPage extends ListingPageInfo {
@@ -58,32 +61,6 @@ export function buildHomePageData({
     recentlyUpdatedProjects: latest.slice(0, HOMEPAGE_CARD_SECTION_SIZE),
     totalCount
   }
-}
-
-interface JsonLdProps {
-  data: Record<string, unknown>
-}
-
-interface FeaturedProjectsSectionProps {
-  projects: WebsiteBrowseCardMetadata[]
-}
-
-interface RecentlyAddedSectionProps {
-  websites: WebsiteBrowseCardMetadata[]
-}
-
-interface StaticWebsitesListProps {
-  displayLimit: number
-  pagination?: ReactNode
-  totalCount: number
-  websites: WebsiteBrowseCardMetadata[]
-}
-
-export interface HomePageSlots {
-  FeaturedProjectsSection: ComponentType<FeaturedProjectsSectionProps>
-  JsonLd: (props: JsonLdProps) => ReactElement | Promise<ReactElement>
-  RecentlyAddedSection: ComponentType<RecentlyAddedSectionProps>
-  StaticWebsitesList: ComponentType<StaticWebsitesListProps>
 }
 
 /** The homepage URL is the bare origin, `https://best.serp.co`, never `https://best.serp.co/`. */
@@ -138,14 +115,8 @@ export function HomePageCanonicalTags(): ReactElement {
   )
 }
 
-interface HomePageRouteProps {
-  data: HomePageData
-  slots: HomePageSlots
-}
-
-export function HomePageRoute({ data, slots }: HomePageRouteProps): ReactElement {
+export function HomePageRoute({ data }: { data: HomePageData }): ReactElement {
   const { browse, featuredProjects, recentlyUpdatedProjects, totalCount } = data
-  const { FeaturedProjectsSection, JsonLd, RecentlyAddedSection, StaticWebsitesList } = slots
 
   return (
     <>

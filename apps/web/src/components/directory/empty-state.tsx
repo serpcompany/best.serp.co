@@ -1,6 +1,14 @@
-import { FolderOpen, type LucideIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { DirectoryEmpty } from './directory-empty'
+import { FolderOpen } from 'lucide-react'
+import Link from 'next/link'
+import { Button, buttonVariants } from '@/components/ui/button'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from '@/components/ui/empty'
 
 interface EmptyStateProps {
   title: string
@@ -8,61 +16,44 @@ interface EmptyStateProps {
   actionLabel?: string
   actionHref?: string
   onAction?: () => void
-  icon?: LucideIcon
-  iconClassName?: string
-  iconContainerClassName?: string
-  className?: string
-  titleClassName?: string
-  descriptionClassName?: string
 }
 
 /**
- * Display an empty state with optional action button
- * @param props - Component props
- * @param props.title - The title to display
- * @param props.description - The description text
- * @param props.actionLabel - Optional label for the action button
- * @param props.actionHref - Optional href for link-based action
- * @param props.onAction - Optional click handler for button action
- * @param props.icon - Optional custom icon component
- * @param props.iconClassName - Optional className for the icon
- * @param props.iconContainerClassName - Optional className for the icon container
- * @param props.className - Optional className for the container
- * @param props.titleClassName - Optional className for the title
- * @param props.descriptionClassName - Optional className for the description
- * @returns React component
+ * An empty list or search (serplists' `PageEmptyState`, #288): the stock `Empty` with an icon,
+ * the title and description, and an optional action, a button or an in-site link. It sits inside
+ * a page that has its own `h1`, so its title is an `h2`.
  */
 export function EmptyState({
   title,
   description,
   actionLabel,
   actionHref,
-  onAction,
-  icon: Icon = FolderOpen,
-  iconClassName,
-  iconContainerClassName,
-  className,
-  titleClassName,
-  descriptionClassName
+  onAction
 }: EmptyStateProps) {
-  const action =
-    onAction && actionLabel
-      ? { label: actionLabel, onClick: onAction }
-      : actionHref && actionLabel
-        ? { label: actionLabel, path: actionHref }
-        : undefined
+  const action = !actionLabel ? null : onAction ? (
+    <Button type="button" onClick={onAction}>
+      {actionLabel}
+    </Button>
+  ) : actionHref ? (
+    <Link href={actionHref} className={buttonVariants()}>
+      {actionLabel}
+    </Link>
+  ) : null
 
   return (
-    <DirectoryEmpty
-      title={title}
-      description={description}
-      action={action}
-      icon={Icon}
-      iconClassName={cn('h-16 w-16 text-muted-foreground mb-4', iconClassName)}
-      iconContainerClassName={iconContainerClassName}
-      className={className}
-      titleClassName={titleClassName}
-      descriptionClassName={descriptionClassName}
-    />
+    <Empty className="border">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <FolderOpen aria-hidden="true" />
+        </EmptyMedia>
+        <EmptyTitle className="text-2xl">
+          <h2>{title}</h2>
+        </EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+      {action ? (
+        <EmptyContent className="flex-row flex-wrap justify-center">{action}</EmptyContent>
+      ) : null}
+    </Empty>
   )
 }

@@ -7,7 +7,6 @@ import type { WebsiteResourceLink } from '../../lib/seo/website-schema'
 import { Section } from '../layout/section'
 
 type WebsiteResourcesWebsite = {
-  slug: string
   resourceLinks?: WebsiteResourceLink[]
 }
 
