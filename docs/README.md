@@ -21,8 +21,8 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, release flow, cutover checklist | Before any Cloudflare operation or release |
 | [Telemetry](./TELEMETRY.md) | Sentry error reporting, GTM and Cloudflare Web Analytics | You add logging, error reporting, or analytics |
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel | A production write needs undoing |
-| [Catalog hygiene](./CATALOG_HYGIENE.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains | You add or remove listings, or change the domain check |
-| [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, staging before production | You run a `db:*` command or change a release workflow |
+| [Catalog hygiene](./CATALOG_HYGIENE.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains | You add or remove listings, change the domain check, or touch the listing FAQs' `faqsToShow` stopgap |
+| [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, promotion, staging before production, hotfixes | You run a `db:*` command, promote `staging`, open a `hotfix-*` pull request, or change a release workflow |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees | You validate a change, capture runtime evidence, or start a worktree |
 | [CI](./CI.md) | `web.yml` checks and staging deploy, rulesets, runners | A check fails in CI, or you change a workflow |
 | [Dependency security](./DEPENDENCY_SECURITY.md) | Production dependency audit | You add or upgrade a dependency, or the audit fails |

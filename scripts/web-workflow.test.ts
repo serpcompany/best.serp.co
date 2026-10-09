@@ -158,7 +158,7 @@ describe('web workflow', () => {
     })
   })
 
-  it('treats a change as documentation only when every file is under docs/ or Markdown', () => {
+  it('treats a change as documentation only when every file is under docs/, .archive/ or Markdown', () => {
     const find = step('changes', 'Find code changes')
     expect(find.env).toEqual({ BASE: expression('github.event.pull_request.base.sha') })
     // Like git, the stub lists a renamed file only by its new path unless --no-renames is set.
@@ -190,6 +190,9 @@ describe('web workflow', () => {
     expect(classify(['.github/workflows/web.yml'])).toBe('true')
     // Code moved into docs/ is still a code change.
     expect(classify(['apps/web/src/util.ts', 'docs/util.ts'], {}, ['docs/util.ts'])).toBe('true')
+    expect(classify(['apps/web/src/util.ts', '.archive/util.ts'], {}, ['.archive/util.ts'])).toBe(
+      'true'
+    )
     // A push deploys, so it checks the tree it deploys whatever changed; unknown bases run
     // everything.
     expect(classify(['docs/HARNESS.md'], { GITHUB_EVENT_NAME: 'push' })).toBe('true')

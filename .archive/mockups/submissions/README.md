@@ -49,4 +49,4 @@ and the replay failed at the same points.
 
 Changes: `src/build.sh` now resolves paths from its own directory and writes `../index.html`, not
 the scratchpad's `submissions-mockups.html`. The output is unchanged. Example products and URLs
-in the mockups are fictional, so Biome and the link checker skip `docs/mockups/`.
+in the mockups are fictional, so Biome and the link checker skip `.archive/`, where they now live.

@@ -55,7 +55,7 @@ jobs:
             exit 0
           fi
           # Documentation is docs/, .archive/ and Markdown; MDX is site content, so it is code.
-          # Without --no-renames, code moved into docs/ would list only its new path.
+          # Without --no-renames, code moved into docs/ or .archive/ would list only its new path.
           if git diff --name-only --no-renames "$BASE" "$GITHUB_SHA" | grep -qvE '^docs/|^\.archive/|\.md$'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
