@@ -183,6 +183,15 @@ describe('admin review queue reads', () => {
     expect(await reads.getSubmissionReview('missing')).toBeNull()
   })
 
+  it("reads whether a submission's live listing has a current owner (#297 review)", async () => {
+    const reads =
+      fixture(`INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+      VALUES ('lst_keyb', 'user_maya', 'submission', '2026-10-01T00:00:00.000Z');`)
+    expect(await reads.getSubmissionReview('sub_keyb')).toMatchObject({
+      listing: { id: 'lst_keyb', verifiedOwner: true }
+    })
+  })
+
   it('reads a revision with the listing it edits and flags a stale base', async () => {
     const reads = fixture()
     expect(await reads.getRevisionReview('rev_brief')).toMatchObject({
