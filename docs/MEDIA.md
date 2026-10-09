@@ -215,7 +215,7 @@ listing that changed only on production stays refused there; it keeps its produc
 until its rows match staging's again, and is never repointed without the staging check.
 
 Agents prepare and review these files; they never run the uploads or publications
-([Release guards](./RELEASE_GUARDS.md#catalog-data-staging-first)).
+([Catalog publication](./CATALOG_PUBLICATION.md)).
 
 ## Legacy migration
 

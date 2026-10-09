@@ -28,6 +28,8 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel | A production write needs undoing |
 | [Catalog hygiene](./CATALOG_HYGIENE.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains | You add or remove listings, change the domain check, or touch the listing FAQs' `faqsToShow` stopgap |
 | [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, promotion, staging before production, hotfixes | You run a `db:*` command, promote `staging`, open a `hotfix-*` pull request, or change a release workflow |
+| [Catalog publication](./CATALOG_PUBLICATION.md) | Catalog manifests and listing media plans: staging first, the publisher's and uploader's guards | You prepare or publish a `d1/publications/` manifest or a `d1/media/` upload plan |
+| [Credential guards](./CREDENTIAL_GUARDS.md) | Workflow jobs holding the Cloudflare token: no D1 exports, bookmarks before changes, the security boundary | A workflow change gives a job the Cloudflare token, or `deploy-workflows.test.ts` fails on a workflow |
 | [Website guide](../apps/web/docs/agents/web.md) | Design tokens, UI rules, layout blocks, page patterns | You change how a page looks, add a component, or build a page |
 | [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees | You validate a change, capture runtime evidence, or start a worktree |
 | [CI](./CI.md) | `web.yml` checks and staging deploy, rulesets, runners | A check fails in CI, or you change a workflow |
