@@ -121,7 +121,8 @@ test.describe('public parity interactions', () => {
     await expect(favoritesOnlyButton).toBeVisible()
     await favoritesOnlyButton.click()
 
-    await expect(page.getByRole('button', { name: /show all/i })).toBeVisible()
+    // A Toggle (#188): its label stays put and its pressed state says it's on.
+    await expect(favoritesOnlyButton).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByText(/showing \d+ of \d+ matching products/i)).toBeVisible()
 
     const removeFavoriteButton = page
