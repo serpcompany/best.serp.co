@@ -1,4 +1,5 @@
 import { siteConfig } from '../site/site-config'
+import { taxonomyRoutePaths } from '../site/site-routes'
 
 function normalizeBasePath(basePath: string): string {
   return basePath.replace(/^\/+|\/+$/g, '')
@@ -76,13 +77,14 @@ export const routes = {
     index: buildCategoryRoute(''),
     page: buildCategoryRoute()
   },
-  // The taxonomy's tag and best pages (#341, design 2.1). Their pages come with #346; the Worker's
-  // root-level redirect already follows a retired category URL to them (#345).
+  // The taxonomy's tag and best pages (#341, design 2.1), from the route registry.
   tag: {
-    page: buildRouteFromBase(siteConfig.listingRouteBasePath, 'tags/[tag]')
+    index: taxonomyRoutePaths.tagIndex,
+    page: taxonomyRoutePaths.tagPage
   },
   best: {
-    page: '/best/[keyword]/'
+    index: taxonomyRoutePaths.bestIndex,
+    page: taxonomyRoutePaths.bestPage
   },
   about: '/about/',
   account: '/account/',
@@ -124,6 +126,8 @@ type StaticRoutes =
   | 'home'
   | 'account'
   | 'category.index'
+  | 'tag.index'
+  | 'best.index'
   | 'listing.list'
   | 'listing.featured'
   | 'listing.latest'

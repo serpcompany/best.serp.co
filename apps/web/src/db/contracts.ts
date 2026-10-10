@@ -307,6 +307,11 @@ export interface BestPageItem extends ListingSummary {
   blurb?: string
   /** Rendered on the entry's "Visit site" link. */
   linkRel: ListingLinkRel
+  /**
+   * Its most central active tags (`listing_tags.sort_order`, then slug), at most three: the
+   * entry's tag chips beside its hub (design 5.1). Empty when it has none.
+   */
+  tags: ListingTag[]
 }
 
 /** The kinds of taxonomy URL `taxonomy_redirects` can move (#341, design 2.2). */
@@ -348,8 +353,10 @@ export interface CatalogOperations {
   getTagBySlug(slug: string): Promise<PublishedTag | null>
   /**
    * Where a retired or renamed category, tag or best page URL moved (`taxonomy_redirects`, #341
-   * design 2.2), or null when it has no redirect or its target is no longer active. Uncached: one
-   * primary-key seek, asked only after the page missed.
+   * design 2.2), or null when it has no redirect, its target is no longer active, or its target's
+   * page has nothing to show (a category or tag with no public listing, a best page with no
+   * entry, #346 review). The lookup is one uncached primary-key seek, asked only after the page
+   * missed; whether the target renders comes from the cached shell stats, tag stats and best index.
    */
   getTaxonomyRedirect(kind: TaxonomyKind, slug: string): Promise<TaxonomyTarget | null>
   /**

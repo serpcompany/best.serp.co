@@ -16,10 +16,12 @@ import {
 } from '@/lib/catalog/repository'
 import { getCategoryIcon } from '@/lib/directory/categories'
 import { getRoute } from '@/lib/routing/routes'
+import { type PageSearchParams, redirectMovedTaxonomyPage } from '@/lib/routing/taxonomy-redirect'
+import { isCategoryIndexable } from '@/lib/seo/taxonomy-indexing'
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>
-  searchParams: Promise<{ page?: string | string[] }>
+  searchParams: Promise<PageSearchParams>
 }
 
 function presentCategory(storedCategory: PublishedCategory) {
@@ -30,6 +32,12 @@ function presentCategory(storedCategory: PublishedCategory) {
   }
 }
 
+/** The category at `slug` when it has a public listing: the hub renders (#341 design 2.2). */
+async function publicCategory(slug: string): Promise<PublishedCategory | null> {
+  const storedCategory = await getCategoryBySlug(slug)
+  return storedCategory && storedCategory.count > 0 ? storedCategory : null
+}
+
 /**
  * Generates metadata for category pages with SEO-optimized descriptions
  */
@@ -38,7 +46,7 @@ export async function generateMetadata({
   searchParams
 }: CategoryPageProps): Promise<Metadata> {
   const [resolvedParams, resolvedSearchParams] = await Promise.all([params, searchParams])
-  const storedCategory = await getCategoryBySlug(resolvedParams.category)
+  const storedCategory = await publicCategory(resolvedParams.category)
 
   if (!storedCategory) {
     return {
@@ -49,7 +57,8 @@ export async function generateMetadata({
 
   const metadata = await generateCategoryRouteMetadata({
     category: presentCategory(storedCategory),
-    count: storedCategory.count
+    count: storedCategory.count,
+    noindex: !isCategoryIndexable(storedCategory)
   })
   return paginatedMetadata(metadata, {
     basePath: getRoute('category.page', { category: storedCategory.slug }),
@@ -57,11 +66,16 @@ export async function generateMetadata({
   })
 }
 
+/**
+ * A category (a hub, #341) with a public listing renders. Otherwise its URL answers one 308 to
+ * where `taxonomy_redirects` moved it (an old narrow category's tag or best page), else 404.
+ */
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const [resolvedParams, resolvedSearchParams] = await Promise.all([params, searchParams])
-  const storedCategory = await getCategoryBySlug(resolvedParams.category)
+  const storedCategory = await publicCategory(resolvedParams.category)
 
-  if (!storedCategory || storedCategory.count === 0) {
+  if (!storedCategory) {
+    await redirectMovedTaxonomyPage('category', resolvedParams.category, resolvedSearchParams)
     notFound()
   }
 

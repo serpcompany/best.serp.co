@@ -205,7 +205,7 @@ test.describe('with the password', () => {
     for (const [from, to] of [
       ['/about', '/about/'],
       [`/${stagingAccessListing.slug}/`, listing],
-      ['/products/best/', '/products/categories/'],
+      ['/products/best/', '/best/'],
       ['/sitemap.xml', '/sitemap-index.xml']
     ]) {
       const response = await authorized.get(from, { maxRedirects: 0 })

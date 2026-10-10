@@ -18,7 +18,10 @@ function toKeywordValue(value: string): string {
   return value.trim().toLowerCase()
 }
 
-export function getCategorySEO(_slug: string, category: Category): CategorySEOConfig {
+export function getCategorySEO(
+  _slug: string,
+  category: Pick<Category, 'description' | 'name' | 'slug'>
+): CategorySEOConfig {
   // The category record (from D1) carries the canonical display name.
   const categoryName = siteConfig.copy.categoryLabels[category.slug] ?? category.name
   const categoryDescription = category.description

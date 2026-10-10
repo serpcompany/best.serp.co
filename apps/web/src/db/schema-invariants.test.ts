@@ -156,6 +156,24 @@ describe('the #341 taxonomy: tags, best pages, and taxonomy redirects', () => {
     })
   })
 
+  it('moves a tag to another active hub, also bringing a retired one back', () => {
+    const db = taxonomy()
+    const moveTo = (slug: string, set = '') =>
+      `UPDATE tags SET category_id = (SELECT id FROM categories WHERE slug = '${slug}')${set}`
+    const hubOf = () =>
+      db
+        .prepare(
+          'SELECT c.slug AS hub, t.is_active FROM tags t JOIN categories c ON c.id = t.category_id'
+        )
+        .get()
+    db.exec(moveTo('apps'))
+    expect(hubOf()).toEqual({ hub: 'apps', is_active: 1 })
+    // Retired under a retired hub, it comes back moved to an active hub in the same statement.
+    db.exec(`UPDATE tags SET is_active = 0; ${retireHub('apps')}`)
+    db.exec(moveTo('tools', ', is_active = 1'))
+    expect(hubOf()).toEqual({ hub: 'tools', is_active: 1 })
+  })
+
   it('never retires a hub with an active tag, and never deletes a hub with any tag', () => {
     const db = taxonomy()
     // With its listing unpublished, only the active tag holds `tools`.
