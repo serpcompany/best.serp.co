@@ -87,8 +87,8 @@ Issues and labels never grant production, database, or deployment authority.
   static export, or GitHub Pages deploy path. The legacy `products.json` was the one-time
   import's input (archived), never an application input.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
-- Public URLs are part of the SEO contract: `/products/<slug>/`,
-  `/products/categories/<category>/`. Changing a route requires permanent redirects.
+- Public URLs are part of the SEO contract: `/products/<slug>/`, `/products/categories/<category>/`,
+  `/products/tags/<tag>/`, `/best/<keyword>/`. Changing a route requires permanent redirects.
 - Route production mutations through protected GitHub Actions only, apart from the owner's
   emergency `pnpm deploy:*` and the admin panel (`/admin`, #64): an admin's decision writes
   production D1 through the reviewed plans, behind Cloudflare Access, the allowlist, and an

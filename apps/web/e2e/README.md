@@ -69,7 +69,8 @@ skip then.
 
 - The repo workflow only runs E2E when changes touch E2E-relevant frontend paths.
 - Keep route expectations aligned with the active best.serp.co Worker and D1 contract
-  (`/products/<slug>/`, `/products/categories/<category>/`, `/sitemap-*.xml`), not a removed
+  (`/products/<slug>/`, `/products/categories/<category>/`, `/products/tags/<tag>/`,
+  `/best/<keyword>/`, `/sitemap-*.xml`), not a removed
   starter app, the former multi-site platform, or the older llms-era route map.
 - `pnpm test:e2e` is functional coverage by default. Visual snapshot coverage is opt-in with
   `pnpm test:e2e:visual` because snapshots are platform-specific and should be updated only from a

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { dirname, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { site } from '../apps/web/src/lib/site'
-import { auditArtifactSitemaps, parseSitemapLocs } from './audit-sitemaps.ts'
+import { auditArtifactSitemaps, parseSitemapLocs, sitemapMayBeEmpty } from './audit-sitemaps.ts'
 
 const tempDirs: string[] = []
 
@@ -81,6 +81,43 @@ describe('auditArtifactSitemaps', () => {
 
     expect(audit.urlCount).toBe(2)
     expect(audit.issues).toEqual([])
+  })
+
+  // #346: the taxonomy's sitemaps list nothing until its tags and best pages are published.
+  it('accepts an empty tag or best-page sitemap, and reports any other empty one', () => {
+    const artifactDir = makeTempArtifactDir()
+    const sitemapIndex = [
+      '<sitemapindex>',
+      ...[
+        '/sitemaps/pages/1.xml',
+        '/sitemap-tags.xml',
+        '/sitemap-best.xml',
+        '/sitemap-empty.xml'
+      ].map(path => `<sitemap><loc>https://example.com${path}</loc></sitemap>`),
+      '</sitemapindex>'
+    ].join('')
+    writeFile(
+      resolve(artifactDir, 'robots.txt'),
+      'User-agent: *\nAllow: /\nSitemap: https://example.com/sitemap-index.xml\n'
+    )
+    writeFile(resolve(artifactDir, 'sitemap-index.xml'), sitemapIndex)
+    writeFile(resolve(artifactDir, 'sitemap.xml'), sitemapIndex)
+    writeFile(
+      resolve(artifactDir, 'sitemaps/pages/1.xml'),
+      '<urlset><url><loc>https://example.com/</loc><lastmod>2026-06-19</lastmod></url></urlset>'
+    )
+    for (const path of ['sitemap-tags.xml', 'sitemap-best.xml', 'sitemap-empty.xml']) {
+      writeFile(resolve(artifactDir, path), '<urlset></urlset>')
+    }
+    writeFile(resolve(artifactDir, 'index.html'))
+
+    const empty = auditArtifactSitemaps(makeSiteConfig(), artifactDir).issues.filter(
+      issue => issue.message === 'Sitemap file contains no loc entries.'
+    )
+    expect(empty.map(issue => issue.sitemapUrl)).toEqual(['https://example.com/sitemap-empty.xml'])
+    expect(sitemapMayBeEmpty('https://best.serp.co/sitemap-best.xml')).toBe(true)
+    expect(sitemapMayBeEmpty('/sitemap-tags.xml')).toBe(true)
+    expect(sitemapMayBeEmpty('https://best.serp.co/sitemap-products.xml')).toBe(false)
   })
 
   it('reports unreferenced sitemap files left in the artifact', () => {

@@ -170,6 +170,10 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
     // Domain-name slugs are pages, and an existing bad slug can still be renamed away.
     expect(() => manifestSchema.parse(rename('old-slug', 'autoenhance.ai'))).not.toThrow()
     expect(() => manifestSchema.parse(rename('chart.js', 'chart-js'))).not.toThrow()
+    // The site's own pages under /products/ are reserved (#341).
+    for (const to of ['categories', 'tags']) {
+      expect(() => manifestSchema.parse(rename('old-slug', to)), to).toThrow(/categories or tags/u)
+    }
   })
 
   it('takes an ISO instant or the calendar date imported listings store as publishedAt', () => {

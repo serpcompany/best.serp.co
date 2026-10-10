@@ -57,9 +57,9 @@ const NOW = new Date('2026-10-06T12:00:00.000Z')
 const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   // 60 pages; the tag-only pools come from the tag stats, so only pools with a category are read
   'best-index': 6_000, // 4,353, cached per epoch
-  'best-page-items': 2_500, // the 335-listing tag, 25 entries: 1,860
+  'best-page-items': 2_500, // the 335-listing tag, 25 entries with their tags (#346): 2,002
   'canonical-redirect': 10, // one of 50 redirects: 2
-  'legacy-root-target': 10, // a retired category URL and its best page's tag and category: 4
+  'legacy-root-target': 10, // a retired category URL, its target, and whether it renders (#346): 8
   'featured-summaries': 2_500, // 100 featured: 1,887 (walks the publication index)
   'latest-summaries': 1_500, // 100 latest: 829
   'listing-detail': 100, // the most FAQs, links and images, and its tags: 44
@@ -315,6 +315,27 @@ const hostedLogo = new Set(
  * its category, or both, less its exclusions, plus its public pins; pins by position, then tag
  * centrality, hosted logos first, then name and slug in binary order.
  */
+/**
+ * Whether a moved URL's target page renders (#346 review), which `getTaxonomyRedirect` and the
+ * root-level lookup require before they follow it: a category or tag with a public listing, a
+ * best page with an entry, or the directory.
+ */
+function targetRenders(redirect: (typeof scale.taxonomyRedirects)[number]): boolean {
+  const slug = redirect.targetSlug ?? ''
+  switch (redirect.targetKind) {
+    case 'directory':
+      return true
+    case 'category':
+      return (publicMembers.get(slug) ?? 0) > 0
+    case 'tag':
+      return (tagMembers.get(slug) ?? []).some(listing => isLive.has(listing))
+    case 'best': {
+      const page = scale.bestPages.find(candidate => candidate.slug === slug)
+      return page ? expectedBestPage(page).poolSize > 0 : false
+    }
+  }
+}
+
 function expectedBestPage(page: ScaleBestPage): { items: string[]; poolSize: number } {
   const entries = scale.bestPageEntries.filter(entry => entry.bestPageId === page.id)
   const excluded = new Set(entries.filter(entry => entry.excluded).map(entry => entry.listingId))
@@ -832,12 +853,14 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       ).toEqual(expected.items)
     }
     expect(await ops.getBestPageItems('no-such-page')).toEqual([])
-    // Redirects of each kind, a retired category's, and a miss.
+    // Redirects of each kind, a retired category's, and a miss; only to a target that renders.
     for (const redirect of scale.taxonomyRedirects) {
       expect(
         await ops.getTaxonomyRedirect(redirect.sourceKind, redirect.sourceSlug),
         redirect.sourceSlug
-      ).toEqual({ kind: redirect.targetKind, slug: redirect.targetSlug })
+      ).toEqual(
+        targetRenders(redirect) ? { kind: redirect.targetKind, slug: redirect.targetSlug } : null
+      )
     }
     expect(await ops.getTaxonomyRedirect('category', 'x'.repeat(300))).toBeNull()
     // The detail with the widest related-by-tags scan, one whose tags yield fewer than four (its
@@ -900,10 +923,16 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
     expect(await target(small.slug)).toEqual({ kind: 'category', slug: small.slug })
     expect(await target(redirect.oldSlug)).toEqual({ kind: 'listing', slug: redirect.newSlug })
     for (const moved of scale.taxonomyRedirects.filter(item => item.sourceKind === 'category')) {
-      // An old slug that names an active category still renders it.
-      const expected = categoryBySlug.get(moved.sourceSlug)?.isActive
+      // An old slug that names an active category with a public listing still renders it; else
+      // it moves, but only to a target that renders (#346 review).
+      const renders =
+        categoryBySlug.get(moved.sourceSlug)?.isActive &&
+        (publicMembers.get(moved.sourceSlug) ?? 0) > 0
+      const expected = renders
         ? { kind: 'category', slug: moved.sourceSlug }
-        : { kind: 'moved', target: { kind: moved.targetKind, slug: moved.targetSlug } }
+        : targetRenders(moved)
+          ? { kind: 'moved', target: { kind: moved.targetKind, slug: moved.targetSlug } }
+          : null
       expect(await target(moved.sourceSlug), moved.sourceSlug).toEqual(expected)
     }
     expect(await target(unpublished.slug)).toBeNull()

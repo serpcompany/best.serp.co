@@ -228,6 +228,15 @@ describe('taxonomy reads (#345)', () => {
       category: 'primary',
       media: { logo: 'best.serp.co/listings/bravo/logo/0123456789abcdef.png' }
     })
+    // Each entry's active tags for its chips (#346, design 5.1), the most central first: the
+    // retired tag is left out, and ties go by slug.
+    expect(writers.map(item => [item.slug, item.tags.map(tag => tag.slug)])).toEqual([
+      ['delta', ['writers']],
+      ['echo', ['editors']],
+      ['bravo', ['editors', 'writers']],
+      ['alpha', ['editors', 'writers']]
+    ])
+    expect(writers[0]?.tags).toEqual([{ name: 'Writers', slug: 'writers' }])
     // A category alone: every member, less bravo (excluded), by name.
     expect(await slugs('best-primary')).toEqual(['alpha', 'charlie', 'delta', 'echo'])
     // A tag within a category: bravo pinned from outside the category, then centrality.
@@ -259,6 +268,16 @@ describe('taxonomy reads (#345)', () => {
       operation: 'best-page-items',
       state: 'hit'
     })
+
+    // An entry cached before items carried their tags is read again from D1 (#346).
+    const untagged = new MemoryCatalogCache()
+    untagged.values.set(`catalog-best-items:v8:${epoch}:best-primary`, {
+      items: items.map(({ tags: _tags, ...item }) => item),
+      publicationVersion: 1
+    })
+    const retagged = operations(untagged)
+    expect(await retagged.operations.getBestPageItems('best-primary')).toEqual(items)
+    expect(queries(retagged.events)).toContain('best-page-items')
 
     // A corrupt entry is read again from D1.
     const corrupt = new MemoryCatalogCache()
@@ -306,6 +325,28 @@ describe('taxonomy reads (#345)', () => {
     expect(await catalog.getTaxonomyRedirect('category', 'old-best-retired-tag')).toBeNull()
     expect(await catalog.getTaxonomyRedirect('tag', 'old-hub')).toBeNull()
     expect(await catalog.getTaxonomyRedirect('category', 'missing')).toBeNull()
+  })
+
+  // #346 review: a 308 to a page that answers 404 would be a broken moved URL.
+  it('follows a moved URL only to a target whose page renders', async () => {
+    const { events, operations: catalog } = operations()
+    // Active, but with nothing to show: a category and a tag with no public listing, and a best
+    // page with no entry.
+    expect(await catalog.getCategoryBySlug('empty')).toMatchObject({ count: 0 })
+    expect(await catalog.getTagBySlug('idle')).toMatchObject({ count: 0 })
+    expect(await catalog.getBestPageBySlug('best-idle')).toMatchObject({ poolSize: 0 })
+    for (const slug of ['old-empty-hub', 'old-idle-tag', 'old-idle-best']) {
+      expect(await catalog.getTaxonomyRedirect('category', slug), slug).toBeNull()
+    }
+    // An empty category's own URL follows its redirect when the target renders.
+    expect(await catalog.getTaxonomyRedirect('category', 'empty')).toEqual({
+      kind: 'tag',
+      slug: 'writers'
+    })
+    // The check reads the cached shell stats, tag stats and best index: one seek per lookup.
+    const start = events.length
+    await catalog.getTaxonomyRedirect('category', 'old-idle-best')
+    expect(queries(events.slice(start))).toEqual(['taxonomy-redirect'])
   })
 
   it('carries active tags on the detail and ranks related listings by shared tags', async () => {

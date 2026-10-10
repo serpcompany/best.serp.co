@@ -197,12 +197,14 @@ export function listingTitle(name: string): string {
 }
 
 export function generateDynamicMetadata(options: {
-  type: 'website' | 'listing' | 'category' | 'member' | 'guide' | 'doc'
+  type: 'website' | 'listing' | 'category' | 'tag' | 'member' | 'guide' | 'doc'
   name: string
   description: string
   slug: string
   additionalKeywords?: string[]
   image?: OgImage
+  /** `noindex, follow`: a page the taxonomy's robots predicates keep out of search (#341). */
+  noindex?: boolean
   publishedAt?: string
   updatedAt?: string
 }): Metadata {
@@ -213,6 +215,7 @@ export function generateDynamicMetadata(options: {
     slug,
     additionalKeywords = [],
     image,
+    noindex,
     publishedAt,
     updatedAt
   } = options
@@ -228,6 +231,10 @@ export function generateDynamicMetadata(options: {
       break
     case 'category':
       path = getRoute('category.page', { category: slug })
+      title = name
+      break
+    case 'tag':
+      path = getRoute('tag.page', { tag: slug })
       title = name
       break
     case 'member':
@@ -249,7 +256,8 @@ export function generateDynamicMetadata(options: {
     description,
     path,
     keywords: [...KEYWORDS.global, ...additionalKeywords],
-    image
+    image,
+    noindex
   })
 
   if ((type === 'guide' || type === 'website' || type === 'listing') && publishedAt) {

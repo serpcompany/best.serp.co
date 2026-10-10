@@ -73,6 +73,10 @@ describe('moved-URL redirects', () => {
       '/products/autoenhance.ai/',
       '/products/categories/',
       '/products/categories/video-downloaders/',
+      '/products/tags/',
+      '/products/tags/ai-chatbots/',
+      '/best/',
+      '/best/ai-chatbot/',
       '/about/',
       '/legal/privacy-policy/',
       '/legal/terms-conditions/',
@@ -117,6 +121,22 @@ describe('moved-URL redirects', () => {
         source
       ).toMatchObject({ destination, permanent: true })
     }
+  })
+
+  it('send the old /products/best index to the best-page index, and its old pages to categories (#341)', () => {
+    expect(rules.find(rule => rule.source === '/products/best')).toMatchObject({
+      destination: getRoute('best.index'),
+      permanent: true
+    })
+    expect(getRoute('best.index')).toBe('/best/')
+    expect(rules.find(rule => rule.source === '/products/best/:category')).toMatchObject({
+      destination: '/products/categories/:category/',
+      permanent: true
+    })
+    expect(rules.find(rule => rule.source === '/products/best/featured')).toMatchObject({
+      destination: getRoute('category.index'),
+      permanent: true
+    })
   })
 
   it('no longer redirects the retired /news (the Worker answers it 410)', () => {

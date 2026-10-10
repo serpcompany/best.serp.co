@@ -1,6 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { isValidAssetReference } from '@/lib/asset-reference'
 import { hasFileExtension } from '@/lib/file-extensions'
+import { isReservedListingSlug } from '@/lib/site/site-routes'
 import { type UrlKey, urlKey } from '@/lib/url-key'
 import type { CompiledQuery, Database } from './client'
 import type { ListingDetail } from './contracts'
@@ -284,6 +285,10 @@ function keyOf(website: string): UrlKey | { message: string } {
   // would be treated as a file and lose its trailing slash.
   if (hasFileExtension(key.hostKey)) {
     return { message: 'This website address can’t be listed: it ends in a file extension.' }
+  }
+  // `/products/categories/` and `/products/tags/` are the site's own pages (#341).
+  if (isReservedListingSlug(key.hostKey)) {
+    return { message: 'This website address can’t be listed: its page address is reserved.' }
   }
   return key
 }

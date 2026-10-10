@@ -22,6 +22,7 @@ import {
 import { validatePublicHttpUrl } from '../apps/web/src/db/public-url'
 import { BEST_PAGE_LIST_SIZE, taxonomyRedirectSourceKinds } from '../apps/web/src/db/schema'
 import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
+import { isReservedListingSlug } from '../apps/web/src/lib/site'
 import { assertD1Compatible } from './d1-compat'
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import {
@@ -59,9 +60,14 @@ const existingSlug = z.string().regex(/^[a-z0-9.-]+$/)
 // A listing page is `/products/<slug>/`; a slug ending in a file extension (`chart.js`) would
 // make it a file URL without its trailing slash, so a published slug never ends in one.
 // Category slugs have no dots.
-const slug = existingSlug.refine(value => !hasFileExtension(value), {
-  message: 'A listing slug cannot end in a file extension; its page would be served as a file.'
-})
+const slug = existingSlug
+  .refine(value => !hasFileExtension(value), {
+    message: 'A listing slug cannot end in a file extension; its page would be served as a file.'
+  })
+  // `/products/categories/` and `/products/tags/` are the site's own pages (#341).
+  .refine(value => !isReservedListingSlug(value), {
+    message: 'A listing slug cannot be categories or tags; the site serves those pages itself.'
+  })
 const categorySlug = z.string().regex(/^[a-z0-9-]+$/)
 const listingId = z.string().regex(/^lst_[a-z0-9][a-z0-9_-]{7,63}$/)
 const checksum = z.string().regex(/^[a-f0-9]{64}$/)
