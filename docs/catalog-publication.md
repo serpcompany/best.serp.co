@@ -116,7 +116,8 @@ three), and `details` (only the fields that change, at least one).
 The batch is refused, with nothing written, when:
 
 - the slug or any of the three fields isn't exactly `expected`, or the listing isn't approved;
-- its own submission is in review (`paid_pending_review` or `changes_requested`);
+- its own submission is in review (`paid_pending_review` or `changes_requested`), or stands
+  rejected: the listing stays down and read-only, as in the admin panel;
 - a new website is another listing's, the host of a submission in flight, or under a block
   (`listingWebsiteConflicts`, which the admin edit checks too).
 
@@ -126,7 +127,7 @@ its slug, name, description, or website changed since the manifest'`.
 
 The manifest itself is refused when a field in `details` equals `expected`, the name is over 80
 characters or the description over 160 (the admin panel's limits), or the website isn't a public
-HTTP(S) URL.
+HTTP(S) URL. All three are trimmed first, as the admin edit stores them.
 
 Like `listing-categories-set`, it sets `updated_at` (the sitemap `lastmod`), gives the listing a
 new checksum, so an admin edit or owner revision read before it is refused as stale, and logs an

@@ -278,4 +278,5 @@ that batch. Publish it where it was refused; where the original applied, there i
   and fixes faceapp.com's description; `-categories` moves the 4 with a live category.
 
 `scripts/mismatch-manifests.test.ts` keeps them identical to the audit and disjoint from #332's,
-#333's, and #338's, and replays them after #333's. Publish them after those, staging first.
+#333's, and #338's, and replays them after #333's. Publish them after those, staging first. A later
+manifest may change the same listings; a held listing decided later goes into a new manifest.

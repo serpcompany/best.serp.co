@@ -4,7 +4,10 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { z } from 'zod'
-import { listingWebsiteConflicts } from '../apps/web/src/db/listing-plans'
+import {
+  listingSubmissionRejected,
+  listingWebsiteConflicts
+} from '../apps/web/src/db/listing-plans'
 import { IMAGE_CONTENT_TYPES, MAX_IMAGE_SIDE } from '../apps/web/src/db/media-format'
 import {
   contentTypeForKey,
@@ -324,8 +327,8 @@ const operation = z.discriminatedUnion('action', [
    * was renamed, or its copy describes something else), compared and swapped on its slug and all
    * three current values (`expected`), so it is row-level like `listing-categories-set`. `details`
    * names only what changes. As the admin panel's edit does (#64), it refuses a listing that isn't
-   * approved or whose own submission is in review, and a new website that another listing, a
-   * submission in flight, or a block already covers (`listingWebsiteConflicts`).
+   * approved or whose own submission is in review or was rejected, and a new website that another
+   * listing, a submission in flight, or a block already covers (`listingWebsiteConflicts`).
    */
   z
     .object({
@@ -344,7 +347,8 @@ const operation = z.discriminatedUnion('action', [
         .object({
           name: z.string().trim().min(1).max(LISTING_NAME_MAX).optional(),
           description: z.string().trim().min(1).max(LISTING_DESCRIPTION_MAX).optional(),
-          website: z.string().url().optional()
+          // Trimmed as the admin edit stores it, so the exact website match still finds it.
+          website: z.string().trim().url().optional()
         })
         .strict()
     })
@@ -1178,6 +1182,13 @@ export function buildPublicationPlan(
           `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
           op.id,
           `${label}: its own submission is in review`
+        ),
+        // As in the admin panel: a listing whose own submission stands rejected stays down and
+        // read-only (`docs/admin-panel.md`). Its row is still `approved`, with `is_active=0`.
+        statement(
+          `SELECT CASE WHEN ${listingSubmissionRejected('?')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.id,
+          `${label}: its own submission was rejected`
         ),
         ...(conflicts.length > 0
           ? [

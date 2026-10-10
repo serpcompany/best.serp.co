@@ -21,17 +21,20 @@
  *
  * Every operation expects the listing as the reviewed catalog's inventory
  * (d1/hygiene/2026-10-10-other-inventory.json) lists it: its categories (`[other]`), website, name,
- * and description. No other committed manifest may change those for these listings, or their
- * `expected` would be stale (`committedListingChanges`). The manifests are row-level
+ * and description. No manifest they are published after (`precedingManifests`) may change those
+ * for these listings, or their `expected` would be stale (`committedListingChanges`); a later one
+ * may. A held listing decided later goes into a new manifest id, never into these: once a manifest
+ * succeeds on an environment, `publication_runs` refuses its id there. The manifests are row-level
  * (`concurrency: rows`): each operation refuses its whole batch if the listing changed since, so
  * one file applies on staging and production alike. It reads only committed files: no D1, and
  * nothing from `.archive/`.
  */
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse, stringify } from 'yaml'
 import { buildPublicationPlan, parseManifest } from './d1-publisher'
+import { committedOtherCategoryManifests } from './other-categories-manifest'
 
 export const mismatchVerdicts = [
   'keep-recategorize',
@@ -128,24 +131,31 @@ const removalReasons: Partial<Record<MismatchVerdict, string>> = {
 }
 
 /**
- * Manifests `d1-remote-publisher.test.ts` writes and removes while the suite runs; they are never
- * committed, so they are skipped, as `d1-compat.test.ts` skips them.
+ * The committed manifests the #340 manifests are published after, by file name: #333's Other
+ * batches and `other-removals`, #332's duplicates, and #338's slug redirects, all of 2026-10-10.
+ * Every earlier manifest is already in the reviewed inventory. A later manifest is published after
+ * these three, so it may change the same listings (#341 files the renames left in Other) without
+ * making their `expected` stale; it is not read.
  */
-const transientManifests = new Set([
-  'remote-publisher-media-test.yaml',
-  'remote-publisher-test.yaml'
-])
+export function precedingManifests(directory = 'd1/publications'): string[] {
+  return [
+    ...committedOtherCategoryManifests(directory),
+    '2026-10-10-other-removals.yaml',
+    '2026-10-10-duplicate-listings.yaml',
+    '2026-10-10-duplicate-listings-redirects.yaml'
+  ]
+}
 
 /**
- * The listings whose categories, live state, slug, or details a committed manifest changes, by id
- * (the manifest's file name): #333's batches move them, #332's and every hygiene manifest
+ * The listings whose categories, live state, slug, or details a preceding manifest changes, by id
+ * (the manifest's file name): #333's batches move them, #333's removals and #332's duplicates
  * unpublish them. A slug redirect's two listings count too (#338): unpublishing its target would
  * send its source back to 410. Media updates and claim holds change none of what these manifests
  * expect.
  */
 export function committedListingChanges(
   directory = 'd1/publications',
-  except: readonly string[] = Object.values(mismatchManifestIds).map(id => `${id}.yaml`)
+  manifests: readonly string[] = precedingManifests(directory)
 ): Map<string, string> {
   const changing = new Set([
     'listing-create',
@@ -158,11 +168,7 @@ export function committedListingChanges(
     'listing-details-set'
   ])
   const changes = new Map<string, string>()
-  for (const name of readdirSync(resolve(directory))
-    .filter(
-      file => /\.ya?ml$/u.test(file) && !except.includes(file) && !transientManifests.has(file)
-    )
-    .sort()) {
+  for (const name of manifests) {
     const manifest = parse(readFileSync(resolve(directory, name), 'utf8')) as {
       operations?: Array<{
         action?: string
@@ -172,11 +178,17 @@ export function committedListingChanges(
         to?: { id?: string }
       }>
     } | null
+    // Each listing names the first manifest that changes it.
+    const change = (id: string | undefined) => {
+      if (id && !changes.has(id)) changes.set(id, name)
+    }
     for (const operation of manifest?.operations ?? []) {
-      const id = operation.id ?? operation.listing?.id
-      if (id && operation.action && changing.has(operation.action)) changes.set(id, name)
-      if (operation.action === 'listing-slug-redirect')
-        for (const end of [operation.from?.id, operation.to?.id]) if (end) changes.set(end, name)
+      if (operation.action && changing.has(operation.action))
+        change(operation.id ?? operation.listing?.id)
+      if (operation.action === 'listing-slug-redirect') {
+        change(operation.from?.id)
+        change(operation.to?.id)
+      }
     }
   }
   return changes

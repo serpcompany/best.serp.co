@@ -1749,6 +1749,23 @@ describe('listing-details-set in a row-level manifest (#340: a renamed product)'
     }
   )
 
+  it('refuses a listing whose own submission was rejected, which stays down and read-only', () => {
+    const db = database()
+    // A live rejection unpublishes the listing and leaves its row approved (submission-plans.ts).
+    db.exec(`UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test';
+      INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+        logo_url,status,plan,paid_at,listing_id,rejection_reason,rejection_category)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l','rejected',
+        'paid','${now}','lst_sqlite_test','No','prohibited')`)
+    const before = details(db)
+    for (const change of [renamed, { description: 'Fixed.' }]) {
+      expect(() => publish(db, [set(change)]), JSON.stringify(change)).toThrow(
+        'listing-details-set old-slug: its own submission was rejected'
+      )
+      expectRefused(db, before)
+    }
+  })
+
   it.each(['draft', 'review', 'rejected'])('refuses a listing in %s', status => {
     const db = database()
     db.exec(`UPDATE listings SET status='${status}' WHERE id='lst_sqlite_test'`)
@@ -1764,6 +1781,14 @@ describe('listing-details-set in a row-level manifest (#340: a renamed product)'
     db.exec("UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test'")
     publish(db, [set(renamed)])
     expect(details(db)).toMatchObject({ ...renamed, status: 'approved', is_active: 0 })
+  })
+
+  it('stores the website trimmed, as the admin edit does, so exact website matches find it', () => {
+    const db = database()
+    const padded = { ...renamed, website: ` ${renamed.website}\n` }
+    expect(rows([set(padded)]).operations[0]).toMatchObject({ details: renamed })
+    publish(db, [set(padded)])
+    expect(details(db)).toMatchObject(renamed)
   })
 
   it('refuses details that change nothing, a non-public website, and over-long copy', () => {

@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
@@ -12,6 +13,7 @@ import {
   type MismatchEntry,
   mismatchManifestIds,
   mismatchOperations,
+  precedingManifests,
   readMismatchInputs
 } from './mismatch-manifests.ts'
 import { committedOtherCategoryManifests } from './other-categories-manifest.ts'
@@ -258,20 +260,72 @@ describe('the mismatch manifests (#340)', () => {
   })
 
   it("leaves out every listing #333's batches move, #332 retires, or other-removals removes", () => {
-    const changes = committedListingChanges()
-    // The named manifests are among the ones scanned.
-    const sources = new Set(changes.values())
-    for (const name of [
+    // Exactly the manifests these are published after, each of which changes some listing.
+    expect(precedingManifests()).toEqual([
       ...committedOtherCategoryManifests(),
+      '2026-10-10-other-removals.yaml',
       '2026-10-10-duplicate-listings.yaml',
-      '2026-10-10-duplicate-listings-redirects.yaml',
-      '2026-10-10-other-removals.yaml'
+      '2026-10-10-duplicate-listings-redirects.yaml'
     ])
-      expect(sources.has(name), name).toBe(true)
+    expect(committedOtherCategoryManifests()).toHaveLength(9)
+    const changes = committedListingChanges()
+    const sources = new Set(changes.values())
+    for (const name of precedingManifests()) expect(sources.has(name), name).toBe(true)
     for (const id of Object.values(mismatchManifestIds))
       for (const operation of committed(id).operations)
         if ('id' in operation && 'slug' in operation)
           expect(changes.get(operation.id), `${id}: ${operation.slug}`).toBeUndefined()
+  })
+
+  it('ignores a later manifest that changes one of these listings (#341 filing a rename)', () => {
+    const { entries: decided, inventory: listings, liveCategories } = readMismatchInputs()
+    const govdash = committed(mismatchManifestIds.renames).operations.find(
+      operation => 'slug' in operation && operation.slug === 'govdash.com'
+    ) as { id: string; slug: string }
+    const later = {
+      version: 1,
+      id: '2026-10-11-proposed-categories',
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test' },
+      operations: [
+        {
+          action: 'listing-categories-set',
+          id: govdash.id,
+          slug: govdash.slug,
+          reason: 'a later manifest',
+          expected: ['other'],
+          categories: ['ai-sales-tools']
+        }
+      ]
+    }
+    const directory = mkdtempSync(join(tmpdir(), 'mismatch-manifests-'))
+    try {
+      for (const name of precedingManifests())
+        writeFileSync(join(directory, name), readFileSync(resolve('d1/publications', name)))
+      writeFileSync(join(directory, '2026-10-11-proposed-categories.yaml'), JSON.stringify(later))
+      const changes = committedListingChanges(directory)
+      expect(changes.get(govdash.id)).toBeUndefined()
+      // The committed manifests still generate unchanged.
+      for (const { id, source } of buildMismatchManifests(
+        decided,
+        listings,
+        liveCategories,
+        changes
+      ))
+        expect(readFileSync(resolve('d1/publications', `${id}.yaml`), 'utf8'), id).toBe(source)
+      // The same change in a manifest these follow refuses them.
+      writeFileSync(join(directory, '2026-10-10-other-removals.yaml'), JSON.stringify(later))
+      expect(() =>
+        buildMismatchManifests(
+          decided,
+          listings,
+          liveCategories,
+          committedListingChanges(directory)
+        )
+      ).toThrow(/govdash\.com is changed by 2026-10-10-other-removals\.yaml/u)
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
   })
 
   it('applies after the Other batches and removals, as the reviewed inventory replays', () => {
