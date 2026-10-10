@@ -1,4 +1,5 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -131,8 +132,38 @@ describe('repository harness contract', () => {
     }
   })
 
+  it('fails docs:check on an UPPER_SNAKE doc and on a broken anchor (#190)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'docs-check-'))
+    try {
+      execFileSync('git', ['init', '-q'], { cwd: root })
+      mkdirSync(join(root, 'docs'))
+      writeFileSync(join(root, 'package.json'), '{}')
+      writeFileSync(join(root, 'docs/kebab-case.md'), '# Kebab case\n\n[Here](#kebab-case)\n')
+      writeFileSync(
+        join(root, 'docs/UPPER_PROBE.md'),
+        '# Probe\n\n[Nowhere](./kebab-case.md#nowhere) and [gone](#gone)\n'
+      )
+      // The fixture lacks the required files and commands, so only its two docs are compared.
+      const violations = checkDocumentation(root).filter(violation =>
+        /^docs\/(?:kebab-case|UPPER_PROBE)\.md:/u.test(violation)
+      )
+      expect(violations).toEqual([
+        'docs/UPPER_PROBE.md: broken anchor ./kebab-case.md#nowhere',
+        'docs/UPPER_PROBE.md: broken anchor #gone',
+        'docs/UPPER_PROBE.md: not kebab-case; use lowercase words joined by hyphens (only README.md, AGENTS.md and CLAUDE.md are uppercase)'
+      ])
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
+
   it('holds maps and leaves to the docs-are-maps size budgets at 100 columns', () => {
     expect(wrappedLineCount(`short\n${'x'.repeat(250)}\n\n`)).toBe(4)
+    // Counted in code points (#190): 𝒜 is one code point but two UTF-16 code units, so 100 of
+    // them are one line, where counting code units would make it two.
+    expect('𝒜'.repeat(100)).toHaveLength(200)
+    expect(wrappedLineCount('𝒜'.repeat(100))).toBe(1)
+    expect(wrappedLineCount('𝒜'.repeat(101))).toBe(2)
     const lines = (count: number) => Array.from({ length: count }, () => 'line').join('\n')
     expect(
       validateDocumentationBudgets(
