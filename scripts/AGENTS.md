@@ -16,4 +16,4 @@ No script reads the real catalog as local or test data: local D1 is the fixture 
 one-time migration tooling is archived in `.archive/` (#315). Catalog checks read an
 environment's D1 read-only (`pnpm media:health`, `pnpm catalog:domains`).
 
-See [Harness](../docs/HARNESS.md) and [Data model](../docs/DATA_MODEL.md).
+See [Harness](../docs/harness.md) and [Data model](../docs/data-model.md).

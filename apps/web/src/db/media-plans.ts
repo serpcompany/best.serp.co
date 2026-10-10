@@ -463,7 +463,7 @@ export function buildClaimMediaPlans(input: {
  * rejected or withdrawn (which covers an expired draft), or approved with no listing slot still
  * waiting to copy its image. Their images under `best.serp.co/submissions/<id>/` or
  * `best.serp.co/revisions/<id>/` are deleted, then the rows; the cron stops retrying slots
- * nobody will review. An R2 lifecycle rule on those prefixes (an owner action, docs/MEDIA.md)
+ * nobody will review. An R2 lifecycle rule on those prefixes (an owner action, docs/media.md)
  * catches anything this misses.
  */
 export function selectFinishedPendingMediaPlan(limit = MEDIA_INGESTION_BATCH_LIMIT): StatementPlan {

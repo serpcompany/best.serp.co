@@ -10,7 +10,7 @@ export const project = {
   /** Typed confirmations the protected workflows require. */
   confirmation: {
     deploy: 'deploy-best.serp.co-production',
-    /** Owner-approved Worker hotfix from main that skips the staging check; see RELEASE_GUARDS. */
+    /** Owner-approved Worker hotfix from main that skips the staging check; see docs/release-guards.md. */
     hotfix: 'hotfix-best.serp.co-production',
     /** Listing media uploads from a reviewed plan (#95), staging first, then production. */
     mediaUpload: 'upload-media-best.serp.co-production',

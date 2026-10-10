@@ -2,12 +2,12 @@
 
 How database commands name their targets, how changes move from `staging` to `main`, and how a
 production release proves that staging verified the same source first. Environments,
-workflows, and the release procedure itself are in the [deploy runbook](./DEPLOY_RUNBOOK.md).
+workflows, and the release procedure itself are in the [deploy runbook](./deploy-runbook.md).
 Catalog data and listing media reach staging first by their own procedure
-([Catalog publication](./CATALOG_PUBLICATION.md)), and what a workflow holding the Cloudflare
-token may do is in [Credential guards](./CREDENTIAL_GUARDS.md). Until each environment has its
+([Catalog publication](./catalog-publication.md)), and what a workflow holding the Cloudflare
+token may do is in [Credential guards](./credential-guards.md). Until each environment has its
 own token, these guards are a process control, not a
-[security boundary](./CREDENTIAL_GUARDS.md#security-boundary).
+[security boundary](./credential-guards.md#security-boundary).
 
 ## Database commands
 
@@ -31,7 +31,7 @@ ambiguous `db:migrate`. The root `package.json` holds them.
   workflow and branch, or on a dispatch without its typed confirmation
   (`releaseAuthorizations` in `scripts/cloudflare-release.ts` for the release commands).
 - **`pnpm deploy:<env>`** is the owner-only emergency deploy that skips every guard here
-  ([runbook](./DEPLOY_RUNBOOK.md)).
+  ([runbook](./deploy-runbook.md)).
 
 `pnpm worker:config:validate` and every `cloudflare-release.ts` command refuse a D1 binding in
 `apps/web/wrangler.jsonc` whose migrations directory or ledger table drifts.
@@ -119,7 +119,7 @@ GITHUB_TOKEN="$(gh auth token)" pnpm tsx scripts/staging-verification.ts <commit
 
 The publication and submission workflows change production data, not schema or code, so no check gates them on
 staging; catalog data reaches staging first by procedure instead
-([Catalog publication](./CATALOG_PUBLICATION.md)).
+([Catalog publication](./catalog-publication.md)).
 
 ## Hotfixes
 

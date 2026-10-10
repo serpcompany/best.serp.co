@@ -52,7 +52,7 @@ binding.
 
 Listing media (#95) uses a local R2 bucket in the same state; the Worker serves it at
 `/_media/<key>`, and `curl 'localhost:8787/cdn-cgi/handler/scheduled?cron=*/15+*+*+*+*'` runs the
-media cron once ([Listing media](./MEDIA.md#local-development-and-tests)).
+media cron once ([Listing media](./media.md#local-development-and-tests)).
 
 ## Accounts locally
 
@@ -65,7 +65,7 @@ Sign in at `/login/`. Codes are not emailed locally: the dev sender logs them, a
 fixture admin (and `devin@serp.co` the allowlisted owner). Cloudflare Access is off locally and
 on staging; to exercise it, set `CF_ACCESS_REQUIRED=on` with `CF_ACCESS_TEAM_DOMAIN` and
 `CF_ACCESS_AUD` in `.dev.vars` (which overrides vars locally) or, for staging, in
-`env.staging.vars`. See [Accounts](./ACCOUNTS.md).
+`env.staging.vars`. See [Accounts](./accounts.md).
 
 ## Schema changes
 
@@ -77,7 +77,7 @@ pnpm db:migrate:local
 ```
 
 Review the SQL and keep the D1 specifics described in
-[Data model](./DATA_MODEL.md#hand-finished-migrations) (`STRICT` tables and triggers). Never use
+[Data model](./data-model.md#hand-finished-migrations) (`STRICT` tables and triggers). Never use
 `drizzle-kit push`. Then run `pnpm check` (lint, typecheck, `drizzle-kit check`, tests, and the
 Worker build).
 
@@ -86,14 +86,14 @@ After the pull request merges into `staging`, Deploy Staging applies the migrati
 Deploy Production sees the pending migration, backs up production D1, and applies the same
 migration, only after Deploy Staging verified that source tree. Check either remote database
 read-only with `pnpm db:migrations:list:staging` or `pnpm db:migrations:list:production`
-after `wrangler login`; see [Release guards](./RELEASE_GUARDS.md).
+after `wrangler login`; see [Release guards](./release-guards.md).
 
 ## Email
 
 Locally, email is never sent: each message is written to the Worker output as an
 `email_logged` line (recipient, subject, text body). Apply migrations first so the
 `email_deliveries` ledger exists. Environment behavior, the template contract, and the owner
-prerequisites for staging and production are in [Email](./EMAIL.md).
+prerequisites for staging and production are in [Email](./email.md).
 
 ## Validation
 

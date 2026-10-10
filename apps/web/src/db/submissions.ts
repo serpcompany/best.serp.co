@@ -25,7 +25,7 @@ import {
  * Native submission intake (serpcompany/best.serp.co#59, #63): a signed-in owner saves a draft,
  * chooses a plan, and verifies the badge. Every read and write is scoped to the owner's user id;
  * there is no anonymous access. Transitions use the reviewed statement plans in
- * `submission-plans.ts` (see docs/SUBMISSION_FLOW.md).
+ * `submission-plans.ts` (see docs/submission-flow.md).
  */
 
 /** Badge checks per submission that can find a conclusive result (missing, nofollow, ...). */
@@ -95,7 +95,7 @@ export interface NewDraftInput extends DraftContent {
   website: string
 }
 
-/** Whether a website can be submitted, and if not, why (docs/SUBMISSION_FLOW.md). */
+/** Whether a website can be submitted, and if not, why (docs/submission-flow.md). */
 export type UrlAvailability =
   | { kind: 'available'; slug: string }
   | { kind: 'invalid'; message: string }

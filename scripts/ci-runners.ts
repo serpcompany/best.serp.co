@@ -1,5 +1,5 @@
 /**
- * Where CI jobs run (docs/CI.md#runners).
+ * Where CI jobs run (docs/ci.md#runners).
  *
  * A routed job runs where the repository variable `CI_RUNNER_LABELS` points: JSON, either a
  * label array such as `["self-hosted","linux","x64"]` or a quoted runner name. While the

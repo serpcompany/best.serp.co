@@ -411,7 +411,7 @@ export function mediaHealthMarkdown(report: MediaHealthReport): string {
     mediaHealthMarker(report.environment),
     `## Listing media health: ${report.environment}`,
     '',
-    `Checked ${report.checkedAt} by \`pnpm media:health -- ${report.environment}\` (docs/MEDIA_HEALTH.md): ${report.rows} logo and image rows, ${report.hostedKeys} hosted keys, ${report.listedObjects} objects in \`${report.bucket}\`, ${report.cdnSampled} HEADs on ${report.mediaBaseUrl}.`,
+    `Checked ${report.checkedAt} by \`pnpm media:health -- ${report.environment}\` (docs/media-health.md): ${report.rows} logo and image rows, ${report.hostedKeys} hosted keys, ${report.listedObjects} objects in \`${report.bucket}\`, ${report.cdnSampled} HEADs on ${report.mediaBaseUrl}.`,
     '',
     ...unverifiableLines(report)
   ]

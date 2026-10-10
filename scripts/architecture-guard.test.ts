@@ -892,7 +892,7 @@ describe('single-site D1-only repository architecture', () => {
     for (const file of [
       'scripts/architecture-guard.test.ts',
       'apps/web/e2e/home.spec.ts',
-      'docs/HARNESS.md',
+      'docs/harness.md',
       'd1/publications/2026-10-09-adult-removal.yaml'
     ])
       expect(isLiveCode(file), file).toBe(false)

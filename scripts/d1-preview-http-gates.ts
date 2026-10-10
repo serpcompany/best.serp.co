@@ -445,7 +445,7 @@ async function expectRoute(target: GateTarget, path: string): Promise<void> {
 }
 
 /**
- * The admin lock (serpcompany/best.serp.co#60, docs/ACCOUNTS.md): an anonymous request for
+ * The admin lock (serpcompany/best.serp.co#60, docs/accounts.md): an anonymous request for
  * `/admin/` or `/api/admin` must get exactly the answer the environment's checked-in vars
  * imply. Where Access is required (always in production; on staging with
  * `CF_ACCESS_REQUIRED=on`) that is 403 when the team domain and AUD tag are valid (the platform
@@ -848,7 +848,7 @@ async function expectPublicPolicy(
         `CANONICAL_HOST_REDIRECT is on, but best.serp.co${path} is still ${answer.reason}: the production workers.dev host would send visitors there. Finish the cutover or turn the switch off.`
       )
     console.log(
-      `::warning title=best.serp.co check skipped::best.serp.co${path} was not answered by the Worker but by ${answer.reason}; its crawl and analytics check was skipped. Check it by hand (docs/DEPLOY_RUNBOOK.md#after-a-deploy).`
+      `::warning title=best.serp.co check skipped::best.serp.co${path} was not answered by the Worker but by ${answer.reason}; its crawl and analytics check was skipped. Check it by hand (docs/deploy-runbook.md#after-a-deploy).`
     )
   }
   await check('/', async response => {

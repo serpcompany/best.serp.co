@@ -185,7 +185,7 @@ describe('hosted catalog media (#95)', () => {
     expect(named).toBeGreaterThan(1_000)
     expect(
       problems,
-      'A manifest image is a hosted listings/<slug>/<kind>/ key with its plan (docs/MEDIA_PUBLISHING.md#uploading-and-publishing).'
+      'A manifest image is a hosted listings/<slug>/<kind>/ key with its plan (docs/media-publishing.md#uploading-and-publishing).'
     ).toEqual([])
   })
 
@@ -232,7 +232,7 @@ describe('hosted catalog media (#95)', () => {
   })
 
   // The committed plan stays the record of what was uploaded: a file it names that was deleted
-  // after the production publish keeps its reviewed bytes in Git (docs/MEDIA_PUBLISHING.md,
+  // after the production publish keeps its reviewed bytes in Git (docs/media-publishing.md,
   // "Legacy migration"). Publish D1 Catalog and the deploys check out one commit, so CI's `check`
   // job (full history) checks this.
   it.skipIf(!hasRepoMediaArchive())(
@@ -358,7 +358,7 @@ describe('hosted catalog media (#95)', () => {
     )
     expect(
       unrehostedRenames(manifests),
-      'Re-host a renamed listing’s media under its new slug, or ship an empty media update for one with none (docs/MEDIA.md).'
+      'Re-host a renamed listing’s media under its new slug, or ship an empty media update for one with none (docs/media.md).'
     ).toEqual([])
   })
 

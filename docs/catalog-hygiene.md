@@ -10,7 +10,7 @@ Some listings' product domains now serve gambling or betting pages, are parked, 
 
 - **Unpublish** the clear cases: gambling, betting, or spam pages, and parked or for-sale
   domains. Their pages answer 410 Gone and leave the sitemap, search, and RSS, through the
-  admin panel's unpublished state ([Admin panel](./ADMIN_PANEL.md#unpublished-listings-answer-410)).
+  admin panel's unpublished state ([Admin panel](./admin-panel.md#unpublished-listings-answer-410)).
   The rows stay; Republish in `/admin` brings a listing back.
 - **Owner list only:** listings that end on another company's site (an acquisition such as
   `gretel.ai` → NVIDIA, or a rebrand) or are unreachable. They may be legitimate moves or
@@ -48,7 +48,7 @@ pnpm catalog:claim-holds -- d1/hygiene/<date>-listing-domains.yaml <date>-listin
 Re-run the check periodically (a lapsed product domain can be re-registered by anyone), then
 generate a claim-hold manifest from the new report and publish it like any catalog manifest:
 holds already placed stay as they are. The owner clears a hold with a
-`listing-claim-hold-clear` operation ([Claims](./CLAIMS.md)).
+`listing-claim-hold-clear` operation ([Claims](./claims.md)).
 
 It is read-only. The listings come from the D1 of the environment `--env` names, read with one
 `SELECT` through Wrangler (the operator's `wrangler login`), so a run checks the catalog as that
@@ -113,7 +113,7 @@ in a new report and manifest under a new date.
 content, including every downloader for an adult video or cam site. Fan-site downloaders
 (OnlyFans, JustForFans, and Fansly) stay, and so do general-purpose downloaders (YouTube, Vimeo,
 and the like). A submission for an adult product is rejected in review
-([Submission flow](./SUBMISSION_FLOW.md#review-in-the-admin-panel-64)). An adult listing found
+([Submission flow](./submission-flow.md#review-in-the-admin-panel-64)). An adult listing found
 after these manifests can't leave the same way: a retired category can't be added to a listing,
 so for now it can only be unpublished, and its URL answers 410 with the gone page, not 404. How
 such a listing should leave is the owner's open question.
@@ -140,7 +140,7 @@ such a listing should leave is the owner's open question.
   leaves the navigation, the category index, the sitemaps, search, RSS, and the submit and edit
   forms, which read active D1 categories.
 - **It stays down.** The rows stay, but nothing makes such a listing live again: `/admin` refuses
-  Republish and says why ([Admin panel](./ADMIN_PANEL.md#unpublished-listings-answer-410)), a paid
+  Republish and says why ([Admin panel](./admin-panel.md#unpublished-listings-answer-410)), a paid
   relist is never offered (and a payment that raced is refunded), and D1 refuses it on any path
   (`0011_retired_categories`: a published listing is never filed under a retired category).
 - **Brands.** `/brands/` lists devinschumacher.com's brands plus devinschumacher.com (#193), none

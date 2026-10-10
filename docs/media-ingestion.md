@@ -2,13 +2,13 @@
 
 How the Worker turns a source URL into a hosted listing image, where it does so, and how the
 media cron retries what it could not host at once. Keys, storage, and rendering:
-[Listing media](./MEDIA.md).
+[Listing media](./media.md).
 
 ## Fetching and checking a source
 
 `apps/web/src/db/media-ingest.ts` fetches a source through the one shared `safeFetch`, which
 submit v2's badge checks and prefill use too
-([Submission flow](./SUBMISSION_FLOW.md#fetching-submitters-sites)): every hop is checked by
+([Submission flow](./submission-flow.md#fetching-submitters-sites)): every hop is checked by
 `validatePublicHttpUrl`, redirects are few, each request has a timeout and a byte cap, the
 response type is read as Fetch reads it, and media fetches use only ports 80 and 443.
 

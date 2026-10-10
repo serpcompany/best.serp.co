@@ -10,7 +10,7 @@ import { validatePublicHttpUrl } from './public-url'
  *
  * The policy reads the URL, not DNS: a public hostname that resolves to a private address passes
  * it. The Worker relies on Cloudflare's egress, which never reaches private ranges, for that
- * case (docs/SUBMISSION_FLOW.md#fetching-submitters-sites); a Node script passes `nodeFetch`
+ * case (docs/submission-flow.md#fetching-submitters-sites); a Node script passes `nodeFetch`
  * (`safe-fetch-node.ts`), which resolves every hop and refuses restricted addresses. Media
  * fetches also refuse any port but 80 and 443 (`webPortsOnly`, #96 review S5).
  */

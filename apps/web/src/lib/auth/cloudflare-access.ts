@@ -6,7 +6,7 @@
  *
  * - Production always requires Access. An unset or malformed team domain or AUD tag fails
  *   closed with 503 "Access not configured".
- * - Local and staging require it only with `CF_ACCESS_REQUIRED=on` (docs/DEVELOPMENT.md).
+ * - Local and staging require it only with `CF_ACCESS_REQUIRED=on` (docs/development.md).
  * - A missing, unparseable, wrongly signed, expired, or foreign token is 403.
  *
  * The token must be RS256, signed by a key from `https://<team>/cdn-cgi/access/certs`, issued

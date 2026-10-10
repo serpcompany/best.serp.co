@@ -1086,7 +1086,7 @@ describe('database readiness', () => {
     // No re-import exists (#315): a database without a publication is restored from Time Travel.
     await expect(
       checkDatabase(target).then(readiness => assertDatabaseReady(readiness, 'production'))
-    ).rejects.toThrow('Restore it with D1 Time Travel (docs/D1_RECOVERY.md)')
+    ).rejects.toThrow('Restore it with D1 Time Travel (docs/d1-recovery.md)')
 
     publish(database)
     const ready = await checkDatabase(target)
@@ -1212,7 +1212,7 @@ describe('Time Travel bookmark', () => {
     expect(written).toBe(`# Earlier step\n${bookmarkSummary(record)}`)
     expect(written).toContain(`Bookmark \`${bookmark}\`, recorded at 2026-10-06T12:00:00.000Z`)
     expect(written).toContain(`\`\`\`bash\n${record.restore}\n\`\`\``)
-    expect(written).toContain('docs/D1_RECOVERY.md#restore-a-workflow-bookmark')
+    expect(written).toContain('docs/d1-recovery.md#restore-a-workflow-bookmark')
     // Inside Actions a missing summary file is a failure, never a silent skip.
     expect(() =>
       recordTimeTravelBookmark(
@@ -1278,7 +1278,7 @@ describe('Time Travel bookmark', () => {
   })
 
   it('documents the same restore command the run summary prints', () => {
-    const recovery = readFileSync(resolve('docs/D1_RECOVERY.md'), 'utf8').replace(
+    const recovery = readFileSync(resolve('docs/d1-recovery.md'), 'utf8').replace(
       /\s*\\\n\s*/gu,
       ' '
     )

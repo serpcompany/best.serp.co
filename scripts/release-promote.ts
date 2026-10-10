@@ -7,7 +7,7 @@
  *
  * It fetches `origin`, then refuses unless
  * - `origin/main` is an ancestor of `origin/staging` (after a hotfix, merge `main` into
- *   `staging` with a merge-commit pull request first; docs/RELEASE_GUARDS.md#hotfixes),
+ *   `staging` with a merge-commit pull request first; docs/release-guards.md#hotfixes),
  * - Deploy Staging verified the tip of `origin/staging` (`assertStagingVerified`, the check
  *   Deploy Production repeats before it migrates or deploys), and
  * - the owner, at a terminal, types the first 12 characters of that commit.
@@ -89,7 +89,7 @@ export async function promoteStaging(
   const ancestry = await deps.git(['merge-base', '--is-ancestor', main, staging])
   if (ancestry.status === 1) {
     throw new Error(
-      `Refusing: main (${main.slice(0, CONFIRM_LENGTH)}) has commits staging lacks, so main cannot fast-forward. Merge main into staging with a pull request merged with "Create a merge commit", let Deploy Staging verify it, then promote again (docs/RELEASE_GUARDS.md#hotfixes).`
+      `Refusing: main (${main.slice(0, CONFIRM_LENGTH)}) has commits staging lacks, so main cannot fast-forward. Merge main into staging with a pull request merged with "Create a merge commit", let Deploy Staging verify it, then promote again (docs/release-guards.md#hotfixes).`
     )
   }
   if (ancestry.status !== 0) {
@@ -134,7 +134,7 @@ export async function promoteStaging(
   const push = await deps.git(['push', 'origin', `${staging}:refs/heads/main`])
   if (push.status !== 0) {
     throw new Error(
-      `git push to main failed (exit ${push.status}): ${push.stderr.trim()}\nA ruleset rejection means your account cannot bypass main's pull request rules (docs/HARNESS.md); a non-fast-forward or "fetch first" rejection means main moved, so run this again.`
+      `git push to main failed (exit ${push.status}): ${push.stderr.trim()}\nA ruleset rejection means your account cannot bypass main's pull request rules (docs/harness.md); a non-fast-forward or "fetch first" rejection means main moved, so run this again.`
     )
   }
   deps.log(`main is now ${staging}. Deploy Production is running for it.`)

@@ -61,7 +61,7 @@ function doctor(root: string): void {
   if (!existsSync(resolve(root, 'apps/web/drizzle')))
     violations.push('apps/web/drizzle is missing.')
   if (violations.length > 0) {
-    throw new Error(`${violations.join('\n')}\nSee docs/HARNESS.md#runtime-legibility.`)
+    throw new Error(`${violations.join('\n')}\nSee docs/harness.md#runtime-legibility.`)
   }
   console.log(
     manifest
@@ -125,7 +125,7 @@ export function devRuntimeManifest(root: string): RuntimeManifest {
   const manifest = currentManifest(root, true)
   const violations = runtimeViolations(root, manifest)
   if (violations.length > 0) {
-    throw new Error(`${violations.join('\n')}\nSee docs/HARNESS.md#runtime-legibility.`)
+    throw new Error(`${violations.join('\n')}\nSee docs/harness.md#runtime-legibility.`)
   }
   return manifest
 }

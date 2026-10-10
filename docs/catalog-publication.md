@@ -3,15 +3,15 @@
 Every reviewed catalog change reaches staging before production (owner decision). A manifest
 under `d1/publications/` and a listing media plan under `d1/media/` are applied to staging,
 checked there, and applied to production only after the `staging` → `main` promotion. Code and
-schema follow [Release guards](./RELEASE_GUARDS.md); this covers data. The step-by-step media
-procedure is in [Media publishing](./MEDIA_PUBLISHING.md#uploading-and-publishing).
+schema follow [Release guards](./release-guards.md); this covers data. The step-by-step media
+procedure is in [Media publishing](./media-publishing.md#uploading-and-publishing).
 
 ## Order
 
 - **Manifests.** **Publish D1 Catalog (staging)** (`publish-d1-staging.yml`) applies a manifest
   from `staging`, in the `staging` environment. After promotion, **Publish D1 Catalog**
   (`publish-d1.yml`) applies the same manifest from `main`. Each records a D1 Time Travel
-  bookmark first, never a database export ([Credential guards](./CREDENTIAL_GUARDS.md)).
+  bookmark first, never a database export ([Credential guards](./credential-guards.md)).
 - **Media.** **Upload Listing Media (staging)** uploads a plan to the staging bucket, and later
   **Upload Listing Media** from `main` copies staging's verified objects bucket to bucket
   through the R2 API. A plan is uploaded before the manifest that names its keys is published.
@@ -37,5 +37,5 @@ production upload copies the objects staging verified.
   `scripts/d1-publisher.ts` allows) check each row they change instead of a base version. Each
   fits both environments whatever else each published, and a listing that changed since
   generation refuses it with nothing written
-  ([recovery](./MEDIA_PUBLISHING.md#recovering-a-refused-media-manifest)). Any other manifest names the
+  ([recovery](./media-publishing.md#recovering-a-refused-media-manifest)). Any other manifest names the
   base version both environments must share.

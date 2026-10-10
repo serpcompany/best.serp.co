@@ -182,7 +182,7 @@ describe('email delivery ledger', () => {
     expect(
       d1.database.prepare('SELECT datetime(updated_at) AS normalized FROM email_deliveries').get()
     ).toEqual({ normalized: stored?.updated_at })
-    // The docs/EMAIL.md query for sends stuck in `sending`.
+    // The docs/email.md query for sends stuck in `sending`.
     expect(
       d1.database
         .prepare(

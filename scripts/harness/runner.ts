@@ -14,26 +14,26 @@ const sharedSteps: HarnessStep[] = [
     name: 'documentation health',
     command: 'pnpm',
     args: ['docs:check'],
-    remediation: 'Repair the reported path, link, command, or skill contract. See docs/HARNESS.md.'
+    remediation: 'Repair the reported path, link, command, or skill contract. See docs/harness.md.'
   },
   {
     name: 'D1 architecture guard',
     command: 'pnpm',
     args: ['exec', 'vitest', 'run', 'scripts/architecture-guard.test.ts'],
-    remediation: 'Remove the forbidden catalog path or dependency. See docs/ARCHITECTURE.md.'
+    remediation: 'Remove the forbidden catalog path or dependency. See docs/architecture.md.'
   },
   {
     name: 'catalog data operations',
     command: 'pnpm',
     args: ['exec', 'vitest', 'run', '--project', 'unit', 'apps/web/src/db'],
     remediation:
-      'Fix the shared catalog contract, isolation, projection, cache, telemetry, or benchmark failure. See docs/DATA_MODEL.md, docs/PUBLIC_CATALOG.md and docs/CACHING.md.'
+      'Fix the shared catalog contract, isolation, projection, cache, telemetry, or benchmark failure. See docs/data-model.md, docs/public-catalog.md and docs/caching.md.'
   },
   {
     name: 'D1 contracts',
     command: 'pnpm',
     args: ['test:d1'],
-    remediation: 'Fix the schema, publisher, seed, or environment contract. See docs/DATA_MODEL.md.'
+    remediation: 'Fix the schema, publisher, seed, or environment contract. See docs/data-model.md.'
   },
   {
     name: 'TypeScript boundaries',
@@ -56,7 +56,7 @@ const fullOnlySteps: HarnessStep[] = [
     command: 'pnpm',
     args: ['db:check'],
     remediation:
-      'Fix the migration history drizzle-kit reports; never edit generated SQL by hand. See docs/DATA_MODEL.md.'
+      'Fix the migration history drizzle-kit reports; never edit generated SQL by hand. See docs/data-model.md.'
   },
   {
     name: 'repository tests',
@@ -70,7 +70,7 @@ const fullOnlySteps: HarnessStep[] = [
     command: 'pnpm',
     args: ['tsx', 'scripts/d1-local-config.ts'],
     remediation:
-      'Restore the isolated local Worker and D1 identity in apps/web/wrangler.jsonc. See docs/DEPLOY_RUNBOOK.md.'
+      'Restore the isolated local Worker and D1 identity in apps/web/wrangler.jsonc. See docs/deploy-runbook.md.'
   },
   {
     name: 'Cloudflare types',

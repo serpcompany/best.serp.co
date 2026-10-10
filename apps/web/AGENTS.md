@@ -18,12 +18,12 @@ This application is the best.serp.co Cloudflare Worker, not a filesystem-backed 
   with a canonical destination.
 - Write page URLs with a trailing slash and file URLs without one; build absolute URLs
   with `siteUrl` / `absoluteUrl` so the homepage is the bare origin. The Worker entry
-  redirects everything else (see [URLs](../../docs/URLS.md)).
+  redirects everything else (see [URLs](../../docs/urls.md)).
 - Site identity, copy, and route layout come from `src/lib/site`; do not add
   environment-based site selection.
 - Imports flow one way: `src/lib` and `src/db` never import components or routes, and components
   never import routes (`noRestrictedImports` in `biome.jsonc`; tests are exempt).
 - Validate Worker compatibility with `pnpm build`.
 
-See [Architecture](../../docs/ARCHITECTURE.md) and [Harness](../../docs/HARNESS.md). Design, UI components and
+See [Architecture](../../docs/architecture.md) and [Harness](../../docs/harness.md). Design, UI components and
 the page patterns are in the [website guide](./docs/agents/web.md).

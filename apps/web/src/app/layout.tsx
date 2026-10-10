@@ -19,7 +19,7 @@ type RootLayoutProps = {
  */
 export default async function RootLayout({ children }: RootLayoutProps): Promise<ReactElement> {
   // Analytics load only on the public production site, never on local, staging, or the
-  // production Worker's workers.dev host (docs/ARCHITECTURE.md#environments-and-hosts).
+  // production Worker's workers.dev host (docs/architecture.md#environments-and-hosts).
   const analytics = await analyticsForRequest()
 
   return (

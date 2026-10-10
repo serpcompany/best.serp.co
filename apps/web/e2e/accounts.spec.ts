@@ -4,7 +4,7 @@ import { test } from './test'
 /**
  * Accounts over HTTP against the local Worker (serpcompany/best.serp.co#60): the email code
  * sign-in with the local dev sender, the edge cache bypass for signed-in requests, and the admin
- * gate. Local only: staging and production have no dev sender (docs/ACCOUNTS.md).
+ * gate. Local only: staging and production have no dev sender (docs/accounts.md).
  */
 
 function unique(): string {

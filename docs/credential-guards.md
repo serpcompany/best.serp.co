@@ -3,7 +3,7 @@
 What a workflow job that holds the Cloudflare token may do, so D1 data never leaves Cloudflare
 and every D1 change can be undone. `scripts/deploy-workflows.test.ts` enforces it in its
 "D1 data stays in Cloudflare" tests, whose reviewed lists and comments hold the detail. The
-release order itself is in [Release guards](./RELEASE_GUARDS.md).
+release order itself is in [Release guards](./release-guards.md).
 
 ## D1 data stays in Cloudflare
 
@@ -15,7 +15,7 @@ Instead, each workflow step that can change D1 directly follows a step running
 `cloudflare-release.ts bookmark <env>`. That read-only command reads the D1 Time Travel
 bookmark, writes it and the exact restore command to the run summary, and fails when it cannot.
 The endpoint accepts D1 Read, which the deploy token's D1 → Edit includes. Only the owner
-restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
+restores ([D1 recovery](./d1-recovery.md#restore-a-workflow-bookmark)).
 
 ## Workflow checks
 
@@ -42,7 +42,7 @@ restores ([D1 recovery](./D1_RECOVERY.md#restore-a-workflow-bookmark)).
 - **Token steps that change no D1.** The R2-only listing media upload and the weekly media
   health check hold the token, but their exact commands cannot change D1, so they need no
   bookmark; any variant of either still does. The health check's issue step holds no
-  Cloudflare credential ([media health](./MEDIA_HEALTH.md#weekly-workflow)).
+  Cloudflare credential ([media health](./media-health.md#weekly-workflow)).
 - **Nothing leaves as a file.** Only reviewed artifacts and caches are allowed (test evidence
   and the install action's dependency caches), matched by action, name, and path. No workflow
   or script exports D1. In every job where any step holds the token, each step uses only
@@ -84,13 +84,13 @@ boundary.
   and `production` only from `main`, so only workflows on those branches can use their
   secrets.
 - **Still open:** both environments still hold the same account-wide Cloudflare token
-  ([deploy runbook](./DEPLOY_RUNBOOK.md#github-environments)), so a workflow merged to `staging`
-  that uses the `staging` environment could still reach production directly. That path
-  requires a pull request and the required checks, but no approving review.
+  ([deploy credentials](./deploy-credentials.md#github-environments)), so a workflow merged to
+  `staging` that uses the `staging` environment could still reach production directly. That
+  path requires a pull request and the required checks, but no approving review.
 - **No human gate on staging data:** the `staging` environment has no reviewers, so anything
   that can dispatch workflows can run the staging publication or upload. Agents never do
   (AGENTS.md); a `staging-data` environment would enforce it
-  ([Media publishing](./MEDIA_PUBLISHING.md#a-human-gate-on-staging-data)).
+  ([Media publishing](./media-publishing.md#a-human-gate-on-staging-data)).
 
 The per-environment token split closes that path: decision b of serpcompany/best.serp.co#42,
 which the owner approved for right after cutover and the runbook still lists as planned.

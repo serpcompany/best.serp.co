@@ -2,7 +2,7 @@
 
 The Cloudflare API token the protected workflows use, the GitHub environments that hold it, and
 what a leaked token reaches. The workflows themselves are in the
-[deploy runbook](./DEPLOY_RUNBOOK.md#workflows). Cloudflare account: `SERP`,
+[deploy runbook](./deploy-runbook.md#workflows). Cloudflare account: `SERP`,
 `cec5f04e1d18bcc65f2be0aefb04f059` (an account ID is not a secret).
 
 ## Cloudflare API token
@@ -42,7 +42,7 @@ Each holds two environment secrets:
 - `CLOUDFLARE_API_TOKEN`: today, **both environments hold the same account-wide token**, with
   Edit on every Worker, D1 database, and R2 bucket (serp.co's `cdn` too). A leak from either
   environment therefore reaches staging and production alike
-  ([Security boundary](./CREDENTIAL_GUARDS.md#security-boundary)).
+  ([Security boundary](./credential-guards.md#security-boundary)).
 
 The planned fix, an owner decision (decision b in #42) due now that the cutover is complete
 (#310), gives each environment its own token, scoped to its Worker, D1 database, and R2 bucket (production's
@@ -50,11 +50,11 @@ also reads `cdn-staging`, the upload's copy source), each proven in its workflow
 account-wide token goes. Until then, a leak reaches both.
 
 The weekly media check uses a third environment, `production-media-health`, whose token only
-reads D1 and R2 ([Media health](./MEDIA_HEALTH.md#weekly-workflow)).
+reads D1 and R2 ([Media health](./media-health.md#weekly-workflow)).
 
 Without the `staging` secrets, `web.yml`'s `deploy-staging` finishes green with a "Staging
 deploy skipped" notice, and that run verifies nothing for production. The release,
 publication, and upload workflows fail at their credentials step instead. The
 `BETTER_AUTH_SECRET` secret and the `/admin` Access
-app: [Accounts](./ACCOUNTS.md). Error reporting (Sentry) and analytics (GTM, Cloudflare Web
-Analytics): [Telemetry](./TELEMETRY.md).
+app: [Accounts](./accounts.md). Error reporting (Sentry) and analytics (GTM, Cloudflare Web
+Analytics): [Telemetry](./telemetry.md).

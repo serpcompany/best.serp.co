@@ -5,11 +5,11 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 
 ## Start here
 
-1. [Architecture](./docs/ARCHITECTURE.md) for responsibilities and boundaries.
-2. [Data model](./docs/DATA_MODEL.md) for D1 ownership and publication rules.
-3. [Development](./docs/DEVELOPMENT.md) for the local loop.
-4. [Harness](./docs/HARNESS.md) for validation, runtime evidence, and worktrees.
-5. [Deploy runbook](./docs/DEPLOY_RUNBOOK.md) before any Cloudflare operation.
+1. [Architecture](./docs/architecture.md) for responsibilities and boundaries.
+2. [Data model](./docs/data-model.md) for D1 ownership and publication rules.
+3. [Development](./docs/development.md) for the local loop.
+4. [Harness](./docs/harness.md) for validation, runtime evidence, and worktrees.
+5. [Deploy runbook](./docs/deploy-runbook.md) before any Cloudflare operation.
 
 ## Repository map
 
@@ -19,7 +19,7 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `apps/web/src/lib/catalog/`: server-only adapter that validates the `DB` binding and delegates
   to `apps/web/src/db/`; `apps/web/src/lib/admin/` does the same for the admin panel's decisions.
 - `apps/web/src/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
-  the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/ACCOUNTS.md)).
+  the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/accounts.md)).
 - `apps/web/e2e/`: Playwright suites that run against the local or deployed Worker.
 - `apps/web/src/lib/site/`: the checked-in site definition (routes, copy, badges, the route
   registry); `apps/web/content/` holds the MDX content (legal pages, the About page).
@@ -40,12 +40,12 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 
 - `pnpm preview`: build and serve the Worker against local D1 (`pnpm dev` is `next dev`).
 - `pnpm db:seed:local`: reset local D1 and seed fixtures (fake listings, users, submissions);
-  `pnpm db:verify:local` checks them ([Development](./docs/DEVELOPMENT.md#local-data)).
+  `pnpm db:verify:local` checks them ([Development](./docs/development.md#local-data)).
 - `pnpm db:generate`: generate a reviewed migration from the Drizzle schema.
 - `pnpm db:migrations:list:{local,staging,production}`: read-only migration status.
   `pnpm db:migrate:{staging,production}` runs only inside the protected deploy workflows,
   and production only after Deploy Staging verified the same source tree
-  (see [Release guards](./docs/RELEASE_GUARDS.md)).
+  (see [Release guards](./docs/release-guards.md)).
 - `pnpm check`: the read-only finish gate CI runs; `pnpm harness:fast` is the quicker loop.
 - `pnpm cf-typegen`: regenerate `apps/web/cloudflare-env.d.ts` after a Wrangler change.
 - `pnpm test` (all Vitest projects), `pnpm test:e2e` (Playwright on a local Worker); while
@@ -64,7 +64,7 @@ work, start from the open issue labelled `handoff` (`gh issue list --label hando
 `staging` is the base branch: branch from `origin/staging` as `issue-<n>-<slug>` and open
 pull requests into `staging` (`gh pr create --base staging`); each merge deploys staging.
 `main` is production and changes only by a fast-forward promotion (`pnpm release:promote`,
-owner only) or a `hotfix-*` pull request ([Release guards](./docs/RELEASE_GUARDS.md#promotion)).
+owner only) or a `hotfix-*` pull request ([Release guards](./docs/release-guards.md#promotion)).
 Rulesets require a PR and `web.yml`'s `check` and `e2e`, and block force pushes and deletion.
 Agents never merge or push to `main`; the owner approves every merge. Agents never dispatch a
 production workflow or a staging data workflow (catalog publication, media upload), type their
@@ -92,8 +92,8 @@ Issues and labels never grant production, database, or deployment authority.
 - Route production mutations through protected GitHub Actions only, apart from the owner's
   emergency `pnpm deploy:*` and the admin panel (`/admin`, #64): an admin's decision writes
   production D1 through the reviewed plans, behind Cloudflare Access, the allowlist, and an
-  `Origin` check ([Admin panel](./docs/ADMIN_PANEL.md#the-production-write-exception)). Agents
-  use neither in production; recovery is D1 Time Travel ([D1 recovery](./docs/D1_RECOVERY.md)).
+  `Origin` check ([Admin panel](./docs/admin-panel.md#the-production-write-exception)). Agents
+  use neither in production; recovery is D1 Time Travel ([D1 recovery](./docs/d1-recovery.md)).
 
 ## Recorded exceptions to the SERP web stack
 
@@ -115,5 +115,5 @@ Deliberate differences from serp's `web-stack/` standard; change one only throug
 Run targeted checks while editing and `pnpm check` before claiming a
 substantial change is complete. For runtime behavior, capture Playwright or live-route
 evidence. Production operations require the confirmations in
-[the deploy runbook](./docs/DEPLOY_RUNBOOK.md); a passing local harness never grants
+[the deploy runbook](./docs/deploy-runbook.md); a passing local harness never grants
 deployment authority.

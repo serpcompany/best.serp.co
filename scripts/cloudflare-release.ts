@@ -33,7 +33,7 @@
  *
  * Nothing here exports a database. Workflow artifacts of this public repository are readable by
  * any signed-in GitHub user, so D1 data stays in Cloudflare and recovery is Time Travel
- * (docs/D1_RECOVERY.md).
+ * (docs/d1-recovery.md).
  *
  * `list-migrations` reads the ledger with a SELECT instead of `wrangler d1 migrations list`,
  * because Wrangler's list first runs `CREATE TABLE IF NOT EXISTS` on the ledger table.
@@ -283,7 +283,7 @@ export async function requireVerifiedStaging(
   if (isHotfixRelease(authorization, env)) {
     if (command !== 'deploy') {
       throw new Error(
-        `A hotfix release skips staging, so it may only deploy the Worker, never ${command}. Land the change through staging and promote it (docs/RELEASE_GUARDS.md#hotfixes).`
+        `A hotfix release skips staging, so it may only deploy the Worker, never ${command}. Land the change through staging and promote it (docs/release-guards.md#hotfixes).`
       )
     }
     await assertHotfixMerge(github)
@@ -486,7 +486,7 @@ export function assertDatabaseReady(
   }
   if (readiness.publication.rows !== 1) {
     throw new Error(
-      `${environment} D1 has no catalog publication. Restore it with D1 Time Travel (docs/D1_RECOVERY.md).`
+      `${environment} D1 has no catalog publication. Restore it with D1 Time Travel (docs/d1-recovery.md).`
     )
   }
 }
@@ -514,7 +514,7 @@ export function planRelease(
   }
   if (options.hotfix && ledger.missingMigrations.length > 0) {
     throw new Error(
-      `A hotfix release may not migrate, and ${environment} D1 is missing ${ledger.missingMigrations.join(', ')}. Land the migration through staging and promote it (docs/RELEASE_GUARDS.md#hotfixes).`
+      `A hotfix release may not migrate, and ${environment} D1 is missing ${ledger.missingMigrations.join(', ')}. Land the migration through staging and promote it (docs/release-guards.md#hotfixes).`
     )
   }
   return {
@@ -544,7 +544,7 @@ export function parseTimeTravelBookmark(output: string): string {
   return bookmark
 }
 
-/** The owner's restore command for `bookmark`, run from the repository root (docs/D1_RECOVERY.md). */
+/** The owner's restore command for `bookmark`, run from the repository root (docs/d1-recovery.md). */
 export function timeTravelRestoreCommand(environment: RemoteEnvironment, bookmark: string): string {
   return [
     'pnpm exec wrangler d1 time-travel restore',
@@ -565,7 +565,7 @@ export interface TimeTravelRecord {
 
 /** The run summary entry: the bookmark and the exact command that restores it. */
 export function bookmarkSummary(record: TimeTravelRecord): string {
-  const guide = `https://github.com/${project.repository}/blob/main/docs/D1_RECOVERY.md#restore-a-workflow-bookmark`
+  const guide = `https://github.com/${project.repository}/blob/main/docs/d1-recovery.md#restore-a-workflow-bookmark`
   return [
     `### D1 Time Travel bookmark: ${record.database}`,
     '',
@@ -616,7 +616,7 @@ export function recordTimeTravelBookmark(
     )
   } catch (error) {
     throw new Error(
-      `Could not record a D1 Time Travel bookmark of ${database}; refusing to change it without a restore point. The Cloudflare token needs Account → D1 → Edit (docs/DEPLOY_CREDENTIALS.md#cloudflare-api-token). ${
+      `Could not record a D1 Time Travel bookmark of ${database}; refusing to change it without a restore point. The Cloudflare token needs Account → D1 → Edit (docs/deploy-credentials.md#cloudflare-api-token). ${
         error instanceof Error ? error.message : String(error)
       }`
     )
@@ -753,7 +753,7 @@ export async function runRelease(
     const staging = await requireVerifiedStaging(args.command, env, dependencies.fetch)
     if (staging === 'hotfix') {
       console.error(
-        `::warning title=Hotfix release::${args.command} ${args.environment} skips the staging check for ${env.GITHUB_SHA} (owner-approved hotfix). Merge main into staging next (docs/RELEASE_GUARDS.md#hotfixes).`
+        `::warning title=Hotfix release::${args.command} ${args.environment} skips the staging check for ${env.GITHUB_SHA} (owner-approved hotfix). Merge main into staging next (docs/release-guards.md#hotfixes).`
       )
     } else if (staging) {
       console.error(

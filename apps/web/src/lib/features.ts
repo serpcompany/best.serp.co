@@ -28,7 +28,7 @@ export interface SiteFeatures {
    * listing page's "Claim this listing" link and dialog (#70 screens 8 and 9). On since #130;
    * the payment method too since `orders` is on (#133). Off, every claim endpoint would answer
    * 404, the listing page would show no claim link, and emails wouldn't offer to claim a
-   * listing (again). See docs/CLAIMS.md.
+   * listing (again). See docs/claims.md.
    */
   readonly claims: boolean
   /**

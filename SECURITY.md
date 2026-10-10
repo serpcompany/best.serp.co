@@ -25,6 +25,6 @@ a public issue.
 ## Dependency findings
 
 Automated dependency findings are triaged under the process in
-[`docs/DEPENDENCY_SECURITY.md`](./docs/DEPENDENCY_SECURITY.md). A passing baseline-aware
+[`docs/dependency-security.md`](./docs/dependency-security.md). A passing baseline-aware
 audit means no new high or critical production advisory was introduced; it does not
 mean the time-bounded baseline debt is resolved.

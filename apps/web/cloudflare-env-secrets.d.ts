@@ -3,7 +3,7 @@
  * `pnpm cf-typegen` can't see them (#228); this merges them into the generated `CloudflareEnv`.
  */
 interface CloudflareEnv {
-  /** Worker secret on staging and production; `apps/web/.dev.vars` locally (docs/DEVELOPMENT.md). */
+  /** Worker secret on staging and production; `apps/web/.dev.vars` locally (docs/development.md). */
   BETTER_AUTH_SECRET?: string
   /**
    * `on` turns orders (#68) on for a local Worker while `features.orders` is off

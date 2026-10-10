@@ -5,15 +5,15 @@ The schema is modeled once in `apps/web/src/db/schema.ts`. `pnpm db:generate`
 it while recording the `d1_migrations` ledger. `drizzle-kit push` is not an approved
 migration path. Every D1 binding in `apps/web/wrangler.jsonc` declares the same `DB` binding and
 migration settings, and the local config check and the release script refuse a binding that
-drifts ([Release guards](./RELEASE_GUARDS.md#database-commands)).
+drifts ([Release guards](./release-guards.md#database-commands)).
 
 Local, staging, and production are separate databases with the same schema and migration
 history. A migration is applied locally (`pnpm db:migrate:local`), then to staging by
 Deploy Staging, then to production by Deploy Production only after Deploy Staging verified
-that commit (see [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
+that commit (see [Release guards](./release-guards.md#staging-before-production)).
 
 Local data is seeded fake/fixture data, as the standard says: `pnpm db:seed:local` (#312,
-[Development](./DEVELOPMENT.md#local-data)). Playwright runs on the seed (#313), and the
+[Development](./development.md#local-data)). Playwright runs on the seed (#313), and the
 rows-read budgets on a generated catalog of production's size (#314). No local or CI data comes
 from the real catalog (#311), and user data is never copied from staging or production.
 
@@ -23,19 +23,19 @@ Column meanings and constraints are commented in `schema.ts`. By area:
 
 - **Catalog**: categories, listings, their ordered category memberships (exactly one primary),
   media, resource links, FAQs, and slug redirects. What makes a listing public and the states
-  it can be in: [Public catalog](./PUBLIC_CATALOG.md). Logos and images are hosted in R2,
+  it can be in: [Public catalog](./public-catalog.md). Logos and images are hosted in R2,
   never hotlinked, and approvals and admin edits host a logo or queue it, never store its URL
-  ([Listing media](./MEDIA.md)).
+  ([Listing media](./media.md)).
 - **Publication**: `publication_state` is a single row holding the catalog version and
   checksum; `publication_runs` records every applied publication, and `migration_runs` the
   one-time import (locally, the fixture seed's run).
 - **Intake and ownership**: submissions, owners, revisions, badge checks, claims, and orders:
-  [Submission and ownership data](./SUBMISSION_DATA.md).
+  [Submission and ownership data](./submission-data.md).
 - **Activity**: `listing_events` is the log of admin and ownership changes to a listing, each
   row with its actor, written by the plan that makes the change.
 - **Accounts and email**: Better Auth's tables, the admin allowlist, and the sign-in rate limits
-  ([Accounts](./ACCOUNTS.md)); `email_deliveries`, the transactional email ledger
-  ([Email](./EMAIL.md)). `email_deliveries` never holds a recipient or content, and
+  ([Accounts](./accounts.md)); `email_deliveries`, the transactional email ledger
+  ([Email](./email.md)). `email_deliveries` never holds a recipient or content, and
   `auth_rate_limit_hits` holds HMAC digests under a key derived from `BETTER_AUTH_SECRET`, never
   an email or IP address. `sessions` stores the client's raw IP address and user agent (Better
   Auth's default).
@@ -93,7 +93,7 @@ SELECT terms and expression depth, but does not enforce the function cap.
   worst-case inputs, with a rows-read budget per query shape (harness step "D1 contracts").
 - Search keeps its terms in one JSON binding matched with `instr()`, so it binds a fixed number
   of values whatever the query's length and needs no LIKE pattern
-  ([Public catalog](./PUBLIC_CATALOG.md#search)).
+  ([Public catalog](./public-catalog.md#search)).
 
 ## Statement plans
 
@@ -115,7 +115,7 @@ Catalog changes made outside the Worker use reviewed YAML manifests under `d1/pu
 The publisher validates the base version, prior checksum, IDs, slugs, URLs, and categories
 before sending one batch, after recording a D1 Time Travel bookmark (no export). A manifest is
 applied to staging first, then to production
-([Catalog publication](./CATALOG_PUBLICATION.md)). A row-level manifest
+([Catalog publication](./catalog-publication.md)). A row-level manifest
 (`concurrency: rows`) checks each row it changes instead of a base version, so one manifest fits
 both environments; `rowLevelActions` in `scripts/d1-publisher.ts` lists the operations it may
 hold.
@@ -126,6 +126,6 @@ The catalog was bootstrapped once from `serpcompany/json-directory-template@25e2
 listings, 141 categories). Imported listing IDs are
 `lst_` + `sha256("legacy-product-map" NUL <slug>)[0:24]`. Staging and production have changed
 since through publications, admin decisions, claims, payments, and hosted media, so neither is
-ever re-imported: recovery is D1 Time Travel ([D1 recovery](./D1_RECOVERY.md)). The import, its
+ever re-imported: recovery is D1 Time Travel ([D1 recovery](./d1-recovery.md)). The import, its
 tooling, and the production bootstrap workflow are history in [`.archive/`](../.archive/README.md)
 (#315).
