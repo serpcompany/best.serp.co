@@ -265,7 +265,8 @@ export function buildApproveRevisionPlans(input: {
       listingId: input.listingId,
       now: input.now,
       reviewedLogoKey: input.expectedLogoKey,
-      source: revisionContentSource(input.revisionId)
+      source: revisionContentSource(input.revisionId),
+      tags: true
     }),
     {
       sql: `UPDATE listing_revisions SET status='approved',reviewed_at=?,reviewed_by=?,updated_at=?

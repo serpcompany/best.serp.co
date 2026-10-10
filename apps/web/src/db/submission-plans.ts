@@ -527,6 +527,8 @@ export function buildRelistListingToPaidPlans(input: {
  * the submission's staged content (which a reviewer may have edited before approving). Refused
  * unless the staged content is the version the reviewer saw and the live listing is unchanged
  * since it was published from this submission (`published_checksum`), so no admin edit is lost.
+ * Its tags are left as they are: payment gave it the submission's tags, and an admin's tag edit
+ * during review (allowed, since tags aren't in the checksum) stands (#341, design 4.3).
  */
 export function buildApproveLiveSubmissionPlans(input: {
   expectedContentVersion: number
@@ -555,7 +557,9 @@ export function buildApproveLiveSubmissionPlans(input: {
       listingId: input.listingId,
       now: input.now,
       reviewedLogoKey: input.expectedLogoKey,
-      source: submissionContentSource(input.submissionId)
+      source: submissionContentSource(input.submissionId),
+      // Payment gave the listing its tags; an admin's later edit stands (design 4.3).
+      tags: false
     }),
     ...(input.expectedImageKey === undefined
       ? []

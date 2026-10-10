@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { ListingDetail } from '@/components/admin/listing-detail'
+import { MAX_LISTING_TAGS } from '@/db/listing-plans'
 import { listingDetailView } from '@/lib/admin/listing-view'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'
@@ -40,6 +41,7 @@ export default async function AdminListingPage({ params }: Props) {
 
       <ListingDetail
         categories={categories}
+        maxTags={MAX_LISTING_TAGS}
         tags={tags.map(tag => ({ ...tag, label: tag.name }))}
         view={listingDetailView(listing, await mediaBaseUrl())}
       />

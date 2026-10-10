@@ -496,8 +496,12 @@ async function approveSubmissionOnce(
     }[field]
     return value.trim() !== current.trim()
   })
-  // Tags are a list: edited when the reviewer's differs from the Creator's (#341).
-  const tagSlugs = input.edits?.tagSlugs?.map(tag => tag.trim())
+  // Tags are a list: edited when the reviewer's differs from the Creator's (#341). A paid
+  // listing already live got its tags at payment and its approval leaves them, so its tags are
+  // edited on the listing page instead, and a tag edit here is not taken (the screen offers
+  // none for it).
+  const tagSlugs =
+    snapshot.status === 'verified' ? input.edits?.tagSlugs?.map(tag => tag.trim()) : undefined
   const tagsEdited = tagSlugs !== undefined && !sameTags(tagSlugs, review.tagSlugs ?? [])
   if (tagsEdited) {
     const invalid = await invalidTags(context, tagSlugs)

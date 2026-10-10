@@ -1549,7 +1549,14 @@ operations:
         `INSERT INTO tags (slug, name, category_id, sort_order) SELECT 'helper', 'Helper', id, 1
           FROM categories WHERE slug = 'tools'`
       ),
-      db.prepare("UPDATE categories SET is_active = 0 WHERE slug = 'narrow'")
+      // A narrow category merged into a tag with another slug (design 2.2), redirected to it.
+      db.prepare("INSERT INTO categories (slug, name, sort_order) VALUES ('merged', 'Merged', 6)"),
+      db.prepare(
+        `INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, target_tag_id,
+          manifest_id) SELECT 'category', 'merged', 'tag', id, 'workerd' FROM tags
+          WHERE slug = 'helper'`
+      ),
+      db.prepare("UPDATE categories SET is_active = 0 WHERE slug IN ('narrow', 'merged')")
     ])
     expect(await all(Q.selectActiveTagsPlan())).toEqual([
       { category: 'tools', category_name: 'Tools', name: 'Helper', slug: 'helper' },
@@ -1559,12 +1566,18 @@ operations:
       (
         await db
           .prepare(
-            `SELECT t.slug FROM listing_tags lt JOIN tags t ON t.id = lt.tag_id
+            `SELECT t.slug, lt.sort_order FROM listing_tags lt JOIN tags t ON t.id = lt.tag_id
             WHERE lt.listing_id = ? ORDER BY lt.sort_order, t.slug`
           )
           .bind(listingId)
-          .all<{ slug: string }>()
-      ).results.map(row => row.slug)
+          .all<{ slug: string; sort_order: number }>()
+      ).results.map(row => `${row.slug}:${row.sort_order}`)
+    const primaryOf = (listingId: string) =>
+      first(
+        `SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
+        WHERE lc.listing_id = ? AND lc.is_primary = 1`,
+        listingId
+      )
 
     // A paid draft saved under the narrow category before it retired goes live at payment.
     await insertDraft('sub-narrow', 'https://narrow-tool.example/')
@@ -1585,13 +1598,27 @@ operations:
         submissionId: 'sub-narrow'
       })
     )
-    expect(
-      await first(
-        `SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
-        WHERE lc.listing_id = 'lst-narrow' AND lc.is_primary = 1`
-      )
-    ).toEqual({ slug: 'apps' })
-    expect(await tagsOf('lst-narrow')).toEqual(['narrow', 'helper'])
+    expect(await primaryOf('lst-narrow')).toEqual({ slug: 'apps' })
+    expect(await tagsOf('lst-narrow')).toEqual(['narrow:0', 'helper:1'])
+
+    // One merged into `helper` goes live through its redirect, under helper's hub (Tools).
+    await insertDraft('sub-merged', 'https://merged-tool.example/')
+    await db
+      .prepare("UPDATE listing_submissions SET category_slug = 'merged' WHERE id = 'sub-merged'")
+      .run()
+    await choose('sub-merged', 'paid')
+    await run(
+      S.buildRecordSubmissionPaymentPlans({
+        actor: 'stripe',
+        listingId: 'lst-merged',
+        now: NOW,
+        outcome: 'publish',
+        publication: await publication('paid-listing', 'sub-merged'),
+        submissionId: 'sub-merged'
+      })
+    )
+    expect(await primaryOf('lst-merged')).toEqual({ slug: 'tools' })
+    expect(await tagsOf('lst-merged')).toEqual(['helper:0'])
 
     // The admin's tag edit, while that submission is in review.
     await run(
@@ -1602,7 +1629,11 @@ operations:
         tags: ['helper']
       })
     )
-    expect(await tagsOf('lst-narrow')).toEqual(['helper'])
+    expect(await tagsOf('lst-narrow')).toEqual(['helper:0'])
+
+    // Its approval leaves that edit (the submission named narrow, and helper).
+    await approveLive('sub-narrow', 'lst-narrow')
+    expect(await tagsOf('lst-narrow')).toEqual(['helper:0'])
     await expect(
       run(
         L.buildSetListingTagsPlans({
@@ -1613,7 +1644,7 @@ operations:
         })
       )
     ).rejects.toThrow(/malformed JSON/u)
-    expect(await tagsOf('lst-narrow')).toEqual(['helper'])
+    expect(await tagsOf('lst-narrow')).toEqual(['helper:0'])
   })
 
   it('ran every exported plan builder on D1', () => {

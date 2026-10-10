@@ -128,10 +128,13 @@ function Timeline({ items }: { items: ListingDetailView['activity'] }) {
 
 export function ListingDetail({
   categories,
+  maxTags,
   tags,
   view
 }: {
   categories: Category[]
+  /** The most tags a listing takes (`MAX_LISTING_TAGS`). */
+  maxTags: number
   /** The active tags (#341), grouped by hub in the Tags field. */
   tags: readonly TagChoice[]
   view: ListingDetailView
@@ -483,6 +486,7 @@ export function ListingDetail({
             disabled={busy}
             firstCategory={view.categorySlug ?? undefined}
             invalid={Boolean(tagsError)}
+            max={maxTags}
             value={tagSlugs}
             onValueChange={next => {
               setTagSlugs(next)

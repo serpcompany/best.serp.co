@@ -406,29 +406,43 @@ export function parseTagSlugs(value: unknown): string[] | null {
 
 /**
  * The stale-slug resolver (#341, design 4.4): what a staged row's `category_slug` (`slugSql`, a
- * column reference with no bindings) files its listing under. An active category with that
- * slug; or else, for a draft, submission, or revision saved before its narrow category retired
- * and became a tag, the hub of the active tag with that slug (`categoryId`), and that tag
- * (`tagId`, null when the slug names an active category). Approval, payment, and revision
- * approval use it, so an in-flight row naming a retired narrow slug still goes live; new saves
- * still require an active category.
+ * column reference with no bindings) files its listing under, for a draft, submission, or
+ * revision saved before its narrow category retired. In order:
+ * 1. an active category with that slug: that category, and no tag;
+ * 2. else the active tag with that slug (an old category kept as a tag): its hub, and the tag;
+ * 3. else the old category's `taxonomy_redirects` row (one of the 36 merged into a tag with
+ *    another slug, such as `ai-copywriting-free`): a `tag` target, or a `best` target's tag, with
+ *    its hub, and that tag; else a `category` target, or a `best` target's category, and no tag.
+ * Tags and hubs must be active. Approval, payment, and revision approval use it, so an in-flight
+ * row naming a retired narrow slug still goes live; new saves still require an active category.
  */
 export function resolveStagedCategorySql(slugSql: string): { categoryId: string; tagId: string } {
   const active = `SELECT c.id FROM categories c WHERE c.slug=${slugSql} AND c.is_active=1`
-  const tag = `FROM tags t JOIN categories hub ON hub.id=t.category_id AND hub.is_active=1
-    WHERE t.slug=${slugSql} AND t.is_active=1`
+  const hub = 'JOIN categories hub ON hub.id=t.category_id AND hub.is_active=1'
+  const redirect = `FROM taxonomy_redirects r LEFT JOIN best_pages b ON b.id=r.target_best_page_id
+    WHERE r.source_kind='category' AND r.source_slug=${slugSql}`
+  const sameSlugTag = `SELECT t.id FROM tags t ${hub} WHERE t.slug=${slugSql} AND t.is_active=1`
+  const redirectTag = `SELECT t.id FROM tags t ${hub} WHERE t.is_active=1
+    AND t.id=(SELECT COALESCE(r.target_tag_id,b.tag_id) ${redirect})`
+  const redirectCategory = `SELECT c.id FROM categories c WHERE c.is_active=1
+    AND c.id=(SELECT COALESCE(r.target_category_id,b.category_id) ${redirect})`
+  const tag = `COALESCE((${sameSlugTag}),(${redirectTag}))`
   return {
-    categoryId: `COALESCE((${active}),(SELECT t.category_id ${tag}))`,
-    tagId: `(SELECT t.id ${tag} AND NOT EXISTS (${active}))`
+    categoryId: `COALESCE((${active}),(SELECT t.category_id FROM tags t WHERE t.id=${tag}),
+      (${redirectCategory}))`,
+    tagId: `(SELECT ${tag} WHERE NOT EXISTS (${active}))`
   }
 }
 
 /**
- * A staged row's tags on its listing (#341, design 4.4): the tag the stale-slug resolver found
- * first, then the row's `tag_slugs` in order, each joined to an active tag, so a retired or
- * unknown one is dropped. When `tag_slugs` is set, the listing's tags are replaced; when it is
- * null (not given), they stay, and only a resolver tag the listing lacks is added. Inserts are
- * plain `INSERT … SELECT … WHERE NOT EXISTS`, never an upsert, whose attempted insert would fire
+ * A staged row's tags on its listing (#341, design 4.4), for a new listing (approval or payment)
+ * and a revision approval. When the row's `tag_slugs` is set, the listing's tags are replaced by
+ * the tag the stale-slug resolver found, then `tag_slugs` in order; when it is null (not given),
+ * the listing keeps its tags and only a resolver tag it lacks is appended after them. Each is
+ * joined to an active tag, so a retired or unknown one is dropped, and numbered densely from the
+ * next free `sort_order` (0 on a new or replaced set), as the admin edit and the publisher's
+ * `listing-tags-set` number them: best pages rank by it. Inserts are plain
+ * `INSERT … SELECT … WHERE NOT EXISTS`, never an upsert, whose attempted insert would fire
  * `listing_tags_refuse_retired_tag` on a retired tag the listing keeps (docs/data-model.md).
  */
 export function stagedTagsPlans(input: {
@@ -444,10 +458,15 @@ export function stagedTagsPlans(input: {
         AND EXISTS (SELECT 1 FROM ${stagedTable} WHERE id=? AND tag_slugs IS NOT NULL)`,
       params: [listingId, stagedId]
     },
+    // The SELECT reads listing_tags, so SQLite runs it whole before inserting: the next free
+    // sort_order is the one before this insert.
     {
       sql: `INSERT INTO listing_tags (listing_id,tag_id,sort_order)
-        SELECT ?,picked.tag_id,picked.sort_order FROM (
-          SELECT tag_id,MIN(position)+1 AS sort_order FROM (
+        SELECT ?,picked.tag_id,
+          COALESCE((SELECT MAX(x.sort_order)+1 FROM listing_tags x WHERE x.listing_id=?),0)
+            + ROW_NUMBER() OVER (ORDER BY picked.position) - 1
+        FROM (
+          SELECT tag_id,MIN(position) AS position FROM (
             SELECT ${resolved.tagId} AS tag_id,-1 AS position FROM ${stagedTable} staged
               WHERE staged.id=?
             UNION ALL
@@ -458,7 +477,7 @@ export function stagedTagsPlans(input: {
         ) picked
         WHERE NOT EXISTS (SELECT 1 FROM listing_tags x
           WHERE x.listing_id=? AND x.tag_id=picked.tag_id)`,
-      params: [listingId, stagedId, stagedId, listingId]
+      params: [listingId, listingId, stagedId, stagedId, listingId]
     }
   ]
 }
@@ -545,9 +564,11 @@ export function replaceStagedChildrenPlans(
  * first so the primary-category triggers allow its memberships to change, then published again
  * (the triggers re-check exactly one primary category). Website, slug, publication time,
  * featured state, images, and secondary categories are kept; the primary category, name,
- * description, content, logo, video, resource links, and FAQs are replaced, and the tags when
- * the staged row gives them (`stagedTagsPlans`). The primary category goes through the stale-slug
- * resolver (`resolveStagedCategorySql`).
+ * description, content, logo, video, resource links, and FAQs are replaced. The primary
+ * category goes through the stale-slug resolver (`resolveStagedCategorySql`). With `tags` (a
+ * revision), the tags are written as `stagedTagsPlans` says; without (a paid listing's live
+ * approval), they are left alone: payment already gave the listing the submission's tags, and an
+ * admin may have changed them since, which approval must not undo (design 4.3).
  */
 export function applyStagedContentPlans(input: {
   checksum: string
@@ -556,6 +577,8 @@ export function applyStagedContentPlans(input: {
   /** The hosted logo the reviewer saw (null for the tile); see `adoptStagedLogoPlans`. */
   reviewedLogoKey?: string | null
   source: StagedContentSource
+  /** Write the staged row's tags (a revision), or leave the listing's (a live submission). */
+  tags: boolean
 }): StatementPlan[] {
   const { listingId, source } = input
   const resolved = resolveStagedCategorySql('staged.category_slug')
@@ -589,7 +612,9 @@ export function applyStagedContentPlans(input: {
       params: [listingId, source.id]
     },
     assertPreviousStatementChangedOne('primary_category_replaced'),
-    ...stagedTagsPlans({ listingId, stagedId: source.id, stagedTable: source.table }),
+    ...(input.tags
+      ? stagedTagsPlans({ listingId, stagedId: source.id, stagedTable: source.table })
+      : []),
     { sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='video'`, params: [listingId] },
     // Never a hotlink (#95), and only the reviewed logo (#96 round 3).
     ...adoptStagedLogoPlans({

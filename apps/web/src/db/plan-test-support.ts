@@ -21,21 +21,55 @@ export function planDatabase(): DatabaseSync {
 }
 
 /**
- * The taxonomy fixture (#341): active tags under the two hubs, a retired tag, and the retired
- * narrow category `chatbots`, whose slug an active tag under Apps took over (the stale-slug
- * resolver's case).
+ * The taxonomy fixture (#341): active tags under the two hubs, a retired tag, and retired narrow
+ * categories for each of the stale-slug resolver's cases (design 4.4):
+ * - `chatbots`: an active tag under Apps took over its slug;
+ * - `merged-narrow`: merged into the tag `note-taking` (Tools), as `ai-copywriting-free` into
+ *   `ai-copywriting`; its `taxonomy_redirects` row points at the tag;
+ * - `best-narrow`: its redirect points at the best page `best-boards`, whose tag is
+ *   `whiteboards` (Apps);
+ * - `hub-narrow`: its redirect points at the category Apps.
  */
 export function seedTags(db: DatabaseSync): void {
   db.exec(`
-    INSERT INTO categories (slug, name, description, sort_order, is_active)
-      VALUES ('chatbots', 'Chatbots', 'Chatbots', 2, 1);
+    INSERT INTO categories (slug, name, description, sort_order, is_active) VALUES
+      ('chatbots', 'Chatbots', 'Chatbots', 2, 1),
+      ('merged-narrow', 'Merged', 'Merged', 3, 1),
+      ('best-narrow', 'Best', 'Best', 4, 1),
+      ('hub-narrow', 'Hub', 'Hub', 5, 1);
     INSERT INTO tags (slug, name, category_id, sort_order, is_active) VALUES
       ('note-taking', 'Note Taking', (SELECT id FROM categories WHERE slug = 'tools'), 0, 1),
       ('whiteboards', 'Whiteboards', (SELECT id FROM categories WHERE slug = 'apps'), 0, 1),
       ('chatbots', 'Chatbots', (SELECT id FROM categories WHERE slug = 'apps'), 1, 1),
       ('retired-tag', 'Retired', (SELECT id FROM categories WHERE slug = 'tools'), 2, 0);
-    UPDATE categories SET is_active = 0 WHERE slug = 'chatbots';
+    INSERT INTO best_pages (slug, keyword, title, heading, intro, tag_id)
+      SELECT 'best-boards', 'best boards', 'Best Boards', 'Best Boards', 'Boards.', id
+      FROM tags WHERE slug = 'whiteboards';
+    INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, target_tag_id,
+      manifest_id) SELECT 'category', 'merged-narrow', 'tag', id, 'fixture' FROM tags
+      WHERE slug = 'note-taking';
+    INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, target_best_page_id,
+      manifest_id) SELECT 'category', 'best-narrow', 'best', id, 'fixture' FROM best_pages
+      WHERE slug = 'best-boards';
+    INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, target_category_id,
+      manifest_id) SELECT 'category', 'hub-narrow', 'category', id, 'fixture' FROM categories
+      WHERE slug = 'apps';
+    UPDATE categories SET is_active = 0
+      WHERE slug IN ('chatbots', 'merged-narrow', 'best-narrow', 'hub-narrow');
   `)
+}
+
+/** A listing's tags with their stored `sort_order`, in order (`sort_order`, then slug). */
+export function listingTagOrder(
+  db: DatabaseSync,
+  listingId: string
+): Array<{ slug: string; sort_order: number }> {
+  return db
+    .prepare(
+      `SELECT t.slug, lt.sort_order FROM listing_tags lt JOIN tags t ON t.id = lt.tag_id
+      WHERE lt.listing_id = ? ORDER BY lt.sort_order, t.slug`
+    )
+    .all(listingId) as Array<{ slug: string; sort_order: number }>
 }
 
 /** A listing's tags in order (`sort_order`, then slug). */

@@ -1023,8 +1023,10 @@ describe('tag decisions (#341)', () => {
   })
 
   it('tags a listing while its submission is in review, then the approval still applies', async () => {
-    const { context, paidLive, tags } = tagged()
+    const { context, db, paidLive, tags } = tagged()
     paidLive('sub_paid')
+    // Payment gave the listing the submission's tags; approval doesn't apply them again.
+    db.exec(`UPDATE listing_submissions SET tag_slugs = '["whiteboards"]' WHERE id = 'sub_paid'`)
     expect(
       await setListingTags(context(), {
         expectedTags: [],
@@ -1032,10 +1034,15 @@ describe('tag decisions (#341)', () => {
         tags: ['note-taking']
       })
     ).toMatchObject({ ok: true, replayed: false })
+    // A tag edit sent with a live approval isn't taken: the listing page edits those tags.
     expect(
-      await approveSubmission(context(), { expectedContentVersion: 1, submissionId: 'sub_paid' })
+      await approveSubmission(context(), {
+        edits: { tagSlugs: ['whiteboards'] },
+        expectedContentVersion: 1,
+        submissionId: 'sub_paid'
+      })
     ).toMatchObject({ ok: true, replayed: false })
-    // The submission gave no tags, so the admin's stay.
+    // The admin's edit made during review stands (design 4.3).
     expect(tags('lst_brief')).toEqual(['note-taking'])
   })
 

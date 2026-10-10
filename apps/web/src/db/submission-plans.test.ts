@@ -5,7 +5,7 @@ import type { StatementPlan } from './plan-support'
 import {
   count,
   execute,
-  listingTags,
+  listingTagOrder,
   NOW,
   planDatabase,
   primaryCategory,
@@ -1543,24 +1543,40 @@ describe('tags and the stale-slug resolver at approval and payment (#341, design
       submissionId
     })
 
-  it('approval tags the listing with the active suggested tags, in order', () => {
+  /** Sets the live listing's tags in order, as an admin's edit or a manifest would. */
+  function tagListing(db: DatabaseSync, slugs: string[]): void {
+    db.prepare('DELETE FROM listing_tags WHERE listing_id=?').run(liveListingId)
+    slugs.forEach((slug, order) => {
+      db.prepare(
+        'INSERT INTO listing_tags (listing_id,tag_id,sort_order) SELECT ?,id,? FROM tags WHERE slug=?'
+      ).run(liveListingId, order, slug)
+    })
+  }
+
+  it('approval tags the listing with the active suggested tags, numbered from 0', () => {
     const db = staged('verified', {
       live: false,
       tags: ['whiteboards', 'retired-tag', 'note-taking']
     })
     execute(db, approvalPlans())
     expect(primaryCategory(db, liveListingId)).toBe('tools')
-    // A retired or unknown tag is dropped; the rest keep the Creator's order.
-    expect(listingTags(db, liveListingId)).toEqual(['whiteboards', 'note-taking'])
+    // A retired or unknown tag is dropped; the rest keep the Creator's order, from 0, as the
+    // admin edit and the publisher number them (best pages rank by it).
+    expect(listingTagOrder(db, liveListingId)).toEqual([
+      { slug: 'whiteboards', sort_order: 0 },
+      { slug: 'note-taking', sort_order: 1 }
+    ])
     const unknown = staged('verified', { live: false, tags: ['no-such-tag', 'note-taking'] })
     execute(unknown, approvalPlans())
-    expect(listingTags(unknown, liveListingId)).toEqual(['note-taking'])
+    expect(listingTagOrder(unknown, liveListingId)).toEqual([
+      { slug: 'note-taking', sort_order: 0 }
+    ])
   })
 
   it('approval of a submission without suggested tags leaves the listing untagged', () => {
     const db = staged('verified', { live: false, tags: null })
     execute(db, approvalPlans())
-    expect(listingTags(db, liveListingId)).toEqual([])
+    expect(listingTagOrder(db, liveListingId)).toEqual([])
   })
 
   it('a paid draft naming a retired narrow slug goes live at payment under its hub and tag', () => {
@@ -1576,21 +1592,48 @@ describe('tags and the stale-slug resolver at approval and payment (#341, design
       status: 'paid_pending_review'
     })
     expect(listing(db)).toMatchObject({ is_active: 1, status: 'approved' })
-    // The retired `chatbots` category resolves to the hub of the active `chatbots` tag (Apps),
-    // which comes first; a suggested duplicate of it is kept once.
+    // The retired `chatbots` category resolves to the hub of the active `chatbots` tag (Apps).
+    // That tag comes first; a suggested duplicate of it is kept once.
     expect(primaryCategory(db, liveListingId)).toBe('apps')
-    expect(listingTags(db, liveListingId)).toEqual(['chatbots', 'note-taking'])
+    expect(listingTagOrder(db, liveListingId)).toEqual([
+      { slug: 'chatbots', sort_order: 0 },
+      { slug: 'note-taking', sort_order: 1 }
+    ])
     expect(publicationState(db).version).toBe(2)
+  })
+
+  it('a paid draft naming a merged narrow slug goes live through its taxonomy redirect', () => {
+    // `merged-narrow` became the tag `note-taking` (Tools), as `ai-copywriting-free` became
+    // `ai-copywriting`; `best-narrow` redirects to a best page on `whiteboards` (Apps); and
+    // `hub-narrow` to the category Apps, with no tag.
+    for (const [category, hub, tags] of [
+      ['merged-narrow', 'tools', ['note-taking', 'whiteboards']],
+      ['best-narrow', 'apps', ['whiteboards']],
+      ['hub-narrow', 'apps', ['whiteboards']]
+    ] as const) {
+      const db = staged('draft', {
+        category,
+        draftPlan: 'paid',
+        live: false,
+        tags: ['whiteboards']
+      })
+      execute(db, pay())
+      expect(submission(db).status, category).toBe('paid_pending_review')
+      expect(primaryCategory(db, liveListingId), category).toBe(hub)
+      expect(listingTagOrder(db, liveListingId), category).toEqual(
+        tags.map((slug, order) => ({ slug, sort_order: order }))
+      )
+    }
   })
 
   it('a verified submission naming a retired narrow slug is approved under its hub and tag', () => {
     const db = staged('verified', { category: 'chatbots', live: false, tags: null })
     execute(db, approvalPlans())
     expect(primaryCategory(db, liveListingId)).toBe('apps')
-    expect(listingTags(db, liveListingId)).toEqual(['chatbots'])
+    expect(listingTagOrder(db, liveListingId)).toEqual([{ slug: 'chatbots', sort_order: 0 }])
   })
 
-  it('refuses a slug that is neither an active category nor an active tag, at payment too', () => {
+  it('refuses a slug that is neither a category, a tag, nor redirected, at payment too', () => {
     for (const category of ['retired-tag', 'no-such-slug']) {
       const db = staged('draft', { category, draftPlan: 'paid', live: false })
       expect(() => execute(db, pay())).toThrow(/malformed JSON/u)
@@ -1599,29 +1642,29 @@ describe('tags and the stale-slug resolver at approval and payment (#341, design
     }
   })
 
-  it('a live approval replaces the tags only when the submission gives them', () => {
-    const given = staged('paid_pending_review', { tags: ['whiteboards'] })
-    given.exec(`INSERT INTO listing_tags (listing_id,tag_id,sort_order)
-      SELECT '${liveListingId}',id,0 FROM tags WHERE slug='note-taking'`)
-    execute(given, approveLivePlans())
-    expect(listingTags(given, liveListingId)).toEqual(['whiteboards'])
-
-    const notGiven = staged('paid_pending_review', { tags: null })
-    notGiven.exec(`INSERT INTO listing_tags (listing_id,tag_id,sort_order)
-      SELECT '${liveListingId}',id,0 FROM tags WHERE slug='note-taking'`)
-    execute(notGiven, approveLivePlans())
-    expect(listingTags(notGiven, liveListingId)).toEqual(['note-taking'])
-  })
-
-  it("keeps a retired tag the listing has when the submission doesn't give tags", () => {
+  it("a live approval leaves the listing's tags, so an admin's edit during review stands", () => {
+    // Payment gave the listing the submission's tags; an admin then changed them (design 4.3).
+    for (const [category, tags, edited] of [
+      // The submission named tags: approval doesn't put them back.
+      ['tools', ['whiteboards', 'note-taking'], ['note-taking']],
+      // It named none.
+      ['tools', null, ['whiteboards']],
+      // A retired narrow slug: approval doesn't re-add the resolver tag the admin removed.
+      ['chatbots', null, ['whiteboards']],
+      ['chatbots', ['chatbots', 'note-taking'], ['note-taking']]
+    ] as const) {
+      const db = staged('paid_pending_review', { category, tags: tags ? [...tags] : null })
+      tagListing(db, [...edited])
+      execute(db, approveLivePlans())
+      expect(submission(db).status).toBe('approved')
+      expect(listingTagOrder(db, liveListingId), `${category} ${tags}`).toEqual(
+        edited.map((slug, order) => ({ slug, sort_order: order }))
+      )
+    }
+    // The primary category still follows the resolver: the retired slug files under its hub.
     const db = staged('paid_pending_review', { category: 'chatbots', tags: null })
-    db.exec(`INSERT INTO listing_tags (listing_id,tag_id,sort_order)
-      SELECT '${liveListingId}',id,0 FROM tags WHERE slug='whiteboards'`)
-    db.exec("UPDATE tags SET is_active=0 WHERE slug='whiteboards'")
-    // No upsert touches the retired membership, so its trigger never fires (docs/data-model.md).
     execute(db, approveLivePlans())
     expect(primaryCategory(db, liveListingId)).toBe('apps')
-    expect(listingTags(db, liveListingId)).toEqual(['chatbots', 'whiteboards'])
   })
 
   it('a content edit writes the suggested tags when given and keeps them otherwise', () => {

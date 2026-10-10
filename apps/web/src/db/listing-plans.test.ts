@@ -18,6 +18,7 @@ import { prepareCatalogPublication } from './plan-support'
 import {
   count,
   execute,
+  listingTagOrder,
   listingTags,
   NOW,
   planDatabase,
@@ -934,7 +935,10 @@ describe("an admin's tag edit (#341, design 4.3)", () => {
     const db = tagged()
     const before = listing(db)
     execute(db, setTags(['whiteboards', 'note-taking'], []))
-    expect(listingTags(db, listingId)).toEqual(['whiteboards', 'note-taking'])
+    expect(listingTagOrder(db, listingId)).toEqual([
+      { slug: 'whiteboards', sort_order: 0 },
+      { slug: 'note-taking', sort_order: 1 }
+    ])
     expect(listing(db)).toMatchObject({ checksum: before.checksum, updated_at: NOW })
     expectPublished(db, 2)
     expect(

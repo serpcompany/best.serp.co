@@ -143,12 +143,13 @@ replaces them through active tags (a plain `INSERT … SELECT … WHERE is_activ
 upsert), sets `updated_at` (the sitemap `lastmod`), logs the event, and finishes the
 publication. A retired tag the listing still carries is compared but no longer offered, so
 saving leaves it off. The checksum stays, which is why the edit is allowed while the listing's
-own submission is in review.
+own submission is in review, and that submission's approval leaves the tags as the admin set
+them (payment already wrote its suggested tags). The field takes at most `MAX_LISTING_TAGS` (20).
 
 The review screens show the Creator's suggested tags (`tag_slugs`), and "Edit, then approve"
-edits them as `edits.tagSlugs` (up to three active tags), logged as `tags` among the edited
-fields. A revision's tags can't be edited at review: approve it, then set the listing's tags
-here. Hubs, tags, and best pages themselves change only through manifests
+on a submission not yet live edits them as `edits.tagSlugs` (up to three active tags), logged as
+`tags` among the edited fields. A paid submission already live, or a revision, has no tag edit
+at review: set the listing's tags here. Hubs, tags, and best pages themselves change only through manifests
 ([Catalog publication](./catalog-publication.md#taxonomy-operations)).
 
 ## Unpublished listings answer 410

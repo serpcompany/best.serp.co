@@ -208,13 +208,15 @@ owner except filling in the form; the anonymous capability-token flow is gone.
 
 A Creator may suggest up to three active tags (on `/submit/` and the owner's listing edit),
 stored in `tag_slugs`: null on a submission without tags, and on a revision whose tags equal the
-listing's own, which approval then leaves alone. Approval and payment
-(`createListingFromSubmissionPlans`) give the new listing the suggested tags still active, in
-order; a live or revision approval (`applyStagedContentPlans`) replaces its tags only when
-`tag_slugs` is not null. A row saved before its narrow category retired still goes live:
-`resolveStagedCategorySql` (`plan-support.ts`) files it under an active category with that slug,
-or else under the hub of the active tag with that slug, and adds that tag first. New saves still
-require an active category.
+listing's own. Approval and payment (`createListingFromSubmissionPlans`) give the new listing
+the suggested tags still active, numbered from 0 in order. A revision approval replaces its
+tags only when `tag_slugs` is not null; a paid listing's live approval never writes tags, since
+payment did and an admin may have changed them since. A row saved before its narrow category
+retired still goes live: `resolveStagedCategorySql` (`plan-support.ts`) files it under an
+active category with that slug, else the hub of the active tag with that slug, else whatever the
+old category's `taxonomy_redirects` row leads to (a merged slug's tag, a best page's tag or
+category, or a category). The tag it finds comes first in a new or replaced set, or after a
+revision's listing's own tags. New saves still require an active category.
 
 ### Fetching submitters' sites
 

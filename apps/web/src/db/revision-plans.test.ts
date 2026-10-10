@@ -6,7 +6,7 @@ import {
   categoryId,
   count,
   execute,
-  listingTags,
+  listingTagOrder,
   NOW,
   planDatabase,
   primaryCategory,
@@ -772,26 +772,54 @@ describe("a revision's tags and the stale-slug resolver (#341, design 4.4)", () 
     expect(revision(db)?.tag_slugs).toBe('["whiteboards"]')
   })
 
-  it('replaces the tags when the revision gives them, an empty list included', () => {
+  it('replaces the tags when the revision gives them, from 0, an empty list included', () => {
     const db = tagged(['note-taking'])
-    approve(db, { tagSlugs: ['whiteboards', 'retired-tag'] })
-    expect(listingTags(db, listingId)).toEqual(['whiteboards'])
+    approve(db, { tagSlugs: ['whiteboards', 'retired-tag', 'note-taking'] })
+    expect(listingTagOrder(db, listingId)).toEqual([
+      { slug: 'whiteboards', sort_order: 0 },
+      { slug: 'note-taking', sort_order: 1 }
+    ])
     const emptied = tagged(['note-taking'])
     approve(emptied, { tagSlugs: [] })
-    expect(listingTags(emptied, listingId)).toEqual([])
+    expect(listingTagOrder(emptied, listingId)).toEqual([])
   })
 
   it('leaves the tags as they are when the revision gives none', () => {
     const db = tagged(['note-taking', 'whiteboards'])
     approve(db, { tagSlugs: null })
-    expect(listingTags(db, listingId)).toEqual(['note-taking', 'whiteboards'])
+    expect(listingTagOrder(db, listingId)).toEqual([
+      { slug: 'note-taking', sort_order: 0 },
+      { slug: 'whiteboards', sort_order: 1 }
+    ])
   })
 
-  it('files a revision naming a retired narrow slug under its hub, and adds its tag', () => {
-    const db = tagged(['note-taking'])
+  it("files a retired narrow slug under its hub, appending its tag after the listing's own", () => {
+    const db = tagged(['note-taking', 'whiteboards'])
     approve(db, { categorySlug: 'chatbots', tagSlugs: null })
     expect(primaryCategory(db, listingId)).toBe('apps')
-    expect(listingTags(db, listingId)).toEqual(['chatbots', 'note-taking'])
+    expect(listingTagOrder(db, listingId)).toEqual([
+      { slug: 'note-taking', sort_order: 0 },
+      { slug: 'whiteboards', sort_order: 1 },
+      { slug: 'chatbots', sort_order: 2 }
+    ])
     expect(publicationState(db).version).toBe(2)
+    // Already there, it stays where it is.
+    const kept = tagged(['whiteboards', 'chatbots'])
+    approve(kept, { categorySlug: 'chatbots', tagSlugs: null })
+    expect(listingTagOrder(kept, listingId)).toEqual([
+      { slug: 'whiteboards', sort_order: 0 },
+      { slug: 'chatbots', sort_order: 1 }
+    ])
+  })
+
+  it('puts the resolver tag first when the revision gives tags, a merged slug included', () => {
+    const db = tagged(['whiteboards'])
+    approve(db, { categorySlug: 'merged-narrow', tagSlugs: ['whiteboards', 'note-taking'] })
+    // `merged-narrow` redirects to the tag `note-taking` (Tools).
+    expect(primaryCategory(db, listingId)).toBe('tools')
+    expect(listingTagOrder(db, listingId)).toEqual([
+      { slug: 'note-taking', sort_order: 0 },
+      { slug: 'whiteboards', sort_order: 1 }
+    ])
   })
 })
