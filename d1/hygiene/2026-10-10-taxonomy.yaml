@@ -30,8 +30,9 @@
 #
 # Who moves (phase 2). The input is the reviewed catalog: d1/hygiene/2026-10-10-other-inventory.json (the
 # 2,419 listings filed only under Other) and 2026-10-10-taxonomy-inventory.json (every other approved listing,
-# live or unpublished), with every committed manifest published after that snapshot applied on top: #337 and
-# #352 (#332, #338), other-removals and the 9 other-categories batches (#333), and #358's 4 (#340).
+# live or unpublished), with the 16 committed manifests published after that snapshot applied on top, named in
+# the generator (`taxonomyInputManifests`): #337 and #352 (#332, #338), other-removals and the 9
+# other-categories batches (#333), and #358's 4 (#340). A manifest committed later is never read.
 #   - Every approved listing filed under a retiring category, live or unpublished, is filed under its hub
 #     alone, and tagged with each of its categories' tags (merges applied, duplicates dropped), in membership
 #     order. Its hub is its primary category's tag's hub, or video-downloaders.
@@ -52,15 +53,22 @@
 #              the listing's host and its subdomains), in that order. evidence is what ranked each pin.
 #              Skipped: excluded listings; listings with an active claim hold (2026-10-06-listing-claim-holds,
 #              less #358's five clears), whose link ends off the product; the listings #333 flagged for
-#              uncensored or NSFW plans (freedomgpt.com, opendream.ai, openjourneybot.com); and passedOver.
+#              uncensored or NSFW plans (freedomgpt.com, opendream.ai, openjourneybot.com); every listing in
+#              featureListings, on every page; and the page's passedOver.
 #              video-downloader's listings are SERP's own products with no domain of their own: it pins the
 #              video downloaders whose "<platform> video downloader" has the most US searches (Ahrefs,
-#              2026-10-10), never a fan-site or adult-site downloader. No pin has a blurb: each shows its
-#              listing's description.
-#   passedOver a listing that would rank above the 10th pin but whose domain's traffic is not the listed
-#              product (a feature of a larger site), or which isn't the keyword's kind of product.
+#              2026-10-10), never a fan-site or adult-site downloader. hipaa-compliant-hosting pins only a
+#              provider whose own site offers HIPAA hosting (its evidence names the page, GET 2026-10-11) and
+#              excludes the rest. No pin has a blurb: each shows its listing's description.
+#   passedOver a listing that would rank above the 10th pin but isn't the keyword's kind of product, whose
+#              listing copy describes something else, or that duplicates a pin.
 #   exclude    pool listings the page never shows (design 5.2: student study tools on
-#              ai-tools-for-teachers, data-extraction tools on ai-pdf).
+#              ai-tools-for-teachers, data-extraction tools on ai-pdf; and hosts with no HIPAA offering on
+#              hipaa-compliant-hosting).
+# featureListings: a listing that names one feature, add-on, model or sub-tool of a larger site (Einstein GPT
+#   on salesforce.com, ChatSpot on hubspot.com, Slack GPT, Miro AI) is never ranked by its host's traffic,
+#   which measures the parent product: it is passed over on every page. A listing that is the site's own
+#   product (Picsart, Cursor, Monday.com, a renamed product such as Mapify's ChatMind) counts.
 # redirects: design 2.2's table, unchanged: every narrow category's URL to its tag, or to the best page that
 #   takes over its tag; then every tag a tag-only best page uses, to that page. None aims at a retiring
 #   category, and none at a URL that redirects itself.
@@ -77,6 +85,7 @@ counts:
   mergedCategories: 36
   bestPages: 30
   pins: 300
+  featureListings: 83
   redirects: 166
   categoryRedirects: 137
   tagRedirects: 29
@@ -756,8 +765,6 @@ bestPages:
   - {slug: watermarkremover.io, id: lst_92fc03c70fa70d5fe9767402, evidence: "DR 67, 1,065,414 organic visits/mo"}
   - {slug: picwish.com, id: lst_8dcdafa52ecb88a2101876d2, evidence: "DR 71, 853,025 organic visits/mo"}
   - {slug: slazzer.com, id: lst_fb9536366d52202e41f643bf, evidence: "DR 67, 843,538 organic visits/mo"}
-  passedOver:
-  - {slug: icons8.com, reason: "icons8.com's traffic is its icon library, not the Swapper face-swap tool"}
 - slug: ai-music-generator
   keyword: ai music generator
   volume: 49000
@@ -837,16 +844,16 @@ bestPages:
     built in, and others are focused add-ons for prospecting or call analysis. Each entry links to its
     own listing with a description and the product's website.
   pins:
-  - {slug: salesforce.com, id: lst_85e33fc0ffe8c02ec4145c19, evidence: "DR 92, 7,953,133 organic visits/mo"}
   - {slug: leadiq.com, id: lst_a0b115154aae6a3d3a715b9a, evidence: "DR 71, 155,417 organic visits/mo"}
   - {slug: salesforge.ai, id: lst_7c63dff03c5ee090d5eaab7d, evidence: "DR 73, 82,212 organic visits/mo"}
   - {slug: instantly.ai, id: lst_0a635967f635a6ade31e1494, evidence: "DR 80, 63,685 organic visits/mo"}
   - {slug: seamless.ai, id: lst_2970bd2d905fb052d3e17947, evidence: "DR 72, 45,170 organic visits/mo"}
-  - {slug: vtiger.com, id: lst_e20a14748cea7b2247f1216b, evidence: "DR 79, 41,758 organic visits/mo"}
-  - {slug: gong.io, id: lst_7e4dfc81c43d49a2e9d17db1, evidence: "DR 83, 37,878 organic visits/mo"}
   - {slug: reply.io, id: lst_983550c8865b039039fb04bb, evidence: "DR 78, 14,089 organic visits/mo"}
   - {slug: finalscout.com, id: lst_0f7f350b788af63882dd0cd9, evidence: "DR 31, 7,079 organic visits/mo"}
   - {slug: sybill.ai, id: lst_82c64921e846d0837d0ab3cc, evidence: "DR 66, 5,499 organic visits/mo"}
+  - {slug: dux-soup.com, id: lst_1fbcc301b89d6cc85af443f8, evidence: "DR 66, 4,696 organic visits/mo"}
+  - {slug: trellus.ai, id: lst_3992fc28f6bc0e05c3ad2e7c, evidence: "DR 53, 4,406 organic visits/mo"}
+  - {slug: govdash.com, id: lst_8b6bf8b5dea3e471120960e0, evidence: "DR 46, 2,608 organic visits/mo"}
 - slug: ai-tools-for-teachers
   keyword: ai tools for teachers
   volume: 2600
@@ -894,17 +901,15 @@ bestPages:
   - {slug: mintlify.com, id: lst_b7e5a3c697c8330f89bad51c, evidence: "DR 91, 63,263 organic visits/mo"}
   - {slug: litellm.ai, id: lst_4bbc4d07086af547d8a0c072, evidence: "DR 80, 62,878 organic visits/mo"}
   - {slug: jina.ai, id: lst_016dd0e7bee6c03cb73b8cab, evidence: "DR 77, 29,009 organic visits/mo"}
-  - {slug: together.ai, id: lst_80af6eca8917719828a782bd, evidence: "DR 81, 22,860 organic visits/mo"}
   - {slug: gradio.app, id: lst_91624e71320d2cb92664bbdd, evidence: "DR 76, 20,523 organic visits/mo"}
   - {slug: flowiseai.com, id: lst_43c21fdb51773aec1c4a00f7, evidence: "DR 73, 16,042 organic visits/mo"}
   - {slug: virtuosoqa.com, id: lst_841b3fb522d431585135c361, evidence: "DR 61, 15,359 organic visits/mo"}
+  - {slug: h2o.ai, id: lst_6687a3350a75a97c497ee67d, evidence: "DR 77, 12,247 organic visits/mo"}
   passedOver:
   - {slug: twilio.com, reason: "its listing describes a messaging API, not an AI tool"}
   - {slug: firebase.google.com, reason: "its listing describes a general app platform, not an AI tool"}
   - {slug: threejs.org, reason: "a 3D graphics library, not an AI tool"}
-  - {slug: merge.dev, reason: "merge.dev's traffic is its unified API, not Blueprint"}
   - {slug: pulumi.com, reason: "its listing describes infrastructure as code, not an AI tool"}
-  - {slug: sciencelogic.com, reason: "sciencelogic.com's traffic is its IT operations suite, not Zebrium"}
 - slug: ai-pdf
   keyword: ai pdf
   volume: 800
@@ -962,17 +967,9 @@ bestPages:
   - {slug: chatbase.co, id: lst_dee4a3356ac72173cc2cf282, evidence: "DR 81, 56,042 organic visits/mo"}
   - {slug: wonderchat.io, id: lst_55f4cd6f9ea9ed2e9f9b5e07, evidence: "DR 67, 50,111 organic visits/mo"}
   - {slug: docsbot.ai, id: lst_7d377aadd295f9aebd22c471, evidence: "DR 70, 28,811 organic visits/mo"}
-  - {slug: cohere.com, id: lst_3fd4a20e001a5d82ecc1ddbf, evidence: "DR 82, 27,962 organic visits/mo"}
+  - {slug: sitegpt.ai, id: lst_0b496a56a764e2296f586562, evidence: "DR 66, 24,760 organic visits/mo"}
   passedOver:
-  - {slug: snapchat.com, reason: "snapchat.com's traffic is the Snapchat app, not My AI"}
-  - {slug: slack.com, reason: "slack.com's traffic is Slack's team chat, not Slack GPT"}
-  - {slug: opera.com, reason: "opera.com's traffic is its web browsers"}
-  - {slug: navercorp.com, reason: "navercorp.com is NAVER's corporate site, not HyperCLOVA"}
-  - {slug: miniapps.ai, reason: "miniapps.ai's traffic is its catalog of mini apps, not this bot"}
-  - {slug: raycast.com, reason: "raycast.com's traffic is its Mac launcher, not Raycast AI"}
-  - {slug: crisp.chat, reason: "crisp.chat's traffic is its customer messaging suite, not MagicReply"}
-  - {slug: letsview.com, reason: "letsview.com's traffic is its screen-mirroring app"}
-  - {slug: yext.com, reason: "yext.com's traffic is its search and listings platform, not Yext Chat"}
+  - {slug: miniapps.ai, reason: "its listing describes one bot, Contrarian Bot; miniapps.ai's traffic is its catalog of AI apps"}
 - slug: ai-customer-service
   keyword: ai customer service
   volume: 3500
@@ -985,18 +982,16 @@ bestPages:
     agent to the tools a support team already uses. Each entry links to its own listing with a description
     and the product's website.
   pins:
-  - {slug: livechat.com, id: lst_651ae748fecf113a02cfd03b, evidence: "DR 88, 927,545 organic visits/mo"}
   - {slug: dialpad.com, id: lst_0f159058f7cfe0e81566b1b3, evidence: "DR 83, 332,816 organic visits/mo"}
   - {slug: voiceflow.com, id: lst_4aad4dc51ccb020a6df559b1, evidence: "DR 79, 175,941 organic visits/mo"}
-  - {slug: crisp.chat, id: lst_d0eb1d21af57e95091b2537a, evidence: "DR 89, 64,842 organic visits/mo"}
   - {slug: chatbase.co, id: lst_dee4a3356ac72173cc2cf282, evidence: "DR 81, 56,042 organic visits/mo"}
   - {slug: wonderchat.io, id: lst_55f4cd6f9ea9ed2e9f9b5e07, evidence: "DR 67, 50,111 organic visits/mo"}
   - {slug: docsbot.ai, id: lst_7d377aadd295f9aebd22c471, evidence: "DR 70, 28,811 organic visits/mo"}
   - {slug: bird.com, id: lst_2eee16bafaa94c3114479589, evidence: "DR 82, 28,008 organic visits/mo"}
   - {slug: sitegpt.ai, id: lst_0b496a56a764e2296f586562, evidence: "DR 66, 24,760 organic visits/mo"}
-  - {slug: landbot.io, id: lst_785e5b5ec11c13a7dab59a28, evidence: "DR 77, 18,605 organic visits/mo"}
-  passedOver:
-  - {slug: yext.com, reason: "yext.com's traffic is its search and listings platform, not Yext Chat"}
+  - {slug: yellow.ai, id: lst_b77f74a2eb145541be9b4817, evidence: "DR 74, 16,206 organic visits/mo"}
+  - {slug: liveperson.com, id: lst_4a5c0c9588719469a6f60b05, evidence: "DR 79, 14,786 organic visits/mo"}
+  - {slug: yourgpt.ai, id: lst_b9c95a04491e8884940d361d, evidence: "DR 70, 11,273 organic visits/mo"}
 - slug: ai-content-generator
   keyword: ai content generator
   volume: 6900
@@ -1008,7 +1003,6 @@ bestPages:
     listing with a description and the product's website.
   pins:
   - {slug: simplified.com, id: lst_702c00dcfa3735f76e751528, evidence: "DR 77, 374,076 organic visits/mo"}
-  - {slug: markcopy.ai, id: lst_dda79bd41d7b4b2159a1c38b, evidence: "DR 49, 191,913 organic visits/mo"}
   - {slug: seo.ai, id: lst_789008ddf9f60aa217fc8bb4, evidence: "DR 77, 116,226 organic visits/mo"}
   - {slug: writesonic.com, id: lst_70c946c2551e22e26774ae44, evidence: "DR 84, 113,611 organic visits/mo"}
   - {slug: easy-peasy.ai, id: lst_9d0a5bda7935086c07265cb7, evidence: "DR 70, 93,614 organic visits/mo"}
@@ -1017,6 +1011,7 @@ bestPages:
   - {slug: ryrob.com, id: lst_664e8cf3014059312e3685f5, evidence: "DR 77, 72,514 organic visits/mo"}
   - {slug: neuroflash.com, id: lst_32093756932acb14d7a68082, evidence: "DR 73, 43,990 organic visits/mo"}
   - {slug: junia.ai, id: lst_177b29b17046f5f839d35035, evidence: "DR 69, 31,231 organic visits/mo"}
+  - {slug: scalenut.com, id: lst_ae602b893abe389474f48220, evidence: "DR 72, 23,169 organic visits/mo"}
 - slug: ai-copywriting
   keyword: ai copywriting
   volume: 1500
@@ -1029,7 +1024,6 @@ bestPages:
     copy at scale. Each entry links to its own listing with a description and the product''s website.'
   pins:
   - {slug: simplified.com, id: lst_702c00dcfa3735f76e751528, evidence: "DR 77, 374,076 organic visits/mo"}
-  - {slug: markcopy.ai, id: lst_dda79bd41d7b4b2159a1c38b, evidence: "DR 49, 191,913 organic visits/mo"}
   - {slug: writesonic.com, id: lst_70c946c2551e22e26774ae44, evidence: "DR 84, 113,611 organic visits/mo"}
   - {slug: copy.ai, id: lst_585959381adc0935775e398b, evidence: "DR 86, 99,255 organic visits/mo"}
   - {slug: easy-peasy.ai, id: lst_9d0a5bda7935086c07265cb7, evidence: "DR 70, 93,614 organic visits/mo"}
@@ -1038,6 +1032,7 @@ bestPages:
   - {slug: ryrob.com, id: lst_664e8cf3014059312e3685f5, evidence: "DR 77, 72,514 organic visits/mo"}
   - {slug: neuroflash.com, id: lst_32093756932acb14d7a68082, evidence: "DR 73, 43,990 organic visits/mo"}
   - {slug: rytr.me, id: lst_324d94887c8ff8260c5eda83, evidence: "DR 79, 35,743 organic visits/mo"}
+  - {slug: nichesss.com, id: lst_9c3423bf643178a0d82eb11f, evidence: "DR 50, 22,408 organic visits/mo"}
 - slug: ai-image-generator
   keyword: ai image generator
   volume: 247000
@@ -1059,11 +1054,7 @@ bestPages:
   - {slug: getimg.ai, id: lst_8f4888eede3eb543df858e8a, evidence: "DR 73, 44,549 organic visits/mo"}
   - {slug: starryai.com, id: lst_9937e6ba65354886891fba24, evidence: "DR 70, 38,902 organic visits/mo"}
   passedOver:
-  - {slug: openai.com, reason: "openai.com's traffic is ChatGPT, not DALL-E 2"}
-  - {slug: deviantart.com, reason: "deviantart.com's traffic is its art community, not DreamUp"}
-  - {slug: emojipedia.org, reason: "emojipedia.org's traffic is its emoji reference, not the emoji generator"}
   - {slug: imgflip.com, reason: "imgflip.com's traffic is its meme maker, not AI image generation"}
-  - {slug: creativefabrica.com, reason: "creativefabrica.com's traffic is its fonts and graphics marketplace, not CF Spark"}
   - {slug: creator.nightcafe.studio, reason: "the same product as nightcafe.studio, which is pinned"}
 - slug: ai-productivity-tools
   keyword: ai productivity tools
@@ -1075,19 +1066,16 @@ bestPages:
     Some are workspaces for whole teams and others are single-purpose helpers. Each entry links to its
     own listing with a description and the product's website.
   pins:
-  - {slug: slack.com, id: lst_b7639eebb5f7f3034943381b, evidence: "DR 92, 4,093,268 organic visits/mo"}
-  - {slug: miro.com, id: lst_5d0da7f081adae9c235ce80d, evidence: "DR 90, 2,309,774 organic visits/mo"}
   - {slug: monica.im, id: lst_a70cfc124fd4525fe79e5db5, evidence: "DR 74, 1,159,559 organic visits/mo"}
   - {slug: monday.com, id: lst_cc08310da200f327f5e7f007, evidence: "DR 91, 741,826 organic visits/mo"}
   - {slug: tinywow.com, id: lst_c3997e13624668b7a4e77625, evidence: "DR 71, 427,990 organic visits/mo"}
   - {slug: getvoila.ai, id: lst_dcf360d4e8f56e792f958fcf, evidence: "DR 52, 186,078 organic visits/mo"}
-  - {slug: whimsical.com, id: lst_d008ec887c8dda320c9cac44, evidence: "DR 79, 115,413 organic visits/mo"}
   - {slug: mapify.so, id: lst_5c623298f3e74aa614201065, evidence: "DR 66, 102,789 organic visits/mo"}
-  - {slug: eraser.io, id: lst_23f0d92a5076fa3114048fa0, evidence: "DR 61, 97,709 organic visits/mo"}
   - {slug: missiveapp.com, id: lst_6d660b16d76aa800f4cc971f, evidence: "DR 74, 87,328 organic visits/mo"}
-  passedOver:
-  - {slug: microsoft.com, reason: "microsoft.com's traffic is Microsoft as a whole, and Edge is a web browser"}
-  - {slug: opera.com, reason: "opera.com's traffic is its web browsers"}
+  - {slug: superhuman.com, id: lst_692085f232c9ba8f1cea086f, evidence: "DR 81, 74,395 organic visits/mo"}
+  - {slug: craft.do, id: lst_fd938555facec2c12ac49ba1, evidence: "DR 76, 54,496 organic visits/mo"}
+  - {slug: shift.com, id: lst_fa5f8e8c11dc0d0351675958, evidence: "DR 73, 53,837 organic visits/mo"}
+  - {slug: usemotion.com, id: lst_014a1e0f4f0cdea41c0c3224, evidence: "DR 82, 45,957 organic visits/mo"}
 - slug: video-downloader
   keyword: video downloader
   volume: 192000
@@ -1132,7 +1120,6 @@ bestPages:
   - {slug: clipfly.ai, id: lst_c562db082cccaf7b836c835b, evidence: "DR 57, 92,480 organic visits/mo"}
   passedOver:
   - {slug: pika.art, reason: "its listing's copy describes a chatbot builder, not Pika's video generator"}
-  - {slug: myheritage.fr, reason: "myheritage.fr's traffic is MyHeritage's genealogy service, not Deep Nostalgia"}
   - {slug: vidday.com, reason: "its listing describes group video gifts, not AI video generation"}
 - slug: ai-data-analysis
   keyword: ai data analysis
@@ -1146,18 +1133,15 @@ bestPages:
     entry links to its own listing with a description and the product's website.
   pins:
   - {slug: tableau.com, id: lst_99bdb22cb2d01a204cb786a7, evidence: "DR 91, 1,358,240 organic visits/mo"}
-  - {slug: mixpanel.com, id: lst_f6073bce20eea78a33796081, evidence: "DR 90, 154,038 organic visits/mo"}
   - {slug: youscan.io, id: lst_b8840864975df45d3cda30fd, evidence: "DR 72, 77,322 organic visits/mo"}
   - {slug: coefficient.io, id: lst_a411a7f297a2ccd93ee3a884, evidence: "DR 72, 42,395 organic visits/mo"}
-  - {slug: rows.com, id: lst_10ba1e2ad5fc4afb23b4520d, evidence: "DR 71, 36,232 organic visits/mo"}
-  - {slug: deepnote.com, id: lst_bb6446d5879a2e746b224b6c, evidence: "DR 72, 18,165 organic visits/mo"}
   - {slug: numerous.ai, id: lst_d7162c9cc6717150dbbec3ae, evidence: "DR 64, 17,835 organic visits/mo"}
   - {slug: gptexcel.uk, id: lst_7487a5e75daae5669a95c513, evidence: "DR 51, 13,578 organic visits/mo"}
   - {slug: hex.tech, id: lst_6bb3c650690fab4f0481bc8d, evidence: "DR 76, 12,357 organic visits/mo"}
   - {slug: kanaries.net, id: lst_367184ac70d03d1fa0acd414, evidence: "DR 53, 12,059 organic visits/mo"}
-  passedOver:
-  - {slug: medallia.com, reason: "medallia.com's traffic is its customer experience platform, not MonkeyLearn"}
-  - {slug: boloforms.com, reason: "boloforms.com's traffic is its e-signature product, not SheetGod"}
+  - {slug: graphy.app, id: lst_e0548da75032401636af0f71, evidence: "DR 46, 6,435 organic visits/mo"}
+  - {slug: formulashq.com, id: lst_70e27b5c7b230c20452bdebf, evidence: "DR 33, 4,982 organic visits/mo"}
+  - {slug: promptloop.com, id: lst_3f0491d36ff3bc31e219af7d, evidence: "DR 49, 4,282 organic visits/mo"}
 - slug: ai-social-media-tools
   keyword: ai social media tools
   volume: 300
@@ -1169,15 +1153,15 @@ bestPages:
     links to its own listing with a description and the product's website.
   pins:
   - {slug: vidiq.com, id: lst_be98d3ff6981b3df719db152, evidence: "DR 80, 827,807 organic visits/mo"}
-  - {slug: buffer.com, id: lst_43ae562ab2420b083b4a2cd1, evidence: "DR 91, 826,720 organic visits/mo"}
   - {slug: hootsuite.com, id: lst_250dd8cad4fef884026bec1b, evidence: "DR 91, 825,289 organic visits/mo"}
-  - {slug: flick.social, id: lst_9f580d9e6266993556e3e887, evidence: "DR 73, 212,420 organic visits/mo"}
   - {slug: postly.ai, id: lst_c29c832e45f836888edde3db, evidence: "DR 63, 102,029 organic visits/mo"}
   - {slug: socialbu.com, id: lst_b819f25be12ec3c8e4d5ee04, evidence: "DR 65, 90,834 organic visits/mo"}
-  - {slug: livereacting.com, id: lst_8db60e406a07b3714b93d147, evidence: "DR 57, 88,776 organic visits/mo"}
   - {slug: youscan.io, id: lst_b8840864975df45d3cda30fd, evidence: "DR 72, 77,322 organic visits/mo"}
   - {slug: taplio.com, id: lst_a7bf6f40afb0f965ea1b204e, evidence: "DR 72, 71,200 organic visits/mo"}
-  - {slug: socialbee.com, id: lst_b0479abd8b81aefc09017251, evidence: "DR 80, 55,007 organic visits/mo"}
+  - {slug: portaly.cc, id: lst_7cdc3ca8ab9e8dde21cb5fc4, evidence: "DR 76, 44,855 organic visits/mo"}
+  - {slug: tweethunter.io, id: lst_b2c18d0ef61e56de326a3f40, evidence: "DR 71, 41,680 organic visits/mo"}
+  - {slug: predis.ai, id: lst_5da6c0322740c0039977eec3, evidence: "DR 78, 26,712 organic visits/mo"}
+  - {slug: taggbox.com, id: lst_7311f297caf5e804cbc6af7f, evidence: "DR 78, 15,868 organic visits/mo"}
 - slug: ai-coding-assistant
   keyword: ai coding assistant
   volume: 1800
@@ -1188,16 +1172,16 @@ bestPages:
     code. Some are full development environments with AI built in and others plug into the tools you already
     use. Each entry links to its own listing with a description and the product's website.
   pins:
-  - {slug: replit.com, id: lst_7f018cc179b1ab753ba19042, evidence: "DR 88, 1,577,248 organic visits/mo"}
   - {slug: cursor.com, id: lst_e45d81af038164bc25ab4dda, evidence: "DR 90, 526,750 organic visits/mo"}
   - {slug: codia.ai, id: lst_4353e34b74e4fc10b50557d9, evidence: "DR 44, 144,614 organic visits/mo"}
-  - {slug: warp.dev, id: lst_fef20e110470167e8b29b742, evidence: "DR 79, 62,451 organic visits/mo"}
   - {slug: coderabbit.ai, id: lst_2803a06d19ee877af9e9a7c6, evidence: "DR 80, 49,618 organic visits/mo"}
-  - {slug: codesandbox.io, id: lst_9c7bf8d0e68785c74cd2448d, evidence: "DR 87, 41,505 organic visits/mo"}
-  - {slug: deepnote.com, id: lst_bb6446d5879a2e746b224b6c, evidence: "DR 72, 18,165 organic visits/mo"}
   - {slug: trickle.so, id: lst_069e4e2caeedd1f39fa7b0fb, evidence: "DR 61, 17,324 organic visits/mo"}
   - {slug: zzzcode.ai, id: lst_d21e976439664fe1aaf00ac3, evidence: "DR 48, 12,555 organic visits/mo"}
   - {slug: codeconvert.ai, id: lst_5756684ead7c70c65cb8ff59, evidence: "DR 33, 10,123 organic visits/mo"}
+  - {slug: qodo.ai, id: lst_83776aab9fb5d8dea8e83e95, evidence: "DR 76, 8,389 organic visits/mo"}
+  - {slug: pseudoeditor.com, id: lst_856d5d558b67c4cac9f63790, evidence: "DR 8, 5,275 organic visits/mo"}
+  - {slug: docuwriter.ai, id: lst_8ef1e02224ce390886eaf2a8, evidence: "DR 51, 2,269 organic visits/mo"}
+  - {slug: codiga.io, id: lst_a93dfdd172209a3786fd6d64, evidence: "DR 57, 1,619 organic visits/mo"}
 - slug: ai-seo-tools
   keyword: ai seo tools
   volume: 2900
@@ -1228,8 +1212,6 @@ bestPages:
     data. Some are all-in-one platforms for small businesses and others serve large marketing teams. Each
     entry links to its own listing with a description and the product's website.
   pins:
-  - {slug: salesforce.com, id: lst_85e33fc0ffe8c02ec4145c19, evidence: "DR 92, 7,953,133 organic visits/mo"}
-  - {slug: hubspot.com, id: lst_1f31337a943b53a5948269d1, evidence: "DR 93, 3,643,486 organic visits/mo"}
   - {slug: yotpo.com, id: lst_ebb0f78d4057325bee01a84b, evidence: "DR 88, 308,579 organic visits/mo"}
   - {slug: unbounce.com, id: lst_c0382ec163272b3a0de73622, evidence: "DR 88, 253,036 organic visits/mo"}
   - {slug: systeme.io, id: lst_c43a435c9838ab7ad9db9244, evidence: "DR 92, 139,618 organic visits/mo"}
@@ -1238,8 +1220,8 @@ bestPages:
   - {slug: handwrytten.com, id: lst_84251986672ed88e4c771841, evidence: "DR 70, 18,958 organic visits/mo"}
   - {slug: typeface.ai, id: lst_669817377825227fac0807a3, evidence: "DR 74, 7,843 organic visits/mo"}
   - {slug: nicejob.com, id: lst_46d04eadede67ebea7e5a27e, evidence: "DR 81, 6,729 organic visits/mo"}
-  passedOver:
-  - {slug: bazaarvoice.com, reason: "bazaarvoice.com's traffic is its reviews platform, not Affable.ai"}
+  - {slug: ortto.com, id: lst_460e234a2dd92e61732945a6, evidence: "DR 78, 4,157 organic visits/mo"}
+  - {slug: fullpath.com, id: lst_ac321f838dfb002c530f394d, evidence: "DR 52, 3,969 organic visits/mo"}
 - slug: ai-video-editor
   keyword: ai video editor
   volume: 39000
@@ -1260,9 +1242,6 @@ bestPages:
   - {slug: clipfly.ai, id: lst_c562db082cccaf7b836c835b, evidence: "DR 57, 92,480 organic visits/mo"}
   - {slug: gliacloud.com, id: lst_219b0c90eaebef5b5f4847e4, evidence: "DR 51, 53,627 organic visits/mo"}
   - {slug: zeemo.ai, id: lst_83115e11a2bed1031871cf61, evidence: "DR 45, 48,609 organic visits/mo"}
-  passedOver:
-  - {slug: streamlabs.com, reason: "streamlabs.com's traffic is its live-streaming software, not Type Studio"}
-  - {slug: livereacting.com, reason: "a live-streaming tool, not a video editor"}
 - slug: ai-art-generator
   keyword: ai art generator
   volume: 84000
@@ -1284,9 +1263,6 @@ bestPages:
   - {slug: stability.ai, id: lst_8511e86d98b6cc1d88d1802f, evidence: "DR 84, 37,569 organic visits/mo"}
   - {slug: phygital.plus, id: lst_3e043d5ebb3b11d2909f6c93, evidence: "DR 46, 28,524 organic visits/mo"}
   passedOver:
-  - {slug: openai.com, reason: "openai.com's traffic is ChatGPT, not DALL-E 2"}
-  - {slug: deviantart.com, reason: "deviantart.com's traffic is its art community, not DreamUp"}
-  - {slug: creativefabrica.com, reason: "creativefabrica.com's traffic is its fonts and graphics marketplace, not CF Spark"}
   - {slug: creator.nightcafe.studio, reason: "the same product as nightcafe.studio, which is pinned"}
 - slug: ai-website-builder
   keyword: ai website builder
@@ -1298,16 +1274,16 @@ bestPages:
     pages for campaigns, and a few export clean code for developers. Each entry links to its own listing
     with a description and the product's website.
   pins:
-  - {slug: wix.com, id: lst_b4d2f9f4314f39472ad55f00, evidence: "DR 95, 7,180,621 organic visits/mo"}
   - {slug: squarespace.com, id: lst_c15f52c9dcf33b02da879cbf, evidence: "DR 96, 3,374,504 organic visits/mo"}
   - {slug: framer.com, id: lst_dd4688213f18a5c94d0655bf, evidence: "DR 91, 530,267 organic visits/mo"}
   - {slug: unbounce.com, id: lst_c0382ec163272b3a0de73622, evidence: "DR 88, 253,036 organic visits/mo"}
   - {slug: b12.io, id: lst_21692e31390723380f372120, evidence: "DR 81, 104,022 organic visits/mo"}
-  - {slug: softr.io, id: lst_02c69023341a0ca2066d76be, evidence: "DR 84, 78,091 organic visits/mo"}
   - {slug: weblium.com, id: lst_3c9e642b6034758699860304, evidence: "DR 82, 39,543 organic visits/mo"}
   - {slug: codedesign.ai, id: lst_e12257a5c54a69ad1a5f9105, evidence: "DR 70, 10,942 organic visits/mo"}
   - {slug: teleporthq.io, id: lst_2741305ba7a27e2953ca0cfd, evidence: "DR 72, 6,599 organic visits/mo"}
   - {slug: pineapplebuilder.com, id: lst_5481d6b16f76f25c62c10ec3, evidence: "DR 65, 5,890 organic visits/mo"}
+  - {slug: zipwp.com, id: lst_b2b28043b71c907f5ad5c666, evidence: "DR 75, 5,338 organic visits/mo"}
+  - {slug: landingsite.ai, id: lst_f571186929a7332192d9b27d, evidence: "DR 71, 4,430 organic visits/mo"}
 - slug: cloud-gpu
   keyword: cloud gpu
   volume: 800
@@ -1329,10 +1305,6 @@ bestPages:
   - {slug: tencentcloud.com, id: lst_f51453f93fc61f394df14b8d, evidence: "DR 80, 28,141 organic visits/mo"}
   - {slug: paperspace.com, id: lst_4f5723dbdd28a781c3ffd776, evidence: "DR 73, 22,077 organic visits/mo"}
   - {slug: koyeb.com, id: lst_b979adf02dcfbb11c72c6a76, evidence: "DR 71, 17,193 organic visits/mo"}
-  passedOver:
-  - {slug: ibm.com, reason: "watsonx.ai is an AI development platform, not a GPU cloud"}
-  - {slug: aws.amazon.com, reason: "its listing is Amazon Polly, a text-to-speech service"}
-  - {slug: nvidia.com, reason: "its listing is NVIDIA Canvas, a painting app"}
 - slug: ai-meeting-assistant
   keyword: ai meeting assistant
   volume: 2600
@@ -1347,14 +1319,12 @@ bestPages:
   - {slug: dialpad.com, id: lst_0f159058f7cfe0e81566b1b3, evidence: "DR 83, 332,816 organic visits/mo"}
   - {slug: tactiq.io, id: lst_25d1350468e113ad446342ce, evidence: "DR 73, 275,257 organic visits/mo"}
   - {slug: krisp.ai, id: lst_700ae45785680837a642e4d3, evidence: "DR 79, 136,580 organic visits/mo"}
-  - {slug: read.ai, id: lst_480c5ac86878eb6958f475bd, evidence: "DR 75, 79,194 organic visits/mo"}
   - {slug: tldv.io, id: lst_d97ef6867abc090d4413f77b, evidence: "DR 75, 75,878 organic visits/mo"}
   - {slug: fireflies.ai, id: lst_f46425860ca3337609f99f6f, evidence: "DR 82, 59,072 organic visits/mo"}
   - {slug: noota.io, id: lst_44d14d7eb104fa59bf2a5aaa, evidence: "DR 62, 44,328 organic visits/mo"}
   - {slug: rewind.ai, id: lst_7ce8ac46145d0bbc07e06d67, evidence: "DR 61, 30,637 organic visits/mo"}
   - {slug: poised.com, id: lst_0f0b4124c7e06ec5bd18dfdb, evidence: "DR 53, 25,615 organic visits/mo"}
-  passedOver:
-  - {slug: zoom.com, reason: "zoom.com's traffic is Zoom's video meetings, not Zoom IQ"}
+  - {slug: supernormal.com, id: lst_ce0a6986a6440b184379c940, evidence: "DR 66, 21,191 organic visits/mo"}
 - slug: ai-note-taker
   keyword: ai note taker
   volume: 18000
@@ -1369,14 +1339,12 @@ bestPages:
   - {slug: otter.ai, id: lst_334360169f73c5a7620d44e0, evidence: "DR 86, 378,775 organic visits/mo"}
   - {slug: tactiq.io, id: lst_25d1350468e113ad446342ce, evidence: "DR 73, 275,257 organic visits/mo"}
   - {slug: krisp.ai, id: lst_700ae45785680837a642e4d3, evidence: "DR 79, 136,580 organic visits/mo"}
-  - {slug: read.ai, id: lst_480c5ac86878eb6958f475bd, evidence: "DR 75, 79,194 organic visits/mo"}
   - {slug: tldv.io, id: lst_d97ef6867abc090d4413f77b, evidence: "DR 75, 75,878 organic visits/mo"}
   - {slug: craft.do, id: lst_fd938555facec2c12ac49ba1, evidence: "DR 76, 54,496 organic visits/mo"}
   - {slug: noota.io, id: lst_44d14d7eb104fa59bf2a5aaa, evidence: "DR 62, 44,328 organic visits/mo"}
   - {slug: metaview.ai, id: lst_4b030ad174fa5a07e30ab0ab, evidence: "DR 70, 35,322 organic visits/mo"}
   - {slug: supernormal.com, id: lst_ce0a6986a6440b184379c940, evidence: "DR 66, 21,191 organic visits/mo"}
-  passedOver:
-  - {slug: zoho.com, reason: "zoho.com's traffic is Zoho's business suite, not Notes for ChatGPT"}
+  - {slug: meetjamie.ai, id: lst_666b338d68d6b043bccb09f2, evidence: "DR 69, 20,240 organic visits/mo"}
 - slug: ai-text-to-speech
   keyword: ai text to speech
   volume: 26000
@@ -1419,7 +1387,6 @@ bestPages:
   - {slug: plagiarismdetector.net, id: lst_f89e8569737c46d21fa68c6f, evidence: "DR 71, 488,679 organic visits/mo"}
   - {slug: smodin.io, id: lst_ac1b56ec9cc1e2328249869d, evidence: "DR 71, 194,580 organic visits/mo"}
   passedOver:
-  - {slug: grammarly.com, reason: "its listing is GrammarlyGO, which generates text rather than checking for plagiarism"}
   - {slug: sapling.ai, reason: "its listing describes language APIs, not plagiarism checking"}
   - {slug: edubirdie.com, reason: "an essay-writing service"}
 - slug: hipaa-compliant-hosting
@@ -1427,24 +1394,115 @@ bestPages:
   volume: 800
   tag: hipaa-compliant-hosting
   plural: hipaa compliant hosting providers
-  intro: HIPAA compliant hosting keeps protected health information on servers set up to meet the HIPAA
-    Security Rule. The providers here offer cloud and dedicated servers, managed security and backups,
-    encrypted email, and a business associate agreement for healthcare organizations and the software
-    companies that serve them. Some are large clouds with healthcare programs and others specialize in
-    compliance. Each entry links to its own listing with a description and the provider's website.
+  intro: HIPAA compliant hosting keeps protected health information on infrastructure and services set
+    up for the HIPAA Security Rule. The providers here offer cloud, dedicated and colocation hosting,
+    managed security and backups, encrypted email, and platforms for deploying health apps, each marketed
+    to healthcare organizations and the software companies that serve them. Some are large clouds with
+    healthcare programs and others specialize in compliance. An organization still needs a business associate
+    agreement for the service it uses. Each entry links to its own listing with a description and the
+    provider's website.
   pins:
-  - {slug: azure.microsoft.com, id: lst_a590ff5f631d1250224df4e3, evidence: "DR 96, 3,683,520 organic visits/mo"}
-  - {slug: rackspace.com, id: lst_f3fe329066251301efb7dab6, evidence: "DR 86, 143,533 organic visits/mo"}
-  - {slug: greengeeks.com, id: lst_550deeba4d8724905250b26e, evidence: "DR 84, 61,011 organic visits/mo"}
-  - {slug: tierpoint.com, id: lst_3ea5780c5f90d731adf503fe, evidence: "DR 71, 25,365 organic visits/mo"}
-  - {slug: hipaavault.com, id: lst_e7ec160437237670f8d55f33, evidence: "DR 57, 19,701 organic visits/mo"}
-  - {slug: leaseweb.com, id: lst_752764c40458318859bca9b3, evidence: "DR 77, 16,717 organic visits/mo"}
-  - {slug: servermania.com, id: lst_64d01bfeda69a4db37249b02, evidence: "DR 64, 8,737 organic visits/mo"}
-  - {slug: sherweb.com, id: lst_663a07bb996dd0ccf9a7cda5, evidence: "DR 69, 4,716 organic visits/mo"}
-  - {slug: luxsci.com, id: lst_7db2b41213a0fa3aa0e732ae, evidence: "DR 71, 2,762 organic visits/mo"}
-  - {slug: lightedge.com, id: lst_993b1205a26a9890ce3c76be, evidence: "DR 56, 2,484 organic visits/mo"}
-  passedOver:
-  - {slug: aws.amazon.com, reason: "its listing is Amazon Polly, a text-to-speech service"}
+  - {slug: azure.microsoft.com, id: lst_a590ff5f631d1250224df4e3, evidence: "DR 96, 3,683,520 organic visits/mo; HIPAA offering: https://learn.microsoft.com/en-us/azure/compliance/offerings/offering-hipaa-us"}
+  - {slug: rackspace.com, id: lst_f3fe329066251301efb7dab6, evidence: "DR 86, 143,533 organic visits/mo; HIPAA offering: https://www.rackspace.com/industry/healthcare"}
+  - {slug: tierpoint.com, id: lst_3ea5780c5f90d731adf503fe, evidence: "DR 71, 25,365 organic visits/mo; HIPAA offering: https://www.tierpoint.com/industry-it-solutions/healthcare/"}
+  - {slug: hipaavault.com, id: lst_e7ec160437237670f8d55f33, evidence: "DR 57, 19,701 organic visits/mo; HIPAA offering: https://hipaavault.com/"}
+  - {slug: sherweb.com, id: lst_663a07bb996dd0ccf9a7cda5, evidence: "DR 69, 4,716 organic visits/mo; HIPAA offering: https://www.sherweb.com/about/newsroom/sherweb-making-hipaa-compliance-easier-for-businesses"}
+  - {slug: luxsci.com, id: lst_7db2b41213a0fa3aa0e732ae, evidence: "DR 71, 2,762 organic visits/mo; HIPAA offering: https://luxsci.com/"}
+  - {slug: lightedge.com, id: lst_993b1205a26a9890ce3c76be, evidence: "DR 56, 2,484 organic visits/mo; HIPAA offering: https://lightedge.com/hipaa-cloud/"}
+  - {slug: medstack.co, id: lst_5feb6ba9a5a2f56731e83c1d, evidence: "DR 41, 519 organic visits/mo; HIPAA offering: https://medstack.co/"}
+  - {slug: connectria.com, id: lst_f3bd853de9d630e280f11c06, evidence: "DR 52, 302 organic visits/mo; HIPAA offering: https://www.connectria.com/"}
+  - {slug: bytegrid.com, id: lst_a7e78106154177ad79236c5d, evidence: "DR 22, 73 organic visits/mo; HIPAA offering: https://www.bytegrid.com/"}
+  exclude:
+  - {slug: aws.amazon.com, id: lst_31a93dfdd1a9daea71399d95, reason: "its listing is Amazon Polly, a text-to-speech service"}
+  - {slug: greengeeks.com, id: lst_550deeba4d8724905250b26e, reason: "no HIPAA offering on greengeeks.com: its home, web, VPS and dedicated hosting pages don't mention HIPAA (GET, 2026-10-11)"}
+  - {slug: leaseweb.com, id: lst_752764c40458318859bca9b3, reason: "no HIPAA offering found on leaseweb.com's home, compliance and certification pages (GET, 2026-10-11)"}
+  - {slug: linqto.com, id: lst_aa82a29b27b0eced74916ebc, reason: "an investment platform, not hosting"}
+  - {slug: servermania.com, id: lst_64d01bfeda69a4db37249b02, reason: "servermania.com lists its data centers' SOC 2-HIPAA reports, but no HIPAA hosting offering (GET, 2026-10-11)"}
+  - {slug: truevault.com, id: lst_8d0d625095e3c610cb08dd25, reason: "privacy-compliance software, not hosting"}
+featureListings:
+- {slug: aws.amazon.com, id: lst_31a93dfdd1a9daea71399d95, name: "Amazon Polly", reason: "names one feature of a larger site; aws.amazon.com's traffic measures all of AWS"}
+- {slug: ayoa.com, id: lst_8a4ac7eb74fdcf1aebcfa16e, name: "GenerateIdeas.ai", reason: "names one feature of a larger site; ayoa.com's traffic measures Ayoa's mind-mapping app"}
+- {slug: bazaarvoice.com, id: lst_cd4f6534709518e512eb802d, name: "Affable.ai", reason: "names one feature of a larger site; bazaarvoice.com's traffic measures Bazaarvoice's reviews platform"}
+- {slug: boloforms.com, id: lst_c6806b4adbbb65a7c7397030, name: "SheetGod", reason: "names one feature of a larger site; boloforms.com's traffic measures BoloForms' e-signature product"}
+- {slug: buffer.com, id: lst_43ae562ab2420b083b4a2cd1, name: "Buffer AI assistant", reason: "names one feature of a larger site; buffer.com's traffic measures Buffer's social media scheduler"}
+- {slug: chai-research.com, id: lst_b669de52d4736f4e045e8284, name: "ChaiGPT", reason: "names one feature of a larger site; chai-research.com's traffic measures Chai's research site"}
+- {slug: coda.io, id: lst_60654b29810d314ac4071b57, name: "OpenAI for Coda", reason: "names one feature of a larger site; coda.io's traffic measures Coda's document platform"}
+- {slug: codesandbox.io, id: lst_9c7bf8d0e68785c74cd2448d, name: "Boxy", reason: "names one feature of a larger site; codesandbox.io's traffic measures CodeSandbox's online IDE"}
+- {slug: cohere.com, id: lst_3fd4a20e001a5d82ecc1ddbf, name: "Coral", reason: "names one feature of a larger site; cohere.com's traffic measures Cohere's model platform"}
+- {slug: creativefabrica.com, id: lst_13d6c48086b6ffd68daf23ff, name: "CF Spark", reason: "names one feature of a larger site; creativefabrica.com's traffic measures Creative Fabrica's fonts and graphics marketplace"}
+- {slug: crisp.chat, id: lst_d0eb1d21af57e95091b2537a, name: "Crisp MagicReply", reason: "names one feature of a larger site; crisp.chat's traffic measures Crisp's customer messaging suite"}
+- {slug: dashword.com, id: lst_188cc4011a132f3258176d15, name: "Content brief generator", reason: "names one feature of a larger site; dashword.com's traffic measures Dashword's content optimizer"}
+- {slug: datasette.io, id: lst_61ec380de1e7194c1d8634ca, name: "Datasette ChatGPT plugin", reason: "names one feature of a larger site; datasette.io's traffic measures Datasette itself"}
+- {slug: deepnote.com, id: lst_bb6446d5879a2e746b224b6c, name: "Deepnote Copilot", reason: "names one feature of a larger site; deepnote.com's traffic measures Deepnote's data notebooks"}
+- {slug: deviantart.com, id: lst_76f39960871cc00bae41cd44, name: "Dream Up (Deviant Art)", reason: "names one feature of a larger site; deviantart.com's traffic measures DeviantArt's art community"}
+- {slug: emojipedia.org, id: lst_78aaa7d453b9b40478966c25, name: "Emojipedia (AI Emoji Generator)", reason: "names one feature of a larger site; emojipedia.org's traffic measures Emojipedia's emoji reference"}
+- {slug: eraser.io, id: lst_23f0d92a5076fa3114048fa0, name: "DiagramGPT", reason: "names one feature of a larger site; eraser.io's traffic measures Eraser's docs and diagrams"}
+- {slug: flick.social, id: lst_9f580d9e6266993556e3e887, name: "Flick - AI assistant", reason: "names one feature of a larger site; flick.social's traffic measures Flick's hashtag and scheduling suite"}
+- {slug: frontitude.com, id: lst_c988a50a050772d6cd3fbc40, name: "UX writing assistant", reason: "names one feature of a larger site; frontitude.com's traffic measures Frontitude's UX copy platform"}
+- {slug: futurimedia.com, id: lst_864992608e4295e26ac005b5, name: "RadioGPT", reason: "names one feature of a larger site; futurimedia.com's traffic measures Futuri's media products"}
+- {slug: goblin.tools, id: lst_3904dbeab135f07dadba9af6, name: "Magic ToDo", reason: "names one feature of a larger site; goblin.tools's traffic measures goblin.tools' set of tools"}
+- {slug: gong.io, id: lst_7e4dfc81c43d49a2e9d17db1, name: "Gong Engage", reason: "names one feature of a larger site; gong.io's traffic measures Gong's revenue platform"}
+- {slug: goteleport.com, id: lst_f8a67f719df72da7c82d419d, name: "Teleport Assist", reason: "names one feature of a larger site; goteleport.com's traffic measures Teleport's access platform"}
+- {slug: grain.com, id: lst_672960460d8d1f47f7b025f0, name: "Grain AI", reason: "names one feature of a larger site; grain.com's traffic measures Grain's call recorder"}
+- {slug: grammarly.com, id: lst_501525d47f04c10d5f177c06, name: "GrammarlyGO", reason: "names one feature of a larger site; grammarly.com's traffic measures Grammarly's writing assistant"}
+- {slug: hiverhq.com, id: lst_d55d77bf47740c0eaddc4682, name: "Harvey", reason: "names one feature of a larger site; hiverhq.com's traffic measures Hiver's shared inbox"}
+- {slug: httpie.io, id: lst_bf0377170725d01de90ffb62, name: "HTTPie AI", reason: "names one feature of a larger site; httpie.io's traffic measures HTTPie's API client"}
+- {slug: hubspot.com, id: lst_1f31337a943b53a5948269d1, name: "ChatSpot", reason: "names one feature of a larger site; hubspot.com's traffic measures HubSpot's CRM and marketing suite"}
+- {slug: ibm.com, id: lst_a1059399afb4c39fab03d6f6, name: "WatsonX.ai by IBM", reason: "names one feature of a larger site; ibm.com's traffic measures IBM's whole site"}
+- {slug: icons8.com, id: lst_9e37bca8f83e2858a5c06130, name: "Swapper", reason: "names one feature of a larger site; icons8.com's traffic measures Icons8's icon and photo library"}
+- {slug: intercom.com, id: lst_ecaf56ae30e976ce6ccba9c1, name: "Fin by Intercom", reason: "names one feature of a larger site; intercom.com's traffic measures Intercom's customer messaging suite"}
+- {slug: kive.ai, id: lst_5b7ca8764bc5bee99f8d1408, name: "AI Canvas", reason: "names one feature of a larger site; kive.ai's traffic measures Kive's image library"}
+- {slug: koala.sh, id: lst_daed633e32b6d282769ec311, name: "KoalaChat", reason: "names one feature of a larger site; koala.sh's traffic measures Koala's article writer"}
+- {slug: landbot.io, id: lst_785e5b5ec11c13a7dab59a28, name: "Landbot AI", reason: "names one feature of a larger site; landbot.io's traffic measures Landbot's chatbot builder"}
+- {slug: letsview.com, id: lst_9fe076b643406379c89a583d, name: "LetsView Chat", reason: "names one feature of a larger site; letsview.com's traffic measures LetsView's screen-mirroring app"}
+- {slug: livechat.com, id: lst_651ae748fecf113a02cfd03b, name: "Chat Summary for LiveChat", reason: "names one feature of a larger site; livechat.com's traffic measures LiveChat's customer chat software"}
+- {slug: livereacting.com, id: lst_8db60e406a07b3714b93d147, name: "LiveReacting AI", reason: "names one feature of a larger site; livereacting.com's traffic measures LiveReacting's live-streaming studio"}
+- {slug: magictool.ai, id: lst_b353697b1fc37fb8c828a699, name: "InsightJini", reason: "names one feature of a larger site; magictool.ai's traffic measures the MagicTool site"}
+- {slug: markcopy.ai, id: lst_dda79bd41d7b4b2159a1c38b, name: "Rocket Mode (Mark Copy)", reason: "names one feature of a larger site; markcopy.ai's traffic measures Mark Copy as a whole"}
+- {slug: medallia.com, id: lst_07ba1fe335c6b87a4bd58b33, name: "MonkeyLearn", reason: "names one feature of a larger site; medallia.com's traffic measures Medallia's customer experience platform"}
+- {slug: merge.dev, id: lst_9d2be43809280c184c3b90e3, name: "Blueprint", reason: "names one feature of a larger site; merge.dev's traffic measures Merge's unified API"}
+- {slug: microsoft.com, id: lst_59cb69478cf7d3e7f2809de6, name: "Microsoft Edge", reason: "names one feature of a larger site; microsoft.com's traffic measures Microsoft's whole site"}
+- {slug: miro.com, id: lst_5d0da7f081adae9c235ce80d, name: "Miro AI", reason: "names one feature of a larger site; miro.com's traffic measures Miro's whiteboard"}
+- {slug: mixpanel.com, id: lst_f6073bce20eea78a33796081, name: "Mixpanel Spark", reason: "names one feature of a larger site; mixpanel.com's traffic measures Mixpanel's product analytics"}
+- {slug: myheritage.com, id: lst_d3d8797ed03a6ed8d7a24b34, name: "AI Time Machine", reason: "names one feature of a larger site; myheritage.com's traffic measures MyHeritage's genealogy service"}
+- {slug: myheritage.fr, id: lst_ecae1f2e223637cd3f1721d3, name: "Deep Nostalgia", reason: "names one feature of a larger site; myheritage.fr's traffic measures MyHeritage's genealogy service"}
+- {slug: navercorp.com, id: lst_5a37a14cd7d2f2cbba8d0ae2, name: "HyperCLOVA", reason: "names one feature of a larger site; navercorp.com's traffic measures NAVER's corporate site"}
+- {slug: nvidia.com, id: lst_d03084545300d5e43da9b589, name: "NVIDIA Canvas", reason: "names one feature of a larger site; nvidia.com's traffic measures NVIDIA's whole site"}
+- {slug: openai.com, id: lst_8dc866963dc832267ccfdcc9, name: "DallE-2", reason: "names one feature of a larger site; openai.com's traffic measures ChatGPT and OpenAI"}
+- {slug: opera.com, id: lst_be6104e442383d421efbd4bb, name: "Opera AI Prompts", reason: "names one feature of a larger site; opera.com's traffic measures Opera's web browsers"}
+- {slug: photoleapapp.com, id: lst_b480a68344b9a8eece879f3f, name: "Text to Image by Photoleap", reason: "names one feature of a larger site; photoleapapp.com's traffic measures Photoleap's photo editor"}
+- {slug: radaar.io, id: lst_1829fbded2edde3caa341313, name: "AI-Powered Post Generator", reason: "names one feature of a larger site; radaar.io's traffic measures Radaar's social media suite"}
+- {slug: raycast.com, id: lst_fa4837d350588954da806d7c, name: "Raycast AI", reason: "names one feature of a larger site; raycast.com's traffic measures Raycast's Mac launcher"}
+- {slug: read.ai, id: lst_480c5ac86878eb6958f475bd, name: "Read Highlights", reason: "names one feature of a larger site; read.ai's traffic measures Read AI's meeting assistant as a whole"}
+- {slug: reflect.app, id: lst_59b5574ffe924a3f7604daa2, name: "Reflect AI", reason: "names one feature of a larger site; reflect.app's traffic measures Reflect's note-taking app"}
+- {slug: replit.com, id: lst_7f018cc179b1ab753ba19042, name: "Code Oracle by Repl.it", reason: "names one feature of a larger site; replit.com's traffic measures Replit's development platform"}
+- {slug: riverside.fm, id: lst_00700d96f8d85e30213dc9ef, name: "AI Transcriptions by Riverside", reason: "names one feature of a larger site; riverside.fm's traffic measures Riverside's recording studio"}
+- {slug: rows.com, id: lst_10ba1e2ad5fc4afb23b4520d, name: "Rows AI", reason: "names one feature of a larger site; rows.com's traffic measures Rows' spreadsheet"}
+- {slug: saga.so, id: lst_b3c952a1fff0f768f119783d, name: "Saga AI", reason: "names one feature of a larger site; saga.so's traffic measures Saga's workspace"}
+- {slug: salesforce.com, id: lst_85e33fc0ffe8c02ec4145c19, name: "Einstein GPT", reason: "names one feature of a larger site; salesforce.com's traffic measures Salesforce's CRM"}
+- {slug: sciencelogic.com, id: lst_cfeb7d6810d707bd6b73fd9b, name: "Zebrium", reason: "names one feature of a larger site; sciencelogic.com's traffic measures ScienceLogic's IT operations suite"}
+- {slug: sensible.so, id: lst_6725c26ac9d0ac6e8446bad4, name: "Sensible Instruct", reason: "names one feature of a larger site; sensible.so's traffic measures Sensible's document extraction"}
+- {slug: seovendor.co, id: lst_55b8c4f872d0ea0f76a49590, name: "SEO GPT", reason: "names one feature of a larger site; seovendor.co's traffic measures SEO Vendor's agency services"}
+- {slug: shutterstock.com, id: lst_74b46fabf684074f077416e0, name: "Shutterstock image generator", reason: "names one feature of a larger site; shutterstock.com's traffic measures Shutterstock's stock library"}
+- {slug: slack.com, id: lst_b7639eebb5f7f3034943381b, name: "Slack GPT", reason: "names one feature of a larger site; slack.com's traffic measures Slack's team chat"}
+- {slug: snapchat.com, id: lst_34dedd0969aa621718eb138e, name: "Snapchat My AI", reason: "names one feature of a larger site; snapchat.com's traffic measures the Snapchat app"}
+- {slug: socialbee.com, id: lst_b0479abd8b81aefc09017251, name: "AI Social Post Generator", reason: "names one feature of a larger site; socialbee.com's traffic measures SocialBee's social media scheduler"}
+- {slug: softr.io, id: lst_02c69023341a0ca2066d76be, name: "Softr AI", reason: "names one feature of a larger site; softr.io's traffic measures Softr's no-code app builder"}
+- {slug: stork.ai, id: lst_24b14b3ca1bad4fce3b24cd0, name: "Call My Link", reason: "names one feature of a larger site; stork.ai's traffic measures Stork's team communication app"}
+- {slug: streamlabs.com, id: lst_6243c9097d51790fea6dd695, name: "Type Studio", reason: "names one feature of a larger site; streamlabs.com's traffic measures Streamlabs' live-streaming software"}
+- {slug: tailwindapp.com, id: lst_4a276dc60e50cd5c1cd37877, name: "Tailwind Ghostwriter", reason: "names one feature of a larger site; tailwindapp.com's traffic measures Tailwind's social media scheduler"}
+- {slug: themesberg.com, id: lst_ca7963fc93efad2fbff32225, name: "GPT-3 Tailwind CSS", reason: "names one feature of a larger site; themesberg.com's traffic measures Themesberg's templates"}
+- {slug: together.ai, id: lst_80af6eca8917719828a782bd, name: "OpenChatKit", reason: "names one feature of a larger site; together.ai's traffic measures Together AI's model platform"}
+- {slug: user.com, id: lst_b7471a9d94fe805c7b97db1c, name: "AI Chat", reason: "names one feature of a larger site; user.com's traffic measures User.com's marketing automation"}
+- {slug: vtiger.com, id: lst_e20a14748cea7b2247f1216b, name: "Vtiger Calculus GPT", reason: "names one feature of a larger site; vtiger.com's traffic measures Vtiger's CRM"}
+- {slug: warp.dev, id: lst_fef20e110470167e8b29b742, name: "Warp AI", reason: "names one feature of a larger site; warp.dev's traffic measures Warp's terminal"}
+- {slug: webflow.com, id: lst_2a3253fb3d661d8914a2e770, name: "Intellimize", reason: "names one feature of a larger site; webflow.com's traffic measures Webflow's site builder"}
+- {slug: whimsical.com, id: lst_d008ec887c8dda320c9cac44, name: "Whimsical AI", reason: "names one feature of a larger site; whimsical.com's traffic measures Whimsical's diagrams and docs"}
+- {slug: wix.com, id: lst_b4d2f9f4314f39472ad55f00, name: "Wix ADI", reason: "names one feature of a larger site; wix.com's traffic measures Wix's site builder"}
+- {slug: yext.com, id: lst_4f3b344b4a0c351b774ffdc6, name: "Yext Chat", reason: "names one feature of a larger site; yext.com's traffic measures Yext's search and listings platform"}
+- {slug: yodlee.com, id: lst_0ecec553c1cf538fef957e71, name: "Abe AI", reason: "names one feature of a larger site; yodlee.com's traffic measures Yodlee's financial data platform"}
+- {slug: zoho.com, id: lst_064348ab26a2cea64f43daa1, name: "Notes for ChatGPT", reason: "names one feature of a larger site; zoho.com's traffic measures Zoho's business suite"}
+- {slug: zoom.com, id: lst_76d610bebe80b2ff8d9d2777, name: "Zoom IQ", reason: "names one feature of a larger site; zoom.com's traffic measures Zoom's video meetings"}
 redirects:
 - {from: {kind: category, slug: ai-advertising-tools}, to: {kind: tag, slug: ai-advertising-tools}}
 - {from: {kind: category, slug: ai-agents}, to: {kind: tag, slug: ai-agents}}

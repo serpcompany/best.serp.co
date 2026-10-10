@@ -7,16 +7,21 @@
  *
  * Its inputs are committed files only, never D1 and nothing from `.archive/`: the mapping; the
  * reviewed catalog's inventories (2026-10-10-other-inventory.json for the listings filed only under
- * Other, 2026-10-10-taxonomy-inventory.json for every other approved listing), with every committed
- * manifest published after that snapshot applied on top (#332, #333, #338, #340); #333's proposal
- * for the Other listings' clusters; and #340's audit for the renamed ones.
+ * Other, 2026-10-10-taxonomy-inventory.json for every other approved listing), with the 16 committed
+ * manifests published after that snapshot applied on top (`taxonomyInputManifests`: #332, #333,
+ * #338, #340); #333's proposal for the Other listings' clusters; and #340's audit for the renamed
+ * ones. A manifest committed later is never read, so the generator's output stays fixed once the
+ * owner publishes it (as `mismatch-manifests.ts` names its preceding manifests).
  *
  * It writes three phases of row-level manifests (`concurrency: rows`), each planning at most
  * 2,000 statements, to publish in file order:
  *   1. create (`-01a-create`, `-01b-redirects`): the new hub categories, the tags, and the best
  *      pages with their pins and exclusions; then the redirects of every old category URL and of
- *      every tag a tag-only best page takes over. All inert until listings move: a page renders
- *      over its redirect while it has listings (design 2.2).
+ *      every tag a tag-only best page takes over. The hubs, tags and redirects are inert until
+ *      listings move (a page renders over its redirect while it has listings, design 2.2), but the
+ *      best pages go live at `-01a`: their pins count toward their pool, so each renders its 10
+ *      entries at once, with links to tags and hubs that stay empty until phase 2. Publish `-01b`
+ *      and every phase-2 batch straight after it.
  *   2. move listings (`-02-move-NN`): `listing-tags-set` (expected none) and
  *      `listing-categories-set` (expected the listing's categories, set to its hub alone).
  *   3. retire (`-03-retire`): `category-unpublish` of every narrow category, which refuses while a
@@ -28,7 +33,6 @@
  * already applied keeps its meaning. Delete the committed batches to re-slice only while none of
  * them is published anywhere.
  */
-import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -115,6 +119,11 @@ export interface TaxonomyMapping {
   redirects: MappingRedirect[]
   /** Clustered catch-all listings left in it while the owner's flag on them stands. */
   held?: Array<MappingListingRef & { flag: string }>
+  /**
+   * Listings that name one feature, add-on, model or sub-tool of a larger site: its traffic
+   * measures the parent product, so they are never pinned, on any page.
+   */
+  featureListings?: Array<MappingListingRef & { name: string; reason: string }>
 }
 
 /** An approved listing as the catalog files it: categories in the publisher's guard order. */
@@ -137,6 +146,12 @@ export interface TaxonomyCatalog {
   categories: CatalogCategory[]
   /** Listings whose own submission is in review: `listing-categories-set` refuses them. */
   inReview?: ReadonlySet<string>
+  /**
+   * Listings whose slug redirects to another listing (`listing_slug_redirects`, #338).
+   * `category-unpublish` refuses while one is filed under the category, so each must move, and
+   * it gets no tags: its page redirects.
+   */
+  slugRedirectSources?: ReadonlySet<string>
 }
 
 export interface TaxonomyInputs {
@@ -235,6 +250,7 @@ export function planTaxonomy(inputs: TaxonomyInputs): TaxonomyPlan {
   const clusters = inputs.clusters ?? new Map<string, string[]>()
   const untagged = inputs.untagged ?? new Set<string>()
   const inReview = catalog.inReview ?? new Set<string>()
+  const redirectSources = catalog.slugRedirectSources ?? new Set<string>()
   const problems: string[] = []
   const fail = (message: string) => problems.push(message)
   const categories = new Map(catalog.categories.map(category => [category.slug, category]))
@@ -300,14 +316,20 @@ export function planTaxonomy(inputs: TaxonomyInputs): TaxonomyPlan {
     const cluster = clusters.get(listing.id) ?? []
     for (const tag of cluster)
       if (!tags.has(tag)) fail(`${listing.slug}: cluster tag ${tag} is not a tag`)
+    const narrow = listing.categories.filter(slug => retiringSet.has(slug))
     // Filed under a retired category (Adult): it answers 404 and stays as it is.
     if (listing.categories.some(slug => !activeCategory(slug))) {
       if (cluster.length > 0)
         fail(`${listing.slug} is clustered but filed under a retired category`)
+      // It can't be re-filed (a retired category can't be set), so a redirect from it would keep
+      // its narrow categories from retiring.
+      if (narrow.length > 0 && redirectSources.has(listing.id))
+        fail(
+          `${listing.slug} is a slug redirect source filed under ${narrow.join(', ')} and a retired category, so they could never retire`
+        )
       notMoved.push(listing)
       continue
     }
-    const narrow = listing.categories.filter(slug => retiringSet.has(slug))
     const [primary = ''] = listing.categories
     let hub: string
     let listingTags: string[]
@@ -332,7 +354,9 @@ export function planTaxonomy(inputs: TaxonomyInputs): TaxonomyPlan {
       live: listing.live,
       expected: listing.categories,
       hub,
-      tags: untagged.has(listing.id) ? [] : [...new Set(listingTags)]
+      // A redirect source's page redirects, and another manifest's retirement keeps its tags off.
+      tags:
+        untagged.has(listing.id) || redirectSources.has(listing.id) ? [] : [...new Set(listingTags)]
     })
   }
   if (blocked.length > 0)
@@ -417,6 +441,16 @@ export function planTaxonomy(inputs: TaxonomyInputs): TaxonomyPlan {
     }
     if (inPool.size - excluded.size < 1) fail(`${label} would list nothing`)
   }
+
+  // A feature of a larger site is ranked by nothing its host's traffic says: never a pin.
+  const features = new Set((mapping.featureListings ?? []).map(entry => entry.id))
+  for (const entry of mapping.featureListings ?? [])
+    if (listingsById.get(entry.id)?.slug !== entry.slug)
+      fail(`feature listing ${entry.slug} is not a listing of the catalog`)
+  for (const page of mapping.bestPages)
+    for (const pin of page.pins)
+      if (features.has(pin.id))
+        fail(`best page ${page.slug} pins ${pin.slug}, a feature of a larger site`)
 
   // Redirects: one from every narrow category, and one from every tag a tag-only best page uses,
   // each to a hub, a tag or a best page with something to show, never to another redirect.
@@ -582,8 +616,10 @@ export function buildTaxonomyManifests(
     [
       `serpcompany/best.serp.co#349 (#341 phase 1 of 3, create): ${plan.newHubs.length} hub categories, ${plan.tags.length} tags under their hubs,`,
       `then ${plan.bestPages.length} best pages at /best/<keyword>/, each with its pins (positions 1 to 10) and exclusions.`,
-      'Inert until listings move: nothing is filed under the hubs and tags yet, so their pages and the best',
-      'pages answer 404. The evidence for each keyword and pin is in the mapping. Publish first.'
+      'The hubs and tags answer 404 until listings move, but the best pages go live here: their pins count toward',
+      'their pool, so each renders its 10 entries at once, with links to tags and hubs that stay empty until',
+      'phase 2. Publish first, then -01b and every -02 batch straight after. The evidence for each keyword and',
+      'pin is in the mapping.'
     ],
     [
       ...plan.newHubs.map(hub => ({
@@ -731,6 +767,31 @@ export function buildTaxonomyManifests(
   return out
 }
 
+/**
+ * The owner's read-only checks before publishing (docs/taxonomy-migration.md), each expecting no
+ * rows: no listing's own submission in review (`listing-categories-set` refuses it, and its
+ * batch), no owner revision open (a move changes the listing's checksum, so the revision could
+ * never be approved), and, before `-03-retire`, nothing `category-unpublish` refuses: a live
+ * listing, or a slug redirect source, filed under a narrow category.
+ */
+export function dispatchChecks(mapping: TaxonomyMapping): {
+  reviewQueue: string
+  revisions: string
+  retire: string
+} {
+  const kept = [
+    ...mapping.hubs.map(hub => hub.slug),
+    ...(mapping.catchAll ? [mapping.catchAll] : [])
+  ]
+  return {
+    reviewQueue:
+      "SELECT l.slug, s.status FROM listing_submissions s JOIN listings l ON l.id=s.listing_id WHERE s.status IN ('paid_pending_review','changes_requested') ORDER BY l.slug",
+    revisions:
+      "SELECT l.slug, r.status FROM listing_revisions r JOIN listings l ON l.id=r.listing_id WHERE r.status IN ('pending_review','changes_requested') ORDER BY l.slug",
+    retire: `SELECT c.slug AS category, l.slug AS listing FROM listing_categories lc JOIN categories c ON c.id=lc.category_id JOIN listings l ON l.id=lc.listing_id WHERE c.is_active=1 AND c.slug NOT IN (${kept.map(slug => `'${slug}'`).join(',')}) AND ((l.status='approved' AND l.is_active=1) OR EXISTS (SELECT 1 FROM listing_slug_redirects r WHERE r.old_slug=l.slug)) ORDER BY c.slug, l.slug`
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // The reviewed catalog and the committed files.
 
@@ -799,9 +860,9 @@ const NEUTRAL_ACTIONS = new Set([
 ])
 
 /**
- * Applies every committed manifest that the inventories' snapshot doesn't include, in file order,
- * to the listings' categories and live state, refusing an operation whose `expected` disagrees.
- * Slug redirects are recorded: their sources may not stay filed under a retiring category.
+ * Applies the given manifests, in order, to the listings' categories and live state, refusing an
+ * operation whose `expected` disagrees or that it can't replay. Returns the listings that become
+ * slug redirect sources, which `planTaxonomy` re-files without tags and checks can move.
  */
 export function applyCommittedManifests(
   listings: Map<string, ReplayListing>,
@@ -838,14 +899,25 @@ export function applyCommittedManifests(
   return { redirectSources }
 }
 
-/** The committed manifests by file name, as git tracks them (other tests write temporary ones). */
-function committedPublications(directory = taxonomyPaths.publications): string[] {
-  return execFileSync('git', ['ls-files', directory], { encoding: 'utf8' })
-    .split('\n')
-    .filter(path => /\.ya?ml$/u.test(path))
-    .map(path => path.slice(path.lastIndexOf('/') + 1))
-    .sort()
-}
+/**
+ * The committed manifests published after the inventories' snapshot that the generator applies,
+ * by file name, in the owner's dispatch order (#321). Named, not discovered: a manifest committed
+ * later (#351's, or a hygiene manifest that touches a listing this one moves) changes nothing
+ * here, as `mismatch-manifests.ts` names the manifests it follows.
+ */
+export const taxonomyInputManifests = [
+  '2026-10-10-duplicate-listings.yaml',
+  '2026-10-10-other-removals.yaml',
+  ...Array.from(
+    { length: 9 },
+    (_, index) => `2026-10-10-other-categories-${String(index + 1).padStart(2, '0')}.yaml`
+  ),
+  '2026-10-10-duplicate-listings-redirects.yaml',
+  '2026-10-10-mismatch-removals.yaml',
+  '2026-10-10-mismatch-renames.yaml',
+  '2026-10-10-mismatch-categories.yaml',
+  '2026-10-10-mismatch-claim-holds-clear.yaml'
+] as const
 
 interface Proposal {
   slug: string
@@ -906,10 +978,13 @@ export function readReviewedInputs(paths = taxonomyPaths): ReviewedInputs {
       categories: [...listing.categories]
     })
   }
-  const files = committedPublications(paths.publications)
-    .filter(name => !replayed.has(name) && !name.startsWith(`${taxonomyDefaults.date}-taxonomy-`))
-    .map(name => ({ name, source: readFileSync(resolve(paths.publications, name), 'utf8') }))
-  applyCommittedManifests(listings, files)
+  for (const name of taxonomyInputManifests)
+    if (replayed.has(name)) throw new Error(`${name} is in the inventories' snapshot already.`)
+  const files = taxonomyInputManifests.map(name => ({
+    name,
+    source: readFileSync(resolve(paths.publications, name), 'utf8')
+  }))
+  const { redirectSources } = applyCommittedManifests(listings, files)
 
   const narrow = (
     JSON.parse(readFileSync(resolve(paths.categories), 'utf8')) as {
@@ -996,7 +1071,8 @@ export function readReviewedInputs(paths = taxonomyPaths): ReviewedInputs {
           live: listing.live,
           categories: listing.categories
         })),
-        categories
+        categories,
+        slugRedirectSources: redirectSources
       },
       clusters,
       untagged: new Set(removed.keys())

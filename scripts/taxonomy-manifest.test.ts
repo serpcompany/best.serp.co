@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { parse, stringify } from 'yaml'
@@ -18,6 +19,7 @@ import {
   committedBatchAssignments,
   committedTaxonomyManifests,
   defaultBestTitle,
+  dispatchChecks,
   planTaxonomy,
   readReviewedInputs,
   STATEMENT_CEILING,
@@ -27,6 +29,7 @@ import {
   type TaxonomyPlan,
   taxonomyDefaults,
   taxonomyIds,
+  taxonomyInputManifests,
   taxonomyPaths
 } from './taxonomy-manifest.ts'
 
@@ -269,6 +272,43 @@ describe('the taxonomy generator (#349)', () => {
     ).toThrow(/clear the review queue first: c\.ai/u)
   })
 
+  it('re-files a slug redirect source without tags, and refuses one that can never move', () => {
+    const sources = new Set([id('c.ai')])
+    // Without the declared counts: an untagged source leaves ai-seo with one listing fewer.
+    const uncounted = smallMapping()
+    uncounted.tags = uncounted.tags.map(({ listings: _, ...tag }) => tag)
+    expect(
+      planTaxonomy({
+        ...smallInputs(uncounted),
+        catalog: { ...small, slugRedirectSources: sources }
+      }).moves.find(move => move.slug === 'c.ai')
+    ).toMatchObject({ hub: 'marketing', tags: [] })
+    // Filed under a retired category, it can't be re-filed, so ai-chat could never retire.
+    const stuck = {
+      ...small,
+      listings: [
+        ...small.listings,
+        listing('y-downloader', ['downloaders', 'adult', 'ai-chat'], false)
+      ]
+    }
+    expect(() =>
+      planTaxonomy({
+        ...smallInputs(),
+        catalog: { ...stuck, slugRedirectSources: new Set([listing('y-downloader', []).id]) }
+      })
+    ).toThrow(/y-downloader is a slug redirect source filed under ai-chat and a retired category/u)
+  })
+
+  it('never pins a listing that names a feature of a larger site', () => {
+    const mapping = smallMapping()
+    mapping.featureListings = [
+      { slug: 'a.ai', id: id('a.ai'), name: 'A GPT', reason: 'a feature of A' }
+    ]
+    expect(() => planTaxonomy(smallInputs(mapping))).toThrow(
+      /best page ai-chatbot pins a\.ai, a feature of a larger site/u
+    )
+  })
+
   it('writes the phases in publish order, each a row-level manifest the publisher accepts', () => {
     const manifests = buildTaxonomyManifests(planTaxonomy(smallInputs()), options)
     expect(manifests.map(manifest => manifest.id)).toEqual([
@@ -433,7 +473,13 @@ function catalogFrom(db: DatabaseSync): TaxonomyCatalog {
       "SELECT listing_id FROM listing_submissions WHERE status IN ('paid_pending_review','changes_requested') AND listing_id IS NOT NULL"
     ).map(row => row.listing_id)
   )
-  return { listings, categories, inReview }
+  const slugRedirectSources = new Set(
+    all<{ id: string }>(
+      db,
+      'SELECT l.id FROM listings l JOIN listing_slug_redirects r ON r.old_slug=l.slug'
+    ).map(row => row.id)
+  )
+  return { listings, categories, inReview, slugRedirectSources }
 }
 
 /**
@@ -872,6 +918,22 @@ describe('the committed taxonomy mapping and manifests (#349)', () => {
     // Every keyword was checked: a volume and its time.
     expect(mapping.keywordsCheckedAt).toMatch(/^2026-10-10T/u)
     for (const page of mapping.bestPages) expect(page.volume, page.slug).toBeGreaterThan(0)
+    // A feature of a larger site is never pinned, on any page (#366 review).
+    const features = new Set((mapping.featureListings ?? []).map(entry => entry.slug))
+    for (const slug of [
+      'slack.com',
+      'crisp.chat',
+      'salesforce.com',
+      'hubspot.com',
+      'miro.com',
+      'livechat.com'
+    ])
+      expect(features.has(slug), slug).toBe(true)
+    // The HIPAA page pins only providers with a HIPAA offering, each naming its evidence.
+    const hipaa = mapping.bestPages.find(page => page.slug === 'hipaa-compliant-hosting')
+    for (const pin of hipaa?.pins ?? [])
+      expect(pin.evidence, pin.slug).toMatch(/HIPAA offering: https:/u)
+    expect(hipaa?.exclude?.map(entry => entry.slug)).toContain('greengeeks.com')
   })
 
   it('leaves out what #337, #358 and other-removals retire, and the held listings', () => {
@@ -957,12 +1019,31 @@ describe('the committed taxonomy mapping and manifests (#349)', () => {
       expect(names[0]).toBe(`${ids.create}.yaml`)
       expect(names[1]).toBe(`${ids.redirects}.yaml`)
       expect(names.at(-1)).toBe(`${ids.retire}.yaml`)
+      const checks = dispatchChecks(reviewed.mapping)
+      const rows = (sql: string) => all(db, sql)
+      expect(rows(checks.reviewQueue)).toEqual([])
+      expect(rows(checks.revisions)).toEqual([])
       for (const name of names) {
-        // Retiring early refuses whole: live listings are still filed under the narrow categories.
-        if (name === `${ids.move(1)}.yaml`)
+        // Retiring early refuses whole: live listings are still filed under the narrow categories,
+        // and the owner's check before -03 lists them.
+        if (name === `${ids.move(1)}.yaml`) {
           expect(() => apply(db, ids.retire, committed(`${ids.retire}.yaml`))).toThrow(
             /does not apply/u
           )
+          expect(rows(checks.retire).length).toBeGreaterThan(2000)
+        }
+        if (name === `${ids.retire}.yaml`) {
+          // After every -02 batch the check is empty, so the owner goes on; the 14 unpublished
+          // cam downloaders still filed under livestream-downloaders (and Adult) don't block it.
+          expect(rows(checks.retire)).toEqual([])
+          expect(
+            rows(
+              `SELECT l.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id
+               JOIN listings l ON l.id=lc.listing_id WHERE c.slug='livestream-downloaders'
+               AND l.is_active=0`
+            )
+          ).toHaveLength(14)
+        }
         expect(apply(db, name, committed(name)), name).toBeLessThanOrEqual(STATEMENT_CEILING)
       }
       expectMigrated(db, reviewed.mapping, plan)
@@ -978,6 +1059,56 @@ describe('the committed taxonomy mapping and manifests (#349)', () => {
     },
     REPLAY_TIMEOUT
   )
+
+  it(
+    'reads only the 16 manifests it names: a later one changes nothing it generates',
+    () => {
+      expect(taxonomyInputManifests).toHaveLength(16)
+      const directory = mkdtempSync(join(tmpdir(), 'taxonomy-manifest-'))
+      try {
+        for (const name of taxonomyInputManifests)
+          copyFileSync(resolve(taxonomyPaths.publications, name), join(directory, name))
+        // What #351 or a later hygiene manifest would add: none of it is read.
+        const moved = plan.moves.find(move => move.live && move.tags.length > 0)
+        writeFileSync(
+          join(directory, '2026-10-12-later.yaml'),
+          stringify({
+            version: 1,
+            id: '2026-10-12-later',
+            concurrency: 'rows',
+            provenance: { actor: 'test', workflow: 'test' },
+            operations: [
+              { action: 'category-unpublish', slug: 'other' },
+              {
+                action: 'listing-unpublish',
+                id: moved?.id,
+                slug: moved?.slug,
+                categories: [moved?.hub],
+                reason: 'later'
+              }
+            ]
+          })
+        )
+        const later = readReviewedInputs({ ...taxonomyPaths, publications: directory })
+        expect(later.inputs.catalog).toEqual(reviewed.inputs.catalog)
+        expect(planTaxonomy(later.inputs)).toEqual(plan)
+        // A named input that's missing is an error, not a silent change.
+        rmSync(join(directory, '2026-10-10-mismatch-categories.yaml'))
+        expect(() => readReviewedInputs({ ...taxonomyPaths, publications: directory })).toThrow(
+          /ENOENT/u
+        )
+      } finally {
+        rmSync(directory, { force: true, recursive: true })
+      }
+    },
+    GENERATE_TIMEOUT
+  )
+
+  it("documents the owner's checks exactly as the replay runs them", () => {
+    const doc = readFileSync(resolve('docs/taxonomy-migration.md'), 'utf8')
+    for (const sql of Object.values(dispatchChecks(reviewed.mapping)))
+      expect(doc.includes(sql), sql).toBe(true)
+  })
 
   it('applies the committed manifests published after the snapshot the way the publisher does', () => {
     const listings = new Map([
