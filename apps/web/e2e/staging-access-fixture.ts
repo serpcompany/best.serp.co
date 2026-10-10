@@ -6,10 +6,15 @@ import { listingStatements, suiteCatalogStatements } from './fixture-seed'
 /**
  * Staging's password (serpcompany/best.serp.co#359) on a local Worker:
  * `playwright.staging-access.config.ts` serves the already-built Worker with
- * `LOCAL_STAGING_ACCESS=on`, so it serves as staging does (`servesAsStaging` in `src/lib/environment/site-environment.ts`): every request
- * needs the password except the exemptions, a request with it is indexable, and every page writes
+ * `LOCAL_STAGING_ACCESS=on`, so it serves as staging does (`servesAsStaging` in
+ * `src/lib/environment/site-environment.ts`): every request needs the password except the
+ * exemptions, a request with it is indexable, and every page writes
  * `https://staging.best.serp.co`. It has its own fresh D1 with one category and listing, which the
  * suite seeds. Never used against a deployed Worker: the smoke suite checks staging itself.
+ *
+ * It runs in its own Playwright run, after the main one (`pnpm test:e2e` runs both): a ninth
+ * preview Worker beside the main run's eight exhausts the CI runner's memory (#111). It serves
+ * the Worker the main run built.
  *
  * The password is a test value, never staging's own (`env.staging.vars` in `wrangler.jsonc`), so
  * the suite proves the Worker reads it from its vars.
@@ -19,12 +24,6 @@ const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 
 /** Only when Playwright starts its own servers (the same rule as the admin suite). */
 export const stagingAccessSuiteEnabled = adminSuiteEnabled
-
-/**
- * It runs in its own Playwright run, after the main one (`pnpm test:e2e` runs both): a ninth
- * preview Worker beside the main run's eight exhausts the CI runner's memory (#111). It serves
- * the Worker the main run built.
- */
 
 export const STAGING_ACCESS_TEST_PASSWORD = 'e2e-staging-password'
 
@@ -45,7 +44,7 @@ export function stagingAccessServerCommand(): string {
   const vars = `LOCAL_STAGING_ACCESS=on,STAGING_BASIC_AUTH_PASSWORD=${STAGING_ACCESS_TEST_PASSWORD}`
   return [
     // The main run builds the Worker (`pnpm test:e2e`); alone, build it first (`pnpm build`).
-    `test -f .open-next/worker.js || { echo 'No built Worker: run pnpm build first.' >&2; exit 1; }`,
+    `test -f .open-next/worker.js || { echo 'No built Worker: pnpm build' >&2; exit 1; }`,
     'cd ../..',
     `rm -rf "${state}"`,
     `mkdir -p "${state}"`,

@@ -112,14 +112,14 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
     var, not a secret: the owner's decision, because every SERP site shares it, serp's standard
     states it, and staging's content is the public site's. The gate checks only the password
     and ignores the username (Ahrefs needs one; use `staging`).
-  - **The gate** (`apps/web/src/lib/environment/staging-access.ts`) runs in the Worker entry
-    right after the canonical-host redirect (so staging's workers.dev host still sends a request
-    without the smoke-test header to staging.best.serp.co first), on every host of a Worker that
-    serves as staging (`servesAsStaging`: `SITE_ENVIRONMENT=staging`). Without the password a request gets 401
-    with `WWW-Authenticate: Basic realm="best.serp.co staging"` and `Cache-Control: no-store`.
-    It fails closed: without the var, every request is refused but the exemptions. The
-    comparison hashes both values with SHA-256 and compares the digests in constant time.
-    Production and local have no gate.
+  - **The gate** (`apps/web/src/lib/environment/staging-access.ts`) runs in the Worker entry right
+    after the canonical-host redirect (so staging's workers.dev host still sends a request without
+    the smoke-test header to staging.best.serp.co first), on every host of a Worker that serves as
+    staging (`servesAsStaging`: `SITE_ENVIRONMENT=staging`). Without the password a request gets 401
+    with `WWW-Authenticate: Basic realm="best.serp.co staging"` and `Cache-Control: no-store`. It
+    fails closed: without the var, every request is refused but the exemptions. The comparison
+    hashes both values with SHA-256 and compares the digests in constant time. Production and local
+    have no gate.
   - **Exemptions**, served without the password and kept `noindex`: requests with the
     `x-best-serp-co-smoke-test` header (CI's gates and smoke), `GET`/`HEAD /robots.txt`, and
     the billing provider's test-mode webhook (`POST /api/billing/webhook/`), which proves

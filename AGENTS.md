@@ -95,7 +95,6 @@ Issues and labels never grant production, database, or deployment authority.
   production D1 through the reviewed plans, behind Cloudflare Access, the allowlist, and an
   `Origin` check ([Admin panel](./docs/admin-panel.md#the-production-write-exception)). Agents
   use neither in production; recovery is D1 Time Travel ([D1 recovery](./docs/d1-recovery.md)).
-- Staging's password skips smoke tests, robots.txt, the billing webhook, static files (pre-Worker).
 
 ## Recorded exceptions to the SERP web stack
 
@@ -106,7 +105,7 @@ Deliberate differences from serp's `web-stack/` standard; change one only throug
   for directories on serp.co subdomains.
 - One build serves every environment; the environment is read per request
   (`apps/web/src/lib/environment/request-environment.ts`), so nothing per-environment is
-  prerendered.
+  prerendered. Staging's password skips smoke tests, robots.txt, the webhook and static files.
 - `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
 - The Stripe webhook is `/api/billing/webhook/` behind a provider-neutral `BillingProvider`
   with no Stripe SDK, until the payments audit (#156) decides. Brand icons use

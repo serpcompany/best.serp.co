@@ -67,18 +67,18 @@ production) assert the redirects, the `/api` exemption, and the homepage form.
   `HomePageRoute`: `/products/` reuses it, and only its page 1 (canonical `/`) renders them.
   JSON-LD node identifiers keep their fragment form (`https://best.serp.co/#website`); they name
   a graph node, not the page.
-- **Origin.** Every absolute URL a page, sitemap, feed or robots.txt writes takes its
-  environment's origin, read per request from the Worker's vars, never from the `Host`
-  header (`siteOrigin()` in `src/lib/environment/site-origin.ts`, #359): the staging Worker
-  writes `https://staging.best.serp.co` on both its hosts (its workers.dev host too), and
-  production (best.serp.co and its workers.dev host) and local write `https://best.serp.co`. Staging sits behind a password, so it can describe itself exactly as
-  production will and an SEO audit of it reads like one of production
-  ([Environments and hosts](./architecture.md#environments-and-hosts)). Call `siteOrigin()`,
-  `siteUrl()` and the other builders in `seo-config.ts` during a request, never at module
-  load: page metadata is `generateMetadata()`, not a `metadata` constant. The badge embed
-  code and the badge verifier keep best.serp.co's listing URL on every environment: other
-  sites copy that code, and staging tests the code production hands out. The site has no
-  hreflang (one language).
+- **Origin.** Every absolute URL a page, sitemap, feed or robots.txt writes takes its environment's
+  origin, read per request from the Worker's vars, never from the `Host` header (`siteOrigin()` in
+  `src/lib/environment/site-origin.ts`, #359): the staging Worker writes
+  `https://staging.best.serp.co` on both its hosts (its workers.dev host too), and production
+  (best.serp.co and its workers.dev host) and local write `https://best.serp.co`. Staging sits
+  behind a password, so it can describe itself exactly as production will and an SEO audit of it
+  reads like one of production ([Environments and hosts](./architecture.md#environments-and-hosts)).
+  Call `siteOrigin()`, `siteUrl()` and the other builders in `seo-config.ts` during a request, never
+  at module load: page metadata is `generateMetadata()`, not a `metadata` constant. The badge embed
+  code and the badge verifier keep best.serp.co's listing URL on every environment: other sites copy
+  that code, and staging tests the code production hands out. The site has no hreflang (one
+  language).
 
 ## Pagination
 
