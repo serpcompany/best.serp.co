@@ -251,10 +251,11 @@ categories through reviewed files:
 - **Manifests.** `pnpm catalog:other-categories` writes
   `d1/publications/2026-10-10-other-categories-NN.yaml`: one `listing-categories-set` per listing
   with a real primary ([Catalog publication](./catalog-publication.md#category-operations)),
-  `expected: [other]`, 200 per batch. `scripts/other-categories-manifest.test.ts` keeps them
-  identical to the proposal and replays them on the inventory.
+  `expected: [other]`, 180 per batch. A listing keeps the batch its committed manifest gives it;
+  new work goes to a new batch. `scripts/other-categories-manifest.test.ts` keeps them identical
+  to the proposal and replays them on the inventory, each at most 2,000 statements.
 
 They are row-level: publish them in order, staging first, then production after promotion. A batch
 refuses whole if one of its listings changed since the reviewed catalog (an admin edit, a revision,
-a #332 retirement): set its `primary` to `other` with the reason, regenerate, and publish the
-regenerated batches; the ones before it don't change.
+a #332 retirement): set its `primary` to `other` with the reason and regenerate, which rewrites only
+that batch. Publish it where it was refused; where the original applied, there is nothing to redo.

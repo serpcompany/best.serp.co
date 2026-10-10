@@ -83,8 +83,8 @@ duplicate:
   - slug: notion.com
     id: lst_07d139284ae444577f159706
     website: https://serp.ly/notion-search
-    flag: "same product as notion.ai (Notion AI), found after #332; owner decides which stays"
-    here: "categorized: ai-productivity-tools, ai-knowledge-management"
+    flag: "same product as notion.ai (Notion AI), found after #332; held in Other until the owner picks which stays (notion.ai keeps its categories)"
+    here: held in Other until the owner picks which of the pair stays
   - slug: phrasee.co
     id: lst_520c843ef16b99939a10de32
     website: https://serp.ly/phrasee.co
@@ -93,13 +93,13 @@ duplicate:
   - slug: plusai.com
     id: lst_9178db1976b647af0ee6a538
     website: https://serp.ly/plusai.com
-    flag: "same company and product as plusdocs.com, found after #332; owner decides which stays"
+    flag: "same company and product as plusdocs.com, found after #332; categorized, with plusdocs.com held in Other until the owner picks which stays"
     here: "categorized: ai-presentation-maker"
   - slug: plusdocs.com
     id: lst_d2b096011b7cf4a03641f07a
     website: https://serp.ly/plusdocs
-    flag: "same company and product as plusai.com (Plus AI), found after #332; owner decides which stays"
-    here: "categorized: ai-presentation-maker"
+    flag: "same company and product as plusai.com (Plus AI), found after #332; held in Other until the owner picks which stays (plusai.com is categorized)"
+    here: held in Other until the owner picks which of the pair stays
   - slug: timely.com
     id: lst_7209bfcc01723a5393382fec
     website: https://serp.ly/timely

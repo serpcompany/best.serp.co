@@ -10,6 +10,7 @@ import {
   buildOtherCategoryManifests,
   type CategoryProposal,
   categorySetOperations,
+  committedBatchAssignments,
   committedOtherCategoryManifests,
   type InventoryListing,
   otherCategoryDefaults,
@@ -28,6 +29,8 @@ const proposals: CategoryProposal[] = [
   { slug: 'c.ai', id: 'lst_cccccccccccc', primary: 'ai-copywriting' }
 ]
 const options = { ...otherCategoryDefaults, batchSize: 1 }
+/** The most statements a committed batch may plan to. */
+const STATEMENT_CEILING = 2000
 
 describe('the Other categorization manifests (#333)', () => {
   it('sets each proposal with a live primary, primary first, and leaves Other proposals out', () => {
@@ -64,6 +67,53 @@ describe('the Other categorization manifests (#333)', () => {
     expect(first?.source).toMatch(
       /^# serpcompany\/best\.serp\.co#333: move 1 listings filed only under Other/u
     )
+  })
+
+  it('keeps every listing in its batch when the manifests are regenerated (#342 review)', () => {
+    const many: InventoryListing[] = ['a', 'b', 'c', 'd', 'e'].map(letter => ({
+      id: `lst_${letter.repeat(12)}`,
+      slug: `${letter}.ai`,
+      categories: ['other']
+    }))
+    const proposed: CategoryProposal[] = many.map(listing => ({
+      slug: listing.slug,
+      id: listing.id,
+      primary: 'ai-chatbots'
+    }))
+    const pairs = { ...otherCategoryDefaults, batchSize: 2 }
+    const first = buildOtherCategoryManifests(proposed, many, live, pairs)
+    expect(first.map(({ id }) => id.slice(-2))).toEqual(['01', '02', '03'])
+    const assignments = new Map<string, number>()
+    first.forEach(({ source }, index) => {
+      for (const operation of parseManifest(source).operations)
+        if ('id' in operation) assignments.set(operation.id, index + 1)
+    })
+    const changed = (next: CategoryProposal[]) =>
+      buildOtherCategoryManifests(next, many, live, pairs, assignments)
+        .filter(({ id, source }) => first.find(manifest => manifest.id === id)?.source !== source)
+        .map(({ id }) => id.slice(-2))
+    const edit = (slug: string, change: Partial<CategoryProposal>) =>
+      proposed.map(proposal => (proposal.slug === slug ? { ...proposal, ...change } : proposal))
+    // Another category, or back to Other: only that listing's batch changes.
+    expect(changed(edit('c.ai', { primary: 'ai-seo' }))).toEqual(['02'])
+    expect(changed(edit('a.ai', { primary: 'other' }))).toEqual(['01'])
+    // A listing no committed batch holds goes to a new batch; the others stay as they are.
+    const fresh = buildOtherCategoryManifests(
+      proposed,
+      many,
+      live,
+      pairs,
+      new Map([...assignments].filter(([id]) => id !== 'lst_bbbbbbbbbbbb'))
+    )
+    expect(fresh.map(({ id }) => id.slice(-2))).toEqual(['01', '02', '03', '04'])
+    expect(fresh.slice(1, 3).map(({ source }) => source)).toEqual(
+      first.slice(1, 3).map(({ source }) => source)
+    )
+    expect(
+      parseManifest(fresh[3]?.source ?? '').operations.map(operation =>
+        'slug' in operation ? operation.slug : ''
+      )
+    ).toEqual(['b.ai'])
   })
 
   it.each([
@@ -168,7 +218,8 @@ describe('the Other categorization manifests (#333)', () => {
       committed,
       listings,
       liveCategories,
-      otherCategoryDefaults
+      otherCategoryDefaults,
+      committedBatchAssignments()
     )
     expect(committedOtherCategoryManifests()).toEqual(manifests.map(({ id }) => `${id}.yaml`))
     for (const { id, source } of manifests)
@@ -227,6 +278,8 @@ describe('the Other categorization manifests (#333)', () => {
         checksum: string
       }
       const plan = buildPublicationPlan(parseManifest(source), source, now, state)
+      // #342 review: no batch bigger than the largest one ever published (legacy-media-06, 2,129).
+      expect(plan.statements.length, name).toBeLessThanOrEqual(STATEMENT_CEILING)
       db.exec('BEGIN')
       try {
         for (const statement of plan.statements) {

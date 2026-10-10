@@ -18,10 +18,10 @@ evidence:
   - "PR #337 (#332) unpublishes 14 duplicate listings; the 4 of them filed under Other are left out here."
 counts:
   listings: 2419
-  categorized: 1578
-  staysInOther: 841
+  categorized: 1575
+  staysInOther: 844
   proposedNewCategory: 584
-  heldForFlags: 60
+  heldForFlags: 62
   retiredBy337: 4
   unpublishedByOwner: 5
   flags:
@@ -54,7 +54,13 @@ alignments:
   - "logo makers: both halves file them under ai-design with ai-graphic-design; gradientinsight.com (LogoBrainstorm) lacked the secondary (1: gradientinsight.com)"
   - "interview prep: both halves file mock-interview tools under ai-career-coach with ai-job-search (talkberry.ai, English interview practice, under ai-language-teacher with ai-career-coach); no change"
   - "left out of the manifests: #337 (#332) unpublishes them as duplicates (4: flowrite.com, magical.so, phrasee.co, trajectdata.com)"
-  - "held in Other for the owner (left out of the manifests): a mismatch, spam, dead, adult or other flag leaves the category uncertain; categorized anyway: duplicate flags, and opendream.ai, orderhive.com, openjourneybot.com and freedomgpt.com, whose flags are notes (60: bjoernkarmann.dk, blog.google, blog.rossintelligence.com, bookhero.ai, botto.com, browsegpt.ai, ca.la, chatworm.com, clip.audio, collegetools.io, contractreader.io, copylime.com, coverletterwrite.com, curaihealth.com, detangle.ai, drawmeasheep.net, earkind.com, earningscall.ai, fabric.so, figma.com, financebrain.ai, flexos.work, flipped.ai, freebeat.ai, getslate.ai, githubnext.com, goheather.io, gptinf.com, graydient.ai, headlime.com, il.ly, instant-portrait.com, interflexion.com, ivy.ai, joinsquad.co, kadoa.com, kaiber.ai, kleap.co, lifesight.io, magicthumbnails.com, makeavideo.studio, mutinyhq.com, nourishingsoftware.com, onetask.me, plantrips.net, prompthero.com, raplyrics.eu, replicate.com, reroom.ai, serper.dev, slashdreamer.com, teameet.cc, timecomplexity.ai, toptal.com, triplewhale.com, tubemagic.com, vice.com, wonderplan.ai, yesilhealth.com, zizoto.com)"
+  - "PR #342 review: mjsplitter.com (ai-image-generators) → Other under the proposed ai-photo-editors: it splits Midjourney grids and generates nothing (1: mjsplitter.com)"
+  - "PR #342 review: hexowatch.com (ai-web-scraping) → Other, folded like the website-monitoring cluster (ohdear.app, pagecanary.com) (1: hexowatch.com)"
+  - "PR #342 review: clinical note-takers get ai-note-taker as primary and ai-doctor as secondary: upheal.io (therapy progress notes), nabla.com (ambient assistant that writes clinical notes), scribeberry.com (medical scribe drafting clinical documentation), soapnoteai.com (SOAP notes), suki.ai (ambient clinical documentation) (5: upheal.io, nabla.com, scribeberry.com, soapnoteai.com, suki.ai)"
+  - "PR #342 review: sharegpt.com (ai-chatbots) → ai-productivity-tools: a Chrome extension that saves and shares ChatGPT conversations, not a chatbot (1: sharegpt.com)"
+  - "PR #342 review: billing platforms, one rule: zuora.com joins chargebee.com, fastspring.com, getlago.com, logisense.com, m3ter.com and metronome.com under subscription-analytics-software (one listing moves, not six); payment-processing keeps the payment processors (1: zuora.com)"
+  - "PR #342 review: duplicate pairs held apart: notion.com stays in Other (notion.ai keeps its categories), plusdocs.com stays in Other (plusai.com is categorized), until the owner picks (2: notion.com, plusdocs.com)"
+  - "held in Other for the owner (left out of the manifests): a mismatch, spam, dead, adult or other flag leaves the category uncertain; categorized anyway: duplicate flags (apart from the two pairs the #342 review holds), and opendream.ai, orderhive.com, openjourneybot.com and freedomgpt.com, whose flags are notes (60: bjoernkarmann.dk, blog.google, blog.rossintelligence.com, bookhero.ai, botto.com, browsegpt.ai, ca.la, chatworm.com, clip.audio, collegetools.io, contractreader.io, copylime.com, coverletterwrite.com, curaihealth.com, detangle.ai, drawmeasheep.net, earkind.com, earningscall.ai, fabric.so, figma.com, financebrain.ai, flexos.work, flipped.ai, freebeat.ai, getslate.ai, githubnext.com, goheather.io, gptinf.com, graydient.ai, headlime.com, il.ly, instant-portrait.com, interflexion.com, ivy.ai, joinsquad.co, kadoa.com, kaiber.ai, kleap.co, lifesight.io, magicthumbnails.com, makeavideo.studio, mutinyhq.com, nourishingsoftware.com, onetask.me, plantrips.net, prompthero.com, raplyrics.eu, replicate.com, reroom.ai, serper.dev, slashdreamer.com, teameet.cc, timecomplexity.ai, toptal.com, triplewhale.com, tubemagic.com, vice.com, wonderplan.ai, yesilhealth.com, zizoto.com)"
   - "unpublished by the owner's decision of 2026-10-10 (2026-10-10-other-removals), so in no batch (5: copycraftai.com, gistvid.com, imgnai.com, sparktraffic.com, trafficbotpro.com)"
 newCategories:
   - slug: ai-developer-tools
@@ -70,7 +76,7 @@ newCategories:
       - "cogniflow.ai: No-code platform to build and deploy AI models"
   - slug: ai-photo-editors
     name: AI Photo Editors
-    listings: 74
+    listings: 75
     flagged: 2
     samples:
       - "autoretouch.com: Automated retouching and background editing for fashion product photos"
@@ -277,17 +283,6 @@ newCategories:
       - "makeforms.io: Form builder with AI and conditional logic"
       - "vocads.com: Voice-based customer surveys for richer feedback"
       - "zigpoll.com: Zigpoll AI-powered customer feedback surveys for online stores"
-  - slug: payment-processing
-    name: Payment Processing
-    listings: 6
-    flagged: 0
-    samples:
-      - "paddle.com: Merchant-of-record payments and subscription billing for software companies"
-      - "paypal.com: PayPal online payments and financial services"
-      - "squareup.com: Square payments, point of sale and business tools"
-      - "stripe.com: Stripe online payments infrastructure"
-      - "withorb.com: Orb usage-based billing and metering platform"
-      - "zuora.com: Zuora subscription billing and revenue management"
   - slug: ai-computer-vision
     name: AI Computer Vision
     listings: 5
@@ -317,6 +312,16 @@ newCategories:
       - "connexun.com: AI news analysis and news data API"
       - "idoubt.news: AI tool to critically evaluate news articles"
       - "japandailynews.com: AI English summaries of NHK news"
+  - slug: payment-processing
+    name: Payment Processing
+    listings: 5
+    flagged: 0
+    samples:
+      - "paddle.com: Merchant-of-record payments and subscription billing for software companies"
+      - "paypal.com: PayPal online payments and financial services"
+      - "squareup.com: Square payments, point of sale and business tools"
+      - "stripe.com: Stripe online payments infrastructure"
+      - "withorb.com: Orb usage-based billing and metering platform"
 listings:
   - slug: automatic.chat
     id: lst_41bb1c0e33189be4c3e4209f
@@ -4542,7 +4547,9 @@ listings:
     why: Website uptime, performance, SEO and security monitoring
   - slug: hexowatch.com
     id: lst_73286f11b2c5cea6afd91a3e
-    primary: ai-web-scraping
+    primary: other
+    reason: "website change monitoring; no existing category fits; too few for a new category (website-monitoring: 3)"
+    aligned: "PR #342 review: back to Other"
     why: AI website change monitoring
   - slug: hey-photo.com
     id: lst_a0a793fd41a8a9808f9eafc5
@@ -6833,7 +6840,10 @@ listings:
     why: Multimodal search and indexing platform for video, image and text data
   - slug: mjsplitter.com
     id: lst_8cbb1a07cc14b9ab256d5f68
-    primary: ai-image-generators
+    primary: other
+    reason: splits Midjourney grid images and generates nothing; no existing category fits
+    newCategory: ai-photo-editors
+    aligned: "PR #342 review: back to Other (proposed ai-photo-editors)"
     why: Utility that splits Midjourney grid images into individual PNG files
   - slug: mnemonic.ai
     id: lst_8f0425a55813aacd92e04029
@@ -7111,9 +7121,10 @@ listings:
     why: "AI study platform: chat with lecture videos and PDFs, flashcards and feedback"
   - slug: nabla.com
     id: lst_32ece2577a0a35c4a2d8c7a4
-    primary: ai-doctor
+    primary: ai-note-taker
     secondary:
-      - ai-note-taker
+      - ai-doctor
+    aligned: "PR #342 review: ai-note-taker primary, ai-doctor secondary (its main job is writing notes)"
     why: Ambient AI assistant that writes clinical notes for clinicians
   - slug: namecheap.com
     id: lst_c5b1337f1cedcc760f7d761a
@@ -7365,10 +7376,14 @@ listings:
     why: Write with James, James Altucher's writing program on the Notepd ideas app
   - slug: notion.com
     id: lst_07d139284ae444577f159706
-    primary: ai-productivity-tools
-    secondary:
-      - ai-knowledge-management
-    flag: "duplicate: same product as notion.ai (Notion AI), found after #332; owner decides which stays"
+    primary: other
+    reason: "held for the owner: a duplicate of notion.ai; the owner picks which stays"
+    held:
+      primary: ai-productivity-tools
+      secondary:
+        - ai-knowledge-management
+    flag: "duplicate: same product as notion.ai (Notion AI), found after #332; held in Other until the owner picks which stays (notion.ai keeps its categories)"
+    aligned: "PR #342 review: held in Other so the pair doesn't share category pages; notion.ai keeps its categories"
     why: Notion AI workspace for notes, docs, search and writing
   - slug: noty.ai
     id: lst_d212fc91ebfdf49f0130602b
@@ -8191,12 +8206,16 @@ listings:
   - slug: plusai.com
     id: lst_9178db1976b647af0ee6a538
     primary: ai-presentation-maker
-    flag: "duplicate: same company and product as plusdocs.com, found after #332; owner decides which stays"
+    flag: "duplicate: same company and product as plusdocs.com, found after #332; categorized, with plusdocs.com held in Other until the owner picks which stays"
     why: Plus AI, generates and edits slides in PowerPoint and Google Slides
   - slug: plusdocs.com
     id: lst_d2b096011b7cf4a03641f07a
-    primary: ai-presentation-maker
-    flag: "duplicate: same company and product as plusai.com (Plus AI), found after #332; owner decides which stays"
+    primary: other
+    reason: "held for the owner: a duplicate of plusai.com; the owner picks which stays"
+    held:
+      primary: ai-presentation-maker
+    flag: "duplicate: same company and product as plusai.com (Plus AI), found after #332; held in Other until the owner picks which stays (plusai.com is categorized)"
+    aligned: "PR #342 review: held in Other so the pair doesn't share category pages; plusai.com keeps its categories"
     why: Plus (Plusdocs), AI presentation creation and live snapshots for teams
   - slug: plytix.com
     id: lst_23cace55d3fcbe8d928afef4
@@ -9571,9 +9590,10 @@ listings:
     why: AI email reply suggestions in your inbox
   - slug: scribeberry.com
     id: lst_2eb78bc58a55301bd66eee9a
-    primary: ai-doctor
+    primary: ai-note-taker
     secondary:
-      - ai-note-taker
+      - ai-doctor
+    aligned: "PR #342 review: ai-note-taker primary, ai-doctor secondary (its main job is writing notes)"
     why: AI medical scribe that drafts clinical documentation
   - slug: scribehow.com
     id: lst_717610716b6f5d002e715c69
@@ -9807,7 +9827,8 @@ listings:
     why: Recommendation and search API for developers
   - slug: sharegpt.com
     id: lst_7371e4a9d50825313647ab67
-    primary: ai-chatbots
+    primary: ai-productivity-tools
+    aligned: "PR #342 review: ai-chatbots → ai-productivity-tools (saves and shares ChatGPT conversations)"
     why: Chrome extension to save and share ChatGPT conversations
   - slug: sharehouse.app
     id: lst_dce1526748872a6ed4a28ee7
@@ -10142,9 +10163,10 @@ listings:
     why: Train custom AI image models and generate images
   - slug: soapnoteai.com
     id: lst_c64bb49c3fd395c76ed10a4f
-    primary: ai-doctor
+    primary: ai-note-taker
     secondary:
-      - ai-note-taker
+      - ai-doctor
+    aligned: "PR #342 review: ai-note-taker primary, ai-doctor secondary (its main job is writing notes)"
     why: AI SOAP note generation for healthcare providers
   - slug: soax.com
     id: lst_879b543514bb3d6d77241fe7
@@ -10686,9 +10708,10 @@ listings:
     why: AI story structure and narrative development for writers
   - slug: suki.ai
     id: lst_458fc079274781fb3e415bc8
-    primary: ai-doctor
+    primary: ai-note-taker
     secondary:
-      - ai-note-taker
+      - ai-doctor
+    aligned: "PR #342 review: ai-note-taker primary, ai-doctor secondary (its main job is writing notes)"
     why: Suki ambient AI clinical documentation assistant
   - slug: sumly.ai
     id: lst_33fe8437b08b5dc29e8f9a09
@@ -11932,9 +11955,10 @@ listings:
     why: UpCodes building code search and compliance platform
   - slug: upheal.io
     id: lst_276c872ca89e8a7c27989eed
-    primary: ai-doctor
+    primary: ai-note-taker
     secondary:
-      - ai-note-taker
+      - ai-doctor
+    aligned: "PR #342 review: ai-note-taker primary, ai-doctor secondary (its main job is writing notes)"
     why: Upheal AI progress notes for therapists
   - slug: upit.com
     id: lst_1fde716ad15a5420fad1e284
@@ -13136,11 +13160,8 @@ listings:
     why: Zoom IQ (AI Companion) meeting summaries and assistance
   - slug: zuora.com
     id: lst_bb7370710688ea402e9968e0
-    primary: other
-    secondary:
-      - subscription-analytics-software
-    reason: no existing category fits
-    newCategory: payment-processing
+    primary: subscription-analytics-software
+    aligned: "PR #342 review: filed with the six billing platforms (proposed payment-processing → subscription-analytics-software)"
     why: Zuora subscription billing and revenue management
   - slug: zuva.ai
     id: lst_35593f6c25b348eadfbf27f1
