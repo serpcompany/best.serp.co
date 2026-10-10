@@ -2017,6 +2017,42 @@ describe('listing-claim-hold-add and -clear (#67: holds for the owner’s review
     expect(holds(db)).toEqual([expect.objectContaining({ cleared_at: null, cleared_by: null })])
   })
 
+  it('with expected.website, clears only once the listing has it (#340: after the renames)', () => {
+    const website = 'https://www.new.example/'
+    const ordered = { ...clear, expected: { website } }
+    const rename = {
+      action: 'listing-details-set',
+      id: 'lst_sqlite_test',
+      slug: 'old-slug',
+      reason: 'the product moved',
+      expected: { name: 'Old', description: 'Description', website: 'https://example.com' },
+      details: { website }
+    }
+    const db = database()
+    const sync = () => {
+      live = db
+        .prepare('SELECT version,checksum FROM publication_state WHERE id=1')
+        .get() as typeof live
+    }
+    live = { checksum: beforeChecksum, version: 4 }
+    executeInTestTransaction(db, rowsPlan([add]))
+    // Dispatched before the rename: refused whole, with the reason bound like every guard's.
+    sync()
+    expect(() => executeInTestTransaction(db, rowsPlan([ordered], 5))).toThrow(
+      `listing-claim-hold-clear old-slug: its website is not ${website} yet; publish the manifest that sets it first`
+    )
+    expect(holds(db)).toEqual([expect.objectContaining({ cleared_at: null, cleared_by: null })])
+    expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 5 })
+    // After the rename sets the website, the same clear applies.
+    executeInTestTransaction(db, rowsPlan([rename], 5))
+    sync()
+    executeInTestTransaction(db, rowsPlan([ordered], 6))
+    expect(holds(db)).toEqual([expect.objectContaining({ cleared_at: now })])
+    // Without the field, the operation plans as it did before #340: no website guard.
+    expect(rowsPlan([clear]).statements.some(item => item.query.includes('website=?'))).toBe(false)
+    expect(rowsPlan([ordered]).statements.some(item => item.query.includes('website=?'))).toBe(true)
+  })
+
   it('refuses a listing whose slug or website changed since the report', () => {
     live = { checksum: beforeChecksum, version: 4 }
     for (const change of [

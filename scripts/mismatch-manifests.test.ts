@@ -137,7 +137,9 @@ describe('the mismatch manifests (#340)', () => {
         action: 'listing-claim-hold-clear',
         id: 'lst_dddddddddddd',
         slug: 'd.ai',
-        note: '#340 owner decision 6 (2026-10-10): 2026-10-10-mismatch-renames sets its website to https://d.ai/; the hold was off_domain (ends on x.ai, not d.ai)'
+        note: '#340 owner decision 6 (2026-10-10): 2026-10-10-mismatch-renames sets its website to https://d.ai/; the hold was off_domain (ends on x.ai, not d.ai)',
+        // The renames' website, so a clear dispatched before them is refused.
+        expected: { website: 'https://d.ai/' }
       }
     ])
     const manifests = buildMismatchManifests(entries, inventory, live, noChanges, holds)
@@ -465,8 +467,7 @@ describe('the mismatch manifests (#340)', () => {
       order.indexOf(mismatchManifestIds.renames)
     )
     let before = 0
-    for (const id of order) {
-      if (id === mismatchManifestIds.removals) before = liveCount()
+    const apply = (id: string) => {
       const source = readFileSync(resolve('d1/publications', `${id}.yaml`), 'utf8')
       const state = db
         .prepare('SELECT version,checksum FROM publication_state WHERE id=1')
@@ -491,6 +492,21 @@ describe('the mismatch manifests (#340)', () => {
         db.exec('ROLLBACK')
         throw new Error(`${id} does not apply: ${error}`)
       }
+    }
+    for (const id of order) {
+      if (id === mismatchManifestIds.removals) before = liveCount()
+      // Dispatched before the renames, the claim-hold clears are refused whole: the holds stay.
+      if (id === mismatchManifestIds.renames) {
+        expect(() => apply(mismatchManifestIds.claimHolds)).toThrow(
+          /listing-claim-hold-clear govdash\.com: its website is not https:\/\/www\.govdash\.com\/ yet/u
+        )
+        expect(
+          db
+            .prepare('SELECT COUNT(*) AS count FROM listing_claim_holds WHERE cleared_at IS NULL')
+            .get()
+        ).toEqual({ count: heldIds.length })
+      }
+      apply(id)
     }
 
     // The 127 removals are unpublished, and nothing else is.

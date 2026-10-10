@@ -275,8 +275,8 @@ that batch. Publish it where it was refused; where the original applied, there i
 - `-renames` gives 8 renamed products a new name, a description from the live site, and their own
   URL where the serp.ly link no longer reaches them ([`listing-details-set`](./catalog-publication.md#listing-details)),
   and fixes faceapp.com's description; `-categories` moves the 4 with a live category.
-- `-claim-holds-clear`, published after `-renames`, clears the [claim holds](./claims.md#holds) of
-  the 5 renames whose new website replaces the link that caused the hold.
+- `-claim-holds-clear` clears the [claim holds](./claims.md#holds) of the 5 renames whose new
+  website replaces the link that caused the hold; before `-renames`, it is refused.
 
 `scripts/mismatch-manifests.test.ts` keeps them identical to the audit and disjoint from #332's,
 #333's, and #338's, and replays them after #333's. Publish them after those, staging first. A later

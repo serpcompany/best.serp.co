@@ -493,13 +493,18 @@ const operation = z.discriminatedUnion('action', [
       expected: z.object({ website: z.string().url() }).strict().optional()
     })
     .strict(),
-  /** Clears a listing's active claim hold (#67): the owner decided it can be claimed. */
+  /**
+   * Clears a listing's active claim hold (#67): the owner decided it can be claimed. With
+   * `expected.website` (#340), only once the listing has that website: a hold cleared because a
+   * rename fixed the link waits for the manifest that sets it, and is refused before it.
+   */
   z
     .object({
       action: z.literal('listing-claim-hold-clear'),
       id: listingId,
       slug: existingSlug,
-      note: z.string().trim().min(1).max(200)
+      note: z.string().trim().min(1).max(200),
+      expected: z.object({ website: z.string().url() }).strict().optional()
     })
     .strict(),
   z.object({ action: z.literal('category-create'), category }).strict(),
@@ -1920,6 +1925,16 @@ export function buildPublicationPlan(
       routes.add(listingRoute(op.slug))
     }
     if (op.action === 'listing-claim-hold-clear') {
+      if (op.expected)
+        statements.push(
+          statement(
+            `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND website=?) THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
+            op.id,
+            op.slug,
+            op.expected.website,
+            `listing-claim-hold-clear ${op.slug}: its website is not ${op.expected.website} yet; publish the manifest that sets it first`
+          )
+        )
       statements.push(
         statement(
           'UPDATE listing_claim_holds SET cleared_at=?,cleared_by=? WHERE listing_id=? AND cleared_at IS NULL AND EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?)',
