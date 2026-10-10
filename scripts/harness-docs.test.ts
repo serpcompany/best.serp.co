@@ -20,7 +20,7 @@ describe('repository harness contract', () => {
 
   it('leaves .archive/ out of the documentation checks: it keeps history as it was', () => {
     expect(isMaintainedFile('.archive/releases/2026-10-06-promotion-plan.md')).toBe(false)
-    expect(isMaintainedFile('docs/HARNESS.md')).toBe(true)
+    expect(isMaintainedFile('docs/harness.md')).toBe(true)
     expect(isMaintainedFile('apps/web/docs/agents/web.md')).toBe(true)
   })
 
@@ -74,8 +74,8 @@ describe('repository harness contract', () => {
           'AGENTS.md': lines(120),
           'apps/web/AGENTS.md': `${lines(119)}\n${'x'.repeat(101)}`,
           'docs/README.md': lines(121),
-          'docs/HARNESS.md': lines(300),
-          'docs/DEPLOY_RUNBOOK.md': lines(301),
+          'docs/harness.md': lines(300),
+          'docs/deploy-runbook.md': lines(301),
           'apps/web/content/legal/terms.mdx': lines(500),
           'SECURITY.md': lines(500)
         },
@@ -84,7 +84,7 @@ describe('repository harness contract', () => {
     ).toEqual([
       'apps/web/AGENTS.md: 121 wrapped lines exceeds the map budget of 120; move detail into a leaf doc',
       'docs/README.md: 121 wrapped lines exceeds the map budget of 120; move detail into a leaf doc',
-      'docs/DEPLOY_RUNBOOK.md: 301 wrapped lines exceeds the leaf budget of 300; split it by topic'
+      'docs/deploy-runbook.md: 301 wrapped lines exceeds the leaf budget of 300; split it by topic'
     ])
   })
 
@@ -101,11 +101,11 @@ describe('repository harness contract', () => {
     // An allowance covers only its own file.
     expect(
       validateDocumentationBudgets(
-        { 'docs/LEGACY.md': lines(320), 'docs/HARNESS.md': lines(301) },
+        { 'docs/LEGACY.md': lines(320), 'docs/harness.md': lines(301) },
         allowances
       )
     ).toEqual([
-      'docs/HARNESS.md: 301 wrapped lines exceeds the leaf budget of 300; split it by topic'
+      'docs/harness.md: 301 wrapped lines exceeds the leaf budget of 300; split it by topic'
     ])
   })
 
@@ -113,8 +113,8 @@ describe('repository harness contract', () => {
     const lines = (count: number) => Array.from({ length: count }, () => 'line').join('\n')
     expect(
       validateDocumentationBudgets(
-        { 'docs/LEGACY.md': lines(300), 'docs/HARNESS.md': lines(320) },
-        { 'docs/GONE.md': 400, 'docs/HARNESS.md': 350, 'docs/LEGACY.md': 340 }
+        { 'docs/LEGACY.md': lines(300), 'docs/harness.md': lines(320) },
+        { 'docs/GONE.md': 400, 'docs/harness.md': 350, 'docs/LEGACY.md': 340 }
       )
     ).toEqual([
       'docs/GONE.md: its allowance of 400 lines is no longer needed (no such budgeted doc); delete its DOC_LINE_ALLOWANCES entry in scripts/harness/docs-health.ts',

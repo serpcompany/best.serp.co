@@ -1,6 +1,6 @@
 /**
  * The browser side of email-code sign-in (serpcompany/best.serp.co#60): calls the three
- * `/api/auth` endpoints and turns each answer into one UI outcome (docs/ACCOUNTS.md).
+ * `/api/auth` endpoints and turns each answer into one UI outcome (docs/accounts.md).
  *
  * A code request answers 200 whether or not a per-email limit stopped the email, so `sent`
  * only means "if the address is valid, a code is on its way". Only per-client limits answer

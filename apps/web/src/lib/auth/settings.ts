@@ -3,7 +3,7 @@
  * (serpcompany/best.serp.co#60). Staging and production fail closed: a missing or malformed
  * secret, base URL, or trusted origin is an `AuthConfigurationError`, which the route handler
  * answers with 503 and the guards treat as "not signed in". Only local development may run
- * without `BETTER_AUTH_SECRET` (see docs/DEVELOPMENT.md).
+ * without `BETTER_AUTH_SECRET` (see docs/development.md).
  *
  * | Var | local | staging | production |
  * | --- | --- | --- | --- |

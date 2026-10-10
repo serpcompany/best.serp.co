@@ -2,8 +2,8 @@
 
 A catalog-wide media change (the legacy migration, or a regeneration of it) reaches staging and
 then production as reviewed files, uploaded and published by protected workflows. Keys and
-storage: [Listing media](./MEDIA.md). Why staging comes first:
-[Catalog publication](./CATALOG_PUBLICATION.md).
+storage: [Listing media](./media.md). Why staging comes first:
+[Catalog publication](./catalog-publication.md).
 
 Agents prepare and review these files; they never run the uploads or publications.
 
@@ -100,10 +100,10 @@ for any regeneration:
   slugs), as the `2026-10-07-legacy-media-rebrands` plan did.
 - **Adult listings** never took another site's Open Graph image, only SERP's curated screenshot
   from apps.serp.co; their site icons were fine. The catalog no longer lists adult products
-  ([Catalog hygiene](./CATALOG_HYGIENE.md#adult-products-260)).
+  ([Catalog hygiene](./catalog-hygiene.md#adult-products-260)).
 - **Owner sign-off.** A refused replacement leaves the tile and is listed in the report with its
   final page and reason. Listing content never changes here; hijacked listings are
-  [catalog hygiene](./CATALOG_HYGIENE.md#listing-domains)'s.
+  [catalog hygiene](./catalog-hygiene.md#listing-domains)'s.
 - `scripts/catalog-media.test.ts` checks that every image a manifest names is in the plan with the
   same bytes; `scripts/v1-import-publications.test.ts` (archived with the import by #315) applied
   the manifests to the import: every logo and image was then hosted, and nothing else changed.

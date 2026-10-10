@@ -7,7 +7,7 @@ name: Check Listing Media Health
 # re-dispatches this workflow on main, so only main's code reads production. Both jobs are
 # skipped until the repository variable MEDIA_HEALTH_CHECK is `on`, and the check is skipped until
 # the production-media-health environment holds Cloudflare credentials. It uses its own
-# environment because the production environment requires reviewer approval. See docs/MEDIA_HEALTH.md.
+# environment because the production environment requires reviewer approval. See docs/media-health.md.
 on:
   workflow_dispatch:
   schedule:
@@ -56,7 +56,7 @@ jobs:
             exit 0
           fi
           echo "configured=false" >> "$GITHUB_OUTPUT"
-          message="Media health check skipped: the production-media-health environment has no CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/MEDIA_HEALTH.md)."
+          message="Media health check skipped: the production-media-health environment has no CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets (docs/media-health.md)."
           echo "::warning title=Media health check skipped::$message"
           echo "$message" >> "$GITHUB_STEP_SUMMARY"
 

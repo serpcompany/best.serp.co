@@ -1,7 +1,7 @@
 # Listing image safety and media health
 
 A listing image never renders as a broken image, and hosted media is checked every week
-(serpcompany/best.serp.co#122). Hosting itself: [Listing media](./MEDIA.md).
+(serpcompany/best.serp.co#122). Hosting itself: [Listing media](./media.md).
 
 ## One listing image component
 
@@ -76,7 +76,7 @@ never writes, so it never re-queues anything itself.
 issue with the findings, updates the open one, or closes it with a comment once the check is
 clean. Only an issue `github-actions[bot]` opened counts, so a planted marker is ignored, and the
 checkout keeps no token (`persist-credentials: false`) for the step that holds the Cloudflare one. A schedule on `staging` (the default branch) relays to `main`. In the
-[credential guards](./CREDENTIAL_GUARDS.md#workflow-checks) the check's exact command is a
+[credential guards](./credential-guards.md#workflow-checks) the check's exact command is a
 token step without D1 changes, so it needs no bookmark; any variant still does.
 
 Owner setup, until which every run is skipped:

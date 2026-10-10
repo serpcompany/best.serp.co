@@ -2,7 +2,7 @@
 
 How every page and file URL is written, which requests redirect, how listings are paged, and
 what the pages publish for search engines. The Worker entry that enforces it is in
-[Architecture](./ARCHITECTURE.md); public URLs are part of the SEO contract (`AGENTS.md`).
+[Architecture](./architecture.md); public URLs are part of the SEO contract (`AGENTS.md`).
 
 ## One canonical form
 
@@ -92,7 +92,7 @@ for display; only the sitemaps and the JSON feed read every listing.
 
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other host
   serves a disallow-all robots.txt, which on staging.best.serp.co also lets Ahrefs' Site Audit
-  in; see [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)).
+  in; see [Environments and hosts](./architecture.md#environments-and-hosts)).
   The index lists the root-level sitemaps; the older sitemap URLs answer one 308. The route
   registry
   (`apps/web/src/lib/site/site-routes.ts`) sets each static page's indexability and sitemap for

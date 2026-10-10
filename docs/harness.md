@@ -58,7 +58,7 @@ full loop before a substantial completion claim.
 
 ## CI
 
-[CI](./CI.md) covers `web.yml` (the required checks and the staging deploy), the repository
+[CI](./ci.md) covers `web.yml` (the required checks and the staging deploy), the repository
 rulesets, and where CI jobs run (`CI_RUNNER_LABELS`).
 
 ## Documentation health

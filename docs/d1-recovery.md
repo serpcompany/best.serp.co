@@ -2,11 +2,11 @@
 
 Production D1 changes in two ways. The protected workflows (deploy, publish, approve)
 record a Time Travel bookmark first, in the run summary
-([Deploy runbook](./DEPLOY_RUNBOOK.md#bookmarks-and-recovery)). None exports the database: this
+([Deploy runbook](./deploy-runbook.md#bookmarks-and-recovery)). None exports the database: this
 repository is public, so any signed-in GitHub user could download an export uploaded as an
 Actions artifact, with its sessions, OAuth tokens, and emails (#99). The admin panel
 (serpcompany/best.serp.co#64) writes from the Worker on each decision and records no bookmark,
-so a wrong admin write is undone by restoring to a moment ([Admin panel](./ADMIN_PANEL.md)).
+so a wrong admin write is undone by restoring to a moment ([Admin panel](./admin-panel.md)).
 Either way, **D1 Time Travel** is the only recovery.
 
 Time Travel keeps a point-in-time history of every D1 database: 30 days on the Workers Paid
@@ -140,7 +140,7 @@ Hence the order:
    pending: any Deploy Production of `main` (a push, a re-run, or a dispatch) plans
    `database-and-worker`, records a new bookmark, and applies the same migration again. The
    hotfix path cannot ship around it either: `plan-release` refuses a hotfix while migrations
-   are pending ([Release guards](./RELEASE_GUARDS.md#hotfixes)). Reject every Deploy Production
+   are pending ([Release guards](./release-guards.md#hotfixes)). Reject every Deploy Production
    run that waits for approval until then.
 4. **Fix forward through `staging`.** If running the bad migration again is harmless once a
    corrective migration follows it, add that migration in a pull request into `staging` and

@@ -2,7 +2,7 @@ name: Web
 
 # The checks for every pull request into staging (the base branch) and main (hotfix-* branches;
 # staging reaches main by fast-forward), the same checks on every push to them, and the staging
-# deploy, which waits for both (docs/CI.md, serp's CI workflows standard):
+# deploy, which waits for both (docs/ci.md, serp's CI workflows standard):
 # - `check` runs `pnpm check`. On a push the deploy job builds the Worker, so `check` skips its
 #   build and each commit is built once.
 # - `e2e` runs Playwright and records a `passed-e2e-<tree>` receipt. A push whose tree a pull
@@ -12,7 +12,7 @@ name: Web
 # - On a draft pull request `e2e` fails until it is marked ready for review; it never skips,
 #   because a skipped required job reports success.
 # Production releases from deploy-production.yml, only a tree this workflow's staging deploy
-# verified (docs/RELEASE_GUARDS.md).
+# verified (docs/release-guards.md).
 on:
   pull_request:
     branches: ['staging', 'main']
@@ -70,7 +70,7 @@ jobs:
     # with no output, it runs everything.
     if: '!cancelled()'
     # CI_RUNNER_LABELS picks the runner; a fork's pull request always runs on ubuntu-latest
-    # (docs/CI.md#runners).
+    # (docs/ci.md#runners).
     runs-on: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER_LABELS || '"ubuntu-latest"') }}
     steps:
       - name: Checkout
@@ -83,7 +83,7 @@ jobs:
       # fast-forward promotion (`pnpm release:promote`, no pull request) or a hotfix-* pull
       # request. It is an accident guard, not the control: a pull request runs its own copy of
       # this file. The control is Deploy Production's release-time tree check
-      # (docs/RELEASE_GUARDS.md#promotion).
+      # (docs/release-guards.md#promotion).
       - name: Require a hotfix branch for pull requests into main
         if: github.base_ref == 'main'
         env:
@@ -103,7 +103,7 @@ jobs:
           if [ "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY" ] && [[ "$HEAD_REF" =~ ^hotfix-[A-Za-z0-9._-]+$ ]]; then
             exit 0
           fi
-          echo "::error::main is production: it accepts only hotfix-* pull requests, and staging reaches it by the owner's fast-forward promotion, not a pull request. Retarget this pull request to staging (docs/RELEASE_GUARDS.md#promotion)."
+          echo "::error::main is production: it accepts only hotfix-* pull requests, and staging reaches it by the owner's fast-forward promotion, not a pull request. Retarget this pull request to staging (docs/release-guards.md#promotion)."
           exit 1
 
       - name: Install
@@ -231,7 +231,7 @@ jobs:
     # bookmark, staging D1 migrations, Worker deploy, HTTP gates, and the Playwright smoke suite
     # against the deployed staging Worker. Deploy Production releases only a tree one of these
     # jobs verified. Skips (green) until the `staging` environment holds Cloudflare credentials;
-    # see docs/DEPLOY_CREDENTIALS.md.
+    # see docs/deploy-credentials.md.
     name: Validate, migrate, deploy & smoke-test staging
     needs: [check, e2e, tip]
     if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'
@@ -265,7 +265,7 @@ jobs:
             exit 0
           fi
           echo "configured=false" >> "$GITHUB_OUTPUT"
-          message="Staging deploy skipped: the staging environment has no CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets yet (docs/DEPLOY_CREDENTIALS.md)."
+          message="Staging deploy skipped: the staging environment has no CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets yet (docs/deploy-credentials.md)."
           echo "::notice title=Staging deploy skipped::$message"
           echo "$message" >> "$GITHUB_STEP_SUMMARY"
 

@@ -7,7 +7,7 @@
  * quads), then IP literals in private, reserved, or translation ranges and local-only names are
  * refused, and so are URLs carrying credentials. A public hostname that *resolves* to a private
  * address is not caught here: the Worker relies on Cloudflare's egress, which never reaches
- * private ranges, for that (docs/SUBMISSION_FLOW.md). The fetcher applies the policy to every
+ * private ranges, for that (docs/submission-flow.md). The fetcher applies the policy to every
  * redirect hop.
  */
 

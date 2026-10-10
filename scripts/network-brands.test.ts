@@ -26,7 +26,7 @@ const sourceCopyPath = resolve(
 )
 
 /**
- * Sibling checkouts (docs/HARNESS.md, "Sibling checkouts"). The comparisons read a recorded
+ * Sibling checkouts (docs/harness.md, "Sibling checkouts"). The comparisons read a recorded
  * commit, never a working tree, and skip when the checkout or the commit is missing (CI).
  */
 const reposRoot = process.env.SERP_REPOS_ROOT ?? resolve(homedir(), 'dev/repos')

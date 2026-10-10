@@ -38,7 +38,7 @@ export const listingLinkRels = ['follow', 'nofollow', 'sponsored'] as const
 export type ListingLinkRel = (typeof listingLinkRels)[number]
 
 /**
- * Submission lifecycle (docs/SUBMISSION_FLOW.md). `draft` is saved with no plan chosen yet
+ * Submission lifecycle (docs/submission-flow.md). `draft` is saved with no plan chosen yet
  * (or paid chosen and checkout not completed); `pending_badge` means free was chosen and the
  * badge is not verified yet. `verified` and `paid_pending_review` are the review queue;
  * `paid_pending_review` is the only queue state whose listing is already live.
@@ -1040,7 +1040,7 @@ export const listingSubmissionUrlBlocks = sqliteTable(
  * Who owns a listing. One current `owner` per listing (a partial unique index); revoking keeps
  * the row with `revoked_at`, so the table is also the ownership history. Further roles can be
  * added for teams. The public "Verified owner" badge is derived from a current owner row, so a
- * change here advances the catalog epoch in the same batch (see DATA_MODEL.md).
+ * change here advances the catalog epoch in the same batch (see data-model.md).
  */
 export const listingOwners = sqliteTable(
   'listing_owners',
@@ -1401,7 +1401,7 @@ export const listingClaimHolds = sqliteTable(
 
 /**
  * Billing (#68). `orders` is the ledger of record for every charge and refund, whatever the
- * submission or listing it was for could accept (docs/SUBMISSION_DATA.md, "Payments and
+ * submission or listing it was for could accept (docs/submission-data.md, "Payments and
  * refunds"). Provider-neutral: `provider` names the billing provider (`stripe` now, Lago
  * later) and the `provider_*` columns hold its references. Amounts are integer minor units.
  */

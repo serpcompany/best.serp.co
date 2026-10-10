@@ -17,5 +17,5 @@
   Production migrates only a commit that Deploy Staging already migrated and smoke-tested.
   `pnpm db:migrations:list:<local|staging|production>` is read-only.
 
-Read [the data model](../docs/DATA_MODEL.md) and
-[deploy runbook](../docs/DEPLOY_RUNBOOK.md) before changing this directory.
+Read [the data model](../docs/data-model.md) and
+[deploy runbook](../docs/deploy-runbook.md) before changing this directory.

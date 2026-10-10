@@ -3,7 +3,7 @@
 How public pages stay fast without serving stale content: four cache layers, of which the edge
 HTML cache and the data cache are keyed by the catalog epoch, so a publication reaches every page
 without a purge. The Worker entry that runs the first layer is in
-[Architecture](./ARCHITECTURE.md); what a publication changes is in [Data model](./DATA_MODEL.md).
+[Architecture](./architecture.md); what a publication changes is in [Data model](./data-model.md).
 
 ## The catalog epoch
 
@@ -49,7 +49,7 @@ From the edge inward:
 
 Both Cache API layers are per data center and populate on demand. A deployment gets a new
 Worker version and therefore a cold HTML cache; the data cache survives deployments. Confirming
-it after a deploy is in the [Deploy runbook](./DEPLOY_RUNBOOK.md#caching-after-a-deploy).
+it after a deploy is in the [Deploy runbook](./deploy-runbook.md#caching-after-a-deploy).
 
 ## Why this design
 

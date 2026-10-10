@@ -76,7 +76,7 @@ let nextConfig: NextConfig = {
   ...baseConfig,
 
   // `unauthorized()` / `forbidden()` give admin pages real 401 and 403 responses
-  // (`requireAdmin()` in src/lib/auth/server.ts; docs/ACCOUNTS.md).
+  // (`requireAdmin()` in src/lib/auth/server.ts; docs/accounts.md).
   experimental: {
     authInterrupts: true
   },
@@ -141,7 +141,7 @@ let nextConfig: NextConfig = {
   headers: async () => [
     {
       // Defense in depth: the Worker entry sends noindex on every response outside public
-      // production (SITE_ENVIRONMENT, docs/ARCHITECTURE.md#environments-and-hosts). This host
+      // production (SITE_ENVIRONMENT, docs/architecture.md#environments-and-hosts). This host
       // rule keeps the *.workers.dev hosts out of search indexes even if that config is wrong.
       source: '/:path*',
       has: [{ type: 'host', value: '.*\\.workers\\.dev' }],

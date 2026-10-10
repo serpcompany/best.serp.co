@@ -9,12 +9,12 @@ const REQUIRED_FILES = [
   'README.md',
   'SECURITY.md',
   'docs/README.md',
-  'docs/ARCHITECTURE.md',
-  'docs/DATA_MODEL.md',
-  'docs/DEVELOPMENT.md',
-  'docs/DEPLOY_RUNBOOK.md',
-  'docs/DEPENDENCY_SECURITY.md',
-  'docs/HARNESS.md',
+  'docs/architecture.md',
+  'docs/data-model.md',
+  'docs/development.md',
+  'docs/deploy-runbook.md',
+  'docs/dependency-security.md',
+  'docs/harness.md',
   'docs/agents/domain.md',
   'docs/agents/issue-tracker.md',
   'docs/agents/triage-labels.md',
@@ -337,7 +337,7 @@ function main(): void {
   if (violations.length > 0) {
     console.error('Documentation health failed:')
     for (const violation of violations) console.error(`- ${violation}`)
-    console.error('See docs/HARNESS.md#documentation-health for remediation.')
+    console.error('See docs/harness.md#documentation-health for remediation.')
     process.exitCode = 1
     return
   }

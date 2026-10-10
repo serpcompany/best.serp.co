@@ -188,7 +188,7 @@ describe('fresh Drizzle D1 history', () => {
     }
     expect(baseline).toContain('COLLATE NOCASE')
 
-    // Every table of every migration is STRICT (Drizzle cannot express it; see DATA_MODEL.md).
+    // Every table of every migration is STRICT (Drizzle cannot express it; see data-model.md).
     // A rebuild creates `__new_<table>` and renames it over the table it replaces.
     const history = freshMigrationNames()
       .map(name => readFileSync(resolve(freshMigrationsDirectory, name), 'utf8'))

@@ -47,7 +47,7 @@ fixture sites on the site's flags.
   (`paid_pending_review` or `changes_requested`) waits for that decision, because unpublishing
   is refused meanwhile; it is not fetched again every hour.
 - **The page checked** is a submitted listing's website, or for a badge claimer the product page
-  recorded with their claim (`listing_claims.product_url`, [Claims](./CLAIMS.md)): an imported
+  recorded with their claim (`listing_claims.product_url`, [Claims](./claims.md)): an imported
   listing's website is usually a `serp.ly` link, whose page never shows the badge.
 - **The check** is the submit flow's verifier (`badge-verifier.ts`): the page must link the
   badge to the listing with a plain followed link. A **conclusive miss** is a loaded page whose
@@ -113,7 +113,7 @@ retried refund checks again):
   plan refuses unless that check did not pass, so an earlier weekly pass can neither keep the
   listing nor block the refund.
 
-The admin Orders refund calls it ([Billing](./BILLING.md)).
+The admin Orders refund calls it ([Billing](./billing.md)).
 
 ## Checking it on staging
 

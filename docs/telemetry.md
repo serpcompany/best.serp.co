@@ -8,7 +8,7 @@ event with its environment.
 
 Analytics load only on public production: `SITE_ENVIRONMENT=production` on best.serp.co
 (`analyticsForRequest` in `apps/web/src/lib/environment/request-environment.ts`;
-[Architecture](./ARCHITECTURE.md#environments-and-hosts)). Local, staging, and the production
+[Architecture](./architecture.md#environments-and-hosts)). Local, staging, and the production
 Worker's workers.dev host render neither tag, and `public-policy.test.tsx` holds that line.
 
 - **Google Tag Manager:** the container in `site.analytics.gtmId`

@@ -13,14 +13,14 @@ the sites belongs in the theme's token values, not in a component.
 
 | Topic | Read |
 |---|---|
-| Local Worker, local D1, accounts and email locally | [Development](../../../../docs/DEVELOPMENT.md) |
-| Environments, workflows, releases and caching after a deploy | [Deploy runbook](../../../../docs/DEPLOY_RUNBOOK.md) |
-| `wrangler.jsonc`, bindings, the Worker entry and the edge cache | [Architecture](../../../../docs/ARCHITECTURE.md) |
+| Local Worker, local D1, accounts and email locally | [Development](../../../../docs/development.md) |
+| Environments, workflows, releases and caching after a deploy | [Deploy runbook](../../../../docs/deploy-runbook.md) |
+| `wrangler.jsonc`, bindings, the Worker entry and the edge cache | [Architecture](../../../../docs/architecture.md) |
 | Worker vars and secrets | Vars are set in `wrangler.jsonc` and typed in the generated `cloudflare-env.d.ts` (`pnpm cf-typegen`); secrets and local-only vars are declared by hand in `cloudflare-env-secrets.d.ts`. Each is described in its feature's doc |
-| Checks, runtime evidence and worktrees | [Harness](../../../../docs/HARNESS.md) |
-| Sign-in, the dashboard shell and the admin gate | [Accounts](../../../../docs/ACCOUNTS.md) |
-| `/account` screens | [Submitter dashboard](../../../../docs/ACCOUNT_DASHBOARD.md) |
-| `/admin` screens | [Admin panel](../../../../docs/ADMIN_PANEL.md) |
+| Checks, runtime evidence and worktrees | [Harness](../../../../docs/harness.md) |
+| Sign-in, the dashboard shell and the admin gate | [Accounts](../../../../docs/accounts.md) |
+| `/account` screens | [Submitter dashboard](../../../../docs/account-dashboard.md) |
+| `/admin` screens | [Admin panel](../../../../docs/admin-panel.md) |
 
 ## Design system
 
@@ -141,7 +141,7 @@ Public URLs are part of the SEO contract: changing one needs a permanent redirec
 ## Dashboards
 
 `/account` and `/admin` share the shadcn sidebar shell in `components/dashboard/` (its parts are
-in [Accounts](../../../../docs/ACCOUNTS.md)). Their UI rules are serp's
+in [Accounts](../../../../docs/accounts.md)). Their UI rules are serp's
 [dashboard UI rules](https://github.com/serpcompany/serp/blob/main/docs/engineering/websites/features/submissions/account-dashboard.md#ui-rules),
 from best.serp.co's own review: start from the stock blocks (dashboard-01, sidebar-07) and keep
 their structure; show unbuilt items with a "Soon" badge, never greyed out; put `Empty` inside a
