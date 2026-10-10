@@ -115,13 +115,13 @@ operation and reason, and D1 reports it as `bad JSON path: '<operation> <slug>: 
 |---|---|---|
 | `tag-create` | Adds an active tag under a hub: `tag: {slug, name, description, category, order}` | A tag has the slug, active or retired, or the hub is missing or retired |
 | `tag-update` | Rewrites a tag's name, description, hub and order (`tag`), compared with `expected` (name, description, hub). A retired tag stays retired | The tag isn't `expected`, or the new hub is missing or retired |
-| `tag-unpublish` | Retires a tag and redirects its URL to `redirect` | No active tag has the slug, an active best page uses it, or the target is missing or retired |
+| `tag-unpublish` | Retires a tag and redirects its URL to `redirect` | No active tag has the slug, an active best page uses it, or the target is missing, retired, or redirects elsewhere itself |
 | `listing-tags-set` | Replaces a listing's tags with `tags`, the first the most central | The slug or tags aren't `expected`, the listing isn't approved, or a tag is missing or retired |
 | `best-page-create` | Adds an active best page: `page: {slug, keyword, title, heading, intro, tag, category, listSize, keywordVolume, keywordCheckedAt, order}`, on a tag, a category, or both | A best page has the slug, active or retired, or its tag or category is missing or retired |
 | `best-page-update` | Rewrites every field of a best page but its slug (`page`), compared with all of them (`expected`) | The page isn't `expected`, or its new tag or category is missing or retired |
 | `best-page-listings-set` | Replaces a page's pins (`pins`, positions 1, 2, … with an optional `blurb`) and exclusions (`exclude`), each `{id, slug}` | The page is missing, its pins and exclusions aren't `expected`, or a listing isn't approved with that id and slug |
-| `best-page-unpublish` | Retires a best page and redirects its URL to `redirect` | No active best page has the slug, or the target is missing or retired |
-| `taxonomy-redirect-set` | Points `from` (`{kind, slug}`, kind `category`, `tag` or `best`) at `to` | Its current target isn't `expected` (`null` for none), or the target is missing or retired |
+| `best-page-unpublish` | Retires a best page and redirects its URL to `redirect` | No active best page has the slug, or the target is missing, retired, or redirects elsewhere itself |
+| `taxonomy-redirect-set` | Points `from` (`{kind, slug}`, kind `category`, `tag` or `best`) at `to` | Its current target isn't `expected` (`null` for none), the target is missing or retired, or it would make a chain or a loop: the target redirects too, or a redirect already ends at `from` |
 
 A target is `{kind, slug}`, an active category, tag, or best page, or `{kind: directory}`, which
 is `/products/`. Redirects store their target's id, so a later rename keeps them current.
@@ -129,7 +129,10 @@ is `/products/`. Redirects store their target's id, so a later rename keeps them
 - **Redirects never chain.** `tag-unpublish` and `best-page-unpublish` re-point every redirect
   aimed at what they retire to their own target, in the same batch. A redirect from the target's
   own URL would then point at itself, so it is removed: the target's page renders while it's
-  active, and the target's own retirement writes that URL's redirect.
+  active, and the target's own retirement writes that URL's redirect. A redirect from the
+  target's own URL to anywhere else refuses the batch. `taxonomy-redirect-set` refuses a target
+  that redirects too, and a source that other redirects end at, whichever the batch writes
+  first: to move a URL that others point at, retire its tag or best page.
 - **A page wins over its redirect.** A redirect can be published while its source still renders,
   as #341's first manifest does for old category URLs. It takes effect once that page empties or
   retires.

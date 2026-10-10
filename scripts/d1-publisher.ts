@@ -510,7 +510,7 @@ const operation = z.discriminatedUnion('action', [
    * Retires an active tag. Its listings keep their memberships (public reads filter on the tag's
    * `is_active`), its URL redirects to `redirect`, and every redirect aimed at it is re-pointed
    * there, so redirects never chain. Refused while an active best page uses the tag, or when the
-   * target is missing or retired.
+   * target is missing or retired, or its own URL redirects elsewhere.
    */
   z
     .object({ action: z.literal('tag-unpublish'), slug: taxonomySlug, redirect: taxonomyTarget })
@@ -589,7 +589,8 @@ const operation = z.discriminatedUnion('action', [
     .strict(),
   /**
    * Retires an active best page: its URL redirects to `redirect`, and every redirect aimed at it
-   * is re-pointed there, so redirects never chain. Refused when the target is missing or retired.
+   * is re-pointed there, so redirects never chain. Refused when the target is missing or retired,
+   * or its own URL redirects elsewhere.
    */
   z
     .object({
@@ -602,7 +603,8 @@ const operation = z.discriminatedUnion('action', [
    * Points an old category, tag, or best page URL at an active target, or at `/products/`. The
    * page itself takes precedence while it renders, so a redirect can be published before its
    * source empties (design 2.2). Compared and swapped on `expected`, the current target or null
-   * for none. Refused when the current target isn't `expected`, or the target is missing or retired.
+   * for none. Refused when the current target isn't `expected`, the target is missing or retired,
+   * or it would make a chain: the target's own URL redirects, or a redirect already ends here.
    */
   z
     .object({
@@ -1098,6 +1100,29 @@ function targetActiveGuard(
     )
   ]
 }
+/**
+ * Refuses a redirect that would make a chain or a loop (design 2.2: no chains), as
+ * `listing-slug-redirect` does for listings: `to`'s own URL already redirects, or a redirect
+ * already ends at `from`. A page wins over its redirect, so either would become a second hop once
+ * that page empties or retires. Retiring a tag or best page is how a URL that others point at
+ * moves: it re-points them (`retireWithRedirect`).
+ */
+function redirectChainGuard(
+  from: { kind: keyof typeof TAXONOMY_TABLES; slug: string },
+  to: TaxonomyTarget,
+  label: string
+): PlannedStatement {
+  const endsAtSource = `EXISTS (SELECT 1 FROM taxonomy_redirects WHERE ${TARGET_ID_COLUMNS[from.kind]}=(SELECT id FROM ${TAXONOMY_TABLES[from.kind]} WHERE slug=?))`
+  const reason = `${label}: this would make a chain: the target redirects too, or a redirect already ends at this URL`
+  if (to.kind === 'directory') return guard(`NOT ${endsAtSource}`, reason, from.slug)
+  return guard(
+    `NOT EXISTS (SELECT 1 FROM taxonomy_redirects WHERE source_kind=? AND source_slug=?) AND NOT ${endsAtSource}`,
+    reason,
+    to.kind,
+    to.slug,
+    from.slug
+  )
+}
 /** Inserts the redirect of `kind` `slug` to `target`; the caller has removed any earlier one. */
 function insertRedirect(
   kind: string,
@@ -1122,7 +1147,8 @@ function insertRedirect(
  * target, so a redirect never leads to a retired page or through a second hop (design 2.2). A
  * redirect from the target's own URL would then point at itself, so it is removed instead: while
  * the target is active its page renders, and if it retires later, its own retirement writes the
- * redirect for that URL.
+ * redirect for that URL. A redirect from the target's own URL to anywhere else refuses the batch:
+ * it would be a second hop.
  */
 function retireWithRedirect(
   kind: 'best' | 'tag',
@@ -1146,6 +1172,14 @@ function retireWithRedirect(
     ...(target.kind === 'directory'
       ? []
       : [
+          // A redirect from the target's own URL to anywhere else would be a second hop.
+          guard(
+            `NOT EXISTS (SELECT 1 FROM taxonomy_redirects WHERE source_kind=? AND source_slug=? AND ${column} IS NOT (SELECT id FROM ${table} WHERE slug=?))`,
+            `${label}: the redirect target itself redirects elsewhere; this would make a chain`,
+            target.kind,
+            target.slug,
+            slug
+          ),
           statement(
             `DELETE FROM taxonomy_redirects WHERE source_kind=? AND source_slug=? AND ${column}=(SELECT id FROM ${table} WHERE slug=?)`,
             target.kind,
@@ -1569,6 +1603,7 @@ function taxonomyStatements(
           expected === null ? null : JSON.stringify(targetPair(expected))
         ),
         ...targetActiveGuard(to, label),
+        redirectChainGuard(from, to, label),
         expected === null
           ? insertRedirect(from.kind, from.slug, to, manifest.id, now)
           : statement(

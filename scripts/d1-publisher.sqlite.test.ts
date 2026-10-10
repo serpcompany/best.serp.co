@@ -2095,13 +2095,12 @@ describe('taxonomy operations in a row-level manifest (#344, #341 design 4.1)', 
     it('retires a tag, keeps its memberships, and redirects its URL and every redirect aimed at it', () => {
       const db = seeded()
       publish(db, [
-        // Old category URLs already sent to the tag, and its own URL's pre-staged redirect.
+        // Old category and best page URLs already sent to the tag.
         redirectSet({ kind: 'category', slug: 'ai-content' }, null, {
           kind: 'tag',
           slug: 'ai-writing'
         }),
         redirectSet({ kind: 'best', slug: 'ai-writer' }, null, { kind: 'tag', slug: 'ai-writing' }),
-        redirectSet({ kind: 'tag', slug: 'ai-writing' }, null, { kind: 'directory' }),
         // A redirect from the new target's own URL to the tag would point at itself: removed.
         redirectSet({ kind: 'tag', slug: 'ai-seo' }, null, { kind: 'tag', slug: 'ai-writing' })
       ])
@@ -2124,6 +2123,23 @@ describe('taxonomy operations in a row-level manifest (#344, #341 design 4.1)', 
         expect.arrayContaining(['/products/tags/ai-writing/', '/products/tags/ai-seo/'])
       )
       expect(booleanBindings(publication)).toEqual([])
+    })
+
+    it('replaces a redirect pre-staged for its own URL', () => {
+      const db = seeded()
+      publish(db, [redirectSet({ kind: 'tag', slug: 'ai-writing' }, null, { kind: 'directory' })])
+      publish(db, [unpublish('ai-writing', { kind: 'category', slug: 'writing' })])
+      expect(redirects(db)).toEqual(['tag ai-writing -> category writing'])
+    })
+
+    it('refuses a target whose own URL redirects elsewhere: a chain', () => {
+      const db = seeded()
+      publish(db, [redirectSet({ kind: 'tag', slug: 'ai-seo' }, null, { kind: 'directory' })])
+      refuses(
+        db,
+        [unpublish('ai-writing', { kind: 'tag', slug: 'ai-seo' })],
+        'tag-unpublish ai-writing: the redirect target itself redirects elsewhere; this would make a chain'
+      )
     })
 
     it('redirects to the directory, a category, or a best page', () => {
@@ -2745,6 +2761,18 @@ describe('taxonomy operations in a row-level manifest (#344, #341 design 4.1)', 
       ])
     })
 
+    it('refuses a target whose own URL redirects elsewhere: a chain', () => {
+      const db = seeded()
+      publish(db, [
+        redirectSet({ kind: 'tag', slug: 'ai-seo' }, null, { kind: 'category', slug: 'writing' })
+      ])
+      refuses(
+        db,
+        [unpublish('ai-seo-tools', { kind: 'tag', slug: 'ai-seo' })],
+        'best-page-unpublish ai-seo-tools: the redirect target itself redirects elsewhere; this would make a chain'
+      )
+    })
+
     it('refuses a missing or retired target, a missing or retired page, and itself', () => {
       for (const [kind, slug] of [
         ['best', 'old-best'],
@@ -2871,6 +2899,49 @@ describe('taxonomy operations in a row-level manifest (#344, #341 design 4.1)', 
           `taxonomy-redirect-set category old: the redirect target ${kind === 'best' ? 'best page' : kind} ${slug} is missing or retired`
         )
       }
+    })
+
+    it('refuses a chain or a loop, in either order within a batch', () => {
+      const chain = (from: { kind: string; slug: string }) =>
+        `taxonomy-redirect-set ${from.kind} ${from.slug}: this would make a chain: the target redirects too, or a redirect already ends at this URL`
+      const db = seeded()
+      publish(db, [
+        redirectSet({ kind: 'tag', slug: 'ai-writing' }, null, { kind: 'directory' }),
+        redirectSet({ kind: 'category', slug: 'empty-hub' }, null, {
+          kind: 'best',
+          slug: 'ai-seo-tools'
+        })
+      ])
+      // To a URL that redirects.
+      const elsewhere = { kind: 'category', slug: 'elsewhere' }
+      refuses(
+        db,
+        [redirectSet(elsewhere, null, { kind: 'tag', slug: 'ai-writing' })],
+        chain(elsewhere)
+      )
+      // From a URL a redirect ends at, to the directory too.
+      const bestPage = { kind: 'best', slug: 'ai-seo-tools' }
+      for (const to of [{ kind: 'directory' }, { kind: 'tag', slug: 'ai-seo' }])
+        refuses(db, [redirectSet(bestPage, null, to)], chain(bestPage))
+      // A loop back to the category that redirects here.
+      refuses(
+        db,
+        [redirectSet(bestPage, null, { kind: 'category', slug: 'empty-hub' })],
+        chain(bestPage)
+      )
+      // Within one batch, whichever comes first.
+      const source = { kind: 'category', slug: 'old' }
+      const tag = { kind: 'tag', slug: 'ai-seo' }
+      refuses(
+        seeded(),
+        [redirectSet(source, null, tag), redirectSet(tag, null, { kind: 'directory' })],
+        chain(tag)
+      )
+      refuses(
+        seeded(),
+        [redirectSet(tag, null, { kind: 'directory' }), redirectSet(source, null, tag)],
+        chain(source)
+      )
     })
 
     it('refuses a redirect to itself, one that changes nothing, and a source written twice', () => {
