@@ -6,6 +6,7 @@ import {
   logRequestError,
   registerServerSentryStarter,
   reportsToServerSentry,
+  SERVER_SENTRY_SURFACES,
   startServerSentryFor
 } from './server-errors'
 
@@ -61,6 +62,62 @@ describe('which requests report to the Worker Sentry SDK (#355)', () => {
     ]) {
       expect(reportsToServerSentry(path), path).toBe(false)
     }
+  })
+
+  it('reads only the pathname of an absolute URL', () => {
+    expect(reportsToServerSentry('https://best.serp.co/admin/listings/?q=1')).toBe(true)
+    expect(reportsToServerSentry('https://best.serp.co/api/search/')).toBe(true)
+    expect(reportsToServerSentry('https://best.serp.co/products/admin/')).toBe(false)
+    expect(reportsToServerSentry('https://best.serp.co/')).toBe(false)
+  })
+})
+
+/**
+ * The top-level route segments that are public pages: their request errors go to the Worker's
+ * logs, not Sentry. A new top-level route must join this list or `SERVER_SENTRY_SURFACES`.
+ */
+const PUBLIC_SEGMENTS = [
+  'about',
+  'brands',
+  'contact',
+  'legal',
+  'pricing',
+  'products',
+  'rss.xml',
+  'search',
+  'sitemap-categories.xml',
+  'sitemap-index.xml',
+  'sitemap-pages.xml',
+  'sitemap-products.xml',
+  'sponsor'
+]
+
+/** The first URL segment of every route folder in `src/app`, looking through route groups. */
+function topLevelRouteSegments(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !/^[_@]/u.test(entry.name))
+    .flatMap(entry =>
+      /^\(.+\)$/u.test(entry.name)
+        ? topLevelRouteSegments(join(directory, entry.name))
+        : [entry.name]
+    )
+}
+
+describe('every top-level route is classified (#355)', () => {
+  const segments = [...new Set(topLevelRouteSegments(join(import.meta.dirname, '../../app')))]
+
+  it('as a Sentry surface or a public page, never both', () => {
+    for (const segment of segments) {
+      const surface = SERVER_SENTRY_SURFACES.includes(segment)
+      expect(surface || PUBLIC_SEGMENTS.includes(segment), `classify /${segment}/`).toBe(true)
+      expect(surface && PUBLIC_SEGMENTS.includes(segment), `/${segment}/ is in both`).toBe(false)
+      expect(reportsToServerSentry(`/${segment}/`), `/${segment}/`).toBe(surface)
+    }
+  })
+
+  it('with no entry for a route that no longer exists', () => {
+    for (const segment of [...SERVER_SENTRY_SURFACES, ...PUBLIC_SEGMENTS])
+      expect(segments, segment).toContain(segment)
   })
 })
 
@@ -160,18 +217,60 @@ describe('a public page error in the Worker logs (#355)', () => {
   })
 })
 
+/**
+ * A static import, re-export, bare import or `require` of any `@sentry/*` package: each one
+ * evaluates the SDK with the module that holds it. Comments are dropped first; a dynamic
+ * `import()` is allowed.
+ */
+const STATIC_SENTRY_IMPORT =
+  /(?:^|[\s;])(?:import|export)\b[^'"();]*?['"]@sentry\/[^'"]*['"]|\brequire\(\s*['"]@sentry\//mu
+
+function importsSentryStatically(source: string): boolean {
+  return STATIC_SENTRY_IMPORT.test(
+    source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
+  )
+}
+
 describe('where the Sentry SDK is imported (#355)', () => {
+  it('recognizes every static form, and not a dynamic import', () => {
+    for (const source of [
+      "import * as Sentry from '@sentry/nextjs'",
+      "import { init,\n  captureException } from '@sentry/nextjs'",
+      "import '@sentry/nextjs'",
+      "export { captureException } from '@sentry/nextjs'",
+      "export * from '@sentry/core'",
+      "import { withSentry } from '@sentry/cloudflare'",
+      "const Sentry = require('@sentry/nextjs')"
+    ]) {
+      expect(importsSentryStatically(source), source).toBe(true)
+    }
+    for (const source of [
+      "const sentry = await import('@sentry/nextjs')",
+      "void import('@sentry/nextjs').then(({ captureException }) => captureException(error))",
+      "// import * as Sentry from '@sentry/nextjs'",
+      "/* export * from '@sentry/nextjs' */",
+      "import { z } from 'zod'"
+    ]) {
+      expect(importsSentryStatically(source), source).toBe(false)
+    }
+  })
+
   it('statically only in the browser entry and the gated Worker module', () => {
-    const source = join(import.meta.dirname, '../..')
-    const importers = (readdirSync(source, { recursive: true }) as string[])
-      .filter(file => /\.(ts|tsx)$/u.test(file) && !/\.test\.tsx?$/u.test(file))
-      .filter(file =>
-        /^\s*import[^(]*from\s+['"]@sentry\/nextjs['"]|require\(\s*['"]@sentry\/nextjs/mu.test(
-          readFileSync(join(source, file), 'utf8')
-        )
+    const web = join(import.meta.dirname, '../../..')
+    const files = [
+      'worker.ts',
+      ...(readdirSync(join(web, 'src'), { recursive: true }) as string[]).map(file =>
+        join('src', file)
       )
-      .map(file => relative(source, join(source, file)))
+    ]
+    const importers = files
+      .filter(file => /\.(?:[cm]?js|jsx|ts|tsx)$/u.test(file) && !/\.test\.tsx?$/u.test(file))
+      .filter(file => importsSentryStatically(readFileSync(join(web, file), 'utf8')))
+      .map(file => relative(web, join(web, file)))
       .sort()
-    expect(importers).toEqual(['instrumentation-client.ts', 'lib/telemetry/server-sentry.ts'])
+    expect(importers).toEqual([
+      'src/instrumentation-client.ts',
+      'src/lib/telemetry/server-sentry.ts'
+    ])
   })
 })

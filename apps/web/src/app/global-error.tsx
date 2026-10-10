@@ -4,6 +4,7 @@ import type NextError from 'next/error'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { fonts } from '@/lib/fonts'
+import { reportGlobalError } from '@/lib/telemetry/report-global-error'
 
 type GlobalErrorProperties = {
   readonly error: NextError & { digest?: string }
@@ -18,10 +19,8 @@ type GlobalErrorProperties = {
  */
 const GlobalError = ({ error, reset }: GlobalErrorProperties) => {
   useEffect(() => {
-    // Imported here, not at the top: every page's server render loads this component, and a
-    // static import would load the Sentry server SDK with it (#355). In the browser it resolves
-    // to the SDK `instrumentation-client.ts` already started.
-    void import('@sentry/nextjs').then(({ captureException }) => captureException(error))
+    // Not a static Sentry import: this component is in every page's server render (#355).
+    void reportGlobalError(error)
   }, [error])
 
   return (

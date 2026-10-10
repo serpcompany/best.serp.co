@@ -74,8 +74,9 @@ is made per request, at run time, by which modules the isolate evaluates.
   chunk into `.open-next/worker.js`: its Turbopack patch replaces reading chunk files, which
   workerd can't do, with a static `requireChunk` switch. A chunk's modules run only when first
   required, though, so an isolate that never imports the SDK carries its code but never
-  evaluates it. `server-errors.test.ts` holds that only `instrumentation-client.ts` and
-  `server-sentry.ts` import the SDK statically.
+  evaluates it. `server-errors.test.ts` scans `apps/web/src` and `apps/web/worker.ts` for any
+  static import, re-export, bare import or `require` of an `@sentry/*` package: only
+  `instrumentation-client.ts` and `server-sentry.ts` may have one.
 - **Two bundles share one switch.** The Worker entry (`apps/web/worker.ts`, bundled by Wrangler)
   sees every request first. Next.js runs `register()` once per isolate: OpenNext's
   instrumentation patch requires the built `instrumentation.js` statically, and Next.js awaits
@@ -89,12 +90,17 @@ is made per request, at run time, by which modules the isolate evaluates.
   So a reporting request always renders with Sentry started, as before (#48), and a public
   request never starts it.
 - **`onRequestError` routes by path.** A reporting path goes to `Sentry.captureRequestError`.
-  Any other path, or a reporting one whose SDK failed to load, is logged as `request_error`.
-- **`global-error.tsx` imports `captureException` inside its effect.** Every page's server
-  render loads that component, and its static import used to load a second, server-rendering
-  copy of the SDK. In the browser, the import reaches the SDK that `instrumentation-client.ts`
-  already started, so the error page still reports, as before. The browser's chunks change with
-  it:
+  Any other path, or a reporting one whose SDK failed to load or start, is logged as
+  `request_error`. Only the first segment of the pathname counts, even in an absolute URL.
+  `server-errors.test.ts` walks the top-level routes in `apps/web/src/app` and fails on one that
+  is neither a surface (`SERVER_SENTRY_SURFACES`) nor in its list of public segments.
+- **`global-error.tsx` imports `captureException` when it shows**
+  (`lib/telemetry/report-global-error.ts`). Every page's server render loads that component,
+  and its static import used to load a second, server-rendering copy of the SDK. In the
+  browser, the import reaches the SDK that `instrumentation-client.ts` already started, so the
+  error page still reports, as before. If that import fails (offline, or a tab left open across
+  a deploy), the error is rethrown outside React and that SDK's global handler reports it. The
+  browser's chunks change with it:
   - every page loads the SDK as one chunk instead of two, about 4 KB smaller gzipped, so it has
     one `<script>` tag fewer;
   - the error page alone loads one more SDK chunk, about 110 KB gzipped, before it reports.

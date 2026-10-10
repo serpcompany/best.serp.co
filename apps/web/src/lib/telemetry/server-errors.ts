@@ -19,15 +19,20 @@
  */
 import { stripQuery } from './sentry'
 
-/** The path prefixes whose requests report to Sentry: everything signed in or operational. */
-const SERVER_SENTRY_SURFACES = ['/account', '/admin', '/api', '/claims', '/login', '/submit']
+/**
+ * The first path segments whose requests report to Sentry: everything signed in or operational.
+ * `server-errors.test.ts` holds every top-level route in `src/app` to this list or to its list
+ * of public segments, so a new route is classified on purpose.
+ */
+export const SERVER_SENTRY_SURFACES = ['account', 'admin', 'api', 'claims', 'login', 'submit']
 
-/** Whether a request for this path (query string allowed) reports its errors to Sentry. */
+/**
+ * Whether a request for this path reports its errors to Sentry. Next.js passes the path with its
+ * query string, or, behind a proxy, an absolute URL; only the pathname counts.
+ */
 export function reportsToServerSentry(path: string): boolean {
-  const pathname = stripQuery(path)
-  return SERVER_SENTRY_SURFACES.some(
-    surface => pathname === surface || pathname.startsWith(`${surface}/`)
-  )
+  const [, first] = new URL(path, 'http://path.invalid').pathname.split('/')
+  return first !== undefined && SERVER_SENTRY_SURFACES.includes(first)
 }
 
 interface ServerSentrySwitch {
