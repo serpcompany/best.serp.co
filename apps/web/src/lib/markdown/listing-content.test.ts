@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest'
 import {
   isListingContentTree,
   LISTING_CONTENT_FORMAT,
-  listingContentTree,
   stripDuplicateLinksSection
 } from './listing-content'
 import { KITCHEN_SINK_BODY, REVIEW_BODY } from './listing-content-test-support'
+import { listingContentTree } from './listing-content-tree'
 
 describe('listing content trees (#334)', () => {
   it('captures the tree react-markdown renders, without source positions', () => {

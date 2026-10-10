@@ -1,10 +1,13 @@
 import React, { isValidElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { listingContentTree, stripDuplicateLinksSection } from '../../lib/markdown/listing-content'
+import { stripDuplicateLinksSection } from '../../lib/markdown/listing-content'
 import { KITCHEN_SINK_BODY, REVIEW_BODY } from '../../lib/markdown/listing-content-test-support'
+import {
+  LISTING_MARKDOWN_OPTIONS,
+  listingContentTree
+} from '../../lib/markdown/listing-content-tree'
 import { MarkdownTree } from './markdown-tree'
 import { components } from './mdx-components'
 
@@ -31,9 +34,9 @@ function shape(node: ReactNode): unknown {
 /** What each server component returns, rendered through react-markdown as the page does. */
 function direct(body: string, hasLinks: boolean) {
   return ReactMarkdown({
+    ...LISTING_MARKDOWN_OPTIONS,
     children: stripDuplicateLinksSection(body, hasLinks),
-    components,
-    remarkPlugins: [remarkGfm]
+    components
   })
 }
 

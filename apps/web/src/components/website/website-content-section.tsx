@@ -1,12 +1,12 @@
 import { Info } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import type { WebsiteMetadata } from '../../lib/directory/content-query'
 import {
   type ListingContentTree,
   stripDuplicateLinksSection
 } from '../../lib/markdown/listing-content'
+import { LISTING_MARKDOWN_OPTIONS } from '../../lib/markdown/listing-content-tree'
 import { siteCopy } from '../../lib/site/site-copy'
 import { MarkdownTree } from '../content/markdown-tree'
 import { components as mdxComponents } from '../content/mdx-components'
@@ -47,7 +47,7 @@ export function WebsiteContentSection({ contentTree, website }: WebsiteContentSe
           {contentTree ? (
             <MarkdownTree components={mdxComponents} tree={contentTree} />
           ) : (
-            <ReactMarkdown components={mdxComponents} remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown {...LISTING_MARKDOWN_OPTIONS} components={mdxComponents}>
               {stripDuplicateLinksSection(website.content, Boolean(website.resourceLinks?.length))}
             </ReactMarkdown>
           )}

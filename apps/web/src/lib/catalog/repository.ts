@@ -23,8 +23,7 @@ import type { WebsiteDetailMetadata, WebsiteMetadata } from '@/lib/directory/con
 import {
   isListingContentTree,
   LISTING_CONTENT_FORMAT,
-  type ListingContentTree,
-  listingContentTree
+  type ListingContentTree
 } from '@/lib/markdown/listing-content'
 
 export type { ListingNamePage, PublishedCategory, UnpublishedListing }
@@ -98,7 +97,10 @@ const readListingBySlug = cache(async (slug: string): Promise<WebsiteDetailMetad
 /**
  * A listing body as the tree its page renders (`lib/markdown/listing-content.ts`): parsed once
  * per catalog epoch and data center, then read from the data cache (#334). Read with the detail,
- * so the page and its metadata wait for one promise and the render's order is unchanged.
+ * so the page and its metadata wait for one promise and the render's order is unchanged. The
+ * parser is imported only when the cache has no tree, so the routes that read the catalog
+ * without a listing body (the home page, the directory and category pages, search, feeds,
+ * sitemaps) never load react-markdown.
  */
 async function readContentTree(
   operations: CatalogOperations,
@@ -107,7 +109,10 @@ async function readContentTree(
   const { content } = listing
   if (!content) return null
   return operations.getDerivedValue({
-    compute: () => listingContentTree(content, Boolean(listing.resourceLinks?.length)),
+    compute: async () => {
+      const { listingContentTree } = await import('@/lib/markdown/listing-content-tree')
+      return listingContentTree(content, Boolean(listing.resourceLinks?.length))
+    },
     format: LISTING_CONTENT_FORMAT,
     id: listing.slug,
     kind: 'listing-content',
