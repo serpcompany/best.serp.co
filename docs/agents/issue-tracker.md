@@ -13,6 +13,17 @@ Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all op
 
 Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
 
+## Handoffs
+
+A handoff is the briefing a person or a fresh agent needs to resume work: the status of the
+work in flight, the rules for continuing it, and a prompt to start a lead agent on it.
+
+- Label it `handoff` and pin it (`gh issue pin <n>`). Exactly one is open at a time.
+- Keep its state on GitHub (its status table, the step issues, their PRs), never only in a
+  local checkout or a session's temp folder.
+- When a new handoff replaces it, link the new one, then unpin and close the old one. Closed
+  `handoff` issues are the history: `gh issue list --label handoff --state all`.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_

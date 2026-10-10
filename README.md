@@ -13,6 +13,13 @@ The catalog was imported once from the JSON `serp.co` site in
 `serpcompany/json-directory-template@25e2a8d` (serpcompany/best.serp.co#34). D1 is now
 the source of truth.
 
+## Picking up work
+
+Planning lives in GitHub Issues. To resume where the last person or agent stopped, open the
+[current handoff](https://github.com/serpcompany/best.serp.co/issues?q=is%3Aissue%20is%3Aopen%20label%3Ahandoff),
+the one open issue labelled `handoff`, which is also pinned on the Issues tab. It holds the
+status of the work in flight, the rules for continuing it, and a prompt to start an agent on it.
+
 ## Local development
 
 Use Node 24 and pnpm. Local D1 is seeded with fixtures (fake listings, users, and
