@@ -61,7 +61,7 @@
     "start": "pnpm --filter web start",
     "test": "vitest run",
     "test:d1": "vitest run --project d1",
-    "test:e2e": "pnpm --filter web test:e2e",
+    "test:e2e": "pnpm --filter web test:e2e; main=$?; pnpm --filter web test:e2e:staging-access && exit $main",
     "test:e2e:debug": "pnpm --filter web test:e2e:debug",
     "test:e2e:smoke": "pnpm --filter web test:e2e:smoke",
     "test:e2e:ui": "pnpm --filter web test:e2e:ui",

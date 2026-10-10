@@ -1,11 +1,15 @@
 # Playwright E2E
 
 Playwright coverage for the best.serp.co Worker. The config is `apps/web/playwright.config.ts`.
+`pnpm test:e2e` (what CI runs) runs it, then `apps/web/playwright.staging-access.config.ts`
+(#359), which serves the Worker the first run built as staging: every preview Worker costs the
+CI runner 1.5-2.5 GB, and a ninth one beside the main run's eight exhausts it (#111). The second
+run starts even when the first fails, and the command fails when either does.
 
 ## Commands
 
 ```bash
-pnpm test:e2e
+pnpm test:e2e         # both runs; pass spec filters to `pnpm --filter web test:e2e` instead
 pnpm test:e2e:smoke   # e2e/smoke.spec.ts + e2e/public-parity.spec.ts
 pnpm test:e2e:visual  # opt-in; no committed baselines yet (see Notes)
 pnpm test:e2e:ui
@@ -42,7 +46,7 @@ The local suite runs on the fixture seed, never the real catalog (#311, #313):
   rows with the seed's builders (`listingStatements`, `suiteCatalogStatements`), so they run in
   parallel without counting each other's rows. The media server's D1 is the seed plus a queued
   logo. The staging-access Worker runs with `LOCAL_STAGING_ACCESS=on` and a test password, so
-  it serves as staging does behind its password (#359).
+  it serves as staging does behind its password (#359), in its own run after the others.
 - `smoke.spec.ts` and `public-parity.spec.ts` also run against staging after each deploy
   (`pnpm test:e2e:smoke`), on its workers.dev host: `playwright.config.ts` then sends the
   smoke-test header on every request, and one smoke test checks that a request without it gets

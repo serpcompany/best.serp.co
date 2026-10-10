@@ -4,8 +4,8 @@
  * will, and `https://best.serp.co` everywhere else, exactly as before. Each builder runs inside a
  * stand-in for OpenNext's request context (the Worker's vars), the way a render reads it.
  */
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -170,22 +170,74 @@ function sourceFiles(dir: string): string[] {
   })
 }
 
-describe('no module computes the origin at load time', () => {
-  // A top-level constant would be computed once, outside any request, and keep best.serp.co on
-  // staging. `export const metadata = { title: 'Admins' }` (no URL) is fine.
-  const builders =
-    /\b(?:generateBaseMetadata|generateDynamicMetadata|generateLegalPageMetadata|generateDisabledRouteMetadata|homePageMetadata|notFoundMetadata|rootLayoutMetadata|siteOrigin|siteUrl|siteWebsiteId|siteLogoUrl|siteOgImageUrl|siteFaviconUrl|siteAppleTouchIconUrl|defaultOgImage|generateWebsiteSchema|generateBreadcrumbSchema|generateCollectionSchema)\(/u
+/** The module a relative or `@/` import names, or null for a package. */
+function resolveImport(from: string, specifier: string, srcRoot: string): string | null {
+  const base = specifier.startsWith('@/')
+    ? join(srcRoot, specifier.slice(2))
+    : specifier.startsWith('.')
+      ? join(dirname(from), specifier)
+      : null
+  if (!base) return null
+  const candidates = [
+    base,
+    `${base}.ts`,
+    `${base}.tsx`,
+    join(base, 'index.ts'),
+    join(base, 'index.tsx')
+  ]
+  return (
+    candidates.find(candidate => existsSync(candidate) && !statSync(candidate).isDirectory()) ??
+    null
+  )
+}
 
-  it('builds page metadata and URLs inside functions only', () => {
-    const root = new URL('../../', import.meta.url).pathname
-    const offenders = sourceFiles(root).flatMap(file => {
-      const lines = readFileSync(file, 'utf8').split('\n')
+describe('no module computes the origin at load time', () => {
+  // A top-level constant is computed once, outside any request, so one built from anything that
+  // reads the origin would keep best.serp.co on staging. The functions that read it are derived,
+  // not listed: every function exported by `site-origin.ts` or by a module that imports one that
+  // does, transitively. `export const metadata = { title: 'Admins' }` (no call) is fine.
+  it('calls nothing that reads the origin at module load', () => {
+    const srcRoot = new URL('../../', import.meta.url).pathname
+    const files = sourceFiles(srcRoot)
+    const sources = new Map(files.map(file => [file, readFileSync(file, 'utf8')]))
+    const imports = new Map(
+      files.map(file => [
+        file,
+        [...(sources.get(file) ?? '').matchAll(/\bfrom\s+'([^']+)'/gu)]
+          .map(match => resolveImport(file, match[1] ?? '', srcRoot))
+          .filter((resolved): resolved is string => resolved !== null)
+      ])
+    )
+    const readers = new Set([join(srcRoot, 'lib/environment/site-origin.ts')])
+    for (let grew = true; grew; ) {
+      grew = false
+      for (const file of files)
+        if (!readers.has(file) && imports.get(file)?.some(target => readers.has(target))) {
+          readers.add(file)
+          grew = true
+        }
+    }
+    const names = new Set(
+      [...readers].flatMap(file =>
+        [
+          ...(sources.get(file) ?? '').matchAll(
+            /^export (?:async )?function (\w+)|^export const (\w+) = (?:async )?(?:\(|function)/gmu
+          )
+        ].map(match => match[1] ?? match[2] ?? '')
+      )
+    )
+    // Sanity: the derivation reaches the builders the pages use.
+    for (const name of ['siteUrl', 'generateBaseMetadata', 'generateWebsiteDetailSchema'])
+      expect(names, name).toContain(name)
+    const calls = new RegExp(`\\b(?:${[...names].join('|')})\\(`, 'u')
+    const offenders = files.flatMap(file => {
+      const lines = (sources.get(file) ?? '').split('\n')
       return lines.flatMap((line, index) => {
         if (!/^(?:export )?(?:const|let|var) /u.test(line)) return []
         // The whole top-level statement: up to the next line that starts at column 0.
         const end = lines.findIndex((next, at) => at > index && /^\S/u.test(next))
         const statement = lines.slice(index, end === -1 ? undefined : end).join('\n')
-        return builders.test(statement) ? [`${file.slice(root.length)}:${index + 1}`] : []
+        return calls.test(statement) ? [`${file.slice(srcRoot.length)}:${index + 1}`] : []
       })
     })
     expect(offenders).toEqual([])

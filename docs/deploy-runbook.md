@@ -17,9 +17,12 @@ from its Worker since the [production cutover](./production-cutover.md).
 | Email ([useSend](./email.md)) | `mail.serp.co`, `[staging]` prefix, allowlist | `mail.serp.co` |
 
 Every `*.workers.dev` response carries `X-Robots-Tag: noindex, nofollow`. Staging asks for its
-password on every host except for smoke-test requests, `/robots.txt` and the billing webhook,
-and a request with it is indexable and canonical on staging.best.serp.co, so SEO auditors
-crawl staging as they will crawl best.serp.co. The password is not a secret: it is
+password on staging.best.serp.co, and on its workers.dev host after the 308 that sends a request
+without the smoke-test header to staging.best.serp.co. Exempt: smoke-test requests,
+`/robots.txt`, the billing webhook, and static files (`apps/web/public`, `/_next/static`), which
+Workers static assets serve before the Worker runs; they stay `noindex`. A request with the
+password is indexable and canonical on staging.best.serp.co, so SEO auditors crawl staging as
+they will crawl best.serp.co. The password is not a secret: it is
 `STAGING_BASIC_AUTH_PASSWORD` in `env.staging.vars`, shared by SERP sites, and stated in serp's
 staging access standard (serpcompany/serp#1458;
 [Environments and hosts](./architecture.md#environments-and-hosts)). Keep
@@ -153,6 +156,9 @@ curl -sI -H 'x-best-serp-co-smoke-test: 1' https://staging.best.serp.co/about/ |
 # best.serp.co's rules and staging's sitemap index.
 curl -s https://staging.best.serp.co/robots.txt
 
+# Static files are served before the Worker, so without the password too, and stay noindex.
+curl -sI https://staging.best.serp.co/og.png | grep -i -e '^HTTP' -e x-robots-tag  # HTTP/2 200; noindex, nofollow
+
 # The workers.dev host still sends everyone else to the canonical host first.
 curl -sI https://best-serp-co-staging.serpcompany.workers.dev/about | grep -i location  # https://staging.best.serp.co/about/
 ```
@@ -163,11 +169,12 @@ After a deploy that changes what staging's pages describe, re-crawl Ahrefs Site 
 
 `wrangler.jsonc` points `main` at `apps/web/worker.ts`, which wraps the generated
 `.open-next/worker.js`, so every deploy ships the edge HTML cache with the Worker
-([Caching](./caching.md)). Confirm it after a deploy:
+([Caching](./caching.md)). Confirm it after a deploy with GET requests: only a GET response
+is stored, so a HEAD never shows a HIT.
 
 ```bash
-curl -sI -u staging:stagingpassword https://staging.best.serp.co/about/ | grep -i x-edge-cache  # MISS
-curl -sI -u staging:stagingpassword https://staging.best.serp.co/about/ | grep -i x-edge-cache  # HIT
+curl -s -o /dev/null -D - -u staging:stagingpassword https://staging.best.serp.co/about/ | grep -i x-edge-cache  # MISS
+curl -s -o /dev/null -D - -u staging:stagingpassword https://staging.best.serp.co/about/ | grep -i x-edge-cache  # HIT
 ```
 
 A deploy starts with a cold HTML cache (the Worker version is part of every key): the first

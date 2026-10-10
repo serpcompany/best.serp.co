@@ -1,8 +1,8 @@
 /**
  * Worker entry: the canonical-host redirect, staging's password (#359), old root-level URL and
  * trailing-slash redirects, the environment's crawl policy, then the OpenNext-generated handler
- * behind a catalog-epoch-keyed edge cache. Its cron hosts queued listing media, and locally it serves the media bucket at
- * `/_media` (#95).
+ * behind a catalog-epoch-keyed edge cache. Its cron hosts queued listing media, and locally it
+ * serves the media bucket at `/_media` (#95).
  *
  * Admin paths pass the Cloudflare Access and session-cookie gate first
  * (`src/lib/auth/admin-gate.ts`).

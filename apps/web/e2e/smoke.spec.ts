@@ -116,6 +116,8 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     const origin = await originOf(request)
     const response = await page.goto('/', { waitUntil: 'networkidle' })
     expect(response?.status()).toBe(200)
+    // Only staging has a password, and a smoke-test request never meets it (#359).
+    expect(response?.headers()['www-authenticate']).toBeUndefined()
     await expect(page).toHaveTitle(site.title)
     await expect(
       page.getByRole('heading', { level: 1, name: site.name, exact: true })

@@ -102,16 +102,18 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   `staging.best.serp.co`, and `next.config.ts` keeps its `*.workers.dev` `noindex` rule as
   defense in depth.
 - **Staging's password** (#359; serp's `docs/engineering/standards/staging-access.md`, proposed
-  in serpcompany/serp#1458). Staging sits behind HTTP Basic auth, so it can describe itself exactly as production will and
-  SEO auditors (Ahrefs project 10510472) crawl it as search engines will crawl best.serp.co.
+  in serpcompany/serp#1458). Staging sits behind HTTP Basic auth, so it can describe itself
+  exactly as production will and SEO auditors (Ahrefs project 10510472) crawl it as search
+  engines will crawl best.serp.co.
   - **Credentials:** username `staging`, password `stagingpassword`. The password is
     `STAGING_BASIC_AUTH_PASSWORD` in `env.staging.vars` of `apps/web/wrangler.jsonc`, a plain
     var, not a secret: the owner's decision, because every SERP site shares it, serp's standard
     states it, and staging's content is the public site's. The gate checks only the password
     and ignores the username (Ahrefs needs one; use `staging`).
   - **The gate** (`apps/web/src/lib/environment/staging-access.ts`) runs in the Worker entry
-    right after the canonical-host redirect, on every host of a Worker that serves as staging
-    (`servesAsStaging`: `SITE_ENVIRONMENT=staging`). Without the password a request gets 401
+    right after the canonical-host redirect (so staging's workers.dev host still sends a request
+    without the smoke-test header to staging.best.serp.co first), on every host of a Worker that
+    serves as staging (`servesAsStaging`: `SITE_ENVIRONMENT=staging`). Without the password a request gets 401
     with `WWW-Authenticate: Basic realm="best.serp.co staging"` and `Cache-Control: no-store`.
     It fails closed: without the var, every request is refused but the exemptions. The
     comparison hashes both values with SHA-256 and compares the digests in constant time.
@@ -120,6 +122,14 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
     `x-best-serp-co-smoke-test` header (CI's gates and smoke), `GET`/`HEAD /robots.txt`, and
     the billing provider's test-mode webhook (`POST /api/billing/webhook/`), which proves
     itself with its signature ([Billing](./billing.md)).
+  - **Static files are not gated either:** everything in `apps/web/public` (`/og.png`,
+    `/badge/*.svg`, `/ads.txt`) and `/_next/static` answers 200 without the password, because
+    Workers static assets serve them before `worker.ts` runs. Their content is the public
+    site's, `apps/web/public/_headers` keeps them `noindex`, and robots.txt disallows them to
+    every crawler but the auditor.
+    Gating them would take `assets.run_worker_first` in `env.staging`, which runs the Worker
+    for every staging asset request and makes it hand each one to `env.ASSETS` after the gate;
+    that cost buys nothing the threat model needs.
   - **With the password**, a request goes on without its `Authorization` header (so the edge
     cache stores it like an anonymous one) and gets no environment `X-Robots-Tag`; a page's own
     noindex stays, as on best.serp.co. Analytics stay off. Every absolute URL staging writes

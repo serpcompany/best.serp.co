@@ -14,11 +14,6 @@ import { badgeOrigin, badgeServerCommand, badgeSuiteEnabled } from './e2e/badge-
 import { claimsOrigin, claimsServerCommand, claimsSuiteEnabled } from './e2e/claims-fixture'
 import { mediaOrigin, mediaServerCommand, mediaServerEnabled } from './e2e/media-fixture'
 import { isPlatformOrigin, site } from './e2e/site-fixture'
-import {
-  stagingAccessOrigin,
-  stagingAccessServerCommand,
-  stagingAccessSuiteEnabled
-} from './e2e/staging-access-fixture'
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`
@@ -28,6 +23,9 @@ const webServerCommand = process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? defaultWeb
 const useExternalServer = process.env.PLAYWRIGHT_EXTERNAL_SERVER === '1'
 const workerCount = Number(process.env.E2E_WORKERS ?? 2)
 const ignoredTests = [
+  // Its own run, after this one (playwright.staging-access.config.ts, #359): a ninth preview
+  // Worker beside this run's eight exhausts the CI runner's memory (#111).
+  '**/staging-access.spec.ts',
   ...(process.env.E2E_VISUAL === '1' ? [] : ['**/visual.spec.ts']),
   ...(process.env.AGENT_CAPTURE_DIRECTORY ? [] : ['**/agent-capture.spec.ts'])
 ]
@@ -55,6 +53,17 @@ export default defineConfig({
     // do. It goes on every request, so a cross-origin fetch() would need a CORS preflight that
     // allows it; the pages make none today (images go through /_next/image).
     ...(isPlatformOrigin(baseUrl) ? { extraHTTPHeaders: { [site.smokeTestHeader]: '1' } } : {}),
+    // staging.best.serp.co asks for its password (#359), as for the hand-run media check
+    // (e2e/listing-media-acceptance.spec.ts); it goes to that origin only, on every request.
+    ...(new URL(baseUrl).origin === site.canonicalOrigins.staging
+      ? {
+          httpCredentials: {
+            ...site.stagingAccess,
+            origin: site.canonicalOrigins.staging,
+            send: 'always' as const
+          }
+        }
+      : {}),
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -110,9 +119,11 @@ export default defineConfig({
     // }
   ],
   // Web servers start in order: the first builds the Worker, the Access-lock servers
-  // (e2e/access-lock-fixture.ts) then serve that build with CF_ACCESS_REQUIRED=on, the
-  // media server (e2e/media-fixture.ts) serves it on its own seeded local D1 and R2, and the
-  // staging-access server (e2e/staging-access-fixture.ts) serves it as staging (#359).
+  // (e2e/access-lock-fixture.ts) then serve that build with CF_ACCESS_REQUIRED=on, and the
+  // media server (e2e/media-fixture.ts) serves it on its own seeded local D1 and R2. Eight
+  // Workers in all: every preview Worker costs the CI runner 1.5-2.5 GB, and a ninth exhausts
+  // it (#111, #359), so the staging-access suite runs afterwards in its own run
+  // (playwright.staging-access.config.ts).
   webServer: useExternalServer
     ? undefined
     : [
@@ -181,19 +192,6 @@ export default defineConfig({
               {
                 command: claimsServerCommand(),
                 url: `${claimsOrigin()}/robots.txt`,
-                reuseExistingServer: !process.env.CI,
-                timeout: 180000,
-                env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
-              }
-            ]
-          : []),
-        // A local Worker that serves as staging, behind its password (#359): robots.txt is
-        // exempt, so it answers the readiness probe.
-        ...(stagingAccessSuiteEnabled
-          ? [
-              {
-                command: stagingAccessServerCommand(),
-                url: `${stagingAccessOrigin()}/robots.txt`,
                 reuseExistingServer: !process.env.CI,
                 timeout: 180000,
                 env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }

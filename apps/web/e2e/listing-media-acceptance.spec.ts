@@ -11,8 +11,9 @@ import { test } from './test'
  *     PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm --filter web exec playwright test \
  *     e2e/listing-media-acceptance.spec.ts --project=chromium
  *
- * The media host follows the base URL (`MEDIA_HOST` overrides it). It never runs in CI or
- * locally, where the catalog is the fixture seed, not the migrated catalog it checks.
+ * The media host follows the base URL (`MEDIA_HOST` overrides it). On staging.best.serp.co,
+ * `playwright.config.ts` sends staging's password (#359). It never runs in CI or locally, where
+ * the catalog is the fixture seed, not the migrated catalog it checks.
  */
 const enabled = process.env.MEDIA_ACCEPTANCE === '1' && Boolean(process.env.PLAYWRIGHT_BASE_URL)
 const fallbackTile = '/listing-logos/favicon-fallback-512x512.png'

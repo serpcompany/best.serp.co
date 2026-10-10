@@ -69,9 +69,9 @@ production) assert the redirects, the `/api` exemption, and the homepage form.
   a graph node, not the page.
 - **Origin.** Every absolute URL a page, sitemap, feed or robots.txt writes takes its
   environment's origin, read per request from the Worker's vars, never from the `Host`
-  header (`siteOrigin()` in `src/lib/environment/site-origin.ts`, #359): staging writes
-  `https://staging.best.serp.co`, and production, local, and the `*.workers.dev` hosts write
-  `https://best.serp.co`. Staging sits behind a password, so it can describe itself exactly as
+  header (`siteOrigin()` in `src/lib/environment/site-origin.ts`, #359): the staging Worker
+  writes `https://staging.best.serp.co` on both its hosts (its workers.dev host too), and
+  production (best.serp.co and its workers.dev host) and local write `https://best.serp.co`. Staging sits behind a password, so it can describe itself exactly as
   production will and an SEO audit of it reads like one of production
   ([Environments and hosts](./architecture.md#environments-and-hosts)). Call `siteOrigin()`,
   `siteUrl()` and the other builders in `seo-config.ts` during a request, never at module
