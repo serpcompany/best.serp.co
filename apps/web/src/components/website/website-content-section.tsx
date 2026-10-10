@@ -1,22 +1,24 @@
 import { Info } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
 import type { WebsiteMetadata } from '../../lib/directory/content-query'
+import {
+  type ListingContentTree,
+  stripDuplicateLinksSection
+} from '../../lib/markdown/listing-content'
+import { LISTING_MARKDOWN_OPTIONS } from '../../lib/markdown/listing-content-tree'
 import { siteCopy } from '../../lib/site/site-copy'
+import { MarkdownTree } from '../content/markdown-tree'
 import { components as mdxComponents } from '../content/mdx-components'
 import { ListingImage } from '../listing/listing-image'
 
 export interface WebsiteContentSectionProps {
+  /**
+   * The body's tree from the data cache (`WebsiteDetailMetadata.contentTree`, #334). Without it
+   * the body's Markdown is parsed here, to the same markup.
+   */
+  contentTree?: ListingContentTree
   website: WebsiteMetadata
-}
-
-function stripDuplicateLinksSection(content: string, hasSupplementalLinks: boolean): string {
-  if (!hasSupplementalLinks) {
-    return content
-  }
-
-  return content.replace(/\n## Links[\s\S]*$/i, '').trim()
 }
 
 function stripHtmlTags(html: string | null | undefined): string {
@@ -24,7 +26,7 @@ function stripHtmlTags(html: string | null | undefined): string {
   return html.replace(/<[^>]*>/g, '').trim()
 }
 
-export function WebsiteContentSection({ website }: WebsiteContentSectionProps) {
+export function WebsiteContentSection({ contentTree, website }: WebsiteContentSectionProps) {
   const categoryLabels = [
     ...(website.category ? [website.category] : []),
     ...(website.categories || [])
@@ -34,11 +36,6 @@ export function WebsiteContentSection({ website }: WebsiteContentSectionProps) {
   const featuredImageUrl = website.media?.images?.[0]
 
   if (website.content) {
-    const renderedContent = stripDuplicateLinksSection(
-      website.content,
-      Boolean(website.resourceLinks?.length)
-    )
-
     return (
       <section>
         {featuredImageUrl ? (
@@ -47,9 +44,13 @@ export function WebsiteContentSection({ website }: WebsiteContentSectionProps) {
           </div>
         ) : null}
         <div className="prose max-w-none prose-headings:scroll-mt-20 dark:prose-invert">
-          <ReactMarkdown components={mdxComponents} remarkPlugins={[remarkGfm]}>
-            {renderedContent}
-          </ReactMarkdown>
+          {contentTree ? (
+            <MarkdownTree components={mdxComponents} tree={contentTree} />
+          ) : (
+            <ReactMarkdown {...LISTING_MARKDOWN_OPTIONS} components={mdxComponents}>
+              {stripDuplicateLinksSection(website.content, Boolean(website.resourceLinks?.length))}
+            </ReactMarkdown>
+          )}
         </div>
       </section>
     )

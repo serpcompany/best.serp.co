@@ -26,9 +26,51 @@ export function categoryRoute(slug: string): string {
 }
 
 /**
- * Sitemap files whose content changes when listings or categories change; the pages sitemap
- * too, since its catalog pages carry the newest listing's lastmod (#218).
+ * The taxonomy's pages (#341, design 2.1): tag pages beside the category pages, under the listing
+ * base path, and best pages at the root. #346 serves them and adds them to the route registry.
  */
-export function catalogSitemapRoutes(): string[] {
-  return [SITEMAP_INDEX_PATH, sitemapPaths.pages, sitemapPaths.products, sitemapPaths.categories]
+const TAG_SEGMENT = 'tags'
+const BEST_BASE_PATH = 'best'
+
+/** `/products/tags/`, the tag index. */
+export function tagIndexRoute(): string {
+  return joinRoute(site.routes.listingBasePath, TAG_SEGMENT)
+}
+
+/** `/products/tags/<slug>/`. */
+export function tagRoute(slug: string): string {
+  return joinRoute(site.routes.listingBasePath, TAG_SEGMENT, slug)
+}
+
+/** `/best/`, the best-page index. */
+export function bestIndexRoute(): string {
+  return joinRoute(BEST_BASE_PATH)
+}
+
+/** `/best/<slug>/`. */
+export function bestRoute(slug: string): string {
+  return joinRoute(BEST_BASE_PATH, slug)
+}
+
+/**
+ * The taxonomy's child sitemaps (#341, design 2.3), which #346 adds to the registry's
+ * `sitemapPaths` and the sitemap index.
+ */
+const TAXONOMY_SITEMAP_PATHS = ['/sitemap-tags.xml', '/sitemap-best.xml'] as const
+
+/**
+ * Sitemap files whose content changes when listings or categories change; the pages sitemap
+ * too, since its catalog pages carry the newest listing's lastmod (#218). With `taxonomy`, also
+ * the tag and best-page sitemaps, for a publication that changes tags, best pages, or taxonomy
+ * redirects (#344). A publication without one records the same routes as before, so every
+ * manifest committed before the taxonomy plans exactly as it was reviewed.
+ */
+export function catalogSitemapRoutes({ taxonomy = false }: { taxonomy?: boolean } = {}): string[] {
+  return [
+    SITEMAP_INDEX_PATH,
+    sitemapPaths.pages,
+    sitemapPaths.products,
+    sitemapPaths.categories,
+    ...(taxonomy ? TAXONOMY_SITEMAP_PATHS : [])
+  ]
 }

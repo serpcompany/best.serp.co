@@ -8,7 +8,7 @@ import {
   WebsiteDetailRoutePage
 } from '@/components/website-routes/detail-page'
 import { getUnpublishedListing } from '@/lib/catalog/repository'
-import { currentClaimCopy, currentClaimFlags } from '@/lib/claims/runtime'
+import { currentClaimCopy, currentClaimFlags } from '@/lib/claims/current'
 import { getWebsiteBySlug, getWebsiteCanonicalRedirect } from '@/lib/content-loader'
 import { getFeaturedOnBadgePreviewPathFromKey } from '@/lib/directory/featured-on-badge-url'
 import { GONE_RENDER_HEADER } from '@/lib/routing/gone-listing'
