@@ -24,13 +24,18 @@ export async function register(): Promise<void> {
 
 /**
  * Errors from server rendering, route handlers, and server actions: to Sentry from the
- * signed-in and operational surfaces, to the Worker's logs from public pages (#355).
+ * signed-in and operational surfaces, to the Worker's logs from public pages (#355). An error
+ * whose Sentry SDK fails to load goes to the logs too, so it is never lost.
  */
 export const onRequestError: Instrumentation.onRequestError = async (error, request, context) => {
-  if (!reportsToServerSentry(request.path)) {
-    logRequestError(error, request, context)
-    return
+  if (reportsToServerSentry(request.path)) {
+    try {
+      const sentry = await serverSentry()
+      sentry.captureRequestError(error, request, context)
+      return
+    } catch {
+      // Logged below instead.
+    }
   }
-  const sentry = await serverSentry()
-  sentry.captureRequestError(error, request, context)
+  logRequestError(error, request, context)
 }

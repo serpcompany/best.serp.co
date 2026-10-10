@@ -73,4 +73,25 @@ describe('instrumentation (#48, #355)', () => {
     expect(sentry.captureRequestError).toHaveBeenCalledWith(error, request, routeContext)
     expect(logged).not.toHaveBeenCalled()
   })
+
+  it('logs a surface error whose Sentry SDK fails to start', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    sentry.startServerSentry.mockImplementation(() => {
+      throw new Error('chunk failed')
+    })
+    const { onRequestError } = await import('./instrumentation')
+    await expect(
+      onRequestError(
+        new Error('admin render failed'),
+        { headers: {}, method: 'GET', path: '/admin/listings/' },
+        { ...context, routePath: '/(dashboard)/admin/listings' }
+      )
+    ).resolves.toBeUndefined()
+    expect(sentry.captureRequestError).not.toHaveBeenCalled()
+    expect(JSON.parse(String(logged.mock.calls[0]?.[0]))).toMatchObject({
+      event: 'request_error',
+      message: 'admin render failed',
+      path: '/admin/listings/'
+    })
+  })
 })
