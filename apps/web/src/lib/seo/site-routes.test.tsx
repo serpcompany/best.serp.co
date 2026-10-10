@@ -7,19 +7,64 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SITEMAP_INDEX_PATH, sitemapPaths, siteRoutes } from '@/lib/site'
+import {
+  isReservedListingSlug,
+  reservedListingSlugs,
+  SITEMAP_INDEX_PATH,
+  site,
+  sitemapPaths,
+  siteRoutes,
+  taxonomyRoutePaths
+} from '@/lib/site'
+import {
+  bestIndexRoute,
+  bestRoute,
+  catalogSitemapRoutes,
+  tagIndexRoute,
+  tagRoute
+} from '../../../../../scripts/site-routes'
 import { SiteFooter } from '../../components/layout/site-footer'
 import { headerItems } from '../../components/layout/site-links'
+import { getRoute } from '../routing/routes'
 import { canonicalPathname } from './canonical-url'
 import { generateBaseMetadata, registeredRoute } from './seo-config'
 import {
+  createBestPagesSitemapResponse,
   createCanonicalRobots,
   createPagesSitemapResponse,
-  createSitemapIndexResponse
+  createSitemapIndexResponse,
+  createTagsSitemapResponse
 } from './sitemaps'
+import { isBestPageIndexable, isTagIndexable } from './taxonomy-indexing'
 
 const origin = 'https://best.serp.co'
 const staticRoutes = siteRoutes.filter(route => !route.path.includes('['))
+
+/** A catalog with something in every taxonomy index, so the pages sitemap lists them all. */
+const tags = [
+  { count: 12, lastModifiedAt: '2026-09-01T00:00:00.000Z', slug: 'ai-writing' },
+  { count: 4, lastModifiedAt: '2026-09-02T00:00:00.000Z', slug: 'ai-summaries' },
+  { count: 30, lastModifiedAt: '2026-09-03T00:00:00.000Z', slug: 'ai-chatbots' }
+]
+const bestPages = [
+  {
+    category: null,
+    lastModifiedAt: '2026-09-04T00:00:00.000Z',
+    listSize: 10,
+    poolSize: 30,
+    slug: 'ai-chatbot',
+    tag: 'ai-chatbots'
+  },
+  {
+    category: 'writing',
+    lastModifiedAt: '2026-09-05T00:00:00.000Z',
+    listSize: 10,
+    poolSize: 3,
+    slug: 'ai-summarizer',
+    tag: 'ai-summaries'
+  }
+]
+const loaders = { getBestPages: () => bestPages, getTags: () => tags, getWebsites: () => [] }
 
 function locations(xml: string): string[] {
   return [...xml.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(match => match[1] ?? '')
@@ -59,21 +104,73 @@ describe('the route registry (#167)', () => {
   })
 
   it('the pages sitemap lists exactly its static pages, in canonical form', async () => {
-    const listed = locations(
-      await (await createPagesSitemapResponse({ getWebsites: () => [] })).text()
-    ).map(pathOf)
+    const listed = locations(await (await createPagesSitemapResponse(loaders)).text()).map(pathOf)
     expect(listed).toEqual(
       staticRoutes.filter(route => route.sitemapGroup === 'pages').map(route => route.path)
     )
   })
 
   it('the index lists exactly the child sitemaps, and robots.txt names the index', async () => {
-    expect(
-      locations(await (await createSitemapIndexResponse({ getWebsites: () => [] })).text()).map(
-        pathOf
-      )
-    ).toEqual([sitemapPaths.pages, sitemapPaths.products, sitemapPaths.categories])
+    expect(locations(await (await createSitemapIndexResponse(loaders)).text()).map(pathOf)).toEqual(
+      [
+        sitemapPaths.pages,
+        sitemapPaths.products,
+        sitemapPaths.categories,
+        sitemapPaths.tags,
+        sitemapPaths.best
+      ]
+    )
     expect(createCanonicalRobots().sitemap).toBe(`${origin}${SITEMAP_INDEX_PATH}`)
+  })
+
+  // One predicate, two consumers (#341, design 2.3): a tag or best page is in its sitemap exactly
+  // when its page renders `index` (the pages call the same predicates for their metadata).
+  it('lists a tag or best page in its sitemap exactly when the page is indexable', async () => {
+    const listedTags = locations(await (await createTagsSitemapResponse(loaders)).text())
+    for (const tag of tags) {
+      expect(
+        listedTags.includes(`${origin}${getRoute('tag.page', { tag: tag.slug })}`),
+        tag.slug
+      ).toBe(isTagIndexable(tag, bestPages))
+    }
+    const listedBest = locations(await (await createBestPagesSitemapResponse(loaders)).text())
+    for (const page of bestPages) {
+      expect(
+        listedBest.includes(`${origin}${getRoute('best.page', { keyword: page.slug })}`),
+        page.slug
+      ).toBe(isBestPageIndexable(page))
+    }
+    expect(listedTags).toEqual([`${origin}/products/tags/ai-writing/`])
+    expect(listedBest).toEqual([`${origin}/best/ai-chatbot/`])
+  })
+
+  // #346: `scripts/site-routes.ts` (the publisher's affected routes) reads the registry too.
+  it('gives the scripts, getRoute and the registry one set of taxonomy routes and sitemaps', () => {
+    expect(tagIndexRoute()).toBe(getRoute('tag.index'))
+    expect(tagRoute('ai-chatbots')).toBe(getRoute('tag.page', { tag: 'ai-chatbots' }))
+    expect(bestIndexRoute()).toBe(getRoute('best.index'))
+    expect(bestRoute('ai-chatbot')).toBe(getRoute('best.page', { keyword: 'ai-chatbot' }))
+    expect([tagIndexRoute(), tagRoute('x'), bestIndexRoute(), bestRoute('x')]).toEqual([
+      '/products/tags/',
+      '/products/tags/x/',
+      '/best/',
+      '/best/x/'
+    ])
+    const registered = siteRoutes.map(route => route.path)
+    for (const path of Object.values(taxonomyRoutePaths)) expect(registered).toContain(path)
+    // Tag pages sit beside the category pages, under the listing base path.
+    expect(taxonomyRoutePaths.tagIndex.startsWith(`/${site.routes.listingBasePath}/`)).toBe(true)
+    expect(catalogSitemapRoutes({ taxonomy: true }).slice(-2)).toEqual([
+      sitemapPaths.tags,
+      sitemapPaths.best
+    ])
+    expect(catalogSitemapRoutes()).not.toContain(sitemapPaths.tags)
+  })
+
+  it('reserves the listing slugs of the registry pages under /products/', () => {
+    expect([...reservedListingSlugs].sort()).toEqual(['categories', 'tags'])
+    expect(isReservedListingSlug('tags')).toBe(true)
+    expect(isReservedListingSlug('autoenhance.ai')).toBe(false)
   })
 
   it('robots.txt disallows exactly the disallowed routes, and nothing a sitemap lists', () => {

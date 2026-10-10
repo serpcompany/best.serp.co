@@ -13,6 +13,7 @@ import { paginatedMetadata } from '@/components/directory/listing-pagination'
 import { HomePageCanonicalTags, homePageMetadata } from '@/components/home/home-page'
 import { notFoundMetadata } from '@/components/layout/not-found-content'
 import { rootLayoutMetadata } from '@/components/layout/root-shell'
+import { bestPageSchema } from '@/components/taxonomy/best-page'
 import { generateWebsiteDetailSchema } from '../seo/schema'
 import {
   defaultOgImage,
@@ -24,10 +25,12 @@ import {
   siteUrl
 } from '../seo/seo-config'
 import {
+  createBestPagesSitemapResponse,
   createCanonicalRobots,
   createListingsSitemapResponse,
   createPagesSitemapResponse,
   createSitemapIndexResponse,
+  createTagsSitemapResponse,
   createTaxonomiesSitemapResponse
 } from '../seo/sitemaps'
 import { siteOrigin } from './site-origin'
@@ -54,9 +57,30 @@ function runAs(env: Record<string, string> | null): void {
   else delete global[CONTEXT]
 }
 
+/** A tag and a best page, each indexable, so the taxonomy's sitemaps and indexes list them. */
+const tags = [{ count: 12, lastModifiedAt: '2026-09-01T00:00:00.000Z', slug: 'ai-writing' }]
+const bestPage = {
+  category: null,
+  heading: 'Best AI Video Editors',
+  hub: 'video',
+  intro: 'Editors.',
+  keyword: 'ai video editor',
+  lastModifiedAt: '2026-09-02T00:00:00.000Z',
+  listSize: 10,
+  order: 0,
+  poolSize: 12,
+  slug: 'ai-video-editor',
+  tag: 'ai-video-editors',
+  title: 'Best AI Video Editors'
+}
+
 /** Everything a request writes, as text: metadata, JSON-LD, sitemaps, the feed, the tags. */
 async function everythingWritten(): Promise<string> {
-  const loaders = { getWebsites: () => websites }
+  const loaders = {
+    getBestPages: () => [bestPage],
+    getTags: () => tags,
+    getWebsites: () => websites
+  }
   const { GET: rss } = await import('../../app/(files)/rss.xml/route')
   const base = generateBaseMetadata({ description: 'd', path: '/about/', title: 't' })
   return [
@@ -92,6 +116,13 @@ async function everythingWritten(): Promise<string> {
     await (await createPagesSitemapResponse(loaders)).text(),
     await (await createListingsSitemapResponse(loaders)).text(),
     await (await createTaxonomiesSitemapResponse(loaders)).text(),
+    await (await createTagsSitemapResponse(loaders)).text(),
+    await (await createBestPagesSitemapResponse(loaders)).text(),
+    JSON.stringify(
+      bestPageSchema(bestPage, [
+        { ...websites[0], categories: [websites[0].category], linkRel: 'follow', tags: [] }
+      ])
+    ),
     await (await rss()).text(),
     renderToStaticMarkup(<HomePageCanonicalTags />)
   ].join('\n')
@@ -132,6 +163,9 @@ describe("each request's origin", () => {
     const written = await everythingWritten()
     expect(written).toContain(`"canonical":"${STAGING}/about/"`)
     expect(written).toContain(`<loc>${STAGING}/products/autoenhance.ai/</loc>`)
+    expect(written).toContain(`<loc>${STAGING}/products/tags/ai-writing/</loc>`)
+    expect(written).toContain(`<loc>${STAGING}/best/ai-video-editor/</loc>`)
+    expect(written).toContain(`"url":"${STAGING}/best/ai-video-editor/"`)
     expect(written).toContain(`"home_page_url":"${STAGING}"`)
     expect(written).toContain(`"@id":"${STAGING}/#website"`)
     expect(written).toContain(`href="${STAGING}"`)

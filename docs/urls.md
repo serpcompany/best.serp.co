@@ -42,7 +42,8 @@ one of these extensions (`chart.js`), and a test checks the committed import.
   static moved URLs there (not as a page that calls `permanentRedirect()`); `redirects.test.ts`
   checks that each destination is canonical and each source is matched in both slash forms.
 - **Redirects that need D1** run in their pages (`listing_slug_redirects`: renamed listing slugs,
-  and unpublished duplicates sent to the listing they duplicated, #338) or in the Worker (the old
+  and unpublished duplicates sent to the listing they duplicated, #338; `taxonomy_redirects`: a
+  category, tag or best page with nothing to show, #346) or in the Worker (the old
   root-level `/<slug>`, before the slash rule, `apps/web/src/lib/routing/legacy-root.ts`) and
   write a canonical destination (`getRoute`). The root-level lookup answers in one hop: a live
   listing, an active category, a retired listing slug followed through `listing_slug_redirects`
@@ -50,6 +51,8 @@ one of these extensions (`chart.js`), and a test checks the committed import.
   `taxonomy_redirects` to its target (#341). A moved taxonomy URL keeps its query string except
   `page`, which would not match the target's pagination (`withoutPageQuery`), so a campaign's
   `utm_source` survives the redirect; the listing and category redirects keep the whole query.
+  A taxonomy page rebuilds the query from its decoded search parameters, so it keeps every
+  parameter but may re-encode one (`lib/routing/taxonomy-redirect.ts`).
 - **Fail closed.** The Worker validates the manifest at startup and refuses to start if its shape
   is unexpected (no `redirects` array or route list, a rule without a string `regex`, a pattern
   that does not compile or matches every path), so a framework upgrade cannot silently turn off
@@ -85,9 +88,41 @@ production) assert the redirects, the `/api` exemption, and the homepage form.
   that code, and staging tests the code production hands out. The site has no hreflang (one
   language).
 
+## Taxonomy pages
+
+The three-layer taxonomy (#341, design 2.1–2.3; routes #346): broad categories (hubs), tags, and
+keyword-targeted best pages. The route registry names their paths (`taxonomyRoutePaths` in
+`apps/web/src/lib/site/site-routes.ts`), and `getRoute` and `scripts/site-routes.ts` (the
+publisher's affected routes) build their URLs from it.
+
+| Path | Page | Robots | Sitemap |
+| --- | --- | --- | --- |
+| `/products/categories/<category>/` | A category (hub) with a public listing; else one 308 through `taxonomy_redirects`; else 404 | index; `other` noindex | `sitemap-categories.xml`, without `other` |
+| `/products/tags/` | Tags with 3 or more listings, grouped by hub | index; noindex while it lists none | `sitemap-pages.xml`, while it lists one |
+| `/products/tags/<tag>/` | A tag with a public listing, 48 a page (`?page=N`); else one 308; else 404 | index from 10 listings, unless an indexable best page ranks the tag alone | `sitemap-tags.xml` when indexable |
+| `/best/` | Best pages with an entry, grouped by hub | index; noindex while it lists none | `sitemap-pages.xml`, while it lists one |
+| `/best/<keyword>/` | Up to its list size of entries, one page; with none, one 308, else 404 | index from 5 entries | `sitemap-best.xml` when indexable |
+
+- **One predicate, two consumers.** `isTagIndexable`, `isBestPageIndexable` and
+  `isCategoryIndexable` (`apps/web/src/lib/seo/taxonomy-indexing.ts`) decide both a page's robots
+  metadata and its sitemap entry; `site-routes.test.tsx` holds them together. The thresholds are
+  constants in `apps/web/src/lib/site/taxonomy.ts`, not environment variables. A page that is not
+  indexable still renders `noindex, follow`, so its links are crawled.
+- **Rendering wins over a redirect.** A page answers its 308 only when it has nothing to show, so
+  a redirect row published before its listings move takes over the moment the old page empties.
+- **Best pages** take their title and H1 from D1 and list their entries in rank order: position,
+  logo, name, the owner's blurb or the description, hub and tag chips, and "Visit Site" with the
+  listing's `link_rel`. Their JSON-LD is a `CollectionPage` with an ordered `ItemList` and a
+  `BreadcrumbList`, and no `Review` or rating.
+- **Reserved slugs.** No listing may take `categories` or `tags` (`reservedListingSlugs`, derived
+  from the registry's pages under `/products/`): submission intake, the admin panel's approval and
+  the publisher's manifest schema refuse them, and the Worker's 410 check skips them.
+- **Static redirects.** `/products/best` answers one 308 to `/best/`; the other pre-D1
+  `/products/best/<category>` URLs still go to `/products/categories/<category>/`.
+
 ## Pagination
 
-The directory (`/`, `/products/`) and category pages show 48 listings per page in
+The directory (`/`, `/products/`), category and tag pages show 48 listings per page in
 directory order (publication order, then a stable locale sort by name, as the pages
 always rendered). Later pages use a `?page=N` query parameter on the existing URL:
 `/products/?page=2`, `/products/categories/other/?page=3`. The homepage shows page 1 and
@@ -107,8 +142,9 @@ for display; only the sitemaps and the JSON feed read every listing.
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other host
   serves a disallow-all robots.txt; staging's gives Ahrefs' Site Audit best.serp.co's rules and
   its own sitemap index; see [Environments and hosts](./architecture.md#environments-and-hosts)).
-  The index lists the root-level sitemaps; the older sitemap URLs answer one 308. The route
-  registry
+  The index lists the five root-level sitemaps (pages, products, categories, tags and best
+  pages, the last two empty until the taxonomy is published); the older sitemap URLs answer one
+  308. The route registry
   (`apps/web/src/lib/site/site-routes.ts`) sets each static page's indexability and sitemap for
   the sitemaps, robots.txt, page metadata, and footer. A listing's `lastmod` is its later
   `updated_at` or `published_at`; a collection's is its newest listing's.

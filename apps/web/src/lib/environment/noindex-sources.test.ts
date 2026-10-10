@@ -31,8 +31,15 @@ vi.mock('@/lib/auth/header-state', () => ({ getHeaderAuthState: async () => null
 vi.mock('@/components/auth/sign-out-button', () => ({
   useSignOut: () => [false, async () => {}]
 }))
+// The taxonomy indexes are indexable once they list something (#346): one tag and one best page.
+const taxonomy = vi.hoisted(() => ({
+  bestPages: [{ hub: 'writing', listSize: 10, poolSize: 5, slug: 'ai-writer' }],
+  tags: [{ category: 'writing', count: 3, slug: 'ai-writing' }]
+}))
 vi.mock('@/lib/catalog/repository', () => ({
-  getActiveCategories: async () => []
+  getActiveCategories: async () => [],
+  getActiveTags: async () => taxonomy.tags,
+  getBestPages: async () => taxonomy.bestPages
 }))
 // The other registry pages' data and form modules (#167); their metadata does not use them.
 vi.mock('@/lib/content-loader', () => ({
@@ -83,10 +90,16 @@ const PUBLIC_PATHS = [
   '/products/',
   '/products/autoenhance.ai/',
   '/products/categories/video-downloaders/',
+  '/products/tags/',
+  '/products/tags/ai-chatbots/',
+  '/best/',
+  '/best/ai-chatbot/',
   '/legal/privacy-policy/',
   '/robots.txt',
   '/sitemap-index.xml',
   '/sitemap-products.xml',
+  '/sitemap-tags.xml',
+  '/sitemap-best.xml',
   '/rss.xml'
 ]
 const PLATFORM_HOSTS = [
@@ -189,6 +202,27 @@ describe('exported page metadata', () => {
   })
 })
 
+describe('the taxonomy indexes (#346)', () => {
+  it('render noindex, follow while they list nothing, before the taxonomy is published', async () => {
+    const saved = { bestPages: taxonomy.bestPages, tags: taxonomy.tags }
+    try {
+      taxonomy.bestPages = [{ hub: 'writing', listSize: 10, poolSize: 0, slug: 'ai-writer' }]
+      taxonomy.tags = [{ category: 'writing', count: 2, slug: 'ai-writing' }]
+      for (const page of [
+        await import('../../app/(site)/best/page'),
+        await import('../../app/(site)/products/tags/page')
+      ]) {
+        expect(resolveRobots((await page.generateMetadata()).robots)).toEqual({
+          basic: 'noindex, follow',
+          googleBot: 'noindex, follow'
+        })
+      }
+    } finally {
+      Object.assign(taxonomy, saved)
+    }
+  })
+})
+
 /** Every static page the route registry lists, by the module that renders it. */
 const registryPageModules: Record<
   string,
@@ -196,6 +230,7 @@ const registryPageModules: Record<
 > = {
   '/': () => import('../../app/(site)/page'),
   '/about/': () => import('../../app/(site)/about/page'),
+  '/best/': () => import('../../app/(site)/best/page'),
   '/brands/': () => import('../../app/(site)/brands/page'),
   '/contact/': () => import('../../app/(site)/contact/page'),
   '/legal/': () => import('../../app/(site)/legal/page'),
@@ -207,6 +242,7 @@ const registryPageModules: Record<
   '/pricing/': () => import('../../app/(site)/pricing/page'),
   '/products/': () => import('../../app/(site)/products/page'),
   '/products/categories/': () => import('../../app/(site)/products/categories/page'),
+  '/products/tags/': () => import('../../app/(site)/products/tags/page'),
   '/search/': () => import('../../app/(site)/search/page'),
   '/sponsor/': () => import('../../app/(site)/sponsor/page'),
   '/submit/': () => import('../../app/(site)/submit/page')

@@ -29,9 +29,12 @@ From the edge inward:
    private, mutable and free-form paths are bypassed by their first segment, in any case
    (`BYPASS_PATH_SEGMENTS`), and so are requests with `Authorization` and requests carrying a
    Better Auth (`better-auth.*`) or preview cookie, so a signed-in request is never served from
-   or stored in the cache. Responses carry `x-edge-cache: HIT | MISS | BYPASS`. The Worker
-   adds the environment headers (`X-Robots-Tag`, `x-site-environment`, `x-worker-version`)
-   after this layer, from each request, so a stored response carries none of them.
+   or stored in the cache. The taxonomy's pages (`/products/tags/`, `/best/`, #346) are cached
+   like any catalog page, and so is the 308 of a moved category, tag or best page URL: the
+   publication that moves it changes the epoch. Responses carry
+   `x-edge-cache: HIT | MISS | BYPASS`. The Worker adds the environment headers (`X-Robots-Tag`,
+   `x-site-environment`, `x-worker-version`) after this layer, from each request, so a stored
+   response carries none of them.
    **Staging's password** (#359, [Architecture](./architecture.md#environments-and-hosts)) is
    checked before this layer: a request without it gets a 401 that is never stored and never
    reaches a stored page, and a request with it continues without its `Authorization` header,
@@ -49,8 +52,9 @@ From the edge inward:
 3. **Data cache** (Workers Cache API, `apps/web/src/db/cache.ts`). Shell counts, tag counts,
    the best index, name order and name pages (keyed by scope: `*`, `c:<category>` or
    `t:<tag>`, so a tag and a category with one slug never share an entry), a best page's
-   entries, featured/latest heads, details, search results (per normalized query and limit),
-   and the full summary list (for sitemaps and the feed) are cached under epoch-scoped keys for
+   entries (with each entry's tags, #346: an entry cached without them is read again),
+   featured/latest heads, details, search results (per normalized query and limit), and the
+   full summary list (for sitemaps and the feed) are cached under epoch-scoped keys for
    24 hours, with live D1 fallback when the cache fails. The redirect lookups (renamed listing
    slugs, moved taxonomy URLs, root-level URLs) are single seeks and stay uncached. Each
    listing body's parsed Markdown is cached too (`getDerivedValue`, built by

@@ -101,6 +101,11 @@ const RELATED_MEMBER_SCAN_LIMIT = 128
  */
 const RELATED_SCORED_TAGS = 3
 /**
+ * How many of a best-page entry's active tags it carries for its chips (#341, design 5.1): the
+ * most central, so hydrating an entry reads at most this many tags however many it has.
+ */
+const BEST_ITEM_TAGS = 3
+/**
  * `strftime` with this format reads both D1 time formats and writes the ISO instant `toInstant`
  * writes, so `MAX()` over it orders a column whose rows mix the two.
  */
@@ -173,6 +178,7 @@ interface BestIndexRow {
 interface BestItemRow extends SummaryRow {
   blurb: string | null
   link_rel: string
+  tags: string
 }
 
 interface TaxonomyRedirectRow {
@@ -743,7 +749,11 @@ function isBestPageItem(value: unknown): value is BestPageItem {
   const candidate = value as BestPageItem
   return (
     (candidate.blurb === undefined || isNonEmptyString(candidate.blurb)) &&
-    runtimeLinkRels.has(candidate.linkRel)
+    runtimeLinkRels.has(candidate.linkRel) &&
+    // Required, so an entry cached before it carried its tags is read again.
+    Array.isArray(candidate.tags) &&
+    candidate.tags.length <= BEST_ITEM_TAGS &&
+    candidate.tags.every(tag => tag && isNonEmptyString(tag.name) && isNonEmptyString(tag.slug))
   )
 }
 
@@ -1944,7 +1954,17 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
           SELECT b.id, b.tag_id, b.category_id FROM best_pages b
           WHERE b.slug = ? AND b.is_active = 1
         )
-        SELECT ${summaryColumns}, l.link_rel, ranked.blurb
+        SELECT ${summaryColumns}, l.link_rel, ranked.blurb,
+          COALESCE((
+            SELECT json_group_array(json_object('slug', ordered.slug, 'name', ordered.name))
+            FROM (
+              SELECT t.slug, t.name FROM listing_tags lt
+              JOIN tags t ON t.id = lt.tag_id
+              WHERE lt.listing_id = l.id AND t.is_active = 1
+              ORDER BY lt.sort_order ASC, t.slug ASC
+              LIMIT ${BEST_ITEM_TAGS}
+            ) ordered
+          ), '[]') AS tags
         FROM (
           SELECT
             l.id,
@@ -2005,7 +2025,8 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       return {
         ...mapSummary(row),
         ...(blurb ? { blurb } : {}),
-        linkRel: row.link_rel as ListingLinkRel
+        linkRel: row.link_rel as ListingLinkRel,
+        tags: mapListingTags(row.tags)
       }
     })
     await writeCache('best-page-items', cacheKey, { items, publicationVersion })

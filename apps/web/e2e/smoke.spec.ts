@@ -177,7 +177,8 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       [`/products/best/${category.slug}/`, categoryPath(category.slug)],
       [`/categories/${category.slug}/`, categoryPath(category.slug)],
       ['/products/best/featured/', categoriesIndexPath],
-      ['/products/best/', categoriesIndexPath],
+      // The old "best" index is the best-page index (#346); it renders before there is one.
+      ['/products/best/', '/best/'],
       // Top-level legal pages of the static site and the short legal URLs: each legal page has
       // one canonical URL under /legal/ (#166).
       ['/privacy/', '/legal/privacy-policy/'],
@@ -544,15 +545,25 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       expect(robotsText).toContain(`Sitemap: ${url('/sitemap-index.xml')}`)
     } else expect(robotsText).toBe('User-agent: *\nDisallow: /\n')
 
-    // Every index entry carries its newest child's lastmod, from D1 (#218).
+    // Every index entry carries its newest child's lastmod, from D1 (#218); the taxonomy's
+    // sitemaps (#346) have one once they list a page, which staging may not yet.
     const index = await (await request.get('/sitemap-index.xml')).text()
-    expect(index.match(/<lastmod>\d{4}-\d{2}-\d{2}T[\d:.]+Z<\/lastmod>/gu)).toHaveLength(3)
-    // Root-level child sitemaps (#167); the old URLs and /sitemap.xml answer one 308.
+    for (const path of ['/sitemap-pages.xml', '/sitemap-products.xml', '/sitemap-categories.xml'])
+      expect(index).toMatch(
+        new RegExp(
+          `<loc>${escapeRegExp(url(path))}</loc><lastmod>\\d{4}-\\d{2}-\\d{2}T[\\d:.]+Z</lastmod>`,
+          'u'
+        )
+      )
+    // Root-level child sitemaps (#167, #346); the old URLs and /sitemap.xml answer one 308.
     expect(await getSitemap(request, '/sitemap-index.xml')).toEqual([
       url('/sitemap-pages.xml'),
       url('/sitemap-products.xml'),
-      url('/sitemap-categories.xml')
+      url('/sitemap-categories.xml'),
+      url('/sitemap-tags.xml'),
+      url('/sitemap-best.xml')
     ])
+    for (const path of ['/sitemap-tags.xml', '/sitemap-best.xml']) await getSitemap(request, path)
     for (const [from, to] of [
       ['/sitemap.xml', '/sitemap-index.xml'],
       ['/sitemaps/pages/1.xml', '/sitemap-pages.xml'],

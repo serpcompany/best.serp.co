@@ -41,6 +41,7 @@ const LISTING_IMAGE_CALLERS = [
   'apps/web/src/components/directory/project-navigation.tsx',
   'apps/web/src/components/llm/listing-card.tsx',
   'apps/web/src/components/submit/submit-ui.tsx',
+  'apps/web/src/components/taxonomy/best-page.tsx',
   'apps/web/src/components/website-routes/detail-page.tsx',
   'apps/web/src/components/website/website-content-section.tsx'
 ]

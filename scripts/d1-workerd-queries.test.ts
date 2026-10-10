@@ -57,7 +57,7 @@ const NOW = new Date('2026-10-06T12:00:00.000Z')
 const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   // 60 pages; the tag-only pools come from the tag stats, so only pools with a category are read
   'best-index': 6_000, // 4,353, cached per epoch
-  'best-page-items': 2_500, // the 335-listing tag, 25 entries: 1,860
+  'best-page-items': 2_500, // the 335-listing tag, 25 entries with their tags (#346): 2,002
   'canonical-redirect': 10, // one of 50 redirects: 2
   'legacy-root-target': 10, // a retired category URL and its best page's tag and category: 4
   'featured-summaries': 2_500, // 100 featured: 1,887 (walks the publication index)

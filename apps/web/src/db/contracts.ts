@@ -307,6 +307,11 @@ export interface BestPageItem extends ListingSummary {
   blurb?: string
   /** Rendered on the entry's "Visit site" link. */
   linkRel: ListingLinkRel
+  /**
+   * Its most central active tags (`listing_tags.sort_order`, then slug), at most three: the
+   * entry's tag chips beside its hub (design 5.1). Empty when it has none.
+   */
+  tags: ListingTag[]
 }
 
 /** The kinds of taxonomy URL `taxonomy_redirects` can move (#341, design 2.2). */

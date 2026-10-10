@@ -66,7 +66,8 @@ and public listings:
   in its category, or both, less its exclusions, plus its public pins. A tag-only page's pool is
   counted from the tag counts, so the index never reads the largest pools again. A page shows the
   first `min(listSize, poolSize)` entries: pins by position, then tag centrality, listings with a
-  hosted logo, then name and slug. Nothing a Creator pays for ranks a listing.
+  hosted logo, then name and slug. Nothing a Creator pays for ranks a listing. Each entry carries
+  its three most central active tags, for its chips (#346).
 - **Related listings** of a listing with tags are ranked by how many of its three most central
   tags they share, with ties broken from the listing's own name onward, so listings that share
   tags link to different neighbours. When its tags give fewer than four, its hub fills the rest
