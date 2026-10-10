@@ -1,5 +1,5 @@
 import { type APIRequestContext, type BrowserContext, expect, type Page } from '@playwright/test'
-import { seedCategories, seedListings, seedWebsite } from './seed-facts'
+import { seedCategories, seedListings, seedTags, seedWebsite } from './seed-facts'
 import { escapeRegExp, listingPath, site } from './site-fixture'
 import { executeLocalD1, type FixtureSite, startFixtureSite } from './submit-fixture'
 import { expectedResponse, test } from './test'
@@ -238,6 +238,67 @@ test.describe('submit v2', () => {
     await expect(
       page.getByRole('row', { name: new RegExp(productName) }).getByText('In review')
     ).toBeVisible()
+    await context.close()
+  })
+
+  test('suggests up to three active tags, the chosen category’s first, and saves them (#341)', async ({
+    baseURL,
+    browser
+  }) => {
+    test.setTimeout(90_000)
+    const label = `tags-${unique()}`
+    const productName = `Tagwise ${label.slice(-5)}`
+    fixture.set(label, {
+      badge: 'missing',
+      description: 'Sorts whiteboard sketches into tidy mockups.',
+      name: productName
+    })
+    const context = await newClient(browser)
+    await signInContext(context, baseURL ?? '', `e2e-submit-tags-${unique()}@example.com`)
+    const page = await context.newPage()
+    await page.goto('/submit/')
+    await typeWebsite(page, fixture.website(label))
+    await expect(page.getByText(`We filled in 3 fields from ${fixture.slug(label)}`)).toBeVisible()
+    await chooseCategory(page, seedCategories.design.name)
+
+    // Active tags only, grouped by category, the chosen one's first; no free text.
+    await page.getByLabel('Tags').click()
+    const listbox = page.getByRole('listbox')
+    await expect(listbox.getByRole('group').first()).toHaveAccessibleName(
+      seedCategories.design.name
+    )
+    await expect(listbox.getByRole('option', { name: seedTags.retired.name })).toHaveCount(0)
+    for (const tag of [seedTags.mockups, seedTags.noteTaking, seedTags.whiteboards]) {
+      await listbox.getByRole('option', { name: tag.name }).click()
+    }
+    // Three is the most: the rest can't be chosen.
+    await expect(listbox.getByRole('option', { name: seedTags.apis.name })).toBeDisabled()
+    await page.keyboard.type('zz-not-a-tag')
+    await expect(listbox.getByRole('option')).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    const chips = page.locator('[data-slot="combobox-chip"]')
+    await expect(chips).toHaveText([
+      seedTags.mockups.name,
+      seedTags.noteTaking.name,
+      seedTags.whiteboards.name
+    ])
+
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.waitForURL(/\/submit\/[0-9a-f-]{36}\/choose\/\?saved=1$/u)
+    const submissionId = new URL(page.url()).pathname.split('/')[2] as string
+
+    // Saved in that order: editing the draft shows them, and removing one saves the rest.
+    await page.goto(`/submit/?edit=${submissionId}`)
+    await expect(chips).toHaveText([
+      seedTags.mockups.name,
+      seedTags.noteTaking.name,
+      seedTags.whiteboards.name
+    ])
+    await chips.filter({ hasText: seedTags.noteTaking.name }).getByRole('button').click()
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.waitForURL(/\/submit\/[0-9a-f-]{36}\/choose\/\?saved=1$/u)
+    await page.goto(`/submit/?edit=${submissionId}`)
+    await expect(chips).toHaveText([seedTags.mockups.name, seedTags.whiteboards.name])
     await context.close()
   })
 

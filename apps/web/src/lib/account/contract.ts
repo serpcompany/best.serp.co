@@ -1,5 +1,10 @@
 import { z } from 'zod'
-import { draftContentSchema, SUBMISSION_FIELD_LIMITS } from '../submissions/contract'
+import {
+  draftContentSchema,
+  FIELD_MESSAGES,
+  SUBMISSION_FIELD_LIMITS,
+  SUBMISSION_TAG_LIMIT
+} from '../submissions/contract'
 
 /**
  * The submitter dashboard's HTTP contract (serpcompany/best.serp.co#65), shared by the route
@@ -81,7 +86,13 @@ export const revisionRequestSchema = extrasSchema.extend({
       SUBMISSION_FIELD_LIMITS.description,
       `Keep it to ${SUBMISSION_FIELD_LIMITS.description} characters or fewer.`
     ),
-  logoUrl: z.string().trim().min(1, 'Add a logo.').max(2048)
+  logoUrl: z.string().trim().min(1, 'Add a logo.').max(2048),
+  /** Up to three tags (#341); left out, the listing's tags stay as they are. */
+  tagSlugs: z
+    .array(z.string().trim().min(1).max(100))
+    .max(SUBMISSION_TAG_LIMIT, FIELD_MESSAGES.tagSlugs)
+    .refine(tags => new Set(tags).size === tags.length, FIELD_MESSAGES.tagSlugs)
+    .optional()
 })
 
 export type RevisionRequest = z.input<typeof revisionRequestSchema>

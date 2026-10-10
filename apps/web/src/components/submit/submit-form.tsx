@@ -54,6 +54,7 @@ import {
   normalizeWebsiteInput,
   type PrefillResponse,
   SUBMISSION_FIELD_LIMITS,
+  SUBMISSION_TAG_LIMIT,
   type SubmissionField,
   type SubmissionSummary
 } from '@/lib/submissions/contract'
@@ -67,6 +68,7 @@ import {
 } from './draft-storage'
 import { createDraft, requestPrefill, updateDraft } from './submit-api'
 import { ProductLogo, ToneAlert } from './submit-ui'
+import { type TagChoice, TagsCombobox } from './tags-combobox'
 
 /**
  * `/submit` (#70 screen 2): one Card with the product's details. The form works signed out and
@@ -92,6 +94,8 @@ export interface SubmitFormProps {
   signedInEmail: string | null
   /** Keys this browser's draft to the account (`draft-storage.ts`); null signed out. */
   signedInUserId: string | null
+  /** The active tags (#341), grouped by hub in the Tags field. */
+  tags: readonly TagChoice[]
 }
 
 type FilledField = 'description' | 'logo' | 'name'
@@ -108,6 +112,7 @@ const FIELD_LABELS: Record<SubmissionField, string> = {
   description: 'Short description',
   logoUrl: 'Logo',
   name: 'Name',
+  tagSlugs: 'Tags',
   website: 'Website URL'
 }
 
@@ -115,6 +120,7 @@ const FIELD_ORDER: SubmissionField[] = [
   'website',
   'name',
   'categorySlug',
+  'tagSlugs',
   'description',
   'logoUrl',
   'content'
@@ -176,13 +182,15 @@ export function SubmitForm({
   editing,
   initialUrl,
   signedInEmail,
-  signedInUserId
+  signedInUserId,
+  tags
 }: SubmitFormProps) {
   const router = useRouter()
   const signedIn = signedInEmail !== null
   const [website, setWebsite] = useState(editing?.website ?? '')
   const [name, setName] = useState(editing?.name ?? '')
   const [categorySlug, setCategorySlug] = useState(editing?.categorySlug ?? '')
+  const [tagSlugs, setTagSlugs] = useState<string[]>(editing?.tagSlugs ?? [])
   const [description, setDescription] = useState(editing?.description ?? '')
   const [content, setContent] = useState(editing?.content ?? '')
   const [logoChoice, setLogoChoice] = useState<LogoChoice | null>(editing ? 'url' : null)
@@ -285,6 +293,7 @@ export function SubmitForm({
       setWebsite(local.website)
       setName(local.name)
       setCategorySlug(local.categorySlug)
+      setTagSlugs(local.tagSlugs)
       setDescription(local.description)
       setContent(local.content)
       setLogoChoice(local.logoChoice)
@@ -315,6 +324,7 @@ export function SubmitForm({
         name,
         siteIcon,
         socialImage,
+        tagSlugs,
         website
       }
       if (website || name || description || content) writeLocalDraft(draft, signedInUserId)
@@ -332,6 +342,7 @@ export function SubmitForm({
     restored,
     siteIcon,
     socialImage,
+    tagSlugs,
     website
   ])
 
@@ -371,6 +382,7 @@ export function SubmitForm({
       description,
       logoUrl,
       name,
+      tagSlugs,
       website: normalizeWebsiteInput(website)
     })
     const found = parsed.success ? {} : fieldErrors(parsed.error)
@@ -404,6 +416,7 @@ export function SubmitForm({
           name,
           siteIcon,
           socialImage,
+          tagSlugs,
           website: normalizeWebsiteInput(website)
         },
         null
@@ -412,7 +425,7 @@ export function SubmitForm({
       return
     }
     setPending(true)
-    const fields = { categorySlug, content, description, logoUrl, name }
+    const fields = { categorySlug, content, description, logoUrl, name, tagSlugs }
     const response = editing
       ? await updateDraft(editing.id, {
           ...fields,
@@ -654,6 +667,25 @@ export function SubmitForm({
                     ) : null}
                   </Field>
                 </div>
+
+                <Field data-invalid={errors.tagSlugs ? true : undefined}>
+                  <FieldLabel htmlFor="submit-tags">
+                    Tags <span className="font-normal text-muted-foreground">(optional)</span>
+                  </FieldLabel>
+                  <TagsCombobox
+                    id="submit-tags"
+                    choices={tags}
+                    firstCategory={categorySlug || undefined}
+                    invalid={Boolean(errors.tagSlugs)}
+                    max={SUBMISSION_TAG_LIMIT}
+                    value={tagSlugs}
+                    onValueChange={next => {
+                      setTagSlugs(next)
+                      clearError('tagSlugs')
+                    }}
+                  />
+                  {errors.tagSlugs ? <FieldError>{errors.tagSlugs}</FieldError> : null}
+                </Field>
 
                 <Field data-invalid={errors.description || descriptionTooLong ? true : undefined}>
                   <TaggedLabel htmlFor="submit-description" tag={sourceTag(filled.description)}>

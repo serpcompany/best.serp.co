@@ -34,8 +34,12 @@ Column meanings and constraints are commented in `schema.ts`. By area:
   target, held as a foreign key so a later rename keeps it current. Submissions and revisions keep
   a Creator's suggested tags in `tag_slugs` (a JSON array of at most three, or null). The
   publisher writes the taxonomy tables ([Catalog publication](./catalog-publication.md#taxonomy-operations)),
-  and the catalog reads them (#345: [Public catalog](./public-catalog.md#reads)); the routes and
-  app writes are later steps of #341. Write tags and memberships with `UPDATE`, or
+  and the catalog reads them (#345: [Public catalog](./public-catalog.md#reads)). In the app,
+  an admin sets a listing's tags ([Admin panel](./admin-panel.md#tags-341)), and approvals,
+  payments, and revisions write `tag_slugs` to the listing, resolving a retired narrow
+  `category_slug` through its tag or its `taxonomy_redirects` row
+  ([Submission flow](./submission-flow.md#tags-and-retired-categories-341)).
+  Write tags and memberships with `UPDATE`, or
   `INSERT … SELECT … WHERE is_active = 1`, never an upsert: SQLite fires a `BEFORE INSERT`
   trigger on an upsert's attempted insert even when it becomes an update, so the taxonomy
   triggers would refuse one that touches a retired tag. So don't base a tag writer on the
