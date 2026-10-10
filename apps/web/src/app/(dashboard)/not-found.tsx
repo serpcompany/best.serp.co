@@ -1,6 +1,9 @@
+import type { Metadata } from 'next'
 import { NotFoundContent, notFoundMetadata } from '@/components/layout/not-found-content'
 
-export const metadata = notFoundMetadata
+export function generateMetadata(): Metadata {
+  return notFoundMetadata()
+}
 
 /** `notFound()` in `/account` and `/admin`: the 404 without the public chrome. */
 export default function DashboardNotFound() {

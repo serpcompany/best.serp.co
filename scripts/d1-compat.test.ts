@@ -60,6 +60,14 @@ describe('D1 compatibility of generated statements (#95 release blocker, SQLITE_
       for (const statement of plan.statements) {
         expect(d1CompatViolations(statement.query), `${file}: ${statement.query}`).toEqual([])
       }
+      // D1's REST API takes the bindings as JSON, so a boolean would arrive as true or false, not
+      // 1 or 0 as the Worker binding sends it (#339 review): every committed plan binds none.
+      expect(
+        plan.statements
+          .flatMap(statement => statement.bindings)
+          .filter(b => typeof b === 'boolean'),
+        file
+      ).toEqual([])
       // The guards are assertion SELECTs, not a table.
       expect(plan.statements.some(statement => statement.query.includes(GUARD_FAILURE))).toBe(true)
     }
@@ -69,7 +77,9 @@ describe('D1 compatibility of generated statements (#95 release blocker, SQLITE_
       'listing-categories-remove',
       'listing-categories-set',
       'listing-claim-hold-add',
+      'listing-claim-hold-clear',
       'listing-content-remove-suffix',
+      'listing-details-set',
       'listing-media-update',
       'listing-slug-redirect',
       'listing-unpublish'

@@ -5,12 +5,14 @@ import { getAccountOverview } from '@/lib/account/overview'
 import { requireAccountUser } from '@/lib/account/pages'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Listings',
-  description: 'Your listings on SERP.',
-  path: '/account/listings/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Listings',
+    description: 'Your listings on SERP.',
+    path: '/account/listings/',
+    noindex: true
+  })
+}
 
 /** `/account/listings/` (#65): the screen-5 table with the listings the user owns. */
 export default async function AccountListingsPage(): Promise<ReactElement> {

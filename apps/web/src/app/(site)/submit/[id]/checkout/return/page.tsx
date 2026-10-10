@@ -14,12 +14,14 @@ import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { submissionBadgeTargets } from '@/lib/submissions/presentation'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Payment',
-  description: 'Your payment for a listing on SERP.',
-  path: '/submit/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Payment',
+    description: 'Your payment for a listing on SERP.',
+    path: '/submit/',
+    noindex: true
+  })
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u
 

@@ -10,13 +10,22 @@ from its Worker since the [production cutover](./production-cutover.md).
 | | Staging | Production |
 |---|---|---|
 | Worker and D1 database | `best-serp-co-staging` | `best-serp-co-production` |
-| Origin | https://staging.best.serp.co (Worker Custom Domain on the `serp.co` zone, declared in `env.staging.routes`, #323); `noindex` except for Ahrefs' Site Audit | https://best.serp.co (Worker Custom Domain on the `serp.co` zone) |
+| Origin | https://staging.best.serp.co (Worker Custom Domain on the `serp.co` zone, declared in `env.staging.routes`, #323), behind HTTP Basic auth: username `staging`, password `stagingpassword` (#359) | https://best.serp.co (Worker Custom Domain on the `serp.co` zone) |
 | Platform host | https://best-serp-co-staging.serpcompany.workers.dev, which 308s to staging.best.serp.co except for smoke-test requests | https://best-serp-co-production.serpcompany.workers.dev, which 308s to best.serp.co except for smoke-test requests |
 | Branch | `staging`, the base branch (pull requests squash-merge; hotfix merge-backs use a merge commit) | `main` (fast-forward promotions of `staging`, and `hotfix-*` pull requests) |
 | GitHub environment | `staging` (`staging` branch only, no reviewers) | `production` (`main` only, required reviewers) |
 | Email ([useSend](./email.md)) | `mail.serp.co`, `[staging]` prefix, allowlist | `mail.serp.co` |
 
-Every `*.workers.dev` response carries `X-Robots-Tag: noindex, nofollow`. Keep
+Every `*.workers.dev` response carries `X-Robots-Tag: noindex, nofollow`. Staging asks for its
+password on staging.best.serp.co, and on its workers.dev host after the 308 that sends a request
+without the smoke-test header to staging.best.serp.co. Exempt: smoke-test requests,
+`/robots.txt`, the billing webhook, and static files (`apps/web/public`, `/_next/static`), which
+Workers static assets serve before the Worker runs; they stay `noindex`. A request with the
+password is indexable and canonical on staging.best.serp.co, so SEO auditors crawl staging as
+they will crawl best.serp.co. The password is not a secret: it is
+`STAGING_BASIC_AUTH_PASSWORD` in `env.staging.vars`, shared by SERP sites, and stated in serp's
+staging access standard (serpcompany/serp#1458;
+[Environments and hosts](./architecture.md#environments-and-hosts)). Keep
 `workers_dev: true` on both: CI gates each Worker through its platform host with the
 `x-best-serp-co-smoke-test` header (and the staging smoke runs there with it), then production
 on best.serp.co without it
@@ -126,24 +135,46 @@ The first runs the same best.serp.co checks without skipping anything; the secon
 `x-site-environment: production` and the version the run deployed (what each check compares:
 [Environments and hosts](./architecture.md#environments-and-hosts)).
 
-Deploy Staging gates staging on its workers.dev host only. To see staging.best.serp.co as
-visitors and Ahrefs' Site Audit do (#323), after the first deploy with the Custom Domain or a
-change to the crawl policy:
+Deploy Staging gates staging on its workers.dev host with the smoke-test header, and the staging
+smoke checks staging.best.serp.co's password when the Worker answers its runner. To see
+staging.best.serp.co as visitors, CI and Ahrefs' Site Audit do (#359), after a change to the
+crawl policy or the password:
 
 ```bash
-curl -sI https://staging.best.serp.co/ | grep -i -e x-site-environment -e x-robots-tag  # staging; noindex, nofollow
-curl -sI -A 'AhrefsSiteAudit/6.1' https://staging.best.serp.co/ | grep -i -e x-site-environment -e x-robots-tag  # staging; no x-robots-tag
-curl -s https://staging.best.serp.co/robots.txt  # AhrefsSiteAudit: Allow /; everyone else: Disallow /
+# Without the password: 401, a Basic challenge, never cached.
+curl -sI https://staging.best.serp.co/ | grep -i -e '^HTTP' -e www-authenticate -e cache-control -e x-robots-tag
+# HTTP/2 401; www-authenticate: Basic realm="best.serp.co staging", charset="UTF-8"; cache-control: no-store; x-robots-tag: noindex, nofollow
+
+# With the password: 200 and indexable (no x-robots-tag), canonical on staging's own host.
+curl -sI -u staging:stagingpassword https://staging.best.serp.co/about/ | grep -i -e '^HTTP' -e x-robots-tag  # HTTP/2 200, no x-robots-tag
+curl -s -u staging:stagingpassword https://staging.best.serp.co/about/ | grep -o '<link rel="canonical" href="[^"]*"'  # https://staging.best.serp.co/about/
+
+# A smoke-test request, as CI sends it: served without the password, still noindex.
+curl -sI -H 'x-best-serp-co-smoke-test: 1' https://staging.best.serp.co/about/ | grep -i -e '^HTTP' -e x-robots-tag  # HTTP/2 200; noindex, nofollow
+
+# robots.txt, without the password: everyone disallowed but AhrefsSiteAudit, which gets
+# best.serp.co's rules and staging's sitemap index.
+curl -s https://staging.best.serp.co/robots.txt
+
+# Static files are served before the Worker, so without the password too, and stay noindex.
+curl -sI https://staging.best.serp.co/og.png | grep -i -e '^HTTP' -e x-robots-tag  # HTTP/2 200; noindex, nofollow
+
+# The workers.dev host still sends everyone else to the canonical host first.
 curl -sI https://best-serp-co-staging.serpcompany.workers.dev/about | grep -i location  # https://staging.best.serp.co/about/
 ```
 
+After a deploy that changes what staging's pages describe, re-crawl Ahrefs Site Audit project
+10510472 (Authentication: Basic, username `staging`, password `stagingpassword`); serp's
+`docs/engineering/technology/ahrefs-site-audit.md` covers its other settings and how to read it.
+
 `wrangler.jsonc` points `main` at `apps/web/worker.ts`, which wraps the generated
 `.open-next/worker.js`, so every deploy ships the edge HTML cache with the Worker
-([Caching](./caching.md)). Confirm it after a deploy:
+([Caching](./caching.md)). Confirm it after a deploy with GET requests: only a GET response
+is stored, so a HEAD never shows a HIT.
 
 ```bash
-curl -sI https://staging.best.serp.co/about/ | grep -i x-edge-cache  # MISS
-curl -sI https://staging.best.serp.co/about/ | grep -i x-edge-cache  # HIT
+curl -s -o /dev/null -D - -u staging:stagingpassword https://staging.best.serp.co/about/ | grep -i x-edge-cache  # MISS
+curl -s -o /dev/null -D - -u staging:stagingpassword https://staging.best.serp.co/about/ | grep -i x-edge-cache  # HIT
 ```
 
 A deploy starts with a cold HTML cache (the Worker version is part of every key): the first

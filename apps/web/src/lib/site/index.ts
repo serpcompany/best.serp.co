@@ -1,6 +1,7 @@
 export { content } from './content'
 export { site } from './site'
 export {
+  crawlRules,
   disallowedPaths,
   SITEMAP_INDEX_PATH,
   type SitemapGroup,

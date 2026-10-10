@@ -154,7 +154,8 @@ included; Stripe does not follow redirects):
 
 - `https://best.serp.co/api/billing/webhook/` (live mode)
 - `https://staging.best.serp.co/api/billing/webhook/` (test mode; staging's canonical host
-  since #323, whose workers.dev host 308s there)
+  since #323, whose workers.dev host 308s there). It is exempt from staging's password (#359):
+  the provider can't send one, and its signature proves the request.
 
 ### Prices and promotion codes
 

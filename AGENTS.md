@@ -16,8 +16,9 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `apps/web/`: the best.serp.co Next.js routes and OpenNext Worker (`wrangler.jsonc`); its
   code is in `apps/web/src/` (`app/`, `components/`, `lib/`, `hooks/`, `actions/`).
   `worker.ts` is the Worker entry: an epoch-keyed edge HTML cache in front of OpenNext.
-- `apps/web/src/lib/catalog/`: server-only adapter that validates the `DB` binding and delegates
-  to `apps/web/src/db/`; `apps/web/src/lib/admin/` does the same for the admin panel's decisions.
+- `apps/web/src/lib/catalog/`: server-only adapter that validates the `DB` binding, delegates to
+  `apps/web/src/db/`, and derives each listing body's Markdown tree through the data cache;
+  `apps/web/src/lib/admin/` validates and delegates the same way for the admin panel's decisions.
 - `apps/web/src/lib/auth/`: Better Auth sign-in codes, `requireUser()` / `requireAdmin()`, and
   the Worker's Cloudflare Access gate on `/admin` ([Accounts](./docs/accounts.md)).
 - `apps/web/e2e/`: Playwright suites that run against the local or deployed Worker.
@@ -104,7 +105,7 @@ Deliberate differences from serp's `web-stack/` standard; change one only throug
   for directories on serp.co subdomains.
 - One build serves every environment; the environment is read per request
   (`apps/web/src/lib/environment/request-environment.ts`), so nothing per-environment is
-  prerendered.
+  prerendered. Staging's password skips smoke tests, robots.txt, the webhook and static files.
 - `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
 - The Stripe webhook is `/api/billing/webhook/` behind a provider-neutral `BillingProvider`
   with no Stripe SDK, until the payments audit (#156) decides. Brand icons use

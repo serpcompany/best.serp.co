@@ -8,12 +8,14 @@ import { nextStepPath } from '@/lib/submissions/contract'
 import { toSummary } from '@/lib/submissions/http'
 import { ownSubmissionForPage } from '@/lib/submissions/pages'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Choose how to get listed',
-  description: 'Choose how to get your product listed on SERP.',
-  path: '/submit/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Choose how to get listed',
+    description: 'Choose how to get your product listed on SERP.',
+    path: '/submit/',
+    noindex: true
+  })
+}
 
 type ChoosePageProps = {
   params: Promise<{ id: string }>

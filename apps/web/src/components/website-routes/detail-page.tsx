@@ -133,7 +133,7 @@ export function WebsiteDetailRoutePage({
         <div className="flex flex-col gap-12">
           {/* The listing's own text, links and FAQs read in one column. */}
           <div className="flex max-w-3xl flex-col gap-12">
-            <WebsiteContentSection website={project} />
+            <WebsiteContentSection contentTree={project.contentTree} website={project} />
 
             <WebsiteResourcesSection website={resourcesWebsite} />
 

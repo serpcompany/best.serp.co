@@ -1,4 +1,6 @@
-import { urlKey, websiteSpellings } from '@/lib/url-key'
+// Relative, not `@/`: the D1 publisher loads this module under plain tsx (#340), which has no
+// alias (`scripts/tsx-import-graph.test.ts`).
+import { urlKey, websiteSpellings } from '../lib/url-key'
 import { type HostedMedia, isListingMediaKey } from './media-keys'
 import { buildQueueMediaPlans, buildRecordMediaFailurePlans } from './media-plans'
 import {
@@ -148,8 +150,11 @@ export function listingWebsiteConflicts(input: { listingId: string; website: str
   }
 }
 
-/** True while the listing's originating submission stands rejected (either category). */
-function listingSubmissionRejected(listingIdSql: string): string {
+/**
+ * True while the listing's originating submission stands rejected (either category): the listing
+ * stays down and read-only, here and in the D1 publisher's `listing-details-set` (#340).
+ */
+export function listingSubmissionRejected(listingIdSql: string): string {
   return `EXISTS (SELECT 1 FROM listing_submissions rejected
     WHERE rejected.listing_id=${listingIdSql} AND rejected.status='rejected')`
 }

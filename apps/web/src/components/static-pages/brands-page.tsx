@@ -7,7 +7,7 @@ import { PageHero } from '@/components/layout/page-hero'
 import { PageSection } from '@/components/layout/page-shell'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { getRoute } from '../../lib/routing/routes'
-import { generateBaseMetadata, SITE_PUBLIC_URL, SITE_WEBSITE_ID } from '../../lib/seo/seo-config'
+import { generateBaseMetadata, siteOrigin, siteWebsiteId } from '../../lib/seo/seo-config'
 import type { NetworkBrandEntry } from '../../lib/site/network-brands'
 import { getNetworkBrands } from '../../lib/site/network-brands'
 import { generateDisabledRouteMetadata } from '../../lib/site/route-feature-gates'
@@ -30,7 +30,8 @@ export function generateMetadata(): Metadata {
 }
 
 function BrandsJsonLd({ brands }: { brands: NetworkBrandEntry[] }) {
-  const brandsUrl = `${SITE_PUBLIC_URL}${getRoute('brands')}`
+  const origin = siteOrigin()
+  const brandsUrl = `${origin}${getRoute('brands')}`
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -39,9 +40,9 @@ function BrandsJsonLd({ brands }: { brands: NetworkBrandEntry[] }) {
     url: brandsUrl,
     isPartOf: {
       '@type': 'WebSite',
-      '@id': SITE_WEBSITE_ID,
+      '@id': siteWebsiteId(),
       name: siteConfig.name,
-      url: SITE_PUBLIC_URL
+      url: origin
     },
     mainEntity: {
       '@type': 'ItemList',

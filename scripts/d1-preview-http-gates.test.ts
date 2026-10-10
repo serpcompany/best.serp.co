@@ -1370,6 +1370,15 @@ describe('best.serp.co public policy in the production gates', () => {
       'best.serp.co robots.txt does not list'
     ],
     [
+      // #359: only staging has a password; serp's staging-access standard checks production.
+      'a password challenge',
+      (url: URL, response: Response) =>
+        url.pathname === '/robots.txt'
+          ? withHeader(response, 'www-authenticate', 'Basic realm="best.serp.co staging"')
+          : response,
+      'best.serp.co route /robots.txt asked for a password (WWW-Authenticate)'
+    ],
+    [
       'a staging Worker',
       (_url: URL, response: Response) => withHeader(response, SITE_ENVIRONMENT_HEADER, 'staging'),
       'best.serp.co route / was not answered by the production Worker (x-site-environment staging'

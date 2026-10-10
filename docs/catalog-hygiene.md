@@ -4,7 +4,8 @@ What best.serp.co lists, and how listings that don't belong leave: [adult produc
 are never listed, [the listing domain check](#the-check) finds hijacked, parked, and dead domains,
 and a product listed twice keeps [one listing](#duplicate-listings-332).
 [Listings filed under Other](#listings-filed-under-other-333) covers moving listings out of the
-catch-all category.
+catch-all category, and [listings whose copy doesn't match their product](#mismatched-listings-340)
+are retired or renamed.
 
 ## Listing domains
 
@@ -262,3 +263,21 @@ They are row-level: publish them in order, staging first, then production after 
 refuses whole if one of its listings changed since the reviewed catalog (an admin edit, a revision,
 a #332 retirement): set its `primary` to `other` with the reason and regenerate, which rewrites only
 that batch. Publish it where it was refused; where the original applied, there is nothing to redo.
+
+## Mismatched listings (#340)
+
+#333 flagged 139 listings whose copy doesn't describe their product; #340 checked each website.
+`d1/hygiene/2026-10-10-mismatch-audit.yaml` holds the verdicts, evidence, and owner's `decision`
+(2026-10-10), which `pnpm catalog:mismatch` turns into four row-level manifests:
+
+- `-removals` unpublishes 127: 40 dead, hijacked, or not products (3 more are held), and 87 real
+  products with the wrong copy (`unowned`, as [duplicates](#duplicate-listings-332) are).
+- `-renames` gives 8 renamed products a new name, a description from the live site, and their own
+  URL where the serp.ly link no longer reaches them ([`listing-details-set`](./catalog-publication.md#listing-details)),
+  and fixes faceapp.com's description; `-categories` moves the 4 with a live category.
+- `-claim-holds-clear` clears the [claim holds](./claims.md#holds) of the 5 renames whose new
+  website replaces the link that caused the hold; before `-renames`, it is refused.
+
+`scripts/mismatch-manifests.test.ts` keeps them identical to the audit and disjoint from #332's,
+#333's, and #338's, and replays them after #333's. Publish them after those, staging first. A later
+manifest may change the same listings; a held listing decided later goes into a new manifest.

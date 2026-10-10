@@ -187,37 +187,46 @@ describe('public crawl and analytics policy through the Worker and the root layo
     expect(page.html).not.toContain('cloudflareinsights')
   })
 
-  // #323: Ahrefs' Site Audit sees staging.best.serp.co without the noindex, but as staging: no
-  // analytics, and nothing it was served reaches another visitor from the edge cache.
+  // #359: a request with staging's password sees staging.best.serp.co without the noindex, but
+  // as staging: no analytics, and nothing it was served reaches a request without the password.
   it.each([
-    ['AhrefsSiteAudit first', [true, false, true, false]],
-    ['a visitor first', [false, true, false, true]]
-  ])(
-    'serves staging.best.serp.co without analytics, noindex for all but AhrefsSiteAudit (%s)',
-    async (_label, auditVisits) => {
+    ['the password first', ['password', 'anonymous', 'smoke', 'password']],
+    ['a smoke-test request first', ['smoke', 'password', 'anonymous', 'password']]
+  ] as const)(
+    'serves staging.best.serp.co without analytics, noindex for all but the password (%s)',
+    async (_label, visitors) => {
       const visit = worker({
         CANONICAL_HOST_REDIRECT: 'on',
         CF_WEB_ANALYTICS_TOKEN: WEB_ANALYTICS_TOKEN,
-        SITE_ENVIRONMENT: 'staging'
+        SITE_ENVIRONMENT: 'staging',
+        STAGING_BASIC_AUTH_PASSWORD: 'policy-test-password'
       })
       const states: (string | null)[] = []
-      for (const audit of auditVisits) {
+      for (const visitor of visitors) {
         const page = await visit('https://staging.best.serp.co/', {
-          headers: {
-            'user-agent': audit
-              ? 'Mozilla/5.0 (compatible; AhrefsSiteAudit/6.1; +http://ahrefs.com/robot/site-audit)'
-              : 'Mozilla/5.0 (Macintosh) Chrome/141.0 Safari/537.36'
-          }
+          headers:
+            visitor === 'password'
+              ? { authorization: `Basic ${btoa('staging:policy-test-password')}` }
+              : visitor === 'smoke'
+                ? { [SMOKE_TEST_HEADER]: '1' }
+                : {}
         })
+        expect(page.headers.get(SITE_ENVIRONMENT_HEADER)).toBe('staging')
+        expect(page.headers.get('x-robots-tag')).toBe(
+          visitor === 'password' ? null : 'noindex, nofollow'
+        )
+        if (visitor === 'anonymous') {
+          expect(page.status).toBe(401)
+          expect(page.html).not.toContain('<h1>SERP</h1>')
+          continue
+        }
         states.push(page.headers.get(EDGE_CACHE_HEADER))
         expect(page.status).toBe(200)
-        expect(page.headers.get('x-robots-tag')).toBe(audit ? null : 'noindex, nofollow')
-        expect(page.headers.get(SITE_ENVIRONMENT_HEADER)).toBe('staging')
         expect(page.html).toContain('<h1>SERP</h1>')
         expect(page.html).not.toContain('googletagmanager.com')
         expect(page.html).not.toContain('cloudflareinsights')
       }
-      expect(states).toEqual(['MISS', 'HIT', 'HIT', 'HIT'])
+      expect(states).toEqual(['MISS', 'HIT', 'HIT'])
     }
   )
 

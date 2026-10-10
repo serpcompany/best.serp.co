@@ -20,8 +20,22 @@ export const site = {
   publicUrl: 'https://best.serp.co',
   /** Served instead of redirected on a deployed Worker's workers.dev host; CI sends it there. */
   smokeTestHeader: 'x-best-serp-co-smoke-test',
+  /**
+   * Staging's HTTP Basic auth (#359): shared by SERP sites and stated in serp's staging-access
+   * standard, so not a secret. Only the password is checked; people and Ahrefs use `staging`.
+   */
+  stagingAccess: { password: 'stagingpassword', username: 'staging' },
   title: 'SERP Directory of Products and Resources'
 } as const
+
+/**
+ * The origin a Worker writes in its absolute URLs (canonicals, JSON-LD, sitemaps, the feed), by
+ * the `x-site-environment` it reports: staging writes its own (#359); production and local write
+ * best.serp.co.
+ */
+export function writtenOrigin(environment: string | undefined): string {
+  return environment === 'staging' ? site.canonicalOrigins.staging : site.publicUrl
+}
 
 /** A deployed Worker's `*.workers.dev` host, which needs the smoke-test header (#323). */
 export function isPlatformOrigin(baseURL: string | undefined): boolean {
@@ -43,9 +57,12 @@ export function categoryPath(slug: string): string {
 
 export const categoriesIndexPath = '/products/categories/'
 
-/** The canonical absolute URL: the homepage is the bare origin, never `https://best.serp.co/`. */
-export function absoluteUrl(path: string): string {
-  return path === '/' ? site.publicUrl : `${site.publicUrl}${path}`
+/**
+ * The canonical absolute URL: the homepage is the bare origin, never `https://best.serp.co/`. On
+ * best.serp.co unless another origin is given (`writtenOrigin`).
+ */
+export function absoluteUrl(path: string, origin: string = site.publicUrl): string {
+  return path === '/' ? origin : `${origin}${path}`
 }
 
 export function escapeRegExp(value: string): string {

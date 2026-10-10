@@ -6,43 +6,49 @@
  * 1. Canonical host: on a deployed Worker with `CANONICAL_HOST_REDIRECT=on`, a
  *    `*.workers.dev` request without the smoke-test header gets one 308 to that Worker's
  *    canonical host, best.serp.co or staging.best.serp.co (`lib/routing/canonical-host.ts`).
- * 2. Retired URLs without a replacement (`/news`) answer 410 Gone (`lib/routing/retired-paths.ts`).
- * 3. An old root-level listing or category URL: one 308 to its page (`lib/routing/legacy-root.ts`).
- * 4. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
- * 5. Outside public production, `/robots.txt` disallows every crawler; on staging's canonical
- *    host it lets Ahrefs' Site Audit in (#323).
- * 6. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
+ * 2. Staging's password (#359, `lib/environment/staging-access.ts`): on a Worker that serves as
+ *    staging, every request without the password gets a 401, except the smoke-test header,
+ *    `/robots.txt` and the billing webhook. A request that passes goes on without its
+ *    `Authorization` header. Production and local skip this.
+ * 3. Retired URLs without a replacement (`/news`) answer 410 Gone (`lib/routing/retired-paths.ts`).
+ * 4. An old root-level listing or category URL: one 308 to its page (`lib/routing/legacy-root.ts`).
+ * 5. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
+ * 6. Outside public production, `/robots.txt` disallows every crawler; a Worker that serves as
+ *    staging also lets its auditor in, with best.serp.co's rules (#359).
+ * 7. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
  *    503, 403, or 401 (`lib/auth/admin-gate.ts`); pages and handlers then require an admin.
- * 7. The local dev endpoints (`/api/dev/*`, `/api/auth/dev/*`) answer 404 unless the Worker was
+ * 8. The local dev endpoints (`/api/dev/*`, `/api/auth/dev/*`) answer 404 unless the Worker was
  *    reached on a local host (#164). This uses the Worker's own URL: inside OpenNext a client's
  *    `X-Forwarded-Host` becomes `Host`, so a check there alone could be talked past.
- * 8. Everything else is served through the edge HTML cache and OpenNext (`serve`).
+ * 9. Everything else is served through the edge HTML cache and OpenNext (`serve`).
  *
  * Every response then carries the configured environment, the Worker version and, outside
  * public production, `X-Robots-Tag: noindex, nofollow` (`lib/environment/site-environment.ts`),
- * which only a staging audit request (Ahrefs' Site Audit on staging's canonical host) goes
- * without. These headers are added after the edge cache, from this request alone, so they
- * always describe the Worker, host and client that asked: a stored response never carries
- * them, and one stored for Ahrefs reaches every other client with the noindex.
+ * which only a staging request that passed the password goes without. These headers are added
+ * after the edge cache, from this request alone, so they always describe the Worker, host and
+ * client that asked: a stored response never carries them, and one stored for a request that
+ * passed the password reaches a smoke-test request with the noindex. The password is checked
+ * before the cache, so nothing stored is ever served to a request without it, and a 401 is
+ * never stored.
  */
 import { adminGate } from '../auth/admin-gate'
 import type { AccessEnv, VerifyAccessOptions } from '../auth/cloudflare-access'
 import { isLocalRequestHost } from '../environment/local-host'
 import {
   isPublicProduction,
-  isStagingAuditRequest,
-  isStagingCanonical,
   NON_PRODUCTION_ROBOTS_TXT,
   nonProductionRobotsTxt,
   parseSiteEnvironment,
-  STAGING_CANONICAL_ROBOTS_TXT,
+  servesAsStaging,
+  stagingRobotsTxt,
   withEnvironmentHeaders
 } from '../environment/site-environment'
+import { type StagingAccessEnv, stagingAccess } from '../environment/staging-access'
 import { type CanonicalHostEnv, canonicalHostRedirect } from '../routing/canonical-host'
 import { retiredPathResponse } from '../routing/retired-paths'
 import { trailingSlashRedirect } from '../routing/trailing-slash'
 
-export interface WorkerRequestEnv extends CanonicalHostEnv, AccessEnv {
+export interface WorkerRequestEnv extends CanonicalHostEnv, AccessEnv, StagingAccessEnv {
   CF_VERSION_METADATA?: { id?: string }
 }
 
@@ -62,26 +68,30 @@ export async function handleWorkerRequest(
   env: WorkerRequestEnv,
   pipeline: WorkerRequestPipeline
 ): Promise<Response> {
-  const host = new URL(request.url).host
-  const publicProduction = isPublicProduction(env.SITE_ENVIRONMENT, host)
-  const robotsTxt = isStagingCanonical(env.SITE_ENVIRONMENT, host)
-    ? STAGING_CANONICAL_ROBOTS_TXT
-    : NON_PRODUCTION_ROBOTS_TXT
+  const publicProduction = isPublicProduction(env.SITE_ENVIRONMENT, new URL(request.url).host)
+  const headers = (response: Response, passedStagingGate = false) =>
+    withEnvironmentHeaders(response, {
+      environment: parseSiteEnvironment(env.SITE_ENVIRONMENT),
+      passedStagingGate,
+      publicProduction,
+      versionId: env.CF_VERSION_METADATA?.id
+    })
+
+  const hostRedirect = canonicalHostRedirect(request, env, pipeline.configRedirects)
+  if (hostRedirect) return headers(hostRedirect)
+  const access = await stagingAccess(request, env)
+  if (access.gate === 'refused') return headers(access.response)
+  const admitted = access.gate === 'passed' ? access.request : request
+  const robotsTxt = servesAsStaging(env) ? stagingRobotsTxt() : NON_PRODUCTION_ROBOTS_TXT
   const response =
-    canonicalHostRedirect(request, env, pipeline.configRedirects) ??
-    retiredPathResponse(request) ??
-    (await pipeline.legacyRoot?.(request)) ??
-    trailingSlashRedirect(request, pipeline.configRedirects) ??
-    (publicProduction ? null : nonProductionRobotsTxt(request, robotsTxt)) ??
-    (await adminGate(request, env, pipeline.access)) ??
-    devEndpointGate(request) ??
-    (await pipeline.serve(request))
-  return withEnvironmentHeaders(response, {
-    environment: parseSiteEnvironment(env.SITE_ENVIRONMENT),
-    publicProduction,
-    stagingAudit: isStagingAuditRequest(env.SITE_ENVIRONMENT, request),
-    versionId: env.CF_VERSION_METADATA?.id
-  })
+    retiredPathResponse(admitted) ??
+    (await pipeline.legacyRoot?.(admitted)) ??
+    trailingSlashRedirect(admitted, pipeline.configRedirects) ??
+    (publicProduction ? null : nonProductionRobotsTxt(admitted, robotsTxt)) ??
+    (await adminGate(admitted, env, pipeline.access)) ??
+    devEndpointGate(admitted) ??
+    (await pipeline.serve(admitted))
+  return headers(response, access.gate === 'passed')
 }
 
 const DEV_ENDPOINT_PREFIXES = ['/api/dev/', '/api/auth/dev/']
