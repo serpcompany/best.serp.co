@@ -3,8 +3,8 @@
 The private side of the data model: submissions, listing owners, owner revisions, badge checks,
 and the payment fields. Column meanings and most constraints are commented in
 `apps/web/src/db/schema.ts`; this page holds the invariants that span columns or tables, and why.
-Statuses and transitions are in [Submission flow](./SUBMISSION_FLOW.md), claims in
-[Claims](./CLAIMS.md#data), and orders in [Billing](./BILLING.md#data).
+Statuses and transitions are in [Submission flow](./submission-flow.md), claims in
+[Claims](./claims.md#data), and orders in [Billing](./billing.md#data).
 
 ## Ownership
 
@@ -32,7 +32,7 @@ account deletion must resolve ownership first.
 - **Draft clock.** `draft_saved_at` starts when the draft is first saved. Edits never reset it or
   the reminders (owner decision, 2026-10-06: the 30 days run from the first save), so editing
   cannot extend a hold on a URL. The schedule is in
-  [Submission flow](./SUBMISSION_FLOW.md#draft-reminders-and-expiry).
+  [Submission flow](./submission-flow.md#draft-reminders-and-expiry).
 
 ## URL keys and prohibited URLs
 
@@ -61,7 +61,7 @@ then), so there is no backfill.
 
 ## Payments and refunds
 
-- **Charges are recorded in `orders`** ([Billing](./BILLING.md)), the ledger of record for every
+- **Charges are recorded in `orders`** ([Billing](./billing.md)), the ledger of record for every
   charge and refund. `paid_at` and `refunded_at` describe a payment applied to this submission,
   nothing more; a charge the submission can't accept (a duplicate checkout, a payment after a
   withdrawal, rejection, or change request) is refunded from `orders` alone.
@@ -69,7 +69,7 @@ then), so there is no backfill.
   batch on. The batch writes that marker atomically (`status = 'rejected'`,
   `rejection_category = 'other'`, `paid_at` set, `refunded_at` null), so no extra column is
   needed; recording the refund clears it. The refund hook is idempotent and is retried by a
-  replayed rejection and by its sweep ([Admin panel](./ADMIN_PANEL.md#refunds)).
+  replayed rejection and by its sweep ([Admin panel](./admin-panel.md#refunds)).
 
 ## Revisions and badge checks
 
@@ -78,7 +78,7 @@ then), so there is no backfill.
   revision, and none while its own submission is still in review, because that submission is
   then its only edit channel. The logo is required, like a submission's.
 - `badge_checks` is the badge program history, written only by
-  `apps/web/src/db/badge-program.ts` ([Badge program](./BADGE_PROGRAM.md)). Writing it never
+  `apps/web/src/db/badge-program.ts` ([Badge program](./badge-program.md)). Writing it never
   changes the catalog epoch. An owner's own checks are recorded on the submission
-  ([Submitter dashboard](./ACCOUNT_DASHBOARD.md#badge-panel)).
+  ([Submitter dashboard](./account-dashboard.md#badge-panel)).
 - `orders` and `billing_events` are written only by `apps/web/src/db/billing.ts`.

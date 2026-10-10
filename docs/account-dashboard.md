@@ -5,7 +5,7 @@ submissions and manages the listings they own. The screens follow the mockups ap
 (screens 5 to 7 and the dashboard-01 shell, `components/account/account-shell.tsx`, which the
 admin panel shares through `@/components/dashboard/*`). `features.accountDashboard`
 (`apps/web/src/lib/features.ts`) is on, so emails and the submit pages use its approved wording and
-links ([Email templates](./EMAIL_TEMPLATES.md#routes-the-buttons-need)).
+links ([Email templates](./email-templates.md#routes-the-buttons-need)).
 
 | Screen | Route |
 |---|---|
@@ -90,7 +90,7 @@ badge reads "Fix the badge before the recheck" with "If it’s still failing at 
 overview's "Badge checks" card says "Free listings are checked weekly" (`feature-copy.ts`; off,
 none of it promises weekly checks). The "Upgrade: $49 one-off" entry point (in the badge panel)
 and an unlisted listing's "Relist for $49" show only while orders are on, as they are since #133
-([Billing](./BILLING.md)), and a draft's next step reads "Choose free or paid".
+([Billing](./billing.md)), and a draft's next step reads "Choose free or paid".
 
 ## Logos
 

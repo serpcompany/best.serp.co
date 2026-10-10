@@ -137,7 +137,7 @@ test.describe('sign-in screens', () => {
     await expect(page.getByRole('heading', { name: 'Sign up or sign in' })).toBeVisible()
 
     await requestCodeInPage(page, email)
-    // The answer is the same whether or not an email went out (docs/ACCOUNTS.md).
+    // The answer is the same whether or not an email went out (docs/accounts.md).
     await expect(page.getByText(`If ${email} is a valid address`)).toBeVisible()
     // The 60-second resend countdown starts at 1:00, never above it.
     await expect(page.getByText(/Resend in (?:1:00|0:[0-5]\d)/u)).toBeVisible()

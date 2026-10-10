@@ -2,8 +2,8 @@
 
 What GitHub Actions runs for this repository: the checks on pull requests and pushes, the staging
 deploy, the rulesets, and the runners. Release-time guards are in
-[Release guards](./RELEASE_GUARDS.md); the release steps are in the
-[deploy runbook](./DEPLOY_RUNBOOK.md#workflows).
+[Release guards](./release-guards.md); the release steps are in the
+[deploy runbook](./deploy-runbook.md#workflows).
 
 One workflow, `web.yml` (#182), checks pull requests into `staging` (the base branch) and `main`
 (`hotfix-*` branches only), checks every push to them, and deploys staging:
@@ -28,7 +28,7 @@ One workflow, `web.yml` (#182), checks pull requests into `staging` (the base br
 - `deploy-staging` waits in `deploy-best-serp-co-staging` with `queue: max`, so nothing joining
   cancels a waiting deploy or catalog publication. It builds, checks the tip again (a partial
   re-run reuses the old `tip` output), then runs the staging release steps
-  ([deploy runbook](./DEPLOY_RUNBOOK.md#workflows)).
+  ([deploy runbook](./deploy-runbook.md#workflows)).
 - `changes` compares with `--no-renames`, so code moved into `docs/` still counts as code.
 
 Three branch rulesets apply: `staging` (24491650), `main pull requests` (24716331), and `main`
@@ -55,12 +55,12 @@ and `main` keeps the deletion and force-push blocks nobody can bypass. Agents ne
 a pull request's head branch, so `check` fails a pull request into `main` whose
 head is not a `hotfix-*` branch. That only catches mis-targeted pull requests; Deploy
 Production's tree check is the control. Agents never merge: the owner approves every merge
-([Release guards](./RELEASE_GUARDS.md#promotion)).
+([Release guards](./release-guards.md#promotion)).
 
 After a pull request merges, the push run checks the exact resulting revision again; when it
 merged up to date its tree is the one the pull request tested, so only the quick checks repeat.
 `deploy-production.yml` releases each `main` push after reviewer approval, and only a tree
-`deploy-staging` verified (see [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
+`deploy-staging` verified (see [Release guards](./release-guards.md#staging-before-production)).
 
 ## Runners
 

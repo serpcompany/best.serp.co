@@ -1,6 +1,6 @@
 import { handleAuthRequest } from '@/lib/auth/server'
 
-// Better Auth endpoints (sign-in code, sign-in, session, sign-out): docs/ACCOUNTS.md.
+// Better Auth endpoints (sign-in code, sign-in, session, sign-out): docs/accounts.md.
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request): Promise<Response> {

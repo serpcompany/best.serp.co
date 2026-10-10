@@ -35,7 +35,7 @@ describe('Worker configuration (serp web-stack/nextjs-on-workers.md)', () => {
       expect(config.vars.CF_WEB_ANALYTICS_TOKEN, name).toBeUndefined()
     }
     // The same pattern `analyticsForRequest` accepts (apps/web/src/lib/environment). Set since
-    // 2026-10-09: the best.serp.co site in the SERP account's Web Analytics (docs/TELEMETRY.md).
+    // 2026-10-09: the best.serp.co site in the SERP account's Web Analytics (docs/telemetry.md).
     expect(resolved('production').vars.CF_WEB_ANALYTICS_TOKEN).toMatch(/^[0-9a-f]{32}$/u)
   })
 

@@ -5,12 +5,12 @@ break whenever the source moves.
 
 This page covers storage, keys, the D1 records, and rendering. Two leaves branch off it:
 
-- [Media ingestion](./MEDIA_INGESTION.md): how a source URL becomes a hosted image, where the
+- [Media ingestion](./media-ingestion.md): how a source URL becomes a hosted image, where the
   Worker hosts one (submissions, admin edits, revisions, approvals), and the media cron.
-- [Media publishing](./MEDIA_PUBLISHING.md): catalog-wide changes through reviewed upload plans
+- [Media publishing](./media-publishing.md): catalog-wide changes through reviewed upload plans
   and manifests, recovering a refused manifest, and the legacy migration.
 
-The fallback tile and the weekly media check: [image safety](./MEDIA_HEALTH.md).
+The fallback tile and the weekly media check: [image safety](./media-health.md).
 
 ## Owner decisions (2026-10-06)
 
@@ -22,7 +22,7 @@ The fallback tile and the weekly media check: [image safety](./MEDIA_HEALTH.md).
   so one publication manifest fits staging and production.
 - **SVG is refused**, because a same-host SVG can carry script.
 - **All existing catalog images move** into the store; the
-  [legacy migration](./MEDIA_PUBLISHING.md#legacy-migration) is a separate, reviewed step.
+  [legacy migration](./media-publishing.md#legacy-migration) is a separate, reviewed step.
 
 ## Keys and objects
 
@@ -46,7 +46,9 @@ under a live listing's path.
 - **A slug change keeps the media rows.** The key carries the slug, and a `listing-slug-change`
   manifest keeps the listing's media rows: re-host them under the new slug with a later
   `listing-media-update`, or media health reports them as `foreign_key`
-  (`scripts/catalog-media.test.ts` holds committed manifests to that).
+  (`scripts/catalog-media.test.ts` holds committed manifests to that). A listing with no logo or
+  image gets an empty update (`expected: []`, `media: {}`), which the publisher refuses if it has
+  media after all. After a second rename, the update goes under the latest slug.
 - **The production bucket is shared with serp.co.** `storeHostedMedia` is the only write to the
   bucket and refuses any key outside this site's three scopes, whatever bucket it is handed;
   `scopedMediaBucket` refuses the same before R2, and deletes only pending keys. The Worker never
@@ -79,7 +81,7 @@ The web adapter (`apps/web/src/lib/catalog/repository.ts`) turns keys into URLs 
 `MEDIA_BASE_URL` and fails closed when the variable is missing or malformed. Listing JSON-LD
 names the hosted logo, so on staging and in production it names the media host rather than
 best.serp.co. A slot that is not hosted, or an image that fails to load, shows the fallback tile
-([image safety](./MEDIA_HEALTH.md)).
+([image safety](./media-health.md)).
 
 The admin screens and the review previews render the same way (`renderableImage`): the hosted
 copy, or an imported site-relative path on our own origin; a source on another host is shown as
@@ -101,7 +103,7 @@ the e2e media server (`apps/web/e2e/media-fixture.ts`) runs it and queues an unr
 
 The `cdn-staging` bucket and both custom domains exist, and the deploy token
 `best-serp-co-deploy` has Account → Workers R2 Storage → Edit
-([deploy credentials](./DEPLOY_CREDENTIALS.md#cloudflare-api-token)).
+([deploy credentials](./deploy-credentials.md#cloudflare-api-token)).
 
 ### Optional owner actions
 
@@ -113,4 +115,4 @@ The `cdn-staging` bucket and both custom domains exist, and the deploy token
   never stored): a Response Header Transform Rule on `serp.co` for `cdn.serp.co` and
   `cdn-staging.serp.co` paths under `/best.serp.co/` setting `X-Content-Type-Options: nosniff`.
 - **A human gate on staging data**:
-  [Media publishing](./MEDIA_PUBLISHING.md#a-human-gate-on-staging-data).
+  [Media publishing](./media-publishing.md#a-human-gate-on-staging-data).

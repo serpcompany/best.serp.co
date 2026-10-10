@@ -5,7 +5,7 @@
 Native submissions (serpcompany/best.serp.co#59) move through these statuses in
 `listing_submissions.status`. Every transition is a compare-and-swap statement plan in
 `apps/web/src/db/submission-plans.ts` (`submissionTransitions`), tested for every source
-status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement-plans).
+status in `submission-plans.test.ts`; see [Data model](./data-model.md#statement-plans).
 
 | Status | Meaning | Live | Review queue |
 | --- | --- | --- | --- |
@@ -66,7 +66,7 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
   payment from `pending_badge`; a payment that completes after withdrawal or expiry is recorded
   with its refund (#68's webhook issues it). Any other charge the submission cannot accept lives
   only in #68's `orders`, which is the ledger of record
-  ([Submission data](./SUBMISSION_DATA.md#payments-and-refunds)). Once paid, the owner cannot
+  ([Submission data](./submission-data.md#payments-and-refunds)). Once paid, the owner cannot
   withdraw; they message the team (#73) and an admin decides.
 - The protected publisher's `listing-unpublish` can still take a listing down while its
   submission is queued (an emergency takedown is never blocked). The in-app plans refuse that,
@@ -89,11 +89,11 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
 - Owners edit a live listing through a revision (`listing_revisions`): `pending_review`,
   `changes_requested`, then `approved` (applied atomically to the listing), `rejected`, or
   `withdrawn` (`revision-plans.ts`). The owner's side of every transition here is the
-  [Submitter dashboard](./ACCOUNT_DASHBOARD.md) (#65).
+  [Submitter dashboard](./account-dashboard.md) (#65).
 
 ## Review in the admin panel (#64)
 
-Admins decide in `/admin` ([Admin panel](./ADMIN_PANEL.md)). The review queue lists
+Admins decide in `/admin` ([Admin panel](./admin-panel.md)). The review queue lists
 `verified` and `paid_pending_review` submissions and `pending_review` revisions, oldest first.
 On a submission an admin can approve (optionally editing the name, category, short and long
 description, and logo first, and choosing the outbound link; the edit and the approval are one
@@ -102,14 +102,14 @@ prohibited URL, "Allow resubmission" lifts the block. Each decision is these pla
 `content_version` guard, is idempotent (a replay answers `replayed: true` and sends nothing),
 records the admin's email in the events, and emails the submitter once ("approved", "changes
 requested", "rejected", or "rejected: prohibited"). Rejecting a paid submission as `other`
-refunds it ([Billing](./BILLING.md)). These decisions write production D1 directly: the documented
-production-write exception ([Admin panel](./ADMIN_PANEL.md#the-production-write-exception)).
+refunds it ([Billing](./billing.md)). These decisions write production D1 directly: the documented
+production-write exception ([Admin panel](./admin-panel.md#the-production-write-exception)).
 
 **Adult products are not listed** (#260, owner decisions of 2026-10-09): reject a submission for
 anything built for adult content, including a downloader for an adult video or cam site (fan-site
 downloaders such as OnlyFans stay), with the existing Reject; `prohibited` also blocks its domain
 from new submissions. The forms no longer offer the Adult category
-([Catalog hygiene](./CATALOG_HYGIENE.md#adult-products-260)).
+([Catalog hygiene](./catalog-hygiene.md#adult-products-260)).
 
 ## Submit v2 (#63)
 
@@ -150,7 +150,7 @@ owner except filling in the form; the anonymous capability-token flow is gone.
 5. **`/submit/<id>/choose/`** (screen 2b): "Get the badge code" chooses free
    (`POST /api/submissions/<id>/plan`, `draft` → `pending_badge`). With `features.orders` on
    (since #133) the paid card, "Skip the badge: $49 one-off", shows beside it, and "Pay $49 and
-   go live" opens the checkout ([Billing](./BILLING.md)); with it off, the paid card and every
+   go live" opens the checkout ([Billing](./billing.md)); with it off, the paid card and every
    $49 link are hidden. "Decide later" leaves
    the draft in the account (`/account/` lists it with "Expires in N days" and Continue).
 6. **`/submit/<id>/badge/`** (screen 3): the light and dark snippets link to the future listing.
@@ -226,7 +226,7 @@ proposes an SVG icon. A local Worker also accepts http, for its fixture sites.
 The saved logo, and the social image the server's own prefill finds on the website, are then
 copied to our media host under the submission (`best.serp.co/submissions/<id>/…`, after the
 response, so hosting never fails the save; see
-[Media ingestion](./MEDIA_INGESTION.md#where-it-runs)). The review screen and previews show
+[Media ingestion](./media-ingestion.md#where-it-runs)). The review screen and previews show
 those hosted copies, or the fallback tile with a link to the source; approval copies the logo,
 and the featured image exactly as the reviewer saw it, into the listing's path.
 Only the submitter's own form previews the URL they typed, through
@@ -246,7 +246,7 @@ reminder copy follows `features.orders` (on since #133): it offers both plans wi
 and asks a draft left in checkout to complete it; with orders off it offers the free badge
 listing only, with no price, and sends a draft left in checkout to the plan choice. A run
 handles at most 100 of each and logs whether more remain. The same hourly trigger then continues
-the [badge program](./BADGE_PROGRAM.md). The deploy that ships the Worker registers the
+the [badge program](./badge-program.md). The deploy that ships the Worker registers the
 triggers (the dashboard lists them under the Worker's Settings → Triggers), and each run logs
 `scheduled_job_finished` or `scheduled_job_failed` per job. The local preview runs Wrangler with
 `--test-scheduled`, so `/__scheduled?cron=<expression>` runs `scheduled()` on demand; the job's
@@ -260,4 +260,4 @@ Code: `apps/web/src/app/(site)/submit/`, `apps/web/src/components/submit/`,
 
 A submitted logo is never published as the submitter's URL (#95): approval adopts its hosted copy
 or queues the source behind the fallback tile. Submit v2 hosts it at intake
-([Media ingestion](./MEDIA_INGESTION.md#where-it-runs)).
+([Media ingestion](./media-ingestion.md#where-it-runs)).

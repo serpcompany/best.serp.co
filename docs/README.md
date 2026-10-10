@@ -4,39 +4,39 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 
 | Document | Covers | Read it when |
 |---|---|---|
-| [Architecture](./ARCHITECTURE.md) | Runtime boundaries and responsibilities | You change the Worker entry, a binding, an environment or host rule, or which layer owns what |
-| [URLs](./URLS.md) | Canonical URLs, redirects, pagination, sitemaps and structured data | You add a route, a redirect, a sitemap, or structured data |
-| [Caching](./CACHING.md) | The catalog epoch and the four cache layers | You change what a page caches, or a change isn't showing |
-| [Data model](./DATA_MODEL.md) | D1 schema and migrations, D1 limits, statement plans, manifests, where the catalog came from | You touch a table or a migration, write a statement plan, or change how catalog data is changed |
-| [Public catalog](./PUBLIC_CATALOG.md) | Public eligibility, listing states, the catalog epoch, read shapes, search | You change what a page may show, a catalog read, or search |
-| [Submission and ownership data](./SUBMISSION_DATA.md) | Submission, ownership, revision, and payment invariants; URL keys and prohibited-URL blocks | You touch a submission, owner, revision or payment table, or how URLs are keyed and blocked |
-| [Development](./DEVELOPMENT.md) | Local data, Worker preview, schema changes | You set up a checkout, run the Worker locally, or change the schema |
-| [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review | You change `/submit` or how a submission reaches review |
-| [Claims](./CLAIMS.md) | Claiming an existing listing: domain-email code, badge or payment | You change the claim link, its checks, or ownership |
-| [Badge program](./BADGE_PROGRAM.md) | Weekly badge checks, rechecks, unpublishing, ownership removal | You change the badge crons or what a failed check does |
-| [Listing media](./MEDIA.md) | Hosted logos and images: R2 keys, D1 records, rendering, local media | You add, host or move a listing image |
-| [Media ingestion](./MEDIA_INGESTION.md) | Fetching a source, where the Worker hosts images, the media cron | You change how a source is fetched and hosted, or the media cron |
-| [Media publishing](./MEDIA_PUBLISHING.md) | Catalog-wide media changes: upload plans, manifests, recovery, the legacy migration | You plan a catalog-wide media change, or a media manifest is refused |
-| [Image safety and media health](./MEDIA_HEALTH.md) | The listing image fallback, its guards, the weekly media check | You render a listing image or change the media check |
-| [Email](./EMAIL.md) | Transactional email, environments, owner prerequisites | You send mail or change where it may go |
-| [Email templates](./EMAIL_TEMPLATES.md) | Every email, its trigger, recipient, and link | You add or reword an email |
-| [Billing](./BILLING.md) | Paid listings: Stripe behind the billing module, orders, refunds | You touch a payment, an order, or the billing sweep |
-| [Submitter dashboard](./ACCOUNT_DASHBOARD.md) | `/account`: statuses, edits, revisions, the badge panel | You change a `/account` screen |
-| [Accounts](./ACCOUNTS.md) | Better Auth sign-in codes, admins, Cloudflare Access | You change sign-in, sessions, the dashboard shell, or the admin gate |
-| [Admin panel](./ADMIN_PANEL.md) | `/admin` screens, decisions, the production-write exception | You change an `/admin` screen or a decision it writes |
-| [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, workflows and their guards, production release, recovery, post-deploy checks | Before any Cloudflare operation or release, or when a deploy gate fails |
-| [Deploy credentials](./DEPLOY_CREDENTIALS.md) | The Cloudflare API token, the GitHub environments that hold it, what a leak reaches | You create, rotate or narrow the token or an environment's secrets |
-| [Production cutover](./PRODUCTION_CUTOVER.md) | The finished move of best.serp.co from GitHub Pages to the Worker, and the canonical-host switch | Code or a gate mentions the cutover or the canonical-host switch |
-| [Telemetry](./TELEMETRY.md) | Sentry error reporting, GTM and Cloudflare Web Analytics | You add logging, error reporting, or analytics |
-| [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel | A production write needs undoing |
-| [Catalog hygiene](./CATALOG_HYGIENE.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains | You add or remove listings, change the domain check, or touch the listing FAQs' `faqsToShow` stopgap |
-| [Release guards](./RELEASE_GUARDS.md) | `db:*` commands by target, promotion, staging before production, hotfixes | You run a `db:*` command, promote `staging`, open a `hotfix-*` pull request, or change a release workflow |
-| [Catalog publication](./CATALOG_PUBLICATION.md) | Catalog manifests and listing media plans: staging first, the publisher's and uploader's guards | You prepare or publish a `d1/publications/` manifest or a `d1/media/` upload plan |
-| [Credential guards](./CREDENTIAL_GUARDS.md) | Workflow jobs holding the Cloudflare token: no D1 exports, bookmarks before changes, the security boundary | A workflow change gives a job the Cloudflare token, or `deploy-workflows.test.ts` fails on a workflow |
+| [Architecture](./architecture.md) | Runtime boundaries and responsibilities | You change the Worker entry, a binding, an environment or host rule, or which layer owns what |
+| [URLs](./urls.md) | Canonical URLs, redirects, pagination, sitemaps and structured data | You add a route, a redirect, a sitemap, or structured data |
+| [Caching](./caching.md) | The catalog epoch and the four cache layers | You change what a page caches, or a change isn't showing |
+| [Data model](./data-model.md) | D1 schema and migrations, D1 limits, statement plans, manifests, where the catalog came from | You touch a table or a migration, write a statement plan, or change how catalog data is changed |
+| [Public catalog](./public-catalog.md) | Public eligibility, listing states, the catalog epoch, read shapes, search | You change what a page may show, a catalog read, or search |
+| [Submission and ownership data](./submission-data.md) | Submission, ownership, revision, and payment invariants; URL keys and prohibited-URL blocks | You touch a submission, owner, revision or payment table, or how URLs are keyed and blocked |
+| [Development](./development.md) | Local data, Worker preview, schema changes | You set up a checkout, run the Worker locally, or change the schema |
+| [Submission flow](./submission-flow.md) | Public intake, badge verification, review | You change `/submit` or how a submission reaches review |
+| [Claims](./claims.md) | Claiming an existing listing: domain-email code, badge or payment | You change the claim link, its checks, or ownership |
+| [Badge program](./badge-program.md) | Weekly badge checks, rechecks, unpublishing, ownership removal | You change the badge crons or what a failed check does |
+| [Listing media](./media.md) | Hosted logos and images: R2 keys, D1 records, rendering, local media | You add, host or move a listing image |
+| [Media ingestion](./media-ingestion.md) | Fetching a source, where the Worker hosts images, the media cron | You change how a source is fetched and hosted, or the media cron |
+| [Media publishing](./media-publishing.md) | Catalog-wide media changes: upload plans, manifests, recovery, the legacy migration | You plan a catalog-wide media change, or a media manifest is refused |
+| [Image safety and media health](./media-health.md) | The listing image fallback, its guards, the weekly media check | You render a listing image or change the media check |
+| [Email](./email.md) | Transactional email, environments, owner prerequisites | You send mail or change where it may go |
+| [Email templates](./email-templates.md) | Every email, its trigger, recipient, and link | You add or reword an email |
+| [Billing](./billing.md) | Paid listings: Stripe behind the billing module, orders, refunds | You touch a payment, an order, or the billing sweep |
+| [Submitter dashboard](./account-dashboard.md) | `/account`: statuses, edits, revisions, the badge panel | You change a `/account` screen |
+| [Accounts](./accounts.md) | Better Auth sign-in codes, admins, Cloudflare Access | You change sign-in, sessions, the dashboard shell, or the admin gate |
+| [Admin panel](./admin-panel.md) | `/admin` screens, decisions, the production-write exception | You change an `/admin` screen or a decision it writes |
+| [Deploy runbook](./deploy-runbook.md) | Environments, workflows and their guards, production release, recovery, post-deploy checks | Before any Cloudflare operation or release, or when a deploy gate fails |
+| [Deploy credentials](./deploy-credentials.md) | The Cloudflare API token, the GitHub environments that hold it, what a leak reaches | You create, rotate or narrow the token or an environment's secrets |
+| [Production cutover](./production-cutover.md) | The finished move of best.serp.co from GitHub Pages to the Worker, and the canonical-host switch | Code or a gate mentions the cutover or the canonical-host switch |
+| [Telemetry](./telemetry.md) | Sentry error reporting, GTM and Cloudflare Web Analytics | You add logging, error reporting, or analytics |
+| [D1 recovery](./d1-recovery.md) | Undoing a production write with D1 Time Travel | A production write needs undoing |
+| [Catalog hygiene](./catalog-hygiene.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains | You add or remove listings, change the domain check, or touch the listing FAQs' `faqsToShow` stopgap |
+| [Release guards](./release-guards.md) | `db:*` commands by target, promotion, staging before production, hotfixes | You run a `db:*` command, promote `staging`, open a `hotfix-*` pull request, or change a release workflow |
+| [Catalog publication](./catalog-publication.md) | Catalog manifests and listing media plans: staging first, the publisher's and uploader's guards | You prepare or publish a `d1/publications/` manifest or a `d1/media/` upload plan |
+| [Credential guards](./credential-guards.md) | Workflow jobs holding the Cloudflare token: no D1 exports, bookmarks before changes, the security boundary | A workflow change gives a job the Cloudflare token, or `deploy-workflows.test.ts` fails on a workflow |
 | [Website guide](../apps/web/docs/agents/web.md) | Design tokens, UI rules, layout blocks, page patterns | You change how a page looks, add a component, or build a page |
-| [Harness](./HARNESS.md) | Validation loops, runtime evidence, worktrees | You validate a change, capture runtime evidence, or start a worktree |
-| [CI](./CI.md) | `web.yml` checks and staging deploy, rulesets, runners | A check fails in CI, or you change a workflow |
-| [Dependency security](./DEPENDENCY_SECURITY.md) | Production dependency audit | You add or upgrade a dependency, or the audit fails |
+| [Harness](./harness.md) | Validation loops, runtime evidence, worktrees | You validate a change, capture runtime evidence, or start a worktree |
+| [CI](./ci.md) | `web.yml` checks and staging deploy, rulesets, runners | A check fails in CI, or you change a workflow |
+| [Dependency security](./dependency-security.md) | Production dependency audit | You add or upgrade a dependency, or the audit fails |
 | [Issue tracker](./agents/issue-tracker.md) | Agent issue workflow configuration | You file, label or close an issue |
 | [Triage labels](./agents/triage-labels.md) | Label conventions | You triage an issue |
 | [Domain docs](./agents/domain.md) | Shared vocabulary configuration | You name a domain concept |

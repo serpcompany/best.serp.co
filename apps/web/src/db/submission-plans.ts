@@ -45,7 +45,7 @@ export interface SubmissionApprovalSnapshot {
 export const REFUND_BADGE_CHECK_MAX_AGE_HOURS = 1
 
 /**
- * The submission transition map (docs/SUBMISSION_FLOW.md). Each plan below compares and swaps
+ * The submission transition map (docs/submission-flow.md). Each plan below compares and swaps
  * exactly these source statuses; the tests run every plan from every status.
  */
 export const submissionTransitions = {

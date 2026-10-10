@@ -10,7 +10,7 @@ import { test } from './test'
 
 /**
  * The production Cloudflare Access lock in the built OpenNext Worker (serpcompany/best.serp.co#60;
- * docs/ACCOUNTS.md#admin-gate). Two extra local Workers run with `CF_ACCESS_REQUIRED=on`, the
+ * docs/accounts.md#admin-gate). Two extra local Workers run with `CF_ACCESS_REQUIRED=on`, the
  * setting production always has: one without the team domain and AUD tag (production before the
  * owner sets them) and one with test values. Both lock `/admin` and `/api/admin` before any
  * session is considered, so even the signed-in owner is refused.

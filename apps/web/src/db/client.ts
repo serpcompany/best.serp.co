@@ -31,7 +31,7 @@ export async function runQuery<T>(
   return (await client.database.run(query)) as D1Result<T>
 }
 
-/** D1 and SQLite failure messages mapped to a stable reason (D1 limits: docs/DATA_MODEL.md). */
+/** D1 and SQLite failure messages mapped to a stable reason (D1 limits: docs/data-model.md). */
 const D1_ERROR_REASONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/too many SQL variables|variable number must be between/iu, 'too_many_variables'],
   [/LIKE or GLOB pattern too complex/iu, 'like_pattern_too_long'],

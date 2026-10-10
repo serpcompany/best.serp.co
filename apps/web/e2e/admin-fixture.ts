@@ -255,7 +255,7 @@ export function client(request: APIRequestContext, baseURL: string | undefined):
   }
 }
 
-/** Signs in with the local dev code sender (docs/ACCOUNTS.md). */
+/** Signs in with the local dev code sender (docs/accounts.md). */
 export async function signIn({ headers, request }: Client, email: string): Promise<void> {
   const requested = await request.post('/api/auth/email-otp/send-verification-otp', {
     data: { email, type: 'sign-in' },

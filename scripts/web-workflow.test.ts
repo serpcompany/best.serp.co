@@ -183,11 +183,11 @@ describe('web workflow', () => {
         { BASE: 'abc', GITHUB_EVENT_NAME: 'pull_request', GITHUB_SHA: 'def', ...env }
       ).outputs.code
     }
-    expect(classify(['docs/HARNESS.md'])).toBe('false')
-    expect(classify(['docs/HARNESS.md', 'AGENTS.md', 'apps/web/e2e/README.md'])).toBe('false')
+    expect(classify(['docs/harness.md'])).toBe('false')
+    expect(classify(['docs/harness.md', 'AGENTS.md', 'apps/web/e2e/README.md'])).toBe('false')
     expect(classify(['docs/diagram.svg'])).toBe('false')
     expect(classify(['.archive/mockups/submissions/index.html'])).toBe('false')
-    expect(classify(['docs/HARNESS.md', 'scripts/harness/runner.ts'])).toBe('true')
+    expect(classify(['docs/harness.md', 'scripts/harness/runner.ts'])).toBe('true')
     // MDX is site content.
     expect(classify(['apps/web/content/legal/terms-conditions.mdx'])).toBe('true')
     expect(classify(['.github/workflows/web.yml'])).toBe('true')
@@ -198,10 +198,10 @@ describe('web workflow', () => {
     )
     // A push deploys, so it checks the tree it deploys whatever changed; unknown bases run
     // everything.
-    expect(classify(['docs/HARNESS.md'], { GITHUB_EVENT_NAME: 'push' })).toBe('true')
-    expect(classify(['docs/HARNESS.md'], { GITHUB_EVENT_NAME: 'workflow_dispatch' })).toBe('true')
-    expect(classify(['docs/HARNESS.md'], { BASE: '' })).toBe('true')
-    expect(classify(['docs/HARNESS.md'], { CAT_STATUS: '128' })).toBe('true')
+    expect(classify(['docs/harness.md'], { GITHUB_EVENT_NAME: 'push' })).toBe('true')
+    expect(classify(['docs/harness.md'], { GITHUB_EVENT_NAME: 'workflow_dispatch' })).toBe('true')
+    expect(classify(['docs/harness.md'], { BASE: '' })).toBe('true')
+    expect(classify(['docs/harness.md'], { CAT_STATUS: '128' })).toBe('true')
   })
 
   it('skips E2E on a push whose tree passed before, and on documentation; fails toward running', () => {

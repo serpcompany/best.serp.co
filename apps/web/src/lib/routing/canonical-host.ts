@@ -11,7 +11,7 @@
  * are served normally so CI can test the deployment through its platform host.
  *
  * Production's switch was `off` until the cutover, while the workers.dev URL was the production
- * review origin, and is `on` since (docs/PRODUCTION_CUTOVER.md, step 5); staging's is `on` since
+ * review origin, and is `on` since (docs/production-cutover.md, step 5); staging's is `on` since
  * it got `staging.best.serp.co` (#323). Local never redirects, whatever the switch says. Running
  * before the edge cache means a stored response can never answer the wrong client: the redirect
  * is never stored, and the cache only sees workers.dev requests that carry the smoke header.

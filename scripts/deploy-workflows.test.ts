@@ -474,11 +474,11 @@ describe('recreated D1 operation workflows', () => {
 describe('D1 data stays in Cloudflare', () => {
   // This repository is public: any signed-in GitHub user can download a workflow artifact, and
   // fork pull requests can restore caches. A D1 export holds sessions, OAuth tokens, and emails,
-  // so no workflow exports D1; recovery is a Time Travel bookmark (#99, docs/D1_RECOVERY.md).
-  // These checks read workflow and script text, not data; docs/CREDENTIAL_GUARDS.md lists what
+  // so no workflow exports D1; recovery is a Time Travel bookmark (#99, docs/d1-recovery.md).
+  // These checks read workflow and script text, not data; docs/credential-guards.md lists what
   // they miss.
   //
-  // Adding a job that gets CLOUDFLARE_API_TOKEN (docs/CREDENTIAL_GUARDS.md, "Adding a
+  // Adding a job that gets CLOUDFLARE_API_TOKEN (docs/credential-guards.md, "Adding a
   // credentialed job"):
   // 1. add `<file>:<job>` to `credentialedJobs`;
   // 2. put `cloudflare-release.ts bookmark <env>` right before each step that can change D1 and
@@ -1747,7 +1747,7 @@ describe('protected deployment boundaries', () => {
 
   it('runs every credentialed or deploying job on an ephemeral GitHub-hosted runner', () => {
     // CI_RUNNER_LABELS never moves these, so no secret, D1 data, or Wrangler session lands on a
-    // persistent host (docs/CI.md#runners).
+    // persistent host (docs/ci.md#runners).
     for (const file of [...newWorkflows, 'submit-gsc-sitemaps.yml']) {
       for (const [name, job] of Object.entries(loadWorkflow(file).jobs)) {
         // web.yml's check holds no secret and deploys nothing (scripts/ci-runners.ts routes it).

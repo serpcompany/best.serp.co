@@ -3,7 +3,7 @@ import { test } from './test'
 
 /**
  * The #95 acceptance check, run by hand against a deployed Worker after its catalog was
- * migrated (docs/MEDIA_PUBLISHING.md): no page, `og:image`, or JSON-LD names a listing image
+ * migrated (docs/media-publishing.md): no page, `og:image`, or JSON-LD names a listing image
  * outside the environment's media host or the fallback tile, and every listing image there
  * answers 200.
  *

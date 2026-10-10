@@ -126,6 +126,54 @@ function trackedFiles(): string[] {
     .filter(file => file && !file.startsWith('.archive/'))
 }
 
+/**
+ * Code, configs, and workflows: under `scripts/`, `apps/web/` and `.github/`, and at the root,
+ * where `package.json`, `vitest.config.ts` and the other configs run in the harness or the build
+ * (#320). Tests may name what they assert is gone or archived.
+ */
+function isLiveCode(file: string): boolean {
+  return (
+    (/^[^/]+$/u.test(file) || /^(?:scripts|apps\/web|\.github)\//u.test(file)) &&
+    /\.(?:[cm]?[jt]sx?|jsonc?|ya?ml)$/u.test(file) &&
+    !/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file)
+  )
+}
+
+function liveCodeFiles(files: readonly string[]): string[] {
+  return files.filter(file => isLiveCode(file) && existsSync(resolve(file)))
+}
+
+/** The modules #315 split out of `scripts/` into `.archive/scripts/`, by name. */
+function archivedModules(): string[] {
+  const files = execFileSync('git', ['ls-files', '.archive/scripts'], { encoding: 'utf8' })
+    .split('\n')
+    .filter(file => /^\.archive\/scripts\/[^/]+\.ts$/u.test(file))
+  return [
+    ...new Set(files.map(file => file.replace(/^.*\//u, '').replace(/(?:\.test)?\.ts$/u, '')))
+  ]
+}
+
+/**
+ * A path into `.archive/`, quoted or as a shell argument: at least one path character must
+ * follow, so code that excludes the archive by its `.archive/` prefix doesn't match.
+ */
+const ARCHIVE_PATH = /(?:^|[\s'"`=(:,])(?:\.{1,2}\/)*\.archive(?:\/[\w.-]|['"`]\s*,)/u
+
+/**
+ * The lines of `source` that read a path into `.archive/` or name a module archived there
+ * (#320). Comment lines are prose and are skipped.
+ */
+function archiveReferences(source: string, modules: readonly string[]): string[] {
+  const names = modules.map(name => name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')).join('|')
+  const archivedModule = names
+    ? new RegExp(`[\\s'"\`/](?:${names})(?:\\.[cm]?[jt]sx?)?(?:[\\s'"\`]|$)`, 'u')
+    : null
+  return source.split('\n').filter(line => {
+    if (/^\s*(?:\/\/|\/\*|\*|#)/u.test(line)) return false
+    return ARCHIVE_PATH.test(line) || Boolean(archivedModule?.test(line))
+  })
+}
+
 const forbiddenExactCatalogPaths = [
   ['data', 'listings.json'].join('/'),
   [project.appDirectory, 'public', 'search', 'search-index.json'].join('/')
@@ -796,15 +844,69 @@ describe('single-site D1-only repository architecture', () => {
     // Code, configs, and workflows; tests may name what they assert is gone.
     const retired =
       /(?<!\.archive\/)\bd1\/artifacts\b|scripts\/migration\/|\bmigration:(?:compare|generate|legacy-media|preflight)\b|db:import:local|d1-import-artifact|d1-application-snapshot|bootstrap-production-d1\.yml/u
-    const readers = files.filter(
-      file =>
-        (file === 'package.json' || /^(?:scripts|apps\/web|\.github)\//u.test(file)) &&
-        /\.(?:m?[jt]sx?|jsonc?|ya?ml)$/u.test(file) &&
-        !/\.(?:test|spec)\.tsx?$/u.test(file) &&
-        existsSync(resolve(file)) &&
-        retired.test(readFileSync(resolve(file), 'utf8'))
+    const readers = liveCodeFiles(files).filter(file =>
+      retired.test(readFileSync(resolve(file), 'utf8'))
     )
     expect(readers).toEqual([])
+  })
+
+  it('keeps live code from reading .archive/ or importing a module archived there (#320)', () => {
+    const modules = archivedModules()
+    expect(modules).toEqual(expect.arrayContaining(['listing-faq-move', 'd1-local-guard-import']))
+    const readers = liveCodeFiles(trackedFiles()).flatMap(file =>
+      archiveReferences(readFileSync(resolve(file), 'utf8'), modules).map(
+        line => `${file}: ${line.trim()}`
+      )
+    )
+    expect(readers).toEqual([])
+  })
+
+  it('catches every way live code can reach into .archive/', () => {
+    const modules = ['listing-faq-move', 'cloudflare-release-bootstrap']
+    const reaches = {
+      'a quoted read': `readFileSync('.archive/d1/artifacts/best-serp-co-v1-parity.yaml')`,
+      'a relative import': `import { run } from '../.archive/scripts/cloudflare-release-bootstrap'`,
+      'a template literal': 'readFileSync(`./.archive/d1/artifacts/parity.yaml`)',
+      'a joined segment': `resolve(root, '.archive', 'd1')`,
+      'a shell argument': 'run: pnpm tsx .archive/scripts/listing-faq-move.ts',
+      'an archived module': `import { moveFaqs } from './listing-faq-move'`,
+      'an archived module with its extension': `"faqs": "tsx scripts/listing-faq-move.ts"`,
+      'an archived module at the end of a line': 'run: pnpm tsx scripts/listing-faq-move.ts'
+    }
+    for (const [name, source] of Object.entries(reaches))
+      expect(archiveReferences(source, modules), name).not.toEqual([])
+    // Every file that runs in the harness or the build is read, root configs included.
+    for (const file of [
+      'vitest.config.ts',
+      'eslint.config.mjs',
+      'package.json',
+      'tsconfig.json',
+      'biome.jsonc',
+      'pnpm-workspace.yaml',
+      'scripts/listing-domain-check.ts',
+      'apps/web/next.config.ts',
+      'apps/web/wrangler.jsonc',
+      '.github/workflows/web.yml'
+    ])
+      expect(isLiveCode(file), file).toBe(true)
+    for (const file of [
+      'scripts/architecture-guard.test.ts',
+      'apps/web/e2e/home.spec.ts',
+      'docs/harness.md',
+      'd1/publications/2026-10-09-adult-removal.yaml'
+    ])
+      expect(isLiveCode(file), file).toBe(false)
+    for (const prose of [
+      // Excluding the archive names only its prefix, never a path into it.
+      `return !file.startsWith('.archive/')`,
+      `'The v1 catalog import is retired (#315; history in .archive/).'`,
+      ' * Approved copy (`.archive/mockups/submissions/COPY.md`).',
+      '// Archived with the v1 import in .archive/scripts/listing-faq-move.ts',
+      '# history: .archive/.github/workflows/bootstrap-production-d1.yml',
+      // A live module whose name an archived one extends.
+      `import { release } from './cloudflare-release'`
+    ])
+      expect(archiveReferences(prose, modules), prose).toEqual([])
   })
 
   // #77: node:sqlite applies none of D1's statement limits and workerd does not enforce the

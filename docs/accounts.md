@@ -108,7 +108,7 @@ Rate-limit rows hold HMAC-SHA256 digests under a key derived from `BETTER_AUTH_S
 **Delivery.** Locally, the dev sender logs each code and `GET /api/auth/dev/otp-outbox?email=`
 returns the latest one and when it was sent (the endpoint exists only when the dev sender
 runs, which is refused outside `local`, and the Worker answers it only on a local host). Staging and production send the code as the
-`sign-in-code` email through `enqueueEmail` ([Email](./EMAIL.md)), keyed
+`sign-in-code` email through `enqueueEmail` ([Email](./email.md)), keyed
 `emailEventKey('sign-in-code', crypto.randomUUID())`: every code is a new event, and no key
 derives from a code. Only `sign-in` codes are sent. The code's length and lifetime are
 defined once, in `apps/web/src/lib/email/sign-in-code.ts`; `rate-limits.ts` configures Better Auth
@@ -165,7 +165,7 @@ the request carries a session cookie, so anonymous pages never load Better Auth 
   code length, lifetime, and attempts come from `lib/email/sign-in-code.ts`, like Better Auth's.
 - **`/account`** (`components/account/account-shell.tsx`, shadcn dashboard-01): the sidebar
   shell without the public header and footer, the user's email and sign-out, and the
-  submitter dashboard ([Submitter dashboard](./ACCOUNT_DASHBOARD.md), #65). Signed out, it
+  submitter dashboard ([Submitter dashboard](./account-dashboard.md), #65). Signed out, it
   redirects to `/login?callbackUrl=/account/`. Messages (#73) and Settings show a "Soon" badge
   and do not link. The shell is composed from the shared dashboard pieces in
   `apps/web/src/components/dashboard/` (`AppShell`, `SidebarBrand`, `NavMain`, `NavSecondary`,
@@ -195,7 +195,7 @@ Requests that pass reach pages and handlers, which call `requireAdmin()` (Next.j
 `unauthorized()` 401 / `forbidden()` 403, with `experimental.authInterrupts`) or
 `authorizeAdminRequest()` (JSON; a state-changing method also needs an `Origin` among the
 trusted origins, since every `*.serp.co` site is same-site). `/admin/` redirects admins to
-the review queue ([Admin panel](./ADMIN_PANEL.md)). Unknown admin paths are caught by `app/admin/[...path]`
+the review queue ([Admin panel](./admin-panel.md)). Unknown admin paths are caught by `app/admin/[...path]`
 and `app/api/admin/[[...path]]`. `scripts/architecture-guard.test.ts` fails any admin page or
 route that does not call the guard, and any Server Action anywhere in `apps/web`
 (actions are reachable by id from any path, so no path gate sees them; #64 decided that admin
@@ -216,7 +216,7 @@ sign-in `POST` with an empty email, from the environment's trusted origin, to an
 deploys get the same answer and no code is sent.
 
 The edge HTML cache bypasses the auth paths and every request that carries a `better-auth.*`
-cookie, so pages under auth are never served from or stored in it ([Caching](./CACHING.md)).
+cookie, so pages under auth are never served from or stored in it ([Caching](./caching.md)).
 
 ## Configuration
 

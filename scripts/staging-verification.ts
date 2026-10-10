@@ -125,7 +125,7 @@ function isStagingRun(run: WorkflowRun): boolean {
 }
 
 /** The remediation every refusal ends with. */
-const rerunHint = `Start a new run for the head of ${stagingWorkflow.branch} with \`gh workflow run ${stagingWorkflow.file} --ref ${stagingWorkflow.branch}\` (or wait for the push-triggered run), let it finish, then re-run the production workflow. See docs/RELEASE_GUARDS.md#staging-before-production.`
+const rerunHint = `Start a new run for the head of ${stagingWorkflow.branch} with \`gh workflow run ${stagingWorkflow.file} --ref ${stagingWorkflow.branch}\` (or wait for the push-triggered run), let it finish, then re-run the production workflow. See docs/release-guards.md#staging-before-production.`
 
 type GitHubGet = (path: string, parameters?: Record<string, string>) => Promise<unknown>
 
@@ -198,7 +198,7 @@ export async function assertCurrentRelease(
   }
   if (head === sha || (await treeOf(get, head)) === (await treeOf(get, sha))) return { head }
   throw new Error(
-    `${options.branch} now points at ${head}, not ${sha}, so this release is stale: the newer push has its own Deploy Production run. Roll back with Cloudflare rather than re-running an older release (docs/DEPLOY_RUNBOOK.md#bookmarks-and-recovery).`
+    `${options.branch} now points at ${head}, not ${sha}, so this release is stale: the newer push has its own Deploy Production run. Roll back with Cloudflare rather than re-running an older release (docs/deploy-runbook.md#bookmarks-and-recovery).`
   )
 }
 
@@ -246,7 +246,7 @@ export async function assertHotfixMerge(
   )
   if (!hotfix) {
     throw new Error(
-      `${sha} is not the merge commit of a merged hotfix-* pull request from ${project.repository} into main, so the hotfix confirmation cannot release it. Release it through staging instead (docs/RELEASE_GUARDS.md#hotfixes).`
+      `${sha} is not the merge commit of a merged hotfix-* pull request from ${project.repository} into main, so the hotfix confirmation cannot release it. Release it through staging instead (docs/release-guards.md#hotfixes).`
     )
   }
   return {
@@ -326,7 +326,7 @@ export async function assertStagingVerified(
 
   if (checked.length === 0) {
     throw new Error(
-      `${stagingWorkflow.name} has no run on ${stagingWorkflow.branch} for ${sha} or for any commit with its tree ${tree}. Production releases only source that ${stagingWorkflow.name} has migrated, deployed, and smoke-tested on staging. A fast-forward promotion releases a verified staging commit itself (pnpm release:promote); a hotfix pushed to main is released with the hotfix confirmation instead (docs/RELEASE_GUARDS.md#hotfixes). If main has commits that staging lacks, merge main into staging first. ${rerunHint}`
+      `${stagingWorkflow.name} has no run on ${stagingWorkflow.branch} for ${sha} or for any commit with its tree ${tree}. Production releases only source that ${stagingWorkflow.name} has migrated, deployed, and smoke-tested on staging. A fast-forward promotion releases a verified staging commit itself (pnpm release:promote); a hotfix pushed to main is released with the hotfix confirmation instead (docs/release-guards.md#hotfixes). If main has commits that staging lacks, merge main into staging first. ${rerunHint}`
     )
   }
   const seen = checked

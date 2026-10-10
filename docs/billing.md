@@ -7,7 +7,7 @@ while `features.orders` (`apps/web/src/lib/features.ts`) is on, which it is sinc
 owner's decision, with the provider's secrets and webhooks set up; see
 [Configuration](#configuration-owner)). The submit flow then offers the paid plan ("Skip the
 badge: $49 one-off", "Pay $49 and go live"), the account offers "Upgrade: $49 one-off" and
-"Relist for $49", the claim dialog offers "Skip the badge: $49 one-off" ([Claims](./CLAIMS.md)),
+"Relist for $49", the claim dialog offers "Skip the badge: $49 one-off" ([Claims](./claims.md)),
 the admin sidebar shows Orders, the draft reminder and the badge program's emails make their
 paid offers, and the hourly sweep runs. Turned off, all of that is hidden, every checkout route
 and the webhook answer 404, `/admin/orders/` is a 404, and the sweep does nothing.

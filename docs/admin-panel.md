@@ -18,7 +18,7 @@ and top bar since #261); pages set their breadcrumb with `AdminCrumbs`.
 | Orders (#68) | `/admin/orders/` | `selectAdminOrdersPlan` (`src/db/billing.ts`) |
 
 The reads are statement plans in `apps/web/src/db/admin-queries.ts`; `apps/web/src/lib/admin/`
-holds no SQL (the architecture guard checks it). Orders (screen 13, [Billing](./BILLING.md)) are
+holds no SQL (the architecture guard checks it). Orders (screen 13, [Billing](./billing.md)) are
 shown while orders are on (`features.orders`, on since #133); otherwise the entry is hidden and
 `/admin/orders/` is a 404. The Inbox and the conversation panels on screens 11 and 12 are #73's.
 
@@ -39,10 +39,10 @@ forbids `'use server'`): an action id is reachable from any path, so no path gat
 | `/api/admin/listings/<id>/link-rel` | `linkRel` | `setListingLinkRel` |
 | `/api/admin/listings/<id>/{transfer-owner,remove-owner}` | `email`, `expectedOwnerUserId` | `transferListingOwner`, `removeListingOwner` |
 | `/api/admin/admins` (`POST` adds, `DELETE` removes) | `email` | `addAdmin`, `removeAdmin` |
-| `/api/admin/orders/<id>/refund` | none | `refundOrder` ([Billing](./BILLING.md)) |
+| `/api/admin/orders/<id>/refund` | none | `refundOrder` ([Billing](./billing.md)) |
 
 Every request passes, in order: the Worker's Cloudflare Access and session-cookie gate
-([Accounts](./ACCOUNTS.md#admin-gate)); `authorizeAdminRequest()`, which re-checks the session
+([Accounts](./accounts.md#admin-gate)); `authorizeAdminRequest()`, which re-checks the session
 and the allowlist and, for any write, requires an `Origin` among the Worker's trusted origins
 (the CSRF check: every `*.serp.co` site is same-site, so `SameSite=Lax` alone is not enough);
 a JSON body (`application/json`, at most 64 KB) parsed by its schema (`lib/admin/schemas.ts`);
@@ -95,7 +95,7 @@ below), and otherwise sends the reviewed statement plans as one D1 batch:
   404. A body `urlKey`, the key the admin confirmed, is only compared with it (409 when they
   differ), so a request can't lift a block on another URL.
 
-Emails go through `enqueueEmail` ([Email](./EMAIL.md)), built from the stored state whenever
+Emails go through `enqueueEmail` ([Email](./email.md)), built from the stored state whenever
 the decision holds. A replay enqueues the same email under the same event key: the ledger sends
 it at most once, and resends one whose first send failed (a provider outage), so retrying the
 decision is the recovery path.
@@ -142,7 +142,7 @@ the gone page, and answers it with 410. The edge cache stores the 410 under the 
 An unpublished listing filed under a retired category (`categories.is_active = 0`, primary or
 secondary) keeps its plain 404 (#260): `isUnpublishedListingSlug` and `getUnpublishedListing` leave
 it out, so there is no gone page, category link, or "Relist it". That is how the adult listings
-left ([Catalog hygiene](./CATALOG_HYGIENE.md#adult-products-260)). Such a listing stays down: the
+left ([Catalog hygiene](./catalog-hygiene.md#adult-products-260)). Such a listing stays down: the
 listing screen shows why instead of Republish, `republishListing` answers 409
 `listing_category_retired` with the same reason, and the plan and D1
 (`0011_retired_categories`) refuse it too.
@@ -162,7 +162,7 @@ guards instead:
 - an audit row per decision with the admin's email, and a `publication_runs` row per catalog
   change.
 
-Recovery is D1 Time Travel, run by the owner ([D1 recovery](./D1_RECOVERY.md)). Nothing else in
+Recovery is D1 Time Travel, run by the owner ([D1 recovery](./d1-recovery.md)). Nothing else in
 the app writes production data, and agents never use the production admin panel.
 
 ## Tests

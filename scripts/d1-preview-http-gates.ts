@@ -445,7 +445,7 @@ async function expectRoute(target: GateTarget, path: string): Promise<void> {
 }
 
 /**
- * The admin lock (serpcompany/best.serp.co#60, docs/ACCOUNTS.md): an anonymous request for
+ * The admin lock (serpcompany/best.serp.co#60, docs/accounts.md): an anonymous request for
  * `/admin/` or `/api/admin` must get exactly the answer the environment's checked-in vars
  * imply. Where Access is required (always in production; on staging with
  * `CF_ACCESS_REQUIRED=on`) that is 403 when the team domain and AUD tag are valid (the platform
@@ -848,7 +848,7 @@ async function expectPublicPolicy(
         `CANONICAL_HOST_REDIRECT is on, but best.serp.co${path} is still ${answer.reason}: the production workers.dev host would send visitors there. Finish the cutover or turn the switch off.`
       )
     console.log(
-      `::warning title=best.serp.co check skipped::best.serp.co${path} was not answered by the Worker but by ${answer.reason}; its crawl and analytics check was skipped. Check it by hand (docs/DEPLOY_RUNBOOK.md#after-a-deploy).`
+      `::warning title=best.serp.co check skipped::best.serp.co${path} was not answered by the Worker but by ${answer.reason}; its crawl and analytics check was skipped. Check it by hand (docs/deploy-runbook.md#after-a-deploy).`
     )
   }
   await check('/', async response => {
@@ -965,9 +965,12 @@ export async function runHttpGates(
 
 /**
  * The live listing and categories the gates request on a deployed Worker. They are real catalog
- * rows, because the gates run against staging's and production's data: the v1 import's first
- * listing and its first category no manifest retires, which the gates read from the import's
- * parity report until #315 archived it. A committed manifest that unpublishes the listing or
+ * rows, because the gates run against staging's and production's data. The listing is the v1
+ * import's first one (#315). The category is that listing's own, `video-downloaders`, with 63
+ * live listings on staging and production on 2026-10-10 (#320). An empty category answers 404,
+ * so the gates no longer sample `ai-advertising-tools`, which one unpublish would have emptied;
+ * and while the listing the gates already require is filed under this one, it can't be empty. A
+ * committed manifest that unpublishes or renames the listing, takes the category off it, or
  * retires every category here fails `d1-preview-http-gates.test.ts`; name another live one then.
  */
 export interface HttpGateSamples {
@@ -977,7 +980,7 @@ export interface HttpGateSamples {
 }
 
 export const httpGateSamples: HttpGateSamples = {
-  categories: ['ai-advertising-tools'],
+  categories: ['video-downloaders'],
   listing: '123movies-downloader'
 }
 

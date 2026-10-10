@@ -1065,7 +1065,7 @@ async function refundUnapplied(
 
 /**
  * The admin panel's refund hook for a paid submission rejected as `other` (`AdminRefunds`,
- * docs/ADMIN_PANEL.md "Refunds"): claims its order's refund, refunds at the provider, records
+ * docs/admin-panel.md "Refunds"): claims its order's refund, refunds at the provider, records
  * it on the submission and the order in one batch, and sends "rejected and refunded". Runs
  * after the rejection, on every replay of it, and from the sweep; throws when the refund didn't
  * go through, so it stays pending.

@@ -1,7 +1,7 @@
 # Workers static assets header rules (not served as a file). Static files are answered before
 # the Worker runs, so the Worker's non-production X-Robots-Tag never reaches them; keep every
 # *.workers.dev host's files, and staging's canonical host's, out of search indexes too. See
-# docs/ARCHITECTURE.md, "Environments and hosts".
+# docs/architecture.md, "Environments and hosts".
 https://:worker.:account.workers.dev/*
   X-Robots-Tag: noindex, nofollow
 

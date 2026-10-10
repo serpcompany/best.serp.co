@@ -8,7 +8,7 @@ on:
 
 jobs:
   links-checker:
-    # CI_RUNNER_LABELS picks the runner; fork pull requests stay on ubuntu-latest (docs/CI.md#runners).
+    # CI_RUNNER_LABELS picks the runner; fork pull requests stay on ubuntu-latest (docs/ci.md#runners).
     runs-on: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || fromJSON(vars.CI_RUNNER_LABELS || '"ubuntu-latest"') }}
     name: Links Checker
     permissions:

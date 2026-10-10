@@ -25,14 +25,14 @@ Browser
 ```
 
 `/admin` and `/api/admin` pass the Worker entry's Cloudflare Access and session-cookie gate
-first ([Accounts](./ACCOUNTS.md)). The admin panel is the one place the app writes production
-D1 ([Admin panel](./ADMIN_PANEL.md#the-production-write-exception)); every other production
+first ([Accounts](./accounts.md)). The admin panel is the one place the app writes production
+D1 ([Admin panel](./admin-panel.md#the-production-write-exception)); every other production
 change runs in a protected workflow.
 
 ## Responsibility map
 
 - `apps/web/src/app/` adapts HTTP routes to page behavior. The route registry
-  (`apps/web/src/lib/site/site-routes.ts`) and `getRoute` hold the public URLs; [URLs](./URLS.md)
+  (`apps/web/src/lib/site/site-routes.ts`) and `getRoute` hold the public URLs; [URLs](./urls.md)
   covers their canonical form and the redirects of older URL schemes. "Featured" is a listing
   flag for placements (the homepage section), not a category page.
 - `apps/web/worker.ts` is the Worker entry. It wires the build output into the request pipeline
@@ -44,23 +44,23 @@ change runs in a protected workflow.
   404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is rendered
   again as the 410 gone page), all through `apps/web/src/db/`.
   Its `scheduled()` handler runs `lib/worker/scheduled.ts`, which maps each Cron Trigger to its
-  jobs: [draft reminders](./SUBMISSION_FLOW.md#draft-reminders-and-expiry) and the
-  [billing sweep](./BILLING.md) (hourly), and the [badge program](./BADGE_PROGRAM.md).
+  jobs: [draft reminders](./submission-flow.md#draft-reminders-and-expiry) and the
+  [billing sweep](./billing.md) (hourly), and the [badge program](./badge-program.md).
 - `apps/web/src/lib/catalog/` acquires the binding, validates the runtime environment,
   and deduplicates reads per request. It contains no SQL.
 - `apps/web/src/lib/submissions/` validates the binding, fetches submitters' pages and images
   only through its bounded safe fetcher (badge checks, URL prefill, logo checks), and
   delegates every submission read and write to `apps/web/src/db/`, scoped to the owner.
-  `apps/web/src/lib/claims/` does the same for [claims](./CLAIMS.md).
+  `apps/web/src/lib/claims/` does the same for [claims](./claims.md).
 - `apps/web/src/lib/email/` sends transactional email through the useSend API after the
   response, claims each template and event key in the `email_deliveries` ledger
   (`apps/web/src/db/`) so it never sends twice, and only logs locally
-  ([Email](./EMAIL.md)).
+  ([Email](./email.md)).
 - `apps/web/src/lib/admin/` validates the binding for the admin panel, parses `/api/admin/*`
   bodies, and runs each decision as reviewed plans from `apps/web/src/db/` (no SQL here).
 - `apps/web/src/lib/auth/` configures Better Auth (email sign-in codes) on the `DB` binding,
   serves `/api/auth/*`, guards admin routes, and verifies Cloudflare Access JWTs; account SQL
-  lives in `apps/web/src/db/auth.ts` ([Accounts](./ACCOUNTS.md)).
+  lives in `apps/web/src/db/auth.ts` ([Accounts](./accounts.md)).
 - `apps/web/src/lib/site/` is the checked-in site definition (name, domain, copy, routes,
   badges, feature flags, the route registry); `apps/web/content/` holds the MDX content.
 - `src/components/`, `src/hooks/`, and `src/lib/{seo,site,directory,analytics,routing}/`
@@ -107,8 +107,8 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   analytics stay off, and staging's workers.dev host, production and local are unchanged. The
   header is added per request after the edge cache, which keys on neither the `User-Agent` nor
   the exemption, so nothing an Ahrefs request was served can reach another client
-  ([Caching](./CACHING.md)). Canonical tags still name best.serp.co
-  ([URLs](./URLS.md#written-urls)).
+  ([Caching](./caching.md)). Canonical tags still name best.serp.co
+  ([URLs](./urls.md#written-urls)).
 - **Canonical host.** With `CANONICAL_HOST_REDIRECT=on`, a deployed Worker answers every
   `*.workers.dev` request (the workers.dev URL and preview URLs) with one 308 to its own
   canonical host, in canonical form and with the query kept byte for byte: production to
@@ -146,7 +146,7 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   pipeline and the root layout's analytics decision, and `noindex-sources.test.ts` checks the
   real `next.config.ts` headers and the layout's and pages' robots metadata.
 - **Manual check of best.serp.co** (after any gate run that logged `best.serp.co check skipped`;
-  [deploy runbook](./DEPLOY_RUNBOOK.md#after-a-deploy)). `pnpm tsx scripts/d1-preview-http-gates.ts
+  [deploy runbook](./deploy-runbook.md#after-a-deploy)). `pnpm tsx scripts/d1-preview-http-gates.ts
   public https://best.serp.co` runs the same best.serp.co checks without skipping anything. Then
   `curl -sI https://best.serp.co/` must show `x-site-environment: production` and an
   `x-worker-version` equal to the version Deploy Production deployed: the id its gate log
@@ -155,9 +155,9 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
 
 ## URLs and caching
 
-- [URLs](./URLS.md): the canonical form of every URL, the redirects, pagination, and what pages
+- [URLs](./urls.md): the canonical form of every URL, the redirects, pagination, and what pages
   publish for search engines (sitemaps, structured data).
-- [Caching](./CACHING.md): the catalog epoch and the four cache layers from the edge HTML cache
+- [Caching](./caching.md): the catalog epoch and the four cache layers from the edge HTML cache
   inward.
 
 ## Trust direction

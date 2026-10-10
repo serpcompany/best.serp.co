@@ -1,7 +1,7 @@
 # Listing image safety and media health
 
 A listing image never renders as a broken image, and hosted media is checked every week
-(serpcompany/best.serp.co#122). Hosting itself: [Listing media](./MEDIA.md).
+(serpcompany/best.serp.co#122). Hosting itself: [Listing media](./media.md).
 
 ## One listing image component
 
@@ -35,9 +35,9 @@ Every listing image carries `data-listing-image="logo|image"`. Guards:
   keys (`listings/<slug>/<kind>/`), each in an upload plan with the same bytes, or no image, and
   no listing content to embed an image, so no other host is ever rendered. On fixture rows, it
   also requires a `listing-slug-change` to leave no media keyed to the old slug, and every
-  committed rename to be followed by a `listing-media-update` under the new slug. (Until #315 the
-  same checks also ran on every published logo and image of the v1 import; that test is archived
-  with the import.)
+  committed rename to be followed by a `listing-media-update` under the listing's slug at that
+  point (an empty one for a listing with no logo or image). (Until #315 the same checks also ran
+  on every published logo and image of the v1 import; that test is archived with the import.)
 
 ## Media health check
 
@@ -76,7 +76,7 @@ never writes, so it never re-queues anything itself.
 issue with the findings, updates the open one, or closes it with a comment once the check is
 clean. Only an issue `github-actions[bot]` opened counts, so a planted marker is ignored, and the
 checkout keeps no token (`persist-credentials: false`) for the step that holds the Cloudflare one. A schedule on `staging` (the default branch) relays to `main`. In the
-[credential guards](./CREDENTIAL_GUARDS.md#workflow-checks) the check's exact command is a
+[credential guards](./credential-guards.md#workflow-checks) the check's exact command is a
 token step without D1 changes, so it needs no bookmark; any variant still does.
 
 Owner setup, until which every run is skipped:

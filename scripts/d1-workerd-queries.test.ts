@@ -196,7 +196,7 @@ const unicode = first(
 )
 
 /**
- * The search contract (DATA_MODEL.md, #81) on the generated rows: every term in the public
+ * The search contract (data-model.md, #81) on the generated rows: every term in the public
  * listing's name, short description or slug, or in an active category's slug or name, never its
  * website; ASCII letters folded as SQLite's `lower()` does, other characters as typed; exact
  * matches first, then names starting with the query, then names containing it, then by name and

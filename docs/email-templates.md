@@ -2,7 +2,7 @@
 
 The emails best.serp.co sends, built to the mockups in serpcompany/best.serp.co#70 (screen
 15, revisions 3–5). Sending, environments, and the template contract are in
-[Email](./EMAIL.md). Each template lives in `apps/web/src/lib/email/emails/` and is registered in
+[Email](./email.md). Each template lives in `apps/web/src/lib/email/emails/` and is registered in
 `apps/web/src/lib/email/registry.ts` under the id below.
 
 Template ids are stable: each one is part of every delivery's ledger key and provider
@@ -52,7 +52,7 @@ sample and fails on a link to a missing page. Copy and links that need a later s
 its flag in `apps/web/src/lib/features.ts` and switch to the approved wording when that issue turns
 it on (owner decision on #64):
 
-- `features.accountDashboard` (#65, on: [Submitter dashboard](./ACCOUNT_DASHBOARD.md)). Off,
+- `features.accountDashboard` (#65, on: [Submitter dashboard](./account-dashboard.md)). Off,
   `changes-requested` says "Update your details and
   resubmit from your account at <`/account/` link>" with an "Open your account" button (owner
   decision, 2026-10-06: the submission keeps its URL key, so `/submit/` would refuse it), and
@@ -94,7 +94,7 @@ in emails nothing sends yet: `/account/messages/...` and `/admin/inbox/<thread>/
 `/account/listings/<slug>/`, where badge-missing and unlisted point, opens the listing's badge
 panel (#65). The draft reminder, which the hourly job sends (#63), renders
 with `features.orders` as the job passes it, and its "Complete checkout" link opens
-`/submit/<id>/checkout/` ([Billing](./BILLING.md)). The billing module alone sends
+`/submit/<id>/checkout/` ([Billing](./billing.md)). The billing module alone sends
 `listing-live-paid`, `payment-received-in-review`, and `submission-rejected-refunded`, only
 while orders are on (`FLAGGED_SENDERS`, so they are sent now).
 

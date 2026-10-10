@@ -1,24 +1,24 @@
 # Public catalog
 
 What makes a listing public, the states a listing can be in, and how the public reads are
-shaped. The tables, migrations, and write plans are in [Data model](./DATA_MODEL.md); the cache
-layers are in [Caching](./CACHING.md).
+shaped. The tables, migrations, and write plans are in [Data model](./data-model.md); the cache
+layers are in [Caching](./caching.md).
 
 ## Public eligibility
 
 Public queries require `status = 'approved'`, `is_active = 1`, and a `published_at` that is not
 in the future. Pages, the sitemap, search, RSS, category pages, and counts all apply them.
 Creating or badge-verifying a submission never satisfies those predicates; only a plan that
-records a catalog publication promotes a row ([Statement plans](./DATA_MODEL.md#statement-plans)),
+records a catalog publication promotes a row ([Statement plans](./data-model.md#statement-plans)),
 so every change to public output has publication provenance.
 
 ## Listing states
 
 - **Unpublished** is `status = 'approved'` with `is_active = 0`: the row, slug, and memberships
   stay, every public query drops it, and its URL answers 410 Gone instead of 404
-  ([Admin panel](./ADMIN_PANEL.md#unpublished-listings-answer-410)). Republishing sets
+  ([Admin panel](./admin-panel.md#unpublished-listings-answer-410)). Republishing sets
   `is_active = 1` and the URL works again. The publisher's `listing-unpublish` reaches the same
-  state, with the same activity records ([Catalog hygiene](./CATALOG_HYGIENE.md)).
+  state, with the same activity records ([Catalog hygiene](./catalog-hygiene.md)).
 - A **retired** category (`is_active = 0`) leaves public queries and forms; it and its listings
   answer 404, and `0011_retired_categories` keeps any published listing off it.
 - `source` is who added the listing: `admin` (the import, publication manifests, admin-added) or

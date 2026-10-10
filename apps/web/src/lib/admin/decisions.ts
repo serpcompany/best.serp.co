@@ -7,7 +7,7 @@
  * version), so a concurrent or stale decision is refused whole and answered 409.
  *
  * These writes go to the environment's own D1 from the Worker: the documented production-write
- * exception (docs/ADMIN_PANEL.md). The actor is the admin's verified email; each decision is
+ * exception (docs/admin-panel.md). The actor is the admin's verified email; each decision is
  * recorded in the submission, revision, or listing events, and in `publication_runs` when it
  * changes the catalog. Emails go through the injected `notify` whenever the decision holds,
  * a replay included: the email ledger keys each one by its event, so a retried decision never
@@ -85,7 +85,7 @@ export type AdminNotify = <K extends keyof AppEmailTemplates & string>(
  * `lib/billing/service.ts`). Absent while orders are off, so a paid submission cannot be
  * rejected as `other` (which promises a refund) then.
  *
- * The contract (docs/ADMIN_PANEL.md, "Refunds"): the rejection batch leaves the submission
+ * The contract (docs/admin-panel.md, "Refunds"): the rejection batch leaves the submission
  * refund-pending (`selectRefundPendingSubmissionsPlan`) until the refund is recorded, so
  * `refundRejectedSubmission` may run more than once for a submission: after the rejection,
  * on every replay of it, and from #68's sweep. It must be idempotent (a provider idempotency
