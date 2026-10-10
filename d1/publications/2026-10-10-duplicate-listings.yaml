@@ -14,16 +14,28 @@
 #   there.
 # - Rebrands and acquisitions keep the current brand's domain: maestrolabs.com (Flowrite is now
 #   MailMaestro, from Maestro Labs), jacquard.com (Phrasee is now Jacquard), lambda.ai, timely.com,
-#   magical.so (where both listings' links land; timeos.ai now redirects to timeless.day), and
-#   scaleserp.com (the product is still Scale SERP; trajectdata.com is its parent company's site).
+#   timeos.ai (magical.so now serves timeOS with its canonical at timeos.ai, and timeOS is now
+#   Timeless: timeos.ai redirects to timeless.day), and scaleserp.com (the product is still Scale
+#   SERP; trajectdata.com is its parent company's site).
 #
-# Owners, claims, badges: no page of the 28 showed a Verified owner badge on staging or production,
-# so nothing moves. Claim holds (2026-10-06-listing-claim-holds) stay on their rows.
+# Media first, in the same batch: eight kept listings lack media their duplicate has, so each gets
+# a copy of it under its own key: the logo of six downloaders (Facebook, Kajabi, Loom, SproutVideo,
+# Vimeo, Whop), Lambda's social image, and Scale SERP's logo and image. Each update lists the
+# listing's current rows and refuses the batch if they changed. Skool's and Wistia's kept listings
+# already have the same logo, and the other kept listings have as much media as their duplicate
+# (neither timeOS listing has a logo or image).
+# Upload d1/media/2026-10-10-duplicate-listings.json to the environment first: the publisher
+# refuses keys its bucket does not hold.
+#
+# Owners, claims, badges: no page of the 28 showed a Verified owner badge on staging or production.
+# Each unpublish is `unowned`: a listing anyone owns, claims, paid for, or submitted by publish time
+# refuses the whole batch, rather than leaving those records on a retired row. Claim holds
+# (2026-10-06-listing-claim-holds) stay on their rows.
 #
 # Ids are the v1 import's (.archive/d1/artifacts/); categories and websites match each listing's
-# public page on staging and production. Row-level: a listing whose id, slug, website, or
-# categories changed, that is no longer live, or whose own submission is in review refuses the
-# whole batch, with nothing written. Apply staging first, then production after promotion.
+# public page on staging and production. Row-level: a listing whose id, slug, website, categories,
+# or media changed, that is no longer live, or whose own submission is in review refuses the whole
+# batch, with nothing written. Apply staging first, then production after promotion.
 version: 1
 id: 2026-10-10-duplicate-listings
 concurrency: rows
@@ -31,6 +43,485 @@ provenance:
   actor: devinschumacher
   workflow: github/publish-d1
 operations:
+  - action: listing-media-update
+    id: lst_a18091d61a39a387973490b9
+    slug: facebook-video-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/facebook-video-downloader.jpg
+        key: best.serp.co/listings/facebook-video-downloader/image/854a4420a5871f53.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/facebook-video-downloader/main/images/facebook-video-downloader.gif
+        key: best.serp.co/listings/facebook-video-downloader/image/0bd240d54034ea32.gif
+    media:
+      logo:
+        bytes: 2998
+        contentType: image/png
+        height: 325
+        key: best.serp.co/listings/facebook-video-downloader/logo/a3c4f14c54929f56.png
+        sha256: a3c4f14c54929f56a44c8d7a551ad1b40c3f9fa8369da3a7a2b218f9d9831597
+        source: https://cdn.serp.co/best.serp.co/listings/facebook-downloader/logo/a3c4f14c54929f56.png
+        width: 325
+      images:
+        - bytes: 65610
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/facebook-video-downloader/image/854a4420a5871f53.jpg
+          sha256: 854a4420a5871f53bbee40035961a83091584bac2a5a18839015be13c2f4a348
+          source: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/facebook-video-downloader.jpg
+          width: 1920
+        - bytes: 509110
+          contentType: image/gif
+          height: 1080
+          key: best.serp.co/listings/facebook-video-downloader/image/0bd240d54034ea32.gif
+          sha256: 0bd240d54034ea32153c0f4e78542966299c3410845761e6b93ca03e7f4d2788
+          source: https://raw.githubusercontent.com/serpapps/facebook-video-downloader/main/images/facebook-video-downloader.gif
+          width: 1920
+  - action: listing-media-update
+    id: lst_74e0e74369d59ac99e0e8ab7
+    slug: kajabi-video-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/kajabi-video-downloader.jpg
+        key: best.serp.co/listings/kajabi-video-downloader/image/dfe9c2edb3a6c6e8.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/kajabi-video-downloader/main/images/kajabi-video-downloader.gif
+        key: best.serp.co/listings/kajabi-video-downloader/image/03e873043fa52654.gif
+    media:
+      logo:
+        bytes: 20716
+        contentType: image/png
+        height: 630
+        key: best.serp.co/listings/kajabi-video-downloader/logo/14727aa9b4ca3914.png
+        sha256: 14727aa9b4ca3914e92d2ac0b45d00a9323e1c26f9944ec487a2d428e4572c97
+        source: https://cdn.serp.co/best.serp.co/listings/kajabi-downloader/logo/14727aa9b4ca3914.png
+        width: 1200
+      images:
+        - bytes: 211549
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/kajabi-video-downloader/image/dfe9c2edb3a6c6e8.jpg
+          sha256: dfe9c2edb3a6c6e8cd0361f68575f03c8717879351ba92ed32a8fa20fa2bf708
+          source: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/kajabi-video-downloader.jpg
+          width: 1920
+        - bytes: 482566
+          contentType: image/gif
+          height: 1080
+          key: best.serp.co/listings/kajabi-video-downloader/image/03e873043fa52654.gif
+          sha256: 03e873043fa52654288eb67fd3862d97a7a844e1fc082acec5a511abf4158022
+          source: https://raw.githubusercontent.com/serpapps/kajabi-video-downloader/main/images/kajabi-video-downloader.gif
+          width: 1920
+  - action: listing-media-update
+    id: lst_bfa3d572078554563e4b9d6c
+    slug: loom-video-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/loom-video-downloader.jpg
+        key: best.serp.co/listings/loom-video-downloader/image/b0f0bfd83d46bbc0.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/loom-video-downloader/main/images/loom-video-downloader.gif
+        key: best.serp.co/listings/loom-video-downloader/image/878bb0143a8a0612.gif
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/loom-video-downloader/main/screenshots/loom-downloader-screenshot-1.jpg
+        key: best.serp.co/listings/loom-video-downloader/image/4302f5cf673d4c01.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/loom-video-downloader/main/screenshots/loom-downloader-screenshot-2.jpg
+        key: best.serp.co/listings/loom-video-downloader/image/e07e1fc7d0e00457.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/loom-video-downloader/main/screenshots/loom-downloader-screenshot-3.jpg
+        key: best.serp.co/listings/loom-video-downloader/image/528eb04f1a560771.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/loom-video-downloader/main/images/loom-video-downloader.png
+        key: best.serp.co/listings/loom-video-downloader/image/eb69d77d5dd1e7aa.png
+    media:
+      logo:
+        bytes: 1845
+        contentType: image/png
+        height: 192
+        key: best.serp.co/listings/loom-video-downloader/logo/649960f7124ca944.png
+        sha256: 649960f7124ca944d8a3d93473d01a0951117585b1e67e4ff04bfc4ff20f628b
+        source: https://cdn.serp.co/best.serp.co/listings/loom-downloader/logo/649960f7124ca944.png
+        width: 192
+      images:
+        - bytes: 118268
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/loom-video-downloader/image/b0f0bfd83d46bbc0.jpg
+          sha256: b0f0bfd83d46bbc0cdaaad4c457b4db5c561214d20610fceb2a886ffbe676c64
+          source: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/loom-video-downloader.jpg
+          width: 1920
+        - bytes: 1147853
+          contentType: image/gif
+          height: 1080
+          key: best.serp.co/listings/loom-video-downloader/image/878bb0143a8a0612.gif
+          sha256: 878bb0143a8a0612ec05979f6293ccbeaa5f4b939255f95717ed04d5e73ade76
+          source: https://raw.githubusercontent.com/serpapps/loom-video-downloader/main/images/loom-video-downloader.gif
+          width: 1920
+        - bytes: 233900
+          contentType: image/jpeg
+          height: 2234
+          key: best.serp.co/listings/loom-video-downloader/image/4302f5cf673d4c01.jpg
+          sha256: 4302f5cf673d4c01ecb84b734c0395cfa50f6d1da3b5ce6468b0bb85461eecee
+          source: https://raw.githubusercontent.com/serpapps/loom-video-downloader/main/screenshots/loom-downloader-screenshot-1.jpg
+          width: 3456
+        - bytes: 259581
+          contentType: image/jpeg
+          height: 2234
+          key: best.serp.co/listings/loom-video-downloader/image/e07e1fc7d0e00457.jpg
+          sha256: e07e1fc7d0e00457c52aacff1125bd13ae4f572bb81dab1d078defacd435880e
+          source: https://raw.githubusercontent.com/serpapps/loom-video-downloader/main/screenshots/loom-downloader-screenshot-2.jpg
+          width: 3456
+        - bytes: 237183
+          contentType: image/jpeg
+          height: 2234
+          key: best.serp.co/listings/loom-video-downloader/image/528eb04f1a560771.jpg
+          sha256: 528eb04f1a56077103778d1353aba955c7b87325f27c5cf18fa8e8662c5035a3
+          source: https://raw.githubusercontent.com/serpapps/loom-video-downloader/main/screenshots/loom-downloader-screenshot-3.jpg
+          width: 3456
+        - bytes: 144140
+          contentType: image/png
+          height: 1080
+          key: best.serp.co/listings/loom-video-downloader/image/eb69d77d5dd1e7aa.png
+          sha256: eb69d77d5dd1e7aae130817dc54de94c56aff7c36fbc5a76e2a7666e52e031d2
+          source: https://raw.githubusercontent.com/serpapps/loom-video-downloader/main/images/loom-video-downloader.png
+          width: 1920
+  - action: listing-media-update
+    id: lst_8220983e1c99a496fc5b4fd3
+    slug: sprout-video-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/sprout-video-downloader.jpg
+        key: best.serp.co/listings/sprout-video-downloader/image/456a38014255954c.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/main/images/sprout-video-downloader-downloader.jpg
+        key: best.serp.co/listings/sprout-video-downloader/image/8f0184d4de1af33a.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/main/images/sprout-video-downloader-downloader.gif
+        key: best.serp.co/listings/sprout-video-downloader/image/b2d3551e2b55580b.gif
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-1.jpg
+        key: best.serp.co/listings/sprout-video-downloader/image/3565a57a923bbada.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-2.jpg
+        key: best.serp.co/listings/sprout-video-downloader/image/99b00e5b1591bf74.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-3.jpg
+        key: best.serp.co/listings/sprout-video-downloader/image/c4a4545d4768b6f9.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-4.jpg
+        key: best.serp.co/listings/sprout-video-downloader/image/d8be7f023a53915f.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-5.jpg
+        key: best.serp.co/listings/sprout-video-downloader/image/81af5aa1b139ea56.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-6.jpg
+        key: best.serp.co/listings/sprout-video-downloader/image/87cc773f429be499.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-7.jpg
+        key: best.serp.co/listings/sprout-video-downloader/image/57fa55aa493d7a4e.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-8.jpg
+        key: best.serp.co/listings/sprout-video-downloader/image/432105f7f3faeb44.jpg
+    media:
+      logo:
+        bytes: 11245
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/sprout-video-downloader/logo/3c352700a367b65a.png
+        sha256: 3c352700a367b65a838a882dfb8a7e32d508e14a45dc6cb20a5de9247ca44acb
+        source: https://cdn.serp.co/best.serp.co/listings/sprout-downloader/logo/3c352700a367b65a.png
+        width: 180
+      images:
+        - bytes: 111485
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/sprout-video-downloader/image/456a38014255954c.jpg
+          sha256: 456a38014255954c1d909a1a2ab7a4330a7334662882754c2ad61e06147f55ed
+          source: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/sprout-video-downloader.jpg
+          width: 1920
+        - bytes: 164474
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/sprout-video-downloader/image/8f0184d4de1af33a.jpg
+          sha256: 8f0184d4de1af33a658b5a8944c511b95d96ce221a3d046a354342ead5bb0f6e
+          source: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/main/images/sprout-video-downloader-downloader.jpg
+          width: 1920
+        - bytes: 492662
+          contentType: image/gif
+          height: 1080
+          key: best.serp.co/listings/sprout-video-downloader/image/b2d3551e2b55580b.gif
+          sha256: b2d3551e2b55580b42d6d8563b36ac371d74b423fe66093864a9d27910e8cd1b
+          source: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/main/images/sprout-video-downloader-downloader.gif
+          width: 1920
+        - bytes: 193288
+          contentType: image/jpeg
+          height: 1034
+          key: best.serp.co/listings/sprout-video-downloader/image/3565a57a923bbada.jpg
+          sha256: 3565a57a923bbadadf42a45ad66c672c4dd6e9dd875334327aba5251acd9971b
+          source: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-1.jpg
+          width: 1720
+        - bytes: 218329
+          contentType: image/jpeg
+          height: 1117
+          key: best.serp.co/listings/sprout-video-downloader/image/99b00e5b1591bf74.jpg
+          sha256: 99b00e5b1591bf7487e18542b77dae2d7e3d59f76b3e564b8eccfc89a66ea72b
+          source: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-2.jpg
+          width: 1728
+        - bytes: 205064
+          contentType: image/jpeg
+          height: 1117
+          key: best.serp.co/listings/sprout-video-downloader/image/c4a4545d4768b6f9.jpg
+          sha256: c4a4545d4768b6f9b73082a5fe91da5ac5f864b805b92c2379ae3f2208434186
+          source: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-3.jpg
+          width: 1728
+        - bytes: 220001
+          contentType: image/jpeg
+          height: 1117
+          key: best.serp.co/listings/sprout-video-downloader/image/d8be7f023a53915f.jpg
+          sha256: d8be7f023a53915f766135668c3c41528781e6e0e43ebfbe9e7cd8760d5dc1e2
+          source: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-4.jpg
+          width: 1728
+        - bytes: 131963
+          contentType: image/jpeg
+          height: 1117
+          key: best.serp.co/listings/sprout-video-downloader/image/81af5aa1b139ea56.jpg
+          sha256: 81af5aa1b139ea563e2d3fc659bb75cd4eb7179ccf4d5ccbdd5406e3f0a561c9
+          source: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-5.jpg
+          width: 1728
+        - bytes: 91455
+          contentType: image/jpeg
+          height: 1117
+          key: best.serp.co/listings/sprout-video-downloader/image/87cc773f429be499.jpg
+          sha256: 87cc773f429be4994b0b511e1622c7579628b5cecafc24ecad80997076008896
+          source: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-6.jpg
+          width: 1728
+        - bytes: 59563
+          contentType: image/jpeg
+          height: 562
+          key: best.serp.co/listings/sprout-video-downloader/image/57fa55aa493d7a4e.jpg
+          sha256: 57fa55aa493d7a4eec234c16898726dc7edb1d6672b068c945a16d03155e7ec4
+          source: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-7.jpg
+          width: 890
+        - bytes: 149782
+          contentType: image/jpeg
+          height: 1117
+          key: best.serp.co/listings/sprout-video-downloader/image/432105f7f3faeb44.jpg
+          sha256: 432105f7f3faeb445c0b37a1bf7f338a2d5a47bcca7f9df97da0c90205151ab6
+          source: https://raw.githubusercontent.com/serpapps/sprout-video-downloader/refs/heads/main/screenshots/sprout-video-downloader-8.jpg
+          width: 1728
+  - action: listing-media-update
+    id: lst_57e20ae1ccd797430b80911e
+    slug: vimeo-video-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/vimeo-video-downloader.jpg
+        key: best.serp.co/listings/vimeo-video-downloader/image/1073278faa3b9884.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/images/vimeo-video-downloader.gif
+        key: best.serp.co/listings/vimeo-video-downloader/image/4dc80fa08544e1b9.gif
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/screenshots/vimeo-video-downloader-screenshot-1.jpg
+        key: best.serp.co/listings/vimeo-video-downloader/image/692104ad4bd20d11.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/screenshots/vimeo-video-downloader-screenshot2.jpg
+        key: best.serp.co/listings/vimeo-video-downloader/image/a5ef13611090c738.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/screenshots/vimeo-video-downloader-screenshot3.jpg
+        key: best.serp.co/listings/vimeo-video-downloader/image/bb4e4238f3cbdf5a.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/screenshots/vimeo-video-downloader-screenshot4.jpg
+        key: best.serp.co/listings/vimeo-video-downloader/image/435bb8aacb50a56d.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/screenshots/vimeo-video-downloader-screenshot5.jpg
+        key: best.serp.co/listings/vimeo-video-downloader/image/7731ba95dc5a9e7c.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/images/vimeo-video-downloader.png
+        key: best.serp.co/listings/vimeo-video-downloader/image/bc67ea79e1739e39.png
+    media:
+      logo:
+        bytes: 1106
+        contentType: image/png
+        height: 48
+        key: best.serp.co/listings/vimeo-video-downloader/logo/1ada80992b87fce5.png
+        sha256: 1ada80992b87fce5fc2c6e53ae6312d3aa9bc4b46fb1138b0723a1a10e3c9149
+        source: https://cdn.serp.co/best.serp.co/listings/vimeo-downloader/logo/1ada80992b87fce5.png
+        width: 48
+      images:
+        - bytes: 110285
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/vimeo-video-downloader/image/1073278faa3b9884.jpg
+          sha256: 1073278faa3b9884e21bebbddc9c4f32a196c26dc1e9897275e2433156509488
+          source: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/vimeo-video-downloader.jpg
+          width: 1920
+        - bytes: 1136105
+          contentType: image/gif
+          height: 1080
+          key: best.serp.co/listings/vimeo-video-downloader/image/4dc80fa08544e1b9.gif
+          sha256: 4dc80fa08544e1b9bbef48a5efba8680abbd2439e8a1b2e5c88d48f7af661f83
+          source: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/images/vimeo-video-downloader.gif
+          width: 1920
+        - bytes: 213438
+          contentType: image/jpeg
+          height: 1976
+          key: best.serp.co/listings/vimeo-video-downloader/image/692104ad4bd20d11.jpg
+          sha256: 692104ad4bd20d11b573e097af89466ea49756ffa63e5db04c655cda191643a4
+          source: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/screenshots/vimeo-video-downloader-screenshot-1.jpg
+          width: 3446
+        - bytes: 226055
+          contentType: image/jpeg
+          height: 1994
+          key: best.serp.co/listings/vimeo-video-downloader/image/a5ef13611090c738.jpg
+          sha256: a5ef13611090c738a6045001d020436decc5eefa3cc9bbd0e63d302bc5d2b96f
+          source: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/screenshots/vimeo-video-downloader-screenshot2.jpg
+          width: 3436
+        - bytes: 153005
+          contentType: image/jpeg
+          height: 1814
+          key: best.serp.co/listings/vimeo-video-downloader/image/bb4e4238f3cbdf5a.jpg
+          sha256: bb4e4238f3cbdf5acd64d0fd21325973ce7710cd3e71b83ab8dfb6ec185c24d5
+          source: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/screenshots/vimeo-video-downloader-screenshot3.jpg
+          width: 3402
+        - bytes: 141327
+          contentType: image/jpeg
+          height: 1680
+          key: best.serp.co/listings/vimeo-video-downloader/image/435bb8aacb50a56d.jpg
+          sha256: 435bb8aacb50a56db1839b84743eec13a4131ea5bbc8bd844c49f1f46a23be38
+          source: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/screenshots/vimeo-video-downloader-screenshot4.jpg
+          width: 3444
+        - bytes: 238003
+          contentType: image/jpeg
+          height: 2234
+          key: best.serp.co/listings/vimeo-video-downloader/image/7731ba95dc5a9e7c.jpg
+          sha256: 7731ba95dc5a9e7ce9189973a7526538a40a2471160100c8ea65f9042cda1100
+          source: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/screenshots/vimeo-video-downloader-screenshot5.jpg
+          width: 3456
+        - bytes: 150436
+          contentType: image/png
+          height: 1080
+          key: best.serp.co/listings/vimeo-video-downloader/image/bc67ea79e1739e39.png
+          sha256: bc67ea79e1739e39258ccd3afa3df8bf7714b7ccf400d56cbbe923a532469799
+          source: https://raw.githubusercontent.com/serpapps/vimeo-video-downloader/main/images/vimeo-video-downloader.png
+          width: 1920
+  - action: listing-media-update
+    id: lst_834a96e6f8c01222d90d0390
+    slug: whop-video-downloader
+    expected:
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/whop-video-downloader.jpg
+        key: best.serp.co/listings/whop-video-downloader/image/a5d19af6822899fa.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/main/images/whop-video-downloader.gif
+        key: best.serp.co/listings/whop-video-downloader/image/61ce634f92faef05.gif
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-1.jpg
+        key: best.serp.co/listings/whop-video-downloader/image/9bdd6efd678a66f8.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-2.jpg
+        key: best.serp.co/listings/whop-video-downloader/image/e8582bdde0933398.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-3.jpg
+        key: best.serp.co/listings/whop-video-downloader/image/90cbd319caed3d47.jpg
+      - kind: image
+        url: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-4.jpg
+        key: best.serp.co/listings/whop-video-downloader/image/ea0809ad95913a15.jpg
+    media:
+      logo:
+        bytes: 9960
+        contentType: image/png
+        height: 256
+        key: best.serp.co/listings/whop-video-downloader/logo/22b0423d7163a810.png
+        sha256: 22b0423d7163a810fb0c65fea5eb9a703d73825875d4a3de93b1afcc46a61131
+        source: https://cdn.serp.co/best.serp.co/listings/whop-downloader/logo/22b0423d7163a810.png
+        width: 256
+      images:
+        - bytes: 45139
+          contentType: image/jpeg
+          height: 1080
+          key: best.serp.co/listings/whop-video-downloader/image/a5d19af6822899fa.jpg
+          sha256: a5d19af6822899fa415aceb1abd7d606e6e1cded450878a6e37731e3a1fa5fd2
+          source: https://raw.githubusercontent.com/serpapps/.github/refs/heads/main/sites/whop-video-downloader.jpg
+          width: 1920
+        - bytes: 672241
+          contentType: image/gif
+          height: 1080
+          key: best.serp.co/listings/whop-video-downloader/image/61ce634f92faef05.gif
+          sha256: 61ce634f92faef055fd68ad5693effabe1de588276d66aa82cdaac66b89c73d7
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/main/images/whop-video-downloader.gif
+          width: 1920
+        - bytes: 242196
+          contentType: image/jpeg
+          height: 1440
+          key: best.serp.co/listings/whop-video-downloader/image/9bdd6efd678a66f8.jpg
+          sha256: 9bdd6efd678a66f87c64ef589802a8c6545fdd18751fa78ea2be335915e929b0
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-1.jpg
+          width: 2560
+        - bytes: 128609
+          contentType: image/jpeg
+          height: 1362
+          key: best.serp.co/listings/whop-video-downloader/image/e8582bdde0933398.jpg
+          sha256: e8582bdde093339811ebd158f77ff90d988d4f6723aa88ce4e6c4c19a1137084
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-2.jpg
+          width: 1270
+        - bytes: 166314
+          contentType: image/jpeg
+          height: 1440
+          key: best.serp.co/listings/whop-video-downloader/image/90cbd319caed3d47.jpg
+          sha256: 90cbd319caed3d4742468d7a6f1435bed007a42e4005185d31ce46c1a4ed7dd7
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-3.jpg
+          width: 2560
+        - bytes: 301111
+          contentType: image/jpeg
+          height: 1440
+          key: best.serp.co/listings/whop-video-downloader/image/ea0809ad95913a15.jpg
+          sha256: ea0809ad95913a15616407cb91dcd5777d2842972dc034fc32630a39ec19339f
+          source: https://raw.githubusercontent.com/serpapps/whop-video-downloader/refs/heads/main/screenshots/whop-video-downloader-4.jpg
+          width: 2560
+  - action: listing-media-update
+    id: lst_7e9736364b5d462013a79498
+    slug: lambda.ai
+    expected:
+      - kind: logo
+        url: https://lambda.ai/hubfs/raw_assets/33/public/@projects/Lambda%20Marketing%20Website/lambda-theme/assets/static/img/apple-touch-icon-180x180.png
+        key: best.serp.co/listings/lambda.ai/logo/4d104dd27ad8154a.webp
+    media:
+      logo:
+        bytes: 904
+        contentType: image/webp
+        height: 180
+        key: best.serp.co/listings/lambda.ai/logo/4d104dd27ad8154a.webp
+        sha256: 4d104dd27ad8154ad92352613f02179bfb8f6d349ef2bc70f01f596615203e8d
+        source: https://lambda.ai/hubfs/raw_assets/33/public/@projects/Lambda%20Marketing%20Website/lambda-theme/assets/static/img/apple-touch-icon-180x180.png
+        width: 180
+      images:
+        - bytes: 63838
+          contentType: image/webp
+          height: 630
+          key: best.serp.co/listings/lambda.ai/image/05b00243897ff797.webp
+          sha256: 05b00243897ff7975d3b2dcadcb83f8768155a57046363ac09b4ca353496aa31
+          source: https://cdn.serp.co/best.serp.co/listings/lambdalabs.com/image/05b00243897ff797.webp
+          width: 1200
+  - action: listing-media-update
+    id: lst_43c3f8e25133ae6ea80b7e2e
+    slug: scaleserp.com
+    expected: []
+    media:
+      logo:
+        bytes: 45377
+        contentType: image/avif
+        height: 600
+        key: best.serp.co/listings/scaleserp.com/logo/991536ecff06271e.avif
+        sha256: 991536ecff06271ee0b57ddcc35a3f758b001f5e4179ec5a7ec07fa30c90a73a
+        source: https://cdn.serp.co/best.serp.co/listings/trajectdata.com/logo/991536ecff06271e.avif
+        width: 800
+      images:
+        - bytes: 45377
+          contentType: image/avif
+          height: 600
+          key: best.serp.co/listings/scaleserp.com/image/991536ecff06271e.avif
+          sha256: 991536ecff06271ee0b57ddcc35a3f758b001f5e4179ec5a7ec07fa30c90a73a
+          source: https://cdn.serp.co/best.serp.co/listings/trajectdata.com/image/991536ecff06271e.avif
+          width: 800
   - action: listing-unpublish
     id: lst_6848e48a02324d7854be5396
     slug: facebook-downloader
@@ -39,6 +530,7 @@ operations:
     reason: "#332 duplicate of facebook-video-downloader, the slug SERP's links use (apps.serp.co/facebook-video-downloader)"
     expected:
       website: https://serp.ly/facebook-downloader
+      unowned: true
   - action: listing-unpublish
     id: lst_3601e4f5ecdb41c38f4af867
     slug: kajabi-downloader
@@ -47,6 +539,7 @@ operations:
     reason: "#332 duplicate of kajabi-video-downloader, the slug SERP's links use (apps.serp.co/kajabi-video-downloader)"
     expected:
       website: https://serp.ly/kajabi-video-downloader
+      unowned: true
   - action: listing-unpublish
     id: lst_b5e8cf522bb20bb82d019ea7
     slug: loom-downloader
@@ -55,6 +548,7 @@ operations:
     reason: "#332 duplicate of loom-video-downloader, the slug SERP's links use (apps.serp.co/loom-video-downloader)"
     expected:
       website: https://serp.ly/loom-video-downloader
+      unowned: true
   - action: listing-unpublish
     id: lst_2d97c5bf77ddd52e691d2826
     slug: skool-downloader
@@ -63,6 +557,7 @@ operations:
     reason: "#332 duplicate of skool-video-downloader, the slug SERP's links use (apps.serp.co/skool-video-downloader)"
     expected:
       website: https://serp.ly/skool-video-downloader
+      unowned: true
   - action: listing-unpublish
     id: lst_8950abff1c7315b2a05ed3d4
     slug: sprout-downloader
@@ -71,6 +566,7 @@ operations:
     reason: "#332 duplicate of sprout-video-downloader, the slug SERP's links use (apps.serp.co/sprout-video-downloader)"
     expected:
       website: https://serp.ly/sprout-video-downloader
+      unowned: true
   - action: listing-unpublish
     id: lst_23fc568c5d83d33a8e1ff8b8
     slug: vimeo-downloader
@@ -79,6 +575,7 @@ operations:
     reason: "#332 duplicate of vimeo-video-downloader, the slug SERP's links use (apps.serp.co/vimeo-video-downloader)"
     expected:
       website: https://serp.ly/vimeo-video-downloader
+      unowned: true
   - action: listing-unpublish
     id: lst_eb9f9e91aa46a4e661aeb2e4
     slug: whop-downloader
@@ -87,6 +584,7 @@ operations:
     reason: "#332 duplicate of whop-video-downloader, the slug SERP's links use (apps.serp.co/whop-video-downloader)"
     expected:
       website: https://serp.ly/whop-video-downloader
+      unowned: true
   - action: listing-unpublish
     id: lst_dd8fb0cfe5d5d2e3524ebf0f
     slug: wistia-downloader
@@ -95,6 +593,7 @@ operations:
     reason: "#332 duplicate of wistia-video-downloader, the slug SERP's links use (apps.serp.co/wistia-video-downloader)"
     expected:
       website: https://serp.ly/wistia-video-downloader
+      unowned: true
   - action: listing-unpublish
     id: lst_abfe947189d1a2c36bfc30bd
     slug: flowrite.com
@@ -103,6 +602,7 @@ operations:
     reason: "#332 duplicate of maestrolabs.com: Flowrite is now MailMaestro, and flowrite.com redirects to maestrolabs.com/flowrite"
     expected:
       website: https://serp.ly/flowrite.com
+      unowned: true
   - action: listing-unpublish
     id: lst_520c843ef16b99939a10de32
     slug: phrasee.co
@@ -111,6 +611,7 @@ operations:
     reason: "#332 duplicate of jacquard.com: Phrasee is now Jacquard, and phrasee.co redirects to jacquard.com"
     expected:
       website: https://serp.ly/phrasee.co
+      unowned: true
   - action: listing-unpublish
     id: lst_125869b72bec8380b6e03430
     slug: lambdalabs.com
@@ -120,14 +621,16 @@ operations:
     reason: "#332 duplicate of lambda.ai: lambdalabs.com redirects to lambda.ai, Lambda's current domain"
     expected:
       website: https://serp.ly/lambda
+      unowned: true
   - action: listing-unpublish
-    id: lst_ce9486f34a719d8172fdbf08
-    slug: timeos.ai
+    id: lst_8250b7e98ab4961ec79ab00a
+    slug: magical.so
     categories:
       - other
-    reason: "#332 duplicate of magical.so: both listings' links land on magical.so (timeOS), and timeos.ai now redirects to timeless.day"
+    reason: "#332 duplicate of timeos.ai: magical.so now serves timeOS with its canonical at timeos.ai, and timeOS is now Timeless (timeos.ai redirects to timeless.day)"
     expected:
-      website: https://serp.ly/magical
+      website: https://serp.ly/magical.so
+      unowned: true
   - action: listing-unpublish
     id: lst_7cccdaebce54e5ccc387136b
     slug: trajectdata.com
@@ -136,6 +639,7 @@ operations:
     reason: "#332 duplicate of scaleserp.com: the product is still Scale SERP and SERP's links use scaleserp.com; trajectdata.com is its parent company's site"
     expected:
       website: https://serp.ly/scale-serp
+      unowned: true
   - action: listing-unpublish
     id: lst_07bc2165413fbae535846dcb
     slug: timelyapp.com
@@ -144,3 +648,4 @@ operations:
     reason: "#332 duplicate of timely.com: timelyapp.com redirects to timely.com, Timely's current domain"
     expected:
       website: https://serp.ly/timelyapp.com
+      unowned: true

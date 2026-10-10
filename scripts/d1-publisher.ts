@@ -160,7 +160,9 @@ const operation = z.discriminatedUnion('action', [
    * becomes 0, the row is kept, and the URL answers 410 Gone. `reason` goes to the activity log.
    * `expected` is the row the manifest was generated against (#100): the batch refuses a listing
    * whose website changed since, so the operation stays correct on any environment, and a
-   * row-level (`rows`) manifest requires it.
+   * row-level (`rows`) manifest requires it. `expected.unowned` (#332) also refuses a listing
+   * that anyone owns, claims, or paid for (`LISTING_HAS_OWNERSHIP_RECORDS`): a retirement in
+   * favour of another listing would leave those records on the unpublished row.
    */
   z
     .object({
@@ -169,7 +171,10 @@ const operation = z.discriminatedUnion('action', [
       slug: existingSlug,
       categories,
       reason: z.string().trim().min(1).max(200).optional(),
-      expected: z.object({ website: z.string().url() }).strict().optional()
+      expected: z
+        .object({ website: z.string().url(), unowned: z.literal(true).optional() })
+        .strict()
+        .optional()
     })
     .strict(),
   /**
@@ -307,7 +312,8 @@ export const manifestConcurrency = ['publication', 'rows'] as const
  * Operations that carry their own row-level compare-and-swap, so a `rows` manifest may hold them:
  * media rows (`expected`), categories (`expected`, added or removed), a description's length and
  * ending (#105), an unpublish with its `expected.website` (#100: categories, live, website, no
- * submission in review), and a category retirement (#260: no live listing left in it).
+ * submission in review; with `expected.unowned`, no ownership records either, #332), and a
+ * category retirement (#260: no live listing left in it).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
@@ -508,6 +514,19 @@ function membershipGuard(id: string, expected: string[]): PlannedStatement {
     ...expected
   )
 }
+/**
+ * True while anything ties listing `?` to a person or a payment (#332), each in its open
+ * statuses as `apps/web/src/db/schema.ts` defines them: a current owner (`listing_owners`), an
+ * open claim (`openListingClaimStatuses`), an order on the listing or one of its submissions
+ * that is pending, paid, or being refunded, an open revision (`openRevisionStatuses`), or a
+ * submission that is not rejected or withdrawn (an approved free one is how the badge program
+ * knows the listing's owner). Binds the listing id six times.
+ */
+export const LISTING_HAS_OWNERSHIP_RECORDS = `(EXISTS (SELECT 1 FROM listing_owners WHERE listing_id=? AND revoked_at IS NULL)
+  OR EXISTS (SELECT 1 FROM listing_claims WHERE listing_id=? AND status IN ('code_sent','email_verified'))
+  OR EXISTS (SELECT 1 FROM orders WHERE (listing_id=? OR submission_id IN (SELECT id FROM listing_submissions WHERE listing_id=?)) AND status IN ('pending','paid','refunding'))
+  OR EXISTS (SELECT 1 FROM listing_revisions WHERE listing_id=? AND status IN ('pending_review','changes_requested'))
+  OR EXISTS (SELECT 1 FROM listing_submissions WHERE listing_id=? AND status NOT IN ('rejected','withdrawn')))`
 /** Refuses the batch unless the listing has this slug and exactly these categories, in order. */
 function categoriesGuard(id: string, slug: string, expected: string[]): PlannedStatement {
   return statement(
@@ -771,6 +790,15 @@ export function buildPublicationPlan(
           `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${GUARD_FAILURE} ELSE 1 END`,
           op.id
         ),
+        // #332: an owner, claim, order, revision, or submission would be stranded on the row.
+        ...(op.expected?.unowned
+          ? [
+              statement(
+                `SELECT CASE WHEN ${LISTING_HAS_OWNERSHIP_RECORDS} THEN ${GUARD_FAILURE} ELSE 1 END`,
+                ...Array.from({ length: 6 }, () => op.id)
+              )
+            ]
+          : []),
         statement(
           `UPDATE listings SET is_active=0,updated_at=? WHERE id=? AND slug=? AND status='approved' AND is_active=1${
             op.expected ? ' AND website=?' : ''

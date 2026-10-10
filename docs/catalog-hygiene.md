@@ -1,7 +1,8 @@
 # Catalog hygiene
 
 What best.serp.co lists, and how listings that don't belong leave: [adult products](#adult-products-260)
-are never listed, and [the listing domain check](#the-check) finds hijacked, parked, and dead domains.
+are never listed, [the listing domain check](#the-check) finds hijacked, parked, and dead domains,
+and a product listed twice keeps [one listing](#duplicate-listings-332).
 
 ## Listing domains
 
@@ -180,6 +181,23 @@ stay live off them, no other adult-platform listing is live, every removed URL a
 archived with the import in `.archive/scripts/v1-import-publications.test.ts` (#315); since then
 the generator reads the environment's own D1 (`--env`), and `scripts/listing-domain-check.test.ts`
 covers it on fixture listings.
+
+## Duplicate listings (#332)
+
+Some products were imported twice, under two slugs with the same name and description.
+`d1/publications/2026-10-10-duplicate-listings.yaml` keeps one listing of each pair and unpublishes
+the other (410, like the cleanups above); its header says which slug stays and why. No manifest
+operation can redirect one listing's slug to another listing, so the retired URL answers 410.
+
+- **Media first.** Where the retired listing had a logo or image the kept one lacked, a
+  `listing-media-update` earlier in the same batch gives the kept listing a copy under its own key
+  (`d1/media/2026-10-10-duplicate-listings.json`, copied from the retired listing's hosted object),
+  so the upload plan goes to the environment before the manifest.
+- **Nothing stranded.** Each unpublish carries `expected.unowned: true`: the batch refuses a listing
+  that has a current owner, an open claim, a pending, paid, or refunding order (on the listing or
+  its submission), an open revision, or a submission that is not rejected or withdrawn. Those
+  records would stay on the retired row, so the owner moves or settles them first. The hygiene
+  manifests above leave it out: a hijacked, dead, or adult listing leaves whoever claimed it.
 
 ## Listing FAQs (#105)
 

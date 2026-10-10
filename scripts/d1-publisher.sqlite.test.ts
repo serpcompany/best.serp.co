@@ -3,9 +3,20 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
+import {
+  openListingClaimStatuses,
+  openRevisionStatuses,
+  orderStatuses,
+  submissionStatuses
+} from '../apps/web/src/db/schema'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
-import { buildPublicationPlan, manifestSchema, type PublicationPlan } from './d1-publisher.ts'
+import {
+  buildPublicationPlan,
+  LISTING_HAS_OWNERSHIP_RECORDS,
+  manifestSchema,
+  type PublicationPlan
+} from './d1-publisher.ts'
 
 const beforeChecksum = 'a'.repeat(64)
 const afterChecksum = createHash('sha256')
@@ -924,6 +935,143 @@ describe('listing-unpublish (the admin panel’s unpublished state, #64 and #100
     expect(() => unpublish({ reason: '  ' })).toThrow()
     expect(() => unpublish({ expected: { website: 'https://example.com', name: 'Old' } })).toThrow()
     expect(() => unpublish({ expected: { website: 'not a url' } })).toThrow()
+  })
+})
+
+describe('listing-unpublish with expected.unowned (#332: retiring a duplicate listing)', () => {
+  const retire = (unowned = true) =>
+    plan({
+      operations: [
+        {
+          action: 'listing-unpublish',
+          id: 'lst_sqlite_test',
+          slug: 'old-slug',
+          categories: ['seo'],
+          reason: '#332 duplicate of new-slug',
+          expected: { website: 'https://example.com', ...(unowned ? { unowned: true } : {}) }
+        }
+      ]
+    })
+  const isActive = (db: DatabaseSync) =>
+    db.prepare("SELECT is_active FROM listings WHERE id='lst_sqlite_test'").get()
+  const user = `INSERT INTO users (id,name,email,email_verified)
+    VALUES ('user_maker','Maker','maker@example.com',1);`
+  const owner = (revoked: boolean) => `INSERT INTO listing_owners (listing_id,user_id,verified_via,
+      verified_at,revoked_at,revoked_reason)
+    VALUES ('lst_sqlite_test','user_maker','badge_claim','${now}',
+      ${revoked ? `'${now}','admin removed'` : 'NULL,NULL'});`
+  const claim = (
+    status: string
+  ) => `INSERT INTO listing_claims (id,listing_id,user_id,method,status,
+      email,email_domain,product_url,listing_website,code_sent_at,code_expires_at,email_verified_at)
+    VALUES ('claim_${status}','lst_sqlite_test','user_maker','paid','${status}','maker@example.com',
+      'example.com','https://example.com/','https://example.com','${now}','${now}',
+      ${status === 'code_sent' ? 'NULL' : `'${now}'`});`
+  /** A paid-claim order on the listing, or with `submission` a paid submission's order. */
+  const order = (status: string, number: number, submission?: string) => {
+    const paid = status !== 'pending' && status !== 'failed'
+    const refund = status === 'refunding' || status === 'refunded'
+    const target = submission
+      ? `'paid_listing','submission','submission:${submission}','${submission}',NULL,NULL`
+      : `'paid_claim','claim','claim:claim_${number}',NULL,'lst_sqlite_test','claim_${number}'`
+    return `INSERT INTO orders (id,number,user_id,kind,purpose,target_key,submission_id,listing_id,
+        claim_id,amount_cents,currency,provider,status,paid_at,provider_payment_id,charged_cents,
+        charged_currency,refund_reason,refund_requested_at,refunded_at,failed_at,created_at,
+        updated_at)
+      VALUES ('order_${number}',${number},'user_maker',${target},4900,'usd','stripe','${status}',
+        ${paid ? `'${now}','pi_${number}',4900,'usd'` : 'NULL,NULL,NULL,NULL'},
+        ${refund ? `'rejected','${now}'` : 'NULL,NULL'},
+        ${status === 'refunded' ? `'${now}'` : 'NULL'},${status === 'failed' ? `'${now}'` : 'NULL'},
+        '${now}','${now}');`
+  }
+  const revision = (status: string) => `INSERT INTO listing_revisions (id,listing_id,author_user_id,
+      status,base_checksum,name,description,content,category_slug,logo_url)
+    VALUES ('rev_${status}','lst_sqlite_test','user_maker','${status}','c','Old','d','c','seo',
+      'https://example.com/logo.png');`
+  const submission = (id: string, status: string) => `INSERT INTO listing_submissions (id,slug,name,
+      description,website,content,category_slug,logo_url,status,plan,listing_id,rejection_category,
+      rejection_reason,withdrawal_reason)
+    VALUES ('${id}','${id}.example','Old','d','https://${id}.example/','c','seo','l','${status}',
+      'free','lst_sqlite_test',${status === 'rejected' ? "'other','not a product'" : 'NULL,NULL'},
+      ${status === 'withdrawn' ? "'owner'" : 'NULL'});`
+
+  it('retires a listing whose ownership records are all closed', () => {
+    const db = database()
+    db.exec(
+      [
+        user,
+        owner(true),
+        claim('cancelled'),
+        order('failed', 1),
+        order('refunded', 2),
+        revision('rejected'),
+        submission('sub_rejected', 'rejected'),
+        submission('sub_withdrawn', 'withdrawn')
+      ].join('\n')
+    )
+    executeInTestTransaction(db, retire())
+    expect(isActive(db)).toEqual({ is_active: 0 })
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 5
+    })
+  })
+
+  it.each([
+    ['a current owner', owner(false)],
+    ['a claim waiting for its code', claim('code_sent')],
+    ['a claim waiting for the badge or the payment', claim('email_verified')],
+    ['a pending order', order('pending', 1)],
+    ['a paid order', order('paid', 1)],
+    ['an order being refunded', order('refunding', 1)],
+    [
+      'a paid order on its submission',
+      `${submission('sub_rejected', 'rejected')}\n${order('paid', 1, 'sub_rejected')}`
+    ],
+    ['a revision in review', revision('pending_review')],
+    ['a revision sent back for changes', revision('changes_requested')],
+    ['an open submission', submission('sub_verified', 'verified')],
+    ['an approved submission (the badge program’s free listing)', submission('sub_ok', 'approved')]
+  ])('refuses the whole batch when the listing has %s', (_name, records) => {
+    const db = database()
+    db.exec(`${user}\n${records}`)
+    expect(() => executeInTestTransaction(db, retire())).toThrow()
+    expect(isActive(db)).toEqual({ is_active: 1 })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({ count: 0 })
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 4
+    })
+    // The guard is opt-in: without `unowned`, a hygiene unpublish (a hijacked or dead domain)
+    // of the same listing still applies.
+    executeInTestTransaction(db, retire(false))
+    expect(isActive(db)).toEqual({ is_active: 0 })
+  })
+
+  it('names the schema’s own open statuses', () => {
+    const list = (values: readonly string[]) => values.map(value => `'${value}'`).join(',')
+    expect(LISTING_HAS_OWNERSHIP_RECORDS).toContain(`status IN (${list(openListingClaimStatuses)})`)
+    expect(LISTING_HAS_OWNERSHIP_RECORDS).toContain(`status IN (${list(openRevisionStatuses)})`)
+    // Orders: every status but the two that end without money held.
+    expect(LISTING_HAS_OWNERSHIP_RECORDS).toContain(
+      `status IN (${list(orderStatuses.filter(status => status !== 'refunded' && status !== 'failed'))})`
+    )
+    expect(submissionStatuses).toEqual(expect.arrayContaining(['rejected', 'withdrawn']))
+  })
+
+  it('takes unowned only as true, and only on the expected row', () => {
+    const op = (expected: Record<string, unknown>) =>
+      plan({
+        operations: [
+          {
+            action: 'listing-unpublish',
+            id: 'lst_sqlite_test',
+            slug: 'old-slug',
+            categories: ['seo'],
+            expected
+          }
+        ]
+      })
+    expect(() => op({ website: 'https://example.com', unowned: false })).toThrow()
+    expect(() => op({ unowned: true })).toThrow()
   })
 })
 
