@@ -215,37 +215,28 @@ archived with it in `.archive/scripts/` (#315); the committed manifest is the re
 
 ## Listings filed under Other (#333)
 
-The v1 import filed 2,419 of the 2,690 live listings under Other alone, so most category pages held
-one or two listings. They move to real categories through reviewed files:
+The v1 import filed 2,419 of the 2,690 live listings under Other alone. They move to real
+categories through reviewed files:
 
-- **The inventory.** `d1/hygiene/2026-10-10-other-inventory.json` lists those 2,419 listings: name,
-  website, short description, and the start of the long description. It came from the reviewed catalog,
-  the archived v1 import with the committed manifests replayed, by a one-off script posted on #333. Each
-  listing's `categories` is what a manifest operation expects. `2026-10-10-categories.json` lists the 138
-  other live categories.
-- **The proposal.** `d1/hygiene/2026-10-10-other-categories.yaml` gives each listing a primary category
-  and up to two secondaries, or Other with a reason. Two classifier agents wrote it in two halves by slug
-  order, and the `alignments` record how their calls were made consistent. A cluster with no fitting
-  category is proposed in `newCategories` and created by no manifest, so its listings stay in Other until
-  the owner decides. A listing whose flag makes its category uncertain (mismatch, spam, dead, adult, and
-  most `other` flags) stays in Other, with the classifiers' category kept as `held`.
-  `decidedAt` is `pending` until the owner accepts it.
-- **The owner's list.** `d1/hygiene/2026-10-10-other-owner-flags.yaml` collects every flag by kind: adult,
-  spam, dead, duplicate, mismatch, and other. On 2026-10-10 the owner decided to unpublish the adult
-  listing and four spam listings: `d1/publications/2026-10-10-other-removals.yaml`, row-level
-  `listing-unpublish` operations like the other hygiene removals, so not `unowned`. The other flags
-  wait for the owner's decision.
-- **The manifests.** `pnpm catalog:other-categories` writes `d1/publications/2026-10-10-other-categories-NN.yaml`
-  from the proposal and the inventory. Each listing with a real primary gets one `listing-categories-set`
-  operation ([Catalog publication](./catalog-publication.md#category-operations)): `expected` is `[other]`,
-  and `categories` is the primary, then the secondaries. A batch holds 200 operations, about as many
-  statements as the legacy media batches. `scripts/other-categories-manifest.test.ts` keeps the manifests
-  identical to what the proposal generates, and replays them on the inventory, so that Other loses exactly
-  the proposed listings.
+- **Inventory.** `d1/hygiene/2026-10-10-other-inventory.json`: each listing's name, website, short
+  description, start of its long description, and `categories` (what an operation expects), from
+  the reviewed catalog by a one-off script posted on #333. `2026-10-10-categories.json` lists the
+  138 other live categories.
+- **Proposal.** `d1/hygiene/2026-10-10-other-categories.yaml` (`decidedAt: pending` until the owner
+  accepts it): a primary category and up to two secondaries per listing, or Other with a reason.
+  Two classifier agents wrote it in halves; `alignments` record how their calls were made one.
+  Clusters with no fitting category are in `newCategories`, which no manifest creates. A flag that
+  makes the category uncertain keeps the listing in Other, its category kept as `held`.
+- **Owner flags.** `d1/hygiene/2026-10-10-other-owner-flags.yaml`, by kind. The owner decided on
+  2026-10-10 to unpublish the adult listing and four spam listings
+  (`d1/publications/2026-10-10-other-removals.yaml`, hygiene removals, so not `unowned`).
+- **Manifests.** `pnpm catalog:other-categories` writes
+  `d1/publications/2026-10-10-other-categories-NN.yaml`: one `listing-categories-set` per listing
+  with a real primary ([Catalog publication](./catalog-publication.md#category-operations)),
+  `expected: [other]`, 200 per batch. `scripts/other-categories-manifest.test.ts` keeps them
+  identical to the proposal and replays them on the inventory.
 
-The manifests are row-level, so each fits staging and production. Publish them in order, staging first,
-then production after promotion. A batch refuses whole, writing nothing, if any of its listings changed
-since the reviewed catalog: an admin edit, an approved revision, or a duplicate retired by #332. To fix a
-refused batch, set that listing's `primary` to `other` in the proposal with the reason, regenerate, and
-publish the regenerated batches. The batches before it don't change.
-
+They are row-level: publish them in order, staging first, then production after promotion. A batch
+refuses whole if one of its listings changed since the reviewed catalog (an admin edit, a revision,
+a #332 retirement): set its `primary` to `other` with the reason, regenerate, and publish the
+regenerated batches; the ones before it don't change.
