@@ -65,8 +65,9 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
 - Payment races: a draft that switched to free while its checkout was open is upgraded by the
   payment from `pending_badge`; a payment that completes after withdrawal or expiry is recorded
   with its refund (#68's webhook issues it). Any other charge the submission cannot accept lives
-  only in #68's `orders`, which is the ledger of record ([Data model](./DATA_MODEL.md)). Once
-  paid, the owner cannot withdraw; they message the team (#73) and an admin decides.
+  only in #68's `orders`, which is the ledger of record
+  ([Submission data](./SUBMISSION_DATA.md#payments-and-refunds)). Once paid, the owner cannot
+  withdraw; they message the team (#73) and an admin decides.
 - The protected publisher's `listing-unpublish` can still take a listing down while its
   submission is queued (an emergency takedown is never blocked). The in-app plans refuse that,
   but after such a takedown a `changes_requested` submission cannot be resubmitted and a
