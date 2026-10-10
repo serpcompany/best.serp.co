@@ -34,11 +34,10 @@ const CHANGED_ONE_GUARD = `SELECT CASE WHEN changes()=1 THEN 1 ELSE ${GUARD_FAIL
 /**
  * A guard failure that says why (#338 review): it rolls the batch back like `GUARD_FAILURE`, and
  * D1 names the reason in its error (`bad JSON path: '<reason>'`), so the workflow's log says what
- * to fix. The reason is a constant of the plan, never a binding.
+ * to fix. The reason names manifest values (slugs), so it is bound like every runtime value: the
+ * statement binds it as the parameter for this `?`, its last.
  */
-export function guardFailure(reason: string): string {
-  return `json_extract('{}', '${reason.replaceAll("'", "''")}')`
-}
+export const REASONED_GUARD_FAILURE = "json_extract('{}', ?)"
 
 /** A slug that already exists; renaming or unpublishing it must stay possible. */
 const existingSlug = z.string().regex(/^[a-z0-9.-]+$/)
@@ -873,8 +872,9 @@ export function buildPublicationPlan(
         // #338: never while a listing filed under it is a slug redirect's source. Retired, that
         // listing would answer 404 (#260), but the product page reads the redirect first.
         statement(
-          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id JOIN listings l ON l.id=lc.listing_id JOIN listing_slug_redirects r ON r.old_slug=l.slug WHERE c.slug=?) THEN ${guardFailure(`category-unpublish ${op.slug}: a listing filed under it is the source of a slug redirect; re-file that listing first`)} ELSE 1 END`,
-          op.slug
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id JOIN listings l ON l.id=lc.listing_id JOIN listing_slug_redirects r ON r.old_slug=l.slug WHERE c.slug=?) THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.slug,
+          `category-unpublish ${op.slug}: a listing filed under it is the source of a slug redirect; re-file that listing first`
         )
       )
       addCategories([op.slug])
@@ -1180,25 +1180,28 @@ export function buildPublicationPlan(
         // (`isUnpublishedListingSlug`). One filed under a retired category answers 404 and stays
         // there: #260 sends no adult listing's traffic elsewhere. Its row is never changed.
         statement(
-          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL) AND NOT ${listingInRetiredCategory('?')} THEN 1 ELSE ${guardFailure(`${redirect}: the source is not this unpublished listing, or is filed under a retired category`)} END`,
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL) AND NOT ${listingInRetiredCategory('?')} THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
           op.from.id,
           op.from.slug,
-          op.from.id
+          op.from.id,
+          `${redirect}: the source is not this unpublished listing, or is filed under a retired category`
         ),
         // The target: public now, by the predicates the product page's redirect lookup applies.
         statement(
-          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?) THEN 1 ELSE ${guardFailure(`${redirect}: the target is not this live listing`)} END`,
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?) THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
           op.to.id,
           op.to.slug,
-          now
+          now,
+          `${redirect}: the target is not this live listing`
         ),
         // No redirect for the slug yet; no chain or loop: the target's slug isn't redirected, and
         // no older slug redirects to the source.
         statement(
-          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_slug_redirects WHERE old_slug IN (?, ?) OR listing_id=?) THEN ${guardFailure(`${redirect}: the slug already redirects, or this would make a chain or a loop`)} ELSE 1 END`,
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_slug_redirects WHERE old_slug IN (?, ?) OR listing_id=?) THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
           op.from.slug,
           op.to.slug,
-          op.from.id
+          op.from.id,
+          `${redirect}: the slug already redirects, or this would make a chain or a loop`
         ),
         statement(
           'INSERT INTO listing_slug_redirects (listing_id,old_slug,new_slug,manifest_id,reason,created_at) VALUES (?,?,?,?,?,?)',
@@ -1222,11 +1225,12 @@ export function buildPublicationPlan(
     if (op.action !== 'listing-slug-redirect') continue
     statements.push(
       statement(
-        `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL) AND NOT ${listingInRetiredCategory('?')} AND EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?) THEN 1 ELSE ${guardFailure(`${redirectLabel(op)}: by the end of the batch, its source is no longer unpublished outside retired categories, or its target is no longer live`)} END`,
+        `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL) AND NOT ${listingInRetiredCategory('?')} AND EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?) THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
         op.from.id,
         op.from.id,
         op.to.id,
-        now
+        now,
+        `${redirectLabel(op)}: by the end of the batch, its source is no longer unpublished outside retired categories, or its target is no longer live`
       )
     )
   }
