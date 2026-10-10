@@ -1,0 +1,1696 @@
+# serpcompany/best.serp.co#349 (step 7 of #341): how today's 138 categories and #333's clusters map onto the
+# three layers. 16 broad hub categories, 125 tags and 30 /best/<keyword>/ pages, with a permanent redirect for
+# every old category URL. `pnpm catalog:taxonomy` (scripts/taxonomy-manifest.ts) turns it into the row-level
+# manifests d1/publications/2026-10-10-taxonomy-*.yaml. The design is #341's "Design (1/3)" to "(3/3)".
+#
+# decidedAt: the owner's hands-off decision of 2026-10-10 ("as hands off as possible", on #321). Every choice
+# below is design section 7's default, recorded here instead of asked:
+#   Q1, Q2, Q17  the 16 hubs of design 1.6 with short topic slugs; video-downloaders stays as the existing hub.
+#   Q3, Q4       tags at /products/tags/<tag>/; hubs keep /products/categories/<hub>/ (routes: #346).
+#   Q5, Q6       hybrid best pages: the 30 of design 5.2, each with its top 10 pinned by the rule below.
+#   Q7           list size 10; the index thresholds (tags 10, best pages 5, hub chips 3) live in the code (#346).
+#   Q8, Q10      #333's 24 clusters become tags, not categories; 36 categories merge into a neighbouring tag
+#                (design 2.2's table, unchanged).
+#   Q9           Other stays a catch-all for the listings nothing fits; step 10 (#351) retires it.
+#   Q14          titles and H1s "Best {keyword, plural, title case}", with no year; intros drafted here.
+#   Q15          the owner dispatches the manifests one at a time, in file order (the PR lists them).
+# Defaults this file adds where section 7 is silent:
+#   - Keywords keep design 5.2's phrasing. Every one marked "pending" there was checked with Ahrefs Keywords
+#     Explorer (US) at keywordsCheckedAt, and the 8 #333 checked were checked again; `volume` is the US monthly
+#     volume. A variant with more volume was not swapped in: design 5.1 picks singular or plural by volume, and
+#     5.2's phrasing already does. Variants seen: ai song generator 72,000 (ai music generator 49,000);
+#     ai coding 5,600 (ai coding assistant 1,800); ai for data analysis 2,800 (ai data analysis 1,300);
+#     social media ai 1,500 (ai social media tools 300).
+#   - A tag that keeps an old category's slug keeps its name and description. New hubs and cluster tags get
+#     the template every category already uses ("Browse <name> listings and resources."). Writing new
+#     category copy is not this step's.
+#   - Order: hubs 1 to 16 as listed (video-downloaders keeps its own); tags and best pages 0 (name order).
+#   - Intros: 60 to 150 words, written from the descriptions of the pool's listings. They describe the kinds
+#     of tools on the page and make no claim D1 can't support: no ratings, rankings or prices.
+#
+# Who moves (phase 2). The input is the reviewed catalog: d1/hygiene/2026-10-10-other-inventory.json (the
+# 2,419 listings filed only under Other) and 2026-10-10-taxonomy-inventory.json (every other approved listing,
+# live or unpublished), with the 16 committed manifests published after that snapshot applied on top, named in
+# the generator (`taxonomyInputManifests`): #337 and #352 (#332, #338), other-removals and the 9
+# other-categories batches (#333), and #358's 4 (#340). A manifest committed later is never read.
+#   - Every approved listing filed under a retiring category, live or unpublished, is filed under its hub
+#     alone, and tagged with each of its categories' tags (merges applied, duplicates dropped), in membership
+#     order. Its hub is its primary category's tag's hub, or video-downloaders.
+#   - A live listing filed only under Other with a #333 cluster (`newCategory`, or #340's `category` for a
+#     listing the owner renamed or fixed) moves to the cluster tag's hub, tagged with the cluster first and
+#     then its #333 secondary hints.
+#   - Left out: listings filed under a retired category (Adult: they stay 404); every listing #337, #358 or
+#     other-removals unpublishes; and the clustered Other listings `held` below, whose owner flag stands.
+#     Two of #337's retired duplicates, lambdalabs.com and timelyapp.com, are filed under retiring categories
+#     and are slug redirect sources (#352), so category-unpublish would refuse while they stay: they are
+#     re-filed under their hub, with no tags.
+#   - The 141 live listings left filed only under Other stay there, untagged.
+# hubs[].listings, other.listings and tags[].listings count live listings once every phase is published
+# (primary category, and tag). The generator refuses the mapping when its plan differs from them.
+#
+# bestPages: keyword and volume (Ahrefs, US), its pool (a tag, or the video-downloaders hub), the intro, then:
+#   pins       the top 10 of the pool by Ahrefs organic traffic (Batch Analysis, 2026-10-10: all countries,
+#              the listing's host and its subdomains), in that order. evidence is what ranked each pin.
+#              Skipped: excluded listings; listings with an active claim hold (2026-10-06-listing-claim-holds,
+#              less #358's five clears), whose link ends off the product; the listings #333 flagged for
+#              uncensored or NSFW plans (freedomgpt.com, opendream.ai, openjourneybot.com); every listing in
+#              featureListings, on every page; and the page's passedOver.
+#              video-downloader's listings are SERP's own products with no domain of their own: it pins the
+#              video downloaders whose "<platform> video downloader" has the most US searches (Ahrefs,
+#              2026-10-10), never a fan-site or adult-site downloader. hipaa-compliant-hosting pins only a
+#              provider whose own site offers HIPAA hosting (its evidence names the page, GET 2026-10-11) and
+#              excludes the rest. No pin has a blurb: each shows its listing's description.
+#   passedOver a listing that would rank above the 10th pin but isn't the keyword's kind of product, whose
+#              listing copy describes something else, or that duplicates a pin.
+#   exclude    pool listings the page never shows (design 5.2: student study tools on
+#              ai-tools-for-teachers, data-extraction tools on ai-pdf; and hosts with no HIPAA offering on
+#              hipaa-compliant-hosting).
+# featureListings: a listing that names one feature, add-on, model or sub-tool of a larger site (Einstein GPT
+#   on salesforce.com, ChatSpot on hubspot.com, Slack GPT, Miro AI) is never ranked by its host's traffic,
+#   which measures the parent product: it is passed over on every page. A listing that is the site's own
+#   product (Picsart, Cursor, Monday.com, a renamed product such as Mapify's ChatMind) counts.
+# redirects: design 2.2's table, unchanged: every narrow category's URL to its tag, or to the best page that
+#   takes over its tag; then every tag a tag-only best page uses, to that page. None aims at a retiring
+#   category, and none at a URL that redirects itself.
+issue: serpcompany/best.serp.co#349
+design: serpcompany/best.serp.co#341
+decidedAt: '2026-10-10'
+catchAll: other
+keywordsCheckedAt: '2026-10-10T13:10:00.000Z'
+counts:
+  hubs: 16
+  newHubs: 15
+  tags: 125
+  clusterTags: 24
+  mergedCategories: 36
+  bestPages: 30
+  pins: 300
+  featureListings: 83
+  redirects: 166
+  categoryRedirects: 137
+  tagRedirects: 29
+  retiringCategories: 137
+  listingsRefiled: 2381
+  liveListings: 2544
+  otherListings: 141
+  held: 5
+hubs:
+- slug: writing
+  name: Writing
+  order: 1
+  listings: 298
+- slug: image-design
+  name: Image & Design
+  order: 2
+  listings: 275
+- slug: developer-tools
+  name: Developer Tools
+  order: 3
+  listings: 255
+- slug: productivity
+  name: Productivity
+  order: 4
+  listings: 256
+- slug: chatbots-agents
+  name: Chatbots & Agents
+  order: 5
+  listings: 244
+- slug: marketing
+  name: Marketing & SEO
+  order: 6
+  listings: 185
+- slug: business
+  name: Business & Finance
+  order: 7
+  listings: 165
+- slug: audio
+  name: Audio & Music
+  order: 8
+  listings: 114
+- slug: lifestyle
+  name: Health & Lifestyle
+  order: 9
+  listings: 96
+- slug: education
+  name: Education
+  order: 10
+  listings: 93
+- slug: video
+  name: Video
+  order: 11
+  listings: 93
+- slug: data-analytics
+  name: Data & Analytics
+  order: 12
+  listings: 94
+- slug: careers
+  name: Careers & Hiring
+  order: 13
+  listings: 72
+- slug: ecommerce
+  name: Ecommerce
+  order: 14
+  listings: 60
+- slug: video-downloaders
+  existing: true
+  listings: 55
+- slug: cloud-hosting
+  name: Cloud & Hosting
+  order: 16
+  listings: 48
+other:
+  listings: 141
+tags:
+- slug: ai-book-writer
+  hub: writing
+  name: AI Book Writers
+  listings: 8
+- slug: ai-content-creator
+  hub: writing
+  name: AI Content Creators
+  listings: 98
+- slug: ai-content-detection
+  hub: writing
+  name: AI Content Detection
+  listings: 13
+- slug: ai-copywriting
+  hub: writing
+  name: AI Copywriting
+  merges:
+  - ai-copywriting-free
+  listings: 93
+- slug: ai-email-writing-assistants
+  hub: writing
+  name: AI Email Writing Assistants
+  merges:
+  - ai-email-generators
+  listings: 35
+- slug: ai-paraphrasing-tool
+  hub: writing
+  name: AI Paraphrasing
+  merges:
+  - ai-paragraph-rewriter
+  listings: 17
+- slug: ai-script-generator
+  hub: writing
+  name: AI Script Generators
+  listings: 10
+- slug: ai-story-writers
+  hub: writing
+  name: AI Story Writers
+  listings: 27
+- slug: ai-summarizers
+  hub: writing
+  name: AI Summarizers
+  cluster: true
+  listings: 23
+- slug: ai-translation
+  hub: writing
+  name: AI Translation
+  cluster: true
+  listings: 14
+- slug: ai-writing-assistants
+  hub: writing
+  name: AI Writing Assistants
+  cluster: true
+  listings: 47
+- slug: plagiarism-checker
+  hub: writing
+  name: Plagiarism Checker
+  listings: 27
+- slug: ai-3d-tools
+  hub: image-design
+  name: AI 3D Tools
+  cluster: true
+  listings: 12
+- slug: ai-art-generators
+  hub: image-design
+  name: AI Art Generators
+  listings: 37
+- slug: ai-avatar
+  hub: image-design
+  name: AI Avatars
+  listings: 34
+- slug: ai-design
+  hub: image-design
+  name: AI Design
+  listings: 67
+- slug: ai-graphic-design
+  hub: image-design
+  name: AI Graphic Design
+  merges:
+  - ai-cover-generator
+  - ai-flyer-generator
+  - ai-poster-generator
+  listings: 27
+- slug: ai-headshot-generator
+  hub: image-design
+  name: AI Headshot Generators
+  listings: 14
+- slug: ai-image-generators
+  hub: image-design
+  name: AI Image Generators
+  merges:
+  - ai-emoji-generator
+  - ai-meme-generator
+  listings: 83
+- slug: ai-interior-design
+  hub: image-design
+  name: AI Interior Design
+  listings: 26
+- slug: ai-photo-editors
+  hub: image-design
+  name: AI Photo Editors
+  cluster: true
+  merges:
+  - ai-colorization-tools
+  listings: 81
+- slug: ai-app-builders
+  hub: developer-tools
+  name: AI App Builders
+  cluster: true
+  listings: 23
+- slug: ai-coding
+  hub: developer-tools
+  name: AI Coding
+  merges:
+  - ai-programmer
+  listings: 56
+- slug: ai-computer-vision
+  hub: developer-tools
+  name: AI Computer Vision
+  cluster: true
+  listings: 5
+- slug: ai-cybersecurity
+  hub: developer-tools
+  name: AI Cybersecurity
+  cluster: true
+  listings: 11
+- slug: ai-developer-tools
+  hub: developer-tools
+  name: AI Developer Tools
+  cluster: true
+  listings: 82
+- slug: ai-development-services
+  hub: developer-tools
+  name: AI Development Services
+  cluster: true
+  listings: 5
+- slug: ai-web-scraping
+  hub: developer-tools
+  name: AI Web Scraping
+  listings: 16
+- slug: ai-website-builders
+  hub: developer-tools
+  name: AI Website Builders
+  listings: 38
+- slug: nextjs-templates
+  hub: developer-tools
+  name: Nextjs Templates
+  listings: 3
+- slug: no-code-web-scraper
+  hub: developer-tools
+  name: No Code Web Scrapers
+  listings: 5
+- slug: react-components
+  hub: developer-tools
+  name: React Component Libraries
+  listings: 13
+- slug: serp-api
+  hub: developer-tools
+  name: SERP API
+  merges:
+  - google-search-scraper
+  - google-serp-api
+  listings: 6
+- slug: tailwind-templates
+  hub: developer-tools
+  name: Tailwind Templates
+  listings: 10
+- slug: web-proxy
+  hub: developer-tools
+  name: Web Proxies
+  listings: 6
+- slug: ai-automation-tools
+  hub: productivity
+  name: AI Automation
+  merges:
+  - auto-form-fill
+  listings: 34
+- slug: ai-document-tools
+  hub: productivity
+  name: AI Document Tools
+  cluster: true
+  listings: 35
+- slug: ai-knowledge-management
+  hub: productivity
+  name: AI Knowledge Management
+  listings: 40
+- slug: ai-meeting-assistant
+  hub: productivity
+  name: AI Meeting Assistants
+  listings: 35
+- slug: ai-news
+  hub: productivity
+  name: AI News
+  cluster: true
+  listings: 4
+- slug: ai-note-taker
+  hub: productivity
+  name: AI Note Takers
+  listings: 33
+- slug: ai-presentation-maker
+  hub: productivity
+  name: AI Presentation Makers
+  listings: 23
+- slug: ai-product-management
+  hub: productivity
+  name: AI Product Management
+  listings: 21
+- slug: ai-productivity-tools
+  hub: productivity
+  name: ai productivity tools
+  listings: 77
+- slug: ai-project-management
+  hub: productivity
+  name: AI Project Management
+  listings: 17
+- slug: ai-scheduling-assistants
+  hub: productivity
+  name: AI Scheduling
+  listings: 7
+- slug: ai-survey-tools
+  hub: productivity
+  name: AI Survey Tools
+  cluster: true
+  listings: 8
+- slug: ai-time-tracking
+  hub: productivity
+  name: ai time tracking
+  listings: 5
+- slug: ai-agents
+  hub: chatbots-agents
+  name: AI Agents
+  listings: 23
+- slug: ai-answer-generator
+  hub: chatbots-agents
+  name: AI Answer Generator
+  listings: 9
+- slug: ai-chatbots
+  hub: chatbots-agents
+  name: AI Chatbots
+  merges:
+  - ai-confessional
+  listings: 171
+- slug: ai-customer-service-agents
+  hub: chatbots-agents
+  name: AI Customer Service Agents
+  listings: 98
+- slug: ai-prompt-generator
+  hub: chatbots-agents
+  name: AI Prompt Generators
+  listings: 17
+- slug: ai-voice-bots
+  hub: chatbots-agents
+  name: AI Voice Bots
+  listings: 18
+- slug: ai-advertising-tools
+  hub: marketing
+  name: AI Advertising
+  listings: 20
+- slug: ai-customer-segmentation
+  hub: marketing
+  name: AI Customer Segmentation
+  listings: 16
+- slug: ai-email-marketing
+  hub: marketing
+  name: AI Email Marketing
+  listings: 21
+- slug: ai-marketing-tools
+  hub: marketing
+  name: AI Marketing
+  listings: 44
+- slug: ai-seo
+  hub: marketing
+  name: AI SEO
+  listings: 51
+- slug: ai-social-media
+  hub: marketing
+  name: AI Social Media
+  listings: 58
+- slug: link-building-services
+  hub: marketing
+  name: Link Building Services
+  merges:
+  - backlink-companies
+  listings: 12
+- slug: local-seo
+  hub: marketing
+  name: Local SEO
+  listings: 11
+- slug: review-management-software
+  hub: marketing
+  name: Review Management Software
+  listings: 17
+- slug: seo
+  hub: marketing
+  name: SEO
+  listings: 3
+- slug: website-submission-directories
+  hub: marketing
+  name: Website Submission Directories
+  merges:
+  - ai-directories
+  - local-business-directories
+  - product-launch-websites
+  - saas-directories
+  listings: 6
+- slug: ai-accounting
+  hub: business
+  name: AI Accounting
+  cluster: true
+  merges:
+  - ai-tax-preparation
+  listings: 16
+- slug: ai-business-consultant
+  hub: business
+  name: AI Business Consultant
+  listings: 17
+- slug: ai-field-management
+  hub: business
+  name: AI Field Management
+  listings: 4
+- slug: ai-financial-advisor
+  hub: business
+  name: AI Financial Advisor
+  listings: 22
+- slug: ai-insurance
+  hub: business
+  name: AI Insurance
+  listings: 7
+- slug: ai-lawyer
+  hub: business
+  name: AI Lawyer
+  listings: 18
+- slug: ai-real-estate-agent
+  hub: business
+  name: AI Real Estate Agent
+  listings: 15
+- slug: ai-risk-management
+  hub: business
+  name: AI Risk Management
+  listings: 19
+- slug: ai-sales-tools
+  hub: business
+  name: AI Sales Tools
+  cluster: true
+  merges:
+  - apollo-lead-scrapers
+  listings: 54
+- slug: payment-processing
+  hub: business
+  name: Payment Processing
+  cluster: true
+  listings: 5
+- slug: ai-lyrics-generator
+  hub: audio
+  name: AI Lyrics Generators
+  merges:
+  - ai-rap-generator
+  listings: 6
+- slug: ai-music-generators
+  hub: audio
+  name: AI Music Generators
+  cluster: true
+  listings: 33
+- slug: ai-podcast
+  hub: audio
+  name: AI Podcasting
+  listings: 20
+- slug: ai-text-to-speech
+  hub: audio
+  name: AI Text to Speech
+  merges:
+  - text-to-speech
+  listings: 33
+- slug: ai-transcription
+  hub: audio
+  name: AI Transcription
+  cluster: true
+  listings: 24
+- slug: ai-voice-changers
+  hub: audio
+  name: AI Voice Changers
+  listings: 8
+- slug: ai-voice-cloning
+  hub: audio
+  name: AI Voice Cloning
+  listings: 15
+- slug: ai-doctor
+  hub: lifestyle
+  name: AI Doctor
+  listings: 20
+- slug: ai-event-planner
+  hub: lifestyle
+  name: AI Event Planner
+  listings: 4
+- slug: ai-game-generator
+  hub: lifestyle
+  name: AI Game Generators
+  listings: 15
+- slug: ai-health
+  hub: lifestyle
+  name: AI Health
+  cluster: true
+  listings: 18
+- slug: ai-nutritionist
+  hub: lifestyle
+  name: AI Nutritionist
+  listings: 12
+- slug: ai-personal-trainer
+  hub: lifestyle
+  name: AI Personal Trainer
+  listings: 7
+- slug: ai-recipe-generators
+  hub: lifestyle
+  name: AI Recipe Generators
+  cluster: true
+  listings: 11
+- slug: ai-stylist
+  hub: lifestyle
+  name: AI Stylist
+  merges:
+  - face-shape-analyzer
+  listings: 6
+- slug: ai-travel-agent
+  hub: lifestyle
+  name: AI Travel Agent
+  listings: 14
+- slug: ai-education
+  hub: education
+  name: AI Education
+  cluster: true
+  listings: 29
+- slug: ai-language-teacher
+  hub: education
+  name: AI Language Teacher
+  listings: 22
+- slug: ai-research-assistants
+  hub: education
+  name: AI Research Assistants
+  cluster: true
+  listings: 20
+- slug: ai-tutor
+  hub: education
+  name: AI Tutor
+  listings: 24
+- slug: ai-clip-generator
+  hub: video
+  name: AI Clip Generators
+  listings: 18
+- slug: ai-ugc
+  hub: video
+  name: AI UGC
+  merges:
+  - ugc-creator
+  listings: 8
+- slug: ai-video-editor
+  hub: video
+  name: AI Video Editor
+  listings: 38
+- slug: ai-video-enhancer
+  hub: video
+  name: AI Video Enhancers
+  listings: 6
+- slug: ai-video-generators
+  hub: video
+  name: AI Video Generators
+  merges:
+  - ai-product-demos
+  - ai-product-video-generator
+  - birthday-video-maker
+  - cartoon-video-maker
+  - image-to-video-ai
+  - lyric-video-maker
+  - script-to-video-ai
+  - text-to-video-ai
+  listings: 47
+- slug: ai-data-analyst
+  hub: data-analytics
+  name: AI Data Analyst
+  listings: 58
+- slug: ai-data-management
+  hub: data-analytics
+  name: AI Data Management
+  listings: 23
+- slug: database-management
+  hub: data-analytics
+  name: Database Management
+  listings: 22
+- slug: subscription-analytics-software
+  hub: data-analytics
+  name: Subscription Analytics Software
+  listings: 10
+- slug: ai-career-coach
+  hub: careers
+  name: AI Career Coach
+  listings: 16
+- slug: ai-cover-letter-generator
+  hub: careers
+  name: AI Cover Letter Generators
+  listings: 11
+- slug: ai-hr-tools
+  hub: careers
+  name: AI HR Tools
+  cluster: true
+  listings: 9
+- slug: ai-job-search
+  hub: careers
+  name: AI Job Searching
+  listings: 20
+- slug: ai-recruiting
+  hub: careers
+  name: AI Recruiting
+  listings: 20
+- slug: ai-resume-builders
+  hub: careers
+  name: AI Resume Builders
+  listings: 21
+- slug: ai-shopping-assistants
+  hub: ecommerce
+  name: AI Shopping Assistants
+  cluster: true
+  listings: 6
+- slug: catalog-management-software
+  hub: ecommerce
+  name: Catalog Management Software
+  listings: 5
+- slug: ecommerce-analytics-tools
+  hub: ecommerce
+  name: Ecommerce Analytics Tools
+  listings: 10
+- slug: ecommerce-merchandising-tools
+  hub: ecommerce
+  name: Ecommerce Merchandising Tools
+  merges:
+  - merchandising-software
+  listings: 9
+- slug: ecommerce-platforms
+  hub: ecommerce
+  name: Ecommerce Platforms
+  merges:
+  - b2b-ecommerce-platforms
+  listings: 13
+- slug: marketplace-software
+  hub: ecommerce
+  name: Marketplace Software
+  listings: 7
+- slug: multi-channel-ecommerce-software
+  hub: ecommerce
+  name: Multi-Channel Ecommerce Software
+  listings: 11
+- slug: order-management-software
+  hub: ecommerce
+  name: Order Management Software
+  listings: 16
+- slug: course-platform-downloaders
+  hub: video-downloaders
+  name: Course Platform Downloaders
+  listings: 9
+- slug: fansite-downloaders
+  hub: video-downloaders
+  name: Fansite Downloaders
+  listings: 3
+- slug: image-downloaders
+  hub: video-downloaders
+  name: Image Downloaders
+  listings: 1
+- slug: livestream-downloaders
+  hub: video-downloaders
+  name: Livestream Downloaders
+  listings: 1
+- slug: social-media-downloaders
+  hub: video-downloaders
+  name: Social Media Downloaders
+  listings: 9
+- slug: cloud-gpu-providers
+  hub: cloud-hosting
+  name: Cloud GPU
+  merges:
+  - cloud-gpus-for-deep-learning
+  listings: 30
+- slug: hipaa-compliant-hosting
+  hub: cloud-hosting
+  name: HIPAA Compliant Hosting
+  listings: 22
+bestPages:
+- slug: ai-photo-editor
+  keyword: ai photo editor
+  volume: 53000
+  tag: ai-photo-editors
+  intro: AI photo editors handle edits that once took manual masking and retouching. The tools here remove
+    or replace backgrounds, upscale low-resolution images, erase objects and watermarks, retouch portraits,
+    swap faces, and restore or colorize old photos. Some run in the browser, some are mobile apps, and
+    some offer an API for batch work such as product photos for online stores. Several focus on a single
+    task, like background removal, while others bundle many tools into one editor. Each entry links to
+    its own listing with a description and the product's website.
+  pins:
+  - {slug: remove.bg, id: lst_c949d4383530687093f47ce3, evidence: "DR 83, 37,984,422 organic visits/mo"}
+  - {slug: picsart.com, id: lst_90ffc1543656f967e410a27c, evidence: "DR 82, 11,018,355 organic visits/mo"}
+  - {slug: photoroom.com, id: lst_9dbdd663153decd7a8e88ce8, evidence: "DR 78, 8,067,547 organic visits/mo"}
+  - {slug: pixlr.com, id: lst_507b5e0124e9385cd0def1ec, evidence: "DR 85, 3,391,866 organic visits/mo"}
+  - {slug: cutout.pro, id: lst_5baebb7558f6eae40316f32e, evidence: "DR 72, 3,106,492 organic visits/mo"}
+  - {slug: pixelcut.ai, id: lst_56a2feed0951a873b3eb0c27, evidence: "DR 74, 2,570,090 organic visits/mo"}
+  - {slug: fotor.com, id: lst_64186572c2638bfea5d3aa17, evidence: "DR 81, 1,960,387 organic visits/mo"}
+  - {slug: watermarkremover.io, id: lst_92fc03c70fa70d5fe9767402, evidence: "DR 67, 1,065,414 organic visits/mo"}
+  - {slug: picwish.com, id: lst_8dcdafa52ecb88a2101876d2, evidence: "DR 71, 853,025 organic visits/mo"}
+  - {slug: slazzer.com, id: lst_fb9536366d52202e41f643bf, evidence: "DR 67, 843,538 organic visits/mo"}
+- slug: ai-music-generator
+  keyword: ai music generator
+  volume: 49000
+  tag: ai-music-generators
+  intro: AI music generators compose new audio from a prompt, a mood or a few settings. The tools here
+    create royalty-free background tracks for videos and podcasts, turn text descriptions into songs,
+    generate adaptive soundscapes for focus and sleep, and offer music generation through an API for apps
+    and games. Some aim at content creators who need a quick soundtrack, while others give producers stems
+    and melodies to work with. Each entry links to its own listing with a description and the product's
+    website.
+  pins:
+  - {slug: endel.io, id: lst_6dfe404b671b6a01c048b95f, evidence: "DR 67, 92,853 organic visits/mo"}
+  - {slug: loudly.com, id: lst_bb89a7ee7c28890a4986187c, evidence: "DR 63, 67,788 organic visits/mo"}
+  - {slug: soundful.com, id: lst_e02606122b42b7336bf17a08, evidence: "DR 64, 53,037 organic visits/mo"}
+  - {slug: mubert.com, id: lst_8e44ddee9cbd28b3801b3a83, evidence: "DR 72, 47,038 organic visits/mo"}
+  - {slug: musicfy.lol, id: lst_a3e6862ea3c53d29c3b942ab, evidence: "DR 59, 34,677 organic visits/mo"}
+  - {slug: beatoven.ai, id: lst_8acf5384c3a85a5c2122a116, evidence: "DR 70, 19,746 organic visits/mo"}
+  - {slug: musick.ai, id: lst_0dc07a64311d3c70f384b10a, evidence: "DR 31, 10,210 organic visits/mo"}
+  - {slug: ecrettmusic.com, id: lst_850d658dd6e04628a322e132, evidence: "DR 52, 3,770 organic visits/mo"}
+  - {slug: splashmusic.com, id: lst_6a217950c47de46e8f41f2a5, evidence: "DR 59, 1,394 organic visits/mo"}
+  - {slug: musicapi.ai, id: lst_40d7cea248731e6c68498ce8, evidence: "DR 41, 1,166 organic visits/mo"}
+  passedOver:
+  - {slug: lalal.ai, reason: "separates vocals and instruments in existing tracks; generates no music"}
+  - {slug: landr.com, reason: "mastering and distribution for musicians; generates no music"}
+  - {slug: fadr.com, reason: "its listing describes stem separation, not music generation"}
+  - {slug: chordai.net, reason: "recognizes chords in existing songs; generates no music"}
+  - {slug: lunaverus.com, reason: "transcribes audio to sheet music; generates no music"}
+  - {slug: cyanite.ai, reason: "tags and searches music catalogs; generates no music"}
+- slug: ai-writing-assistant
+  keyword: ai writing assistant
+  volume: 22000
+  tag: ai-writing-assistants
+  intro: AI writing assistants help with the writing you already do rather than producing whole articles
+    on their own. The tools here check grammar and style in many languages, suggest rewrites and the next
+    sentence, help with academic papers and citations, and edit drafts inside the browser or a document
+    editor. Several focus on research and academic writing, while others work across email, documents
+    and chat. Each entry links to its own listing with a description and the product's website.
+  pins:
+  - {slug: languagetool.org, id: lst_8d1b2cfce9faf3a40ada75f9, evidence: "DR 80, 1,709,275 organic visits/mo"}
+  - {slug: paperpal.com, id: lst_db8c03e3cd9ee80705ee949d, evidence: "DR 72, 451,594 organic visits/mo"}
+  - {slug: jenni.ai, id: lst_94b821e7c40b35a457cc90d2, evidence: "DR 72, 409,049 organic visits/mo"}
+  - {slug: trinka.ai, id: lst_f8ebc024234fbe6750a4c2a9, evidence: "DR 65, 230,666 organic visits/mo"}
+  - {slug: writefull.com, id: lst_3693dd8b899a1becb1103128, evidence: "DR 68, 36,174 organic visits/mo"}
+  - {slug: hyperwriteai.com, id: lst_d98ea892258d219266accaf0, evidence: "DR 71, 32,569 organic visits/mo"}
+  - {slug: editgpt.app, id: lst_504a5c5e60b9f0e51c000409, evidence: "DR 56, 27,949 organic visits/mo"}
+  - {slug: samwell.ai, id: lst_fb62d72ab69e4016916d3ef7, evidence: "DR 41, 27,164 organic visits/mo"}
+  - {slug: type.ai, id: lst_c5d5dec6fa3f9fc34078f460, evidence: "DR 63, 25,843 organic visits/mo"}
+  - {slug: perfectessaywriter.ai, id: lst_e95fe78c19e9d6a55d99f480, evidence: "DR 50, 13,261 organic visits/mo"}
+- slug: ai-transcription
+  keyword: ai transcription
+  volume: 4600
+  tag: ai-transcription
+  plural: ai transcription tools
+  intro: AI transcription tools turn recorded speech into text. The tools here transcribe audio and video
+    files in dozens of languages, label different speakers, translate transcripts, add subtitles, and
+    let you edit the result alongside the recording. Some are web apps for interviews, podcasts and lectures,
+    and others are speech-to-text APIs that developers build into their own products. Each entry links
+    to its own listing with a description and the product's website.
+  pins:
+  - {slug: sonix.ai, id: lst_3294db949b46ccc99cf3db6c, evidence: "DR 74, 46,904 organic visits/mo"}
+  - {slug: speakai.co, id: lst_64355f533a726b8ecb046cab, evidence: "DR 57, 15,900 organic visits/mo"}
+  - {slug: speechtext.ai, id: lst_a30522599fcde83935e94f40, evidence: "DR 49, 10,391 organic visits/mo"}
+  - {slug: speechmatics.com, id: lst_2bbd0983f1332b5e3eda8367, evidence: "DR 73, 8,876 organic visits/mo"}
+  - {slug: gladia.io, id: lst_a648ee8fee4d5599d0368a12, evidence: "DR 68, 4,543 organic visits/mo"}
+  - {slug: goodtape.io, id: lst_01e8eeee01c5e887371f71e5, evidence: "DR 54, 2,259 organic visits/mo"}
+  - {slug: taption.com, id: lst_d58fb9148b846760fd8e13c6, evidence: "DR 34, 2,072 organic visits/mo"}
+  - {slug: scribewave.com, id: lst_0b03d81e39f11963863bb0f2, evidence: "DR 18, 626 organic visits/mo"}
+  - {slug: revoldiv.com, id: lst_22d2c24db8de9bad83b7478f, evidence: "DR 28, 509 organic visits/mo"}
+  - {slug: whisperapi.com, id: lst_9829df7eb3f3feb949ca8aee, evidence: "DR 21, 205 organic visits/mo"}
+- slug: ai-sales-tools
+  keyword: ai sales tools
+  volume: 2700
+  tag: ai-sales-tools
+  intro: AI sales tools take on the repetitive parts of selling. The tools here find and verify prospects'
+    contact details, write and send personalized cold email and LinkedIn outreach, score leads, record
+    and summarize sales calls, coach reps, and update the CRM automatically. Some are full CRMs with AI
+    built in, and others are focused add-ons for prospecting or call analysis. Each entry links to its
+    own listing with a description and the product's website.
+  pins:
+  - {slug: leadiq.com, id: lst_a0b115154aae6a3d3a715b9a, evidence: "DR 71, 155,417 organic visits/mo"}
+  - {slug: salesforge.ai, id: lst_7c63dff03c5ee090d5eaab7d, evidence: "DR 73, 82,212 organic visits/mo"}
+  - {slug: instantly.ai, id: lst_0a635967f635a6ade31e1494, evidence: "DR 80, 63,685 organic visits/mo"}
+  - {slug: seamless.ai, id: lst_2970bd2d905fb052d3e17947, evidence: "DR 72, 45,170 organic visits/mo"}
+  - {slug: reply.io, id: lst_983550c8865b039039fb04bb, evidence: "DR 78, 14,089 organic visits/mo"}
+  - {slug: finalscout.com, id: lst_0f7f350b788af63882dd0cd9, evidence: "DR 31, 7,079 organic visits/mo"}
+  - {slug: sybill.ai, id: lst_82c64921e846d0837d0ab3cc, evidence: "DR 66, 5,499 organic visits/mo"}
+  - {slug: dux-soup.com, id: lst_1fbcc301b89d6cc85af443f8, evidence: "DR 66, 4,696 organic visits/mo"}
+  - {slug: trellus.ai, id: lst_3992fc28f6bc0e05c3ad2e7c, evidence: "DR 53, 4,406 organic visits/mo"}
+  - {slug: govdash.com, id: lst_8b6bf8b5dea3e471120960e0, evidence: "DR 46, 2,608 organic visits/mo"}
+- slug: ai-tools-for-teachers
+  keyword: ai tools for teachers
+  volume: 2600
+  tag: ai-education
+  intro: AI tools for teachers cut the time spent on planning, assessment and course material. The tools
+    here grade essays against a rubric, draft lesson plans aligned to a curriculum, turn readings into
+    quizzes and interactive slides, build whole courses from a topic or document, and run online tests.
+    Most are made for classroom teachers, and some suit trainers and course creators too. Tools that students
+    use for their own study are left off this page. Each entry links to its own listing with a description
+    and the product's website.
+  pins:
+  - {slug: essaygrader.ai, id: lst_fcb457625bb825f9201dc780, evidence: "DR 54, 113,418 organic visits/mo"}
+  - {slug: curipod.com, id: lst_93d32001549a18e8f52ffb79, evidence: "DR 62, 50,157 organic visits/mo"}
+  - {slug: briskteaching.com, id: lst_30a55339ed378891dff3de60, evidence: "DR 69, 45,549 organic visits/mo"}
+  - {slug: to-teach.ai, id: lst_70c6c51767ec5c4ea7539db6, evidence: "DR 44, 20,585 organic visits/mo"}
+  - {slug: coursebox.ai, id: lst_18d73d5e9e1a0480f46284ed, evidence: "DR 70, 20,000 organic visits/mo"}
+  - {slug: quizgecko.com, id: lst_4fad3a5c7605b41003706dcb, evidence: "DR 60, 16,717 organic visits/mo"}
+  - {slug: quilgo.com, id: lst_3a9c9c72d958a425029c41b2, evidence: "DR 44, 4,537 organic visits/mo"}
+  - {slug: mindsmith.ai, id: lst_af2ff4fb14fb6b989ea8b678, evidence: "DR 54, 3,139 organic visits/mo"}
+  - {slug: quizbot.ai, id: lst_5591723eb864ff51839b4aca, evidence: "DR 32, 2,483 organic visits/mo"}
+  - {slug: minicoursegenerator.com, id: lst_1b2ee6e6321e1fc3756f2c91, evidence: "DR 67, 1,435 organic visits/mo"}
+  exclude:
+  - {slug: dupple.com, id: lst_78d50921ed563452295e80b8, reason: "professional AI training courses"}
+  - {slug: esai.ai, id: lst_f33e52c4e97cb7a2409a26c5, reason: "helps students with college applications"}
+  - {slug: hellohistory.ai, id: lst_d1b30b9d098c0bae69e3613c, reason: "a learner-facing chat with historical figures"}
+  - {slug: info.credly.com, id: lst_438eee6c3fc7dc110f4adcac, reason: "digital credential management for organizations"}
+  - {slug: kodekloud.com, id: lst_fbf84db1c5172b47fb5261bc, reason: "DevOps training for learners"}
+  - {slug: lablab.ai, id: lst_1e70d750a815e22475c1ef21, reason: "an AI learning and hackathon community"}
+  - {slug: nocode.mba, id: lst_219b76db2a21d5b22bd0f38e, reason: "a course on building no-code AI apps"}
+  - {slug: typpo.app, id: lst_333a5e345c3fdeeb0a9a6b3f, reason: "microlearning for learners"}
+- slug: ai-tools-for-developers
+  keyword: ai tools for developers
+  volume: 1200
+  tag: ai-developer-tools
+  intro: AI tools for developers cover the building blocks of AI applications. The tools here include
+    machine learning frameworks, platforms for building and deploying LLM apps and agents, gateways that
+    route requests across many language models, embedding and search APIs, computer vision tooling, browser
+    demos for models, AI-written documentation and automated software testing. Some are open source libraries
+    and others are hosted services. Each entry links to its own listing with a description and the product's
+    website.
+  pins:
+  - {slug: pytorch.org, id: lst_26168246a922b91fdc07038e, evidence: "DR 87, 284,363 organic visits/mo"}
+  - {slug: roboflow.com, id: lst_3c2b5ae7337fb3eea0c96944, evidence: "DR 77, 217,473 organic visits/mo"}
+  - {slug: dify.ai, id: lst_3f72c9e916479ba575906ea0, evidence: "DR 78, 108,927 organic visits/mo"}
+  - {slug: mintlify.com, id: lst_b7e5a3c697c8330f89bad51c, evidence: "DR 91, 63,263 organic visits/mo"}
+  - {slug: litellm.ai, id: lst_4bbc4d07086af547d8a0c072, evidence: "DR 80, 62,878 organic visits/mo"}
+  - {slug: jina.ai, id: lst_016dd0e7bee6c03cb73b8cab, evidence: "DR 77, 29,009 organic visits/mo"}
+  - {slug: gradio.app, id: lst_91624e71320d2cb92664bbdd, evidence: "DR 76, 20,523 organic visits/mo"}
+  - {slug: flowiseai.com, id: lst_43c21fdb51773aec1c4a00f7, evidence: "DR 73, 16,042 organic visits/mo"}
+  - {slug: virtuosoqa.com, id: lst_841b3fb522d431585135c361, evidence: "DR 61, 15,359 organic visits/mo"}
+  - {slug: h2o.ai, id: lst_6687a3350a75a97c497ee67d, evidence: "DR 77, 12,247 organic visits/mo"}
+  passedOver:
+  - {slug: twilio.com, reason: "its listing describes a messaging API, not an AI tool"}
+  - {slug: firebase.google.com, reason: "its listing describes a general app platform, not an AI tool"}
+  - {slug: threejs.org, reason: "a 3D graphics library, not an AI tool"}
+  - {slug: pulumi.com, reason: "its listing describes infrastructure as code, not an AI tool"}
+- slug: ai-pdf
+  keyword: ai pdf
+  volume: 800
+  tag: ai-document-tools
+  plural: ai pdf tools
+  intro: AI PDF tools let you ask questions about a PDF and get answers with references to the page. The
+    tools here summarize long reports, papers and contracts, translate them, chat across several files
+    at once, and edit, convert or merge PDFs. Some are browser apps and others offer an API for working
+    with documents in bulk. Tools built only to extract data from invoices and forms are left off this
+    page. Each entry links to its own listing with a description and the product's website.
+  pins:
+  - {slug: lightpdf.com, id: lst_4254ca7b9522a4b88217dbfa, evidence: "DR 65, 790,900 organic visits/mo"}
+  - {slug: chatpdf.com, id: lst_a5ff2c141a13014166f87234, evidence: "DR 73, 403,727 organic visits/mo"}
+  - {slug: humata.ai, id: lst_29ae35d79a69f099568843cf, evidence: "DR 65, 45,685 organic visits/mo"}
+  - {slug: pdf.ai, id: lst_478f9886562c132a50f1df62, evidence: "DR 60, 39,570 organic visits/mo"}
+  - {slug: sharly.ai, id: lst_70aa7bc593cdae4d6a15ad5b, evidence: "DR 50, 9,532 organic visits/mo"}
+  - {slug: scannergo.net, id: lst_0dc1892c0f74b7a5af56255f, evidence: "DR 53, 8,816 organic visits/mo"}
+  - {slug: macro.com, id: lst_9f2a93cb0cae093e76ca5b50, evidence: "DR 42, 2,414 organic visits/mo"}
+  - {slug: documind.chat, id: lst_023041ac800863bc0cb8164c, evidence: "DR 47, 2,364 organic visits/mo"}
+  - {slug: docanalyzer.ai, id: lst_1d8354603dcb780e93fa5885, evidence: "DR 35, 1,053 organic visits/mo"}
+  - {slug: chatdoc.com, id: lst_4057e436e9051eb21bda3b12, evidence: "DR 60, 979 organic visits/mo"}
+  exclude:
+  - {slug: base64.ai, id: lst_bff561a1779a6e9008c22aab, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: cradl.ai, id: lst_721d35f360758e9736b940ea, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: doclime.com, id: lst_870155f9356fb4193f851d54, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: documentpro.ai, id: lst_7ba0e7684082d999e7d541b0, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: formx.ai, id: lst_a049bebdf6a425248ac3ad59, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: hebbia.ai, id: lst_8888a722aec6e36276ba79d9, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: instabase.com, id: lst_716fa9cf268166b94ef5231d, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: nanonets.com, id: lst_52122d28344f642e91fb01ab, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: parseur.com, id: lst_64e59695bd404e16ebee649f, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: parsio.io, id: lst_b74b2d8c22af4cf8082578e6, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: procys.com, id: lst_c773dd82ef6a7e407263d7a9, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: scrol.ai, id: lst_f2691e25b75048d8da33a085, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: sensible.so, id: lst_6725c26ac9d0ac6e8446bad4, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: super.ai, id: lst_ad66cb07fc4f5809a356fd34, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: textunbox.app, id: lst_2d6302c672e99e25e494529f, reason: "extracts data from business documents; not a PDF reader or editor"}
+  - {slug: workist.com, id: lst_a77dd388ba2c907ff4283ae0, reason: "extracts data from business documents; not a PDF reader or editor"}
+- slug: ai-chatbot
+  keyword: ai chatbot
+  volume: 178000
+  tag: ai-chatbots
+  intro: AI chatbots answer questions and carry on a conversation in plain language. The tools here include
+    chat apps that give access to several language models in one place, browser assistants that summarize
+    and translate pages, and platforms that turn a website, help center or set of documents into a chatbot
+    for customers or a team. Some are ready to use, and others let you build and deploy your own bot without
+    code. Each entry links to its own listing with a description and the product's website.
+  pins:
+  - {slug: monica.im, id: lst_a70cfc124fd4525fe79e5db5, evidence: "DR 74, 1,159,559 organic visits/mo"}
+  - {slug: poe.com, id: lst_c53473ac39a96203a9ec2ab6, evidence: "DR 80, 343,851 organic visits/mo"}
+  - {slug: voiceflow.com, id: lst_4aad4dc51ccb020a6df559b1, evidence: "DR 79, 175,941 organic visits/mo"}
+  - {slug: hotbot.com, id: lst_1ac2780c3c34103d703c78bb, evidence: "DR 75, 107,421 organic visits/mo"}
+  - {slug: langdock.com, id: lst_ae949f533c27ed78a3196973, evidence: "DR 66, 76,814 organic visits/mo"}
+  - {slug: vondy.com, id: lst_1fc8165acdc7930020ff10dc, evidence: "DR 60, 69,609 organic visits/mo"}
+  - {slug: chatbase.co, id: lst_dee4a3356ac72173cc2cf282, evidence: "DR 81, 56,042 organic visits/mo"}
+  - {slug: wonderchat.io, id: lst_55f4cd6f9ea9ed2e9f9b5e07, evidence: "DR 67, 50,111 organic visits/mo"}
+  - {slug: docsbot.ai, id: lst_7d377aadd295f9aebd22c471, evidence: "DR 70, 28,811 organic visits/mo"}
+  - {slug: sitegpt.ai, id: lst_0b496a56a764e2296f586562, evidence: "DR 66, 24,760 organic visits/mo"}
+  passedOver:
+  - {slug: miniapps.ai, reason: "its listing describes one bot, Contrarian Bot; miniapps.ai's traffic is its catalog of AI apps"}
+- slug: ai-customer-service
+  keyword: ai customer service
+  volume: 3500
+  tag: ai-customer-service-agents
+  plural: ai customer service tools
+  intro: AI customer service tools answer customer questions and support the agents who handle the rest.
+    The tools here put chatbots trained on a help center or website in front of customers, around the
+    clock and in many languages, summarize and route conversations, draft replies, and run phone and messaging
+    channels with AI built in. Some are complete help desks and contact centers, and others add an AI
+    agent to the tools a support team already uses. Each entry links to its own listing with a description
+    and the product's website.
+  pins:
+  - {slug: dialpad.com, id: lst_0f159058f7cfe0e81566b1b3, evidence: "DR 83, 332,816 organic visits/mo"}
+  - {slug: voiceflow.com, id: lst_4aad4dc51ccb020a6df559b1, evidence: "DR 79, 175,941 organic visits/mo"}
+  - {slug: chatbase.co, id: lst_dee4a3356ac72173cc2cf282, evidence: "DR 81, 56,042 organic visits/mo"}
+  - {slug: wonderchat.io, id: lst_55f4cd6f9ea9ed2e9f9b5e07, evidence: "DR 67, 50,111 organic visits/mo"}
+  - {slug: docsbot.ai, id: lst_7d377aadd295f9aebd22c471, evidence: "DR 70, 28,811 organic visits/mo"}
+  - {slug: bird.com, id: lst_2eee16bafaa94c3114479589, evidence: "DR 82, 28,008 organic visits/mo"}
+  - {slug: sitegpt.ai, id: lst_0b496a56a764e2296f586562, evidence: "DR 66, 24,760 organic visits/mo"}
+  - {slug: yellow.ai, id: lst_b77f74a2eb145541be9b4817, evidence: "DR 74, 16,206 organic visits/mo"}
+  - {slug: liveperson.com, id: lst_4a5c0c9588719469a6f60b05, evidence: "DR 79, 14,786 organic visits/mo"}
+  - {slug: yourgpt.ai, id: lst_b9c95a04491e8884940d361d, evidence: "DR 70, 11,273 organic visits/mo"}
+- slug: ai-content-generator
+  keyword: ai content generator
+  volume: 6900
+  tag: ai-content-creator
+  intro: AI content generators draft blog posts, articles, social posts and marketing copy from a topic
+    or a short brief. The tools here write long-form articles with headings and SEO keywords, rewrite
+    and expand existing text, keep a brand's voice across a team, and offer dozens of templates for everyday
+    content. Several also create images or publish straight to a website. Each entry links to its own
+    listing with a description and the product's website.
+  pins:
+  - {slug: simplified.com, id: lst_702c00dcfa3735f76e751528, evidence: "DR 77, 374,076 organic visits/mo"}
+  - {slug: seo.ai, id: lst_789008ddf9f60aa217fc8bb4, evidence: "DR 77, 116,226 organic visits/mo"}
+  - {slug: writesonic.com, id: lst_70c946c2551e22e26774ae44, evidence: "DR 84, 113,611 organic visits/mo"}
+  - {slug: easy-peasy.ai, id: lst_9d0a5bda7935086c07265cb7, evidence: "DR 70, 93,614 organic visits/mo"}
+  - {slug: jasper.ai, id: lst_eb46c3546a107a7f2bbf719d, evidence: "DR 88, 90,839 organic visits/mo"}
+  - {slug: writecream.com, id: lst_8156803fd9826379deeb6e25, evidence: "DR 71, 79,771 organic visits/mo"}
+  - {slug: ryrob.com, id: lst_664e8cf3014059312e3685f5, evidence: "DR 77, 72,514 organic visits/mo"}
+  - {slug: neuroflash.com, id: lst_32093756932acb14d7a68082, evidence: "DR 73, 43,990 organic visits/mo"}
+  - {slug: junia.ai, id: lst_177b29b17046f5f839d35035, evidence: "DR 69, 31,231 organic visits/mo"}
+  - {slug: scalenut.com, id: lst_ae602b893abe389474f48220, evidence: "DR 72, 23,169 organic visits/mo"}
+- slug: ai-copywriting
+  keyword: ai copywriting
+  volume: 1500
+  tag: ai-copywriting
+  plural: ai copywriting tools
+  intro: 'AI copywriting tools write the short, persuasive text that marketing runs on: ads, product descriptions,
+    landing pages, emails and social captions. The tools here generate several variations of a headline
+    or ad at once, follow a brand''s voice and style guide, and turn a product''s details into copy for
+    different channels. Many also write longer blog content, and some are built for teams that produce
+    copy at scale. Each entry links to its own listing with a description and the product''s website.'
+  pins:
+  - {slug: simplified.com, id: lst_702c00dcfa3735f76e751528, evidence: "DR 77, 374,076 organic visits/mo"}
+  - {slug: writesonic.com, id: lst_70c946c2551e22e26774ae44, evidence: "DR 84, 113,611 organic visits/mo"}
+  - {slug: copy.ai, id: lst_585959381adc0935775e398b, evidence: "DR 86, 99,255 organic visits/mo"}
+  - {slug: easy-peasy.ai, id: lst_9d0a5bda7935086c07265cb7, evidence: "DR 70, 93,614 organic visits/mo"}
+  - {slug: jasper.ai, id: lst_eb46c3546a107a7f2bbf719d, evidence: "DR 88, 90,839 organic visits/mo"}
+  - {slug: writecream.com, id: lst_8156803fd9826379deeb6e25, evidence: "DR 71, 79,771 organic visits/mo"}
+  - {slug: ryrob.com, id: lst_664e8cf3014059312e3685f5, evidence: "DR 77, 72,514 organic visits/mo"}
+  - {slug: neuroflash.com, id: lst_32093756932acb14d7a68082, evidence: "DR 73, 43,990 organic visits/mo"}
+  - {slug: rytr.me, id: lst_324d94887c8ff8260c5eda83, evidence: "DR 79, 35,743 organic visits/mo"}
+  - {slug: nichesss.com, id: lst_9c3423bf643178a0d82eb11f, evidence: "DR 50, 22,408 organic visits/mo"}
+- slug: ai-image-generator
+  keyword: ai image generator
+  volume: 247000
+  tag: ai-image-generators
+  intro: AI image generators turn a text prompt into a picture. The tools here create illustrations, photorealistic
+    images, logos and icons, memes and design assets, and several let you edit a result, change its style
+    or extend it beyond its edges. Some run their own models and others offer a choice of models such
+    as Stable Diffusion, with community galleries of prompts to learn from. Each entry links to its own
+    listing with a description and the product's website.
+  pins:
+  - {slug: midjourney.com, id: lst_b45559f3bcef5b330ff87dd1, evidence: "DR 90, 1,133,649 organic visits/mo"}
+  - {slug: openart.ai, id: lst_e3b896ae532e92e9244366c8, evidence: "DR 77, 706,062 organic visits/mo"}
+  - {slug: nightcafe.studio, id: lst_b41872b95e408732fdd165e4, evidence: "DR 77, 253,357 organic visits/mo"}
+  - {slug: imagine.art, id: lst_135c2ac8187dbbfc1fcd3fa7, evidence: "DR 75, 199,611 organic visits/mo"}
+  - {slug: recraft.ai, id: lst_431ec9deaa5ae6d7dac1a526, evidence: "DR 75, 146,557 organic visits/mo"}
+  - {slug: easy-peasy.ai, id: lst_9d0a5bda7935086c07265cb7, evidence: "DR 70, 93,614 organic visits/mo"}
+  - {slug: supermeme.ai, id: lst_e748537540ed7e8474a073ca, evidence: "DR 64, 82,798 organic visits/mo"}
+  - {slug: dzine.ai, id: lst_d6249dda79278667e93342b1, evidence: "DR 62, 47,546 organic visits/mo"}
+  - {slug: getimg.ai, id: lst_8f4888eede3eb543df858e8a, evidence: "DR 73, 44,549 organic visits/mo"}
+  - {slug: starryai.com, id: lst_9937e6ba65354886891fba24, evidence: "DR 70, 38,902 organic visits/mo"}
+  passedOver:
+  - {slug: imgflip.com, reason: "imgflip.com's traffic is its meme maker, not AI image generation"}
+  - {slug: creator.nightcafe.studio, reason: "the same product as nightcafe.studio, which is pinned"}
+- slug: ai-productivity-tools
+  keyword: ai productivity tools
+  volume: 3400
+  tag: ai-productivity-tools
+  intro: AI productivity tools bring AI into the apps where work already happens. The tools here summarize
+    team chat and email threads, turn notes into mind maps and diagrams, draft documents and replies,
+    plan projects and tasks, and add an assistant to the browser for summarizing and translating pages.
+    Some are workspaces for whole teams and others are single-purpose helpers. Each entry links to its
+    own listing with a description and the product's website.
+  pins:
+  - {slug: monica.im, id: lst_a70cfc124fd4525fe79e5db5, evidence: "DR 74, 1,159,559 organic visits/mo"}
+  - {slug: monday.com, id: lst_cc08310da200f327f5e7f007, evidence: "DR 91, 741,826 organic visits/mo"}
+  - {slug: tinywow.com, id: lst_c3997e13624668b7a4e77625, evidence: "DR 71, 427,990 organic visits/mo"}
+  - {slug: getvoila.ai, id: lst_dcf360d4e8f56e792f958fcf, evidence: "DR 52, 186,078 organic visits/mo"}
+  - {slug: mapify.so, id: lst_5c623298f3e74aa614201065, evidence: "DR 66, 102,789 organic visits/mo"}
+  - {slug: missiveapp.com, id: lst_6d660b16d76aa800f4cc971f, evidence: "DR 74, 87,328 organic visits/mo"}
+  - {slug: superhuman.com, id: lst_692085f232c9ba8f1cea086f, evidence: "DR 81, 74,395 organic visits/mo"}
+  - {slug: craft.do, id: lst_fd938555facec2c12ac49ba1, evidence: "DR 76, 54,496 organic visits/mo"}
+  - {slug: usemotion.com, id: lst_014a1e0f4f0cdea41c0c3224, evidence: "DR 82, 45,957 organic visits/mo"}
+  - {slug: taskade.com, id: lst_5a38a0d086bf9fddf4a807aa, evidence: "DR 76, 35,223 organic visits/mo"}
+  passedOver:
+  - {slug: shift.com, reason: "a web browser; this page ranks no browser (Microsoft Edge and Opera are passed over too)"}
+- slug: video-downloader
+  keyword: video downloader
+  volume: 192000
+  category: video-downloaders
+  intro: Video downloaders save videos from websites as files you keep, usually MP4. The tools here are
+    browser extensions for social platforms such as YouTube, TikTok, Instagram, Facebook, X and Reddit,
+    for course and membership platforms where lessons have no download button, and for streaming formats
+    like M3U8 that ordinary downloaders can't read. Most let you choose the quality and save audio separately.
+    Each entry links to its own listing with a description and the product's website.
+  pins:
+  - {slug: youtube-downloader, id: lst_5c78bbdb78f3fa13970399c1, evidence: "'youtube video downloader' 349,000 US searches/mo"}
+  - {slug: instagram-downloader, id: lst_093c329a3bf0eef710824272, evidence: "'instagram video downloader' 332,000 US searches/mo"}
+  - {slug: twitter-x-downloader, id: lst_34b9d549c34b75076ae98e93, evidence: "'twitter video downloader' 308,000 US searches/mo"}
+  - {slug: tiktok-downloader, id: lst_939891a6494949693bb712ff, evidence: "'tiktok video downloader' 176,000 US searches/mo"}
+  - {slug: facebook-video-downloader, id: lst_a18091d61a39a387973490b9, evidence: "'facebook video downloader' 132,000 US searches/mo"}
+  - {slug: reddit-downloader, id: lst_31ccb57efcd0e48b95a659b2, evidence: "'reddit video downloader' 31,000 US searches/mo"}
+  - {slug: vimeo-video-downloader, id: lst_57e20ae1ccd797430b80911e, evidence: "'vimeo video downloader' 2,800 US searches/mo"}
+  - {slug: twitch-video-downloader, id: lst_a97de07030551e1fdfc4b467, evidence: "'twitch video downloader' 1,800 US searches/mo"}
+  - {slug: dailymotion-downloader, id: lst_d9e04a8dcf78e84867ea926e, evidence: "'dailymotion video downloader' 1,500 US searches/mo"}
+  - {slug: linkedin-downloader, id: lst_ffeec6e5afe7fd8dbcecce98, evidence: "'linkedin video downloader' 1,500 US searches/mo"}
+  passedOver:
+  - {slug: pinterest-downloader, reason: "saves pins and boards as images, not video"}
+- slug: ai-video-generator
+  keyword: ai video generator
+  volume: 224000
+  tag: ai-video-generators
+  intro: AI video generators make videos from text, images or a script. The tools here turn a prompt or
+    blog post into a finished video with stock footage, voiceover and music, create presenter videos with
+    AI avatars that speak dozens of languages, animate still photos, and produce explainer and marketing
+    videos from templates. Several include an editor for trimming and captioning the result. Each entry
+    links to its own listing with a description and the product's website.
+  pins:
+  - {slug: veed.io, id: lst_ac66bd0505467dbb716b90db, evidence: "DR 86, 2,138,942 organic visits/mo"}
+  - {slug: invideo.io, id: lst_c6663bda539da986a0a89c3e, evidence: "DR 87, 2,016,021 organic visits/mo"}
+  - {slug: renderforest.com, id: lst_258261ffa340b7bb806131bf, evidence: "DR 80, 966,013 organic visits/mo"}
+  - {slug: synthesia.io, id: lst_fe02219bcbe4acfc55255efa, evidence: "DR 85, 396,742 organic visits/mo"}
+  - {slug: powtoon.com, id: lst_ec6a3a4db308997d38aa9101, evidence: "DR 79, 224,027 organic visits/mo"}
+  - {slug: pictory.ai, id: lst_f3ffefe5825bb3860e75cc04, evidence: "DR 80, 184,377 organic visits/mo"}
+  - {slug: captions.ai, id: lst_f614201afbf4c642b440559d, evidence: "DR 73, 171,941 organic visits/mo"}
+  - {slug: fliki.ai, id: lst_33534dbd720ff1866cea0957, evidence: "DR 75, 126,094 organic visits/mo"}
+  - {slug: d-id.com, id: lst_37008c9b0578ee3bb7f868d8, evidence: "DR 77, 106,322 organic visits/mo"}
+  - {slug: clipfly.ai, id: lst_c562db082cccaf7b836c835b, evidence: "DR 57, 92,480 organic visits/mo"}
+  passedOver:
+  - {slug: pika.art, reason: "its listing's copy describes a chatbot builder, not Pika's video generator"}
+  - {slug: vidday.com, reason: "its listing describes group video gifts, not AI video generation"}
+- slug: ai-data-analysis
+  keyword: ai data analysis
+  volume: 1300
+  tag: ai-data-analyst
+  plural: ai data analysis tools
+  intro: AI data analysis tools let you ask questions of your data in plain language and get charts, formulas
+    or code back. The tools here add AI to spreadsheets, write SQL and Python in data notebooks, build
+    dashboards and visualizations, analyze product and customer behavior, and monitor social media at
+    scale. Some are full analytics platforms and others are add-ons for Excel and Google Sheets. Each
+    entry links to its own listing with a description and the product's website.
+  pins:
+  - {slug: tableau.com, id: lst_99bdb22cb2d01a204cb786a7, evidence: "DR 91, 1,358,240 organic visits/mo"}
+  - {slug: youscan.io, id: lst_b8840864975df45d3cda30fd, evidence: "DR 72, 77,322 organic visits/mo"}
+  - {slug: coefficient.io, id: lst_a411a7f297a2ccd93ee3a884, evidence: "DR 72, 42,395 organic visits/mo"}
+  - {slug: numerous.ai, id: lst_d7162c9cc6717150dbbec3ae, evidence: "DR 64, 17,835 organic visits/mo"}
+  - {slug: gptexcel.uk, id: lst_7487a5e75daae5669a95c513, evidence: "DR 51, 13,578 organic visits/mo"}
+  - {slug: hex.tech, id: lst_6bb3c650690fab4f0481bc8d, evidence: "DR 76, 12,357 organic visits/mo"}
+  - {slug: kanaries.net, id: lst_367184ac70d03d1fa0acd414, evidence: "DR 53, 12,059 organic visits/mo"}
+  - {slug: graphy.app, id: lst_e0548da75032401636af0f71, evidence: "DR 46, 6,435 organic visits/mo"}
+  - {slug: formulashq.com, id: lst_70e27b5c7b230c20452bdebf, evidence: "DR 33, 4,982 organic visits/mo"}
+  - {slug: promptloop.com, id: lst_3f0491d36ff3bc31e219af7d, evidence: "DR 49, 4,282 organic visits/mo"}
+- slug: ai-social-media-tools
+  keyword: ai social media tools
+  volume: 300
+  tag: ai-social-media
+  intro: AI social media tools help plan, write and measure posts across networks. The tools here generate
+    captions, hashtags and post ideas, schedule content to several platforms from one calendar, grow audiences
+    on LinkedIn, X and YouTube, monitor mentions and sentiment, and run live streams with automated hosts.
+    Some are complete social media management suites and others focus on a single network. Each entry
+    links to its own listing with a description and the product's website.
+  pins:
+  - {slug: vidiq.com, id: lst_be98d3ff6981b3df719db152, evidence: "DR 80, 827,807 organic visits/mo"}
+  - {slug: hootsuite.com, id: lst_250dd8cad4fef884026bec1b, evidence: "DR 91, 825,289 organic visits/mo"}
+  - {slug: postly.ai, id: lst_c29c832e45f836888edde3db, evidence: "DR 63, 102,029 organic visits/mo"}
+  - {slug: socialbu.com, id: lst_b819f25be12ec3c8e4d5ee04, evidence: "DR 65, 90,834 organic visits/mo"}
+  - {slug: youscan.io, id: lst_b8840864975df45d3cda30fd, evidence: "DR 72, 77,322 organic visits/mo"}
+  - {slug: taplio.com, id: lst_a7bf6f40afb0f965ea1b204e, evidence: "DR 72, 71,200 organic visits/mo"}
+  - {slug: tweethunter.io, id: lst_b2c18d0ef61e56de326a3f40, evidence: "DR 71, 41,680 organic visits/mo"}
+  - {slug: predis.ai, id: lst_5da6c0322740c0039977eec3, evidence: "DR 78, 26,712 organic visits/mo"}
+  - {slug: taggbox.com, id: lst_7311f297caf5e804cbc6af7f, evidence: "DR 78, 15,868 organic visits/mo"}
+  - {slug: contentin.io, id: lst_837845d43a835bc6bf319c2d, evidence: "DR 43, 6,981 organic visits/mo"}
+  passedOver:
+  - {slug: portaly.cc, reason: "a link-in-bio site builder for creators, not a social media tool"}
+- slug: ai-coding-assistant
+  keyword: ai coding assistant
+  volume: 1800
+  tag: ai-coding
+  intro: AI coding assistants write, explain and review code alongside a developer. The tools here complete
+    code as you type in an editor, generate whole functions or apps from a description, review pull requests,
+    add AI to the terminal, convert code between programming languages, and turn designs into front-end
+    code. Some are full development environments with AI built in and others plug into the tools you already
+    use. Each entry links to its own listing with a description and the product's website.
+  pins:
+  - {slug: cursor.com, id: lst_e45d81af038164bc25ab4dda, evidence: "DR 90, 526,750 organic visits/mo"}
+  - {slug: codia.ai, id: lst_4353e34b74e4fc10b50557d9, evidence: "DR 44, 144,614 organic visits/mo"}
+  - {slug: coderabbit.ai, id: lst_2803a06d19ee877af9e9a7c6, evidence: "DR 80, 49,618 organic visits/mo"}
+  - {slug: trickle.so, id: lst_069e4e2caeedd1f39fa7b0fb, evidence: "DR 61, 17,324 organic visits/mo"}
+  - {slug: zzzcode.ai, id: lst_d21e976439664fe1aaf00ac3, evidence: "DR 48, 12,555 organic visits/mo"}
+  - {slug: codeconvert.ai, id: lst_5756684ead7c70c65cb8ff59, evidence: "DR 33, 10,123 organic visits/mo"}
+  - {slug: qodo.ai, id: lst_83776aab9fb5d8dea8e83e95, evidence: "DR 76, 8,389 organic visits/mo"}
+  - {slug: pseudoeditor.com, id: lst_856d5d558b67c4cac9f63790, evidence: "DR 8, 5,275 organic visits/mo"}
+  - {slug: docuwriter.ai, id: lst_8ef1e02224ce390886eaf2a8, evidence: "DR 51, 2,269 organic visits/mo"}
+  - {slug: cosine.sh, id: lst_f8bf4271ce883bf4c804d63b, evidence: "DR 65, 1,496 organic visits/mo"}
+  passedOver:
+  - {slug: codiga.io, reason: "its site leads with \"Codiga has joined Datadog!\", and it is a static-analysis tool, not a coding assistant"}
+- slug: ai-seo-tools
+  keyword: ai seo tools
+  volume: 2900
+  tag: ai-seo
+  intro: AI SEO tools help pages rank in search. The tools here research keywords and cluster them by
+    intent, plan content around topics, score drafts against the pages that already rank, write and optimize
+    articles, and suggest titles and descriptions for YouTube videos. Several combine research and writing
+    in one editor, while others focus on content strategy for larger sites. Each entry links to its own
+    listing with a description and the product's website.
+  pins:
+  - {slug: vidiq.com, id: lst_be98d3ff6981b3df719db152, evidence: "DR 80, 827,807 organic visits/mo"}
+  - {slug: seo.ai, id: lst_789008ddf9f60aa217fc8bb4, evidence: "DR 77, 116,226 organic visits/mo"}
+  - {slug: surferseo.com, id: lst_c86da8584b20b0d2c560020a, evidence: "DR 85, 43,147 organic visits/mo"}
+  - {slug: junia.ai, id: lst_177b29b17046f5f839d35035, evidence: "DR 69, 31,231 organic visits/mo"}
+  - {slug: scalenut.com, id: lst_ae602b893abe389474f48220, evidence: "DR 72, 23,169 organic visits/mo"}
+  - {slug: rightblogger.com, id: lst_b8865729d03fc284b41bf342, evidence: "DR 71, 13,992 organic visits/mo"}
+  - {slug: marketmuse.com, id: lst_5c81f27a8ee0613fcfa25ecc, evidence: "DR 77, 10,021 organic visits/mo"}
+  - {slug: frase.io, id: lst_fb2093b9375f4d98fc6b3321, evidence: "DR 80, 7,807 organic visits/mo"}
+  - {slug: surgegraph.io, id: lst_cd96430e9397ab20e445503c, evidence: "DR 48, 6,756 organic visits/mo"}
+  - {slug: keywordinsights.ai, id: lst_fd5711dca03ba6e974a0b403, evidence: "DR 72, 5,682 organic visits/mo"}
+- slug: ai-marketing-tools
+  keyword: ai marketing tools
+  volume: 5000
+  tag: ai-marketing-tools
+  intro: AI marketing tools apply AI across campaigns, from writing copy to deciding who sees it. The
+    tools here generate on-brand content, build and test landing pages, personalize email and messaging,
+    manage reviews and loyalty programs, send handwritten notes at scale, and connect marketing with CRM
+    data. Some are all-in-one platforms for small businesses and others serve large marketing teams. Each
+    entry links to its own listing with a description and the product's website.
+  pins:
+  - {slug: yotpo.com, id: lst_ebb0f78d4057325bee01a84b, evidence: "DR 88, 308,579 organic visits/mo"}
+  - {slug: unbounce.com, id: lst_c0382ec163272b3a0de73622, evidence: "DR 88, 253,036 organic visits/mo"}
+  - {slug: systeme.io, id: lst_c43a435c9838ab7ad9db9244, evidence: "DR 92, 139,618 organic visits/mo"}
+  - {slug: jasper.ai, id: lst_eb46c3546a107a7f2bbf719d, evidence: "DR 88, 90,839 organic visits/mo"}
+  - {slug: bird.com, id: lst_2eee16bafaa94c3114479589, evidence: "DR 82, 28,008 organic visits/mo"}
+  - {slug: handwrytten.com, id: lst_84251986672ed88e4c771841, evidence: "DR 70, 18,958 organic visits/mo"}
+  - {slug: typeface.ai, id: lst_669817377825227fac0807a3, evidence: "DR 74, 7,843 organic visits/mo"}
+  - {slug: nicejob.com, id: lst_46d04eadede67ebea7e5a27e, evidence: "DR 81, 6,729 organic visits/mo"}
+  - {slug: ortto.com, id: lst_460e234a2dd92e61732945a6, evidence: "DR 78, 4,157 organic visits/mo"}
+  - {slug: fullpath.com, id: lst_ac321f838dfb002c530f394d, evidence: "DR 52, 3,969 organic visits/mo"}
+- slug: ai-video-editor
+  keyword: ai video editor
+  volume: 39000
+  tag: ai-video-editor
+  intro: AI video editors speed up cutting, captioning and repurposing video. The tools here add subtitles
+    automatically, cut long recordings into short clips for social media, remove silences and filler words,
+    edit by editing the transcript, resize video for each platform, and add effects, music and voiceover.
+    Most run in the browser or on a phone, and several are built for creators who publish every day. Each
+    entry links to its own listing with a description and the product's website.
+  pins:
+  - {slug: capcut.com, id: lst_2aa45f1e543fb2080e0eb91a, evidence: "DR 87, 18,734,598 organic visits/mo"}
+  - {slug: invideo.io, id: lst_c6663bda539da986a0a89c3e, evidence: "DR 87, 2,016,021 organic visits/mo"}
+  - {slug: media.io, id: lst_aa561245069f3c2504b4e9c0, evidence: "DR 74, 1,222,397 organic visits/mo"}
+  - {slug: kapwing.com, id: lst_f7286d338ccc6a26b2e18fb8, evidence: "DR 80, 1,199,613 organic visits/mo"}
+  - {slug: vizard.ai, id: lst_b69412cd71a638236b7790f1, evidence: "DR 68, 173,435 organic visits/mo"}
+  - {slug: captions.ai, id: lst_f614201afbf4c642b440559d, evidence: "DR 73, 171,941 organic visits/mo"}
+  - {slug: submagic.co, id: lst_07236be97271e32c58abb224, evidence: "DR 73, 140,062 organic visits/mo"}
+  - {slug: clipfly.ai, id: lst_c562db082cccaf7b836c835b, evidence: "DR 57, 92,480 organic visits/mo"}
+  - {slug: gliacloud.com, id: lst_219b0c90eaebef5b5f4847e4, evidence: "DR 51, 53,627 organic visits/mo"}
+  - {slug: zeemo.ai, id: lst_83115e11a2bed1031871cf61, evidence: "DR 45, 48,609 organic visits/mo"}
+- slug: ai-art-generator
+  keyword: ai art generator
+  volume: 84000
+  tag: ai-art-generators
+  intro: AI art generators create artwork from a text prompt or an existing image. The tools here produce
+    paintings, illustrations, anime and cartoon styles, tattoo designs and concept art, with style presets,
+    community galleries and tools to refine a result. Some run their own models and others build on open
+    models such as Stable Diffusion. Each entry links to its own listing with a description and the product's
+    website.
+  pins:
+  - {slug: midjourney.com, id: lst_b45559f3bcef5b330ff87dd1, evidence: "DR 90, 1,133,649 organic visits/mo"}
+  - {slug: openart.ai, id: lst_e3b896ae532e92e9244366c8, evidence: "DR 77, 706,062 organic visits/mo"}
+  - {slug: nightcafe.studio, id: lst_b41872b95e408732fdd165e4, evidence: "DR 77, 253,357 organic visits/mo"}
+  - {slug: imagine.art, id: lst_135c2ac8187dbbfc1fcd3fa7, evidence: "DR 75, 199,611 organic visits/mo"}
+  - {slug: imagetocartoon.com, id: lst_f9854a79f2bd0370434da852, evidence: "DR 40, 54,587 organic visits/mo"}
+  - {slug: getimg.ai, id: lst_8f4888eede3eb543df858e8a, evidence: "DR 73, 44,549 organic visits/mo"}
+  - {slug: starryai.com, id: lst_9937e6ba65354886891fba24, evidence: "DR 70, 38,902 organic visits/mo"}
+  - {slug: tattoosai.com, id: lst_f7e231ef102d958509d02c0d, evidence: "DR 49, 38,389 organic visits/mo"}
+  - {slug: stability.ai, id: lst_8511e86d98b6cc1d88d1802f, evidence: "DR 84, 37,569 organic visits/mo"}
+  - {slug: phygital.plus, id: lst_3e043d5ebb3b11d2909f6c93, evidence: "DR 46, 28,524 organic visits/mo"}
+  passedOver:
+  - {slug: creator.nightcafe.studio, reason: "the same product as nightcafe.studio, which is pinned"}
+- slug: ai-website-builder
+  keyword: ai website builder
+  volume: 28000
+  tag: ai-website-builders
+  intro: AI website builders generate a working site from a few questions or a short description. The
+    tools here draft the pages, layout, images and copy, then let you edit them in a visual editor and
+    publish with hosting included. Some are long-standing site builders that added AI, others build landing
+    pages for campaigns, and a few export clean code for developers. Each entry links to its own listing
+    with a description and the product's website.
+  pins:
+  - {slug: squarespace.com, id: lst_c15f52c9dcf33b02da879cbf, evidence: "DR 96, 3,374,504 organic visits/mo"}
+  - {slug: framer.com, id: lst_dd4688213f18a5c94d0655bf, evidence: "DR 91, 530,267 organic visits/mo"}
+  - {slug: unbounce.com, id: lst_c0382ec163272b3a0de73622, evidence: "DR 88, 253,036 organic visits/mo"}
+  - {slug: b12.io, id: lst_21692e31390723380f372120, evidence: "DR 81, 104,022 organic visits/mo"}
+  - {slug: weblium.com, id: lst_3c9e642b6034758699860304, evidence: "DR 82, 39,543 organic visits/mo"}
+  - {slug: codedesign.ai, id: lst_e12257a5c54a69ad1a5f9105, evidence: "DR 70, 10,942 organic visits/mo"}
+  - {slug: teleporthq.io, id: lst_2741305ba7a27e2953ca0cfd, evidence: "DR 72, 6,599 organic visits/mo"}
+  - {slug: pineapplebuilder.com, id: lst_5481d6b16f76f25c62c10ec3, evidence: "DR 65, 5,890 organic visits/mo"}
+  - {slug: zipwp.com, id: lst_b2b28043b71c907f5ad5c666, evidence: "DR 75, 5,338 organic visits/mo"}
+  - {slug: landingsite.ai, id: lst_f571186929a7332192d9b27d, evidence: "DR 71, 4,430 organic visits/mo"}
+- slug: cloud-gpu
+  keyword: cloud gpu
+  volume: 800
+  tag: cloud-gpu-providers
+  plural: cloud gpu providers
+  intro: Cloud GPU providers rent graphics processors by the hour for training and running machine learning
+    models. The providers here offer on-demand and reserved GPU instances, serverless GPUs that scale
+    to zero, managed Kubernetes and notebooks, and clusters for large training jobs. Some are general-purpose
+    clouds with GPU options and others specialize in AI workloads. Each entry links to its own listing
+    with a description and the provider's website.
+  pins:
+  - {slug: azure.microsoft.com, id: lst_a590ff5f631d1250224df4e3, evidence: "DR 96, 3,683,520 organic visits/mo"}
+  - {slug: ovhcloud.com, id: lst_14c6281f69f0dacb6d778bf1, evidence: "DR 92, 1,418,263 organic visits/mo"}
+  - {slug: coreweave.com, id: lst_27641d95cb9929a191b17331, evidence: "DR 76, 170,692 organic visits/mo"}
+  - {slug: runpod.io, id: lst_ae75e6d9d1e53babb32e9a5e, evidence: "DR 77, 122,291 organic visits/mo"}
+  - {slug: linode.com, id: lst_801ae8c07b36a4d79b995b9e, evidence: "DR 86, 117,327 organic visits/mo"}
+  - {slug: lambda.ai, id: lst_7e9736364b5d462013a79498, evidence: "DR 76, 33,442 organic visits/mo"}
+  - {slug: gcore.com, id: lst_08e038eaff1ce9f10863aca2, evidence: "DR 75, 32,447 organic visits/mo"}
+  - {slug: tencentcloud.com, id: lst_f51453f93fc61f394df14b8d, evidence: "DR 80, 28,141 organic visits/mo"}
+  - {slug: paperspace.com, id: lst_4f5723dbdd28a781c3ffd776, evidence: "DR 73, 22,077 organic visits/mo"}
+  - {slug: koyeb.com, id: lst_b979adf02dcfbb11c72c6a76, evidence: "DR 71, 17,193 organic visits/mo"}
+- slug: ai-meeting-assistant
+  keyword: ai meeting assistant
+  volume: 2600
+  tag: ai-meeting-assistant
+  intro: AI meeting assistants join calls on Zoom, Google Meet and Microsoft Teams to record, transcribe
+    and summarize them. The tools here write meeting notes and action items, search past conversations,
+    remove background noise, coach speakers on pace and filler words, and send summaries to a CRM or team
+    chat. Some work as a bot in the call and others as a desktop or browser app. Each entry links to its
+    own listing with a description and the product's website.
+  pins:
+  - {slug: screenapp.io, id: lst_66c95acc9139861fbcc88024, evidence: "DR 71, 474,148 organic visits/mo"}
+  - {slug: dialpad.com, id: lst_0f159058f7cfe0e81566b1b3, evidence: "DR 83, 332,816 organic visits/mo"}
+  - {slug: tactiq.io, id: lst_25d1350468e113ad446342ce, evidence: "DR 73, 275,257 organic visits/mo"}
+  - {slug: krisp.ai, id: lst_700ae45785680837a642e4d3, evidence: "DR 79, 136,580 organic visits/mo"}
+  - {slug: tldv.io, id: lst_d97ef6867abc090d4413f77b, evidence: "DR 75, 75,878 organic visits/mo"}
+  - {slug: fireflies.ai, id: lst_f46425860ca3337609f99f6f, evidence: "DR 82, 59,072 organic visits/mo"}
+  - {slug: noota.io, id: lst_44d14d7eb104fa59bf2a5aaa, evidence: "DR 62, 44,328 organic visits/mo"}
+  - {slug: rewind.ai, id: lst_7ce8ac46145d0bbc07e06d67, evidence: "DR 61, 30,637 organic visits/mo"}
+  - {slug: poised.com, id: lst_0f0b4124c7e06ec5bd18dfdb, evidence: "DR 53, 25,615 organic visits/mo"}
+  - {slug: supernormal.com, id: lst_ce0a6986a6440b184379c940, evidence: "DR 66, 21,191 organic visits/mo"}
+- slug: ai-note-taker
+  keyword: ai note taker
+  volume: 18000
+  tag: ai-note-taker
+  intro: AI note takers write notes so you can pay attention instead. The tools here transcribe meetings,
+    interviews and lectures, summarize them into key points and action items, and keep notes searchable.
+    Some join video calls automatically, some record in person, and some are note-taking apps with AI
+    that organizes and writes. A few serve specific work, such as recruiting interviews or clinical notes.
+    Each entry links to its own listing with a description and the product's website.
+  pins:
+  - {slug: screenapp.io, id: lst_66c95acc9139861fbcc88024, evidence: "DR 71, 474,148 organic visits/mo"}
+  - {slug: otter.ai, id: lst_334360169f73c5a7620d44e0, evidence: "DR 86, 378,775 organic visits/mo"}
+  - {slug: tactiq.io, id: lst_25d1350468e113ad446342ce, evidence: "DR 73, 275,257 organic visits/mo"}
+  - {slug: krisp.ai, id: lst_700ae45785680837a642e4d3, evidence: "DR 79, 136,580 organic visits/mo"}
+  - {slug: tldv.io, id: lst_d97ef6867abc090d4413f77b, evidence: "DR 75, 75,878 organic visits/mo"}
+  - {slug: craft.do, id: lst_fd938555facec2c12ac49ba1, evidence: "DR 76, 54,496 organic visits/mo"}
+  - {slug: noota.io, id: lst_44d14d7eb104fa59bf2a5aaa, evidence: "DR 62, 44,328 organic visits/mo"}
+  - {slug: metaview.ai, id: lst_4b030ad174fa5a07e30ab0ab, evidence: "DR 70, 35,322 organic visits/mo"}
+  - {slug: supernormal.com, id: lst_ce0a6986a6440b184379c940, evidence: "DR 66, 21,191 organic visits/mo"}
+  - {slug: meetjamie.ai, id: lst_666b338d68d6b043bccb09f2, evidence: "DR 69, 20,240 organic visits/mo"}
+- slug: ai-text-to-speech
+  keyword: ai text to speech
+  volume: 26000
+  tag: ai-text-to-speech
+  plural: ai text to speech tools
+  intro: AI text-to-speech tools read text aloud in natural-sounding voices. The tools here convert documents,
+    web pages and scripts into audio in dozens of languages and accents, let you adjust speed, pitch and
+    pauses, and export voiceovers for videos, podcasts and e-learning. Some are reading apps for listening
+    on the go, and others are voiceover studios with hundreds of voices for creators and businesses. Each
+    entry links to its own listing with a description and the product's website.
+  pins:
+  - {slug: naturalreaders.com, id: lst_b60aad2072dd2df6d31c2283, evidence: "DR 75, 637,549 organic visits/mo"}
+  - {slug: speechify.com, id: lst_024cbabf21db19b937c13d83, evidence: "DR 80, 483,439 organic visits/mo"}
+  - {slug: text-to-speech.online, id: lst_c6aa7368ec48024692eadee3, evidence: "DR 34, 386,301 organic visits/mo"}
+  - {slug: voicemaker.in, id: lst_aa009aa814714d281d96859d, evidence: "DR 53, 264,702 organic visits/mo"}
+  - {slug: ttsmaker.com, id: lst_f576e4b1c7082a37d61e0548, evidence: "DR 59, 263,883 organic visits/mo"}
+  - {slug: murf.ai, id: lst_15caf71f765ce253eb674674, evidence: "DR 80, 144,762 organic visits/mo"}
+  - {slug: listnr.ai, id: lst_07f4546fc668173d6d72d9eb, evidence: "DR 62, 97,438 organic visits/mo"}
+  - {slug: topmediai.com, id: lst_5f4fb2054fa0fbf96b679947, evidence: "DR 56, 91,259 organic visits/mo"}
+  - {slug: speechgen.io, id: lst_58eb4f4e495886d56ca8da1f, evidence: "DR 49, 65,340 organic visits/mo"}
+  - {slug: wavel.ai, id: lst_44b278e879e4d1f8d12107fd, evidence: "DR 60, 44,285 organic visits/mo"}
+- slug: plagiarism-checker
+  keyword: plagiarism checker
+  volume: 388000
+  tag: plagiarism-checker
+  intro: Plagiarism checkers compare a text against web pages, publications and student papers to find
+    copied or closely paraphrased passages. The tools here highlight matches with links to their sources,
+    generate citations, and many also detect text written by AI. Some are built for schools and publishers,
+    and others are quick web checks for students, writers and site owners. Each entry links to its own
+    listing with a description and the product's website.
+  pins:
+  - {slug: quillbot.com, id: lst_ac4416aa91fae9babe6004ce, evidence: "DR 83, 32,951,102 organic visits/mo"}
+  - {slug: zerogpt.com, id: lst_3ecb99567f8b456ccf970ccd, evidence: "DR 80, 10,043,887 organic visits/mo"}
+  - {slug: duplichecker.com, id: lst_6367309c19623f83dc3ae948, evidence: "DR 76, 7,981,237 organic visits/mo"}
+  - {slug: scribbr.com, id: lst_a9c1a8b226044120eb8bf6ca, evidence: "DR 79, 5,883,816 organic visits/mo"}
+  - {slug: turnitin.com, id: lst_057167f4a2c2be0ef0579845, evidence: "DR 84, 1,904,169 organic visits/mo"}
+  - {slug: copyleaks.com, id: lst_12eb1800ee0bf8d2fdc5057c, evidence: "DR 76, 693,179 organic visits/mo"}
+  - {slug: originality.ai, id: lst_93fdaea32741cf6389c9b4d8, evidence: "DR 79, 542,884 organic visits/mo"}
+  - {slug: prowritingaid.com, id: lst_9083e33b6565a2154ed6b14e, evidence: "DR 79, 508,565 organic visits/mo"}
+  - {slug: plagiarismdetector.net, id: lst_f89e8569737c46d21fa68c6f, evidence: "DR 71, 488,679 organic visits/mo"}
+  - {slug: smodin.io, id: lst_ac1b56ec9cc1e2328249869d, evidence: "DR 71, 194,580 organic visits/mo"}
+  passedOver:
+  - {slug: sapling.ai, reason: "its listing describes language APIs, not plagiarism checking"}
+  - {slug: edubirdie.com, reason: "an essay-writing service"}
+- slug: hipaa-compliant-hosting
+  keyword: hipaa compliant hosting
+  volume: 800
+  tag: hipaa-compliant-hosting
+  plural: hipaa compliant hosting providers
+  intro: HIPAA compliant hosting keeps protected health information on infrastructure and services set
+    up for the HIPAA Security Rule. The providers here offer cloud, dedicated and colocation hosting,
+    managed security and backups, encrypted email, and platforms for deploying health apps, each marketed
+    to healthcare organizations and the software companies that serve them. Some are large clouds with
+    healthcare programs and others specialize in compliance. An organization still needs a business associate
+    agreement for the service it uses. Each entry links to its own listing with a description and the
+    provider's website.
+  pins:
+  - {slug: azure.microsoft.com, id: lst_a590ff5f631d1250224df4e3, evidence: "DR 96, 3,683,520 organic visits/mo; HIPAA offering: https://learn.microsoft.com/en-us/azure/compliance/offerings/offering-hipaa-us"}
+  - {slug: rackspace.com, id: lst_f3fe329066251301efb7dab6, evidence: "DR 86, 143,533 organic visits/mo; HIPAA offering: https://www.rackspace.com/industry/healthcare"}
+  - {slug: tierpoint.com, id: lst_3ea5780c5f90d731adf503fe, evidence: "DR 71, 25,365 organic visits/mo; HIPAA offering: https://www.tierpoint.com/industry-it-solutions/healthcare/"}
+  - {slug: hipaavault.com, id: lst_e7ec160437237670f8d55f33, evidence: "DR 57, 19,701 organic visits/mo; HIPAA offering: https://hipaavault.com/"}
+  - {slug: luxsci.com, id: lst_7db2b41213a0fa3aa0e732ae, evidence: "DR 71, 2,762 organic visits/mo; HIPAA offering: https://luxsci.com/"}
+  - {slug: lightedge.com, id: lst_993b1205a26a9890ce3c76be, evidence: "DR 56, 2,484 organic visits/mo; HIPAA offering: https://lightedge.com/healthcare-life-sciences/"}
+  - {slug: medstack.co, id: lst_5feb6ba9a5a2f56731e83c1d, evidence: "DR 41, 519 organic visits/mo; HIPAA offering: https://medstack.co/"}
+  - {slug: connectria.com, id: lst_f3bd853de9d630e280f11c06, evidence: "DR 52, 302 organic visits/mo; HIPAA offering: https://www.connectria.com/"}
+  - {slug: bytegrid.com, id: lst_a7e78106154177ad79236c5d, evidence: "DR 22, 73 organic visits/mo; HIPAA offering: https://www.bytegrid.com/"}
+  - {slug: healthcareblocks.com, id: lst_05e0a382416b1cd854e2f88b, evidence: "DR 46, 11 organic visits/mo; HIPAA offering: https://www.healthcareblocks.com/solutions/healthcare-blocks-aws"}
+  exclude:
+  - {slug: aws.amazon.com, id: lst_31a93dfdd1a9daea71399d95, reason: "its listing is Amazon Polly, a text-to-speech service"}
+  - {slug: cyracom.com, id: lst_c7d69228a72038141831e437, reason: "language services, not hosting"}
+  - {slug: greengeeks.com, id: lst_550deeba4d8724905250b26e, reason: "no HIPAA offering on greengeeks.com: its home, web, VPS and dedicated hosting pages don't mention HIPAA (GET, 2026-10-11)"}
+  - {slug: leaseweb.com, id: lst_752764c40458318859bca9b3, reason: "no HIPAA offering found on leaseweb.com's home, compliance and certification pages (GET, 2026-10-11)"}
+  - {slug: linqto.com, id: lst_aa82a29b27b0eced74916ebc, reason: "an investment platform, not hosting"}
+  - {slug: servermania.com, id: lst_64d01bfeda69a4db37249b02, reason: "servermania.com lists its data centers' SOC 2-HIPAA reports, but no HIPAA hosting offering (GET, 2026-10-11)"}
+  - {slug: sherweb.com, id: lst_663a07bb996dd0ccf9a7cda5, reason: "no current HIPAA hosting offering on sherweb.com: only a 2013 newsroom post and blog articles about Microsoft 365 (GET, 2026-10-11)"}
+  - {slug: truevault.com, id: lst_8d0d625095e3c610cb08dd25, reason: "privacy-compliance software, not hosting"}
+featureListings:
+- {slug: aws.amazon.com, id: lst_31a93dfdd1a9daea71399d95, name: "Amazon Polly", reason: "names one feature of a larger site; aws.amazon.com's traffic measures all of AWS"}
+- {slug: ayoa.com, id: lst_8a4ac7eb74fdcf1aebcfa16e, name: "GenerateIdeas.ai", reason: "names one feature of a larger site; ayoa.com's traffic measures Ayoa's mind-mapping app"}
+- {slug: bazaarvoice.com, id: lst_cd4f6534709518e512eb802d, name: "Affable.ai", reason: "names one feature of a larger site; bazaarvoice.com's traffic measures Bazaarvoice's reviews platform"}
+- {slug: boloforms.com, id: lst_c6806b4adbbb65a7c7397030, name: "SheetGod", reason: "names one feature of a larger site; boloforms.com's traffic measures BoloForms' e-signature product"}
+- {slug: buffer.com, id: lst_43ae562ab2420b083b4a2cd1, name: "Buffer AI assistant", reason: "names one feature of a larger site; buffer.com's traffic measures Buffer's social media scheduler"}
+- {slug: chai-research.com, id: lst_b669de52d4736f4e045e8284, name: "ChaiGPT", reason: "names one feature of a larger site; chai-research.com's traffic measures Chai's research site"}
+- {slug: coda.io, id: lst_60654b29810d314ac4071b57, name: "OpenAI for Coda", reason: "names one feature of a larger site; coda.io's traffic measures Coda's document platform"}
+- {slug: codesandbox.io, id: lst_9c7bf8d0e68785c74cd2448d, name: "Boxy", reason: "names one feature of a larger site; codesandbox.io's traffic measures CodeSandbox's online IDE"}
+- {slug: cohere.com, id: lst_3fd4a20e001a5d82ecc1ddbf, name: "Coral", reason: "names one feature of a larger site; cohere.com's traffic measures Cohere's model platform"}
+- {slug: creativefabrica.com, id: lst_13d6c48086b6ffd68daf23ff, name: "CF Spark", reason: "names one feature of a larger site; creativefabrica.com's traffic measures Creative Fabrica's fonts and graphics marketplace"}
+- {slug: crisp.chat, id: lst_d0eb1d21af57e95091b2537a, name: "Crisp MagicReply", reason: "names one feature of a larger site; crisp.chat's traffic measures Crisp's customer messaging suite"}
+- {slug: dashword.com, id: lst_188cc4011a132f3258176d15, name: "Content brief generator", reason: "names one feature of a larger site; dashword.com's traffic measures Dashword's content optimizer"}
+- {slug: datasette.io, id: lst_61ec380de1e7194c1d8634ca, name: "Datasette ChatGPT plugin", reason: "names one feature of a larger site; datasette.io's traffic measures Datasette itself"}
+- {slug: deepnote.com, id: lst_bb6446d5879a2e746b224b6c, name: "Deepnote Copilot", reason: "names one feature of a larger site; deepnote.com's traffic measures Deepnote's data notebooks"}
+- {slug: deviantart.com, id: lst_76f39960871cc00bae41cd44, name: "Dream Up (Deviant Art)", reason: "names one feature of a larger site; deviantart.com's traffic measures DeviantArt's art community"}
+- {slug: emojipedia.org, id: lst_78aaa7d453b9b40478966c25, name: "Emojipedia (AI Emoji Generator)", reason: "names one feature of a larger site; emojipedia.org's traffic measures Emojipedia's emoji reference"}
+- {slug: eraser.io, id: lst_23f0d92a5076fa3114048fa0, name: "DiagramGPT", reason: "names one feature of a larger site; eraser.io's traffic measures Eraser's docs and diagrams"}
+- {slug: flick.social, id: lst_9f580d9e6266993556e3e887, name: "Flick - AI assistant", reason: "names one feature of a larger site; flick.social's traffic measures Flick's hashtag and scheduling suite"}
+- {slug: frontitude.com, id: lst_c988a50a050772d6cd3fbc40, name: "UX writing assistant", reason: "names one feature of a larger site; frontitude.com's traffic measures Frontitude's UX copy platform"}
+- {slug: futurimedia.com, id: lst_864992608e4295e26ac005b5, name: "RadioGPT", reason: "names one feature of a larger site; futurimedia.com's traffic measures Futuri's media products"}
+- {slug: goblin.tools, id: lst_3904dbeab135f07dadba9af6, name: "Magic ToDo", reason: "names one feature of a larger site; goblin.tools's traffic measures goblin.tools' set of tools"}
+- {slug: gong.io, id: lst_7e4dfc81c43d49a2e9d17db1, name: "Gong Engage", reason: "names one feature of a larger site; gong.io's traffic measures Gong's revenue platform"}
+- {slug: goteleport.com, id: lst_f8a67f719df72da7c82d419d, name: "Teleport Assist", reason: "names one feature of a larger site; goteleport.com's traffic measures Teleport's access platform"}
+- {slug: grain.com, id: lst_672960460d8d1f47f7b025f0, name: "Grain AI", reason: "names one feature of a larger site; grain.com's traffic measures Grain's call recorder"}
+- {slug: grammarly.com, id: lst_501525d47f04c10d5f177c06, name: "GrammarlyGO", reason: "names one feature of a larger site; grammarly.com's traffic measures Grammarly's writing assistant"}
+- {slug: hiverhq.com, id: lst_d55d77bf47740c0eaddc4682, name: "Harvey", reason: "names one feature of a larger site; hiverhq.com's traffic measures Hiver's shared inbox"}
+- {slug: httpie.io, id: lst_bf0377170725d01de90ffb62, name: "HTTPie AI", reason: "names one feature of a larger site; httpie.io's traffic measures HTTPie's API client"}
+- {slug: hubspot.com, id: lst_1f31337a943b53a5948269d1, name: "ChatSpot", reason: "names one feature of a larger site; hubspot.com's traffic measures HubSpot's CRM and marketing suite"}
+- {slug: ibm.com, id: lst_a1059399afb4c39fab03d6f6, name: "WatsonX.ai by IBM", reason: "names one feature of a larger site; ibm.com's traffic measures IBM's whole site"}
+- {slug: icons8.com, id: lst_9e37bca8f83e2858a5c06130, name: "Swapper", reason: "names one feature of a larger site; icons8.com's traffic measures Icons8's icon and photo library"}
+- {slug: intercom.com, id: lst_ecaf56ae30e976ce6ccba9c1, name: "Fin by Intercom", reason: "names one feature of a larger site; intercom.com's traffic measures Intercom's customer messaging suite"}
+- {slug: kive.ai, id: lst_5b7ca8764bc5bee99f8d1408, name: "AI Canvas", reason: "names one feature of a larger site; kive.ai's traffic measures Kive's image library"}
+- {slug: koala.sh, id: lst_daed633e32b6d282769ec311, name: "KoalaChat", reason: "names one feature of a larger site; koala.sh's traffic measures Koala's article writer"}
+- {slug: landbot.io, id: lst_785e5b5ec11c13a7dab59a28, name: "Landbot AI", reason: "names one feature of a larger site; landbot.io's traffic measures Landbot's chatbot builder"}
+- {slug: letsview.com, id: lst_9fe076b643406379c89a583d, name: "LetsView Chat", reason: "names one feature of a larger site; letsview.com's traffic measures LetsView's screen-mirroring app"}
+- {slug: livechat.com, id: lst_651ae748fecf113a02cfd03b, name: "Chat Summary for LiveChat", reason: "names one feature of a larger site; livechat.com's traffic measures LiveChat's customer chat software"}
+- {slug: livereacting.com, id: lst_8db60e406a07b3714b93d147, name: "LiveReacting AI", reason: "names one feature of a larger site; livereacting.com's traffic measures LiveReacting's live-streaming studio"}
+- {slug: magictool.ai, id: lst_b353697b1fc37fb8c828a699, name: "InsightJini", reason: "names one feature of a larger site; magictool.ai's traffic measures the MagicTool site"}
+- {slug: markcopy.ai, id: lst_dda79bd41d7b4b2159a1c38b, name: "Rocket Mode (Mark Copy)", reason: "names one feature of a larger site; markcopy.ai's traffic measures Mark Copy as a whole"}
+- {slug: medallia.com, id: lst_07ba1fe335c6b87a4bd58b33, name: "MonkeyLearn", reason: "names one feature of a larger site; medallia.com's traffic measures Medallia's customer experience platform"}
+- {slug: merge.dev, id: lst_9d2be43809280c184c3b90e3, name: "Blueprint", reason: "names one feature of a larger site; merge.dev's traffic measures Merge's unified API"}
+- {slug: microsoft.com, id: lst_59cb69478cf7d3e7f2809de6, name: "Microsoft Edge", reason: "names one feature of a larger site; microsoft.com's traffic measures Microsoft's whole site"}
+- {slug: miro.com, id: lst_5d0da7f081adae9c235ce80d, name: "Miro AI", reason: "names one feature of a larger site; miro.com's traffic measures Miro's whiteboard"}
+- {slug: mixpanel.com, id: lst_f6073bce20eea78a33796081, name: "Mixpanel Spark", reason: "names one feature of a larger site; mixpanel.com's traffic measures Mixpanel's product analytics"}
+- {slug: myheritage.com, id: lst_d3d8797ed03a6ed8d7a24b34, name: "AI Time Machine", reason: "names one feature of a larger site; myheritage.com's traffic measures MyHeritage's genealogy service"}
+- {slug: myheritage.fr, id: lst_ecae1f2e223637cd3f1721d3, name: "Deep Nostalgia", reason: "names one feature of a larger site; myheritage.fr's traffic measures MyHeritage's genealogy service"}
+- {slug: navercorp.com, id: lst_5a37a14cd7d2f2cbba8d0ae2, name: "HyperCLOVA", reason: "names one feature of a larger site; navercorp.com's traffic measures NAVER's corporate site"}
+- {slug: nvidia.com, id: lst_d03084545300d5e43da9b589, name: "NVIDIA Canvas", reason: "names one feature of a larger site; nvidia.com's traffic measures NVIDIA's whole site"}
+- {slug: openai.com, id: lst_8dc866963dc832267ccfdcc9, name: "DallE-2", reason: "names one feature of a larger site; openai.com's traffic measures ChatGPT and OpenAI"}
+- {slug: opera.com, id: lst_be6104e442383d421efbd4bb, name: "Opera AI Prompts", reason: "names one feature of a larger site; opera.com's traffic measures Opera's web browsers"}
+- {slug: photoleapapp.com, id: lst_b480a68344b9a8eece879f3f, name: "Text to Image by Photoleap", reason: "names one feature of a larger site; photoleapapp.com's traffic measures Photoleap's photo editor"}
+- {slug: radaar.io, id: lst_1829fbded2edde3caa341313, name: "AI-Powered Post Generator", reason: "names one feature of a larger site; radaar.io's traffic measures Radaar's social media suite"}
+- {slug: raycast.com, id: lst_fa4837d350588954da806d7c, name: "Raycast AI", reason: "names one feature of a larger site; raycast.com's traffic measures Raycast's Mac launcher"}
+- {slug: read.ai, id: lst_480c5ac86878eb6958f475bd, name: "Read Highlights", reason: "names one feature of a larger site; read.ai's traffic measures Read AI's meeting assistant as a whole"}
+- {slug: reflect.app, id: lst_59b5574ffe924a3f7604daa2, name: "Reflect AI", reason: "names one feature of a larger site; reflect.app's traffic measures Reflect's note-taking app"}
+- {slug: replit.com, id: lst_7f018cc179b1ab753ba19042, name: "Code Oracle by Repl.it", reason: "names one feature of a larger site; replit.com's traffic measures Replit's development platform"}
+- {slug: riverside.fm, id: lst_00700d96f8d85e30213dc9ef, name: "AI Transcriptions by Riverside", reason: "names one feature of a larger site; riverside.fm's traffic measures Riverside's recording studio"}
+- {slug: rows.com, id: lst_10ba1e2ad5fc4afb23b4520d, name: "Rows AI", reason: "names one feature of a larger site; rows.com's traffic measures Rows' spreadsheet"}
+- {slug: saga.so, id: lst_b3c952a1fff0f768f119783d, name: "Saga AI", reason: "names one feature of a larger site; saga.so's traffic measures Saga's workspace"}
+- {slug: salesforce.com, id: lst_85e33fc0ffe8c02ec4145c19, name: "Einstein GPT", reason: "names one feature of a larger site; salesforce.com's traffic measures Salesforce's CRM"}
+- {slug: sciencelogic.com, id: lst_cfeb7d6810d707bd6b73fd9b, name: "Zebrium", reason: "names one feature of a larger site; sciencelogic.com's traffic measures ScienceLogic's IT operations suite"}
+- {slug: sensible.so, id: lst_6725c26ac9d0ac6e8446bad4, name: "Sensible Instruct", reason: "names one feature of a larger site; sensible.so's traffic measures Sensible's document extraction"}
+- {slug: seovendor.co, id: lst_55b8c4f872d0ea0f76a49590, name: "SEO GPT", reason: "names one feature of a larger site; seovendor.co's traffic measures SEO Vendor's agency services"}
+- {slug: shutterstock.com, id: lst_74b46fabf684074f077416e0, name: "Shutterstock image generator", reason: "names one feature of a larger site; shutterstock.com's traffic measures Shutterstock's stock library"}
+- {slug: slack.com, id: lst_b7639eebb5f7f3034943381b, name: "Slack GPT", reason: "names one feature of a larger site; slack.com's traffic measures Slack's team chat"}
+- {slug: snapchat.com, id: lst_34dedd0969aa621718eb138e, name: "Snapchat My AI", reason: "names one feature of a larger site; snapchat.com's traffic measures the Snapchat app"}
+- {slug: socialbee.com, id: lst_b0479abd8b81aefc09017251, name: "AI Social Post Generator", reason: "names one feature of a larger site; socialbee.com's traffic measures SocialBee's social media scheduler"}
+- {slug: softr.io, id: lst_02c69023341a0ca2066d76be, name: "Softr AI", reason: "names one feature of a larger site; softr.io's traffic measures Softr's no-code app builder"}
+- {slug: stork.ai, id: lst_24b14b3ca1bad4fce3b24cd0, name: "Call My Link", reason: "names one feature of a larger site; stork.ai's traffic measures Stork's team communication app"}
+- {slug: streamlabs.com, id: lst_6243c9097d51790fea6dd695, name: "Type Studio", reason: "names one feature of a larger site; streamlabs.com's traffic measures Streamlabs' live-streaming software"}
+- {slug: tailwindapp.com, id: lst_4a276dc60e50cd5c1cd37877, name: "Tailwind Ghostwriter", reason: "names one feature of a larger site; tailwindapp.com's traffic measures Tailwind's social media scheduler"}
+- {slug: themesberg.com, id: lst_ca7963fc93efad2fbff32225, name: "GPT-3 Tailwind CSS", reason: "names one feature of a larger site; themesberg.com's traffic measures Themesberg's templates"}
+- {slug: together.ai, id: lst_80af6eca8917719828a782bd, name: "OpenChatKit", reason: "names one feature of a larger site; together.ai's traffic measures Together AI's model platform"}
+- {slug: user.com, id: lst_b7471a9d94fe805c7b97db1c, name: "AI Chat", reason: "names one feature of a larger site; user.com's traffic measures User.com's marketing automation"}
+- {slug: vtiger.com, id: lst_e20a14748cea7b2247f1216b, name: "Vtiger Calculus GPT", reason: "names one feature of a larger site; vtiger.com's traffic measures Vtiger's CRM"}
+- {slug: warp.dev, id: lst_fef20e110470167e8b29b742, name: "Warp AI", reason: "names one feature of a larger site; warp.dev's traffic measures Warp's terminal"}
+- {slug: webflow.com, id: lst_2a3253fb3d661d8914a2e770, name: "Intellimize", reason: "names one feature of a larger site; webflow.com's traffic measures Webflow's site builder"}
+- {slug: whimsical.com, id: lst_d008ec887c8dda320c9cac44, name: "Whimsical AI", reason: "names one feature of a larger site; whimsical.com's traffic measures Whimsical's diagrams and docs"}
+- {slug: wix.com, id: lst_b4d2f9f4314f39472ad55f00, name: "Wix ADI", reason: "names one feature of a larger site; wix.com's traffic measures Wix's site builder"}
+- {slug: yext.com, id: lst_4f3b344b4a0c351b774ffdc6, name: "Yext Chat", reason: "names one feature of a larger site; yext.com's traffic measures Yext's search and listings platform"}
+- {slug: yodlee.com, id: lst_0ecec553c1cf538fef957e71, name: "Abe AI", reason: "names one feature of a larger site; yodlee.com's traffic measures Yodlee's financial data platform"}
+- {slug: zoho.com, id: lst_064348ab26a2cea64f43daa1, name: "Notes for ChatGPT", reason: "names one feature of a larger site; zoho.com's traffic measures Zoho's business suite"}
+- {slug: zoom.com, id: lst_76d610bebe80b2ff8d9d2777, name: "Zoom IQ", reason: "names one feature of a larger site; zoom.com's traffic measures Zoom's video meetings"}
+redirects:
+- {from: {kind: category, slug: ai-advertising-tools}, to: {kind: tag, slug: ai-advertising-tools}}
+- {from: {kind: category, slug: ai-agents}, to: {kind: tag, slug: ai-agents}}
+- {from: {kind: category, slug: ai-answer-generator}, to: {kind: tag, slug: ai-answer-generator}}
+- {from: {kind: category, slug: ai-art-generators}, to: {kind: best, slug: ai-art-generator}}
+- {from: {kind: category, slug: ai-automation-tools}, to: {kind: tag, slug: ai-automation-tools}}
+- {from: {kind: category, slug: ai-avatar}, to: {kind: tag, slug: ai-avatar}}
+- {from: {kind: category, slug: ai-book-writer}, to: {kind: tag, slug: ai-book-writer}}
+- {from: {kind: category, slug: ai-business-consultant}, to: {kind: tag, slug: ai-business-consultant}}
+- {from: {kind: category, slug: ai-career-coach}, to: {kind: tag, slug: ai-career-coach}}
+- {from: {kind: category, slug: ai-chatbots}, to: {kind: best, slug: ai-chatbot}}
+- {from: {kind: category, slug: ai-clip-generator}, to: {kind: tag, slug: ai-clip-generator}}
+- {from: {kind: category, slug: ai-coding}, to: {kind: best, slug: ai-coding-assistant}}
+- {from: {kind: category, slug: ai-colorization-tools}, to: {kind: best, slug: ai-photo-editor}}
+- {from: {kind: category, slug: ai-confessional}, to: {kind: best, slug: ai-chatbot}}
+- {from: {kind: category, slug: ai-content-creator}, to: {kind: best, slug: ai-content-generator}}
+- {from: {kind: category, slug: ai-content-detection}, to: {kind: tag, slug: ai-content-detection}}
+- {from: {kind: category, slug: ai-copywriting}, to: {kind: best, slug: ai-copywriting}}
+- {from: {kind: category, slug: ai-copywriting-free}, to: {kind: best, slug: ai-copywriting}}
+- {from: {kind: category, slug: ai-cover-generator}, to: {kind: tag, slug: ai-graphic-design}}
+- {from: {kind: category, slug: ai-cover-letter-generator}, to: {kind: tag, slug: ai-cover-letter-generator}}
+- {from: {kind: category, slug: ai-customer-segmentation}, to: {kind: tag, slug: ai-customer-segmentation}}
+- {from: {kind: category, slug: ai-customer-service-agents}, to: {kind: best, slug: ai-customer-service}}
+- {from: {kind: category, slug: ai-data-analyst}, to: {kind: best, slug: ai-data-analysis}}
+- {from: {kind: category, slug: ai-data-management}, to: {kind: tag, slug: ai-data-management}}
+- {from: {kind: category, slug: ai-design}, to: {kind: tag, slug: ai-design}}
+- {from: {kind: category, slug: ai-directories}, to: {kind: tag, slug: website-submission-directories}}
+- {from: {kind: category, slug: ai-doctor}, to: {kind: tag, slug: ai-doctor}}
+- {from: {kind: category, slug: ai-email-generators}, to: {kind: tag, slug: ai-email-writing-assistants}}
+- {from: {kind: category, slug: ai-email-marketing}, to: {kind: tag, slug: ai-email-marketing}}
+- {from: {kind: category, slug: ai-email-writing-assistants}, to: {kind: tag, slug: ai-email-writing-assistants}}
+- {from: {kind: category, slug: ai-emoji-generator}, to: {kind: best, slug: ai-image-generator}}
+- {from: {kind: category, slug: ai-event-planner}, to: {kind: tag, slug: ai-event-planner}}
+- {from: {kind: category, slug: ai-field-management}, to: {kind: tag, slug: ai-field-management}}
+- {from: {kind: category, slug: ai-financial-advisor}, to: {kind: tag, slug: ai-financial-advisor}}
+- {from: {kind: category, slug: ai-flyer-generator}, to: {kind: tag, slug: ai-graphic-design}}
+- {from: {kind: category, slug: ai-game-generator}, to: {kind: tag, slug: ai-game-generator}}
+- {from: {kind: category, slug: ai-graphic-design}, to: {kind: tag, slug: ai-graphic-design}}
+- {from: {kind: category, slug: ai-headshot-generator}, to: {kind: tag, slug: ai-headshot-generator}}
+- {from: {kind: category, slug: ai-image-generators}, to: {kind: best, slug: ai-image-generator}}
+- {from: {kind: category, slug: ai-insurance}, to: {kind: tag, slug: ai-insurance}}
+- {from: {kind: category, slug: ai-interior-design}, to: {kind: tag, slug: ai-interior-design}}
+- {from: {kind: category, slug: ai-job-search}, to: {kind: tag, slug: ai-job-search}}
+- {from: {kind: category, slug: ai-knowledge-management}, to: {kind: tag, slug: ai-knowledge-management}}
+- {from: {kind: category, slug: ai-language-teacher}, to: {kind: tag, slug: ai-language-teacher}}
+- {from: {kind: category, slug: ai-lawyer}, to: {kind: tag, slug: ai-lawyer}}
+- {from: {kind: category, slug: ai-lyrics-generator}, to: {kind: tag, slug: ai-lyrics-generator}}
+- {from: {kind: category, slug: ai-marketing-tools}, to: {kind: best, slug: ai-marketing-tools}}
+- {from: {kind: category, slug: ai-meeting-assistant}, to: {kind: best, slug: ai-meeting-assistant}}
+- {from: {kind: category, slug: ai-meme-generator}, to: {kind: best, slug: ai-image-generator}}
+- {from: {kind: category, slug: ai-note-taker}, to: {kind: best, slug: ai-note-taker}}
+- {from: {kind: category, slug: ai-nutritionist}, to: {kind: tag, slug: ai-nutritionist}}
+- {from: {kind: category, slug: ai-paragraph-rewriter}, to: {kind: tag, slug: ai-paraphrasing-tool}}
+- {from: {kind: category, slug: ai-paraphrasing-tool}, to: {kind: tag, slug: ai-paraphrasing-tool}}
+- {from: {kind: category, slug: ai-personal-trainer}, to: {kind: tag, slug: ai-personal-trainer}}
+- {from: {kind: category, slug: ai-podcast}, to: {kind: tag, slug: ai-podcast}}
+- {from: {kind: category, slug: ai-poster-generator}, to: {kind: tag, slug: ai-graphic-design}}
+- {from: {kind: category, slug: ai-presentation-maker}, to: {kind: tag, slug: ai-presentation-maker}}
+- {from: {kind: category, slug: ai-product-demos}, to: {kind: best, slug: ai-video-generator}}
+- {from: {kind: category, slug: ai-product-management}, to: {kind: tag, slug: ai-product-management}}
+- {from: {kind: category, slug: ai-product-video-generator}, to: {kind: best, slug: ai-video-generator}}
+- {from: {kind: category, slug: ai-productivity-tools}, to: {kind: best, slug: ai-productivity-tools}}
+- {from: {kind: category, slug: ai-programmer}, to: {kind: best, slug: ai-coding-assistant}}
+- {from: {kind: category, slug: ai-project-management}, to: {kind: tag, slug: ai-project-management}}
+- {from: {kind: category, slug: ai-prompt-generator}, to: {kind: tag, slug: ai-prompt-generator}}
+- {from: {kind: category, slug: ai-rap-generator}, to: {kind: tag, slug: ai-lyrics-generator}}
+- {from: {kind: category, slug: ai-real-estate-agent}, to: {kind: tag, slug: ai-real-estate-agent}}
+- {from: {kind: category, slug: ai-recruiting}, to: {kind: tag, slug: ai-recruiting}}
+- {from: {kind: category, slug: ai-resume-builders}, to: {kind: tag, slug: ai-resume-builders}}
+- {from: {kind: category, slug: ai-risk-management}, to: {kind: tag, slug: ai-risk-management}}
+- {from: {kind: category, slug: ai-scheduling-assistants}, to: {kind: tag, slug: ai-scheduling-assistants}}
+- {from: {kind: category, slug: ai-script-generator}, to: {kind: tag, slug: ai-script-generator}}
+- {from: {kind: category, slug: ai-seo}, to: {kind: best, slug: ai-seo-tools}}
+- {from: {kind: category, slug: ai-social-media}, to: {kind: best, slug: ai-social-media-tools}}
+- {from: {kind: category, slug: ai-story-writers}, to: {kind: tag, slug: ai-story-writers}}
+- {from: {kind: category, slug: ai-stylist}, to: {kind: tag, slug: ai-stylist}}
+- {from: {kind: category, slug: ai-tax-preparation}, to: {kind: tag, slug: ai-accounting}}
+- {from: {kind: category, slug: ai-text-to-speech}, to: {kind: best, slug: ai-text-to-speech}}
+- {from: {kind: category, slug: ai-time-tracking}, to: {kind: tag, slug: ai-time-tracking}}
+- {from: {kind: category, slug: ai-travel-agent}, to: {kind: tag, slug: ai-travel-agent}}
+- {from: {kind: category, slug: ai-tutor}, to: {kind: tag, slug: ai-tutor}}
+- {from: {kind: category, slug: ai-ugc}, to: {kind: tag, slug: ai-ugc}}
+- {from: {kind: category, slug: ai-video-editor}, to: {kind: best, slug: ai-video-editor}}
+- {from: {kind: category, slug: ai-video-enhancer}, to: {kind: tag, slug: ai-video-enhancer}}
+- {from: {kind: category, slug: ai-video-generators}, to: {kind: best, slug: ai-video-generator}}
+- {from: {kind: category, slug: ai-voice-bots}, to: {kind: tag, slug: ai-voice-bots}}
+- {from: {kind: category, slug: ai-voice-changers}, to: {kind: tag, slug: ai-voice-changers}}
+- {from: {kind: category, slug: ai-voice-cloning}, to: {kind: tag, slug: ai-voice-cloning}}
+- {from: {kind: category, slug: ai-web-scraping}, to: {kind: tag, slug: ai-web-scraping}}
+- {from: {kind: category, slug: ai-website-builders}, to: {kind: best, slug: ai-website-builder}}
+- {from: {kind: category, slug: apollo-lead-scrapers}, to: {kind: best, slug: ai-sales-tools}}
+- {from: {kind: category, slug: auto-form-fill}, to: {kind: tag, slug: ai-automation-tools}}
+- {from: {kind: category, slug: b2b-ecommerce-platforms}, to: {kind: tag, slug: ecommerce-platforms}}
+- {from: {kind: category, slug: backlink-companies}, to: {kind: tag, slug: link-building-services}}
+- {from: {kind: category, slug: birthday-video-maker}, to: {kind: best, slug: ai-video-generator}}
+- {from: {kind: category, slug: cartoon-video-maker}, to: {kind: best, slug: ai-video-generator}}
+- {from: {kind: category, slug: catalog-management-software}, to: {kind: tag, slug: catalog-management-software}}
+- {from: {kind: category, slug: cloud-gpu-providers}, to: {kind: best, slug: cloud-gpu}}
+- {from: {kind: category, slug: cloud-gpus-for-deep-learning}, to: {kind: best, slug: cloud-gpu}}
+- {from: {kind: category, slug: course-platform-downloaders}, to: {kind: tag, slug: course-platform-downloaders}}
+- {from: {kind: category, slug: database-management}, to: {kind: tag, slug: database-management}}
+- {from: {kind: category, slug: ecommerce-analytics-tools}, to: {kind: tag, slug: ecommerce-analytics-tools}}
+- {from: {kind: category, slug: ecommerce-merchandising-tools}, to: {kind: tag, slug: ecommerce-merchandising-tools}}
+- {from: {kind: category, slug: ecommerce-platforms}, to: {kind: tag, slug: ecommerce-platforms}}
+- {from: {kind: category, slug: face-shape-analyzer}, to: {kind: tag, slug: ai-stylist}}
+- {from: {kind: category, slug: fansite-downloaders}, to: {kind: tag, slug: fansite-downloaders}}
+- {from: {kind: category, slug: google-search-scraper}, to: {kind: tag, slug: serp-api}}
+- {from: {kind: category, slug: google-serp-api}, to: {kind: tag, slug: serp-api}}
+- {from: {kind: category, slug: hipaa-compliant-hosting}, to: {kind: best, slug: hipaa-compliant-hosting}}
+- {from: {kind: category, slug: image-downloaders}, to: {kind: tag, slug: image-downloaders}}
+- {from: {kind: category, slug: image-to-video-ai}, to: {kind: best, slug: ai-video-generator}}
+- {from: {kind: category, slug: link-building-services}, to: {kind: tag, slug: link-building-services}}
+- {from: {kind: category, slug: livestream-downloaders}, to: {kind: tag, slug: livestream-downloaders}}
+- {from: {kind: category, slug: local-business-directories}, to: {kind: tag, slug: website-submission-directories}}
+- {from: {kind: category, slug: local-seo}, to: {kind: tag, slug: local-seo}}
+- {from: {kind: category, slug: lyric-video-maker}, to: {kind: best, slug: ai-video-generator}}
+- {from: {kind: category, slug: marketplace-software}, to: {kind: tag, slug: marketplace-software}}
+- {from: {kind: category, slug: merchandising-software}, to: {kind: tag, slug: ecommerce-merchandising-tools}}
+- {from: {kind: category, slug: multi-channel-ecommerce-software}, to: {kind: tag, slug: multi-channel-ecommerce-software}}
+- {from: {kind: category, slug: nextjs-templates}, to: {kind: tag, slug: nextjs-templates}}
+- {from: {kind: category, slug: no-code-web-scraper}, to: {kind: tag, slug: no-code-web-scraper}}
+- {from: {kind: category, slug: order-management-software}, to: {kind: tag, slug: order-management-software}}
+- {from: {kind: category, slug: plagiarism-checker}, to: {kind: best, slug: plagiarism-checker}}
+- {from: {kind: category, slug: product-launch-websites}, to: {kind: tag, slug: website-submission-directories}}
+- {from: {kind: category, slug: react-components}, to: {kind: tag, slug: react-components}}
+- {from: {kind: category, slug: review-management-software}, to: {kind: tag, slug: review-management-software}}
+- {from: {kind: category, slug: saas-directories}, to: {kind: tag, slug: website-submission-directories}}
+- {from: {kind: category, slug: script-to-video-ai}, to: {kind: best, slug: ai-video-generator}}
+- {from: {kind: category, slug: seo}, to: {kind: tag, slug: seo}}
+- {from: {kind: category, slug: serp-api}, to: {kind: tag, slug: serp-api}}
+- {from: {kind: category, slug: social-media-downloaders}, to: {kind: tag, slug: social-media-downloaders}}
+- {from: {kind: category, slug: subscription-analytics-software}, to: {kind: tag, slug: subscription-analytics-software}}
+- {from: {kind: category, slug: tailwind-templates}, to: {kind: tag, slug: tailwind-templates}}
+- {from: {kind: category, slug: text-to-speech}, to: {kind: best, slug: ai-text-to-speech}}
+- {from: {kind: category, slug: text-to-video-ai}, to: {kind: best, slug: ai-video-generator}}
+- {from: {kind: category, slug: ugc-creator}, to: {kind: tag, slug: ai-ugc}}
+- {from: {kind: category, slug: web-proxy}, to: {kind: tag, slug: web-proxy}}
+- {from: {kind: category, slug: website-submission-directories}, to: {kind: tag, slug: website-submission-directories}}
+- {from: {kind: tag, slug: ai-art-generators}, to: {kind: best, slug: ai-art-generator}}
+- {from: {kind: tag, slug: ai-chatbots}, to: {kind: best, slug: ai-chatbot}}
+- {from: {kind: tag, slug: ai-coding}, to: {kind: best, slug: ai-coding-assistant}}
+- {from: {kind: tag, slug: ai-content-creator}, to: {kind: best, slug: ai-content-generator}}
+- {from: {kind: tag, slug: ai-copywriting}, to: {kind: best, slug: ai-copywriting}}
+- {from: {kind: tag, slug: ai-customer-service-agents}, to: {kind: best, slug: ai-customer-service}}
+- {from: {kind: tag, slug: ai-data-analyst}, to: {kind: best, slug: ai-data-analysis}}
+- {from: {kind: tag, slug: ai-developer-tools}, to: {kind: best, slug: ai-tools-for-developers}}
+- {from: {kind: tag, slug: ai-document-tools}, to: {kind: best, slug: ai-pdf}}
+- {from: {kind: tag, slug: ai-education}, to: {kind: best, slug: ai-tools-for-teachers}}
+- {from: {kind: tag, slug: ai-image-generators}, to: {kind: best, slug: ai-image-generator}}
+- {from: {kind: tag, slug: ai-marketing-tools}, to: {kind: best, slug: ai-marketing-tools}}
+- {from: {kind: tag, slug: ai-meeting-assistant}, to: {kind: best, slug: ai-meeting-assistant}}
+- {from: {kind: tag, slug: ai-music-generators}, to: {kind: best, slug: ai-music-generator}}
+- {from: {kind: tag, slug: ai-note-taker}, to: {kind: best, slug: ai-note-taker}}
+- {from: {kind: tag, slug: ai-photo-editors}, to: {kind: best, slug: ai-photo-editor}}
+- {from: {kind: tag, slug: ai-productivity-tools}, to: {kind: best, slug: ai-productivity-tools}}
+- {from: {kind: tag, slug: ai-sales-tools}, to: {kind: best, slug: ai-sales-tools}}
+- {from: {kind: tag, slug: ai-seo}, to: {kind: best, slug: ai-seo-tools}}
+- {from: {kind: tag, slug: ai-social-media}, to: {kind: best, slug: ai-social-media-tools}}
+- {from: {kind: tag, slug: ai-text-to-speech}, to: {kind: best, slug: ai-text-to-speech}}
+- {from: {kind: tag, slug: ai-transcription}, to: {kind: best, slug: ai-transcription}}
+- {from: {kind: tag, slug: ai-video-editor}, to: {kind: best, slug: ai-video-editor}}
+- {from: {kind: tag, slug: ai-video-generators}, to: {kind: best, slug: ai-video-generator}}
+- {from: {kind: tag, slug: ai-website-builders}, to: {kind: best, slug: ai-website-builder}}
+- {from: {kind: tag, slug: ai-writing-assistants}, to: {kind: best, slug: ai-writing-assistant}}
+- {from: {kind: tag, slug: cloud-gpu-providers}, to: {kind: best, slug: cloud-gpu}}
+- {from: {kind: tag, slug: hipaa-compliant-hosting}, to: {kind: best, slug: hipaa-compliant-hosting}}
+- {from: {kind: tag, slug: plagiarism-checker}, to: {kind: best, slug: plagiarism-checker}}
+held:
+- slug: eightsleep.com
+  id: lst_ccde81cef2a1a7ec07a003d2
+  flag: 'other: a hardware smart bed, not a software tool'
+- slug: instacart.com
+  id: lst_77502c1d83dad6f747f36dbc
+  flag: 'dead: ChatGPT plugins were retired in 2024'
+- slug: klarna.com
+  id: lst_a70d4d8fd9ecaeca027b271d
+  flag: 'dead: ChatGPT plugins were retired in 2024'
+- slug: livekit.io
+  id: lst_fba8f8c4b45e258bb7536c19
+  flag: 'other: Kitt is a LiveKit demo app; LiveKit itself is a developer platform'
+- slug: studycrumb.com
+  id: lst_cd6fbabc56e9de5a55863835
+  flag: 'other: mainly a human academic writing service for students, not an AI tool'

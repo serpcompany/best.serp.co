@@ -30,6 +30,7 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Telemetry](./telemetry.md) | Sentry error reporting, GTM and Cloudflare Web Analytics | You add logging, error reporting, or analytics |
 | [D1 recovery](./d1-recovery.md) | Undoing a production write with D1 Time Travel | A production write needs undoing |
 | [Catalog hygiene](./catalog-hygiene.md) | What the catalog lists (no adult products) and the listing domain check: hijacked, parked, and moved domains | You add or remove listings, change the domain check, or touch the listing FAQs' `faqsToShow` stopgap |
+| [Taxonomy migration](./taxonomy-migration.md) | #341's mapping from narrow categories to hubs, tags and best pages, its generator, and the phased manifests | You change the taxonomy mapping, regenerate its manifests, or publish them |
 | [Release guards](./release-guards.md) | `db:*` commands by target, promotion, staging before production, hotfixes | You run a `db:*` command, promote `staging`, open a `hotfix-*` pull request, or change a release workflow |
 | [Catalog publication](./catalog-publication.md) | Catalog manifests and listing media plans: staging first, the publisher's and uploader's guards | You prepare or publish a `d1/publications/` manifest or a `d1/media/` upload plan |
 | [Credential guards](./credential-guards.md) | Workflow jobs holding the Cloudflare token: no D1 exports, bookmarks before changes, the security boundary | A workflow change gives a job the Cloudflare token, or `deploy-workflows.test.ts` fails on a workflow |
