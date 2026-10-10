@@ -1155,6 +1155,400 @@ describe('category-unpublish in a row-level manifest (#260: retire the Adult cat
   })
 })
 
+describe('listing-categories-set and category-create in a row-level manifest (#333: out of Other)', () => {
+  const live = { checksum: beforeChecksum, version: 4 }
+  const rows = (operations: Record<string, unknown>[]) =>
+    manifestSchema.parse({
+      version: 1,
+      id: 'out-of-other',
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations
+    })
+  const set = (expected: string[], categories: string[], extra: Record<string, unknown> = {}) => ({
+    action: 'listing-categories-set',
+    id: 'lst_sqlite_test',
+    slug: 'old-slug',
+    expected,
+    categories,
+    ...extra
+  })
+  /**
+   * The fixture listing and a second live listing, both filed only under Other, with an active
+   * AI Chatbots category and a retired one. The fixture listing moves while a draft, as the
+   * primary-category triggers require.
+   */
+  const inOther = () => {
+    const db = database()
+    db.exec(`INSERT INTO categories (id,slug,name) VALUES (2,'other','Other'),(3,'ai-chatbots','AI Chatbots');
+      INSERT INTO categories (id,slug,name,is_active) VALUES (4,'retired','Retired',0);
+      UPDATE listings SET status='draft' WHERE id='lst_sqlite_test';
+      UPDATE listing_categories SET category_id=2 WHERE listing_id='lst_sqlite_test';
+      UPDATE listings SET status='approved' WHERE id='lst_sqlite_test';
+      INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+        VALUES ('lst_sqlite_other','other-product','Other product','Description','https://other.example','draft','${now}','test','fixture','${'d'.repeat(64)}');
+      INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('lst_sqlite_other',2,0,1);
+      UPDATE listings SET status='approved' WHERE id='lst_sqlite_other';`)
+    return db
+  }
+  const memberships = (db: DatabaseSync, id = 'lst_sqlite_test') =>
+    db
+      .prepare(
+        `SELECT c.slug, lc.is_primary, lc.sort_order FROM listing_categories lc
+         JOIN categories c ON c.id = lc.category_id WHERE lc.listing_id=? ORDER BY lc.sort_order`
+      )
+      .all(id)
+  /** Live listings per category, as the category index counts them (primary or secondary). */
+  const liveCounts = (db: DatabaseSync) =>
+    Object.fromEntries(
+      (
+        db
+          .prepare(
+            `SELECT c.slug, COUNT(l.id) AS count FROM categories c
+             LEFT JOIN listing_categories lc ON lc.category_id=c.id
+             LEFT JOIN listings l ON l.id=lc.listing_id AND l.status='approved' AND l.is_active=1
+             WHERE c.is_active=1 GROUP BY c.slug`
+          )
+          .all() as Array<{ slug: string; count: number }>
+      ).map(row => [row.slug, row.count])
+    )
+  const listingState = (db: DatabaseSync) =>
+    db
+      .prepare(
+        "SELECT status,is_active,checksum,updated_at FROM listings WHERE id='lst_sqlite_test'"
+      )
+      .get()
+  /** Asserts the batch was refused whole: the listing, its categories, and the version as before. */
+  const expectRefused = (db: DatabaseSync, before: ReturnType<typeof listingState>) => {
+    expect(memberships(db)).toEqual([{ is_primary: 1, slug: 'other', sort_order: 0 }])
+    expect(listingState(db)).toEqual(before)
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 4
+    })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({ count: 0 })
+  }
+
+  it('moves a listing out of Other to a new primary and secondaries, and Other loses it', () => {
+    const db = inOther()
+    expect(liveCounts(db)).toMatchObject({ other: 2, 'ai-chatbots': 0, seo: 0 })
+    const before = listingState(db) as { checksum: string }
+    db.prepare('UPDATE publication_state SET version=9').run()
+    const publication = buildPublicationPlan(
+      rows([set(['other'], ['ai-chatbots', 'seo'])]),
+      'out of other',
+      now,
+      { ...live, version: 9 }
+    )
+    // `is_primary` binds as 1 or 0: D1's REST API gets the same values as the Worker binding.
+    expect(
+      publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+    ).toEqual([])
+    executeInTestTransaction(db, publication)
+    expect(memberships(db)).toEqual([
+      { is_primary: 1, slug: 'ai-chatbots', sort_order: 0 },
+      { is_primary: 0, slug: 'seo', sort_order: 1 }
+    ])
+    expect(liveCounts(db)).toMatchObject({ other: 1, 'ai-chatbots': 1, seo: 1 })
+    expect(memberships(db, 'lst_sqlite_other')).toEqual([
+      { is_primary: 1, slug: 'other', sort_order: 0 }
+    ])
+    // Published again, with a new checksum (a stale admin edit is refused) and lastmod.
+    const after = listingState(db) as { checksum: string; status: string; updated_at: string }
+    expect(after).toMatchObject({ status: 'approved', is_active: 1, updated_at: now })
+    expect(after.checksum).not.toBe(before.checksum)
+    expect(
+      db.prepare('SELECT listing_id,event_type,detail,actor FROM listing_events').all()
+    ).toEqual([
+      {
+        listing_id: 'lst_sqlite_test',
+        event_type: 'edited',
+        detail: JSON.stringify({
+          fields: ['categories'],
+          manifest: 'out-of-other',
+          from: ['other'],
+          to: ['ai-chatbots', 'seo']
+        }),
+        actor: 'test@example.com'
+      }
+    ])
+    // The catalog epoch turns over, and the run names every page the move changed.
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 10
+    })
+    expect(publication.affectedRoutes.split('\n')).toEqual(
+      expect.arrayContaining([
+        '/products/old-slug/',
+        '/products/categories/other/',
+        '/products/categories/ai-chatbots/',
+        '/products/categories/seo/'
+      ])
+    )
+    // Applied once: the categories no longer match, so the same operation is refused.
+    expect(() =>
+      executeInTestTransaction(
+        db,
+        buildPublicationPlan(rows([set(['other'], ['ai-chatbots', 'seo'])]), 'again', now, {
+          checksum: publication.afterChecksum,
+          version: 10
+        })
+      )
+    ).toThrow()
+    expect(memberships(db)).toEqual([
+      { is_primary: 1, slug: 'ai-chatbots', sort_order: 0 },
+      { is_primary: 0, slug: 'seo', sort_order: 1 }
+    ])
+  })
+
+  it('promotes a secondary to primary and drops the old primary', () => {
+    const db = inOther()
+    const first = buildPublicationPlan(
+      rows([set(['other'], ['ai-chatbots', 'other'])]),
+      'm',
+      now,
+      live
+    )
+    executeInTestTransaction(db, first)
+    expect(memberships(db)).toEqual([
+      { is_primary: 1, slug: 'ai-chatbots', sort_order: 0 },
+      { is_primary: 0, slug: 'other', sort_order: 1 }
+    ])
+    executeInTestTransaction(
+      db,
+      buildPublicationPlan(rows([set(['ai-chatbots', 'other'], ['other'])]), 'm2', now, {
+        checksum: first.afterChecksum,
+        version: 5
+      })
+    )
+    expect(memberships(db)).toEqual([{ is_primary: 1, slug: 'other', sort_order: 0 }])
+  })
+
+  it('refuses the whole batch when the categories changed since generation', () => {
+    const db = inOther()
+    const before = listingState(db)
+    for (const [expected, categories] of [
+      [['seo'], ['ai-chatbots']],
+      [['other', 'seo'], ['ai-chatbots']],
+      [['ai-chatbots'], ['seo']]
+    ]) {
+      expect(() =>
+        executeInTestTransaction(
+          db,
+          buildPublicationPlan(rows([set(expected, categories)]), 'm', now, live)
+        )
+      ).toThrow()
+      expectRefused(db, before)
+    }
+    // Another listing's change in the same batch is rolled back with it.
+    expect(() =>
+      executeInTestTransaction(
+        db,
+        buildPublicationPlan(
+          rows([
+            set(['other'], ['ai-chatbots'], { id: 'lst_sqlite_other', slug: 'other-product' }),
+            set(['seo'], ['ai-chatbots'])
+          ]),
+          'm',
+          now,
+          live
+        )
+      )
+    ).toThrow()
+    expect(memberships(db, 'lst_sqlite_other')).toEqual([
+      { is_primary: 1, slug: 'other', sort_order: 0 }
+    ])
+    // A renamed listing: the slug no longer matches.
+    expect(() =>
+      executeInTestTransaction(
+        db,
+        buildPublicationPlan(
+          rows([set(['other'], ['ai-chatbots'], { slug: 'new-slug' })]),
+          'm',
+          now,
+          live
+        )
+      )
+    ).toThrow()
+    expectRefused(db, before)
+  })
+
+  it('refuses an unknown or retired category, as primary or secondary', () => {
+    for (const categories of [
+      ['nope'],
+      ['retired'],
+      ['ai-chatbots', 'retired'],
+      ['ai-chatbots', 'nope']
+    ]) {
+      const db = inOther()
+      const before = listingState(db)
+      expect(
+        () =>
+          executeInTestTransaction(
+            db,
+            buildPublicationPlan(rows([set(['other'], categories)]), 'm', now, live)
+          ),
+        categories.join(',')
+      ).toThrow()
+      expectRefused(db, before)
+    }
+  })
+
+  it.each(['paid_pending_review', 'changes_requested'])(
+    'refuses a listing whose own submission is %s, so that paid submission can still be approved',
+    status => {
+      const db = inOther()
+      // A paid submission's approval requires the listing's checksum to equal `published_checksum`,
+      // written once at payment (`submission-plans.ts`).
+      db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,
+        category_slug,logo_url,status,plan,paid_at,listing_id,published_checksum)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','other','l',
+        '${status}','paid','${now}','lst_sqlite_test',
+        (SELECT checksum FROM listings WHERE id='lst_sqlite_test'))`)
+      const before = listingState(db)
+      expect(() =>
+        executeInTestTransaction(
+          db,
+          buildPublicationPlan(rows([set(['other'], ['ai-chatbots'])]), 'm', now, live)
+        )
+      ).toThrow()
+      expectRefused(db, before)
+      expect(
+        db
+          .prepare(
+            "SELECT COUNT(*) AS count FROM listings l JOIN listing_submissions s ON s.listing_id=l.id WHERE s.id='sub' AND l.checksum=s.published_checksum"
+          )
+          .get()
+      ).toEqual({ count: 1 })
+      // Once that submission is decided, the listing moves.
+      db.exec("UPDATE listing_submissions SET status='approved' WHERE id='sub'")
+      executeInTestTransaction(
+        db,
+        buildPublicationPlan(rows([set(['other'], ['ai-chatbots'])]), 'm', now, live)
+      )
+      expect(memberships(db)).toEqual([{ is_primary: 1, slug: 'ai-chatbots', sort_order: 0 }])
+    }
+  )
+
+  it.each(['review', 'rejected'])(
+    'refuses a listing in %s, which never comes back approved or live',
+    status => {
+      const db = inOther()
+      // Still active with a `published_at`: approving it again would publish it.
+      db.exec(`UPDATE listings SET status='${status}' WHERE id='lst_sqlite_test'`)
+      const before = listingState(db)
+      expect(() =>
+        executeInTestTransaction(
+          db,
+          buildPublicationPlan(rows([set(['other'], ['ai-chatbots'])]), 'm', now, live)
+        )
+      ).toThrow()
+      expectRefused(db, before)
+      expect(listingState(db)).toMatchObject({ status, is_active: 1 })
+      expect(
+        db
+          .prepare(
+            "SELECT COUNT(*) AS count FROM listings WHERE id='lst_sqlite_test' AND status='approved' AND is_active=1 AND published_at IS NOT NULL"
+          )
+          .get()
+      ).toEqual({ count: 0 })
+    }
+  )
+
+  it('replaces an unpublished listing’s categories and leaves it unpublished', () => {
+    const db = inOther()
+    db.exec("UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test'")
+    executeInTestTransaction(
+      db,
+      buildPublicationPlan(rows([set(['other'], ['ai-chatbots'])]), 'm', now, live)
+    )
+    expect(memberships(db)).toEqual([{ is_primary: 1, slug: 'ai-chatbots', sort_order: 0 }])
+    expect(listingState(db)).toMatchObject({ status: 'approved', is_active: 0 })
+  })
+
+  it('refuses no change, a duplicate category, and an empty list', () => {
+    expect(() => rows([set(['other'], ['other'])])).toThrow(/already has exactly these categories/u)
+    expect(() => rows([set(['other'], ['seo', 'seo'])])).toThrow(/Duplicate affected category/u)
+    expect(() => rows([set(['other'], [])])).toThrow()
+    expect(() => rows([set([], ['seo'])])).toThrow()
+    // A different order is a change: the first category is the primary.
+    expect(() => rows([set(['seo', 'other'], ['other', 'seo'])])).not.toThrow()
+  })
+
+  it('creates a category row-level at any version and files a listing under it', () => {
+    const db = inOther()
+    db.prepare('UPDATE publication_state SET version=12').run()
+    const publication = buildPublicationPlan(
+      rows([
+        {
+          action: 'category-create',
+          category: {
+            slug: 'ai-transcription',
+            name: 'AI Transcription',
+            description: 'Speech to text.'
+          }
+        },
+        set(['other'], ['ai-transcription'])
+      ]),
+      'new category',
+      now,
+      { ...live, version: 12 }
+    )
+    expect(
+      publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+    ).toEqual([])
+    executeInTestTransaction(db, publication)
+    expect(
+      db
+        .prepare(
+          "SELECT name,description,sort_order,is_active FROM categories WHERE slug='ai-transcription'"
+        )
+        .get()
+    ).toEqual({
+      name: 'AI Transcription',
+      description: 'Speech to text.',
+      sort_order: 0,
+      is_active: 1
+    })
+    expect(memberships(db)).toEqual([{ is_primary: 1, slug: 'ai-transcription', sort_order: 0 }])
+    expect(publication.affectedRoutes.split('\n')).toContain(
+      '/products/categories/ai-transcription/'
+    )
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 13
+    })
+  })
+
+  it('refuses to create a category whose slug exists, active or retired, writing nothing', () => {
+    for (const slug of ['seo', 'retired']) {
+      const db = inOther()
+      const before = listingState(db)
+      expect(
+        () =>
+          executeInTestTransaction(
+            db,
+            buildPublicationPlan(
+              rows([
+                { action: 'category-create', category: { slug, name: 'Again' } },
+                set(['other'], ['ai-chatbots'])
+              ]),
+              'm',
+              now,
+              live
+            )
+          ),
+        slug
+      ).toThrow()
+      expectRefused(db, before)
+      expect(db.prepare('SELECT name FROM categories WHERE slug=?').get(slug)).not.toEqual({
+        name: 'Again'
+      })
+    }
+    // category-update still names its base version.
+    expect(() =>
+      rows([{ action: 'category-update', category: { slug: 'seo', name: 'SEO' } }])
+    ).toThrow(/only listing-media-update/u)
+  })
+})
+
 describe('listing-content-remove-suffix (#105: imported FAQ blocks move to the FAQs section)', () => {
   const body = 'Intro with an emoji 🚀 and more.'
   const suffix = '\n\n## FAQ\n\n### Is it free?\n\nYes.'
