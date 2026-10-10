@@ -57,21 +57,63 @@ describe('repository harness contract', () => {
         '<a id="custom-anchor"></a>'
       ].join('\n')
     )
-    expect([...anchors]).toEqual([
+    expect([...anchors.headings]).toEqual([
       'release-guards',
       'db-commands-by-target',
       'staging-before-production',
       'staging-before-production-1',
-      'linked-heading',
-      'custom-anchor'
+      'linked-heading'
     ])
+    expect([...anchors.ids]).toEqual(['custom-anchor'])
+  })
+
+  it('closes a code fence only on a run of its own character at least as long', () => {
+    const { headings } = markdownAnchors(
+      ['````md', '```md', '## Inside', '```', '````', '## After'].join('\n')
+    )
+    expect([...headings]).toEqual(['after'])
+  })
+
+  it('reads ATX headings indented up to three spaces and Setext headings', () => {
+    const { headings } = markdownAnchors(
+      [
+        '   ### Indented',
+        '    ## Indented code',
+        '',
+        'Title',
+        '=====',
+        '',
+        'Section',
+        '-------',
+        '',
+        'Text',
+        '',
+        '---',
+        '',
+        'After a break',
+        '***',
+        '---',
+        '',
+        '- List item',
+        '---'
+      ].join('\n')
+    )
+    expect([...headings]).toEqual(['indented', 'title', 'section'])
+  })
+
+  it('suffixes a taken slug with the first free number, as GitHub does', () => {
+    const { headings } = markdownAnchors(['# Foo', '## Foo', '## Foo-1'].join('\n'))
+    expect([...headings]).toEqual(['foo', 'foo-1', 'foo-1-1'])
   })
 
   it('fails a link whose anchor names no heading in its target doc (#190)', () => {
     const root = mkdtempSync(join(tmpdir(), 'docs-anchors-'))
     try {
       writeFileSync(join(root, 'runbook.md'), '# Runbook\n\n## After a deploy\n')
-      writeFileSync(join(root, 'caching.md'), '# Caching\n\n## Why this design\n')
+      writeFileSync(
+        join(root, 'caching.md'),
+        '# Caching\n\n## Why this design\n\n<a id="Custom-ID"></a>\n'
+      )
       const check = (target: string) => validateLinkAnchor(root, 'caching.md', target)
       expect(check('./runbook.md#after-a-deploy')).toBeNull()
       expect(check('#why-this-design')).toBeNull()
@@ -80,6 +122,10 @@ describe('repository harness contract', () => {
         'caching.md: broken anchor ./runbook.md#caching-after-a-deploy'
       )
       expect(check('#gone')).toBe('caching.md: broken anchor #gone')
+      // An explicit id matches only in its own case; a heading slug matches in any case.
+      expect(check('#Custom-ID')).toBeNull()
+      expect(check('#custom-id')).toBe('caching.md: broken anchor #custom-id')
+      expect(check('./runbook.md#After-A-Deploy')).toBeNull()
     } finally {
       rmSync(root, { force: true, recursive: true })
     }

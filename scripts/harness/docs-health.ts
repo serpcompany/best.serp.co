@@ -91,30 +91,20 @@ export function validateDocumentNames(files: readonly string[]): string[] {
 }
 
 /**
- * The anchors GitHub gives a Markdown file's headings: the heading's text, lowercased, with
- * everything but letters, digits, spaces, hyphens and underscores removed and spaces made
- * hyphens; a repeated slug gets `-1`, `-2`, and so on. Headings inside code fences don't count;
- * `<a id>` and `<a name>` anchors do.
+ * The anchors GitHub gives a Markdown file:
+ * - `headings`: one slug per heading, ATX (`## Title`, indented up to three spaces) or Setext (a
+ *   paragraph underlined with `===` or `---`). The slug is the heading's text, lowercased, with
+ *   everything but letters, digits, spaces, hyphens and underscores removed and spaces made
+ *   hyphens; a slug already taken gets the first free `-1`, `-2`, and so on. Headings inside a
+ *   code fence don't count, and a fence closes only on a run of its own character at least as
+ *   long as the one that opened it.
+ * - `ids`: `<a id>` and `<a name>` values, which are case-sensitive.
  */
-export function markdownAnchors(source: string): Set<string> {
-  const anchors = new Set<string>()
-  const seen = new Map<string, number>()
-  let fence: string | null = null
-  for (const line of source.split('\n')) {
-    const fenceMatch = /^\s*(`{3,}|~{3,})/u.exec(line)
-    if (fenceMatch?.[1]) {
-      const marker = fenceMatch[1][0] as string
-      if (fence === null) fence = marker
-      else if (fence === marker) fence = null
-      continue
-    }
-    if (fence !== null) continue
-    for (const match of line.matchAll(/<a\s+(?:id|name)="([^"]+)"/gu)) {
-      if (match[1]) anchors.add(match[1])
-    }
-    const heading = /^#{1,6}\s+(.*?)\s*#*\s*$/u.exec(line)
-    if (!heading?.[1]) continue
-    const text = heading[1]
+export function markdownAnchors(source: string): { headings: Set<string>; ids: Set<string> } {
+  const headings = new Set<string>()
+  const ids = new Set<string>()
+  const addHeading = (raw: string) => {
+    const text = raw
       .replace(/!?\[([^\]]*)\]\([^)]*\)/gu, '$1')
       .replace(/<[^>]+>/gu, '')
       .replace(/`/gu, '')
@@ -122,11 +112,48 @@ export function markdownAnchors(source: string): Set<string> {
       .toLowerCase()
       .replace(/[^\p{L}\p{N}\s_-]/gu, '')
       .replace(/\s/gu, '-')
-    const count = seen.get(base) ?? 0
-    seen.set(base, count + 1)
-    anchors.add(count === 0 ? base : `${base}-${count}`)
+    let slug = base
+    for (let suffix = 1; headings.has(slug); suffix += 1) slug = `${base}-${suffix}`
+    headings.add(slug)
   }
-  return anchors
+  let fence: string | null = null
+  // The open paragraph's text, which a Setext underline makes a heading; `false` for a list item,
+  // quote, table or HTML line, or an indented line, none of which can be one.
+  let paragraph: string | false | null = null
+  for (const line of source.split('\n')) {
+    const fenceMatch = /^\s*(`{3,}|~{3,})(.*)$/u.exec(line)
+    if (fence !== null) {
+      const [, run = '', rest = ''] = fenceMatch ?? []
+      if (run[0] === fence[0] && run.length >= fence.length && !rest.trim()) fence = null
+      continue
+    }
+    if (fenceMatch?.[1]) {
+      fence = fenceMatch[1]
+      paragraph = null
+      continue
+    }
+    for (const match of line.matchAll(/<a\s+(?:id|name)="([^"]+)"/gu)) {
+      if (match[1]) ids.add(match[1])
+    }
+    const atx = /^ {0,3}#{1,6}(?:\s+(.*?))?\s*#*\s*$/u.exec(line)
+    if (atx) {
+      if (atx[1]) addHeading(atx[1])
+      paragraph = null
+      continue
+    }
+    const underline = /^ {0,3}(?:=+|-+)\s*$/u.test(line)
+    if (underline && typeof paragraph === 'string') {
+      addHeading(paragraph)
+      paragraph = null
+      continue
+    }
+    const thematicBreak = /^ {0,3}([-*_])(?:\s*\1){2,}\s*$/u.test(line)
+    if (!line.trim() || underline || thematicBreak) paragraph = null
+    else if (/^ {0,3}(?:[>|<]|[-*+]\s|\d+[.)]\s)/u.test(line)) paragraph = false
+    else if (paragraph === null) paragraph = /^\S/u.test(line) ? line.trim() : false
+    else if (paragraph !== false) paragraph = `${paragraph} ${line.trim()}`
+  }
+  return { headings, ids }
 }
 
 /** A local Markdown link's `#fragment` that names no heading or anchor in its target file. */
@@ -146,7 +173,8 @@ export function validateLinkAnchor(
     ? resolve(root, dirname(sourcePath), decodeURIComponent(path))
     : resolve(root, sourcePath)
   if (extname(file) !== '.md' || !existsSync(file) || statSync(file).isDirectory()) return null
-  if (markdownAnchors(readFileSync(file, 'utf8')).has(fragment.toLowerCase())) return null
+  const { headings, ids } = markdownAnchors(readFileSync(file, 'utf8'))
+  if (ids.has(fragment) || headings.has(fragment.toLowerCase())) return null
   return `${sourcePath}: broken anchor ${rawTarget}`
 }
 
