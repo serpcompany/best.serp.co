@@ -20,7 +20,7 @@ import { formatListingCount, siteCopy } from '../../lib/site/site-copy'
 import { CategoryWebsitesList } from '../directory/category-websites-list'
 import { PageHero } from '../layout/page-hero'
 import { PageContainer, PageSection } from '../layout/page-shell'
-import { SiteBreadcrumb } from '../layout/site-breadcrumb'
+import { type BreadcrumbItemData, SiteBreadcrumb } from '../layout/site-breadcrumb'
 import { JsonLd } from '../seo/json-ld'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
 
@@ -47,10 +47,16 @@ export interface CategoryCollection {
 
 export async function generateCategoryRouteMetadata({
   category,
-  count
+  count,
+  kind = 'category',
+  noindex
 }: {
-  category: Category
+  category: Pick<Category, 'description' | 'name' | 'slug'>
   count: number
+  /** A tag page (#341) writes its own canonical URL; its title and description read the same. */
+  kind?: 'category' | 'tag'
+  /** `noindex, follow` (`isCategoryIndexable`, `isTagIndexable`). */
+  noindex?: boolean
 }): Promise<Metadata> {
   const seoContent = getCategorySEO(category.slug, category)
 
@@ -62,7 +68,7 @@ export async function generateCategoryRouteMetadata({
       : seoContent.metaDescription
 
   return generateDynamicMetadata({
-    type: 'category',
+    type: kind,
     name: title,
     description: composeMetaDescription(description, [
       [
@@ -71,7 +77,8 @@ export async function generateCategoryRouteMetadata({
       ]
     ]),
     slug: category.slug,
-    additionalKeywords: seoContent.keywords
+    additionalKeywords: seoContent.keywords,
+    noindex
   })
 }
 
@@ -92,20 +99,77 @@ export function CategoryRoutePage({
   pagination?: ReactNode
 }) {
   const seoContent = getCategorySEO(category.slug, category)
-  const categoryDisplayName = seoContent.h1Title
   const categoryPath = getRoute('category.page', { category: category.slug })
-  const origin = siteOrigin()
-  const categoryUrl = `${origin}${categoryPath}`
+  return CollectionRoutePage({
+    breadcrumb: [
+      { name: 'Categories', href: getRoute('category.index') },
+      { name: category.name, href: categoryPath }
+    ],
+    collection,
+    description: category.description,
+    faqQuestions: seoContent.faqQuestions,
+    intro: seoContent.introText,
+    name: seoContent.h1Title,
+    pageProjects,
+    pagination,
+    path: categoryPath
+  })
+}
 
-  const categoryCount = collection.count
+/**
+ * A page of one collection of listings, a category or a tag (#341): the breadcrumb and a
+ * `PageHero` with its name, description and size, then its listings in the shared card grid and
+ * the page links. Its JSON-LD is a `CollectionPage` whose `ItemList` is the collection's first
+ * listings, the same on every page.
+ */
+export function CollectionRoutePage({
+  analyticsSource,
+  breadcrumb,
+  chips,
+  collection,
+  description,
+  faqQuestions,
+  intro,
+  listSummary,
+  name,
+  pageProjects,
+  pagination,
+  path
+}: {
+  /** The listing cards' `data-source` (`category` when unset). */
+  analyticsSource?: string
+  /** The trail below Home, ending with this page. */
+  breadcrumb: BreadcrumbItemData[]
+  /** Links under the hero (a tag page's best pages). */
+  chips?: ReactNode
+  collection: CategoryCollection
+  /** The collection's description, for its JSON-LD. */
+  description: string
+  faqQuestions?: Array<{ answer: string; question: string }>
+  /** The hero's text. */
+  intro: string
+  /** The listing toolbar's summary, in place of the category's. */
+  listSummary?: ReactNode
+  /** The collection's display name: the `h1`. */
+  name: string
+  /** The listings on the requested page, in directory (name) order. */
+  pageProjects: WebsiteMetadata[]
+  pagination?: ReactNode
+  /** The page's canonical path. */
+  path: string
+}) {
+  const origin = siteOrigin()
+  const pageUrl = `${origin}${path}`
+
+  const count = collection.count
   const leadingProjects = collection.leadingProjects
-  const listedCategoryProjectCards = pageProjects.map(toWebsiteBrowseCardMetadata)
+  const listedProjectCards = pageProjects.map(toWebsiteBrowseCardMetadata)
   const publicationDates = resolveCollectionPageSchemaDates(
     [collection.firstPublishedAt, collection.lastPublishedAt]
       .filter((publishedAt): publishedAt is string => Boolean(publishedAt))
       .map(publishedAt => ({ publishedAt }))
   )
-  // The same value as the categories sitemap's `lastmod` (#218).
+  // The same value as the collection's sitemap `lastmod` (#218).
   const schemaDates = collection.lastModifiedAt
     ? { ...publicationDates, dateModified: collection.lastModifiedAt }
     : publicationDates
@@ -117,13 +181,13 @@ export function CategoryRoutePage({
           data={{
             '@context': 'https://schema.org',
             '@type': 'CollectionPage',
-            '@id': categoryUrl,
-            name: `${categoryDisplayName} - ${SITE_NAME}`,
-            headline: `${categoryCount}+ ${categoryDisplayName} ${siteCopy.listingName.pluralTitle}`,
-            description: `Explore ${categoryCount}+ curated ${categoryDisplayName.toLowerCase()} ${
+            '@id': pageUrl,
+            name: `${name} - ${SITE_NAME}`,
+            headline: `${count}+ ${name} ${siteCopy.listingName.pluralTitle}`,
+            description: `Explore ${count}+ curated ${name.toLowerCase()} ${
               siteCopy.listingName.plural
-            } from ${SITE_NAME}. ${category.description}`,
-            url: categoryUrl,
+            } from ${SITE_NAME}. ${description}`,
+            url: pageUrl,
             inLanguage: 'en-US',
             isPartOf: {
               '@type': 'WebSite',
@@ -141,26 +205,21 @@ export function CategoryRoutePage({
                   name: 'Home',
                   item: origin
                 },
-                {
+                ...breadcrumb.map((item, index) => ({
                   '@type': 'ListItem',
-                  position: 2,
-                  name: 'Categories',
-                  item: `${origin}${getRoute('category.index')}`
-                },
-                {
-                  '@type': 'ListItem',
-                  position: 3,
-                  name: categoryDisplayName,
-                  item: categoryUrl
-                }
+                  position: index + 2,
+                  // The page's own crumb is its display name, as the hero shows it.
+                  name: index === breadcrumb.length - 1 ? name : item.name,
+                  item: `${origin}${item.href}`
+                }))
               ]
             },
             // CollectionPage takes no list properties; the listings are its ItemList (#151).
             mainEntity: {
               '@type': 'ItemList',
-              name: `${categoryDisplayName} ${siteCopy.listingName.pluralTitle}`,
-              description: category.description,
-              numberOfItems: categoryCount,
+              name: `${name} ${siteCopy.listingName.pluralTitle}`,
+              description,
+              numberOfItems: count,
               itemListOrder: 'https://schema.org/ItemListOrderAscending',
               itemListElement: leadingProjects.slice(0, 20).map((project, index) => ({
                 '@type': 'ListItem',
@@ -181,12 +240,12 @@ export function CategoryRoutePage({
             ...schemaDates
           }}
         />
-        {seoContent.faqQuestions && seoContent.faqQuestions.length > 0 && (
+        {faqQuestions && faqQuestions.length > 0 && (
           <JsonLd
             data={{
               '@context': 'https://schema.org',
               '@type': 'FAQPage',
-              mainEntity: seoContent.faqQuestions.map(faq => ({
+              mainEntity: faqQuestions.map(faq => ({
                 '@type': 'Question',
                 name: faq.question,
                 acceptedAnswer: {
@@ -198,21 +257,20 @@ export function CategoryRoutePage({
           />
         )}
         <PageSection spacing="hero" className="border-b">
-          <SiteBreadcrumb
-            items={[
-              { name: 'Categories', href: getRoute('category.index') },
-              { name: category.name, href: categoryPath }
-            ]}
-            baseUrl={origin}
-          />
+          <SiteBreadcrumb items={breadcrumb} baseUrl={origin} />
           <PageHero
-            eyebrow={formatListingCount(categoryCount)}
-            title={seoContent.h1Title}
-            description={seoContent.introText}
+            chips={chips}
+            eyebrow={formatListingCount(count)}
+            title={name}
+            description={intro}
           />
         </PageSection>
         <PageContainer className="flex flex-col gap-8 py-12">
-          <CategoryWebsitesList initialWebsites={listedCategoryProjectCards} />
+          <CategoryWebsitesList
+            analyticsSource={analyticsSource}
+            initialWebsites={listedProjectCards}
+            summary={listSummary}
+          />
           {pagination}
         </PageContainer>
       </>

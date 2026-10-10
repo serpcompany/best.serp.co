@@ -228,7 +228,17 @@ export const seedTaxonomyRedirects = [
   },
   { from: { kind: 'category', slug: 'misc-tools' }, to: { kind: 'directory', slug: null } },
   { from: { kind: 'tag', slug: 'whiteboarding' }, to: { kind: 'tag', slug: 'whiteboards' } },
-  { from: { kind: 'best', slug: 'whiteboard-tools' }, to: { kind: 'best', slug: 'whiteboard-app' } }
+  {
+    from: { kind: 'best', slug: 'whiteboard-tools' },
+    to: { kind: 'best', slug: 'whiteboard-app' }
+  },
+  // Targets with nothing to show (the empty category and tag): these URLs answer 404, not a 308
+  // to a 404 (#346 review).
+  {
+    from: { kind: 'category', slug: 'sound-tools' },
+    to: { kind: 'category', slug: seedCategories.empty.slug }
+  },
+  { from: { kind: 'category', slug: 'podcasts' }, to: { kind: 'tag', slug: seedTags.empty.slug } }
 ] as const
 
 export const seedFacts = {

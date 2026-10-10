@@ -13,7 +13,7 @@ import type { Redirect } from 'next/dist/lib/load-custom-routes'
 // Relative module paths: next.config.ts loads this file, and its loader resolves neither `@/`
 // nor directory imports.
 import { site } from '../site/site'
-import { SITEMAP_INDEX_PATH, sitemapPaths } from '../site/site-routes'
+import { SITEMAP_INDEX_PATH, sitemapPaths, taxonomyRoutePaths } from '../site/site-routes'
 
 /** The canonical legal pages; `getRoute('privacy')` and `getRoute('terms')` name the same. */
 export const LEGAL_CANONICAL = {
@@ -50,9 +50,13 @@ export function movedUrlRedirects(): Redirect[] {
       destination: '/products/:slug/',
       permanent: true
     },
-    ...['/products/best', '/products/best/featured', '/categories', '/categories/featured'].map(
-      source => ({ source, destination: '/products/categories/', permanent: true })
-    ),
+    // The old "best" index is the best-page index now (#341, design 2.2 rule 3).
+    { source: '/products/best', destination: taxonomyRoutePaths.bestIndex, permanent: true },
+    ...['/products/best/featured', '/categories', '/categories/featured'].map(source => ({
+      source,
+      destination: '/products/categories/',
+      permanent: true
+    })),
     {
       source: '/products/best/:category',
       destination: '/products/categories/:category/',

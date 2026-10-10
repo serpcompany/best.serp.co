@@ -9,15 +9,29 @@
  */
 
 /** The child sitemaps, each served at the root (serp websites/features/xml-sitemaps.md). */
-export const sitemapGroups = ['pages', 'products', 'categories'] as const
+export const sitemapGroups = ['pages', 'products', 'categories', 'tags', 'best'] as const
 export type SitemapGroup = (typeof sitemapGroups)[number]
 
 /** Where each child sitemap is served; `/sitemap-index.xml` lists exactly these. */
 export const sitemapPaths: Record<SitemapGroup, string> = {
+  best: '/sitemap-best.xml',
   categories: '/sitemap-categories.xml',
   pages: '/sitemap-pages.xml',
-  products: '/sitemap-products.xml'
+  products: '/sitemap-products.xml',
+  tags: '/sitemap-tags.xml'
 }
+
+/**
+ * The taxonomy's pages (#341, design 2.1): the tag index and tag pages beside the category pages,
+ * and the best-page index and best pages at the root. `routes.ts` (`getRoute`) and
+ * `scripts/site-routes.ts` (the publisher's affected routes) build their URLs from these.
+ */
+export const taxonomyRoutePaths = {
+  bestIndex: '/best/',
+  bestPage: '/best/[keyword]/',
+  tagIndex: '/products/tags/',
+  tagPage: '/products/tags/[tag]/'
+} as const
 
 export const SITEMAP_INDEX_PATH = '/sitemap-index.xml'
 
@@ -40,6 +54,11 @@ export type SiteRoute = {
 export const siteRoutes = [
   { indexable: true, path: '/', sitemapGroup: 'pages' },
   { indexable: true, path: '/about/', sitemapGroup: 'pages' },
+  // The best-page index lists a best page once it has an entry. While it lists none it renders
+  // noindex and the pages sitemap leaves it out (`listedBestPages`, `lib/seo/taxonomy-indexing.ts`).
+  { indexable: true, path: taxonomyRoutePaths.bestIndex, sitemapGroup: 'pages' },
+  // Indexed at `BEST_PAGE_INDEX_MIN_ENTRIES` entries (`isBestPageIndexable`).
+  { indexable: true, path: taxonomyRoutePaths.bestPage, sitemapGroup: 'best' },
   { indexable: true, path: '/brands/', sitemapGroup: 'pages' },
   { indexable: true, path: '/contact/', sitemapGroup: 'pages' },
   { indexable: true, path: '/legal/', sitemapGroup: 'pages' },
@@ -53,7 +72,12 @@ export const siteRoutes = [
   { canonicalPath: '/', indexable: true, path: '/products/', sitemapGroup: null },
   { indexable: true, path: '/products/[slug]/', sitemapGroup: 'products' },
   { indexable: true, path: '/products/categories/', sitemapGroup: 'pages' },
+  // A transitional category (`other`) is noindex and left out of its sitemap (`isCategoryIndexable`).
   { indexable: true, path: '/products/categories/[category]/', sitemapGroup: 'categories' },
+  // Like the best-page index: indexed and in the pages sitemap once it links a tag (`linkedTags`).
+  { indexable: true, path: taxonomyRoutePaths.tagIndex, sitemapGroup: 'pages' },
+  // Indexed at `TAG_INDEX_MIN_LISTINGS` listings, unless a best page ranks it (`isTagIndexable`).
+  { indexable: true, path: taxonomyRoutePaths.tagPage, sitemapGroup: 'tags' },
   { disallow: true, indexable: false, path: '/search/', sitemapGroup: null },
   { indexable: true, path: '/sponsor/', sitemapGroup: 'pages' },
   { disallow: true, indexable: false, path: '/submit/', sitemapGroup: null }
@@ -64,6 +88,22 @@ export function sitemapRoutePaths(group: SitemapGroup): string[] {
   return siteRoutes
     .filter(route => route.sitemapGroup === group && !route.path.includes('['))
     .map(route => route.path)
+}
+
+const LISTING_CHILD_PAGE = /^\/products\/([^/[\]]+)\/$/u
+
+/**
+ * Slugs no listing may take (#341, design 2.1): the registry's own pages directly under
+ * `/products/` (`categories`, `tags`), which `/products/<slug>/` would otherwise shadow. The
+ * publisher's manifest schema, submission intake and the admin panel's approval refuse them.
+ */
+export const reservedListingSlugs: ReadonlySet<string> = new Set(
+  siteRoutes.flatMap(route => LISTING_CHILD_PAGE.exec(route.path)?.[1] ?? [])
+)
+
+/** True for a slug `reservedListingSlugs` holds. */
+export function isReservedListingSlug(slug: string): boolean {
+  return reservedListingSlugs.has(slug)
 }
 
 /** robots.txt `Disallow` values: each disallowed route without its trailing slash (a prefix). */

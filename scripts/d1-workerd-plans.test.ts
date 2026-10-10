@@ -1809,7 +1809,8 @@ describe('taxonomy CHECKs and triggers on Wrangler-local D1 (workerd, #341)', ()
         .run()
     await db.batch([
       db.prepare(
-        "INSERT INTO categories (slug, name) VALUES ('taxonomy-hub', 'Hub'), ('taxonomy-retired', 'Retired')"
+        `INSERT INTO categories (slug, name) VALUES ('taxonomy-hub', 'Hub'),
+          ('taxonomy-other', 'Other hub'), ('taxonomy-retired', 'Retired')`
       ),
       db.prepare("UPDATE categories SET is_active = 0 WHERE slug = 'taxonomy-retired'"),
       db.prepare(
@@ -1827,7 +1828,13 @@ describe('taxonomy CHECKs and triggers on Wrangler-local D1 (workerd, #341)', ()
       ),
       db.prepare("UPDATE tags SET is_active = 0 WHERE slug = 'taxonomy-old'")
     ])
-    const retiredHub = "(SELECT id FROM categories WHERE slug = 'taxonomy-retired')"
+    const hub = (slug: string) => `(SELECT id FROM categories WHERE slug = '${slug}')`
+    const retiredHub = hub('taxonomy-retired')
+    const tagHub = () =>
+      first(
+        `SELECT c.slug AS hub, t.is_active FROM tags t JOIN categories c ON c.id = t.category_id
+          WHERE t.slug = 'taxonomy-tag'`
+      )
     await expect(
       exec(
         `INSERT INTO tags (slug, name, category_id) VALUES ('taxonomy-new', 'New', ${retiredHub})`
@@ -1836,6 +1843,10 @@ describe('taxonomy CHECKs and triggers on Wrangler-local D1 (workerd, #341)', ()
     await expect(
       exec(`UPDATE tags SET category_id = ${retiredHub} WHERE slug = 'taxonomy-tag'`)
     ).rejects.toThrow(/a tag must not be filed under a retired category/u)
+    // An active tag moves to another active hub, and back.
+    await exec(`UPDATE tags SET category_id = ${hub('taxonomy-other')} WHERE slug = 'taxonomy-tag'`)
+    expect(await tagHub()).toEqual({ hub: 'taxonomy-other', is_active: 1 })
+    await exec(`UPDATE tags SET category_id = ${hub('taxonomy-hub')} WHERE slug = 'taxonomy-tag'`)
     await expect(
       exec(
         "INSERT INTO listing_tags (listing_id, tag_id) SELECT 'lst-taxonomy', id FROM tags WHERE slug = 'taxonomy-old'"
@@ -1851,6 +1862,17 @@ describe('taxonomy CHECKs and triggers on Wrangler-local D1 (workerd, #341)', ()
     ).toEqual({
       count: 1
     })
+    // A tag never comes back under its retired hub; moved to an active hub in the same
+    // statement, it does.
+    await expect(exec("UPDATE tags SET is_active = 1 WHERE slug = 'taxonomy-tag'")).rejects.toThrow(
+      /a tag must not be filed under a retired category/u
+    )
+    expect(await tagHub()).toEqual({ hub: 'taxonomy-hub', is_active: 0 })
+    await exec(
+      `UPDATE tags SET category_id = ${hub('taxonomy-other')}, is_active = 1
+        WHERE slug = 'taxonomy-tag'`
+    )
+    expect(await tagHub()).toEqual({ hub: 'taxonomy-other', is_active: 1 })
 
     await expect(
       exec(

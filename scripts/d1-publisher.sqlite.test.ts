@@ -170,6 +170,10 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
     // Domain-name slugs are pages, and an existing bad slug can still be renamed away.
     expect(() => manifestSchema.parse(rename('old-slug', 'autoenhance.ai'))).not.toThrow()
     expect(() => manifestSchema.parse(rename('chart.js', 'chart-js'))).not.toThrow()
+    // The site's own pages under /products/ are reserved (#341).
+    for (const to of ['categories', 'tags']) {
+      expect(() => manifestSchema.parse(rename('old-slug', to)), to).toThrow(/categories or tags/u)
+    }
   })
 
   it('takes an ISO instant or the calendar date imported listings store as publishedAt', () => {
@@ -3332,6 +3336,48 @@ describe('taxonomy operations in a row-level manifest (#344, #341 design 4.1)', 
           retireEmptyHub
         ],
         'best-page-update ai-seo-tools: by the end of the batch, its tag or category is retired'
+      )
+    })
+
+    it('lets a retired best page keep a category a later operation retires', () => {
+      const db = seeded()
+      const oldBest = {
+        ...seoTools,
+        keyword: 'old best',
+        title: 'Best Old',
+        heading: 'Best Old',
+        intro: 'Old intro.',
+        tag: 'ai-writing'
+      }
+      publish(db, [
+        {
+          action: 'best-page-update',
+          slug: 'old-best',
+          expected: oldBest,
+          page: { ...oldBest, category: 'empty-hub' }
+        },
+        retireEmptyHub
+      ])
+      expect(
+        db
+          .prepare(
+            `SELECT b.is_active, c.slug AS category, c.is_active AS category_active
+             FROM best_pages b JOIN categories c ON c.id=b.category_id WHERE b.slug='old-best'`
+          )
+          .get()
+      ).toEqual({ category: 'empty-hub', category_active: 0, is_active: 0 })
+    })
+
+    it('refuses a batch whose retirement removes a redirect it wrote', () => {
+      // Retiring `ai-writing` would re-point the new `ai-seo` redirect at `ai-seo` itself, so it
+      // removes that redirect, and the batch is refused.
+      refuses(
+        seeded(),
+        [
+          redirectSet({ kind: 'tag', slug: 'ai-seo' }, null, { kind: 'tag', slug: 'ai-writing' }),
+          { action: 'tag-unpublish', slug: 'ai-writing', redirect: { kind: 'tag', slug: 'ai-seo' } }
+        ],
+        'taxonomy-redirect-set tag ai-seo: by the end of the batch, its redirect is gone or its target is retired'
       )
     })
   })

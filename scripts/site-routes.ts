@@ -1,4 +1,9 @@
-import { SITEMAP_INDEX_PATH, site, sitemapPaths } from '../apps/web/src/lib/site'
+import {
+  SITEMAP_INDEX_PATH,
+  site,
+  sitemapPaths,
+  taxonomyRoutePaths
+} from '../apps/web/src/lib/site'
 
 /**
  * Public route shapes of best.serp.co, derived from the checked-in site config the
@@ -26,37 +31,35 @@ export function categoryRoute(slug: string): string {
 }
 
 /**
- * The taxonomy's pages (#341, design 2.1): tag pages beside the category pages, under the listing
- * base path, and best pages at the root. #346 serves them and adds them to the route registry.
+ * The taxonomy's pages (#341, design 2.1), read from the route registry
+ * (`apps/web/src/lib/site/site-routes.ts`), which the pages, `getRoute` and the sitemaps read too.
  */
-const TAG_SEGMENT = 'tags'
-const BEST_BASE_PATH = 'best'
+function fillRoute(pattern: string, parameter: string, value: string): string {
+  if (!pattern.includes(`[${parameter}]`)) {
+    throw new Error(`Route registry pattern ${pattern} has no [${parameter}] segment.`)
+  }
+  return pattern.replace(`[${parameter}]`, value)
+}
 
 /** `/products/tags/`, the tag index. */
 export function tagIndexRoute(): string {
-  return joinRoute(site.routes.listingBasePath, TAG_SEGMENT)
+  return taxonomyRoutePaths.tagIndex
 }
 
 /** `/products/tags/<slug>/`. */
 export function tagRoute(slug: string): string {
-  return joinRoute(site.routes.listingBasePath, TAG_SEGMENT, slug)
+  return fillRoute(taxonomyRoutePaths.tagPage, 'tag', slug)
 }
 
 /** `/best/`, the best-page index. */
 export function bestIndexRoute(): string {
-  return joinRoute(BEST_BASE_PATH)
+  return taxonomyRoutePaths.bestIndex
 }
 
 /** `/best/<slug>/`. */
 export function bestRoute(slug: string): string {
-  return joinRoute(BEST_BASE_PATH, slug)
+  return fillRoute(taxonomyRoutePaths.bestPage, 'keyword', slug)
 }
-
-/**
- * The taxonomy's child sitemaps (#341, design 2.3), which #346 adds to the registry's
- * `sitemapPaths` and the sitemap index.
- */
-const TAXONOMY_SITEMAP_PATHS = ['/sitemap-tags.xml', '/sitemap-best.xml'] as const
 
 /**
  * Sitemap files whose content changes when listings or categories change; the pages sitemap
@@ -71,6 +74,6 @@ export function catalogSitemapRoutes({ taxonomy = false }: { taxonomy?: boolean 
     sitemapPaths.pages,
     sitemapPaths.products,
     sitemapPaths.categories,
-    ...(taxonomy ? TAXONOMY_SITEMAP_PATHS : [])
+    ...(taxonomy ? [sitemapPaths.tags, sitemapPaths.best] : [])
   ]
 }

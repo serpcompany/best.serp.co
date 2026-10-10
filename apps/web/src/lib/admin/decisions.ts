@@ -68,6 +68,7 @@ import {
   submissionTransitions
 } from '@/db/submission-plans'
 import { hasFileExtension } from '@/lib/file-extensions'
+import { isReservedListingSlug } from '@/lib/site/site-routes'
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
@@ -450,6 +451,9 @@ async function approveSubmissionOnce(
   if (snapshot.content_version !== input.expectedContentVersion) return changed
   if (hasFileExtension(snapshot.slug)) {
     return failure(422, 'invalid_slug', `${snapshot.slug} ends in a file extension.`)
+  }
+  if (isReservedListingSlug(snapshot.slug)) {
+    return failure(422, 'invalid_slug', `${snapshot.slug} is reserved for the site's own page.`)
   }
   const reads = createAdminReadOperations({ client: context.client })
   const review = await reads.getSubmissionReview(input.submissionId)

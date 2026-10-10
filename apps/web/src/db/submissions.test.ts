@@ -157,6 +157,17 @@ describe('native submission intake', () => {
     })
   })
 
+  it('refuses a website whose slug is one of the site’s own pages under /products/ (#341)', async () => {
+    for (const website of ['https://tags/', 'https://CATEGORIES./']) {
+      await expect(draft({ website }), website).rejects.toMatchObject({
+        code: 'invalid_url',
+        message: expect.stringContaining('reserved'),
+        status: 400
+      })
+    }
+    expect(count('listing_submissions')).toBe(0)
+  })
+
   it('blocks every variant and subdomain of a prohibited registrable domain', async () => {
     sqlite.database.exec(`INSERT INTO listing_submission_url_blocks
       (url_key,covers_subdomains,reason,blocked_by,blocked_at) VALUES

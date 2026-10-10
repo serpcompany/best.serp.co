@@ -78,6 +78,7 @@ describe('which requests report to the Worker Sentry SDK (#355)', () => {
  */
 const PUBLIC_SEGMENTS = [
   'about',
+  'best',
   'brands',
   'contact',
   'legal',
@@ -85,10 +86,12 @@ const PUBLIC_SEGMENTS = [
   'products',
   'rss.xml',
   'search',
+  'sitemap-best.xml',
   'sitemap-categories.xml',
   'sitemap-index.xml',
   'sitemap-pages.xml',
   'sitemap-products.xml',
+  'sitemap-tags.xml',
   'sponsor'
 ]
 

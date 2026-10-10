@@ -16,6 +16,8 @@
  * `goneListingRenderer` strips it from every incoming request, so a client cannot turn the 410
  * into a 200 for itself on a request that bypasses the edge cache (#64 review).
  */
+import { isReservedListingSlug } from '@/lib/site/site-routes'
+
 export const GONE_RENDER_HEADER = 'x-best-serp-co-render-gone'
 
 /** The request without `GONE_RENDER_HEADER`. */
@@ -54,8 +56,8 @@ export function listingSlugFromPath(pathname: string): string | null {
   } catch {
     return null
   }
-  // `/products/categories/` is the category index, not a listing.
-  if (slug === 'categories' || slug.length > 253) return null
+  // `/products/categories/` and `/products/tags/` are indexes, not listings (#341).
+  if (isReservedListingSlug(slug) || slug.length > 253) return null
   return slug
 }
 

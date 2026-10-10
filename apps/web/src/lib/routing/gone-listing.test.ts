@@ -15,6 +15,7 @@ describe('410 for unpublished listings (#64)', () => {
     for (const path of [
       '/products/',
       '/products/categories/',
+      '/products/tags/',
       '/products/brieflow.ai',
       '/products/brieflow.ai/reviews/',
       '/products/%E0%A4%A/',

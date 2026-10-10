@@ -859,6 +859,37 @@ describe('legacy root-level URLs (#168)', () => {
       expect(await target(slug), slug).toBeNull()
     }
     expect(await target('primary')).toEqual({ kind: 'category', slug: 'primary' })
+    // #346 review: a target with nothing to show (a category and a tag with no public listing, a
+    // best page with no entry) answers 404, never a 308 to a 404; an active category with no
+    // public listing follows its own redirect row instead of rendering empty.
+    for (const slug of ['old-empty-hub', 'old-idle-tag', 'old-idle-best']) {
+      expect(await target(slug), slug).toBeNull()
+    }
+    expect(await target('empty')).toEqual({
+      kind: 'moved',
+      target: { kind: 'tag', slug: 'writers' }
+    })
+    // A best page renders from a public pin alone (bravo, outside its category), and stops once
+    // neither its pin nor its pool has a public listing.
+    sqlite.database.exec(`
+      INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, target_best_page_id,
+        manifest_id)
+        SELECT 'category', 'old-editors', 'best', id, 'fixture' FROM best_pages
+        WHERE slug = 'best-editors-in-secondary';
+    `)
+    expect(await target('old-editors')).toEqual({
+      kind: 'moved',
+      target: { kind: 'best', slug: 'best-editors-in-secondary' }
+    })
+    sqlite.database.exec(`
+      UPDATE listings SET is_active = 0 WHERE slug IN ('alpha', 'charlie', 'echo');
+    `)
+    expect(await target('old-editors'), 'its public pin alone').toEqual({
+      kind: 'moved',
+      target: { kind: 'best', slug: 'best-editors-in-secondary' }
+    })
+    sqlite.database.exec("UPDATE listings SET is_active = 0 WHERE slug = 'bravo'")
+    expect(await target('old-editors'), 'no public entry').toBeNull()
   })
 })
 
