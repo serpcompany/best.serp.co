@@ -6,7 +6,8 @@ tooling, and the production D1 bootstrap built on it were moved here by #315. Pr
 changed since through publications, admin decisions, claims, payments, and hosted media, so it is
 never re-imported: recovery is D1 Time Travel ([D1 recovery](../docs/D1_RECOVERY.md)).
 
-Each file keeps the path it had under this directory, as it was when archived. Imports name the
+Each file keeps the path it had under this directory (#298's docs without their `docs/`
+prefix), as it was when archived. Imports name the
 files as they were then, so nothing here builds or runs in place: to run something, check out the
 commit before #315's merge.
 
@@ -26,6 +27,8 @@ runs workflows only from the root `.github/workflows/`, so the archived workflow
 | `scripts/listing-faq-move.ts`, `.test.ts` | `scripts/` | `pnpm catalog:faqs`, the generator of `d1/publications/2026-10-06-listing-faqs.yaml` (#105). |
 | `.github/workflows/bootstrap-production-d1.yml` | `.github/workflows/` | Bootstrap Production D1: the import into an empty production D1 (`bootstrap-best.serp.co-production`). |
 | `docs/PRODUCTION_BOOTSTRAP.md` | `docs/` | That workflow's runbook, rehearsal, and read-only checks. |
+| `releases/2026-10-06-promotion-plan.md` | `docs/releases/` | The first `staging` → `main` promotion of the #59 work: blockers, order, rollback (#298). |
+| `mockups/submissions/` | `docs/mockups/submissions/` | The owner-approved #70 mockups and their copy, `COPY.md`, which the submission screens still follow (#298). |
 
 Parts of live files that served only the import were cut into files of their own:
 

@@ -59,7 +59,7 @@ asked of Stripe, then finalized (`refunded`), so a racing fulfilment can never a
 payment nor a refund undo an applied one. Provider calls carry idempotency keys
 (`checkout:<order>`, `refund:<order>`).
 
-- **Screens** (#70 screen 4, copy from `docs/mockups/submissions/COPY.md`): the handoff
+- **Screens** (#70 screen 4, copy from `.archive/mockups/submissions/COPY.md`): the handoff
   `/submit/<id>/checkout/` (4a; the choose and badge steps' "$49" links and the draft reminder's
   "Complete checkout" open it, and it moves on to the checkout by itself); the return
   `/submit/<id>/checkout/return/?order=<id>` (4c confirming, refreshing until settled; 4d live

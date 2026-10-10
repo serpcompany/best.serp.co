@@ -60,18 +60,6 @@
   },
   "overrides": [
     {
-      "includes": ["docs/mockups/**"],
-      "assist": {
-        "enabled": false
-      },
-      "formatter": {
-        "enabled": false
-      },
-      "linter": {
-        "enabled": false
-      }
-    },
-    {
       "includes": ["**/*.svg"],
       "linter": {
         "enabled": false

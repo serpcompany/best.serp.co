@@ -147,7 +147,7 @@ from best.serp.co's own review: start from the stock blocks (dashboard-01, sideb
 their structure; show unbuilt items with a "Soon" badge, never greyed out; put `Empty` inside a
 `Card` under a visible heading; give every page a heading and a description; and status tones are
 classes on `Alert` and `Badge`. The owner-approved #70 mockups and their copy
-(`docs/mockups/submissions/`) are the contract for those screens: a visible change needs the
+(`.archive/mockups/submissions/`) are the contract for those screens: a visible change needs the
 owner's re-approval.
 
 ## Checking a UI change
