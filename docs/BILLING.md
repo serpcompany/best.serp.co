@@ -153,7 +153,8 @@ key needs write access to Checkout Sessions and Refunds, and read access to Prod
 included; Stripe does not follow redirects):
 
 - `https://best.serp.co/api/billing/webhook/` (live mode)
-- the staging Worker's origin + `/api/billing/webhook/` (test mode)
+- `https://staging.best.serp.co/api/billing/webhook/` (test mode; staging's canonical host
+  since #323, whose workers.dev host 308s there)
 
 ### Prices and promotion codes
 

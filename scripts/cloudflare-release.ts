@@ -150,6 +150,7 @@ interface WranglerEnvironmentConfig {
   }>
   name?: string
   r2_buckets?: Array<{ binding?: string; bucket_name?: string }>
+  routes?: Array<string | { custom_domain?: boolean; pattern?: string }>
   vars?: Record<string, string | undefined>
   workers_dev?: boolean
 }
@@ -167,8 +168,10 @@ function parseCommand(value: string | undefined): ReleaseCommand {
 
 /**
  * Refuses a Wrangler config whose `env.<environment>` block no longer matches the reviewed
- * remote identity in `project.ts` (Worker name, workers.dev exposure, D1 binding, migration
- * history and ledger table, runtime env, media bucket and host).
+ * remote identity in `project.ts` (Worker name, workers.dev exposure, routes, D1 binding,
+ * migration history and ledger table, runtime env, media bucket and host). A route may only
+ * attach the environment's own canonical host as a Custom Domain, so a deploy can never move
+ * another environment's host (best.serp.co onto the staging Worker, say) to this Worker.
  */
 export function validateRemoteConfig(
   environment: RemoteEnvironment,
@@ -185,6 +188,14 @@ export function validateRemoteConfig(
   if (block?.name !== expected.workerName) problems.push(`name must be ${expected.workerName}`)
   if (block?.workers_dev !== expected.workersDev)
     problems.push(`workers_dev must be ${expected.workersDev}`)
+  const canonicalHost = new URL(expected.origin).host
+  if (
+    (block?.routes ?? []).some(
+      route =>
+        typeof route === 'string' || route.custom_domain !== true || route.pattern !== canonicalHost
+    )
+  )
+    problems.push(`routes may only attach ${canonicalHost} as a Custom Domain`)
   if (block?.vars?.D1_RUNTIME_ENV !== environment)
     problems.push(`vars.D1_RUNTIME_ENV must be ${environment}`)
   if (

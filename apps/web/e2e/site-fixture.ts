@@ -6,12 +6,27 @@
  * catalog (`catalog-sample.ts`).
  */
 export const site = {
+  /**
+   * Each deployed Worker's canonical origin, by the `x-site-environment` it reports: its
+   * workers.dev host 308s there without the smoke-test header (#323).
+   */
+  canonicalOrigins: {
+    production: 'https://best.serp.co',
+    staging: 'https://staging.best.serp.co'
+  },
   /** `?via=` on every serp.ly link the site renders (#169). */
   dubPartnerId: 'best.serp.co',
   name: 'SERP',
   publicUrl: 'https://best.serp.co',
+  /** Served instead of redirected on a deployed Worker's workers.dev host; CI sends it there. */
+  smokeTestHeader: 'x-best-serp-co-smoke-test',
   title: 'SERP Directory of Products and Resources'
 } as const
+
+/** A deployed Worker's `*.workers.dev` host, which needs the smoke-test header (#323). */
+export function isPlatformOrigin(baseURL: string | undefined): boolean {
+  return baseURL !== undefined && new URL(baseURL).hostname.endsWith('.workers.dev')
+}
 
 export const featuredBadgeUrls = {
   dark: `${site.publicUrl}/badge/featured-on-serp.co-dark.svg`,

@@ -166,6 +166,16 @@ describe('public crawl and analytics policy through the Worker and the root layo
       { SITE_ENVIRONMENT: 'staging' },
       'https://best-serp-co-staging.serpcompany.workers.dev/'
     ],
+    [
+      "staging's workers.dev host with the switch on (smoke test)",
+      { CANONICAL_HOST_REDIRECT: 'on', SITE_ENVIRONMENT: 'staging' },
+      'https://best-serp-co-staging.serpcompany.workers.dev/'
+    ],
+    [
+      "staging's canonical host",
+      { CANONICAL_HOST_REDIRECT: 'on', SITE_ENVIRONMENT: 'staging' },
+      'https://staging.best.serp.co/'
+    ],
     ['local', { SITE_ENVIRONMENT: 'local' }, 'http://127.0.0.1:8787/'],
     ['a Worker without SITE_ENVIRONMENT on best.serp.co', {}, 'https://best.serp.co/']
   ])('serves %s noindex, without analytics even with a token', async (_label, env, url) => {
@@ -176,6 +186,40 @@ describe('public crawl and analytics policy through the Worker and the root layo
     expect(page.html).not.toContain('googletagmanager.com')
     expect(page.html).not.toContain('cloudflareinsights')
   })
+
+  // #323: Ahrefs' Site Audit sees staging.best.serp.co without the noindex, but as staging: no
+  // analytics, and nothing it was served reaches another visitor from the edge cache.
+  it.each([
+    ['AhrefsSiteAudit first', [true, false, true, false]],
+    ['a visitor first', [false, true, false, true]]
+  ])(
+    'serves staging.best.serp.co without analytics, noindex for all but AhrefsSiteAudit (%s)',
+    async (_label, auditVisits) => {
+      const visit = worker({
+        CANONICAL_HOST_REDIRECT: 'on',
+        CF_WEB_ANALYTICS_TOKEN: WEB_ANALYTICS_TOKEN,
+        SITE_ENVIRONMENT: 'staging'
+      })
+      const states: (string | null)[] = []
+      for (const audit of auditVisits) {
+        const page = await visit('https://staging.best.serp.co/', {
+          headers: {
+            'user-agent': audit
+              ? 'Mozilla/5.0 (compatible; AhrefsSiteAudit/6.1; +http://ahrefs.com/robot/site-audit)'
+              : 'Mozilla/5.0 (Macintosh) Chrome/141.0 Safari/537.36'
+          }
+        })
+        states.push(page.headers.get(EDGE_CACHE_HEADER))
+        expect(page.status).toBe(200)
+        expect(page.headers.get('x-robots-tag')).toBe(audit ? null : 'noindex, nofollow')
+        expect(page.headers.get(SITE_ENVIRONMENT_HEADER)).toBe('staging')
+        expect(page.html).toContain('<h1>SERP</h1>')
+        expect(page.html).not.toContain('googletagmanager.com')
+        expect(page.html).not.toContain('cloudflareinsights')
+      }
+      expect(states).toEqual(['MISS', 'HIT', 'HIT', 'HIT'])
+    }
+  )
 
   it('leaves analytics out, and logs why, when the environment cannot be read', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})

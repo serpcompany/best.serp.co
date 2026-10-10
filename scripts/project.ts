@@ -58,7 +58,10 @@ export const project = {
       databaseName: 'best-serp-co-staging',
       /** A separate bucket, so staging can never overwrite production objects (#95). */
       media: { baseUrl: 'https://cdn-staging.serp.co', bucket: 'cdn-staging' },
-      origin: 'https://best-serp-co-staging.serpcompany.workers.dev',
+      /** Staging's branded canonical host (#323), the Worker's Custom Domain in `wrangler.jsonc`. */
+      origin: 'https://staging.best.serp.co',
+      /** The staging Worker's noindex workers.dev host, which CI's HTTP gates and smoke go through. */
+      reviewOrigin: 'https://best-serp-co-staging.serpcompany.workers.dev',
       workerName: 'best-serp-co-staging',
       workersDev: true
     }

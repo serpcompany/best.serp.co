@@ -43,6 +43,7 @@
       "keep_names": false,
       "upload_source_maps": true,
       "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "best-serp-co-staging" }],
+      "routes": [{ "pattern": "staging.best.serp.co", "custom_domain": true }],
       "workers_dev": true,
       "preview_urls": false,
       "observability": {
@@ -50,8 +51,9 @@
         "redact_query_string": true
       },
       "vars": {
-        "BETTER_AUTH_TRUSTED_ORIGINS": "https://best-serp-co-staging.serpcompany.workers.dev",
-        "BETTER_AUTH_URL": "https://best-serp-co-staging.serpcompany.workers.dev",
+        "BETTER_AUTH_TRUSTED_ORIGINS": "https://staging.best.serp.co",
+        "BETTER_AUTH_URL": "https://staging.best.serp.co",
+        "CANONICAL_HOST_REDIRECT": "on",
         "CF_ACCESS_AUD": "",
         "CF_ACCESS_REQUIRED": "off",
         "CF_ACCESS_TEAM_DOMAIN": "",

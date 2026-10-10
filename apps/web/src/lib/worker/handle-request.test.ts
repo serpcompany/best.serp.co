@@ -1,11 +1,13 @@
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose'
 import { describe, expect, it, vi } from 'vitest'
+import { parseRobotsTxt, robotsTxtAllows } from '../../../../../scripts/crawl-policy'
 import { ACCESS_JWT_HEADER } from '../auth/cloudflare-access'
 import { EDGE_CACHE_HEADER, withEdgeCache } from '../edge-cache/html-cache'
 import {
   NON_PRODUCTION_ROBOTS_TXT,
   SITE_ENVIRONMENT_HEADER,
   SMOKE_TEST_HEADER,
+  STAGING_CANONICAL_ROBOTS_TXT,
   WORKER_VERSION_HEADER
 } from '../environment/site-environment'
 import { handleWorkerRequest, type WorkerRequestEnv } from './handle-request'
@@ -13,7 +15,19 @@ import { handleWorkerRequest, type WorkerRequestEnv } from './handle-request'
 const production = 'https://best.serp.co'
 const review = 'https://best-serp-co-production.serpcompany.workers.dev'
 const staging = 'https://best-serp-co-staging.serpcompany.workers.dev'
+/** Staging's canonical host (#323); `staging` above is its workers.dev host. */
+const stagingCanonical = 'https://staging.best.serp.co'
+/** Ahrefs' Site Audit crawler, as it identifies itself. */
+const AHREFS_SITE_AUDIT =
+  'Mozilla/5.0 (compatible; AhrefsSiteAudit/6.1; +http://ahrefs.com/robot/site-audit)'
+const BROWSER =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/141.0 Safari/537.36'
 const version = { id: '9d6c0a52-1111-4222-8333-444455556666' }
+const stagingEnv: WorkerRequestEnv = {
+  CANONICAL_HOST_REDIRECT: 'on',
+  CF_VERSION_METADATA: version,
+  SITE_ENVIRONMENT: 'staging'
+}
 const productionEnv: WorkerRequestEnv = {
   CANONICAL_HOST_REDIRECT: 'off',
   CF_VERSION_METADATA: version,
@@ -124,11 +138,129 @@ describe('Worker request pipeline', () => {
       expect(handler.serve).toHaveBeenCalledOnce()
     })
 
-    it('never redirects best.serp.co or staging', async () => {
+    it('never redirects best.serp.co, or staging to best.serp.co', async () => {
       expect((await run(`${production}/`, env).response).status).toBe(200)
-      const stagingOn = { SITE_ENVIRONMENT: 'staging', CANONICAL_HOST_REDIRECT: 'on' }
-      expect((await run(`${staging}/`, stagingOn).response).status).toBe(200)
+      // The staging Worker's switch sends its workers.dev host to its own canonical host.
+      const redirect = await run(`${staging}/`, stagingEnv).response
+      expect(redirect.status).toBe(308)
+      expect(redirect.headers.get('location')).toBe(`${stagingCanonical}/`)
     })
+  })
+
+  // #323: staging mirrors production's host setup on staging.best.serp.co.
+  describe('on staging with CANONICAL_HOST_REDIRECT=on', () => {
+    it('redirects workers.dev to staging.best.serp.co in one hop, before the slash rule and the cache', async () => {
+      const { handler, response } = run(`${staging}/about?ref=x%26y`, stagingEnv)
+      const redirect = await response
+      expect(redirect.status).toBe(308)
+      expect(redirect.headers.get('location')).toBe(`${stagingCanonical}/about/?ref=x%26y`)
+      expect(redirect.headers.get(WORKER_VERSION_HEADER)).toBe(version.id)
+      expect(redirect.headers.get('x-robots-tag')).toBe('noindex, nofollow')
+      expect(handler.serve).not.toHaveBeenCalled()
+    })
+
+    it('serves smoke-test requests through workers.dev, noindex, and never redirects its canonical host', async () => {
+      const smoke = { headers: { [SMOKE_TEST_HEADER]: '1' } }
+      const page = run(`${staging}/`, stagingEnv, smoke)
+      expect((await page.response).status).toBe(200)
+      expect((await page.response).headers.get('x-robots-tag')).toBe('noindex, nofollow')
+      const robots = await run(`${staging}/robots.txt`, stagingEnv, smoke).response
+      expect(await robots.text()).toBe(NON_PRODUCTION_ROBOTS_TXT)
+      const canonical = run(`${stagingCanonical}/`, stagingEnv)
+      expect((await canonical.response).status).toBe(200)
+      expect(canonical.handler.serve).toHaveBeenCalledOnce()
+    })
+  })
+})
+
+// #323: Ahrefs' Site Audit may crawl staging's canonical host; nothing else changes.
+describe("staging's canonical host and Ahrefs' Site Audit", () => {
+  const as = (userAgent: string) => ({ headers: { 'user-agent': userAgent } })
+
+  it('serves a robots.txt that lets AhrefsSiteAudit in and keeps every other crawler out', async () => {
+    for (const userAgent of [AHREFS_SITE_AUDIT, BROWSER]) {
+      const { handler, response } = run(`${stagingCanonical}/robots.txt`, stagingEnv, as(userAgent))
+      const robots = await response
+      const text = await robots.text()
+      expect(text).toBe('User-agent: AhrefsSiteAudit\nAllow: /\n\nUser-agent: *\nDisallow: /\n')
+      expect(text).toBe(STAGING_CANONICAL_ROBOTS_TXT)
+      expect(handler.serve).not.toHaveBeenCalled()
+      const groups = parseRobotsTxt(text)
+      expect(robotsTxtAllows(groups, 'ahrefssiteaudit', '/')).toBe(true)
+      expect(robotsTxtAllows(groups, 'ahrefssiteaudit', '/products/autoenhance.ai/')).toBe(true)
+      for (const agent of ['*', 'googlebot', 'bingbot', 'ahrefsbot'])
+        expect(robotsTxtAllows(groups, agent, '/'), agent).toBe(false)
+    }
+  })
+
+  it('sends AhrefsSiteAudit no X-Robots-Tag, and every other client noindex', async () => {
+    for (const path of ['/', '/about/', '/sitemap-index.xml', '/robots.txt', '/about']) {
+      const audit = await run(`${stagingCanonical}${path}`, stagingEnv, as(AHREFS_SITE_AUDIT))
+        .response
+      expect(audit.headers.get('x-robots-tag'), path).toBeNull()
+      expect(audit.headers.get(SITE_ENVIRONMENT_HEADER), path).toBe('staging')
+      for (const userAgent of [
+        BROWSER,
+        'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        'Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)',
+        ''
+      ]) {
+        const other = await run(`${stagingCanonical}${path}`, stagingEnv, as(userAgent)).response
+        expect(other.headers.get('x-robots-tag'), `${path} ${userAgent}`).toBe('noindex, nofollow')
+      }
+    }
+    const lowercase = await run(`${stagingCanonical}/`, stagingEnv, as('ahrefssiteaudit/6.1'))
+      .response
+    expect(lowercase.headers.get('x-robots-tag')).toBeNull()
+  })
+
+  it("keeps a page's own noindex for AhrefsSiteAudit, as best.serp.co would", async () => {
+    const response = await handleWorkerRequest(
+      new Request(`${stagingCanonical}/products/?page=2`, as(AHREFS_SITE_AUDIT)),
+      stagingEnv,
+      {
+        configRedirects,
+        serve: async () =>
+          new Response('page', { headers: { 'x-robots-tag': 'noindex, nofollow, noarchive' } })
+      }
+    )
+    expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow, noarchive')
+  })
+
+  it.each([
+    ["staging's workers.dev host (smoke test)", staging, stagingEnv, 'staging'],
+    ['staging without its redirect switch', staging, { SITE_ENVIRONMENT: 'staging' }, 'staging'],
+    ['the production review URL', review, productionEnv, 'production'],
+    [
+      'the production Worker on staging.best.serp.co',
+      stagingCanonical,
+      productionEnv,
+      'production'
+    ],
+    ['the staging Worker on best.serp.co', production, stagingEnv, 'staging'],
+    ['a local Worker', 'http://127.0.0.1:8787', { SITE_ENVIRONMENT: 'local' }, 'local'],
+    ['a Worker without SITE_ENVIRONMENT', stagingCanonical, {}, 'unset']
+  ])(
+    'gives AhrefsSiteAudit nothing on %s',
+    async (_label, origin, env: WorkerRequestEnv, reported) => {
+      const audit = { headers: { [SMOKE_TEST_HEADER]: '1', 'user-agent': AHREFS_SITE_AUDIT } }
+      const robots = await run(`${origin}/robots.txt`, env, audit).response
+      expect(await robots.text()).toBe(NON_PRODUCTION_ROBOTS_TXT)
+      expect(robots.headers.get('x-robots-tag')).toBe('noindex, nofollow')
+      const page = await run(`${origin}/`, env, audit).response
+      expect(page.headers.get('x-robots-tag')).toBe('noindex, nofollow')
+      expect(page.headers.get(SITE_ENVIRONMENT_HEADER)).toBe(reported)
+    }
+  )
+
+  it('leaves public production indexable for every client, AhrefsSiteAudit included', async () => {
+    for (const userAgent of [AHREFS_SITE_AUDIT, BROWSER]) {
+      const robots = await run(`${production}/robots.txt`, productionEnv, as(userAgent)).response
+      expect(await robots.text()).toBe('User-Agent: *\nAllow: /\n')
+      expect(robots.headers.get('x-robots-tag')).toBeNull()
+      const page = await run(`${production}/`, productionEnv, as(userAgent)).response
+      expect(page.headers.get('x-robots-tag')).toBeNull()
+    }
   })
 })
 
@@ -207,6 +339,64 @@ describe('Worker request pipeline and the edge cache', () => {
     )
     expect(rendered).toHaveLength(1)
   })
+
+  // #323: the AhrefsSiteAudit exemption is decided per request after the cache, so a stored
+  // response never carries the crawl headers, and neither order of visitors can leak them.
+  it.each([
+    ['AhrefsSiteAudit first', [AHREFS_SITE_AUDIT, BROWSER, AHREFS_SITE_AUDIT, BROWSER]],
+    ['a visitor first', [BROWSER, AHREFS_SITE_AUDIT, BROWSER, AHREFS_SITE_AUDIT]]
+  ])(
+    "never serves staging's AhrefsSiteAudit exemption to anyone else from the cache (%s)",
+    async (_label, visitors) => {
+      const cache = new MemoryCache()
+      const pending: Promise<unknown>[] = []
+      const context = { waitUntil: (promise: Promise<unknown>) => pending.push(promise) }
+      const visit = async (url: string, headers: Record<string, string>) => {
+        const response = await handleWorkerRequest(new Request(url, { headers }), stagingEnv, {
+          configRedirects,
+          serve: request =>
+            withEdgeCache(
+              request,
+              context,
+              {
+                cache: cache as unknown as Cache,
+                deploymentId: version.id,
+                epoch: async () => 'e'
+              },
+              // What OpenNext renders: next.config.ts adds its noindex on *.workers.dev only.
+              async rendered =>
+                new Response('<html>page</html>', {
+                  headers: new URL(rendered.url).hostname.endsWith('.workers.dev')
+                    ? { 'x-robots-tag': 'noindex, nofollow' }
+                    : {}
+                })
+            )
+        })
+        await Promise.all(pending.splice(0))
+        return response
+      }
+
+      // The workers.dev host's copy (stored by the smoke run) is a different cache entry.
+      const smoke = await visit(`${staging}/products/`, { [SMOKE_TEST_HEADER]: '1' })
+      expect(smoke.headers.get('x-robots-tag')).toBe('noindex, nofollow')
+      const states: string[] = []
+      for (const userAgent of visitors) {
+        const response = await visit(`${stagingCanonical}/products/`, { 'user-agent': userAgent })
+        states.push(response.headers.get(EDGE_CACHE_HEADER) ?? '')
+        expect(await response.text()).toBe('<html>page</html>')
+        expect(response.headers.get('x-robots-tag'), userAgent).toBe(
+          userAgent === AHREFS_SITE_AUDIT ? null : 'noindex, nofollow'
+        )
+      }
+      expect(states).toEqual(['MISS', 'HIT', 'HIT', 'HIT'])
+      // Two entries, one per host; the canonical host's carries no crawl header at all.
+      expect(cache.entries.size).toBe(2)
+      for (const [key, stored] of cache.entries)
+        expect(stored.headers.get('x-robots-tag'), key).toBe(
+          key.includes('best-serp-co-staging.serpcompany.workers.dev') ? 'noindex, nofollow' : null
+        )
+    }
+  )
 })
 
 // serpcompany/best.serp.co#60: /admin and /api/admin need Cloudflare Access (production) and a

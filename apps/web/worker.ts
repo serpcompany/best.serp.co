@@ -114,7 +114,9 @@ export default {
         legacyRootRedirect(incoming, legacyRootSlug, catalogLegacyRootLookup(env, log)),
       // Redirects and the non-production robots.txt are answered before this, so they are
       // never rendered or stored. A cacheable request reaches OpenNext with allowlisted
-      // headers only (`renderRequestFor` in src/lib/edge-cache/html-cache.ts).
+      // headers only (`renderRequestFor` in src/lib/edge-cache/html-cache.ts). The crawl
+      // policy's X-Robots-Tag is added after this, per request (handle-request.ts), so no
+      // stored response carries it or its absence.
       serve: async served => {
         const cache = await caches.open(EDGE_CACHE_NAME)
         return withEdgeCache(

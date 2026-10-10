@@ -882,6 +882,17 @@ describe('remote Wrangler identity', () => {
       expect(bindings[0].migrations_table).toBe(project.migrationsTable)
     }
     expect(project.remote.production.origin).toBe(project.publicUrl)
+    // Staging's branded canonical host (#323) is its Custom Domain; CI goes through workers.dev.
+    expect(project.remote.staging.origin).toBe('https://staging.best.serp.co')
+    expect(config.env.staging.routes).toEqual([
+      { custom_domain: true, pattern: 'staging.best.serp.co' }
+    ])
+    expect(project.remote.staging.reviewOrigin).toBe(
+      `https://${project.remote.staging.workerName}.serpcompany.workers.dev`
+    )
+    expect(project.remote.production.reviewOrigin).toBe(
+      `https://${project.remote.production.workerName}.serpcompany.workers.dev`
+    )
     // Staging and production media live in different buckets on different hosts (#95).
     expect(project.remote.staging.media.bucket).not.toBe(project.remote.production.media.bucket)
     expect(project.remote.staging.media.baseUrl).not.toBe(project.remote.production.media.baseUrl)
@@ -966,6 +977,38 @@ describe('remote Wrangler identity', () => {
       writeFileSync(path, JSON.stringify(config))
       expect(() => validateRemoteConfig('production', path)).toThrow(message)
     }
+  })
+
+  it("refuses a route to anything but the environment's own canonical host (#323)", () => {
+    const base = JSON.parse(readFileSync(resolve(project.wranglerConfigPath), 'utf8'))
+    for (const environment of ['staging', 'production'] as const) {
+      base.env[environment].d1_databases[0].migrations_dir = resolve('apps/web/drizzle')
+    }
+    const check = (
+      environment: 'production' | 'staging',
+      routes: Array<string | { custom_domain?: boolean; pattern?: string }>
+    ) => {
+      const config = JSON.parse(JSON.stringify(base))
+      config.env[environment].routes = routes
+      const path = join(fixtureDirectory, 'wrangler.routes.jsonc')
+      writeFileSync(path, JSON.stringify(config))
+      return () => validateRemoteConfig(environment, path)
+    }
+    // The reviewed shapes: staging's Custom Domain, and production's once #192 declares it.
+    expect(
+      check('staging', [{ custom_domain: true, pattern: 'staging.best.serp.co' }])
+    ).not.toThrow()
+    expect(check('production', [{ custom_domain: true, pattern: 'best.serp.co' }])).not.toThrow()
+    expect(check('production', [])).not.toThrow()
+    for (const [environment, routes, host] of [
+      ['staging', [{ custom_domain: true, pattern: 'best.serp.co' }], 'staging.best.serp.co'],
+      ['production', [{ custom_domain: true, pattern: 'staging.best.serp.co' }], 'best.serp.co'],
+      ['staging', [{ pattern: 'staging.best.serp.co/*' }], 'staging.best.serp.co'],
+      ['staging', ['staging.best.serp.co/*'], 'staging.best.serp.co']
+    ] as const)
+      expect(check(environment, [...routes]), JSON.stringify(routes)).toThrow(
+        `routes may only attach ${host} as a Custom Domain`
+      )
   })
 })
 

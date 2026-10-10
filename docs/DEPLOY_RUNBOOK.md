@@ -10,14 +10,16 @@ from its Worker since the [production cutover](./PRODUCTION_CUTOVER.md).
 | | Staging | Production |
 |---|---|---|
 | Worker and D1 database | `best-serp-co-staging` | `best-serp-co-production` |
-| Origin | https://best-serp-co-staging.serpcompany.workers.dev | https://best.serp.co (Worker Custom Domain on the `serp.co` zone) |
-| Platform host | the origin; every `*.workers.dev` response carries `X-Robots-Tag: noindex, nofollow` | https://best-serp-co-production.serpcompany.workers.dev, which 308s to best.serp.co except for smoke-test requests |
+| Origin | https://staging.best.serp.co (Worker Custom Domain on the `serp.co` zone, declared in `env.staging.routes`, #323); `noindex` except for Ahrefs' Site Audit | https://best.serp.co (Worker Custom Domain on the `serp.co` zone) |
+| Platform host | https://best-serp-co-staging.serpcompany.workers.dev, which 308s to staging.best.serp.co except for smoke-test requests | https://best-serp-co-production.serpcompany.workers.dev, which 308s to best.serp.co except for smoke-test requests |
 | Branch | `staging`, the base branch (pull requests squash-merge; hotfix merge-backs use a merge commit) | `main` (fast-forward promotions of `staging`, and `hotfix-*` pull requests) |
 | GitHub environment | `staging` (`staging` branch only, no reviewers) | `production` (`main` only, required reviewers) |
 | Email ([useSend](./EMAIL.md)) | `mail.serp.co`, `[staging]` prefix, allowlist | `mail.serp.co` |
 
-Keep `workers_dev: true` on both: CI gates production through its platform host with the
-`x-best-serp-co-smoke-test` header, then on best.serp.co without it
+Every `*.workers.dev` response carries `X-Robots-Tag: noindex, nofollow`. Keep
+`workers_dev: true` on both: CI gates each Worker through its platform host with the
+`x-best-serp-co-smoke-test` header (and the staging smoke runs there with it), then production
+on best.serp.co without it
 ([Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)). The identities live in
 `env.staging` / `env.production` of `apps/web/wrangler.jsonc` and in `scripts/project.ts` (IDs
 are not secrets); `scripts/cloudflare-release.ts` refuses to run when the two disagree. The
@@ -124,13 +126,24 @@ The first runs the same best.serp.co checks without skipping anything; the secon
 `x-site-environment: production` and the version the run deployed (what each check compares:
 [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)).
 
+Deploy Staging gates staging on its workers.dev host only. To see staging.best.serp.co as
+visitors and Ahrefs' Site Audit do (#323), after the first deploy with the Custom Domain or a
+change to the crawl policy:
+
+```bash
+curl -sI https://staging.best.serp.co/ | grep -i -e x-site-environment -e x-robots-tag  # staging; noindex, nofollow
+curl -sI -A 'AhrefsSiteAudit/6.1' https://staging.best.serp.co/ | grep -ci x-robots-tag  # 0
+curl -s https://staging.best.serp.co/robots.txt  # AhrefsSiteAudit: Allow /; everyone else: Disallow /
+curl -sI https://best-serp-co-staging.serpcompany.workers.dev/about | grep -i location  # https://staging.best.serp.co/about/
+```
+
 `wrangler.jsonc` points `main` at `apps/web/worker.ts`, which wraps the generated
 `.open-next/worker.js`, so every deploy ships the edge HTML cache with the Worker
 ([Caching](./CACHING.md)). Confirm it after a deploy:
 
 ```bash
-curl -sI https://best-serp-co-staging.serpcompany.workers.dev/about/ | grep -i x-edge-cache  # MISS
-curl -sI https://best-serp-co-staging.serpcompany.workers.dev/about/ | grep -i x-edge-cache  # HIT
+curl -sI https://staging.best.serp.co/about/ | grep -i x-edge-cache  # MISS
+curl -sI https://staging.best.serp.co/about/ | grep -i x-edge-cache  # HIT
 ```
 
 A deploy starts with a cold HTML cache (the Worker version is part of every key): the first

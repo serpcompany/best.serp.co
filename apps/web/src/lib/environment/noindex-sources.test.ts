@@ -7,6 +7,7 @@
  * and the data and runtime modules these files import are stubbed.
  */
 
+import { readFileSync } from 'node:fs'
 import { buildCustomRoute } from 'next/dist/lib/build-custom-route'
 import loadCustomRoutes from 'next/dist/lib/load-custom-routes'
 import { resolveRobots } from 'next/dist/lib/metadata/resolvers/resolve-basics'
@@ -107,6 +108,16 @@ describe('next.config.ts headers()', () => {
     for (const path of PUBLIC_PATHS)
       expect(
         configRobotsTags('best.serp.co', path).filter(tag => NOINDEX.test(tag)),
+        path
+      ).toEqual([])
+  })
+
+  // #323: on staging.best.serp.co the Worker adds the noindex per request, after the edge
+  // cache, so Ahrefs' Site Audit can go without it; a headers() rule would be stored with the page.
+  it("adds no noindex on staging's canonical host either", () => {
+    for (const path of PUBLIC_PATHS)
+      expect(
+        configRobotsTags('staging.best.serp.co', path).filter(tag => NOINDEX.test(tag)),
         path
       ).toEqual([])
   })
@@ -215,4 +226,31 @@ describe('the route registry and the pages (#167)', () => {
       )
     }
   )
+})
+
+/** The static-asset header rules (`apps/web/public/_headers`): host pattern -> headers. */
+function staticAssetRules(): Map<string, string[]> {
+  const rules = new Map<string, string[]>()
+  let current: string[] | undefined
+  const text = readFileSync(new URL('../../../public/_headers', import.meta.url), 'utf8')
+  for (const line of text.split('\n')) {
+    if (!line.trim() || line.startsWith('#')) continue
+    if (/^\s/u.test(line)) {
+      current?.push(line.trim())
+      continue
+    }
+    current = []
+    rules.set(line.trim(), current)
+  }
+  return rules
+}
+
+describe('static files (apps/web/public/_headers)', () => {
+  // Static files are answered before the Worker, so these rules are their only crawl policy.
+  it('keeps the workers.dev hosts and staging.best.serp.co noindex, and best.serp.co indexable', () => {
+    expect(Object.fromEntries(staticAssetRules())).toEqual({
+      'https://:worker.:account.workers.dev/*': ['X-Robots-Tag: noindex, nofollow'],
+      'https://staging.best.serp.co/*': ['X-Robots-Tag: noindex, nofollow']
+    })
+  })
 })

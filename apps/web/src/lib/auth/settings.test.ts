@@ -9,7 +9,7 @@ import {
 } from './settings'
 
 const SECRET = 's'.repeat(48)
-const STAGING_ORIGIN = 'https://best-serp-co-staging.serpcompany.workers.dev'
+const STAGING_ORIGIN = 'https://staging.best.serp.co'
 
 function expectConfigurationError(env: AuthEnv, message: RegExp): void {
   let caught: unknown

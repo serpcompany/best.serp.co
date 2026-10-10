@@ -8,7 +8,7 @@
  * | Var | local | staging | production |
  * | --- | --- | --- | --- |
  * | `BETTER_AUTH_SECRET` (secret) | `apps/web/.dev.vars`, else an ephemeral per-isolate value | Worker secret | Worker secret |
- * | `BETTER_AUTH_URL` | unset: the request's localhost origin | staging workers.dev origin | `https://best.serp.co` |
+ * | `BETTER_AUTH_URL` | unset: the request's localhost origin | `https://staging.best.serp.co` | `https://best.serp.co` |
  * | `BETTER_AUTH_TRUSTED_ORIGINS` | unset: localhost origins | the same origin | the same origin |
  */
 import { parseSiteEnvironment, type SiteEnvironment } from '../environment/site-environment'
