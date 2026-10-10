@@ -2,12 +2,15 @@ import {
   SEED_ID,
   SEED_MEDIA_ORIGIN,
   SEED_NOW,
+  seedBestPages,
   seedCategories,
   seedFillerListings,
   seedListings,
   seedResourceLinks,
   seedRevisions,
   seedSubmissions,
+  seedTags,
+  seedTaxonomyRedirects,
   seedUsers,
   seedWebsite
 } from './seed-facts'
@@ -757,10 +760,157 @@ function badgeProgramStatements(): SeedStatement[] {
   ]
 }
 
+const writer = (number: number) => `fixture-writer-${String(number).padStart(2, '0')}`
+
+/**
+ * Each tag's listings (`seedTags`), as `[slug, sort_order]`: `sort_order` 0 is the listing's most
+ * central tag.
+ */
+const TAG_MEMBERS: Record<keyof typeof seedTags, ReadonlyArray<readonly [string, number]>> = {
+  noteTaking: [
+    [seedListings.submitted.slug, 0],
+    ...Array.from({ length: 11 }, (_, index) => [writer(index + 1), 0] as const)
+  ],
+  documentEditors: [
+    [seedListings.paid.slug, 0],
+    [seedListings.submitted.slug, 1],
+    [writer(12), 0],
+    [seedListings.unlisted.slug, 0]
+  ],
+  whiteboards: [
+    [seedListings.claimable.slug, 0],
+    [seedListings.noLogo.slug, 0]
+  ],
+  mockups: [
+    [seedListings.detail.slug, 0],
+    [seedListings.claimable.slug, 1]
+  ],
+  apis: [
+    [seedListings.held.slug, 0],
+    [seedListings.owned.slug, 0],
+    [seedListings.ownerRemoved.slug, 0]
+  ],
+  empty: [],
+  retired: [
+    [writer(1), 1],
+    [writer(2), 1]
+  ]
+}
+
+/** "note taking app" → "Best Note Taking Apps". */
+function bestTitle(keyword: string): string {
+  return `Best ${keyword.replace(/\b[a-z]/gu, letter => letter.toUpperCase())}s`
+}
+
+/**
+ * The taxonomy (#341): tags on the seed's categories with their memberships (one tag retired once
+ * its listings were tagged, as retiring leaves memberships), best pages with pins and an
+ * exclusion, and redirects of old taxonomy URLs to each kind of target.
+ */
+function taxonomyStatements(): SeedStatement[] {
+  const tags = Object.entries(seedTags) as Array<
+    [keyof typeof seedTags, (typeof seedTags)[keyof typeof seedTags]]
+  >
+  const statements: SeedStatement[] = tags.map(([, tag], index) => ({
+    sql: `INSERT INTO tags (id,slug,name,description,category_id,sort_order,is_active,created_at,
+        updated_at) SELECT ?,?,?,?,id,?,1,?,? FROM categories WHERE slug=?`,
+    params: [
+      index + 1,
+      tag.slug,
+      tag.name,
+      `${tag.name} in the local fixture seed.`,
+      index,
+      seedTime(30),
+      seedTime(30),
+      tag.category.slug
+    ]
+  }))
+  for (const [key, tag] of tags) {
+    for (const [slug, sortOrder] of TAG_MEMBERS[key]) {
+      statements.push({
+        sql: 'INSERT INTO listing_tags (listing_id,tag_id,sort_order) SELECT ?,id,? FROM tags WHERE slug=?',
+        params: [seedListingId(slug), sortOrder, tag.slug]
+      })
+    }
+  }
+  statements.push({
+    sql: 'UPDATE tags SET is_active=0,updated_at=? WHERE slug=?',
+    params: [seedTime(10), seedTags.retired.slug]
+  })
+  for (const [index, page] of Object.values(seedBestPages).entries()) {
+    const title = bestTitle(page.keyword)
+    statements.push({
+      sql: `INSERT INTO best_pages (id,slug,keyword,title,heading,intro,tag_id,category_id,list_size,
+          keyword_volume,keyword_checked_at,sort_order,is_active,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,(SELECT id FROM tags WHERE slug=?),
+          (SELECT id FROM categories WHERE slug=?),?,?,?,?,1,?,?)`,
+      params: [
+        index + 1,
+        page.slug,
+        page.keyword,
+        title,
+        title,
+        `The local fixture seed's best page for "${page.keyword}". Every listing on it is made up.`,
+        page.tag?.slug ?? null,
+        page.category?.slug ?? null,
+        page.tag && !page.category ? 10 : 5,
+        index === 0 ? 1900 : null,
+        index === 0 ? seedTime(6) : null,
+        index,
+        seedTime(5),
+        seedTime(5)
+      ]
+    })
+    for (const [position, pin] of page.pins.entries()) {
+      statements.push(
+        insert('best_page_listings', {
+          best_page_id: index + 1,
+          blurb: position === 0 ? `${pin.name} is the fixture pick for "${page.keyword}".` : null,
+          excluded: 0,
+          listing_id: seedListingId(pin.slug),
+          position: position + 1
+        })
+      )
+    }
+    for (const excluded of page.excluded) {
+      statements.push(
+        insert('best_page_listings', {
+          best_page_id: index + 1,
+          blurb: null,
+          excluded: 1,
+          listing_id: seedListingId(excluded.slug),
+          position: null
+        })
+      )
+    }
+  }
+  for (const redirect of seedTaxonomyRedirects) {
+    const target = (kind: string) => (redirect.to.kind === kind ? redirect.to.slug : null)
+    statements.push({
+      sql: `INSERT INTO taxonomy_redirects (source_kind,source_slug,target_kind,target_category_id,
+          target_tag_id,target_best_page_id,manifest_id,created_at)
+        VALUES (?,?,?,(SELECT id FROM categories WHERE slug=?),(SELECT id FROM tags WHERE slug=?),
+          (SELECT id FROM best_pages WHERE slug=?),?,?)`,
+      params: [
+        redirect.from.kind,
+        redirect.from.slug,
+        redirect.to.kind,
+        target('category'),
+        target('tag'),
+        target('best'),
+        SEED_ID,
+        seedTime(5)
+      ]
+    })
+  }
+  return statements
+}
+
 /** Every row of the seed but its hosted media, in foreign-key order. */
 export function fixtureSeedStatements(): SeedStatement[] {
   return [
     ...catalogStatements(),
+    ...taxonomyStatements(),
     ...userStatements(),
     ...submissionStatements(),
     ...ownershipStatements(),
