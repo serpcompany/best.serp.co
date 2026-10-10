@@ -25,7 +25,7 @@ const listing = (letter: string): InventoryListing => ({
   website: `https://serp.ly/${letter}`,
   categories: ['other']
 })
-const inventory = ['a', 'b', 'c', 'd', 'e', 'f'].map(listing)
+const inventory = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(listing)
 const entry = (letter: string, rest: Partial<MismatchEntry>): MismatchEntry =>
   ({ slug: `${letter}.ai`, id: `lst_${letter.repeat(12)}`, ...rest }) as MismatchEntry
 const entries: MismatchEntry[] = [
@@ -53,7 +53,8 @@ const entries: MismatchEntry[] = [
     decision: 'fix-description',
     category: 'ai-chatbots',
     details: { description: 'What F does.' }
-  })
+  }),
+  entry('g', { verdict: 'rename', decision: 'retire-instead-of-rename', category: 'ai-design' })
 ]
 /** The most statements a committed batch may plan to (#342 review: legacy-media-06 was 2,129). */
 const STATEMENT_CEILING = 2000
@@ -79,6 +80,14 @@ describe('the mismatch manifests (#340)', () => {
         categories: ['other'],
         reason: expect.stringMatching(/^#340 keep-rewrite, retired instead of rewritten/u),
         expected: { website: 'https://serp.ly/b', unowned: true }
+      },
+      {
+        action: 'listing-unpublish',
+        id: 'lst_gggggggggggg',
+        slug: 'g.ai',
+        categories: ['other'],
+        reason: expect.stringMatching(/^#340 rename, retired instead/u),
+        expected: { website: 'https://serp.ly/g', unowned: true }
       }
     ])
     expect(renames).toEqual([
@@ -142,6 +151,11 @@ describe('the mismatch manifests (#340)', () => {
       /only a rename or a description fix/u
     ],
     [
+      'a retired rename with details',
+      replace('g.ai', { details: { name: 'G New' } }),
+      /only a rename or a description fix/u
+    ],
+    [
       'a rename without details',
       replace('d.ai', { details: undefined }),
       /only a rename or a description fix/u
@@ -195,13 +209,15 @@ describe('the mismatch manifests (#340)', () => {
       retire: count('retire'),
       hold: count('hold'),
       'retire-instead-of-rewrite': count('retire-instead-of-rewrite'),
+      'retire-instead-of-rename': count('retire-instead-of-rename'),
       rename: count('rename'),
       'fix-description': count('fix-description')
     }).toEqual({
       retire: 40,
       hold: 3,
       'retire-instead-of-rewrite': 75,
-      rename: 20,
+      'retire-instead-of-rename': 12,
+      rename: 8,
       'fix-description': 1
     })
     expect(
@@ -213,15 +229,32 @@ describe('the mismatch manifests (#340)', () => {
     const removals = committed(mismatchManifestIds.removals).operations.flatMap(operation =>
       operation.action === 'listing-unpublish' ? [operation] : []
     )
-    expect(removals).toHaveLength(115)
-    // Real products (keep-rewrite) are `unowned`; hygiene removals are not.
+    expect(removals).toHaveLength(127)
+    // Real products (keep-rewrite, and renames with another product's copy) are `unowned`;
+    // hygiene removals are not.
     const verdicts = new Map(decided.map(item => [item.id, item]))
     for (const removal of removals)
       expect(removal.expected?.unowned ?? false, removal.slug).toBe(
-        verdicts.get(removal.id)?.decision === 'retire-instead-of-rewrite'
+        verdicts.get(removal.id)?.decision !== 'retire'
       )
-    expect(committed(mismatchManifestIds.renames).operations).toHaveLength(21)
-    expect(committed(mismatchManifestIds.categories).operations).toHaveLength(11)
+    expect(
+      removals.filter(removal => verdicts.get(removal.id)?.verdict === 'rename').map(r => r.slug)
+    ).toEqual([
+      'earningscall.ai',
+      'figma.com',
+      'getslate.ai',
+      'heroguide.ai',
+      'letsfoodie.com',
+      'mirrorthink.ai',
+      'onetask.me',
+      'rapideditor.org',
+      'riffusion.com',
+      'triplewhale.com',
+      'vogent.ai',
+      'writepanda.ai'
+    ])
+    expect(committed(mismatchManifestIds.renames).operations).toHaveLength(9)
+    expect(committed(mismatchManifestIds.categories).operations).toHaveLength(4)
   })
 
   it("leaves out every listing #333's batches move, #332 retires, or other-removals removes", () => {
@@ -313,8 +346,8 @@ describe('the mismatch manifests (#340)', () => {
       }
     }
 
-    // The 115 removals are unpublished, and nothing else is.
-    expect(liveCount()).toBe(before - 115)
+    // The 127 removals are unpublished, and nothing else is.
+    expect(liveCount()).toBe(before - 127)
     const state = db.prepare(
       `SELECT l.name,l.description,l.website,l.is_active,(SELECT json_group_array(slug) FROM
        (SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id=lc.category_id
@@ -330,7 +363,7 @@ describe('the mismatch manifests (#340)', () => {
         website: string
       }
       const original = inventoryById.get(item.id) as InventoryListing
-      const removed = item.decision === 'retire' || item.decision === 'retire-instead-of-rewrite'
+      const removed = item.decision.startsWith('retire')
       expect(row.is_active, item.slug).toBe(removed ? 0 : 1)
       // Renames and the fix carry their new details; every other listing keeps its own.
       expect(

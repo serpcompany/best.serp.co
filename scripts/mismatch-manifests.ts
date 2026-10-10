@@ -12,6 +12,8 @@
  *   someone claimed it.
  * - `retire-instead-of-rewrite` (`keep-rewrite`): `listing-unpublish` with `expected.unowned`, as
  *   #332's duplicates: a real product someone owns, claims, or paid for refuses the batch instead.
+ * - `retire-instead-of-rename` (`rename`): the same, for a renamed product whose long description
+ *   still describes another product.
  * - `hold` (`retire-dead`): nothing yet; the site is rechecked first.
  * - `rename` and `fix-description` (`rename`, `keep-recategorize`): `listing-details-set` with the
  *   entry's `details`, and, when the entry's `category` is a live category, `listing-categories-set`
@@ -45,17 +47,24 @@ export type MismatchVerdict = (typeof mismatchVerdicts)[number]
 export const mismatchDecisions = [
   'retire',
   'retire-instead-of-rewrite',
+  'retire-instead-of-rename',
   'hold',
   'rename',
   'fix-description'
 ] as const
 export type MismatchDecision = (typeof mismatchDecisions)[number]
 
+/** Removals of real products: `expected.unowned`, so an owned or claimed listing refuses the batch. */
+const unowned: ReadonlySet<MismatchDecision> = new Set([
+  'retire-instead-of-rewrite',
+  'retire-instead-of-rename'
+])
+
 /** The decisions the owner could make on each verdict. */
 const decisionsByVerdict: Record<MismatchVerdict, readonly MismatchDecision[]> = {
   'keep-recategorize': ['fix-description'],
   'keep-rewrite': ['retire-instead-of-rewrite'],
-  rename: ['rename'],
+  rename: ['rename', 'retire-instead-of-rename'],
   'retire-dead': ['retire', 'hold'],
   'retire-hijacked': ['retire'],
   'retire-not-a-product': ['retire'],
@@ -106,6 +115,8 @@ export type MismatchManifestKind = keyof typeof mismatchManifestIds
 
 /** The activity log's reason for each removal (at most 200 characters), by verdict. */
 const removalReasons: Partial<Record<MismatchVerdict, string>> = {
+  rename:
+    '#340 rename, retired instead (owner decision 2026-10-10): its long description still describes another product; evidence in d1/hygiene/2026-10-10-mismatch-audit.yaml',
   'retire-dead':
     '#340 retire-dead (owner decision 2026-10-10): the site is down, parked, shut down, or no longer the product; evidence in d1/hygiene/2026-10-10-mismatch-audit.yaml',
   'retire-hijacked':
@@ -189,7 +200,7 @@ export function mismatchOperations(
     const edits = entry.decision === 'rename' || entry.decision === 'fix-description'
     if (edits !== (details !== undefined))
       throw new Error(`${entry.slug}: only a rename or a description fix has details.`)
-    if (entry.decision === 'retire' || entry.decision === 'retire-instead-of-rewrite') {
+    if (entry.decision === 'retire' || unowned.has(entry.decision)) {
       removals.push({
         action: 'listing-unpublish',
         id: listing.id,
@@ -198,7 +209,7 @@ export function mismatchOperations(
         reason: removalReasons[entry.verdict],
         expected: {
           website: listing.website,
-          ...(entry.decision === 'retire-instead-of-rewrite' ? { unowned: true } : {})
+          ...(unowned.has(entry.decision) ? { unowned: true } : {})
         }
       })
     }
@@ -252,6 +263,8 @@ const headers: Record<MismatchManifestKind, (count: number, held: readonly strin
 # - Owner decision 2, retire instead of rewriting their copy: the keep-rewrite verdicts, real and
 #   live products. Each is \`unowned\` (#332): a listing anyone owns, claims, paid for, or submitted
 #   by publish time refuses the whole batch, rather than leaving those records on a retired row.
+# - Owner decision 5, retire instead of renaming: the renames whose long description still describes
+#   another product (an explainer, an article, terms or policies). \`unowned\`, as decision 2.
 # Each operation's \`reason\` names its verdict; the evidence per listing is in
 # d1/hygiene/2026-10-10-mismatch-audit.yaml.
 `,
@@ -264,8 +277,9 @@ const headers: Record<MismatchManifestKind, (count: number, held: readonly strin
 #   page its serp.ly link points to is gone, 404, blocked, or fails TLS): the product's own URL.
 # - Owner decision 4, faceapp.com: only its one-line description, which described Google Maps
 #   imaging, changes.
-# The long descriptions stay as they are. 2026-10-10-mismatch-categories moves the renamed listings
-# whose audit category is live out of Other.
+# The long descriptions stay as they are: each renamed listing's already describes its new product
+# (decision 5 retires the others). 2026-10-10-mismatch-categories moves the renamed listings whose
+# audit category is live out of Other.
 # Each listing-details-set compares and swaps the listing's slug, name, short description, and
 # website, refuses a listing whose own submission is in review, and refuses a new website that
 # another listing, a submission in flight, or a block already covers. It logs "Details edited".

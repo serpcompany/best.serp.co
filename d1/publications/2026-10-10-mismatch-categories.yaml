@@ -1,4 +1,4 @@
-# serpcompany/best.serp.co#340: move 11 renamed listings out of Other to the category the audit
+# serpcompany/best.serp.co#340: move 4 renamed listings out of Other to the category the audit
 # gives them, as the owner decided in chat on 2026-10-10 (decision 3). listing-categories-set replaces
 # each listing's [other] with that category as its primary. Renamed listings whose audit category is
 # a proposed new one (d1/hygiene/2026-10-10-other-categories.yaml newCategories, which no manifest
@@ -26,33 +26,12 @@ operations:
     categories:
       - ai-design
   - action: listing-categories-set
-    id: lst_e41fa6f53c3dbf173400bc25
-    slug: earningscall.ai
-    expected:
-      - other
-    categories:
-      - ai-financial-advisor
-  - action: listing-categories-set
-    id: lst_eb2eb75ce38971b317bc4b46
-    slug: figma.com
-    expected:
-      - other
-    categories:
-      - ai-design
-  - action: listing-categories-set
     id: lst_309b2cfc6aff3767b829292c
     slug: goheather.io
     expected:
       - other
     categories:
       - ai-lawyer
-  - action: listing-categories-set
-    id: lst_0fead6f869bf0b5685e44e3d
-    slug: heroguide.ai
-    expected:
-      - other
-    categories:
-      - ai-marketing-tools
   - action: listing-categories-set
     id: lst_0016fd7139440ce2b067e28b
     slug: kadoa.com
@@ -61,37 +40,9 @@ operations:
     categories:
       - ai-web-scraping
   - action: listing-categories-set
-    id: lst_be0db4b7d9c5ff6589f93827
-    slug: onetask.me
-    expected:
-      - other
-    categories:
-      - ai-productivity-tools
-  - action: listing-categories-set
-    id: lst_4a8b8006361d29300b80f3de
-    slug: triplewhale.com
-    expected:
-      - other
-    categories:
-      - ecommerce-analytics-tools
-  - action: listing-categories-set
     id: lst_ba7217e8db768dd57cecb220
     slug: tubemagic.com
     expected:
       - other
     categories:
       - ai-content-creator
-  - action: listing-categories-set
-    id: lst_dba282aa0242c1e73fbc1590
-    slug: vogent.ai
-    expected:
-      - other
-    categories:
-      - ai-voice-bots
-  - action: listing-categories-set
-    id: lst_7506e4284cf646247968a59c
-    slug: writepanda.ai
-    expected:
-      - other
-    categories:
-      - ai-video-editor

@@ -35,13 +35,14 @@
 #   rename (decision 3): d1/publications/2026-10-10-mismatch-renames.yaml sets details: the new name, a short
 #     factual description written from the live site on 2026-10-10, and a website only where the listing's link no
 #     longer reaches the product (the page its serp.ly link points to is gone, 404, blocked or fails TLS): the
-#     product's own URL. Where
-#     category is a live category, d1/publications/2026-10-10-mismatch-categories.yaml moves the listing there out
-#     of Other; a proposed new category (ai-music-generators, ai-recipe-generators, ai-research-assistants,
-#     ai-sales-tools, ai-survey-tools, ai-writing-assistants) waits for the taxonomy work (#341), and the listing
-#     stays in Other. The long description stays.
+#     product's own URL. Where category is a live category, d1/publications/2026-10-10-mismatch-categories.yaml
+#     moves the listing there out of Other; a proposed new category (ai-sales-tools, ai-survey-tools) waits for the
+#     taxonomy work (#341), and the listing stays in Other. The long description stays: each of these already
+#     describes the new product.
 #   fix-description (decision 4): faceapp.com, whose one-line description was about Google Maps imaging; the renames
 #     manifest sets details.description. Its ai-photo-editors is a proposed category too, so it stays in Other.
+#   retire-instead-of-rename (decision 5): a rename whose long description still describes another product (an
+#     explainer, an article, terms or policies). The removals manifest unpublishes it with `unowned`, as decision 2.
 issue: serpcompany/best.serp.co#340
 checkedAt: "2026-10-10"
 decidedAt: "2026-10-10"
@@ -59,7 +60,8 @@ decisions:
   retire: 40
   hold: 3
   retire-instead-of-rewrite: 75
-  rename: 20
+  retire-instead-of-rename: 12
+  rename: 8
   fix-description: 1
 listings:
   - slug: autoreviews.ai
@@ -235,15 +237,12 @@ listings:
   - slug: earningscall.ai
     id: lst_e41fa6f53c3dbf173400bc25
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "EarningsCall.ai (earningscall.ai)"
     category: ai-financial-advisor
     finalUrl: "https://www.earningscall.ai/"
     status: "200 (browser; curl 429 Vercel checkpoint)"
     evidence: "curl gets a Vercel checkpoint (429) at www.earningsdigest.ai; in a browser it redirects to www.earningscall.ai, 'AI Earnings Call Summaries and Insights', © EarningsCall.ai. Staging copy is a generic earnings-call explainer"
-    details:
-      name: "EarningsCall.ai"
-      description: "AI summaries of company earnings calls, with guidance, Q&A highlights and peer comparisons."
   - slug: essaywriters.ai
     id: lst_200354ee6d99cc882cf96231
     verdict: keep-rewrite
@@ -296,16 +295,12 @@ listings:
   - slug: figma.com
     id: lst_eb2eb75ce38971b317bc4b46
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "Figma AI (figma.com/ai)"
     category: ai-design
     finalUrl: "https://www.figma.com/ai/"
     status: "200"
     evidence: "diagram.com fails TLS on https; on http it 301s to figma.com/ai, 'Figma AI', which took over Diagram. Staging copy is a FigJam sequence-diagram guide"
-    details:
-      name: "Figma AI"
-      description: "Figma's AI agent and tools: generate design directions, create diagrams, edit images, search files, and turn designs into code-backed prototypes."
-      website: "https://www.figma.com/ai/"
   - slug: financebrain.ai
     id: lst_16fdff0edd214351897faf6c
     verdict: keep-rewrite
@@ -379,16 +374,12 @@ listings:
   - slug: getslate.ai
     id: lst_e1f97383042d765ad2fad2a4
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "Slate Keyboard (getslate.ai)"
     category: ai-writing-assistants
     finalUrl: "https://www.zeeno.ai/"
     status: "tls-error"
     evidence: "serp.ly goes to zeeno.ai, which fails TLS twice (http only 301s back to https), so Zeeno is gone. The slug's own getslate.ai is live as 'Slate Keyboard', an AI iPhone keyboard, and staging copy is Slate's terms"
-    details:
-      name: "Slate Keyboard"
-      description: "An AI keyboard for iPhone that finishes your sentences in your voice, with an assistant, themes and snippets."
-      website: "https://getslate.ai/"
   - slug: getzuro.com
     id: lst_b50056d12a6793a753ae8cfb
     verdict: keep-rewrite
@@ -462,15 +453,12 @@ listings:
   - slug: heroguide.ai
     id: lst_0fead6f869bf0b5685e44e3d
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "HeroGuide Brand Story Generator (heroguide.ai)"
     category: ai-marketing-tools
     finalUrl: "https://www.heroguide.ai/"
     status: "200"
     evidence: "brandscriptgenerator.com 308s to heroguide.ai, 'Your AI HeroGuide Brand Story Generator'. Staging copy describes Chargezoom accounts receivable"
-    details:
-      name: "HeroGuide Brand Story Generator"
-      description: "An AI generator that writes a brand story from a description of your business, its customers and the problem it solves."
   - slug: il.ly
     id: lst_59edce7642b39c54683ffbc4
     verdict: retire-dead
@@ -621,15 +609,12 @@ listings:
   - slug: letsfoodie.com
     id: lst_80f38e54e082d555c03e7016
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "Let's Foodie AI Recipe Generator"
     category: ai-recipe-generators
     finalUrl: "https://letsfoodie.com/ai-recipe-generator/"
     status: "200"
     evidence: "Live: 'AI Recipe Generator (100% Free) | Let's Foodie', a free tool on a cooking site, not called 'Recipes By AI'. Staging copy is a mirepoix article"
-    details:
-      name: "Let's Foodie AI Recipe Generator"
-      description: "A free AI recipe generator from the cooking site Let's Foodie that suggests a recipe from the ingredients you have."
   - slug: lifesight.io
     id: lst_c3685bbd8f03a485050b86f8
     verdict: retire-dead
@@ -677,15 +662,12 @@ listings:
   - slug: mirrorthink.ai
     id: lst_d9b7038019521350945ec598
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "Vicena (vicena.ai)"
     category: ai-research-assistants
     finalUrl: "https://vicena.ai/"
     status: "200"
     evidence: "mirrorthink.ai 301s to vicena.ai, 'Vicena — AI for Real Science' (simulations and lab experiments). Staging copy is subscription and refund policies"
-    details:
-      name: "Vicena"
-      description: "AI for scientific R&D that researches prior work, runs digital experiments and simulations, and coordinates real lab experiments."
   - slug: mutinyhq.com
     id: lst_414adeabaecab8db594c8c29
     verdict: keep-rewrite
@@ -735,15 +717,12 @@ listings:
   - slug: onetask.me
     id: lst_be0db4b7d9c5ff6589f93827
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "Fluidwave (simplerlist.com)"
     category: ai-productivity-tools
     finalUrl: "https://simplerlist.com/"
     status: "200 (browser; curl 429 Vercel checkpoint)"
     evidence: "curl gets a Vercel checkpoint (429) at simplerlist.com; a browser shows 'Fluidwave: Act Wisely' (AI tasks, email, calendar). onetask.me itself is 404 NOT_FOUND. Staging copy is an essay on AI decision trees"
-    details:
-      name: "Fluidwave"
-      description: "An AI assistant that manages your tasks, email, calendar, contacts and notes in one place."
   - slug: ora.ai
     id: lst_05cb99f9e2832e8d9a46dc86
     verdict: keep-rewrite
@@ -817,15 +796,11 @@ listings:
   - slug: rapideditor.org
     id: lst_4275884092ff11a244ddc555
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "Rapid (rapideditor.org)"
     finalUrl: "https://rapideditor.org/"
     status: "200 (past an expired certificate)"
     evidence: "mapwith.ai has an expired certificate; past it, it 301s to rapideditor.org, 'Rapid Editor', an OpenStreetMap editor whose canonical is still mapwith.ai. Staging copy is its data policy; no category fits"
-    details:
-      name: "Rapid"
-      description: "An OpenStreetMap editor that speeds up mapping with open data and features AI detects in satellite imagery."
-      website: "https://rapideditor.org/"
   - slug: raplyrics.eu
     id: lst_048fc38286c84531cfc79405
     verdict: keep-rewrite
@@ -852,15 +827,12 @@ listings:
   - slug: riffusion.com
     id: lst_d18bb5bd94d45912b957eef4
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "Google Flow Music (flowmusic.app)"
     category: ai-music-generators
     finalUrl: "https://www.flowmusic.app/"
     status: "200"
     evidence: "www.riffusion.com 301s to producer.ai, which 301s to flowmusic.app, 'Google Flow Music' (AI song creation). Staging copy is its terms and data practices"
-    details:
-      name: "Google Flow Music"
-      description: "A generative AI platform for creating, remixing and sharing songs and directing their music videos."
   - slug: riogpt.com
     id: lst_d63eeb22dc5a32c96514ef87
     verdict: keep-rewrite
@@ -1005,15 +977,12 @@ listings:
   - slug: triplewhale.com
     id: lst_4a8b8006361d29300b80f3de
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "Moby by Triple Whale (triplewhale.com/moby-ai)"
     category: ecommerce-analytics-tools
     finalUrl: "https://www.triplewhale.com/moby-ai"
     status: "200"
     evidence: "triplewhale.com/willy 301s to /moby, then /moby-ai, 'Moby — Triple Whale', the AI agent that replaced Willy. Staging copy is an AI-in-marketing article"
-    details:
-      name: "Moby by Triple Whale"
-      description: "Triple Whale's AI agent for ecommerce brands: it answers questions from your store's metrics and history and takes actions such as media buying."
   - slug: trustfinta.com
     id: lst_98d348511e769332b3d28049
     verdict: keep-rewrite
@@ -1110,15 +1079,12 @@ listings:
   - slug: vogent.ai
     id: lst_dba282aa0242c1e73fbc1590
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "Vogent (vogent.ai)"
     category: ai-voice-bots
     finalUrl: "https://www.vogent.ai/"
     status: "200"
     evidence: "elto.ai 308s to vogent.ai, 'Vogent - Create AI Voice Agents', whose demo link is still calendly.com/elto. Staging copy is a web-design careers article"
-    details:
-      name: "Vogent"
-      description: "A platform to build, test and deploy AI voice agents."
   - slug: webquery.net
     id: lst_bc082459984d538bc3b0080b
     verdict: keep-rewrite
@@ -1182,15 +1148,12 @@ listings:
   - slug: writepanda.ai
     id: lst_7506e4284cf646247968a59c
     verdict: rename
-    decision: rename
+    decision: retire-instead-of-rename
     renameTo: "PandaStudio (writepanda.ai)"
     category: ai-video-editor
     finalUrl: "https://www.writepanda.ai/lifetime-signup"
     status: "200"
     evidence: "writepanda.io 301s to writepanda.ai, now 'PandaStudio: AI video editor for Claude, Codex and creators'. Staging copy is its privacy and terms"
-    details:
-      name: "PandaStudio"
-      description: "A desktop AI video editor for Mac and Windows that cuts by transcript, captions and clips Shorts, and works with Claude and Codex."
   - slug: writepaw.com
     id: lst_06b2871c098329279341b86c
     verdict: keep-rewrite

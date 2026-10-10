@@ -267,13 +267,14 @@ that batch. Publish it where it was refused; where the original applied, there i
 website, read-only: `d1/hygiene/2026-10-10-mismatch-audit.yaml` holds the verdicts, evidence, and the
 owner's `decision` of 2026-10-10. `pnpm catalog:mismatch` turns them into three row-level manifests:
 
-- `2026-10-10-mismatch-removals` unpublishes 115: 40 dead, hijacked, or not products (hygiene
-  removals, not `unowned`; 3 more are held for a recheck), and 75 real products whose copy would
-  need regenerating (`unowned`, as [duplicates](#duplicate-listings-332) are).
-- `2026-10-10-mismatch-renames` gives 20 renamed products their new name, a short description from
+- `2026-10-10-mismatch-removals` unpublishes 127: 40 dead, hijacked, or not products (hygiene
+  removals, not `unowned`; 3 more are held for a recheck), 75 real products whose copy would need
+  regenerating, and 12 renamed products whose long description is about something else (both
+  `unowned`, as [duplicates](#duplicate-listings-332) are).
+- `2026-10-10-mismatch-renames` gives 8 renamed products their new name, a short description from
   the live site, and their own URL where the serp.ly link no longer reaches them
   (`listing-details-set`, [Catalog publication](./catalog-publication.md#listing-details)), and fixes
-  faceapp.com's description. `-categories` moves the 11 whose category is live out of Other.
+  faceapp.com's description. `-categories` moves the 4 whose category is live out of Other.
 
 `scripts/mismatch-manifests.test.ts` keeps them identical to the audit and disjoint from #333's and
 #332's manifests, and replays them after #333's. Publish them after #333's batches and removals,
