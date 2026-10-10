@@ -130,6 +130,107 @@ export const seedRevisions = {
   withdrawn: { id: 'fixture-revision-withdrawn', listing: seedListings.owned.slug }
 } as const
 
+/**
+ * The three-layer taxonomy (#341): tags under the seed's categories (its hubs), best pages, and
+ * redirects of old taxonomy URLs. Nothing reads them yet (#343). `listingCount` counts a tag's
+ * published listings; `scribe.test` (unpublished) keeps its tag too.
+ */
+export const seedTags = {
+  /** Fixture Inkwell and Fixture Writer 01 to 11. */
+  noteTaking: {
+    category: seedCategories.writing,
+    listingCount: 12,
+    name: 'Note Taking',
+    slug: 'note-taking'
+  },
+  /** Fixture Parchment, Fixture Inkwell (its second tag) and Fixture Writer 12. */
+  documentEditors: {
+    category: seedCategories.writing,
+    listingCount: 3,
+    name: 'Document Editors',
+    slug: 'document-editors'
+  },
+  /** Fixture Canvas and Fixture Doodlewick. */
+  whiteboards: {
+    category: seedCategories.design,
+    listingCount: 2,
+    name: 'Whiteboards',
+    slug: 'whiteboards'
+  },
+  /** Fixture Studio and Fixture Canvas (its second tag). */
+  mockups: {
+    category: seedCategories.design,
+    listingCount: 2,
+    name: 'Mockup Tools',
+    slug: 'mockup-tools'
+  },
+  /** Fixture Quaybin, Fixture Ledger and Fixture Relay. */
+  apis: {
+    category: seedCategories.developer,
+    listingCount: 3,
+    name: 'Developer APIs',
+    slug: 'developer-apis'
+  },
+  /** Active, with no listing, on the empty category. */
+  empty: {
+    category: seedCategories.empty,
+    listingCount: 0,
+    name: 'Podcast Editing',
+    slug: 'podcast-editing'
+  },
+  /** Retired after Fixture Writer 01 and 02 were tagged with it: they keep the membership. */
+  retired: {
+    category: seedCategories.writing,
+    listingCount: 2,
+    name: 'Outlining',
+    slug: 'outlining'
+  }
+} as const
+
+/** Best pages, each with its pins in position order and its exclusions. */
+export const seedBestPages = {
+  /** On a tag only. */
+  tag: {
+    category: null,
+    excluded: [{ name: 'Fixture Writer 11', slug: 'fixture-writer-11' }],
+    keyword: 'note taking app',
+    pins: [seedListings.submitted, { name: 'Fixture Writer 03', slug: 'fixture-writer-03' }],
+    slug: 'note-taking-app',
+    tag: seedTags.noteTaking
+  },
+  /** On a category only. */
+  category: {
+    category: seedCategories.design,
+    excluded: [],
+    keyword: 'design app',
+    pins: [seedListings.detail],
+    slug: 'design-app',
+    tag: null
+  },
+  /** On a tag within a category. */
+  intersection: {
+    category: seedCategories.design,
+    excluded: [],
+    keyword: 'whiteboard app',
+    pins: [],
+    slug: 'whiteboard-app',
+    tag: seedTags.whiteboards
+  }
+} as const
+
+/** Old taxonomy URLs and where they point (`taxonomy_redirects`). */
+export const seedTaxonomyRedirects = [
+  { from: { kind: 'category', slug: 'notebooks' }, to: { kind: 'tag', slug: 'note-taking' } },
+  { from: { kind: 'category', slug: 'note-apps' }, to: { kind: 'best', slug: 'note-taking-app' } },
+  {
+    from: { kind: 'category', slug: 'drawing-tools' },
+    to: { kind: 'category', slug: 'design-tools' }
+  },
+  { from: { kind: 'category', slug: 'misc-tools' }, to: { kind: 'directory', slug: null } },
+  { from: { kind: 'tag', slug: 'whiteboarding' }, to: { kind: 'tag', slug: 'whiteboards' } },
+  { from: { kind: 'best', slug: 'whiteboard-tools' }, to: { kind: 'best', slug: 'whiteboard-app' } }
+] as const
+
 export const seedFacts = {
   /** Published listings: the directory total, RSS, and the products sitemap. */
   listingCount: 55,
