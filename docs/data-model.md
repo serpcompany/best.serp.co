@@ -38,7 +38,8 @@ Column meanings and constraints are commented in `schema.ts`. By area:
   app writes are later steps of #341. Write tags and memberships with `UPDATE`, or
   `INSERT … SELECT … WHERE is_active = 1`, never an upsert: SQLite fires a `BEFORE INSERT`
   trigger on an upsert's attempted insert even when it becomes an update, so the taxonomy
-  triggers would refuse one that touches a retired tag.
+  triggers would refuse one that touches a retired tag. So never copy a tag writer from the
+  category writers (`listing-plans.ts`, `plan-support.ts`), which upsert `listing_categories`.
 - **Publication**: `publication_state` is a single row holding the catalog version and
   checksum; `publication_runs` records every applied publication, and `migration_runs` the
   one-time import (locally, the fixture seed's run).
@@ -63,15 +64,18 @@ Drizzle cannot express everything the schema needs, so migrations are finished b
 `pnpm db:generate`, replace the generated SQL with the hand-finished form and check that a
 second `pnpm db:generate` reports no changes. Keep these properties in every migration:
 
-- Every table is `STRICT`: end each `CREATE TABLE` with `STRICT` by hand.
+- Every table is `STRICT`: end each `CREATE TABLE` with `STRICT` by hand, in the generated
+  migration. serp's data-and-storage standard puts `STRICT` tables in a `--custom` migration,
+  which would emit them again (next item), so this is a
+  [recorded exception](../AGENTS.md#recorded-exceptions-to-the-serp-web-stack).
   `PRAGMA foreign_keys = ON` leads `0000_baseline.sql`.
 - Triggers are written by hand: the baseline's four enforce that a published listing always has
   exactly one primary category, and later ones refuse blocked URLs, keep published listings
   off retired categories, keep an active tag under an active category, and keep new tag
   memberships off retired tags. They go in a `drizzle-kit generate --custom` migration
-  (`0011_retired_categories.sql`, `0013_taxonomy_triggers.sql`). A custom migration copies the
-  previous snapshot, so tables and columns go in the generated migration, finished by hand, or the
-  next `pnpm db:generate` would emit them again.
+  (`0011_retired_categories.sql`, `0013_taxonomy_triggers.sql`), as an FTS5 table would. A
+  custom migration copies the previous snapshot, so tables and columns go in the generated
+  migration, finished by hand, or the next `pnpm db:generate` would emit them again.
 - A migration that seeds a table uses fixed values, as `0002_better_auth.sql` does for the
   admin allowlist's `created_at`, so every fresh database, and so the fixture seed, is the same.
 - D1 enforces foreign keys and runs a migration in one transaction, where

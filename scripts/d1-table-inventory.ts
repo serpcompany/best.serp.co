@@ -373,7 +373,15 @@ export function orderedRowsSql(table: ApplicationTableName): string {
   return `SELECT ${columns} FROM "${table}" ORDER BY ${columns}`
 }
 
-/** Foreign-key-safe order for loading or replaying application rows. */
+/**
+ * Foreign-key order for loading application rows: each table follows the tables it references.
+ * It doesn't replay every valid state row by row, because the triggers refuse three kinds of
+ * row in this order: a published listing (its primary category loads after it), a retired tag
+ * under a retired hub, and a retired tag's memberships. Load those as the fixture seed and the
+ * scale catalog do: a listing as a draft, published once it's filed under its primary category;
+ * a tag active, retired after its memberships, and its hub retired after it. A freshly migrated
+ * database also already holds the rows a migration seeds (`admin_allowlist`).
+ */
 export const importOrder: ApplicationTableName[] = [
   'categories',
   'listings',

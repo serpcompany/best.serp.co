@@ -190,6 +190,10 @@ is `/products/`. Redirects store their target's id, so a later rename keeps them
   earlier one.
 - **Routes.** `affected_routes` names the tag and best pages, their indexes (`/products/tags/`,
   `/best/`), the hubs and listings involved, and `sitemap-tags.xml` and `sitemap-best.xml`. A
-  manifest without a taxonomy operation records the same routes as before.
+  retirement (`tag-unpublish`, `best-page-unpublish`) names only its own page, its index, and its
+  redirect target: the tag's hub, the best page's pool, and the sources whose redirects it
+  re-points aren't known at plan time. `affected_routes` is an audit record, and the edge cache
+  keys on the [catalog epoch](./caching.md#the-catalog-epoch), so no page stays stale. A manifest
+  without a taxonomy operation records the same routes as before.
 - **Bindings** are numbers, strings, and nulls, never booleans. D1's REST API takes them as JSON
   (`d1-compat.test.ts` checks every committed manifest).
