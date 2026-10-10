@@ -5,6 +5,7 @@ import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { parse, stringify } from 'yaml'
 import { fixtureSeedStatements } from '../apps/web/e2e/fixture-seed'
+import { resolveStagedCategorySql } from '../apps/web/src/db/plan-support'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
 import { applyMigrations } from '../apps/web/src/db/test-support'
 import { d1CompatViolations } from './d1-compat'
@@ -1047,6 +1048,25 @@ describe('the committed taxonomy mapping and manifests (#349)', () => {
         expect(apply(db, name, committed(name)), name).toBeLessThanOrEqual(STATEMENT_CEILING)
       }
       expectMigrated(db, reviewed.mapping, plan)
+      // #348's stale-slug resolver: a draft, submission or revision saved before the retirement
+      // still names a narrow slug, and it resolves to the slug's tag and that tag's hub, whether
+      // the tag kept the slug or the category merged into another (through its redirect).
+      const resolver = resolveStagedCategorySql('staged.category_slug')
+      const resolveSlug = db.prepare(
+        `WITH staged(category_slug) AS (VALUES (?)) SELECT
+           (SELECT slug FROM categories WHERE id=(${resolver.categoryId})) AS category,
+           (SELECT slug FROM tags WHERE id=(${resolver.tagId})) AS tag FROM staged`
+      )
+      const tagOf = new Map<string, string>()
+      for (const tag of reviewed.mapping.tags) {
+        if (!tag.cluster) tagOf.set(tag.slug, tag.slug)
+        for (const merged of tag.merges ?? []) tagOf.set(merged, tag.slug)
+      }
+      const hubOf = new Map(reviewed.mapping.tags.map(tag => [tag.slug, tag.hub]))
+      for (const slug of plan.retiring) {
+        const tag = tagOf.get(slug)
+        expect(resolveSlug.get(slug), slug).toEqual({ category: hubOf.get(tag ?? ''), tag })
+      }
       // The 141 left in Other, and the five held among them, carry no tag.
       expect(
         all(
