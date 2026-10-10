@@ -18,6 +18,9 @@
  * - `rename` and `fix-description` (`rename`, `keep-recategorize`): `listing-details-set` with the
  *   entry's `details`, and, when the entry's `category` is a live category, `listing-categories-set`
  *   out of Other. A proposed category no manifest has created leaves the listing in Other.
+ * - `claimHold: clear` (decision 6, on a `rename` whose `details.website` replaces the link that
+ *   caused its claim hold in 2026-10-06-listing-claim-holds): `listing-claim-hold-clear`, in a
+ *   fourth manifest published after the renames.
  *
  * Every operation expects the listing as the reviewed catalog's inventory
  * (d1/hygiene/2026-10-10-other-inventory.json) lists it: its categories (`[other]`), website, name,
@@ -88,6 +91,15 @@ export interface MismatchEntry {
   decision: MismatchDecision
   category?: string
   details?: ListingDetails
+  /** Decision 6: clear the listing's claim hold once its new website is set. */
+  claimHold?: 'clear'
+}
+
+/** A listing's claim hold, as the committed hold manifest placed it. */
+export interface ClaimHold {
+  slug: string
+  reason: string
+  note: string
 }
 
 /** A listing of the reviewed catalog's inventory, as each operation expects it. */
@@ -105,14 +117,17 @@ export const OTHER = 'other'
 export const mismatchPaths = {
   audit: 'd1/hygiene/2026-10-10-mismatch-audit.yaml',
   inventory: 'd1/hygiene/2026-10-10-other-inventory.json',
-  categories: 'd1/hygiene/2026-10-10-categories.json'
+  categories: 'd1/hygiene/2026-10-10-categories.json',
+  /** #100's holds (#67), published on both environments before #340. */
+  claimHolds: 'd1/publications/2026-10-06-listing-claim-holds.yaml'
 }
 
 /** The manifests this generator writes, by kind. */
 export const mismatchManifestIds = {
   removals: '2026-10-10-mismatch-removals',
   renames: '2026-10-10-mismatch-renames',
-  categories: '2026-10-10-mismatch-categories'
+  categories: '2026-10-10-mismatch-categories',
+  claimHolds: '2026-10-10-mismatch-claim-holds-clear'
 } as const
 export type MismatchManifestKind = keyof typeof mismatchManifestIds
 
@@ -194,22 +209,50 @@ export function committedListingChanges(
   return changes
 }
 
+/** The active claim holds a hold manifest leaves, by listing id. */
+export function committedClaimHolds(path = mismatchPaths.claimHolds): Map<string, ClaimHold> {
+  const manifest = parse(readFileSync(resolve(path), 'utf8')) as {
+    operations?: Array<{
+      action?: string
+      id: string
+      note?: string
+      reason?: string
+      slug: string
+    }>
+  }
+  const holds = new Map<string, ClaimHold>()
+  for (const operation of manifest.operations ?? []) {
+    if (operation.action === 'listing-claim-hold-add')
+      holds.set(operation.id, {
+        slug: operation.slug,
+        reason: operation.reason ?? '',
+        note: operation.note ?? ''
+      })
+    if (operation.action === 'listing-claim-hold-clear') holds.delete(operation.id)
+  }
+  return holds
+}
+
 /**
  * The operations of each manifest, in slug order. Refuses an audit that doesn't match the
  * inventory, a decision its verdict doesn't allow, details on a listing that isn't renamed or
- * fixed (or none on one that is), and a listing another committed manifest changes (`excluded`).
+ * fixed (or none on one that is), a listing another committed manifest changes (`excluded`), and
+ * a claim hold cleared on a listing that isn't held (`holds`) or whose link the rename doesn't
+ * replace.
  */
 export function mismatchOperations(
   entries: readonly MismatchEntry[],
   inventory: readonly InventoryListing[],
   liveCategories: ReadonlySet<string>,
-  excluded: ReadonlyMap<string, string> = new Map()
+  excluded: ReadonlyMap<string, string> = new Map(),
+  holds: ReadonlyMap<string, ClaimHold> = new Map()
 ) {
   const listings = new Map(inventory.map(listing => [listing.id, listing]))
   const seen = new Set<string>()
   const removals: Array<Record<string, unknown>> = []
   const renames: Array<Record<string, unknown>> = []
   const categories: Array<Record<string, unknown>> = []
+  const claimHolds: Array<Record<string, unknown>> = []
   // Code-point order, the same on every machine (localeCompare depends on the locale).
   for (const entry of [...entries].sort((a, b) =>
     a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0
@@ -246,11 +289,32 @@ export function mismatchOperations(
         }
       })
     }
-    if (!details) continue
+    if (!details) {
+      if (entry.claimHold !== undefined)
+        throw new Error(
+          `${entry.slug}: only a rename that replaces its website clears a claim hold.`
+        )
+      continue
+    }
     if (entry.decision === 'rename' && (!details.name || details.name === listing.name))
       throw new Error(`${entry.slug}: a rename needs a new name.`)
     if (entry.decision === 'fix-description' && Object.keys(details).join() !== 'description')
       throw new Error(`${entry.slug}: a description fix changes only the description.`)
+    if (entry.claimHold !== undefined) {
+      const hold = holds.get(entry.id)
+      if (entry.claimHold !== 'clear' || entry.decision !== 'rename' || !details.website)
+        throw new Error(
+          `${entry.slug}: only a rename that replaces its website clears a claim hold.`
+        )
+      if (!hold || hold.slug !== entry.slug)
+        throw new Error(`${entry.slug} has no claim hold in ${mismatchPaths.claimHolds}.`)
+      claimHolds.push({
+        action: 'listing-claim-hold-clear',
+        id: listing.id,
+        slug: listing.slug,
+        note: `#340 owner decision 6 (2026-10-10): 2026-10-10-mismatch-renames sets its website to ${details.website}; the hold was ${hold.reason} (${hold.note})`
+      })
+    }
     renames.push({
       action: 'listing-details-set',
       id: listing.id,
@@ -279,7 +343,7 @@ export function mismatchOperations(
         categories: [entry.category]
       })
   }
-  return { removals, renames, categories }
+  return { removals, renames, categories, claimHolds }
 }
 
 const headers: Record<MismatchManifestKind, (count: number, held: readonly string[]) => string> = {
@@ -314,8 +378,10 @@ const headers: Record<MismatchManifestKind, (count: number, held: readonly strin
 # (decision 5 retires the others). 2026-10-10-mismatch-categories moves the renamed listings whose
 # audit category is live out of Other.
 # Each listing-details-set compares and swaps the listing's slug, name, short description, and
-# website, refuses a listing whose own submission is in review, and refuses a new website that
-# another listing, a submission in flight, or a block already covers. It logs "Details edited".
+# website, refuses a listing whose own submission is in review or was rejected, and refuses a new
+# website that another listing, a submission in flight, or a block already covers. It logs
+# "Details edited". 2026-10-10-mismatch-claim-holds-clear then clears the claim holds of the renamed
+# listings whose new website replaces the link that caused them.
 `,
   categories:
     count => `# serpcompany/best.serp.co#340: move ${count} renamed listings out of Other to the category the audit
@@ -323,18 +389,39 @@ const headers: Record<MismatchManifestKind, (count: number, held: readonly strin
 # each listing's [other] with that category as its primary. Renamed listings whose audit category is
 # a proposed new one (d1/hygiene/2026-10-10-other-categories.yaml newCategories, which no manifest
 # creates; the taxonomy work is #341) or that have none stay in Other, and so does faceapp.com.
+`,
+  claimHolds:
+    count => `# serpcompany/best.serp.co#340: clear the instant-claim holds of ${count} renamed listings, as the owner
+# decided in chat on 2026-10-10 (decision 6). 2026-10-06-listing-claim-holds held each because its
+# serp.ly link ended on another company's domain (off_domain) or answered 404 (unreachable).
+# 2026-10-10-mismatch-renames gives each its own website, so the cause is gone; each note names the
+# new website and the old cause. ca.la keeps its hold: its link still ends on mercer.design.
+# Publish after 2026-10-10-mismatch-renames on each environment. listing-claim-hold-clear checks
+# the listing's id and slug and an active hold, not its website: cleared before the renames, the
+# listing would be claimable while its link still ends on the other domain.
 `
 }
 
-const footer = `# Generated by \`pnpm catalog:mismatch\` from the audit's decisions. Every operation expects the
+const rowsFooter = `# Generated by \`pnpm catalog:mismatch\` from the audit's decisions. Every operation expects the
 # listing as the reviewed inventory lists it (d1/hygiene/2026-10-10-other-inventory.json, the v1
 # import's values; no committed manifest changes them), filed under [other] alone. None is in the
 # 2026-10-10-other-categories batches (#333), 2026-10-10-other-removals,
 # 2026-10-10-duplicate-listings (#332), or its slug redirects (#338). Row-level: a listing that
 # changed since, or is no longer as expected, refuses the whole batch, with nothing written.
 # Publish after #333's batches and 2026-10-10-other-removals, staging first, then production after
-# promotion; the three #340 manifests apply in any order relative to each other.
+# promotion. The removals, renames, and categories apply in any order relative to each other;
+# 2026-10-10-mismatch-claim-holds-clear goes after the renames.
 `
+const footers: Record<MismatchManifestKind, string> = {
+  removals: rowsFooter,
+  renames: rowsFooter,
+  categories: rowsFooter,
+  claimHolds: `# Generated by \`pnpm catalog:mismatch\` from the audit's claimHold decisions and the holds of
+# 2026-10-06-listing-claim-holds. Row-level: a listing whose slug changed, or whose hold is no
+# longer active, refuses the whole batch, with nothing written. Staging first, then production
+# after promotion.
+`
+}
 
 /** A row-level manifest the publisher accepts (planned at any publication state), or an error. */
 function manifestSource(
@@ -349,7 +436,7 @@ function manifestSource(
     provenance: { actor: 'devinschumacher', workflow: 'github/publish-d1' },
     operations
   }
-  const source = `${headers[kind](operations.length, held)}${footer}${stringify(manifest, { lineWidth: 0 })}`
+  const source = `${headers[kind](operations.length, held)}${footers[kind]}${stringify(manifest, { lineWidth: 0 })}`
   buildPublicationPlan(parseManifest(source), source, new Date().toISOString(), {
     checksum: 'a'.repeat(64),
     version: 1
@@ -362,9 +449,10 @@ export function buildMismatchManifests(
   entries: readonly MismatchEntry[],
   inventory: readonly InventoryListing[],
   liveCategories: ReadonlySet<string>,
-  excluded: ReadonlyMap<string, string> = new Map()
+  excluded: ReadonlyMap<string, string> = new Map(),
+  holds: ReadonlyMap<string, ClaimHold> = new Map()
 ): Array<{ id: string; source: string }> {
-  const operations = mismatchOperations(entries, inventory, liveCategories, excluded)
+  const operations = mismatchOperations(entries, inventory, liveCategories, excluded, holds)
   const held = entries
     .filter(entry => entry.decision === 'hold')
     .map(entry => entry.slug)
@@ -377,9 +465,10 @@ export function buildMismatchManifests(
     }))
 }
 
-/** The committed inputs: the audit's decisions, the inventory, and the live categories. */
+/** The committed inputs: the audit's decisions, the inventory, the live categories, and the holds. */
 export function readMismatchInputs(paths = mismatchPaths): {
   entries: MismatchEntry[]
+  holds: Map<string, ClaimHold>
   inventory: InventoryListing[]
   liveCategories: Set<string>
 } {
@@ -395,16 +484,22 @@ export function readMismatchInputs(paths = mismatchPaths): {
       categories: Array<{ slug: string }>
     }
   ).categories
-  return { entries, inventory, liveCategories: new Set(categories.map(row => row.slug)) }
+  return {
+    entries,
+    holds: committedClaimHolds(paths.claimHolds),
+    inventory,
+    liveCategories: new Set(categories.map(row => row.slug))
+  }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
-  const { entries, inventory, liveCategories } = readMismatchInputs()
+  const { entries, holds, inventory, liveCategories } = readMismatchInputs()
   for (const { id, source } of buildMismatchManifests(
     entries,
     inventory,
     liveCategories,
-    committedListingChanges()
+    committedListingChanges(),
+    holds
   )) {
     writeFileSync(resolve('d1/publications', `${id}.yaml`), source)
     console.log(`Wrote d1/publications/${id}.yaml`)

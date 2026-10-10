@@ -10,7 +10,8 @@
 # 2026-10-10-duplicate-listings (#332), or its slug redirects (#338). Row-level: a listing that
 # changed since, or is no longer as expected, refuses the whole batch, with nothing written.
 # Publish after #333's batches and 2026-10-10-other-removals, staging first, then production after
-# promotion; the three #340 manifests apply in any order relative to each other.
+# promotion. The removals, renames, and categories apply in any order relative to each other;
+# 2026-10-10-mismatch-claim-holds-clear goes after the renames.
 version: 1
 id: 2026-10-10-mismatch-categories
 concurrency: rows

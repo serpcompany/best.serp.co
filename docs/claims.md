@@ -104,6 +104,10 @@ only creates the table, so an environment gets the holds by publishing the manif
 other catalog manifests. Re-run `pnpm catalog:domains -- --env production` periodically and
 publish a new hold manifest from its report ([Catalog hygiene](./catalog-hygiene.md)).
 
+`d1/publications/2026-10-10-mismatch-claim-holds-clear.yaml` clears five of those holds (#340):
+renamed listings whose new website, set by `2026-10-10-mismatch-renames`, replaces the link that
+caused the hold. Publish it after the renames ([Catalog hygiene](./catalog-hygiene.md#mismatched-listings-340)).
+
 ## Data
 
 `listing_claims` (`0008_listing_claims`): the claimer, the method (`badge` | `paid`), the status

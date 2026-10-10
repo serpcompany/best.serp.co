@@ -43,6 +43,10 @@
 #     manifest sets details.description. Its ai-photo-editors is a proposed category too, so it stays in Other.
 #   retire-instead-of-rename (decision 5): a rename whose long description still describes another product (an
 #     explainer, an article, terms or policies). The removals manifest unpublishes it with `unowned`, as decision 2.
+# claimHold: clear (the owner, in chat on 2026-10-10, decision 6): a rename whose new website replaces the link that
+#   caused its claim hold in d1/publications/2026-10-06-listing-claim-holds.yaml (off_domain: the link ended on
+#   another company's domain; unreachable: it answered 404). d1/publications/2026-10-10-mismatch-claim-holds-clear.yaml
+#   clears the hold, published after the renames manifest. ca.la keeps its hold: its link still ends on mercer.design.
 issue: serpcompany/best.serp.co#340
 checkedAt: "2026-10-10"
 decidedAt: "2026-10-10"
@@ -63,6 +67,7 @@ decisions:
   retire-instead-of-rename: 12
   rename: 8
   fix-description: 1
+claimHoldsCleared: 5
 listings:
   - slug: autoreviews.ai
     id: lst_9a0b151d58241705baa5f6c8
@@ -435,6 +440,7 @@ listings:
       name: "GovDash"
       description: "An AI platform for government contractors to discover, capture, price, propose and manage contracts."
       website: "https://www.govdash.com/"
+    claimHold: clear
   - slug: headlime.com
     id: lst_3181e3545f1555f3a2b97584
     verdict: keep-rewrite
@@ -531,6 +537,7 @@ listings:
       name: "Rhubarb"
       description: "Smart backyard gardens that coach you as you grow your own food, combining AI with human guidance."
       website: "https://joinrhubarb.com/"
+    claimHold: clear
   - slug: joinsquad.co
     id: lst_21c54d39c669ee0db1f92feb
     verdict: keep-rewrite
@@ -552,6 +559,7 @@ listings:
       name: "Kadoa"
       description: "AI agents that build, monitor and maintain web data pipelines, producing verified datasets for investment firms."
       website: "https://www.kadoa.com/"
+    claimHold: clear
   - slug: kaiber.ai
     id: lst_ca8f70fd1b9778d1678449c1
     verdict: keep-rewrite
@@ -1020,6 +1028,7 @@ listings:
       name: "TubeMagic"
       description: "AI that researches and writes YouTube scripts, titles, descriptions, tags and thumbnails. Formerly Morise.ai."
       website: "https://tubemagic.com/"
+    claimHold: clear
   - slug: twain.ai
     id: lst_1aa53dfc89bdec73e738beef
     verdict: keep-rewrite
@@ -1130,6 +1139,7 @@ listings:
       name: "Wizu"
       description: "AI-powered conversational surveys that collect customer feedback and turn it into organized, actionable insights."
       website: "https://www.wizu.com/"
+    claimHold: clear
   - slug: wnr.ai
     id: lst_e2679b55281eb985e69245b7
     verdict: retire-dead

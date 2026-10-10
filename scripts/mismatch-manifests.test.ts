@@ -8,6 +8,7 @@ import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-loca
 import { buildPublicationPlan, type PublicationManifest, parseManifest } from './d1-publisher.ts'
 import {
   buildMismatchManifests,
+  committedClaimHolds,
   committedListingChanges,
   type InventoryListing,
   type MismatchEntry,
@@ -42,7 +43,8 @@ const entries: MismatchEntry[] = [
     verdict: 'rename',
     decision: 'rename',
     category: 'ai-design',
-    details: { name: 'D New', description: 'What D does.', website: 'https://d.ai/' }
+    details: { name: 'D New', description: 'What D does.', website: 'https://d.ai/' },
+    claimHold: 'clear'
   }),
   entry('e', {
     verdict: 'rename',
@@ -58,6 +60,11 @@ const entries: MismatchEntry[] = [
   }),
   entry('g', { verdict: 'rename', decision: 'retire-instead-of-rename', category: 'ai-design' })
 ]
+/** d.ai's claim hold, which its rename clears (decision 6). */
+const holds = new Map([
+  ['lst_dddddddddddd', { slug: 'd.ai', reason: 'off_domain', note: 'ends on x.ai, not d.ai' }]
+])
+const noChanges = new Map<string, string>()
 /** The most statements a committed batch may plan to (#342 review: legacy-media-06 was 2,129). */
 const STATEMENT_CEILING = 2000
 const committed = (id: string): PublicationManifest =>
@@ -65,7 +72,13 @@ const committed = (id: string): PublicationManifest =>
 
 describe('the mismatch manifests (#340)', () => {
   it('turns each decision into its operations, and holds nothing', () => {
-    const { removals, renames, categories } = mismatchOperations(entries, inventory, live)
+    const { removals, renames, categories, claimHolds } = mismatchOperations(
+      entries,
+      inventory,
+      live,
+      noChanges,
+      holds
+    )
     expect(removals).toEqual([
       {
         action: 'listing-unpublish',
@@ -118,7 +131,16 @@ describe('the mismatch manifests (#340)', () => {
       },
       expect.objectContaining({ slug: 'f.ai', categories: ['ai-chatbots'] })
     ])
-    const manifests = buildMismatchManifests(entries, inventory, live)
+    // A rename whose new website replaces the link that caused its hold clears the hold.
+    expect(claimHolds).toEqual([
+      {
+        action: 'listing-claim-hold-clear',
+        id: 'lst_dddddddddddd',
+        slug: 'd.ai',
+        note: '#340 owner decision 6 (2026-10-10): 2026-10-10-mismatch-renames sets its website to https://d.ai/; the hold was off_domain (ends on x.ai, not d.ai)'
+      }
+    ])
+    const manifests = buildMismatchManifests(entries, inventory, live, noChanges, holds)
     expect(manifests.map(({ id }) => id)).toEqual(Object.values(mismatchManifestIds))
     for (const { source } of manifests) expect(parseManifest(source).concurrency).toBe('rows')
   })
@@ -171,32 +193,60 @@ describe('the mismatch manifests (#340)', () => {
       'a description fix that renames',
       replace('f.ai', { details: { name: 'F', description: 'x' } }),
       /changes only the description/u
+    ],
+    [
+      'a claim hold cleared by a rename that keeps its website',
+      replace('e.ai', { claimHold: 'clear' }),
+      /e\.ai: only a rename that replaces its website clears a claim hold/u
+    ],
+    [
+      'a claim hold cleared on a removal',
+      replace('g.ai', { claimHold: 'clear' }),
+      /g\.ai: only a rename that replaces its website clears a claim hold/u
     ]
   ])('refuses %s', (_name, given, message) => {
-    expect(() => mismatchOperations(given, inventory, live)).toThrow(message)
+    expect(() => mismatchOperations(given, inventory, live, noChanges, holds)).toThrow(message)
+  })
+
+  it('refuses to clear a claim hold the hold manifest never placed', () => {
+    expect(() => mismatchOperations(entries, inventory, live, noChanges, new Map())).toThrow(
+      /d\.ai has no claim hold in d1\/publications\/2026-10-06-listing-claim-holds\.yaml/u
+    )
+    const elsewhere = new Map([['lst_dddddddddddd', { slug: 'x.ai', reason: 'admin', note: 'x' }]])
+    expect(() => mismatchOperations(entries, inventory, live, noChanges, elsewhere)).toThrow(
+      /d\.ai has no claim hold/u
+    )
   })
 
   it('refuses a listing not filed under Other alone, or one another manifest changes', () => {
     const moved = inventory.map(item =>
       item.slug === 'a.ai' ? { ...item, categories: ['ai-design'] } : item
     )
-    expect(() => mismatchOperations(entries, moved, live)).toThrow(/not Other alone/u)
+    expect(() => mismatchOperations(entries, moved, live, noChanges, holds)).toThrow(
+      /not Other alone/u
+    )
     expect(() =>
-      mismatchOperations(entries, inventory, live, new Map([['lst_dddddddddddd', 'x.yaml']]))
+      mismatchOperations(entries, inventory, live, new Map([['lst_dddddddddddd', 'x.yaml']]), holds)
     ).toThrow(/d\.ai is changed by x\.yaml/u)
     // A held listing has no operation, so another manifest may change it.
     expect(() =>
-      mismatchOperations(entries, inventory, live, new Map([['lst_cccccccccccc', 'x.yaml']]))
+      mismatchOperations(entries, inventory, live, new Map([['lst_cccccccccccc', 'x.yaml']]), holds)
     ).not.toThrow()
   })
 
   it('keeps the committed manifests identical to what the audit generates', () => {
-    const { entries: decided, inventory: listings, liveCategories } = readMismatchInputs()
+    const {
+      entries: decided,
+      holds: held,
+      inventory: listings,
+      liveCategories
+    } = readMismatchInputs()
     const manifests = buildMismatchManifests(
       decided,
       listings,
       liveCategories,
-      committedListingChanges()
+      committedListingChanges(),
+      held
     )
     expect(manifests.map(({ id }) => id)).toEqual(Object.values(mismatchManifestIds))
     for (const { id, source } of manifests)
@@ -257,6 +307,26 @@ describe('the mismatch manifests (#340)', () => {
     ])
     expect(committed(mismatchManifestIds.renames).operations).toHaveLength(9)
     expect(committed(mismatchManifestIds.categories).operations).toHaveLength(4)
+    // Decision 6: the five renames whose new website replaces the link that caused their hold.
+    // ca.la keeps its hold: its rename keeps the serp.ly link, which still ends on mercer.design.
+    const cleared = committed(mismatchManifestIds.claimHolds).operations
+    expect(cleared.map(operation => ('slug' in operation ? operation.slug : ''))).toEqual([
+      'govdash.com',
+      'joinrhubarb.com',
+      'kadoa.com',
+      'tubemagic.com',
+      'wizu.com'
+    ])
+    const held = committedClaimHolds()
+    for (const operation of cleared) {
+      const item = verdicts.get('id' in operation ? operation.id : '')
+      expect(item?.decision, item?.slug).toBe('rename')
+      expect(item?.details?.website, item?.slug).toBeDefined()
+      expect(held.has(item?.id ?? ''), item?.slug).toBe(true)
+    }
+    const caLa = decided.find(item => item.slug === 'ca.la')
+    expect(held.has(caLa?.id ?? '')).toBe(true)
+    expect(caLa?.claimHold).toBeUndefined()
   })
 
   it("leaves out every listing #333's batches move, #332 retires, or other-removals removes", () => {
@@ -278,7 +348,12 @@ describe('the mismatch manifests (#340)', () => {
   })
 
   it('ignores a later manifest that changes one of these listings (#341 filing a rename)', () => {
-    const { entries: decided, inventory: listings, liveCategories } = readMismatchInputs()
+    const {
+      entries: decided,
+      holds: held,
+      inventory: listings,
+      liveCategories
+    } = readMismatchInputs()
     const govdash = committed(mismatchManifestIds.renames).operations.find(
       operation => 'slug' in operation && operation.slug === 'govdash.com'
     ) as { id: string; slug: string }
@@ -310,7 +385,8 @@ describe('the mismatch manifests (#340)', () => {
         decided,
         listings,
         liveCategories,
-        changes
+        changes,
+        held
       ))
         expect(readFileSync(resolve('d1/publications', `${id}.yaml`), 'utf8'), id).toBe(source)
       // The same change in a manifest these follow refuses them.
@@ -320,7 +396,8 @@ describe('the mismatch manifests (#340)', () => {
           decided,
           listings,
           liveCategories,
-          committedListingChanges(directory)
+          committedListingChanges(directory),
+          held
         )
       ).toThrow(/govdash\.com is changed by 2026-10-10-other-removals\.yaml/u)
     } finally {
@@ -329,7 +406,12 @@ describe('the mismatch manifests (#340)', () => {
   })
 
   it('applies after the Other batches and removals, as the reviewed inventory replays', () => {
-    const { entries: decided, inventory: listings, liveCategories } = readMismatchInputs()
+    const {
+      entries: decided,
+      holds: held,
+      inventory: listings,
+      liveCategories
+    } = readMismatchInputs()
     const db = new DatabaseSync(':memory:')
     for (const migration of freshMigrationNames())
       db.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
@@ -359,6 +441,12 @@ describe('the mismatch manifests (#340)', () => {
     db.exec(
       `INSERT INTO publication_state (id,version,checksum,published_at) VALUES (1,1,'${'a'.repeat(64)}','${now}')`
     )
+    // 2026-10-06-listing-claim-holds is published on both environments: its holds on these rows.
+    const hold = db.prepare(
+      'INSERT INTO listing_claim_holds (listing_id,reason,source,created_at) VALUES (?,?,?,?)'
+    )
+    const heldIds = listings.filter(item => held.has(item.id)).map(item => item.id)
+    for (const id of heldIds) hold.run(id, held.get(id)?.reason ?? '', 'manifest', now)
     db.exec('COMMIT')
     const liveCount = () =>
       (
@@ -366,12 +454,16 @@ describe('the mismatch manifests (#340)', () => {
           .prepare("SELECT COUNT(*) AS count FROM listings WHERE status='approved' AND is_active=1")
           .get() as { count: number }
       ).count
-    // The owner's dispatch order: #333's batches and its removals, then the three #340 manifests.
+    // The owner's dispatch order: #333's batches and its removals, then the four #340 manifests,
+    // the claim holds after the renames.
     const order = [
       ...committedOtherCategoryManifests().map(name => name.slice(0, -'.yaml'.length)),
       '2026-10-10-other-removals',
       ...Object.values(mismatchManifestIds)
     ]
+    expect(order.indexOf(mismatchManifestIds.claimHolds)).toBeGreaterThan(
+      order.indexOf(mismatchManifestIds.renames)
+    )
     let before = 0
     for (const id of order) {
       if (id === mismatchManifestIds.removals) before = liveCount()
@@ -435,5 +527,23 @@ describe('the mismatch manifests (#340)', () => {
         liveCategories.has(item.category)
       expect(JSON.parse(row.categories), item.slug).toEqual(moves ? [item.category] : ['other'])
     }
+    // Exactly the five holds decision 6 names are cleared, each recording the manifest and its
+    // note in full; every other hold stays.
+    const holds = db
+      .prepare('SELECT listing_id,cleared_by FROM listing_claim_holds WHERE cleared_at IS NOT NULL')
+      .all() as Array<{ cleared_by: string; listing_id: string }>
+    expect(holds.map(row => row.listing_id).sort()).toEqual(
+      decided
+        .filter(item => item.claimHold === 'clear')
+        .map(item => item.id)
+        .sort()
+    )
+    for (const row of holds)
+      expect(row.cleared_by).toMatch(
+        /^devinschumacher \(manifest 2026-10-10-mismatch-claim-holds-clear: #340 owner decision 6 .*\)\)$/u
+      )
+    expect(
+      db.prepare('SELECT COUNT(*) AS count FROM listing_claim_holds WHERE cleared_at IS NULL').get()
+    ).toEqual({ count: heldIds.length - 5 })
   })
 })
