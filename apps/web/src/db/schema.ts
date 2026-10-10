@@ -740,6 +740,12 @@ export const publicationRuns = sqliteTable(
   ]
 )
 
+/**
+ * Old listing slugs and the listing each answers 308 to (`listing_id`, followed to its current
+ * slug; `new_slug` is that slug when the row was written): the listing itself after a rename
+ * (`listing-slug-change`), or another live listing for an unpublished duplicate
+ * (`listing-slug-redirect`, #338). The product page reads it before it renders the 410 page.
+ */
 export const listingSlugRedirects = sqliteTable(
   'listing_slug_redirects',
   {

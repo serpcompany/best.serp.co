@@ -41,7 +41,8 @@ one of these extensions (`chart.js`), and a test checks the committed import.
   patterns from `.next/routes-manifest.json`), and the request reaches its page in one hop. Add
   static moved URLs there (not as a page that calls `permanentRedirect()`); `redirects.test.ts`
   checks that each destination is canonical and each source is matched in both slash forms.
-- **Redirects that need D1** run in their pages (renamed listing slugs) or in the Worker (the old
+- **Redirects that need D1** run in their pages (`listing_slug_redirects`: renamed listing slugs,
+  and unpublished duplicates sent to the listing they duplicated, #338) or in the Worker (the old
   root-level `/<slug>`, before the slash rule, `apps/web/src/lib/routing/legacy-root.ts`) and
   write a canonical destination (`getRoute`). The root-level lookup answers in one hop: a live
   listing, an active category, a retired listing slug followed through `listing_slug_redirects`

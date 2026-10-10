@@ -29,8 +29,12 @@ so every change to public output has publication provenance.
   another.
 - A listing has a **verified owner** while `listing_owners` has a current `owner` row. The badge
   is public output, so an ownership change advances the catalog epoch in the same batch.
-- Listing IDs are stable across slug changes; `listing_slug_redirects` maps a retired slug to its
-  listing.
+- Listing IDs are stable across slug changes; `listing_slug_redirects` maps a retired slug to the
+  listing it answers 308 to: its own after a rename, or another live listing for an unpublished
+  duplicate (`listing-slug-redirect`, #338). The product page looks a slug up there before it
+  renders the 410 page, and follows the listing's id to its current slug, so a later rename still
+  lands in one hop. A redirect never makes its unpublished listing public: it stays out of the
+  sitemap, search, RSS, and category pages.
 
 ## Catalog epoch
 
