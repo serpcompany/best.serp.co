@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import type { ReactNode } from 'react'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+import { cn } from '@/lib/utils'
 import { useCloseMobileSidebar } from './nav-main'
 
 const SERP_MARK =
@@ -17,44 +17,49 @@ export function SerpMark({ className }: { className?: string }) {
   )
 }
 
+/** serplists' `BrandMark`: the logo tile, with the SERP mark for its grid icon. */
+export function BrandMark({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground',
+        className
+      )}
+    >
+      <SerpMark className="size-4" />
+    </span>
+  )
+}
+
 /**
- * The sidebar's top entry. Without `subtitle` it is dashboard-01's logo and name; with one it
- * is sidebar-07's square logo tile over a name and a second line (for example "Admin").
+ * The sidebar's top row, serplists' `AppSidebar` brand: the logo tile and the name. With a
+ * `subtitle` (for example "Admin"), the name sits over it, as in sidebar-07.
  */
 export function SidebarBrand({
   href,
   title,
-  subtitle,
-  logo
+  subtitle
 }: {
   href: string
   title: string
   subtitle?: string
-  logo?: ReactNode
 }) {
   const close = useCloseMobileSidebar()
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        {subtitle ? (
-          <SidebarMenuButton size="lg" render={<Link href={href} onClick={close} />}>
-            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              {logo ?? <SerpMark className="size-4" />}
-            </div>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">{title}</span>
+        <SidebarMenuButton size="lg" tooltip={title} render={<Link href={href} onClick={close} />}>
+          <BrandMark className="size-8 rounded-lg" />
+          {subtitle ? (
+            <span className="grid min-w-0 flex-1 text-left leading-tight">
+              <span className="truncate font-semibold">{title}</span>
               <span className="truncate text-xs">{subtitle}</span>
-            </div>
-          </SidebarMenuButton>
-        ) : (
-          <SidebarMenuButton
-            className="data-[slot=sidebar-menu-button]:!p-1.5"
-            render={<Link href={href} onClick={close} />}
-          >
-            {logo ?? <SerpMark className="!size-5" />}
-            <span className="text-base font-semibold">{title}</span>
-          </SidebarMenuButton>
-        )}
+            </span>
+          ) : (
+            <span className="truncate font-semibold">{title}</span>
+          )}
+        </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>
   )

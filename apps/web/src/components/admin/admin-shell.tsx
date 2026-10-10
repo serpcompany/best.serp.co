@@ -1,26 +1,25 @@
 'use client'
 
-import { Box, CircleUser, ExternalLink, Inbox, Receipt, Users } from 'lucide-react'
+import { Box, ExternalLink, Inbox, Receipt, Users } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { signOut } from '@/components/auth/sign-in-api'
+import { type DashboardUser, SidebarAccountMenu } from '@/components/dashboard/account-menu'
 import { AppShell } from '@/components/dashboard/app-shell'
+import { type DashboardCrumb, DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { type DashboardNavItem, isNavItemActive, NavMain } from '@/components/dashboard/nav-main'
 import { NavSecondary } from '@/components/dashboard/nav-secondary'
-import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
 import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
-import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
-import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 /**
- * The admin shell (#64): shadcn sidebar-07 (`collapsible="icon"` with a rail, the logo tile,
- * NavUser with the switch to the account area), built from the shared dashboard pieces in
- * `@/components/dashboard/*` like the account shell. The layout renders it once, so
- * the sidebar keeps its state across admin pages; each page names its breadcrumb with
- * `AdminCrumbs`. Unbuilt areas are hidden: the Inbox arrives with #73 and Orders with #68
- * (`showOrders`).
+ * The admin shell (#64): shadcn sidebar-07 (`collapsible="icon"` with a rail, the logo tile),
+ * built from the shared dashboard pieces in `@/components/dashboard/*` like the account shell,
+ * with serplists' rows, footer and top bar (#261); the account menu links to the account area.
+ * The layout renders it once, so the sidebar keeps its state across admin pages; each page names
+ * its breadcrumb with `AdminCrumbs`. Unbuilt areas are hidden: the Inbox arrives with #73 and
+ * Orders with #68 (`showOrders`).
  */
 
 const CrumbsContext = createContext<{
@@ -52,19 +51,16 @@ function AdminHeader() {
   const pathname = usePathname() ?? ''
   const context = useContext(CrumbsContext)
   return (
-    <SiteHeader
+    <DashboardHeader
       crumbs={context?.crumbs ?? defaultCrumbs(pathname.toLowerCase())}
       actions={
-        <>
-          <a
-            href="/"
-            className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'hidden sm:flex')}
-          >
-            View site
-            <ExternalLink />
-          </a>
-          <ThemeToggle />
-        </>
+        <a
+          href="/"
+          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'hidden sm:flex')}
+        >
+          View site
+          <ExternalLink />
+        </a>
       }
     />
   )
@@ -116,17 +112,17 @@ export function AdminShell({
         sidebarHeader={<SidebarBrand href="/admin/submissions/" title="SERP" subtitle="Admin" />}
         sidebarContent={
           <>
-            <NavMain label="Admin" items={nav} />
+            <NavMain items={nav} />
             <NavSecondary
               className="mt-auto"
               items={[{ href: '/', icon: ExternalLink, title: 'View best.serp.co' }]}
             />
           </>
         }
-        sidebarFooter={
-          <NavUser
+        accountMenu={
+          <SidebarAccountMenu
             user={user}
-            links={[{ href: '/account/', icon: CircleUser, title: 'Switch to Account' }]}
+            links={[{ href: '/account/', title: 'Switch to Account' }]}
             onSignOut={() => void onSignOut()}
             signingOut={signingOut}
           />

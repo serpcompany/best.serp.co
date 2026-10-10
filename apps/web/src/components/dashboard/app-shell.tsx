@@ -7,24 +7,30 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarInset,
+  SidebarMenu,
+  SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
   useSidebar
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
+import { ThemeMenuButton } from './theme-menu-button'
 
 /**
  * The signed-in dashboard frame shared by `/account` (shadcn dashboard-01: `variant="inset"`,
  * `collapsible="offcanvas"`) and `/admin` (shadcn sidebar-07: `collapsible="icon"` with a
- * rail). The sidebar becomes a Sheet below the `md` breakpoint. Pages render inside the inset,
- * under `header` (usually `SiteHeader`).
+ * rail). Inside it, the rows follow serplists' `AppSidebar` (#261): the section rows in a
+ * "Dashboard" navigation, and a footer with the theme row over the account menu. The sidebar
+ * becomes a Sheet below the `md` breakpoint. Pages render inside the inset, under `header`
+ * (usually `DashboardHeader`).
  */
 export interface AppShellProps {
   children: ReactNode
-  /** Usually `SiteHeader`. */
+  /** Usually `DashboardHeader`. */
   header: ReactNode
   sidebarContent: ReactNode
-  sidebarFooter?: ReactNode
+  /** The last footer row, under the theme row: usually `SidebarAccountMenu`. */
+  accountMenu: ReactNode
   sidebarHeader?: ReactNode
   variant?: 'inset' | 'sidebar' | 'floating'
   collapsible?: 'offcanvas' | 'icon' | 'none'
@@ -37,6 +43,7 @@ export interface AppShellProps {
 }
 
 export function AppShell({
+  accountMenu,
   children,
   collapsible = 'offcanvas',
   contentClassName,
@@ -44,25 +51,30 @@ export function AppShell({
   header,
   rail = false,
   sidebarContent,
-  sidebarFooter,
   sidebarHeader,
   variant = 'inset'
 }: AppShellProps) {
   return (
     <SidebarProvider
       defaultOpen={defaultOpen}
-      style={
-        {
-          '--sidebar-width': 'calc(var(--spacing) * 64)',
-          '--header-height': 'calc(var(--spacing) * 12)'
-        } as CSSProperties
-      }
+      style={{ '--sidebar-width': 'calc(var(--spacing) * 64)' } as CSSProperties}
     >
       <Sidebar collapsible={collapsible} variant={variant}>
         <SidebarPanel collapsible={collapsible}>
           {sidebarHeader ? <SidebarHeader>{sidebarHeader}</SidebarHeader> : null}
-          <SidebarContent>{sidebarContent}</SidebarContent>
-          {sidebarFooter ? <SidebarFooter>{sidebarFooter}</SidebarFooter> : null}
+          <SidebarContent>
+            <nav aria-label="Dashboard" className="flex min-h-0 flex-1 flex-col">
+              {sidebarContent}
+            </nav>
+          </SidebarContent>
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <ThemeMenuButton />
+              </SidebarMenuItem>
+              <SidebarMenuItem>{accountMenu}</SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
         </SidebarPanel>
         {rail ? <SidebarRail /> : null}
       </Sidebar>
