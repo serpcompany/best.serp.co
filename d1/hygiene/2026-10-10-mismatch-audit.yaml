@@ -1,0 +1,988 @@
+# serpcompany/best.serp.co#340: the 139 listings #333 flagged as mismatch (copy that doesn't describe the product),
+# each checked against its website and its staging page on 2026-10-10. This file proposes; nothing here unpublishes,
+# renames, rewrites or recategorizes a listing. Retirements, renames and rewrites are the owner's decision.
+#   Input: the mismatch section of d1/hygiene/2026-10-10-other-owner-flags.yaml on issue-333-categorize-other
+#   (b4aa120), in its order, with names and copy from 2026-10-10-other-inventory.json. Categories come from
+#   2026-10-10-categories.json (existing) or 2026-10-10-other-categories.yaml newCategories (proposed).
+#   Website: curl (OpenSSL build, desktop Chrome User-Agent, 20 s timeout, at most 4 requests at a time) on the
+#   listing's website. serp.ly links answer 200 with a meta refresh, which was followed to the product. A request
+#   with no reply was retried once. A TLS failure was also tried over http. Redirects were traced hop by hop.
+#   Pages curl couldn't read (a Vercel or Cloudflare bot check, a JavaScript shell) were also opened in a desktop
+#   browser; where only the browser got through, status says so. Read-only page loads throughout.
+#   Staging: https://staging.best.serp.co/products/<slug>/ for all 139. Each answered 200, is filed under Other,
+#   and shows the description and copy in the inventory, so "staging copy" in evidence is what the page shows.
+#   Duplicates: no final host matched another listing's slug in staging's product sitemap (2,690 listings), and
+#   no new name matched another inventory listing, so no listing is a duplicate.
+# verdict:
+#   keep-recategorize: real, live, named correctly, and the copy needs at most a one-line fix; category given.
+#   keep-rewrite: real, live and named correctly, but the copy must be regenerated first; category given.
+#   rename: the website or the slug's own domain now hosts a renamed or successor product, named in renameTo
+#     (where the staging copy already describes that product, evidence says so); category given where one fits.
+#   retire-dead: down, parked, for sale, shut down, a placeholder, or waitlist only, or the link redirects to an
+#     unrelated page.
+#   retire-hijacked: the domain now serves gambling, spam or an unrelated business.
+#   retire-not-a-product: an article, blog, publisher, demo or research project.
+#   duplicate: the same product as another listing (none found).
+# finalUrl and status: where the website ended. status is the HTTP status, or dns-error, tls-error, cert-error or
+# timeout when nothing answered; long tracking query strings are cut.
+issue: serpcompany/best.serp.co#340
+checkedAt: "2026-10-10"
+source: "d1/hygiene/2026-10-10-other-owner-flags.yaml (mismatch) on issue-333-categorize-other at b4aa120"
+counts:
+  listings: 139
+  keep-recategorize: 1
+  keep-rewrite: 75
+  rename: 20
+  retire-dead: 23
+  retire-hijacked: 4
+  retire-not-a-product: 16
+  duplicate: 0
+listings:
+  - slug: autoreviews.ai
+    id: lst_9a0b151d58241705baa5f6c8
+    verdict: retire-dead
+    finalUrl: "http://autoreviews.ai/"
+    status: "409"
+    evidence: "https fails the TLS handshake twice; http answers Cloudflare 'DNS resolution error' (1001), so there is no site. Staging copy is an article on Lima restaurants"
+  - slug: auxworld.app
+    id: lst_5f6f2cffeb3e720033b6293b
+    verdict: keep-rewrite
+    category: ai-game-generator
+    finalUrl: "https://www.auxworld.app/"
+    status: "200"
+    evidence: "Live: 'AuxWorld — Type a Dream. Step Inside.', AI-generated multiplayer game worlds from a prompt. Staging copy is a GDPR policy summary"
+  - slug: bbva.com
+    id: lst_1155e368a2b3ce2b9bc406d5
+    verdict: retire-not-a-product
+    finalUrl: "https://www.bbva.com/en/can-gpt-3-help-during-conversations-with-our-spanish-speaking-customers/"
+    status: "404"
+    evidence: "serp.ly points to a BBVA blog post on GPT-3 with Spanish-speaking customers, now 'Error 404 | BBVA'. A bank's article, not a product; staging copy describes BBVA's subsidiaries"
+  - slug: beemerdocs.com
+    id: lst_9b54a5e9e2a0884f7117d021
+    verdict: keep-rewrite
+    category: ai-presentation-maker
+    finalUrl: "https://www.beemerdocs.com/"
+    status: "200"
+    evidence: "Live: 'Beemer - The AI-Powered Pitch Deck Generator' (Google Slides and PowerPoint decks). Staging copy is a generic AI-startups article"
+  - slug: bookhero.ai
+    id: lst_6bcc5fd4189ff3cea0108d0b
+    verdict: keep-rewrite
+    category: ai-book-writer
+    finalUrl: "https://www.bookhero.ai/"
+    status: "200"
+    evidence: "Live, thin page: 'BookHero', AI picture books for children ('create your own book in under 60 seconds', WordPics), © 2023. Staging copy is its terms of service"
+  - slug: brevity.sh
+    id: lst_5b9d0bd8b09ce53a24b488d5
+    verdict: retire-dead
+    finalUrl: "https://901593.toplakehorizon.com/"
+    status: "200"
+    evidence: "Parked: www.brevity.sh bounces through an ad-click feed (torroclk.com, subid=brevity.sh) to a '..Loading..' page on toplakehorizon.com; no product. Staging copy is a privacy summary"
+  - slug: browsegpt.ai
+    id: lst_661111087adaeb437f24c109
+    verdict: keep-rewrite
+    category: ai-automation-tools
+    finalUrl: "https://browsegpt.ai/"
+    status: "200"
+    evidence: "Live: 'BrowseGPT | AI browser automation Chrome extension', open source, runs on Claude or GPT models. Staging copy says Anthropic researchers built it, which is wrong"
+  - slug: builtin.com
+    id: lst_180026526d1b535cd7080e46
+    verdict: retire-not-a-product
+    finalUrl: "https://builtin.com/articles/ai-movie-script"
+    status: "200"
+    evidence: "Built In article 'AI Generated Script: How We Made a Movie With AI' (2021): writing about a short film, not a tool"
+  - slug: buzzfeed.com
+    id: lst_b917e08eb26f2af9ddeab347
+    verdict: retire-not-a-product
+    finalUrl: "https://www.buzzfeed.com/jp"
+    status: "200"
+    evidence: "serp.ly goes to buzzfeed.com, which lands on BuzzFeed Japan's homepage: a news and entertainment publisher, not a software tool. Staging copy wrongly says the app carries CNN and E! News"
+  - slug: ca.la
+    id: lst_2e730c948253ad95fd4a8da3
+    verdict: rename
+    renameTo: "Mercer (mercer.design)"
+    category: ai-design
+    finalUrl: "https://www.mercer.design/"
+    status: "200"
+    evidence: "ca.la 301s to www.mercer.design, 'Mercer: AI-Powered Tools for Fashion', which says 'Formerly Cala'. Staging copy already tells the Cala-to-Mercer story"
+  - slug: campari.com
+    id: lst_25b448bfdf296ace3f929e62
+    verdict: retire-not-a-product
+    finalUrl: "https://www.campari.com/red-diaries-fellini-forward"
+    status: "404"
+    evidence: "The Red Diaries / Fellini Forward page is 404 'Page not found – Campari'. It was a brand film campaign, not a tool"
+  - slug: chatwithdocs.co
+    id: lst_64261277839deb0c5967e676
+    verdict: keep-rewrite
+    category: ai-document-tools
+    finalUrl: "https://chatwithdocs.co/"
+    status: "200"
+    evidence: "Live: 'Chat With Docs - Ask Any Document. Share Any Answer.', chat with PDFs and Word docs with citations. Staging copy is a privacy and data-processing analysis"
+  - slug: chatworm.com
+    id: lst_f1aaec3b491292846c210ae6
+    verdict: keep-rewrite
+    category: ai-chatbots
+    finalUrl: "https://chatworm.com/"
+    status: "200"
+    evidence: "JavaScript shell with no visible text; title 'Chatworm', meta 'a cost-effective solution to ChatGPT ... Access ChatGPT API directly'. Staging copy is its privacy policy"
+  - slug: clip.audio
+    id: lst_46e586b88ad547c2938271b5
+    verdict: retire-dead
+    finalUrl: "https://www.clip.audio/"
+    status: "200"
+    evidence: "Page 'Clip - AI audio search engine' says 'The search is no longer available' and links to 4K Download's YouTube-to-MP3 converter. Staging copy describes EasyWMA, a YouTube-to-MP4 converter"
+  - slug: contractreader.io
+    id: lst_ef3784c483e678e16633d42b
+    verdict: keep-rewrite
+    category: ai-developer-tools
+    finalUrl: "https://www.contractreader.io/"
+    status: "200"
+    evidence: "Live: 'ContractReader', 'The best way to read and understand smart contracts' (Ethereum and L2 contract audit tool, not legal contracts). Staging copy is its privacy policy"
+  - slug: coolgiftideas.io
+    id: lst_8943cfd783321a23347689b9
+    verdict: keep-rewrite
+    category: ai-shopping-assistants
+    finalUrl: "https://www.coolgiftideas.io/"
+    status: "200"
+    evidence: "Live: 'Cool Gift Ideas | Free AI-Powered Gift Suggestions'. Staging copy is an outdoor-gifts listicle"
+  - slug: copylime.com
+    id: lst_ad67c4d0410bc6e2340069c1
+    verdict: keep-rewrite
+    category: ai-writing-assistants
+    finalUrl: "https://copylime.com/"
+    status: "200"
+    evidence: "Live: 'Write your blog articles, books, essays and more with Smart AI • Copylime' (starter, paragraph, listicle, headline and rewriter tools). Staging copy is a paraphrasing-techniques article"
+  - slug: coverletterwrite.com
+    id: lst_ec6b6907a2bfe632f3256ae9
+    verdict: keep-rewrite
+    category: ai-cover-letter-generator
+    finalUrl: "https://coverletterwrite.com/"
+    status: "200"
+    evidence: "Live, thin page: 'Cover Letter Write', an AI cover letter from a job post and your experience. Staging copy is HotConvo's privacy policy"
+  - slug: curaihealth.com
+    id: lst_2990348d63566133229bac88
+    verdict: keep-rewrite
+    category: ai-doctor
+    finalUrl: "https://curaihealth.com/"
+    status: "200"
+    evidence: "Live: 'Curai Health - Patients', affordable virtual primary care. Staging copy is about company culture and remote work"
+  - slug: deepmind.google
+    id: lst_60cd25ea97f789bebeccbbeb
+    verdict: retire-not-a-product
+    finalUrl: "https://deepmind.google/research/publications/"
+    status: "200"
+    evidence: "serp.ly goes to DeepMind's RETRO paper, which now redirects to the publications index. RETRO is a research model, not a product; staging copy covers Veo and Imagen"
+  - slug: detangle.ai
+    id: lst_100de91ad39ef1d481615e77
+    verdict: retire-dead
+    finalUrl: "https://detangle.ai/"
+    status: "403"
+    evidence: "Cloudflare 'DNS points to prohibited IP' (error 1000): the site is not served. Staging copy is its privacy policy"
+  - slug: dev-radar.com
+    id: lst_d6e3af78fcf56ee30a8cd2f6
+    verdict: retire-dead
+    finalUrl: "https://917631.toplakehorizon.com/"
+    status: "200"
+    evidence: "Parked: redirects twice to a '..Loading..' page on toplakehorizon.com (an ad-traffic redirect); no product. Staging copy is a JavaScript news roundup"
+  - slug: earningscall.ai
+    id: lst_e41fa6f53c3dbf173400bc25
+    verdict: rename
+    renameTo: "EarningsCall.ai (earningscall.ai)"
+    category: ai-financial-advisor
+    finalUrl: "https://www.earningscall.ai/"
+    status: "200 (browser; curl 429 Vercel checkpoint)"
+    evidence: "curl gets a Vercel checkpoint (429) at www.earningsdigest.ai; in a browser it redirects to www.earningscall.ai, 'AI Earnings Call Summaries and Insights', © EarningsCall.ai. Staging copy is a generic earnings-call explainer"
+  - slug: essaywriters.ai
+    id: lst_200354ee6d99cc882cf96231
+    verdict: keep-rewrite
+    category: ai-writing-assistants
+    finalUrl: "https://essaywriter.com/"
+    status: "200"
+    evidence: "essaywriters.ai 301s to essaywriter.com, 'AI Essay Writer | Essay Writer Free', from the same company (Devellux Inc. in its footer). Staging copy is its terms of use"
+  - slug: evintersection.com
+    id: lst_d5c89c7198f2d967643e7230
+    verdict: retire-not-a-product
+    finalUrl: "https://www.evintersection.com/"
+    status: "200"
+    evidence: "Live: 'EV Intersection — Compare Electric Vehicles by Range, Price, Performance', a catalog of 67 EVs with AI review summaries: a car-comparison content site, not a software tool. Staging copy is a 2023 best-EVs review"
+  - slug: extrapolate.app
+    id: lst_0151927a284dc3ec31aae926
+    verdict: keep-rewrite
+    category: ai-photo-editors
+    finalUrl: "https://extrapolate.app/"
+    status: "200"
+    evidence: "Live: 'Extrapolate - Transform your face with Artificial Intelligence' (see how you will age). Staging copy is its legal terms"
+  - slug: fabric.so
+    id: lst_fb706ee091f854530c2c5c15
+    verdict: keep-rewrite
+    category: ai-knowledge-management
+    finalUrl: "https://fabric.so/"
+    status: "200"
+    evidence: "Live: 'Fabric – the AI workspace that thinks with you' (files, notes, search, agents). Staging copy is its data-handling policy"
+  - slug: faceapp.com
+    id: lst_e0a376d8610948dc75b595bc
+    verdict: keep-recategorize
+    category: ai-photo-editors
+    finalUrl: "https://www.faceapp.com/"
+    status: "200"
+    evidence: "Live: 'FaceApp: Perfect Face Editor'. Staging content does describe FaceApp; only the one-line description (Google Maps imaging) is wrong and needs replacing"
+  - slug: fgeneds.com
+    id: lst_c0aadeefa42334af82659911
+    verdict: keep-rewrite
+    category: ai-education
+    finalUrl: "https://fgeneds.com/"
+    status: "200"
+    evidence: "Live: 'FGenEds | Turn Lecture Slides to Cheat Sheets' (upload a PDF of slides). Staging copy is a privacy-policy summary"
+  - slug: figma.com
+    id: lst_eb2eb75ce38971b317bc4b46
+    verdict: rename
+    renameTo: "Figma AI (figma.com/ai)"
+    category: ai-design
+    finalUrl: "https://www.figma.com/ai/"
+    status: "200"
+    evidence: "diagram.com fails TLS on https; on http it 301s to figma.com/ai, 'Figma AI', which took over Diagram. Staging copy is a FigJam sequence-diagram guide"
+  - slug: financebrain.ai
+    id: lst_16fdff0edd214351897faf6c
+    verdict: keep-rewrite
+    category: ai-tutor
+    finalUrl: "https://www.financebrain.ai/"
+    status: "200"
+    evidence: "Live: 'FinanceBrain — Your AI Tutor for Finance & Accounting'. Staging copy is an article on corporate finance careers"
+  - slug: findgiftsfor.com
+    id: lst_692155562a3ec71d881c94b9
+    verdict: keep-rewrite
+    category: ai-shopping-assistants
+    finalUrl: "https://www.findgiftsfor.com/"
+    status: "200"
+    evidence: "Live: 'ChatGPT Gift Search | Find Gifts For', AI gift ideas that link to Amazon. Staging copy is a Father's Day gift listicle"
+  - slug: flexos.work
+    id: lst_d94d392151ee20f82b1e4eb4
+    verdict: keep-rewrite
+    category: ai-productivity-tools
+    finalUrl: "https://www.leadwithai.co/tool/ai-action-plan-generator"
+    status: "200"
+    evidence: "flexos.work/tools/small-steps 301s to leadwithai.co (FlexOS is now Lead with AI), where the free 'Small Steps' AI Action Plan Generator is still live. Staging copy is a roundup of productivity tools"
+  - slug: flipped.ai
+    id: lst_9e5b6ba1460b0c5a2b6918e7
+    verdict: keep-rewrite
+    category: ai-recruiting
+    finalUrl: "https://flipped.ai/login?type=org&next=%2Forg"
+    status: "200"
+    evidence: "Live: 'Flipped.ai — Learn, Assess & Get Hired', an AI hiring platform with upskilling and job matching. Staging copy is its privacy practices"
+  - slug: freebeat.ai
+    id: lst_2488ec9a080057fc7a5815bb
+    verdict: keep-rewrite
+    category: ai-video-generators
+    finalUrl: "https://freebeat.ai/"
+    status: "200 (browser; curl 429 Vercel checkpoint)"
+    evidence: "curl gets a Vercel checkpoint (429); a browser shows 'freebeat AI Music Video Generator | Dance Video | Lyrics Video'. Staging copy turns it into home-fitness routines"
+  - slug: futurism.com
+    id: lst_733ce9e7037e300d90670f6f
+    verdict: retire-not-a-product
+    finalUrl: "https://futurism.com/the-byte/coca-cola-openai"
+    status: "200"
+    evidence: "Futurism article 'Coca-Cola Signs Deal With OpenAI's DALL-E and ChatGPT': news about a brand, not a tool"
+  - slug: gems.so
+    id: lst_ed623e45f614ed9cbc000eaf
+    verdict: keep-rewrite
+    category: ai-knowledge-management
+    finalUrl: "https://gems.so/"
+    status: "200"
+    evidence: "Live: 'Your AI knowledge assistant' (Gems), with pricing and Mac and Windows downloads. Staging copy is a data-protection summary"
+  - slug: getchunky.io
+    id: lst_c88519c73bddb939411702d4
+    verdict: keep-rewrite
+    category: ai-chatbots
+    finalUrl: "https://getchunky.io/"
+    status: "200"
+    evidence: "Live: 'Chunky - Build AI chatbots that feel human', no-code chatbots trained on your data. Staging copy is a privacy policy"
+  - slug: getmindguide.com
+    id: lst_cc0a13a08d17a3e60c2a6480
+    verdict: retire-dead
+    finalUrl: "https://getmindguide.com/"
+    status: "403"
+    evidence: "Cloudflare 'CNAME Cross-User Banned' (error 1014): the site is not served. Staging copy is a privacy and terms review"
+  - slug: getslate.ai
+    id: lst_e1f97383042d765ad2fad2a4
+    verdict: rename
+    renameTo: "Slate Keyboard (getslate.ai)"
+    category: ai-writing-assistants
+    finalUrl: "https://www.zeeno.ai/"
+    status: "tls-error"
+    evidence: "serp.ly goes to zeeno.ai, which fails TLS twice (http only 301s back to https), so Zeeno is gone. The slug's own getslate.ai is live as 'Slate Keyboard', an AI iPhone keyboard, and staging copy is Slate's terms"
+  - slug: getzuro.com
+    id: lst_b50056d12a6793a753ae8cfb
+    verdict: keep-rewrite
+    category: ai-agents
+    finalUrl: "https://getzuro.com/"
+    status: "200"
+    evidence: "askzuro.com 301s to getzuro.com, 'Zuro — Enterprise Agentic AI Platform'. Staging copy is a privacy policy and terms"
+  - slug: giftbox.co
+    id: lst_b0fd1a1cb800bcb33dff99e5
+    verdict: keep-rewrite
+    category: ai-shopping-assistants
+    finalUrl: "https://www.giftbox.co/"
+    status: "200"
+    evidence: "Live: 'Let the power of AI help you find the perfect Gift Ideas', a gift finder by type and age. Staging copy is subscription terms and a privacy policy"
+  - slug: glyf.in
+    id: lst_e6dd8701a58d74b3ccbc1960
+    verdict: retire-dead
+    finalUrl: "https://glyf.in/"
+    status: "200"
+    evidence: "For sale: the page loads only Above.com's for-sale script (forsale.min.js?d=glyf.in), with no title or content"
+  - slug: goheather.io
+    id: lst_309b2cfc6aff3767b829292c
+    verdict: rename
+    renameTo: "goHeather (goheather.io)"
+    category: ai-lawyer
+    finalUrl: "https://www.goheather.io/"
+    status: "200"
+    evidence: "tally.work 301s to goheather.io, 'goHeather | Legal AI for Contracts: Draft, Review, Negotiate'. Staging copy already describes goHeather"
+  - slug: google.com
+    id: lst_a24eed247152530e567d4b7c
+    verdict: retire-not-a-product
+    finalUrl: "https://www.google.com/"
+    status: "200"
+    evidence: "serp.ly goes to google.com's homepage. Apprentice Bard was Google's internal chatbot test (later Bard, now Gemini), never a product of its own; staging copy is about fantasy role-playing games"
+  - slug: govdash.com
+    id: lst_8b6bf8b5dea3e471120960e0
+    verdict: rename
+    renameTo: "GovDash (govdash.com)"
+    category: ai-sales-tools
+    finalUrl: "https://www.olli.ai/"
+    status: "404"
+    evidence: "olli.ai is 404 'Site Not Found | Framer'. The slug's govdash.com is live ('GovDash | Dash, the AI for Government Contractors') and staging copy already describes GovDash; no link to Olli.ai found"
+  - slug: headlime.com
+    id: lst_3181e3545f1555f3a2b97584
+    verdict: keep-rewrite
+    category: ai-copywriting
+    finalUrl: "https://headlime.com/?invite=Toiwtk8YSsQNtTZ4Qj0zRqMp2ne2"
+    status: "200"
+    evidence: "JavaScript shell with no visible text; title 'Write better marketing copy faster with AI. | Headlime'. Staging copy is a CSV formatting guide"
+  - slug: henshu.ai
+    id: lst_46f3a93fab87e9991efe28c0
+    verdict: retire-dead
+    finalUrl: "https://www.henshu.ai/"
+    status: "200"
+    evidence: "Page says 'Service Discontinued: Henshu has been shut down'"
+  - slug: heroguide.ai
+    id: lst_0fead6f869bf0b5685e44e3d
+    verdict: rename
+    renameTo: "HeroGuide Brand Story Generator (heroguide.ai)"
+    category: ai-marketing-tools
+    finalUrl: "https://www.heroguide.ai/"
+    status: "200"
+    evidence: "brandscriptgenerator.com 308s to heroguide.ai, 'Your AI HeroGuide Brand Story Generator'. Staging copy describes Chargezoom accounts receivable"
+  - slug: il.ly
+    id: lst_59edce7642b39c54683ffbc4
+    verdict: retire-dead
+    finalUrl: "https://il.ly/blog/app-mafia"
+    status: "200"
+    evidence: "castpush.com 301s to il.ly/blog/castpush and on to an unrelated post, 'App Mafia: Who They Are...', on Ilias Ism's blog: Castpush is gone. Staging copy reviews StoryChief and Typefully"
+  - slug: instant-portrait.com
+    id: lst_9dc79868e5357394ceeaf5e8
+    verdict: keep-rewrite
+    category: ai-avatar
+    finalUrl: "https://instant-portrait.com/"
+    status: "200"
+    evidence: "Live, thin page with no title: 'Instant Portrait ... Unlimited AI Generated Portraits of Yourself', an app download. Staging copy is its data-collection policy"
+  - slug: institutionalinvestor.com
+    id: lst_3eca7e30ed63d6e1e7187d61
+    verdict: retire-not-a-product
+    finalUrl: "https://www.institutionalinvestor.com/article/2bswpo28um6zpil13ot1c/opinion/an-interview-with-a-hyper-realistic-ai-powered-simulation-of-jerome-powell"
+    status: "200"
+    evidence: "Institutional Investor opinion piece 'An Interview With a Hyper-Realistic, AI-Powered Simulation of Jerome Powell': an article, not a tool"
+  - slug: interflexion.com
+    id: lst_26f1d1e47b825f8a0aee8c64
+    verdict: keep-rewrite
+    category: ai-career-coach
+    finalUrl: "https://interflexion.com/"
+    status: "200"
+    evidence: "Live: 'Welcome | Interflexion', AI role-play for leadership and interpersonal skills. Staging copy is a job posting"
+  - slug: irmoai.com
+    id: lst_22c26314c034b0506b9e10d2
+    verdict: keep-rewrite
+    category: ai-photo-editors
+    finalUrl: "https://www.irmoai.com/"
+    status: "200"
+    evidence: "Next.js shell with no title; rendered in a browser it is an AI photo-effects app (hairstyles, photoshoots, image-to-video, 'My Artworks', pricing). Staging copy is its terms and conditions"
+  - slug: itraveledthere.io
+    id: lst_b40d1965a9afbd5b5a9b6644
+    verdict: retire-not-a-product
+    finalUrl: "https://itraveledthere.io/"
+    status: "200"
+    evidence: "Homepage is a blog and Q&A 'knowledge base' about AI travel and dating headshots (2026 posts), with no app, sign-in or pricing. Staging copy is a travel-photography article"
+  - slug: ivy.ai
+    id: lst_6db5fa5f9739c00330650eae
+    verdict: keep-rewrite
+    category: ai-chatbots
+    finalUrl: "https://ivy.ai/"
+    status: "200"
+    evidence: "JavaScript shell; title 'Generative chatbots for higher education, healthcare and government.' Staging copy is a generic overview of AI"
+  - slug: jessezhang.org
+    id: lst_e8a8194c24cdf98a41854bac
+    verdict: retire-not-a-product
+    finalUrl: "https://jessezhang.org/llmdemo"
+    status: "200"
+    evidence: "A demo on Jesse Zhang's personal site, 'Demo of Custom GPTs', that asks for your own OpenAI API key: not a product"
+  - slug: joinrhubarb.com
+    id: lst_47f752f0373223f81dd5de9e
+    verdict: rename
+    renameTo: "Rhubarb (joinrhubarb.com)"
+    finalUrl: "https://artickl.com/"
+    status: "403"
+    evidence: "artickl.com blocks both curl and a browser (Cloudflare 'Sorry, you have been blocked'), so artickl is unchecked. The slug's joinrhubarb.com is live ('Rhubarb :: Grow smarter, not harder', AI gardening help) and staging copy already describes it; no category fits"
+  - slug: joinsquad.co
+    id: lst_21c54d39c669ee0db1f92feb
+    verdict: keep-rewrite
+    category: ai-productivity-tools
+    finalUrl: "https://www.joinsquad.co/quazilla"
+    status: "200"
+    evidence: "Live: 'Quazilla - ChatGPT Personal Coach by Squad', a WhatsApp goal and habit coach (©2023). Staging copy describes the Squad habit app instead"
+  - slug: kadoa.com
+    id: lst_0016fd7139440ce2b067e28b
+    verdict: rename
+    renameTo: "Kadoa (kadoa.com)"
+    category: ai-web-scraping
+    finalUrl: "https://www.kadoa.com/joblens"
+    status: "404"
+    evidence: "kadoa.com/joblens is 404, so Joblens is gone. kadoa.com is live ('Kadoa is the web data platform for investment firms') and staging copy already describes Kadoa"
+  - slug: kaiber.ai
+    id: lst_ca8f70fd1b9778d1678449c1
+    verdict: keep-rewrite
+    category: ai-video-generators
+    finalUrl: "https://kaiber.ai/"
+    status: "200"
+    evidence: "JavaScript shell; title 'Kaiber', meta 'AI Video Generation'. Staging copy is about Kaiber Labs' art projects"
+  - slug: kamaraapp.com
+    id: lst_e187bd1246ba1555202b9cd5
+    verdict: retire-dead
+    finalUrl: "https://kamaraapp.com/"
+    status: "200"
+    evidence: "Page says 'Project Sunset: Thanks to everyone who used Kamara ... It's no longer active'"
+  - slug: kleap.co
+    id: lst_43ecde23c619be17d8569b3e
+    verdict: keep-rewrite
+    category: ai-website-builders
+    finalUrl: "https://kleap.co/"
+    status: "200"
+    evidence: "Live: 'AI Builder for Apps, Tools, Sites & More | Kleap'. Staging copy is about its QR code generator"
+  - slug: klynk.ai
+    id: lst_c402e8563e7c2725905c9962
+    verdict: keep-rewrite
+    category: ai-sales-tools
+    finalUrl: "https://klynk.ai/"
+    status: "200"
+    evidence: "JavaScript shell; title 'Klynk Orchestra — Your Command Center for Customer Success Operations' (onboarding, renewals, QBRs). Staging copy is a data-collection policy"
+  - slug: knowbuddy.ai
+    id: lst_9dc185da437179d0e0812db2
+    verdict: retire-dead
+    finalUrl: "https://knowbuddy.ai/"
+    status: "200"
+    evidence: "Pre-registration page only ('AI without the faff', ChatGPT over WhatsApp, 'Pre-Register' and a demo video): no live product. Staging copy is a privacy summary"
+  - slug: korewa.ai
+    id: lst_66fa7b65e6de3a5ea8131ff2
+    verdict: keep-rewrite
+    category: ai-chatbots
+    finalUrl: "https://korewa.ai/"
+    status: "200"
+    evidence: "Live: 'korewa.AI', AI chat with user-made anime characters. Staging copy is its legal and privacy terms"
+  - slug: kotaku.com
+    id: lst_e5c385731eea4cf758a44cea
+    verdict: retire-not-a-product
+    finalUrl: "https://kotaku.com/what-happens-when-ai-tries-to-review-a-video-game-1847917110"
+    status: "200"
+    evidence: "Kotaku article 'What Happens When AI Tries To Review A Video Game' (2021): not a tool"
+  - slug: letsfoodie.com
+    id: lst_80f38e54e082d555c03e7016
+    verdict: rename
+    renameTo: "Let's Foodie AI Recipe Generator"
+    category: ai-recipe-generators
+    finalUrl: "https://letsfoodie.com/ai-recipe-generator/"
+    status: "200"
+    evidence: "Live: 'AI Recipe Generator (100% Free) | Let's Foodie', a free tool on a cooking site, not called 'Recipes By AI'. Staging copy is a mirepoix article"
+  - slug: lifesight.io
+    id: lst_c3685bbd8f03a485050b86f8
+    verdict: retire-dead
+    finalUrl: "https://www.getmoda.io/"
+    status: "dns-error"
+    evidence: "getmoda.io does not resolve (twice), so Moda is gone. The slug's lifesight.io blocks us (BlogVault firewall, 403), and staging copy describes Moda, not Lifesight"
+  - slug: linktr.ee
+    id: lst_3697ffd0390be1797de944d2
+    verdict: retire-dead
+    finalUrl: "https://linktr.ee/dreamlifeai"
+    status: "404"
+    evidence: "linktr.ee/dreamlifeai is 404 'Linktree | Page Not Found'. Staging copy describes a sales-recruitment scheme"
+  - slug: lovelacestudio.com
+    id: lst_49aeeb51a957c870506947e6
+    verdict: retire-hijacked
+    finalUrl: "https://lovelacestudio.com/"
+    status: "200"
+    evidence: "The title still says Lovelace Studio, but the page lists unrelated Spanish posts and a Russian review of the 1xBet betting app"
+  - slug: medium.com
+    id: lst_1911071766bbc41a9e8e013f
+    verdict: retire-not-a-product
+    finalUrl: "https://medium.com/geekculture/inventorbot-using-ai-to-generate-new-ideas-in-any-field-9345f9042df"
+    status: "403"
+    evidence: "A Medium article ('InventorBot: using AI to generate new ideas in any field'); Medium answers curl with a Cloudflare challenge. An article, not a tool"
+  - slug: meiro.cc
+    id: lst_0c970e9b0f6faca5ce1300c3
+    verdict: keep-rewrite
+    category: ai-marketing-tools
+    finalUrl: "https://meiro.cc/"
+    status: "200"
+    evidence: "Live: 'Meiro – AI-powered builder for tests and quizzes' for lead generation. Staging copy is a Make integration how-to"
+  - slug: mikeai.co
+    id: lst_e9c853a2b4c577c4f52c6089
+    verdict: keep-rewrite
+    category: ai-nutritionist
+    finalUrl: "https://www.mikeai.co/"
+    status: "200"
+    evidence: "JavaScript shell; title 'MikeAI - AI Meal Plans & Personalized Workout Routines'. Staging copy describes bank and card money transfers"
+  - slug: mirrorthink.ai
+    id: lst_d9b7038019521350945ec598
+    verdict: rename
+    renameTo: "Vicena (vicena.ai)"
+    category: ai-research-assistants
+    finalUrl: "https://vicena.ai/"
+    status: "200"
+    evidence: "mirrorthink.ai 301s to vicena.ai, 'Vicena — AI for Real Science' (simulations and lab experiments). Staging copy is subscription and refund policies"
+  - slug: mutinyhq.com
+    id: lst_414adeabaecab8db594c8c29
+    verdict: keep-rewrite
+    category: ai-sales-tools
+    finalUrl: "https://www.mutinyhq.com/"
+    status: "200"
+    evidence: "Live: 'Mutiny | The sales assistant built for customer-facing work', pivoted from website personalization. Staging copy is its privacy policy"
+  - slug: mynd.so
+    id: lst_5a79da39350f6b5cfb7c0242
+    verdict: keep-rewrite
+    category: ai-health
+    finalUrl: "https://www.mynd.so/"
+    status: "200"
+    evidence: "Live: 'Discover Mynd - Where Lifelong Learners Find Clarity', a self-reflection journaling app (release 12/12/2024). Staging copy is its privacy and terms"
+  - slug: namelyai.com
+    id: lst_f4eebe99eb569a99e17a804b
+    verdict: keep-rewrite
+    category: ai-voice-bots
+    finalUrl: "https://www.callconnect.ai/"
+    status: "200"
+    evidence: "serp.ly goes to callconnect.ai, live as 'Call Connect Conversational AI Agents' (AI phone agents); the slug namelyai.com shows only its domain name. Staging copy compares two privacy policies"
+  - slug: nautilushomeschool.com
+    id: lst_5dcb90595dbd5cd6f3aa781b
+    verdict: retire-dead
+    finalUrl: "https://www.nautilushomeschool.com/story-multiplier/"
+    status: "404"
+    evidence: "greatbookshomeschool.com/story-multiplier 301s to nautilushomeschool.com/story-multiplier, which is 404; the site is a homeschool curriculum"
+  - slug: notepd.com
+    id: lst_a8b275a1d9b4092d4474f6e3
+    verdict: keep-rewrite
+    category: ai-writing-assistants
+    finalUrl: "https://notepd.com/write_with_james"
+    status: "200"
+    evidence: "Live: 'Write with AI James Altucher | NotePD', an AI idea generator in James Altucher's style. Staging copy is an essay on his writing career"
+  - slug: nourishingsoftware.com
+    id: lst_a3a7b0ac3de6e92997424afa
+    verdict: retire-dead
+    finalUrl: "https://nourishingsoftware.com/productivity-pet-app"
+    status: "404"
+    evidence: "The Productivity Pet page is 404 'Page not found – Nourishing Software', now a genetic-health data company"
+  - slug: onetask.me
+    id: lst_be0db4b7d9c5ff6589f93827
+    verdict: rename
+    renameTo: "Fluidwave (simplerlist.com)"
+    category: ai-productivity-tools
+    finalUrl: "https://simplerlist.com/"
+    status: "200 (browser; curl 429 Vercel checkpoint)"
+    evidence: "curl gets a Vercel checkpoint (429) at simplerlist.com; a browser shows 'Fluidwave: Act Wisely' (AI tasks, email, calendar). onetask.me itself is 404 NOT_FOUND. Staging copy is an essay on AI decision trees"
+  - slug: ora.ai
+    id: lst_05cb99f9e2832e8d9a46dc86
+    verdict: keep-rewrite
+    category: ai-seo
+    finalUrl: "https://ora.ai/"
+    status: "200"
+    evidence: "Live: 'Ora | Make your site work for agents', which scores how AI agents find and use a site. Staging copy is its data-handling practices"
+  - slug: perxeive.com
+    id: lst_06fafc4b597cfd997189d43c
+    verdict: retire-dead
+    finalUrl: "https://www.perxeive.com/"
+    status: "200"
+    evidence: "Waitlist page only ('Be the first to know when the all new Perxeive launches') with a stray stock-ticker widget: no live product. Staging copy explains the ReAct framework"
+  - slug: philosophy.fyi
+    id: lst_d1c47389617fd3b00190a007
+    verdict: keep-rewrite
+    category: ai-chatbots
+    finalUrl: "https://www.philosophy.fyi/"
+    status: "200"
+    evidence: "Live: 'Ask a Philosopher Online', AI versions of Socrates, Nietzsche, Buddha and others. Staging copy is its privacy policy"
+  - slug: plantrips.net
+    id: lst_7c07fff1ceb3fff1a0ab5a70
+    verdict: retire-dead
+    finalUrl: "https://plantrips.net/"
+    status: "200"
+    evidence: "A fresh WordPress install ('Hello world! Welcome to WordPress', June 29, 2026) under the name PlanTrips, with no planner. Staging copy is a Thailand itinerary"
+  - slug: podcastworld.io
+    id: lst_49b36ab05426dce4b3af20df
+    verdict: retire-dead
+    finalUrl: "https://podcastdisclosed.com/"
+    status: "200 (browser; curl cert-error, then a bot check)"
+    evidence: "podcastdisclosed.com has a broken certificate chain and a bot check for curl; a browser shows 'This domain is coming soon.' Staging copy reviews popular podcasts"
+  - slug: prompthero.com
+    id: lst_7b9eb63603e37a100a34740c
+    verdict: keep-rewrite
+    category: ai-prompt-generator
+    finalUrl: "https://prompthero.com/"
+    status: "200"
+    evidence: "Live: 'Search Prompts for AI Image & Video Generation | PromptHero'. Staging copy describes one cyborg image prompt"
+  - slug: prompts.ai
+    id: lst_aa994ab82b20f971f6cde6a7
+    verdict: keep-rewrite
+    category: ai-automation-tools
+    finalUrl: "https://www.prompts.ai/"
+    status: "200"
+    evidence: "Live: '[prompts.ai] | Generative AI Tools for Enterprise Prompt Engineering', one platform for 35+ models and workflows. Staging copy is a one-line privacy summary"
+  - slug: question-aid.com
+    id: lst_71d2760fca9652cf7a87bf0b
+    verdict: keep-rewrite
+    category: ai-education
+    finalUrl: "https://question-aid.com/"
+    status: "200"
+    evidence: "Live: 'QuestionAid - Generate questions from any text', quizzes exported to Moodle and Kahoot. Staging copy is its terms of service"
+  - slug: quino.ai
+    id: lst_6c7b0c7299222e8d2453cd14
+    verdict: keep-rewrite
+    category: ai-education
+    finalUrl: "https://quino.ai/"
+    status: "200"
+    evidence: "JavaScript shell titled 'ExamAI - The LMS with AI marking'; rendered in a browser it is 'Quino - The LMS that grades every exam'. Staging copy is its terms and conditions"
+  - slug: rapideditor.org
+    id: lst_4275884092ff11a244ddc555
+    verdict: rename
+    renameTo: "Rapid (rapideditor.org)"
+    finalUrl: "https://rapideditor.org/"
+    status: "200 (past an expired certificate)"
+    evidence: "mapwith.ai has an expired certificate; past it, it 301s to rapideditor.org, 'Rapid Editor', an OpenStreetMap editor whose canonical is still mapwith.ai. Staging copy is its data policy; no category fits"
+  - slug: raplyrics.eu
+    id: lst_048fc38286c84531cfc79405
+    verdict: keep-rewrite
+    category: ai-rap-generator
+    finalUrl: "https://raplyrics.eu/"
+    status: "200"
+    evidence: "Live: 'Raplyrics – Generate your rap music punchlines.' Staging copy is mostly a rap-history essay"
+  - slug: react.dev
+    id: lst_9c69952e69ab3057da6774ab
+    verdict: retire-not-a-product
+    finalUrl: "https://react.dev/"
+    status: "200"
+    evidence: "serp.ly goes to reactjs.org, which 308s to react.dev, React's home and docs; there is no 'Text to JSX' tool. Staging copy is React's JSX guide"
+  - slug: reroom.ai
+    id: lst_2a2a252bb0118ce7668b1dd4
+    verdict: keep-rewrite
+    category: ai-interior-design
+    finalUrl: "https://reroom.ai/"
+    status: "200"
+    evidence: "Live: 'ReRoom | AI interior rendering', photoreal renders from model screenshots. Staging copy describes one sample office redesign"
+  - slug: riffusion.com
+    id: lst_d18bb5bd94d45912b957eef4
+    verdict: rename
+    renameTo: "Google Flow Music (flowmusic.app)"
+    category: ai-music-generators
+    finalUrl: "https://www.flowmusic.app/"
+    status: "200"
+    evidence: "www.riffusion.com 301s to producer.ai, which 301s to flowmusic.app, 'Google Flow Music' (AI song creation). Staging copy is its terms and data practices"
+  - slug: riogpt.com
+    id: lst_d63eeb22dc5a32c96514ef87
+    verdict: keep-rewrite
+    category: ai-email-writing-assistants
+    finalUrl: "https://riogpt.com/"
+    status: "200"
+    evidence: "Live, thin page: 'Rio ChatGPT powered AI Bot', AI email replies and summaries for Gmail (© 2024). Staging copy is its terms of use"
+  - slug: roblox.com
+    id: lst_0225b131dfae5a0f7ec1353d
+    verdict: keep-rewrite
+    category: ai-game-generator
+    finalUrl: "https://www.roblox.com/"
+    status: "200"
+    evidence: "Live (JavaScript shell): 'Play Free Online Games on Roblox', a game platform that fits only through its AI creation tools. Staging copy is its community standards"
+  - slug: salley.co
+    id: lst_ac7d8b7bc8ff1d40e833a485
+    verdict: keep-rewrite
+    category: ai-risk-management
+    finalUrl: "https://www.salley.co/"
+    status: "200"
+    evidence: "Live: 'Salley AI : Prevent enterprise program failures before they happen.' Staging copy is a leadership program's refund policy"
+  - slug: serper.dev
+    id: lst_d16531f2468cffa7d520320e
+    verdict: keep-rewrite
+    category: serp-api
+    finalUrl: "https://serper.dev/"
+    status: "200"
+    evidence: "Live: 'Serper - The World's Fastest and Cheapest Google Search API'. Staging copy is its data-collection practices"
+  - slug: seths.blog
+    id: lst_62dbd4f799836d0e7833fe41
+    verdict: retire-not-a-product
+    finalUrl: "https://seths.blog/bot/"
+    status: "200"
+    evidence: "A page on Seth Godin's blog, 'Ask an AI trained on Seth's writing': a blog feature, not a product. Staging copy is a blog essay about ChatGPT"
+  - slug: shello-ai.com
+    id: lst_353ad6a655ecb829238bb883
+    verdict: retire-hijacked
+    finalUrl: "https://1xlite-19465.pro/"
+    status: "200 (browser; curl tls-error, then a JavaScript redirect)"
+    evidence: "https fails TLS; http serves a 'Redirecting...' script that, in a browser, goes through cf.superrise.site to a 1xBet sports-betting site"
+  - slug: sketchpro.ai
+    id: lst_2f6d4577a08133c3860df9f1
+    verdict: keep-rewrite
+    category: ai-design
+    finalUrl: "https://sketchpro.ai/"
+    status: "200"
+    evidence: "Live: 'SketchPro - AI Copilot for Revit and Construction Documentation'. Staging copy is a templated privacy policy"
+  - slug: slashdreamer.com
+    id: lst_9b669e386179257df16f65b3
+    verdict: retire-dead
+    finalUrl: "https://slashdreamer.com/"
+    status: "timeout"
+    evidence: "https times out after 20 s twice; http only 301s to the same https: no reply"
+  - slug: steno.ai
+    id: lst_0940e0a8e3ac40d94be4aa4e
+    verdict: keep-rewrite
+    category: ai-chatbots
+    finalUrl: "https://www.steno.ai/"
+    status: "200"
+    evidence: "Live: 'Steno.ai | AI Twins for brands and experts', chat twins for coaches and influencers. Staging copy is its data collection and terms"
+  - slug: supermanage.ai
+    id: lst_de04ce8cc40f853146b1d6f6
+    verdict: retire-hijacked
+    finalUrl: "https://supermanage.ai/"
+    status: "200"
+    evidence: "Now 'Supermanage.ai — Popular AI Tools for Gambling Analysis', articles on slot odds. Staging copy is a team-management article"
+  - slug: synexr.com
+    id: lst_6b0a4492baa479f10c0ff396
+    verdict: retire-hijacked
+    finalUrl: "https://synexr.com/"
+    status: "200"
+    evidence: "Now 'synexr - Explore Australia: Your Ultimate Travel Guide', a travel blog. Staging copy describes a picnic reserve"
+  - slug: tally.so
+    id: lst_0fe97057f423a0ccbc2a27bc
+    verdict: rename
+    renameTo: "Tally (tally.so)"
+    category: ai-survey-tools
+    finalUrl: "https://tally.so/?ref=devin"
+    status: "200"
+    evidence: "serp.ly goes to tally.so/?ref=devin, 'Tally - Create Beautiful Forms for Free'; no 'Startup Pitch Generator' exists there, and staging copy already describes the Tally form builder"
+  - slug: teameet.cc
+    id: lst_7851f855e53e35b3f0317f14
+    verdict: keep-rewrite
+    category: ai-meeting-assistant
+    finalUrl: "https://www.teameet.cc/"
+    status: "200"
+    evidence: "JavaScript shell with no title; meta 'Teameet provides free and unlimited video calls and meetings ... realtime translation'. Staging copy is its data practices"
+  - slug: thinktask.io
+    id: lst_12153b22b196f08b84410376
+    verdict: keep-rewrite
+    category: ai-project-management
+    finalUrl: "https://www.thinktask.io/"
+    status: "200"
+    evidence: "Live: 'ThinkTask - ChatGPT with Task Management', AI project and team reports. Staging copy is pricing, privacy and terms"
+  - slug: timecomplexity.ai
+    id: lst_12051c8372fe6f55caa96816
+    verdict: keep-rewrite
+    category: ai-coding
+    finalUrl: "https://www.timecomplexity.ai/"
+    status: "200"
+    evidence: "Live: 'TimeComplexity.ai', paste code and get its Big O. Staging copy is a general time-complexity guide"
+  - slug: toptal.com
+    id: lst_c5eb74d3a5b1552e3053b613
+    verdict: retire-dead
+    finalUrl: "https://www.toptal.com/developers/no-code"
+    status: "200"
+    evidence: "welovenocode.com/ai-project-description-generator 301s to Toptal's 'Hire Freelance No-Code Developers' page: the generator is gone"
+  - slug: totemotech.com
+    id: lst_1b8b02fc8639ba2296b92ac3
+    verdict: retire-not-a-product
+    finalUrl: "https://totemotech.com/"
+    status: "200"
+    evidence: "'TotemoTech', an AI-generated daily podcast of Japan tech news whose latest episode is 2024-10-10: content, not a tool. Staging copy is one news roundup"
+  - slug: transkrip.xyz
+    id: lst_9d07564d525863952c348da8
+    verdict: keep-rewrite
+    category: ai-transcription
+    finalUrl: "https://www.transkrip.xyz/id"
+    status: "200"
+    evidence: "Live: 'Transkrip Audio dan Video ke Teks dengan AI', Indonesian audio and video transcription. Staging copy is its privacy and terms"
+  - slug: triplewhale.com
+    id: lst_4a8b8006361d29300b80f3de
+    verdict: rename
+    renameTo: "Moby by Triple Whale (triplewhale.com/moby-ai)"
+    category: ecommerce-analytics-tools
+    finalUrl: "https://www.triplewhale.com/moby-ai"
+    status: "200"
+    evidence: "triplewhale.com/willy 301s to /moby, then /moby-ai, 'Moby — Triple Whale', the AI agent that replaced Willy. Staging copy is an AI-in-marketing article"
+  - slug: trustfinta.com
+    id: lst_98d348511e769332b3d28049
+    verdict: keep-rewrite
+    category: ai-sales-tools
+    finalUrl: "https://finta.ai/"
+    status: "200"
+    evidence: "trustfinta.com 308s to finta.ai, 'Finta — AI Relationship Intelligence, CRM & Automation' for fundraising and sales. Staging copy leads with branded merchandise"
+  - slug: trychart.com
+    id: lst_795ef4aec773c35b3a889240
+    verdict: keep-rewrite
+    category: ai-accounting
+    finalUrl: "https://www.trychart.com/"
+    status: "200"
+    evidence: "serp.ly goes to getcharteditor.com, which 301s to trychart.com, 'Chart', 'Instant Access to Verified Tax Records' for fintechs (confirm it is the same Chart). Staging copy is its data-collection practices"
+  - slug: trykai.app
+    id: lst_70b06cbf874323fa578fc620
+    verdict: keep-rewrite
+    category: ai-writing-assistants
+    finalUrl: "https://trykai.app/"
+    status: "200"
+    evidence: "Live, thin page: 'KAI | KeyboardAI', 'ChatGPT Anywhere In Your iPhone' keyboard. Staging copy is its data practices"
+  - slug: tubemagic.com
+    id: lst_ba7217e8db768dd57cecb220
+    verdict: rename
+    renameTo: "TubeMagic (tubemagic.com)"
+    category: ai-content-creator
+    finalUrl: "https://morise.ai/"
+    status: "403"
+    evidence: "morise.ai returns Cloudflare 'DNS points to prohibited IP' (1000); tubemagic.com is live ('TubeMagic: Viral YouTube scripts in seconds', footer 'Tube Magic LLC (previously Morise.ai)') and staging copy already describes it"
+  - slug: twain.ai
+    id: lst_1aa53dfc89bdec73e738beef
+    verdict: keep-rewrite
+    category: ai-sales-tools
+    finalUrl: "https://www.twain.ai/"
+    status: "200"
+    evidence: "usetwain.com 301s to twain.ai, 'Twain: Outreach worth sending and replying to'; the display name should be Twain. Staging copy is its privacy practices"
+  - slug: typeblock.co
+    id: lst_1dc73ba63ac1ba4664e1c206
+    verdict: keep-rewrite
+    category: ai-app-builders
+    finalUrl: "https://www.typeblock.co/"
+    status: "200"
+    evidence: "Next.js shell with no title for curl; rendered in a browser it is 'Typeblock - Build AI apps with no-code'. Staging copy is an OpenAI API streaming tutorial"
+  - slug: ulog.ai
+    id: lst_d616541bc319bbf807ad3ed6
+    verdict: keep-rewrite
+    category: ai-productivity-tools
+    finalUrl: "https://ulog.ai/"
+    status: "200"
+    evidence: "Live: 'uLog.ai – Conversational journaling with an AI companion'. Staging copy is its security and bug-bounty practices"
+  - slug: up.codes
+    id: lst_45c9d56de66e6927a0c31051
+    verdict: keep-rewrite
+    category: ai-research-assistants
+    finalUrl: "https://up.codes/features/ai"
+    status: "200"
+    evidence: "Live, thin page: 'UpCodes Copilot | AI-Powered Compliance Research Assistant' for building codes. Staging copy summarizes New York City building codes"
+  - slug: usedouble.com
+    id: lst_9eb86fa44ddd6cdc89ec0b9b
+    verdict: keep-rewrite
+    category: ai-sales-tools
+    finalUrl: "https://www.usedouble.com/"
+    status: "200"
+    evidence: "Live: 'Double | Find and convert leads with hyper-targeted messages using AI'. Staging copy is its privacy policy"
+  - slug: versy.ai
+    id: lst_908cb59b33bde891eb1fb787
+    verdict: keep-rewrite
+    category: ai-real-estate-agent
+    finalUrl: "https://versy.ai/"
+    status: "200"
+    evidence: "Live: 'Software di marketing immobiliare per agenzie | Versy', Italian real-estate marketing content for agencies. Staging copy is its terms and privacy"
+  - slug: visus.ai
+    id: lst_0df9d8da7e9444769360a923
+    verdict: keep-rewrite
+    category: ai-knowledge-management
+    finalUrl: "https://www.visus.ai/"
+    status: "200"
+    evidence: "Live: 'Visus - Train your own ChatGPT AI' on your own documents. Staging copy is its data collection"
+  - slug: vogent.ai
+    id: lst_dba282aa0242c1e73fbc1590
+    verdict: rename
+    renameTo: "Vogent (vogent.ai)"
+    category: ai-voice-bots
+    finalUrl: "https://www.vogent.ai/"
+    status: "200"
+    evidence: "elto.ai 308s to vogent.ai, 'Vogent - Create AI Voice Agents', whose demo link is still calendly.com/elto. Staging copy is a web-design careers article"
+  - slug: webquery.net
+    id: lst_bc082459984d538bc3b0080b
+    verdict: keep-rewrite
+    category: ai-summarizers
+    finalUrl: "https://www.webquery.net/en"
+    status: "200"
+    evidence: "Live: 'WebQuery', chat about any link you upload. Staging copy is its terms and privacy policy"
+  - slug: wewritecards.com
+    id: lst_77ae684cc2eadf6a913e6c0d
+    verdict: retire-dead
+    finalUrl: "https://wewritecards.com/"
+    status: "200"
+    evidence: "Only a maintenance page ('We'll Be Back Soon!', reference SEC-ERR-...) to both curl and a browser. Staging copy describes Lazy Cards"
+  - slug: withpoly.com
+    id: lst_361c73d9369d39c27c3c2adc
+    verdict: keep-rewrite
+    category: ai-productivity-tools
+    finalUrl: "https://poly.app/"
+    status: "200"
+    evidence: "withpoly.com 301s to poly.app, 'Poly: The Intelligent Cloud File Browser' with AI search and chat. Staging copy is its customer agreement"
+  - slug: wiz.chat
+    id: lst_dd2e21700357ffbf55a374fb
+    verdict: keep-rewrite
+    category: ai-chatbots
+    finalUrl: "https://wiz.chat/"
+    status: "200"
+    evidence: "Live: 'Wiz.chat | Chat with your favorite characters.', free AI characters running locally in Chrome on your GPU. Staging copy is its terms of service"
+  - slug: wizu.com
+    id: lst_217eaa52954b8a32eaae9ab0
+    verdict: rename
+    renameTo: "Wizu (wizu.com)"
+    category: ai-survey-tools
+    finalUrl: "https://casestudywriter.ai/"
+    status: "dns-error"
+    evidence: "casestudywriter.ai does not resolve (twice). wizu.com is live ('Wizu: AI-Powered Conversational Surveys') and staging copy already describes Wizu"
+  - slug: wnr.ai
+    id: lst_e2679b55281eb985e69245b7
+    verdict: retire-dead
+    finalUrl: "https://wnr.ai/"
+    status: "200"
+    evidence: "Page says 'WNR.AI has shut down. As of January 1, 2026, WNR.AI is no longer available.'"
+  - slug: wonderplan.ai
+    id: lst_6176283ba2033646b3fbba64
+    verdict: keep-rewrite
+    category: ai-travel-agent
+    finalUrl: "https://wonderplan.ai/"
+    status: "200"
+    evidence: "Live: 'Wonderplan - Best AI Trip Planner, Free AI Travel Planner'. Staging copy is a sample US itinerary"
+  - slug: writepanda.ai
+    id: lst_7506e4284cf646247968a59c
+    verdict: rename
+    renameTo: "PandaStudio (writepanda.ai)"
+    category: ai-video-editor
+    finalUrl: "https://www.writepanda.ai/lifetime-signup"
+    status: "200"
+    evidence: "writepanda.io 301s to writepanda.ai, now 'PandaStudio: AI video editor for Claude, Codex and creators'. Staging copy is its privacy and terms"
+  - slug: writepaw.com
+    id: lst_06b2871c098329279341b86c
+    verdict: keep-rewrite
+    category: ai-writing-assistants
+    finalUrl: "https://writepaw.com/"
+    status: "200"
+    evidence: "Live: 'Writepaw | AI writing assistant for content creation and control'. Staging copy is its terms and privacy"
+  - slug: yesilhealth.com
+    id: lst_eecc7937b38e911c4bfe5e88
+    verdict: keep-rewrite
+    category: ai-doctor
+    finalUrl: "https://yesilhealth.com/"
+    status: "200"
+    evidence: "Live: 'Yesil — Understand your health. Find your next step.', AI for lab results and health questions. Staging copy is a women's health guide"
+  - slug: yoursearch.ai
+    id: lst_96bcf8728b85ea63ab330be1
+    verdict: retire-dead
+    finalUrl: "https://yoursearch.ai/"
+    status: "200"
+    evidence: "A default hosting page: 'This is the default server vhost ... domain name is either not yet pointed or is still propagating'"
+  - slug: zizoto.com
+    id: lst_3fa8fadd5f00694fa8480b01
+    verdict: keep-rewrite
+    category: ai-image-generators
+    finalUrl: "https://zizoto.com/"
+    status: "200"
+    evidence: "Live: 'Zizoto', generate AI images, remix others' and print posters. Staging copy is its terms of service"
