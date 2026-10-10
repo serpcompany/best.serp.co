@@ -33,6 +33,7 @@ const STOCK_UI = [
   'card',
   'checkbox',
   'collapsible',
+  'combobox',
   'command',
   'dialog',
   'drawer',

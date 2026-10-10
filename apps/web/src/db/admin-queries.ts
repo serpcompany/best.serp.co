@@ -2,7 +2,7 @@ import { selectAdminAllowlistPlan } from './admin-plans'
 import type { Database } from './client'
 import { toInstant } from './instants'
 import { listingWebsiteConflicts } from './listing-plans'
-import type { StatementPlan } from './plan-support'
+import { parseTagSlugs, type StatementPlan } from './plan-support'
 import type {
   BadgeCheckOutcome,
   ListingLinkRel,
@@ -162,7 +162,7 @@ export function selectSubmissionReviewPlans(submissionId: string): StatementPlan
           s.verification_attempts,s.last_verification_at,s.last_verification_error,
           s.badge_verified_at,s.reviewed_at,s.reviewed_by,s.reviewer_note,s.rejection_reason,
           s.rejection_category,s.withdrawal_reason,s.created_at,s.updated_at,s.content_version,
-          s.listing_id,s.published_checksum,COALESCE(s.block_key,s.slug) AS block_key,
+          s.listing_id,s.published_checksum,COALESCE(s.block_key,s.slug) AS block_key,s.tag_slugs,
           u.id AS owner_user_id,u.email AS owner_email,u.created_at AS owner_created_at,
           (SELECT COUNT(*) FROM listing_submissions o
             WHERE o.owner_user_id=s.owner_user_id AND o.id!=s.id) AS owner_other_submissions,
@@ -217,7 +217,8 @@ export function selectRevisionReviewPlans(revisionId: string): StatementPlan[] {
           r.category_slug,c.name AS category_name,r.logo_url,r.video_url,r.reviewer_note,
           ${revisionHostedLogoKey('r')} AS logo_key,
           r.rejection_reason,r.reviewed_at,r.reviewed_by,r.created_at,r.updated_at,
-          r.content_version,l.slug,l.website,l.name AS listing_name,l.checksum AS listing_checksum,
+          r.content_version,r.tag_slugs,l.slug,l.website,l.name AS listing_name,
+          l.checksum AS listing_checksum,
           l.link_rel AS listing_link_rel,
           CASE WHEN l.status='approved' AND l.is_active=1 AND l.published_at IS NOT NULL
             THEN 1 ELSE 0 END AS listing_live,
@@ -375,6 +376,10 @@ export function selectAdminListingPlans(slug: string): StatementPlan[] {
             JOIN categories c ON c.id=lc.category_id
             WHERE lc.listing_id=l.id AND c.is_active=0 ORDER BY lc.sort_order))
             AS retired_categories,
+          (SELECT json_group_array(json_object('slug',slug,'name',name,'active',is_active))
+            FROM (SELECT t.slug,t.name,t.is_active FROM listing_tags lt
+              JOIN tags t ON t.id=lt.tag_id WHERE lt.listing_id=l.id
+              ORDER BY lt.sort_order,t.slug)) AS tags,
           (SELECT o.user_id FROM listing_owners o
             WHERE o.listing_id=l.id AND o.role='owner' AND o.revoked_at IS NULL) AS owner_user_id,
           (SELECT o.verified_at FROM listing_owners o
@@ -472,6 +477,19 @@ export function selectResubmissionTargetPlan(
 export function selectActiveCategoriesPlan(): StatementPlan {
   return {
     sql: `SELECT slug,name FROM categories WHERE is_active=1 ORDER BY sort_order,name`,
+    params: []
+  }
+}
+
+/**
+ * Active tags for the tag fields (#341), with their hubs, in the hubs' display order and then
+ * the tags' own.
+ */
+export function selectActiveTagsPlan(): StatementPlan {
+  return {
+    sql: `SELECT t.slug,t.name,c.slug AS category,c.name AS category_name FROM tags t
+      JOIN categories c ON c.id=t.category_id AND c.is_active=1
+      WHERE t.is_active=1 ORDER BY c.sort_order,c.name,t.sort_order,t.name`,
     params: []
   }
 }
@@ -603,6 +621,8 @@ export interface SubmissionReview {
   slug: string
   status: SubmissionStatus
   submitter: Submitter | null
+  /** The Creator's suggested tags (#341), or null when none were given. */
+  tagSlugs: string[] | null
   updatedAt: string | null
   verificationAttempts: number
   videoUrl: string | null
@@ -651,6 +671,8 @@ export interface RevisionReview {
   stale: boolean
   status: RevisionStatus
   submitter: Submitter | null
+  /** The owner's tags (#341), or null: approval then leaves the listing's tags as they are. */
+  tagSlugs: string[] | null
   updatedAt: string | null
   videoUrl: string | null
   website: string
@@ -734,6 +756,14 @@ export interface AdminListingDetail extends AdminListingRow {
     submitterEmail: string | null
   } | null
   submissionQueued: boolean
+  /** Its tags in order (the first is the most central), retired ones included (#341). */
+  tags: ListingTag[]
+}
+
+export interface ListingTag {
+  active: boolean
+  name: string
+  slug: string
 }
 
 export interface CategoryOption {
@@ -741,7 +771,24 @@ export interface CategoryOption {
   slug: string
 }
 
+/** An active tag with its hub (#341). */
+export interface TagOption {
+  category: string
+  categoryName: string
+  name: string
+  slug: string
+}
+
 type Row = Record<string, unknown>
+
+function parseListingTags(value: unknown): ListingTag[] {
+  if (typeof value !== 'string' || !value) return []
+  return (JSON.parse(value) as Array<Record<string, unknown>>).map(tag => ({
+    active: Number(tag.active) === 1,
+    name: text(tag.name),
+    slug: text(tag.slug)
+  }))
+}
 
 function parseLogoQueue(value: unknown): AdminListingDetail['logoQueue'] {
   if (typeof value !== 'string' || !value) return null
@@ -834,6 +881,7 @@ export interface AdminReadOperations {
   getRevisionReview(revisionId: string): Promise<RevisionReview | null>
   getSubmissionReview(submissionId: string): Promise<SubmissionReview | null>
   listActiveCategories(): Promise<CategoryOption[]>
+  listActiveTags(): Promise<TagOption[]>
   listReviewQueue(view: ReviewQueueView): Promise<ReviewQueueItem[]>
   reviewQueueCounts(): Promise<ReviewQueueCounts>
   searchListings(
@@ -906,7 +954,8 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
               submitterEmail: optionalText(row.submitter_email)
             }
           : null,
-        submissionQueued: Number(row.submission_queued) === 1
+        submissionQueued: Number(row.submission_queued) === 1,
+        tags: parseListingTags(row.tags)
       }
     },
 
@@ -954,6 +1003,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         stale: text(row.base_checksum) !== text(row.listing_checksum),
         status: text(row.status) as RevisionStatus,
         submitter: submitter(row),
+        tagSlugs: parseTagSlugs(row.tag_slugs),
         updatedAt: toInstant(row.updated_at),
         videoUrl: optionalText(row.video_url),
         website: text(row.website)
@@ -1018,6 +1068,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         slug: text(row.slug),
         status: text(row.status) as SubmissionStatus,
         submitter: submitter(row),
+        tagSlugs: parseTagSlugs(row.tag_slugs),
         updatedAt: toInstant(row.updated_at),
         verificationAttempts: Number(row.verification_attempts ?? 0),
         videoUrl: optionalText(row.video_url),
@@ -1039,6 +1090,16 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
     async listActiveCategories() {
       const result = await statement(selectActiveCategoriesPlan()).all<Row>()
       return result.results.map(row => ({ name: text(row.name), slug: text(row.slug) }))
+    },
+
+    async listActiveTags() {
+      const result = await statement(selectActiveTagsPlan()).all<Row>()
+      return result.results.map(row => ({
+        category: text(row.category),
+        categoryName: text(row.category_name),
+        name: text(row.name),
+        slug: text(row.slug)
+      }))
     },
 
     async listReviewQueue(view) {

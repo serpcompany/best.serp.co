@@ -6,10 +6,11 @@ import { ListingEdit } from '@/components/account/listing-edit'
 import { requireAccountUser } from '@/lib/account/pages'
 import { accountOperations } from '@/lib/account/runtime'
 import { categoryChoices } from '@/lib/account/view'
-import { getActiveCategories } from '@/lib/catalog/repository'
+import { getActiveCategories, getActiveTags } from '@/lib/catalog/repository'
 import { featureCopy } from '@/lib/feature-copy'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
+import { tagChoices } from '@/lib/submissions/presentation'
 
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
@@ -41,7 +42,7 @@ export default async function AccountListingEditPage({
   ) {
     redirect(`/account/submissions/${listing.submission.id}/`)
   }
-  const categories = await getActiveCategories()
+  const [categories, tags] = await Promise.all([getActiveCategories(), getActiveTags()])
   const revision = listing.revision
   return (
     <>
@@ -61,6 +62,7 @@ export default async function AccountListingEditPage({
           slug: revision?.categorySlug ?? listing.categorySlug
         })}
         faqsHint={featureCopy().faqsHint ?? ''}
+        tags={tagChoices(categories, tags)}
         view={{
           categoryName: listing.categoryName,
           categorySlug: listing.categorySlug ?? '',
@@ -74,6 +76,7 @@ export default async function AccountListingEditPage({
           resourceLinks: listing.resourceLinks,
           revision,
           slug: listing.slug,
+          tags: listing.tags,
           website: listing.website
         }}
       />

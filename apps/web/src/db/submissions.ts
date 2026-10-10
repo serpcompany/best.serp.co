@@ -8,10 +8,12 @@ import type { ListingDetail } from './contracts'
 import { toInstant } from './instants'
 import { listingIdsWithWebsite } from './listing-plans'
 import { isMediaKey, mediaUrl } from './media-keys'
+import { parseTagSlugs } from './plan-support'
 import { validatePublicHttpUrl } from './public-url'
 import {
   categories,
   listingSubmissionRateLimits,
+  MAX_SUGGESTED_TAGS,
   type SubmissionPlan,
   type SubmissionStatus
 } from './schema'
@@ -90,6 +92,11 @@ export interface DraftContent {
   description: string
   logoUrl: string
   name: string
+  /**
+   * The Creator's suggested tags (#341): up to three active tag slugs. Left out, an edit keeps
+   * the stored ones; an empty list is stored as null ("not given").
+   */
+  tagSlugs?: string[]
 }
 
 export interface NewDraftInput extends DraftContent {
@@ -136,6 +143,8 @@ export interface OwnSubmission {
   plan: SubmissionPlan | null
   slug: string
   status: SubmissionStatus
+  /** The Creator's suggested tags (#341), in order; empty when none were given. */
+  tagSlugs: string[]
   verificationAttempts: number
   website: string
 }
@@ -195,6 +204,7 @@ interface OwnSubmissionRow {
   plan: SubmissionPlan | null
   slug: string
   status: SubmissionStatus
+  tag_slugs: string | null
   verification_attempts: number
   website: string
 }
@@ -242,7 +252,7 @@ async function sha256(value: string): Promise<string> {
 const OWN_SUBMISSION_COLUMNS = `s.id,s.slug,s.name,s.description,s.website,s.content,s.category_slug,
   c.name AS category_name,s.logo_url,s.status,s.plan,s.draft_saved_at,s.badge_verified_at,
   s.verification_attempts,s.last_verification_at,s.last_verification_error,s.content_version,
-  s.created_at`
+  s.created_at,s.tag_slugs`
 
 function toOwnSubmission(row: OwnSubmissionRow): OwnSubmission {
   return {
@@ -262,6 +272,7 @@ function toOwnSubmission(row: OwnSubmissionRow): OwnSubmission {
     plan: row.plan,
     slug: row.slug,
     status: row.status,
+    tagSlugs: parseTagSlugs(row.tag_slugs) ?? [],
     verificationAttempts: row.verification_attempts,
     website: row.website
   }
@@ -427,7 +438,42 @@ export function validateDraftContent(
   if (logo.url.protocol !== 'https:' && !allowInsecureLogos) {
     throw new SubmissionError('invalid_logo', 'Use an image address that starts with https://.')
   }
-  return { categorySlug, content: body, description, logoUrl, name }
+  const checked: DraftContent = { categorySlug, content: body, description, logoUrl, name }
+  if (content.tagSlugs !== undefined) {
+    const tags = content.tagSlugs.map(tag => tag.trim())
+    if (
+      tags.length > MAX_SUGGESTED_TAGS ||
+      new Set(tags).size !== tags.length ||
+      tags.some(tag => !tag)
+    ) {
+      throw new SubmissionError('invalid_tags', TAGS_MESSAGE)
+    }
+    checked.tagSlugs = tags
+  }
+  return checked
+}
+
+const TAGS_MESSAGE = `Choose up to ${MAX_SUGGESTED_TAGS} tags from the list.`
+
+/**
+ * Whether every tag is an active tag (#341): new saves suggest only tags that exist, as they
+ * name only an active category.
+ */
+export async function activeTags(client: Database, tags: readonly string[]): Promise<boolean> {
+  if (tags.length === 0) return true
+  const row = await client.binding
+    .prepare(
+      `SELECT COUNT(*) AS found FROM tags t JOIN categories c ON c.id=t.category_id
+        AND c.is_active=1 WHERE t.is_active=1 AND t.slug IN (SELECT value FROM json_each(?))`
+    )
+    .bind(JSON.stringify(tags))
+    .first<{ found: number }>()
+  return Number(row?.found ?? 0) === tags.length
+}
+
+/** Tags as `tag_slugs` stores a submission's: an empty list is "not given" (null). */
+export function storedTagSlugs(tags: readonly string[] | undefined): string | null {
+  return tags && tags.length > 0 ? JSON.stringify(tags) : null
 }
 
 async function runPlans(client: Database, plans: SubmissionStatementPlan[]): Promise<boolean> {
@@ -593,6 +639,9 @@ export function createSubmissionOperations(config: {
         checkKey(key, website, ownerUserId)
       ])
       if (!category) throw new SubmissionError('invalid_category', 'Choose a primary category.')
+      if (!(await activeTags(client, content.tagSlugs ?? []))) {
+        throw new SubmissionError('invalid_tags', TAGS_MESSAGE)
+      }
       if (availability.kind !== 'available') throw unavailableError(availability)
 
       const id = crypto.randomUUID()
@@ -602,9 +651,9 @@ export function createSubmissionOperations(config: {
           // A draft is native (#62 contract): owner, block key and scope, no plan, and the
           // draft clock from this first save, which edits never reset.
           sql: `INSERT INTO listing_submissions
-            (id,slug,name,description,website,content,category_slug,logo_url,status,plan,
-              owner_user_id,draft_saved_at,block_key,block_covers_subdomains)
-            VALUES (?,?,?,?,?,?,?,?,'draft',NULL,?,?,?,?)`,
+            (id,slug,name,description,website,content,category_slug,logo_url,tag_slugs,status,
+              plan,owner_user_id,draft_saved_at,block_key,block_covers_subdomains)
+            VALUES (?,?,?,?,?,?,?,?,?,'draft',NULL,?,?,?,?)`,
           params: [
             id,
             key.hostKey,
@@ -614,6 +663,7 @@ export function createSubmissionOperations(config: {
             content.content,
             content.categorySlug,
             content.logoUrl,
+            storedTagSlugs(content.tagSlugs),
             ownerUserId,
             now,
             key.blockKey,
@@ -655,6 +705,9 @@ export function createSubmissionOperations(config: {
           .limit(1)
       )
       if (!category) throw new SubmissionError('invalid_category', 'Choose a primary category.')
+      if (!(await activeTags(client, checked.tagSlugs ?? []))) {
+        throw new SubmissionError('invalid_tags', TAGS_MESSAGE)
+      }
       const updated = await runPlans(
         client,
         buildReplaceSubmissionContentPlans({
@@ -667,7 +720,10 @@ export function createSubmissionOperations(config: {
             faqs: [],
             logoUrl: checked.logoUrl,
             name: checked.name,
-            resourceLinks: []
+            resourceLinks: [],
+            ...(checked.tagSlugs === undefined
+              ? {}
+              : { tagSlugs: checked.tagSlugs.length > 0 ? checked.tagSlugs : null })
           },
           expectedContentVersion,
           expectedStatuses: [current.status],

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { type ReactNode, useState } from 'react'
 import { toast } from 'sonner'
 import { ProductLogo, ToneAlert } from '@/components/submit/submit-ui'
+import { type TagChoice, TagsCombobox } from '@/components/submit/tags-combobox'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,11 +19,11 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { FieldGroup } from '@/components/ui/field'
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { formatDay, formatStamp } from '@/lib/account/format'
-import { hostOf } from '@/lib/submissions/contract'
+import { hostOf, SUBMISSION_TAG_LIMIT } from '@/lib/submissions/contract'
 import { discardRevision, saveRevision } from './account-api'
 import {
   type CategoryChoice,
@@ -77,10 +78,14 @@ export interface ListingEditView extends Extras {
         reviewedAt: string | null
         reviewerNote: string | null
         status: 'approved' | 'changes_requested' | 'pending_review' | 'rejected' | 'withdrawn'
+        /** The revision's tags, or null when it leaves the listing's as they are (#341). */
+        tagSlugs: string[] | null
         updatedAt: string
       })
     | null
   slug: string
+  /** The listing's active tags (#341). */
+  tags: string[]
   website: string
 }
 
@@ -96,9 +101,11 @@ function MessageButton() {
 /** One field's before and after, or the items added and removed from a list. */
 function Changes({
   revision,
+  tagLabel,
   view
 }: {
   revision: NonNullable<ListingEditView['revision']>
+  tagLabel: (slug: string) => string
   view: ListingEditView
 }) {
   const blocks: ReactNode[] = []
@@ -192,6 +199,7 @@ function Changes({
     revision.faqs.map(faq),
     item => (JSON.parse(item) as string[])[0]
   )
+  if (revision.tagSlugs) list('Tags', view.tags, revision.tagSlugs, tagLabel)
   list('Links', view.resourceLinks.map(link), revision.resourceLinks.map(link), item => {
     const [label, url] = JSON.parse(item) as string[]
     return (
@@ -219,10 +227,13 @@ function Changes({
 export function ListingEdit({
   categories,
   faqsHint,
+  tags,
   view
 }: {
   categories: readonly CategoryChoice[]
   faqsHint: string
+  /** The active tags (#341). */
+  tags: readonly TagChoice[]
   view: ListingEditView
 }) {
   const router = useRouter()
@@ -242,13 +253,17 @@ export function ListingEdit({
   const [editing, setEditing] = useState(open?.status !== 'pending_review')
   const [value, setValue] = useState<ContentValue>(original)
   const [extras, setExtras] = useState<ExtrasValue>(() => extrasValue(source))
-  const [errors, setErrors] = useState<ContentErrors>({})
+  const originalTags = open?.tagSlugs ?? view.tags
+  const [tagSlugs, setTagSlugs] = useState<string[]>(originalTags)
+  const tagLabel = (slug: string) => tags.find(tag => tag.slug === slug)?.label ?? slug
+  const [errors, setErrors] = useState<ContentErrors & { tagSlugs?: string }>({})
   const [extrasProblems, setExtrasProblems] = useState<ExtrasErrors | null>(null)
   const [busy, setBusy] = useState(false)
   const [discarding, setDiscarding] = useState(false)
 
   function reset() {
     setValue(original)
+    setTagSlugs(originalTags)
     setExtras(extrasValue(source))
     setErrors({})
     setExtrasProblems(null)
@@ -270,11 +285,13 @@ export function ListingEdit({
       description: value.description,
       expectedRevisionVersion: open?.contentVersion ?? null,
       logoUrl: value.logoUrl,
+      // The listing's own tags are left out: the revision then leaves them as they are.
+      ...(tagSlugs.join(',') === view.tags.join(',') ? {} : { tagSlugs }),
       ...extrasInput(extras)
     })
     setBusy(false)
     if (!response.ok) {
-      if (response.error.fields) setErrors(response.error.fields as ContentErrors)
+      if (response.error.fields) setErrors(response.error.fields as typeof errors)
       toast.error(response.error.error)
       return
     }
@@ -369,7 +386,7 @@ export function ListingEdit({
             reviewer approves the changes.
           </p>
         </ToneAlert>
-        <Changes revision={open} view={view} />
+        <Changes revision={open} tagLabel={tagLabel} view={view} />
         <AlertDialog open={discarding} onOpenChange={setDiscarding}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -427,6 +444,23 @@ export function ListingEdit({
               nameNote="To change the name or URL, message the reviewers."
               onChange={setValue}
               original={original}
+              tags={
+                <Field data-invalid={errors.tagSlugs ? true : undefined}>
+                  <FieldLabel htmlFor="listing-tags">
+                    Tags <span className="font-normal text-muted-foreground">(optional)</span>
+                  </FieldLabel>
+                  <TagsCombobox
+                    id="listing-tags"
+                    choices={tags}
+                    firstCategory={value.categorySlug || undefined}
+                    invalid={Boolean(errors.tagSlugs)}
+                    max={SUBMISSION_TAG_LIMIT}
+                    value={tagSlugs}
+                    onValueChange={setTagSlugs}
+                  />
+                  {errors.tagSlugs ? <FieldError>{errors.tagSlugs}</FieldError> : null}
+                </Field>
+              }
               tallContent
               value={value}
             />

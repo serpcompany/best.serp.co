@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { MAX_LISTING_TAGS } from '@/db/listing-plans'
+import { MAX_SUGGESTED_TAGS } from '@/db/schema'
 
 /**
  * Request bodies of the admin API (`/api/admin/*`, serpcompany/best.serp.co#64). Route handlers
@@ -7,6 +9,7 @@ import { z } from 'zod'
 
 const text = (max: number) => z.string().max(max)
 const linkRel = z.enum(['follow', 'nofollow', 'sponsored'])
+const tagSlug = z.string().trim().min(1).max(120)
 
 /** Submission and revision ids: UUIDs today, opaque ids from the native flows (#63, #65). */
 export const decisionIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/u)
@@ -18,7 +21,9 @@ export const approveSubmissionSchema = z.object({
       content: text(20_000).optional(),
       description: text(400).optional(),
       logoUrl: text(2_000).optional(),
-      name: text(200).optional()
+      name: text(200).optional(),
+      /** The Creator's suggested tags as the reviewer edited them (#341). */
+      tagSlugs: z.array(tagSlug).max(MAX_SUGGESTED_TAGS).optional()
     })
     .strict()
     .optional(),
@@ -61,6 +66,12 @@ export const listingDetailsSchema = z.object({
     })
     .strict(),
   expectedChecksum: text(200)
+})
+
+/** A listing's tags in order, and the tags the admin saw (#341): `LISTING_TAGS_JSON`'s order. */
+export const listingTagsSchema = z.object({
+  expectedTags: z.array(tagSlug).max(200),
+  tags: z.array(tagSlug).max(MAX_LISTING_TAGS)
 })
 
 export const unpublishListingSchema = z.object({ note: text(1_000).optional() })

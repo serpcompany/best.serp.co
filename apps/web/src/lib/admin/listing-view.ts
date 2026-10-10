@@ -175,6 +175,7 @@ export function listingDetailView(
         }
       : null,
     submissionQueued: listing.submissionQueued,
+    tags: listing.tags,
     unpublished:
       listing.adminStatus === 'unlisted'
         ? {
@@ -236,6 +237,8 @@ export interface ListingDetailView {
     submitterEmail: string | null
   } | null
   submissionQueued: boolean
+  /** Its tags in order, retired ones included (#341). */
+  tags: Array<{ active: boolean; name: string; slug: string }>
   /** `retiredReason`: filed under a retired category (#260), so it answers 404 and stays down. */
   unpublished: {
     at: string | null

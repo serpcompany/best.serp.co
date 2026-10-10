@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_SUGGESTED_TAGS } from '@/db/schema'
 import {
   VERIFICATION_COOLDOWN_SECONDS as DATA_COOLDOWN,
   SUBMISSION_LIMITS,
@@ -15,6 +16,7 @@ import {
   nextStepPath,
   normalizeWebsiteInput,
   SUBMISSION_FIELD_LIMITS,
+  SUBMISSION_TAG_LIMIT,
   VERIFICATION_ATTEMPT_LIMIT,
   VERIFICATION_COOLDOWN_SECONDS,
   verificationInstant
@@ -89,6 +91,12 @@ describe('submit contract', () => {
   })
 })
 
+describe('the Tags limit (#341)', () => {
+  it('is the schema’s', () => {
+    expect(SUBMISSION_TAG_LIMIT).toBe(MAX_SUGGESTED_TAGS)
+  })
+})
+
 describe('local submit draft', () => {
   it('restores only well-formed, recent drafts and never more than the form holds', () => {
     const now = Date.parse('2026-10-06T12:00:00.000Z')
@@ -103,6 +111,7 @@ describe('local submit draft', () => {
       savedAt: now - 1000,
       siteIcon: 'https://example.com/i.png',
       socialImage: 'javascript:alert(1)',
+      tagSlugs: ['note-taking', 7, 'whiteboards', 'mockup-tools', 'developer-apis'],
       website: 'https://example.com'
     })
     expect(parseLocalDraft(stored, now)).toEqual({
@@ -116,6 +125,8 @@ describe('local submit draft', () => {
       savedAt: now - 1000,
       siteIcon: 'https://example.com/i.png',
       socialImage: null,
+      // Strings only, and no more than the Tags field holds (#341).
+      tagSlugs: ['note-taking', 'whiteboards', 'mockup-tools'],
       website: 'https://example.com'
     })
     expect(parseLocalDraft(stored, now + 31 * 86_400_000)).toBeNull()

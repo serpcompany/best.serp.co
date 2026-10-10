@@ -9,6 +9,8 @@ import { z } from 'zod'
 
 /** Field limits; `@/db/submissions` enforces the same (`SUBMISSION_LIMITS`). */
 export const SUBMISSION_FIELD_LIMITS = { content: 5000, description: 160, name: 120 } as const
+/** Suggested tags per submission or revision (#341): `MAX_SUGGESTED_TAGS` in `@/db/schema`. */
+export const SUBMISSION_TAG_LIMIT = 3
 export const VERIFICATION_ATTEMPT_LIMIT = 10
 export const VERIFICATION_COOLDOWN_SECONDS = 30
 
@@ -17,6 +19,7 @@ export const FIELD_MESSAGES = {
   description: 'Add a short description.',
   logoUrl: 'Add a logo. Use the one from your site or paste an image link.',
   name: 'Enter the product name.',
+  tagSlugs: `Choose up to ${SUBMISSION_TAG_LIMIT} tags from the list.`,
   website: 'Enter your website address, starting with https://.'
 } as const
 
@@ -61,7 +64,13 @@ export const draftContentSchema = z.object({
     .string()
     .trim()
     .min(1, FIELD_MESSAGES.name)
-    .max(SUBMISSION_FIELD_LIMITS.name, 'Keep the name to 120 characters or fewer.')
+    .max(SUBMISSION_FIELD_LIMITS.name, 'Keep the name to 120 characters or fewer.'),
+  /** Optional suggested tags (#341); left out, an edit keeps the saved ones. */
+  tagSlugs: z
+    .array(z.string().trim().min(1).max(100))
+    .max(SUBMISSION_TAG_LIMIT, FIELD_MESSAGES.tagSlugs)
+    .refine(tags => new Set(tags).size === tags.length, FIELD_MESSAGES.tagSlugs)
+    .optional()
 })
 
 export const newDraftSchema = draftContentSchema.extend({
@@ -164,6 +173,8 @@ export interface SubmissionSummary {
   plan: 'free' | 'paid' | null
   slug: string
   status: SubmissionStatusName
+  /** The Creator's suggested tags (#341), in order. */
+  tagSlugs: string[]
   verificationAttempts: number
   website: string
 }

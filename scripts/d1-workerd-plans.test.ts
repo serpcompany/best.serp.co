@@ -1538,6 +1538,115 @@ operations:
     ).toBeNull()
   })
 
+  it('sets tags, and resolves a retired narrow slug at payment, on D1 (#341)', async () => {
+    await db.batch([
+      db.prepare("INSERT INTO categories (slug, name, sort_order) VALUES ('narrow', 'Narrow', 5)"),
+      db.prepare(
+        `INSERT INTO tags (slug, name, category_id, sort_order) SELECT 'narrow', 'Narrow', id, 0
+          FROM categories WHERE slug = 'apps'`
+      ),
+      db.prepare(
+        `INSERT INTO tags (slug, name, category_id, sort_order) SELECT 'helper', 'Helper', id, 1
+          FROM categories WHERE slug = 'tools'`
+      ),
+      // A narrow category merged into a tag with another slug (design 2.2), redirected to it.
+      db.prepare("INSERT INTO categories (slug, name, sort_order) VALUES ('merged', 'Merged', 6)"),
+      db.prepare(
+        `INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, target_tag_id,
+          manifest_id) SELECT 'category', 'merged', 'tag', id, 'workerd' FROM tags
+          WHERE slug = 'helper'`
+      ),
+      db.prepare("UPDATE categories SET is_active = 0 WHERE slug IN ('narrow', 'merged')")
+    ])
+    expect(await all(Q.selectActiveTagsPlan())).toEqual([
+      { category: 'tools', category_name: 'Tools', name: 'Helper', slug: 'helper' },
+      { category: 'apps', category_name: 'Apps', name: 'Narrow', slug: 'narrow' }
+    ])
+    const tagsOf = async (listingId: string) =>
+      (
+        await db
+          .prepare(
+            `SELECT t.slug, lt.sort_order FROM listing_tags lt JOIN tags t ON t.id = lt.tag_id
+            WHERE lt.listing_id = ? ORDER BY lt.sort_order, t.slug`
+          )
+          .bind(listingId)
+          .all<{ slug: string; sort_order: number }>()
+      ).results.map(row => `${row.slug}:${row.sort_order}`)
+    const primaryOf = (listingId: string) =>
+      first(
+        `SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
+        WHERE lc.listing_id = ? AND lc.is_primary = 1`,
+        listingId
+      )
+
+    // A paid draft saved under the narrow category before it retired goes live at payment.
+    await insertDraft('sub-narrow', 'https://narrow-tool.example/')
+    await db
+      .prepare(
+        `UPDATE listing_submissions SET category_slug = 'narrow', tag_slugs = '["helper"]'
+        WHERE id = 'sub-narrow'`
+      )
+      .run()
+    await choose('sub-narrow', 'paid')
+    await run(
+      S.buildRecordSubmissionPaymentPlans({
+        actor: 'stripe',
+        listingId: 'lst-narrow',
+        now: NOW,
+        outcome: 'publish',
+        publication: await publication('paid-listing', 'sub-narrow'),
+        submissionId: 'sub-narrow'
+      })
+    )
+    expect(await primaryOf('lst-narrow')).toEqual({ slug: 'apps' })
+    expect(await tagsOf('lst-narrow')).toEqual(['narrow:0', 'helper:1'])
+
+    // One merged into `helper` goes live through its redirect, under helper's hub (Tools).
+    await insertDraft('sub-merged', 'https://merged-tool.example/')
+    await db
+      .prepare("UPDATE listing_submissions SET category_slug = 'merged' WHERE id = 'sub-merged'")
+      .run()
+    await choose('sub-merged', 'paid')
+    await run(
+      S.buildRecordSubmissionPaymentPlans({
+        actor: 'stripe',
+        listingId: 'lst-merged',
+        now: NOW,
+        outcome: 'publish',
+        publication: await publication('paid-listing', 'sub-merged'),
+        submissionId: 'sub-merged'
+      })
+    )
+    expect(await primaryOf('lst-merged')).toEqual({ slug: 'tools' })
+    expect(await tagsOf('lst-merged')).toEqual(['helper:0'])
+
+    // The admin's tag edit, while that submission is in review.
+    await run(
+      L.buildSetListingTagsPlans({
+        expectedTags: ['narrow', 'helper'],
+        listingId: 'lst-narrow',
+        publication: await publication('listing-tags', 'lst-narrow'),
+        tags: ['helper']
+      })
+    )
+    expect(await tagsOf('lst-narrow')).toEqual(['helper:0'])
+
+    // Its approval leaves that edit (the submission named narrow, and helper).
+    await approveLive('sub-narrow', 'lst-narrow')
+    expect(await tagsOf('lst-narrow')).toEqual(['helper:0'])
+    await expect(
+      run(
+        L.buildSetListingTagsPlans({
+          expectedTags: ['narrow', 'helper'],
+          listingId: 'lst-narrow',
+          publication: await publication('listing-tags', 'lst-narrow'),
+          tags: []
+        })
+      )
+    ).rejects.toThrow(/malformed JSON/u)
+    expect(await tagsOf('lst-narrow')).toEqual(['helper:0'])
+  })
+
   it('ran every exported plan builder on D1', () => {
     expect(builderNames.length).toBeGreaterThan(30)
     expect(builderNames.filter(name => !called.has(name))).toEqual([])
