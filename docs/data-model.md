@@ -21,11 +21,19 @@ from the real catalog (#311), and user data is never copied from staging or prod
 
 Column meanings and constraints are commented in `schema.ts`. By area:
 
-- **Catalog**: categories, listings, their ordered category memberships (exactly one primary),
-  media, resource links, FAQs, and slug redirects. What makes a listing public and the states
+- **Catalog**: categories (broad topic hubs), listings, their ordered category memberships
+  (exactly one primary), media, resource links, FAQs, and slug redirects. What makes a listing public and the states
   it can be in: [Public catalog](./public-catalog.md). Logos and images are hosted in R2,
   never hotlinked, and approvals and admin edits host a logo or queue it, never store its URL
   ([Listing media](./media.md)).
+- **Taxonomy** (#341): `tags` are finer groupings, each under one category (its hub), and
+  `listing_tags` holds a listing's tags, with no primary. `best_pages` are rankings at
+  `/best/<slug>/` that each target one search phrase: their pool is a tag's listings, a
+  category's, or both, and `best_page_listings` pins the top positions and excludes listings that
+  don't fit. `taxonomy_redirects` sends a retired or renamed category, tag, or best page URL to its
+  target, held as a foreign key so a later rename keeps it current. Submissions and revisions keep
+  a Creator's suggested tags in `tag_slugs` (a JSON array of at most three, or null). Nothing reads
+  these yet: the reads, routes, and writes are later steps of #341.
 - **Publication**: `publication_state` is a single row holding the catalog version and
   checksum; `publication_runs` records every applied publication, and `migration_runs` the
   one-time import (locally, the fixture seed's run).
@@ -53,8 +61,12 @@ second `pnpm db:generate` reports no changes. Keep these properties in every mig
 - Every table is `STRICT`: end each `CREATE TABLE` with `STRICT` by hand.
   `PRAGMA foreign_keys = ON` leads `0000_baseline.sql`.
 - Triggers are written by hand: the baseline's four enforce that a published listing always has
-  exactly one primary category, and later ones refuse blocked URLs and keep published listings
-  off retired categories.
+  exactly one primary category, and later ones refuse blocked URLs, keep published listings
+  off retired categories, keep an active tag under an active category, and keep new tag
+  memberships off retired tags. They go in a `drizzle-kit generate --custom` migration
+  (`0011_retired_categories.sql`, `0013_taxonomy_triggers.sql`). A custom migration copies the
+  previous snapshot, so tables and columns go in the generated migration, finished by hand, or the
+  next `pnpm db:generate` would emit them again.
 - A migration that seeds a table uses fixed values, as `0002_better_auth.sql` does for the
   admin allowlist's `created_at`, so every fresh database, and so the fixture seed, is the same.
 - D1 enforces foreign keys and runs a migration in one transaction, where
@@ -62,6 +74,8 @@ second `pnpm db:generate` reports no changes. Keep these properties in every mig
 - `listings` only gains columns (`ALTER TABLE ... ADD ... CHECK`), even where Drizzle generates
   a rebuild, as it does for a new CHECK. Never rebuild `listings`: dropping it would
   cascade-delete its memberships, media, links, and FAQs and drop the primary-category triggers.
+  `listing_submissions` and `listing_revisions` gain columns the same way
+  (`0012_taxonomy.sql`).
 - When a referenced table must be rebuilt, rebuild its children as `__new_*` tables that
   reference the new parent, and drop the old children before the old parent, so no drop
   cascades; the renames carry the references over. Recreate the table's triggers.

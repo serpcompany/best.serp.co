@@ -15,7 +15,11 @@ import { mediaKey } from '../../apps/web/src/db/media-keys'
  *   a hosted logo on most listings and featured images on most of those, and 335 featured;
  *
  * and what production has gained since: unpublished listings (a retired category's among them,
- * #260), slug redirects, listing owners (current and revoked), and submissions in every status.
+ * #260), slug redirects, listing owners (current and revoked), and submissions in every status;
+ * and the taxonomy's scale (#341, design 3.4): 130 tags (2 retired) with about 3,700 memberships,
+ * one tag of 335 listings and a listing with 9 tags, 60 best pages (tag, category and both) with 0
+ * to 10 pins, and 140 taxonomy redirects. The categories stay as they are: they remain the worst
+ * case for the category shapes, and each tag sits under one of them as its hub.
  *
  * Deterministic: one seeded PRNG drives every choice, so a seed always yields the same rows. It is
  * generated at test time, never checked in. Names are generated pseudo-words and every URL is on a
@@ -47,6 +51,8 @@ export interface ScaleCategory {
 export interface ScaleListing {
   /** Category slugs, primary first. */
   categories: string[]
+  /** Tag slugs, the most central first (#341). */
+  tags: string[]
   checksum: string
   content: string
   createdAt: string
@@ -111,7 +117,50 @@ export interface ScaleSubmission {
   withdrawalReason: 'expired' | 'owner' | null
 }
 
+export interface ScaleTag {
+  /** Its hub. */
+  categorySlug: string
+  description: string
+  id: number
+  isActive: boolean
+  name: string
+  slug: string
+  sortOrder: number
+}
+
+export interface ScaleBestPage {
+  categorySlug: string | null
+  id: number
+  intro: string
+  keyword: string
+  keywordCheckedAt: string | null
+  keywordVolume: number | null
+  listSize: number
+  slug: string
+  sortOrder: number
+  tagSlug: string | null
+  title: string
+}
+
+export interface ScaleBestPageEntry {
+  bestPageId: number
+  blurb: string | null
+  excluded: boolean
+  listingId: string
+  position: number | null
+}
+
+export interface ScaleTaxonomyRedirect {
+  sourceKind: 'best' | 'category' | 'tag'
+  sourceSlug: string
+  targetKind: 'best' | 'category' | 'directory' | 'tag'
+  /** The target's slug; null for the directory. */
+  targetSlug: string | null
+}
+
 export interface ScaleCatalog {
+  bestPageEntries: ScaleBestPageEntry[]
+  bestPages: ScaleBestPage[]
   categories: ScaleCategory[]
   faqs: Array<{ answer: string; listingId: string; question: string; sortOrder: number }>
   listings: ScaleListing[]
@@ -128,6 +177,8 @@ export interface ScaleCatalog {
   redirects: Array<{ listingId: string; newSlug: string; oldSlug: string }>
   resources: Array<{ label: string; listingId: string; sortOrder: number; url: string }>
   submissions: ScaleSubmission[]
+  tags: ScaleTag[]
+  taxonomyRedirects: ScaleTaxonomyRedirect[]
   urlBlocks: Array<{ blockedAt: string; reason: string; submissionId: string; urlKey: string }>
   users: Array<{ email: string; id: string; name: string }>
 }
@@ -166,6 +217,31 @@ const LATER_LISTINGS = 110
 const FEATURED_LISTINGS = 335
 const FAQ_LISTINGS = 335
 const RESOURCE_LISTINGS = 337
+
+/**
+ * The taxonomy (#341, design 3.4), drawn from its own PRNG so the rows above stay as they were.
+ * Tag sizes are memberships: one of 335 for headroom, then a long tail like the real tags' (95 of
+ * 10 or more, 28 of 3 to 9, 2 below 3), and 2 retired tags that keep their memberships.
+ */
+const TAXONOMY_SEED_OFFSET = 341
+const HEADROOM_TAG_SIZE = 335
+const LARGE_TAGS = 96
+const MEDIUM_TAG_SIZES = Array.from({ length: 28 }, (_, index) => 3 + (index % 7))
+const SMALL_TAG_SIZES = [2, 1, 1]
+const RETIRED_TAG_SIZES = [12, 4]
+/** How many tags a tagged listing has (weights), besides the one listing with 9. */
+const TAG_COUNTS: Array<[number, number]> = [
+  [1, 88],
+  [2, 9],
+  [3, 2],
+  [4, 1]
+]
+/** The hubs tags sit under: the active categories with the most public listings, but `other`. */
+const TAG_HUBS = 16
+const TAG_BEST_PAGES = 30
+const CATEGORY_BEST_PAGES = 15
+const INTERSECTION_BEST_PAGES = 15
+const TAXONOMY_MANIFEST = 'scale-catalog-taxonomy'
 
 const BULK_PUBLISHED_AT = '2026-05-16'
 const BULK_CREATED_AT = '2026-09-30T10:00:00.000Z'
@@ -519,6 +595,238 @@ function listingContent(random: Random, name: string, object: string): string {
   return [section('Overview', overview), features, section('Pricing', 1)].join('\n\n')
 }
 
+/** "photo converters" → "Photo Converters". */
+const titleCase = (value: string): string =>
+  value.replace(/\b[a-z]/gu, letter => letter.toUpperCase())
+
+/**
+ * Tags with their memberships, best pages, and taxonomy redirects (#341) for the generated
+ * listings, written onto `listing.tags`. Tags are topic and kind pairs no category uses, so no tag
+ * shares a category's slug, and each sits under one of the largest categories (its hub). Public
+ * listings carry them, and so do unpublished ones outside the retired category (the migration
+ * re-files those too), most with one tag; the rest, like Other's residue, have none.
+ */
+function buildTaxonomy(
+  random: Random,
+  categories: ScaleCategory[],
+  listings: ScaleListing[],
+  plans: Map<string, CategoryPlan>
+): Pick<ScaleCatalog, 'bestPageEntries' | 'bestPages' | 'tags' | 'taxonomyRedirects'> {
+  const retiredCategory = (categories.find(category => !category.isActive) as ScaleCategory).slug
+  const isPublic = (listing: ScaleListing) => listing.status === 'approved' && listing.isActive
+  const publicCount = new Map<string, number>()
+  for (const listing of listings.filter(isPublic)) {
+    for (const slug of listing.categories) publicCount.set(slug, (publicCount.get(slug) ?? 0) + 1)
+  }
+  const ranked = categories
+    .filter(category => category.isActive && category.slug !== CATCH_ALL_CATEGORY)
+    .sort(
+      (left, right) =>
+        (publicCount.get(right.slug) ?? 0) - (publicCount.get(left.slug) ?? 0) ||
+        byCodeUnit(left.slug, right.slug)
+    )
+  const hubs = ranked.slice(0, TAG_HUBS)
+
+  const used = [...plans.values()]
+  const free = TOPICS.flatMap(topic => KINDS.map(kind => ({ kind, topic }))).filter(
+    plan => !used.some(other => other.topic === plan.topic && other.kind === plan.kind)
+  )
+  const sizes = [
+    HEADROOM_TAG_SIZE,
+    ...Array.from({ length: LARGE_TAGS }, (_, index) => Math.round(180 / Math.sqrt(index + 1))),
+    ...MEDIUM_TAG_SIZES,
+    ...SMALL_TAG_SIZES
+  ]
+  const activeTags = sizes.length
+  const tags: ScaleTag[] = random
+    .shuffle(free)
+    .slice(0, activeTags + RETIRED_TAG_SIZES.length)
+    .map((plan, index) => {
+      const name = `${plan.topic[0]} ${plan.kind[0]}`
+      return {
+        categorySlug: (hubs[index % hubs.length] as ScaleCategory).slug,
+        description: `${name} for ${random.pick(AUDIENCES)}.`,
+        id: index + 1,
+        isActive: index < activeTags,
+        name,
+        slug: slugify(name),
+        sortOrder: index
+      }
+    })
+  sizes.push(...RETIRED_TAG_SIZES)
+
+  // Deal each tag's slots to listings, no tag twice on one listing; the first public listing
+  // takes the headroom tag and eight more, the widest related-by-tags scan.
+  const slots = random.shuffle(
+    tags.flatMap((tag, index) => Array<string>(sizes[index] as number).fill(tag.slug))
+  )
+  const taggable = random.shuffle(
+    listings.filter(
+      listing => listing.status === 'approved' && !listing.categories.includes(retiredCategory)
+    )
+  )
+  const widest = taggable.findIndex(isPublic)
+  taggable.unshift(...taggable.splice(widest, 1))
+  const take = (listing: ScaleListing, count: number) => {
+    for (let index = 0; listing.tags.length < count && index < slots.length; index += 1) {
+      const slug = slots[index] as string
+      if (!listing.tags.includes(slug)) {
+        listing.tags.push(slug)
+        slots.splice(index, 1)
+        index -= 1
+      }
+    }
+  }
+  const [first, ...rest] = taggable as [ScaleListing, ...ScaleListing[]]
+  slots.splice(slots.indexOf((tags[0] as ScaleTag).slug), 1)
+  first.tags.push((tags[0] as ScaleTag).slug)
+  take(first, 9)
+  for (const listing of rest) {
+    if (slots.length === 0) break
+    take(listing, random.weighted(TAG_COUNTS))
+  }
+  if (slots.length > 0) throw new Error('Scale catalog: tag memberships were left undealt.')
+
+  // Best pages on a tag, on a category, and on a tag within its hub, with 0 to 10 pins.
+  const live = listings.filter(isPublic)
+  const tagMembers = (slug: string) => live.filter(listing => listing.tags.includes(slug))
+  const inCategory = (slug: string) => live.filter(listing => listing.categories.includes(slug))
+  const active = tags.filter(tag => tag.isActive)
+  const pools: Array<{
+    category: ScaleCategory | null
+    keyword: string
+    pool: ScaleListing[]
+    slug: string
+    tag: ScaleTag | null
+  }> = [
+    ...active.slice(0, TAG_BEST_PAGES).map(tag => ({
+      category: null,
+      keyword: tag.name.toLowerCase(),
+      pool: tagMembers(tag.slug),
+      slug: tag.slug,
+      tag
+    })),
+    ...ranked.slice(0, CATEGORY_BEST_PAGES).map(category => ({
+      category,
+      keyword: category.name.toLowerCase(),
+      pool: inCategory(category.slug),
+      slug: category.slug,
+      tag: null
+    })),
+    // A tag within the category most of its public listings share, as `ai-seo` within
+    // `ecommerce`: not necessarily the tag's own hub.
+    ...active.slice(TAG_BEST_PAGES, TAG_BEST_PAGES + INTERSECTION_BEST_PAGES).map(tag => {
+      const shared = new Map<string, number>()
+      for (const listing of tagMembers(tag.slug)) {
+        for (const slug of listing.categories) shared.set(slug, (shared.get(slug) ?? 0) + 1)
+      }
+      const category =
+        ranked
+          .filter(candidate => shared.has(candidate.slug))
+          .sort((left, right) => (shared.get(right.slug) ?? 0) - (shared.get(left.slug) ?? 0))[0] ??
+        (hubs.find(hub => hub.slug === tag.categorySlug) as ScaleCategory)
+      const keyword = `${tag.name} for ${category.name}`.toLowerCase()
+      return {
+        category,
+        keyword,
+        pool: tagMembers(tag.slug).filter(listing => listing.categories.includes(category.slug)),
+        slug: slugify(keyword),
+        tag
+      }
+    })
+  ]
+  const bestPages: ScaleBestPage[] = []
+  const bestPageEntries: ScaleBestPageEntry[] = []
+  for (const [index, page] of pools.entries()) {
+    const id = index + 1
+    const volume = random.chance(0.6) ? random.int(100, 60_000) : null
+    bestPages.push({
+      categorySlug: page.category?.slug ?? null,
+      id,
+      intro: `Compare the best ${page.keyword} for ${random.pick(AUDIENCES)}. ${random.pick(EXTRA_SENTENCES)}`,
+      keyword: page.keyword,
+      keywordCheckedAt: volume === null ? null : laterInstant(random.int(126, 128)),
+      keywordVolume: volume,
+      listSize: index === 0 ? 25 : index % 7 === 3 ? 5 : 10,
+      slug: page.slug,
+      sortOrder: index,
+      tagSlug: page.tag?.slug ?? null,
+      title: `Best ${titleCase(page.keyword)}`
+    })
+    // A pin joins the pool even when the rule doesn't select it: a small intersection pins from
+    // its tag.
+    const candidates = random.shuffle([
+      ...page.pool,
+      ...(page.tag ? tagMembers(page.tag.slug).filter(listing => !page.pool.includes(listing)) : [])
+    ])
+    const pins = candidates.slice(0, index % 11)
+    for (const [position, listing] of pins.entries()) {
+      bestPageEntries.push({
+        bestPageId: id,
+        blurb: position === 0 ? `${listing.name} leads for ${page.keyword}.` : null,
+        excluded: false,
+        listingId: listing.id,
+        position: position + 1
+      })
+    }
+    if (index % 4 === 1) {
+      for (const listing of page.pool.filter(item => !pins.includes(item)).slice(0, 2)) {
+        bestPageEntries.push({
+          bestPageId: id,
+          blurb: null,
+          excluded: true,
+          listingId: listing.id,
+          position: null
+        })
+      }
+    }
+  }
+
+  // Old URLs: narrow categories that became tags (or the best page on that tag), renamed tags,
+  // best pages and hubs, and the retired and catch-all categories, sent to the directory.
+  const bestOnTag = new Map(
+    bestPages
+      .filter(page => page.tagSlug && !page.categorySlug)
+      .map(page => [page.tagSlug, page.slug])
+  )
+  const taxonomyRedirects: ScaleTaxonomyRedirect[] = [
+    ...active.slice(0, 100).map(tag => {
+      const best = bestOnTag.get(tag.slug)
+      return {
+        sourceKind: 'category' as const,
+        sourceSlug: tag.slug,
+        targetKind: best ? ('best' as const) : ('tag' as const),
+        targetSlug: best ?? tag.slug
+      }
+    }),
+    ...active.slice(100, 120).map(tag => ({
+      sourceKind: 'tag' as const,
+      sourceSlug: `${tag.slug}-old`,
+      targetKind: 'tag' as const,
+      targetSlug: tag.slug
+    })),
+    ...bestPages.slice(0, 10).map(page => ({
+      sourceKind: 'best' as const,
+      sourceSlug: `${page.slug}-old`,
+      targetKind: 'best' as const,
+      targetSlug: page.slug
+    })),
+    ...hubs.slice(0, 8).map(hub => ({
+      sourceKind: 'category' as const,
+      sourceSlug: `${hub.slug}-old`,
+      targetKind: 'category' as const,
+      targetSlug: hub.slug
+    })),
+    ...[retiredCategory, `${CATCH_ALL_CATEGORY}-old`].map(slug => ({
+      sourceKind: 'category' as const,
+      sourceSlug: slug,
+      targetKind: 'directory' as const,
+      targetSlug: null
+    }))
+  ]
+  return { bestPageEntries, bestPages, tags, taxonomyRedirects }
+}
+
 /** Generates the catalog for `seed`. Same seed, same rows. */
 export function generateScaleCatalog(seed: number = SCALE_CATALOG_SEED): ScaleCatalog {
   const random = new Random(seed)
@@ -597,6 +905,7 @@ export function generateScaleCatalog(seed: number = SCALE_CATALOG_SEED): ScaleCa
     const content = listingContent(random, name, object)
     const fields = {
       categories: draft.categories,
+      tags: [] as string[],
       content,
       createdAt,
       description,
@@ -914,7 +1223,15 @@ export function generateScaleCatalog(seed: number = SCALE_CATALOG_SEED): ScaleCa
     })
   }
 
+  const taxonomy = buildTaxonomy(
+    new Random(seed + TAXONOMY_SEED_OFFSET),
+    categories,
+    listings,
+    plans
+  )
+
   return {
+    ...taxonomy,
     categories,
     faqs,
     listings,
@@ -1225,5 +1542,129 @@ export function scaleCatalogStatements(catalog: ScaleCatalog): SqlStatement[] {
       ])
     )
   )
+  statements.push(...taxonomyStatements(catalog, categoryIds))
   return statements
+}
+
+/**
+ * The taxonomy's rows (#341): every tag goes in active, its memberships follow, then the retired
+ * ones retire, as a retired tag keeps its listings but takes no new one.
+ */
+function taxonomyStatements(
+  catalog: ScaleCatalog,
+  categoryIds: Map<string, number>
+): SqlStatement[] {
+  const tagIds = new Map(catalog.tags.map(tag => [tag.slug, tag.id]))
+  const bestPageIds = new Map(catalog.bestPages.map(page => [page.slug, page.id]))
+  const idOf = (ids: Map<string, number>, slug: string | null) =>
+    slug === null ? null : (ids.get(slug) as number)
+  const target = (redirect: ScaleTaxonomyRedirect, kind: ScaleTaxonomyRedirect['targetKind']) =>
+    redirect.targetKind === kind ? redirect.targetSlug : null
+  return [
+    ...insertRows(
+      'tags',
+      [
+        'id',
+        'slug',
+        'name',
+        'description',
+        'category_id',
+        'sort_order',
+        'is_active',
+        'created_at',
+        'updated_at'
+      ],
+      catalog.tags.map(tag => [
+        tag.id,
+        tag.slug,
+        tag.name,
+        tag.description,
+        categoryIds.get(tag.categorySlug) as number,
+        tag.sortOrder,
+        1,
+        BULK_CREATED_AT,
+        BULK_CREATED_AT
+      ])
+    ),
+    ...insertRows(
+      'listing_tags',
+      ['listing_id', 'tag_id', 'sort_order'],
+      catalog.listings.flatMap(listing =>
+        listing.tags.map((slug, index) => [listing.id, tagIds.get(slug) as number, index])
+      )
+    ),
+    {
+      params: [JSON.stringify(catalog.tags.filter(tag => !tag.isActive).map(tag => tag.id))],
+      sql: 'UPDATE tags SET is_active=0 WHERE id IN (SELECT value FROM json_each(?))'
+    },
+    ...insertRows(
+      'best_pages',
+      [
+        'id',
+        'slug',
+        'keyword',
+        'title',
+        'heading',
+        'intro',
+        'tag_id',
+        'category_id',
+        'list_size',
+        'keyword_volume',
+        'keyword_checked_at',
+        'sort_order',
+        'created_at',
+        'updated_at'
+      ],
+      catalog.bestPages.map(page => [
+        page.id,
+        page.slug,
+        page.keyword,
+        page.title,
+        page.title,
+        page.intro,
+        idOf(tagIds, page.tagSlug),
+        idOf(categoryIds, page.categorySlug),
+        page.listSize,
+        page.keywordVolume,
+        page.keywordCheckedAt,
+        page.sortOrder,
+        BULK_CREATED_AT,
+        BULK_CREATED_AT
+      ])
+    ),
+    ...insertRows(
+      'best_page_listings',
+      ['best_page_id', 'listing_id', 'position', 'excluded', 'blurb'],
+      catalog.bestPageEntries.map(entry => [
+        entry.bestPageId,
+        entry.listingId,
+        entry.position,
+        flag(entry.excluded),
+        entry.blurb
+      ])
+    ),
+    ...insertRows(
+      'taxonomy_redirects',
+      [
+        'source_kind',
+        'source_slug',
+        'target_kind',
+        'target_category_id',
+        'target_tag_id',
+        'target_best_page_id',
+        'manifest_id',
+        'created_at'
+      ],
+      catalog.taxonomyRedirects.map(redirect => [
+        redirect.sourceKind,
+        redirect.sourceSlug,
+        redirect.targetKind,
+        idOf(categoryIds, target(redirect, 'category')),
+        idOf(tagIds, target(redirect, 'tag')),
+        idOf(bestPageIds, target(redirect, 'best')),
+        TAXONOMY_MANIFEST,
+        BULK_CREATED_AT
+      ])
+    )
+  ]
 }

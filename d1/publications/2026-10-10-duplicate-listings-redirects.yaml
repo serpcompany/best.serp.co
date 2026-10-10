@@ -1,0 +1,138 @@
+# serpcompany/best.serp.co#338, the follow-up #332 asked for: 2026-10-10-duplicate-listings.yaml
+# unpublished 14 duplicate listings, so their URLs answer 410 Gone. This manifest sends each retired
+# slug to the listing it duplicated instead: /products/<retired>/ answers 308 to
+# /products/<kept>/, which keeps the retired URL's links and sends visitors to the product.
+#
+# Each operation is a listing-slug-redirect: one listing_slug_redirects row, (kept id, retired slug,
+# kept slug). The product page looks the slug up there before it renders the gone page, and
+# follows the kept id to that listing's current slug. The retired rows stay unpublished, so they stay
+# out of the sitemap, search, RSS and category pages. Republish in /admin still brings one back:
+# its live page then wins over the redirect.
+#
+# Kept and retired ids and slugs are 2026-10-10-duplicate-listings.yaml's (the v1 import's ids); its
+# header and reasons say why each slug stays.
+#
+# Publish after 2026-10-10-duplicate-listings.yaml on the same environment: until then the retired
+# listings are live and every operation refuses. Row-level: the batch refuses whole, with nothing
+# written, if a retired listing isn't unpublished, a kept listing isn't live (or its id or slug
+# changed), a retired slug already redirects, a kept slug is itself a redirected slug, or an older
+# slug redirects to a retired listing. Apply staging first, then production after promotion.
+version: 1
+id: 2026-10-10-duplicate-listings-redirects
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-slug-redirect
+    from:
+      id: lst_6848e48a02324d7854be5396
+      slug: facebook-downloader
+    to:
+      id: lst_a18091d61a39a387973490b9
+      slug: facebook-video-downloader
+    reason: "#332 duplicate of facebook-video-downloader"
+  - action: listing-slug-redirect
+    from:
+      id: lst_3601e4f5ecdb41c38f4af867
+      slug: kajabi-downloader
+    to:
+      id: lst_74e0e74369d59ac99e0e8ab7
+      slug: kajabi-video-downloader
+    reason: "#332 duplicate of kajabi-video-downloader"
+  - action: listing-slug-redirect
+    from:
+      id: lst_b5e8cf522bb20bb82d019ea7
+      slug: loom-downloader
+    to:
+      id: lst_bfa3d572078554563e4b9d6c
+      slug: loom-video-downloader
+    reason: "#332 duplicate of loom-video-downloader"
+  - action: listing-slug-redirect
+    from:
+      id: lst_2d97c5bf77ddd52e691d2826
+      slug: skool-downloader
+    to:
+      id: lst_7df4054ba79c031fe5c35a43
+      slug: skool-video-downloader
+    reason: "#332 duplicate of skool-video-downloader"
+  - action: listing-slug-redirect
+    from:
+      id: lst_8950abff1c7315b2a05ed3d4
+      slug: sprout-downloader
+    to:
+      id: lst_8220983e1c99a496fc5b4fd3
+      slug: sprout-video-downloader
+    reason: "#332 duplicate of sprout-video-downloader"
+  - action: listing-slug-redirect
+    from:
+      id: lst_23fc568c5d83d33a8e1ff8b8
+      slug: vimeo-downloader
+    to:
+      id: lst_57e20ae1ccd797430b80911e
+      slug: vimeo-video-downloader
+    reason: "#332 duplicate of vimeo-video-downloader"
+  - action: listing-slug-redirect
+    from:
+      id: lst_eb9f9e91aa46a4e661aeb2e4
+      slug: whop-downloader
+    to:
+      id: lst_834a96e6f8c01222d90d0390
+      slug: whop-video-downloader
+    reason: "#332 duplicate of whop-video-downloader"
+  - action: listing-slug-redirect
+    from:
+      id: lst_dd8fb0cfe5d5d2e3524ebf0f
+      slug: wistia-downloader
+    to:
+      id: lst_5fd233158f7997c59a6dac65
+      slug: wistia-video-downloader
+    reason: "#332 duplicate of wistia-video-downloader"
+  - action: listing-slug-redirect
+    from:
+      id: lst_abfe947189d1a2c36bfc30bd
+      slug: flowrite.com
+    to:
+      id: lst_4c31906882b562d432dbb957
+      slug: maestrolabs.com
+    reason: "#332 duplicate of maestrolabs.com: Flowrite is now MailMaestro"
+  - action: listing-slug-redirect
+    from:
+      id: lst_520c843ef16b99939a10de32
+      slug: phrasee.co
+    to:
+      id: lst_155c88e3fd757f8e2fd8e67e
+      slug: jacquard.com
+    reason: "#332 duplicate of jacquard.com: Phrasee is now Jacquard"
+  - action: listing-slug-redirect
+    from:
+      id: lst_125869b72bec8380b6e03430
+      slug: lambdalabs.com
+    to:
+      id: lst_7e9736364b5d462013a79498
+      slug: lambda.ai
+    reason: "#332 duplicate of lambda.ai: lambdalabs.com redirects there"
+  - action: listing-slug-redirect
+    from:
+      id: lst_8250b7e98ab4961ec79ab00a
+      slug: magical.so
+    to:
+      id: lst_ce9486f34a719d8172fdbf08
+      slug: timeos.ai
+    reason: "#332 duplicate of timeos.ai: magical.so now serves timeOS"
+  - action: listing-slug-redirect
+    from:
+      id: lst_7cccdaebce54e5ccc387136b
+      slug: trajectdata.com
+    to:
+      id: lst_43c3f8e25133ae6ea80b7e2e
+      slug: scaleserp.com
+    reason: "#332 duplicate of scaleserp.com: the product is still Scale SERP"
+  - action: listing-slug-redirect
+    from:
+      id: lst_07bc2165413fbae535846dcb
+      slug: timelyapp.com
+    to:
+      id: lst_7209bfcc01723a5393382fec
+      slug: timely.com
+    reason: "#332 duplicate of timely.com: timelyapp.com redirects there"

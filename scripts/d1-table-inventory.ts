@@ -40,6 +40,46 @@ export const applicationColumnInventory = {
     'link_rel'
   ],
   listing_categories: ['listing_id', 'category_id', 'sort_order', 'is_primary'],
+  tags: [
+    'id',
+    'slug',
+    'name',
+    'description',
+    'category_id',
+    'sort_order',
+    'is_active',
+    'created_at',
+    'updated_at'
+  ],
+  listing_tags: ['listing_id', 'tag_id', 'sort_order'],
+  best_pages: [
+    'id',
+    'slug',
+    'keyword',
+    'title',
+    'heading',
+    'intro',
+    'tag_id',
+    'category_id',
+    'list_size',
+    'keyword_volume',
+    'keyword_checked_at',
+    'sort_order',
+    'is_active',
+    'created_at',
+    'updated_at'
+  ],
+  best_page_listings: ['best_page_id', 'listing_id', 'position', 'excluded', 'blurb'],
+  taxonomy_redirects: [
+    'source_kind',
+    'source_slug',
+    'target_kind',
+    'target_category_id',
+    'target_tag_id',
+    'target_best_page_id',
+    'manifest_id',
+    'created_at'
+  ],
   listing_media: [
     'id',
     'listing_id',
@@ -128,7 +168,8 @@ export const applicationColumnInventory = {
     'block_key',
     'block_covers_subdomains',
     'published_checksum',
-    'content_version'
+    'content_version',
+    'tag_slugs'
   ],
   listing_submission_resource_links: ['id', 'submission_id', 'label', 'url', 'sort_order'],
   listing_submission_faqs: ['id', 'submission_id', 'question', 'answer', 'sort_order'],
@@ -215,7 +256,8 @@ export const applicationColumnInventory = {
     'reviewed_by',
     'created_at',
     'updated_at',
-    'content_version'
+    'content_version',
+    'tag_slugs'
   ],
   listing_revision_resource_links: ['id', 'revision_id', 'label', 'url', 'sort_order'],
   listing_revision_faqs: ['id', 'revision_id', 'question', 'answer', 'sort_order'],
@@ -336,6 +378,11 @@ export const importOrder: ApplicationTableName[] = [
   'categories',
   'listings',
   'listing_categories',
+  'tags',
+  'listing_tags',
+  'best_pages',
+  'best_page_listings',
+  'taxonomy_redirects',
   'listing_media',
   'listing_resource_links',
   'listing_faqs',

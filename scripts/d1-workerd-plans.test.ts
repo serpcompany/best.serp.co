@@ -1480,6 +1480,43 @@ operations:
     })
     expect((await live()).version).toBe(before.version + 1)
 
+    // #338: the unpublished slug then redirects to a live listing, guards and all, on D1 too.
+    const redirect = `version: 1
+id: workerd-redirect-parked.example
+concurrency: rows
+provenance:
+  actor: test
+  workflow: test/workerd
+operations:
+  - action: listing-slug-redirect
+    from: { id: lst_unpublish_workerd, slug: parked.example }
+    to: { id: lst_moved_workerd, slug: moved.example }
+    reason: duplicate of moved.example
+`
+    const unredirected = await live()
+    await executePublicationPlan(
+      db,
+      buildPublicationPlan(parseManifest(redirect), redirect, NOW, unredirected)
+    )
+    expect(
+      await first(
+        'SELECT listing_id, old_slug, new_slug FROM listing_slug_redirects WHERE old_slug=?',
+        'parked.example'
+      )
+    ).toEqual({
+      listing_id: 'lst_moved_workerd',
+      new_slug: 'moved.example',
+      old_slug: 'parked.example'
+    })
+    expect((await live()).version).toBe(unredirected.version + 1)
+    // A guard that says why: D1 reports the reason, and the batch writes nothing.
+    const again = redirect.replace('workerd-redirect-parked.example', 'workerd-redirect-again')
+    const redirected = await live()
+    await expect(
+      executePublicationPlan(db, buildPublicationPlan(parseManifest(again), again, NOW, redirected))
+    ).rejects.toThrow(/the slug already redirects, or this would make a chain or a loop/u)
+    expect(await live()).toEqual(redirected)
+
     // A listing whose website moved: the guard's malformed JSON rolls the whole batch back.
     const after = await live()
     const stale = manifest('lst_moved_workerd', 'moved.example', 'https://elsewhere.example/')
@@ -1755,5 +1792,101 @@ describe('claims on Wrangler-local D1 (workerd, #67)', () => {
     expect(
       await first("SELECT verified_via FROM listing_owners WHERE listing_id = 'lst-claim'")
     ).toEqual({ verified_via: 'badge_claim' })
+  })
+})
+
+describe('taxonomy CHECKs and triggers on Wrangler-local D1 (workerd, #341)', () => {
+  it('keeps tags under active hubs, new memberships off retired tags, and suggested tags short', async () => {
+    const exec = (sql: string, ...params: unknown[]) =>
+      db
+        .prepare(checked(sql, params))
+        .bind(...params)
+        .run()
+    await db.batch([
+      db.prepare(
+        "INSERT INTO categories (slug, name) VALUES ('taxonomy-hub', 'Hub'), ('taxonomy-retired', 'Retired')"
+      ),
+      db.prepare("UPDATE categories SET is_active = 0 WHERE slug = 'taxonomy-retired'"),
+      db.prepare(
+        `INSERT INTO tags (slug, name, category_id) SELECT 'taxonomy-tag', 'Tag', id FROM categories
+          WHERE slug = 'taxonomy-hub' UNION ALL SELECT 'taxonomy-old', 'Old', id FROM categories
+          WHERE slug = 'taxonomy-hub'`
+      ),
+      db.prepare(
+        `INSERT INTO listings (id, slug, name, description, website, source_kind, source_identity,
+          checksum) VALUES ('lst-taxonomy', 'taxonomy.example', 'Taxonomy', 'd',
+          'https://taxonomy.example/', 'workerd', 'taxonomy', 'c')`
+      ),
+      db.prepare(
+        "INSERT INTO listing_tags (listing_id, tag_id) SELECT 'lst-taxonomy', id FROM tags WHERE slug = 'taxonomy-tag'"
+      ),
+      db.prepare("UPDATE tags SET is_active = 0 WHERE slug = 'taxonomy-old'")
+    ])
+    const retiredHub = "(SELECT id FROM categories WHERE slug = 'taxonomy-retired')"
+    await expect(
+      exec(
+        `INSERT INTO tags (slug, name, category_id) VALUES ('taxonomy-new', 'New', ${retiredHub})`
+      )
+    ).rejects.toThrow(/a tag must not be filed under a retired category/u)
+    await expect(
+      exec(`UPDATE tags SET category_id = ${retiredHub} WHERE slug = 'taxonomy-tag'`)
+    ).rejects.toThrow(/a tag must not be filed under a retired category/u)
+    await expect(
+      exec(
+        "INSERT INTO listing_tags (listing_id, tag_id) SELECT 'lst-taxonomy', id FROM tags WHERE slug = 'taxonomy-old'"
+      )
+    ).rejects.toThrow(/a listing must not be tagged with a retired tag/u)
+    await expect(
+      exec("UPDATE categories SET is_active = 0 WHERE slug = 'taxonomy-hub'")
+    ).rejects.toThrow(/a category with an active tag cannot retire/u)
+    await exec("UPDATE tags SET is_active = 0 WHERE slug = 'taxonomy-tag'")
+    await exec("UPDATE categories SET is_active = 0 WHERE slug = 'taxonomy-hub'")
+    expect(
+      await first("SELECT COUNT(*) AS count FROM listing_tags WHERE listing_id = 'lst-taxonomy'")
+    ).toEqual({
+      count: 1
+    })
+
+    await expect(
+      exec(
+        `INSERT INTO best_pages (slug, keyword, title, heading, intro, tag_id, list_size)
+          SELECT 'taxonomy', 'taxonomy', 'T', 'T', 'I', id, 26 FROM tags WHERE slug = 'taxonomy-tag'`
+      )
+    ).rejects.toThrow(/best_pages_list_size_range/u)
+    await expect(
+      exec(
+        `INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, manifest_id)
+          VALUES ('category', 'taxonomy-old', 'tag', 'workerd')`
+      )
+    ).rejects.toThrow(/taxonomy_redirects_target_matches_kind/u)
+
+    const revision = (id: string, tagSlugs: string) =>
+      exec(
+        `INSERT INTO listing_revisions (id, listing_id, author_user_id, base_checksum, name,
+          description, category_slug, logo_url, tag_slugs) VALUES (?, 'lst-taxonomy', 'user_owner',
+          'c', 'n', 'd', 'tools', 'https://taxonomy.example/logo.png', ?)`,
+        id,
+        tagSlugs
+      )
+    await expect(revision('rev-taxonomy-bad', 'not json')).rejects.toThrow(
+      /listing_revisions_tag_slugs_valid/u
+    )
+    await expect(revision('rev-taxonomy-long', '["a","b","c","d"]')).rejects.toThrow(
+      /listing_revisions_tag_slugs_valid/u
+    )
+    await revision('rev-taxonomy', '["taxonomy-tag"]')
+    const submission = (id: string, tagSlugs: string) =>
+      exec(
+        `INSERT INTO listing_submissions (id, slug, name, description, website, content,
+          category_slug, logo_url, tag_slugs) VALUES (?, ?, 'n', 'd', 'https://taxonomy.example/',
+          'c', 'tools', 'https://taxonomy.example/logo.png', ?)`,
+        id,
+        `${id}.example`,
+        tagSlugs
+      )
+    await expect(submission('sub-taxonomy-object', '{"tags":[]}')).rejects.toThrow(
+      /listing_submissions_tag_slugs_valid/u
+    )
+    await submission('sub-taxonomy', '[]')
   })
 })
