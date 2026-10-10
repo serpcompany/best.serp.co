@@ -69,3 +69,27 @@ triggers still hold. An unpublished listing stays unpublished. The operation als
 Publish a manifest's `category-create` before the operations that file listings under the new
 category, earlier in the same manifest or in an earlier one. A category with no live listing
 answers 404. As with every publication, the catalog epoch advances, so cached pages turn over.
+
+## Listing details
+
+`listing-details-set` (#340) replaces a listing's name, short description, or website, the fields
+the admin panel's edit changes, for a listing whose product was renamed or whose one-line
+description describes something else. It is row-level. It names the listing's `id` and `slug`, a
+`reason` for the activity log, `expected` (its current `name`, `description`, and `website`, all
+three), and `details` (only the fields that change, at least one).
+
+The batch is refused, with nothing written, when:
+
+- the slug or any of the three fields isn't exactly `expected`, or the listing isn't approved;
+- its own submission is in review (`paid_pending_review` or `changes_requested`);
+- a new website is another listing's, the host of a submission in flight, or under a block
+  (`listingWebsiteConflicts`, which the admin edit checks too).
+
+The manifest itself is refused when a field in `details` equals `expected`, the name is over 80
+characters or the description over 160 (the admin panel's limits), or the website isn't a public
+HTTP(S) URL.
+
+Like `listing-categories-set`, it sets `updated_at` (the sitemap `lastmod`), gives the listing a
+new checksum, so an admin edit or owner revision read before it is refused as stale, and logs an
+`edited` event, which `/admin` shows as "Details edited: name, description". An unpublished
+listing stays unpublished, its categories stay, and the long description is left as it is.
