@@ -3,12 +3,18 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { type APIRequestContext, expect } from '@playwright/test'
+import {
+  insert,
+  listingStatements,
+  type SeedStatement,
+  suiteCatalogStatements
+} from './fixture-seed'
 import { BILLING_PREVIEW_VARS } from './orders-worker'
 
 /**
  * The admin panel suite (serpcompany/best.serp.co#64) runs on its own local Worker with its own
  * D1, which `playwright.config.ts` starts from the already-built Worker: the suite publishes and
- * unpublishes listings, which would change the imported catalog the smoke suite counts exactly.
+ * unpublishes listings, which would change the seeded catalog the smoke suite counts exactly.
  * Helpers here run SQL on that D1, seed fixture submissions, and sign in a fresh admin. Never
  * used against a deployed Worker.
  */
@@ -69,16 +75,16 @@ function stateRoot(server: SuiteServer): string {
   return resolve(server.stateDirectory, 'drizzle', 'best-serp-co')
 }
 
+/** The category the admin and account suites' submissions and listings use. */
+const adminCategory = {
+  description: 'Tools for the admin panel suite.',
+  name: 'E2E Tools',
+  slug: 'e2e-tools'
+} as const
+
 /** The publication state and one category the suite's submissions use. */
 export function seedAdminCatalog(server: SuiteServer = adminServer): void {
-  localD1(
-    `
-    INSERT OR IGNORE INTO publication_state (id, version, checksum) VALUES (1, 0, 'e2e-admin');
-    INSERT OR IGNORE INTO categories (slug, name, description, sort_order)
-      VALUES ('e2e-tools', 'E2E Tools', 'Tools for the admin panel suite.', 0);
-  `,
-    server
-  )
+  runStatements(suiteCatalogStatements({ category: adminCategory, checksum: 'e2e-admin' }), server)
 }
 
 /**
@@ -99,7 +105,7 @@ function databaseFile(server: SuiteServer): string {
 /**
  * Runs SQL on the admin Worker's local D1 and returns the rows of a single query. It opens the
  * SQLite file directly: `wrangler d1 execute` would start a second Miniflare per call, which
- * takes seconds each.
+ * takes seconds each. Rows built from values go through `runStatements` instead.
  */
 export function localD1<T = Record<string, unknown>>(
   sql: string,
@@ -114,6 +120,29 @@ export function localD1<T = Record<string, unknown>>(
     }
     database.exec(trimmed)
     return []
+  } finally {
+    database.close()
+  }
+}
+
+/**
+ * Runs bound statements (`fixture-seed.ts`'s builders) on a suite Worker's local D1, in one
+ * transaction, the way `localD1` reaches it.
+ */
+export function runStatements(
+  statements: readonly SeedStatement[],
+  server: SuiteServer = adminServer
+): void {
+  const database = new DatabaseSync(databaseFile(server))
+  try {
+    database.exec('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = ON; BEGIN IMMEDIATE;')
+    try {
+      for (const statement of statements) database.prepare(statement.sql).run(...statement.params)
+      database.exec('COMMIT')
+    } catch (error) {
+      database.exec('ROLLBACK')
+      throw error
+    }
   } finally {
     database.close()
   }
@@ -178,29 +207,39 @@ export function seedImportedListing(
 ): FixtureSubmission {
   const key = `${label}-${unique()}`
   const listing = { id: `e2e-import-${key}`, name: `E2E ${label} ${key.slice(-5)}`, slug: key }
-  localD1(`
-    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
-      source_kind, source_identity, checksum)
-    VALUES (${q(listing.id)}, ${q(listing.slug)}, ${q(listing.name)},
-      'An imported listing for the admin panel suite.', ${q(`https://www.${key}.example`)},
-      'It came from the one-time JSON import.', 'draft', '2026-05-16',
-      'legacy-json-migration-v1', ${q(listing.slug)}, ${q(`e2e-${key}`)});
-    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
-      SELECT ${q(listing.id)}, id, 0, 1 FROM categories WHERE slug = ${q(category)};
-    ${
-      logoUrl
-        ? `INSERT INTO listing_media (listing_id, kind, url, sort_order)
-            VALUES (${q(listing.id)}, 'logo', ${q(logoUrl)}, 0);`
-        : ''
-    }
-    UPDATE listings SET status = 'approved' WHERE id = ${q(listing.id)};
-  `)
+  runStatements(
+    listingStatements({
+      beforeApproval: logoUrl
+        ? [
+            insert('listing_media', {
+              kind: 'logo',
+              listing_id: listing.id,
+              sort_order: 0,
+              url: logoUrl
+            })
+          ]
+        : [],
+      category,
+      row: {
+        checksum: `e2e-${key}`,
+        content: 'It came from the one-time JSON import.',
+        description: 'An imported listing for the admin panel suite.',
+        id: listing.id,
+        name: listing.name,
+        published_at: '2026-05-16',
+        slug: listing.slug,
+        source_identity: listing.slug,
+        source_kind: 'legacy-json-migration-v1',
+        website: `https://www.${key}.example`
+      }
+    })
+  )
   return listing
 }
 
 /** The category `seedAdminCatalog` adds. */
 export function activeCategory(): string {
-  return 'e2e-tools'
+  return adminCategory.slug
 }
 
 export interface Client {

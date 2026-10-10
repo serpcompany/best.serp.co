@@ -9,7 +9,14 @@ import {
   signInAsNewAdmin,
   unique
 } from './admin-fixture'
-import { claimsD1, claimsOrigin, claimsServer, claimsSuiteEnabled } from './claims-fixture'
+import {
+  claimsD1,
+  claimsOrigin,
+  claimsServer,
+  claimsSuiteEnabled,
+  seedClaimsCatalog,
+  seedClaimsListing
+} from './claims-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
 import { test } from './test'
 
@@ -42,16 +49,14 @@ function seedListing(label: string, name: string): Seeded {
   fixture.set(label, { badge: 'missing', description: `${name}, a fixture.`, name })
   const slug = fixture.slug(label)
   const id = `e2e-claim-${label}`
-  claimsD1(`
-    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
-      source_kind, source_identity, checksum)
-    VALUES (${q(id)}, ${q(slug)}, ${q(name)}, 'A listing for the claims suite.',
-      ${q(fixture.website(label))}, 'Imported.', 'draft', '2026-05-16',
-      'legacy-json-migration-v1', ${q(id)}, ${q(`e2e-${label}`)});
-    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
-      SELECT ${q(id)}, id, 0, 1 FROM categories WHERE slug = 'e2e-claim-tools';
-    UPDATE listings SET status = 'approved' WHERE id = ${q(id)};
-  `)
+  seedClaimsListing({
+    content: 'Imported.',
+    description: 'A listing for the claims suite.',
+    id,
+    name,
+    slug,
+    website: fixture.website(label)
+  })
   return { id, label, name, slug }
 }
 
@@ -81,11 +86,7 @@ async function step(user: Client, id: string, action: string, data: unknown = {}
 
 test.beforeAll(async () => {
   fixture = await startFixtureSite()
-  claimsD1(`
-    INSERT OR IGNORE INTO publication_state (id, version, checksum) VALUES (1, 0, 'e2e-claims');
-    INSERT OR IGNORE INTO categories (slug, name, description, sort_order)
-      VALUES ('e2e-claim-tools', 'E2E Claim Tools', 'Tools for the claims suite.', 0);
-  `)
+  seedClaimsCatalog()
   removeLeftoverAdmins([ADMIN_EMAIL_PREFIXES.claims], claimsServer)
 })
 
@@ -251,16 +252,14 @@ test('refuses expired and over-attempt codes, and requests without a session or 
   // An imported listing that links through serp.ly is claimed through its product's domain:
   // SERP's own mail never proves it (#108 review round 1).
   const imported = `e2e-claim-serply-${key}`
-  claimsD1(`
-    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
-      source_kind, source_identity, checksum)
-    VALUES (${q(imported)}, ${q(`${key}-tool.example`)}, 'Imported product', 'd',
-      ${q(`https://serp.ly/${key}`)}, 'Imported.', 'draft', '2026-05-16',
-      'legacy-json-migration-v1', ${q(imported)}, ${q(`e2e-${imported}`)});
-    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
-      SELECT ${q(imported)}, id, 0, 1 FROM categories WHERE slug = 'e2e-claim-tools';
-    UPDATE listings SET status = 'approved' WHERE id = ${q(imported)};
-  `)
+  seedClaimsListing({
+    content: 'Imported.',
+    description: 'd',
+    id: imported,
+    name: 'Imported product',
+    slug: `${key}-tool.example`,
+    website: `https://serp.ly/${key}`
+  })
   const serply = await claim(user.client, {
     email: 'team@serp.ly',
     listing: `${key}-tool.example`,

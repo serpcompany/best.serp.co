@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
-import { detailListing } from './listing-fixture'
-import { categoryPath, listingPath, sampleCategory } from './site-fixture'
+import { detailListing, sampleCategory } from './listing-fixture'
+import { seedListings } from './seed-facts'
+import { categoryPath, listingPath } from './site-fixture'
 import { test } from './test'
 
 /** Every JSON-LD node on a page, flattening any `@graph`; empty scripts are skipped. */
@@ -19,10 +20,10 @@ async function jsonLdNodes(page: Page): Promise<Array<Record<string, unknown>>> 
 
 /**
  * The D1 catalog records no product pricing (serpcompany/best.serp.co#88), so a listing's
- * JSON-LD must not claim a price: no Offer at all, rather than a default "free" one. Both
- * listings here are paid products that the old default offer called free.
+ * JSON-LD must not claim a price: no Offer at all, rather than a default "free" one. One listing
+ * an admin added and one that came from a submission (a domain-name slug).
  */
-const unpricedListingPaths = [detailListing.path, listingPath('autoenhance.ai')]
+const unpricedListingPaths = [detailListing.path, listingPath(seedListings.submitted.slug)]
 
 test.describe('listing structured data', () => {
   for (const path of unpricedListingPaths) {

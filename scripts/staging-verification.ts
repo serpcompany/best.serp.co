@@ -30,9 +30,8 @@
  * failures describe the staging environment, not the source, and a non-monotonic rule could let
  * `migrate production` pass and `deploy production` refuse within one release.
  *
- * deploy-production.yml and bootstrap-production-d1.yml run it before reviewer approval, and
- * `cloudflare-release.ts` repeats it before every production migration, import, and Worker
- * deploy.
+ * deploy-production.yml runs it before reviewer approval, and `cloudflare-release.ts` repeats it
+ * before every production migration and Worker deploy.
  */
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'

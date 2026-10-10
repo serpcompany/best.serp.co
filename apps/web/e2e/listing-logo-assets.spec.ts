@@ -1,41 +1,17 @@
 import { type APIRequestContext, expect, type Page } from '@playwright/test'
-import { detailListing } from './listing-fixture'
-import {
-  categoriesIndexPath,
-  categoryPath,
-  listingPath,
-  sampleCategory,
-  site
-} from './site-fixture'
+import { detailListing, sampleCategory, sampleListing, searchSample } from './listing-fixture'
+import { seedListings } from './seed-facts'
+import { categoriesIndexPath, categoryPath, site } from './site-fixture'
 import { test } from './test'
 
 /** The checked-in "no logo" tile (serpcompany/best.serp.co#86). */
 const fallbackLogoPath = '/listing-logos/favicon-fallback-512x512.png'
-/** A published listing with no logo in D1. */
-const logoLessListing = {
-  name: 'Vimeo Video Downloader',
-  path: listingPath('vimeo-video-downloader')
-}
-/** A published listing whose imported logo is a remote image (Cloudflare Images). */
-const remoteLogoListingPath = listingPath('autoenhance.ai')
+/** The seed's published listing with no logo in D1. */
+const logoLessListing = sampleListing(seedListings.noLogo)
 
 /**
- * The local Worker serves the raw import, whose site-relative logo and image rows name files
- * deleted once production published their hosted copies (#124; the cleanup section of
- * `d1/media/2026-10-06-legacy-media.report.md`). Only there may these paths be missing; a
- * deployed Worker renders hosted keys.
- */
-const deletedImportPaths = ['/listing-logos/serpdownloaders.com/', '/media/products/launchbuzz.io/']
-
-/** A local Worker, which serves the reviewed import as is (`pnpm test:e2e`, CI). */
-function isLocalWorker(baseURL: string | undefined): boolean {
-  const host = new URL(baseURL ?? 'http://127.0.0.1').hostname
-  return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.localhost')
-}
-
-/**
- * Pages a visitor reaches first, plus listings with an imported logo (123movies, whose file was
- * deleted in #124, and autoenhance.ai's remote one) and without one (Vimeo Video Downloader).
+ * Pages a visitor reaches first, plus a listing with a hosted logo and featured image (the seed
+ * hosts them through the real ingestion path, served at `/_media`) and one without a logo.
  */
 const samplePages = [
   '/',
@@ -43,9 +19,8 @@ const samplePages = [
   categoriesIndexPath,
   categoryPath(sampleCategory.slug),
   '/about/',
-  '/search/?q=video',
+  `/search/?q=${searchSample.query}`,
   detailListing.path,
-  remoteLogoListingPath,
   logoLessListing.path
 ]
 
@@ -160,30 +135,21 @@ test.describe('listing logo assets', () => {
     expect(JSON.stringify(data)).not.toContain(fallbackLogoPath)
   })
 
-  test('a listing with a logo names that logo as the JSON-LD primary image', async ({
-    baseURL,
-    page
-  }) => {
-    // Locally 123movies' logo is a deleted file, which may be swapped for the tile (#124).
-    const paths = isLocalWorker(baseURL)
-      ? [remoteLogoListingPath]
-      : [detailListing.path, remoteLogoListingPath]
-    for (const path of paths) {
-      await page.goto(path, { waitUntil: 'domcontentloaded' })
-      const heroLogo = page
-        .getByRole('main')
-        .getByRole('img', { name: / logo$/u })
-        .first()
-      const logoSrc = await heroLogo.getAttribute('src')
-      expect(logoSrc, `${path} hero logo`).toBeTruthy()
-      expect(logoSrc).not.toBe(fallbackLogoPath)
+  test('a listing with a logo names that logo as the JSON-LD primary image', async ({ page }) => {
+    await page.goto(detailListing.path, { waitUntil: 'domcontentloaded' })
+    const heroLogo = page
+      .getByRole('main')
+      .getByRole('img', { name: / logo$/u })
+      .first()
+    const logoSrc = await heroLogo.getAttribute('src')
+    expect(logoSrc, `${detailListing.path} hero logo`).toBeTruthy()
+    expect(logoSrc).not.toBe(fallbackLogoPath)
 
-      const primaryImage = webPageNode(await structuredData(page)).primaryImageOfPage
-      expect(primaryImage, path).toEqual({
-        '@type': 'ImageObject',
-        url: new URL(logoSrc ?? '', site.publicUrl).href
-      })
-    }
+    const primaryImage = webPageNode(await structuredData(page)).primaryImageOfPage
+    expect(primaryImage, detailListing.path).toEqual({
+      '@type': 'ImageObject',
+      url: new URL(logoSrc ?? '', site.publicUrl).href
+    })
   })
 
   test('sample pages reference no missing same-origin asset, in markup or JSON-LD', async ({
@@ -196,20 +162,11 @@ test.describe('listing logo assets', () => {
     const origin = baseURL ?? ''
     const referenced = new Map<string, string>()
     const failedLoads: string[] = []
-    const deletedImportFiles = new Set<string>()
-    /** A same-origin path to check: any, except a file deleted in #124 on the local import. */
-    const checked = (path: string | undefined): path is string => {
-      if (!path) return false
-      if (!isLocalWorker(baseURL) || !deletedImportPaths.some(prefix => path.startsWith(prefix)))
-        return true
-      deletedImportFiles.add(path)
-      return false
-    }
 
     page.on('response', response => {
       const path = localPath(response.url(), origin)
       if (
-        checked(path) &&
+        path &&
         response.status() >= 400 &&
         checkedResourceTypes.has(response.request().resourceType())
       ) {
@@ -227,14 +184,14 @@ test.describe('listing logo assets', () => {
       ]
       for (const url of urls) {
         const path = localPath(url, origin)
-        if (checked(path) && !referenced.has(path)) referenced.set(path, pagePath)
+        if (path && !referenced.has(path)) referenced.set(path, pagePath)
       }
     }
 
     expect(referenced.has(fallbackLogoPath), 'the sample renders the fallback tile').toBe(true)
     test.info().annotations.push({
       type: 'assets checked',
-      description: `${referenced.size} same-origin files from ${samplePages.length} pages; ${deletedImportFiles.size} imported paths deleted in #124 skipped`
+      description: `${referenced.size} same-origin files from ${samplePages.length} pages`
     })
     for (const [path, referrer] of referenced) await expectServed(request, path, referrer)
     expect(failedLoads).toEqual([])

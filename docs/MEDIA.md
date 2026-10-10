@@ -43,6 +43,10 @@ under a live listing's path.
   size before copying), and the cron deletes finished submissions' and revisions' images:
   approved and copied, rejected, or withdrawn (which covers an expired draft). A listing row
   only ever holds a `listings/` key.
+- **A slug change keeps the media rows.** The key carries the slug, and a `listing-slug-change`
+  manifest keeps the listing's media rows: re-host them under the new slug with a later
+  `listing-media-update`, or media health reports them as `foreign_key`
+  (`scripts/catalog-media.test.ts` holds committed manifests to that).
 - **The production bucket is shared with serp.co.** `storeHostedMedia` is the only write to the
   bucket and refuses any key outside this site's three scopes, whatever bucket it is handed;
   `scopedMediaBucket` refuses the same before R2, and deletes only pending keys. The Worker never
@@ -89,9 +93,9 @@ The local Worker serves its bucket at `/_media/<key>` (GET and HEAD, this site's
 on staging or in production). Locally, media fetches may use any port, for the e2e fixture sites
 on `*.localtest.me:<port>`. `curl 'localhost:8787/cdn-cgi/handler/scheduled?cron=*/15+*+*+*+*'`
 runs the media cron once; without `cron` the Worker runs no job.
-`pnpm tsx scripts/seed-local-media.ts` hosts sample media through the real ingestion path, as the
-e2e media fixture does on throwaway state; `apps/web/e2e/listing-media.spec.ts` checks the
-rendered media against local R2.
+`pnpm db:seed:local` hosts fixture logos through the real ingestion path (`seed-local-media.ts`);
+the e2e media server (`apps/web/e2e/media-fixture.ts`) runs it and queues an unreachable logo, and
+`listing-media.spec.ts` checks the rendered media against local R2.
 
 ## Owner setup
 

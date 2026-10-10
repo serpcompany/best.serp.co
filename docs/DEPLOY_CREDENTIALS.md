@@ -15,7 +15,7 @@ account permissions:
 
 | Account permission | Used by |
 |---|---|
-| D1 → Edit | `wrangler d1 migrations apply`, `d1 execute` (bootstrap import, read-only checks), `d1 time-travel info` bookmarks, and the D1 query API used by the publisher |
+| D1 → Edit | `wrangler d1 migrations apply`, `d1 execute` (read-only checks), `d1 time-travel info` bookmarks, and the D1 query API used by the publisher |
 | Workers Scripts → Edit | `opennextjs-cloudflare deploy`: Worker upload, static assets, the workers.dev setting, observability |
 | Account Settings → Read | Wrangler account lookups during deploy |
 | Workers R2 Storage → Edit | the `MEDIA` bucket binding and listing media uploads |
@@ -52,7 +52,7 @@ The weekly media check uses a third environment, `production-media-health`, whos
 reads D1 and R2 ([Media health](./MEDIA_HEALTH.md#weekly-workflow)).
 
 Without the `staging` secrets, `web.yml`'s `deploy-staging` finishes green with a "Staging
-deploy skipped" notice, and that run verifies nothing for production. The release, bootstrap,
+deploy skipped" notice, and that run verifies nothing for production. The release,
 publication, and upload workflows fail at their credentials step instead. The
 `BETTER_AUTH_SECRET` secret and the `/admin` Access
 app: [Accounts](./ACCOUNTS.md). Error reporting (Sentry) and analytics (GTM, Cloudflare Web

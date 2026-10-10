@@ -75,8 +75,8 @@ change runs in a protected workflow.
 - The publishers in `scripts/` consume credential-free statement plans from
   `apps/web/src/db/`; they are the only layer that acquires credentials or calls remote
   APIs.
-- `scripts/migration/` holds the one-time JSON import and page comparison tooling. It
-  is never imported by runtime or build code.
+- `.archive/` holds retired history (#315): the one-time JSON import, its tooling, and the
+  production D1 bootstrap. Nothing builds, lints, tests, or runs it.
 
 ## Environments and hosts
 

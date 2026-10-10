@@ -57,4 +57,15 @@ describe('Markdown components (#289)', () => {
     }
     expect(markup).not.toContain(' node=')
   })
+
+  it('tags a serp.ly link in body text with the Dub partner ID, and leaves others (#169)', () => {
+    const markup = renderToStaticMarkup(
+      <ReactMarkdown components={components}>
+        {'[Start here](https://serp.ly/start) or [elsewhere](https://example.com/).'}
+      </ReactMarkdown>
+    )
+    // Written out, not read from the config, so a config regression fails here (#313 review).
+    expect(markup).toContain('href="https://serp.ly/start?via=best.serp.co"')
+    expect(markup).toContain('href="https://example.com/"')
+  })
 })

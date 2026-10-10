@@ -1,7 +1,11 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
+import { localSqlitePath } from '../d1-local-guard'
+import { type SeedQuery, seedIncomplete } from '../d1-local-seed'
+import { hasLocalD1Database, resolveFreshD1StateRoot } from '../d1-local-state'
 import { project } from '../project'
 import {
   buildRuntimeManifest,
@@ -66,14 +70,14 @@ function doctor(root: string): void {
   )
 }
 
-async function dev(root: string): Promise<void> {
-  const manifest = currentManifest(root, true)
-  mkdirSync(manifest.logDirectory, { recursive: true })
-  const logPath = resolve(manifest.logDirectory, 'runtime.log')
-  writeFileSync(logPath, '')
-  console.log(`Runtime: ${manifest.webUrl}`)
-  console.log(`Log: ${logPath}`)
-  const child = spawn('pnpm', ['tsx', 'scripts/d1-local-guard.ts', 'preview'], {
+/** Runs a local D1 guard command for this runtime, mirroring its output into the log. */
+async function runLogged(
+  root: string,
+  manifest: RuntimeManifest,
+  logPath: string,
+  command: 'preview' | 'seed'
+): Promise<number> {
+  const child = spawn('pnpm', ['tsx', 'scripts/d1-local-guard.ts', command], {
     cwd: root,
     env: {
       ...process.env,
@@ -90,10 +94,64 @@ async function dev(root: string): Promise<void> {
     process.stderr.write(chunk)
     appendFileSync(logPath, chunk)
   })
-  const status = await new Promise<number>(resolveStatus => {
-    child.on('close', code => resolveStatus(code || 0))
+  // A command a signal killed has no exit code, and never succeeded (#313).
+  return new Promise<number>(resolveStatus => {
+    child.on('close', code => resolveStatus(code ?? 1))
   })
-  process.exitCode = status
+}
+
+/**
+ * Whether the runtime's local D1 needs the fixture seed before it is served: none exists yet, or
+ * a seed that failed part-way left it migrated but empty, or seeded but unfinished (#313).
+ */
+export function needsFixtureSeed(stateRoot: string): boolean {
+  if (!hasLocalD1Database(stateRoot)) return true
+  const database = new DatabaseSync(localSqlitePath(stateRoot), { readOnly: true })
+  try {
+    const query: SeedQuery = (sql, params = []) =>
+      database.prepare(sql).all(...params) as Array<Record<string, unknown>>
+    return seedIncomplete(query)
+  } finally {
+    database.close()
+  }
+}
+
+/**
+ * The runtime `agent:dev` serves, refused unless it belongs to this worktree and keeps its state
+ * inside it (`runtimeViolations`, as `agent:doctor` checks): the seed resets the manifest's D1
+ * directory, so a stale or foreign manifest must never reach it (#316 review).
+ */
+export function devRuntimeManifest(root: string): RuntimeManifest {
+  const manifest = currentManifest(root, true)
+  const violations = runtimeViolations(root, manifest)
+  if (violations.length > 0) {
+    throw new Error(`${violations.join('\n')}\nSee docs/HARNESS.md#runtime-legibility.`)
+  }
+  return manifest
+}
+
+async function dev(root: string): Promise<void> {
+  const manifest = devRuntimeManifest(root)
+  mkdirSync(manifest.logDirectory, { recursive: true })
+  const logPath = resolve(manifest.logDirectory, 'runtime.log')
+  writeFileSync(logPath, '')
+  console.log(`Runtime: ${manifest.webUrl}`)
+  console.log(`Log: ${logPath}`)
+  // A fresh runtime has no local D1 yet: seed it with the fixtures (#312) before serving. So does
+  // one a failed seed left half-written (#313).
+  const stateRoot = resolveFreshD1StateRoot({
+    harnessStateDirectory: manifest.d1StateDirectory,
+    repositoryRoot: root
+  })
+  if (needsFixtureSeed(stateRoot)) {
+    console.log('No seeded local D1 yet: seeding fixtures with pnpm db:seed:local.')
+    const seeded = await runLogged(root, manifest, logPath, 'seed')
+    if (seeded !== 0) {
+      process.exitCode = seeded
+      return
+    }
+  }
+  process.exitCode = await runLogged(root, manifest, logPath, 'preview')
 }
 
 function logs(root: string): void {

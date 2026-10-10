@@ -71,8 +71,11 @@ until its rows match staging's again, and is never repointed without the staging
 
 ## Legacy migration
 
-`pnpm migration:legacy-media` (`scripts/migration/legacy-media.ts`, whose header holds the
-details) resolved every logo and image of the imported catalog into the upload plan
+This section records a one-time tool. `pnpm migration:legacy-media`
+(`scripts/migration/legacy-media.ts`, whose header holds the details) read the v1 import, so
+#315 archived it with the import in `.archive/scripts/migration/`; to run it again (also with
+`--current <dir>`, an environment's exported rows), check out the commit before #315's merge.
+It resolved every logo and image of the imported catalog into the upload plan
 `d1/media/2026-10-06-legacy-media.json` and its row-level manifests, all published on
 production. Every count, the refused replacements, and each logo left on the tile are in the
 [report](../d1/media/2026-10-06-legacy-media.report.md).
@@ -101,9 +104,9 @@ for any regeneration:
 - **Owner sign-off.** A refused replacement leaves the tile and is listed in the report with its
   final page and reason. Listing content never changes here; hijacked listings are
   [catalog hygiene](./CATALOG_HYGIENE.md#listing-domains)'s.
-- `scripts/catalog-media.test.ts` applies the manifests to the import and checks that every logo
-  and image is then a hosted key with a matching object in the plan, and that nothing else
-  changes.
+- `scripts/catalog-media.test.ts` checks that every image a manifest names is in the plan with the
+  same bytes; `scripts/v1-import-publications.test.ts` (archived with the import by #315) applied
+  the manifests to the import: every logo and image was then hosted, and nothing else changed.
 - **Deleted `repo:` files.** Once production had published every part, the plan's `repo:` files
   were deleted. The plan still names them, and their bytes stay in Git at the commit
   `scripts/media-repo-archive.ts` records, where the migration reads them. The uploader never
@@ -120,17 +123,6 @@ uses these:
 - `--refresh <upload summary JSON>` refetches the source of every object the upload reported as
   failed, whatever the reason (a drifted source usually fails on its byte count, before its
   digest), so those keys follow the new bytes.
-- `--current <dir>` regenerates from an environment's current rows instead of the import (after
-  a refused publication). Rows already hosted are kept as they are; only the rest is resolved.
-  The owner exports the rows read-only into the directory:
-
-```bash
-for table in listings media; do
-  pnpm exec wrangler d1 execute best-serp-co-staging --env staging --remote --json \
-    --config apps/web/wrangler.jsonc \
-    --command "$(pnpm -s migration:legacy-media -- --snapshot-sql "$table")" > "<dir>/$table.json"
-done
-```
 
 ## A human gate on staging data
 

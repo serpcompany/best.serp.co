@@ -103,6 +103,34 @@ describe('shared catalog data operations', () => {
     expect(await catalog.getListingBySlug('future')).toBeNull()
   })
 
+  it('links every public listing to its neighbours in publication order, at every boundary', async () => {
+    // The older-date branch of `next` has no `asOf` bound of its own since #314 (the current
+    // listing is public, so older ones are too). Each branch, both directions: across a
+    // publication date, to the next display order on one date, the slug tie on one date and
+    // display order, and both ends. With the clock before alpha's date, alpha is not public yet,
+    // and `future` never is.
+    const orders: Record<string, string[]> = {
+      '2026-07-30T00:00:00.000Z': ['alpha', 'bravo', 'charlie', 'delta', 'echo'],
+      '2026-07-04T12:00:00.000Z': ['bravo', 'charlie', 'delta', 'echo']
+    }
+    for (const [clock, order] of Object.entries(orders)) {
+      const catalog = createCatalogOperations({
+        cache: new MemoryCatalogCache(),
+        client: createDatabase(sqlite.asD1Database()),
+        clock: () => new Date(clock),
+        observe: () => undefined
+      })
+      expect((await catalog.getPublishedListings()).map(item => item.slug)).toEqual(order)
+      for (const [index, slug] of order.entries()) {
+        const detail = await catalog.getListingBySlug(slug)
+        expect(
+          [detail?.previousWebsite?.slug ?? null, detail?.nextWebsite?.slug ?? null],
+          `${clock} ${slug}`
+        ).toEqual([order[index - 1] ?? null, order[index + 1] ?? null])
+      }
+    }
+  })
+
   it('ranks single-category related listings from the category members', async () => {
     const { events, operations: catalog } = operations()
     const detail = await catalog.getListingBySlug('bravo')

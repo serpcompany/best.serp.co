@@ -17,6 +17,7 @@ export const D1_TESTS = [
   'scripts/d1-remote-publisher.test.ts',
   'scripts/d1-workerd-plans.test.ts',
   'scripts/d1-workerd-queries.test.ts',
+  'scripts/fixtures/scale-catalog.test.ts',
   'scripts/listing-domain-check.test.ts',
   'scripts/media-health.test.ts',
   'scripts/media-upload.test.ts',
