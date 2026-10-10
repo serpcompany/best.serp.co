@@ -164,3 +164,36 @@ describe('listing detail JSON-LD dates (#218)', () => {
     )
   })
 })
+
+describe('listing detail JSON-LD breadcrumb (#347)', () => {
+  const trail = (schema: ReturnType<typeof generateWebsiteDetailSchema>) =>
+    (
+      graphNode(schema, 'BreadcrumbList').itemListElement as Array<{
+        item: string
+        name: string
+        position: number
+      }>
+    ).map(({ item, name, position }) => [position, name, item])
+
+  it('runs Home, the directory, the hub, then the listing', () => {
+    expect(
+      trail(
+        generateWebsiteDetailSchema(listing, {
+          name: 'Video Downloaders',
+          slug: 'video-downloaders'
+        })
+      )
+    ).toEqual([
+      [1, 'Home', SITE_PUBLIC_URL],
+      [2, 'All Products', `${SITE_PUBLIC_URL}/products/`],
+      [3, 'Video Downloaders', `${SITE_PUBLIC_URL}/products/categories/video-downloaders/`],
+      [4, 'Example Downloader', `${SITE_PUBLIC_URL}/products/example-downloader/`]
+    ])
+  })
+
+  it('leaves the hub out when there is none', () => {
+    expect(trail(generateWebsiteDetailSchema(listing)).map(([position]) => position)).toEqual([
+      1, 2, 3
+    ])
+  })
+})

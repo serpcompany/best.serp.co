@@ -70,7 +70,7 @@ const taxonomy = vi.hoisted(() => {
 })
 vi.mock('server-only', () => ({}))
 vi.mock('@/lib/catalog/repository', () => ({
-  getActiveCategories: async () => [],
+  getActiveCategories: async () => taxonomy.categories,
   getActiveTags: async () => taxonomy.tags,
   getBestPageBySlug: async (slug: string) =>
     [...taxonomy.bestPages, taxonomy.smallBestPage].find(page => page.slug === slug) ?? null,

@@ -43,25 +43,42 @@ export type FooterGroup = { title: string; links: readonly SiteLink[] }
 
 export type SocialLink = SiteLink & { icon: ComponentType<{ className?: string }> }
 
-// "All products" is the homepage, the canonical URL of `/products/`'s first page (#167).
-export const productLinks: SiteLink[] = [
-  { href: getRoute('home'), label: `All ${siteCopy.listingName.plural}` },
-  { href: getRoute('category.index'), label: 'Categories' },
-  ...(siteConfig.features.showBrands
-    ? [{ href: getRoute('brands'), label: siteCopy.brandsLabel }]
-    : [])
-]
+/** What the header's links depend on: whether the best-page index lists a best page (#347). */
+export interface SiteLinkOptions {
+  /** `listedBestPages` of the cached best index is not empty (`linksBestIndex`). */
+  bestIndexListed: boolean
+}
 
-export const headerItems: readonly HeaderItem[] = [
-  {
-    kind: 'menu',
-    label: siteCopy.listingName.pluralTitle,
-    links: productLinks,
-    sectionPath: getRoute('listing.list')
-  },
-  { kind: 'link', link: { href: getRoute('pricing'), label: 'Pricing' } },
-  { kind: 'link', link: { href: getRoute('about'), label: 'About' } }
-]
+/**
+ * The Products menu. "All products" is the homepage, the canonical URL of `/products/`'s first
+ * page (#167). "Best", the best-page index beside "Categories" (#341 design 5.3, #347), appears
+ * only while the index lists a best page, so the nav never links an index that shows only its
+ * heading: before the taxonomy is published, and on production between promotion and its publish.
+ */
+export function productLinks({ bestIndexListed }: SiteLinkOptions): SiteLink[] {
+  return [
+    { href: getRoute('home'), label: `All ${siteCopy.listingName.plural}` },
+    { href: getRoute('category.index'), label: 'Categories' },
+    ...(bestIndexListed ? [{ href: getRoute('best.index'), label: 'Best' }] : []),
+    ...(siteConfig.features.showBrands
+      ? [{ href: getRoute('brands'), label: siteCopy.brandsLabel }]
+      : [])
+  ]
+}
+
+/** The header's items: the Products menu, then Pricing and About. */
+export function headerItems(options: SiteLinkOptions): HeaderItem[] {
+  return [
+    {
+      kind: 'menu',
+      label: siteCopy.listingName.pluralTitle,
+      links: productLinks(options),
+      sectionPath: getRoute('listing.list')
+    },
+    { kind: 'link', link: { href: getRoute('pricing'), label: 'Pricing' } },
+    { kind: 'link', link: { href: getRoute('about'), label: 'About' } }
+  ]
+}
 
 const withoutTrailingSlash = (path: string) => path.replace(/\/+$/u, '') || '/'
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { getHeaderAuthState } from '@/lib/auth/header-state'
+import { linksBestIndex } from '@/lib/catalog/site-nav'
 import { SiteFooter } from './site-footer'
 import { SiteHeader } from './site-header'
 
@@ -8,10 +9,10 @@ import { SiteHeader } from './site-header'
  * root 404 page render it. The dashboards (`(dashboard)`) have their own shells instead.
  */
 export async function SiteChrome({ children }: { children: ReactNode }) {
-  const authState = await getHeaderAuthState()
+  const [authState, bestIndexListed] = await Promise.all([getHeaderAuthState(), linksBestIndex()])
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader authState={authState} />
+      <SiteHeader authState={authState} links={{ bestIndexListed }} />
       <main className="flex flex-1 flex-col">{children}</main>
       <SiteFooter />
     </div>

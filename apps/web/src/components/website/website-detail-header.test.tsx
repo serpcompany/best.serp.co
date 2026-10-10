@@ -173,19 +173,26 @@ describe('the product page header', () => {
     expect(collectText(owned)).not.toContain('Claim this listing')
   })
 
-  it('shows the badges and category links, and nothing for a listing with none', () => {
+  it('shows the badges, the hub, other categories and tags as links, and nothing for none', () => {
     const meta = websiteDetailMeta({
-      category: 'video-downloaders',
-      categories: ['video-downloaders', 'browser-extensions'],
+      categories: [
+        { name: 'Video Downloaders', slug: 'video-downloaders' },
+        { name: 'Browser Extensions', slug: 'browser-extensions' }
+      ],
       isUnofficial: true,
+      tags: [{ name: 'Vimeo', slug: 'vimeo' }],
       verifiedOwner: true
     })
 
     expect(collectText(meta)).toContain('Unofficial')
+    // Names from D1, not the slug-casing helper (#347).
+    expect(collectText(meta)).toContain('Video DownloadersBrowser ExtensionsVimeo')
     expect(collectHrefProps(meta)).toEqual([
       '/products/categories/video-downloaders/',
-      '/products/categories/browser-extensions/'
+      '/products/categories/browser-extensions/',
+      '/products/tags/vimeo/'
     ])
     expect(websiteDetailMeta({})).toBeUndefined()
+    expect(websiteDetailMeta({ categories: [], tags: [] })).toBeUndefined()
   })
 })

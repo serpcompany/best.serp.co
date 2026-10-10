@@ -175,7 +175,23 @@ export interface ListingTag {
   slug: string
 }
 
+/**
+ * An active best page's pin or exclusion of a listing (`best_page_listings`, #341 design 1.3).
+ * With the best index, it tells which best pages show the listing (its "Featured in", #347).
+ */
+export interface ListingBestPageMark {
+  /** The best page's slug. */
+  page: string
+  /** The pin's position (1 is the top), or null when the page excludes the listing. */
+  position: number | null
+}
+
 export interface ListingDetail extends ListingSummary {
+  /**
+   * The active best pages that pin or exclude it, by page slug; absent when none do. Its "Featured
+   * in" reads them with the best index (#347), so it costs no statement of its own.
+   */
+  bestPageMarks?: ListingBestPageMark[]
   content?: string
   entityType?: string
   /** The listing's FAQs in order (#105); absent when it has none. */

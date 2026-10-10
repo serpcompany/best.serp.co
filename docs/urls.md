@@ -119,6 +119,23 @@ publisher's affected routes) build their URLs from it.
   logo, name, the owner's blurb or the description, hub and tag chips, and "Visit Site" with the
   listing's `link_rel`. Their JSON-LD is a `CollectionPage` with an ordered `ItemList` and a
   `BreadcrumbList`, and no `Review` or rating.
+- **Links between the layers** (design 5.3, #347).
+  - The Products menu links `/best/` beside Categories once the best index lists a best page
+    (`linksBestIndex`), so it never links an index that shows only its heading.
+  - The homepage (and `/products/`) shows a grid of the hubs: the categories that hold a tag.
+  - A hub's page shows its tags with 3 or more listings as chips, most listings first, and its
+    best pages under "Best {hub} lists".
+  - A listing page's breadcrumb, and its JSON-LD, run Products, its hub, the listing. Its header
+    shows its hub badge and its other categories named from D1, then its tag chips, and "Featured
+    in" names up to three best pages that show it ([Public catalog](./public-catalog.md#reads)).
+  - The 410 page links the listing's hub while the hub's page renders (`renderingCategory`), else
+    the directory.
+
+  Without tags or best pages there is no hub grid, tag chip, "Best {hub} lists", "Featured in" or
+  "Best" link. These change on every page all the same: a listing's breadcrumb gains its hub, its
+  hub badge and category names come from D1, an untagged listing's related listings start after
+  its own name ([Public catalog](./public-catalog.md#reads)), the 410 page links the hub instead
+  of `/products/?category=`, and the nav gains "Best" once a best page exists.
 - **Reserved slugs.** No listing may take `categories` or `tags` (`reservedListingSlugs`, derived
   from the registry's pages under `/products/`): submission intake, the admin panel's approval and
   the publisher's manifest schema refuse them, and the Worker's 410 check skips them.
@@ -135,8 +152,9 @@ links into `/products/?page=N`. `/products/` itself renders the homepage's conte
 canonical is `/`. Page 1 is the bare URL; pages 2+ are linked with plain `<a href>` anchors,
 canonicalize to themselves, carry `noindex, follow` and a "- Page N" title, and a page
 past the end is a 404. The bar links the first and last pages, the current page's neighbours,
-and the pages 10 either side (#331), so no page of the 57-page directory is more than 6 links
-from page 1; below `sm` it hides the ±10 links (they stay in the HTML) to fit one row. Category JSON-LD describes the whole category on every page.
+and the pages 10 either side (#331), so every page of a list of up to 60 pages is within 7 links
+of page 1; below `sm` it hides the ±10 links (they stay in the HTML) to fit one row. Category
+JSON-LD describes the whole category on every page.
 `apps/web/src/components/directory/listing-pagination.tsx` owns the parameter, links, and metadata;
 `getListingNamePage` in `apps/web/src/db` reads one page (ids in name order are cached
 per epoch, then only that page's summaries are read). Routes never load the full catalog

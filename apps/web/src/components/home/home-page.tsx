@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import type { ReactElement } from 'react'
 import { buttonVariants } from '@/components/ui/button'
+import type { PublishedCategory, PublishedTag } from '@/db/contracts'
 import {
   toWebsiteBrowseCardMetadata,
   type WebsiteMetadata
@@ -16,9 +17,11 @@ import {
 } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
+import { CategoryCards } from '../category-routes/category-cards'
 import { type ListingPageInfo, ListingPagination } from '../directory/listing-pagination'
 import { PageHero } from '../layout/page-hero'
 import { PageContainer, PageSection } from '../layout/page-shell'
+import { Section } from '../layout/section'
 import { FeaturedProjectsSection } from '../sections/featured-projects-section'
 import { RecentlyAddedSection } from '../sections/recently-added-section'
 import { StaticWebsitesList } from '../sections/static-websites-list'
@@ -33,31 +36,56 @@ export interface DirectoryPage extends ListingPageInfo {
 export interface HomePageData {
   browse: DirectoryPage
   featuredProjects: WebsiteMetadata[]
+  /** The hub grid's categories (#347), by name; empty before the taxonomy is published. */
+  hubs: PublishedCategory[]
   recentlyUpdatedProjects: WebsiteMetadata[]
   totalCount: number
 }
 
 interface BuildHomePageDataInput {
   browse: DirectoryPage
+  /** Active categories with their public counts (the shell stats). */
+  categories?: readonly PublishedCategory[]
   /** Featured listings in publication order (the `is_featured` placement flag). */
   featured: WebsiteMetadata[]
   /** Latest listings in publication order. */
   latest: WebsiteMetadata[]
+  /** Active tags with their hubs (the tag stats). */
+  tags?: readonly Pick<PublishedTag, 'category'>[]
   totalCount: number
 }
 
 const HOMEPAGE_CARD_SECTION_SIZE = 8
 
+/**
+ * The homepage's hubs (#341 design 5.3, #347): categories with a public listing that hold an
+ * active tag, by name, as the categories index orders them. Before the taxonomy is published no
+ * category holds a tag, so the homepage shows no grid and looks as it did; the narrow categories
+ * a migration has yet to retire hold none either.
+ */
+export function homepageHubs(
+  categories: readonly PublishedCategory[],
+  tags: readonly Pick<PublishedTag, 'category'>[]
+): PublishedCategory[] {
+  const hubs = new Set(tags.map(tag => tag.category))
+  return categories
+    .filter(category => category.count > 0 && hubs.has(category.slug))
+    .sort((left, right) => left.name.localeCompare(right.name))
+}
+
 export function buildHomePageData({
   browse,
+  categories = [],
   featured,
   latest,
+  tags = [],
   totalCount
 }: BuildHomePageDataInput): HomePageData {
   return {
     browse,
     // Without featured listings the section falls back to the newest ones, as before.
     featuredProjects: (featured.length ? featured : latest).slice(0, HOMEPAGE_CARD_SECTION_SIZE),
+    hubs: homepageHubs(categories, tags),
     recentlyUpdatedProjects: latest.slice(0, HOMEPAGE_CARD_SECTION_SIZE),
     totalCount
   }
@@ -116,7 +144,7 @@ export function HomePageCanonicalTags(): ReactElement {
 }
 
 export function HomePageRoute({ data }: { data: HomePageData }): ReactElement {
-  const { browse, featuredProjects, recentlyUpdatedProjects, totalCount } = data
+  const { browse, featuredProjects, hubs, recentlyUpdatedProjects, totalCount } = data
 
   return (
     <>
@@ -137,6 +165,12 @@ export function HomePageRoute({ data }: { data: HomePageData }): ReactElement {
       <PageContainer className="flex flex-col gap-12 py-12">
         <FeaturedProjectsSection projects={featuredProjects.map(toWebsiteBrowseCardMetadata)} />
         <RecentlyAddedSection websites={recentlyUpdatedProjects.map(toWebsiteBrowseCardMetadata)} />
+        {/* The hub grid (#347): the categories index's cards, for the hubs only. */}
+        {hubs.length > 0 ? (
+          <Section title="Categories" titleId="categories" viewAllHref={getRoute('category.index')}>
+            <CategoryCards categories={hubs} />
+          </Section>
+        ) : null}
         <StaticWebsitesList
           websites={browse.items.map(toWebsiteBrowseCardMetadata)}
           totalCount={totalCount}

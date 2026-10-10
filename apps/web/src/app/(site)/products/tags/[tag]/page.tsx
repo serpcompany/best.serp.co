@@ -20,7 +20,7 @@ import {
 } from '@/lib/catalog/repository'
 import { getRoute } from '@/lib/routing/routes'
 import { type PageSearchParams, redirectMovedTaxonomyPage } from '@/lib/routing/taxonomy-redirect'
-import { bestPageEntryCount, isTagIndexable } from '@/lib/seo/taxonomy-indexing'
+import { bestPageEntryCount, isTagIndexable, renderingCategory } from '@/lib/seo/taxonomy-indexing'
 import { formatListingCount } from '@/lib/site/site-copy'
 
 interface TagPageProps {
@@ -76,7 +76,7 @@ export default async function TagPage({ params, searchParams }: TagPageProps) {
 
   const tagPath = getRoute('tag.page', { tag: tag.slug })
   // The hub is a link only while its page renders (it has a public listing).
-  const hub = categories.find(category => category.slug === tag.category && category.count > 0)
+  const hub = renderingCategory(categories, tag.category)
   const rankedBy = bestPages.filter(
     bestPage => bestPage.tag === tag.slug && bestPageEntryCount(bestPage) > 0
   )

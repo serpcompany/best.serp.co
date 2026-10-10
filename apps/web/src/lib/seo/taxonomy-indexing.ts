@@ -63,6 +63,20 @@ export function listedBestPages<T extends Pick<PublishedBestPage, 'listSize' | '
 }
 
 /**
+ * The category at `slug` when its page renders: it is active (in the shell stats) and has a
+ * public listing (#341 design 2.2). Without one its URL answers a 308 or a 404, so the hub route
+ * renders only what this returns, and the 410 page links a hub only when this returns it (#347).
+ */
+export function renderingCategory<T extends Pick<PublishedCategory, 'count' | 'slug'>>(
+  categories: readonly T[],
+  slug: string | null | undefined
+): T | null {
+  if (!slug) return null
+  const category = categories.find(candidate => candidate.slug === slug)
+  return category && category.count > 0 ? category : null
+}
+
+/**
  * A category page with a public listing is indexed, except a transitional catch-all hub
  * (`TRANSITIONAL_CATEGORY_SLUGS`: `other`), which stays crawlable for its links.
  */

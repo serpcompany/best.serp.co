@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { headerItems, isCurrentPage, isMenuActive } from './site-links'
 
-const products = headerItems.find(item => item.kind === 'menu')
-if (products?.kind !== 'menu') throw new Error('the header has a Products menu')
+function productsMenu(bestIndexListed: boolean) {
+  const menu = headerItems({ bestIndexListed }).find(item => item.kind === 'menu')
+  if (menu?.kind !== 'menu') throw new Error('the header has a Products menu')
+  return menu
+}
+const products = productsMenu(true)
 
 describe('header link states (#259)', () => {
   it('marks only the exact page as current, with or without a trailing slash', () => {
@@ -18,6 +22,8 @@ describe('header link states (#259)', () => {
       '/products/vimeo-downloader/',
       '/products/categories/',
       '/products/categories/ai-agents/',
+      '/best/',
+      '/best/ai-photo-editor/',
       '/brands/'
     ]) {
       expect(isMenuActive(path, products), path).toBe(true)
@@ -25,5 +31,19 @@ describe('header link states (#259)', () => {
     for (const path of ['/', '/pricing/', '/about/', '/submit/']) {
       expect(isMenuActive(path, products), path).toBe(false)
     }
+  })
+})
+
+describe('the Products menu (#347)', () => {
+  it('links the best-page index beside Categories while the index lists a best page', () => {
+    expect(products.links.map(link => [link.label, link.href]).slice(0, 3)).toEqual([
+      ['All products', '/'],
+      ['Categories', '/products/categories/'],
+      ['Best', '/best/']
+    ])
+  })
+
+  it('leaves Best out while the index lists none, so it never links a heading alone', () => {
+    expect(productsMenu(false).links.map(link => link.label)).not.toContain('Best')
   })
 })

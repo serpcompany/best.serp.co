@@ -118,10 +118,10 @@ describe('taxonomy reads (#345)', () => {
         'secondary'
       ])
       expect([...cache.values.keys()].filter(key => key.includes('secondary')).sort()).toEqual([
-        `catalog-name-order:v8:${epoch}:c:secondary`,
-        `catalog-name-order:v8:${epoch}:t:secondary`,
-        `catalog-name-page:v8:${epoch}:c:secondary:48:1`,
-        `catalog-name-page:v8:${epoch}:t:secondary:48:1`
+        `catalog-name-order:v9:${epoch}:c:secondary`,
+        `catalog-name-order:v9:${epoch}:t:secondary`,
+        `catalog-name-page:v9:${epoch}:c:secondary:48:1`,
+        `catalog-name-page:v9:${epoch}:t:secondary:48:1`
       ])
       // Warm: both come from the cache, still apart.
       const warm = operations(cache)
@@ -259,7 +259,7 @@ describe('taxonomy reads (#345)', () => {
     const cold = operations(cache)
     const items = await cold.operations.getBestPageItems('best-primary')
     expect(items).toHaveLength(4)
-    expect([...cache.values.keys()]).toContain(`catalog-best-items:v8:${epoch}:best-primary`)
+    expect([...cache.values.keys()]).toContain(`catalog-best-items:v9:${epoch}:best-primary`)
     const warm = operations(cache)
     expect(await warm.operations.getBestPageItems('best-primary')).toEqual(items)
     expect(queries(warm.events)).toEqual(['publication-version'])
@@ -271,7 +271,7 @@ describe('taxonomy reads (#345)', () => {
 
     // An entry cached before items carried their tags is read again from D1 (#346).
     const untagged = new MemoryCatalogCache()
-    untagged.values.set(`catalog-best-items:v8:${epoch}:best-primary`, {
+    untagged.values.set(`catalog-best-items:v9:${epoch}:best-primary`, {
       items: items.map(({ tags: _tags, ...item }) => item),
       publicationVersion: 1
     })
@@ -281,8 +281,8 @@ describe('taxonomy reads (#345)', () => {
 
     // A corrupt entry is read again from D1.
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-best-items:v8:${epoch}:best-primary`, { items: 'wrong' })
-    corrupt.values.set(`catalog-best-index:v8:${epoch}`, { pages: [{ slug: 'x' }] })
+    corrupt.values.set(`catalog-best-items:v9:${epoch}:best-primary`, { items: 'wrong' })
+    corrupt.values.set(`catalog-best-index:v9:${epoch}`, { pages: [{ slug: 'x' }] })
     const recovered = operations(corrupt)
     expect(await recovered.operations.getBestPageItems('best-primary')).toEqual(items)
     expect(recovered.events).toContainEqual({
@@ -382,6 +382,41 @@ describe('taxonomy reads (#345)', () => {
       'delta',
       'echo'
     ])
+  })
+
+  it("carries the active best pages' pins and exclusions on the detail, in the same statement", async () => {
+    const catalog = operations().operations
+    const start = sqlite.statements.length
+    // bravo: pinned first on the intersection page, excluded from the category page.
+    expect((await catalog.getListingBySlug('bravo'))?.bestPageMarks).toEqual([
+      { page: 'best-editors-in-secondary', position: 1 },
+      { page: 'best-primary', position: null }
+    ])
+    // Epoch, detail, related, previous, next: the marks add no statement.
+    expect(sqlite.statements.length - start).toBe(5)
+    expect((await catalog.getListingBySlug('delta'))?.bestPageMarks).toEqual([
+      { page: 'best-writers', position: 1 }
+    ])
+    expect((await catalog.getListingBySlug('charlie'))?.bestPageMarks).toEqual([
+      { page: 'best-writers', position: null }
+    ])
+    // Marked by no best page: absent, like its tags would be.
+    expect((await catalog.getListingBySlug('alpha'))?.bestPageMarks).toBeUndefined()
+    // An inactive best page's marks are left out.
+    sqlite.database.exec(`
+      INSERT INTO best_page_listings (best_page_id, listing_id, position, excluded)
+        SELECT id, 'serp-alpha', 1, 0 FROM best_pages WHERE slug = 'best-inactive';
+    `)
+    try {
+      expect(
+        (await operations().operations.getListingBySlug('alpha'))?.bestPageMarks
+      ).toBeUndefined()
+    } finally {
+      sqlite.database.exec(`
+        DELETE FROM best_page_listings WHERE listing_id = 'serp-alpha'
+          AND best_page_id = (SELECT id FROM best_pages WHERE slug = 'best-inactive');
+      `)
+    }
   })
 
   it('scores related listings on the three most central tags only, and fills from the hub', async () => {

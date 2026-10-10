@@ -96,15 +96,19 @@ describe('listing pagination', () => {
       const pages = window.filter(entry => entry !== 'gap')
       expect(pages[0], `${page}/${pageCount}`).toBe(1)
       expect(pages.at(-1), `${page}/${pageCount}`).toBe(pageCount)
-      for (const expected of [
+      // Exactly the first and last pages, the page, its neighbours and the pages 10 either side.
+      const expected = [
+        1,
         page - PAGINATION_JUMP,
         page - 1,
         page,
         page + 1,
-        page + PAGINATION_JUMP
-      ]) {
-        if (expected >= 1 && expected <= pageCount) expect(pages).toContain(expected)
-      }
+        page + PAGINATION_JUMP,
+        pageCount
+      ].filter(entry => entry >= 1 && entry <= pageCount)
+      expect(pages, `${page}/${pageCount}`).toEqual(
+        [...new Set(expected)].sort((left, right) => left - right)
+      )
       expectGapsWhereSkipped(window, `${page}/${pageCount}`)
     }
   })

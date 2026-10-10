@@ -239,12 +239,33 @@ export function BestPageView({
         ) : null}
       </PageSection>
       {hub && related.length ? (
-        <PageSection spacing="spacious" className="border-t" aria-labelledby="related-best-pages">
-          <SectionHeader id="related-best-pages" title={`Best ${hub.name} lists`} />
-          <BestPageCards pages={related} />
-        </PageSection>
+        <BestPagesSection className="border-t" hub={hub} id="related-best-pages" pages={related} />
       ) : null}
     </>
+  )
+}
+
+/**
+ * A hub's best pages under "Best {hub} lists" (design 5.3): a best page's related lists, and the
+ * hub page's own (#347).
+ */
+export function BestPagesSection({
+  className,
+  hub,
+  id,
+  pages
+}: {
+  className?: string
+  hub: Pick<PublishedCategory, 'name'>
+  /** The heading's id, which names the section. */
+  id: string
+  pages: readonly PublishedBestPage[]
+}) {
+  return (
+    <PageSection spacing="spacious" className={className} aria-labelledby={id}>
+      <SectionHeader id={id} title={`Best ${hub.name} lists`} />
+      <BestPageCards pages={pages} />
+    </PageSection>
   )
 }
 
@@ -254,7 +275,7 @@ export function BestPageCards({
   pages
 }: {
   className?: string
-  pages: PublishedBestPage[]
+  pages: readonly PublishedBestPage[]
 }) {
   return (
     <CardGrid as="ul" className={cn(className)}>
