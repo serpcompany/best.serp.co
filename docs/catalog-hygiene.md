@@ -191,7 +191,7 @@ Some products were imported twice, under two slugs with the same name and descri
 `d1/publications/2026-10-10-duplicate-listings.yaml` keeps one listing of each pair and unpublishes
 the other (410, like the cleanups above); its header says which slug stays and why. Then
 `2026-10-10-duplicate-listings-redirects.yaml` sends each retired slug on to the listing it
-duplicated: `/products/<retired>/` answers 308 to `/products/<kept>/`
+duplicated: `/products/<retired>/` and `/<retired>` (#356) answer 308 to `/products/<kept>/`
 ([Slug redirects](./catalog-publication.md#slug-redirects), #338). Publish it after the first
 manifest on each environment: until the retired listings are unpublished, it refuses whole.
 

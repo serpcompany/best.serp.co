@@ -3,6 +3,8 @@ import type { Database } from './client'
 
 export type CatalogOperation =
   | 'autocomplete'
+  | 'best-index'
+  | 'best-page-items'
   | 'canonical-redirect'
   | 'featured-summaries'
   | 'latest-summaries'
@@ -14,10 +16,14 @@ export type CatalogOperation =
   | 'publication-version'
   | 'search-summaries'
   | 'shell-stats'
+  | 'tag-stats'
+  | 'taxonomy-redirect'
   | 'unpublished-listing'
   | 'unpublished-listing-status'
 
 export type CatalogQueryShape =
+  | 'best-index'
+  | 'best-page-items'
   | 'canonical-redirect'
   | 'featured-summaries'
   | 'latest-summaries'
@@ -30,10 +36,14 @@ export type CatalogQueryShape =
   | 'publication-version'
   | 'published-summaries'
   | 'related-shared-categories'
+  | 'related-shared-tags'
   | 'related-single-category-members'
   | 'related-single-category-seek'
   | 'search-summaries'
   | 'shell-stats'
+  | 'tag-name-order'
+  | 'tag-stats'
+  | 'taxonomy-redirect'
   | 'unpublished-listing'
   | 'unpublished-listing-status'
 
@@ -58,6 +68,8 @@ export interface CatalogQueryEvent {
 export interface CatalogCacheEvent {
   event: 'catalog_cache'
   operation:
+    | 'best-index'
+    | 'best-page-items'
     | 'featured-summaries'
     | 'latest-summaries'
     | 'listing-content'
@@ -67,6 +79,7 @@ export interface CatalogCacheEvent {
     | 'published-summaries'
     | 'search-summaries'
     | 'shell-stats'
+    | 'tag-stats'
   state: 'corrupt' | 'error' | 'hit' | 'miss' | 'write-error' | 'written'
 }
 
@@ -156,6 +169,12 @@ export interface RelatedListing {
 /** The `rel` of our outbound link to the listing's website (an admin setting per listing). */
 export type ListingLinkRel = 'follow' | 'nofollow' | 'sponsored'
 
+/** One of a listing's active tags (#341). */
+export interface ListingTag {
+  name: string
+  slug: string
+}
+
 export interface ListingDetail extends ListingSummary {
   content?: string
   entityType?: string
@@ -169,6 +188,11 @@ export interface ListingDetail extends ListingSummary {
   priority?: 'high' | 'medium' | 'low'
   relatedWebsites: RelatedListing[]
   resourceLinks?: ListingResourceLink[]
+  /**
+   * Its active tags (#341), the most central first (`listing_tags.sort_order`, then slug); absent
+   * when it has none. A listing with tags takes its related listings from them.
+   */
+  tags?: ListingTag[]
   /** Present when the listing has a current owner (`listing_owners`): the "Verified owner" badge. */
   verifiedOwner?: true
 }
@@ -188,7 +212,7 @@ export interface UnpublishedListing {
 }
 
 /**
- * One page of listings in directory (name) order, optionally within one category.
+ * One page of listings in directory (name) order, optionally within one category or one tag.
  * `firstPublishedAt` / `lastPublishedAt` / `lastModifiedAt` span the whole collection, not just
  * the page; `lastModifiedAt` is the newest `modifiedAt` among its listings (#218).
  */
@@ -201,15 +225,27 @@ export interface ListingNamePage {
   page: number
   pageCount: number
   pageSize: number
+  /** The tag the page is of (#341), or null. */
+  tag: string | null
   total: number
 }
 
-export interface ListingNamePageQuery {
-  /** Restrict to one active category slug; omit for the whole directory. */
-  category?: string
+/** One page of the whole directory, of one active category, or of one active tag (#341). */
+export type ListingNamePageQuery = {
   page?: number
   pageSize?: number
-}
+} & (
+  | {
+      /** Restrict to one active category slug; omit for the whole directory. */
+      category?: string
+      tag?: undefined
+    }
+  | {
+      category?: undefined
+      /** Restrict to one active tag slug (#341). */
+      tag?: string
+    }
+)
 
 export interface PublishedCategory {
   count: number
@@ -227,9 +263,75 @@ export interface CatalogShellStats {
   publicationVersion: number
 }
 
+/** An active tag (#341, design 3.1) with its public listings. */
+export interface PublishedTag {
+  /** Its hub: the active category it sits under. */
+  category: string
+  /** Its public listings. */
+  count: number
+  description: string
+  /** The newest `modifiedAt` among its public listings (its sitemap `lastmod`), or null. */
+  lastModifiedAt: string | null
+  name: string
+  order: number
+  slug: string
+}
+
+/**
+ * An active best page (`/best/<slug>/`, #341, design 1.3) whose tag and category, where set, are
+ * active. Its pool is the public listings with its tag, in its category, or both, less its
+ * exclusions, plus its public pins; the page shows the first `min(listSize, poolSize)`.
+ */
+export interface PublishedBestPage {
+  /** The category it ranks within, or null when it ranks a tag alone. */
+  category: string | null
+  heading: string
+  /** The hub it belongs to: its category, else its tag's. */
+  hub: string
+  intro: string
+  keyword: string
+  /** The later of the page's own `updated_at` and the newest `modifiedAt` in its pool. */
+  lastModifiedAt: string
+  listSize: number
+  order: number
+  poolSize: number
+  slug: string
+  /** The tag it ranks, or null when it ranks a category alone. */
+  tag: string | null
+  title: string
+}
+
+/** One entry of a best page, in rank order (#341, design 1.3 and 5.1). */
+export interface BestPageItem extends ListingSummary {
+  /** The owner's "why it is here" for a pinned entry. */
+  blurb?: string
+  /** Rendered on the entry's "Visit site" link. */
+  linkRel: ListingLinkRel
+}
+
+/** The kinds of taxonomy URL `taxonomy_redirects` can move (#341, design 2.2). */
+export type TaxonomyKind = 'best' | 'category' | 'tag'
+
+/** Where a moved taxonomy URL points: an active category, tag or best page, or the directory. */
+export type TaxonomyTarget =
+  | { kind: TaxonomyKind; slug: string }
+  | { kind: 'directory'; slug: null }
+
 export interface CatalogOperations {
   getActiveCategories(): Promise<PublishedCategory[]>
+  /** Active tags with their hubs and public counts, cached per epoch (#341). */
+  getActiveTags(): Promise<PublishedTag[]>
   getAutocomplete(query: string, limit?: number): Promise<ListingSummary[]>
+  /** The active best page at `slug`, from the best index, or null (#341). */
+  getBestPageBySlug(slug: string): Promise<PublishedBestPage | null>
+  /**
+   * The entries of the best page at `slug`, in rank order: pins by position, then tag
+   * centrality, hosted logos first, then name and slug; at most its `listSize`. Empty for a slug
+   * that is not an active best page (#341, design 1.3).
+   */
+  getBestPageItems(slug: string): Promise<BestPageItem[]>
+  /** Every active best page (the best index), cached per epoch (#341). */
+  getBestPages(): Promise<PublishedBestPage[]>
   getCanonicalSlugForRedirect(oldSlug: string): Promise<string | null>
   getCategoryBySlug(slug: string): Promise<PublishedCategory | null>
   getFeaturedListingCount(): Promise<number>
@@ -243,14 +345,21 @@ export interface CatalogOperations {
   getPublishedListings(): Promise<ListingSummary[]>
   getShellStats(): Promise<CatalogShellStats>
   getSitemapListings(): Promise<ListingSummary[]>
+  getTagBySlug(slug: string): Promise<PublishedTag | null>
+  /**
+   * Where a retired or renamed category, tag or best page URL moved (`taxonomy_redirects`, #341
+   * design 2.2), or null when it has no redirect or its target is no longer active. Uncached: one
+   * primary-key seek, asked only after the page missed.
+   */
+  getTaxonomyRedirect(kind: TaxonomyKind, slug: string): Promise<TaxonomyTarget | null>
   /**
    * The unpublished listing at `slug`, or null when the slug is live, never existed, or is filed
    * under a retired category (#260).
    */
   getUnpublishedListing(slug: string): Promise<UnpublishedListing | null>
   /**
-   * Public listings whose name, short description, slug, or an active category (slug or name)
-   * contains every term of the normalized query (`normalizeSearchQuery`), at most
+   * Public listings whose name, short description, slug, or an active category or tag (slug or
+   * name) contains every term of the normalized query (`normalizeSearchQuery`), at most
    * `MAX_SEARCH_LIMIT`.
    */
   searchListings(query: string, limit?: number): Promise<ListingSummary[]>

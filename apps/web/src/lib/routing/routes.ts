@@ -76,6 +76,14 @@ export const routes = {
     index: buildCategoryRoute(''),
     page: buildCategoryRoute()
   },
+  // The taxonomy's tag and best pages (#341, design 2.1). Their pages come with #346; the Worker's
+  // root-level redirect already follows a retired category URL to them (#345).
+  tag: {
+    page: buildRouteFromBase(siteConfig.listingRouteBasePath, 'tags/[tag]')
+  },
+  best: {
+    page: '/best/[keyword]/'
+  },
   about: '/about/',
   account: '/account/',
   affiliateDisclosure: '/legal/affiliate-disclosure/',
@@ -149,6 +157,8 @@ type DynamicRoutes =
   | 'docs.doc'
   | 'guides.guide'
   | 'category.page'
+  | 'tag.page'
+  | 'best.page'
 
 type Routes = StaticRoutes | DynamicRoutes
 
@@ -160,6 +170,8 @@ type DynamicRouteParams = {
   'docs.doc': { slug: string }
   'guides.guide': { slug: string }
   'category.page': { category: string }
+  'tag.page': { tag: string }
+  'best.page': { keyword: string }
 }
 
 export function getRoute<T extends Routes>(

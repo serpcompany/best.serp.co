@@ -46,18 +46,20 @@ From the edge inward:
    purged: old keys stop matching and expire. The entry shares the epoch with the renders in
    its isolate (`shareCatalogEpochToken`, a global, never a request header), so a render
    reuses it for up to 30 seconds instead of reading it again.
-3. **Data cache** (Workers Cache API, `apps/web/src/db/cache.ts`). Shell counts,
-   name order, name pages, featured/latest heads, details, search results (per normalized
-   query and limit), and the full summary list (for sitemaps and the feed) are cached under
-   epoch-scoped keys for 24 hours, with live D1 fallback when the cache fails. So is each
-   listing body's parsed Markdown (`getDerivedValue`, built by
+3. **Data cache** (Workers Cache API, `apps/web/src/db/cache.ts`). Shell counts, tag counts,
+   the best index, name order and name pages (keyed by scope: `*`, `c:<category>` or
+   `t:<tag>`, so a tag and a category with one slug never share an entry), a best page's
+   entries, featured/latest heads, details, search results (per normalized query and limit),
+   and the full summary list (for sitemaps and the feed) are cached under epoch-scoped keys for
+   24 hours, with live D1 fallback when the cache fails. The redirect lookups (renamed listing
+   slugs, moved taxonomy URLs, root-level URLs) are single seeks and stay uncached. Each
+   listing body's parsed Markdown is cached too (`getDerivedValue`, built by
    `lib/markdown/listing-content-tree.ts`, #334): the page renders the cached tree instead of
-   parsing the body on every uncached render. A
-   tree's JSON is about twice its body for prose and up to about 9 times for markup-dense
-   Markdown (19 KB on average for 10.8 KB bodies, 39 KB at most for a 21 KB one), far below the
-   Cache API's object limit. Its key also names the tree's format
-   (`LISTING_CONTENT_FORMAT`), which a change to the parser's output must bump, because the data
-   cache survives deployments.
+   parsing the body on every uncached render. A tree's JSON is about twice its body for prose
+   and up to about 9 times for markup-dense Markdown (19 KB on average for 10.8 KB bodies, 39 KB
+   at most for a 21 KB one), far below the Cache API's object limit. Its key also names the
+   tree's format (`LISTING_CONTENT_FORMAT`), which a change to the parser's output must bump,
+   because the data cache survives deployments.
 4. React `cache()` deduplicates reads within a request.
 
 Both Cache API layers are per data center and populate on demand. A deployment gets a new

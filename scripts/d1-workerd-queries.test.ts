@@ -11,6 +11,7 @@ import {
   MAX_SEARCH_LIMIT,
   normalizeSearchQuery
 } from '../apps/web/src/db/catalog'
+import { legacyRootTarget } from '../apps/web/src/db/catalog-epoch'
 import { createDatabase } from '../apps/web/src/db/client'
 import type {
   CatalogCacheEvent,
@@ -26,6 +27,7 @@ import {
   CATCH_ALL_CATEGORY,
   generateScaleCatalog,
   isPublicListing,
+  type ScaleBestPage,
   type ScaleListing,
   scaleCatalogStatements
 } from './fixtures/scale-catalog'
@@ -47,30 +49,58 @@ const NOW = new Date('2026-10-06T12:00:00.000Z')
 /**
  * Most rows one statement of each shape may read on the generated catalog, which has the v1
  * import's size and shape (3,422 public listings, 3,777 public memberships, 141 active
- * categories); the budgets are the ones set on the import (#77). Values measured on the generated
- * catalog are in the comments; the budgets leave room for growth but not for a lost index or a
- * full scan of a larger table.
+ * categories) and the taxonomy's (#341: 130 tags, 3,794 tag memberships, 60 best pages); the
+ * budgets are the ones set on the import (#77) and, for the taxonomy, in #341's design (3.4).
+ * Values measured on the generated catalog are in the comments; the budgets leave room for growth
+ * but not for a lost index or a full scan of a larger table.
  */
 const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
+  // 60 pages; the tag-only pools come from the tag stats, so only pools with a category are read
+  'best-index': 6_000, // 4,353, cached per epoch
+  'best-page-items': 2_500, // the 335-listing tag, 25 entries: 1,860
   'canonical-redirect': 10, // one of 50 redirects: 2
-  'legacy-root-target': 10, // worker-entry slug seek; not run by this suite
+  'legacy-root-target': 10, // a retired category URL and its best page's tag and category: 4
   'featured-summaries': 2_500, // 100 featured: 1,887 (walks the publication index)
   'latest-summaries': 1_500, // 100 latest: 829
-  'listing-detail': 100, // the most FAQs, links and images: 37
+  'listing-detail': 100, // the most FAQs, links and images, and its tags: 44
   'listing-name-order': 12_000, // `other`: 8,854 (3 rows per member)
   'listing-name-page-items': 1_200, // 100 ids: ~900
   'navigation-next': 20, // 5 at worst, at every boundary (3,425 on the oldest before #314)
   'navigation-previous': 20, // 5
   'publication-version': 5, // 2 index seeks
   'published-summaries': 35_000, // 28,203, cached per epoch for sitemaps and the feed
-  'related-shared-categories': 3_000, // worst listing: 2,401
-  'related-single-category-members': 500, // 104
+  // Measured on listings without tags (a tagged listing ranks by its tags): 2,250 and 78; 2,401
+  // and 104 on the worst listings before they had tags (#345).
+  'related-shared-categories': 3_000, // worst untagged listing: 2,250
+  // Scored on a listing's three most central tags (#362 review): the 335-listing tag and two
+  // more, 2,442 (2,757 on all nine of one listing's tags before the cap). Filling from the hub:
+  // 196 when it walks the name index, 119 through a small hub's members.
+  'related-shared-tags': 3_000,
+  'related-single-category-members': 500, // 78
   'related-single-category-seek': 200, // the sparsest category over 128: 79
-  'search-summaries': 17_000, // worst: a term that matches category names only: 15,520
+  // worst: a term in the catch-all's name (`other`, `the`): 10,826; 15,520 before #345's
+  // uncorrelated category and tag subqueries. The widest searches have their own budget below.
+  'search-summaries': 17_000,
   'shell-stats': 20_000, // 15,243, cached per epoch
+  'tag-name-order': 1_500, // the 335-listing tag: 994 (3 rows per member)
+  'tag-stats': 20_000, // 8,383 (2 rows per membership), cached per epoch
+  'taxonomy-redirect': 10, // a best page and its tag and category: 3
   'unpublished-listing': 10, // a hit, in one category like all of #100's and #104's: 8
   'unpublished-listing-status': 10 // worker-entry slug seek; not run by this suite
 }
+
+/**
+ * The widest searches' own budget (#362 review). Each search term builds, at most once per
+ * statement, the set of listings filed under an active category or tag whose slug or name
+ * contains it: at most one pass over the categories, the tags and their memberships, about 8,000
+ * rows here. Eight one-character terms that nearly every category and tag contains are the
+ * measured worst (`o e a i n r s t`: 27,528; `- a e i o r s t`: 29,165); the ceiling is the
+ * listing scan plus eight full passes, about 68,000 rows. Kept rather than bounded: per-listing
+ * membership lookups (staging's category shape, extended to tags) would bound it, but they cost
+ * 15,000 to 27,000 rows on ordinary two-word queries that this shape answers in 4,500 to 6,500,
+ * and every result is cached per epoch and query.
+ */
+const BROAD_SEARCH_ROWS_READ_BUDGET = 35_000
 
 /** The generated catalog, and the facts the assertions name, all read from its rows. */
 const scale = generateScaleCatalog()
@@ -86,8 +116,16 @@ for (const listing of scale.listings) {
     if (isLive.has(listing)) publicMembers.set(slug, (publicMembers.get(slug) ?? 0) + 1)
   }
 }
+const tagBySlug = new Map(scale.tags.map(tag => [tag.slug, tag]))
+const activeTags = (listing: ScaleListing) =>
+  listing.tags.filter(slug => tagBySlug.get(slug)?.isActive)
+/**
+ * Public listings without an active tag (#341), which take their related listings from their
+ * categories: the category shapes below are measured on them.
+ */
+const untagged = live.filter(listing => activeTags(listing).length === 0)
 const onlyIn = (slug: string) =>
-  live.find(listing => listing.categories.length === 1 && listing.categories[0] === slug)
+  untagged.find(listing => listing.categories.length === 1 && listing.categories[0] === slug)
 const first = <T>(values: T[], label: string): T => {
   if (values[0] === undefined) throw new Error(`The scale catalog has no ${label}.`)
   return values[0]
@@ -96,14 +134,14 @@ const sharedMembers = (listing: ScaleListing) =>
   listing.categories.reduce((total, slug) => total + (allMembers.get(slug) ?? 0), 0)
 /** The worst related scan: several categories with the most members between them. */
 const widest = first(
-  live
+  untagged
     .filter(listing => listing.categories.length > 1)
     .sort((left, right) => sharedMembers(right) - sharedMembers(left)),
   'listing in several categories'
 )
 /** A listing filed only under the catch-all: the related query walks the name index. */
 const dense = first(
-  live.filter(
+  untagged.filter(
     listing => listing.categories.length === 1 && listing.categories[0] === CATCH_ALL_CATEGORY
   ),
   'listing only in the catch-all'
@@ -195,10 +233,122 @@ const unicode = first(
   'non-ASCII listing'
 )
 
+/** The taxonomy (#341): tag members, and the best pages' pools and order. */
+const tagMembers = new Map<string, ScaleListing[]>()
+for (const listing of scale.listings) {
+  for (const slug of listing.tags) tagMembers.set(slug, [...(tagMembers.get(slug) ?? []), listing])
+}
+const largestTag = first(
+  scale.tags
+    .filter(tag => tag.isActive)
+    .sort(
+      (left, right) =>
+        (tagMembers.get(right.slug)?.length ?? 0) - (tagMembers.get(left.slug)?.length ?? 0)
+    ),
+  'tag'
+)
+/** The active tags that score a listing's related listings: its three most central (#362). */
+const scoredTags = (listing: ScaleListing) => activeTags(listing).slice(0, 3)
+const scoredMembers = (listing: ScaleListing) =>
+  scoredTags(listing).reduce((sum, slug) => sum + (tagMembers.get(slug)?.length ?? 0), 0)
+/** The worst related-by-tags scan: the tagged listing whose scored tags have the most members. */
+const widestTagged = first(
+  live
+    .filter(listing => activeTags(listing).length > 0)
+    .sort((left, right) => scoredMembers(right) - scoredMembers(left)),
+  'tagged listing'
+)
+/**
+ * A tagged listing's related listings by the contract (#341 design 3.2, #362): the public
+ * listings sharing its scored tags, by how many they share, then the names after its own first
+ * (binary name and slug order), then from the start; fewer than four are filled from its hub (its
+ * primary category) in the same name order.
+ */
+function expectedRelatedByTags(listing: ScaleListing): string[] {
+  const scored = new Set(scoredTags(listing))
+  const after = (other: ScaleListing) =>
+    binary(other.name, listing.name) > 0 ||
+    (other.name === listing.name && binary(other.slug, listing.slug) > 0)
+  const byKeyset = (left: ScaleListing, right: ScaleListing) =>
+    Number(!after(left)) - Number(!after(right)) ||
+    binary(left.name, right.name) ||
+    binary(left.slug, right.slug)
+  const score = (other: ScaleListing) => other.tags.filter(slug => scored.has(slug)).length
+  const tagged = live
+    .filter(other => other.id !== listing.id && score(other) > 0)
+    .sort((left, right) => score(right) - score(left) || byKeyset(left, right))
+    .slice(0, 4)
+  const hub = listing.categories[0]
+  const fill = live
+    .filter(
+      other =>
+        other.id !== listing.id &&
+        !tagged.includes(other) &&
+        other.categories.includes(hub as string)
+    )
+    .sort(byKeyset)
+  return [...tagged, ...fill].slice(0, 4).map(other => other.slug)
+}
+/** Tagged listings whose scored tags yield fewer than four: their hubs fill the rest (#362). */
+const thinTagged = live.filter(
+  listing =>
+    activeTags(listing).length > 0 &&
+    new Set(
+      live.filter(
+        other => other !== listing && other.tags.some(slug => scoredTags(listing).includes(slug))
+      )
+    ).size < 4
+)
+/**
+ * One whose hub walks the name index (more than 128 memberships). The catalog has no thin listing
+ * in a smaller hub, read through its members; the taxonomy test tags one for that branch.
+ */
+const thinInLargeHub = first(
+  thinTagged.filter(listing => (allMembers.get(listing.categories[0] as string) ?? 0) > 128),
+  'thin tagged listing in a large hub'
+)
+const hostedLogo = new Set(
+  scale.media.filter(item => item.kind === 'logo' && item.mediaKey).map(item => item.listingId)
+)
+/**
+ * A best page's entries by the contract (#341 design 1.3): the public listings with its tag, in
+ * its category, or both, less its exclusions, plus its public pins; pins by position, then tag
+ * centrality, hosted logos first, then name and slug in binary order.
+ */
+function expectedBestPage(page: ScaleBestPage): { items: string[]; poolSize: number } {
+  const entries = scale.bestPageEntries.filter(entry => entry.bestPageId === page.id)
+  const excluded = new Set(entries.filter(entry => entry.excluded).map(entry => entry.listingId))
+  const position = new Map(
+    entries.flatMap(entry => (entry.position === null ? [] : [[entry.listingId, entry.position]]))
+  )
+  const pool = live.filter(
+    listing =>
+      position.has(listing.id) ||
+      (!excluded.has(listing.id) &&
+        (page.tagSlug === null || listing.tags.includes(page.tagSlug)) &&
+        (page.categorySlug === null || listing.categories.includes(page.categorySlug)))
+  )
+  const centrality = (listing: ScaleListing) =>
+    page.tagSlug === null ? 0 : listing.tags.indexOf(page.tagSlug)
+  const items = pool
+    .sort(
+      (left, right) =>
+        (position.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+          (position.get(right.id) ?? Number.MAX_SAFE_INTEGER) ||
+        centrality(left) - centrality(right) ||
+        Number(hostedLogo.has(right.id)) - Number(hostedLogo.has(left.id)) ||
+        binary(left.name, right.name) ||
+        binary(left.slug, right.slug)
+    )
+    .slice(0, page.listSize)
+    .map(listing => listing.slug)
+  return { items, poolSize: pool.length }
+}
+
 /**
  * The search contract (data-model.md, #81) on the generated rows: every term in the public
- * listing's name, short description or slug, or in an active category's slug or name, never its
- * website; ASCII letters folded as SQLite's `lower()` does, other characters as typed; exact
+ * listing's name, short description or slug, or in an active category's or tag's slug or name
+ * (#341), never its website; ASCII letters folded as SQLite's `lower()` does, other characters as typed; exact
  * matches first, then names starting with the query, then names containing it, then by name and
  * slug in binary order.
  */
@@ -217,6 +367,10 @@ function expectedSearch(query: string, limit = MAX_SEARCH_LIMIT): string[] {
             category?.isActive &&
             (fold(category.slug).includes(term) || fold(category.name).includes(term))
           )
+        }) ||
+        activeTags(listing).some(slug => {
+          const tag = tagBySlug.get(slug)
+          return tag && (fold(tag.slug).includes(term) || fold(tag.name).includes(term))
         })
     )
   )
@@ -443,7 +597,12 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       '视频下载器'.repeat(60),
       '🎬'.repeat(200),
       `%_\\'"; DROP TABLE listings; --`,
-      'ÉLAN Café Ünïcode'
+      'ÉLAN Café Ünïcode',
+      // The widest category and tag matches (#341): the catch-all's members, a letter in nearly
+      // every category and tag name, and the largest tag.
+      CATCH_ALL_CATEGORY,
+      'o',
+      largestTag.name
     ]
     for (const query of queries) {
       const results = await ops.searchListings(query, 10_000)
@@ -454,9 +613,42 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       (await ops.searchListings(query, 100)).map(listing => listing.slug)
     // Exactly the contract's matches, in its order.
     const smallCategory = categoryBySlug.get(small.slug)?.name as string
-    for (const query of ['video downloader', 'ly', domain.slug, stem, smallCategory, 'OÜ']) {
+    for (const query of [
+      'video downloader',
+      'ly',
+      domain.slug,
+      stem,
+      smallCategory,
+      'OÜ',
+      largestTag.name,
+      `${largestTag.name} ${smallCategory}`
+    ]) {
       expect(await slugsFor(query), query).toEqual(expectedSearch(query))
     }
+    // The widest searches there are (#362 review), held to their own recorded budget
+    // (`BROAD_SEARCH_ROWS_READ_BUDGET`) so the shape's budget keeps catching regressions on every
+    // other query: up to eight one-character terms that nearly every category and tag slug or
+    // name contains, so each term builds its full membership sets. Still the contract's matches.
+    const broadRows: number[] = []
+    const broad = createCatalogOperations({
+      cache: noCatalogDataCache,
+      client: createDatabase(checked(db)),
+      clock: () => NOW,
+      observe: event => {
+        if (event.event !== 'd1_query') return
+        expect(event.success, event.queryShape).toBe(true)
+        if (event.queryShape === 'search-summaries') broadRows.push(event.rowsRead ?? Infinity)
+      }
+    })
+    for (const query of ['o e a i n r s t', '- a e i o r s t', 'a e i o u l r n']) {
+      expect(
+        (await broad.searchListings(query, 100)).map(listing => listing.slug),
+        query
+      ).toEqual(expectedSearch(query))
+    }
+    console.info(JSON.stringify({ broadSearchRows: broadRows, event: 'workerd_rows_read' }))
+    expect(broadRows).toHaveLength(3)
+    expect(Math.max(...broadRows)).toBeLessThanOrEqual(BROAD_SEARCH_ROWS_READ_BUDGET)
     // A product's domain finds it through the slug, first (owner decision, #81).
     expect((await slugsFor(domain.slug))[0]).toBe(domain.slug)
     expect(await slugsFor(stem)).toContain(domain.slug)
@@ -599,6 +791,125 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
     )
   }, 120_000)
 
+  it('serves every taxonomy read within its budget, by the contract (#341, #345)', async () => {
+    const ops = catalog()
+    // Tag stats: every active tag under its hub, counting its public listings.
+    const tags = await ops.getActiveTags()
+    expect(tags.map(tag => [tag.slug, tag.category, tag.count])).toEqual(
+      scale.tags
+        .filter(tag => tag.isActive)
+        .sort((left, right) => left.sortOrder - right.sortOrder || binary(left.name, right.name))
+        .map(tag => [
+          tag.slug,
+          tag.categorySlug,
+          (tagMembers.get(tag.slug) ?? []).filter(listing => isLive.has(listing)).length
+        ])
+    )
+    expect(await ops.getTagBySlug(largestTag.slug)).toMatchObject({ slug: largestTag.slug })
+    // The largest tag's name order, in pages.
+    const largestPublic = (tagMembers.get(largestTag.slug) ?? []).filter(listing =>
+      isLive.has(listing)
+    )
+    const lastTagPage = Math.ceil(largestPublic.length / 100)
+    for (const page of [1, lastTagPage]) {
+      const namePage = await ops.getListingNamePage({ page, pageSize: 100, tag: largestTag.slug })
+      expect(namePage).toMatchObject({ tag: largestTag.slug, total: largestPublic.length })
+    }
+    // The best index and every page's entries, in the contract's order.
+    const pages = await ops.getBestPages()
+    expect(pages.map(page => page.slug).sort()).toEqual(
+      scale.bestPages.map(page => page.slug).sort()
+    )
+    for (const page of scale.bestPages) {
+      const expected = expectedBestPage(page)
+      expect(await ops.getBestPageBySlug(page.slug), page.slug).toMatchObject({
+        listSize: page.listSize,
+        poolSize: expected.poolSize
+      })
+      expect(
+        (await ops.getBestPageItems(page.slug)).map(item => item.slug),
+        page.slug
+      ).toEqual(expected.items)
+    }
+    expect(await ops.getBestPageItems('no-such-page')).toEqual([])
+    // Redirects of each kind, a retired category's, and a miss.
+    for (const redirect of scale.taxonomyRedirects) {
+      expect(
+        await ops.getTaxonomyRedirect(redirect.sourceKind, redirect.sourceSlug),
+        redirect.sourceSlug
+      ).toEqual({ kind: redirect.targetKind, slug: redirect.targetSlug })
+    }
+    expect(await ops.getTaxonomyRedirect('category', 'x'.repeat(300))).toBeNull()
+    // The detail with the widest related-by-tags scan, one whose tags yield fewer than four (its
+    // large hub fills the rest), and every 40th tagged listing, by the contract.
+    const detail = await ops.getListingBySlug(widestTagged.slug)
+    expect(detail?.tags?.map(tag => tag.slug)).toEqual(activeTags(widestTagged))
+    const tagged = live.filter(listing => activeTags(listing).length > 0)
+    for (const listing of [
+      widestTagged,
+      thinInLargeHub,
+      ...tagged.filter((_, index) => index % 40 === 0)
+    ]) {
+      const related = (await catalog().getListingBySlug(listing.slug))?.relatedWebsites
+      expect(
+        related?.map(item => item.slug),
+        listing.slug
+      ).toEqual(expectedRelatedByTags(listing))
+    }
+    // A small hub (at most 128 memberships) fills through its members: tag the small category's
+    // listing with a tag no other listing has, then put the catalog back.
+    expect(allMembers.get(small.slug)).toBeLessThanOrEqual(128)
+    await db.batch([
+      db
+        .prepare(
+          "INSERT INTO tags (slug, name, category_id) SELECT 'workerd-solo', 'Workerd Solo', id FROM categories WHERE slug = ?"
+        )
+        .bind(small.slug),
+      db
+        .prepare(
+          "INSERT INTO listing_tags (listing_id, tag_id) SELECT ?, id FROM tags WHERE slug = 'workerd-solo'"
+        )
+        .bind(small.listing.id)
+    ])
+    try {
+      const solo = await catalog().getListingBySlug(small.listing.slug)
+      expect(solo?.tags).toEqual([{ name: 'Workerd Solo', slug: 'workerd-solo' }])
+      expect(solo?.relatedWebsites.map(item => item.slug)).toEqual(
+        expectedRelatedByTags({ ...small.listing, tags: [] })
+      )
+    } finally {
+      await db.batch([
+        db.prepare(
+          "DELETE FROM listing_tags WHERE tag_id = (SELECT id FROM tags WHERE slug = 'workerd-solo')"
+        ),
+        db.prepare("DELETE FROM tags WHERE slug = 'workerd-solo'")
+      ])
+    }
+  }, 120_000)
+
+  it('answers every root-level URL with one bounded statement (#168, #356, #341)', async () => {
+    const client = createDatabase(checked(db))
+    const target = (slug: string) =>
+      legacyRootTarget({
+        asOf: NOW.toISOString(),
+        client,
+        observe: event => events.push(event as CatalogQueryEvent),
+        slug
+      })
+    expect(await target(domain.slug)).toEqual({ kind: 'listing', slug: domain.slug })
+    expect(await target(small.slug)).toEqual({ kind: 'category', slug: small.slug })
+    expect(await target(redirect.oldSlug)).toEqual({ kind: 'listing', slug: redirect.newSlug })
+    for (const moved of scale.taxonomyRedirects.filter(item => item.sourceKind === 'category')) {
+      // An old slug that names an active category still renders it.
+      const expected = categoryBySlug.get(moved.sourceSlug)?.isActive
+        ? { kind: 'category', slug: moved.sourceSlug }
+        : { kind: 'moved', target: { kind: moved.targetKind, slug: moved.targetSlug } }
+      expect(await target(moved.sourceSlug), moved.sourceSlug).toEqual(expected)
+    }
+    expect(await target(unpublished.slug)).toBeNull()
+    expect(await target('x'.repeat(253))).toBeNull()
+  })
+
   it('kept every catalog query successful and within its budget, and ran every operation', () => {
     const queries = events.filter((event): event is CatalogQueryEvent => event.event === 'd1_query')
     expect(queries.length).toBeGreaterThan(30)
@@ -612,10 +923,10 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
     const overBudget = [...worst].filter(([shape, rows]) => rows > ROWS_READ_BUDGET[shape])
     expect(overBudget, JSON.stringify(Object.fromEntries(worst))).toEqual([])
     // Every budget was measured: the generated catalog reaches every shape this suite runs. The
-    // two worker-entry seeks run elsewhere.
+    // worker entry's gone-listing seek runs elsewhere.
     expect(
       (Object.keys(ROWS_READ_BUDGET) as CatalogQueryShape[]).filter(shape => !worst.has(shape))
-    ).toEqual(['legacy-root-target', 'unpublished-listing-status'])
+    ).toEqual(['unpublished-listing-status'])
     expect(operationNames.filter(name => !called.has(name))).toEqual([])
   })
 })

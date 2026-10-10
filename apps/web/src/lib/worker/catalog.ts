@@ -1,6 +1,7 @@
 import {
   catalogEpochToken,
   isUnpublishedListingSlug,
+  type LegacyRootTarget,
   legacyRootTarget,
   readCatalogEpoch,
   shareCatalogEpochToken
@@ -96,13 +97,13 @@ export function catalogRenderer(
 }
 
 /**
- * Where an old root-level URL moved (`lib/routing/legacy-root.ts`, #168), or undefined without
- * a valid binding, when the catalog pages fail closed too.
+ * Where an old root-level URL moved (`lib/routing/legacy-root.ts`, #168, #356), or undefined
+ * without a valid binding, when the catalog pages fail closed too.
  */
 export function catalogLegacyRootLookup(
   env: CatalogWorkerEnv,
   observe: Observe
-): ((slug: string) => Promise<'category' | 'listing' | null>) | undefined {
+): ((slug: string) => Promise<LegacyRootTarget | null>) | undefined {
   const database = catalogDatabase(env)
   if (!database) return undefined
   return slug =>

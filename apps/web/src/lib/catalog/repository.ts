@@ -7,11 +7,16 @@ import { createCatalogOperations, MAX_SEARCH_LIMIT } from '@/db/catalog'
 import { sharedCatalogEpoch } from '@/db/catalog-epoch'
 import { createDatabase } from '@/db/client'
 import type {
+  BestPageItem,
   CatalogObserver,
   CatalogOperations,
   ListingNamePage,
   ListingNamePageQuery,
+  PublishedBestPage,
   PublishedCategory,
+  PublishedTag,
+  TaxonomyKind,
+  TaxonomyTarget,
   UnpublishedListing
 } from '@/db/contracts'
 import {
@@ -26,7 +31,16 @@ import {
   type ListingContentTree
 } from '@/lib/markdown/listing-content'
 
-export type { ListingNamePage, PublishedCategory, UnpublishedListing }
+export type {
+  BestPageItem,
+  ListingNamePage,
+  PublishedBestPage,
+  PublishedCategory,
+  PublishedTag,
+  TaxonomyKind,
+  TaxonomyTarget,
+  UnpublishedListing
+}
 /** Largest `limit` search and autocomplete honor (`/api/search` clamps to it). */
 export { MAX_SEARCH_LIMIT }
 
@@ -123,23 +137,26 @@ async function readContentTree(
 export const getPublishedListings = readPublishedListings
 
 /**
- * One page of the directory (or of one category) in directory name order. This is how
- * list pages read the catalog; never load `getPublishedListings()` for display.
+ * One page of the directory, or of one category or one tag (#341), in directory name order.
+ * This is how list pages read the catalog; never load `getPublishedListings()` for display.
  */
 const readListingNamePage = cache(
-  async (category: string, page: number): Promise<ListingNamePage> => {
-    const result = await (await getOperations()).getListingNamePage({
-      category: category || undefined,
-      page
-    })
+  async (category: string, tag: string, page: number): Promise<ListingNamePage> => {
+    const operations = await getOperations()
+    const result = await operations.getListingNamePage(
+      tag ? { page, tag } : { category: category || undefined, page }
+    )
     return { ...result, items: await withMediaUrls(result.items) }
   }
 )
 
 export async function getListingNamePage(
-  query: Pick<ListingNamePageQuery, 'category' | 'page'>
+  query: Omit<ListingNamePageQuery, 'pageSize'>
 ): Promise<ListingNamePage> {
-  return readListingNamePage(query.category ?? '', query.page ?? 1)
+  if (query.category && query.tag) {
+    throw new Error('A name page lists one category or one tag, not both.')
+  }
+  return readListingNamePage(query.category ?? '', query.tag ?? '', query.page ?? 1)
 }
 
 /** Number of publicly visible listings (cached with the shell statistics). */
@@ -180,6 +197,45 @@ export async function getActiveCategories(): Promise<PublishedCategory[]> {
 
 export async function getCategoryBySlug(slug: string): Promise<PublishedCategory | null> {
   return (await readShellStats()).categories.find(category => category.slug === slug) || null
+}
+
+const readActiveTags = cache(async () => (await getOperations()).getActiveTags())
+
+/** Active tags with their hubs and public counts (#341), cached per epoch. */
+export async function getActiveTags(): Promise<PublishedTag[]> {
+  return readActiveTags()
+}
+
+export async function getTagBySlug(slug: string): Promise<PublishedTag | null> {
+  return (await readActiveTags()).find(tag => tag.slug === slug) || null
+}
+
+const readBestPages = cache(async () => (await getOperations()).getBestPages())
+
+/** Every active best page with its pool size (the best index, #341), cached per epoch. */
+export async function getBestPages(): Promise<PublishedBestPage[]> {
+  return readBestPages()
+}
+
+export async function getBestPageBySlug(slug: string): Promise<PublishedBestPage | null> {
+  return (await readBestPages()).find(page => page.slug === slug) || null
+}
+
+/** A best page's entries in rank order, with media URLs on the media host (#341). */
+export const getBestPageItems = cache(
+  async (slug: string): Promise<BestPageItem[]> =>
+    withMediaUrls(await (await getOperations()).getBestPageItems(slug))
+)
+
+/**
+ * Where a retired or renamed category, tag or best page URL moved (#341), or null; ask only
+ * after the page missed.
+ */
+export async function getTaxonomyRedirect(
+  kind: TaxonomyKind,
+  slug: string
+): Promise<TaxonomyTarget | null> {
+  return (await getOperations()).getTaxonomyRedirect(kind, slug)
 }
 
 export async function searchListings(query: string, limit = 50): Promise<WebsiteMetadata[]> {

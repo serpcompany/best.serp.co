@@ -11,7 +11,8 @@
  *    `/robots.txt` and the billing webhook. A request that passes goes on without its
  *    `Authorization` header. Production and local skip this.
  * 3. Retired URLs without a replacement (`/news`) answer 410 Gone (`lib/routing/retired-paths.ts`).
- * 4. An old root-level listing or category URL: one 308 to its page (`lib/routing/legacy-root.ts`).
+ * 4. An old root-level listing or category URL, also through a listing slug or category redirect:
+ *    one 308 to its current page (`lib/routing/legacy-root.ts`).
  * 5. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
  * 6. Outside public production, `/robots.txt` disallows every crawler; a Worker that serves as
  *    staging also lets its auditor in, with best.serp.co's rules (#359).

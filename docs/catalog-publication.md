@@ -79,9 +79,10 @@ page answers 308 instead of 410. It names `from` and `to`, each a listing's `id`
 
 - **What changes.** Only the redirect row: both listings stay as they are. `from` stays unpublished,
   so it stays out of the sitemap, search, RSS, and category pages, and Republish in `/admin` still
-  brings it back, its live page then winning over the redirect. The product page follows `to`'s id
-  to its current slug, so a later rename of `to` still lands in one hop. If `to` is unpublished
-  later, the lookup finds no live listing and `from` answers 410 again.
+  brings it back, its live page then winning over the redirect. The product page, and the old
+  root-level `/<from>` (#356), follow `to`'s id to its current slug, so a later rename of `to`
+  still lands in one hop. If `to` is unpublished later, the lookup finds no live listing: `from`'s
+  page answers 410 again, and `/<from>` 404.
 - **Refused, with nothing written, when:**
   - `from` isn't that id and slug, unpublished (approved and inactive), as its 410 page finds it.
     A listing filed under a retired category answers 404 and keeps it, so no adult listing's
