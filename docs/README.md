@@ -5,10 +5,10 @@
 | [Architecture](./ARCHITECTURE.md) | Runtime boundaries and responsibilities |
 | [URLs](./URLS.md) | Canonical URLs, redirects, pagination, sitemaps and structured data |
 | [Caching](./CACHING.md) | The catalog epoch and the four cache layers |
-| [Data model](./DATA_MODEL.md) | D1 schema and migrations, D1 limits, statement plans, manifests, the initial import |
+| [Data model](./DATA_MODEL.md) | D1 schema and migrations, D1 limits, statement plans, manifests, where the catalog came from |
 | [Public catalog](./PUBLIC_CATALOG.md) | Public eligibility, listing states, the catalog epoch, read shapes, search |
 | [Submission and ownership data](./SUBMISSION_DATA.md) | Submission, ownership, revision, and payment invariants; URL keys and prohibited-URL blocks |
-| [Development](./DEVELOPMENT.md) | Local catalog, Worker preview, schema changes |
+| [Development](./DEVELOPMENT.md) | Local data, Worker preview, schema changes |
 | [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review |
 | [Claims](./CLAIMS.md) | Claiming an existing listing: domain-email code, badge or payment |
 | [Badge program](./BADGE_PROGRAM.md) | Weekly badge checks, rechecks, unpublishing, ownership removal |
@@ -23,7 +23,7 @@
 | [Submissions mockups](./mockups/submissions/README.md) | The owner-approved #70 mockups and their copy |
 | [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, workflows and their guards, production release, recovery, post-deploy checks |
 | [Deploy credentials](./DEPLOY_CREDENTIALS.md) | The Cloudflare API token, the GitHub environments that hold it, what a leak reaches |
-| [Production D1 bootstrap](./PRODUCTION_BOOTSTRAP.md) | Importing the reviewed catalog into an empty production D1, its rehearsal and read-only checks |
+| [Archive](../.archive/README.md) | Retired history: the v1 catalog import, its tooling, and the production D1 bootstrap (#315) |
 | [Production cutover](./PRODUCTION_CUTOVER.md) | The finished move of best.serp.co from GitHub Pages to the Worker, and the canonical-host switch |
 | [Telemetry](./TELEMETRY.md) | Sentry error reporting, GTM and Cloudflare Web Analytics |
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel |

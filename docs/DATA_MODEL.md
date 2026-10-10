@@ -12,11 +12,10 @@ history. A migration is applied locally (`pnpm db:migrate:local`), then to stagi
 Deploy Staging, then to production by Deploy Production only after Deploy Staging verified
 that commit (see [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
 
-Local data is a documented exception to the standard's "seeded fake/fixture data" rule
-(owner decision a, serpcompany/best.serp.co#42). Local D1 is seeded with the real public
-catalog from the committed import. That data is public and pinned, contains no submissions
-or other user data, and the parity checks and Playwright suites need it. Submissions and any
-future user data are seeded from fixtures only, never copied from staging or production.
+Local data is seeded fake/fixture data, as the standard says: `pnpm db:seed:local` (#312,
+[Development](./DEVELOPMENT.md#local-data)). Playwright runs on the seed (#313), and the
+rows-read budgets on a generated catalog of production's size (#314). No local or CI data comes
+from the real catalog (#311), and user data is never copied from staging or production.
 
 ## Tables
 
@@ -28,7 +27,8 @@ Column meanings and constraints are commented in `schema.ts`. By area:
   never hotlinked, and approvals and admin edits host a logo or queue it, never store its URL
   ([Listing media](./MEDIA.md)).
 - **Publication**: `publication_state` is a single row holding the catalog version and
-  checksum; `publication_runs` records every applied publication and `migration_runs` the import.
+  checksum; `publication_runs` records every applied publication, and `migration_runs` the
+  one-time import (locally, the fixture seed's run).
 - **Intake and ownership**: submissions, owners, revisions, badge checks, claims, and orders:
   [Submission and ownership data](./SUBMISSION_DATA.md).
 - **Activity**: `listing_events` is the log of admin and ownership changes to a listing, each
@@ -40,11 +40,9 @@ Column meanings and constraints are commented in `schema.ts`. By area:
   an email or IP address. `sessions` stores the client's raw IP address and user agent (Better
   Auth's default).
 
-`scripts/d1-table-inventory.ts` is the exact table and column inventory that snapshot, parity,
-and verification tooling read, so a schema change updates it in the same change. Tables written
-at runtime (`runtimeTableNames`) are left out of bootstrap parity (`db:verify:local`,
-`verify-import`), and `verify-import` also requires them to be empty; every other table is
-compared exactly, including the intake tables the import leaves empty.
+`scripts/d1-table-inventory.ts` lists every table and column; the fresh-schema check
+(`scripts/d1-drizzle-local.ts verify`) and its tests hold the migrations to it, so a schema change
+updates it in the same change.
 
 ## Hand-finished migrations
 
@@ -57,8 +55,8 @@ second `pnpm db:generate` reports no changes. Keep these properties in every mig
 - Triggers are written by hand: the baseline's four enforce that a published listing always has
   exactly one primary category, and later ones refuse blocked URLs and keep published listings
   off retired categories.
-- A migration that seeds a parity-compared table uses fixed values, as `0002_better_auth.sql`
-  does for the admin allowlist's `created_at`, so bootstrap parity stays exact.
+- A migration that seeds a table uses fixed values, as `0002_better_auth.sql` does for the
+  admin allowlist's `created_at`, so every fresh database, and so the fixture seed, is the same.
 - D1 enforces foreign keys and runs a migration in one transaction, where
   `PRAGMA foreign_keys=OFF` has no effect, so dropping a referenced table cascades.
 - `listings` only gains columns (`ALTER TABLE ... ADD ... CHECK`), even where Drizzle generates
@@ -91,8 +89,8 @@ SELECT terms and expression depth, but does not enforce the function cap.
 - The SQLite and workerd test helpers run every statement through `assertD1StatementLimits`,
   which also refuses a column compared with itself.
 - The workerd suites run the statement plans and every catalog, search, account, email, and
-  submission operation on workerd with the full import and worst-case inputs, with a rows-read
-  budget per catalog query shape (harness step "D1 contracts").
+  submission operation on workerd with a generated catalog at production scale (#314) and
+  worst-case inputs, with a rows-read budget per query shape (harness step "D1 contracts").
 - Search keeps its terms in one JSON binding matched with `instr()`, so it binds a fixed number
   of values whatever the query's length and needs no LIKE pattern
   ([Public catalog](./PUBLIC_CATALOG.md#search)).
@@ -122,14 +120,12 @@ applied to staging first, then to production
 both environments; `rowLevelActions` in `scripts/d1-publisher.ts` lists the operations it may
 hold.
 
-## Initial import
+## Where the catalog came from
 
-The catalog was bootstrapped once from `serpcompany/json-directory-template@25e2a8d`
-(`sites/serp.co/products.json`, 3,422 listings, 141 categories) with `pnpm migration:generate`.
-Listing IDs derive from the source slug (`stableIdAlgorithm` in the parity report), so
-re-running the generator produces identical rows. `best-serp-co-v1-parity.yaml` records source
-checksums, counts, the SQL checksum, and the target checksum written to `publication_state`;
-`best-serp-co-v1.sql.br` is the committed brotli copy of the SQL that seeds local D1 and CI. The
-uncompressed SQL and per-batch files are git-ignored. Remote environments are bootstrapped from
-the same checksum-verified SQL by `bootstrap-production-d1.yml`, which imports only into an
-empty database and then verifies exact parity with the report.
+The catalog was bootstrapped once from `serpcompany/json-directory-template@25e2a8d` (3,422
+listings, 141 categories). Imported listing IDs are
+`lst_` + `sha256("legacy-product-map" NUL <slug>)[0:24]`. Staging and production have changed
+since through publications, admin decisions, claims, payments, and hosted media, so neither is
+ever re-imported: recovery is D1 Time Travel ([D1 recovery](./D1_RECOVERY.md)). The import, its
+tooling, and the production bootstrap workflow are history in [`.archive/`](../.archive/README.md)
+(#315).

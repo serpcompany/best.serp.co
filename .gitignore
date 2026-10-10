@@ -72,17 +72,14 @@ tmp/deploy/
 .cursor/
 
 **/next-env.d.ts
-!d1/artifacts/*.yaml
 
 # Per-worktree harness state, logs, browser profiles, and evidence
 .runtime/
 
-# One-time JSON -> D1 import artifacts (~70 MB). Regenerate deterministically with
-# `pnpm migration:generate` from json-directory-template@25e2a8d. The parity report and
-# a brotli copy of the combined SQL (seeds local D1 and CI) are committed.
-d1/artifacts/*
-!d1/artifacts/*-parity.yaml
-!d1/artifacts/*.sql.br
+# The retired v1 import (#315): its committed parity report and brotli SQL are history in
+# .archive/d1/artifacts/. A checkout that ran `pnpm migration:generate` before then may still
+# hold the generated SQL and batches (~70 MB) here; delete them freely.
+d1/artifacts/
 
 # Claude Code agent worktrees
 .claude/worktrees/

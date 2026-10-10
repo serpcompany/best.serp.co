@@ -11,11 +11,14 @@ import {
   unique
 } from './admin-fixture'
 import {
+  billingCategory,
   billingD1,
   billingOrigin,
   billingServer,
   billingSuiteEnabled,
   type StripeMock,
+  seedBillingCatalog,
+  seedBillingListing,
   startStripeMock,
   stripeSignatureHeader
 } from './billing-fixture'
@@ -58,11 +61,7 @@ async function capture(page: Page, name: string): Promise<void> {
 test.beforeAll(async () => {
   stripe = await startStripeMock()
   site = await startFixtureSite()
-  billingD1(`
-    INSERT OR IGNORE INTO publication_state (id, version, checksum) VALUES (1, 0, 'e2e-billing');
-    INSERT OR IGNORE INTO categories (slug, name, description, sort_order)
-      VALUES ('e2e-billing-tools', 'E2E Billing Tools', 'Tools for the orders suite.', 0);
-  `)
+  seedBillingCatalog()
   removeLeftoverAdmins([ADMIN_EMAIL_PREFIXES.billing], billingServer)
 })
 
@@ -94,7 +93,7 @@ function seedDraft(userId: string, label: string, badge: FixtureProduct['badge']
     INSERT INTO listing_submissions (id, slug, name, description, website, content, category_slug,
       logo_url, status, plan, owner_user_id, draft_saved_at, block_key, block_covers_subdomains)
     VALUES (${q(id)}, ${q(slug)}, ${q(`Paid ${key.slice(-5)}`)}, 'A fixture for the orders suite.',
-      ${q(site.website(key))}, 'Long content.', 'e2e-billing-tools',
+      ${q(site.website(key))}, 'Long content.', ${q(billingCategory.slug)},
       ${q(`${site.website(key)}icon.png`)}, 'draft', NULL, ${q(userId)}, ${q(new Date().toISOString())},
       ${q(slug)}, 1);
   `)
@@ -107,20 +106,25 @@ function seedFreeListing(userId: string, label: string) {
   site.set(key, product(`Free ${key.slice(-5)}`, 'valid'))
   const slug = site.slug(key)
   const listingId = `e2e-billing-lst-${key}`
+  seedBillingListing({
+    checksum: `e2e-${key}`,
+    content: 'Content.',
+    description: 'A free listing.',
+    id: listingId,
+    name: `Free ${key.slice(-5)}`,
+    published_at: '2026-05-16',
+    slug,
+    source: 'submission',
+    source_identity: listingId,
+    source_kind: 'e2e',
+    website: site.website(key)
+  })
   billingD1(`
-    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
-      source_kind, source_identity, checksum, source)
-    VALUES (${q(listingId)}, ${q(slug)}, ${q(`Free ${key.slice(-5)}`)}, 'A free listing.',
-      ${q(site.website(key))}, 'Content.', 'draft', '2026-05-16', 'e2e', ${q(listingId)},
-      ${q(`e2e-${key}`)}, 'submission');
-    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
-      SELECT ${q(listingId)}, id, 0, 1 FROM categories WHERE slug = 'e2e-billing-tools';
-    UPDATE listings SET status = 'approved' WHERE id = ${q(listingId)};
     INSERT INTO listing_submissions (id, slug, name, description, website, content,
       category_slug, logo_url, status, plan, listing_id, owner_user_id, block_key,
       block_covers_subdomains)
     VALUES (${q(crypto.randomUUID())}, ${q(slug)}, ${q(`Free ${key.slice(-5)}`)}, 'A free listing.',
-      ${q(site.website(key))}, 'Content.', 'e2e-billing-tools', ${q(`${site.website(key)}icon.png`)},
+      ${q(site.website(key))}, 'Content.', ${q(billingCategory.slug)}, ${q(`${site.website(key)}icon.png`)},
       'approved', 'free', ${q(listingId)}, ${q(userId)}, ${q(slug)}, 1);
     INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
       VALUES (${q(listingId)}, ${q(userId)}, 'submission', ${q(new Date().toISOString())});
@@ -588,15 +592,19 @@ test('a paid claim: the payment makes the claimer the owner (#67)', async ({ pag
   const listingId = `e2e-billing-claim-${key}`
   const claimId = crypto.randomUUID()
   const verifiedAt = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  seedBillingListing({
+    checksum: `e2e-${key}`,
+    content: 'Content.',
+    description: 'A curated listing.',
+    id: listingId,
+    name: `Claim ${key.slice(-5)}`,
+    published_at: '2026-05-16',
+    slug,
+    source_identity: listingId,
+    source_kind: 'e2e',
+    website: site.website(key)
+  })
   billingD1(`
-    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
-      source_kind, source_identity, checksum)
-    VALUES (${q(listingId)}, ${q(slug)}, ${q(`Claim ${key.slice(-5)}`)}, 'A curated listing.',
-      ${q(site.website(key))}, 'Content.', 'draft', '2026-05-16', 'e2e', ${q(listingId)},
-      ${q(`e2e-${key}`)});
-    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
-      SELECT ${q(listingId)}, id, 0, 1 FROM categories WHERE slug = 'e2e-billing-tools';
-    UPDATE listings SET status = 'approved' WHERE id = ${q(listingId)};
     INSERT INTO listing_claims (id, listing_id, user_id, method, status, email, email_domain,
       product_url, listing_website, code_sent_at, code_expires_at, email_verified_at)
     VALUES (${q(claimId)}, ${q(listingId)}, ${q(claimer.id)}, 'paid', 'email_verified',

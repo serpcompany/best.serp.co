@@ -1,6 +1,7 @@
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { adminSuiteEnabled, localD1, type SuiteServer } from './admin-fixture'
+import { adminSuiteEnabled, localD1, runStatements, type SuiteServer } from './admin-fixture'
+import { listingStatements, suiteCatalogStatements } from './fixture-seed'
 
 /**
  * The claims suite (serpcompany/best.serp.co#67) runs on its own local Worker with its own D1,
@@ -38,4 +39,43 @@ export function claimsServerCommand(): string {
 
 export function claimsD1<T = Record<string, unknown>>(sql: string): T[] {
   return localD1<T>(sql, claimsServer)
+}
+
+/** The category the claims suites' listings are filed under. */
+const claimsCategory = {
+  description: 'Tools for the claims suite.',
+  name: 'E2E Claim Tools',
+  slug: 'e2e-claim-tools'
+} as const
+
+/** The claims D1's publication state and category (each worker's `beforeAll` writes them). */
+export function seedClaimsCatalog(): void {
+  runStatements(
+    suiteCatalogStatements({ category: claimsCategory, checksum: 'e2e-claims' }),
+    claimsServer
+  )
+}
+
+/** A live listing on the claims D1, as the one-time import left it: no owner, no submission. */
+export function seedClaimsListing(listing: {
+  content: string
+  description: string
+  id: string
+  name: string
+  slug: string
+  website: string
+}): void {
+  runStatements(
+    listingStatements({
+      category: claimsCategory.slug,
+      row: {
+        ...listing,
+        checksum: `e2e-${listing.id}`,
+        published_at: '2026-05-16',
+        source_identity: listing.id,
+        source_kind: 'legacy-json-migration-v1'
+      }
+    }),
+    claimsServer
+  )
 }

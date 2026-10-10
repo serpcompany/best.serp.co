@@ -37,6 +37,9 @@ purge.
   checks the stored bytes against the recorded SHA-256, type, and size before copying), and the
   cron deletes finished submissions' and revisions' images: approved and copied, rejected, or
   withdrawn (which covers an expired draft). A listing row only ever holds a `listings/` key.
+- The key carries the slug, and a `listing-slug-change` manifest keeps the listing's media rows:
+  re-host them under the new slug with a later `listing-media-update`, or media health reports
+  them as `foreign_key` (`scripts/catalog-media.test.ts` holds committed manifests to that).
 - `storeHostedMedia` is the only write to the bucket and refuses any key outside those three
   prefixes, whatever bucket it is handed; `scopedMediaBucket` refuses the same before R2, and
   deletes only pending (`submissions/`, `revisions/`) keys. The production bucket is shared with serp.co.
@@ -150,9 +153,9 @@ review B1).
 The local Worker serves its bucket at `/_media/<key>` (GET and HEAD, this site's keys only, never
 on staging or in production). Locally, media fetches may use any port, for the e2e fixture sites
 on `*.localtest.me:<port>`. `curl localhost:8787/cdn-cgi/handler/scheduled` runs the cron once.
-`pnpm tsx scripts/seed-local-media.ts` hosts sample media through the real ingestion path, as the
-e2e media server (`apps/web/e2e/media-fixture.ts`) does on throwaway state;
-`apps/web/e2e/listing-media.spec.ts` checks the rendered media against local R2.
+`pnpm db:seed:local` hosts fixture logos through the real ingestion path (`seed-local-media.ts`);
+the e2e media server (`apps/web/e2e/media-fixture.ts`) runs it and queues an unreachable logo, and
+`listing-media.spec.ts` checks the rendered media against local R2.
 
 ## Uploading and publishing
 
@@ -219,8 +222,10 @@ Agents prepare and review these files; they never run the uploads or publication
 
 ## Legacy migration
 
-`pnpm migration:legacy-media` (`scripts/migration/legacy-media.ts`) resolves every logo and image
-of the catalog into `d1/media/2026-10-06-legacy-media.json` and seven row-level manifests
+This section is the record of a one-time tool: `pnpm migration:legacy-media`
+(`scripts/migration/legacy-media.ts`) read the v1 import, so #315 archived it with the import in
+`.archive/scripts/migration/`; to run it again (also with `--current <dir>`, an environment's
+exported rows), check out the commit before #315's merge. It resolved every logo and image of the catalog into `d1/media/2026-10-06-legacy-media.json` and seven row-level manifests
 `d1/publications/2026-10-06-legacy-media-01…07.yaml` (500 listings each). Every count, the
 refused replacements, and each logo left on the tile are in `d1/media/2026-10-06-legacy-media.report.md`.
 
@@ -247,9 +252,9 @@ refused replacements, and each logo left on the tile are in `d1/media/2026-10-06
   row-level manifest of `listing-categories-add` (secondary, never primary).
 - **Owner sign-off.** A refused replacement leaves the tile and is listed in the report with its
   final page and reason; listing content never changes here (#100 covers hijacked listings).
-- `scripts/catalog-media.test.ts` applies the manifests to the import and checks that every logo
-  and image is then a hosted key with a matching object in the plan, and that nothing else
-  changes.
+- `scripts/catalog-media.test.ts` checks that every image a manifest names is in the plan with the
+  same bytes; `scripts/v1-import-publications.test.ts` (archived with the import by #315) applied
+  the manifests to the import: every logo and image was then hosted, and nothing else changed.
 - **Cleanup (#124).** Once production had published every part, the plan's 145 `repo:` files were
   deleted (the #86 tile stays). The plan still names them, and their bytes stay in Git at
   `0e17a98e20`, where the migration reads them (`scripts/media-repo-archive.ts`). See the
@@ -261,18 +266,6 @@ and `--manifest-id <id>` names a regeneration. `-- --retry-errors` refetches cac
 429s, and 5xx answers. `-- --refresh <upload summary JSON>` refetches the source of every object
 the upload reported as failed, whatever the reason (a drifted source usually fails on its byte
 count, before its digest), so those keys follow the new bytes.
-
-To regenerate from an environment's current rows instead of the import (after a refused
-publication), the owner exports them read-only into a directory and passes `-- --current <dir>`.
-Rows already hosted are kept as they are; only the rest is resolved:
-
-```bash
-for table in listings media; do
-  pnpm exec wrangler d1 execute best-serp-co-staging --env staging --remote --json \
-    --config apps/web/wrangler.jsonc \
-    --command "$(pnpm -s migration:legacy-media -- --snapshot-sql "$table")" > "<dir>/$table.json"
-done
-```
 
 ## Owner setup
 

@@ -6,7 +6,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { getPlatformProxy } from 'wrangler'
 import { createAuthOperations } from '../apps/web/src/db/auth'
 import { noCatalogDataCache } from '../apps/web/src/db/cache'
-import { createCatalogOperations, MAX_SEARCH_LIMIT } from '../apps/web/src/db/catalog'
+import {
+  createCatalogOperations,
+  MAX_SEARCH_LIMIT,
+  normalizeSearchQuery
+} from '../apps/web/src/db/catalog'
 import { createDatabase } from '../apps/web/src/db/client'
 import type {
   CatalogCacheEvent,
@@ -17,45 +21,217 @@ import { createDraftJobOperations } from '../apps/web/src/db/draft-jobs'
 import { createEmailDeliveryLedger } from '../apps/web/src/db/email-deliveries'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
 import { createSubmissionOperations } from '../apps/web/src/db/submissions'
+import {
+  AFFILIATE_HOST,
+  CATCH_ALL_CATEGORY,
+  generateScaleCatalog,
+  isPublicListing,
+  type ScaleListing,
+  scaleCatalogStatements
+} from './fixtures/scale-catalog'
 import { project } from './project'
 
 vi.mock('server-only', () => ({}))
 
 /**
  * Every catalog, search, account, email, and submission query against Wrangler-local D1
- * (workerd) with the full committed catalog import and worst-case inputs (#77). node:sqlite
- * applies none of D1's limits; workerd applies most of them, and each statement also passes
- * `assertD1StatementLimits` (which adds the 32-argument function limit workerd skips). The
- * hot catalog queries have a rows-read budget each, so a plan regression or a full scan fails
- * here instead of on the bill. The last test checks that every operation ran.
+ * (workerd) with a generated catalog at production scale (`fixtures/scale-catalog.ts`, #314)
+ * and worst-case inputs (#77). node:sqlite applies none of D1's limits; workerd applies most of
+ * them, and each statement also passes `assertD1StatementLimits` (which adds the 32-argument
+ * function limit workerd skips). The hot catalog queries have a rows-read budget each, so a plan
+ * regression or a full scan fails here instead of on the bill. The last test checks that every
+ * operation ran.
  */
 const NOW = new Date('2026-10-06T12:00:00.000Z')
 
 /**
- * Most rows one statement of each shape may read on the imported catalog (3,422 listings,
- * 3,777 memberships, 141 categories). Measured values are in the comments; the budgets leave
- * room for growth but not for a lost index or a full scan of a larger table.
+ * Most rows one statement of each shape may read on the generated catalog, which has the v1
+ * import's size and shape (3,422 public listings, 3,777 public memberships, 141 active
+ * categories); the budgets are the ones set on the import (#77). Values measured on the generated
+ * catalog are in the comments; the budgets leave room for growth but not for a lost index or a
+ * full scan of a larger table.
  */
 const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
-  'canonical-redirect': 10,
+  'canonical-redirect': 10, // one of 50 redirects: 2
   'legacy-root-target': 10, // worker-entry slug seek; not run by this suite
-  'category-summaries': 2_000,
-  'featured-summaries': 2_500, // 100 featured: 2,076 (walks the publication index)
-  'latest-summaries': 1_500, // 100 latest: 837
-  'listing-detail': 100,
-  'listing-name-order': 12_000, // `other`: 8,605 (3 rows per member)
+  'featured-summaries': 2_500, // 100 featured: 1,887 (walks the publication index)
+  'latest-summaries': 1_500, // 100 latest: 829
+  'listing-detail': 100, // the most FAQs, links and images: 37
+  'listing-name-order': 12_000, // `other`: 8,854 (3 rows per member)
   'listing-name-page-items': 1_200, // 100 ids: ~900
-  'navigation-next': 20,
-  'navigation-previous': 20,
+  'navigation-next': 20, // 5 at worst, at every boundary (3,425 on the oldest before #314)
+  'navigation-previous': 20, // 5
   'publication-version': 5, // 2 index seeks
-  'published-summaries': 35_000, // 28,183, cached per epoch for sitemaps and the feed
-  'related-shared-categories': 3_000, // worst listing: 2,172
-  'related-single-category-members': 500,
-  'related-single-category-seek': 200,
-  'search-summaries': 17_000, // worst: a term that matches category names only
-  'shell-stats': 20_000, // 15,242, cached per epoch
-  'unpublished-listing': 10,
+  'published-summaries': 35_000, // 28,203, cached per epoch for sitemaps and the feed
+  'related-shared-categories': 3_000, // worst listing: 2,401
+  'related-single-category-members': 500, // 104
+  'related-single-category-seek': 200, // the sparsest category over 128: 79
+  'search-summaries': 17_000, // worst: a term that matches category names only: 15,520
+  'shell-stats': 20_000, // 15,243, cached per epoch
+  'unpublished-listing': 10, // a hit, in one category like all of #100's and #104's: 8
   'unpublished-listing-status': 10 // worker-entry slug seek; not run by this suite
+}
+
+/** The generated catalog, and the facts the assertions name, all read from its rows. */
+const scale = generateScaleCatalog()
+const live = scale.listings.filter(listing => isPublicListing(listing, NOW.toISOString()))
+const categoryBySlug = new Map(scale.categories.map(category => [category.slug, category]))
+/** Members per category: public ones (the shell counts), and all (what a related scan reads). */
+const publicMembers = new Map<string, number>()
+const allMembers = new Map<string, number>()
+const isLive = new Set(live)
+for (const listing of scale.listings) {
+  for (const slug of listing.categories) {
+    allMembers.set(slug, (allMembers.get(slug) ?? 0) + 1)
+    if (isLive.has(listing)) publicMembers.set(slug, (publicMembers.get(slug) ?? 0) + 1)
+  }
+}
+const onlyIn = (slug: string) =>
+  live.find(listing => listing.categories.length === 1 && listing.categories[0] === slug)
+const first = <T>(values: T[], label: string): T => {
+  if (values[0] === undefined) throw new Error(`The scale catalog has no ${label}.`)
+  return values[0]
+}
+const sharedMembers = (listing: ScaleListing) =>
+  listing.categories.reduce((total, slug) => total + (allMembers.get(slug) ?? 0), 0)
+/** The worst related scan: several categories with the most members between them. */
+const widest = first(
+  live
+    .filter(listing => listing.categories.length > 1)
+    .sort((left, right) => sharedMembers(right) - sharedMembers(left)),
+  'listing in several categories'
+)
+/** A listing filed only under the catch-all: the related query walks the name index. */
+const dense = first(
+  live.filter(
+    listing => listing.categories.length === 1 && listing.categories[0] === CATCH_ALL_CATEGORY
+  ),
+  'listing only in the catch-all'
+)
+/**
+ * The largest category the related query still reads member by member (at most 128 public
+ * members, `RELATED_MEMBER_SCAN_LIMIT` in `catalog.ts`), with a listing filed only there.
+ */
+const small = first(
+  [...publicMembers]
+    .filter(([slug, size]) => size <= 128 && onlyIn(slug))
+    .sort((left, right) => right[1] - left[1])
+    .map(([slug]) => ({ listing: onlyIn(slug) as ScaleListing, slug })),
+  'small category'
+)
+/**
+ * The sparsest category the related query reaches through the name index (more than 128 public
+ * members, the fewest such), with a listing filed only there: the longest walk to four members.
+ */
+const sparse = first(
+  [...publicMembers]
+    .filter(([slug, size]) => slug !== CATCH_ALL_CATEGORY && size > 128 && onlyIn(slug))
+    .sort((left, right) => left[1] - right[1])
+    .map(([slug]) => ({ listing: onlyIn(slug) as ScaleListing, slug })),
+  'sparse category'
+)
+const binary = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0)
+/** Public listings in publication order (`PUBLICATION_ORDER` in `catalog.ts`): newest first. */
+const publicationOrder = [...live].sort(
+  (left, right) =>
+    binary(right.publishedAt as string, left.publishedAt as string) ||
+    left.displayOrder - right.displayOrder ||
+    binary(left.slug, right.slug)
+)
+const bulkStart = publicationOrder.findIndex(
+  listing => listing.publishedAt === publicationOrder.at(-1)?.publishedAt
+)
+/**
+ * Navigation at every kind of boundary: the newest listing (no previous), listings published
+ * after the bulk import (each its own date: the next one is on another date), the last of them
+ * (next crosses into the bulk import), the first and a middle bulk listing (same date, next
+ * display order), and the oldest (no next).
+ */
+const navigationStops = [
+  0,
+  1,
+  Math.floor(bulkStart / 2),
+  bulkStart - 2,
+  bulkStart - 1,
+  bulkStart,
+  Math.floor((bulkStart + publicationOrder.length) / 2),
+  publicationOrder.length - 1
+].map(index => ({ index, listing: publicationOrder[index] as ScaleListing }))
+/** The listing with the most FAQs, resource links and images: the largest detail statement. */
+const richness = new Map<string, number>()
+for (const { listingId } of [...scale.faqs, ...scale.resources, ...scale.media]) {
+  richness.set(listingId, (richness.get(listingId) ?? 0) + 1)
+}
+const richest = first(
+  [...live].sort((left, right) => (richness.get(right.id) ?? 0) - (richness.get(left.id) ?? 0)),
+  'listing with FAQs'
+)
+const unpublishedOf = (retired: boolean) =>
+  scale.listings
+    .filter(
+      listing =>
+        listing.status === 'approved' &&
+        !listing.isActive &&
+        listing.categories.some(slug => !categoryBySlug.get(slug)?.isActive) === retired
+    )
+    .sort((left, right) => right.categories.length - left.categories.length)
+/**
+ * Unpublished in the most categories (the 410 page's worst lookup), and unpublished under a
+ * retired category (a 404, #260).
+ */
+const unpublished = first(unpublishedOf(false), 'unpublished listing')
+const retired = first(unpublishedOf(true), 'listing of a retired category')
+const redirect = first(scale.redirects, 'slug redirect')
+/** A listing whose slug is its domain, while its website is an affiliate link (#81). */
+const domain = first(
+  live.filter(
+    listing => listing.slug.endsWith('.test') && listing.website.includes(AFFILIATE_HOST)
+  ),
+  'domain listing'
+)
+const stem = domain.slug.replace(/\.test$/u, '')
+const unicode = first(
+  live.filter(listing => listing.description.includes('OÜ')),
+  'non-ASCII listing'
+)
+
+/**
+ * The search contract (DATA_MODEL.md, #81) on the generated rows: every term in the public
+ * listing's name, short description or slug, or in an active category's slug or name, never its
+ * website; ASCII letters folded as SQLite's `lower()` does, other characters as typed; exact
+ * matches first, then names starting with the query, then names containing it, then by name and
+ * slug in binary order.
+ */
+function expectedSearch(query: string, limit = MAX_SEARCH_LIMIT): string[] {
+  const { phrase, terms } = normalizeSearchQuery(query)
+  const fold = (value: string) => value.replace(/[A-Z]+/gu, letters => letters.toLowerCase())
+  const matches = live.filter(listing =>
+    terms.every(
+      term =>
+        [listing.name, listing.description, listing.slug].some(value =>
+          fold(value).includes(term)
+        ) ||
+        listing.categories.some(slug => {
+          const category = categoryBySlug.get(slug)
+          return (
+            category?.isActive &&
+            (fold(category.slug).includes(term) || fold(category.name).includes(term))
+          )
+        })
+    )
+  )
+  const rank = (listing: ScaleListing) => {
+    const name = fold(listing.name)
+    if (name === phrase || fold(listing.slug) === phrase) return 0
+    return name.startsWith(phrase) ? 1 : name.includes(phrase) ? 2 : 3
+  }
+  return matches
+    .sort(
+      (left, right) =>
+        rank(left) - rank(right) || binary(left.name, right.name) || binary(left.slug, right.slug)
+    )
+    .slice(0, limit)
+    .map(listing => listing.slug)
 }
 
 let stateDirectory: string
@@ -119,10 +295,22 @@ function local(command: string): void {
   })
 }
 
+/** Loads the generated catalog through the D1 binding, each statement within D1's limits. */
+async function seed(binding: D1Database): Promise<void> {
+  const statements = scaleCatalogStatements(scale)
+  for (let start = 0; start < statements.length; start += 250) {
+    await binding.batch(
+      statements.slice(start, start + 250).map(({ params, sql }) => {
+        assertD1StatementLimits(sql, params)
+        return binding.prepare(sql).bind(...params)
+      })
+    )
+  }
+}
+
 beforeAll(async () => {
   stateDirectory = mkdtempSync(join(tmpdir(), 'best-serp-co-workerd-queries-'))
   local('migrate')
-  local('import')
   const configPath = join(stateDirectory, 'wrangler.jsonc')
   writeFileSync(
     configPath,
@@ -144,6 +332,7 @@ beforeAll(async () => {
   })
   dispose = () => proxy.dispose()
   db = proxy.env.DB
+  await seed(db)
 }, 240_000)
 
 afterAll(async () => {
@@ -163,41 +352,73 @@ function catalog() {
   )
 }
 
-describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
+describe('every query on Wrangler-local D1 with a catalog at production scale (#77, #314)', () => {
   it('serves every catalog read within its rows-read budget', async () => {
     const ops = catalog()
+    const catchAllSize = publicMembers.get(CATCH_ALL_CATEGORY) as number
     await ops.getPublicationVersion()
-    expect((await ops.getShellStats()).listingCount).toBe(3422)
-    expect((await ops.getActiveCategories()).length).toBeGreaterThan(100)
-    expect(await ops.getCategoryBySlug('other')).toMatchObject({ slug: 'other' })
-    expect(await ops.getFeaturedListingCount()).toBeGreaterThan(0)
+    expect(live.length).toBeGreaterThanOrEqual(3_422)
+    expect((await ops.getShellStats()).listingCount).toBe(live.length)
+    expect(await ops.getActiveCategories()).toHaveLength(
+      scale.categories.filter(category => category.isActive).length
+    )
+    expect(await ops.getCategoryBySlug(CATCH_ALL_CATEGORY)).toMatchObject({
+      count: catchAllSize,
+      slug: CATCH_ALL_CATEGORY
+    })
+    expect(await ops.getFeaturedListingCount()).toBe(
+      live.filter(listing => listing.isFeatured).length
+    )
     expect(await ops.getFeaturedListings(10_000)).toHaveLength(100)
     expect(await ops.getLatestListings(10_000)).toHaveLength(100)
-    expect(await ops.getPublishedListings()).toHaveLength(3422)
-    expect(await ops.getSitemapListings()).toHaveLength(3422)
+    expect(await ops.getPublishedListings()).toHaveLength(live.length)
+    expect(await ops.getSitemapListings()).toHaveLength(live.length)
+    const lastCatchAllPage = Math.ceil(catchAllSize / 100)
     for (const query of [
       { page: 1 },
       { page: 999 },
-      { category: 'other', page: 1, pageSize: 100 },
-      { category: 'other', page: 29, pageSize: 100 },
-      { category: 'plagiarism-checker' },
+      { category: CATCH_ALL_CATEGORY, page: 1, pageSize: 100 },
+      { category: CATCH_ALL_CATEGORY, page: lastCatchAllPage, pageSize: 100 },
+      { category: small.slug },
       { category: 'no-such-category' }
     ]) {
       await ops.getListingNamePage(query)
     }
-    // The detail shapes: several categories (worst related scan), one dense and one small
-    // category, and a slug that does not exist.
+    // The detail shapes: several categories (worst related scan), one dense, one sparse and one
+    // small category, the most FAQs, links and images, an unpublished listing, and a slug that
+    // does not exist.
     for (const slug of [
-      'jasper.ai',
-      'myfreecams-downloader',
-      'automatic.chat',
-      'ouriginal.com',
-      'does-not-exist.example'
+      widest.slug,
+      dense.slug,
+      sparse.listing.slug,
+      small.listing.slug,
+      richest.slug,
+      unpublished.slug,
+      'does-not-exist.test'
     ]) {
       await ops.getListingBySlug(slug)
     }
-    expect(await ops.getUnpublishedListing('jasper.ai')).toBeNull()
+    expect(await ops.getListingBySlug(widest.slug)).toMatchObject({ slug: widest.slug })
+    // Previous and next are the neighbours in publication order, across every boundary.
+    for (const { index, listing } of navigationStops) {
+      // A fresh operations object, so no detail read earlier in this test is reused.
+      const detail = await catalog().getListingBySlug(listing.slug)
+      expect(
+        [detail?.previousWebsite?.slug ?? null, detail?.nextWebsite?.slug ?? null],
+        `${index}: ${listing.slug}`
+      ).toEqual([
+        publicationOrder[index - 1]?.slug ?? null,
+        publicationOrder[index + 1]?.slug ?? null
+      ])
+    }
+    expect(await ops.getListingBySlug(unpublished.slug)).toBeNull()
+    expect(await ops.getUnpublishedListing(widest.slug)).toBeNull()
+    expect(await ops.getUnpublishedListing(unpublished.slug)).toMatchObject({
+      slug: unpublished.slug
+    })
+    expect(await ops.getUnpublishedListing(retired.slug)).toBeNull()
     expect(await ops.getCanonicalSlugForRedirect('x'.repeat(300))).toBeNull()
+    expect(await ops.getCanonicalSlugForRedirect(redirect.oldSlug)).toBe(redirect.newSlug)
   }, 120_000)
 
   it('answers every search, however long or odd, with one bounded statement', async () => {
@@ -219,28 +440,28 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
       expect(results.length, query.slice(0, 30)).toBeLessThanOrEqual(MAX_SEARCH_LIMIT)
     }
     expect((await ops.searchListings('video downloader')).length).toBeGreaterThan(0)
-    // A product's domain finds it through the slug (owner decision, #81).
     const slugsFor = async (query: string) =>
       (await ops.searchListings(query, 100)).map(listing => listing.slug)
-    expect((await slugsFor('jasper.ai'))[0]).toBe('jasper.ai')
-    expect(await slugsFor('orderdesk')).toContain('orderdesk.com')
-    // The website URL is not searched: 3,359 of 3,422 websites are serp.ly affiliate links, so
-    // matching their host returned ~3,360 listings for "erp", "serp", or "ly" (#81 round 2).
-    expect(await slugsFor('erp')).toHaveLength(79)
-    expect(await slugsFor('serp')).toHaveLength(12)
-    expect(await slugsFor('serp.ly')).toEqual([])
-    const ly = await ops.searchListings('ly', 100)
-    expect(ly).toHaveLength(MAX_SEARCH_LIMIT)
-    for (const listing of ly) {
-      const text = [listing.name, listing.description, listing.slug, ...(listing.categories ?? [])]
-        .join(' ')
-        .replace(/[A-Z]+/gu, letters => letters.toLowerCase())
-      expect(text, listing.slug).toContain('ly')
+    // Exactly the contract's matches, in its order.
+    const smallCategory = categoryBySlug.get(small.slug)?.name as string
+    for (const query of ['video downloader', 'ly', domain.slug, stem, smallCategory, 'OÜ']) {
+      expect(await slugsFor(query), query).toEqual(expectedSearch(query))
     }
+    // A product's domain finds it through the slug, first (owner decision, #81).
+    expect((await slugsFor(domain.slug))[0]).toBe(domain.slug)
+    expect(await slugsFor(stem)).toContain(domain.slug)
+    // The website URL is not searched: nearly every website is an affiliate link on one host
+    // (production's are serp.ly links), so matching it would return every listing (#81 round 2).
+    expect(live.filter(listing => listing.website.includes(AFFILIATE_HOST)).length).toBeGreaterThan(
+      3_000
+    )
+    expect(await slugsFor(AFFILIATE_HOST)).toEqual([])
+    expect(await slugsFor('example')).toEqual([])
+    expect(await slugsFor('ly')).toHaveLength(MAX_SEARCH_LIMIT)
     // Non-ASCII letters match as typed, the way SQLite's lower() leaves them (#81 review).
-    expect(await slugsFor('OÜ')).toContain('instant-portrait.com')
+    expect(await slugsFor('OÜ')).toContain(unicode.slug)
     expect(await ops.searchListings('  \n\t ')).toEqual([])
-    expect((await ops.getAutocomplete('jas', 5)).length).toBeLessThanOrEqual(5)
+    expect((await ops.getAutocomplete(stem.slice(0, 3), 5)).length).toBeLessThanOrEqual(5)
   }, 120_000)
 
   it('runs the account, email, and submission operations with worst-case inputs', async () => {
@@ -294,16 +515,16 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
     const owner = 'wq_user'
     const website = `https://workerd-queries.example/${'p'.repeat(1_900)}`
     const content = {
-      categorySlug: 'other',
+      categorySlug: CATCH_ALL_CATEGORY,
       content: 'c'.repeat(5_000),
       description: 'd'.repeat(160),
       logoUrl: `https://workerd-queries.example/${'l'.repeat(1_900)}.png`,
       name: 'n'.repeat(120)
     }
     expect(await submissions.checkUrl(website, owner)).toMatchObject({ kind: 'available' })
-    expect(await submissions.checkUrl('https://www.jasper.ai/pricing', owner)).toMatchObject({
+    expect(await submissions.checkUrl(`https://www.${domain.slug}/pricing`, owner)).toMatchObject({
       kind: 'listed',
-      listing: { public: true, slug: 'jasper.ai' }
+      listing: { public: true, slug: domain.slug }
     })
     const draft = await submissions.createDraft({
       ownerUserId: owner,
@@ -338,8 +559,19 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
     expect(await submissions.listOwnSubmissions(owner, 10_000)).toHaveLength(2)
     const jobs = tracked('draftJobs', createDraftJobOperations({ client }))
     const later = (hours: number) => new Date(NOW.getTime() + hours * 3_600_000).toISOString()
+    // The generated catalog's two drafts, saved two and five days before, are due for their
+    // second reminder and expire with this one. No other submission is due: not `draft`, now
+    // pending its badge, nor any generated submission in another status.
+    const generatedDrafts = scale.submissions
+      .filter(item => item.status === 'draft')
+      .sort((left, right) => binary(left.draftSavedAt as string, right.draftSavedAt as string))
+      .map(item => item.id)
+    expect(generatedDrafts).toHaveLength(2)
     const due = await jobs.remindersDue({ limit: 100, now: later(13) })
-    expect(due.map(item => [item.id, item.reminder])).toEqual([[waiting.id, 1]])
+    expect(due.map(item => [item.id, item.reminder])).toEqual([
+      ...generatedDrafts.map(id => [id, 2]),
+      [waiting.id, 1]
+    ])
     expect(
       await jobs.claimReminder({
         now: later(13),
@@ -350,7 +582,7 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
     ).toBe(true)
     expect(
       (await jobs.expiredDrafts({ limit: 100, now: later(31 * 24) })).map(item => item.id)
-    ).toEqual([waiting.id])
+    ).toEqual([...generatedDrafts, waiting.id])
     expect(await jobs.expireDraft({ now: later(31 * 24), submissionId: waiting.id })).toBe(true)
     expect(await jobs.retryableEmails({ limit: 100, maxAttempts: 5, now: later(31 * 24) })).toEqual(
       []
@@ -369,6 +601,11 @@ describe('every query on Wrangler-local D1 with the full catalog (#77)', () => {
     console.info(JSON.stringify({ event: 'workerd_rows_read', worst: Object.fromEntries(worst) }))
     const overBudget = [...worst].filter(([shape, rows]) => rows > ROWS_READ_BUDGET[shape])
     expect(overBudget, JSON.stringify(Object.fromEntries(worst))).toEqual([])
+    // Every budget was measured: the generated catalog reaches every shape this suite runs. The
+    // two worker-entry seeks run elsewhere.
+    expect(
+      (Object.keys(ROWS_READ_BUDGET) as CatalogQueryShape[]).filter(shape => !worst.has(shape))
+    ).toEqual(['legacy-root-target', 'unpublished-listing-status'])
     expect(operationNames.filter(name => !called.has(name))).toEqual([])
   })
 })

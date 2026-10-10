@@ -525,7 +525,7 @@ test.describe('listings', () => {
       localD1<{ url: string }>(
         `SELECT url FROM listing_media WHERE listing_id = ${q(id)} AND kind = 'logo'`
       )
-    const relativeLogo = '/listing-logos/serpdownloaders.com/logo.png'
+    const relativeLogo = '/listing-logos/legacy-logo.test/logo.png'
     for (const [label, logo] of [
       ['no-logo', null],
       ['relative-logo', relativeLogo]

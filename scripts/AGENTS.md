@@ -12,7 +12,8 @@ Scripts are repository boundaries and must fail with remediation-oriented messag
 - Export pure functions where a deterministic unit test can exercise the contract.
 - Do not hide subprocess output or convert a failed check into a warning.
 
-Migration scripts may read catalog files only from an explicit external source path.
-They must not copy those files into this repository or become runtime adapters.
+No script reads the real catalog as local or test data: local D1 is the fixture seed, and the
+one-time migration tooling is archived in `.archive/` (#315). Catalog checks read an
+environment's D1 read-only (`pnpm media:health`, `pnpm catalog:domains`).
 
 See [Harness](../docs/HARNESS.md) and [Data model](../docs/DATA_MODEL.md).

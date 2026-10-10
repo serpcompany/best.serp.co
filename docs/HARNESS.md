@@ -32,8 +32,7 @@ pnpm harness:fast
 
 This runs documentation health, the D1-only architecture guard, shared catalog
 data-operation contracts and scan benchmark, fresh Drizzle migration/idempotency
-tests, deterministic local D1-to-D1 transfer/parity tests, D1 schema/publication
-contract tests,
+tests, the fixture seed's tests, D1 schema/publication contract tests,
 and TypeScript checks. Each step stops on failure and prints the governing document.
 The catalog contract also proves the injected Drizzle client retains per-statement
 D1 telemetry and reviewed query-plan bounds.
@@ -98,9 +97,9 @@ pnpm agent:ui:capture -- --name home --path /
 `agent:manifest` prints URLs, ports, D1 and Wrangler state paths, log/artifact paths,
 Git identity, Worker name, D1 binding, and runtime variables as JSON.
 
-`agent:dev` initializes an isolated runtime when needed, builds the Worker, starts its
-local D1 preview on the manifest port, and mirrors output into
-`.runtime/<instance>/logs/runtime.log`. `agent:logs` returns the last 200 lines.
+`agent:dev` initializes an isolated runtime when needed, seeds its local D1 with fixtures
+(`pnpm db:seed:local`) when it has none yet, builds the Worker, starts its local D1 preview on
+the manifest port, and mirrors output into `.runtime/<instance>/logs/runtime.log`. `agent:logs` returns the last 200 lines.
 The agent runtime, canonical local D1 aliases, app preview, and Playwright all resolve
 the same `apps/web/drizzle/` state below the manifest's D1 directory. They do
 not inspect or migrate a legacy local state directory.
@@ -120,8 +119,10 @@ pnpm test:e2e:smoke
 ```
 
 Playwright retains traces, screenshots, and video on failure. A running isolated
-Worker may be supplied through `PLAYWRIGHT_BASE_URL` and
-`PLAYWRIGHT_WEB_SERVER_COMMAND`.
+Worker may be supplied through `PLAYWRIGHT_BASE_URL` and `PLAYWRIGHT_EXTERNAL_SERVER=1` (or
+`PLAYWRIGHT_WEB_SERVER_COMMAND`). E2E data is the fixture seed: by default Playwright reseeds local
+D1 and specs assert the seed's facts (`apps/web/e2e/seed-facts.ts`); only the smoke run against a
+deployed Worker reads the live catalog ([E2E data](../apps/web/e2e/README.md#data)).
 
 ## Worktree isolation
 
@@ -139,7 +140,8 @@ The command:
 4. allocates a deterministic, worktree-specific port;
 5. creates isolated D1, Wrangler, cache, log, artifact, and browser directories;
 6. writes `.runtime/manifest.json`;
-7. prints the exact directory from which to open Codex.
+7. prints the seed command for its local D1 (`pnpm db:seed:local`) and the directory from
+   which to open Codex.
 
 Inside an existing manually created worktree:
 
@@ -161,21 +163,12 @@ The local D1 guard reads the worktree manifest and passes that instance’s stat
 to Wrangler. No worktree receives preview or production credentials automatically,
 and `.env` files are deliberately not copied.
 
-## Migration harness
+## Migration harness (retired)
 
-The one-time import reads the legacy json-directory-template checkout in place:
-
-```bash
-pnpm migration:preflight -- \
-  --source-root /absolute/path/to/json-directory \
-  --site-id serp.co
-pnpm migration:generate -- --source-root /absolute/path/to/json-directory --site-id serp.co
-```
-
-The preflight reports source hashes, counts, and integrity issues; the generator
-writes the ignored `d1/artifacts/` SQL and must reproduce the committed parity
-report. `pnpm migration:compare -- <origin>` compares sampled pages between
-https://best.serp.co and a candidate origin.
+The one-time json-directory-template import and its harness (`migration:preflight`,
+`migration:generate`, `migration:compare`, `migration:legacy-media`) are archived in
+[`.archive/`](../.archive/README.md) (#315). `.archive/` is history: no check, lint, typecheck,
+test, or workflow reads it.
 
 ## Sibling checkouts
 

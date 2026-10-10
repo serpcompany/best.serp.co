@@ -52,8 +52,9 @@ Each read keeps a reviewed SQL shape, explained where it is built in
 totals sum primary memberships, which the baseline triggers keep at exactly one per published
 listing), related listings from one statement whose plan depends on the listing's categories,
 and previous/next from one `COALESCE` over three keyset branches. Every shape has a rows-read
-budget on the full import (`ROWS_READ_BUDGET` in `scripts/d1-workerd-queries.test.ts`), so a lost
-index or a full scan fails a test instead of showing up on the bill.
+budget on a generated catalog of production's size (`ROWS_READ_BUDGET` in
+`scripts/d1-workerd-queries.test.ts`, #314), so a lost index or a full scan fails a test instead
+of showing up on the bill.
 
 ## Search
 

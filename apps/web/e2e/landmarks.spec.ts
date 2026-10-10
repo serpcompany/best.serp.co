@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test'
 import { adminSuiteEnabled, client, signIn, unique } from './admin-fixture'
-import { detailListing } from './listing-fixture'
-import { categoryPath, sampleCategory } from './site-fixture'
+import { detailListing, sampleCategory, searchSample } from './listing-fixture'
+import { categoryPath } from './site-fixture'
 import { expectedResponse, test } from './test'
 
 test.use({
@@ -34,7 +34,7 @@ const publicPages = [
   '/products/categories/',
   categoryPath(sampleCategory.slug),
   detailListing.path,
-  `/search/?q=${detailListing.searchQuery}`,
+  `/search/?q=${searchSample.query}`,
   '/login/',
   '/submit/'
 ]

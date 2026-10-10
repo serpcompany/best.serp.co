@@ -19,7 +19,7 @@ Report each level separately; a lower level never proves a higher one.
 - Build:
 - Automated tests (`pnpm check`, CI run):
 - UI / browser (Playwright, screenshots):
-- Deployed (staging run, live-route checks, `pnpm migration:compare`):
+- Deployed (staging run, Playwright smoke, live-route checks):
 - Owner acceptance:
 
 Review: <rounds>, <outcome> (a fresh review agent; the author never reviews its own PR)

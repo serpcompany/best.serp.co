@@ -4,8 +4,7 @@ The private side of the data model: submissions, listing owners, owner revisions
 and the payment fields. Column meanings and most constraints are commented in
 `apps/web/src/db/schema.ts`; this page holds the invariants that span columns or tables, and why.
 Statuses and transitions are in [Submission flow](./SUBMISSION_FLOW.md), claims in
-[Claims](./CLAIMS.md#data), and orders in [Billing](./BILLING.md#data). The tables are empty in
-the initial import, so bootstrap parity compares them exactly ([Data model](./DATA_MODEL.md)).
+[Claims](./CLAIMS.md#data), and orders in [Billing](./BILLING.md#data).
 
 ## Ownership
 

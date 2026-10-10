@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test'
+import { seedFacts, seedListings } from './seed-facts'
 import { test } from './test'
 
 /**
@@ -28,17 +29,33 @@ test.describe('search API', () => {
   })
 
   test('finds listings by name, description, or category within the limit', async ({ request }) => {
-    const response = await request.get('/api/search?q=video%20downloader&limit=5')
+    // The seed's paginated category, by name: more matches than the limit.
+    const category = seedFacts.paginatedCategory
+    const response = await request.get(`/api/search?q=${encodeURIComponent(category.name)}&limit=5`)
     expect(response.status()).toBe(200)
-    const results = (await response.json()) as Array<{ slug: string; url: string }>
-    expect(results.length).toBeGreaterThan(0)
-    expect(results.length).toBeLessThanOrEqual(5)
-    for (const result of results) expect(result.url).toBe(`/products/${result.slug}/`)
-    expect(await (await request.get('/api/search?q=%20%20')).json()).toEqual([])
-    // A domain finds its listing through the slug and the website host (owner decision, #81).
-    const domain = (await (await request.get('/api/search?q=jasper.ai&limit=5')).json()) as Array<{
+    const results = (await response.json()) as Array<{
+      category: string
       slug: string
+      url: string
     }>
-    expect(domain[0]?.slug).toBe('jasper.ai')
+    expect(results).toHaveLength(5)
+    for (const result of results) {
+      expect(result.url).toBe(`/products/${result.slug}/`)
+      expect(result.category).toBe(category.slug)
+    }
+    expect(await (await request.get('/api/search?q=%20%20')).json()).toEqual([])
+    // A query that matches one listing's name finds exactly that listing.
+    const named = (await (
+      await request.get(`/api/search?q=${encodeURIComponent(seedFacts.search.query)}`)
+    ).json()) as Array<{ slug: string }>
+    expect(named.map(result => result.slug)).toEqual(
+      seedFacts.search.listings.map(listing => listing.slug)
+    )
+    // A domain finds its listing through the slug and the website host (owner decision, #81).
+    const host = seedListings.submitted.slug
+    const domain = (await (
+      await request.get(`/api/search?q=${encodeURIComponent(host)}&limit=5`)
+    ).json()) as Array<{ slug: string }>
+    expect(domain[0]?.slug).toBe(host)
   })
 })
