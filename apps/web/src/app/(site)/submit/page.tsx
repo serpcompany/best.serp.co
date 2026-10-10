@@ -2,10 +2,11 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { SubmitForm } from '@/components/submit/submit-form'
 import { getSessionUser } from '@/lib/auth/server'
-import { getActiveCategories } from '@/lib/catalog/repository'
+import { getActiveCategories, getActiveTags } from '@/lib/catalog/repository'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { toSummary } from '@/lib/submissions/http'
+import { tagChoices } from '@/lib/submissions/presentation'
 import { getOwnSubmission, insecureLogosAllowed } from '@/lib/submissions/repository'
 
 // Noindex and robots-disallowed, from the route registry (#167).
@@ -35,7 +36,11 @@ function first(value: string | string[] | undefined): string | null {
  */
 export default async function SubmitPage({ searchParams }: SubmitPageProps) {
   const params = await searchParams
-  const [categories, user] = await Promise.all([getActiveCategories(), getSessionUser()])
+  const [categories, tags, user] = await Promise.all([
+    getActiveCategories(),
+    getActiveTags(),
+    getSessionUser()
+  ])
   const edit = first(params.edit)
   let editing = null
   if (edit) {
@@ -54,6 +59,7 @@ export default async function SubmitPage({ searchParams }: SubmitPageProps) {
       allowInsecureLogos={await insecureLogosAllowed()}
       signedInEmail={user?.email ?? null}
       signedInUserId={user?.id ?? null}
+      tags={tagChoices(categories, tags)}
     />
   )
 }

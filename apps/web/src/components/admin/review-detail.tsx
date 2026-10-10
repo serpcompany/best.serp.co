@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { type ReactNode, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { type TagChoice, TagsCombobox } from '@/components/submit/tags-combobox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -68,6 +69,7 @@ import {
 } from '@/lib/admin/format'
 import type { LinkRel } from '@/lib/admin/listing-view'
 import type { ReviewView } from '@/lib/admin/review-view'
+import { SUBMISSION_TAG_LIMIT } from '@/lib/submissions/contract'
 import { cn } from '@/lib/utils'
 import { adminRequest } from './api'
 import { Kv } from './kv'
@@ -128,10 +130,13 @@ function hostOf(url: string): string {
 export function ReviewDetail({
   categories,
   preview,
+  tags,
   view
 }: {
   categories: Category[]
   preview: ReactNode
+  /** The active tags (#341), for the suggested tags' names and the edit's Tags field. */
+  tags: readonly TagChoice[]
   view: ReviewView
 }) {
   const router = useRouter()
@@ -146,6 +151,10 @@ export function ReviewDetail({
     logoUrl: view.logoUrl,
     name: view.name
   })
+  const [tagSlugs, setTagSlugs] = useState<string[]>(view.tagSlugs ?? [])
+  const tagsEdited = tagSlugs.join(',') !== (view.tagSlugs ?? []).join(',')
+  const tagNames = (slugs: readonly string[]) =>
+    slugs.map(slug => tags.find(tag => tag.slug === slug)?.label ?? slug).join(', ') || '—'
   const [note, setNote] = useState('')
   const [reason, setReason] = useState('')
   const [category, setCategory] = useState<'other' | 'prohibited'>('other')
@@ -165,11 +174,13 @@ export function ReviewDetail({
   const refundDue = isSubmission && view.paid && view.paidAmountCents !== null
   const amount = formatUsd(view.paidAmountCents ?? 0)
   const editedFields = useMemo(
-    () =>
-      (Object.keys(edits) as Array<keyof typeof edits>).filter(
+    () => [
+      ...(Object.keys(edits) as Array<keyof typeof edits>).filter(
         field => edits[field].trim() !== view[field].trim()
       ),
-    [edits, view]
+      ...(tagsEdited ? (['tagSlugs'] as const) : [])
+    ],
+    [edits, tagsEdited, view]
   )
   const basePath = `/api/admin/${isSubmission ? 'submissions' : 'revisions'}/${encodeURIComponent(view.id)}`
 
@@ -204,7 +215,10 @@ export function ReviewDetail({
       'approve',
       isSubmission
         ? {
-            edits: editing && editedFields.length > 0 ? edits : undefined,
+            edits:
+              editing && editedFields.length > 0
+                ? { ...edits, ...(tagsEdited ? { tagSlugs } : {}) }
+                : undefined,
             expectedContentVersion: view.contentVersion,
             // Approval adopts only the images shown here (#96 rounds 2 and 3).
             expectedImageKey: view.featuredImage?.key ?? null,
@@ -345,6 +359,17 @@ export function ReviewDetail({
               </Select>
             </Field>
           </div>
+          <Field>
+            <FieldLabel htmlFor="edit-tags">Tags</FieldLabel>
+            <TagsCombobox
+              id="edit-tags"
+              choices={tags}
+              firstCategory={edits.categorySlug || undefined}
+              max={SUBMISSION_TAG_LIMIT}
+              value={tagSlugs}
+              onValueChange={setTagSlugs}
+            />
+          </Field>
           <Field data-invalid={edits.description.length > DESCRIPTION_MAX || undefined}>
             <div className="flex items-center gap-2">
               <FieldLabel htmlFor="edit-description">Short description</FieldLabel>
@@ -501,6 +526,9 @@ export function ReviewDetail({
                 </span>
               ],
               ['Category', view.categoryName ?? view.categorySlug],
+              ...(view.tagSlugs
+                ? ([['Tags', tagNames(view.tagSlugs)]] as Array<[string, ReactNode]>)
+                : []),
               ['Plan', view.paid ? `Paid · ${amount}` : 'Free (badge)'],
               ['Logo', `From ${hostOf(view.logoUrl)}`]
             ]}

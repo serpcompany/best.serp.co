@@ -6,12 +6,15 @@ import {
   categoryId,
   count,
   execute,
+  listingTags,
   NOW,
   planDatabase,
+  primaryCategory,
   publication,
   publicationState,
   query,
-  seedLiveListing
+  seedLiveListing,
+  seedTags
 } from './plan-test-support'
 import {
   buildApproveRevisionPlans,
@@ -704,5 +707,91 @@ describe("a revision's or claim's logo at approval (#96 review round 4, S1)", ()
     )
     expect(logoRows(db, claimed)).toEqual([{ media_key: current.key, url: current.sourceUrl }])
     expect(logoQueue(db, claimed)).toEqual([])
+  })
+})
+
+describe("a revision's tags and the stale-slug resolver (#341, design 4.4)", () => {
+  function tagged(listingTagSlugs: string[]): DatabaseSync {
+    const db = database()
+    seedTags(db)
+    listingTagSlugs.forEach((slug, order) => {
+      db.prepare(
+        `INSERT INTO listing_tags (listing_id,tag_id,sort_order)
+        SELECT ?,id,? FROM tags WHERE slug=?`
+      ).run(listingId, order, slug)
+    })
+    return db
+  }
+
+  function approve(db: DatabaseSync, staged: Partial<StagedListingContent>): void {
+    execute(
+      db,
+      buildCreateRevisionPlans({
+        authorUserId: 'user_owner',
+        content: { ...content, ...staged },
+        listingId,
+        now: NOW,
+        revisionId
+      })
+    )
+    execute(
+      db,
+      buildApproveRevisionPlans({
+        expectedContentVersion: 1,
+        listingId,
+        now: NOW,
+        publication: publication('revision-approval'),
+        reviewer: 'reviewer',
+        revisionId
+      })
+    )
+  }
+
+  it('stores the tags, or null when not given', () => {
+    const db = tagged([])
+    execute(
+      db,
+      buildCreateRevisionPlans({
+        authorUserId: 'user_owner',
+        content,
+        listingId,
+        now: NOW,
+        revisionId
+      })
+    )
+    expect(revision(db)?.tag_slugs).toBeNull()
+    execute(
+      db,
+      buildReplaceRevisionContentPlans({
+        authorUserId: 'user_owner',
+        content: { ...content, tagSlugs: ['whiteboards'] },
+        now: NOW,
+        revisionId
+      })
+    )
+    expect(revision(db)?.tag_slugs).toBe('["whiteboards"]')
+  })
+
+  it('replaces the tags when the revision gives them, an empty list included', () => {
+    const db = tagged(['note-taking'])
+    approve(db, { tagSlugs: ['whiteboards', 'retired-tag'] })
+    expect(listingTags(db, listingId)).toEqual(['whiteboards'])
+    const emptied = tagged(['note-taking'])
+    approve(emptied, { tagSlugs: [] })
+    expect(listingTags(emptied, listingId)).toEqual([])
+  })
+
+  it('leaves the tags as they are when the revision gives none', () => {
+    const db = tagged(['note-taking', 'whiteboards'])
+    approve(db, { tagSlugs: null })
+    expect(listingTags(db, listingId)).toEqual(['note-taking', 'whiteboards'])
+  })
+
+  it('files a revision naming a retired narrow slug under its hub, and adds its tag', () => {
+    const db = tagged(['note-taking'])
+    approve(db, { categorySlug: 'chatbots', tagSlugs: null })
+    expect(primaryCategory(db, listingId)).toBe('apps')
+    expect(listingTags(db, listingId)).toEqual(['chatbots', 'note-taking'])
+    expect(publicationState(db).version).toBe(2)
   })
 })

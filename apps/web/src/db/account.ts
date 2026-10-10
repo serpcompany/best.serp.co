@@ -3,6 +3,7 @@ import {
   listingInRetiredCategory,
   MAX_STAGED_FAQS,
   MAX_STAGED_RESOURCE_LINKS,
+  parseTagSlugs,
   type StatementPlan
 } from './plan-support'
 import { validatePublicHttpUrl } from './public-url'
@@ -12,7 +13,13 @@ import {
   buildResubmitRevisionPlans,
   buildWithdrawRevisionPlans
 } from './revision-plans'
-import type { RejectionCategory, RevisionStatus, SubmissionPlan, SubmissionStatus } from './schema'
+import {
+  MAX_SUGGESTED_TAGS,
+  type RejectionCategory,
+  type RevisionStatus,
+  type SubmissionPlan,
+  type SubmissionStatus
+} from './schema'
 import {
   buildClaimListingBadgeCheckPlans,
   buildFinishListingBadgeCheckPlans,
@@ -23,6 +30,7 @@ import {
   LISTING_BADGE_CHECK_ACTOR
 } from './submission-plans'
 import {
+  activeTags,
   CONCLUSIVE_VERIFICATION_FAILURES,
   type DraftContent,
   SUBMISSION_LIMITS,
@@ -158,6 +166,8 @@ export interface AccountRevisionDetail extends AccountRevision, AccountExtras {
   description: string
   logoUrl: string
   name: string
+  /** The owner's tags (#341), or null when the revision leaves the listing's as they are. */
+  tagSlugs: string[] | null
 }
 
 export interface AccountListing {
@@ -191,6 +201,8 @@ export interface AccountListing {
 export interface AccountListingDetail extends AccountListing, AccountExtras {
   content: string
   revision: AccountRevisionDetail | null
+  /** The listing's active tags in order (#341). */
+  tags: string[]
   videoUrl: string | null
 }
 
@@ -205,6 +217,11 @@ export interface RevisionContent extends AccountExtras {
   content: string
   description: string
   logoUrl: string
+  /**
+   * Up to three active tags (#341). Left out, or the listing's own tags, the revision leaves
+   * the listing's tags as they are.
+   */
+  tagSlugs?: string[]
 }
 
 type Row = Record<string, unknown>
@@ -361,7 +378,10 @@ export function selectAccountListingPlans(userId: string, slug: string): Stateme
     {
       sql: `SELECT ${LISTING_COLUMNS},l.content,
           (SELECT m.url FROM listing_media m WHERE m.listing_id=l.id AND m.kind='video'
-            ORDER BY m.sort_order LIMIT 1) AS video_url
+            ORDER BY m.sort_order LIMIT 1) AS video_url,
+          (SELECT json_group_array(slug) FROM (SELECT t.slug FROM listing_tags lt
+            JOIN tags t ON t.id=lt.tag_id WHERE lt.listing_id=l.id AND t.is_active=1
+            ORDER BY lt.sort_order,t.slug)) AS tags
         FROM listings l ${LISTING_JOINS}
         WHERE l.slug=?2 AND l.status='approved' AND ${OWNED}`,
       params: [userId, slug]
@@ -378,7 +398,8 @@ export function selectAccountListingPlans(userId: string, slug: string): Stateme
     },
     {
       sql: `SELECT r.name,r.description,r.content,r.category_slug,c.name AS category_name,
-          r.logo_url FROM listing_revisions r LEFT JOIN categories c ON c.slug=r.category_slug
+          r.logo_url,r.tag_slugs FROM listing_revisions r
+          LEFT JOIN categories c ON c.slug=r.category_slug
         WHERE r.id=(${revision})`,
       params: [userId, slug]
     },
@@ -714,9 +735,11 @@ export function createAccountOperations(config: {
               faqs: faqs(revisionFaqs ?? []),
               logoUrl: text(staged.logo_url),
               name: text(staged.name),
-              resourceLinks: links(revisionLinks ?? [])
+              resourceLinks: links(revisionLinks ?? []),
+              tagSlugs: parseTagSlugs(staged.tag_slugs)
             }
           : null,
+      tags: parseTagSlugs(row.tags) ?? [],
       videoUrl: optional(row.video_url)
     }
   }
@@ -874,6 +897,12 @@ export function createAccountOperations(config: {
       if (!(await activeCategory(checked.categorySlug))) {
         throw new SubmissionError('invalid_category', 'Choose a primary category.')
       }
+      if (!(await activeTags(config.client, checked.tagSlugs ?? []))) {
+        throw new SubmissionError(
+          'invalid_tags',
+          `Choose up to ${MAX_SUGGESTED_TAGS} tags from the list.`
+        )
+      }
       const children = extras
         ? validateExtras(extras)
         : { faqs: current.faqs, resourceLinks: current.resourceLinks }
@@ -892,6 +921,10 @@ export function createAccountOperations(config: {
             ...checked,
             faqs: children.faqs,
             resourceLinks: children.resourceLinks,
+            // No tags given is "not given" (null), as on a draft (#341).
+            ...(checked.tagSlugs === undefined
+              ? {}
+              : { tagSlugs: checked.tagSlugs.length > 0 ? checked.tagSlugs : null }),
             videoUrl: current.videoUrl
           },
           eventDetail: JSON.stringify({ fields: edited }),
@@ -974,6 +1007,20 @@ export function createAccountOperations(config: {
       }
       if (!logoUrl) throw new SubmissionError('invalid_logo', 'Add a logo.')
       const extras = validateExtras(content)
+      // Tags equal to the listing's own are "not given", so approval leaves them (#341).
+      const tags = content.tagSlugs?.map(tag => tag.trim())
+      if (tags) {
+        if (
+          tags.length > MAX_SUGGESTED_TAGS ||
+          new Set(tags).size !== tags.length ||
+          !(await activeTags(config.client, tags))
+        ) {
+          throw new SubmissionError(
+            'invalid_tags',
+            `Choose up to ${MAX_SUGGESTED_TAGS} tags from the list.`
+          )
+        }
+      }
       const staged = {
         categorySlug,
         content: body,
@@ -982,6 +1029,7 @@ export function createAccountOperations(config: {
         logoUrl,
         name: current.name,
         resourceLinks: extras.resourceLinks,
+        tagSlugs: tags && JSON.stringify(tags) !== JSON.stringify(current.tags) ? tags : null,
         videoUrl: current.videoUrl
       }
       const stale = new SubmissionError(

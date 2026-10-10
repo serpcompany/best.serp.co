@@ -22,9 +22,10 @@ export default async function SubmissionReviewPage({ params }: Props) {
   const id = decisionIdSchema.safeParse((await params).id)
   if (!id.success) notFound()
   const reads = await getAdminReads()
-  const [review, categories] = await Promise.all([
+  const [review, categories, tags] = await Promise.all([
     reads.getSubmissionReview(id.data),
-    reads.listActiveCategories()
+    reads.listActiveCategories(),
+    reads.listActiveTags()
   ])
   if (!review) notFound()
   const media = await mediaBaseUrl()
@@ -40,6 +41,7 @@ export default async function SubmissionReviewPage({ params }: Props) {
 
       <ReviewDetail
         categories={categories}
+        tags={tags.map(tag => ({ ...tag, label: tag.name }))}
         preview={
           <PreviewCardBody
             categoryName={review.categoryName}

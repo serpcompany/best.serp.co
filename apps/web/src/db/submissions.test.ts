@@ -376,6 +376,44 @@ describe('native submission intake', () => {
     ).rejects.toMatchObject({ code: 'stale_submission', status: 409 })
   })
 
+  it('stores up to three active suggested tags, in order, and keeps them through an edit (#341)', async () => {
+    sqlite.database.exec(`
+      INSERT INTO tags (slug,name,category_id,sort_order,is_active) VALUES
+        ('note-taking','Note Taking',1,0,1),('whiteboards','Whiteboards',1,1,1),
+        ('mockups','Mockups',1,2,1),('apis','APIs',1,3,1),('gone','Gone',1,4,0);
+    `)
+    const stored = () =>
+      (
+        sqlite.database.prepare('SELECT tag_slugs FROM listing_submissions').get() as {
+          tag_slugs: string | null
+        }
+      ).tag_slugs
+    const saved = await draft({ tagSlugs: ['whiteboards', 'note-taking'] })
+    expect(saved.tagSlugs).toEqual(['whiteboards', 'note-taking'])
+    expect(stored()).toBe('["whiteboards","note-taking"]')
+    const edit = (tagSlugs: string[] | undefined, version: number) =>
+      operations().updateDraft({
+        content: { ...input, tagSlugs },
+        expectedContentVersion: version,
+        ownerUserId: OWNER,
+        submissionId: saved.id
+      })
+    // Left out, the tags stay; an empty list is "not given".
+    expect((await edit(undefined, 1)).tagSlugs).toEqual(['whiteboards', 'note-taking'])
+    expect((await edit([], 2)).tagSlugs).toEqual([])
+    expect(stored()).toBeNull()
+    for (const tagSlugs of [['gone'], ['nope'], ['apis', 'apis']]) {
+      await expect(edit(tagSlugs, 3)).rejects.toMatchObject({ code: 'invalid_tags' })
+    }
+    await expect(edit(['note-taking', 'whiteboards', 'mockups', 'apis'], 3)).rejects.toMatchObject({
+      code: 'invalid_tags'
+    })
+    await expect(
+      draft({ tagSlugs: ['gone'], website: 'https://other.example/' })
+    ).rejects.toMatchObject({ code: 'invalid_tags' })
+    expect(count('listing_submissions')).toBe(1)
+  })
+
   it('chooses the free plan once and refuses an expired draft', async () => {
     const saved = await draft()
     const chosen = await operations().chooseFreePlan(saved.id, OWNER)

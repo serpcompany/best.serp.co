@@ -23,6 +23,7 @@ import {
   republishListing,
   requestSubmissionChanges,
   setListingLinkRel,
+  setListingTags,
   transferListingOwner,
   unpublishListing,
   updateListingDetails
@@ -946,6 +947,137 @@ describe('listing decisions', () => {
     expect(row('SELECT COUNT(*) AS owners FROM listing_owners WHERE revoked_at IS NULL')).toEqual({
       owners: 0
     })
+  })
+})
+
+describe('tag decisions (#341)', () => {
+  function tagged() {
+    const fixture_ = fixture()
+    fixture_.db.exec(`
+      INSERT INTO tags (slug, name, category_id, sort_order) VALUES
+        ('note-taking', 'Note Taking', 1, 0), ('whiteboards', 'Whiteboards', 2, 0),
+        ('retired-tag', 'Retired', 1, 1);
+      UPDATE tags SET is_active = 0 WHERE slug = 'retired-tag';
+    `)
+    const tags = (listingId: string) =>
+      (
+        fixture_.db
+          .prepare(
+            `SELECT t.slug FROM listing_tags lt JOIN tags t ON t.id = lt.tag_id
+            WHERE lt.listing_id = ? ORDER BY lt.sort_order, t.slug`
+          )
+          .all(listingId) as Array<{ slug: string }>
+      ).map(row => row.slug)
+    return { ...fixture_, tags }
+  }
+
+  it("sets a listing's tags once, answers a replay, and refuses stale or retired tags", async () => {
+    const { context, row, tags } = tagged()
+    const set = (next: string[], expectedTags: string[]) =>
+      setListingTags(context(), { expectedTags, listingId: 'lst_brief', tags: next })
+    expect(await set(['whiteboards', 'note-taking'], [])).toEqual({
+      ok: true,
+      replayed: false,
+      tags: ['whiteboards', 'note-taking']
+    })
+    expect(tags('lst_brief')).toEqual(['whiteboards', 'note-taking'])
+    expect(row('SELECT version FROM publication_state')).toEqual({ version: 2 })
+    expect(row("SELECT checksum FROM listings WHERE id='lst_brief'")).toEqual({
+      checksum: 'brief-checksum'
+    })
+    // The same request again is a replay; one made from a stale view is a conflict.
+    expect(await set(['whiteboards', 'note-taking'], [])).toMatchObject({ replayed: true })
+    expect(await set(['note-taking'], [])).toMatchObject({ error: 'conflict', status: 409 })
+    expect(await set(['retired-tag'], ['whiteboards', 'note-taking'])).toMatchObject({
+      error: 'invalid_tags',
+      status: 422
+    })
+    expect(await set(['nope'], ['whiteboards', 'note-taking'])).toMatchObject({ status: 422 })
+    expect(tags('lst_brief')).toEqual(['whiteboards', 'note-taking'])
+    expect(row('SELECT version FROM publication_state')).toEqual({ version: 2 })
+    expect(
+      await setListingTags(context(), { expectedTags: [], listingId: 'nope', tags: [] })
+    ).toMatchObject({ status: 404 })
+  })
+
+  it('tags a listing while its submission is in review, then the approval still applies', async () => {
+    const { context, paidLive, tags } = tagged()
+    paidLive('sub_paid')
+    expect(
+      await setListingTags(context(), {
+        expectedTags: [],
+        listingId: 'lst_brief',
+        tags: ['note-taking']
+      })
+    ).toMatchObject({ ok: true, replayed: false })
+    expect(
+      await approveSubmission(context(), { expectedContentVersion: 1, submissionId: 'sub_paid' })
+    ).toMatchObject({ ok: true, replayed: false })
+    // The submission gave no tags, so the admin's stay.
+    expect(tags('lst_brief')).toEqual(['note-taking'])
+  })
+
+  it('retries once when another publication won the race', async () => {
+    const { context, racingClient, tags } = tagged()
+    expect(
+      await setListingTags(context({ client: racingClient() }), {
+        expectedTags: [],
+        listingId: 'lst_brief',
+        tags: ['whiteboards']
+      })
+    ).toMatchObject({ ok: true, replayed: false })
+    expect(tags('lst_brief')).toEqual(['whiteboards'])
+  })
+
+  it("approves with the reviewer's tags, which the listing then carries", async () => {
+    const { context, db, row, submission, tags } = tagged()
+    submission('sub_tags', 'tagged.app', 'verified')
+    db.exec(`UPDATE listing_submissions SET tag_slugs = '["note-taking"]' WHERE id = 'sub_tags'`)
+    const review = await createAdminReadOperations({
+      client: context().client
+    }).getSubmissionReview('sub_tags')
+    expect(review?.tagSlugs).toEqual(['note-taking'])
+    expect(
+      await approveSubmission(context(), {
+        edits: { tagSlugs: ['retired-tag'] },
+        expectedContentVersion: 1,
+        submissionId: 'sub_tags'
+      })
+    ).toMatchObject({ error: 'invalid_tags', status: 422 })
+    expect(
+      await approveSubmission(context(), {
+        edits: { tagSlugs: ['whiteboards', 'note-taking'] },
+        expectedContentVersion: 1,
+        submissionId: 'sub_tags'
+      })
+    ).toMatchObject({ ok: true, replayed: false })
+    expect(tags('submission_sub_tags')).toEqual(['whiteboards', 'note-taking'])
+    expect(row("SELECT detail FROM listing_submission_events WHERE event_type = 'edited'")).toEqual(
+      { detail: JSON.stringify({ fields: ['tags'] }) }
+    )
+  })
+
+  it('approves an edited submission still naming a retired narrow slug under its hub', async () => {
+    const { context, db, row, submission, tags } = tagged()
+    db.exec(`
+      INSERT INTO categories (slug, name, sort_order) VALUES ('chatbots', 'Chatbots', 2);
+      INSERT INTO tags (slug, name, category_id) VALUES ('chatbots', 'Chatbots', 2);
+      UPDATE categories SET is_active = 0 WHERE slug = 'chatbots';
+    `)
+    submission('sub_stale', 'stale.app', 'verified')
+    db.exec("UPDATE listing_submissions SET category_slug = 'chatbots' WHERE id = 'sub_stale'")
+    expect(
+      await approveSubmission(context(), {
+        edits: { name: 'Stale, renamed' },
+        expectedContentVersion: 1,
+        submissionId: 'sub_stale'
+      })
+    ).toMatchObject({ ok: true, replayed: false })
+    expect(
+      row(`SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
+        WHERE lc.listing_id = 'submission_sub_stale' AND lc.is_primary = 1`)
+    ).toEqual({ slug: 'apps' })
+    expect(tags('submission_sub_stale')).toEqual(['chatbots'])
   })
 })
 

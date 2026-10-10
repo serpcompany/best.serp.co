@@ -22,9 +22,10 @@ export default async function AdminListingPage({ params }: Props) {
     .toLowerCase()
   if (!slug || slug.length > 253) notFound()
   const reads = await getAdminReads()
-  const [listing, categories] = await Promise.all([
+  const [listing, categories, tags] = await Promise.all([
     reads.getAdminListing(slug),
-    reads.listActiveCategories()
+    reads.listActiveCategories(),
+    reads.listActiveTags()
   ])
   if (!listing) notFound()
   return (
@@ -39,6 +40,7 @@ export default async function AdminListingPage({ params }: Props) {
 
       <ListingDetail
         categories={categories}
+        tags={tags.map(tag => ({ ...tag, label: tag.name }))}
         view={listingDetailView(listing, await mediaBaseUrl())}
       />
     </>

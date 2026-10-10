@@ -5,12 +5,15 @@ import type { StatementPlan } from './plan-support'
 import {
   count,
   execute,
+  listingTags,
   NOW,
   planDatabase,
+  primaryCategory,
   publication,
   publicationState,
   query,
-  seedLiveListing
+  seedLiveListing,
+  seedTags
 } from './plan-test-support'
 import { type SubmissionStatus, submissionStatuses } from './schema'
 import {
@@ -1510,5 +1513,140 @@ describe('protected submission statement plans', () => {
     expect(rejectionSql).not.toMatch(/\bTEMP\b/iu)
     expect(approvalSql).toContain("json_extract('', '$')")
     expect(rejectionSql).toContain("json_extract('', '$')")
+  })
+})
+
+describe('tags and the stale-slug resolver at approval and payment (#341, design 4.4)', () => {
+  /** The fixture in `status`, with the taxonomy, its category and suggested tags as given. */
+  function staged(
+    status: SubmissionStatus,
+    options: SeedOptions & { category?: string; tags?: string[] | null } = {}
+  ): DatabaseSync {
+    const db = planDatabase()
+    seedTags(db)
+    seedSubmission(db, status, options)
+    db.prepare('UPDATE listing_submissions SET category_slug=?,tag_slugs=? WHERE id=?').run(
+      options.category ?? 'tools',
+      options.tags === undefined || options.tags === null ? null : JSON.stringify(options.tags),
+      submissionId
+    )
+    return db
+  }
+
+  const pay = () =>
+    buildRecordSubmissionPaymentPlans({
+      actor: 'stripe',
+      listingId: liveListingId,
+      now: NOW,
+      outcome: 'publish',
+      publication: publication('paid-listing'),
+      submissionId
+    })
+
+  it('approval tags the listing with the active suggested tags, in order', () => {
+    const db = staged('verified', {
+      live: false,
+      tags: ['whiteboards', 'retired-tag', 'note-taking']
+    })
+    execute(db, approvalPlans())
+    expect(primaryCategory(db, liveListingId)).toBe('tools')
+    // A retired or unknown tag is dropped; the rest keep the Creator's order.
+    expect(listingTags(db, liveListingId)).toEqual(['whiteboards', 'note-taking'])
+    const unknown = staged('verified', { live: false, tags: ['no-such-tag', 'note-taking'] })
+    execute(unknown, approvalPlans())
+    expect(listingTags(unknown, liveListingId)).toEqual(['note-taking'])
+  })
+
+  it('approval of a submission without suggested tags leaves the listing untagged', () => {
+    const db = staged('verified', { live: false, tags: null })
+    execute(db, approvalPlans())
+    expect(listingTags(db, liveListingId)).toEqual([])
+  })
+
+  it('a paid draft naming a retired narrow slug goes live at payment under its hub and tag', () => {
+    const db = staged('draft', {
+      category: 'chatbots',
+      draftPlan: 'paid',
+      live: false,
+      tags: ['note-taking', 'chatbots']
+    })
+    execute(db, pay())
+    expect(submission(db)).toMatchObject({
+      listing_id: liveListingId,
+      status: 'paid_pending_review'
+    })
+    expect(listing(db)).toMatchObject({ is_active: 1, status: 'approved' })
+    // The retired `chatbots` category resolves to the hub of the active `chatbots` tag (Apps),
+    // which comes first; a suggested duplicate of it is kept once.
+    expect(primaryCategory(db, liveListingId)).toBe('apps')
+    expect(listingTags(db, liveListingId)).toEqual(['chatbots', 'note-taking'])
+    expect(publicationState(db).version).toBe(2)
+  })
+
+  it('a verified submission naming a retired narrow slug is approved under its hub and tag', () => {
+    const db = staged('verified', { category: 'chatbots', live: false, tags: null })
+    execute(db, approvalPlans())
+    expect(primaryCategory(db, liveListingId)).toBe('apps')
+    expect(listingTags(db, liveListingId)).toEqual(['chatbots'])
+  })
+
+  it('refuses a slug that is neither an active category nor an active tag, at payment too', () => {
+    for (const category of ['retired-tag', 'no-such-slug']) {
+      const db = staged('draft', { category, draftPlan: 'paid', live: false })
+      expect(() => execute(db, pay())).toThrow(/malformed JSON/u)
+      expect(count(db, 'SELECT COUNT(*) AS count FROM listings')).toBe(0)
+      expect(submission(db).status).toBe('draft')
+    }
+  })
+
+  it('a live approval replaces the tags only when the submission gives them', () => {
+    const given = staged('paid_pending_review', { tags: ['whiteboards'] })
+    given.exec(`INSERT INTO listing_tags (listing_id,tag_id,sort_order)
+      SELECT '${liveListingId}',id,0 FROM tags WHERE slug='note-taking'`)
+    execute(given, approveLivePlans())
+    expect(listingTags(given, liveListingId)).toEqual(['whiteboards'])
+
+    const notGiven = staged('paid_pending_review', { tags: null })
+    notGiven.exec(`INSERT INTO listing_tags (listing_id,tag_id,sort_order)
+      SELECT '${liveListingId}',id,0 FROM tags WHERE slug='note-taking'`)
+    execute(notGiven, approveLivePlans())
+    expect(listingTags(notGiven, liveListingId)).toEqual(['note-taking'])
+  })
+
+  it("keeps a retired tag the listing has when the submission doesn't give tags", () => {
+    const db = staged('paid_pending_review', { category: 'chatbots', tags: null })
+    db.exec(`INSERT INTO listing_tags (listing_id,tag_id,sort_order)
+      SELECT '${liveListingId}',id,0 FROM tags WHERE slug='whiteboards'`)
+    db.exec("UPDATE tags SET is_active=0 WHERE slug='whiteboards'")
+    // No upsert touches the retired membership, so its trigger never fires (docs/data-model.md).
+    execute(db, approveLivePlans())
+    expect(primaryCategory(db, liveListingId)).toBe('apps')
+    expect(listingTags(db, liveListingId)).toEqual(['chatbots', 'whiteboards'])
+  })
+
+  it('a content edit writes the suggested tags when given and keeps them otherwise', () => {
+    const db = staged('verified', { live: false, tags: ['note-taking'] })
+    const edit = (tagSlugs: string[] | null | undefined, version: number) =>
+      execute(
+        db,
+        buildReplaceSubmissionContentPlans({
+          actor: 'reviewer',
+          content: { ...content, tagSlugs },
+          expectedContentVersion: version,
+          expectedStatuses: ['verified'],
+          now: NOW,
+          submissionId
+        })
+      )
+    edit(undefined, 1)
+    expect(submission(db).tag_slugs).toBe('["note-taking"]')
+    edit(['whiteboards', 'note-taking'], 2)
+    expect(submission(db).tag_slugs).toBe('["whiteboards","note-taking"]')
+    edit([], 3)
+    expect(submission(db).tag_slugs).toBe('[]')
+    edit(null, 4)
+    expect(submission(db).tag_slugs).toBeNull()
+    expect(() => edit(['a', 'b', 'c', 'd'], 5)).toThrow(/at most 3/u)
+    expect(() => edit(['a', 'a'], 5)).toThrow(/distinct/u)
   })
 })

@@ -1538,6 +1538,84 @@ operations:
     ).toBeNull()
   })
 
+  it('sets tags, and resolves a retired narrow slug at payment, on D1 (#341)', async () => {
+    await db.batch([
+      db.prepare("INSERT INTO categories (slug, name, sort_order) VALUES ('narrow', 'Narrow', 5)"),
+      db.prepare(
+        `INSERT INTO tags (slug, name, category_id, sort_order) SELECT 'narrow', 'Narrow', id, 0
+          FROM categories WHERE slug = 'apps'`
+      ),
+      db.prepare(
+        `INSERT INTO tags (slug, name, category_id, sort_order) SELECT 'helper', 'Helper', id, 1
+          FROM categories WHERE slug = 'tools'`
+      ),
+      db.prepare("UPDATE categories SET is_active = 0 WHERE slug = 'narrow'")
+    ])
+    expect(await all(Q.selectActiveTagsPlan())).toEqual([
+      { category: 'tools', category_name: 'Tools', name: 'Helper', slug: 'helper' },
+      { category: 'apps', category_name: 'Apps', name: 'Narrow', slug: 'narrow' }
+    ])
+    const tagsOf = async (listingId: string) =>
+      (
+        await db
+          .prepare(
+            `SELECT t.slug FROM listing_tags lt JOIN tags t ON t.id = lt.tag_id
+            WHERE lt.listing_id = ? ORDER BY lt.sort_order, t.slug`
+          )
+          .bind(listingId)
+          .all<{ slug: string }>()
+      ).results.map(row => row.slug)
+
+    // A paid draft saved under the narrow category before it retired goes live at payment.
+    await insertDraft('sub-narrow', 'https://narrow-tool.example/')
+    await db
+      .prepare(
+        `UPDATE listing_submissions SET category_slug = 'narrow', tag_slugs = '["helper"]'
+        WHERE id = 'sub-narrow'`
+      )
+      .run()
+    await choose('sub-narrow', 'paid')
+    await run(
+      S.buildRecordSubmissionPaymentPlans({
+        actor: 'stripe',
+        listingId: 'lst-narrow',
+        now: NOW,
+        outcome: 'publish',
+        publication: await publication('paid-listing', 'sub-narrow'),
+        submissionId: 'sub-narrow'
+      })
+    )
+    expect(
+      await first(
+        `SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
+        WHERE lc.listing_id = 'lst-narrow' AND lc.is_primary = 1`
+      )
+    ).toEqual({ slug: 'apps' })
+    expect(await tagsOf('lst-narrow')).toEqual(['narrow', 'helper'])
+
+    // The admin's tag edit, while that submission is in review.
+    await run(
+      L.buildSetListingTagsPlans({
+        expectedTags: ['narrow', 'helper'],
+        listingId: 'lst-narrow',
+        publication: await publication('listing-tags', 'lst-narrow'),
+        tags: ['helper']
+      })
+    )
+    expect(await tagsOf('lst-narrow')).toEqual(['helper'])
+    await expect(
+      run(
+        L.buildSetListingTagsPlans({
+          expectedTags: ['narrow', 'helper'],
+          listingId: 'lst-narrow',
+          publication: await publication('listing-tags', 'lst-narrow'),
+          tags: []
+        })
+      )
+    ).rejects.toThrow(/malformed JSON/u)
+    expect(await tagsOf('lst-narrow')).toEqual(['helper'])
+  })
+
   it('ran every exported plan builder on D1', () => {
     expect(builderNames.length).toBeGreaterThan(30)
     expect(builderNames.filter(name => !called.has(name))).toEqual([])

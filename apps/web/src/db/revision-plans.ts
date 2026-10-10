@@ -9,7 +9,8 @@ import {
   replaceStagedChildrenPlans,
   revisionContentSource,
   type StagedListingContent,
-  type StatementPlan
+  type StatementPlan,
+  tagSlugsJson
 } from './plan-support'
 import type { RevisionStatus } from './schema'
 
@@ -65,7 +66,8 @@ export function selectRevisionForDecisionPlan(revisionId: string): StatementPlan
  * A listing's current owner stages an edit of the live listing. `base_checksum` records the
  * listing content it was based on; a listing has at most one open revision, and none while its
  * own submission is still in review (`paid_pending_review` or `changes_requested`), so a listing
- * has one staged-edit channel at a time.
+ * has one staged-edit channel at a time. `tagSlugs` null (or left out) leaves the listing's tags
+ * as they are when the revision is approved; a list replaces them (#341).
  */
 export function buildCreateRevisionPlans(input: {
   authorUserId: string
@@ -79,8 +81,8 @@ export function buildCreateRevisionPlans(input: {
     {
       sql: `INSERT INTO listing_revisions
         (id,listing_id,author_user_id,status,base_checksum,name,description,content,
-         category_slug,logo_url,video_url,created_at,updated_at)
-        SELECT ?,l.id,?,'pending_review',l.checksum,?,?,?,?,?,?,?,?
+         category_slug,logo_url,video_url,tag_slugs,created_at,updated_at)
+        SELECT ?,l.id,?,'pending_review',l.checksum,?,?,?,?,?,?,?,?,?
         FROM listings l
         WHERE l.id=? AND ${listingIsLiveGuard('l.id')} AND ${currentOwner('l.id', '?')}
           AND NOT ${listingHasQueuedSubmission('l.id')}`,
@@ -93,6 +95,7 @@ export function buildCreateRevisionPlans(input: {
         content.categorySlug,
         content.logoUrl,
         content.videoUrl ?? null,
+        tagSlugsJson(content.tagSlugs ?? null),
         input.now,
         input.now,
         input.listingId,
@@ -126,8 +129,8 @@ export function buildReplaceRevisionContentPlans(input: {
   return [
     {
       sql: `UPDATE listing_revisions
-        SET name=?,description=?,content=?,category_slug=?,logo_url=?,video_url=?,updated_at=?,
-          content_version=content_version+1
+        SET name=?,description=?,content=?,category_slug=?,logo_url=?,video_url=?,tag_slugs=?,
+          updated_at=?,content_version=content_version+1
         WHERE id=? AND author_user_id=? AND status IN (${statusList(revisionTransitions.edit.from)})${
           expected === undefined ? '' : ' AND content_version=?'
         }`,
@@ -138,6 +141,7 @@ export function buildReplaceRevisionContentPlans(input: {
         content.categorySlug,
         content.logoUrl,
         content.videoUrl ?? null,
+        tagSlugsJson(content.tagSlugs ?? null),
         input.now,
         input.revisionId,
         input.authorUserId,

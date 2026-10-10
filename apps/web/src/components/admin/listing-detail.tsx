@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { type ReactNode, useState } from 'react'
 import { toast } from 'sonner'
+import { type TagChoice, TagsCombobox } from '@/components/submit/tags-combobox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -64,9 +65,11 @@ import { RecordHeader } from './record-header'
 import { StatusBadge, type StatusKind } from './status-badge'
 
 /**
- * One listing (#64 screen 12): details, outbound link, owner, badge checks, and activity, with
- * unpublish or republish, transfer and remove owner, and "Allow resubmission" for a URL blocked
- * by a prohibited rejection. Each action posts to `/api/admin/listings/<id>/<action>`.
+ * One listing (#64 screen 12): details, tags (#341), outbound link, owner, badge checks, and
+ * activity, with unpublish or republish, transfer and remove owner, and "Allow resubmission" for
+ * a URL blocked by a prohibited rejection. Each action posts to
+ * `/api/admin/listings/<id>/<action>`. Tags save on their own (`tags`), also while the listing's
+ * submission is in review, since they leave its checksum alone.
  */
 
 interface Category {
@@ -125,9 +128,12 @@ function Timeline({ items }: { items: ListingDetailView['activity'] }) {
 
 export function ListingDetail({
   categories,
+  tags,
   view
 }: {
   categories: Category[]
+  /** The active tags (#341), grouped by hub in the Tags field. */
+  tags: readonly TagChoice[]
   view: ListingDetailView
 }) {
   const router = useRouter()
@@ -148,6 +154,11 @@ export function ListingDetail({
     website: view.website
   })
   const [detailsError, setDetailsError] = useState<string | null>(null)
+  // A retired tag is no longer offered: saving leaves it off (#341).
+  const [tagSlugs, setTagSlugs] = useState<string[]>(
+    view.tags.filter(tag => tag.active).map(tag => tag.slug)
+  )
+  const [tagsError, setTagsError] = useState<string | null>(null)
   const [linkRel, setLinkRel] = useState<LinkRel>(view.linkRel)
   const [note, setNote] = useState('')
   const [transferEmail, setTransferEmail] = useState('')
@@ -318,6 +329,7 @@ export function ListingDetail({
               </span>
             ],
             ['Category', view.categoryName ?? '—'],
+            ['Tags', view.tags.map(tag => tag.name).join(', ') || '—'],
             [
               'Short description',
               <span key="d" className="font-normal">
@@ -456,6 +468,44 @@ export function ListingDetail({
           </Button>
           <FieldDescription>Saves to production and is logged under your name.</FieldDescription>
         </div>
+      </CardFooter>
+    </Card>
+  )
+
+  const tagsCard = readOnly ? null : (
+    <Card>
+      <CardContent>
+        <Field data-invalid={tagsError ? true : undefined}>
+          <FieldLabel htmlFor="listing-tags">Tags</FieldLabel>
+          <TagsCombobox
+            id="listing-tags"
+            choices={tags}
+            disabled={busy}
+            firstCategory={view.categorySlug ?? undefined}
+            invalid={Boolean(tagsError)}
+            value={tagSlugs}
+            onValueChange={next => {
+              setTagSlugs(next)
+              setTagsError(null)
+            }}
+          />
+          {tagsError ? <FieldError>{tagsError}</FieldError> : null}
+        </Field>
+      </CardContent>
+      <CardFooter className="border-t pt-6">
+        <Button
+          disabled={busy}
+          onClick={() =>
+            void send(
+              'tags',
+              { expectedTags: view.tags.map(tag => tag.slug), tags: tagSlugs },
+              'Saved.',
+              message => setTagsError(message || null)
+            )
+          }
+        >
+          Save tags
+        </Button>
       </CardFooter>
     </Card>
   )
@@ -629,7 +679,10 @@ export function ListingDetail({
       {head}
       {notice}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0">{detailsCard}</div>
+        <div className="flex min-w-0 flex-col gap-6">
+          {detailsCard}
+          {tagsCard}
+        </div>
         <div className="flex flex-col gap-4">{side}</div>
       </div>
 

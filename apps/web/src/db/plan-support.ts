@@ -1,3 +1,5 @@
+import { MAX_SUGGESTED_TAGS } from './schema'
+
 /**
  * Credential-free statement plans (serpcompany/best.serp.co#62). A plan is an ordered list of
  * prepared statements that a caller sends as one D1 batch (one transaction). Every transition
@@ -375,7 +377,90 @@ export interface StagedListingContent {
   logoUrl: string
   name: string
   resourceLinks: Array<{ label: string; url: string }>
+  /**
+   * The Creator's suggested tags (#341), stored as `tag_slugs`: null for "not given" (a
+   * revision then leaves the listing's tags as they are). Omitted, the stored value is kept.
+   */
+  tagSlugs?: readonly string[] | null
   videoUrl?: string | null
+}
+
+/** `tag_slugs` as stored: a JSON array of tag slugs, or null (not given). */
+export function tagSlugsJson(tags: readonly string[] | null): string | null {
+  if (tags === null) return null
+  if (new Set(tags).size !== tags.length || tags.some(tag => !tag.trim())) {
+    throw new Error('Suggested tags are distinct, non-empty slugs.')
+  }
+  if (tags.length > MAX_SUGGESTED_TAGS) {
+    throw new Error(`A Creator suggests at most ${MAX_SUGGESTED_TAGS} tags.`)
+  }
+  return JSON.stringify(tags)
+}
+
+/** A stored `tag_slugs` (a JSON array, or null) as a list, or null. */
+export function parseTagSlugs(value: unknown): string[] | null {
+  if (typeof value !== 'string' || !value) return null
+  const parsed = JSON.parse(value) as unknown
+  return Array.isArray(parsed) ? parsed.map(slug => String(slug)) : null
+}
+
+/**
+ * The stale-slug resolver (#341, design 4.4): what a staged row's `category_slug` (`slugSql`, a
+ * column reference with no bindings) files its listing under. An active category with that
+ * slug; or else, for a draft, submission, or revision saved before its narrow category retired
+ * and became a tag, the hub of the active tag with that slug (`categoryId`), and that tag
+ * (`tagId`, null when the slug names an active category). Approval, payment, and revision
+ * approval use it, so an in-flight row naming a retired narrow slug still goes live; new saves
+ * still require an active category.
+ */
+export function resolveStagedCategorySql(slugSql: string): { categoryId: string; tagId: string } {
+  const active = `SELECT c.id FROM categories c WHERE c.slug=${slugSql} AND c.is_active=1`
+  const tag = `FROM tags t JOIN categories hub ON hub.id=t.category_id AND hub.is_active=1
+    WHERE t.slug=${slugSql} AND t.is_active=1`
+  return {
+    categoryId: `COALESCE((${active}),(SELECT t.category_id ${tag}))`,
+    tagId: `(SELECT t.id ${tag} AND NOT EXISTS (${active}))`
+  }
+}
+
+/**
+ * A staged row's tags on its listing (#341, design 4.4): the tag the stale-slug resolver found
+ * first, then the row's `tag_slugs` in order, each joined to an active tag, so a retired or
+ * unknown one is dropped. When `tag_slugs` is set, the listing's tags are replaced; when it is
+ * null (not given), they stay, and only a resolver tag the listing lacks is added. Inserts are
+ * plain `INSERT … SELECT … WHERE NOT EXISTS`, never an upsert, whose attempted insert would fire
+ * `listing_tags_refuse_retired_tag` on a retired tag the listing keeps (docs/data-model.md).
+ */
+export function stagedTagsPlans(input: {
+  listingId: string
+  stagedId: string
+  stagedTable: 'listing_revisions' | 'listing_submissions'
+}): StatementPlan[] {
+  const { listingId, stagedId, stagedTable } = input
+  const resolved = resolveStagedCategorySql('staged.category_slug')
+  return [
+    {
+      sql: `DELETE FROM listing_tags WHERE listing_id=?
+        AND EXISTS (SELECT 1 FROM ${stagedTable} WHERE id=? AND tag_slugs IS NOT NULL)`,
+      params: [listingId, stagedId]
+    },
+    {
+      sql: `INSERT INTO listing_tags (listing_id,tag_id,sort_order)
+        SELECT ?,picked.tag_id,picked.sort_order FROM (
+          SELECT tag_id,MIN(position)+1 AS sort_order FROM (
+            SELECT ${resolved.tagId} AS tag_id,-1 AS position FROM ${stagedTable} staged
+              WHERE staged.id=?
+            UNION ALL
+            SELECT t.id,j.key FROM ${stagedTable} staged, json_each(staged.tag_slugs) j
+              JOIN tags t ON t.slug=j.value AND t.is_active=1
+              WHERE staged.id=? AND staged.tag_slugs IS NOT NULL
+          ) WHERE tag_id IS NOT NULL GROUP BY tag_id
+        ) picked
+        WHERE NOT EXISTS (SELECT 1 FROM listing_tags x
+          WHERE x.listing_id=? AND x.tag_id=picked.tag_id)`,
+      params: [listingId, stagedId, stagedId, listingId]
+    }
+  ]
 }
 
 export interface StagedContentSource {
@@ -460,7 +545,9 @@ export function replaceStagedChildrenPlans(
  * first so the primary-category triggers allow its memberships to change, then published again
  * (the triggers re-check exactly one primary category). Website, slug, publication time,
  * featured state, images, and secondary categories are kept; the primary category, name,
- * description, content, logo, video, resource links, and FAQs are replaced.
+ * description, content, logo, video, resource links, and FAQs are replaced, and the tags when
+ * the staged row gives them (`stagedTagsPlans`). The primary category goes through the stale-slug
+ * resolver (`resolveStagedCategorySql`).
  */
 export function applyStagedContentPlans(input: {
   checksum: string
@@ -471,8 +558,9 @@ export function applyStagedContentPlans(input: {
   source: StagedContentSource
 }): StatementPlan[] {
   const { listingId, source } = input
-  const stagedCategory = `(SELECT c.id FROM ${source.table} staged
-    JOIN categories c ON c.slug=staged.category_slug AND c.is_active=1 WHERE staged.id=?)`
+  const resolved = resolveStagedCategorySql('staged.category_slug')
+  const stagedCategory = `(SELECT ${resolved.categoryId} FROM ${source.table} staged
+    WHERE staged.id=?)`
   return [
     {
       sql: `UPDATE listings SET status='draft'
@@ -495,13 +583,13 @@ export function applyStagedContentPlans(input: {
     },
     {
       sql: `INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
-        SELECT ?,c.id,0,1 FROM ${source.table} staged
-        JOIN categories c ON c.slug=staged.category_slug AND c.is_active=1
-        WHERE staged.id=?
+        SELECT ?,${resolved.categoryId},0,1 FROM ${source.table} staged
+        WHERE staged.id=? AND ${resolved.categoryId} IS NOT NULL
         ON CONFLICT(listing_id,category_id) DO UPDATE SET is_primary=1,sort_order=0`,
       params: [listingId, source.id]
     },
     assertPreviousStatementChangedOne('primary_category_replaced'),
+    ...stagedTagsPlans({ listingId, stagedId: source.id, stagedTable: source.table }),
     { sql: `DELETE FROM listing_media WHERE listing_id=? AND kind='video'`, params: [listingId] },
     // Never a hotlink (#95), and only the reviewed logo (#96 round 3).
     ...adoptStagedLogoPlans({

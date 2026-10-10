@@ -1,6 +1,7 @@
 'use client'
 
 import { ImageIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { ProductLogo } from '@/components/submit/submit-ui'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -62,6 +63,7 @@ export function ContentFields({
   nameNote,
   onChange,
   original,
+  tags,
   tallContent = false,
   value,
   website
@@ -74,6 +76,8 @@ export function ContentFields({
   onChange: (value: ContentValue) => void
   /** The saved values, to tag a changed short description "Edited". */
   original: ContentValue
+  /** The Tags field (#341), under the name and category, when the form has one. */
+  tags?: ReactNode
   tallContent?: boolean
   value: ContentValue
   /** Shown read-only with a note, when given. */
@@ -128,6 +132,7 @@ export function ContentFields({
           {errors.categorySlug ? <FieldError>{errors.categorySlug}</FieldError> : null}
         </Field>
       </div>
+      {tags}
       {website ? (
         <Field>
           <FieldLabel htmlFor={id('website')}>Website URL</FieldLabel>

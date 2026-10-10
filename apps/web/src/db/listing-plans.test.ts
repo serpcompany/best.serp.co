@@ -5,6 +5,7 @@ import {
   buildRepublishListingPlans,
   buildRevokeListingOwnerPlans,
   buildSetListingLinkRelPlans,
+  buildSetListingTagsPlans,
   buildTransferListingOwnerPlans,
   buildUnpublishListingPlans,
   buildUpdateListingDetailsPlans,
@@ -17,12 +18,14 @@ import { prepareCatalogPublication } from './plan-support'
 import {
   count,
   execute,
+  listingTags,
   NOW,
   planDatabase,
   publication,
   publicationState,
   query,
-  seedLiveListing
+  seedLiveListing,
+  seedTags
 } from './plan-test-support'
 
 const listingId = 'lst_live'
@@ -900,5 +903,108 @@ describe('listing activity log and admin edits (#64)', () => {
         publication: publication('listing-edit')
       })
     ).toThrow(/public HTTP\(S\)/u)
+  })
+})
+
+describe("an admin's tag edit (#341, design 4.3)", () => {
+  function tagged(): DatabaseSync {
+    const db = database()
+    seedTags(db)
+    return db
+  }
+
+  function setTags(
+    tags: readonly string[],
+    expectedTags: readonly string[],
+    version = 1,
+    db?: DatabaseSync
+  ) {
+    return buildSetListingTagsPlans({
+      expectedTags,
+      listingId,
+      publication: publication('listing-tags', {
+        checksum: db ? publicationState(db).checksum : undefined,
+        version
+      }),
+      tags
+    })
+  }
+
+  it('replaces the tags in order, logs them, and publishes without touching the checksum', () => {
+    const db = tagged()
+    const before = listing(db)
+    execute(db, setTags(['whiteboards', 'note-taking'], []))
+    expect(listingTags(db, listingId)).toEqual(['whiteboards', 'note-taking'])
+    expect(listing(db)).toMatchObject({ checksum: before.checksum, updated_at: NOW })
+    expectPublished(db, 2)
+    expect(
+      db.prepare("SELECT detail,actor FROM listing_events WHERE event_type='edited'").all()
+    ).toEqual([
+      {
+        actor: 'reviewer',
+        detail: JSON.stringify({
+          fields: ['tags'],
+          from: [],
+          to: ['whiteboards', 'note-taking']
+        })
+      }
+    ])
+    // The next edit compares against the tags as they are now, in that order.
+    expectRefused(db, setTags(['note-taking'], ['note-taking', 'whiteboards'], 2, db))
+    execute(db, setTags(['note-taking'], ['whiteboards', 'note-taking'], 2, db))
+    expect(listingTags(db, listingId)).toEqual(['note-taking'])
+    execute(db, setTags([], ['note-taking'], 3, db))
+    expect(listingTags(db, listingId)).toEqual([])
+    expectPublished(db, 4)
+  })
+
+  it('refuses a retired or unknown tag, and stale tags, leaving the tags as they were', () => {
+    const db = tagged()
+    execute(db, setTags(['whiteboards'], []))
+    const expected = ['whiteboards']
+    for (const tags of [['retired-tag'], ['no-such-tag'], ['note-taking', 'retired-tag']]) {
+      expectRefused(db, setTags(tags, expected, 2, db))
+      expect(listingTags(db, listingId)).toEqual(expected)
+    }
+    expectRefused(db, setTags(['note-taking'], [], 2, db))
+    expect(() => setTags(['note-taking', 'note-taking'], expected)).toThrow(/distinct/u)
+  })
+
+  it('keeps a retired tag in the comparison, and the edit can drop it', () => {
+    const db = tagged()
+    db.exec(`INSERT INTO listing_tags (listing_id,tag_id,sort_order)
+      SELECT '${listingId}',id,0 FROM tags WHERE slug='note-taking'`)
+    db.exec("UPDATE tags SET is_active=0 WHERE slug='note-taking'")
+    expectRefused(db, setTags(['whiteboards'], []))
+    execute(db, setTags(['whiteboards'], ['note-taking']))
+    expect(listingTags(db, listingId)).toEqual(['whiteboards'])
+  })
+
+  it("is allowed while the listing's submission is in review, unlike a details edit", () => {
+    const db = tagged()
+    db.prepare(
+      `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+        logo_url,status,plan,paid_at,listing_id,published_checksum)
+      VALUES ('sub','lst_live.example','Live','d','https://lst_live.example/','c','tools','l',
+        'paid_pending_review','paid',?,'lst_live','checksum-lst_live')`
+    ).run(NOW)
+    execute(db, setTags(['note-taking'], []))
+    expect(listingTags(db, listingId)).toEqual(['note-taking'])
+    // The checksum stays, so the paid submission's approval still matches what it published.
+    expect(listing(db).checksum).toBe('checksum-lst_live')
+  })
+
+  it('refuses a listing whose submission was rejected, or one that is not approved', () => {
+    const db = tagged()
+    db.prepare(
+      `INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+        logo_url,status,plan,listing_id,rejection_reason,rejection_category)
+      VALUES ('sub','lst_live.example','Live','d','https://lst_live.example/','c','tools','l',
+        'rejected','free','lst_live','Spam','other')`
+    ).run()
+    expectRefused(db, setTags(['note-taking'], []))
+    db.exec("DELETE FROM listing_submissions WHERE id='sub'")
+    db.exec(`UPDATE listings SET status='draft' WHERE id='${listingId}'`)
+    expectRefused(db, setTags(['note-taking'], []))
   })
 })

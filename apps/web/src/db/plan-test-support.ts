@@ -20,6 +20,48 @@ export function planDatabase(): DatabaseSync {
   return db
 }
 
+/**
+ * The taxonomy fixture (#341): active tags under the two hubs, a retired tag, and the retired
+ * narrow category `chatbots`, whose slug an active tag under Apps took over (the stale-slug
+ * resolver's case).
+ */
+export function seedTags(db: DatabaseSync): void {
+  db.exec(`
+    INSERT INTO categories (slug, name, description, sort_order, is_active)
+      VALUES ('chatbots', 'Chatbots', 'Chatbots', 2, 1);
+    INSERT INTO tags (slug, name, category_id, sort_order, is_active) VALUES
+      ('note-taking', 'Note Taking', (SELECT id FROM categories WHERE slug = 'tools'), 0, 1),
+      ('whiteboards', 'Whiteboards', (SELECT id FROM categories WHERE slug = 'apps'), 0, 1),
+      ('chatbots', 'Chatbots', (SELECT id FROM categories WHERE slug = 'apps'), 1, 1),
+      ('retired-tag', 'Retired', (SELECT id FROM categories WHERE slug = 'tools'), 2, 0);
+    UPDATE categories SET is_active = 0 WHERE slug = 'chatbots';
+  `)
+}
+
+/** A listing's tags in order (`sort_order`, then slug). */
+export function listingTags(db: DatabaseSync, listingId: string): string[] {
+  return (
+    db
+      .prepare(
+        `SELECT t.slug FROM listing_tags lt JOIN tags t ON t.id = lt.tag_id
+        WHERE lt.listing_id = ? ORDER BY lt.sort_order, t.slug`
+      )
+      .all(listingId) as Array<{ slug: string }>
+  ).map(row => row.slug)
+}
+
+/** A listing's primary category slug. */
+export function primaryCategory(db: DatabaseSync, listingId: string): string | undefined {
+  return (
+    db
+      .prepare(
+        `SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
+        WHERE lc.listing_id = ? AND lc.is_primary = 1`
+      )
+      .get(listingId) as { slug: string } | undefined
+  )?.slug
+}
+
 export function categoryId(db: DatabaseSync, slug: string): number {
   const row = db.prepare('SELECT id FROM categories WHERE slug = ?').get(slug) as { id: number }
   return row.id

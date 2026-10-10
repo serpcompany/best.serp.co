@@ -13,9 +13,12 @@ import {
   listingIsLiveGuard,
   type PlanGuard,
   replaceStagedChildrenPlans,
+  resolveStagedCategorySql,
   type StagedListingContent,
   type StatementPlan,
-  submissionContentSource
+  stagedTagsPlans,
+  submissionContentSource,
+  tagSlugsJson
 } from './plan-support'
 import {
   type ListingLinkRel,
@@ -148,6 +151,8 @@ export function selectSubmissionForDecisionPlan(submissionId: string): Statement
  * `submission` and the outbound link `nofollow` (#59), and the submitter, when signed in,
  * becomes the listing's owner (`verified_via = 'submission'`). `sourceCondition` is the
  * caller's compare-and-swap on the submission (unqualified columns); the first insert asserts it.
+ * The primary category goes through the stale-slug resolver, and the listing gets the
+ * submission's active suggested tags (`stagedTagsPlans`, #341), on approval and at payment alike.
  */
 function createListingFromSubmissionPlans(input: {
   checksum: string
@@ -168,6 +173,7 @@ function createListingFromSubmissionPlans(input: {
   if (!(listingLinkRels as readonly string[]).includes(input.linkRel)) {
     throw new Error('Link rel must be follow, nofollow, or sponsored.')
   }
+  const category = resolveStagedCategorySql('staged.category_slug')
   return [
     {
       sql: `INSERT INTO listings
@@ -186,14 +192,15 @@ function createListingFromSubmissionPlans(input: {
       ]
     },
     assertPreviousStatementChangedOne('draft_listing_created'),
+    // An in-flight row naming a retired narrow slug goes live under its tag's hub (#341).
     {
       sql: `INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
-        SELECT ?,c.id,0,1 FROM listing_submissions s JOIN categories c
-          ON c.slug=s.category_slug AND c.is_active=1
-        WHERE s.id=?`,
+        SELECT ?,${category.categoryId},0,1 FROM listing_submissions staged
+        WHERE staged.id=? AND ${category.categoryId} IS NOT NULL`,
       params: [listingId, submissionId]
     },
     assertPreviousStatementChangedOne('primary_category_created'),
+    ...stagedTagsPlans({ listingId, stagedId: submissionId, stagedTable: 'listing_submissions' }),
     // Never a hotlink (#95): the submission's hosted logo is queued for a copy into the
     // listing's path (or its source for the cron), and its featured image only as reviewed.
     ...adoptStagedLogoPlans({
@@ -926,10 +933,13 @@ export function buildReplaceSubmissionContentPlans(input: {
   }
   const owner = input.ownerUserId === undefined ? '' : ' AND owner_user_id=?'
   const version = input.expectedContentVersion === undefined ? '' : ' AND content_version=?'
+  // Tags the content leaves out (undefined) stay as stored (#341).
+  const tags = input.content.tagSlugs === undefined ? null : tagSlugsJson(input.content.tagSlugs)
   return [
     {
       sql: `UPDATE listing_submissions
         SET name=?,description=?,content=?,category_slug=?,logo_url=?,video_url=?,updated_at=?,
+          ${input.content.tagSlugs === undefined ? '' : 'tag_slugs=?,'}
           content_version=content_version+1
         WHERE id=? AND status IN (${statusList(input.expectedStatuses)})${owner}${version}`,
       params: [
@@ -940,6 +950,7 @@ export function buildReplaceSubmissionContentPlans(input: {
         input.content.logoUrl,
         input.content.videoUrl ?? null,
         input.now,
+        ...(input.content.tagSlugs === undefined ? [] : [tags]),
         input.submissionId,
         ...(input.ownerUserId === undefined ? [] : [input.ownerUserId]),
         ...(input.expectedContentVersion === undefined
