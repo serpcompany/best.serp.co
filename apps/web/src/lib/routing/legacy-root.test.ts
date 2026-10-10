@@ -141,7 +141,7 @@ describe('legacy root-level URLs (#168)', () => {
     expect(lookup).not.toHaveBeenCalled()
   })
 
-  it('sends a moved category URL to its target, without the query (#341)', async () => {
+  it('sends a moved category URL to its target, dropping only `page` from the query (#341)', async () => {
     const targets = {
       'old-best': { kind: 'best', slug: 'ai-chatbot' },
       'old-directory': { kind: 'directory', slug: null },
@@ -160,6 +160,16 @@ describe('legacy root-level URLs (#168)', () => {
     expect(await location('/old-directory/')).toBe('/products/')
     expect(await location('/old-hub?page=2')).toBe('/products/categories/writing/')
     expect(await location('/old-tag')).toBe('/products/tags/ai-avatar/')
+    // Every other parameter survives, exactly as sent (#362 review).
+    expect(await location('/old-hub?page=2&utm_source=news')).toBe(
+      '/products/categories/writing/?utm_source=news'
+    )
+    expect(await location('/old-tag/?utm_source=news&page=4&utm_campaign=a%26b')).toBe(
+      '/products/tags/ai-avatar/?utm_source=news&utm_campaign=a%26b'
+    )
+    expect(await location('/old-best?pa%67e=2&pages=3&utm_source=x')).toBe(
+      '/best/ai-chatbot/?pages=3&utm_source=x'
+    )
     expect(taxonomyTargetRoute({ kind: 'tag', slug: 'ai-avatar' })).toBe(
       '/products/tags/ai-avatar/'
     )
@@ -216,11 +226,11 @@ describe('root-level URLs on the Worker path, against D1 (#356)', () => {
   it('answers a retired category URL with one 308 to its target (#341)', async () => {
     const { lookup } = workerLookup()
     const response = await legacyRootRedirect(
-      new Request('https://best.serp.co/old-best/?page=2'),
+      new Request('https://best.serp.co/old-best/?page=2&utm_source=news'),
       slugFor,
       lookup
     )
     expect(response?.status).toBe(308)
-    expect(response?.headers.get('location')).toBe('/best/best-writers/')
+    expect(response?.headers.get('location')).toBe('/best/best-writers/?utm_source=news')
   })
 })

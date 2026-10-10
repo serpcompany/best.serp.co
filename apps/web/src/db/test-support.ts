@@ -282,8 +282,8 @@ export function seedContractFixture(sqlite: SqliteD1): void {
  *   excluded), `best-primary` (the category; bravo excluded), `best-editors-in-secondary` (the tag
  *   within the category; bravo, outside the category, pinned), `best-idle` (the empty category),
  *   and `best-retired-tag` and `best-inactive`, which are not public;
- * - redirects from old URLs to each kind of target, a retired one, and one from an active
- *   category.
+ * - redirects from old URLs to each kind of target, a retired one, one to a best page whose tag
+ *   is retired, and one from an active category.
  *
  * Only bravo has a hosted logo, and every `updated_at` is fixed (bravo's last, in D1's
  * `CURRENT_TIMESTAMP` format), so the order and the dates are deterministic.
@@ -362,6 +362,7 @@ export function seedTaxonomyFixture(sqlite: SqliteD1): void {
         UNION ALL SELECT 'category', 'old-best', 'best', 'best-writers'
         UNION ALL SELECT 'category', 'old-other', 'directory', NULL
         UNION ALL SELECT 'category', 'old-retired-tag', 'tag', 'retired-tag'
+        UNION ALL SELECT 'category', 'old-best-retired-tag', 'best', 'best-retired-tag'
         UNION ALL SELECT 'category', 'primary', 'category', 'secondary'
         UNION ALL SELECT 'tag', 'old-writers', 'tag', 'writers'
         UNION ALL SELECT 'best', 'old-best-writers', 'best', 'best-writers'

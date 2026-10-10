@@ -95,6 +95,12 @@ async function sha256Hex(value: string): Promise<string> {
  */
 const RELATED_MEMBER_SCAN_LIMIT = 128
 /**
+ * How many of a tagged listing's active tags score its related listings: the most central
+ * (`listing_tags.sort_order`, then slug, the order its page lists them in), so the statement reads
+ * the members of at most this many tags however many the listing has (#362 review).
+ */
+const RELATED_SCORED_TAGS = 3
+/**
  * `strftime` with this format reads both D1 time formats and writes the ISO instant `toInstant`
  * writes, so `MAX()` over it orders a column whose rows mix the two.
  */
@@ -763,6 +769,123 @@ function nameOrderScopeKey(scope: NameOrderScope): string {
   return `${scope.kind === 'category' ? 'c' : 't'}:${scope.slug}`
 }
 
+/**
+ * The candidates of a tagged listing's related listings (#341 design 3.2, #362 review), in one
+ * statement:
+ *
+ * - `tagged`: the listings sharing its `RELATED_SCORED_TAGS` most central active tags, scored by
+ *   how many they share, ties broken on a keyset from its own name and slug (the names after it
+ *   first, then from the start), at most four.
+ * - When `tagged` has fewer than four, its hub (primary category) fills the rest with score 0 and
+ *   the same keyset: through the hub's members when the hub has at most
+ *   `RELATED_MEMBER_SCAN_LIMIT` memberships, else by walking the public name index from its own
+ *   name and then from the start, as an untagged listing in one category does. `fill.plan` picks
+ *   the branch, and the others' `LIMIT` is 0, which SQLite checks before reading a row; no branch
+ *   reads anything once `tagged` has four. Each returns at most four rows, which always covers
+ *   the gap: at most as many of them repeat `tagged` as `tagged` has, which leaves at least as
+ *   many new ones as it lacks.
+ */
+function relatedByTags(
+  row: { id: string; name: string; slug: string },
+  asOf: string
+): { bindings: unknown[]; candidates: string } {
+  const columns = 'l.id, l.slug, l.name, l.description, l.website, l.is_unofficial, 0 AS score'
+  const limit = (plan: 'members' | 'walk') =>
+    `CASE WHEN (SELECT plan FROM fill) = '${plan}' THEN 4 ELSE 0 END`
+  const walk = (comparison: '<' | '>', wrap: 0 | 1) => `SELECT * FROM (
+         SELECT ${columns}, ${wrap} AS wrap
+         FROM listings l INDEXED BY listings_related_name_idx
+         WHERE ${publicEligibilitySql()}
+           AND (l.name, l.slug) ${comparison} (?, ?)
+           AND EXISTS (
+             SELECT 1 FROM listing_categories member
+             WHERE member.listing_id = l.id AND member.category_id = (SELECT id FROM fill)
+           )
+         ORDER BY l.name ASC, l.slug ASC
+         LIMIT ${limit('walk')}
+       )`
+  return {
+    bindings: [
+      row.id,
+      row.name,
+      row.slug,
+      row.id,
+      asOf,
+      row.id,
+      row.name,
+      row.slug,
+      asOf,
+      row.id,
+      asOf,
+      row.name,
+      row.slug,
+      asOf,
+      row.name,
+      row.slug
+    ],
+    candidates: `WITH current_tags AS (
+         SELECT lt.tag_id
+         FROM listing_tags lt
+         CROSS JOIN tags t ON t.id = lt.tag_id
+         WHERE lt.listing_id = ? AND t.is_active = 1
+         ORDER BY lt.sort_order ASC, t.slug ASC
+         LIMIT ${RELATED_SCORED_TAGS}
+       ),
+       tagged AS (
+         SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
+           COUNT(*) AS score,
+           CASE WHEN (l.name, l.slug) > (?, ?) THEN 0 ELSE 1 END AS wrap
+         FROM current_tags current
+         CROSS JOIN listing_tags shared INDEXED BY listing_tags_tag_idx
+           ON shared.tag_id = current.tag_id
+         CROSS JOIN listings l ON l.id = shared.listing_id
+         WHERE shared.listing_id != ? AND ${publicEligibilitySql()}
+         GROUP BY l.id
+         ORDER BY score DESC, wrap ASC, l.name ASC, l.slug ASC
+         LIMIT 4
+       ),
+       fill AS (
+         SELECT hub.category_id AS id,
+           CASE
+             WHEN (SELECT COUNT(*) FROM tagged) >= 4 THEN 'none'
+             WHEN NOT EXISTS (
+               SELECT 1 FROM listing_categories sized INDEXED BY listing_categories_category_idx
+               WHERE sized.category_id = hub.category_id
+               LIMIT 1 OFFSET ${RELATED_MEMBER_SCAN_LIMIT}
+             ) THEN 'members'
+             ELSE 'walk'
+           END AS plan
+         FROM listing_categories hub
+         WHERE hub.listing_id = ? AND hub.is_primary = 1
+         LIMIT 1
+       )
+       SELECT id, slug, name, description, website, is_unofficial,
+         MAX(score) AS score, MIN(wrap) AS wrap
+       FROM (
+         SELECT * FROM tagged
+         UNION ALL
+         SELECT * FROM (
+           SELECT ${columns},
+             CASE WHEN (l.name, l.slug) > (?, ?) THEN 0 ELSE 1 END AS wrap
+           FROM listing_categories member INDEXED BY listing_categories_category_idx
+           CROSS JOIN listings l ON l.id = member.listing_id
+           WHERE member.category_id = (SELECT id FROM fill)
+             AND ${publicEligibilitySql()}
+             AND l.id != ?
+           ORDER BY wrap ASC, l.name ASC, l.slug ASC
+           LIMIT ${limit('members')}
+         )
+         UNION ALL
+         ${walk('>', 0)}
+         UNION ALL
+         ${walk('<', 1)}
+       )
+       GROUP BY id
+       ORDER BY score DESC, wrap ASC, name ASC, slug ASC
+       LIMIT 4`
+  }
+}
+
 export function createCatalogOperations(config: CatalogOperationsConfig): CatalogOperations {
   const { cache, client, clock, observe } = config
   let epochPromise: Promise<CatalogEpoch> | undefined
@@ -1177,10 +1300,12 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
    * returned rows.
    *
    * - Tags (#341, design 3.2): ranked by shared active tags (most first), counted from the
-   *   listing's own tags (bounded by the size of those tags). Ties break on a keyset from the
-   *   listing's own name and slug: the listings after it in name order first, wrapping round to
-   *   the start, so listings that share the same tags link onward to different neighbours instead
-   *   of all linking to the first names (#331).
+   *   listing's three most central tags (`RELATED_SCORED_TAGS`, bounded by the size of those
+   *   tags). Ties break on a keyset from the listing's own name and slug: the listings after it in
+   *   name order first, wrapping round to the start, so listings that share the same tags link
+   *   onward to different neighbours instead of all linking to the first names (#331). When the
+   *   tags yield fewer than four, the rest come from its hub in the same statement, with the same
+   *   keyset (`relatedByTags`).
    * - No tags: ranked by shared categories (most first), then name and slug.
    *   - Several categories: count shared memberships from the listing's own categories
    *     (bounded by the size of those categories).
@@ -1202,22 +1327,9 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     if (tags.length > 0) {
       queryShape = 'related-shared-tags'
       tieBreak = 'related.wrap ASC, '
-      candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
-             COUNT(*) AS score,
-             CASE WHEN l.name > ? OR (l.name = ? AND l.slug > ?) THEN 0 ELSE 1 END AS wrap
-           FROM listing_tags current
-           CROSS JOIN tags t ON t.id = current.tag_id
-           CROSS JOIN listing_tags shared INDEXED BY listing_tags_tag_idx
-             ON shared.tag_id = current.tag_id
-           CROSS JOIN listings l ON l.id = shared.listing_id
-           WHERE current.listing_id = ?
-             AND t.is_active = 1
-             AND shared.listing_id != current.listing_id
-             AND ${publicEligibilitySql()}
-           GROUP BY l.id
-           ORDER BY score DESC, wrap ASC, l.name ASC, l.slug ASC
-           LIMIT 4`
-      bindings = [row.name, row.name, row.slug, row.id, asOf]
+      const statement = relatedByTags(row, asOf)
+      candidates = statement.candidates
+      bindings = statement.bindings
     } else if (sharedCategoryCount > 1) {
       queryShape = 'related-shared-categories'
       candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
@@ -1961,7 +2073,10 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
    * LIKE/GLOB pattern for D1's 50-byte limit. The category and tag matches are uncorrelated `IN`
    * subqueries, which SQLite builds once per statement from the matching categories' and tags'
    * members instead of looking up each listing's memberships, so a typical search stays near one
-   * read per listing. Results are cached per epoch.
+   * read per listing. A term that nearly every category and tag contains builds a set of nearly
+   * every membership, so the widest searches (several such one-character terms) cost up to one
+   * pass over the memberships per term (`BROAD_SEARCH_ROWS_READ_BUDGET` in
+   * `scripts/d1-workerd-queries.test.ts`, #362 review). Results are cached per epoch.
    */
   async function searchListings(query: string, limit = 50): Promise<ListingSummary[]> {
     const { phrase, terms } = normalizeSearchQuery(query)

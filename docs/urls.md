@@ -47,7 +47,9 @@ one of these extensions (`chart.js`), and a test checks the committed import.
   write a canonical destination (`getRoute`). The root-level lookup answers in one hop: a live
   listing, an active category, a retired listing slug followed through `listing_slug_redirects`
   to its listing's current URL (#356), or a retired category URL followed through
-  `taxonomy_redirects` to its target, without the query string (#341).
+  `taxonomy_redirects` to its target (#341). A moved taxonomy URL keeps its query string except
+  `page`, which would not match the target's pagination (`withoutPageQuery`), so a campaign's
+  `utm_source` survives the redirect; the listing and category redirects keep the whole query.
 - **Fail closed.** The Worker validates the manifest at startup and refuses to start if its shape
   is unexpected (no `redirects` array or route list, a rule without a string `regex`, a pattern
   that does not compile or matches every path), so a framework upgrade cannot silently turn off

@@ -152,13 +152,22 @@ export async function isUnpublishedListingSlug(input: {
 
 /**
  * The current slug of a `taxonomy_redirects` row `r`'s target (#341, design 2.2), or NULL when
- * the target is retired. Its target is a foreign key, so a rename keeps the redirect current. Each
- * join is a primary-key seek, and only the row's own target kind matches one.
+ * the target is not public: retired, or a best page whose tag or category is retired (the best
+ * index leaves that page out, so it answers 404). Its target is a foreign key, so a rename keeps
+ * the redirect current. Each join is a primary-key seek, and only the row's own target kind
+ * matches one.
  */
 export const TAXONOMY_TARGET_JOINS = `LEFT JOIN categories target_c
     ON target_c.id = r.target_category_id AND target_c.is_active = 1
   LEFT JOIN tags target_t ON target_t.id = r.target_tag_id AND target_t.is_active = 1
-  LEFT JOIN best_pages target_b ON target_b.id = r.target_best_page_id AND target_b.is_active = 1`
+  LEFT JOIN best_pages target_b ON target_b.id = r.target_best_page_id AND target_b.is_active = 1
+    AND (target_b.tag_id IS NULL OR EXISTS (
+      SELECT 1 FROM tags target_bt WHERE target_bt.id = target_b.tag_id AND target_bt.is_active = 1
+    ))
+    AND (target_b.category_id IS NULL OR EXISTS (
+      SELECT 1 FROM categories target_bc
+      WHERE target_bc.id = target_b.category_id AND target_bc.is_active = 1
+    ))`
 export const TAXONOMY_TARGET_SLUG = 'COALESCE(target_c.slug, target_t.slug, target_b.slug)'
 
 /** A `taxonomy_redirects` target read with `TAXONOMY_TARGET_SLUG`, or null when it is retired. */

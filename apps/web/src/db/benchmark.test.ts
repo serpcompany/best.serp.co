@@ -96,6 +96,8 @@ function totalRows(evidence: ScanEvidence[]): number | null {
 
 /** Benchmark listings from this index on carry tags (#345); the ones before have none. */
 const FIRST_TAGGED = 200
+/** The one listing before them with a tag, which no other listing has. */
+const SOLO_TAGGED = 120
 
 function addBenchmarkRows(sqlite: SqliteD1): void {
   const { database } = sqlite
@@ -110,6 +112,8 @@ function addBenchmarkRows(sqlite: SqliteD1): void {
   const thirdTagged = Number(
     (insertTag.get('bench-third', 'Third', secondary) as { id: number }).id
   )
+  // A tag only bench-120 has: its related listings all come from its hub (#362 review).
+  const soloTagged = Number((insertTag.get('bench-solo', 'Solo', primary) as { id: number }).id)
   const insertMembership = database.prepare(
     'INSERT INTO listing_tags(listing_id, tag_id, sort_order) VALUES (?, ?, ?)'
   )
@@ -150,6 +154,7 @@ function addBenchmarkRows(sqlite: SqliteD1): void {
         )
         .run(id, `Question ${faq}`, `Answer ${faq}`, faq)
     }
+    if (index === SOLO_TAGGED) insertMembership.run(id, soloTagged, 0)
     if (index >= FIRST_TAGGED) {
       insertMembership.run(id, everyTagged, 0)
       if (index % 3 === 0) insertMembership.run(id, thirdTagged, 1)
@@ -322,6 +327,15 @@ describe('representative D1 query benchmark', () => {
       ).total
     )
     const wrapped = await catalog.getListingBySlug('bench-313')
+    // A tag no other listing has: the hub (`primary`, over 128 members) fills all four by walking
+    // the public name index from bench-120's own name, in the same statement.
+    const soloStart = sqlite.statements.length
+    const solo = await operations().getListingBySlug('bench-120')
+    const soloStatements = sqlite.statements.slice(soloStart)
+    const soloRelated = soloStatements.find(statement => statement.sql.includes('related.wrap'))
+    if (!soloRelated) throw new Error('Missing hub-fill benchmark statement.')
+    const soloEvidence = scanStatements([soloRelated])
+    const soloRows = totalRows(soloEvidence)
 
     const report = {
       fixture: {
@@ -355,6 +369,8 @@ describe('representative D1 query benchmark', () => {
               .filter(line => !line.includes('loops='))
           )
         ],
+        hubFillScanRows: soloRows,
+        hubFillStatementCount: soloStatements.length,
         optimizedScanRows: taggedRows,
         sharedMemberships: sharedTagMemberships,
         statementCount: taggedStatements.length
@@ -394,6 +410,15 @@ describe('representative D1 query benchmark', () => {
     expect(taggedEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
       'listing_tags_tag_idx'
     )
+    expect(solo?.relatedWebsites.map(related => related.slug)).toEqual([
+      'bench-121',
+      'bench-122',
+      'bench-123',
+      'bench-124'
+    ])
+    expect(soloEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
+      'listings_related_name_idx'
+    )
     if (scanStatsAvailable) {
       expect(legacyAdjacent.rows).not.toBeNull()
       expect(optimizedAdjacentRows).not.toBeNull()
@@ -401,6 +426,9 @@ describe('representative D1 query benchmark', () => {
       expect(optimizedAdjacentRows as number).toBeLessThanOrEqual(100)
       expect(optimizedRelatedRows as number).toBeLessThanOrEqual(2 * sharedMemberships + 50)
       expect(taggedRows as number).toBeLessThanOrEqual(2 * sharedTagMemberships + 50)
+      // The hub-size probe reads at most 129 entries of the category index; the walk is bounded
+      // like the single-category seek above.
+      expect(soloRows as number).toBeLessThanOrEqual(129 + 100)
       expect(singleCategoryRows as number).toBeLessThanOrEqual(100)
       expect(legacyShell.rows as number).toBeGreaterThan(coldShellRows as number)
       expect(warmShellRows as number).toBeLessThanOrEqual(10)
@@ -412,13 +440,15 @@ describe('representative D1 query benchmark', () => {
         optimizedRelatedRows,
         singleCategoryRows,
         taggedRows,
+        soloRows,
         coldShellRows,
         oneColdPlus99WarmAverage
-      ]).toEqual(Array(7).fill(null))
+      ]).toEqual(Array(8).fill(null))
     }
     // Epoch probe, detail row, related listings, previous, next.
     expect(detailStatements.length).toBeLessThanOrEqual(5)
     expect(taggedStatements.length).toBeLessThanOrEqual(5)
+    expect(soloStatements.length).toBeLessThanOrEqual(5)
     expect(events.every(event => event.success)).toBe(true)
   })
 })

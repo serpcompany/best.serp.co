@@ -853,9 +853,9 @@ describe('legacy root-level URLs (#168)', () => {
       kind: 'moved',
       target: { kind: 'directory', slug: null }
     })
-    // Only category sources were root-level URLs, a retired target answers 404, and an active
-    // category with a redirect row still renders.
-    for (const slug of ['old-writers', 'old-retired-tag']) {
+    // Only category sources were root-level URLs, a retired target (or a best page whose tag is
+    // retired) answers 404, and an active category with a redirect row still renders.
+    for (const slug of ['old-writers', 'old-retired-tag', 'old-best-retired-tag']) {
       expect(await target(slug), slug).toBeNull()
     }
     expect(await target('primary')).toEqual({ kind: 'category', slug: 'primary' })

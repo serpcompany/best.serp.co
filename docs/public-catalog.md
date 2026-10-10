@@ -67,10 +67,13 @@ and public listings:
   counted from the tag counts, so the index never reads the largest pools again. A page shows the
   first `min(listSize, poolSize)` entries: pins by position, then tag centrality, listings with a
   hosted logo, then name and slug. Nothing a Creator pays for ranks a listing.
-- **Related listings** of a listing with tags are ranked by shared tags, with ties broken from
-  the listing's own name onward, so listings that share tags link to different neighbours; a
-  listing without tags is ranked by shared categories, as before.
-- **Moved taxonomy URLs** follow `taxonomy_redirects` to the target's current URL.
+- **Related listings** of a listing with tags are ranked by how many of its three most central
+  tags they share, with ties broken from the listing's own name onward, so listings that share
+  tags link to different neighbours. When its tags give fewer than four, its hub fills the rest
+  in the same name order, in the same statement. A listing without tags is ranked by shared
+  categories, as before.
+- **Moved taxonomy URLs** follow `taxonomy_redirects` to the target's current URL, when it is
+  public: a best page whose tag or category is retired is not followed.
 
 Every shape has a rows-read budget on a generated catalog of production's size
 (`ROWS_READ_BUDGET` in `scripts/d1-workerd-queries.test.ts`, #314), so a lost index or a full

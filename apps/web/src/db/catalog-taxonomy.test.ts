@@ -299,8 +299,11 @@ describe('taxonomy reads (#345)', () => {
       kind: 'best',
       slug: 'best-writers'
     })
-    // A retired target, another kind's source, or no row: nothing to follow.
+    // A retired target, a best page whose tag is retired (not in the best index, so a 404),
+    // another kind's source, or no row: nothing to follow.
     expect(await catalog.getTaxonomyRedirect('category', 'old-retired-tag')).toBeNull()
+    expect(await catalog.getBestPageBySlug('best-retired-tag')).toBeNull()
+    expect(await catalog.getTaxonomyRedirect('category', 'old-best-retired-tag')).toBeNull()
     expect(await catalog.getTaxonomyRedirect('tag', 'old-hub')).toBeNull()
     expect(await catalog.getTaxonomyRedirect('category', 'missing')).toBeNull()
   })
@@ -325,10 +328,11 @@ describe('taxonomy reads (#345)', () => {
       'echo'
     ])
     expect(queries(events)).toContain('related-shared-tags')
-    // From echo, every candidate sorts before it, so the order wraps to the start.
+    // From echo, every candidate sorts before it, so the order wraps to the start. Its one tag
+    // yields three, so its hub (`primary`) fills the fourth slot in the same statement, after them.
     expect(
       (await catalog.getListingBySlug('echo'))?.relatedWebsites.map(item => item.slug)
-    ).toEqual(['alpha', 'bravo', 'charlie'])
+    ).toEqual(['alpha', 'bravo', 'charlie', 'delta'])
     // Neighbours differ: the "same three" (#331) no longer repeat.
     const alpha = await catalog.getListingBySlug('alpha')
     expect(alpha?.relatedWebsites.map(item => item.slug)).toEqual([
@@ -337,6 +341,63 @@ describe('taxonomy reads (#345)', () => {
       'delta',
       'echo'
     ])
+  })
+
+  it('scores related listings on the three most central tags only, and fills from the hub', async () => {
+    // bravo's active tags, most central first: editors and writers (0), fringe-a (5), fringe-b (9).
+    // delta shares writers, fringe-a and fringe-b; fringe-b is bravo's fourth, so it doesn't count.
+    sqlite.database.exec(`
+      INSERT INTO tags (slug, name, category_id) SELECT 'fringe-a', 'Fringe A', id FROM categories
+        WHERE slug = 'primary';
+      INSERT INTO tags (slug, name, category_id) SELECT 'fringe-b', 'Fringe B', id FROM categories
+        WHERE slug = 'primary';
+      INSERT INTO tags (slug, name, category_id) SELECT 'solo', 'Solo', id FROM categories
+        WHERE slug = 'secondary';
+      INSERT INTO listing_tags (listing_id, tag_id, sort_order)
+        SELECT m.listing_id, t.id, m.sort_order FROM (
+          SELECT 'serp-bravo' AS listing_id, 'fringe-a' AS tag, 5 AS sort_order
+          UNION ALL SELECT 'serp-bravo', 'fringe-b', 9
+          UNION ALL SELECT 'serp-delta', 'fringe-a', 0
+          UNION ALL SELECT 'serp-delta', 'fringe-b', 0
+        ) m JOIN tags t ON t.slug = m.tag;
+    `)
+    try {
+      const catalog = operations().operations
+      // Scored on all four, delta (3) would lead. On three it ties with alpha and charlie (2), and
+      // the keyset from bravo's name orders the tie: charlie, delta, then the wrap to alpha.
+      expect(
+        (await catalog.getListingBySlug('bravo'))?.relatedWebsites.map(item => item.slug)
+      ).toEqual(['charlie', 'delta', 'alpha', 'echo'])
+
+      // A tag no other public listing has: all four come from the hub, after its own name first.
+      sqlite.database.exec(`
+        DELETE FROM listing_tags WHERE listing_id = 'serp-charlie';
+        INSERT INTO listing_tags (listing_id, tag_id) SELECT 'serp-charlie', id FROM tags
+          WHERE slug = 'solo';
+      `)
+      const fresh = operations()
+      const start = sqlite.statements.length
+      const charlie = await fresh.operations.getListingBySlug('charlie')
+      expect(charlie?.tags).toEqual([{ name: 'Solo', slug: 'solo' }])
+      expect(charlie?.relatedWebsites.map(item => item.slug)).toEqual([
+        'delta',
+        'echo',
+        'alpha',
+        'bravo'
+      ])
+      expect(sqlite.statements.length - start).toBe(5)
+      expect(queries(fresh.events)).toContain('related-shared-tags')
+    } finally {
+      sqlite.database.exec(`
+        DELETE FROM listing_tags WHERE listing_id = 'serp-charlie';
+        INSERT INTO listing_tags (listing_id, tag_id, sort_order)
+          SELECT 'serp-charlie', id, CASE slug WHEN 'writers' THEN 0 ELSE 1 END FROM tags
+          WHERE slug IN ('writers', 'editors');
+        DELETE FROM listing_tags
+          WHERE tag_id IN (SELECT id FROM tags WHERE slug IN ('fringe-a', 'fringe-b', 'solo'));
+        DELETE FROM tags WHERE slug IN ('fringe-a', 'fringe-b', 'solo');
+      `)
+    }
   })
 
   it('finds listings by an active tag name or slug, never a retired one', async () => {

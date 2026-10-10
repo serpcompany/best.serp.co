@@ -59,7 +59,7 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   'best-index': 6_000, // 4,353, cached per epoch
   'best-page-items': 2_500, // the 335-listing tag, 25 entries: 1,860
   'canonical-redirect': 10, // one of 50 redirects: 2
-  'legacy-root-target': 10, // a retired category URL and its target: 3
+  'legacy-root-target': 10, // a retired category URL and its best page's tag and category: 4
   'featured-summaries': 2_500, // 100 featured: 1,887 (walks the publication index)
   'latest-summaries': 1_500, // 100 latest: 829
   'listing-detail': 100, // the most FAQs, links and images, and its tags: 44
@@ -72,19 +72,35 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   // Measured on listings without tags (a tagged listing ranks by its tags): 2,250 and 78; 2,401
   // and 104 on the worst listings before they had tags (#345).
   'related-shared-categories': 3_000, // worst untagged listing: 2,250
-  'related-shared-tags': 3_000, // 9 tags, the 335-listing one among them: 2,757
+  // Scored on a listing's three most central tags (#362 review): the 335-listing tag and two
+  // more, 2,442 (2,757 on all nine of one listing's tags before the cap). Filling from the hub:
+  // 196 when it walks the name index, 119 through a small hub's members.
+  'related-shared-tags': 3_000,
   'related-single-category-members': 500, // 78
   'related-single-category-seek': 200, // the sparsest category over 128: 79
   // worst: a term in the catch-all's name (`other`, `the`): 10,826; 15,520 before #345's
-  // uncorrelated category and tag subqueries
+  // uncorrelated category and tag subqueries. The widest searches have their own budget below.
   'search-summaries': 17_000,
   'shell-stats': 20_000, // 15,243, cached per epoch
   'tag-name-order': 1_500, // the 335-listing tag: 994 (3 rows per member)
   'tag-stats': 20_000, // 8,383 (2 rows per membership), cached per epoch
-  'taxonomy-redirect': 10, // 2
+  'taxonomy-redirect': 10, // a best page and its tag and category: 3
   'unpublished-listing': 10, // a hit, in one category like all of #100's and #104's: 8
   'unpublished-listing-status': 10 // worker-entry slug seek; not run by this suite
 }
+
+/**
+ * The widest searches' own budget (#362 review). Each search term builds, at most once per
+ * statement, the set of listings filed under an active category or tag whose slug or name
+ * contains it: at most one pass over the categories, the tags and their memberships, about 8,000
+ * rows here. Eight one-character terms that nearly every category and tag contains are the
+ * measured worst (`o e a i n r s t`: 27,528; `- a e i o r s t`: 29,165); the ceiling is the
+ * listing scan plus eight full passes, about 68,000 rows. Kept rather than bounded: per-listing
+ * membership lookups (staging's category shape, extended to tags) would bound it, but they cost
+ * 15,000 to 27,000 rows on ordinary two-word queries that this shape answers in 4,500 to 6,500,
+ * and every result is cached per epoch and query.
+ */
+const BROAD_SEARCH_ROWS_READ_BUDGET = 35_000
 
 /** The generated catalog, and the facts the assertions name, all read from its rows. */
 const scale = generateScaleCatalog()
@@ -231,16 +247,65 @@ const largestTag = first(
     ),
   'tag'
 )
-/** The worst related-by-tags scan: the tagged listing whose tags have the most members. */
+/** The active tags that score a listing's related listings: its three most central (#362). */
+const scoredTags = (listing: ScaleListing) => activeTags(listing).slice(0, 3)
+const scoredMembers = (listing: ScaleListing) =>
+  scoredTags(listing).reduce((sum, slug) => sum + (tagMembers.get(slug)?.length ?? 0), 0)
+/** The worst related-by-tags scan: the tagged listing whose scored tags have the most members. */
 const widestTagged = first(
   live
     .filter(listing => activeTags(listing).length > 0)
-    .sort(
-      (left, right) =>
-        activeTags(right).reduce((sum, slug) => sum + (tagMembers.get(slug)?.length ?? 0), 0) -
-        activeTags(left).reduce((sum, slug) => sum + (tagMembers.get(slug)?.length ?? 0), 0)
-    ),
+    .sort((left, right) => scoredMembers(right) - scoredMembers(left)),
   'tagged listing'
+)
+/**
+ * A tagged listing's related listings by the contract (#341 design 3.2, #362): the public
+ * listings sharing its scored tags, by how many they share, then the names after its own first
+ * (binary name and slug order), then from the start; fewer than four are filled from its hub (its
+ * primary category) in the same name order.
+ */
+function expectedRelatedByTags(listing: ScaleListing): string[] {
+  const scored = new Set(scoredTags(listing))
+  const after = (other: ScaleListing) =>
+    binary(other.name, listing.name) > 0 ||
+    (other.name === listing.name && binary(other.slug, listing.slug) > 0)
+  const byKeyset = (left: ScaleListing, right: ScaleListing) =>
+    Number(!after(left)) - Number(!after(right)) ||
+    binary(left.name, right.name) ||
+    binary(left.slug, right.slug)
+  const score = (other: ScaleListing) => other.tags.filter(slug => scored.has(slug)).length
+  const tagged = live
+    .filter(other => other.id !== listing.id && score(other) > 0)
+    .sort((left, right) => score(right) - score(left) || byKeyset(left, right))
+    .slice(0, 4)
+  const hub = listing.categories[0]
+  const fill = live
+    .filter(
+      other =>
+        other.id !== listing.id &&
+        !tagged.includes(other) &&
+        other.categories.includes(hub as string)
+    )
+    .sort(byKeyset)
+  return [...tagged, ...fill].slice(0, 4).map(other => other.slug)
+}
+/** Tagged listings whose scored tags yield fewer than four: their hubs fill the rest (#362). */
+const thinTagged = live.filter(
+  listing =>
+    activeTags(listing).length > 0 &&
+    new Set(
+      live.filter(
+        other => other !== listing && other.tags.some(slug => scoredTags(listing).includes(slug))
+      )
+    ).size < 4
+)
+/**
+ * One whose hub walks the name index (more than 128 memberships). The catalog has no thin listing
+ * in a smaller hub, read through its members; the taxonomy test tags one for that branch.
+ */
+const thinInLargeHub = first(
+  thinTagged.filter(listing => (allMembers.get(listing.categories[0] as string) ?? 0) > 128),
+  'thin tagged listing in a large hub'
 )
 const hostedLogo = new Set(
   scale.media.filter(item => item.kind === 'logo' && item.mediaKey).map(item => item.listingId)
@@ -560,6 +625,30 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
     ]) {
       expect(await slugsFor(query), query).toEqual(expectedSearch(query))
     }
+    // The widest searches there are (#362 review), held to their own recorded budget
+    // (`BROAD_SEARCH_ROWS_READ_BUDGET`) so the shape's budget keeps catching regressions on every
+    // other query: up to eight one-character terms that nearly every category and tag slug or
+    // name contains, so each term builds its full membership sets. Still the contract's matches.
+    const broadRows: number[] = []
+    const broad = createCatalogOperations({
+      cache: noCatalogDataCache,
+      client: createDatabase(checked(db)),
+      clock: () => NOW,
+      observe: event => {
+        if (event.event !== 'd1_query') return
+        expect(event.success, event.queryShape).toBe(true)
+        if (event.queryShape === 'search-summaries') broadRows.push(event.rowsRead ?? Infinity)
+      }
+    })
+    for (const query of ['o e a i n r s t', '- a e i o r s t', 'a e i o u l r n']) {
+      expect(
+        (await broad.searchListings(query, 100)).map(listing => listing.slug),
+        query
+      ).toEqual(expectedSearch(query))
+    }
+    console.info(JSON.stringify({ broadSearchRows: broadRows, event: 'workerd_rows_read' }))
+    expect(broadRows).toHaveLength(3)
+    expect(Math.max(...broadRows)).toBeLessThanOrEqual(BROAD_SEARCH_ROWS_READ_BUDGET)
     // A product's domain finds it through the slug, first (owner decision, #81).
     expect((await slugsFor(domain.slug))[0]).toBe(domain.slug)
     expect(await slugsFor(stem)).toContain(domain.slug)
@@ -751,10 +840,51 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       ).toEqual({ kind: redirect.targetKind, slug: redirect.targetSlug })
     }
     expect(await ops.getTaxonomyRedirect('category', 'x'.repeat(300))).toBeNull()
-    // The detail with the widest related-by-tags scan.
+    // The detail with the widest related-by-tags scan, one whose tags yield fewer than four (its
+    // large hub fills the rest), and every 40th tagged listing, by the contract.
     const detail = await ops.getListingBySlug(widestTagged.slug)
     expect(detail?.tags?.map(tag => tag.slug)).toEqual(activeTags(widestTagged))
-    expect(detail?.relatedWebsites).toHaveLength(4)
+    const tagged = live.filter(listing => activeTags(listing).length > 0)
+    for (const listing of [
+      widestTagged,
+      thinInLargeHub,
+      ...tagged.filter((_, index) => index % 40 === 0)
+    ]) {
+      const related = (await catalog().getListingBySlug(listing.slug))?.relatedWebsites
+      expect(
+        related?.map(item => item.slug),
+        listing.slug
+      ).toEqual(expectedRelatedByTags(listing))
+    }
+    // A small hub (at most 128 memberships) fills through its members: tag the small category's
+    // listing with a tag no other listing has, then put the catalog back.
+    expect(allMembers.get(small.slug)).toBeLessThanOrEqual(128)
+    await db.batch([
+      db
+        .prepare(
+          "INSERT INTO tags (slug, name, category_id) SELECT 'workerd-solo', 'Workerd Solo', id FROM categories WHERE slug = ?"
+        )
+        .bind(small.slug),
+      db
+        .prepare(
+          "INSERT INTO listing_tags (listing_id, tag_id) SELECT ?, id FROM tags WHERE slug = 'workerd-solo'"
+        )
+        .bind(small.listing.id)
+    ])
+    try {
+      const solo = await catalog().getListingBySlug(small.listing.slug)
+      expect(solo?.tags).toEqual([{ name: 'Workerd Solo', slug: 'workerd-solo' }])
+      expect(solo?.relatedWebsites.map(item => item.slug)).toEqual(
+        expectedRelatedByTags({ ...small.listing, tags: [] })
+      )
+    } finally {
+      await db.batch([
+        db.prepare(
+          "DELETE FROM listing_tags WHERE tag_id = (SELECT id FROM tags WHERE slug = 'workerd-solo')"
+        ),
+        db.prepare("DELETE FROM tags WHERE slug = 'workerd-solo'")
+      ])
+    }
   }, 120_000)
 
   it('answers every root-level URL with one bounded statement (#168, #356, #341)', async () => {

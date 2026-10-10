@@ -34,12 +34,34 @@ export function taxonomyTargetRoute(target: TaxonomyTarget): string {
 }
 
 /**
+ * A query string without its `page` parameters, every other parameter kept exactly as sent (a
+ * campaign's `utm_source`, for example). A moved taxonomy URL's redirect drops only `page`
+ * (#341 design 2.2, rule 4): the old page number would not match the target's pagination.
+ */
+export function withoutPageQuery(search: string): string {
+  const kept = search
+    .replace(/^\?/u, '')
+    .split('&')
+    .filter(pair => {
+      if (!pair) return false
+      const name = pair.split('=', 1)[0] ?? ''
+      try {
+        return decodeURIComponent(name.replaceAll('+', ' ')) !== 'page'
+      } catch {
+        return true
+      }
+    })
+  return kept.length ? `?${kept.join('&')}` : ''
+}
+
+/**
  * The `Location` of a root-level URL's 308. A listing or category keeps the query string; a
- * retired category's redirect drops it (#341 design 2.2: its `?page=N` would not match the
- * target's pagination).
+ * retired category's redirect keeps it without `page` (`withoutPageQuery`).
  */
 export function legacyRootLocation(target: LegacyRootTarget, search: string): string {
-  if (target.kind === 'moved') return taxonomyTargetRoute(target.target)
+  if (target.kind === 'moved') {
+    return `${taxonomyTargetRoute(target.target)}${withoutPageQuery(search)}`
+  }
   const page =
     target.kind === 'listing'
       ? getRoute('listing.detail', { slug: target.slug })
