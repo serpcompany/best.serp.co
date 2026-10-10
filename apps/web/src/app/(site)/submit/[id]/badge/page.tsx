@@ -10,12 +10,14 @@ import { toSummary } from '@/lib/submissions/http'
 import { ownSubmissionForPage } from '@/lib/submissions/pages'
 import { submissionBadgeTargets } from '@/lib/submissions/presentation'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Add the badge',
-  description: 'Add the Featured on SERP Best badge to your site and verify it.',
-  path: '/submit/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Add the badge',
+    description: 'Add the Featured on SERP Best badge to your site and verify it.',
+    path: '/submit/',
+    noindex: true
+  })
+}
 
 type BadgePageProps = {
   params: Promise<{ id: string }>

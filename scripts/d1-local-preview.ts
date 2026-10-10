@@ -17,8 +17,11 @@ import { project } from './project'
  * `features.orders` is off (on since #133, so no suite sets it), `LOCAL_STRIPE_MOCK_PORT` points
  * billing at the suite's mocked Stripe API, and `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`
  * take the suite's own test values (`lib/billing/` ignores the first two anywhere but local,
- * and refuses a live key outside production). Identity and environment vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`) can never be
- * overridden here.
+ * and refuses a live key outside production), and staging's password (#359):
+ * `LOCAL_STAGING_ACCESS=on` makes the local Worker serve as staging behind
+ * `STAGING_BASIC_AUTH_PASSWORD` (apps/web/e2e/staging-access-fixture.ts;
+ * `lib/environment/site-environment.ts` ignores the switch anywhere but local). Identity and
+ * environment vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`) can never be overridden here.
  */
 export const LOCAL_PREVIEW_OVERRIDABLE_VARS = [
   'CF_ACCESS_AUD',
@@ -27,7 +30,9 @@ export const LOCAL_PREVIEW_OVERRIDABLE_VARS = [
   'LOCAL_BADGE_PROGRAM',
   'LOCAL_CLAIMS',
   'LOCAL_ORDERS',
+  'LOCAL_STAGING_ACCESS',
   'LOCAL_STRIPE_MOCK_PORT',
+  'STAGING_BASIC_AUTH_PASSWORD',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET'
 ] as const

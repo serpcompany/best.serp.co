@@ -5,7 +5,9 @@ import {
   type ListingPricing,
   type WebsiteMetadataLike
 } from './schema'
-import { SITE_LOGO_URL, SITE_PUBLIC_URL } from './seo-config'
+import { siteLogoUrl } from './seo-config'
+
+const SITE_PUBLIC_URL = 'https://best.serp.co'
 
 const listing: WebsiteMetadataLike = {
   category: 'video-downloaders',
@@ -62,7 +64,7 @@ describe('listing detail JSON-LD image', () => {
     expect(serialized).not.toContain(DEFAULT_SITE_LISTING_LOGO_FALLBACK_PATH)
     // The only image left is the site publisher logo on the TechArticle.
     expect(serialized.match(/"ImageObject"/gu)).toHaveLength(1)
-    expect(serialized).toContain(JSON.stringify(SITE_LOGO_URL))
+    expect(serialized).toContain(JSON.stringify(siteLogoUrl()))
   })
 })
 

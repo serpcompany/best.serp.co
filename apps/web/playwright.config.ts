@@ -14,6 +14,11 @@ import { badgeOrigin, badgeServerCommand, badgeSuiteEnabled } from './e2e/badge-
 import { claimsOrigin, claimsServerCommand, claimsSuiteEnabled } from './e2e/claims-fixture'
 import { mediaOrigin, mediaServerCommand, mediaServerEnabled } from './e2e/media-fixture'
 import { isPlatformOrigin, site } from './e2e/site-fixture'
+import {
+  stagingAccessOrigin,
+  stagingAccessServerCommand,
+  stagingAccessSuiteEnabled
+} from './e2e/staging-access-fixture'
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`
@@ -105,8 +110,9 @@ export default defineConfig({
     // }
   ],
   // Web servers start in order: the first builds the Worker, the Access-lock servers
-  // (e2e/access-lock-fixture.ts) then serve that build with CF_ACCESS_REQUIRED=on, and the
-  // media server (e2e/media-fixture.ts) serves it on its own seeded local D1 and R2.
+  // (e2e/access-lock-fixture.ts) then serve that build with CF_ACCESS_REQUIRED=on, the
+  // media server (e2e/media-fixture.ts) serves it on its own seeded local D1 and R2, and the
+  // staging-access server (e2e/staging-access-fixture.ts) serves it as staging (#359).
   webServer: useExternalServer
     ? undefined
     : [
@@ -175,6 +181,19 @@ export default defineConfig({
               {
                 command: claimsServerCommand(),
                 url: `${claimsOrigin()}/robots.txt`,
+                reuseExistingServer: !process.env.CI,
+                timeout: 180000,
+                env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
+              }
+            ]
+          : []),
+        // A local Worker that serves as staging, behind its password (#359): robots.txt is
+        // exempt, so it answers the readiness probe.
+        ...(stagingAccessSuiteEnabled
+          ? [
+              {
+                command: stagingAccessServerCommand(),
+                url: `${stagingAccessOrigin()}/robots.txt`,
                 reuseExistingServer: !process.env.CI,
                 timeout: 180000,
                 env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }

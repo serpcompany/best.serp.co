@@ -7,7 +7,8 @@ import {
   escapeRegExp,
   featuredBadgeUrls,
   isPlatformOrigin,
-  site
+  site,
+  writtenOrigin
 } from './site-fixture'
 import { test } from './test'
 
@@ -18,6 +19,14 @@ import { test } from './test'
  * catalog's counts and a listing read from it. A check that holds only for one of them says so
  * (`source`, or a fact only the seed knows).
  */
+
+/**
+ * The origin this Worker writes in its URLs, by the environment it reports: staging writes
+ * `https://staging.best.serp.co` (#359), production and local `https://best.serp.co`.
+ */
+async function originOf(request: APIRequestContext): Promise<string> {
+  return writtenOrigin((await request.get('/robots.txt')).headers()['x-site-environment'])
+}
 
 async function getSitemap(request: APIRequestContext, path: string): Promise<string[]> {
   const response = await request.get(path)
@@ -64,31 +73,36 @@ function structuredDataUrls(value: unknown): string[] {
   )
 }
 
-async function expectCanonical(page: Page, path: string) {
+async function expectCanonical(page: Page, path: string, origin: string) {
   await expect(page.locator('link[rel="canonical"]')).toHaveCount(1)
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', absoluteUrl(path))
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    'href',
+    absoluteUrl(path, origin)
+  )
 }
 
 /**
- * Every best.serp.co URL in the page's JSON-LD is canonical: the homepage is the bare origin,
- * pages end with a slash (node identifiers may add a `#fragment`), and files have none. A
- * file is a known extension, not any dot: a domain-name slug's page (`/products/<host>`) is a
- * page without its slash.
+ * Every URL on the Worker's own origin in the page's JSON-LD is canonical: the homepage is the
+ * bare origin, pages end with a slash (node identifiers may add a `#fragment`), and files have
+ * none. A file is a known extension, not any dot: a domain-name slug's page (`/products/<host>`)
+ * is a page without its slash. On staging, no URL names best.serp.co (#359).
  */
-async function expectCanonicalStructuredData(page: Page): Promise<string[]> {
+async function expectCanonicalStructuredData(page: Page, origin: string): Promise<string[]> {
   const structuredData = await page
     .locator('script[type="application/ld+json"]')
     .evaluateAll(scripts => scripts.map(script => JSON.parse(script.textContent ?? 'null')))
   expect(structuredData.length).toBeGreaterThan(0)
   const linkedUrls = structuredDataUrls(structuredData)
-  for (const url of linkedUrls.filter(url => url.startsWith(site.publicUrl))) {
-    expect(url, 'structured data writes the homepage as the bare origin').not.toBe(
-      `${site.publicUrl}/`
-    )
-    expect(url, 'structured data should only use canonical best.serp.co URLs').toMatch(
-      /^https:\/\/best\.serp\.co(?:\/(?:[^#?]*\/)?(?:#[\w-]+)?|\/[^#?]*\.(?:avif|gif|ico|jpe?g|json|png|svg|txt|webp|xml))?$/iu
-    )
+  const canonicalForm = new RegExp(
+    `^${escapeRegExp(origin)}(?:/(?:[^#?]*/)?(?:#[\\w-]+)?|/[^#?]*\\.(?:avif|gif|ico|jpe?g|json|png|svg|txt|webp|xml))?$`,
+    'iu'
+  )
+  for (const url of linkedUrls.filter(url => url.startsWith(origin))) {
+    expect(url, 'structured data writes the homepage as the bare origin').not.toBe(`${origin}/`)
+    expect(url, `structured data should only use canonical ${origin} URLs`).toMatch(canonicalForm)
   }
+  if (origin !== site.publicUrl)
+    expect(linkedUrls.filter(url => url.startsWith(site.publicUrl))).toEqual([])
   return linkedUrls
 }
 
@@ -99,6 +113,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     request
   }) => {
     const { listingCount } = await catalogSample(request, baseURL)
+    const origin = await originOf(request)
     const response = await page.goto('/', { waitUntil: 'networkidle' })
     expect(response?.status()).toBe(200)
     await expect(page).toHaveTitle(site.title)
@@ -110,20 +125,21 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       page.getByText(new RegExp(`^${listingCount}\\s+products in directory$`, 'i'))
     ).toBeVisible()
     // The homepage is the bare origin in its canonical, og:url, and structured data.
-    await expectCanonical(page, '/')
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', site.publicUrl)
+    await expectCanonical(page, '/', origin)
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', origin)
     await expect(page.locator('meta[property="og:url"]')).toHaveCount(1)
-    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', site.publicUrl)
-    expect(await expectCanonicalStructuredData(page)).toContain(site.publicUrl)
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', origin)
+    expect(await expectCanonicalStructuredData(page, origin)).toContain(origin)
   })
 
   test('renders a listing detail page at its canonical URL', async ({ baseURL, page, request }) => {
     const { listing, source } = await catalogSample(request, baseURL)
+    const origin = await originOf(request)
     const response = await page.goto(listing.path, { waitUntil: 'networkidle' })
     expect(response?.status()).toBe(200)
     await expect(page.getByRole('heading', { level: 1, name: listing.namePattern })).toBeVisible()
     await expect(page).toHaveTitle(new RegExp(`${escapeRegExp(listing.name)}.*\\| SERP$`))
-    await expectCanonical(page, listing.path)
+    await expectCanonical(page, listing.path, origin)
     // Claims are on (#67, #130): a listing without an owner offers the claim link. The seed's
     // sample listing has no owner; a deployed one may have been claimed.
     const claimLink = page.getByRole('button', { name: 'Claim this listing' })
@@ -133,10 +149,10 @@ test.describe('best.serp.co D1 Worker smoke', () => {
         : claimLink.or(page.getByText('Verified owner', { exact: true })).first()
     ).toBeVisible()
 
-    const linkedUrls = await expectCanonicalStructuredData(page)
-    expect(linkedUrls).toContain(absoluteUrl(listing.path))
+    const linkedUrls = await expectCanonicalStructuredData(page, origin)
+    expect(linkedUrls).toContain(absoluteUrl(listing.path, origin))
     // The breadcrumb's Home item is the bare origin.
-    expect(linkedUrls).toContain(site.publicUrl)
+    expect(linkedUrls).toContain(origin)
   })
 
   test('answers the retired /news with 410 Gone, without a redirect (#166)', async ({
@@ -247,6 +263,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     request
   }) => {
     const { category, categoryCount, listing, search } = await catalogSample(request, baseURL)
+    const origin = await originOf(request)
     const listingLinks = page.locator('main a[href^="/products/"]')
 
     await page.goto(categoryPath(category.slug), { waitUntil: 'networkidle' })
@@ -254,13 +271,13 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     await expect(
       page.getByRole('heading', { level: 1, name: category.name ?? /\S/u, exact: true })
     ).toBeVisible()
-    await expectCanonical(page, categoryPath(category.slug))
-    await expectCanonicalStructuredData(page)
+    await expectCanonical(page, categoryPath(category.slug), origin)
+    await expectCanonicalStructuredData(page, origin)
     await expect(page.locator(`main a[href="${listing.path}"]`).first()).toBeVisible()
 
     await page.goto(categoriesIndexPath, { waitUntil: 'networkidle' })
     await expect(page.getByRole('heading', { level: 1, name: 'Categories' })).toBeVisible()
-    await expectCanonical(page, categoriesIndexPath)
+    await expectCanonical(page, categoriesIndexPath, origin)
     // Every published category is linked.
     expect(
       await page.locator('main a[href^="/products/categories/"]').count()
@@ -271,7 +288,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
 
     await page.goto('/products/', { waitUntil: 'networkidle' })
     // The directory's first page is the homepage's content, so it canonicalizes to `/` (#167).
-    await expectCanonical(page, '/')
+    await expectCanonical(page, '/', origin)
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /^index/u)
     expect(await listingLinks.count()).toBeGreaterThan(0)
 
@@ -294,6 +311,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     request
   }) => {
     const { listingCount, paginatedCategory } = await catalogSample(request, baseURL)
+    const origin = await originOf(request)
     const lastDirectoryPage = Math.ceil(listingCount / DIRECTORY_PAGE_SIZE)
     const pagination = page.getByRole('navigation', { name: /pages$/i })
 
@@ -307,7 +325,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
 
     const second = await page.goto('/products/?page=2', { waitUntil: 'domcontentloaded' })
     expect(second?.status()).toBe(200)
-    await expectCanonical(page, '/products/?page=2')
+    await expectCanonical(page, '/products/?page=2', origin)
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/u)
     await expect(page).toHaveTitle(/Page 2/u)
     await expect(pagination.getByRole('link', { name: /previous/i })).toHaveAttribute(
@@ -328,14 +346,14 @@ test.describe('best.serp.co D1 Worker smoke', () => {
 
     const largePath = categoryPath(paginatedCategory.slug)
     await page.goto(largePath, { waitUntil: 'domcontentloaded' })
-    await expectCanonical(page, largePath)
+    await expectCanonical(page, largePath, origin)
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /^index/u)
     await expect(pagination.getByRole('link', { name: 'Page 2' })).toHaveAttribute(
       'href',
       `${largePath}?page=2`
     )
     await page.goto(`${largePath}?page=2`, { waitUntil: 'domcontentloaded' })
-    await expectCanonical(page, `${largePath}?page=2`)
+    await expectCanonical(page, `${largePath}?page=2`, origin)
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
     expect(await page.locator('main a[href^="/products/"]').count()).toBeGreaterThan(0)
   })
@@ -409,7 +427,11 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       expect(response.headers()['x-site-environment'], path).toMatch(/^(?:local|staging)$/u)
     }
     const robots = await request.get('/robots.txt')
-    expect(await robots.text()).toBe('User-agent: *\nDisallow: /\n')
+    const environment = robots.headers()['x-site-environment']
+    const text = await robots.text()
+    // Staging lets only its auditor in, with best.serp.co's rules (#359); local, nobody.
+    if (environment === 'staging') expect(text).toMatch(/^User-agent: \*\nDisallow: \/\n\n/u)
+    else expect(text).toBe('User-agent: *\nDisallow: /\n')
 
     // Neither Google Tag Manager nor the Cloudflare Web Analytics beacon (#170).
     const analyticsRequests: string[] = []
@@ -449,7 +471,41 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     }).toPass({ timeout: 10_000 })
   })
 
-  test('renders static, commercial, and legal pages', async ({ page }) => {
+  test("asks for staging's password on staging.best.serp.co, and serves it indexable with it", async ({
+    baseURL,
+    request
+  }) => {
+    test.skip(!isPlatformOrigin(baseURL), 'only a deployed Worker has a workers.dev host')
+    const environment = (await request.get('/robots.txt')).headers()['x-site-environment']
+    test.skip(environment !== 'staging', 'only staging has the password (#359)')
+    // Through fetch, so no request carries the smoke-test header (playwright.config.ts).
+    const page = new URL('/about/?smoke=staging-access', site.canonicalOrigins.staging)
+    const { password, username } = site.stagingAccess
+    const authorization = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`
+    const probe = await fetch(page, { redirect: 'manual' })
+    // Zone protection, not the Worker, can answer a runner (as on best.serp.co, #44).
+    test.skip(!probe.headers.get('x-site-environment'), 'the Worker did not answer this runner')
+    await expect(async () => {
+      const refused = await fetch(page, { redirect: 'manual' })
+      expect(refused.status, page.href).toBe(401)
+      expect(refused.headers.get('www-authenticate')).toBe(
+        'Basic realm="best.serp.co staging", charset="UTF-8"'
+      )
+      expect(refused.headers.get('cache-control')).toBe('no-store')
+      const served = await fetch(page, { headers: { authorization }, redirect: 'manual' })
+      expect(served.status).toBe(200)
+      expect(served.headers.get('x-robots-tag')).toBeNull()
+      expect(await served.text()).toContain(
+        `<link rel="canonical" href="${site.canonicalOrigins.staging}/about/"/>`
+      )
+      const robots = await fetch(new URL('/robots.txt', page), { redirect: 'manual' })
+      expect(robots.status).toBe(200)
+      expect(await robots.text()).toMatch(/^User-agent: \*\nDisallow: \/\n\n/u)
+    }).toPass({ timeout: 10_000 })
+  })
+
+  test('renders static, commercial, and legal pages', async ({ page, request }) => {
+    const origin = await originOf(request)
     const pages: Array<{ path: string; heading: RegExp }> = [
       { path: '/about/', heading: /^about serp$/i },
       { path: '/brands/', heading: /^brands$/i },
@@ -467,26 +523,33 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
       await expect(page).toHaveTitle(/\| SERP$/)
       // Legal pages pass slashless paths to their breadcrumb; its JSON-LD must still be canonical.
-      if (path.startsWith('/legal/')) await expectCanonicalStructuredData(page)
+      if (path.startsWith('/legal/')) await expectCanonicalStructuredData(page, origin)
     }
   })
 
   test('serves D1-derived sitemap contracts', async ({ baseURL, request }) => {
     const robots = await request.get('/robots.txt')
     expect(robots.status()).toBe(200)
-    // Only best.serp.co advertises its sitemaps; every other host disallows crawling.
+    const origin = writtenOrigin(robots.headers()['x-site-environment'])
+    const url = (path: string) => absoluteUrl(path, origin)
+    const robotsText = await robots.text()
+    // best.serp.co advertises its sitemaps; staging advertises its own, to its auditor only
+    // (#359); every other host disallows crawling.
     if (isPublicProductionOrigin(baseURL))
-      expect(await robots.text()).toContain(`Sitemap: ${absoluteUrl('/sitemap-index.xml')}`)
-    else expect(await robots.text()).toBe('User-agent: *\nDisallow: /\n')
+      expect(robotsText).toContain(`Sitemap: ${url('/sitemap-index.xml')}`)
+    else if (origin !== site.publicUrl) {
+      expect(robotsText).toMatch(/^User-agent: \*\nDisallow: \/\n\nUser-agent: AhrefsSiteAudit\n/u)
+      expect(robotsText).toContain(`Sitemap: ${url('/sitemap-index.xml')}`)
+    } else expect(robotsText).toBe('User-agent: *\nDisallow: /\n')
 
     // Every index entry carries its newest child's lastmod, from D1 (#218).
     const index = await (await request.get('/sitemap-index.xml')).text()
     expect(index.match(/<lastmod>\d{4}-\d{2}-\d{2}T[\d:.]+Z<\/lastmod>/gu)).toHaveLength(3)
     // Root-level child sitemaps (#167); the old URLs and /sitemap.xml answer one 308.
     expect(await getSitemap(request, '/sitemap-index.xml')).toEqual([
-      absoluteUrl('/sitemap-pages.xml'),
-      absoluteUrl('/sitemap-products.xml'),
-      absoluteUrl('/sitemap-categories.xml')
+      url('/sitemap-pages.xml'),
+      url('/sitemap-products.xml'),
+      url('/sitemap-categories.xml')
     ])
     for (const [from, to] of [
       ['/sitemap.xml', '/sitemap-index.xml'],
@@ -500,13 +563,13 @@ test.describe('best.serp.co D1 Worker smoke', () => {
 
     const pages = await getSitemap(request, '/sitemap-pages.xml')
     // The homepage entry is the bare origin; every other page ends with a slash.
-    expect(pages).toContain(site.publicUrl)
-    expect(pages).not.toContain(`${site.publicUrl}/`)
-    for (const location of pages.filter(location => location !== site.publicUrl)) {
-      expect(location).toMatch(/^https:\/\/best\.serp\.co\/.+\/$/u)
+    expect(pages).toContain(origin)
+    expect(pages).not.toContain(`${origin}/`)
+    for (const location of pages.filter(location => location !== origin)) {
+      expect(location).toMatch(new RegExp(`^${escapeRegExp(origin)}/.+/$`, 'u'))
     }
-    expect(pages).toContain(absoluteUrl('/about/'))
-    expect(pages).toContain(absoluteUrl(categoriesIndexPath))
+    expect(pages).toContain(url('/about/'))
+    expect(pages).toContain(url(categoriesIndexPath))
     for (const excluded of [
       '/submit/',
       '/search/',
@@ -514,7 +577,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       '/legal/privacy-policy/',
       '/legal/terms-conditions/'
     ]) {
-      expect(pages).not.toContain(absoluteUrl(excluded))
+      expect(pages).not.toContain(url(excluded))
     }
 
     const { category, categoryCount, listing, listingCount, paginatedCategory } =
@@ -523,35 +586,38 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     expect(listings).toHaveLength(listingCount)
     expect(new Set(listings).size).toBe(listingCount)
     for (const location of listings) {
-      expect(location).toMatch(/^https:\/\/best\.serp\.co\/products\/[^/]+\/$/u)
+      expect(location).toMatch(new RegExp(`^${escapeRegExp(origin)}/products/[^/]+/$`, 'u'))
     }
-    expect(listings).toContain(absoluteUrl(listing.path))
+    expect(listings).toContain(url(listing.path))
 
     const categories = await getSitemap(request, '/sitemap-categories.xml')
     expect(categories).toHaveLength(categoryCount)
     for (const location of categories) {
-      expect(location).toMatch(/^https:\/\/best\.serp\.co\/products\/categories\/[^/]+\/$/u)
+      expect(location).toMatch(
+        new RegExp(`^${escapeRegExp(origin)}/products/categories/[^/]+/$`, 'u')
+      )
     }
-    expect(categories).toContain(absoluteUrl(categoryPath(category.slug)))
-    expect(categories).toContain(absoluteUrl(categoryPath(paginatedCategory.slug)))
-    expect(categories).not.toContain(absoluteUrl(categoryPath('featured')))
+    expect(categories).toContain(url(categoryPath(category.slug)))
+    expect(categories).toContain(url(categoryPath(paginatedCategory.slug)))
+    expect(categories).not.toContain(url(categoryPath('featured')))
   })
 
   test('serves the D1-derived JSON feed', async ({ baseURL, request }) => {
     const feed = await request.get('/rss.xml')
     expect(feed.status()).toBe(200)
+    const origin = writtenOrigin(feed.headers()['x-site-environment'])
     expect(feed.headers()['content-type']).toContain('application/json')
     const payload = await feed.json()
     expect(payload.title).toBe(site.name)
-    expect(payload.home_page_url).toBe(site.publicUrl)
-    expect(payload.feed_url).toBe(absoluteUrl('/rss.xml'))
+    expect(payload.home_page_url).toBe(origin)
+    expect(payload.feed_url).toBe(absoluteUrl('/rss.xml', origin))
     const { listing, listingCount } = await catalogSample(request, baseURL)
     expect(payload.items).toHaveLength(listingCount)
     expect(payload.items).toContainEqual(
       expect.objectContaining({
         id: listing.slug,
         title: listing.name,
-        url: absoluteUrl(listing.path)
+        url: absoluteUrl(listing.path, origin)
       })
     )
   })

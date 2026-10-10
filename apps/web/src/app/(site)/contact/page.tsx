@@ -7,12 +7,14 @@ import { PageSection } from '@/components/layout/page-shell'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { siteConfig } from '@/lib/site/site-config'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: `Contact ${siteConfig.name}`,
-  description:
-    'Contact the SERP team for listing, partnership, and support questions about the SERP directory of products and resources.',
-  path: '/contact/'
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: `Contact ${siteConfig.name}`,
+    description:
+      'Contact the SERP team for listing, partnership, and support questions about the SERP directory of products and resources.',
+    path: '/contact/'
+  })
+}
 
 /** serplists' Contact (#275): a centered hero, then the address as a card. */
 export default function ContactPage() {

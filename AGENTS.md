@@ -94,6 +94,7 @@ Issues and labels never grant production, database, or deployment authority.
   production D1 through the reviewed plans, behind Cloudflare Access, the allowlist, and an
   `Origin` check ([Admin panel](./docs/admin-panel.md#the-production-write-exception)). Agents
   use neither in production; recovery is D1 Time Travel ([D1 recovery](./docs/d1-recovery.md)).
+- Staging's Basic auth exempts only smoke-header requests, `/robots.txt` and the billing webhook.
 
 ## Recorded exceptions to the SERP web stack
 

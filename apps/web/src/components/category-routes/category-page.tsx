@@ -10,10 +10,10 @@ import { getRoute } from '../../lib/routing/routes'
 import {
   composeMetaDescription,
   generateDynamicMetadata,
-  SITE_LOGO_URL,
   SITE_NAME,
-  SITE_PUBLIC_URL,
-  SITE_WEBSITE_ID
+  siteLogoUrl,
+  siteOrigin,
+  siteWebsiteId
 } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
 import { formatListingCount, siteCopy } from '../../lib/site/site-copy'
@@ -94,7 +94,8 @@ export function CategoryRoutePage({
   const seoContent = getCategorySEO(category.slug, category)
   const categoryDisplayName = seoContent.h1Title
   const categoryPath = getRoute('category.page', { category: category.slug })
-  const categoryUrl = `${SITE_PUBLIC_URL}${categoryPath}`
+  const origin = siteOrigin()
+  const categoryUrl = `${origin}${categoryPath}`
 
   const categoryCount = collection.count
   const leadingProjects = collection.leadingProjects
@@ -126,10 +127,10 @@ export function CategoryRoutePage({
             inLanguage: 'en-US',
             isPartOf: {
               '@type': 'WebSite',
-              '@id': SITE_WEBSITE_ID,
+              '@id': siteWebsiteId(),
               name: SITE_NAME,
               description: siteConfig.description,
-              url: SITE_PUBLIC_URL
+              url: origin
             },
             breadcrumb: {
               '@type': 'BreadcrumbList',
@@ -138,13 +139,13 @@ export function CategoryRoutePage({
                   '@type': 'ListItem',
                   position: 1,
                   name: 'Home',
-                  item: SITE_PUBLIC_URL
+                  item: origin
                 },
                 {
                   '@type': 'ListItem',
                   position: 2,
                   name: 'Categories',
-                  item: `${SITE_PUBLIC_URL}${getRoute('category.index')}`
+                  item: `${origin}${getRoute('category.index')}`
                 },
                 {
                   '@type': 'ListItem',
@@ -164,17 +165,17 @@ export function CategoryRoutePage({
               itemListElement: leadingProjects.slice(0, 20).map((project, index) => ({
                 '@type': 'ListItem',
                 position: index + 1,
-                url: `${SITE_PUBLIC_URL}${getRoute('listing.detail', { slug: project.slug })}`,
+                url: `${origin}${getRoute('listing.detail', { slug: project.slug })}`,
                 name: project.name
               }))
             },
             publisher: {
               '@type': 'Organization',
               name: SITE_NAME,
-              url: SITE_PUBLIC_URL,
+              url: origin,
               logo: {
                 '@type': 'ImageObject',
-                url: SITE_LOGO_URL
+                url: siteLogoUrl()
               }
             },
             ...schemaDates
@@ -202,7 +203,7 @@ export function CategoryRoutePage({
               { name: 'Categories', href: getRoute('category.index') },
               { name: category.name, href: categoryPath }
             ]}
-            baseUrl={SITE_PUBLIC_URL}
+            baseUrl={origin}
           />
           <PageHero
             eyebrow={formatListingCount(categoryCount)}

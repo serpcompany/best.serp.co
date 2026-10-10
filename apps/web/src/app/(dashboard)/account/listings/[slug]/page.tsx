@@ -7,12 +7,14 @@ import { requireAccountUser } from '@/lib/account/pages'
 import { ACCOUNT_ID } from '@/lib/account/requests'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Listing',
-  description: 'Your listing on SERP.',
-  path: '/account/listings/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Listing',
+    description: 'Your listing on SERP.',
+    path: '/account/listings/',
+    noindex: true
+  })
+}
 
 type ListingPageProps = { params: Promise<{ slug: string }> }
 

@@ -38,13 +38,19 @@ The local suite runs on the fixture seed, never the real catalog (#311, #313):
   time ("expires in 3 days", "2 days ago") on a seeded row. Assert one only on a row the spec
   writes itself, at the real time.
 - The suites with their own Worker (admin, account, badge program, claims, orders, media,
-  Access lock; `e2e/*-fixture.ts`) each start on a fresh D1 and seed their own rows with the
-  seed's builders (`listingStatements`, `suiteCatalogStatements`), so they run in parallel without
-  counting each other's rows. The media server's D1 is the seed plus a queued logo.
+  Access lock, staging access; `e2e/*-fixture.ts`) each start on a fresh D1 and seed their own
+  rows with the seed's builders (`listingStatements`, `suiteCatalogStatements`), so they run in
+  parallel without counting each other's rows. The media server's D1 is the seed plus a queued
+  logo. The staging-access Worker runs with `LOCAL_STAGING_ACCESS=on` and a test password, so
+  it serves as staging does behind its password (#359).
 - `smoke.spec.ts` and `public-parity.spec.ts` also run against staging after each deploy
   (`pnpm test:e2e:smoke`), on its workers.dev host: `playwright.config.ts` then sends the
   smoke-test header on every request, and one smoke test checks that a request without it gets
-  the 308 to staging.best.serp.co (#323). Their catalog facts come from `e2e/catalog-sample.ts`:
+  the 308 to staging.best.serp.co (#323). Another checks staging.best.serp.co itself, without
+  the header: 401 without staging's password, indexable and self-canonical with it (#359), and
+  skips when zone protection, not the Worker, answers the runner. Pages on staging write
+  staging's origin, so the smoke reads which origin to expect from `x-site-environment`
+  (`writtenOrigin` in `e2e/site-fixture.ts`). Their catalog facts come from `e2e/catalog-sample.ts`:
   the seed's locally, the live catalog's (counts from the feed and sitemap, a listing the
   homepage links) on a deployed Worker. Every other spec asserts the seed and runs only locally.
 - Shared best.serp.co facts that are not catalog data (public URL, title, route helpers) live in

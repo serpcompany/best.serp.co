@@ -5,7 +5,7 @@ import { components } from '@/components/content/mdx-components'
 import { PageShell } from '@/components/layout/docs-page-shell'
 import { BreadcrumbJsonLd } from '@/components/layout/site-breadcrumb'
 import { legalDescription, legalShell } from '@/components/legal/legal-nav'
-import { generateBaseMetadata, SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
+import { generateBaseMetadata, siteOrigin } from '@/lib/seo/seo-config'
 import { type LegalPagePath, legalPageFor } from '@/lib/site/legal-pages'
 
 /**
@@ -48,7 +48,7 @@ export function LegalStaticPage({ content, path }: { content: string; path: Lega
     <>
       <BreadcrumbJsonLd
         items={shell.breadcrumbs.slice(1).map(crumb => ({ name: crumb.name, href: crumb.path }))}
-        baseUrl={SITE_PUBLIC_URL}
+        baseUrl={siteOrigin()}
       />
       <PageShell {...shell}>
         <ReactMarkdown components={legalMarkdownComponents} remarkPlugins={[remarkGfm]}>

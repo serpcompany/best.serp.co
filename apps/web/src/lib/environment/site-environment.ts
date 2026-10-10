@@ -9,16 +9,21 @@
  * var. Non-production responses carry `X-Robots-Tag: noindex, nofollow`, robots.txt disallows
  * every crawler, and no analytics load (Google Tag Manager, Cloudflare Web Analytics).
  *
- * One exception, staging only (#323): on staging's canonical host (`staging.best.serp.co`),
- * robots.txt also lets Ahrefs' Site Audit crawler in, and a request whose `User-Agent` names it
- * gets no environment noindex, so the site can be audited before a release. It stays
- * non-production: every other request there is noindex, and no analytics load.
+ * One exception, staging only (#359; serp `standards/staging-access.md`): staging sits behind a
+ * password (`./staging-access.ts`), so a request that passed it gets no environment noindex, and
+ * the staging Worker writes its own origin (`https://staging.best.serp.co`) in every absolute
+ * URL. Its robots.txt still disallows every crawler but its auditor, Ahrefs' Site Audit, which
+ * gets best.serp.co's rules. Requests exempt from the password keep the noindex, and no
+ * analytics load anywhere on staging.
  *
  * The Worker entry applies the headers and robots.txt (`lib/worker/handle-request.ts`); the
- * root layout gates the analytics (`analyticsForRequest` in `./request-environment.ts`). This module has no
- * Next.js or `server-only` imports so the Worker can run it before OpenNext loads.
+ * root layout gates the analytics (`analyticsForRequest` in `./request-environment.ts`), and
+ * pages read their origin through `./site-origin.ts`. This module has no Next.js or
+ * `server-only` imports so the Worker can run it before OpenNext loads.
  */
+import { absoluteUrl } from '../seo/canonical-url'
 import { site } from '../site/site'
+import { crawlRules, SITEMAP_INDEX_PATH } from '../site/site-routes'
 
 export const siteEnvironments = ['local', 'staging', 'production'] as const
 export type SiteEnvironment = (typeof siteEnvironments)[number]
@@ -60,10 +65,38 @@ export const SITE_ENVIRONMENT_HEADER = 'x-site-environment'
 export const NON_PRODUCTION_X_ROBOTS_TAG = 'noindex, nofollow'
 export const NON_PRODUCTION_ROBOTS_TXT = 'User-agent: *\nDisallow: /\n'
 
-/** The one crawler staging's canonical host admits: Ahrefs' Site Audit (#323). */
+/** The crawler staging's robots.txt admits: Ahrefs' Site Audit (#323, #359). */
 export const STAGING_AUDIT_CRAWLER = 'AhrefsSiteAudit'
-/** robots.txt on staging's canonical host: Ahrefs' Site Audit may crawl, nobody else. */
-export const STAGING_CANONICAL_ROBOTS_TXT = `User-agent: ${STAGING_AUDIT_CRAWLER}\nAllow: /\n\n${NON_PRODUCTION_ROBOTS_TXT}`
+
+/**
+ * Staging's robots.txt (#359): every crawler is disallowed, except the auditor, which gets
+ * best.serp.co's own rules (`crawlRules`, as production's robots.txt) and staging's sitemap index.
+ * It is the same on every host the staging Worker answers, and served without the password.
+ */
+export function stagingRobotsTxt(): string {
+  const { allow, disallow } = crawlRules()
+  return [
+    NON_PRODUCTION_ROBOTS_TXT.trimEnd(),
+    '',
+    `User-agent: ${STAGING_AUDIT_CRAWLER}`,
+    ...allow.map(path => `Allow: ${path}`),
+    ...disallow.map(path => `Disallow: ${path}`),
+    '',
+    `Sitemap: ${absoluteUrl(STAGING_CANONICAL_ORIGIN, SITEMAP_INDEX_PATH)}`,
+    ''
+  ].join('\n')
+}
+
+/** The Worker vars the environment decisions read (`apps/web/wrangler.jsonc`). */
+export interface SiteEnvironmentEnv {
+  D1_RUNTIME_ENV?: string
+  /**
+   * `on` makes a local Worker serve as staging (#359): the e2e suite's staging-access Worker
+   * (`apps/web/e2e/staging-access-fixture.ts`). Ignored unless the Worker is local.
+   */
+  LOCAL_STAGING_ACCESS?: string
+  SITE_ENVIRONMENT?: string
+}
 
 /** The configured environment, or null when the var is missing or not an exact name. */
 export function parseSiteEnvironment(value: unknown): SiteEnvironment | null {
@@ -82,28 +115,31 @@ export function isPublicProduction(environment: unknown, host: string | null | u
 }
 
 /**
- * True only for the staging Worker answering on its canonical host (`staging.best.serp.co`);
- * its `*.workers.dev` host, and every other Worker, is not.
+ * True for a Worker that serves as staging (#359): the staging Worker (`SITE_ENVIRONMENT`
+ * exactly `staging`), on any host, or a local Worker started with `LOCAL_STAGING_ACCESS=on`
+ * (`SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` both `local`), which the e2e suite runs. Such a Worker
+ * asks for staging's password (`./staging-access.ts`), writes staging's origin in its URLs
+ * (`siteOriginFor`), and serves `stagingRobotsTxt`. Production, local, and a missing or
+ * misspelled environment never do.
  */
-export function isStagingCanonical(environment: unknown, host: string | null | undefined): boolean {
+export function servesAsStaging(env: SiteEnvironmentEnv | null | undefined): boolean {
+  const environment = parseSiteEnvironment(env?.SITE_ENVIRONMENT)
+  if (environment === 'staging') return true
   return (
-    parseSiteEnvironment(environment) === 'staging' &&
-    host?.toLowerCase() === STAGING_CANONICAL_HOST
+    environment === 'local' && env?.D1_RUNTIME_ENV === 'local' && env?.LOCAL_STAGING_ACCESS === 'on'
   )
 }
 
 /**
- * True for a request to staging's canonical host from Ahrefs' Site Audit: its `User-Agent`
- * names `AhrefsSiteAudit` (in any case). Decided per request from the request alone, never
- * stored: the edge cache keys on neither the `User-Agent` nor this answer.
+ * The origin a Worker writes in every absolute URL it publishes (canonical tags, `og:url`,
+ * JSON-LD, sitemaps, the feed, robots.txt's `Sitemap:` line): staging's own,
+ * `https://staging.best.serp.co`, on a Worker that serves as staging (#359), and
+ * `https://best.serp.co` everywhere else (production, local, a missing or misspelled var). It
+ * comes from the Worker's vars, never from the request's `Host`, so a cached page is the same
+ * on both sides of staging's password.
  */
-export function isStagingAuditRequest(environment: unknown, request: Request): boolean {
-  return (
-    isStagingCanonical(environment, new URL(request.url).host) &&
-    (request.headers.get('user-agent') ?? '')
-      .toLowerCase()
-      .includes(STAGING_AUDIT_CRAWLER.toLowerCase())
-  )
+export function siteOriginFor(env: SiteEnvironmentEnv | null | undefined): string {
+  return servesAsStaging(env) ? STAGING_CANONICAL_ORIGIN : CANONICAL_ORIGIN
 }
 
 /** True when an `X-Robots-Tag` value already keeps the response out of the index. */
@@ -113,8 +149,8 @@ function blocksIndexing(value: string | null): boolean {
 
 /**
  * Outside public production, every `robots.txt` request is answered with a disallow-all file
- * instead of the production one (which lists the sitemap index). Staging's canonical host
- * passes `STAGING_CANONICAL_ROBOTS_TXT`, which also lets Ahrefs' Site Audit in.
+ * instead of the production one (which lists the sitemap index). A Worker that serves as staging
+ * passes `stagingRobotsTxt()`, which also lets its auditor in.
  */
 export function nonProductionRobotsTxt(
   request: Request,
@@ -134,16 +170,16 @@ export function nonProductionRobotsTxt(
  * The response with the environment headers every Worker response carries: the configured
  * environment, the Worker version when it is known and, outside public production,
  * `X-Robots-Tag: noindex, nofollow` (an existing value that already says `noindex`, such as the
- * admin preview's, is kept). A staging audit request (`isStagingAuditRequest`) gets no
- * environment noindex either, so it sees the headers best.serp.co would send; a page's own
- * noindex still stays.
+ * admin preview's, is kept). A staging request that passed the password check
+ * (`passedStagingGate`, `./staging-access.ts`) gets no environment noindex either, so it sees the
+ * headers best.serp.co would send; a page's own noindex still stays.
  */
 export function withEnvironmentHeaders(
   response: Response,
   options: {
     environment: SiteEnvironment | null
+    passedStagingGate?: boolean
     publicProduction: boolean
-    stagingAudit?: boolean
     versionId?: string
   }
 ): Response {
@@ -153,7 +189,7 @@ export function withEnvironmentHeaders(
   if (options.versionId) headers.set(WORKER_VERSION_HEADER, options.versionId)
   if (
     !options.publicProduction &&
-    !options.stagingAudit &&
+    !options.passedStagingGate &&
     !blocksIndexing(headers.get('x-robots-tag'))
   )
     headers.set('x-robots-tag', NON_PRODUCTION_X_ROBOTS_TAG)

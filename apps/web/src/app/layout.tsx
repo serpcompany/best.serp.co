@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import type { ReactElement, ReactNode } from 'react'
 import './globals.css'
 import { RootAppShell, rootLayoutMetadata } from '@/components/layout/root-shell'
@@ -6,7 +7,9 @@ import { fonts } from '@/lib/fonts'
 import { siteConfig } from '@/lib/site/site-config'
 import { siteCopy } from '@/lib/site/site-copy'
 
-export const metadata = rootLayoutMetadata
+export function generateMetadata(): Metadata {
+  return rootLayoutMetadata()
+}
 export const dynamic = 'force-dynamic'
 
 type RootLayoutProps = {

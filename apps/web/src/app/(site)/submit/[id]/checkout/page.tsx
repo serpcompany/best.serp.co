@@ -5,12 +5,14 @@ import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { site } from '@/lib/site'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Checkout',
-  description: 'Pay for your listing on SERP.',
-  path: '/submit/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Checkout',
+    description: 'Pay for your listing on SERP.',
+    path: '/submit/',
+    noindex: true
+  })
+}
 
 /**
  * `/submit/<id>/checkout/` (#68, #70 screen 4a): the handoff to checkout. The choose and badge

@@ -6,19 +6,22 @@ import {
   canonicalHostRedirectEnabled,
   canonicalHostRedirectOrigin
 } from '../routing/canonical-host'
+import { createCanonicalRobots } from '../seo/sitemaps'
 import {
   CANONICAL_HOST,
+  CANONICAL_ORIGIN,
   CANONICAL_ORIGINS,
   isPublicProduction,
-  isStagingAuditRequest,
-  isStagingCanonical,
+  NON_PRODUCTION_ROBOTS_TXT,
   NON_PRODUCTION_X_ROBOTS_TAG,
   nonProductionRobotsTxt,
   parseSiteEnvironment,
   SITE_ENVIRONMENT_HEADER,
   STAGING_CANONICAL_HOST,
   STAGING_CANONICAL_ORIGIN,
-  STAGING_CANONICAL_ROBOTS_TXT,
+  servesAsStaging,
+  siteOriginFor,
+  stagingRobotsTxt,
   WORKER_VERSION_HEADER,
   withEnvironmentHeaders
 } from './site-environment'
@@ -64,68 +67,84 @@ describe('site environment', () => {
     expect(CANONICAL_ORIGINS.staging).toBe(project.remote.staging.origin)
   })
 
-  // #323: Ahrefs' Site Audit may crawl staging's canonical host, and only that host.
-  it("treats only the staging Worker on staging.best.serp.co as staging's canonical host", () => {
-    expect(isStagingCanonical('staging', 'staging.best.serp.co')).toBe(true)
-    expect(isStagingCanonical('staging', 'STAGING.BEST.SERP.CO')).toBe(true)
-    for (const [environment, host] of [
-      ['staging', 'best-serp-co-staging.serpcompany.workers.dev'],
-      ['staging', 'best.serp.co'],
-      ['staging', 'staging.best.serp.co.evil.example'],
-      ['staging', null],
-      ['production', 'staging.best.serp.co'],
-      ['local', 'staging.best.serp.co'],
-      [undefined, 'staging.best.serp.co']
-    ] as const)
-      expect(isStagingCanonical(environment, host), `${environment} ${host}`).toBe(false)
-    // Staging's canonical host is never public production.
-    expect(isPublicProduction('staging', 'staging.best.serp.co')).toBe(false)
-  })
-
-  it('recognizes an AhrefsSiteAudit request only on staging.best.serp.co', () => {
-    const audit = (url: string, userAgent: string) =>
-      new Request(url, { headers: { 'user-agent': userAgent } })
-    const ahrefs =
-      'Mozilla/5.0 (compatible; AhrefsSiteAudit/6.1; +http://ahrefs.com/robot/site-audit)'
-    expect(isStagingAuditRequest('staging', audit('https://staging.best.serp.co/', ahrefs))).toBe(
-      true
-    )
+  // #359: a Worker that serves as staging asks for the password and writes its own origin.
+  it('serves as staging only on the staging Worker, or a local Worker with the e2e switch', () => {
+    expect(servesAsStaging({ SITE_ENVIRONMENT: 'staging' })).toBe(true)
+    // Any host: the decision reads the Worker's vars only.
+    expect(servesAsStaging({ D1_RUNTIME_ENV: 'staging', SITE_ENVIRONMENT: 'staging' })).toBe(true)
     expect(
-      isStagingAuditRequest('staging', audit('https://staging.best.serp.co/x', 'AHREFSSITEAUDIT'))
+      servesAsStaging({
+        D1_RUNTIME_ENV: 'local',
+        LOCAL_STAGING_ACCESS: 'on',
+        SITE_ENVIRONMENT: 'local'
+      })
     ).toBe(true)
-    for (const [environment, url, userAgent] of [
-      ['staging', 'https://staging.best.serp.co/', 'Mozilla/5.0 (compatible; AhrefsBot/7.0)'],
-      ['staging', 'https://staging.best.serp.co/', 'Googlebot'],
-      ['staging', 'https://best-serp-co-staging.serpcompany.workers.dev/', ahrefs],
-      ['production', 'https://best.serp.co/', ahrefs],
-      ['production', 'https://staging.best.serp.co/', ahrefs],
-      ['local', 'http://127.0.0.1:8787/', ahrefs]
-    ] as const)
-      expect(isStagingAuditRequest(environment, audit(url, userAgent)), `${url} ${userAgent}`).toBe(
-        false
-      )
-    expect(isStagingAuditRequest('staging', new Request('https://staging.best.serp.co/'))).toBe(
-      false
-    )
+    for (const env of [
+      { SITE_ENVIRONMENT: 'production' },
+      { LOCAL_STAGING_ACCESS: 'on', SITE_ENVIRONMENT: 'production' },
+      { D1_RUNTIME_ENV: 'local', SITE_ENVIRONMENT: 'local' },
+      { D1_RUNTIME_ENV: 'local', LOCAL_STAGING_ACCESS: 'ON', SITE_ENVIRONMENT: 'local' },
+      // The switch is ignored unless both vars say local.
+      { LOCAL_STAGING_ACCESS: 'on', SITE_ENVIRONMENT: 'local' },
+      { D1_RUNTIME_ENV: 'production', LOCAL_STAGING_ACCESS: 'on', SITE_ENVIRONMENT: 'local' },
+      { SITE_ENVIRONMENT: 'Staging' },
+      { LOCAL_STAGING_ACCESS: 'on' },
+      {},
+      null,
+      undefined
+    ])
+      expect(servesAsStaging(env), JSON.stringify(env)).toBe(false)
   })
 
-  it("serves staging's canonical robots.txt only to the robots.txt path", async () => {
-    const robots = nonProductionRobotsTxt(
-      new Request('https://staging.best.serp.co/robots.txt'),
-      STAGING_CANONICAL_ROBOTS_TXT
+  it("writes staging's own origin only on a Worker that serves as staging", () => {
+    expect(siteOriginFor({ SITE_ENVIRONMENT: 'staging' })).toBe('https://staging.best.serp.co')
+    expect(
+      siteOriginFor({
+        D1_RUNTIME_ENV: 'local',
+        LOCAL_STAGING_ACCESS: 'on',
+        SITE_ENVIRONMENT: 'local'
+      })
+    ).toBe(STAGING_CANONICAL_ORIGIN)
+    // Production, local, and a missing or misspelled environment write best.serp.co, as before.
+    for (const env of [
+      { SITE_ENVIRONMENT: 'production' },
+      { D1_RUNTIME_ENV: 'local', SITE_ENVIRONMENT: 'local' },
+      { SITE_ENVIRONMENT: 'Staging' },
+      {},
+      undefined
+    ])
+      expect(siteOriginFor(env), JSON.stringify(env)).toBe('https://best.serp.co')
+    expect(CANONICAL_ORIGIN).toBe('https://best.serp.co')
+  })
+
+  it("gives staging's auditor best.serp.co's robots rules, and every other crawler none", () => {
+    const text = stagingRobotsTxt()
+    expect(text).toBe(
+      'User-agent: *\nDisallow: /\n\nUser-agent: AhrefsSiteAudit\nAllow: /\nDisallow: /search\nDisallow: /submit\n\nSitemap: https://staging.best.serp.co/sitemap-index.xml\n'
     )
-    if (!robots) throw new Error('expected a robots.txt response')
-    const groups = parseRobotsTxt(await robots.text())
-    // The reader takes lowercase agent names, as robots.txt matching is case-insensitive.
-    expect(robotsTxtAllows(groups, 'ahrefssiteaudit', '/')).toBe(true)
+    const groups = parseRobotsTxt(text)
     for (const agent of ['*', 'googlebot', 'bingbot', 'ahrefsbot'])
       expect(robotsTxtAllows(groups, agent, '/'), agent).toBe(false)
+    // The auditor's group is exactly production's (the robots.txt route's) rules.
+    const production = createCanonicalRobots().rules
+    const rules = Array.isArray(production) ? production[0] : production
+    const auditor = groups.find(group => group.agents.includes('ahrefssiteaudit'))
+    expect(auditor?.rules).toEqual([
+      ...[rules?.allow ?? []].flat().map(path => ({ allow: true, pattern: path })),
+      ...[rules?.disallow ?? []].flat().map(path => ({ allow: false, pattern: path }))
+    ])
+    expect(robotsTxtAllows(groups, 'ahrefssiteaudit', '/products/autoenhance.ai/')).toBe(true)
+    expect(robotsTxtAllows(groups, 'ahrefssiteaudit', '/search/')).toBe(false)
+    expect(robotsTxtAllows(groups, 'ahrefssiteaudit', '/submit/')).toBe(false)
+    const robots = nonProductionRobotsTxt(
+      new Request('https://staging.best.serp.co/robots.txt'),
+      text
+    )
+    expect(robots?.status).toBe(200)
     expect(
-      nonProductionRobotsTxt(
-        new Request('https://staging.best.serp.co/about/'),
-        STAGING_CANONICAL_ROBOTS_TXT
-      )
+      nonProductionRobotsTxt(new Request('https://staging.best.serp.co/about/'), text)
     ).toBeNull()
+    expect(NON_PRODUCTION_ROBOTS_TXT).toBe('User-agent: *\nDisallow: /\n')
   })
 
   it('answers robots.txt outside production with a file that disallows every crawler', async () => {
@@ -195,12 +214,12 @@ describe('site environment', () => {
     expect(tagged('max-image-preview: large')).toBe(NON_PRODUCTION_X_ROBOTS_TAG)
   })
 
-  it("adds no noindex for a staging audit request, and keeps a page's own", () => {
+  it("adds no noindex for a request that passed staging's password, and keeps a page's own", () => {
     const audited = (headers: Record<string, string> = {}) =>
       withEnvironmentHeaders(new Response('x', { headers }), {
         environment: 'staging',
+        passedStagingGate: true,
         publicProduction: false,
-        stagingAudit: true,
         versionId: 'v-1'
       }).headers
     expect(audited().get('x-robots-tag')).toBeNull()
@@ -253,6 +272,18 @@ describe('apps/web/wrangler.jsonc environment flags', () => {
       'https://staging.best.serp.co'
     )
     expect(canonicalHostRedirectEnabled(config.vars ?? {})).toBe(false)
+  })
+
+  // #359: the owner's decision: a plain var, shared by SERP sites, not a secret.
+  it("gives only staging its password, as a var, so only staging's Worker asks for it", () => {
+    expect(config.env.staging.vars?.STAGING_BASIC_AUTH_PASSWORD).toBe('stagingpassword')
+    expect(config.env.production.vars?.STAGING_BASIC_AUTH_PASSWORD).toBeUndefined()
+    expect(config.vars?.STAGING_BASIC_AUTH_PASSWORD).toBeUndefined()
+    expect(servesAsStaging(config.env.staging.vars)).toBe(true)
+    expect(servesAsStaging(config.env.production.vars)).toBe(false)
+    expect(servesAsStaging(config.vars)).toBe(false)
+    for (const block of [config, config.env.staging, config.env.production])
+      expect(block.vars?.LOCAL_STAGING_ACCESS).toBeUndefined()
   })
 
   it("puts Better Auth on each deployed Worker's canonical host", () => {

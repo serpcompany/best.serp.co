@@ -11,12 +11,14 @@ import { featureCopy } from '@/lib/feature-copy'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Edit listing',
-  description: 'Edit your listing on SERP.',
-  path: '/account/listings/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Edit listing',
+    description: 'Edit your listing on SERP.',
+    path: '/account/listings/',
+    noindex: true
+  })
+}
 
 type EditPageProps = { params: Promise<{ slug: string }> }
 

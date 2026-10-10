@@ -63,54 +63,54 @@ export function buildHomePageData({
   }
 }
 
-/** The homepage URL is the bare origin, `https://best.serp.co`, never `https://best.serp.co/`. */
-const HOME_URL = siteUrl('/')
-
 const HOME_TITLE = `${siteConfig.name} Directory of ${siteCopy.listingName.pluralTitle} and Resources`
-
-const {
-  alternates: _homeAlternates,
-  openGraph: homeOpenGraph,
-  ...homeMetadata
-} = generateBaseMetadata({
-  title: HOME_TITLE,
-  description: `${siteConfig.tagline}. Browse curated ${siteCopy.listingName.plural}, resources, and documentation links in one searchable directory.`,
-  keywords: [
-    ...KEYWORDS.homepage,
-    ...KEYWORDS.global,
-    'directory listings',
-    'curated resources',
-    'documentation links',
-    'resource directory',
-    'searchable directory'
-  ],
-  path: '/'
-})
 
 /**
  * With `trailingSlash`, the Next.js metadata API appends `/` to every same-origin URL, so it
  * would write the homepage canonical and `og:url` as `https://best.serp.co/`. The homepage
  * therefore leaves both unset here and renders `HomePageCanonicalTags` instead. See the URL
- * trailing-slash standard.
+ * trailing-slash standard. Built per request: the origin is this environment's (#359).
  */
-export const homePageMetadata: Metadata = {
-  ...homeMetadata,
-  // The homepage sits in `(site)`, below the root layout, so its title template would add
-  // ` | SERP`; the homepage title is already the full name.
-  title: { absolute: HOME_TITLE },
-  openGraph: { ...homeOpenGraph, url: undefined }
+export function homePageMetadata(): Metadata {
+  const {
+    alternates: _homeAlternates,
+    openGraph: homeOpenGraph,
+    ...homeMetadata
+  } = generateBaseMetadata({
+    title: HOME_TITLE,
+    description: `${siteConfig.tagline}. Browse curated ${siteCopy.listingName.plural}, resources, and documentation links in one searchable directory.`,
+    keywords: [
+      ...KEYWORDS.homepage,
+      ...KEYWORDS.global,
+      'directory listings',
+      'curated resources',
+      'documentation links',
+      'resource directory',
+      'searchable directory'
+    ],
+    path: '/'
+  })
+  return {
+    ...homeMetadata,
+    // The homepage sits in `(site)`, below the root layout, so its title template would add
+    // ` | SERP`; the homepage title is already the full name.
+    title: { absolute: HOME_TITLE },
+    openGraph: { ...homeOpenGraph, url: undefined }
+  }
 }
 
 /**
- * The homepage canonical and `og:url`, written as the bare origin. React hoists both tags
- * into `<head>`. The homepage renders it, and so does `/products/`'s first page, whose canonical
- * is `/` (#167); its later pages keep their own canonical metadata.
+ * The homepage canonical and `og:url`, written as the bare origin (`https://best.serp.co`, never
+ * `https://best.serp.co/`). React hoists both tags into `<head>`. The homepage renders it, and
+ * so does `/products/`'s first page, whose canonical is `/` (#167); its later pages keep their
+ * own canonical metadata.
  */
 export function HomePageCanonicalTags(): ReactElement {
+  const homeUrl = siteUrl('/')
   return (
     <>
-      <link rel="canonical" href={HOME_URL} />
-      <meta property="og:url" content={HOME_URL} />
+      <link rel="canonical" href={homeUrl} />
+      <meta property="og:url" content={homeUrl} />
     </>
   )
 }

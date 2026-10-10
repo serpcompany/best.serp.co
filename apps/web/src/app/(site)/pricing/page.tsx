@@ -10,12 +10,14 @@ import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { siteConfig } from '@/lib/site/site-config'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: `${siteConfig.name} Pricing`,
-  description:
-    'Choose a plan to list, feature, and promote a product or resource on SERP: submit a directory listing for review, or sponsor SERP to reach its audience.',
-  path: '/pricing/'
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: `${siteConfig.name} Pricing`,
+    description:
+      'Choose a plan to list, feature, and promote a product or resource on SERP: submit a directory listing for review, or sponsor SERP to reach its audience.',
+    path: '/pricing/'
+  })
+}
 
 /** A plan: serplists' pricing `PlanCard` (#275), without a feature list. */
 function PlanCard({
