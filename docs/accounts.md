@@ -169,10 +169,13 @@ the request carries a session cookie, so anonymous pages never load Better Auth 
   redirects to `/login?callbackUrl=/account/`. Messages (#73) and Settings show a "Soon" badge
   and do not link. The shell is composed from the shared dashboard pieces in
   `apps/web/src/components/dashboard/` (`AppShell`, `SidebarBrand`, `NavMain`, `NavSecondary`,
-  `NavUser`, `SiteHeader`, `DashboardPageHeader`), which the admin panel (#64, shadcn
-  sidebar-07) reuses with `collapsible="icon"` and `rail`. `NavMain` marks the current page
-  from the path; the collapsed off-canvas sidebar is `inert`; and the mobile Sheet returns
-  focus to the sidebar trigger when it closes (a local addition to the stock Sidebar in `components/ui/sidebar.tsx`).
+  `ThemeMenuButton`, `SidebarAccountMenu`, `DashboardHeader`, `DashboardPageHeader`), which the
+  admin panel (#64, shadcn sidebar-07) reuses with `collapsible="icon"` and `rail`. Their
+  sidebar rows, the footer's theme row and account menu, and the sticky top bar are serplists'
+  console `AppShell` and `AppSidebar` (#261), without its public navigation and footer.
+  `NavMain` marks the current page from the path; the collapsed off-canvas sidebar is `inert`;
+  and the mobile Sheet returns focus to the sidebar trigger when it closes (a local addition to
+  the stock Sidebar in `components/ui/sidebar.tsx`).
 
 Both pages are noindex and bypass the edge cache. `apps/web/e2e/login.spec.ts` covers them
 in a browser.

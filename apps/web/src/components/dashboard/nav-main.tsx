@@ -7,7 +7,6 @@ import type { ComponentProps, ReactNode } from 'react'
 import {
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuBadge,
   SidebarMenuButton,
@@ -56,107 +55,109 @@ export function useCloseMobileSidebar(): () => void {
   }
 }
 
+/** serplists' `FULL_SIZE_TARGET_CLASS`: its sidebar rows are 44px touch targets. */
+export const FULL_SIZE_TARGET_CLASS = 'h-11'
+
+/** Centres a count or "Soon" badge on a full-size row (stock centres it on an 8-high row). */
+const ROW_BADGE_CLASS = 'peer-data-[size=default]/menu-button:top-3'
+
 /**
- * dashboard-01's NavMain: an optional primary "quick create" button, then the section links.
- * Sections without an `href` keep their full colour with a subtle "Soon" badge, instead of
- * looking disabled.
+ * serplists' `AppSidebar` rows: an optional primary "quick create" row over the section rows, in
+ * one group. Sections without an `href` keep their full colour with a subtle "Soon" badge,
+ * instead of looking disabled.
  */
 export function NavMain({
   items,
-  label,
   quickAction,
   className,
   ...props
 }: {
   items: readonly DashboardNavItem[]
-  label?: string
   quickAction?: DashboardQuickAction
 } & ComponentProps<typeof SidebarGroup>) {
   const close = useCloseMobileSidebar()
   const pathname = usePathname()
   return (
-    <>
-      {quickAction ? (
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  tooltip={quickAction.title}
-                  className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-                  render={<Link href={quickAction.href} onClick={close} />}
-                >
-                  {quickAction.icon ? <quickAction.icon /> : null}
-                  <span>{quickAction.title}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      ) : null}
-      <SidebarGroup className={className} {...props}>
-        {/* /80 rather than stock /70, so the label reaches 4.5:1 on the light sidebar. */}
-        {label ? (
-          <SidebarGroupLabel className="text-sidebar-foreground/80">{label}</SidebarGroupLabel>
-        ) : null}
-        <SidebarGroupContent>
+    <SidebarGroup className={className} {...props}>
+      <SidebarGroupContent className="flex flex-col gap-2">
+        {quickAction ? (
           <SidebarMenu>
-            {items.map(item => {
-              const active = item.href
-                ? (item.isActive ?? isNavItemActive(pathname, item.href, item.exact))
-                : false
-              return (
-                <SidebarMenuItem key={item.title}>
-                  {item.href ? (
-                    <SidebarMenuButton
-                      isActive={active}
-                      tooltip={item.title}
-                      render={
-                        <Link
-                          href={item.href}
-                          aria-current={active ? 'page' : undefined}
-                          onClick={close}
-                        />
-                      }
-                    >
-                      {item.icon ? <item.icon /> : null}
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  ) : (
-                    <SidebarMenuButton
-                      tooltip={`${item.title}: coming soon`}
-                      className="cursor-default hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground"
-                      render={<span />}
-                    >
-                      {item.icon ? <item.icon /> : null}
-                      <span>
-                        {item.title}
-                        <span className="sr-only"> (coming soon)</span>
-                      </span>
-                    </SidebarMenuButton>
-                  )}
-                  {item.href ? (
-                    item.badge != null ? (
-                      <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
-                    ) : null
-                  ) : (
-                    <SidebarMenuBadge
-                      aria-hidden="true"
-                      className={cn(
-                        // /80 keeps the 11px label at 4.5:1 or more on the light sidebar.
-                        'border border-sidebar-border px-1.5 text-[11px] font-normal text-sidebar-foreground/80',
-                        'peer-hover/menu-button:text-sidebar-foreground/80'
-                      )}
-                    >
-                      Soon
-                    </SidebarMenuBadge>
-                  )}
-                </SidebarMenuItem>
-              )
-            })}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip={quickAction.title}
+                className={cn(
+                  FULL_SIZE_TARGET_CLASS,
+                  'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground'
+                )}
+                render={<Link href={quickAction.href} onClick={close} />}
+              >
+                {quickAction.icon ? <quickAction.icon /> : null}
+                <span>{quickAction.title}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
-    </>
+        ) : null}
+        <SidebarMenu>
+          {items.map(item => {
+            const active = item.href
+              ? (item.isActive ?? isNavItemActive(pathname, item.href, item.exact))
+              : false
+            return (
+              <SidebarMenuItem key={item.title}>
+                {item.href ? (
+                  <SidebarMenuButton
+                    className={FULL_SIZE_TARGET_CLASS}
+                    isActive={active}
+                    tooltip={item.title}
+                    render={
+                      <Link
+                        href={item.href}
+                        aria-current={active ? 'page' : undefined}
+                        onClick={close}
+                      />
+                    }
+                  >
+                    {item.icon ? <item.icon /> : null}
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                ) : (
+                  <SidebarMenuButton
+                    tooltip={`${item.title}: coming soon`}
+                    className={cn(
+                      FULL_SIZE_TARGET_CLASS,
+                      'cursor-default hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground'
+                    )}
+                    render={<span />}
+                  >
+                    {item.icon ? <item.icon /> : null}
+                    <span>
+                      {item.title}
+                      <span className="sr-only"> (coming soon)</span>
+                    </span>
+                  </SidebarMenuButton>
+                )}
+                {item.href ? (
+                  item.badge != null ? (
+                    <SidebarMenuBadge className={ROW_BADGE_CLASS}>{item.badge}</SidebarMenuBadge>
+                  ) : null
+                ) : (
+                  <SidebarMenuBadge
+                    aria-hidden="true"
+                    className={cn(
+                      ROW_BADGE_CLASS,
+                      // /80 keeps the 11px label at 4.5:1 or more on the light sidebar.
+                      'border border-sidebar-border px-1.5 text-[11px] font-normal text-sidebar-foreground/80',
+                      'peer-hover/menu-button:text-sidebar-foreground/80'
+                    )}
+                  >
+                    Soon
+                  </SidebarMenuBadge>
+                )}
+              </SidebarMenuItem>
+            )
+          })}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   )
 }

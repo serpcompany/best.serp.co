@@ -2,24 +2,23 @@
 
 import {
   Box,
+  CirclePlus,
   ExternalLink,
   FileText,
   LayoutDashboard,
   MessageSquare,
-  PlusCircle,
   Settings
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { signOut } from '@/components/auth/sign-in-api'
+import { type DashboardUser, SidebarAccountMenu } from '@/components/dashboard/account-menu'
 import { AppShell } from '@/components/dashboard/app-shell'
+import { type DashboardCrumb, DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { type DashboardNavItem, isNavItemActive, NavMain } from '@/components/dashboard/nav-main'
 import { NavSecondary } from '@/components/dashboard/nav-secondary'
-import { type DashboardUser, NavUser } from '@/components/dashboard/nav-user'
 import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
-import { type DashboardCrumb, SiteHeader } from '@/components/dashboard/site-header'
-import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { buttonVariants } from '@/components/ui/button'
 import { getRoute } from '@/lib/routing/routes'
 import { cn } from '@/lib/utils'
@@ -27,9 +26,9 @@ import { cn } from '@/lib/utils'
 /**
  * The account dashboard shell from the #70 mockups (screens 5 to 7): shadcn dashboard-01, built
  * from the shared dashboard pieces in `@/components/dashboard/*` (the admin panel
- * reuses them with sidebar-07's options). The layout renders it once; each page names its
- * breadcrumb with `AccountCrumbs`. Messages (#73) and Settings are not built yet, so they show a
- * "Soon" badge.
+ * reuses them with sidebar-07's options), whose rows, footer and top bar follow serplists'
+ * console (#261). The layout renders it once; each page names its breadcrumb with
+ * `AccountCrumbs`. Messages (#73) and Settings are not built yet, so they show a "Soon" badge.
  */
 
 export type AccountUser = DashboardUser
@@ -63,19 +62,16 @@ function AccountHeader() {
   const pathname = usePathname() ?? ''
   const context = useContext(CrumbsContext)
   return (
-    <SiteHeader
+    <DashboardHeader
       crumbs={context?.crumbs ?? defaultCrumbs(pathname.toLowerCase())}
       actions={
-        <>
-          <Link
-            href={getRoute('home')}
-            className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'hidden sm:flex')}
-          >
-            View site
-            <ExternalLink />
-          </Link>
-          <ThemeToggle />
-        </>
+        <Link
+          href={getRoute('home')}
+          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'hidden sm:flex')}
+        >
+          View site
+          <ExternalLink />
+        </Link>
       }
     />
   )
@@ -129,20 +125,19 @@ export function AccountShell({
           <>
             <NavMain
               items={nav}
-              label="Account"
               quickAction={{
                 href: getRoute('submit'),
-                icon: PlusCircle,
+                icon: CirclePlus,
                 title: 'Submit a product'
               }}
             />
             <NavSecondary items={SECONDARY} className="mt-auto" />
           </>
         }
-        sidebarFooter={
-          <NavUser
+        accountMenu={
+          <SidebarAccountMenu
             user={user}
-            links={[{ href: getRoute('home'), icon: ExternalLink, title: 'View best.serp.co' }]}
+            links={[{ href: getRoute('home'), title: 'View best.serp.co' }]}
             onSignOut={() => void onSignOut()}
             signingOut={signingOut}
           />

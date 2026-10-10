@@ -533,6 +533,44 @@ test('withdraws a pending submission from the table', async ({ browser }) => {
   await user.context.close()
 })
 
+test('the shell has serplists’ sidebar rows, theme row, account menu and sticky top bar (#261)', async ({
+  browser
+}) => {
+  const user = await signedIn(browser, 'shell')
+  const { page } = user
+  await page.goto('/account/')
+  const nav = page.getByRole('navigation', { name: 'Dashboard' })
+  await expect(nav.getByRole('link', { name: 'Submit a product' })).toHaveAttribute(
+    'href',
+    '/submit/'
+  )
+  for (const name of ['Submit a product', 'Overview', 'Submissions', 'Listings', 'Message us']) {
+    await expect(nav.getByRole('link', { name, exact: true })).toHaveCSS('height', '44px')
+  }
+  await expect(nav.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page')
+  await expect(page.locator('main > header')).toHaveCSS('position', 'sticky')
+
+  // The theme row switches the theme; it is a client component, so click until hydrated.
+  const html = page.locator('html')
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+    await expect(html).toHaveClass(/\bdark\b/u, { timeout: 2_000 })
+  }).toPass()
+  await page.getByRole('button', { name: 'Switch to light mode' }).click()
+  await expect(html).not.toHaveClass(/\bdark\b/u)
+
+  // A new account has no name, so the menu shows the address, then the site link and Sign out.
+  await page.getByRole('button', { name: 'Account menu' }).click()
+  const menu = page.getByRole('menu')
+  await expect(menu.getByText(user.email)).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'View best.serp.co' })).toHaveAttribute(
+    'href',
+    '/'
+  )
+  await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeVisible()
+  await user.context.close()
+})
+
 test('shows and acts on the user’s own records only, never cached or indexed', async ({
   baseURL,
   browser
