@@ -45,8 +45,9 @@ From the edge inward:
    name order, name pages, featured/latest heads, details, search results (per normalized
    query and limit), and the full summary list (for sitemaps and the feed) are cached under
    epoch-scoped keys for 24 hours, with live D1 fallback when the cache fails. So is each
-   listing body's parsed Markdown (`getDerivedValue`, `lib/markdown/listing-content.ts`, #334):
-   the page renders the cached tree instead of parsing the body on every uncached render. A
+   listing body's parsed Markdown (`getDerivedValue`, built by
+   `lib/markdown/listing-content-tree.ts`, #334): the page renders the cached tree instead of
+   parsing the body on every uncached render. A
    tree's JSON is about twice its body for prose and up to about 9 times for markup-dense
    Markdown (19 KB on average for 10.8 KB bodies, 39 KB at most for a 21 KB one), far below the
    Cache API's object limit. Its key also names the tree's format
