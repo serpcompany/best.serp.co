@@ -7,7 +7,8 @@
  *    `*.workers.dev` request without the smoke-test header gets one 308 to that Worker's
  *    canonical host, best.serp.co or staging.best.serp.co (`lib/routing/canonical-host.ts`).
  * 2. Retired URLs without a replacement (`/news`) answer 410 Gone (`lib/routing/retired-paths.ts`).
- * 3. An old root-level listing or category URL: one 308 to its page (`lib/routing/legacy-root.ts`).
+ * 3. An old root-level listing or category URL, also through a listing slug or category redirect:
+ *    one 308 to its current page (`lib/routing/legacy-root.ts`).
  * 4. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
  * 5. Outside public production, `/robots.txt` disallows every crawler; on staging's canonical
  *    host it lets Ahrefs' Site Audit in (#323).

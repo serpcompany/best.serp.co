@@ -97,8 +97,8 @@ export function catalogRenderer(
 }
 
 /**
- * Where an old root-level URL moved (`lib/routing/legacy-root.ts`, #168), or undefined without
- * a valid binding, when the catalog pages fail closed too.
+ * Where an old root-level URL moved (`lib/routing/legacy-root.ts`, #168, #356), or undefined
+ * without a valid binding, when the catalog pages fail closed too.
  */
 export function catalogLegacyRootLookup(
   env: CatalogWorkerEnv,

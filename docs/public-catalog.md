@@ -32,8 +32,8 @@ so every change to public output has publication provenance.
 - Listing IDs are stable across slug changes; `listing_slug_redirects` maps a retired slug to the
   listing it answers 308 to: its own after a rename, or another live listing for an unpublished
   duplicate (`listing-slug-redirect`, #338). The product page looks a slug up there before it
-  renders the 410 page, and follows the listing's id to its current slug, so a later rename still
-  lands in one hop. A redirect never makes its unpublished listing public: it stays out of the
+  renders the 410 page, and so does the Worker's old root-level `/<slug>` lookup (#356); both
+  follow the listing's id to its current slug, so a later rename still lands in one hop. A redirect never makes its unpublished listing public: it stays out of the
   sitemap, search, RSS, and category pages.
 
 ## Catalog epoch

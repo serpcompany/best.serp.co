@@ -2,7 +2,9 @@
  * Old root-level listing and category URLs (`/<slug>`, the static site's scheme) answer one 308
  * from the Worker (#168; serp web-stack/nextjs-on-workers.md, The Worker entry). They used to
  * take two hops: the Worker's trailing-slash 308, then a `permanentRedirect` from an
- * `app/[slug]` page, which is gone. A root-level path that moved nowhere answers 404.
+ * `app/[slug]` page, which is gone. A retired listing slug (#356) or a retired category URL
+ * (#341) is followed through its redirect to the current page in the same one hop. A root-level
+ * path that moved nowhere answers 404.
  *
  * This module has no Next.js imports so it can run before the Next.js server is loaded.
  */
