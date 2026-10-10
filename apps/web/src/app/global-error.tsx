@@ -1,6 +1,5 @@
 'use client'
 
-import { captureException } from '@sentry/nextjs'
 import type NextError from 'next/error'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
@@ -19,7 +18,10 @@ type GlobalErrorProperties = {
  */
 const GlobalError = ({ error, reset }: GlobalErrorProperties) => {
   useEffect(() => {
-    captureException(error)
+    // Imported here, not at the top: every page's server render loads this component, and a
+    // static import would load the Sentry server SDK with it (#355). In the browser it resolves
+    // to the SDK `instrumentation-client.ts` already started.
+    void import('@sentry/nextjs').then(({ captureException }) => captureException(error))
   }, [error])
 
   return (

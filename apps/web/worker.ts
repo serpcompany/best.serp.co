@@ -5,7 +5,9 @@
  * `/_media` (#95).
  *
  * Admin paths pass the Cloudflare Access and session-cookie gate first
- * (`src/lib/auth/admin-gate.ts`).
+ * (`src/lib/auth/admin-gate.ts`). A request for a signed-in or operational surface starts the
+ * Sentry server SDK before it renders; public pages never load it
+ * (`src/lib/telemetry/server-errors.ts`, #355).
  *
  * `scheduled()` serves the Cron Triggers in `wrangler.jsonc` (`triggers.crons`): the hourly draft
  * reminders and expiry (#63), the listing media queue every 15 minutes (#95), and the weekly
@@ -23,6 +25,7 @@ import { withEdgeCache } from './src/lib/edge-cache/html-cache'
 import { serveLocalMedia } from './src/lib/media/worker-media'
 import { legacyRootRedirect, legacyRootSlugMatcher } from './src/lib/routing/legacy-root'
 import { configRedirectPatterns } from './src/lib/routing/trailing-slash'
+import { startServerSentryFor } from './src/lib/telemetry/server-errors'
 import {
   catalogEpochReader,
   catalogLegacyRootLookup,
@@ -105,7 +108,10 @@ export default {
     if (localMedia) return localMedia
     const render = catalogRenderer(
       env,
-      rendered => openNextWorker.fetch(rendered, env, context),
+      async rendered => {
+        await startServerSentryFor(rendered)
+        return openNextWorker.fetch(rendered, env, context)
+      },
       log
     )
     return handleWorkerRequest(request, env, {

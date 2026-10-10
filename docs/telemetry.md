@@ -35,12 +35,27 @@ no beacon.
 
 ## Error reporting (Sentry)
 
-Sentry reports errors from the Worker (`apps/web/src/instrumentation.ts`, server rendering and
-route handlers) and the browser (`instrumentation-client.ts`), with the settings and the
-scrubber in `apps/web/src/lib/telemetry/sentry.ts`: errors only, with no PII, query strings,
-cookies, headers, console output, logger data, sessions, tracing, or replay. Both deploy
-builds bake in `NEXT_PUBLIC_SENTRY_DSN` (repo variable `SENTRY_DSN`) and the commit as the
-release; with no DSN, Sentry stays off (E2E sets none). `SENTRY_AUTH_TOKEN` (repo secret,
-project releases scope) and the `SENTRY_PROJECT` variable only upload source maps. The owner
-creates the project and sets all three, then checks that the first staging error's stack
-frames resolve. Worker-entry and cron errors are #210.
+Sentry reports errors from the browser (`instrumentation-client.ts`) on every page, and from
+the Worker (`apps/web/src/instrumentation.ts`, server rendering and route handlers) on the
+signed-in and operational surfaces only: `/admin`, `/account`, `/submit`, `/login`, `/claims`
+and `/api` (#355). The settings and the scrubber are in `apps/web/src/lib/telemetry/sentry.ts`:
+errors only, with no PII, query strings, cookies, headers, console output, logger data,
+sessions, tracing, or replay. Both deploy builds bake in `NEXT_PUBLIC_SENTRY_DSN` (repo variable
+`SENTRY_DSN`) and the commit as the release; with no DSN, Sentry stays off (E2E sets none).
+`SENTRY_AUTH_TOKEN` (repo secret, project releases scope) and the `SENTRY_PROJECT` variable
+only upload source maps. The owner creates the project and sets all three, then checks that the
+first staging error's stack frames resolve. Worker-entry and cron errors are #210.
+
+### Public pages: Worker logs, not Sentry
+
+Every other path (the home page, the catalog, search, the sitemaps and RSS, and the other
+public pages) never loads the Worker's Sentry SDK, which cost about 110 ms of CPU in each fresh
+isolate (#334, #355). A server error there is one JSON line on `console.error`, which Workers
+Observability keeps: `event: "request_error"`, with the method, the path without its query
+string, the route, the render source, and the error's name, message, stack and digest. Find
+them by filtering the Worker's logs on `request_error`.
+
+`apps/web/src/lib/telemetry/server-errors.ts` holds the split. The Worker entry starts the SDK
+just before Next.js renders an isolate's first request that reports to Sentry, so those
+requests run with it from the start, as before. `global-error.tsx` imports the SDK only when
+it catches an error in the browser, so a page's server render doesn't load it either.
