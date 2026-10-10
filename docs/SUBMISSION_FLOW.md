@@ -225,9 +225,10 @@ proposes an SVG icon. A local Worker also accepts http, for its fixture sites.
 
 The saved logo, and the social image the server's own prefill finds on the website, are then
 copied to our media host under the submission (`best.serp.co/submissions/<id>/…`, after the
-response, so hosting never fails the save; see [Listing media](./MEDIA.md)). The review screen
-and previews show those hosted copies, or the fallback tile with a link to the source; approval
-copies the logo, and the featured image exactly as the reviewer saw it, into the listing's path.
+response, so hosting never fails the save; see
+[Media ingestion](./MEDIA_INGESTION.md#where-it-runs)). The review screen and previews show
+those hosted copies, or the fallback tile with a link to the source; approval copies the logo,
+and the featured image exactly as the reviewer saw it, into the listing's path.
 Only the submitter's own form previews the URL they typed, through
 `<img referrerpolicy="no-referrer" loading="lazy">`.
 
@@ -259,4 +260,4 @@ Code: `apps/web/src/app/(site)/submit/`, `apps/web/src/components/submit/`,
 
 A submitted logo is never published as the submitter's URL (#95): approval adopts its hosted copy
 or queues the source behind the fallback tile. Submit v2 hosts it at intake
-([Listing media](./MEDIA.md#integration-points)).
+([Media ingestion](./MEDIA_INGESTION.md#where-it-runs)).
