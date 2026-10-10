@@ -60,7 +60,9 @@ describe('the Other categorization manifests (#333)', () => {
     expect(parsed.operations.map(operation => ('slug' in operation ? operation.slug : ''))).toEqual(
       ['a.ai']
     )
-    expect(first?.source).toMatch(/^# serpcompany\/best\.serp\.co#333: file 1 listings/u)
+    expect(first?.source).toMatch(
+      /^# serpcompany\/best\.serp\.co#333: move 1 listings filed only under Other/u
+    )
   })
 
   it.each([
