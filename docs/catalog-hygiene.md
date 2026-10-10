@@ -188,8 +188,11 @@ covers it on fixture listings.
 
 Some products were imported twice, under two slugs with the same name and description.
 `d1/publications/2026-10-10-duplicate-listings.yaml` keeps one listing of each pair and unpublishes
-the other (410, like the cleanups above); its header says which slug stays and why. No manifest
-operation can redirect one listing's slug to another listing, so the retired URL answers 410.
+the other (410, like the cleanups above); its header says which slug stays and why. Then
+`2026-10-10-duplicate-listings-redirects.yaml` sends each retired slug on to the listing it
+duplicated: `/products/<retired>/` answers 308 to `/products/<kept>/`
+([Slug redirects](./catalog-publication.md#slug-redirects), #338). Publish it after the first
+manifest on each environment: until the retired listings are unpublished, it refuses whole.
 
 - **Media first.** Where the retired listing had a logo or image the kept one lacked, a
   `listing-media-update` earlier in the same batch gives the kept listing a copy under its own key
