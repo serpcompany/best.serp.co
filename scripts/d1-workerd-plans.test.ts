@@ -1485,6 +1485,43 @@ operations:
     })
     expect((await live()).version).toBe(before.version + 1)
 
+    // #338: the unpublished slug then redirects to a live listing, guards and all, on D1 too.
+    const redirect = `version: 1
+id: workerd-redirect-parked.example
+concurrency: rows
+provenance:
+  actor: test
+  workflow: test/workerd
+operations:
+  - action: listing-slug-redirect
+    from: { id: lst_unpublish_workerd, slug: parked.example }
+    to: { id: lst_moved_workerd, slug: moved.example }
+    reason: duplicate of moved.example
+`
+    const unredirected = await live()
+    await executePublicationPlan(
+      db,
+      buildPublicationPlan(parseManifest(redirect), redirect, NOW, unredirected)
+    )
+    expect(
+      await first(
+        'SELECT listing_id, old_slug, new_slug FROM listing_slug_redirects WHERE old_slug=?',
+        'parked.example'
+      )
+    ).toEqual({
+      listing_id: 'lst_moved_workerd',
+      new_slug: 'moved.example',
+      old_slug: 'parked.example'
+    })
+    expect((await live()).version).toBe(unredirected.version + 1)
+    // A guard that says why: D1 reports the reason, and the batch writes nothing.
+    const again = redirect.replace('workerd-redirect-parked.example', 'workerd-redirect-again')
+    const redirected = await live()
+    await expect(
+      executePublicationPlan(db, buildPublicationPlan(parseManifest(again), again, NOW, redirected))
+    ).rejects.toThrow(/the slug already redirects, or this would make a chain or a loop/u)
+    expect(await live()).toEqual(redirected)
+
     // A listing whose website moved: the guard's malformed JSON rolls the whole batch back.
     const after = await live()
     const stale = manifest('lst_moved_workerd', 'moved.example', 'https://elsewhere.example/')

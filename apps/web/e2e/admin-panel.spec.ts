@@ -552,6 +552,50 @@ test.describe('listings', () => {
     ])
   })
 
+  test('a retired duplicate answers 410, then 308 to the listing it duplicated once its redirect is published (#338)', async ({
+    baseURL
+  }) => {
+    const kept = seedImportedListing('kept', activeCategory(), null)
+    const retired = seedImportedListing('retired', activeCategory(), null)
+    // Each step writes what its publisher operation writes (`scripts/d1-publisher.ts`, whose plans
+    // and guards `scripts/d1-publisher.sqlite.test.ts` and the workerd suite run) and advances the
+    // catalog version, as every publication does. Playwright can't load the publisher itself.
+    const publish = (sql: string) =>
+      localD1(`${sql}
+        UPDATE publication_state SET version = version + 1 WHERE id = 1;`)
+    const visitor = await playwrightRequest.newContext({ baseURL })
+    try {
+      // `listing-unpublish`, as 2026-10-10-duplicate-listings.yaml retires a duplicate: 410.
+      publish(`UPDATE listings SET is_active = 0 WHERE id = ${q(retired.id)};`)
+      await expect(async () => {
+        expect((await visitor.get(`/products/${retired.slug}/`)).status()).toBe(410)
+      }).toPass({ intervals: [1_000, 2_000, 5_000], timeout: 90_000 })
+
+      // `listing-slug-redirect`, as 2026-10-10-duplicate-listings-redirects.yaml sends it on.
+      publish(`INSERT INTO listing_slug_redirects (listing_id, old_slug, new_slug, manifest_id, reason)
+        VALUES (${q(kept.id)}, ${q(retired.slug)}, ${q(kept.slug)}, 'e2e-redirects',
+          ${q(`duplicate of ${kept.slug}`)});`)
+      await expect(async () => {
+        const moved = await visitor.get(`/products/${retired.slug}/`, { maxRedirects: 0 })
+        expect(moved.status()).toBe(308)
+        expect(new URL(moved.headers().location ?? '', baseURL).pathname).toBe(
+          `/products/${kept.slug}/`
+        )
+      }).toPass({ intervals: [1_000, 2_000, 5_000], timeout: 90_000 })
+      expect((await visitor.get(`/products/${kept.slug}/`, { maxRedirects: 0 })).status()).toBe(200)
+      // The retired row stays unpublished: out of the sitemap and search, which list the kept one.
+      const sitemap = await (await visitor.get('/sitemap-products.xml')).text()
+      expect(sitemap).toContain(`/products/${kept.slug}/`)
+      expect(sitemap).not.toContain(`/products/${retired.slug}/`)
+      const search = async (query: string) =>
+        (await visitor.get(`/api/search?q=${encodeURIComponent(query)}`)).text()
+      expect(await search(kept.name)).toContain(kept.slug)
+      expect(await search(retired.name)).not.toContain(retired.slug)
+    } finally {
+      await visitor.dispose()
+    }
+  })
+
   test('edits imported listings with no logo or a site-relative logo; a new logo is checked and hosted', async ({
     baseURL,
     page
