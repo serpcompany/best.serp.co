@@ -594,6 +594,63 @@ describe('shared catalog data operations', () => {
     })
   })
 
+  it('derives a value once per epoch and format, reading no D1 rows for it (#334)', async () => {
+    const cache = new MemoryCatalogCache()
+    let computed = 0
+    const derivation = (format = 'f1') => ({
+      compute: () => {
+        computed += 1
+        return { body: `tree ${computed}` }
+      },
+      format,
+      id: 'charlie',
+      kind: 'listing-content' as const,
+      validate: (value: unknown): value is { body: string } =>
+        typeof (value as { body?: unknown } | null)?.body === 'string'
+    })
+
+    const cold = operations(cache)
+    expect(await cold.operations.getDerivedValue(derivation())).toEqual({ body: 'tree 1' })
+    // Only the epoch is read from D1; the value comes from `compute`.
+    expect(
+      cold.events.filter(event => event.event === 'd1_query').map(event => event.queryShape)
+    ).toEqual(['publication-version'])
+    expect(cache.values.get(`catalog-listing-content:v7:${epoch(1)}:f1:charlie`)).toEqual({
+      publicationVersion: 1,
+      value: { body: 'tree 1' }
+    })
+    expect(cache.ttlSeconds.get(`catalog-listing-content:v7:${epoch(1)}:f1:charlie`)).toBe(86400)
+
+    const warm = operations(cache)
+    expect(await warm.operations.getDerivedValue(derivation())).toEqual({ body: 'tree 1' })
+    expect(warm.events).toContainEqual({
+      event: 'catalog_cache',
+      operation: 'listing-content',
+      state: 'hit'
+    })
+    expect(computed).toBe(1)
+
+    // Another format, a new epoch, or a corrupt entry derives it again.
+    expect(await operations(cache).operations.getDerivedValue(derivation('f2'))).toEqual({
+      body: 'tree 2'
+    })
+    sqlite.database.prepare('UPDATE publication_state SET version = 2 WHERE id = 1').run()
+    expect(await operations(cache).operations.getDerivedValue(derivation())).toEqual({
+      body: 'tree 3'
+    })
+    cache.values.set(`catalog-listing-content:v7:${epoch(2)}:f1:charlie`, {
+      publicationVersion: 2,
+      value: { body: 7 }
+    })
+    const corrupt = operations(cache)
+    expect(await corrupt.operations.getDerivedValue(derivation())).toEqual({ body: 'tree 4' })
+    expect(corrupt.events).toContainEqual({
+      event: 'catalog_cache',
+      operation: 'listing-content',
+      state: 'corrupt'
+    })
+  })
+
   it('emits attributable query metadata without SQL, bindings, or visitor data', async () => {
     const { events, operations: catalog } = operations()
     await catalog.getPublishedListings()

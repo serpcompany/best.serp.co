@@ -8,6 +8,7 @@ import { sharedCatalogEpoch } from '@/db/catalog-epoch'
 import { createDatabase } from '@/db/client'
 import type {
   CatalogObserver,
+  CatalogOperations,
   ListingNamePage,
   ListingNamePageQuery,
   PublishedCategory,
@@ -19,6 +20,11 @@ import {
   validateMediaBaseUrl
 } from '@/db/media-keys'
 import type { WebsiteDetailMetadata, WebsiteMetadata } from '@/lib/directory/content-query'
+import {
+  isListingContentTree,
+  LISTING_CONTENT_FORMAT,
+  type ListingContentTree
+} from '@/lib/markdown/listing-content'
 
 export type { ListingNamePage, PublishedCategory, UnpublishedListing }
 /** Largest `limit` search and autocomplete honor (`/api/search` clamps to it). */
@@ -80,9 +86,39 @@ const readPublishedListings = cache(
 const readShellStats = cache(async () => (await getOperations()).getShellStats())
 
 const readListingBySlug = cache(async (slug: string): Promise<WebsiteDetailMetadata | null> => {
-  const detail = await (await getOperations()).getListingBySlug(slug)
-  return detail && resolveListingDetailMedia(detail, await getMediaBaseUrl())
+  const operations = await getOperations()
+  const detail = await operations.getListingBySlug(slug)
+  if (!detail) return null
+  const resolved = resolveListingDetailMedia(detail, await getMediaBaseUrl())
+  const contentTree = await readContentTree(operations, resolved)
+  return contentTree ? { ...resolved, contentTree } : resolved
 })
+
+/**
+ * A listing body as the tree its page renders (`lib/markdown/listing-content.ts`): parsed once
+ * per catalog epoch and data center, then read from the data cache (#334). Read with the detail,
+ * so the page and its metadata wait for one promise and the render's order is unchanged. The
+ * parser is imported only when the cache has no tree, so the routes that read the catalog
+ * without a listing body (the home page, the directory and category pages, search, feeds,
+ * sitemaps) never load react-markdown.
+ */
+async function readContentTree(
+  operations: CatalogOperations,
+  listing: WebsiteDetailMetadata
+): Promise<ListingContentTree | null> {
+  const { content } = listing
+  if (!content) return null
+  return operations.getDerivedValue({
+    compute: async () => {
+      const { listingContentTree } = await import('@/lib/markdown/listing-content-tree')
+      return listingContentTree(content, Boolean(listing.resourceLinks?.length))
+    },
+    format: LISTING_CONTENT_FORMAT,
+    id: listing.slug,
+    kind: 'listing-content',
+    validate: isListingContentTree
+  })
+}
 
 export const getPublishedListings = readPublishedListings
 

@@ -1,8 +1,9 @@
 import { clientIp } from '@/lib/auth/rate-limits'
 import { authorizeUserRequest, consumeRequestRateLimit } from '@/lib/auth/server'
+import { currentClaimFlags } from '@/lib/claims/current'
 import { claimFailure, claimsOff, json } from '@/lib/claims/http'
 import { domainPinnedFetcher } from '@/lib/claims/product'
-import { claimDependencies, currentClaimFlags } from '@/lib/claims/runtime'
+import { claimDependencies } from '@/lib/claims/runtime'
 import { checkClaimBadge, confirmClaimEmail } from '@/lib/claims/service'
 import { verifyFeaturedBadge } from '@/lib/submissions/badge-verifier'
 import {
