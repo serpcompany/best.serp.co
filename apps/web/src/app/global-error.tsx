@@ -1,10 +1,10 @@
 'use client'
 
-import { captureException } from '@sentry/nextjs'
 import type NextError from 'next/error'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { fonts } from '@/lib/fonts'
+import { reportGlobalError } from '@/lib/telemetry/report-global-error'
 
 type GlobalErrorProperties = {
   readonly error: NextError & { digest?: string }
@@ -19,7 +19,8 @@ type GlobalErrorProperties = {
  */
 const GlobalError = ({ error, reset }: GlobalErrorProperties) => {
   useEffect(() => {
-    captureException(error)
+    // Not a static Sentry import: this component is in every page's server render (#355).
+    void reportGlobalError(error)
   }, [error])
 
   return (
