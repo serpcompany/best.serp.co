@@ -7,7 +7,9 @@ import { getDomain } from 'tldts'
  * - `hostKey`: the normalized host. It is the submission slug and the duplicate key.
  * - `blockKey`: the registrable domain of `hostKey` (eTLD+1 per the Public Suffix List, private
  *   section included, so `user.github.io` and `app.vercel.app` are sites of their own). A
- *   prohibited rejection blocks it and every subdomain (`coversSubdomains`).
+ *   prohibited rejection blocks it and every subdomain (`coversSubdomains`). The list comes from
+ *   `tldts` (about 46 KB gzipped and no Node APIs, so it runs in the Worker); SQLite cannot
+ *   evaluate it, so intake stores the key.
  * - A host with no registrable domain (a public suffix such as `github.io`, or an IP address) is
  *   its own block key, and a block on it covers that exact host only, never the sites under it.
  */

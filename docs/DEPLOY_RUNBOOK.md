@@ -38,7 +38,7 @@ migrations and Worker deploys.
 | `web.yml` (`deploy-staging`) | push to `staging` after `check`, `e2e` and `tip`, manual from `staging` | `staging` | none | build → tip guard → D1 bookmark → migrations → deploy → HTTP gates → Playwright smoke |
 | `deploy-production.yml` | push to `main`, manual | `production` | dispatch: `deploy-best.serp.co-production` (or `hotfix-…`) | Staging verification → `pnpm harness:fast` → build → `plan-release` → (pending migrations: bookmark → migrate) → deploy → HTTP gates |
 | `publish-d1.yml`, `publish-d1-staging.yml` | manual, `main` / `staging` | `production` / `staging` | `publish-best.serp.co-<env>` | D1 bookmark → apply one reviewed manifest, staging first |
-| `upload-media.yml`, `upload-media-staging.yml` | manual, `main` / `staging` | `production` / `staging` | `upload-media-best.serp.co-<env>` | Upload one reviewed `d1/media/` plan to R2, no D1 change ([media](./MEDIA.md)) |
+| `upload-media.yml`, `upload-media-staging.yml` | manual, `main` / `staging` | `production` / `staging` | `upload-media-best.serp.co-<env>` | Upload one reviewed `d1/media/` plan to R2, no D1 change ([media publishing](./MEDIA_PUBLISHING.md)) |
 | `media-health.yml` | weekly | `production-media-health` | none | [Health](./MEDIA_HEALTH.md) |
 
 Guards, in order:

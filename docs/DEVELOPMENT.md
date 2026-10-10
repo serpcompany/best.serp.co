@@ -51,8 +51,8 @@ D1. `pnpm dev` runs `next dev` for UI work, but only the Worker preview exercise
 binding.
 
 Listing media (#95) uses a local R2 bucket in the same state; the Worker serves it at
-`/_media/<key>`, and `curl localhost:8787/cdn-cgi/handler/scheduled` runs the media cron once
-([Listing media](./MEDIA.md#local-development-and-tests)).
+`/_media/<key>`, and `curl 'localhost:8787/cdn-cgi/handler/scheduled?cron=*/15+*+*+*+*'` runs the
+media cron once ([Listing media](./MEDIA.md#local-development-and-tests)).
 
 ## Accounts locally
 
@@ -76,9 +76,10 @@ pnpm db:generate
 pnpm db:migrate:local
 ```
 
-Review the SQL and keep the D1 specifics described in [Data model](./DATA_MODEL.md)
-(`STRICT` tables and triggers). Never use `drizzle-kit push`. Then run
-`pnpm check` (lint, typecheck, `drizzle-kit check`, tests, and the Worker build).
+Review the SQL and keep the D1 specifics described in
+[Data model](./DATA_MODEL.md#hand-finished-migrations) (`STRICT` tables and triggers). Never use
+`drizzle-kit push`. Then run `pnpm check` (lint, typecheck, `drizzle-kit check`, tests, and the
+Worker build).
 
 After the pull request merges into `staging`, Deploy Staging applies the migration to staging
 (`pnpm db:migrate:staging` in the workflow). When the owner promotes `staging` to `main`,

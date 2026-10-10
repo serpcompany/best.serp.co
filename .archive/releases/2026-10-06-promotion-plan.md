@@ -160,15 +160,15 @@ pnpm exec wrangler d1 execute best-serp-co-staging --env staging --remote --json
 `hosted_rows` above 0 means admin logo edits: those listings will refuse their media part. A
 row-level manifest needs regeneration only if staging refuses it (it writes nothing):
 media via `--current <dir> --manifest-id 2026-10-07-legacy-media`
-([recovery](../../docs/MEDIA.md#recovering-a-refused-media-manifest)); FAQs via
+([recovery](../../docs/MEDIA_PUBLISHING.md#recovering-a-refused-media-manifest)); FAQs via
 `pnpm catalog:faqs -- manifest --skip <slug> --manifest-id 2026-10-07-listing-faqs-staging`.
 Production then publishes exactly the manifests staging published.
 
 ## 7. Runbook
 
 Agents prepare PRs and run read-only checks; the owner dispatches every workflow, staging
-included ([Credential guards](../../docs/CREDENTIAL_GUARDS.md#security-boundary), MEDIA.md). Each publish
-writes its Time Travel bookmark and restore command to the run summary: record it.
+included ([Credential guards](../../docs/CREDENTIAL_GUARDS.md#security-boundary), MEDIA_PUBLISHING.md). Each
+publish writes its Time Travel bookmark and restore command to the run summary: record it.
 
 ### a. Staging
 
@@ -235,4 +235,4 @@ shows no FAQs (it has no FAQ section).
   queries and dry runs, the S3 and P6 acceptance checks, and the post-publish cleanup PR
   (#124: deleted `apps/web/public/listing-logos/serpdownloaders.com/`, `listing-media-seed/`, and
   `media/products/launchbuzz.io/` after read-only queries found every production and staging
-  row hosted; MEDIA.md [Legacy migration](../../docs/MEDIA.md#legacy-migration)).
+  row hosted; MEDIA_PUBLISHING.md [Legacy migration](../../docs/MEDIA_PUBLISHING.md#legacy-migration)).

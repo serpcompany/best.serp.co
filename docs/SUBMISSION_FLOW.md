@@ -65,8 +65,9 @@ status in `submission-plans.test.ts`; see [Data model](./DATA_MODEL.md#statement
 - Payment races: a draft that switched to free while its checkout was open is upgraded by the
   payment from `pending_badge`; a payment that completes after withdrawal or expiry is recorded
   with its refund (#68's webhook issues it). Any other charge the submission cannot accept lives
-  only in #68's `orders`, which is the ledger of record ([Data model](./DATA_MODEL.md)). Once
-  paid, the owner cannot withdraw; they message the team (#73) and an admin decides.
+  only in #68's `orders`, which is the ledger of record
+  ([Submission data](./SUBMISSION_DATA.md#payments-and-refunds)). Once paid, the owner cannot
+  withdraw; they message the team (#73) and an admin decides.
 - The protected publisher's `listing-unpublish` can still take a listing down while its
   submission is queued (an emergency takedown is never blocked). The in-app plans refuse that,
   but after such a takedown a `changes_requested` submission cannot be resubmitted and a
@@ -224,9 +225,10 @@ proposes an SVG icon. A local Worker also accepts http, for its fixture sites.
 
 The saved logo, and the social image the server's own prefill finds on the website, are then
 copied to our media host under the submission (`best.serp.co/submissions/<id>/…`, after the
-response, so hosting never fails the save; see [Listing media](./MEDIA.md)). The review screen
-and previews show those hosted copies, or the fallback tile with a link to the source; approval
-copies the logo, and the featured image exactly as the reviewer saw it, into the listing's path.
+response, so hosting never fails the save; see
+[Media ingestion](./MEDIA_INGESTION.md#where-it-runs)). The review screen and previews show
+those hosted copies, or the fallback tile with a link to the source; approval copies the logo,
+and the featured image exactly as the reviewer saw it, into the listing's path.
 Only the submitter's own form previews the URL they typed, through
 `<img referrerpolicy="no-referrer" loading="lazy">`.
 
@@ -258,4 +260,4 @@ Code: `apps/web/src/app/(site)/submit/`, `apps/web/src/components/submit/`,
 
 A submitted logo is never published as the submitter's URL (#95): approval adopts its hosted copy
 or queues the source behind the fallback tile. Submit v2 hosts it at intake
-([Listing media](./MEDIA.md#integration-points)).
+([Media ingestion](./MEDIA_INGESTION.md#where-it-runs)).

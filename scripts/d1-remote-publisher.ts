@@ -365,7 +365,7 @@ export async function publishRemoteManifest(
       if (drift.length > 0) {
         const first = drift[0]
         throw new Error(
-          `${drift.length} listings changed since this manifest was generated (first: ${first?.slug}, expected ${first?.expected}, found ${first?.actual ?? 'no such listing'}). Nothing was written. Regenerate the manifest from the current state and publish it again (docs/MEDIA.md#recovering-a-refused-media-manifest).`
+          `${drift.length} listings changed since this manifest was generated (first: ${first?.slug}, expected ${first?.expected}, found ${first?.actual ?? 'no such listing'}). Nothing was written. Regenerate the manifest from the current state and publish it again (docs/MEDIA_PUBLISHING.md#recovering-a-refused-media-manifest).`
         )
       }
     }
