@@ -92,9 +92,12 @@ is made per request, at run time, by which modules the isolate evaluates.
   Any other path, or a reporting one whose SDK failed to load, is logged as `request_error`.
 - **`global-error.tsx` imports `captureException` inside its effect.** Every page's server
   render loads that component, and its static import used to load a second, server-rendering
-  copy of the SDK. In the browser, the import resolves to the SDK that
-  `instrumentation-client.ts` already started. Each page's `<script>` tags lose that import's
-  two client chunks, which now load only when the error page shows.
+  copy of the SDK. In the browser, the import reaches the SDK that `instrumentation-client.ts`
+  already started, so the error page still reports, as before. The browser's chunks change with
+  it:
+  - every page loads the SDK as one chunk instead of two, about 4 KB smaller gzipped, so it has
+    one `<script>` tag fewer;
+  - the error page alone loads one more SDK chunk, about 110 KB gzipped, before it reports.
 - **Nothing depends on the environment.** The deploy build bakes in the DSN, and each event
   takes its environment from `SITE_ENVIRONMENT` (`sentryOptions`). Staging and production split
   the same way, and a local build with no DSN runs the same code with Sentry off.
