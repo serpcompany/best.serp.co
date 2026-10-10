@@ -141,8 +141,13 @@ describe('staging deploy job', () => {
     expect(job.if).toBe(
       "github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'"
     )
+    // The branded canonical host (#323); CI reaches the Worker on its workers.dev host.
     expect(job.environment).toEqual({ name: 'staging', url: project.remote.staging.origin })
-    expect(job.env).toEqual({ STAGING_ORIGIN: project.remote.staging.origin })
+    expect(project.remote.staging.origin).toBe('https://staging.best.serp.co')
+    expect(job.env).toEqual({
+      STAGING_ORIGIN: project.remote.staging.origin,
+      STAGING_REVIEW_ORIGIN: project.remote.staging.reviewOrigin
+    })
     expect(JSON.stringify(job)).not.toMatch(/production/u)
   })
 
@@ -172,8 +177,9 @@ describe('staging deploy job', () => {
     expect(names.indexOf('Record staging D1 Time Travel bookmark')).toBe(
       names.indexOf('Deploy only the staging tip') + 1
     )
+    // The smoke runs on the workers.dev host with the smoke-test header (playwright.config.ts).
     expect(stepRunning(job, 'test:e2e:smoke').env).toEqual({
-      PLAYWRIGHT_BASE_URL: expression('env.STAGING_ORIGIN'),
+      PLAYWRIGHT_BASE_URL: expression('env.STAGING_REVIEW_ORIGIN'),
       PLAYWRIGHT_EXTERNAL_SERVER: '1'
     })
     const evidence = job.steps?.find(step => step.uses === 'actions/upload-artifact@v7')
@@ -624,6 +630,7 @@ describe('D1 data stays in Cloudflare', () => {
     RELEASE_CONFIRM: expression('inputs.confirmation'),
     // Deploy Staging's job env, and where the Worker deploy records its version.
     STAGING_ORIGIN: project.remote.staging.origin,
+    STAGING_REVIEW_ORIGIN: project.remote.staging.reviewOrigin,
     WRANGLER_OUTPUT_FILE_PATH: `${expression('runner.temp')}/wrangler-output.ndjson`
   }
   const onlyExemptEnvironment = (env: unknown) =>

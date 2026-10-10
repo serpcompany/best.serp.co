@@ -35,7 +35,7 @@ describe('email environment policy', () => {
       SITE_ENVIRONMENT: 'staging'
     })
     expect(staging.delivery).toBe('provider')
-    expect(staging.linkOrigin).toBe('https://best-serp-co-staging.serpcompany.workers.dev')
+    expect(staging.linkOrigin).toBe('https://staging.best.serp.co')
     expect(prefixedSubject(staging, 'Hello')).toBe('[staging] Hello')
     expect(recipientAllowed(staging, 'owner@serp.co')).toBe(true)
     expect(recipientAllowed(staging, 'tester@example.com')).toBe(true)

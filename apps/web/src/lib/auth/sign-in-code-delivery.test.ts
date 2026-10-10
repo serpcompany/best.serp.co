@@ -22,7 +22,7 @@ const { getCloudflareContext } = vi.hoisted(() => ({ getCloudflareContext: vi.fn
 vi.mock('server-only', () => ({}))
 vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext }))
 
-const STAGING_ORIGIN = 'https://best-serp-co-staging.serpcompany.workers.dev'
+const STAGING_ORIGIN = 'https://staging.best.serp.co'
 const SECRET = 'test-secret-'.repeat(4)
 const FAKE_USESEND_KEY = 'us_fake_key_for_tests'
 

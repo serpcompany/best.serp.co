@@ -13,6 +13,7 @@ import {
 import { badgeOrigin, badgeServerCommand, badgeSuiteEnabled } from './e2e/badge-program-fixture'
 import { claimsOrigin, claimsServerCommand, claimsSuiteEnabled } from './e2e/claims-fixture'
 import { mediaOrigin, mediaServerCommand, mediaServerEnabled } from './e2e/media-fixture'
+import { isPlatformOrigin, site } from './e2e/site-fixture'
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`
@@ -44,6 +45,11 @@ export default defineConfig({
 
   use: {
     baseURL: baseUrl,
+    // A deployed Worker's workers.dev host 308s to its canonical host unless a request carries
+    // the smoke-test header (#323), so the smoke against it sends the header, as the HTTP gates
+    // do. It goes on every request, so a cross-origin fetch() would need a CORS preflight that
+    // allows it; the pages make none today (images go through /_next/image).
+    ...(isPlatformOrigin(baseUrl) ? { extraHTTPHeaders: { [site.smokeTestHeader]: '1' } } : {}),
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

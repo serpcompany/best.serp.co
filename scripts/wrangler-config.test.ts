@@ -50,6 +50,23 @@ describe('Worker configuration (serp web-stack/nextjs-on-workers.md)', () => {
     })
   })
 
+  // Canonical hosts (serp environment-configuration.md): each deployed Worker keeps its
+  // workers.dev host for CI and no preview URLs. Staging declares its branded host as a Custom
+  // Domain (#323); production's best.serp.co is still attached in the dashboard until #192.
+  it.each(deployed)('keeps workers.dev on and preview URLs off in %s', (_name, config) => {
+    expect(config.workers_dev).toBe(true)
+    expect(config.preview_urls).toBe(false)
+  })
+
+  it('routes only staging.best.serp.co, as a Custom Domain of the staging Worker', () => {
+    expect(resolved('staging').routes).toEqual([
+      { custom_domain: true, pattern: new URL(project.remote.staging.origin).host }
+    ])
+    expect(project.remote.staging.origin).toBe('https://staging.best.serp.co')
+    expect(resolved('production').routes ?? []).toEqual([])
+    expect(resolved().routes ?? []).toEqual([])
+  })
+
   // Providers send buyers back with tokens in the query string (serp web-stack/payments.md).
   // Local runs ship no logs, so only the deployed environments are checked.
   it.each(deployed)('keeps Workers Logs on, without query strings, in %s', (_name, config) => {

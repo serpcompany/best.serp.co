@@ -20,9 +20,10 @@ account permissions:
 | Account Settings → Read | Wrangler account lookups during deploy |
 | Workers R2 Storage → Edit | the `MEDIA` bucket binding and listing media uploads |
 
-No zone permission is needed while the Custom Domain is attached in the dashboard. Add Zone →
-Workers Routes → Edit (zone `serp.co`) only if routes or the Custom Domain move to
-`wrangler.jsonc` (proposed in #192).
+Plus one zone permission, Zone → Workers Routes → Edit on `serp.co` (granted 2026-10-09):
+Deploy Staging attaches `staging.best.serp.co`, declared in `env.staging.routes` of
+`wrangler.jsonc` (#323), as the staging Worker's Custom Domain, and production's best.serp.co
+moves there with #192 (until then it is attached in the dashboard).
 
 Cloudflare's current Workers roles map Workers Scripts → Edit to Workers **Editor**, which
 cannot create a Worker. The first production deploy created `best-serp-co-production` with

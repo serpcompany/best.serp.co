@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { CANONICAL_HOST, STAGING_CANONICAL_HOST } from '../environment/site-environment'
 import {
   browserEnvironment,
   scrubEvent,
@@ -142,6 +143,11 @@ describe('Sentry settings (#48)', () => {
     expect(workerEnvironment(undefined)).toBe('local')
     expect(browserEnvironment('best.serp.co')).toBe('production')
     expect(browserEnvironment('best-serp-co-staging.serpcompany.workers.dev')).toBe('staging')
+    // Staging's canonical host (#323); both canonical hosts as site-environment.ts names them.
+    expect(browserEnvironment('staging.best.serp.co')).toBe('staging')
+    expect(browserEnvironment(STAGING_CANONICAL_HOST)).toBe('staging')
+    expect(browserEnvironment(CANONICAL_HOST)).toBe('production')
+    expect(browserEnvironment('staging.best.serp.co.evil.example')).toBe('local')
     expect(browserEnvironment('127.0.0.1')).toBe('local')
     expect(stripQuery('/a?b#c')).toBe('/a')
   })

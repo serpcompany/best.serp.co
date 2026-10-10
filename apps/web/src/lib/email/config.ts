@@ -16,7 +16,8 @@
 import {
   CANONICAL_ORIGIN,
   parseSiteEnvironment,
-  type SiteEnvironment
+  type SiteEnvironment,
+  STAGING_CANONICAL_ORIGIN
 } from '../environment/site-environment'
 import { site } from '../site/site'
 
@@ -107,7 +108,7 @@ export const STAGING_ALLOWLIST_VAR = 'EMAIL_STAGING_ALLOWLIST'
 export const EMAIL_LINK_ORIGINS: Readonly<Record<SiteEnvironment, string>> = {
   local: 'http://localhost:8787',
   production: CANONICAL_ORIGIN,
-  staging: 'https://best-serp-co-staging.serpcompany.workers.dev'
+  staging: STAGING_CANONICAL_ORIGIN
 }
 
 export class EmailConfigError extends Error {

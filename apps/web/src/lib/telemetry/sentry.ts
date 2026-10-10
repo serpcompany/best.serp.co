@@ -102,10 +102,16 @@ export function workerEnvironment(value: string | undefined): SiteEnvironment {
   return value === 'production' || value === 'staging' ? value : 'local'
 }
 
-/** The browser's environment, from the host it was served on. */
+/**
+ * The browser's environment, from the host it was served on: staging's canonical host
+ * (`STAGING_CANONICAL_HOST` in lib/environment/site-environment.ts, #323) or its workers.dev
+ * host. This module stays import-free (next.config.ts loads it), so the hosts are spelled here
+ * and sentry.test.ts holds them to site-environment.ts.
+ */
 export function browserEnvironment(hostname: string): SiteEnvironment {
   if (hostname === 'best.serp.co') return 'production'
-  if (hostname.startsWith('best-serp-co-staging.')) return 'staging'
+  if (hostname === 'staging.best.serp.co' || hostname.startsWith('best-serp-co-staging.'))
+    return 'staging'
   return 'local'
 }
 

@@ -6,6 +6,7 @@ import {
   categoryPath,
   escapeRegExp,
   featuredBadgeUrls,
+  isPlatformOrigin,
   site
 } from './site-fixture'
 import { test } from './test'
@@ -424,6 +425,28 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     expect(html).not.toContain('cloudflareinsights')
     await expect(page.locator('script#google-tag-manager')).toHaveCount(0)
     expect(analyticsRequests).toEqual([])
+  })
+
+  test('sends a workers.dev request without the smoke-test header to the canonical host', async ({
+    baseURL,
+    request
+  }) => {
+    test.skip(!isPlatformOrigin(baseURL), 'only a deployed Worker has a workers.dev host')
+    // Every other request here carries the smoke-test header (playwright.config.ts); this one
+    // must not, so it goes through fetch. The Worker's reported environment names the host its
+    // workers.dev host redirects to (#323): staging.best.serp.co on staging.
+    const environment = (await request.get('/robots.txt')).headers()['x-site-environment']
+    const canonical =
+      environment === 'production' || environment === 'staging'
+        ? site.canonicalOrigins[environment]
+        : undefined
+    expect(canonical, `x-site-environment ${environment}`).toBeDefined()
+    const from = new URL('/about?smoke=canonical-host', baseURL)
+    await expect(async () => {
+      const response = await fetch(from, { redirect: 'manual' })
+      expect(response.status, from.href).toBe(308)
+      expect(response.headers.get('location')).toBe(`${canonical}/about/?smoke=canonical-host`)
+    }).toPass({ timeout: 10_000 })
   })
 
   test('renders static, commercial, and legal pages', async ({ page }) => {

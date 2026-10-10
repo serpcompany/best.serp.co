@@ -31,7 +31,7 @@ import { OTP_REQUEST_LIMITS } from './rate-limits'
 import { resolveAuthSettings } from './settings'
 
 const LOCAL_ORIGIN = 'http://localhost:8978'
-const STAGING_ORIGIN = 'https://best-serp-co-staging.serpcompany.workers.dev'
+const STAGING_ORIGIN = 'https://staging.best.serp.co'
 const SECRET = 'test-secret-'.repeat(4)
 const SEND = '/email-otp/send-verification-otp'
 const SIGN_IN = '/sign-in/email-otp'

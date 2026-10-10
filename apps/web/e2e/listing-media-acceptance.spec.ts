@@ -7,7 +7,7 @@ import { test } from './test'
  * outside the environment's media host or the fallback tile, and every listing image there
  * answers 200.
  *
- *   MEDIA_ACCEPTANCE=1 PLAYWRIGHT_BASE_URL=https://best-serp-co-staging.serpcompany.workers.dev \
+ *   MEDIA_ACCEPTANCE=1 PLAYWRIGHT_BASE_URL=https://staging.best.serp.co \
  *     PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm --filter web exec playwright test \
  *     e2e/listing-media-acceptance.spec.ts --project=chromium
  *

@@ -67,10 +67,11 @@ production) assert the redirects, the `/api` exemption, and the homepage form.
   JSON-LD node identifiers keep their fragment form (`https://best.serp.co/#website`); they name
   a graph node, not the page.
 - **Origin.** Sitemaps, canonical tags, and structured data always use the production
-  origin from `src/lib/site` (`https://best.serp.co`), also locally and on the
-  noindex `*.workers.dev` hosts. This is deliberate: the e2e suite and the HTTP gates then
-  verify on staging exactly the URLs production publishes, and those hosts are never
-  indexed.
+  origin from `src/lib/site` (`https://best.serp.co`), also locally, on staging's
+  `staging.best.serp.co`, and on the noindex `*.workers.dev` hosts. This is deliberate: the
+  e2e suite and the HTTP gates then verify on staging exactly the URLs production publishes,
+  and those hosts are never indexed (an Ahrefs Site Audit of staging, #323, sees the same
+  best.serp.co canonicals production will publish).
 
 ## Pagination
 
@@ -90,7 +91,8 @@ for display; only the sitemaps and the JSON feed read every listing.
 ## What pages publish for search engines
 
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other host
-  serves a disallow-all robots.txt; see [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)).
+  serves a disallow-all robots.txt, which on staging.best.serp.co also lets Ahrefs' Site Audit
+  in; see [Environments and hosts](./ARCHITECTURE.md#environments-and-hosts)).
   The index lists the root-level sitemaps; the older sitemap URLs answer one 308. The route
   registry
   (`apps/web/src/lib/site/site-routes.ts`) sets each static page's indexability and sitemap for

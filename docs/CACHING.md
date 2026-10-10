@@ -29,7 +29,11 @@ From the edge inward:
    private, mutable and free-form paths are bypassed by their first segment, in any case
    (`BYPASS_PATH_SEGMENTS`), and so are requests with `Authorization` and requests carrying a
    Better Auth (`better-auth.*`) or preview cookie, so a signed-in request is never served from
-   or stored in the cache. Responses carry `x-edge-cache: HIT | MISS | BYPASS`.
+   or stored in the cache. Responses carry `x-edge-cache: HIT | MISS | BYPASS`. The Worker
+   adds the environment headers (`X-Robots-Tag`, `x-site-environment`, `x-worker-version`)
+   after this layer, from each request, so a stored response carries none of them: that is
+   why staging's Ahrefs Site Audit exemption (no `X-Robots-Tag` for an `AhrefsSiteAudit`
+   request, #323) can never be served to another client, whichever request filled the entry.
 2. **Epoch memo.** Each isolate reuses its epoch for 30 seconds and revalidates it in the
    background for up to 5 minutes; isolates in one data center share it through the Cache
    API for 30 seconds. D1 therefore sees about one one-row epoch read per data center per

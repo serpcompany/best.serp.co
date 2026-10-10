@@ -3,13 +3,14 @@
  * produces (the OpenNext handler, the routes manifest, the catalog epoch reader); the order
  * and the environment rules live here so they are type-checked and unit-tested.
  *
- * 1. Canonical host: on the production Worker with `CANONICAL_HOST_REDIRECT=on`, a
- *    `*.workers.dev` request without the smoke-test header gets one 308 to best.serp.co
- *    (`lib/routing/canonical-host.ts`).
+ * 1. Canonical host: on a deployed Worker with `CANONICAL_HOST_REDIRECT=on`, a
+ *    `*.workers.dev` request without the smoke-test header gets one 308 to that Worker's
+ *    canonical host, best.serp.co or staging.best.serp.co (`lib/routing/canonical-host.ts`).
  * 2. Retired URLs without a replacement (`/news`) answer 410 Gone (`lib/routing/retired-paths.ts`).
  * 3. An old root-level listing or category URL: one 308 to its page (`lib/routing/legacy-root.ts`).
  * 4. Trailing slash: one 308 to the canonical page or file URL (`lib/routing/trailing-slash.ts`).
- * 5. Outside public production, `/robots.txt` disallows every crawler.
+ * 5. Outside public production, `/robots.txt` disallows every crawler; on staging's canonical
+ *    host it lets Ahrefs' Site Audit in (#323).
  * 6. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
  *    503, 403, or 401 (`lib/auth/admin-gate.ts`); pages and handlers then require an admin.
  * 7. The local dev endpoints (`/api/dev/*`, `/api/auth/dev/*`) answer 404 unless the Worker was
@@ -18,16 +19,23 @@
  * 8. Everything else is served through the edge HTML cache and OpenNext (`serve`).
  *
  * Every response then carries the configured environment, the Worker version and, outside
- * public production, `X-Robots-Tag: noindex, nofollow` (`lib/environment/site-environment.ts`). These headers are
- * added after the edge cache, so they always describe the Worker and host that answered.
+ * public production, `X-Robots-Tag: noindex, nofollow` (`lib/environment/site-environment.ts`),
+ * which only a staging audit request (Ahrefs' Site Audit on staging's canonical host) goes
+ * without. These headers are added after the edge cache, from this request alone, so they
+ * always describe the Worker, host and client that asked: a stored response never carries
+ * them, and one stored for Ahrefs reaches every other client with the noindex.
  */
 import { adminGate } from '../auth/admin-gate'
 import type { AccessEnv, VerifyAccessOptions } from '../auth/cloudflare-access'
 import { isLocalRequestHost } from '../environment/local-host'
 import {
   isPublicProduction,
+  isStagingAuditRequest,
+  isStagingCanonical,
+  NON_PRODUCTION_ROBOTS_TXT,
   nonProductionRobotsTxt,
   parseSiteEnvironment,
+  STAGING_CANONICAL_ROBOTS_TXT,
   withEnvironmentHeaders
 } from '../environment/site-environment'
 import { type CanonicalHostEnv, canonicalHostRedirect } from '../routing/canonical-host'
@@ -54,19 +62,24 @@ export async function handleWorkerRequest(
   env: WorkerRequestEnv,
   pipeline: WorkerRequestPipeline
 ): Promise<Response> {
-  const publicProduction = isPublicProduction(env.SITE_ENVIRONMENT, new URL(request.url).host)
+  const host = new URL(request.url).host
+  const publicProduction = isPublicProduction(env.SITE_ENVIRONMENT, host)
+  const robotsTxt = isStagingCanonical(env.SITE_ENVIRONMENT, host)
+    ? STAGING_CANONICAL_ROBOTS_TXT
+    : NON_PRODUCTION_ROBOTS_TXT
   const response =
     canonicalHostRedirect(request, env, pipeline.configRedirects) ??
     retiredPathResponse(request) ??
     (await pipeline.legacyRoot?.(request)) ??
     trailingSlashRedirect(request, pipeline.configRedirects) ??
-    (publicProduction ? null : nonProductionRobotsTxt(request)) ??
+    (publicProduction ? null : nonProductionRobotsTxt(request, robotsTxt)) ??
     (await adminGate(request, env, pipeline.access)) ??
     devEndpointGate(request) ??
     (await pipeline.serve(request))
   return withEnvironmentHeaders(response, {
     environment: parseSiteEnvironment(env.SITE_ENVIRONMENT),
     publicProduction,
+    stagingAudit: isStagingAuditRequest(env.SITE_ENVIRONMENT, request),
     versionId: env.CF_VERSION_METADATA?.id
   })
 }

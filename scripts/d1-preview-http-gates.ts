@@ -4,10 +4,13 @@
  *
  *   pnpm tsx scripts/d1-preview-http-gates.ts <staging|production|public> <https-origin> [output]
  *
- * - `staging <origin>`: the staging Worker on its workers.dev origin. `deploy-production.yml`
- *   also runs it on the production workers.dev origin while best.serp.co is still GitHub Pages;
- *   that branch is the step-order guard for the canonical-host switch (an early flip fails its
- *   "`/` is not redirected" check).
+ * - `staging <origin>`: the staging Worker. Given `https://staging.best.serp.co`, its canonical
+ *   host (#323), it gates through the staging workers.dev origin with the smoke-test header, as
+ *   production does, and with staging's `CANONICAL_HOST_REDIRECT=on` requires that host to answer
+ *   one 308 to staging.best.serp.co without the header. Any other origin is gated as given.
+ *   `deploy-production.yml` also runs it on the production workers.dev origin while best.serp.co
+ *   is still GitHub Pages; that branch is the step-order guard for the canonical-host switch (an
+ *   early flip fails its "`/` is not redirected" check).
  * - `production <origin>`: the production Worker. The origin may be `https://best.serp.co` or
  *   the production workers.dev origin. Routes, versions, and the workers.dev policy are gated
  *   through the workers.dev origin with the smoke-test header. best.serp.co's public policy
@@ -20,8 +23,8 @@
  * - `public https://best.serp.co`: the same best.serp.co checks, run by hand at cutover, with
  *   no skipping.
  *
- * Every request sends the smoke-test header, so the production Worker's `*.workers.dev` host
- * answers it instead of redirecting to best.serp.co (#42 decision e); the redirect itself is
+ * Every request sends the smoke-test header, so a Worker's `*.workers.dev` host answers it
+ * instead of redirecting to its canonical host (#42 decision e, #323); the redirect itself is
  * checked with one request without it.
  *
  * When the deploy's Worker version is known, the gates first wait until that version answers
@@ -53,7 +56,7 @@ import {
   robotsTxtBlockedPath,
   xRobotsTagBlocksIndexing
 } from './crawl-policy'
-import { project } from './project'
+import { project, type RemoteEnvironment } from './project'
 import { categoryRoute, listingRoute } from './site-routes'
 
 export type HttpGateMode = 'staging' | 'production' | 'public'
@@ -75,6 +78,9 @@ const workerVersionPattern = /^[A-Za-z0-9-]{1,64}$/u
 /** The production Worker's platform host: where CI reaches it, with the smoke-test header. */
 const productionPlatformOrigin = new URL(project.remote.production.reviewOrigin)
 const canonicalOrigin = new URL(project.publicUrl)
+/** Staging's canonical host (#323) and the platform host CI gates it through, as production. */
+const stagingCanonicalOrigin = new URL(project.remote.staging.origin)
+const stagingPlatformOrigin = new URL(project.remote.staging.reviewOrigin)
 
 /** Time source for the version budget; tests pass a virtual clock. */
 export interface GateClock {
@@ -102,7 +108,7 @@ export interface HttpGateOptions {
   versionPollIntervalMs?: number
   /** Budget for the expected version to answer, shared by the wait and every retry (≤ 60 s). */
   versionWaitMs?: number
-  /** Wrangler config whose production `CANONICAL_HOST_REDIRECT` decides the host-redirect gate. */
+  /** Wrangler config whose `CANONICAL_HOST_REDIRECT` per environment decides the host-redirect gate. */
   wranglerConfigPath?: string
 }
 
@@ -512,7 +518,7 @@ async function expectAuthEndpoints(target: GateTarget): Promise<void> {
     if (response.status !== 200)
       throw new Error(`${mode} GET /api/auth/get-session returned ${response.status}, not 200.`)
   })
-  const origin = mode === 'production' ? canonicalOrigin.origin : baseUrl.origin
+  const origin = trustedAuthOrigin(target)
   await boundedFetch(
     target,
     routeUrl(baseUrl, '/api/auth/email-otp/send-verification-otp'),
@@ -536,6 +542,18 @@ async function expectAuthEndpoints(target: GateTarget): Promise<void> {
       method: 'POST'
     }
   )
+}
+
+/**
+ * The origin the bad sign-in comes from: the canonical host Better Auth trusts when the gates go
+ * through a platform host for it (best.serp.co for production, staging.best.serp.co for staging's
+ * platform host, #323), else the gated origin itself.
+ */
+function trustedAuthOrigin({ baseUrl, mode }: GateTarget): string {
+  if (mode === 'production') return canonicalOrigin.origin
+  if (mode === 'staging' && baseUrl.origin === stagingPlatformOrigin.origin)
+    return stagingCanonicalOrigin.origin
+  return baseUrl.origin
 }
 
 /**
@@ -656,7 +674,7 @@ async function readDocument(
 function expectedSiteEnvironment(target: GateTarget): string | null {
   if (target.mode === 'production') return 'production'
   if (target.baseUrl.origin === productionPlatformOrigin.origin) return 'production'
-  if (target.baseUrl.origin === new URL(project.remote.staging.origin).origin) return 'staging'
+  if (target.baseUrl.origin === stagingPlatformOrigin.origin) return 'staging'
   return null
 }
 
@@ -712,29 +730,52 @@ async function expectNonProductionPolicy(target: GateTarget, listingPath: string
   })
 }
 
-/** Whether the checked-in production config turns the canonical-host redirect on. */
+/** Whether the checked-in config turns an environment's canonical-host redirect on. */
 export function canonicalHostRedirectConfigured(
-  configPath: string = project.wranglerConfigPath
+  configPath: string = project.wranglerConfigPath,
+  environment: RemoteEnvironment = 'production'
 ): boolean {
   const config = JSON.parse(readFileSync(resolve(configPath), 'utf8')) as {
-    env?: { production?: { vars?: Record<string, string | undefined> } }
+    env?: Partial<Record<RemoteEnvironment, { vars?: Record<string, string | undefined> }>>
   }
-  const value = config.env?.production?.vars?.CANONICAL_HOST_REDIRECT
+  const value = config.env?.[environment]?.vars?.CANONICAL_HOST_REDIRECT
   if (value !== 'on' && value !== 'off')
-    throw new Error(`${configPath} env.production.vars.CANONICAL_HOST_REDIRECT must be on or off.`)
+    throw new Error(
+      `${configPath} env.${environment}.vars.CANONICAL_HOST_REDIRECT must be on or off.`
+    )
   return value === 'on'
 }
 
 /**
- * The host redirect, checked with the one request that omits the smoke-test header. With
- * `CANONICAL_HOST_REDIRECT=on` (production only), `/about?gate=canonical-host` answers one 308
- * to the same canonical URL on best.serp.co; best.serp.co itself is not requested. Otherwise
- * `/` is served (staging never redirects, and the production workers.dev origin must not
- * redirect before the switch is on).
+ * The canonical origin the gated platform host must answer with one 308 without the smoke-test
+ * header, or null when it must serve the request: best.serp.co for production with its
+ * checked-in switch on, staging.best.serp.co for staging's platform host with staging's switch
+ * on (#323). Any other staging origin, such as the production platform host before the cutover,
+ * must not redirect.
  */
-async function expectHostRedirectPolicy(target: GateTarget, redirectOn: boolean): Promise<void> {
+export function canonicalHostRedirectTarget(
+  mode: HttpGateMode,
+  gated: URL,
+  configPath?: string
+): URL | null {
+  if (mode === 'production')
+    return canonicalHostRedirectConfigured(configPath) ? canonicalOrigin : null
+  if (mode === 'staging' && gated.origin === stagingPlatformOrigin.origin)
+    return canonicalHostRedirectConfigured(configPath, 'staging') ? stagingCanonicalOrigin : null
+  return null
+}
+
+/**
+ * The host redirect, checked with the one request that omits the smoke-test header. With a
+ * `redirectTo` origin (`canonicalHostRedirectTarget`), `/about?gate=canonical-host` answers one
+ * 308 to the same canonical URL there; the canonical host itself is not requested. Otherwise
+ * `/` is served (an origin without the switch, and the production workers.dev origin before
+ * the switch is on, must not redirect). Like every gate request, an answer from the previous
+ * Worker version is retried within the version budget.
+ */
+async function expectHostRedirectPolicy(target: GateTarget, redirectTo: URL | null): Promise<void> {
   const { baseUrl, mode } = target
-  if (!redirectOn) {
+  if (!redirectTo) {
     await boundedFetch(
       target,
       routeUrl(baseUrl, '/'),
@@ -754,7 +795,7 @@ async function expectHostRedirectPolicy(target: GateTarget, redirectOn: boolean)
     routeUrl(baseUrl, '/about?gate=canonical-host'),
     async response => {
       await response.body?.cancel().catch(() => undefined)
-      const expected = `${canonicalOrigin.origin}/about/?gate=canonical-host`
+      const expected = `${redirectTo.origin}/about/?gate=canonical-host`
       const location = response.headers.get('location')
       if (response.status !== 308 || location !== expected)
         throw new Error(
@@ -849,9 +890,15 @@ async function expectPublicPolicy(
   })
 }
 
-/** The origin the gates request: production always goes through its platform host. */
+/**
+ * The origin the gates request: production always goes through its platform host, and staging
+ * given its canonical host goes through its own (#323).
+ */
 export function gateOrigin(mode: HttpGateMode, baseUrl: URL): URL {
-  return mode === 'production' ? productionPlatformOrigin : baseUrl
+  if (mode === 'production') return productionPlatformOrigin
+  if (mode === 'staging' && baseUrl.origin === stagingCanonicalOrigin.origin)
+    return stagingPlatformOrigin
+  return baseUrl
 }
 
 export async function runHttpGates(
@@ -873,8 +920,7 @@ export async function runHttpGates(
     throw new Error('HTTP gate timeout must be a positive integer within the protected bound.')
   if (options.expectedVersion !== undefined && !workerVersionPattern.test(options.expectedVersion))
     throw new Error('The expected Worker version is not a Worker version id.')
-  const redirectOn =
-    mode === 'production' && canonicalHostRedirectConfigured(options.wranglerConfigPath)
+  const redirectTo = canonicalHostRedirectTarget(mode, baseUrl, options.wranglerConfigPath)
   const target: GateTarget = { baseUrl, mode, timeoutMs }
   if (options.expectedVersion) {
     const clock = options.clock ?? realClock
@@ -909,9 +955,12 @@ export async function runHttpGates(
     expectAuthEndpoints(target)
   ])
   await expectNonProductionPolicy(target, listingRoute(listingSlug))
-  await expectHostRedirectPolicy(target, redirectOn)
+  await expectHostRedirectPolicy(target, redirectTo)
   if (mode === 'production')
-    await expectPublicPolicy(target, listingRoute(listingSlug), { redirectOn, skipNonWorker: true })
+    await expectPublicPolicy(target, listingRoute(listingSlug), {
+      redirectOn: redirectTo !== null,
+      skipNonWorker: true
+    })
 }
 
 /**

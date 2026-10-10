@@ -18,7 +18,7 @@ describe('email links', () => {
   it('writes absolute, canonical URLs on each environment origin', () => {
     const cases = [
       ['local', 'http://localhost:8787'],
-      ['staging', 'https://best-serp-co-staging.serpcompany.workers.dev'],
+      ['staging', 'https://staging.best.serp.co'],
       ['production', 'https://best.serp.co']
     ] as const
     for (const [environment, origin] of cases) {
@@ -334,7 +334,7 @@ describe('template contract', () => {
       { path: '/account', title: 'x' },
       context(EMAIL_LINK_ORIGINS.staging)
     )
-    expect(staging.text).toContain('https://best-serp-co-staging.serpcompany.workers.dev/account/')
+    expect(staging.text).toContain('https://staging.best.serp.co/account/')
   })
 
   it('keeps subjects on one line and refuses empty or unescaped output', () => {

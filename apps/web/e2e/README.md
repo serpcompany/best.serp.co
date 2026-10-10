@@ -42,9 +42,11 @@ The local suite runs on the fixture seed, never the real catalog (#311, #313):
   seed's builders (`listingStatements`, `suiteCatalogStatements`), so they run in parallel without
   counting each other's rows. The media server's D1 is the seed plus a queued logo.
 - `smoke.spec.ts` and `public-parity.spec.ts` also run against staging after each deploy
-  (`pnpm test:e2e:smoke`). Their catalog facts come from `e2e/catalog-sample.ts`: the seed's
-  locally, the live catalog's (counts from the feed and sitemap, a listing the homepage links) on
-  a deployed Worker. Every other spec asserts the seed and runs only locally.
+  (`pnpm test:e2e:smoke`), on its workers.dev host: `playwright.config.ts` then sends the
+  smoke-test header on every request, and one smoke test checks that a request without it gets
+  the 308 to staging.best.serp.co (#323). Their catalog facts come from `e2e/catalog-sample.ts`:
+  the seed's locally, the live catalog's (counts from the feed and sitemap, a listing the
+  homepage links) on a deployed Worker. Every other spec asserts the seed and runs only locally.
 - Shared best.serp.co facts that are not catalog data (public URL, title, route helpers) live in
   `e2e/site-fixture.ts`.
 

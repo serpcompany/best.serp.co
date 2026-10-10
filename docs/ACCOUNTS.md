@@ -220,7 +220,7 @@ cookie, so pages under auth are never served from or stored in it ([Caching](./C
 | Name | Kind | local | staging | production |
 |---|---|---|---|---|
 | `BETTER_AUTH_SECRET` | secret (≥ 32 chars) | `apps/web/.dev.vars`, else ephemeral | Worker secret | Worker secret |
-| `BETTER_AUTH_URL` | var | unset (localhost origin) | staging workers.dev origin | `https://best.serp.co` |
+| `BETTER_AUTH_URL` | var | unset (localhost origin) | `https://staging.best.serp.co` | `https://best.serp.co` |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | var | unset (localhost) | same origin | same origin |
 | `CF_ACCESS_TEAM_DOMAIN` | var (public) | unset | empty | `serpcompany.cloudflareaccess.com` |
 | `CF_ACCESS_AUD` | var (public) | unset | empty | `a30cbc5f…8b2491` (the `best` app's AUD tag) |

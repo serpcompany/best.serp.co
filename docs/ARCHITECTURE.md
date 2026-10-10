@@ -87,7 +87,7 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
 | Var | local | staging | production |
 | --- | --- | --- | --- |
 | `SITE_ENVIRONMENT` | `local` | `staging` | `production` |
-| `CANONICAL_HOST_REDIRECT` | unset | unset | `on` since the cutover (`off` before it) |
+| `CANONICAL_HOST_REDIRECT` | unset | `on` since #323 | `on` since the cutover (`off` before it) |
 
 - **Public production** is `SITE_ENVIRONMENT=production` on the canonical host
   `best.serp.co`: indexable, `robots.txt` lists the sitemap index, and analytics load. Everything
@@ -96,19 +96,33 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   `X-Robots-Tag: noindex, nofollow` on every response it answers and answers `/robots.txt`
   with `Disallow: /` for every crawler, and the root layout leaves analytics out
   (`apps/web/src/lib/environment/`). Static files are served before the Worker runs, so
-  `apps/web/public/_headers` keeps them `noindex` on every `*.workers.dev` host, and
-  `next.config.ts` keeps its `*.workers.dev` `noindex` rule as defense in depth.
-- **Canonical host.** With `CANONICAL_HOST_REDIRECT=on`, the production
-  Worker answers every `*.workers.dev` request (the workers.dev URL and preview URLs) with one
-  308 to `https://best.serp.co`, in canonical form and with the query kept byte for byte:
-  `/about?x=1` -> `https://best.serp.co/about/?x=1`. It runs before the trailing-slash rule
+  `apps/web/public/_headers` keeps them `noindex` on every `*.workers.dev` host and on
+  `staging.best.serp.co`, and `next.config.ts` keeps its `*.workers.dev` `noindex` rule as
+  defense in depth.
+- **Ahrefs' Site Audit on staging** (#323). Staging's canonical host `staging.best.serp.co`
+  may be audited in Ahrefs: there, and only there, `/robots.txt` adds a
+  `User-agent: AhrefsSiteAudit` / `Allow: /` group ahead of the disallow-all one, and a request
+  whose `User-Agent` contains `AhrefsSiteAudit` gets no environment `X-Robots-Tag` (a page's
+  own noindex stays, as on best.serp.co). Every other request there is `noindex, nofollow`,
+  analytics stay off, and staging's workers.dev host, production and local are unchanged. The
+  header is added per request after the edge cache, which keys on neither the `User-Agent` nor
+  the exemption, so nothing an Ahrefs request was served can reach another client
+  ([Caching](./CACHING.md)). Canonical tags still name best.serp.co
+  ([URLs](./URLS.md#written-urls)).
+- **Canonical host.** With `CANONICAL_HOST_REDIRECT=on`, a deployed Worker answers every
+  `*.workers.dev` request (the workers.dev URL and preview URLs) with one 308 to its own
+  canonical host, in canonical form and with the query kept byte for byte: production to
+  `https://best.serp.co` (`/about?x=1` -> `https://best.serp.co/about/?x=1`), staging to
+  `https://staging.best.serp.co` (#323). It runs before the trailing-slash rule
   and the edge cache (`apps/web/src/lib/routing/canonical-host.ts`), so a stored response never
   answers the wrong client. Requests that carry the `x-best-serp-co-smoke-test` header (any
   value; not a secret) are served normally, so CI can test through the platform host. A
-  moved URL keeps its path and gets its own redirect on best.serp.co. Static files on
+  moved URL keeps its path and gets its own redirect on the canonical host. Static files on
   `*.workers.dev` are not redirected (they never reach the Worker; they stay `noindex`).
-  Staging never redirects. Both deployed environments set `workers_dev: true` and
-  `preview_urls: false`.
+  Local never redirects. Both deployed environments set `workers_dev: true` and
+  `preview_urls: false`; staging declares `staging.best.serp.co` as a Custom Domain in
+  `env.staging.routes`, and production's best.serp.co is attached in the dashboard until
+  #192. `scripts/cloudflare-release.ts` refuses a route to any other host.
 - **Worker version and gates.** Every Worker response carries `x-worker-version`
   (`CF_VERSION_METADATA.id`) and `x-site-environment` (the configured `SITE_ENVIRONMENT`, or
   `unset`). Given the deployed version (`EXPECTED_WORKER_VERSION`, or the `deploy` entry
@@ -116,7 +130,10 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   (`scripts/d1-preview-http-gates.ts`) wait until it answers three probes in a row (logging
   `Worker version <id> answered N probe(s)`), then require it on every response, retrying an
   answer from the previous version within the same 60-second budget; they assume
-  `wrangler deploy` to 100% of traffic. Production is gated on its platform host with the
+  `wrangler deploy` to 100% of traffic. Staging is gated the same way on its platform host
+  (`staging https://staging.best.serp.co` goes through workers.dev with the smoke-test header,
+  then requires the 308 to staging.best.serp.co without it), and the Playwright smoke runs
+  there with the header. Production is gated on its platform host with the
   smoke-test header (non-production policy, `x-site-environment: production`, and the 308 once
   the switch is `on`), then on best.serp.co itself without it: no noindex, robots.txt lists the
   sitemap index, Google Tag Manager loads. Every answer from the Worker is enforced. Only
