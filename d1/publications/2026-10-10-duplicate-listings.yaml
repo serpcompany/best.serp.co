@@ -1,0 +1,146 @@
+# serpcompany/best.serp.co#332, from #325's Ahrefs audit of staging: 14 products are listed twice,
+# under two slugs with the same name, H1, and description, so each pair splits its links and
+# competes with itself in search. Keep one listing per pair and unpublish the other: its page
+# answers 410 Gone (the gone page links its category, which lists the kept listing) and leaves the
+# sitemap, search, RSS, and category pages. The rows stay (Republish in /admin brings one back).
+#
+# 410, not a redirect: `listing_slug_redirects` sends an old slug to its own listing, and its only
+# writer, `listing-slug-change`, renames a listing to a free slug and is not row-level. No manifest
+# operation points one listing's slug at another listing, so this uses `listing-unpublish`.
+#
+# Kept slugs, checked 2026-10-10 with read-only GETs (each operation's `reason` says why):
+# - SERP's downloaders keep `<name>-video-downloader`. Every serp.ly link of both listings ends on
+#   apps.serp.co/<name>-video-downloader, and apps.serp.co/<name>-downloader is 404 or redirects
+#   there.
+# - Rebrands and acquisitions keep the current brand's domain: maestrolabs.com (Flowrite is now
+#   MailMaestro, from Maestro Labs), jacquard.com (Phrasee is now Jacquard), lambda.ai, timely.com,
+#   magical.so (where both listings' links land; timeos.ai now redirects to timeless.day), and
+#   scaleserp.com (the product is still Scale SERP; trajectdata.com is its parent company's site).
+#
+# Owners, claims, badges: no page of the 28 showed a Verified owner badge on staging or production,
+# so nothing moves. Claim holds (2026-10-06-listing-claim-holds) stay on their rows.
+#
+# Ids are the v1 import's (.archive/d1/artifacts/); categories and websites match each listing's
+# public page on staging and production. Row-level: a listing whose id, slug, website, or
+# categories changed, that is no longer live, or whose own submission is in review refuses the
+# whole batch, with nothing written. Apply staging first, then production after promotion.
+version: 1
+id: 2026-10-10-duplicate-listings
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-unpublish
+    id: lst_6848e48a02324d7854be5396
+    slug: facebook-downloader
+    categories:
+      - video-downloaders
+    reason: "#332 duplicate of facebook-video-downloader, the slug SERP's links use (apps.serp.co/facebook-video-downloader)"
+    expected:
+      website: https://serp.ly/facebook-downloader
+  - action: listing-unpublish
+    id: lst_3601e4f5ecdb41c38f4af867
+    slug: kajabi-downloader
+    categories:
+      - video-downloaders
+    reason: "#332 duplicate of kajabi-video-downloader, the slug SERP's links use (apps.serp.co/kajabi-video-downloader)"
+    expected:
+      website: https://serp.ly/kajabi-video-downloader
+  - action: listing-unpublish
+    id: lst_b5e8cf522bb20bb82d019ea7
+    slug: loom-downloader
+    categories:
+      - video-downloaders
+    reason: "#332 duplicate of loom-video-downloader, the slug SERP's links use (apps.serp.co/loom-video-downloader)"
+    expected:
+      website: https://serp.ly/loom-video-downloader
+  - action: listing-unpublish
+    id: lst_2d97c5bf77ddd52e691d2826
+    slug: skool-downloader
+    categories:
+      - video-downloaders
+    reason: "#332 duplicate of skool-video-downloader, the slug SERP's links use (apps.serp.co/skool-video-downloader)"
+    expected:
+      website: https://serp.ly/skool-video-downloader
+  - action: listing-unpublish
+    id: lst_8950abff1c7315b2a05ed3d4
+    slug: sprout-downloader
+    categories:
+      - video-downloaders
+    reason: "#332 duplicate of sprout-video-downloader, the slug SERP's links use (apps.serp.co/sprout-video-downloader)"
+    expected:
+      website: https://serp.ly/sprout-video-downloader
+  - action: listing-unpublish
+    id: lst_23fc568c5d83d33a8e1ff8b8
+    slug: vimeo-downloader
+    categories:
+      - video-downloaders
+    reason: "#332 duplicate of vimeo-video-downloader, the slug SERP's links use (apps.serp.co/vimeo-video-downloader)"
+    expected:
+      website: https://serp.ly/vimeo-video-downloader
+  - action: listing-unpublish
+    id: lst_eb9f9e91aa46a4e661aeb2e4
+    slug: whop-downloader
+    categories:
+      - video-downloaders
+    reason: "#332 duplicate of whop-video-downloader, the slug SERP's links use (apps.serp.co/whop-video-downloader)"
+    expected:
+      website: https://serp.ly/whop-video-downloader
+  - action: listing-unpublish
+    id: lst_dd8fb0cfe5d5d2e3524ebf0f
+    slug: wistia-downloader
+    categories:
+      - video-downloaders
+    reason: "#332 duplicate of wistia-video-downloader, the slug SERP's links use (apps.serp.co/wistia-video-downloader)"
+    expected:
+      website: https://serp.ly/wistia-video-downloader
+  - action: listing-unpublish
+    id: lst_abfe947189d1a2c36bfc30bd
+    slug: flowrite.com
+    categories:
+      - other
+    reason: "#332 duplicate of maestrolabs.com: Flowrite is now MailMaestro, and flowrite.com redirects to maestrolabs.com/flowrite"
+    expected:
+      website: https://serp.ly/flowrite.com
+  - action: listing-unpublish
+    id: lst_520c843ef16b99939a10de32
+    slug: phrasee.co
+    categories:
+      - other
+    reason: "#332 duplicate of jacquard.com: Phrasee is now Jacquard, and phrasee.co redirects to jacquard.com"
+    expected:
+      website: https://serp.ly/phrasee.co
+  - action: listing-unpublish
+    id: lst_125869b72bec8380b6e03430
+    slug: lambdalabs.com
+    categories:
+      - cloud-gpu-providers
+      - cloud-gpus-for-deep-learning
+    reason: "#332 duplicate of lambda.ai: lambdalabs.com redirects to lambda.ai, Lambda's current domain"
+    expected:
+      website: https://serp.ly/lambda
+  - action: listing-unpublish
+    id: lst_ce9486f34a719d8172fdbf08
+    slug: timeos.ai
+    categories:
+      - other
+    reason: "#332 duplicate of magical.so: both listings' links land on magical.so (timeOS), and timeos.ai now redirects to timeless.day"
+    expected:
+      website: https://serp.ly/magical
+  - action: listing-unpublish
+    id: lst_7cccdaebce54e5ccc387136b
+    slug: trajectdata.com
+    categories:
+      - other
+    reason: "#332 duplicate of scaleserp.com: the product is still Scale SERP and SERP's links use scaleserp.com; trajectdata.com is its parent company's site"
+    expected:
+      website: https://serp.ly/scale-serp
+  - action: listing-unpublish
+    id: lst_07bc2165413fbae535846dcb
+    slug: timelyapp.com
+    categories:
+      - ai-time-tracking
+    reason: "#332 duplicate of timely.com: timelyapp.com redirects to timely.com, Timely's current domain"
+    expected:
+      website: https://serp.ly/timelyapp.com
