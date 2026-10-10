@@ -38,7 +38,7 @@ Column meanings and constraints are commented in `schema.ts`. By area:
   app writes are later steps of #341. Write tags and memberships with `UPDATE`, or
   `INSERT … SELECT … WHERE is_active = 1`, never an upsert: SQLite fires a `BEFORE INSERT`
   trigger on an upsert's attempted insert even when it becomes an update, so the taxonomy
-  triggers would refuse one that touches a retired tag. So never copy a tag writer from the
+  triggers would refuse one that touches a retired tag. So don't base a tag writer on the
   category writers (`listing-plans.ts`, `plan-support.ts`), which upsert `listing_categories`.
 - **Publication**: `publication_state` is a single row holding the catalog version and
   checksum; `publication_runs` records every applied publication, and `migration_runs` the
@@ -68,7 +68,6 @@ second `pnpm db:generate` reports no changes. Keep these properties in every mig
   migration. serp's data-and-storage standard puts `STRICT` tables in a `--custom` migration,
   which would emit them again (next item), so this is a
   [recorded exception](../AGENTS.md#recorded-exceptions-to-the-serp-web-stack).
-  `PRAGMA foreign_keys = ON` leads `0000_baseline.sql`.
 - Triggers are written by hand: the baseline's four enforce that a published listing always has
   exactly one primary category, and later ones refuse blocked URLs, keep published listings
   off retired categories, keep an active tag under an active category, and keep new tag
@@ -78,8 +77,9 @@ second `pnpm db:generate` reports no changes. Keep these properties in every mig
   migration, finished by hand, or the next `pnpm db:generate` would emit them again.
 - A migration that seeds a table uses fixed values, as `0002_better_auth.sql` does for the
   admin allowlist's `created_at`, so every fresh database, and so the fixture seed, is the same.
-- D1 enforces foreign keys and runs a migration in one transaction, where
-  `PRAGMA foreign_keys=OFF` has no effect, so dropping a referenced table cascades.
+- D1 enforces foreign keys (`PRAGMA foreign_keys = ON` leads `0000_baseline.sql`) and runs a
+  migration in one transaction, where `PRAGMA foreign_keys=OFF` has no effect, so dropping a
+  referenced table cascades.
 - `listings` only gains columns (`ALTER TABLE ... ADD ... CHECK`), even where Drizzle generates
   a rebuild, as it does for a new CHECK. Never rebuild `listings`: dropping it would
   cascade-delete its memberships, media, links, and FAQs and drop the primary-category triggers.

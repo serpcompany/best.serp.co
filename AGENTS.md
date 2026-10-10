@@ -81,7 +81,7 @@ Issues and labels never grant production, database, or deployment authority.
   when the binding or `D1_RUNTIME_ENV` is missing or invalid.
 - Use prepared statements and bind every runtime value.
 - Model tables in `apps/web/src/db/schema.ts`; `pnpm db:generate` (never `drizzle-kit push`) writes
-  migrations, which are finished by hand; triggers and FTS5 go in `drizzle-kit generate --custom`.
+  migrations, hand-finished only before they ship; triggers and FTS5 go in `--custom` migrations.
 - No catalog JSON/YAML/CSV runtime, generated browser search index, filesystem fallback,
   static export, or GitHub Pages deploy path. The legacy `products.json` was the one-time
   import's input (archived), never an application input.
@@ -104,8 +104,9 @@ Deliberate differences from serp's `web-stack/` standard; change one only throug
 - One build serves every environment; the environment is read per request
   (`apps/web/src/lib/environment/request-environment.ts`), so nothing per-environment is
   prerendered. Staging's password skips smoke tests, robots.txt, the webhook and static files.
-- `STRICT` is hand-finished, not `--custom` ([why](./docs/data-model.md#hand-finished-migrations)).
-  `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
+- `STRICT` is hand-finished in the generated migration, where serp's data-and-storage standard uses
+  `--custom`, which would re-emit tables ([why](./docs/data-model.md#hand-finished-migrations)).
+- `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
 - Worker Sentry runs only on signed-in and operational surfaces; public pages log errors (#355).
 - The Stripe webhook is `/api/billing/webhook/` behind a provider-neutral `BillingProvider`
   with no Stripe SDK, until the payments audit (#156) decides. Brand icons use
@@ -113,8 +114,7 @@ Deliberate differences from serp's `web-stack/` standard; change one only throug
 
 ## Completion contract
 
-Run targeted checks while editing and `pnpm check` before claiming a
-substantial change is complete. For runtime behavior, capture Playwright or live-route
-evidence. Production operations require the confirmations in
-[the deploy runbook](./docs/deploy-runbook.md); a passing local harness never grants
-deployment authority.
+Run targeted checks while editing and `pnpm check` before claiming a substantial change is
+complete. For runtime behavior, capture Playwright or live-route evidence. Production operations
+require the confirmations in [the deploy runbook](./docs/deploy-runbook.md); a passing local
+harness never grants deployment authority.

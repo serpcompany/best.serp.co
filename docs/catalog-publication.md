@@ -166,11 +166,13 @@ is `/products/`. Redirects store their target's id, so a later rename keeps them
 - **A page wins over its redirect.** A redirect can be published while its source still renders,
   as #341's first manifest does for old category URLs. It takes effect once that page empties or
   retires.
-- **The end of the batch.** Every redirect the manifest wrote must still point at an active
-  target, and every best page it created or updated must still use an active tag and category.
+- **The end of the batch.** Every redirect the manifest wrote must still exist and point at an
+  active target, and every best page it created or updated must still use an active tag and
+  category unless the page is retired: a retired page may keep a category the batch retires.
   `category-unpublish` re-points nothing, so retiring a category that one of them uses refuses the
-  batch, in either order. A category retired by a later manifest isn't checked against redirects
-  or best pages: re-point those first.
+  batch, in either order. A batch that removes a redirect it wrote is refused too, as when a
+  `tag-unpublish` re-points that redirect at its own source. A category retired by a later
+  manifest isn't checked against redirects or best pages: re-point those first.
 - **`listing-tags-set`** sets `updated_at`, the sitemap `lastmod`, and logs an `edited` event, which
   `/admin` shows as "Details edited: tags". It keeps the listing's checksum, because tags aren't
   content that revisions and admin edits compare. So it needs no draft step and allows a listing
@@ -189,11 +191,12 @@ is `/products/`. Redirects store their target's id, so a later rename keeps them
   `best-page-create` before its `best-page-listings-set`, earlier in the same manifest or in an
   earlier one.
 - **Routes.** `affected_routes` names the tag and best pages, their indexes (`/products/tags/`,
-  `/best/`), the hubs and listings involved, and `sitemap-tags.xml` and `sitemap-best.xml`. A
-  retirement (`tag-unpublish`, `best-page-unpublish`) names only its own page, its index, and its
-  redirect target: the tag's hub, the best page's pool, and the sources whose redirects it
-  re-points aren't known at plan time. `affected_routes` is an audit record, and the edge cache
-  keys on the [catalog epoch](./caching.md#the-catalog-epoch), so no page stays stale. A manifest
-  without a taxonomy operation records the same routes as before.
+  `/best/`), the hubs and listings involved, and `sitemap-tags.xml` and `sitemap-best.xml`,
+  beside the routes every manifest records (`/`, `/products/`, `/search/`, `/rss.xml` and the
+  other sitemaps). To those, a retirement (`tag-unpublish`, `best-page-unpublish`) adds only its
+  own page, its index, and its redirect target: the tag's hub, the best page's pool, and the
+  sources whose redirects it re-points aren't known at plan time. `affected_routes` is an audit
+  record, and the edge cache keys on the [catalog epoch](./caching.md#the-catalog-epoch), so no
+  page stays stale. A manifest without a taxonomy operation records the same routes as before.
 - **Bindings** are numbers, strings, and nulls, never booleans. D1's REST API takes them as JSON
   (`d1-compat.test.ts` checks every committed manifest).
