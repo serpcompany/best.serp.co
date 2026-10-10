@@ -128,6 +128,15 @@ const removalReasons: Partial<Record<MismatchVerdict, string>> = {
 }
 
 /**
+ * Manifests `d1-remote-publisher.test.ts` writes and removes while the suite runs; they are never
+ * committed, so they are skipped, as `d1-compat.test.ts` skips them.
+ */
+const transientManifests = new Set([
+  'remote-publisher-media-test.yaml',
+  'remote-publisher-test.yaml'
+])
+
+/**
  * The listings whose categories, live state, slug, or details a committed manifest changes, by id
  * (the manifest's file name): #333's batches move them, #332's and every hygiene manifest
  * unpublish them. A slug redirect's two listings count too (#338): unpublishing its target would
@@ -150,7 +159,9 @@ export function committedListingChanges(
   ])
   const changes = new Map<string, string>()
   for (const name of readdirSync(resolve(directory))
-    .filter(file => /\.ya?ml$/u.test(file) && !except.includes(file))
+    .filter(
+      file => /\.ya?ml$/u.test(file) && !except.includes(file) && !transientManifests.has(file)
+    )
     .sort()) {
     const manifest = parse(readFileSync(resolve(directory, name), 'utf8')) as {
       operations?: Array<{

@@ -1,4 +1,6 @@
-import { urlKey, websiteSpellings } from '@/lib/url-key'
+// Relative, not `@/`: the D1 publisher loads this module under plain tsx (#340), which has no
+// alias (`scripts/tsx-import-graph.test.ts`).
+import { urlKey, websiteSpellings } from '../lib/url-key'
 import { type HostedMedia, isListingMediaKey } from './media-keys'
 import { buildQueueMediaPlans, buildRecordMediaFailurePlans } from './media-plans'
 import {
