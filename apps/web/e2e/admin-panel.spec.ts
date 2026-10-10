@@ -236,6 +236,43 @@ test.describe('admin gate', () => {
   })
 })
 
+test.describe('shell', () => {
+  test('serplists’ sidebar rows, theme row, account menu and sticky top bar (#261)', async ({
+    baseURL,
+    page
+  }) => {
+    const admin = client(page.request, baseURL)
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
+    await page.goto('/admin/submissions/')
+    const nav = page.getByRole('navigation', { name: 'Dashboard' })
+    for (const name of ['Review queue', 'Listings', 'Admins', 'View best.serp.co']) {
+      await expect(nav.getByRole('link', { name })).toHaveCSS('height', '44px')
+    }
+    await expect(nav.getByRole('link', { name: 'Review queue' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    await expect(page.locator('main > header')).toHaveCSS('position', 'sticky')
+
+    // The theme row switches the theme; it is a client component, so click until hydrated.
+    const html = page.locator('html')
+    await expect(async () => {
+      await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+      await expect(html).toHaveClass(/\bdark\b/u, { timeout: 2_000 })
+    }).toPass()
+    await page.getByRole('button', { name: 'Switch to light mode' }).click()
+    await expect(html).not.toHaveClass(/\bdark\b/u)
+
+    await page.getByRole('button', { name: 'Account menu' }).click()
+    const menu = page.getByRole('menu')
+    await expect(menu.getByRole('menuitem', { name: 'Switch to Account' })).toHaveAttribute(
+      'href',
+      '/account/'
+    )
+    await expect(menu.getByRole('menuitem', { name: 'Sign out' })).toBeVisible()
+  })
+})
+
 test.describe('review decisions', () => {
   test('approving publishes the listing to its page and the sitemap; a replay is a no-op', async ({
     baseURL,

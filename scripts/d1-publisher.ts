@@ -160,7 +160,9 @@ const operation = z.discriminatedUnion('action', [
    * becomes 0, the row is kept, and the URL answers 410 Gone. `reason` goes to the activity log.
    * `expected` is the row the manifest was generated against (#100): the batch refuses a listing
    * whose website changed since, so the operation stays correct on any environment, and a
-   * row-level (`rows`) manifest requires it.
+   * row-level (`rows`) manifest requires it. `expected.unowned` (#332) also refuses a listing
+   * that anyone owns, claims, or paid for (`LISTING_HAS_OWNERSHIP_RECORDS`): a retirement in
+   * favour of another listing would leave those records on the unpublished row.
    */
   z
     .object({
@@ -169,7 +171,10 @@ const operation = z.discriminatedUnion('action', [
       slug: existingSlug,
       categories,
       reason: z.string().trim().min(1).max(200).optional(),
-      expected: z.object({ website: z.string().url() }).strict().optional()
+      expected: z
+        .object({ website: z.string().url(), unowned: z.literal(true).optional() })
+        .strict()
+        .optional()
     })
     .strict(),
   /**
@@ -251,6 +256,23 @@ const operation = z.discriminatedUnion('action', [
     })
     .strict(),
   /**
+   * Replaces a listing's categories, primary first, compared and swapped on its slug and current
+   * categories like `listing-categories-add` (#333: listings filed only under Other move to real
+   * categories, which `-add` and `-remove` can't do, as they never touch the primary). The listing
+   * is a draft inside the batch while its memberships are replaced, as the admin panel's edit does,
+   * so the primary-category triggers hold; every category must be active, and the listing's own
+   * submission must not be in review.
+   */
+  z
+    .object({
+      action: z.literal('listing-categories-set'),
+      id: listingId,
+      slug: existingSlug,
+      expected: z.array(categorySlug).min(1),
+      categories
+    })
+    .strict(),
+  /**
    * Holds a listing's instant claim for the owner's review (#67, #108 review round 3): #100's
    * owner-review sets, or one an admin names. Row-level guarded: the listing must still have this
    * slug and, with `expected`, this website. An active hold is left as it is; a cleared one is
@@ -305,18 +327,22 @@ const provenance = z
 export const manifestConcurrency = ['publication', 'rows'] as const
 /**
  * Operations that carry their own row-level compare-and-swap, so a `rows` manifest may hold them:
- * media rows (`expected`), categories (`expected`, added or removed), a description's length and
- * ending (#105), an unpublish with its `expected.website` (#100: categories, live, website, no
- * submission in review), and a category retirement (#260: no live listing left in it).
+ * media rows (`expected`), categories (`expected`, added, removed, or replaced), a description's
+ * length and ending (#105), an unpublish with its `expected.website` (#100: categories, live,
+ * website, no submission in review; with `expected.unowned`, no ownership records either, #332), a
+ * category retirement (#260: no live listing left in it), and a new category (#333: its insert
+ * refuses the batch when the slug exists, retired or not).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
   'listing-categories-add',
   'listing-categories-remove',
+  'listing-categories-set',
   'listing-content-remove-suffix',
   'listing-unpublish',
   'listing-claim-hold-add',
   'listing-claim-hold-clear',
+  'category-create',
   'category-unpublish'
 ])
 export const manifestSchema = z
@@ -347,7 +373,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, and category-unpublish operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, and category-create/-unpublish operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -408,6 +434,16 @@ export const manifestSchema = z
             path: ['operations', index, 'remove']
           })
         }
+      }
+      if (
+        op.action === 'listing-categories-set' &&
+        op.categories.join('\0') === op.expected.join('\0')
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'The listing already has exactly these categories.',
+          path: ['operations', index, 'categories']
+        })
       }
       if (op.action === 'listing-media-update') {
         const keyed = [
@@ -508,6 +544,19 @@ function membershipGuard(id: string, expected: string[]): PlannedStatement {
     ...expected
   )
 }
+/**
+ * True while anything ties listing `?` to a person or a payment (#332), each in its open
+ * statuses as `apps/web/src/db/schema.ts` defines them: a current owner (`listing_owners`), an
+ * open claim (`openListingClaimStatuses`), an order on the listing or one of its submissions
+ * that is pending, paid, or being refunded, an open revision (`openRevisionStatuses`), or a
+ * submission that is not rejected or withdrawn (an approved free one is how the badge program
+ * knows the listing's owner). Binds the listing id six times.
+ */
+export const LISTING_HAS_OWNERSHIP_RECORDS = `(EXISTS (SELECT 1 FROM listing_owners WHERE listing_id=? AND revoked_at IS NULL)
+  OR EXISTS (SELECT 1 FROM listing_claims WHERE listing_id=? AND status IN ('code_sent','email_verified'))
+  OR EXISTS (SELECT 1 FROM orders WHERE (listing_id=? OR submission_id IN (SELECT id FROM listing_submissions WHERE listing_id=?)) AND status IN ('pending','paid','refunding'))
+  OR EXISTS (SELECT 1 FROM listing_revisions WHERE listing_id=? AND status IN ('pending_review','changes_requested'))
+  OR EXISTS (SELECT 1 FROM listing_submissions WHERE listing_id=? AND status NOT IN ('rejected','withdrawn')))`
 /** Refuses the batch unless the listing has this slug and exactly these categories, in order. */
 function categoriesGuard(id: string, slug: string, expected: string[]): PlannedStatement {
   return statement(
@@ -771,6 +820,15 @@ export function buildPublicationPlan(
           `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${GUARD_FAILURE} ELSE 1 END`,
           op.id
         ),
+        // #332: an owner, claim, order, revision, or submission would be stranded on the row.
+        ...(op.expected?.unowned
+          ? [
+              statement(
+                `SELECT CASE WHEN ${LISTING_HAS_OWNERSHIP_RECORDS} THEN ${GUARD_FAILURE} ELSE 1 END`,
+                ...Array.from({ length: 6 }, () => op.id)
+              )
+            ]
+          : []),
         statement(
           `UPDATE listings SET is_active=0,updated_at=? WHERE id=? AND slug=? AND status='approved' AND is_active=1${
             op.expected ? ' AND website=?' : ''
@@ -905,6 +963,64 @@ export function buildPublicationPlan(
       )
       routes.add(listingRoute(op.slug))
       addCategories([...op.expected, ...op.add])
+    }
+    if (op.action === 'listing-categories-set') {
+      statements.push(
+        categoriesGuard(op.id, op.slug, op.expected),
+        // As in the admin panel (#64): never while the listing's own submission is in review. Its
+        // approval needs the checksum the listing was paid at (`published_checksum`), and the new
+        // checksum below would leave that paid submission impossible to approve.
+        statement(
+          `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${GUARD_FAILURE} ELSE 1 END`,
+          op.id
+        ),
+        // A draft while its memberships are replaced, as the admin panel's edit does: the
+        // primary-category triggers refuse removing a published listing's primary.
+        statement(
+          "UPDATE listings SET status='draft' WHERE id=? AND slug=? AND status='approved'",
+          op.id,
+          op.slug
+        ),
+        statement(CHANGED_ONE_GUARD),
+        statement('DELETE FROM listing_categories WHERE listing_id=?', op.id),
+        // The first is the primary. A missing or retired category inserts nothing: refused.
+        // `is_primary` binds as 1 or 0, never a boolean, so D1's REST API binds it as the
+        // Worker binding does (`d1-remote-publisher.ts` sends bindings as JSON).
+        ...op.categories.flatMap((categorySlugToSet, order) => [
+          statement(
+            'INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) SELECT ?,id,?,? FROM categories WHERE slug=? AND is_active=1',
+            op.id,
+            order,
+            order === 0 ? 1 : 0,
+            categorySlugToSet
+          ),
+          statement(CHANGED_ONE_GUARD)
+        ]),
+        // Published again: the triggers check exactly one primary and no retired category. The
+        // page shows its categories, so it changed (sitemap lastmod, #218), and a new checksum
+        // refuses an admin edit or revision read before it, which would put the old primary back.
+        statement(
+          "UPDATE listings SET status='approved',checksum=?,updated_at=? WHERE id=? AND status='draft'",
+          hash(`${manifest.id}\0${op.id}\0categories`),
+          now,
+          op.id
+        ),
+        statement(CHANGED_ONE_GUARD),
+        // The admin panel's activity record for an edit (#64).
+        statement(
+          "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
+          op.id,
+          JSON.stringify({
+            fields: ['categories'],
+            manifest: manifest.id,
+            from: op.expected,
+            to: op.categories
+          }),
+          manifest.provenance.actor
+        )
+      )
+      routes.add(listingRoute(op.slug))
+      addCategories([...op.expected, ...op.categories])
     }
     if (op.action === 'listing-media-update') {
       const expected = expectedMediaJson(op.expected)

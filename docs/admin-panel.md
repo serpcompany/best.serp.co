@@ -4,8 +4,8 @@
 manage listings, and manage the admin allowlist. The screens follow the mockups approved in #70
 (screens 10 to 14 and the admin shell). The shell is shadcn sidebar-07 (`collapsible="icon"`
 with a rail), composed in `apps/web/src/components/admin/admin-shell.tsx` from the dashboard pieces
-the account area shares (`@/components/dashboard/*`); pages set their breadcrumb with
-`AdminCrumbs`.
+the account area shares (`@/components/dashboard/*`, with serplists' sidebar rows, account menu
+and top bar since #261); pages set their breadcrumb with `AdminCrumbs`.
 
 | Screen | Route | Reads |
 |---|---|---|
