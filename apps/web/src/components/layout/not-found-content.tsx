@@ -10,12 +10,15 @@ import { ListCard } from './list-card'
 import { PageSection } from './page-shell'
 import { productLinks } from './site-links'
 
-export const notFoundMetadata: Metadata = generateBaseMetadata({
-  title: 'Page Not Found',
-  description: `The page you are looking for does not exist. Browse ${siteConfig.name} to explore the directory.`,
-  path: '/404',
-  noindex: true
-})
+/** The 404 page's metadata, built per request (its URLs carry this environment's origin, #359). */
+export function notFoundMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Page Not Found',
+    description: `The page you are looking for does not exist. Browse ${siteConfig.name} to explore the directory.`,
+    path: '/404',
+    noindex: true
+  })
+}
 
 // serp.co's page icons (`components/icons.ts`): Layers3 is its brands icon.
 const linkIcons: Record<string, typeof Layers3> = {

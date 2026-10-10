@@ -9,17 +9,19 @@ import { Badge } from '@/components/ui/badge'
 import { getActiveCategories } from '@/lib/catalog/repository'
 import { getCategoryIcon } from '@/lib/directory/categories'
 import { getRoute } from '@/lib/routing/routes'
-import { generateBaseMetadata, SITE_NAME, SITE_PUBLIC_URL } from '@/lib/seo/seo-config'
+import { generateBaseMetadata, SITE_NAME, siteOrigin } from '@/lib/seo/seo-config'
 import { siteCopy } from '@/lib/site/site-copy'
 
 const categoriesPath = getRoute('category.index')
 
 // The root layout's title template adds ` | SERP`.
-export const metadata: Metadata = generateBaseMetadata({
-  title: `${siteCopy.listingName.pluralTitle} by Category`,
-  description: `Browse every ${SITE_NAME} ${siteCopy.listingName.singular} category to find curated software, AI tools, companies, and resources listed in each one.`,
-  path: categoriesPath
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: `${siteCopy.listingName.pluralTitle} by Category`,
+    description: `Browse every ${SITE_NAME} ${siteCopy.listingName.singular} category to find curated software, AI tools, companies, and resources listed in each one.`,
+    path: categoriesPath
+  })
+}
 
 /** The categories index (#268): a `PageHero`, then each category as a `ListCard` in the grid. */
 export default async function CategoriesPage() {
@@ -32,7 +34,7 @@ export default async function CategoriesPage() {
       <PageSection spacing="hero" className="border-b">
         <SiteBreadcrumb
           items={[{ name: 'Categories', href: categoriesPath }]}
-          baseUrl={SITE_PUBLIC_URL}
+          baseUrl={siteOrigin()}
         />
         <PageHero
           title="Categories"

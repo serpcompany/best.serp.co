@@ -10,6 +10,11 @@ interface CloudflareEnv {
    * (`src/lib/billing/flags.ts`; unused since #133 turned the flag on). Ignored anywhere but local.
    */
   LOCAL_ORDERS?: string
+  /**
+   * `on` makes a local Worker serve as staging, behind its password (#359): the e2e suite's
+   * staging-access Worker (`e2e/staging-access-fixture.ts`). Ignored anywhere but local.
+   */
+  LOCAL_STAGING_ACCESS?: string
   /** A local Worker only: the port of the end-to-end suite's mocked Stripe API on 127.0.0.1. */
   LOCAL_STRIPE_MOCK_PORT?: string
   /** Worker secret (#68): Stripe's secret key, test mode on staging and live in production. */

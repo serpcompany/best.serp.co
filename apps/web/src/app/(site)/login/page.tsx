@@ -6,12 +6,14 @@ import { getSessionUser } from '@/lib/auth/server'
 import { requireRouteFeature } from '@/lib/route-feature-gates'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Sign up or sign in',
-  description: 'Sign up or sign in to SERP with a 6-digit code sent to your email.',
-  path: '/login/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Sign up or sign in',
+    description: 'Sign up or sign in to SERP with a 6-digit code sent to your email.',
+    path: '/login/',
+    noindex: true
+  })
+}
 
 type LoginPageProps = {
   searchParams: Promise<{ callbackUrl?: string | string[] }>

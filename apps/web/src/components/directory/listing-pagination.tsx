@@ -9,7 +9,7 @@ import {
   PaginationItem
 } from '@/components/ui/pagination'
 import { cn } from '@/lib/utils'
-import { SITE_PUBLIC_URL } from '../../lib/seo/seo-config'
+import { siteOrigin } from '../../lib/seo/seo-config'
 
 /**
  * Directory and category listings are paginated with a `?page=N` query parameter on the
@@ -42,7 +42,7 @@ export function paginatedMetadata(
   { basePath, page }: { basePath: string; page: number }
 ): Metadata {
   if (page <= 1) return metadata
-  const canonical = `${SITE_PUBLIC_URL}${listingPageHref(basePath, page)}`
+  const canonical = `${siteOrigin()}${listingPageHref(basePath, page)}`
   const title = typeof metadata.title === 'string' ? `${metadata.title} - Page ${page}` : undefined
   return {
     ...metadata,

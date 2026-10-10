@@ -6,12 +6,14 @@ import { PageHero } from '@/components/layout/page-hero'
 import { PageSection } from '@/components/layout/page-shell'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Sponsor SERP',
-  description:
-    'Sponsorship options for reaching the SERP audience: people researching software, AI tools, resources, and SERP network projects.',
-  path: '/sponsor/'
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Sponsor SERP',
+    description:
+      'Sponsorship options for reaching the SERP audience: people researching software, AI tools, resources, and SERP network projects.',
+    path: '/sponsor/'
+  })
+}
 
 /** Laid out as serplists' Contact (#275): a centered hero, then the address as a card. */
 export default function SponsorPage() {

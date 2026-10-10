@@ -5,12 +5,14 @@ import { generateBaseMetadata } from '@/lib/seo/seo-config'
 import { site } from '@/lib/site'
 
 export const dynamic = 'force-dynamic'
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Checkout cancelled',
-  description: 'Your checkout was cancelled.',
-  path: '/submit/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Checkout cancelled',
+    description: 'Your checkout was cancelled.',
+    path: '/submit/',
+    noindex: true
+  })
+}
 
 /** `/submit/<id>/checkout/cancelled/` (#68, #70 screen 4f): back from checkout without paying. */
 export default async function CheckoutCancelledPage({

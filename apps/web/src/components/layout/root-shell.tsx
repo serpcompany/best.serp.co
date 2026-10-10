@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import {
-  SITE_APPLE_TOUCH_ICON_URL,
   SITE_DESCRIPTION,
-  SITE_FAVICON_URL,
   SITE_NAME,
   SITE_TAGLINE,
-  SITE_URL
+  siteAppleTouchIconUrl,
+  siteFaviconUrl,
+  siteOrigin
 } from '../../lib/seo/seo-config'
 import { DesignSystemProvider } from './design-system-provider'
 import {
@@ -16,16 +16,19 @@ import {
   GoogleTagManagerScript
 } from './root-shell-client'
 
-export const rootLayoutMetadata: Metadata = {
-  title: {
-    default: `${SITE_NAME} - ${SITE_TAGLINE}`,
-    template: `%s | ${SITE_NAME}`
-  },
-  description: SITE_DESCRIPTION,
-  metadataBase: new URL(SITE_URL),
-  icons: {
-    icon: SITE_FAVICON_URL,
-    apple: SITE_APPLE_TOUCH_ICON_URL
+/** The root layout's metadata, built per request: `metadataBase` is this environment's origin. */
+export function rootLayoutMetadata(): Metadata {
+  return {
+    title: {
+      default: `${SITE_NAME} - ${SITE_TAGLINE}`,
+      template: `%s | ${SITE_NAME}`
+    },
+    description: SITE_DESCRIPTION,
+    metadataBase: new URL(siteOrigin()),
+    icons: {
+      icon: siteFaviconUrl(),
+      apple: siteAppleTouchIconUrl()
+    }
   }
 }
 

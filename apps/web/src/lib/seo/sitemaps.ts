@@ -12,7 +12,7 @@
 
 import type { MetadataRoute } from 'next'
 import {
-  disallowedPaths,
+  crawlRules,
   SITEMAP_INDEX_PATH,
   type SitemapGroup,
   sitemapGroups,
@@ -23,7 +23,7 @@ import { getActiveCategories } from '../directory/category-navigation'
 import { getRoute } from '../routing/routes'
 import { siteConfig } from '../site/site-config'
 import { absoluteUrl } from './canonical-url'
-import { SITE_PUBLIC_URL } from './seo-config'
+import { siteOrigin } from './seo-config'
 
 type WebsiteSitemapEntry = {
   categories?: string[]
@@ -47,7 +47,7 @@ type SitemapContentLoaders = {
  * Sitemap entries match the page canonical exactly: the homepage is the bare origin, pages
  * end with a slash, and sitemap files never do (see `./canonical-url.ts`).
  */
-function toAbsoluteUrl(path: string, baseUrl = SITE_PUBLIC_URL): string {
+function toAbsoluteUrl(path: string, baseUrl = siteOrigin()): string {
   return absoluteUrl(baseUrl, path)
 }
 
@@ -163,11 +163,7 @@ function getPageEntries(websites: WebsiteSitemapEntry[]): SitemapEntry[] {
 
 export function createCanonicalRobots(): MetadataRoute.Robots {
   return {
-    rules: {
-      userAgent: '*',
-      allow: ['/'],
-      disallow: disallowedPaths()
-    },
+    rules: { userAgent: '*', ...crawlRules() },
     sitemap: toAbsoluteUrl(SITEMAP_INDEX_PATH)
   }
 }

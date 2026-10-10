@@ -6,7 +6,9 @@ import { legalPageFor } from '@/lib/site/legal-pages'
 
 const path = getRoute('dmca')
 
-export const metadata: Metadata = generateLegalPageMetadata(path)
+export function generateMetadata(): Metadata {
+  return generateLegalPageMetadata(path)
+}
 
 export default async function DmcaPage() {
   return (

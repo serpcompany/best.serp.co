@@ -1,14 +1,7 @@
 import { getWebsites, type WebsiteMetadata } from '@/lib/content-loader'
 import { getRoute } from '@/lib/routing/routes'
-import {
-  SITE_APPLE_TOUCH_ICON_URL,
-  SITE_FAVICON_URL,
-  SITE_NAME,
-  SITE_PUBLIC_URL
-} from '@/lib/seo/seo-config'
+import { SITE_NAME, siteAppleTouchIconUrl, siteFaviconUrl, siteOrigin } from '@/lib/seo/seo-config'
 import { siteCopy } from '@/lib/site/site-copy'
-
-const baseUrl = SITE_PUBLIC_URL
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +10,8 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET() {
   const websitesData = await getWebsites()
+  // This environment's origin: best.serp.co, or staging.best.serp.co on staging (#359).
+  const baseUrl = siteOrigin()
 
   const feed = {
     version: 'https://jsonfeed.org/version/1',
@@ -24,8 +19,8 @@ export async function GET() {
     home_page_url: baseUrl,
     feed_url: `${baseUrl}/rss.xml`,
     description: `Latest updates from ${SITE_NAME}`,
-    icon: SITE_APPLE_TOUCH_ICON_URL,
-    favicon: SITE_FAVICON_URL,
+    icon: siteAppleTouchIconUrl(),
+    favicon: siteFaviconUrl(),
     authors: [
       {
         name: SITE_NAME,

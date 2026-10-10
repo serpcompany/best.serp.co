@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { type SiteRoute, siteRoutes } from '@/lib/site'
+import { siteOrigin } from '../environment/site-origin'
 import { getRoute } from '../routing/routes'
 import {
   getConfiguredSocialLinks,
@@ -14,41 +15,61 @@ import { absoluteUrl, canonicalPathname } from './canonical-url'
 export const SITE_NAME = siteConfig.name
 export const SITE_TAGLINE = siteConfig.tagline
 export const SITE_DESCRIPTION = siteConfig.description
-export const SITE_PUBLIC_URL = siteConfig.publicUrl
-export const SITE_URL = SITE_PUBLIC_URL
+
+/**
+ * The origin every absolute URL is written with, read per request (#359): `https://best.serp.co`,
+ * or `https://staging.best.serp.co` on staging, which describes itself as production will
+ * (`lib/environment/site-origin.ts`). Call these at request time, never at module load.
+ */
+export { siteOrigin }
+
 /** The `@id` of the site's one `WebSite` JSON-LD node, defined on the homepage. */
-export const SITE_WEBSITE_ID = `${SITE_PUBLIC_URL}/#website`
+export function siteWebsiteId(): string {
+  return `${siteOrigin()}/#website`
+}
 
 /**
  * The canonical absolute URL of a site path. The homepage is the bare origin
  * (`https://best.serp.co`); pages end with a slash and files never do.
  */
 export function siteUrl(path = '/'): string {
-  return absoluteUrl(SITE_PUBLIC_URL, path)
+  return absoluteUrl(siteOrigin(), path)
 }
 export const SITE_TWITTER_HANDLE = hasConfiguredPublicSocialLinks(siteConfig)
   ? getTwitterHandleFromUrl(siteConfig.twitterUrl)
   : null
-export const SITE_FAVICON_URL = siteConfig.branding.faviconUrl ?? `${SITE_URL}/favicon.ico`
-export const SITE_APPLE_TOUCH_ICON_URL =
-  siteConfig.branding.appleTouchIconUrl ?? `${SITE_URL}/apple-touch-icon.png`
+export function siteFaviconUrl(): string {
+  return siteConfig.branding.faviconUrl ?? `${siteOrigin()}/favicon.ico`
+}
+export function siteAppleTouchIconUrl(): string {
+  return siteConfig.branding.appleTouchIconUrl ?? `${siteOrigin()}/apple-touch-icon.png`
+}
 function absoluteSiteAssetUrl(url: string): string {
-  return new URL(url, SITE_URL).toString()
+  return new URL(url, siteOrigin()).toString()
 }
 
-export const SITE_LOGO_URL = absoluteSiteAssetUrl(
-  siteConfig.branding.logoUrl ?? `${SITE_URL}/placeholder.svg`
-)
-export const SITE_OG_IMAGE_URL = absoluteSiteAssetUrl(
-  siteConfig.branding.opengraphImageUrl ?? SITE_LOGO_URL
-)
+export function siteLogoUrl(): string {
+  return absoluteSiteAssetUrl(siteConfig.branding.logoUrl ?? `${siteOrigin()}/placeholder.svg`)
+}
+export function siteOgImageUrl(): string {
+  return absoluteSiteAssetUrl(siteConfig.branding.opengraphImageUrl ?? siteLogoUrl())
+}
 export const DIRECTORY_LISTINGS_KEYWORD = `directory ${siteCopy.listingName.plural}`
 
-export const DEFAULT_OG_IMAGE = {
-  url: SITE_OG_IMAGE_URL,
-  width: 1200,
-  height: 630,
-  alt: `${SITE_NAME} - ${SITE_TAGLINE}`
+export interface OgImage {
+  alt: string
+  height: number
+  url: string
+  width: number
+}
+
+export function defaultOgImage(): OgImage {
+  return {
+    url: siteOgImageUrl(),
+    width: 1200,
+    height: 630,
+    alt: `${SITE_NAME} - ${SITE_TAGLINE}`
+  }
 }
 
 export const ROBOTS_CONFIG = {
@@ -101,7 +122,7 @@ export function generateBaseMetadata(options: {
   description: string
   path?: string
   keywords?: string[]
-  image?: typeof DEFAULT_OG_IMAGE
+  image?: OgImage
   noindex?: boolean
 }): Metadata {
   const {
@@ -109,20 +130,21 @@ export function generateBaseMetadata(options: {
     description,
     path = '',
     keywords = KEYWORDS.global,
-    image = DEFAULT_OG_IMAGE
+    image = defaultOgImage()
   } = options
   const route = path ? registeredRoute(path) : undefined
   const noindex = options.noindex === true || route?.indexable === false
   const url = siteUrl(route?.canonicalPath ?? path)
+  const origin = siteOrigin()
 
   return {
     title,
     description,
     keywords: keywords.join(', '),
-    authors: [{ name: SITE_NAME, url: SITE_URL }],
+    authors: [{ name: SITE_NAME, url: origin }],
     creator: SITE_NAME,
     publisher: SITE_NAME,
-    metadataBase: new URL(SITE_URL),
+    metadataBase: new URL(origin),
     alternates: {
       canonical: url
     },
@@ -180,7 +202,7 @@ export function generateDynamicMetadata(options: {
   description: string
   slug: string
   additionalKeywords?: string[]
-  image?: typeof DEFAULT_OG_IMAGE
+  image?: OgImage
   publishedAt?: string
   updatedAt?: string
 }): Metadata {
@@ -266,21 +288,22 @@ export function generateWebsiteSchema() {
     ...siteContent.networkLinks.map(link => link.href)
   ]
 
+  const origin = siteOrigin()
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     // Every page's JSON-LD points at this one node (#166).
-    '@id': SITE_WEBSITE_ID,
+    '@id': siteWebsiteId(),
     name: SITE_NAME,
     description: SITE_DESCRIPTION,
-    url: SITE_PUBLIC_URL,
+    url: origin,
     publisher: {
       '@type': 'Organization',
       name: SITE_NAME,
-      url: SITE_PUBLIC_URL,
+      url: origin,
       logo: {
         '@type': 'ImageObject',
-        url: SITE_LOGO_URL
+        url: siteLogoUrl()
       },
       sameAs: [...new Set(sameAs)]
     }
@@ -302,9 +325,9 @@ export function generateCollectionSchema(options: {
     numberOfItems: options.itemCount,
     isPartOf: {
       '@type': 'WebSite',
-      '@id': SITE_WEBSITE_ID,
+      '@id': siteWebsiteId(),
       name: SITE_NAME,
-      url: SITE_URL
+      url: siteOrigin()
     }
   }
 }

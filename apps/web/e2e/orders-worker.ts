@@ -12,7 +12,10 @@
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 
-/** Where the mocked Stripe API listens: +1 to +7 are the suites' Workers, +8 is free. */
+/**
+ * Where the mocked Stripe API listens: +1 to +7 are the suites' Workers, +8 is free. (+9 is the
+ * staging-access Worker, which runs alone after the main run, #359.)
+ */
 export const stripeMockPort = playwrightPort + 8
 
 export const E2E_STRIPE_SECRET_KEY = 'sk_test_e2emock'

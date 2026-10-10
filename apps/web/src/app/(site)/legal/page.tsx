@@ -11,11 +11,13 @@ import { legalPages } from '@/lib/site/legal-pages'
 const description =
   'Legal policies and terms for SERP: the privacy policy and the terms and conditions that apply to using the SERP directory.'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'SERP Legal',
-  description,
-  path: '/legal/'
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'SERP Legal',
+    description,
+    path: '/legal/'
+  })
+}
 
 /** serp.co's page icons (`components/icons.ts`), with a cookie for the cookie policy. */
 const icons = {
