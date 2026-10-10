@@ -271,3 +271,103 @@ export function seedContractFixture(sqlite: SqliteD1): void {
     )
     .run('serp-bravo', 'old-bravo', 'bravo')
 }
+
+/**
+ * The taxonomy (#341) on top of `seedContractFixture`, for the catalog's taxonomy reads:
+ *
+ * - tags `writers` (hub `primary`: alpha, bravo and charlie at centrality 0, delta at 2, and the
+ *   scheduled `future`), `editors` (hub `secondary`: alpha, bravo and echo at 0, charlie at 1),
+ *   `idle` (hub `empty`, no listing) and `retired-tag` (retired after bravo and delta took it);
+ * - best pages `best-writers` (the tag; delta and echo pinned, echo from outside the tag; charlie
+ *   excluded), `best-primary` (the category; bravo excluded), `best-editors-in-secondary` (the tag
+ *   within the category; bravo, outside the category, pinned), `best-idle` (the empty category),
+ *   and `best-retired-tag` and `best-inactive`, which are not public;
+ * - redirects from old URLs to each kind of target, a retired one, and one from an active
+ *   category.
+ *
+ * Only bravo has a hosted logo, and every `updated_at` is fixed (bravo's last, in D1's
+ * `CURRENT_TIMESTAMP` format), so the order and the dates are deterministic.
+ */
+export function seedTaxonomyFixture(sqlite: SqliteD1): void {
+  const { database } = sqlite
+  database.exec(`
+    UPDATE listings SET updated_at = '2026-07-01 00:00:00';
+    UPDATE listings SET updated_at = '2026-07-20 10:30:00' WHERE slug = 'bravo';
+    UPDATE listing_media
+      SET media_key = 'best.serp.co/listings/bravo/logo/0123456789abcdef.png',
+        sha256 = '${'a'.repeat(64)}', content_type = 'image/png', bytes = 100, width = 10,
+        height = 10
+      WHERE listing_id = 'serp-bravo' AND kind = 'logo';
+    INSERT INTO tags (slug, name, description, category_id, sort_order)
+      SELECT 'writers', 'Writers', 'Writing tools', id, 0 FROM categories WHERE slug = 'primary';
+    INSERT INTO tags (slug, name, description, category_id, sort_order)
+      SELECT 'editors', 'Editors', '', id, 1 FROM categories WHERE slug = 'secondary';
+    INSERT INTO tags (slug, name, description, category_id, sort_order)
+      SELECT 'idle', 'Idle', '', id, 2 FROM categories WHERE slug = 'empty';
+    INSERT INTO tags (slug, name, description, category_id, sort_order)
+      SELECT 'retired-tag', 'Retired Tag', '', id, 3 FROM categories WHERE slug = 'primary';
+    INSERT INTO listing_tags (listing_id, tag_id, sort_order)
+      SELECT m.listing_id, t.id, m.sort_order FROM (
+        SELECT 'serp-alpha' AS listing_id, 'writers' AS tag, 0 AS sort_order
+        UNION ALL SELECT 'serp-bravo', 'writers', 0
+        UNION ALL SELECT 'serp-charlie', 'writers', 0
+        UNION ALL SELECT 'serp-delta', 'writers', 2
+        UNION ALL SELECT 'serp-future', 'writers', 0
+        UNION ALL SELECT 'serp-alpha', 'editors', 0
+        UNION ALL SELECT 'serp-bravo', 'editors', 0
+        UNION ALL SELECT 'serp-charlie', 'editors', 1
+        UNION ALL SELECT 'serp-echo', 'editors', 0
+        UNION ALL SELECT 'serp-bravo', 'retired-tag', 2
+        UNION ALL SELECT 'serp-delta', 'retired-tag', 2
+      ) m JOIN tags t ON t.slug = m.tag;
+    UPDATE tags SET is_active = 0 WHERE slug = 'retired-tag';
+    INSERT INTO best_pages (slug, keyword, title, heading, intro, tag_id, category_id, list_size,
+      sort_order, is_active, updated_at)
+      SELECT p.slug, p.keyword, p.title, p.heading, p.intro, t.id, c.id, p.list_size, p.sort_order,
+        p.is_active, '2026-07-02T00:00:00.000Z'
+      FROM (
+        SELECT 'best-writers' AS slug, 'writers' AS keyword, 'Best Writers' AS title,
+          'The best writers' AS heading, 'Writers, ranked.' AS intro, 'writers' AS tag,
+          NULL AS category, 5 AS list_size, 0 AS sort_order, 1 AS is_active
+        UNION ALL SELECT 'best-primary', 'primary', 'Best Primary', 'The best primary', '',
+          NULL, 'primary', 5, 1, 1
+        UNION ALL SELECT 'best-editors-in-secondary', 'editors in secondary',
+          'Best Editors in Secondary', 'The best editors in secondary', '', 'editors',
+          'secondary', 5, 2, 1
+        UNION ALL SELECT 'best-idle', 'idle', 'Best Idle', 'The best idle', '', NULL, 'empty',
+          5, 3, 1
+        UNION ALL SELECT 'best-retired-tag', 'retired', 'Best Retired', 'The best retired', '',
+          'retired-tag', NULL, 5, 4, 1
+      ) p
+      LEFT JOIN tags t ON t.slug = p.tag
+      LEFT JOIN categories c ON c.slug = p.category;
+    INSERT INTO best_pages (slug, keyword, title, heading, intro, tag_id, list_size, is_active)
+      SELECT 'best-inactive', 'inactive', 'Best Inactive', 'The best inactive', '', id, 5, 0
+      FROM tags WHERE slug = 'writers';
+    INSERT INTO best_page_listings (best_page_id, listing_id, position, excluded, blurb)
+      SELECT b.id, e.listing_id, e.position, e.excluded, e.blurb FROM (
+        SELECT 'best-writers' AS page, 'serp-delta' AS listing_id, 1 AS position, 0 AS excluded,
+          'Delta leads.' AS blurb
+        UNION ALL SELECT 'best-writers', 'serp-echo', 2, 0, NULL
+        UNION ALL SELECT 'best-writers', 'serp-charlie', NULL, 1, NULL
+        UNION ALL SELECT 'best-primary', 'serp-bravo', NULL, 1, NULL
+        UNION ALL SELECT 'best-editors-in-secondary', 'serp-bravo', 1, 0, NULL
+      ) e JOIN best_pages b ON b.slug = e.page;
+    INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, target_category_id,
+      target_tag_id, target_best_page_id, manifest_id)
+      SELECT r.source_kind, r.source_slug, r.target_kind, c.id, t.id, b.id, 'fixture' FROM (
+        SELECT 'category' AS source_kind, 'old-hub' AS source_slug, 'category' AS target_kind,
+          'secondary' AS target
+        UNION ALL SELECT 'category', 'old-tag', 'tag', 'writers'
+        UNION ALL SELECT 'category', 'old-best', 'best', 'best-writers'
+        UNION ALL SELECT 'category', 'old-other', 'directory', NULL
+        UNION ALL SELECT 'category', 'old-retired-tag', 'tag', 'retired-tag'
+        UNION ALL SELECT 'category', 'primary', 'category', 'secondary'
+        UNION ALL SELECT 'tag', 'old-writers', 'tag', 'writers'
+        UNION ALL SELECT 'best', 'old-best-writers', 'best', 'best-writers'
+      ) r
+      LEFT JOIN categories c ON r.target_kind = 'category' AND c.slug = r.target
+      LEFT JOIN tags t ON r.target_kind = 'tag' AND t.slug = r.target
+      LEFT JOIN best_pages b ON r.target_kind = 'best' AND b.slug = r.target;
+  `)
+}

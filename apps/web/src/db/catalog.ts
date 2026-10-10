@@ -6,10 +6,14 @@ import {
   catalogEpochStatement,
   catalogEpochToken,
   LISTING_IN_RETIRED_CATEGORY_SQL,
-  parseCatalogEpoch
+  parseCatalogEpoch,
+  parseTaxonomyTarget,
+  TAXONOMY_TARGET_JOINS,
+  TAXONOMY_TARGET_SLUG
 } from './catalog-epoch'
 import { type CompiledQuery, d1ErrorCode, runQuery } from './client'
 import type {
+  BestPageItem,
   CatalogCacheEvent,
   CatalogOperation,
   CatalogOperations,
@@ -25,20 +29,27 @@ import type {
   ListingNavigation,
   ListingResourceLink,
   ListingSummary,
+  ListingTag,
+  PublishedBestPage,
   PublishedCategory,
+  PublishedTag,
   RelatedListing,
+  TaxonomyKind,
+  TaxonomyTarget,
   UnpublishedListing
 } from './contracts'
 import { latestInstant } from './instants'
 import { listingSlugRedirects, listings } from './schema'
 
 /**
- * v7: listing summaries carry `modifiedAt`, and directory pages `lastModifiedAt` (#218); v6:
- * listing details carry `faqs` (#105); v5: a hosted logo or image is its media key (#95),
- * which the web adapter turns into a URL on the environment's media host; v4 added `linkRel`
- * and `verifiedOwner` (#62).
+ * v8: listing details carry `tags`, name pages `tag`, and name-order and name-page keys name
+ * their scope (`*`, `c:<category>`, `t:<tag>`), so a tag and a category with one slug never
+ * share an entry (#345); v7: listing summaries carry `modifiedAt`, and directory pages
+ * `lastModifiedAt` (#218); v6: listing details carry `faqs` (#105); v5: a hosted logo or image is
+ * its media key (#95), which the web adapter turns into a URL on the environment's media host; v4
+ * added `linkRel` and `verifiedOwner` (#62).
  */
-const CACHE_SCHEMA = 'v7'
+const CACHE_SCHEMA = 'v8'
 /**
  * Keys include the catalog epoch (publication version plus the latest public
  * `published_at`), so an entry can never outlive the content it was built from; the TTL
@@ -82,6 +93,11 @@ async function sha256Hex(value: string): Promise<string> {
  * rows; this only picks the cheaper one (see `relatedListings`).
  */
 const RELATED_MEMBER_SCAN_LIMIT = 128
+/**
+ * `strftime` with this format reads both D1 time formats and writes the ISO instant `toInstant`
+ * writes, so `MAX()` over it orders a column whose rows mix the two.
+ */
+const ISO_INSTANT = "'%Y-%m-%dT%H:%M:%fZ'"
 const runtimePriorities = new Set(['high', 'medium', 'low'])
 const runtimeLinkRels = new Set<string>(['follow', 'nofollow', 'sponsored'])
 /** Directory name order is the locale order the pages have always used (`localeCompare`). */
@@ -117,8 +133,44 @@ interface DetailRow extends SummaryRow {
   faqs: string
   priority: string | null
   resource_links: string
+  tags: string
   verified_owner: number
   video: string | null
+}
+
+interface TagStatsRow {
+  tags: string
+}
+
+interface BestIndexRow {
+  category: string | null
+  excluded_in_tag: number
+  heading: string
+  hub: string | null
+  intro: string
+  keyword: string
+  list_size: number
+  pins_outside: number
+  pins_published: string | null
+  pins_updated: string | null
+  scanned_count: number | null
+  scanned_published: string | null
+  scanned_updated: string | null
+  slug: string
+  sort_order: number
+  tag: string | null
+  title: string
+  updated_at: string
+}
+
+interface BestItemRow extends SummaryRow {
+  blurb: string | null
+  link_rel: string
+}
+
+interface TaxonomyRedirectRow {
+  kind: string
+  slug: string | null
 }
 
 interface UnpublishedRow {
@@ -282,6 +334,17 @@ function mapNavigation(row: NavigationRow | undefined): ListingNavigation | null
   }
 }
 
+function mapListingTags(value: string): ListingTag[] {
+  return parseJsonArray(value, 'listing tags').map((tag, index) => {
+    if (!tag || typeof tag !== 'object') throw new Error(`Invalid D1 tag ${index + 1}.`)
+    const candidate = tag as Record<string, unknown>
+    return {
+      name: requireString(candidate.name, `tag ${index + 1} name`),
+      slug: requireString(candidate.slug, `tag ${index + 1} slug`)
+    }
+  })
+}
+
 function mapDetail(
   row: DetailRow
 ): Omit<ListingDetail, 'nextWebsite' | 'previousWebsite' | 'relatedWebsites'> {
@@ -313,6 +376,7 @@ function mapDetail(
       : undefined
   const logo = summary.media?.logo
   const video = row.video || undefined
+  const tags = mapListingTags(row.tags)
   if (!runtimeLinkRels.has(row.link_rel))
     throw new Error(`Invalid D1 listing ${row.slug} link rel.`)
 
@@ -332,6 +396,7 @@ function mapDetail(
         : undefined,
     priority,
     resourceLinks: resources.length ? resources : undefined,
+    tags: tags.length ? tags : undefined,
     verifiedOwner: row.verified_owner === 1 || undefined
   }
 }
@@ -485,6 +550,17 @@ function isListingDetail(value: unknown): value is ListingDetail {
             resource.label.length > 0 &&
             typeof resource.url === 'string' &&
             resource.url.length > 0
+        ))) &&
+    (candidate.tags === undefined ||
+      (Array.isArray(candidate.tags) &&
+        candidate.tags.length > 0 &&
+        candidate.tags.every(
+          tag =>
+            tag &&
+            typeof tag.name === 'string' &&
+            tag.name.length > 0 &&
+            typeof tag.slug === 'string' &&
+            tag.slug.length > 0
         )))
   )
 }
@@ -550,6 +626,8 @@ function isNamePageEntry(value: unknown, publicationVersion: number): value is N
     !!page &&
     typeof page === 'object' &&
     (page.category === null || (typeof page.category === 'string' && page.category.length > 0)) &&
+    (page.tag === null || (typeof page.tag === 'string' && page.tag.length > 0)) &&
+    (page.category === null || page.tag === null) &&
     isNullableString(page.firstPublishedAt) &&
     isNullableString(page.lastModifiedAt) &&
     isNullableString(page.lastPublishedAt) &&
@@ -561,11 +639,121 @@ function isNamePageEntry(value: unknown, publicationVersion: number): value is N
   )
 }
 
+interface TagStatsEntry {
+  publicationVersion: number
+  tags: PublishedTag[]
+}
+
+interface BestIndexEntry {
+  pages: PublishedBestPage[]
+  publicationVersion: number
+}
+
+interface BestItemsEntry {
+  items: BestPageItem[]
+  publicationVersion: number
+}
+
+function isNonNegativeInteger(value: unknown): boolean {
+  return Number.isSafeInteger(value) && (value as number) >= 0
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0
+}
+
+function isPublishedTag(value: unknown): value is PublishedTag {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<PublishedTag>
+  return (
+    isNonEmptyString(candidate.category) &&
+    isNonNegativeInteger(candidate.count) &&
+    typeof candidate.description === 'string' &&
+    isNullableString(candidate.lastModifiedAt) &&
+    isNonEmptyString(candidate.name) &&
+    isNonNegativeInteger(candidate.order) &&
+    isNonEmptyString(candidate.slug)
+  )
+}
+
+function isTagStatsEntry(value: unknown, publicationVersion: number): value is TagStatsEntry {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<TagStatsEntry>
+  return (
+    candidate.publicationVersion === publicationVersion &&
+    Array.isArray(candidate.tags) &&
+    candidate.tags.every(isPublishedTag)
+  )
+}
+
+function isPublishedBestPage(value: unknown): value is PublishedBestPage {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<PublishedBestPage>
+  return (
+    (candidate.category === null || isNonEmptyString(candidate.category)) &&
+    isNonEmptyString(candidate.heading) &&
+    isNonEmptyString(candidate.hub) &&
+    typeof candidate.intro === 'string' &&
+    isNonEmptyString(candidate.keyword) &&
+    isNonEmptyString(candidate.lastModifiedAt) &&
+    isNonNegativeInteger(candidate.listSize) &&
+    isNonNegativeInteger(candidate.order) &&
+    isNonNegativeInteger(candidate.poolSize) &&
+    isNonEmptyString(candidate.slug) &&
+    (candidate.tag === null || isNonEmptyString(candidate.tag)) &&
+    (candidate.tag !== null || candidate.category !== null) &&
+    isNonEmptyString(candidate.title)
+  )
+}
+
+function isBestIndexEntry(value: unknown, publicationVersion: number): value is BestIndexEntry {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<BestIndexEntry>
+  return (
+    candidate.publicationVersion === publicationVersion &&
+    Array.isArray(candidate.pages) &&
+    candidate.pages.every(isPublishedBestPage)
+  )
+}
+
+function isBestPageItem(value: unknown): value is BestPageItem {
+  if (!isListingSummary(value)) return false
+  const candidate = value as BestPageItem
+  return (
+    (candidate.blurb === undefined || isNonEmptyString(candidate.blurb)) &&
+    runtimeLinkRels.has(candidate.linkRel)
+  )
+}
+
+function isBestItemsEntry(value: unknown, publicationVersion: number): value is BestItemsEntry {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<BestItemsEntry>
+  return (
+    candidate.publicationVersion === publicationVersion &&
+    Array.isArray(candidate.items) &&
+    candidate.items.every(isBestPageItem)
+  )
+}
+
+/** Which listings a name order holds: the whole directory, one category, or one tag (#341). */
+type NameOrderScope =
+  | { kind: 'all' }
+  | { kind: 'category'; slug: string }
+  | { kind: 'tag'; slug: string }
+
+/** The scope's part of a name-order or name-page cache key: `*`, `c:<slug>` or `t:<slug>`. */
+function nameOrderScopeKey(scope: NameOrderScope): string {
+  if (scope.kind === 'all') return '*'
+  return `${scope.kind === 'category' ? 'c' : 't'}:${scope.slug}`
+}
+
 export function createCatalogOperations(config: CatalogOperationsConfig): CatalogOperations {
   const { cache, client, clock, observe } = config
   let epochPromise: Promise<CatalogEpoch> | undefined
   let publishedListingsPromise: Promise<ListingSummary[]> | undefined
   let shellStatsPromise: Promise<CatalogShellStats> | undefined
+  let tagStatsPromise: Promise<PublishedTag[]> | undefined
+  let bestIndexPromise: Promise<PublishedBestPage[]> | undefined
   const detailPromises = new Map<string, Promise<ListingDetail | null>>()
   const nameOrderPromises = new Map<string, Promise<NameOrderEntry>>()
 
@@ -935,7 +1123,16 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
             WHERE f.listing_id = l.id
             ORDER BY f.sort_order ASC
           ) ordered
-        ), '[]') AS faqs
+        ), '[]') AS faqs,
+        COALESCE((
+          SELECT json_group_array(json_object('slug', ordered.slug, 'name', ordered.name))
+          FROM (
+            SELECT t.slug, t.name FROM listing_tags lt
+            JOIN tags t ON t.id = lt.tag_id
+            WHERE lt.listing_id = l.id AND t.is_active = 1
+            ORDER BY lt.sort_order ASC, t.slug ASC
+          ) ordered
+        ), '[]') AS tags
       FROM listings l
       WHERE ${publicEligibilitySql()} AND l.slug = ?
       LIMIT 1`,
@@ -945,13 +1142,14 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     const row = rows[0]
     if (!row) return null
 
+    const detail = mapDetail(row)
     const [relatedWebsites, previousWebsite, nextWebsite] = await Promise.all([
-      relatedListings(row, asOf),
+      relatedListings(row, asOf, detail.tags ?? []),
       navigation(row, asOf, 'previous'),
       navigation(row, asOf, 'next')
     ])
     return {
-      ...mapDetail(row),
+      ...detail,
       nextWebsite,
       previousWebsite,
       relatedWebsites
@@ -959,22 +1157,52 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   }
 
   /**
-   * Up to four related listings ranked by shared categories (most first), then name and
-   * slug. One statement, with each related logo resolved only for the returned rows.
+   * Up to four related listings. One statement, with each related logo resolved only for the
+   * returned rows.
    *
-   * - Several categories: count shared memberships from the listing's own categories
-   *   (bounded by the size of those categories).
-   * - One category: read that category's members when it is small, otherwise walk the
-   *   public name index, where a dense category yields four members almost immediately.
+   * - Tags (#341, design 3.2): ranked by shared active tags (most first), counted from the
+   *   listing's own tags (bounded by the size of those tags). Ties break on a keyset from the
+   *   listing's own name and slug: the listings after it in name order first, wrapping round to
+   *   the start, so listings that share the same tags link onward to different neighbours instead
+   *   of all linking to the first names (#331).
+   * - No tags: ranked by shared categories (most first), then name and slug.
+   *   - Several categories: count shared memberships from the listing's own categories
+   *     (bounded by the size of those categories).
+   *   - One category: read that category's members when it is small, otherwise walk the
+   *     public name index, where a dense category yields four members almost immediately.
    */
-  async function relatedListings(row: DetailRow, asOf: string): Promise<RelatedListing[]> {
+  async function relatedListings(
+    row: DetailRow,
+    asOf: string,
+    tags: ListingTag[]
+  ): Promise<RelatedListing[]> {
     const sharedCategoryCount = (row.categories || '')
       .split(String.fromCharCode(31))
       .filter(Boolean).length
     let queryShape: CatalogQueryShape
     let candidates: string
     let bindings: unknown[]
-    if (sharedCategoryCount > 1) {
+    let tieBreak = ''
+    if (tags.length > 0) {
+      queryShape = 'related-shared-tags'
+      tieBreak = 'related.wrap ASC, '
+      candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
+             COUNT(*) AS score,
+             CASE WHEN l.name > ? OR (l.name = ? AND l.slug > ?) THEN 0 ELSE 1 END AS wrap
+           FROM listing_tags current
+           CROSS JOIN tags t ON t.id = current.tag_id
+           CROSS JOIN listing_tags shared INDEXED BY listing_tags_tag_idx
+             ON shared.tag_id = current.tag_id
+           CROSS JOIN listings l ON l.id = shared.listing_id
+           WHERE current.listing_id = ?
+             AND t.is_active = 1
+             AND shared.listing_id != current.listing_id
+             AND ${publicEligibilitySql()}
+           GROUP BY l.id
+           ORDER BY score DESC, wrap ASC, l.name ASC, l.slug ASC
+           LIMIT 4`
+      bindings = [row.name, row.name, row.slug, row.id, asOf]
+    } else if (sharedCategoryCount > 1) {
       queryShape = 'related-shared-categories'
       candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
              COUNT(*) AS score
@@ -1048,7 +1276,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       FROM (
         ${candidates}
       ) related
-      ORDER BY related.score DESC, related.name ASC, related.slug ASC`,
+      ORDER BY related.score DESC, ${tieBreak}related.name ASC, related.slug ASC`,
         bindings
       )
     )
@@ -1156,24 +1384,58 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   }
 
   /**
-   * Public listing ids in directory name order, optionally within one category. The
-   * order is the one the directory pages have always rendered: publication order, then a
-   * stable locale sort by name. Only ids, names, and dates are read, and the result is
+   * Public listing ids in directory name order: the whole directory, one category, or one tag
+   * (#341). The order is the one the directory pages have always rendered: publication order,
+   * then a stable locale sort by name. Only ids, names, and dates are read, and the result is
    * cached per epoch, so a page needs one small lookup instead of the whole catalog.
    */
-  function getNameOrder(category: string | null): Promise<NameOrderEntry> {
-    const key = category ?? '*'
+  function getNameOrder(scope: NameOrderScope): Promise<NameOrderEntry> {
+    const key = nameOrderScopeKey(scope)
     let order = nameOrderPromises.get(key)
     if (!order) {
-      order = loadNameOrder(category)
+      order = loadNameOrder(scope)
       nameOrderPromises.set(key, order)
     }
     return order
   }
 
-  async function loadNameOrder(category: string | null): Promise<NameOrderEntry> {
+  function nameOrderStatement(scope: NameOrderScope, asOf: string): SQL<NameOrderRow> {
+    if (scope.kind === 'all') {
+      return parameterizedQuery<NameOrderRow>(
+        `SELECT l.id, l.name, l.published_at, l.updated_at
+        FROM listings l
+        WHERE ${publicEligibilitySql()}
+        ORDER BY ${PUBLICATION_ORDER}`,
+        [asOf]
+      )
+    }
+    if (scope.kind === 'category') {
+      return parameterizedQuery<NameOrderRow>(
+        `SELECT l.id, l.name, l.published_at, l.updated_at
+        FROM categories c
+        CROSS JOIN listing_categories lc INDEXED BY listing_categories_category_idx
+          ON lc.category_id = c.id
+        CROSS JOIN listings l ON l.id = lc.listing_id
+        WHERE c.slug = ? AND c.is_active = 1 AND ${publicEligibilitySql()}
+        ORDER BY ${PUBLICATION_ORDER}`,
+        [scope.slug, asOf]
+      )
+    }
+    // An active tag's hub is active (the 0013 triggers), so the tag alone decides.
+    return parameterizedQuery<NameOrderRow>(
+      `SELECT l.id, l.name, l.published_at, l.updated_at
+      FROM tags t
+      CROSS JOIN listing_tags lt INDEXED BY listing_tags_tag_idx ON lt.tag_id = t.id
+      CROSS JOIN listings l ON l.id = lt.listing_id
+      WHERE t.slug = ? AND t.is_active = 1 AND ${publicEligibilitySql()}
+      ORDER BY ${PUBLICATION_ORDER}`,
+      [scope.slug, asOf]
+    )
+  }
+
+  async function loadNameOrder(scope: NameOrderScope): Promise<NameOrderEntry> {
     const { key, publicationVersion } = await epochKey('catalog-name-order')
-    const cacheKey = `${key}:${category ?? '*'}`
+    const cacheKey = `${key}:${nameOrderScopeKey(scope)}`
     const cached = await readCache(
       'listing-name-order',
       cacheKey,
@@ -1181,28 +1443,10 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     )
     if (cached) return cached
 
-    const asOf = operationTime()
     const rows = await queryAll<NameOrderRow>(
       'listing-name-order',
-      'listing-name-order',
-      category === null
-        ? parameterizedQuery<NameOrderRow>(
-            `SELECT l.id, l.name, l.published_at, l.updated_at
-            FROM listings l
-            WHERE ${publicEligibilitySql()}
-            ORDER BY ${PUBLICATION_ORDER}`,
-            [asOf]
-          )
-        : parameterizedQuery<NameOrderRow>(
-            `SELECT l.id, l.name, l.published_at, l.updated_at
-            FROM categories c
-            CROSS JOIN listing_categories lc INDEXED BY listing_categories_category_idx
-              ON lc.category_id = c.id
-            CROSS JOIN listings l ON l.id = lc.listing_id
-            WHERE c.slug = ? AND c.is_active = 1 AND ${publicEligibilitySql()}
-            ORDER BY ${PUBLICATION_ORDER}`,
-            [category, asOf]
-          )
+      scope.kind === 'tag' ? 'tag-name-order' : 'listing-name-order',
+      nameOrderStatement(scope, operationTime())
     )
     const ordered = rows
       .map(orderRow => ({
@@ -1226,20 +1470,27 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   }
 
   async function getListingNamePage(query: ListingNamePageQuery = {}): Promise<ListingNamePage> {
-    const category = query.category ?? null
+    if (query.category && query.tag) {
+      throw new Error('A name page lists one category or one tag, not both.')
+    }
+    const scope: NameOrderScope = query.category
+      ? { kind: 'category', slug: query.category }
+      : query.tag
+        ? { kind: 'tag', slug: query.tag }
+        : { kind: 'all' }
     const page = Math.max(1, Math.trunc(query.page ?? 1))
     const pageSize = Math.min(
       MAX_LISTING_PAGE_SIZE,
       Math.max(1, Math.trunc(query.pageSize ?? LISTING_PAGE_SIZE))
     )
     const { key, publicationVersion } = await epochKey('catalog-name-page')
-    const cacheKey = `${key}:${category ?? '*'}:${pageSize}:${page}`
+    const cacheKey = `${key}:${nameOrderScopeKey(scope)}:${pageSize}:${page}`
     const cached = await readCache('listing-name-page', cacheKey, (value): value is NamePageEntry =>
       isNamePageEntry(value, publicationVersion)
     )
     if (cached) return cached.page
 
-    const order = await getNameOrder(category)
+    const order = await getNameOrder(scope)
     const ids = order.ids.slice((page - 1) * pageSize, page * pageSize)
     const rows = ids.length
       ? await queryAll<SummaryRow>(
@@ -1256,7 +1507,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       : []
     const byId = new Map(rows.map(summaryRow => [summaryRow.id, mapSummary(summaryRow)]))
     const result: ListingNamePage = {
-      category,
+      category: scope.kind === 'category' ? scope.slug : null,
       firstPublishedAt: order.firstPublishedAt,
       items: ids.flatMap(id => {
         const item = byId.get(id)
@@ -1267,10 +1518,374 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       page,
       pageCount: Math.max(1, Math.ceil(order.ids.length / pageSize)),
       pageSize,
+      tag: scope.kind === 'tag' ? scope.slug : null,
       total: order.ids.length
     }
     await writeCache('listing-name-page', cacheKey, { page: result, publicationVersion })
     return result
+  }
+
+  /**
+   * Active tags (#341, design 3.1) with their hubs, public counts and newest change, from one
+   * pass over tag memberships in tag order (no sort for the grouping), each membership costing
+   * its index entry and its listing's row. Cached per epoch: the tag, hub and best pages, the
+   * sitemaps, and the best index all read it.
+   */
+  async function loadTagStats(): Promise<PublishedTag[]> {
+    const { key: cacheKey, publicationVersion } = await epochKey('catalog-tag-stats')
+    const cached = await readCache('tag-stats', cacheKey, (value): value is TagStatsEntry =>
+      isTagStatsEntry(value, publicationVersion)
+    )
+    if (cached) return cached.tags
+
+    const rows = await queryAll<TagStatsRow>(
+      'tag-stats',
+      'tag-stats',
+      parameterizedQuery<TagStatsRow>(
+        `WITH counts AS (
+          SELECT
+            lt.tag_id,
+            COUNT(*) AS listing_count,
+            MAX(strftime(${ISO_INSTANT}, l.published_at)) AS published,
+            MAX(strftime(${ISO_INSTANT}, l.updated_at)) AS updated
+          FROM listing_tags lt INDEXED BY listing_tags_tag_idx
+          CROSS JOIN listings l ON l.id = lt.listing_id
+          WHERE ${publicEligibilitySql()}
+          GROUP BY lt.tag_id
+        )
+        SELECT COALESCE((
+          SELECT json_group_array(json_object(
+            'slug', ordered.slug,
+            'name', ordered.name,
+            'description', ordered.description,
+            'category', ordered.category,
+            'order', ordered.sort_order,
+            'count', ordered.listing_count,
+            'published', ordered.published,
+            'updated', ordered.updated
+          ))
+          FROM (
+            SELECT
+              t.slug,
+              t.name,
+              t.description,
+              c.slug AS category,
+              t.sort_order,
+              COALESCE(counts.listing_count, 0) AS listing_count,
+              counts.published,
+              counts.updated
+            FROM tags t
+            JOIN categories c ON c.id = t.category_id
+            LEFT JOIN counts ON counts.tag_id = t.id
+            WHERE t.is_active = 1 AND c.is_active = 1
+            ORDER BY t.sort_order ASC, t.name ASC
+          ) ordered
+        ), '[]') AS tags`,
+        [operationTime()]
+      )
+    )
+    const row = rows[0]
+    if (!row) throw new Error('Missing D1 tag statistics.')
+    const tags = parseJsonArray(row.tags, 'tag statistics').map((value, index): PublishedTag => {
+      if (!value || typeof value !== 'object') throw new Error(`Invalid D1 tag ${index + 1}.`)
+      const tag = value as Record<string, unknown>
+      return {
+        category: requireString(tag.category, `tag ${index + 1} category`),
+        count: requireNonNegativeInteger(tag.count, `tag ${index + 1} count`),
+        description: typeof tag.description === 'string' ? tag.description : '',
+        lastModifiedAt: latestInstant(tag.published, tag.updated),
+        name: requireString(tag.name, `tag ${index + 1} name`),
+        order: requireNonNegativeInteger(tag.order, `tag ${index + 1} order`),
+        slug: requireString(tag.slug, `tag ${index + 1} slug`)
+      }
+    })
+    await writeCache('tag-stats', cacheKey, { publicationVersion, tags })
+    return tags
+  }
+
+  function getTagStats(): Promise<PublishedTag[]> {
+    tagStatsPromise ||= loadTagStats()
+    return tagStatsPromise
+  }
+
+  /**
+   * Every active best page with its pool size and newest change (#341, design 3.1). A tag-only
+   * page's pool is its tag's public listings, which the tag stats already count, corrected for
+   * its exclusions and the pins outside the tag; only a page with a category has its pool counted
+   * here, from the tag's members when it also has a tag (the smaller side), else from the
+   * category's. So the statement never re-reads the largest pools, the tags. Cached per epoch.
+   */
+  async function loadBestIndex(): Promise<PublishedBestPage[]> {
+    const { key: cacheKey, publicationVersion } = await epochKey('catalog-best-index')
+    const cached = await readCache('best-index', cacheKey, (value): value is BestIndexEntry =>
+      isBestIndexEntry(value, publicationVersion)
+    )
+    if (cached) return cached.pages
+
+    const tags = new Map((await getTagStats()).map(tag => [tag.slug, tag]))
+    const asOf = operationTime()
+    const notExcluded = `NOT EXISTS (
+              SELECT 1 FROM best_page_listings excluded
+              WHERE excluded.best_page_id = p.id AND excluded.listing_id = l.id
+                AND excluded.excluded = 1
+            )`
+    const inTag = (listing: string) =>
+      `EXISTS (SELECT 1 FROM listing_tags x WHERE x.listing_id = ${listing} AND x.tag_id = p.tag_id)`
+    const inCategory = (listing: string) =>
+      `EXISTS (SELECT 1 FROM listing_categories x WHERE x.listing_id = ${listing} AND x.category_id = p.category_id)`
+    const rows = await queryAll<BestIndexRow>(
+      'best-index',
+      'best-index',
+      parameterizedQuery<BestIndexRow>(
+        `WITH pages AS (
+          SELECT
+            b.id, b.slug, b.keyword, b.title, b.heading, b.intro, b.list_size, b.sort_order,
+            b.updated_at, b.tag_id, b.category_id,
+            t.slug AS tag,
+            c.slug AS category,
+            COALESCE(c.slug, hub.slug) AS hub
+          FROM best_pages b
+          LEFT JOIN tags t ON t.id = b.tag_id
+          LEFT JOIN categories hub ON hub.id = t.category_id
+          LEFT JOIN categories c ON c.id = b.category_id
+          WHERE b.is_active = 1
+            AND (b.tag_id IS NULL OR t.is_active = 1)
+            AND (b.category_id IS NULL OR c.is_active = 1)
+        ),
+        scanned AS (
+          SELECT
+            p.id AS page_id,
+            COUNT(*) AS listing_count,
+            MAX(strftime(${ISO_INSTANT}, l.published_at)) AS published,
+            MAX(strftime(${ISO_INSTANT}, l.updated_at)) AS updated
+          FROM pages p
+          CROSS JOIN listing_tags lt INDEXED BY listing_tags_tag_idx ON lt.tag_id = p.tag_id
+          CROSS JOIN listings l ON l.id = lt.listing_id
+          WHERE p.category_id IS NOT NULL
+            AND ${publicEligibilitySql()}
+            AND ${inCategory('l.id')}
+            AND ${notExcluded}
+          GROUP BY p.id
+          UNION ALL
+          SELECT
+            p.id,
+            COUNT(*),
+            MAX(strftime(${ISO_INSTANT}, l.published_at)),
+            MAX(strftime(${ISO_INSTANT}, l.updated_at))
+          FROM pages p
+          CROSS JOIN listing_categories lc INDEXED BY listing_categories_category_idx
+            ON lc.category_id = p.category_id
+          CROSS JOIN listings l ON l.id = lc.listing_id
+          WHERE p.tag_id IS NULL
+            AND ${publicEligibilitySql()}
+            AND ${notExcluded}
+          GROUP BY p.id
+        ),
+        entries AS (
+          SELECT
+            p.id AS page_id,
+            SUM(CASE WHEN e.excluded = 0
+              AND NOT ((p.tag_id IS NULL OR ${inTag('l.id')})
+                AND (p.category_id IS NULL OR ${inCategory('l.id')}))
+              THEN 1 ELSE 0 END) AS pins_outside,
+            SUM(CASE WHEN e.excluded = 1 AND p.category_id IS NULL AND ${inTag('l.id')}
+              THEN 1 ELSE 0 END) AS excluded_in_tag,
+            MAX(CASE WHEN e.excluded = 0 THEN strftime(${ISO_INSTANT}, l.published_at) END)
+              AS published,
+            MAX(CASE WHEN e.excluded = 0 THEN strftime(${ISO_INSTANT}, l.updated_at) END)
+              AS updated
+          FROM pages p
+          CROSS JOIN best_page_listings e ON e.best_page_id = p.id
+          CROSS JOIN listings l ON l.id = e.listing_id
+          WHERE ${publicEligibilitySql()}
+          GROUP BY p.id
+        )
+        SELECT
+          p.slug, p.keyword, p.title, p.heading, p.intro, p.list_size, p.sort_order,
+          p.updated_at, p.tag, p.category, p.hub,
+          s.listing_count AS scanned_count,
+          s.published AS scanned_published,
+          s.updated AS scanned_updated,
+          COALESCE(e.pins_outside, 0) AS pins_outside,
+          COALESCE(e.excluded_in_tag, 0) AS excluded_in_tag,
+          e.published AS pins_published,
+          e.updated AS pins_updated
+        FROM pages p
+        LEFT JOIN scanned s ON s.page_id = p.id
+        LEFT JOIN entries e ON e.page_id = p.id
+        ORDER BY p.sort_order ASC, p.slug ASC`,
+        [asOf, asOf, asOf]
+      )
+    )
+    const pages = rows.map((row): PublishedBestPage => {
+      const slug = requireString(row.slug, 'best page slug')
+      const tag = row.tag === null ? null : requireString(row.tag, `best page ${slug} tag`)
+      const category =
+        row.category === null ? null : requireString(row.category, `best page ${slug} category`)
+      const pinsOutside = requireNonNegativeInteger(row.pins_outside, 'best page pins')
+      // A tag-only page's newest change is its tag's (an excluded listing's counts too). A tag the
+      // tag stats lack was activated after they were read: it counts as empty this epoch.
+      const tagStats = category === null && tag !== null ? tags.get(tag) : undefined
+      const poolSize =
+        category === null
+          ? Math.max(
+              0,
+              (tagStats?.count ?? 0) -
+                requireNonNegativeInteger(row.excluded_in_tag, 'best page exclusions') +
+                pinsOutside
+            )
+          : (row.scanned_count ?? 0) + pinsOutside
+      const lastModifiedAt = latestInstant(
+        row.updated_at,
+        tagStats?.lastModifiedAt,
+        row.scanned_published,
+        row.scanned_updated,
+        row.pins_published,
+        row.pins_updated
+      )
+      if (!lastModifiedAt) throw new Error(`Invalid D1 best page ${slug}: updated_at.`)
+      return {
+        category,
+        heading: requireString(row.heading, `best page ${slug} heading`),
+        hub: requireString(row.hub, `best page ${slug} hub`),
+        intro: typeof row.intro === 'string' ? row.intro : '',
+        keyword: requireString(row.keyword, `best page ${slug} keyword`),
+        lastModifiedAt,
+        listSize: requireNonNegativeInteger(row.list_size, `best page ${slug} list size`),
+        order: requireNonNegativeInteger(row.sort_order, `best page ${slug} order`),
+        poolSize,
+        slug,
+        tag,
+        title: requireString(row.title, `best page ${slug} title`)
+      }
+    })
+    await writeCache('best-index', cacheKey, { pages, publicationVersion })
+    return pages
+  }
+
+  function getBestIndex(): Promise<PublishedBestPage[]> {
+    bestIndexPromise ||= loadBestIndex()
+    return bestIndexPromise
+  }
+
+  /**
+   * A best page's entries (#341, design 1.3 and 3.1), in one statement: rank the pool's ids
+   * (its tag's members, else its category's, plus the pins outside them), then hydrate only the
+   * top `listSize`, as related listings do. SQLite evaluates select-list subqueries before it
+   * sorts, so hydrating the whole pool would read categories and logos for all of it. Order: pins
+   * by position, then tag centrality (`listing_tags.sort_order`), hosted logos first, then name
+   * and slug; nothing a Creator pays for. Cached per epoch and page.
+   */
+  async function getBestPageItems(slug: string): Promise<BestPageItem[]> {
+    // Only a public best page with entries reaches D1 (and the cache): never a slug from a URL.
+    const page = (await getBestIndex()).find(candidate => candidate.slug === slug)
+    if (!page || page.poolSize === 0) return []
+    const { key, publicationVersion } = await epochKey('catalog-best-items')
+    const cacheKey = `${key}:${slug}`
+    const cached = await readCache('best-page-items', cacheKey, (value): value is BestItemsEntry =>
+      isBestItemsEntry(value, publicationVersion)
+    )
+    if (cached) return cached.items
+
+    const rows = await queryAll<BestItemRow>(
+      'best-page-items',
+      'best-page-items',
+      parameterizedQuery<BestItemRow>(
+        `WITH page AS (
+          SELECT b.id, b.tag_id, b.category_id FROM best_pages b
+          WHERE b.slug = ? AND b.is_active = 1
+        )
+        SELECT ${summaryColumns}, l.link_rel, ranked.blurb
+        FROM (
+          SELECT
+            l.id,
+            pin.position,
+            pin.blurb,
+            pool.centrality,
+            NOT EXISTS (
+              SELECT 1 FROM listing_media m
+              WHERE m.listing_id = l.id AND m.kind = 'logo' AND m.media_key IS NOT NULL
+            ) AS unhosted,
+            l.name,
+            l.slug
+          FROM (
+            SELECT lt.listing_id AS id, lt.sort_order AS centrality
+            FROM listing_tags lt INDEXED BY listing_tags_tag_idx
+            WHERE lt.tag_id = (SELECT tag_id FROM page)
+            UNION ALL
+            SELECT lc.listing_id, 0
+            FROM listing_categories lc INDEXED BY listing_categories_category_idx
+            WHERE lc.category_id = (SELECT category_id FROM page)
+              AND (SELECT tag_id FROM page) IS NULL
+            UNION ALL
+            SELECT e.listing_id, NULL
+            FROM page p
+            CROSS JOIN best_page_listings e ON e.best_page_id = p.id
+            WHERE e.excluded = 0
+              AND NOT EXISTS (
+                SELECT 1 FROM listing_tags x WHERE x.listing_id = e.listing_id AND x.tag_id = p.tag_id
+              )
+              AND (p.tag_id IS NOT NULL OR NOT EXISTS (
+                SELECT 1 FROM listing_categories x
+                WHERE x.listing_id = e.listing_id AND x.category_id = p.category_id
+              ))
+          ) pool
+          CROSS JOIN page p
+          CROSS JOIN listings l ON l.id = pool.id
+          LEFT JOIN best_page_listings pin ON pin.best_page_id = p.id AND pin.listing_id = l.id
+          WHERE ${publicEligibilitySql()}
+            AND (pin.listing_id IS NULL OR pin.excluded = 0)
+            AND (pin.position IS NOT NULL OR p.tag_id IS NULL OR p.category_id IS NULL OR EXISTS (
+              SELECT 1 FROM listing_categories x
+              WHERE x.listing_id = l.id AND x.category_id = p.category_id
+            ))
+          ORDER BY pin.position IS NULL, pin.position, pool.centrality, unhosted, l.name, l.slug
+          LIMIT ?
+        ) ranked
+        CROSS JOIN listings l ON l.id = ranked.id
+        ORDER BY ranked.position IS NULL, ranked.position, ranked.centrality, ranked.unhosted,
+          ranked.name, ranked.slug`,
+        [slug, operationTime(), page.listSize]
+      )
+    )
+    const items = rows.map((row): BestPageItem => {
+      if (!runtimeLinkRels.has(row.link_rel)) {
+        throw new Error(`Invalid D1 listing ${row.slug} link rel.`)
+      }
+      const blurb = row.blurb ? requireString(row.blurb, 'best page blurb') : undefined
+      return {
+        ...mapSummary(row),
+        ...(blurb ? { blurb } : {}),
+        linkRel: row.link_rel as ListingLinkRel
+      }
+    })
+    await writeCache('best-page-items', cacheKey, { items, publicationVersion })
+    return items
+  }
+
+  /**
+   * Where a retired or renamed taxonomy URL moved (#341, design 2.2): one primary-key seek and
+   * at most one seek on its target. Uncached, like `getCanonicalSlugForRedirect`: it runs only
+   * after a hub, tag or best page missed.
+   */
+  async function getTaxonomyRedirect(
+    kind: TaxonomyKind,
+    slug: string
+  ): Promise<TaxonomyTarget | null> {
+    const rows = await queryAll<TaxonomyRedirectRow>(
+      'taxonomy-redirect',
+      'taxonomy-redirect',
+      parameterizedQuery<TaxonomyRedirectRow>(
+        `SELECT r.target_kind AS kind, ${TAXONOMY_TARGET_SLUG} AS slug
+        FROM taxonomy_redirects r
+        ${TAXONOMY_TARGET_JOINS}
+        WHERE r.source_kind = ? AND r.source_slug = ?
+        LIMIT 1`,
+        [kind, slug]
+      )
+    )
+    const row = rows[0]
+    return row ? parseTaxonomyTarget(row.kind, row.slug) : null
   }
 
   /** First `limit` public listings in publication order, optionally featured only. */
@@ -1300,14 +1915,16 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
 
   /**
    * Every normalized term must occur in the listing's name, short description, slug (the
-   * product's domain), or the slug or name of one of its active categories (owner decisions on
-   * #77 and #81). Never the long content, and never the website URL: almost every website is a
-   * `serp.ly` affiliate link, so its host would match nearly every short term.
+   * product's domain), or the slug or name of one of its active categories or tags (owner
+   * decisions on #77 and #81; #341 design 3.3). Never the long content, and never the website
+   * URL: almost every website is a `serp.ly` affiliate link, so its host would match nearly every
+   * short term.
    * The terms are one JSON binding that each term reads with `json_extract(?1, '$[i]')`, and
    * matching uses `instr()`, so the statement binds four values whatever the query and has no
-   * LIKE/GLOB pattern for D1's 50-byte limit. A term that matches no category name skips the
-   * per-listing membership lookup (the first EXISTS runs once per statement), which keeps a
-   * typical search near one read per listing. Results are cached per epoch.
+   * LIKE/GLOB pattern for D1's 50-byte limit. The category and tag matches are uncorrelated `IN`
+   * subqueries, which SQLite builds once per statement from the matching categories' and tags'
+   * members instead of looking up each listing's memberships, so a typical search stays near one
+   * read per listing. Results are cached per epoch.
    */
   async function searchListings(query: string, limit = 50): Promise<ListingSummary[]> {
     const { phrase, terms } = normalizeSearchQuery(query)
@@ -1324,20 +1941,24 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
 
     const termClauses = terms.map((_, index) => {
       const term = `json_extract(?1, '$[${index}]')`
-      const categoryText = (alias: string) =>
+      const termText = (alias: string) =>
         `(instr(lower(${alias}.slug), ${term}) > 0 OR instr(lower(${alias}.name), ${term}) > 0)`
       return `(
             instr(lower(l.name), ${term}) > 0
             OR instr(lower(l.description), ${term}) > 0
             OR instr(lower(l.slug), ${term}) > 0
-            OR (
-              EXISTS (SELECT 1 FROM categories any_c WHERE any_c.is_active = 1 AND ${categoryText('any_c')})
-              AND EXISTS (
-                SELECT 1
-                FROM listing_categories lc
-                JOIN categories c ON c.id = lc.category_id
-                WHERE lc.listing_id = l.id AND c.is_active = 1 AND ${categoryText('c')}
-              )
+            OR l.id IN (
+              SELECT lc.listing_id
+              FROM categories c
+              CROSS JOIN listing_categories lc INDEXED BY listing_categories_category_idx
+                ON lc.category_id = c.id
+              WHERE c.is_active = 1 AND ${termText('c')}
+            )
+            OR l.id IN (
+              SELECT lt.listing_id
+              FROM tags t
+              CROSS JOIN listing_tags lt INDEXED BY listing_tags_tag_idx ON lt.tag_id = t.id
+              WHERE t.is_active = 1 AND ${termText('t')}
             )
           )`
     })
@@ -1371,9 +1992,15 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     async getActiveCategories() {
       return (await getShellStats()).categories
     },
+    getActiveTags: getTagStats,
     async getAutocomplete(query, limit = 8) {
       return searchListings(query, limit)
     },
+    async getBestPageBySlug(slug) {
+      return (await getBestIndex()).find(page => page.slug === slug) || null
+    },
+    getBestPageItems,
+    getBestPages: getBestIndex,
     async getCanonicalSlugForRedirect(oldSlug) {
       const asOf = operationTime()
       const rows = await queryAll<{ slug: string }>(
@@ -1414,6 +2041,10 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     getPublishedListings,
     getShellStats,
     getSitemapListings: getPublishedListings,
+    async getTagBySlug(slug) {
+      return (await getTagStats()).find(tag => tag.slug === slug) || null
+    },
+    getTaxonomyRedirect,
     getUnpublishedListing,
     searchListings
   }

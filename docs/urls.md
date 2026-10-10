@@ -43,7 +43,10 @@ one of these extensions (`chart.js`), and a test checks the committed import.
   checks that each destination is canonical and each source is matched in both slash forms.
 - **Redirects that need D1** run in their pages (renamed listing slugs) or in the Worker (the old
   root-level `/<slug>`, before the slash rule, `apps/web/src/lib/routing/legacy-root.ts`) and
-  write a canonical destination (`getRoute`).
+  write a canonical destination (`getRoute`). The root-level lookup answers in one hop: a live
+  listing, an active category, a retired listing slug followed through `listing_slug_redirects`
+  to its listing's current URL (#356), or a retired category URL followed through
+  `taxonomy_redirects` to its target, without the query string (#341).
 - **Fail closed.** The Worker validates the manifest at startup and refuses to start if its shape
   is unexpected (no `redirects` array or route list, a rule without a string `regex`, a pattern
   that does not compile or matches every path), so a framework upgrade cannot silently turn off

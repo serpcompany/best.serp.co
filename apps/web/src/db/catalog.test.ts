@@ -10,7 +10,12 @@ import {
 } from './catalog-epoch'
 import { createDatabase } from './client'
 import type { CatalogCacheEvent, CatalogDataCache, CatalogQueryEvent } from './contracts'
-import { MemoryCatalogCache, SqliteD1, seedContractFixture } from './test-support'
+import {
+  MemoryCatalogCache,
+  SqliteD1,
+  seedContractFixture,
+  seedTaxonomyFixture
+} from './test-support'
 
 vi.mock('server-only', () => ({}))
 
@@ -227,7 +232,7 @@ describe('shared catalog data operations', () => {
     expect(after.listingCount).toBe(6)
     expect(after.publicationVersion).toBe(before.publicationVersion)
     expect((await later.getListingNamePage()).items.map(item => item.slug)).toContain('future')
-    expect([...cache.values.keys()]).toContain('catalog-shell:v7:1.2027-01-01T00:00:00.000Z')
+    expect([...cache.values.keys()]).toContain('catalog-shell:v8:1.2027-01-01T00:00:00.000Z')
   })
 
   it('reads the catalog epoch for the Worker edge cache with query telemetry', async () => {
@@ -464,14 +469,14 @@ describe('shared catalog data operations', () => {
       )
     ).toHaveLength(1)
     expect([...cache.values.keys()].sort()).toEqual([
-      `catalog-shell:v7:${epoch(1)}`,
-      `catalog-shell:v7:${epoch(2)}`
+      `catalog-shell:v8:${epoch(1)}`,
+      `catalog-shell:v8:${epoch(2)}`
     ])
   })
 
   it('falls back to live D1 when cached shell data is corrupt or unavailable', async () => {
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-shell:v7:${epoch(1)}`, { featuredCount: 'wrong' })
+    corrupt.values.set(`catalog-shell:v8:${epoch(1)}`, { featuredCount: 'wrong' })
     const corruptCatalog = operations(corrupt)
     expect((await corruptCatalog.operations.getShellStats()).featuredCount).toBe(2)
     expect(corruptCatalog.events).toContainEqual({
@@ -577,8 +582,8 @@ describe('shared catalog data operations', () => {
     ).toHaveLength(2)
 
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-published:v7:${epoch(2)}`, { items: 'wrong' })
-    corrupt.values.set(`catalog-detail:v7:${epoch(2)}:charlie`, { detail: 'wrong' })
+    corrupt.values.set(`catalog-published:v8:${epoch(2)}`, { items: 'wrong' })
+    corrupt.values.set(`catalog-detail:v8:${epoch(2)}:charlie`, { detail: 'wrong' })
     const recovered = operations(corrupt)
     expect(await recovered.operations.getPublishedListings()).toHaveLength(5)
     expect((await recovered.operations.getListingBySlug('charlie'))?.slug).toBe('charlie')
@@ -721,7 +726,7 @@ describe('catalog epoch tokens shared by the Worker entry', () => {
 })
 
 describe('legacy root-level URLs (#168)', () => {
-  it('finds a public listing first, then an active category, else nothing', async () => {
+  function seeded() {
     const sqlite = new SqliteD1()
     seedContractFixture(sqlite)
     sqlite.database.exec(`
@@ -731,14 +736,72 @@ describe('legacy root-level URLs (#168)', () => {
     `)
     const client = createDatabase(sqlite.asD1Database())
     const target = (slug: string) => legacyRootTarget({ asOf: now().toISOString(), client, slug })
-    expect(await target('bravo')).toBe('listing')
+    return { sqlite, target }
+  }
+
+  it('finds a public listing first, then an active category, else nothing', async () => {
+    const { target } = seeded()
+    expect(await target('bravo')).toEqual({ kind: 'listing', slug: 'bravo' })
     // A listing and a category with one slug: the listing wins, as on the old site.
-    expect(await target('alpha')).toBe('listing')
-    expect(await target('primary')).toBe('category')
+    expect(await target('alpha')).toEqual({ kind: 'listing', slug: 'alpha' })
+    expect(await target('primary')).toEqual({ kind: 'category', slug: 'primary' })
     // Unpublished, scheduled, inactive, or unknown: Next.js answers as before.
     for (const slug of ['echo', 'future', 'retired', 'missing']) {
       expect(await target(slug), slug).toBeNull()
     }
+  })
+
+  it('follows a retired listing slug to its public listing in one hop (#356)', async () => {
+    const { sqlite, target } = seeded()
+    // #338's case: an unpublished duplicate whose slug redirects to the listing it duplicated,
+    // which has since been renamed (its id is followed, not `new_slug`).
+    sqlite.database.exec(`
+      INSERT INTO listing_slug_redirects (listing_id, old_slug, new_slug, manifest_id, reason)
+        VALUES ('serp-charlie', 'echo', 'charlie', 'fixture', 'duplicate'),
+               ('serp-echo', 'old-echo', 'echo', 'fixture', 'rename'),
+               ('serp-future', 'old-future', 'future', 'fixture', 'rename');
+      UPDATE listings SET slug = 'charlie-renamed' WHERE id = 'serp-charlie';
+    `)
+    expect(await target('echo')).toEqual({ kind: 'listing', slug: 'charlie-renamed' })
+    expect(await target('old-bravo')).toEqual({ kind: 'listing', slug: 'bravo' })
+    // The listing it points at must be public: unpublished or scheduled answers as before.
+    expect(await target('old-echo')).toBeNull()
+    expect(await target('old-future')).toBeNull()
+    // A live listing or category with the slug still comes first.
+    sqlite.database.exec(`
+      INSERT INTO listing_slug_redirects (listing_id, old_slug, new_slug, manifest_id, reason)
+        VALUES ('serp-charlie', 'bravo', 'charlie', 'fixture', 'rename'),
+               ('serp-charlie', 'primary', 'charlie', 'fixture', 'rename');
+    `)
+    expect(await target('bravo')).toEqual({ kind: 'listing', slug: 'bravo' })
+    expect(await target('primary')).toEqual({ kind: 'category', slug: 'primary' })
+  })
+
+  it('follows a retired category URL to its active target (#341)', async () => {
+    const { sqlite, target } = seeded()
+    seedTaxonomyFixture(sqlite)
+    expect(await target('old-hub')).toEqual({
+      kind: 'moved',
+      target: { kind: 'category', slug: 'secondary' }
+    })
+    expect(await target('old-tag')).toEqual({
+      kind: 'moved',
+      target: { kind: 'tag', slug: 'writers' }
+    })
+    expect(await target('old-best')).toEqual({
+      kind: 'moved',
+      target: { kind: 'best', slug: 'best-writers' }
+    })
+    expect(await target('old-other')).toEqual({
+      kind: 'moved',
+      target: { kind: 'directory', slug: null }
+    })
+    // Only category sources were root-level URLs, a retired target answers 404, and an active
+    // category with a redirect row still renders.
+    for (const slug of ['old-writers', 'old-retired-tag']) {
+      expect(await target(slug), slug).toBeNull()
+    }
+    expect(await target('primary')).toEqual({ kind: 'category', slug: 'primary' })
   })
 })
 

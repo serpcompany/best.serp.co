@@ -1,6 +1,7 @@
 import {
   catalogEpochToken,
   isUnpublishedListingSlug,
+  type LegacyRootTarget,
   legacyRootTarget,
   readCatalogEpoch,
   shareCatalogEpochToken
@@ -102,7 +103,7 @@ export function catalogRenderer(
 export function catalogLegacyRootLookup(
   env: CatalogWorkerEnv,
   observe: Observe
-): ((slug: string) => Promise<'category' | 'listing' | null>) | undefined {
+): ((slug: string) => Promise<LegacyRootTarget | null>) | undefined {
   const database = catalogDatabase(env)
   if (!database) return undefined
   return slug =>

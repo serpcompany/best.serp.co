@@ -1,6 +1,6 @@
 import { type SQL, sql } from 'drizzle-orm'
 import { type Database, d1ErrorCode, runQuery } from './client'
-import type { CatalogObserver } from './contracts'
+import type { CatalogObserver, TaxonomyTarget } from './contracts'
 import { listingInRetiredCategory } from './plan-support'
 
 /**
@@ -151,16 +151,60 @@ export async function isUnpublishedListingSlug(input: {
 }
 
 /**
- * Where an old root-level URL `/<slug>` moved (#168): a public listing first, then an active
- * category, or null. One seek on each unique slug, so the Worker entry can answer the one 308
- * itself instead of letting Next.js redirect after the trailing-slash rule (two hops).
+ * The current slug of a `taxonomy_redirects` row `r`'s target (#341, design 2.2), or NULL when
+ * the target is retired. Its target is a foreign key, so a rename keeps the redirect current. Each
+ * join is a primary-key seek, and only the row's own target kind matches one.
+ */
+export const TAXONOMY_TARGET_JOINS = `LEFT JOIN categories target_c
+    ON target_c.id = r.target_category_id AND target_c.is_active = 1
+  LEFT JOIN tags target_t ON target_t.id = r.target_tag_id AND target_t.is_active = 1
+  LEFT JOIN best_pages target_b ON target_b.id = r.target_best_page_id AND target_b.is_active = 1`
+export const TAXONOMY_TARGET_SLUG = 'COALESCE(target_c.slug, target_t.slug, target_b.slug)'
+
+/** A `taxonomy_redirects` target read with `TAXONOMY_TARGET_SLUG`, or null when it is retired. */
+export function parseTaxonomyTarget(kind: unknown, slug: unknown): TaxonomyTarget | null {
+  if (kind === 'directory') return { kind, slug: null }
+  if (kind !== 'best' && kind !== 'category' && kind !== 'tag') {
+    throw new Error('Invalid D1 taxonomy redirect kind.')
+  }
+  if (slug === null || slug === undefined) return null
+  if (typeof slug !== 'string' || !slug) throw new Error('Invalid D1 taxonomy redirect target.')
+  return { kind, slug }
+}
+
+/**
+ * Where `/<slug>` moved: a public listing or an active category with that slug, or (`moved`) the
+ * target of the retired category URL it names.
+ */
+export type LegacyRootTarget =
+  | { kind: 'category' | 'listing'; slug: string }
+  | { kind: 'moved'; target: TaxonomyTarget }
+
+interface LegacyRootRow {
+  kind: string
+  rank: number
+  slug: string | null
+}
+
+/**
+ * Where an old root-level URL `/<slug>` moved (#168), in one hop, or null:
+ *
+ * 1. a public listing with that slug;
+ * 2. an active category with that slug;
+ * 3. a retired listing slug (`listing_slug_redirects`: a rename, or an unpublished duplicate,
+ *    #338) followed to its public listing's current slug (#356);
+ * 4. a retired category URL (`taxonomy_redirects`, #341 design 2.2) followed to its active target.
+ *
+ * Each branch is one seek on a unique key (plus one for its target), and the four are one
+ * compound SELECT within D1's limit of five terms, so the Worker entry answers the one 308 itself
+ * instead of letting Next.js redirect after the trailing-slash rule (two hops).
  */
 export async function legacyRootTarget(input: {
   asOf: string
   client: Database
   observe?: CatalogObserver
   slug: string
-}): Promise<'category' | 'listing' | null> {
+}): Promise<LegacyRootTarget | null> {
   const startedAt = performance.now()
   let rowsRead: number | null = null
   let d1DurationMs: number | null = null
@@ -168,15 +212,26 @@ export async function legacyRootTarget(input: {
   let resultRows = 0
   let errorCode: string | undefined
   try {
-    const result = await runQuery<{ kind: 'category' | 'listing' }>(
+    const result = await runQuery<LegacyRootRow>(
       input.client,
-      sql<{ kind: 'category' | 'listing' }>`SELECT kind FROM (
-          SELECT 'listing' AS kind, 0 AS rank FROM listings
+      sql<LegacyRootRow>`SELECT kind, slug, rank FROM (
+          SELECT 'listing' AS kind, slug, 0 AS rank FROM listings
             WHERE slug = ${input.slug} AND status = 'approved' AND is_active = 1
               AND published_at IS NOT NULL AND published_at <= ${input.asOf}
           UNION ALL
-          SELECT 'category' AS kind, 1 AS rank FROM categories
+          SELECT 'category' AS kind, slug, 1 AS rank FROM categories
             WHERE slug = ${input.slug} AND is_active = 1
+          UNION ALL
+          SELECT 'listing' AS kind, l.slug, 2 AS rank FROM listing_slug_redirects old
+            JOIN listings l ON l.id = old.listing_id
+            WHERE old.old_slug = ${input.slug} AND l.status = 'approved' AND l.is_active = 1
+              AND l.published_at IS NOT NULL AND l.published_at <= ${input.asOf}
+          UNION ALL
+          SELECT r.target_kind AS kind, ${sql.raw(TAXONOMY_TARGET_SLUG)} AS slug, 3 AS rank
+            FROM taxonomy_redirects r
+            ${sql.raw(TAXONOMY_TARGET_JOINS)}
+            WHERE r.source_kind = 'category' AND r.source_slug = ${input.slug}
+              AND (r.target_kind = 'directory' OR ${sql.raw(TAXONOMY_TARGET_SLUG)} IS NOT NULL)
         )
         ORDER BY rank
         LIMIT 1`
@@ -187,7 +242,16 @@ export async function legacyRootTarget(input: {
     success = result.success
     resultRows = result.results.length
     if (!result.success) throw new Error('D1 legacy root-level URL query failed.')
-    return result.results[0]?.kind ?? null
+    const row = result.results[0]
+    if (!row) return null
+    if (row.rank === 3) {
+      const target = parseTaxonomyTarget(row.kind, row.slug)
+      return target && { kind: 'moved', target }
+    }
+    if ((row.kind !== 'category' && row.kind !== 'listing') || typeof row.slug !== 'string') {
+      throw new Error('Invalid D1 root-level target.')
+    }
+    return { kind: row.kind, slug: row.slug }
   } catch (error) {
     errorCode = d1ErrorCode(error)
     throw error

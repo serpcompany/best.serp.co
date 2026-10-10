@@ -32,8 +32,9 @@ Column meanings and constraints are commented in `schema.ts`. By area:
   category's, or both, and `best_page_listings` pins the top positions and excludes listings that
   don't fit. `taxonomy_redirects` sends a retired or renamed category, tag, or best page URL to its
   target, held as a foreign key so a later rename keeps it current. Submissions and revisions keep
-  a Creator's suggested tags in `tag_slugs` (a JSON array of at most three, or null). Nothing reads
-  these yet: the reads, routes, and writes are later steps of #341.
+  a Creator's suggested tags in `tag_slugs` (a JSON array of at most three, or null). The catalog
+  reads them (#345: [Public catalog](./public-catalog.md#reads)); the routes and writes are later
+  steps of #341.
 - **Publication**: `publication_state` is a single row holding the catalog version and
   checksum; `publication_runs` records every applied publication, and `migration_runs` the
   one-time import (locally, the fixture seed's run).

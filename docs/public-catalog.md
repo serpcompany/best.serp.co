@@ -43,25 +43,41 @@ check, for example) never touches it.
 ## Reads
 
 List and card operations return summary projections; only detail operations hydrate content,
-media, and resource links. List pages read one page at a time (`getListingNamePage`): the public
-ids of the directory or of one category in name order are cached per epoch, and only the
-requested page's summaries are then read by id.
+media, resource links, and tags. List pages read one page at a time (`getListingNamePage`): the
+public ids of the directory, of one category, or of one tag in name order are cached per epoch,
+and only the requested page's summaries are then read by id.
 
 Each read keeps a reviewed SQL shape, explained where it is built in
 `apps/web/src/db/catalog.ts`: the shell counts come from one pass over public memberships (the
 totals sum primary memberships, which the baseline triggers keep at exactly one per published
-listing), related listings from one statement whose plan depends on the listing's categories,
-and previous/next from one `COALESCE` over three keyset branches. Every shape has a rows-read
-budget on a generated catalog of production's size (`ROWS_READ_BUDGET` in
-`scripts/d1-workerd-queries.test.ts`, #314), so a lost index or a full scan fails a test instead
-of showing up on the bill.
+listing), related listings from one statement whose plan depends on the listing's tags or
+categories, and previous/next from one `COALESCE` over three keyset branches.
+
+The taxonomy (#341) reads only active tags, active best pages whose tag and category are active,
+and public listings:
+
+- **Tag counts** come from one pass over tag memberships, each with its hub, public count, and
+  newest change.
+- **The best index** lists every best page with its pool size: the public listings with its tag,
+  in its category, or both, less its exclusions, plus its public pins. A tag-only page's pool is
+  counted from the tag counts, so the index never reads the largest pools again. A page shows the
+  first `min(listSize, poolSize)` entries: pins by position, then tag centrality, listings with a
+  hosted logo, then name and slug. Nothing a Creator pays for ranks a listing.
+- **Related listings** of a listing with tags are ranked by shared tags, with ties broken from
+  the listing's own name onward, so listings that share tags link to different neighbours; a
+  listing without tags is ranked by shared categories, as before.
+- **Moved taxonomy URLs** follow `taxonomy_redirects` to the target's current URL.
+
+Every shape has a rows-read budget on a generated catalog of production's size
+(`ROWS_READ_BUDGET` in `scripts/d1-workerd-queries.test.ts`, #314), so a lost index or a full
+scan fails a test instead of showing up on the bill.
 
 ## Search
 
 Search matches a listing's name, short description, slug (the product's domain), and the slugs
-and names of its active categories, never its long content or website URL: nearly all websites
-are `serp.ly` affiliate links, so their host would match almost every short term. Input past the
-length and term limits is truncated, never rejected, and ASCII letters fold like SQLite's
-`lower()` while other characters match as typed. The terms are one JSON binding matched with
-`instr()`, which keeps search within D1's binding and pattern limits. `searchListings` and
+and names of its active categories and tags, never its long content or website URL: nearly all
+websites are `serp.ly` affiliate links, so their host would match almost every short term. Input
+past the length and term limits is truncated, never rejected, and ASCII letters fold like
+SQLite's `lower()` while other characters match as typed. The terms are one JSON binding matched
+with `instr()`, which keeps search within D1's binding and pattern limits. `searchListings` and
 `normalizeSearchQuery` in `catalog.ts` hold the rules and limits; results are cached per epoch.

@@ -6,10 +6,44 @@
  *
  * This module has no Next.js imports so it can run before the Next.js server is loaded.
  */
+import type { LegacyRootTarget } from '@/db/catalog-epoch'
+import type { TaxonomyTarget } from '@/db/contracts'
 import { getRoute } from '@/lib/routing/routes'
 
-/** Where `/<slug>` moved, from D1: a public listing, an active category, or nothing. */
-export type LegacyRootLookup = (slug: string) => Promise<'category' | 'listing' | null>
+/**
+ * Where `/<slug>` moved, from D1 (`legacyRootTarget`): a public listing (also through a retired
+ * listing slug, #356), an active category, the target of a retired category URL (#341), or
+ * nothing.
+ */
+export type LegacyRootLookup = (slug: string) => Promise<LegacyRootTarget | null>
+
+/** The canonical page of a moved taxonomy URL's target (#341, design 2.2). */
+export function taxonomyTargetRoute(target: TaxonomyTarget): string {
+  switch (target.kind) {
+    case 'category':
+      return getRoute('category.page', { category: target.slug })
+    case 'tag':
+      return getRoute('tag.page', { tag: target.slug })
+    case 'best':
+      return getRoute('best.page', { keyword: target.slug })
+    case 'directory':
+      return getRoute('listing.list')
+  }
+}
+
+/**
+ * The `Location` of a root-level URL's 308. A listing or category keeps the query string; a
+ * retired category's redirect drops it (#341 design 2.2: its `?page=N` would not match the
+ * target's pagination).
+ */
+export function legacyRootLocation(target: LegacyRootTarget, search: string): string {
+  if (target.kind === 'moved') return taxonomyTargetRoute(target.target)
+  const page =
+    target.kind === 'listing'
+      ? getRoute('listing.detail', { slug: target.slug })
+      : getRoute('category.page', { category: target.slug })
+  return `${page}${search}`
+}
 
 const ROOT_SEGMENT = /^\/([^/]+)\/?$/u
 /**
@@ -106,7 +140,7 @@ function lookupUnavailable(): Response {
   })
 }
 
-/** One 308 from `/<slug>` (with or without its slash) to the listing or category page. */
+/** One 308 from `/<slug>` (with or without its slash) to its target's canonical page. */
 export async function legacyRootRedirect(
   request: Request,
   slugFor: (pathname: string) => string | null,
@@ -116,9 +150,9 @@ export async function legacyRootRedirect(
   const url = new URL(request.url)
   const slug = slugFor(url.pathname)
   if (!slug) return null
-  let kind: Awaited<ReturnType<LegacyRootLookup>>
+  let target: Awaited<ReturnType<LegacyRootLookup>>
   try {
-    kind = await lookup(slug)
+    target = await lookup(slug)
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -128,10 +162,9 @@ export async function legacyRootRedirect(
     )
     return lookupUnavailable()
   }
-  if (!kind) return null
-  const location =
-    kind === 'listing'
-      ? getRoute('listing.detail', { slug })
-      : getRoute('category.page', { category: slug })
-  return new Response(null, { headers: { location: `${location}${url.search}` }, status: 308 })
+  if (!target) return null
+  return new Response(null, {
+    headers: { location: legacyRootLocation(target, url.search) },
+    status: 308
+  })
 }

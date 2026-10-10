@@ -94,12 +94,25 @@ function totalRows(evidence: ScanEvidence[]): number | null {
   return evidence.reduce((total, item) => total + (item.rows || 0), 0)
 }
 
+/** Benchmark listings from this index on carry tags (#345); the ones before have none. */
+const FIRST_TAGGED = 200
+
 function addBenchmarkRows(sqlite: SqliteD1): void {
   const { database } = sqlite
   const categories = fixtureCategoryIds(database)
   const primary = categories.get('primary')
   const secondary = categories.get('secondary')
   if (!primary || !secondary) throw new Error('Missing benchmark categories.')
+  const insertTag = database.prepare(
+    'INSERT INTO tags(slug, name, category_id) VALUES (?, ?, ?) RETURNING id'
+  )
+  const everyTagged = Number((insertTag.get('bench-all', 'All', primary) as { id: number }).id)
+  const thirdTagged = Number(
+    (insertTag.get('bench-third', 'Third', secondary) as { id: number }).id
+  )
+  const insertMembership = database.prepare(
+    'INSERT INTO listing_tags(listing_id, tag_id, sort_order) VALUES (?, ?, ?)'
+  )
 
   for (let index = 0; index < 315; index += 1) {
     const sequence = String(index).padStart(3, '0')
@@ -136,6 +149,10 @@ function addBenchmarkRows(sqlite: SqliteD1): void {
           'INSERT INTO listing_faqs(listing_id, question, answer, sort_order) VALUES (?, ?, ?, ?)'
         )
         .run(id, `Question ${faq}`, `Answer ${faq}`, faq)
+    }
+    if (index >= FIRST_TAGGED) {
+      insertMembership.run(id, everyTagged, 0)
+      if (index % 3 === 0) insertMembership.run(id, thirdTagged, 1)
     }
   }
 }
@@ -283,10 +300,34 @@ describe('representative D1 query benchmark', () => {
         .all(fixtureCategoryIds(sqlite.database).get('primary') ?? -1) as Array<{ slug: string }>
     ).map(row => row.slug)
 
+    // Tagged detail (#345): related listings by shared tags. bench-250 has only the tag every
+    // tagged listing has, so every candidate ties, and the keyset from its own name picks the
+    // next four names; bench-313, near the end, wraps round to the first tagged names.
+    const taggedStart = sqlite.statements.length
+    const tagged = await operations().getListingBySlug('bench-250')
+    const taggedStatements = sqlite.statements.slice(taggedStart)
+    const taggedRelated = taggedStatements.find(statement => statement.sql.includes('related.wrap'))
+    if (!taggedRelated) throw new Error('Missing related-by-tags benchmark statement.')
+    const taggedEvidence = scanStatements([taggedRelated])
+    const taggedRows = totalRows(taggedEvidence)
+    const sharedTagMemberships = Number(
+      (
+        sqlite.database
+          .prepare(
+            `SELECT COUNT(*) AS total FROM listing_tags current
+             JOIN listing_tags shared ON shared.tag_id = current.tag_id
+             WHERE current.listing_id = ?`
+          )
+          .get('serp-bench-250') as { total: number }
+      ).total
+    )
+    const wrapped = await catalog.getListingBySlug('bench-313')
+
     const report = {
       fixture: {
         categories: 3,
-        eligibleListings: 320
+        eligibleListings: 320,
+        taggedListings: 315 - FIRST_TAGGED
       },
       navigation: {
         legacyScanRows: legacyAdjacent.rows,
@@ -305,6 +346,18 @@ describe('representative D1 query benchmark', () => {
         optimizedScanRows: optimizedRelatedRows,
         sharedMemberships,
         singleCategoryOptimizedScanRows: singleCategoryRows
+      },
+      relatedByTags: {
+        optimizedPlan: [
+          ...new Set(
+            taggedEvidence
+              .flatMap(evidence => evidence.plan)
+              .filter(line => !line.includes('loops='))
+          )
+        ],
+        optimizedScanRows: taggedRows,
+        sharedMemberships: sharedTagMemberships,
+        statementCount: taggedStatements.length
       },
       shell: {
         coldScanRows: coldShellRows,
@@ -326,12 +379,28 @@ describe('representative D1 query benchmark', () => {
     expect(singleCategoryEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
       'listings_related_name_idx'
     )
+    expect(tagged?.relatedWebsites.map(related => related.slug)).toEqual([
+      'bench-251',
+      'bench-252',
+      'bench-253',
+      'bench-254'
+    ])
+    expect(wrapped?.relatedWebsites.map(related => related.slug)).toEqual([
+      'bench-314',
+      'bench-200',
+      'bench-201',
+      'bench-202'
+    ])
+    expect(taggedEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
+      'listing_tags_tag_idx'
+    )
     if (scanStatsAvailable) {
       expect(legacyAdjacent.rows).not.toBeNull()
       expect(optimizedAdjacentRows).not.toBeNull()
       expect(legacyAdjacent.rows as number).toBeGreaterThan(optimizedAdjacentRows as number)
       expect(optimizedAdjacentRows as number).toBeLessThanOrEqual(100)
       expect(optimizedRelatedRows as number).toBeLessThanOrEqual(2 * sharedMemberships + 50)
+      expect(taggedRows as number).toBeLessThanOrEqual(2 * sharedTagMemberships + 50)
       expect(singleCategoryRows as number).toBeLessThanOrEqual(100)
       expect(legacyShell.rows as number).toBeGreaterThan(coldShellRows as number)
       expect(warmShellRows as number).toBeLessThanOrEqual(10)
@@ -342,12 +411,14 @@ describe('representative D1 query benchmark', () => {
         optimizedAdjacentRows,
         optimizedRelatedRows,
         singleCategoryRows,
+        taggedRows,
         coldShellRows,
         oneColdPlus99WarmAverage
-      ]).toEqual(Array(6).fill(null))
+      ]).toEqual(Array(7).fill(null))
     }
     // Epoch probe, detail row, related listings, previous, next.
     expect(detailStatements.length).toBeLessThanOrEqual(5)
+    expect(taggedStatements.length).toBeLessThanOrEqual(5)
     expect(events.every(event => event.success)).toBe(true)
   })
 })
