@@ -69,3 +69,27 @@ triggers still hold. An unpublished listing stays unpublished. The operation als
 Publish a manifest's `category-create` before the operations that file listings under the new
 category, earlier in the same manifest or in an earlier one. A category with no live listing
 answers 404. As with every publication, the catalog epoch advances, so cached pages turn over.
+
+## Slug redirects
+
+`listing-slug-redirect` sends an unpublished listing's slug to another, live listing (#338): its
+page answers 308 instead of 410. It names `from` and `to`, each a listing's `id` and `slug`, and a
+`reason`, and it adds one `listing_slug_redirects` row: the `to` listing's id, `from`'s slug, and
+`to`'s slug. It is row-level, so one manifest fits staging and production.
+
+- **What changes.** Only the redirect row: both listings stay as they are. `from` stays unpublished,
+  so it stays out of the sitemap, search, RSS, and category pages, and Republish in `/admin` still
+  brings it back, its live page then winning over the redirect. The product page follows `to`'s id
+  to its current slug, so a later rename of `to` still lands in one hop. If `to` is unpublished
+  later, the lookup finds no live listing and `from` answers 410 again.
+- **Refused, with nothing written, when:**
+  - `from` isn't that id and slug, unpublished (approved and inactive), as its 410 page finds it.
+    A listing filed under a retired category answers 404 and keeps it, so no adult listing's
+    traffic is sent elsewhere ([Catalog hygiene](./catalog-hygiene.md#adult-products-260)).
+  - `to` isn't that id and slug, live (approved, active, and published by now).
+  - A redirect already exists for `from`'s slug.
+  - It would make a chain or a loop: `to`'s slug is itself a redirected slug, or an older slug
+    redirects to `from` and would end at an unpublished listing.
+  - The same manifest unpublishes `to`, or redirects `from` twice. Two duplicates may share a `to`.
+- **Order.** Publish it after the manifest that unpublishes `from`, on each environment. As with
+  every publication, the catalog epoch advances, so the cached 410 turns over.

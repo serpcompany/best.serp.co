@@ -2,7 +2,10 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { createCatalogOperations } from '../apps/web/src/db/catalog'
+import { isUnpublishedListingSlug } from '../apps/web/src/db/catalog-epoch'
+import { createDatabase } from '../apps/web/src/db/client'
 import {
   openListingClaimStatuses,
   openRevisionStatuses,
@@ -10,13 +13,18 @@ import {
   submissionStatuses
 } from '../apps/web/src/db/schema'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
+import { MemoryCatalogCache, SqliteD1 } from '../apps/web/src/db/test-support'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
 import {
   buildPublicationPlan,
+  executePublicationPlan,
   LISTING_HAS_OWNERSHIP_RECORDS,
   manifestSchema,
-  type PublicationPlan
+  type PublicationPlan,
+  parseManifest
 } from './d1-publisher.ts'
+
+vi.mock('server-only', () => ({}))
 
 const beforeChecksum = 'a'.repeat(64)
 const afterChecksum = createHash('sha256')
@@ -38,6 +46,11 @@ function database(): DatabaseSync {
   for (const migration of freshMigrationNames()) {
     db.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
   }
+  return seed(db)
+}
+
+/** The rows every test starts from: the `seo` category, one live listing, and version 4. */
+function seed(db: DatabaseSync): DatabaseSync {
   db.exec(`
     PRAGMA foreign_keys=ON;
     INSERT INTO categories (id,slug,name) VALUES (1,'seo','SEO');
@@ -1766,5 +1779,315 @@ describe('listing-claim-hold-add and -clear (#67: holds for the owner’s review
       expect(holds(db)).toEqual([])
       expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 4 })
     }
+  })
+})
+
+describe('listing-slug-redirect (#338: a retired duplicate answers 308 to the listing it duplicated)', () => {
+  const live = { checksum: beforeChecksum, version: 4 }
+  const redirect = {
+    action: 'listing-slug-redirect',
+    from: { id: 'lst_sqlite_test', slug: 'old-slug' },
+    to: { id: 'lst_sqlite_kept', slug: 'kept-slug' },
+    reason: '#332 duplicate of kept-slug'
+  }
+  const rows = (operations: Record<string, unknown>[]) =>
+    manifestSchema.parse({
+      version: 1,
+      id: 'duplicate-redirects',
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations
+    })
+  /** A second live listing, `kept-slug`, and the fixture listing unpublished: its duplicate. */
+  const KEPT_AND_RETIRED = `
+    INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+      VALUES ('lst_sqlite_kept','kept-slug','Kept','Description','https://kept.example','draft','${now}','test','fixture','${'d'.repeat(64)}');
+    INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('lst_sqlite_kept',1,0,1);
+    UPDATE listings SET status='approved' WHERE id='lst_sqlite_kept';
+    UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test';`
+  const retired = () => {
+    const db = database()
+    db.exec(KEPT_AND_RETIRED)
+    return db
+  }
+  const redirects = (db: DatabaseSync) =>
+    db
+      .prepare(
+        'SELECT listing_id,old_slug,new_slug,manifest_id,reason,created_at FROM listing_slug_redirects ORDER BY id'
+      )
+      .all()
+  const listings = (db: DatabaseSync) => db.prepare('SELECT * FROM listings ORDER BY id').all()
+  const version = (db: DatabaseSync) =>
+    db.prepare('SELECT version FROM publication_state WHERE id=1').get()
+  const redirectRow = (listingId: string, oldSlug: string, newSlug: string) =>
+    `INSERT INTO listing_slug_redirects (listing_id,old_slug,new_slug,manifest_id,reason,created_at)
+      VALUES ('${listingId}','${oldSlug}','${newSlug}','prior','Prior','${now}');`
+
+  it('adds one redirect row to the kept listing at any version, and changes neither listing', () => {
+    const db = retired()
+    db.prepare('UPDATE publication_state SET version=9').run()
+    const before = listings(db)
+    const publication = buildPublicationPlan(rows([redirect]), 'redirect manifest', now, {
+      ...live,
+      version: 9
+    })
+    executeInTestTransaction(db, publication)
+    expect(redirects(db)).toEqual([
+      {
+        listing_id: 'lst_sqlite_kept',
+        old_slug: 'old-slug',
+        new_slug: 'kept-slug',
+        manifest_id: 'duplicate-redirects',
+        reason: '#332 duplicate of kept-slug',
+        created_at: now
+      }
+    ])
+    // The retired row stays unpublished, so Republish in /admin can still bring it back.
+    expect(listings(db)).toEqual(before)
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({ count: 0 })
+    // The epoch advances, so the cached 410 turns over.
+    expect(version(db)).toEqual({ version: 10 })
+    const routes = publication.affectedRoutes.split('\n')
+    expect(routes).toEqual(
+      expect.arrayContaining(['/products/old-slug/', '/search/', '/sitemap-index.xml', '/rss.xml'])
+    )
+    expect(routes).not.toContain('/products/kept-slug/')
+  })
+
+  it('makes the product page’s lookup answer the kept slug, through a rename; the retired listing stays out of the sitemap and search', async () => {
+    const sqlite = new SqliteD1()
+    seed(sqlite.database).exec(KEPT_AND_RETIRED)
+    const binding = sqlite.asD1Database()
+    const client = createDatabase(binding)
+    // A fresh operations object per read, as each request gets.
+    const catalog = () =>
+      createCatalogOperations({
+        cache: new MemoryCatalogCache(),
+        client,
+        clock: () => new Date('2026-07-14T00:00:00.000Z'),
+        observe: () => undefined
+      })
+    const gone = () => isUnpublishedListingSlug({ client, slug: 'old-slug' })
+    // Before: no redirect, so the Worker answers the gone page (410).
+    expect(await catalog().getCanonicalSlugForRedirect('old-slug')).toBeNull()
+    expect(await gone()).toBe(true)
+
+    await executePublicationPlan(
+      binding,
+      buildPublicationPlan(rows([redirect]), 'redirect manifest', now, live)
+    )
+    // The product page finds no listing, then this redirect: `permanentRedirect`, a 308.
+    const after = catalog()
+    expect(await after.getListingBySlug('old-slug')).toBeNull()
+    expect(await after.getCanonicalSlugForRedirect('old-slug')).toBe('kept-slug')
+    expect((await after.getSitemapListings()).map(listing => listing.slug)).toEqual(['kept-slug'])
+    expect((await after.searchListings('old')).map(listing => listing.slug)).toEqual([])
+    expect((await after.searchListings('kept')).map(listing => listing.slug)).toEqual(['kept-slug'])
+
+    // The kept listing renamed later: the redirect follows its id, still one hop.
+    const state = sqlite.database
+      .prepare('SELECT version,checksum FROM publication_state WHERE id=1')
+      .get() as { checksum: string; version: number }
+    await executePublicationPlan(
+      binding,
+      buildPublicationPlan(
+        manifestSchema.parse({
+          version: 1,
+          id: 'rename-kept',
+          basePublicationVersion: state.version,
+          provenance: {
+            actor: 'test@example.com',
+            workflow: 'test/sqlite',
+            beforeChecksum: state.checksum
+          },
+          operations: [
+            {
+              action: 'listing-slug-change',
+              id: 'lst_sqlite_kept',
+              from: 'kept-slug',
+              to: 'renamed-slug',
+              categories: ['seo'],
+              reason: 'Rename'
+            }
+          ]
+        }),
+        'rename manifest',
+        now
+      )
+    )
+    expect(await catalog().getCanonicalSlugForRedirect('old-slug')).toBe('renamed-slug')
+
+    // The kept listing unpublished too: no redirect, and the retired slug is the gone page again.
+    sqlite.database.exec("UPDATE listings SET is_active=0 WHERE id='lst_sqlite_kept'")
+    expect(await catalog().getCanonicalSlugForRedirect('old-slug')).toBeNull()
+    expect(await gone()).toBe(true)
+  })
+
+  it.each([
+    ['the source is live', "UPDATE listings SET is_active=1 WHERE id='lst_sqlite_test'"],
+    [
+      'the source was never published',
+      "UPDATE listings SET status='draft' WHERE id='lst_sqlite_test'"
+    ],
+    ['the source has another slug', "UPDATE listings SET slug='moved' WHERE id='lst_sqlite_test'"],
+    [
+      'the source is filed under a retired category (#260: it answers 404)',
+      `INSERT INTO categories (id,slug,name,is_active) VALUES (2,'adult','Adult',0);
+        INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+          VALUES ('lst_sqlite_test',2,1,0);`
+    ],
+    ['the target is unpublished', "UPDATE listings SET is_active=0 WHERE id='lst_sqlite_kept'"],
+    [
+      'the target is scheduled for later',
+      "UPDATE listings SET published_at='2099-01-01T00:00:00.000Z' WHERE id='lst_sqlite_kept'"
+    ],
+    ['the target has another slug', "UPDATE listings SET slug='moved' WHERE id='lst_sqlite_kept'"],
+    ['a redirect exists for the slug', redirectRow('lst_sqlite_kept', 'old-slug', 'kept-slug')],
+    [
+      'the target’s slug is itself redirected (a chain)',
+      `INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+        VALUES ('lst_sqlite_third','third-slug','Third','Description','https://third.example','draft','${now}','test','fixture','${'e'.repeat(64)}');
+      INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('lst_sqlite_third',1,0,1);
+      UPDATE listings SET status='approved' WHERE id='lst_sqlite_third';
+      ${redirectRow('lst_sqlite_third', 'kept-slug', 'third-slug')}`
+    ],
+    [
+      'the target’s slug redirects to the source (a loop)',
+      redirectRow('lst_sqlite_test', 'kept-slug', 'old-slug')
+    ],
+    [
+      'an older slug redirects to the source (a chain)',
+      redirectRow('lst_sqlite_test', 'older-slug', 'old-slug')
+    ]
+  ])('refuses the whole batch when %s', (_name, change) => {
+    const db = retired()
+    db.exec(change)
+    const before = { listings: listings(db), redirects: redirects(db) }
+    expect(() =>
+      executeInTestTransaction(db, buildPublicationPlan(rows([redirect]), 'm', now, live))
+    ).toThrow()
+    expect({ listings: listings(db), redirects: redirects(db) }).toEqual(before)
+    expect(version(db)).toEqual({ version: 4 })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM publication_runs').get()).toEqual({ count: 0 })
+  })
+
+  it('refuses a redirect to its own listing, a bad reason, a target the manifest unpublishes, and a second redirect of a slug', () => {
+    expect(() => rows([{ ...redirect, to: { id: 'lst_sqlite_test', slug: 'kept-slug' } }])).toThrow(
+      /own listing/u
+    )
+    expect(() => rows([{ ...redirect, to: { id: 'lst_sqlite_kept', slug: 'old-slug' } }])).toThrow(
+      /own listing/u
+    )
+    for (const reason of [undefined, '  ', 'x'.repeat(201)]) {
+      expect(() => rows([{ ...redirect, reason }]), String(reason)).toThrow()
+    }
+    expect(() =>
+      rows([{ ...redirect, to: { ...redirect.to, website: 'https://kept.example' } }])
+    ).toThrow()
+    // Its own guard refuses a target unpublished earlier in the batch; this, one unpublished later.
+    const unpublishKept = {
+      action: 'listing-unpublish',
+      id: 'lst_sqlite_kept',
+      slug: 'kept-slug',
+      categories: ['seo'],
+      expected: { website: 'https://kept.example' }
+    }
+    for (const operations of [
+      [redirect, unpublishKept],
+      [unpublishKept, redirect]
+    ]) {
+      expect(() => rows(operations)).toThrow(/same manifest/u)
+    }
+    expect(() => rows([redirect, { ...redirect, reason: 'again' }])).toThrow(
+      /Duplicate listing operation/u
+    )
+    // Two retired duplicates may share a kept listing.
+    expect(() =>
+      rows([redirect, { ...redirect, from: { id: 'lst_sqlite_other', slug: 'other-slug' } }])
+    ).not.toThrow()
+  })
+
+  it('the committed follow-up sends exactly #337’s 14 retired slugs to their kept listings', () => {
+    const read = (file: string) => {
+      const source = readFileSync(resolve('d1/publications', file), 'utf8')
+      return { manifest: parseManifest(source), source }
+    }
+    const duplicates = read('2026-10-10-duplicate-listings.yaml').manifest
+    const { manifest, source } = read('2026-10-10-duplicate-listings-redirects.yaml')
+    const retirements = duplicates.operations.flatMap(op =>
+      op.action === 'listing-unpublish' ? [op] : []
+    )
+    const operations = manifest.operations.flatMap(op =>
+      op.action === 'listing-slug-redirect' ? [op] : []
+    )
+    expect(manifest.concurrency).toBe('rows')
+    expect(operations).toHaveLength(manifest.operations.length)
+    expect(retirements).toHaveLength(14)
+    expect(operations.map(op => op.from)).toEqual(
+      retirements.map(op => ({ id: op.id, slug: op.slug }))
+    )
+    // Each goes to the listing #337's reason names as kept, by its v1 import id
+    // (`lst_` + sha256("legacy-product-map" NUL <slug>)[0:24], docs/data-model.md).
+    const importId = (value: string) =>
+      `lst_${createHash('sha256').update(`legacy-product-map\0${value}`).digest('hex').slice(0, 24)}`
+    for (const [index, op] of operations.entries()) {
+      const kept = op.to.slug.replaceAll('.', '\\.')
+      expect(retirements[index]?.reason, op.from.slug).toMatch(
+        new RegExp(`^#332 duplicate of ${kept}[,:]`, 'u')
+      )
+      expect(op.to.id, op.to.slug).toBe(importId(op.to.slug))
+    }
+    // Where #337 gave a kept listing media, it named the same id and slug.
+    for (const op of duplicates.operations) {
+      if (op.action === 'listing-media-update')
+        expect(operations.map(redirect => redirect.to)).toContainEqual({ id: op.id, slug: op.slug })
+    }
+
+    /** The 28 listings: kept ones live, retired ones live (`retiredActive` 1) or unpublished. */
+    const environment = (retiredActive: 0 | 1) => {
+      const db = database()
+      const insert = db.prepare(
+        `INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+          VALUES (?,?,?,'Description',?,'draft','2026-05-16','test',?,'c')`
+      )
+      const file = db.prepare(
+        'INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES (?,1,0,1)'
+      )
+      const publish = db.prepare("UPDATE listings SET status='approved',is_active=? WHERE id=?")
+      for (const { from, to } of operations) {
+        for (const [listing, active] of [
+          [to, 1],
+          [from, retiredActive]
+        ] as const) {
+          insert.run(
+            listing.id,
+            listing.slug,
+            listing.slug,
+            `https://${listing.slug}/`,
+            listing.slug
+          )
+          file.run(listing.id)
+          publish.run(active, listing.id)
+        }
+      }
+      return db
+    }
+    // After #337's manifest: one redirect per retired slug, to its kept listing.
+    const db = environment(0)
+    executeInTestTransaction(db, buildPublicationPlan(manifest, source, now, live))
+    expect(
+      db
+        .prepare(
+          'SELECT r.old_slug AS retired, l.slug AS kept FROM listing_slug_redirects r JOIN listings l ON l.id=r.listing_id ORDER BY r.id'
+        )
+        .all()
+    ).toEqual(operations.map(op => ({ retired: op.from.slug, kept: op.to.slug })))
+    // Before it, the retired listings are live: the whole batch refuses.
+    const early = environment(1)
+    expect(() =>
+      executeInTestTransaction(early, buildPublicationPlan(manifest, source, now, live))
+    ).toThrow()
+    expect(redirects(early)).toEqual([])
+    expect(version(early)).toEqual({ version: 4 })
   })
 })

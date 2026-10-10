@@ -11,7 +11,10 @@ import {
   MEDIA_HASH_LENGTH,
   parseMediaKey
 } from '../apps/web/src/db/media-keys'
-import { listingHasQueuedSubmission } from '../apps/web/src/db/plan-support'
+import {
+  listingHasQueuedSubmission,
+  listingInRetiredCategory
+} from '../apps/web/src/db/plan-support'
 import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
 import { assertD1Compatible } from './d1-compat'
 import { validateCanonicalLocalConfig } from './d1-local-config'
@@ -204,6 +207,31 @@ const operation = z.discriminatedUnion('action', [
     })
     .strict(),
   /**
+   * Sends an unpublished listing's slug to another, live listing with a 308 (#338: #332's retired
+   * duplicates go to the listing they duplicated instead of answering 410). It adds one
+   * `listing_slug_redirects` row, `(to.id, from.slug, to.slug)`. The product page looks a slug up
+   * there before it renders the gone page and follows `to.id` to that listing's current slug, so
+   * a later rename of `to` still lands in one hop. `from` stays unpublished, so it stays out of
+   * the sitemap, search, RSS and category pages, and Republish in `/admin` can still bring it
+   * back (its live page then wins over the redirect).
+   *
+   * Row-level guarded, so a `rows` manifest may hold it. The batch refuses when:
+   * - `from` isn't this id and slug, unpublished (`approved`, `is_active = 0`) as its 410 page
+   *   finds it: never filed under a retired category, whose listings answer 404 (#260);
+   * - `to` isn't this id and slug, live (`approved`, `is_active = 1`, published by now);
+   * - a redirect already exists for `from.slug`;
+   * - `to.slug` is itself a redirected slug (a chain, or a loop back to `from`);
+   * - older slugs redirect to `from` (a chain: they would end at an unpublished listing).
+   */
+  z
+    .object({
+      action: z.literal('listing-slug-redirect'),
+      from: z.object({ id: listingId, slug: existingSlug }).strict(),
+      to: z.object({ id: listingId, slug: existingSlug }).strict(),
+      reason: z.string().trim().min(1).max(200)
+    })
+    .strict(),
+  /**
    * Replaces a listing's logo and images with hosted copies (#95). `expected` is the listing's
    * logo and image rows (kind, source url, and hosted key, ordered by kind then sort order) when
    * the manifest was generated: the batch refuses a listing whose media changed since (a
@@ -330,8 +358,9 @@ export const manifestConcurrency = ['publication', 'rows'] as const
  * media rows (`expected`), categories (`expected`, added, removed, or replaced), a description's
  * length and ending (#105), an unpublish with its `expected.website` (#100: categories, live,
  * website, no submission in review; with `expected.unowned`, no ownership records either, #332), a
- * category retirement (#260: no live listing left in it), and a new category (#333: its insert
- * refuses the batch when the slug exists, retired or not).
+ * category retirement (#260: no live listing left in it), a new category (#333: its insert
+ * refuses the batch when the slug exists, retired or not), and a slug redirect (#338: an
+ * unpublished source, a live target, no redirect for the slug, no chain or loop).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
@@ -342,6 +371,7 @@ const rowLevelActions = new Set<string>([
   'listing-unpublish',
   'listing-claim-hold-add',
   'listing-claim-hold-clear',
+  'listing-slug-redirect',
   'category-create',
   'category-unpublish'
 ])
@@ -373,7 +403,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, and category-create/-unpublish operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, and category-create/-unpublish operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -468,6 +498,15 @@ export const manifestSchema = z
           path: ['operations', index, 'to']
         })
       if (
+        op.action === 'listing-slug-redirect' &&
+        (op.from.id === op.to.id || op.from.slug === op.to.slug)
+      )
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'A listing slug cannot redirect to its own listing.',
+          path: ['operations', index, 'to']
+        })
+      if (
         op.action === 'category-create' ||
         op.action === 'category-update' ||
         op.action === 'category-unpublish'
@@ -482,14 +521,21 @@ export const manifestSchema = z
         categoryTargets.add(target)
         return
       }
+      // A redirect changes nothing of its target's row, so only its source counts here.
       const id =
-        op.action === 'listing-create' || op.action === 'listing-update' ? op.listing.id : op.id
+        op.action === 'listing-create' || op.action === 'listing-update'
+          ? op.listing.id
+          : op.action === 'listing-slug-redirect'
+            ? op.from.id
+            : op.id
       const target =
         op.action === 'listing-create' || op.action === 'listing-update'
           ? op.listing.slug
           : op.action === 'listing-slug-change'
             ? op.to
-            : op.slug
+            : op.action === 'listing-slug-redirect'
+              ? op.from.slug
+              : op.slug
       if (ids.has(id))
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -504,6 +550,19 @@ export const manifestSchema = z
         })
       ids.add(id)
       slugs.add(target)
+    })
+    // A redirect to a listing this manifest unpublishes would end at a gone page. Its own guard
+    // catches an unpublish that comes first; this catches one that comes after it.
+    const unpublished = new Set(
+      value.operations.flatMap(op => (op.action === 'listing-unpublish' ? [op.id] : []))
+    )
+    value.operations.forEach((op, index) => {
+      if (op.action === 'listing-slug-redirect' && unpublished.has(op.to.id))
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'A redirect’s target cannot be unpublished in the same manifest.',
+          path: ['operations', index, 'to']
+        })
     })
   })
 export type PublicationManifest = z.infer<typeof manifestSchema>
@@ -1088,6 +1147,45 @@ export function buildPublicationPlan(
       routes.add(listingRoute(op.from))
       routes.add(listingRoute(op.to))
       addCategories(op.categories)
+    }
+    if (op.action === 'listing-slug-redirect') {
+      statements.push(
+        // The source: unpublished, exactly as its slug answers 410 today
+        // (`isUnpublishedListingSlug`). One filed under a retired category answers 404 and stays
+        // there: #260 sends no adult listing's traffic elsewhere. Its row is never changed.
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL) AND NOT ${listingInRetiredCategory('?')} THEN 1 ELSE ${GUARD_FAILURE} END`,
+          op.from.id,
+          op.from.slug,
+          op.from.id
+        ),
+        // The target: public now, by the predicates the product page's redirect lookup applies.
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?) THEN 1 ELSE ${GUARD_FAILURE} END`,
+          op.to.id,
+          op.to.slug,
+          now
+        ),
+        // No redirect for the slug yet; no chain or loop: the target's slug isn't redirected, and
+        // no older slug redirects to the source.
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_slug_redirects WHERE old_slug IN (?, ?) OR listing_id=?) THEN ${GUARD_FAILURE} ELSE 1 END`,
+          op.from.slug,
+          op.to.slug,
+          op.from.id
+        ),
+        statement(
+          'INSERT INTO listing_slug_redirects (listing_id,old_slug,new_slug,manifest_id,reason,created_at) VALUES (?,?,?,?,?,?)',
+          op.to.id,
+          op.from.slug,
+          op.to.slug,
+          manifest.id,
+          op.reason,
+          now
+        )
+      )
+      // The source's page turns from 410 to 308; the target's page is unchanged.
+      routes.add(listingRoute(op.from.slug))
     }
   }
   const affectedRoutes = [
