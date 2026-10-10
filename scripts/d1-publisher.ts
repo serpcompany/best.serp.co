@@ -31,6 +31,14 @@ import { catalogSitemapRoutes, categoryRoute, listingIndexRoute, listingRoute } 
 export const GUARD_FAILURE = "json_extract('', '$')"
 /** Refuses the batch unless the statement right before it changed exactly one row. */
 const CHANGED_ONE_GUARD = `SELECT CASE WHEN changes()=1 THEN 1 ELSE ${GUARD_FAILURE} END`
+/**
+ * A guard failure that says why (#338 review): it rolls the batch back like `GUARD_FAILURE`, and
+ * D1 names the reason in its error (`bad JSON path: '<reason>'`), so the workflow's log says what
+ * to fix. The reason is a constant of the plan, never a binding.
+ */
+export function guardFailure(reason: string): string {
+  return `json_extract('{}', '${reason.replaceAll("'", "''")}')`
+}
 
 /** A slug that already exists; renaming or unpublishing it must stay possible. */
 const existingSlug = z.string().regex(/^[a-z0-9.-]+$/)
@@ -221,7 +229,12 @@ const operation = z.discriminatedUnion('action', [
    * - `to` isn't this id and slug, live (`approved`, `is_active = 1`, published by now);
    * - a redirect already exists for `from.slug`;
    * - `to.slug` is itself a redirected slug (a chain, or a loop back to `from`);
-   * - older slugs redirect to `from` (a chain: they would end at an unpublished listing).
+   * - older slugs redirect to `from` (a chain: they would end at an unpublished listing);
+   * - by the end of the batch, `from` is live again or filed under a retired category, or `to` is
+   *   no longer live (#338 review: a later operation in the same batch, in any order).
+   *
+   * A later `category-unpublish` refuses while `from` is filed under that category, so a redirected
+   * listing never ends up in a retired category with a 308 instead of its 404 (#260).
    */
   z
     .object({
@@ -332,7 +345,8 @@ const operation = z.discriminatedUnion('action', [
    * sitemaps, search, and the submit and edit forms, its page answers 404, and so do its
    * unpublished listings (#260). Refused while any live listing remains in it, primary or
    * secondary, so it follows the unpublish operations of its listings. That guard is its own
-   * row-level check, so a `rows` manifest may hold it (#260: the Adult category).
+   * row-level check, so a `rows` manifest may hold it (#260: the Adult category). Also refused
+   * while a listing filed under it is a slug redirect's source (#338): re-file that listing first.
    */
   z.object({ action: z.literal('category-unpublish'), slug: categorySlug }).strict()
 ])
@@ -358,9 +372,10 @@ export const manifestConcurrency = ['publication', 'rows'] as const
  * media rows (`expected`), categories (`expected`, added, removed, or replaced), a description's
  * length and ending (#105), an unpublish with its `expected.website` (#100: categories, live,
  * website, no submission in review; with `expected.unowned`, no ownership records either, #332), a
- * category retirement (#260: no live listing left in it), a new category (#333: its insert
- * refuses the batch when the slug exists, retired or not), and a slug redirect (#338: an
- * unpublished source, a live target, no redirect for the slug, no chain or loop).
+ * category retirement (#260: no live listing and no slug redirect's source left in it, #338), a new
+ * category (#333: its insert refuses the batch when the slug exists, retired or not), and a slug
+ * redirect (#338: an unpublished source, a live target, no redirect for the slug, no chain or
+ * loop, all still true at the end of the batch).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
@@ -752,6 +767,10 @@ function listingStatements(
   out.push(statement("UPDATE listings SET status='approved' WHERE id=?", value.id))
   return out
 }
+/** How a guard failure names a `listing-slug-redirect` operation. */
+function redirectLabel(op: { from: { slug: string }; to: { slug: string } }): string {
+  return `listing-slug-redirect ${op.from.slug} to ${op.to.slug}`
+}
 export const parseManifest = (source: string): PublicationManifest =>
   manifestSchema.parse(parse(source))
 
@@ -850,7 +869,13 @@ export function buildPublicationPlan(
           now,
           op.slug
         ),
-        statement(CHANGED_ONE_GUARD)
+        statement(CHANGED_ONE_GUARD),
+        // #338: never while a listing filed under it is a slug redirect's source. Retired, that
+        // listing would answer 404 (#260), but the product page reads the redirect first.
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id JOIN listings l ON l.id=lc.listing_id JOIN listing_slug_redirects r ON r.old_slug=l.slug WHERE c.slug=?) THEN ${guardFailure(`category-unpublish ${op.slug}: a listing filed under it is the source of a slug redirect; re-file that listing first`)} ELSE 1 END`,
+          op.slug
+        )
       )
       addCategories([op.slug])
     }
@@ -1149,19 +1174,20 @@ export function buildPublicationPlan(
       addCategories(op.categories)
     }
     if (op.action === 'listing-slug-redirect') {
+      const redirect = redirectLabel(op)
       statements.push(
         // The source: unpublished, exactly as its slug answers 410 today
         // (`isUnpublishedListingSlug`). One filed under a retired category answers 404 and stays
         // there: #260 sends no adult listing's traffic elsewhere. Its row is never changed.
         statement(
-          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL) AND NOT ${listingInRetiredCategory('?')} THEN 1 ELSE ${GUARD_FAILURE} END`,
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL) AND NOT ${listingInRetiredCategory('?')} THEN 1 ELSE ${guardFailure(`${redirect}: the source is not this unpublished listing, or is filed under a retired category`)} END`,
           op.from.id,
           op.from.slug,
           op.from.id
         ),
         // The target: public now, by the predicates the product page's redirect lookup applies.
         statement(
-          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?) THEN 1 ELSE ${GUARD_FAILURE} END`,
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?) THEN 1 ELSE ${guardFailure(`${redirect}: the target is not this live listing`)} END`,
           op.to.id,
           op.to.slug,
           now
@@ -1169,7 +1195,7 @@ export function buildPublicationPlan(
         // No redirect for the slug yet; no chain or loop: the target's slug isn't redirected, and
         // no older slug redirects to the source.
         statement(
-          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_slug_redirects WHERE old_slug IN (?, ?) OR listing_id=?) THEN ${GUARD_FAILURE} ELSE 1 END`,
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_slug_redirects WHERE old_slug IN (?, ?) OR listing_id=?) THEN ${guardFailure(`${redirect}: the slug already redirects, or this would make a chain or a loop`)} ELSE 1 END`,
           op.from.slug,
           op.to.slug,
           op.from.id
@@ -1187,6 +1213,22 @@ export function buildPublicationPlan(
       // The source's page turns from 410 to 308; the target's page is unchanged.
       routes.add(listingRoute(op.from.slug))
     }
+  }
+  // #338 review: each redirect still holds once every operation of the batch ran. A later
+  // `category-unpublish` could retire its source's category (that listing answers 404, #260), and
+  // a later `listing-update` could leave its target unpublished or not yet due. Either refuses the
+  // whole batch, in whichever order the manifest lists them.
+  for (const op of manifest.operations) {
+    if (op.action !== 'listing-slug-redirect') continue
+    statements.push(
+      statement(
+        `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL) AND NOT ${listingInRetiredCategory('?')} AND EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?) THEN 1 ELSE ${guardFailure(`${redirectLabel(op)}: by the end of the batch, its source is no longer unpublished outside retired categories, or its target is no longer live`)} END`,
+        op.from.id,
+        op.from.id,
+        op.to.id,
+        now
+      )
+    )
   }
   const affectedRoutes = [
     ...new Set([

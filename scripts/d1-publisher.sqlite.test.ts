@@ -1959,16 +1959,140 @@ describe('listing-slug-redirect (#338: a retired duplicate answers 308 to the li
       'an older slug redirects to the source (a chain)',
       redirectRow('lst_sqlite_test', 'older-slug', 'old-slug')
     ]
-  ])('refuses the whole batch when %s', (_name, change) => {
+  ])('refuses the whole batch when %s, and says why', (name, change) => {
     const db = retired()
     db.exec(change)
     const before = { listings: listings(db), redirects: redirects(db) }
+    // Each guard names the operation and its reason in the error D1 reports.
+    const reason = name.startsWith('the source ')
+      ? 'the source is not this unpublished listing'
+      : /^the target (is|has) /u.test(name)
+        ? 'the target is not this live listing'
+        : 'the slug already redirects, or this would make a chain or a loop'
     expect(() =>
       executeInTestTransaction(db, buildPublicationPlan(rows([redirect]), 'm', now, live))
-    ).toThrow()
+    ).toThrow(`listing-slug-redirect old-slug to kept-slug: ${reason}`)
     expect({ listings: listings(db), redirects: redirects(db) }).toEqual(before)
     expect(version(db)).toEqual({ version: 4 })
     expect(db.prepare('SELECT COUNT(*) AS count FROM publication_runs').get()).toEqual({ count: 0 })
+  })
+
+  /** The retired listing also filed under `retiring`, an active category nothing live is in. */
+  const inRetiring = () => {
+    const db = retired()
+    db.exec(`INSERT INTO categories (id,slug,name) VALUES (2,'retiring','Retiring');
+      INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary)
+        VALUES ('lst_sqlite_test',2,1,0);`)
+    return db
+  }
+  const categoryState = (db: DatabaseSync) =>
+    db.prepare("SELECT is_active FROM categories WHERE slug='retiring'").get()
+  const retire = { action: 'category-unpublish', slug: 'retiring' }
+
+  it('refuses a batch that retires the source’s category after the redirect, or before it (#338 review)', () => {
+    for (const [operations, reason] of [
+      // The redirect first: `category-unpublish` refuses while a redirect's source is filed under
+      // it (and the end-of-batch check would refuse too). Retired, the listing must answer 404.
+      [
+        [redirect, retire],
+        'category-unpublish retiring: a listing filed under it is the source of a slug redirect; re-file that listing first'
+      ],
+      // The retirement first: the redirect's own guard refuses a source in a retired category.
+      [
+        [retire, redirect],
+        'listing-slug-redirect old-slug to kept-slug: the source is not this unpublished listing, or is filed under a retired category'
+      ]
+    ] as const) {
+      const db = inRetiring()
+      expect(() =>
+        executeInTestTransaction(db, buildPublicationPlan(rows([...operations]), 'm', now, live))
+      ).toThrow(reason)
+      expect(categoryState(db)).toEqual({ is_active: 1 })
+      expect(redirects(db)).toEqual([])
+      expect(version(db)).toEqual({ version: 4 })
+    }
+  })
+
+  it('refuses retiring a category in a later manifest while a published redirect’s source is filed under it; re-filed first, it retires', () => {
+    const db = inRetiring()
+    executeInTestTransaction(db, buildPublicationPlan(rows([redirect]), 'redirect', now, live))
+    const published = db
+      .prepare('SELECT version,checksum FROM publication_state WHERE id=1')
+      .get() as { checksum: string; version: number }
+    const later = (operations: Record<string, unknown>[]) =>
+      buildPublicationPlan(
+        manifestSchema.parse({
+          version: 1,
+          id: 'retire-later',
+          concurrency: 'rows',
+          provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+          operations
+        }),
+        'retire later',
+        now,
+        published
+      )
+    expect(() => executeInTestTransaction(db, later([retire]))).toThrow(
+      're-file that listing first'
+    )
+    expect(categoryState(db)).toEqual({ is_active: 1 })
+    // Re-filed off the category in the same batch, the listing keeps its redirect, and the
+    // category retires.
+    executeInTestTransaction(
+      db,
+      later([
+        {
+          action: 'listing-categories-remove',
+          id: 'lst_sqlite_test',
+          slug: 'old-slug',
+          expected: ['seo', 'retiring'],
+          remove: ['retiring']
+        },
+        retire
+      ])
+    )
+    expect(categoryState(db)).toEqual({ is_active: 0 })
+    expect(redirects(db)).toEqual([expect.objectContaining({ old_slug: 'old-slug' })])
+    expect(version(db)).toEqual({ version: 6 })
+  })
+
+  it('refuses a batch that leaves the target not live by its end, in either order (#338 review)', () => {
+    /** A `listing-update` of the kept listing, as a `publication` manifest may hold. */
+    const update = (publishedAt: string) => ({
+      action: 'listing-update',
+      previousCategories: ['seo'],
+      listing: {
+        id: 'lst_sqlite_kept',
+        slug: 'kept-slug',
+        name: 'Kept',
+        description: 'Description',
+        website: 'https://kept.example',
+        publishedAt,
+        categories: ['seo']
+      }
+    })
+    const later = '2099-01-01T00:00:00.000Z'
+    for (const [operations, reason] of [
+      // The update after the redirect: only the end-of-batch check sees it.
+      [
+        [redirect, update(later)],
+        'listing-slug-redirect old-slug to kept-slug: by the end of the batch, its source is no longer unpublished outside retired categories, or its target is no longer live'
+      ],
+      [[update(later), redirect], 'the target is not this live listing']
+    ] as const) {
+      const db = retired()
+      const before = listings(db)
+      expect(() => executeInTestTransaction(db, plan({ operations: [...operations] }))).toThrow(
+        reason
+      )
+      expect(listings(db)).toEqual(before)
+      expect(redirects(db)).toEqual([])
+      expect(version(db)).toEqual({ version: 4 })
+    }
+    // Still public by the end (an earlier date): the redirect stands.
+    const db = retired()
+    executeInTestTransaction(db, plan({ operations: [redirect, update('2026-05-16')] }))
+    expect(redirects(db)).toEqual([expect.objectContaining({ listing_id: 'lst_sqlite_kept' })])
   })
 
   it('refuses a redirect to its own listing, a bad reason, a target the manifest unpublishes, and a second redirect of a slug', () => {
@@ -2082,11 +2206,13 @@ describe('listing-slug-redirect (#338: a retired duplicate answers 308 to the li
         )
         .all()
     ).toEqual(operations.map(op => ({ retired: op.from.slug, kept: op.to.slug })))
-    // Before it, the retired listings are live: the whole batch refuses.
+    // Before it, the retired listings are live: the whole batch refuses, and says why.
     const early = environment(1)
     expect(() =>
       executeInTestTransaction(early, buildPublicationPlan(manifest, source, now, live))
-    ).toThrow()
+    ).toThrow(
+      'listing-slug-redirect facebook-downloader to facebook-video-downloader: the source is not this unpublished listing'
+    )
     expect(redirects(early)).toEqual([])
     expect(version(early)).toEqual({ version: 4 })
   })

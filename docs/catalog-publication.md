@@ -52,7 +52,7 @@ row-level, so one manifest fits staging and production. Each listing operation n
 | `listing-categories-remove` | Removes `remove`, which must be secondary categories | The slug or categories aren't exactly `expected`, or one of them is the primary |
 | `listing-categories-set` | Replaces the listing's categories with `categories`, the first as primary (#333) | As for `-add`, the listing isn't approved, or its own submission is in review (`paid_pending_review` or `changes_requested`) |
 | `category-create` | Adds an active category: `slug`, `name`, `description`, `order` | The slug exists, active or retired |
-| `category-unpublish` | Retires a category ([Catalog hygiene](./catalog-hygiene.md#adult-products-260)) | The slug doesn't exist, or a live listing is still filed under it |
+| `category-unpublish` | Retires a category ([Catalog hygiene](./catalog-hygiene.md#adult-products-260)) | The slug doesn't exist, a live listing is still filed under it, or a listing filed under it is a slug redirect's source ([Slug redirects](#slug-redirects)) |
 
 `listing-categories-set` is the only row-level operation that changes a listing's primary category:
 `-add` and `-remove` never touch it. Within the batch, it moves the listing to a draft, replaces its
@@ -90,6 +90,17 @@ page answers 308 instead of 410. It names `from` and `to`, each a listing's `id`
   - A redirect already exists for `from`'s slug.
   - It would make a chain or a loop: `to`'s slug is itself a redirected slug, or an older slug
     redirects to `from` and would end at an unpublished listing.
+  - By the end of the batch, `from` is no longer unpublished outside retired categories, or `to`
+    is no longer live, whatever the order of the operations. A later `listing-update` that moves
+    `to`'s `published_at` into the future refuses the batch, for example.
   - The same manifest unpublishes `to`, or redirects `from` twice. Two duplicates may share a `to`.
+- **Category retirements.** A listing filed under a retired category answers 404, and a redirect
+  must not turn that into a 308. So `category-unpublish` refuses while any listing filed under the
+  category is the source of a redirect, in the same batch or one published earlier: re-file that
+  listing first (`listing-categories-remove` or `-set`, earlier in the same batch or in an earlier
+  one), and its redirect keeps working.
+- **Errors.** Each of these guards names the operation and its reason in the error D1 reports, for
+  example `bad JSON path: 'category-unpublish other: a listing filed under it is the source of a
+  slug redirect; re-file that listing first'`. Nothing is written.
 - **Order.** Publish it after the manifest that unpublishes `from`, on each environment. As with
   every publication, the catalog epoch advances, so the cached 410 turns over.

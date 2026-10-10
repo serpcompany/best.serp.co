@@ -1509,6 +1509,13 @@ operations:
       old_slug: 'parked.example'
     })
     expect((await live()).version).toBe(unredirected.version + 1)
+    // A guard that says why: D1 reports the reason, and the batch writes nothing.
+    const again = redirect.replace('workerd-redirect-parked.example', 'workerd-redirect-again')
+    const redirected = await live()
+    await expect(
+      executePublicationPlan(db, buildPublicationPlan(parseManifest(again), again, NOW, redirected))
+    ).rejects.toThrow(/the slug already redirects, or this would make a chain or a loop/u)
+    expect(await live()).toEqual(redirected)
 
     // A listing whose website moved: the guard's malformed JSON rolls the whole batch back.
     const after = await live()
