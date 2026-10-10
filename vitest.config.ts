@@ -21,6 +21,7 @@ export const D1_TESTS = [
   'scripts/listing-domain-check.test.ts',
   'scripts/media-health.test.ts',
   'scripts/media-upload.test.ts',
+  'scripts/other-categories-manifest.test.ts',
   'scripts/r2-objects.test.ts',
   'scripts/release-promote.test.ts',
   'scripts/staging-verification.test.ts'

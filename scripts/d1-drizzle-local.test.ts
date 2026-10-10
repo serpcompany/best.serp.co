@@ -165,7 +165,9 @@ describe('fresh Drizzle D1 history', () => {
       '0008_listing_claims.sql',
       '0009_billing_orders.sql',
       '0010_drop_retired_submission_data.sql',
-      '0011_retired_categories.sql'
+      '0011_retired_categories.sql',
+      '0012_taxonomy.sql',
+      '0013_taxonomy_triggers.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.
@@ -517,6 +519,143 @@ describe('fresh Drizzle D1 history', () => {
       { count: 1 }
     )
     expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    database.close()
+  })
+
+  it('adds the #341 taxonomy to a populated database without rebuilding the intake tables', () => {
+    // The intake tables only gain `tag_slugs`: rebuilding `listing_submissions` or
+    // `listing_revisions` under enforced foreign keys would cascade-delete their children.
+    const database = new DatabaseSync(':memory:')
+    const names = freshMigrationNames()
+    const taxonomy = names.indexOf('0012_taxonomy.sql')
+    expect(taxonomy).toBeGreaterThan(0)
+    for (const migration of names.slice(0, taxonomy)) {
+      database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
+    }
+    database.exec(`
+      INSERT INTO categories (slug, name) VALUES ('tools', 'Tools'), ('retired', 'Retired');
+      INSERT INTO listings (id, slug, name, description, website, source_kind, source_identity,
+        checksum)
+      VALUES ('lst_live', 'live.example', 'Live', 'd', 'https://live.example/', 'fixture', 'live',
+        'c');
+      INSERT INTO listing_categories VALUES ('lst_live', 1, 0, 1);
+      UPDATE listings SET status = 'approved', published_at = '2026-05-16';
+      UPDATE categories SET is_active = 0 WHERE slug = 'retired';
+      INSERT INTO users (id, name, email, email_verified)
+        VALUES ('user_owner', 'Owner', 'owner@example.com', 1);
+      INSERT INTO listing_submissions (id, slug, name, description, website, content,
+        category_slug, logo_url, status, plan, owner_user_id, listing_id)
+      VALUES ('sub', 'live.example', 'Live', 'd', 'https://live.example/', 'c', 'tools',
+        'https://live.example/logo.png', 'approved', 'free', 'user_owner', 'lst_live');
+      INSERT INTO listing_submission_faqs (submission_id, question, answer) VALUES ('sub', 'Q', 'A');
+      INSERT INTO listing_submission_resource_links (submission_id, label, url)
+        VALUES ('sub', 'Docs', 'https://live.example/docs');
+      INSERT INTO listing_submission_events (submission_id, event_type, actor)
+        VALUES ('sub', 'approved', 'reviewer');
+      INSERT INTO listing_revisions (id, listing_id, author_user_id, base_checksum, name,
+        description, category_slug, logo_url)
+      VALUES ('rev', 'lst_live', 'user_owner', 'c', 'Live', 'd2', 'tools',
+        'https://live.example/logo.png');
+      INSERT INTO listing_revision_faqs (revision_id, question, answer) VALUES ('rev', 'Q', 'A');
+      INSERT INTO listing_revision_events (revision_id, event_type, actor)
+        VALUES ('rev', 'created', 'user_owner');
+      INSERT INTO media_ingestions (submission_id, kind, source_url, next_attempt_at)
+        VALUES ('sub', 'logo', 'https://live.example/logo.png', '2026-10-06T00:00:00.000Z');
+      INSERT INTO media_ingestions (revision_id, kind, source_url, next_attempt_at)
+        VALUES ('rev', 'logo', 'https://live.example/logo.png', '2026-10-06T00:00:00.000Z');
+      INSERT INTO orders (id, number, user_id, kind, purpose, target_key, submission_id,
+        amount_cents, currency, provider, created_at, updated_at)
+      VALUES ('ord', 1001, 'user_owner', 'paid_listing', 'submission', 'submission:sub', 'sub',
+        4900, 'usd', 'stripe', '2026-10-06T00:00:00.000Z', '2026-10-06T00:00:00.000Z');
+    `)
+    expect(database.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 })
+    const children = () =>
+      Object.fromEntries(
+        [
+          'listing_submissions',
+          'listing_submission_faqs',
+          'listing_submission_resource_links',
+          'listing_submission_events',
+          'listing_revisions',
+          'listing_revision_faqs',
+          'listing_revision_events',
+          'media_ingestions',
+          'orders'
+        ].map(table => [
+          table,
+          Number(database.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get()?.count)
+        ])
+      )
+    const before = children()
+    for (const migration of names.slice(taxonomy)) {
+      database.exec('BEGIN')
+      database.exec(readFileSync(resolve(freshMigrationsDirectory, String(migration)), 'utf8'))
+      database.exec('COMMIT')
+    }
+    expect(children()).toEqual(before)
+    expect(database.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect(
+      database
+        .prepare(
+          'SELECT tag_slugs FROM listing_submissions UNION ALL SELECT tag_slugs FROM listing_revisions'
+        )
+        .all()
+    ).toEqual([{ tag_slugs: null }, { tag_slugs: null }])
+    const objects = (type: string) =>
+      database
+        .prepare('SELECT name FROM sqlite_master WHERE type = ? ORDER BY name')
+        .all(type)
+        .map(row => row.name)
+    // Nothing was rebuilt: the intake tables keep their trigger and indexes.
+    expect(objects('trigger')).toContain('listing_submissions_refuse_blocked_url')
+    expect(objects('index')).toEqual(
+      expect.arrayContaining([
+        'listing_submissions_active_slug_idx',
+        'listing_revisions_open_idx',
+        'tags_category_idx',
+        'best_page_listings_position_idx',
+        'taxonomy_redirects_target_best_page_idx'
+      ])
+    )
+    for (const table of [
+      'tags',
+      'listing_tags',
+      'best_pages',
+      'best_page_listings',
+      'taxonomy_redirects'
+    ]) {
+      expect(
+        String(database.prepare('SELECT sql FROM sqlite_master WHERE name = ?').get(table)?.sql),
+        table
+      ).toMatch(/\) STRICT$/u)
+    }
+    // The new tables take rows on the populated catalog, and its retired category refuses a tag.
+    database.exec(`
+      INSERT INTO tags (slug, name, category_id) VALUES ('widgets', 'Widgets', 1);
+      INSERT INTO listing_tags (listing_id, tag_id) VALUES ('lst_live', 1);
+      INSERT INTO best_pages (slug, keyword, title, heading, intro, tag_id)
+        VALUES ('widget', 'widget', 'Best Widgets', 'Best Widgets', 'Intro', 1);
+      INSERT INTO best_page_listings (best_page_id, listing_id, position) VALUES (1, 'lst_live', 1);
+      INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, target_tag_id,
+        manifest_id) VALUES ('category', 'old-widgets', 'tag', 1, 'manifest');
+      UPDATE listing_submissions SET tag_slugs = '["widgets"]';
+    `)
+    expect(() =>
+      database.exec("INSERT INTO tags (slug, name, category_id) VALUES ('gone', 'Gone', 2)")
+    ).toThrow(/a tag must not be filed under a retired category/u)
+    // Deleting a submission or a listing still cascades to its children.
+    database.exec("DELETE FROM orders WHERE id = 'ord'")
+    database.exec("DELETE FROM listing_submissions WHERE id = 'sub'")
+    expect(database.prepare('SELECT COUNT(*) AS count FROM listing_submission_faqs').get()).toEqual(
+      { count: 0 }
+    )
+    database.exec("UPDATE listings SET is_active = 0 WHERE id = 'lst_live'")
+    database.exec("DELETE FROM listings WHERE id = 'lst_live'")
+    for (const table of ['listing_tags', 'best_page_listings', 'listing_revisions']) {
+      expect(database.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get(), table).toEqual({
+        count: 0
+      })
+    }
     database.close()
   })
 

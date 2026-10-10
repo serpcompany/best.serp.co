@@ -20,7 +20,12 @@ export const d1TriggerNames = [
   // #260: a published listing is never filed under a retired category.
   'listings_refuse_retired_category_on_publication',
   'listing_categories_refuse_retired_category',
-  'categories_refuse_retiring_with_published_listings'
+  'categories_refuse_retiring_with_published_listings',
+  // #341: an active tag sits under an active hub, and no listing is newly tagged with a retired tag.
+  'listing_tags_refuse_retired_tag',
+  'tags_refuse_retired_category',
+  'tags_refuse_retired_category_on_update',
+  'categories_refuse_retiring_with_active_tags'
 ] as const
 
 export const requiredIndexNames = [
@@ -29,6 +34,17 @@ export const requiredIndexNames = [
   'listing_categories_category_idx',
   'listing_categories_listing_order_idx',
   'listing_categories_one_primary_idx',
+  'tags_slug_unique',
+  'tags_category_idx',
+  'listing_tags_tag_idx',
+  'best_pages_slug_unique',
+  'best_pages_tag_idx',
+  'best_pages_category_idx',
+  'best_page_listings_position_idx',
+  'best_page_listings_listing_idx',
+  'taxonomy_redirects_target_category_idx',
+  'taxonomy_redirects_target_tag_idx',
+  'taxonomy_redirects_target_best_page_idx',
   'listing_faqs_listing_order_unique',
   'listing_media_listing_kind_order_unique',
   'listing_resource_links_listing_order_unique',

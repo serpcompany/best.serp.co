@@ -22,6 +22,7 @@ import {
   seedFacts,
   seedFillerListings,
   seedListings,
+  seedTags,
   seedUsers
 } from '../apps/web/e2e/seed-facts'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
@@ -143,10 +144,14 @@ describe('fixture seed (#312)', () => {
       database
         .prepare('UPDATE listings SET is_active=0 WHERE slug=?')
         .run(seedListings.claimable.slug)
+      database.prepare('UPDATE tags SET is_active=0 WHERE slug=?').run(seedTags.empty.slug)
       expect(seedFactViolations(queryOf(database), { marker: true, media: false })).toEqual(
         expect.arrayContaining([
           `published listings: expected ${seedFacts.listingCount}, found ${seedFacts.listingCount - 1}`,
-          `${seedListings.claimable.slug} state: expected "published", found "unpublished"`
+          `${seedListings.claimable.slug} state: expected "published", found "unpublished"`,
+          // Fixture Canvas carries two tags.
+          `${seedTags.whiteboards.slug} published listings: expected 2, found 1`,
+          expect.stringMatching(/^active tags: /u)
         ])
       )
       // Without hosted media, the media facts fail.
